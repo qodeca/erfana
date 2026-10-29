@@ -47819,23 +47819,21 @@
       "id": "user-guide-reference-windows-differences/t01",
       "audience": "user",
       "doc": "docs/user-guide/reference/windows-differences.md",
-      "quote": "Local transcription on Windows needs the Microsoft Visual C++ 2015–2022 Redistributable (x64)",
+      "quote": "its package holds only `whisper.exe` and the DLLs that whisper.cpp builds",
       "status": "fixed",
       "evidence": "source",
-      "source": ".github/workflows/whisper-binaries.yml:346",
-      "match": "cmake -A x64",
-      "note": "Added for reader gap #398. The Windows engine is configured with no static-runtime option (CMake MSVC default is the dynamic /MD runtime) and, unlike the macOS job, without GGML_OPENMP=OFF – so whisper.exe imports MSVCP140/VCRUNTIME140/VCOMP140 (inferred from build config; not run on a runtime-free machine)."
+      "source": ".github/workflows/whisper-binaries.yml:377",
+      "match": "Get-ChildItem build\\bin\\Release -Filter *.dll | Copy-Item -Destination staging\\",
+      "note": "Reworded for #398 to what the build proves: the Windows engine package stages only whisper.exe and the DLLs whisper.cpp builds, so no VC++ runtime is bundled. That the runtime is needed is now stated as a cause reported in #398, not as a code fact."
     },
     {
       "id": "user-guide-reference-windows-differences/t02",
       "audience": "user",
       "doc": "docs/user-guide/reference/windows-differences.md",
       "quote": "Erfana does not install it, but most Windows PCs already have it",
-      "status": "fixed",
+      "status": "removed",
       "evidence": "source",
-      "source": ".github/workflows/whisper-binaries.yml:377",
-      "match": "Get-ChildItem build\\bin\\Release -Filter *.dll | Copy-Item -Destination staging\\",
-      "note": "Added for #398. The engine package stages only whisper.exe and the DLLs whisper.cpp builds; no VC++ runtime DLLs are bundled. 'Most PCs already have it' is general Windows background, not a code claim."
+      "note": "Removed: \"most Windows PCs already have it\" is general Windows background that no source line proves."
     },
     {
       "id": "user-guide-reference-windows-differences/t03",
@@ -47853,11 +47851,9 @@
       "audience": "user",
       "doc": "docs/user-guide/reference/windows-differences.md",
       "quote": "with no further hint",
-      "status": "fixed",
+      "status": "removed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Transcription/TranscriptionDialog.tsx:69",
-      "match": "default:",
-      "note": "Added for #398. getErrorSuggestion has no case for WHISPER_PROCESS_FAILED, so no suggestion line is shown."
+      "note": "Removed with the #398 rewording: the sentence now names the error text only."
     },
     {
       "id": "user-guide-reference-windows-differences/t05",

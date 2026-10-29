@@ -53,3 +53,5 @@ To prove a how-to page still works, its steps run in the real app as Playwright 
 npx electron-vite build
 npx playwright test --project=guide
 ```
+
+The agent tasks (`run-an-agent` and `first-ten-minutes`) run the real Claude Code and fail without a login. Set `ERFANA_GUIDE_CLAUDE_TOKEN_FILE` to a file that holds a Claude Code token, such as the capture runbook's `.local/capture/claude-token`. The token is read inside the terminal and never shown.
