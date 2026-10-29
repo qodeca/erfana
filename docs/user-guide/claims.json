@@ -6520,8 +6520,8 @@
       "quote": "0 ok · 1 scene failed · 2 not macOS · 3 no agent login · 4 unsafe sandbox path",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/capture/run.mjs:48",
-      "match": "export const EXIT = { OK: 0, SCENE: 1, NOT_MACOS: 2, NO_LOGIN: 3, UNSAFE_SANDBOX: 4, PRIVACY: 5, BUDGET: 6, DRIFT: 7 }"
+      "source": "scripts/capture/run.mjs:43",
+      "match": "export const EXIT = { OK: 0, SCENE: 1, NOT_MACOS: 2, NO_LOGIN: 3, UNSAFE_SANDBOX: 4, PRIVACY: 5, BUDGET: 6, DRIFT: 7, VIDEO_PREREQUISITE: 8 }"
     },
     {
       "id": "docs-features-138-user-guide/05",
@@ -6570,7 +6570,7 @@
       "quote": "`ERFANA_CAPTURE_CLAUDE_TOKEN_FILE` (a path the sandbox `.zshrc` reads)",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/capture/run.mjs:113",
+      "source": "scripts/capture/run.mjs:146",
       "match": "ERFANA_CAPTURE_CLAUDE_TOKEN_FILE names a file that cannot be read"
     },
     {
@@ -8127,7 +8127,7 @@
       "quote": "`--only <id,…>` (iterate on some shots; each id is a row id or a scenario id",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/capture/run.mjs:71",
+      "source": "scripts/capture/run.mjs:77",
       "match": "else if (a === '--only') {"
     },
     {
@@ -8229,7 +8229,7 @@
       "quote": "Chromium switches `--force-device-scale-factor=2`, `--force-color-profile=srgb`",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/capture/lib/app.ts:111",
+      "source": "scripts/capture/lib/app.ts:130",
       "match": "args.push('--force-color-profile=srgb', '--force-prefers-reduced-motion'"
     },
     {
@@ -33913,8 +33913,8 @@
       "quote": "on macOS with a real Claude Code login",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/capture/run.mjs:190",
-      "match": "docs:screenshots runs on macOS only."
+      "source": "scripts/capture/run.mjs:377",
+      "match": "docs:screenshots runs on macOS only;"
     },
     {
       "id": "user-guide-maintaining-this-guide/04",
@@ -33923,7 +33923,7 @@
       "quote": "with a real Claude Code login. A full `npm run docs:screenshots`",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/capture/run.mjs:124",
+      "source": "scripts/capture/run.mjs:157",
       "match": "No Claude Code login for the capture sandbox"
     },
     {
@@ -33941,7 +33941,7 @@
       "id": "user-guide-maintaining-this-guide/06",
       "audience": "user",
       "doc": "docs/user-guide/maintaining-this-guide.md",
-      "quote": "regenerates all 52 guide images plus the four README demo outputs",
+      "quote": "regenerates all 52 guide images plus a draft of the README video",
       "status": "verified",
       "evidence": "source",
       "source": "scripts/capture/manifest.test.mjs:76",
@@ -33975,7 +33975,7 @@
       "quote": "Inspect every image and the capture report before committing.",
       "status": "fixed",
       "evidence": "source",
-      "source": "scripts/capture/run.mjs:454",
+      "source": "scripts/capture/run.mjs:538",
       "match": "const out = [`capture report${partial ? ' (partial run)' : ''}`]",
       "note": "Said 'privacy report'; the run writes one capture report (report.txt); privacy hits stop the run rather than producing a separate report."
     },
@@ -33986,7 +33986,7 @@
       "quote": "npm run docs:screenshots -- --check",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/capture/run.mjs:68",
+      "source": "scripts/capture/run.mjs:73",
       "match": "if (a === '--check') opts.check = true"
     },
     {
@@ -34016,7 +34016,7 @@
       "quote": "compares the manifest, files and guide image links, and checks the size budget, without launching the app",
       "status": "fixed",
       "evidence": "source",
-      "source": "scripts/capture/run.mjs:57",
+      "source": "scripts/capture/run.mjs:60",
       "match": "--check        No capture: manifest rows, files, the design's list and the",
       "note": "Omitted that --check also enforces the size budget (run.mjs:58) and that the links compared are the guide's image links."
     },
@@ -34069,7 +34069,7 @@
       "quote": "and checks the size budget, without launching the app",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/capture/manifest.mjs:219",
+      "source": "scripts/capture/manifest.mjs:221",
       "match": "image links agree. No app launch, no network."
     },
     {
@@ -54669,6 +54669,46 @@
       "source": "src/main/services/WindowsTerminalBootstrap.ts:284",
       "match": "export class CmdExeBootstrapBuilder implements WindowsBootstrapBuilder",
       "note": "Still open: only PowerShell, Git Bash and cmd.exe builders exist"
+    },
+    {
+      "id": "scripts-capture-README-video/01",
+      "audience": "developer",
+      "doc": "scripts/capture/README.md",
+      "quote": "| import | Import a file: PDF to Markdown |",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1565",
+      "match": "aria-label={isImporting ? 'Importing file...' : 'Import a file'}"
+    },
+    {
+      "id": "scripts-capture-README-video/02",
+      "audience": "developer",
+      "doc": "scripts/capture/README.md",
+      "quote": "| comment | Comment mode: pin a note |",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:416",
+      "match": "mode: 'Comment mode',"
+    },
+    {
+      "id": "scripts-capture-README-video/03",
+      "audience": "developer",
+      "doc": "scripts/capture/README.md",
+      "quote": "| export | Export to PDF |",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:337",
+      "match": "'Export to PDF'"
+    },
+    {
+      "id": "scripts-capture-README-video/04",
+      "audience": "developer",
+      "doc": "scripts/capture/README.md",
+      "quote": "| screenshot | Capture window for the agent |",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:844",
+      "match": "'Capture window screenshot'"
     }
   ],
   "reviewed": {

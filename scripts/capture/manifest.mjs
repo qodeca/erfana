@@ -31,7 +31,8 @@ export const GUIDE_TOTAL_BYTES = 12 * 1024 * 1024
 /** The design's screenshot list, which the manifest must agree with. */
 export const DESIGN_FILE = 'docs/designs/user-guide/README.md'
 
-const MAX_KB_CEILING = 5120
+/** Per-file ceilings: a still, and the README video loop (spec 023, 023-NFR-002: 30 MB). */
+const MAX_KB_CEILING = { still: 5120, loop: 30720 }
 const ID_PART = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const MAX_MANIFEST_BYTES = 256 * 1024
 const MAX_PAGE_BYTES = 2 * 1024 * 1024
@@ -110,8 +111,9 @@ export function validateManifest(data) {
     }
     if (typeof row.agent !== 'boolean') problems.push(`${where}: agent must be true or false`)
     if (typeof row.native !== 'boolean') problems.push(`${where}: native must be true or false`)
-    if (!Number.isFinite(row.maxKB) || row.maxKB <= 0 || row.maxKB > MAX_KB_CEILING) {
-      problems.push(`${where}: maxKB must be a number from 1 to ${MAX_KB_CEILING}`)
+    const ceiling = MAX_KB_CEILING[row.kind] ?? MAX_KB_CEILING.still
+    if (!Number.isFinite(row.maxKB) || row.maxKB <= 0 || row.maxKB > ceiling) {
+      problems.push(`${where}: maxKB must be a number from 1 to ${ceiling}`)
     }
     return row
   })
