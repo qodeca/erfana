@@ -670,6 +670,10 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
       await expect(chrome.window()).toHaveAttribute('data-view', 'new', { timeout: PREVIEW_BUDGET_MS })
       await chrome.saveNewComment(`Layout-P7 ${id}`, RAW)
       await waitForCommentLoad(app, RAW, 'page', n + 1)
+      // #426: the save reloads the page. The served load lands before the new page's
+      // overlay is up in comment mode, so a click sent at once can hit a page that
+      // ignores it. Wait for main's mode, the page's hello and the overlay again.
+      await chrome.modeOn(app, panelId, target)
     }
     const text = await fsp.readFile(path.join(testProject.path, RAW), 'utf-8')
     expect(text.split('erfana:comment v1').length - 1).toBe(commented.length)
