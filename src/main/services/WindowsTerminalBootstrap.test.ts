@@ -501,7 +501,12 @@ describe.skipIf(spawnSync('pwsh', ['-NoProfile', '-Command', '1'], { timeout: 15
           cwd: dir,
           marker: MARKER
         })
-        const run = spawnSync('pwsh', args, { input: '', encoding: 'utf8', timeout: 15000 })
+        // Captured output uses [Console]::OutputEncoding, which on a Windows host
+        // is the OEM code page (for example ibm437) and turns U+2019 into "'".
+        // Ask for UTF-8 first, so the check reads the path the script really used.
+        const script = args[args.length - 1] as string
+        const utf8Args = [...args.slice(0, -1), `[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); ${script}`]
+        const run = spawnSync('pwsh', utf8Args, { input: '', encoding: 'utf8', timeout: 15000 })
         expect(run.stdout).toContain(dir)
         expect(run.stdout).toContain(MARKER)
       } finally {
