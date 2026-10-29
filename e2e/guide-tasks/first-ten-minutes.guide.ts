@@ -7,14 +7,16 @@
  * Every control is found by the label the page gives the reader. The native
  * folder picker is stubbed. App time per step is measured and printed.
  *
- * Limits, stated rather than hidden:
- * - The real `claude` CLI is started in the terminal, but inside the isolated
- *   sandbox home it is not logged in, so it cannot take a turn. The spec proves
- *   the CLI starts, then stops it.
- * - "Ask the agent to make a small change" is therefore done by a STAND-IN: a
- *   plain shell command typed into the same terminal that appends a line to the
- *   file. It is not the agent; it proves the terminal-to-file-to-preview path
- *   that step 3 asks the reader to review.
+ * Real agent: set ERFANA_GUIDE_CLAUDE_TOKEN_FILE to a file holding a Claude
+ * Code token (as in run-an-agent.guide.ts). The sandbox home and project get
+ * the capture sandbox's Claude Code settings, the token is read from the file
+ * inside the command (never shown), and the agent makes the small change.
+ *
+ * Without it, stated rather than hidden: the real `claude` CLI starts but is
+ * not logged in inside the isolated home, so the spec stops it, and "Ask the
+ * agent to make a small change" is done by a STAND-IN – a plain shell command
+ * in the same terminal. It is not the agent; it proves the
+ * terminal-to-file-to-preview path that step 3 asks the reader to review.
  */
 import * as fs from 'fs'
 import * as path from 'path'
@@ -25,6 +27,8 @@ import { TerminalPage } from '../pages/terminal.page'
 const FILE_NAME = 'garden-notes.md'
 const SEED = '# Garden notes\n\nPlant the tomatoes in May.\n'
 const ADDED_LINE = 'Water the beans every evening.'
+const TOKEN_FILE = process.env.ERFANA_GUIDE_CLAUDE_TOKEN_FILE
+const REAL_AGENT = Boolean(TOKEN_FILE && fs.existsSync(TOKEN_FILE))
 
 test.use({ testProjectFiles: { [FILE_NAME]: SEED } })
 
@@ -32,9 +36,22 @@ test.describe('Guide: Start with Erfana (first ten minutes)', () => {
   test('first launch to a first agent run, by the page alone', async ({
     app,
     window,
-    testProject
+    testProject,
+    homeDir
   }) => {
-    test.setTimeout(120_000)
+    test.setTimeout(REAL_AGENT ? 360_000 : 120_000)
+    test.info().annotations.push({ type: 'agent', description: REAL_AGENT ? 'real Claude Code' : 'shell stand-in (no token file)' })
+    if (REAL_AGENT) {
+      // Harness setup, not a page step: what a user's own Claude Code install
+      // already has (onboarding done, the project trusted, edits accepted).
+      const projects: Record<string, object> = {}
+      for (const p of new Set([testProject.path, fs.realpathSync(testProject.path)])) {
+        projects[p] = { hasTrustDialogAccepted: true, hasCompletedProjectOnboarding: true }
+      }
+      fs.writeFileSync(path.join(homeDir, '.claude.json'), JSON.stringify({ theme: 'dark', hasCompletedOnboarding: true, projects }))
+      fs.mkdirSync(path.join(testProject.path, '.claude'), { recursive: true })
+      fs.writeFileSync(path.join(testProject.path, '.claude', 'settings.json'), JSON.stringify({ permissions: { defaultMode: 'acceptEdits' } }))
+    }
     const timings: Array<[string, number]> = []
     let mark = Date.now()
     const lap = (label: string): void => {
@@ -81,9 +98,10 @@ test.describe('Guide: Start with Erfana (first ten minutes)', () => {
       await terminalButton.click()
       await expect(terminal.getTerminal()).toBeVisible({ timeout: 15_000 })
       await terminal.waitForPrompt()
-      // The real installed CLI agent. In the isolated sandbox home it is not
-      // logged in, so it shows its first-run screen rather than a prompt box.
-      await terminal.sendCommand('claude')
+      // The real installed CLI agent. Without a token file it is not logged in
+      // inside the isolated home, so it shows its login screen instead.
+      // The login prefix is harness, not a page step; the token stays in the file.
+      await terminal.sendCommand(REAL_AGENT ? 'CLAUDE_CODE_OAUTH_TOKEN="$(cat "$ERFANA_GUIDE_CLAUDE_TOKEN_FILE")" claude' : 'claude')
       await expect
         .poll(async () => (await terminal.readScreen()).lines.join('\n'), {
           message: 'the real claude CLI should start and draw its screen',
@@ -91,6 +109,11 @@ test.describe('Guide: Start with Erfana (first ten minutes)', () => {
         })
         .toMatch(/Claude Code|Welcome to Claude|theme|Log in|login/i)
       console.log('[guide] claude screen:\n' + (await terminal.readScreen()).lines.filter((l) => l.trim()).join('\n'))
+      if (REAL_AGENT) {
+        await terminal.waitForOutput('accept edits on', { timeout: 60_000 })
+        lap('open terminal, start agent')
+        return
+      }
       // Not logged in here: stop the CLI and return to the shell.
       // Proof of being back at the shell: only a shell expands $((40+2)).
       await expect(async () => {
@@ -103,7 +126,15 @@ test.describe('Guide: Start with Erfana (first ten minutes)', () => {
       lap('open terminal, start agent')
     })
 
-    await test.step('2. Ask the agent to make a small change to a file in this project.', async () => {
+    await test.step(`2. Ask the agent to make a small change to a file in this project.${REAL_AGENT ? '' : ' (STAND-IN: shell edit)'}`, async () => {
+      if (REAL_AGENT) {
+        await terminal.getTerminal().click()
+        await window.keyboard.type(`In ${FILE_NAME}, add the line "${ADDED_LINE}" at the end. Change nothing else.`)
+        await window.keyboard.press('Enter')
+        await expect.poll(() => fs.readFileSync(filePath, 'utf-8'), { timeout: 240_000, intervals: [500, 1000, 2000] }).toContain(ADDED_LINE)
+        lap('agent change')
+        return
+      }
       // STAND-IN, not the agent: the shell in the same terminal edits the file.
       await terminal.sendCommand(`printf '\\n${ADDED_LINE}\\n' >> ${FILE_NAME}`)
       await expect.poll(() => fs.readFileSync(filePath, 'utf-8')).toContain(ADDED_LINE)
@@ -111,7 +142,9 @@ test.describe('Guide: Start with Erfana (first ten minutes)', () => {
     })
 
     await test.step('3. Review the changed source and preview. … external file changes reload in the open tab.', async () => {
-      await expect(window.getByText(ADDED_LINE, { exact: true })).toBeVisible({ timeout: 15_000 })
+      // Contains, not exact: an agent may append the line to the last paragraph,
+      // and Markdown then renders both lines as one paragraph.
+      await expect(window.getByText(ADDED_LINE).first()).toBeVisible({ timeout: 15_000 })
       await expect(window.locator('.monaco-editor').first()).toContainText(ADDED_LINE)
       lap('review reload')
     })
