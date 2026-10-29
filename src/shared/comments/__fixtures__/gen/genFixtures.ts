@@ -32,7 +32,7 @@ import {
   planInsert,
   serializeBlock,
   type CommentData
-} from '../../index'
+} from '../../../htmlComments/index'
 import { ADA, GRACE, VIEW, fixedId, makeComment, makeReply, projectState } from '../commentTestData'
 import { GOLDEN_CASES } from '../v1/cases'
 import { buildAgentReview } from './agentReview'
@@ -41,7 +41,7 @@ import { printRubricFacts } from './rubricFacts'
 
 // Repository-relative, resolved against the working directory (npm runs a
 // script from the repository root).
-const FIXTURES_DIR = 'src/shared/htmlComments/__fixtures__'
+const FIXTURES_DIR = 'src/shared/comments/__fixtures__'
 const AGENT_REVIEW_DIR = 'e2e/fixtures/html-preview-corpus/comments/agent-review'
 const USAGE = 'usage: npm run fixtures:html-comments [-- --examples <dir>]'
 

@@ -24,7 +24,7 @@ import { z } from 'zod'
 import { ErrorCode } from '../errors'
 import { PREVIEW_LIMITS } from '../preview-limits'
 import { MESSAGE_ID_PATTERN, visibleInline } from '../htmlComments'
-import { TAG_MAX_CHARS } from '../htmlComments/format'
+import { TAG_MAX_CHARS } from '../comments/format'
 import {
   CommentKeySchema as KeySchema,
   CommentPickerSaySchema as PickerSaySchema,

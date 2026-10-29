@@ -142,7 +142,7 @@ export default defineConfig({
         // measured when this entry landed (2026-10-26); never raise one above
         // what the Coverage job measures.
         // measured 100/100/100/100
-        'src/shared/htmlComments/format.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/format.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/shared/htmlComments/parse.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
@@ -151,15 +151,15 @@ export default defineConfig({
         'src/shared/htmlComments/anchor.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // The re-attach tables and quote readers split out of anchor.ts
         // (measured 100/100/100/100 on 2026-10-26, Windows).
-        'src/shared/htmlComments/anchorLookup.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
-        'src/shared/htmlComments/quoteText.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/anchorLookup.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/quoteText.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // The position-corroboration rule split out of anchor.ts (§19 Rev 4,
         // measured 100/100/100/100 on 2026-10-26, Windows).
-        'src/shared/htmlComments/anchorEvidence.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/anchorEvidence.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
-        'src/shared/htmlComments/conflictMarkers.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/conflictMarkers.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
-        'src/shared/htmlComments/encoding.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/encoding.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/shared/htmlComments/instrument.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
@@ -167,7 +167,7 @@ export default defineConfig({
         // measured 100/100/100/100
         'src/shared/htmlComments/frameworkMarkers.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
-        'src/shared/htmlComments/thread.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/thread.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // HTML Preview comments – the writer (design § 7.6, § 12.5: at least
         // 92/92/88/92). The only page-driven write into the user's files: path
         // confinement, link refusal, the re-read/re-hash compare-and-swap and the
@@ -279,7 +279,7 @@ export default defineConfig({
         // measured 100/100/98.24/98.71
         'src/main/services/preview/comments/commentWriteCore.ts': { lines: 98, functions: 98, branches: 96, statements: 96 },
         // measured 100/100/100/100
-        'src/shared/htmlComments/identity.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/identity.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/main/services/preview/PreviewRequestKindLedger.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 93.9/100/94.73/93.9

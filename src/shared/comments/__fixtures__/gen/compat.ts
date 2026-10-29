@@ -15,7 +15,7 @@ import {
   planInsert,
   serializeBlock,
   type CommentData
-} from '../../index'
+} from '../../../htmlComments/index'
 import { ADA, GRACE, fixedId, makeComment, makeReply } from '../commentTestData'
 
 /**

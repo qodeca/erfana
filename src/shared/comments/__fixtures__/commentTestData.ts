@@ -10,10 +10,10 @@
  * turn them into something else in this source.
  */
 import { parse, type DefaultTreeAdapterMap } from 'parse5'
-import { analyzeCommentDocument, type CommentDocument } from '../parse'
-import { applySplice, planInsert, type SplicePlan } from '../splice'
+import { analyzeCommentDocument, type CommentDocument } from '../../htmlComments/parse'
+import { applySplice, planInsert, type SplicePlan } from '../../htmlComments/splice'
 import type { CommentAnchor, CommentAuthor, CommentData, CommentView, RandomBytes } from '../format'
-import type { HtmlIndex, IndexedElement } from '../htmlIndex'
+import type { HtmlIndex, IndexedElement } from '../../htmlComments/htmlIndex'
 
 type ChildNode = DefaultTreeAdapterMap['childNode']
 

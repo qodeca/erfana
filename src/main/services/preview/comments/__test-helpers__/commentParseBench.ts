@@ -17,7 +17,7 @@ import { join } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { Worker } from 'node:worker_threads'
 import { encodeText, serializeBlock, type CommentAnchor } from '../../../../../shared/htmlComments'
-import { BUTTON_ANCHOR, fixedId, makeComment } from '../../../../../shared/htmlComments/__fixtures__/commentTestData'
+import { BUTTON_ANCHOR, fixedId, makeComment } from '../../../../../shared/comments/__fixtures__/commentTestData'
 import { CommentParseClient, WORKER_HEAP_MB } from '../CommentParseWorkerAdapter'
 import { COMMENT_PARSE_WORKER_ROLE } from '../commentParseProtocol'
 

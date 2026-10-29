@@ -18,7 +18,7 @@ import { projectState } from './__fixtures__/commentTestData'
 import { GOLDEN_CASES } from './__fixtures__/v1/cases'
 import { encodeText } from './encoding'
 import { AGENT_NOTE_LINES, renderAgentNote, serializeBlock } from './format'
-import { analyzeCommentDocument, parseCommentFile } from './parse'
+import { analyzeCommentDocument, parseCommentFile } from '../htmlComments/parse'
 
 const FIXTURES = join(__dirname, '__fixtures__')
 const LOCKED_FOLDERS = ['v1', 'v1-compat'] as const

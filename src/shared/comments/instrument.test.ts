@@ -9,14 +9,14 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { PREVIEW_LIMITS } from '../preview-limits'
 import { BOM, fixedId, seededRandom } from './__fixtures__/commentTestData'
-import { attributeOf, indexHtml } from './htmlIndex'
+import { attributeOf, indexHtml } from '../htmlComments/htmlIndex'
 import {
   ELEMENT_TOKEN_ATTRIBUTE,
   ELEMENT_TOKEN_PATTERN,
   instrumentHtml,
   mintElementToken,
   type InstrumentedHtml
-} from './instrument'
+} from '../htmlComments/instrument'
 
 const CONTEXTS = join(__dirname, '__fixtures__', 'contexts')
 const fixture = (name: string): string => readFileSync(join(CONTEXTS, name), 'utf8')

@@ -16,7 +16,7 @@ import { PREVIEW_COMMENTS_ARGUMENT } from '../../main/services/preview/previewSe
 import { PREVIEW_LIMITS } from '../../shared/preview-limits'
 import { PreviewCommentPageChannels } from '../../shared/ipc/preview-comment-channels'
 import { CommentPickSchema } from '../../shared/ipc/preview-comment-schema'
-import { TAG_MAX_CHARS as SHARED_TAG_MAX_CHARS } from '../../shared/htmlComments/format'
+import { TAG_MAX_CHARS as SHARED_TAG_MAX_CHARS } from '../../shared/comments/format'
 import {
   BLOCK_HEADER as SHARED_BLOCK_HEADER,
   ELEMENT_TOKEN_ATTRIBUTE,

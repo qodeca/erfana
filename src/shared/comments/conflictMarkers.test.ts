@@ -15,8 +15,8 @@ import {
   markerAtLineStart
 } from './conflictMarkers'
 import { serializeBlock, type CommentData } from './format'
-import { analyzeCommentDocument, parseCommentBlocks, type DamageReason } from './parse'
-import { planDelete, planInsert } from './splice'
+import { analyzeCommentDocument, parseCommentBlocks, type DamageReason } from '../htmlComments/parse'
+import { planDelete, planInsert } from '../htmlComments/splice'
 
 function block(data: CommentData = makeComment()): string {
   const result = serializeBlock(data, { indent: '  ', eol: '\n' })

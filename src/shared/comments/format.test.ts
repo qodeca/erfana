@@ -59,11 +59,11 @@ import {
   serializeBlock,
   type CommentData
 } from './format'
-import { parseCommentBlocks, type ParsedBlock } from './parse'
-import { prepareSnapshot } from './anchor'
+import { parseCommentBlocks, type ParsedBlock } from '../htmlComments/parse'
+import { prepareSnapshot } from '../htmlComments/anchor'
 import { addReply, createThread } from './thread'
-import { analyzeCommentDocument } from './parse'
-import { planReplace } from './splice'
+import { analyzeCommentDocument } from '../htmlComments/parse'
+import { planReplace } from '../htmlComments/splice'
 
 type ChildNode = DefaultTreeAdapterMap['childNode']
 

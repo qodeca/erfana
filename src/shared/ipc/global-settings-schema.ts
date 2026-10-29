@@ -7,7 +7,7 @@
  * @see Issue #50 - global settings service
  */
 import { z } from 'zod'
-import { hasRefusedIdentityChar } from '../htmlComments/identity'
+import { hasRefusedIdentityChar } from '../comments/identity'
 import { TranscriptionSettingsSchema } from './transcription-schema'
 import { FilesSettingsSchema } from './files-exclude-schema'
 import type { IpcAck } from './schema'

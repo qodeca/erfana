@@ -10,7 +10,7 @@
 import { describe, expect, it } from 'vitest'
 import { analyzeCommentDocument, encodeText } from '../../../../shared/htmlComments'
 import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
-import { FIXED_NOW, VIEW } from '../../../../shared/htmlComments/__fixtures__/commentTestData'
+import { FIXED_NOW, VIEW } from '../../../../shared/comments/__fixtures__/commentTestData'
 import { buttonBlock } from './__test-helpers__/commentParseBench'
 import { byId, draftFor, PAGE } from './__test-helpers__/commentWriterHarness'
 import { createInProcessCommentFileJobs, runCommentFileJob, type CommentFileJob } from './commentFileJobs'

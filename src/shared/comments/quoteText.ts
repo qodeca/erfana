@@ -14,7 +14,7 @@
  * early and its text is incomplete: the caller must discard it.
  */
 import { PREVIEW_LIMITS } from '../preview-limits'
-import type { HtmlIndex, IndexedElement } from './htmlIndex'
+import type { HtmlIndex, IndexedElement } from '../htmlComments/htmlIndex'
 
 /** Characters of context kept on each side of a quote. */
 export const QUOTE_CONTEXT_CHARS = 32

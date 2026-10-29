@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest'
 import { parseCommentFile as frozenParse } from './__fixtures__/frozen-v0.23.1/parse'
 
 const FROZEN = join(__dirname, '__fixtures__', 'frozen-v0.23.1')
-const GOLDENS = join(__dirname, '..', 'htmlComments', '__fixtures__', 'v1-compat')
+const GOLDENS = join(__dirname, '__fixtures__', 'v1-compat')
 const PINNED_PACKAGES = new Set(['parse5-v0.23.1', 'zod-v0.23.1', '@noble/hashes/sha2', '@noble/hashes/utils'])
 
 describe('frozen v0.23.1 copy', () => {

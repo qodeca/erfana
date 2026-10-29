@@ -7,7 +7,7 @@
  * comments are unavailable.
  */
 import { describe, expect, it } from 'vitest'
-import { fixedId } from '../../../../shared/htmlComments/__fixtures__/commentTestData'
+import { fixedId } from '../../../../shared/comments/__fixtures__/commentTestData'
 import { commentedPage } from './__test-helpers__/commentedPages'
 import { FakeFrame, frameFile, serveLoad, stubFrameFiles } from './__test-helpers__/commentServiceHarness'
 import { CommentFrames } from './commentFrames'

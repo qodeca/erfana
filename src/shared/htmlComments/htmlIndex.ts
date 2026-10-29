@@ -27,7 +27,7 @@
  * ever be inserted before the BOM.
  */
 import { parse, type DefaultTreeAdapterMap } from 'parse5'
-import { BOM_CHAR } from './encoding'
+import { BOM_CHAR } from '../comments/encoding'
 import { boundedTreeAdapter, parseLimitsFor, type HtmlParseLimits } from './parseBounds'
 
 type ChildNode = DefaultTreeAdapterMap['childNode']

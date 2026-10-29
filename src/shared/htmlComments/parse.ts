@@ -28,15 +28,15 @@ import { sha256 } from '@noble/hashes/sha2'
 import { bytesToHex } from '@noble/hashes/utils'
 import { PREVIEW_LIMITS } from '../preview-limits'
 import { BLOCK_HEADER, isBlockHeader, resolveBlockTarget, type TargetResolution } from './anchor'
-import { hasConflictHunk, lineHasMarkerPrefix } from './conflictMarkers'
-import { decodeLossless, encodeText, utf8Length, type DecodeFailure } from './encoding'
+import { hasConflictHunk, lineHasMarkerPrefix } from '../comments/conflictMarkers'
+import { decodeLossless, encodeText, utf8Length, type DecodeFailure } from '../comments/encoding'
 import {
   AGENT_NOTE_PREFIX,
   CommentDataSchema,
   LINE_BREAK,
   renderReadableLines,
   type CommentData
-} from './format'
+} from '../comments/format'
 import { hasMoreStartTagsThan, indexHtml, type HtmlIndex, type IndexedComment } from './htmlIndex'
 import { HtmlParseLimitError, hasAttributeFlood } from './parseBounds'
 

@@ -5,7 +5,7 @@
  * writer path is covered in `CommentWriter.test.ts`).
  */
 import { describe, expect, it } from 'vitest'
-import { GOLDEN_CASES } from '../../../../shared/htmlComments/__fixtures__/v1/cases'
+import { GOLDEN_CASES } from '../../../../shared/comments/__fixtures__/v1/cases'
 import { encodeText, isSafeCommentText, serializeBlock } from '../../../../shared/htmlComments'
 import { isSafeInsert } from './commentWriteCore'
 

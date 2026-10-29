@@ -35,9 +35,9 @@ import {
   type DefaultTreeAdapterMap
 } from 'parse5'
 import { PREVIEW_LIMITS } from '../preview-limits'
-import { pathBackupRefuses, positionCorroborated, quoteBackupRefuses } from './anchorEvidence'
-import { anchorLookupOf } from './anchorLookup'
-import { utf8Length } from './encoding'
+import { pathBackupRefuses, positionCorroborated, quoteBackupRefuses } from '../comments/anchorEvidence'
+import { anchorLookupOf } from '../comments/anchorLookup'
+import { utf8Length } from '../comments/encoding'
 import {
   ANCHOR_CLASS_MAX_CHARS,
   ANCHOR_ID_MAX_CHARS,
@@ -45,11 +45,11 @@ import {
   type CommentAnchor,
   type RuntimeAnchor,
   type TextQuote
-} from './format'
+} from '../comments/format'
 import type { HtmlIndex, IndexedElement, Parse5Element } from './htmlIndex'
-import { exactOf, prefixOf, suffixOf } from './quoteText'
+import { exactOf, prefixOf, suffixOf } from '../comments/quoteText'
 
-export { QUOTE_CONTEXT_CHARS } from './quoteText'
+export { QUOTE_CONTEXT_CHARS } from '../comments/quoteText'
 
 type ChildNode = DefaultTreeAdapterMap['childNode']
 type ParentNode = DefaultTreeAdapterMap['parentNode']

@@ -82,7 +82,7 @@ import {
   type ElementPlace
 } from './pages/html-preview.comments-ui'
 import { commentedPage, commentOn } from '../src/main/services/preview/comments/__test-helpers__/commentedPages'
-import { addTo, fixedId } from '../src/shared/htmlComments/__fixtures__/commentTestData'
+import { addTo, fixedId } from '../src/shared/comments/__fixtures__/commentTestData'
 import { manyCommentsPage } from './fixtures/html-preview-comments-pages'
 
 const CORPUS = path.join(__dirname, 'fixtures', 'html-preview-corpus', 'comments')

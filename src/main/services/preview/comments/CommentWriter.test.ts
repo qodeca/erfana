@@ -20,7 +20,7 @@ import {
   RLO,
   seededRandom,
   unit
-} from '../../../../shared/htmlComments/__fixtures__/commentTestData'
+} from '../../../../shared/comments/__fixtures__/commentTestData'
 import { stablePathDigest } from '../../../../shared/stablePathDigest'
 import { sha256Hex } from '../../../utils/atomicWriteBytesStrict'
 import {

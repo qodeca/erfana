@@ -9,7 +9,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { encodeText } from '../../../../shared/htmlComments'
-import { fixedId } from '../../../../shared/htmlComments/__fixtures__/commentTestData'
+import { fixedId } from '../../../../shared/comments/__fixtures__/commentTestData'
 import { buttonBlock } from './__test-helpers__/commentParseBench'
 import { PAGE as WRITER_PAGE, draftFor, byId } from './__test-helpers__/commentWriterHarness'
 import { CommentDocCache, sha256HexOf } from './commentJobDocs'

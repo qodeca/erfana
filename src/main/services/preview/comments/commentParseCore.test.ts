@@ -21,7 +21,7 @@ import {
   addTo,
   fixedId,
   seededRandom
-} from '../../../../shared/htmlComments/__fixtures__/commentTestData'
+} from '../../../../shared/comments/__fixtures__/commentTestData'
 import {
   BASE_PAGE,
   commentOn,

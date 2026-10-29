@@ -49,7 +49,7 @@
  */
 import type { AnchorLookup } from './anchorLookup'
 import type { CommentAnchor, TextQuote } from './format'
-import type { HtmlIndex, IndexedElement } from './htmlIndex'
+import type { HtmlIndex, IndexedElement } from '../htmlComments/htmlIndex'
 
 /** What an element's `id` says: same as stored, another one, or nothing (none stored or none on the element). */
 type IdEvidence = 'same' | 'other' | 'none'

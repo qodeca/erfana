@@ -21,9 +21,9 @@ import {
   documentArb,
   fcParams,
   layoutArb
-} from './__fixtures__/arbitraries'
-import { ADA, LINE_SEP, ch, fixedId, makeComment } from './__fixtures__/commentTestData'
-import { encodeText, utf8Length } from './encoding'
+} from '../comments/__fixtures__/arbitraries'
+import { ADA, LINE_SEP, ch, fixedId, makeComment } from '../comments/__fixtures__/commentTestData'
+import { encodeText, utf8Length } from '../comments/encoding'
 import {
   AGENT_NOTE_LINES,
   assertSafeCommentText,
@@ -32,7 +32,7 @@ import {
   type BlockLayout,
   type CommentAnchor,
   type CommentData
-} from './format'
+} from '../comments/format'
 import { indexHtml, type HtmlIndex, type IndexedElement } from './htmlIndex'
 import {
   analyzeCommentDocument,

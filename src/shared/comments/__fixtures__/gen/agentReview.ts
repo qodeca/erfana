@@ -22,7 +22,7 @@ import {
   type CommentAuthor,
   type CommentData,
   type RuntimeAnchor
-} from '../../index'
+} from '../../../htmlComments/index'
 import { seededRandom } from '../commentTestData'
 import { SPDX_HEADER } from './compat'
 

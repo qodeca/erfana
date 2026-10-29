@@ -24,7 +24,7 @@ import { describe, expect, it } from 'vitest'
 import { ADA, FIXED_NOW, GRACE, LATER, VIEW, elementOf, seededRandom } from './__fixtures__/commentTestData'
 import { decodeLossless } from './encoding'
 import type { CommentAnchor, CommentData } from './format'
-import { analyzeCommentDocument, type CommentDocument } from './parse'
+import { analyzeCommentDocument, type CommentDocument } from '../htmlComments/parse'
 import {
   applySplice,
   planDelete,
@@ -34,7 +34,7 @@ import {
   verifyCommentSplice,
   verifySpliceBytes,
   type PlanResult
-} from './splice'
+} from '../htmlComments/splice'
 import { addReply, createThread, setStatus } from './thread'
 
 const PINS = join(__dirname, '__fixtures__', 'pins')

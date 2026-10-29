@@ -12,7 +12,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { ErrorCode } from '../../../../shared/errors'
 import { decodeLossless, serializeBlock, type ParsedBlock } from '../../../../shared/htmlComments'
-import { BOM, fixedId, makeComment } from '../../../../shared/htmlComments/__fixtures__/commentTestData'
+import { BOM, fixedId, makeComment } from '../../../../shared/comments/__fixtures__/commentTestData'
 import {
   PAGE,
   VIEW,

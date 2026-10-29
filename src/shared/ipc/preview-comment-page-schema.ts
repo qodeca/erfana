@@ -20,7 +20,7 @@
 import { z } from 'zod'
 import { PREVIEW_LIMITS } from '../preview-limits'
 import { ELEMENT_TOKEN_PATTERN, utf8Length } from '../htmlComments'
-import { TAG_MAX_CHARS } from '../htmlComments/format'
+import { TAG_MAX_CHARS } from '../comments/format'
 
 /** Characters in a main-minted key: pin, frame, file, thread and block keys. */
 export const COMMENT_KEY_MAX_CHARS = 40

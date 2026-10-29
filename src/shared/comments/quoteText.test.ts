@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest'
 import { PREVIEW_LIMITS } from '../preview-limits'
 import { PROPERTY_TIMEOUT_MS, fcParams, hostileText } from './__fixtures__/arbitraries'
 import { ch, unit } from './__fixtures__/commentTestData'
-import type { HtmlIndex, IndexedElement } from './htmlIndex'
+import type { HtmlIndex, IndexedElement } from '../htmlComments/htmlIndex'
 import {
   QUOTE_CONTEXT_CHARS,
   exactOf,

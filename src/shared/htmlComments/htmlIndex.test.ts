@@ -6,7 +6,7 @@
  */
 import { defaultTreeAdapter, html as htmlSpec } from 'parse5'
 import { describe, expect, it } from 'vitest'
-import { BOM, LINE_SEP, elementOf } from './__fixtures__/commentTestData'
+import { BOM, LINE_SEP, elementOf } from '../comments/__fixtures__/commentTestData'
 import { attributeOf, hasMoreStartTagsThan, indexHtml } from './htmlIndex'
 import { UNBOUNDED_PARSE } from './parseBounds'
 

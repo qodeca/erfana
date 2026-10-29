@@ -11,10 +11,10 @@ import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import { PROPERTY_TIMEOUT_MS, documentArb, fcParams } from './__fixtures__/arbitraries'
 import { elementOf } from './__fixtures__/commentTestData'
-import { buildAnchor, findAnchorTarget, type TargetResolution, type TargetVia } from './anchor'
+import { buildAnchor, findAnchorTarget, type TargetResolution, type TargetVia } from '../htmlComments/anchor'
 import { AnchorLookup, QUOTE_READ_BUDGET, anchorLookupOf } from './anchorLookup'
 import type { CommentAnchor, TextQuote } from './format'
-import { indexHtml, type HtmlIndex, type IndexedElement } from './htmlIndex'
+import { indexHtml, type HtmlIndex, type IndexedElement } from '../htmlComments/htmlIndex'
 import { exactOf, prefixOf, suffixOf } from './quoteText'
 
 // --- the reference: the per-block scan the tables replaced, with the §19 Rev 4 refusals ---

@@ -8,7 +8,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { analyzeCommentDocument } from '../../index'
+import { analyzeCommentDocument } from '../../../htmlComments/index'
 
 const AGENT_REVIEW_PAGES = ['landing.html', 'slides.html', 'signup-form.html'] as const
 

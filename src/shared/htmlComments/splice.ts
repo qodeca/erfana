@@ -31,14 +31,14 @@
  * damaged or newer block is never rewritten.
  */
 import { PREVIEW_LIMITS } from '../preview-limits'
-import { CHARSET_PRESCAN_BYTES, encodeText, utf8Length } from './encoding'
+import { CHARSET_PRESCAN_BYTES, encodeText, utf8Length } from '../comments/encoding'
 import {
   serializeBlock,
   type BlockLayout,
   type CommentData,
   type Eol,
   type SerializeFailure
-} from './format'
+} from '../comments/format'
 import {
   analyzeCommentDocument,
   type CommentDocument,

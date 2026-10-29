@@ -12,12 +12,12 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { addTo, elementOf, fixedId, makeComment } from './__fixtures__/commentTestData'
-import { buildAnchor, type TargetResolution } from './anchor'
+import { buildAnchor, type TargetResolution } from '../htmlComments/anchor'
 import { positionCorroborated } from './anchorEvidence'
 import { AnchorLookup } from './anchorLookup'
 import type { CommentAnchor, CommentData } from './format'
-import { indexHtml, type HtmlIndex } from './htmlIndex'
-import { analyzeCommentDocument, parseCommentBlocks, type ParsedBlock } from './parse'
+import { indexHtml, type HtmlIndex } from '../htmlComments/htmlIndex'
+import { analyzeCommentDocument, parseCommentBlocks, type ParsedBlock } from '../htmlComments/parse'
 
 const LANDING = join(
   __dirname,

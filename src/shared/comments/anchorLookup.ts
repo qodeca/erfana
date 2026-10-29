@@ -28,7 +28,7 @@
  * guess from half a table. A real page stays far below it.
  */
 import type { TextQuote } from './format'
-import type { HtmlIndex, IndexedElement } from './htmlIndex'
+import type { HtmlIndex, IndexedElement } from '../htmlComments/htmlIndex'
 import { exactOf, prefixOf, suffixOf, type WorkMeter } from './quoteText'
 
 /**

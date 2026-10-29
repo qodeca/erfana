@@ -25,7 +25,7 @@ import {
 } from './__fixtures__/commentTestData'
 import { decodeLossless } from './encoding'
 import type { CommentData } from './format'
-import { analyzeCommentDocument, type CommentDocument } from './parse'
+import { analyzeCommentDocument, type CommentDocument } from '../htmlComments/parse'
 import {
   applySplice,
   lineLayoutAt,
@@ -38,7 +38,7 @@ import {
   verifySplice,
   verifySpliceBytes,
   type SplicePlan
-} from './splice'
+} from '../htmlComments/splice'
 import { addReply, editMessage, setStatus } from './thread'
 
 const CONTEXTS = join(__dirname, '__fixtures__', 'contexts')

@@ -25,7 +25,7 @@ import fc from 'fast-check'
 import { performance } from 'node:perf_hooks'
 import { describe, expect, it, vi } from 'vitest'
 import { PREVIEW_LIMITS } from '../preview-limits'
-import { PROPERTY_TIMEOUT_MS, commentDataArb, fcParams } from './__fixtures__/arbitraries'
+import { PROPERTY_TIMEOUT_MS, commentDataArb, fcParams } from '../comments/__fixtures__/arbitraries'
 import {
   BOM,
   LONE_HIGH,
@@ -38,9 +38,9 @@ import {
   makeComment,
   pageWith,
   uEsc
-} from './__fixtures__/commentTestData'
-import { encodeText } from './encoding'
-import { CommentDataSchema, serializeBlock, type CommentData } from './format'
+} from '../comments/__fixtures__/commentTestData'
+import { encodeText } from '../comments/encoding'
+import { CommentDataSchema, serializeBlock, type CommentData } from '../comments/format'
 import { indexHtml } from './htmlIndex'
 import {
   analyzeCommentDocument,

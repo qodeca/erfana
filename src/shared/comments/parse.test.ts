@@ -21,7 +21,7 @@ import {
 } from './__fixtures__/commentTestData'
 import { encodeText } from './encoding'
 import { AGENT_NOTE_LINES, serializeBlock, type CommentData } from './format'
-import { indexHtml } from './htmlIndex'
+import { indexHtml } from '../htmlComments/htmlIndex'
 import {
   analyzeCommentDocument,
   hashText,
@@ -29,8 +29,8 @@ import {
   parseCommentFile,
   parseDataJson,
   scanJson
-} from './parse'
-import { applySplice, planInsert, spliceBytes, verifySpliceBytes } from './splice'
+} from '../htmlComments/parse'
+import { applySplice, planInsert, spliceBytes, verifySpliceBytes } from '../htmlComments/splice'
 
 const COMPAT = join(__dirname, '__fixtures__', 'v1-compat')
 const CONTEXTS = join(__dirname, '__fixtures__', 'contexts')
