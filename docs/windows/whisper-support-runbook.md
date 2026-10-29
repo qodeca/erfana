@@ -12,11 +12,11 @@ Operator playbook for the 3 whisper error classes most likely to surface in the 
 
 | Platform | Main process log |
 |----------|------------------|
-| macOS | `~/Library/Logs/erfana/main.log` |
-| Windows | `%APPDATA%\erfana\logs\main.log` (typically `C:\Users\<name>\AppData\Roaming\erfana\logs\main.log`) |
-| Linux | `~/.config/erfana/logs/main.log` (Erfana is not Linux-shipped but the path exists for dev builds) |
+| macOS | `~/.erfana/logs/main.log` |
+| Windows | `%USERPROFILE%\.erfana\logs\main.log` (typically `C:\Users\<name>\.erfana\logs\main.log`) |
+| Linux | `~/.erfana/logs/main.log` (Erfana is not Linux-shipped but the path exists for dev builds) |
 
-See `docs/logging.md` for log rotation + levels. The Settings → Logging panel has an "Open logs folder" button that resolves the correct path per platform.
+See `docs/logging.md` for log rotation + levels. Settings → Logging shows the **Logs folder** path with an **Open** button.
 
 **Ask the user to**: (a) reproduce the failure, (b) open the logs folder, (c) grep `main.log` for `WHISPER` or for the specific code, (d) attach the surrounding ~50 lines. The forensic INFO log (`Whisper spawn`, `Whisper binary installed`, `Whisper manifest signature verified`) is at INFO level — visible even on default log settings.
 
@@ -230,7 +230,7 @@ The `notify-on-failure` job auto-creates a GitHub issue titled `[canary] whisper
 
 ## Related
 
-- [`docs/error-codes.md`](../error-codes.md) §"Local Whisper" — the full 14-code index
+- [`docs/error-codes.md`](../error-codes.md) §"Local Whisper" — the full index (`ErrorCode` has 16 `WHISPER_*` codes)
 - [`docs/build/whisper-binaries.md`](../build/whisper-binaries.md) — CI / rebuild / cert-revocation operations
 - [`docs/adrs/0001-self-host-whisper-binaries.md`](../adrs/0001-self-host-whisper-binaries.md) — why self-hosted
 - [`docs/adrs/0002-minisign-over-cosign-sigstore.md`](../adrs/0002-minisign-over-cosign-sigstore.md) — why minisign

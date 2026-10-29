@@ -21,7 +21,7 @@ The implementation uses a **fail-fast approach** for all error conditions.
 
 ### Implementation
 
-`createTerminalStore(terminalOps)` receives the terminal operations by injection (the default store passes `window.api.terminal`). Excerpt of `sendToTerminal` in `src/renderer/src/stores/useTerminalStore.ts`, with the logging lines left out:
+`createTerminalStore(terminalOps)` receives the terminal operations by injection (the default store passes `terminalGateway`, which forwards to `window.api.terminal`). Excerpt of `sendToTerminal` in `src/renderer/src/stores/useTerminalStore.ts`, with the logging lines left out:
 
 ```typescript
 sendToTerminal: async (text: string, autoExecute = false): Promise<boolean> => {
@@ -43,6 +43,10 @@ sendToTerminal: async (text: string, autoExecute = false): Promise<boolean> => {
     if (!writeResult.success) {
       return false
     }
+
+    // A programmatic send counts as user input for the restart and quit guards
+    get().markUserInput(terminalId)
+    get().markActivity(terminalId)
 
     // If autoExecute, send Enter after the 200ms delay
     if (autoExecute) {
@@ -162,7 +166,7 @@ The per-version modified-files tables (v0.3.3 and v0.3.4) are archived in [AutoE
 - `src/renderer/src/prompts/registry.ts` - Prompt template registration (auto-discovers `templates/*.md`)
 
 **Test Suite**:
-- `src/renderer/src/stores/useTerminalStore.autoExecute.test.ts` - 15 tests
+- `src/renderer/src/stores/useTerminalStore.autoExecute.test.ts` - Unit tests for autoExecute
 
 ---
 

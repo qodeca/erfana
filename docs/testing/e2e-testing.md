@@ -5,7 +5,7 @@
 Erfana supports automated E2E testing using Playwright with Electron. This guide covers setup, configuration, and test patterns.
 
 **Related documentation**:
-- [E2E Selectors](./e2e-selectors.md) – Complete testid catalog (274 testids)
+- [E2E Selectors](./e2e-selectors.md) – Complete testid catalog (351 testids)
 - [E2E Third-Party](./e2e-third-party.md) – Monaco, xterm.js, Mermaid testing
 - [E2E Helpers](./e2e-helpers.md) – Test utilities and patterns (backward-compatible adapter)
 - [E2E Debugging](./e2e-debugging.md) – Debugging and CI/CD
@@ -54,8 +54,8 @@ Erfana uses Electron fuses for security hardening. For E2E testing with debuggin
 # Production build (inspector disabled - secure)
 npm run build:mac
 
-# Test build (inspector enabled - for Playwright debugging)
-ERFANA_TEST_BUILD=true npm run build:mac
+# Test build (inspector enabled - for Playwright debugging); sets ERFANA_TEST_BUILD=true
+npm run build:mac:test
 ```
 
 > **Security note**: Test builds have reduced security (inspector enabled). Only use for testing, never distribute.
@@ -126,9 +126,7 @@ One test helper was changed for the container, safely for macOS and Windows too:
 
 ## Playwright configuration
 
-Create `playwright.config.ts` in the project root:
-
-Four Playwright projects are configured:
+`playwright.config.ts` in the project root configures four Playwright projects:
 
 | Project | Test match | Retries | Purpose |
 |---------|-----------|---------|---------|
@@ -185,6 +183,7 @@ Located in `e2e/pages/`:
 | `html-preview.navigation.ts` | Same-tab links and history (#124, part 3) – panel-scoped chrome (`backButton()`, `linkModeToggle()`, `moveAnnouncement()`, `previewTabs()`, `turnSameTabOn()`), main-side reads (`livePages()` / `waitForLivePages()`, `waitForPage()`, `scrollState()`, `previewZoomLevel()`), real input inside the page (`clickLink()` with `button` and `accel`, `pressNavKeyInPage()`, `navChord()`, `zoomInPreview()`) and save-dialog recording (`recordSaveDialogs()` / `savedDialogNames()`). Still holds its own `dismissAllToasts` copy (technical debt) |
 | `html-preview.focus.ts` | Keyboard focus into a previewed page and back (#124, QG-8 U1 and QG-11a H1) – plain functions taking the `ElectronApplication`, like `html-preview.native.ts`: `bandChip()`, `bringAppToFront()` (makes Erfana the OS key window and **fails** when the OS will not, naming the locked screen or inactive session as the cause), `focusState()` (native focus read main-side with `webContents.isFocused()` for the preview and its host window – `document.activeElement` cannot tell), `pressKeyInPage()` (real input through `webContents.sendInputEvent`; Playwright's `page.keyboard` drives the host and never reaches the page), and `recordHostFocusTrail()` / `hostFocusTrail()` (the order of host `focus()` calls and forwarded shortcuts, observable without OS focus) |
 | `html-preview.comments.ts` | HTML Preview comments (P3, P4; docs/designs/comments/html-preview-comments.md §12.4) – plain functions taking the `ElectronApplication`: `commentLoads()` and `commentUnavailable()` read the main-side e2e hook `globalThis.__erfanaE2eComments` (installed only in an unpackaged build with `ERFANA_E2E_TEST_HOOKS=1`, which the fixtures set), never the page's markup; `newestLoad()` / `namesFile()` / `waitForCommentLoad()` pick a file's load; `DOM_TOKENS_EXPR` reads the `data-erfana-el` tokens left in the live DOM – none since P4, the preload strips them. **Comment stub (P4)**, standing in for main's comment handlers until P5: `armCommentStub()` / `commentStubRecord()` record the picks and anchor reports the page's frames send on `webContents.ipc`, `sendCommentState()` sends one frame a `preview-page:commentState`, `enterStubCommentMode()` turns the mode on and waits for the overlay (`OVERLAY_HOSTS_EXPR`, which also proves the host's shadow root is closed), `OVERLAY_HOST_EXPR` / `OVERLAY_HOST_OPEN_EXPR` name the host and read whether it is in the top layer (for a page that fights it), `overlayReportedUnavailable()` reads whether a frame said `overlay: 'unavailable'`, `clickAt()` / `pickAt()` are a frame-aware trusted click and the pick it sent, and `accentPixelsNear()` counts the pin colour in `capturePage()` pixels at an element's top-right corner – the closed shadow root's only outside view |
+| `html-preview.comments-ui.ts` | HTML Preview comments – the reviewer's journeys (P7), shared by the four P7 specs (`html-preview-comments{,.frames,.safety,.perf}.e2e.ts`) on top of `html-preview.comments.ts`: `elementBox()` / `waitForBox()` (an element's box through same-project frames), trusted input `mouseAt()` / `clickPin()` / `pressInPage()`, pixel reads `pinCoverage()` / `accentInStill()` (the overlay is in a closed shadow root), the `CommentChrome` class (toolbar tools, drawer, menu and window of one preview tab), the disk oracle `singleBlockInsert()`, and `setGlobalSetting()` / `resetCommentSettings()` to put the identity back in `afterEach` |
 | `html-preview-bounds.harness.ts` (in `e2e/`) | Not a page object: the shared harness of the two bounds specs (#124, part 1) – a `bounds` fixture (`BoundsHarness`: the native view read main-side in DIP against its placeholder in CSS px, the layout moves the specs share, `sashNear(x)`), `LogTrail` (the drop-reason lines a test produced) and the seeded page. "Settled" means two reads 100 ms apart agree |
 
 > `ImageViewerPage` is **not** exposed as a composed fixture – the specs that use it construct it directly (the export specs go through `openImage()` in `e2e/utils/image-export-helpers.ts`, which is the same thing plus the export budget), because one of them needs its own launch environment. Three conventions in it are worth copying. Panel locators are scoped **inside** `[data-testid="image-viewer-panel"]`, so the full-screen portal (which renders the same test ids into `#portal-root`) can never satisfy a panel assertion — the deliberate exceptions are the `fullScreen*` locators, which scope to the overlay instead, and `exportStatus()`, which is looked up on the page because the panel-owned live region is rendered into whichever surface is on top and must resolve to exactly one element either way. Freshness is asserted on the **decoded** bytes via a `data-marker` attribute embedded in the SVG, not by diffing two multi-kilobyte data URLs — a failing assertion then names which version is on screen instead of dumping base64. And busy is `aria-disabled`, never `disabled`, so `clickExport()` arms a `MutationObserver` before the click rather than polling: a stubbed save dialog can settle inside one poll interval, so the busy transition has to be recorded, not sampled.
@@ -426,22 +425,12 @@ test.describe('Erfana E2E', () => {
 
 ### Test with project loaded
 
+The main process does not read a project path from argv, so open the project over IPC – which is what the `appWithTestProject` / `windowWithTestProject` fixtures do for you:
+
 ```typescript
-import { test, expect, _electron as electron } from '@playwright/test'
-import path from 'path'
+import { test, expect } from '../fixtures'
 
-test('should open project and display files', async () => {
-  const app = await electron.launch({
-    args: [
-      path.join(__dirname, '..'),
-      // Pass project path as argument
-      '/path/to/test/project',
-    ],
-  })
-
-  const window = await app.firstWindow()
-  await window.waitForLoadState('domcontentloaded')
-
+test('should open project and display files', async ({ windowWithTestProject: window }) => {
   // Wait for project tree to populate
   const projectTree = window.locator('[data-testid="project-tree"]')
   await expect(projectTree).toBeVisible()
@@ -449,10 +438,10 @@ test('should open project and display files', async () => {
   // Verify files are shown (not empty state)
   const emptyState = window.locator('[data-testid="project-tree-empty"]')
   await expect(emptyState).not.toBeVisible()
-
-  await app.close()
 })
 ```
+
+Outside the fixtures, call `window.api.file.openProjectByPath({ projectPath })` from `page.evaluate`, as `openProject()` in `e2e/utils/helpers.ts` does.
 
 ### Test fixture pattern
 
@@ -522,14 +511,16 @@ Some E2E tests require external API credentials:
 
 ### Erfana-specific environment variables
 
-Four `ERFANA_E2E_*` variables change app behaviour for tests. They are read by the app, not by Playwright, so they belong in the environment of the launched Electron process (`ERFANA_E2E_FORCE_CRASH`, `ERFANA_E2E_FAST_SHELL`, `ERFANA_E2E_BROWSER_SEAM`) or of the Playwright run itself (`ERFANA_E2E_TRANSCRIPTION`, a project gate):
+These `ERFANA_E2E_*` variables change behaviour for tests. Most are read by the app, so they belong in the environment of the launched Electron process (`ERFANA_E2E_FORCE_CRASH`, `ERFANA_E2E_FAST_SHELL`, `ERFANA_E2E_BROWSER_SEAM`, and `ERFANA_E2E_TEST_HOOKS`, which `buildAppEnv()` sets for every fixture launch); `ERFANA_E2E_TRANSCRIPTION` and `ERFANA_E2E_BENCH` are Playwright project gates read by `playwright.config.ts`, and `ERFANA_E2E_LINUX_CONTAINER` is set by `scripts/e2e-linux.sh` and read only by tests:
 
 | Variable | Effect |
 |----------|--------|
 | `ERFANA_E2E_FORCE_CRASH=1` | Launcher-only crash injection for `root-error-boundary.e2e.ts`: main appends `--erfana-force-crash` to `webPreferences.additionalArguments`, the preload re-exposes it as `window.__ERFANA_FORCE_CRASH__`, and `ForcedCrash` in `App.tsx` throws during render. Gated on `!app.isPackaged`, so packaged builds ignore it; the renderer can never set it |
-| `ERFANA_E2E_BROWSER_SEAM=1` | #124: in an unpackaged build only, a function at `globalThis.__erfanaE2eBrowserLaunch` in the main process replaces the real browser launch and receives `{ via, appPath, filePath }` (`browserLauncher.ts`; `app.isPackaged` is checked first). `html-preview-open-in-browser.e2e.ts` sets the variable in `test.beforeAll` (the fixtures launch Electron with `{ ...process.env }`) and restores the worker's value in `test.afterAll`; each test then arms a recording seam (`armBrowserSeam`), which refuses to arm unless the variable really reached an unpackaged app, and stubs the default-browser lookup, so no test ever starts a browser |
+| `ERFANA_E2E_BROWSER_SEAM=1` | #124: in an unpackaged build only, a function at `globalThis.__erfanaE2eBrowserLaunch` in the main process replaces the real browser launch and receives `{ via, appPath, filePath }` (`browserLauncher.ts`; `app.isPackaged` is checked first). `html-preview-open-in-browser.e2e.ts` sets the variable in `test.beforeAll` (the fixtures' `buildAppEnv()` passes every `ERFANA_*` variable through to the app) and restores the worker's value in `test.afterAll`; each test then arms a recording seam (`armBrowserSeam`), which refuses to arm unless the variable really reached an unpackaged app, and stubs the default-browser lookup, so no test ever starts a browser |
 | `ERFANA_E2E_FAST_SHELL=1` | POSIX only: the PTY bootstrap execs `/bin/sh -i` instead of `exec -l "$SHELL" -i`, skipping user rc files so terminal specs start in tens of milliseconds rather than seconds |
 | `ERFANA_E2E_TRANSCRIPTION=1` | Enables the `transcription` Playwright project (real, paid OpenAI calls; also needs `OPENAI_API_KEY`). Without it the project matches nothing and the `capability-summary` reporter prints a `SKIPPED CAPABILITIES` line |
+| `ERFANA_E2E_TEST_HOOKS=1` | In an unpackaged build only, installs the e2e test hooks – `window.__erfanaTest` (terminal screen, editor value) and main's `globalThis.__erfanaE2eComments`. Set by `buildAppEnv()` for every fixture launch |
+| `ERFANA_E2E_BENCH=1` | Enables the `bench` Playwright project (`*.bench.ts`); without it the project matches nothing |
 
 `ERFANA_TEST_BUILD=true` is a *build*-time variable, not a test-time one – see [Test build vs production build](#test-build-vs-production-build) above. Canonical table: [Testing overview § E2E environment variables](./README.md#e2eui-playwright-electron).
 

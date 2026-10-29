@@ -1,0 +1,7 @@
+# Plain language for a reader who comes back cold. A warning, measured per paragraph.
+extends: metric
+message: "Grade level %s – try shorter sentences and plainer words."
+level: warning
+formula: |
+  (0.39 * (words / sentences)) + (11.8 * (syllables / words)) - 15.59
+condition: "> 12"

@@ -1,0 +1,10 @@
+# maintaining-this-guide.md § Write a page: "Select controls" – the verb works for mouse, keyboard and touch.
+extends: substitution
+message: "Use '%s' instead of '%s'."
+level: error
+ignorecase: true
+swap:
+  '(?<![-\w])click(?![-\w])': select
+  '(?<![-\w])clicks(?![-\w])': selects
+  '(?<![-\w])clicking(?![-\w])': selecting
+  '(?<![-\w])clicked(?![-\w])': selected

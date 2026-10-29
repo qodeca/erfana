@@ -108,7 +108,7 @@ cd erfana
 npm ci
 ```
 
-`npm ci` runs the `postinstall` hook, which is `patch-package && electron-builder install-app-deps`. `patch-package` first applies the committed `patches/node-pty+1.1.0.patch`, then `electron-builder install-app-deps` rebuilds `node-pty` against Electron's bundled Node.js. If the rebuild step fails, you almost always have the wrong Python or are missing the C++ workload — re-check steps 2 and 3.
+`npm ci` runs the `postinstall` hook, which is `patch-package && install-electron && electron-builder install-app-deps`. `patch-package` first applies the committed `patches/node-pty+1.1.0.patch`, `install-electron` downloads the Electron binary, then `electron-builder install-app-deps` rebuilds `node-pty` against Electron's bundled Node.js. If the rebuild step fails, you almost always have the wrong Python or are missing the C++ workload — re-check steps 2 and 3.
 
 > **Why the patch?** A fresh `npm ci` on a default-hardened Windows 11 box used to fail in two ways during the `node-pty` build; `patch-package` now fixes both automatically. See the [node-pty build failures on Windows 11](#node-pty-build-failures-on-windows-11) note below.
 
@@ -128,7 +128,7 @@ npm run test:cov     # should produce coverage/ output
 npm run build:win
 ```
 
-> **This does not work on a developer machine today — see [#132](https://github.com/qodeca/erfana/issues/132).** `electron-builder.yml` declares `win.azureSignOptions` unconditionally, so signing is attempted even locally and the build stops with `Error: Unable to find valid azure env field AZURE_TENANT_ID for signing`. `npm run build:unpack` (`electron-builder --dir`) fails the same way, so there is no unsigned fallback. Verified on Windows 11 Pro 26200 on 2026-09-15; inferred, but not exercised, for a Windows target cross-built from macOS or Linux. Windows installers come from `release.yml` only, which builds on `windows-latest` and supplies the Azure values at invocation — **the release path is healthy and unaffected**. Older notes describing local builds as merely "unsigned" are wrong: they cannot be produced at all. The newest artifact under `release/` is v0.9.4 from 2026-04-23, which is consistent with that.
+> **This does not work on a developer machine today — see [#132](https://github.com/qodeca/erfana/issues/132).** `electron-builder.yml` declares `win.azureSignOptions` unconditionally, so signing is attempted even locally and the build stops with `Error: Unable to find valid azure env field AZURE_TENANT_ID for signing`. `npm run build:unpack` (`electron-builder --dir`) fails the same way, so there is no unsigned fallback. Verified on Windows 11 Pro 26200 on 2026-09-15; inferred, but not exercised, for a Windows target cross-built from macOS or Linux. Windows installers come from `release.yml` only, whose `build_win.yml` leg builds on `windows-latest` and supplies the Azure values at invocation – **the release path is healthy and unaffected**. Older notes describing local builds as merely "unsigned" are wrong: they cannot be produced at all. The newest artifact under `release/` is v0.9.4 from 2026-04-23, which is consistent with that.
 
 When it worked, this produced an NSIS installer in `release/{version}/`. The build runs `prebuild` (the aproba shim) and `electron-builder --win` automatically.
 
@@ -174,9 +174,6 @@ A fresh `git clone && npm ci` on a default-hardened Windows 11 box previously fa
 
 **`build:win` fails with "Cannot create symbolic link : A required privilege is not held by the client"**
 - Developer Mode is not enabled. See step 4. Note this is now the *second* failure you would hit, not the first — the Azure signing error above stops the build earlier.
-
-**`npm run test:cov` complains about missing `out/` directory**
-- Run `npm run build` once first. The script preserves an existing `out/` between runs but expects either none or a valid one.
 
 ---
 

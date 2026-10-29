@@ -46,16 +46,16 @@
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                  preload/index.ts                                │
+│                  preload/terminalBridge.ts                      │
 │  - window.api.terminal.write(terminalId, data)                  │
-│  - ipcRenderer.invoke('terminal:write', {terminalId, data})     │
+│  - ipcRenderer.invoke(TERMINAL_CHANNELS.write, ...)             │
 │  - Returns: Promise<{success: boolean, error?: string}>         │
 └────────────────────────────┬─────────────────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │            main/ipc/terminal-handlers.ts                         │
-│  - ipcMain.handle('terminal:write', (_, {id, data}) => {        │
+│  - registerHandle(TERMINAL_CHANNELS.write, (event, p) => {      │
 │  -   const success = terminalService.write(id, data)            │
 │  -   return {success}                                           │
 │  - })                                                           │
@@ -92,13 +92,13 @@
 
 **Terminal Store** (`stores/useTerminalStore.ts`)
 - **CRITICAL LAYER**: Handles write coordination and timing
-- Receives its terminal operations by injection (`createTerminalStore(terminalOps)`; the default store passes `window.api.terminal`)
+- Receives its terminal operations by injection (`createTerminalStore(terminalOps)`; the default store passes `terminalGateway`, which forwards to `window.api.terminal`)
 - Wraps multi-line text in bracketed paste mode (`\x1b[200~` … `\x1b[201~`, line endings converted to `\r`) so the receiving CLI treats it as one paste
 - Awaits both text write and Enter key write for error handling
 - Implements 200ms delay between text and Enter (rendering time)
 - Simple, reliable fire-and-forget approach
 
-**Preload Bridge** (`preload/index.ts`)
+**Preload Bridge** (`preload/terminalBridge.ts`, exposed through `preload/index.ts`)
 - Exposes async API to renderer
 - Type-safe IPC invocation
 

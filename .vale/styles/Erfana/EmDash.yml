@@ -1,0 +1,7 @@
+# Writing card (docs/design-system/system/foundations/writing.html): never an em dash; the en dash covers both uses.
+extends: existence
+message: "Use an en dash (–), not an em dash."
+level: error
+nonword: true
+tokens:
+  - '—'

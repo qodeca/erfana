@@ -1,6 +1,6 @@
 # Build Troubleshooting
 
-**Last updated**: October 2026 (v0.22.0)
+**Last updated**: October 2026 (v0.23.1)
 
 This document provides solutions to common build errors.
 
@@ -89,7 +89,9 @@ preload: {
     rollupOptions: {
       input: {
         index: resolve('src/preload/index.ts'),
-        screenshotOverlay: resolve('src/preload/screenshotOverlay.ts')
+        screenshotOverlay: resolve('src/preload/screenshotOverlay.ts'),
+        imageExport: resolve('src/preload/imageExport.ts'),
+        previewPage: resolve('src/preload/previewPage.ts')
       },
       output: { format: 'cjs' }
     }
@@ -97,7 +99,7 @@ preload: {
 }
 ```
 
-Both entries must be present. If `screenshotOverlay` is missing, the screenshot overlay windows fail to load their bridge while the main window looks fine.
+All four entries must be present. If a secondary entry is missing, the window that loads it (the screenshot overlays, the hidden image-export window or the HTML preview page) fails to load its preload while the main window looks fine.
 
 **See**: [Preload Bundling](./preload.md)
 
@@ -317,7 +319,7 @@ Tests fail, preventing build
    npm run test:renderer
    ```
 2. Fix failing tests before building
-3. All tests must pass. vitest runs four projects – `main-perf` is the main process's timing-budget suites (`*.perf.test.*`), split out of `main` to run last and alone – and the `main` project covers more than `src/main`: at v0.22.0 it holds 792 test files – main 417 (`src/main` 358 · `src/shared` 35 · `scripts` 24) · renderer 360 · preload 15, counted 2026-10-25 from the vitest `include` globs. The last recorded case count (13,853 passing, 5 skipped on macOS) dates from v0.20.0. Run `npm run test:ci` for the live figure – see [Testing overview](../testing/README.md#key-test-areas)
+3. All tests must pass. vitest runs four projects – `main-perf` is the main process's timing-budget suites (`*.perf.test.*`), split out of `main` to run last and alone – and the main-process projects cover more than `src/main`: 939 test files in all – `main` + `main-perf` 514 (`src/main` 432 · `src/shared` 56 · `scripts` 26) · renderer 387 · preload 38, counted 2026-10-29 from the vitest `include` globs. The last recorded case count (13,853 passing, 5 skipped on macOS) dates from v0.20.0. Run `npm run test:ci` for the live figure – see [Testing overview](../testing/README.md#key-test-areas)
 
 ---
 

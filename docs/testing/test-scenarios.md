@@ -1,4 +1,4 @@
-# Test Scenarios
+# Test scenarios
 
 Pre-defined test scenarios for Erfana using Circuit Electron MCP. For full MCP API, see docs/testing/README.md.
 
@@ -13,9 +13,9 @@ Pre-defined test scenarios for Erfana using Circuit Electron MCP. For full MCP A
 > look at the surface; the spec is what actually gates a regression. Scenarios 1,
 > 2 and 10 have no owning spec and remain genuinely manual.
 
-## UI Scenarios
+## UI scenarios
 
-### 1. Application Launch
+### 1. Application launch
 
 **Goal**: Verify Erfana launches with all core UI panels
 
@@ -28,7 +28,7 @@ Pre-defined test scenarios for Erfana using Circuit Electron MCP. For full MCP A
 
 **MCP**: `app_launch` → `wait_for_selector(.app-dock-layout)` → `screenshot` → `evaluate` panel existence → `close`
 
-### 2. File Tree Navigation
+### 2. File tree navigation
 
 **Goal**: Test file tree interaction and markdown opening
 
@@ -40,7 +40,7 @@ Pre-defined test scenarios for Erfana using Circuit Electron MCP. For full MCP A
 
 **MCP**: `app_launch` → `wait_for_selector(.project-tree)` → `click` folder → `click` file → `screenshot` → `evaluate` tab state
 
-### 3. Markdown Formatting Toolbar
+### 3. Markdown formatting toolbar
 
 *Automated: `e2e/markdown-toolbar.e2e.ts`*
 
@@ -55,7 +55,7 @@ Pre-defined test scenarios for Erfana using Circuit Electron MCP. For full MCP A
 
 **MCP**: `app_launch` → `click_by_text("README.md")` → `click` toolbar buttons → `evaluate` editor content → `screenshot`
 
-### 4. View Mode Switching
+### 4. View mode switching
 
 *Automated: `e2e/markdown-toolbar.e2e.ts`*
 
@@ -81,11 +81,11 @@ Pre-defined test scenarios for Erfana using Circuit Electron MCP. For full MCP A
 - Indicator clears
 - File persisted on disk
 
-**MCP**: `app_launch` → open file → `type` changes → wait 600ms → `evaluate` dirty state → `fs_read_file` verify content
+**MCP**: `app_launch` → open file → `type` changes → `evaluate` dirty state → wait past the 2000 ms debounce (about 2.5 s) → `evaluate` the indicator cleared → `fs_read_file` verify content
 
-## Interaction Scenarios
+## Interaction scenarios
 
-### 6. Keyboard Shortcuts
+### 6. Keyboard shortcuts
 
 *Automated: `e2e/workspace-layout.e2e.ts` (panel toggles) and `e2e/tab-lifecycle.e2e.ts` (close)*
 
@@ -98,7 +98,7 @@ Pre-defined test scenarios for Erfana using Circuit Electron MCP. For full MCP A
 
 **MCP**: `app_launch` → `keyboard_press('b', ['ControlOrMeta'])` → `screenshot` → `evaluate` visibility
 
-### 7. Context Menu Operations
+### 7. Context menu operations
 
 *Automated: `e2e/file-operations.e2e.ts`*
 
@@ -112,7 +112,7 @@ Pre-defined test scenarios for Erfana using Circuit Electron MCP. For full MCP A
 
 **MCP**: `app_launch` → navigate tree → `click` right → `click_by_text("New File")` → `type` name → confirm → `fs_read_file` verify
 
-### 8. Multi-File Tabs
+### 8. Multi-file tabs
 
 *Automated: `e2e/tab-lifecycle.e2e.ts`*
 
@@ -126,20 +126,20 @@ Pre-defined test scenarios for Erfana using Circuit Electron MCP. For full MCP A
 
 **MCP**: `app_launch` → open 3 files → `click` tabs → `evaluate` active panel → `click` close buttons
 
-### 9. Document Statistics
+### 9. Document statistics
 
 *Automated: `e2e/markdown-toolbar.e2e.ts`*
 
-**Goal**: Verify stats in header (word/char count)
+**Goal**: Verify the document statistics bar under the editor (word/char count)
 
 **Verify**:
-- Stats appear in editor header
+- Stats appear in the `DocumentStatsBar` footer of the editor panel
 - Update on typing
 - Accurate counts
 
 **MCP**: `app_launch` → open file → `type` text → `wait` debounce → `evaluate` stat values
 
-### 10. Panel Protection
+### 10. Panel protection
 
 **Goal**: Verify protected panels can't close
 
@@ -159,5 +159,5 @@ Pre-defined test scenarios for Erfana using Circuit Electron MCP. For full MCP A
 
 ## Related
 
-- [Testing README](./README.md) - Setup and commands
-- [Circuit Electron MCP](https://github.com/Circuit-App/circuit-electron-mcp) - Full API docs
+- [Testing README](./README.md) – Setup and commands
+- [Circuit Electron MCP](https://github.com/Circuit-App/circuit-electron-mcp) – Full API docs

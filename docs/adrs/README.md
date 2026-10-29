@@ -55,4 +55,4 @@ Do **not** write one when:
 
 - The answer is in the code and the code is short.
 - The question is "how", not "why".
-- A deferred-work ledger entry already captures the rationale (e.g. `docs/windows/deferred-work.md` D1-D12).
+- A deferred-work ledger entry already captures the rationale (e.g. `docs/windows/deferred-work.md` D1-D8 and `docs/windows/deferred-work-phase4.md` D9-D12).

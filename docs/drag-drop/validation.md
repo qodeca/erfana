@@ -41,14 +41,14 @@ async checkNameConflict(targetParentPath: string, itemName: string): Promise<boo
 }
 ```
 
-**Move conflicts**: Show confirm dialog
+**Move conflicts**: a pasted cut shows the "Replace Item" confirm dialog; a drag-drop move does not ask and fails with an error toast
 **Copy conflicts**: Automatic numbering (file.md → file (1).md → file (2).md)
 
 ### Project Root Protection
 
 ```typescript
-// FileService.ts – moveItem
-if (this.projectPath && sourcePath === this.projectPath) {
+// FileService.ts – moveItem (isProjectRoot compares against the session's canonical root)
+if (this.isProjectRoot(sourcePath)) {
   throw new Error('Cannot move the project root directory')
 }
 ```
@@ -59,11 +59,11 @@ Cannot drag the project root folder itself.
 
 | Validation Rule | Check | Error Message |
 |----------------|-------|--------------|
-| Circular move | `isDescendant(targetPath, sourcePath)` | "Cannot move folder into its own subfolder" |
+| Circular move | `isDescendant(targetPath, sourcePath)` (renderer) | "Cannot move folder into its own subfolder" (main backstop: "Cannot move a folder into its own subfolder") |
 | Drop in its own folder | `isSameFolderMove(sourcePath, targetParent)` (renderer, `ProjectTree/dropTarget.ts`) | None – the drop ends quietly, no toast |
 | Same location | `sourcePath === targetPath` (main) | "Source and target paths are the same" |
-| Root protection | `sourcePath === projectPath` | "Cannot move the project root directory" |
-| Move conflict | `checkNameConflict()` | Confirm dialog shown |
+| Root protection | `sourcePath === projectPath` (renderer), `isProjectRoot(sourcePath)` (main) | "Cannot move project root" (renderer toast); "Cannot move the project root directory" (main) |
+| Move conflict | `checkNameConflict()` | Paste: "Replace Item" dialog; drag: "An item with this name already exists" toast |
 | Copy conflict | `checkNameConflict()` | Auto-numbered name |
 | Copy overflow | `copyNumber > MAX_COPY_ATTEMPTS` (1000) | "Cannot create more than 1000 copies with the same name" |
 
@@ -141,14 +141,14 @@ export class SymlinkDetector {
 `FileService.moveItem` / `copyItem` call `checkPath(sourcePath)` and return `{ path, isSymlink: toOptionalFlag(isSymlink) }`; the renderer uses the flag for its "Symlink Moved / Copied" toast.
 
 **Behavior**:
-- Symlinks are copied as symlinks (not their targets)
-- Symlinks moved like regular files
-- Visual indicator in tree (link icon)
+- Copy: a link to a folder is copied as a link; a link to a file is copied as the file's content (the `file:copyItem` handler in `file-handlers.ts`)
+- Move: the link itself is moved (`fs.rename`), and the "Symlink Moved" warning toast says the target stays where it was
+- Visual indicator in tree (link icon, `aria-label="Symlink"`)
 
 ### Name Sanitization
 
 **Problem**: User attempts to use invalid filename characters
-**Solution**: Handled by dialog validation before reaching file operations
+**Solution**: Handled by dialog validation before reaching file operations, then checked again main-side: the request schema's `entryNameField` refuses `/`, `\`, NUL, `.` and `..`, and `FileService` runs `assertValidUserFilename`
 
 See [Dialog System](../architecture.md#dialog-system) for validation details.
 
@@ -186,12 +186,11 @@ Common errors and their handling:
 
 | Error Code | Meaning | Handling |
 |-----------|---------|----------|
-| `ENOENT` | File not found | Show error toast, reload tree |
-| `EACCES` | Permission denied | Show error toast with permission details |
+| `ENOENT` | File not found | Drag: error toast "Item not found" (`formatFileOperationError`); paste: the error message as thrown |
+| `EACCES` / `EPERM` | Permission denied | Drag: error toast "Permission denied: cannot move item"; paste: the error message as thrown |
 | `EEXIST` | File already exists | Should not happen (conflict check prevents) |
 | `EXDEV` | Cross-filesystem move | Automatic fallback to copy+delete |
-| `EISDIR` | Target is directory | Validation prevents this |
-| `ENOTDIR` | Target is not directory | Validation prevents this |
+| `ENOTDIR` | Target is not directory | Refused before `FileService` runs: the handler requires `kind: 'directory'`, and `FileService` throws "Target must be a directory" as a backstop |
 
 ### Rollback Strategy
 

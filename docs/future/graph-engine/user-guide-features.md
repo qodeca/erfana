@@ -1,5 +1,7 @@
 # User guide – features and workflows
 
+> **Status:** proposal, not shipped – no graph-engine code exists in `src/` on `develop`, and spec 004 (graph foundation) is still `draft` in `specs/registry.json`.
+
 > This is part 1 of the user guide, split for readability.
 >
 > **Other parts:**
@@ -20,7 +22,7 @@ This guide explains what the Erfana Graph Engine is, how to use it, and what val
 
 ## What is the graph engine?
 
-The Erfana Graph Engine is an **intelligent knowledge system** that automatically indexes your markdown documentation and provides AI-powered search, contextual recommendations, and relationship tracking.
+The Erfana Graph Engine is an **intelligent knowledge system** that would automatically index your markdown documentation and provide semantic search (local embedding model), contextual recommendations, and relationship tracking. It adds no built-in AI – it feeds the CLI agent you run in Erfana's terminal.
 
 ### The problem it solves
 
@@ -42,7 +44,7 @@ The Graph Engine automatically:
 4. **Surfaces** relevant information while you write
 5. **Exposes** knowledge to Claude Code via MCP server
 
-**Result:** You write better docs faster, with AI-powered research assistance built into your IDE.
+**Result:** You write better docs faster, and the CLI agent in Erfana's terminal gets structured project knowledge through the MCP server.
 
 ---
 

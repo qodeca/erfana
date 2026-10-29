@@ -122,14 +122,14 @@ src/
 │   │   ├── file/                # imageRead, readDocumentImage, findByName (bounded name search), restoreParentDirectory
 │   │   ├── imageExport/         # ImageExportService, ImageRasterizeWindow, rasterizeSession, exportSinks,
 │   │   │                        #   exportPaths, imageMetadata, declaredDimensions, pdfGeometry
-│   │   ├── preview/             # HTML preview engine (80 modules, counted 2026-10-28): PreviewViewService, PreviewViewRegistry,
+│   │   ├── preview/             # HTML preview engine: PreviewViewService, PreviewViewRegistry,
 │   │   │                        #   PreviewLiveView, PreviewSessionFactory, PreviewProtocolHandler, previewCsp,
 │   │   │                        #   PreviewAllowlistStore, PreviewWatchCoordinator, PreviewFindController,
 │   │   │                        #   previewPageNavigator, previewTabHistory, previewLinkDisposition,
 │   │   │                        #   previewFrameGuard, previewResizeHold, previewHostFocus (#124),
 │   │   │                        #   PreviewLinkScanWorkerAdapter + previewLinkScanWorker/Core/Protocol (link scan
 │   │   │                        #   off the main thread, v0.23.0), previewLiveComments, …
-│   │   │   └── comments/        # HTML Preview comments (37 modules, v0.23.0): PreviewCommentService (per-view façade),
+│   │   │   └── comments/        # HTML Preview comments (v0.23.0): PreviewCommentService (per-view façade),
 │   │   │                        #   CommentWriter + commentFileLock + commentFileAccess (the one write path),
 │   │   │                        #   CommentParseWorkerAdapter + commentParseWorker + commentFileJobs (parse off main),
 │   │   │                        #   commentInstrumentation + ElementTokenTable (served copy), commentKeyStore, …
@@ -145,7 +145,7 @@ src/
 │   │   └── import/              # ImportService, ConverterRegistry, DependencyDetector, ImportToolStatusService,
 │   │                            #   conversionToolGuard (LibreOffice lookup, #250), extensions,
 │   │                            #   converters/ (LiteParseConverter, Audio/VideoConverter, TextConverter – IConverter)
-│   ├── interfaces/              # 9 service interfaces (DIP seams)
+│   ├── interfaces/              # service interfaces (DIP seams)
 │   │   ├── IFileService.ts, IFileWatcherService.ts, IDirectoryWatcherService.ts
 │   │   ├── IGitStatusWorker.ts, IGitWatcherService.ts, IGitPollingService.ts
 │   │   └── IProjectLockService.ts, IProjectSettingsService.ts, ISettingsService.ts
@@ -236,10 +236,10 @@ src/
         │                        #   projectGeneration, textClipboard transport, editorSaveRegistry (#124),
         │                        #   preview/ (PreviewLinkRouter, previewTabMove, previewDragFreeze, OverlayGuardService)
         ├── imageExport/         # harness.ts – rasterize pixel pump loaded in the hidden image-export window
-        ├── stores/              # 20 Zustand stores: ActivityBar, CameraMirror, ClaudeStatus, Clipboard,
+        ├── stores/              # 22 Zustand stores: ActivityBar, CameraMirror, ClaudeStatus, Clipboard,
         │                        #   DiagramViewer, DocumentImport, Git, GlobalSettings, LazyFolder, OverlayOccluder,
-        │                        #   Preview, PreviewChromeGate, PreviewCollapsed, PreviewTab, PreviewViewport,
-        │                        #   Project, Search, Settings, Terminal, Transcription
+        │                        #   Preview, PreviewChromeGate, PreviewCollapsed, PreviewComment, PreviewCovered,
+        │                        #   PreviewTab, PreviewViewport, Project, Search, Settings, Terminal, Transcription
         ├── styles/              # Global stylesheets
         │   ├── fonts.css            # @font-face declarations (Cascadia Mono)
         │   ├── design-tokens.css    # Design tokens - governed by the cards in docs/design-system/
@@ -283,10 +283,10 @@ src/
 - **Process isolation for DOCX conversion**: `@turbodocx/html-to-docx` decodes images synchronously, so a malformed image could spin the CPU in a loop that an in-thread `Promise.race` timeout cannot interrupt. The conversion therefore runs in a killable Electron `utilityProcess` child: `HtmlToDocxConverter` (main-side strip + wrap) → `DocxConvertProcessAdapter` (forks the child, mirrors `GitStatusWorkerAdapter`'s lifecycle, `kill()`s on timeout) → `docx-convert.process.ts` (child entry). A separate process — not a worker thread — is used deliberately, to also cap memory against decompression bombs. See [API Services – Features](./api-services-features.md#docxservice).
 - **Sandboxed HTML preview subsystem (#74)**: live HTML/CSS/JS previews render in a dedicated Electron `WebContentsView` overlaid on the preview panel – a separate web contents, **not** the renderer DOM – so a hostile page cannot reach Erfana's own renderer. Its assets are served over a registered privileged `erfana-preview://` scheme by `PreviewProtocolHandler`; the view runs on a sealed in-memory `session` (no persistent cookies, cache or storage) minted by `PreviewSessionFactory`/`PreviewStorageSeal`; and `PreviewRequestFilter` enforces the per-project host allowlist plus a Content-Security-Policy on every request, blocking un-approved remote hosts. `PreviewViewService` owns the native view lifecycle; IPC is sender-gated by `isTrustedPreviewSender`. Since #124 a page can show same-project pages in frames, and a tab can move to another page in place with its own Back/Forward history; opening a file in the default browser is a separate `browser:` IPC domain, not part of `preview:`. See [HTML preview](./html-preview/README.md) and [Security](./security.md).
 - **Factory injection over module-eval singletons**: `ScreenshotService` is built by `createScreenshotService(capturer?, platform?)`, which falls back to `pickCapturer(platform)` – `darwin` → `MacScreenshotCapturer` (native `/usr/sbin/screencapture`), `win32` → `DesktopCapturerScreenshotCapturer` (Electron `desktopCapturer` + renderer-driven area-select overlay), anything else → `UnsupportedCapturer`. Both arguments are optional, so production gets `process.platform` while tests inject a fake capturer and a fake platform without stubbing globals. This replaced a module-eval singleton that froze the platform choice at import time (#164). `pickCapturer` is exported separately so the routing table can be asserted directly. The capturers implement one `IScreenshotCapturer.capture(request)` method over a discriminated-union request rather than three per-mode methods, keeping the platform branch in exactly one place.
-- **Mermaid Integration**: Client-side diagram rendering (22 types) with dark theme
+- **Mermaid Integration**: Client-side diagram rendering with Mermaid's built-in `default` theme and `securityLevel: 'strict'` (`src/renderer/src/utils/mermaidThemes.ts`)
 - **Prompt Template System**: CSP-compliant markdown templates with Handlebars-style syntax for context menu prompt templates sent to the CLI agent in the terminal (see [Prompt Templates](./prompts/README.md))
 - **Line Range Tracking**: Enhanced markdown preview with `data-line-start/end` attributes for accurate source mapping
-- **Project Persistence**: The last opened project is remembered – `SettingsService` persists `lastProjectPath` (main-only; the unused `file:getLastProjectPath` channel was removed in v0.22.0) and the project appears in the Recent Projects list on the welcome screen – but **start-up never auto-opens it**. The "Load last project on mount - DISABLED" effect in `src/renderer/src/hooks/useProjectManagement.ts` marks the initial load complete without loading anything, and `useProjectManagement.noAutoLoad.test.ts` pins that. This is load bearing, not a preference: the crash screen's Restart button is only safe because a relaunch cannot reopen the project that caused the crash – see [UI Components § Restart-safety invariant](./ui-components.md#restart-safety-invariant) before changing it
+- **Project Persistence**: The last opened project is remembered – `SettingsService` persists `lastProjectPath` (main-only; the unused `file:getLastProjectPath` channel was removed in v0.22.0) and the project appears in the Recent Projects list on the welcome screen – but **start-up never auto-opens it**. `src/renderer/src/hooks/useProjectManagement.ts` has no "load last project on mount" effect (a comment there says so, and `loading` starts false), and `useProjectManagement.noAutoLoad.test.ts` pins that. This is load bearing, not a preference: the crash screen's Restart button is only safe because a relaunch cannot reopen the project that caused the crash – see [UI Components § Restart-safety invariant](./ui-components.md#restart-safety-invariant) before changing it
 - **Layered error containment**: `PanelErrorBoundary` (panel-scoped, degrades one panel or tab; HTML preview tabs are keyed by panel id with `resetKey={filePath}`, so moving a tab to another page does not remount it) → `RootErrorBoundary` plus a **distinct** `FallbackGuard` class (last-resort recovery screen, then an inline-styled `document.body` sibling) → `installGlobalErrorTrail()` (async / event-handler / unhandled-rejection trail) → main-process `rendererCrashHandlers` (process death, hangs, entry-module and preload failures). Every main-side layer is log-only by design: a crash caused by restored state would re-crash on reload, so no auto-reload, dialog or relaunch. The only dialog in the main process is the **start-up** one: if the global settings or the logging service fail to initialise, `index.ts` still registers its handlers and opens the window, writes a `crash.log` line, and shows one non-blocking message box once the window is shown (see [Logging](./logging.md#crashlog-start-up-and-crash-fallback)). Layer-by-layer coverage table in [UI Components § Error containment](./ui-components.md#error-containment)
 - **Shared Utilities**: `types/` for shared TypeScript types (FilterMode), `utils/` for shared functions (sanitizeFilePath, isMarkdownFile, panelUtils)
 
@@ -349,17 +349,17 @@ if (confirmed) await deleteFile()
   - `EMPTY` - Name cannot be empty
   - `TOO_LONG` - Exceeds 255 character limit
   - `INVALID_CHARS` - Contains forbidden characters (/\?*:|"<>)
-  - `RESERVED` - Windows reserved names (CON, PRN, AUX, COM1-9, LPT1-9)
+  - `RESERVED` - Windows reserved names (CON, PRN, AUX, NUL, COM1-9, LPT1-9)
   - `UNCHANGED` - Rename operation with same name
   - `DUPLICATE` - Case-insensitive duplicate detection
 - Edge cases: Dotfiles (`.CON` is valid, `CON` without dot is reserved)
-- Function: `validateFileSystemName(name, existingNames?, currentName?, itemType?)`
+- Function: `validateFileSystemName(name, existingNames = [], options = {})`, where `options` is `{ currentName?, minLength?, maxLength? }`
 
 **Wrapper Components** (Thin wrappers following Open/Closed Principle):
 - `NewFileDialog.tsx` - Configures FileSystemDialog for file creation
 - `NewFolderDialog.tsx` - Configures FileSystemDialog for folder creation
 - `RenameDialog.tsx` - Configures FileSystemDialog for rename (file ↔ folder)
-- Each wrapper: ~50 lines, just props configuration and icon selection
+- Each wrapper: under 75 lines, just props configuration and icon selection
 - Easy to add new file system dialog types without modifying base component
 
 **Features**:
@@ -401,13 +401,13 @@ The v0.3.7 refactoring split `ProjectTree.tsx` using Strategy + Command + Factor
 
 **Architecture Components**:
 - **Custom Hooks**: useProjectManagement (project lifecycle), useFileOperations (CRUD), useDirectoryWatcher (monitoring)
-- **Context Menu**: 13 command classes, node-type strategies, factory selection
+- **Context Menu**: command classes, node-type strategies, factory selection
 - **Helper Functions**: switchHelpers (terminal activity tracking), withWatcherPause (race prevention), constants
 - **Pure Logic**: functions extracted to `.logic.ts` files for fast, deterministic testing
 
 **Pure Logic Pattern Examples** (v0.6.3):
-- `markdownEditorPanel.logic.ts` - Stats calculation, scroll sync algorithms (587 lines, 82 tests)
-- `promptScrollScheduler.logic.ts` - Timestamp-based scroll scheduling with user intent detection (144 lines, 39 tests)
+- `markdownEditorPanel.logic.ts` - Stats calculation, scroll sync algorithms
+- `promptScrollScheduler.logic.ts` - Timestamp-based scroll scheduling with user intent detection
 - `chatBubble.logic.ts` / `diagramViewer.logic.ts` / `mermaidDirections.ts` - Validation helpers, zoom/pan math, chart-type detection — all testable without React
 
 **Shared utility patterns** (cross-platform / cross-process):

@@ -80,7 +80,7 @@ Resolved – `LanguageSelect` accepts an optional `id` prop and renders it on th
 ### 5. E2E workflow disabled on CI
 
 **Severity**: Medium
-**Impact**: The entire `e2e.yml` workflow is disabled (2026-04-25, commit `997ba65` – pre-migration; no longer resolvable, that history was rewritten at the 2026-06 migration). Neither the functional `electron` suite nor the 5 visual screenshot tests run on CI; both regression classes can merge undetected until a developer runs `npm run test:e2e` / `npm run test:e2e:visual` locally. E2E was already excluded from branch-protection required checks, so disabling does not block any merges or releases — but it removes a safety net.
+**Impact**: The entire `e2e.yml` workflow is disabled (2026-04-25, commit `997ba65` – pre-migration; no longer resolvable, that history was rewritten at the 2026-06 migration). Neither the functional `electron` suite nor the 6 visual screenshot tests (`e2e/visual-regression.e2e.ts`) run on CI; both regression classes can merge undetected until a developer runs `npm run test:e2e` / `npm run test:e2e:visual` locally. E2E was already excluded from branch-protection required checks, so disabling does not block any merges or releases – but it removes a safety net.
 
 **Problem**: The visual suite was the original blocker — all 5 tests time out at `page.waitForLoadState('domcontentloaded')` (30s) on GitHub `macos-latest` runners while passing 5/5 locally (including with `CI=true`). The earlier workaround scoped CI to `--project=electron` only, but the functional suite is also unstable on hosted runners; full disable is now the working state until the root cause is isolated.
 
@@ -101,16 +101,9 @@ Resolved – `LanguageSelect` accepts an optional `id` prop and renders it on th
 
 ---
 
-### 6. Monaco cursor-blink flake in `third-party-components.e2e.ts`
+### 6. Monaco cursor-blink flake in `third-party-components.e2e.ts` ✅ Resolved
 
-**Severity**: Low
-**Impact**: `third-party-components.e2e.ts:38` (Monaco keyboard test) fails first attempt ~10% of runs with `expect(cursor).toBeVisible() – received "hidden"`. Passes on retry #1 reliably; classified as flaky, not failing.
-
-**Root cause**: Monaco's `.cursor` element blinks every 500ms by default. A 2s `toBeVisible` timeout can miss the visible half-cycle under CPU contention.
-
-**Fix pattern exists in codebase**: the `disableCursorBlink()` helper in `e2e/visual-regression.e2e.ts` patches `cursorBlinking: 'solid'`. Apply the same helper to the third-party-components test.
-
-**Files**: `e2e/pages/monaco.page.ts` (the `expect(cursor).toBeVisible({ timeout: 2000 })` in `MonacoPage.focus()`), `e2e/third-party-components.e2e.ts` (the `Monaco editor: Set content via keyboard and verify in preview` test).
+Resolved – `MonacoPage.focus()` (`e2e/pages/monaco.page.ts`) no longer waits for the blinking `.cursor` element to be visible. It clicks the editor and checks Monaco's own `focused` class, clicking again until it takes (`toPass({ timeout: 4000 })`), so a hidden blink phase can no longer fail the `Monaco editor: Set content via keyboard and verify in preview` test. The number is kept so existing references to "item #6" stay valid.
 
 ---
 
@@ -125,7 +118,7 @@ Resolved – `LanguageSelect` accepts an optional `id` prop and renders it on th
 - `.claude/skills/releasing-erfana/phases/phase-4-verify.md` § 4.3 Verify minisign signature — operator-facing canonical-source note
 - `README.md` § Release verification — direct `#release-signing-v095-174` anchor into `docs/security.md`
 
-(Citations de-numbered 2026-08-23: the two line references here had already drifted — Guard 5 sits at `:341–372` today, its step name at `:349`, not the `:298–330` / `:306` recorded when the item was filed. Section and step names are stable; line numbers in this item are not.)
+(Citations de-numbered 2026-08-23: the two line references here had already drifted – Guard 5 sat at `:341–372` then, its step name at `:349` (`:418` on 2026-10-29), not the `:298–330` / `:306` recorded when the item was filed. Section and step names are stable; line numbers in this item are not.)
 
 Moving the block would require synchronized edits to checks.yml + skill + README anchor. High blast-radius for cosmetic gain.
 
@@ -161,7 +154,7 @@ Moving the block would require synchronized edits to checks.yml + skill + README
 
 **Fix**: Extract the arrow background (image + size) to a shared utility class or design token so the size lives in one place.
 
-**Files** (re-verified 2026-09-05): `Settings/SettingsOverlay.css:171`, `DocumentImport/DocumentImportDialog.css:117`, `Transcription/TranscriptionDialog.css:71`, `Dialog/CameraDialog.css:56`, `Dialog/Dialog.css:573` — all under `src/renderer/src/components/`. Note `LanguageSelect.tsx`, named here originally, carries no such rule; the language select is styled by `TranscriptionDialog.css`. `SettingsOverlay.css:240` also sets `background-size: 12px` but for the checkbox tick, a different icon — out of scope for this item.
+**Files** (re-verified 2026-10-29): `Settings/SettingsOverlay.css:171`, `DocumentImport/DocumentImportDialog.css:121`, `Transcription/TranscriptionDialog.css:71`, `Dialog/CameraDialog.css:56`, `Dialog/Dialog.css:573` – all under `src/renderer/src/components/`. Note `LanguageSelect.tsx`, named here originally, carries no such rule; the language select is styled by `TranscriptionDialog.css`. `SettingsOverlay.css:252` sizes the checkbox tick, a different icon, through the `var(--space-6)` token – out of scope for this item.
 
 ---
 
@@ -290,7 +283,7 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 **Impact (when filed)**: The renderer project had **no enforced coverage thresholds**. `vitest.renderer.ts` declared `coverage` as a sibling of `test` rather than inside it, and vitest ignores a top-level `coverage` key — so the provider, the report directory, the exclude list and the thresholds were all dead configuration.
 
-**Resolved (#124, QG-8).** The same misplacement turned out to affect `vitest.preload.ts` as well. In both configs the `coverage` block now sits inside `test`, like `vitest.main.ts`, so the thresholds, includes and reporters apply; per-file floors were added for the #124 modules, and `__test__/` and `__test-helpers__/` joined `coverage.exclude` in all three configs. `npm run test:cov` passes with them. **CI enforces them too (#124, QG-11a):** the required `Coverage` job in `.github/workflows/checks.yml` originally ran only `--project main`, so the new renderer and preload floors fired only locally; it now runs two more steps, `npx vitest --run --config vitest.preload.ts --project preload --coverage` and `npx vitest --run --config vitest.renderer.ts --project renderer --coverage`, so a breach of either fails a required check. The number is kept so existing references to "item #19" stay valid.
+**Resolved (#124, QG-8).** The same misplacement turned out to affect `vitest.preload.ts` as well. In both configs the `coverage` block now sits inside `test`, like `vitest.main.ts`, so the thresholds, includes and reporters apply; per-file floors were added for the #124 modules, and `__test__/` and `__test-helpers__/` joined `coverage.exclude` in all three configs. `npm run test:cov` passes with them. **CI enforces them too (#124, QG-11a):** the required `Coverage` job in `.github/workflows/checks.yml` originally ran only `--project main`, so the new renderer and preload floors fired only locally; it now runs two more steps, `npx vitest --run --config vitest.preload.config.ts --project preload --coverage` and `npx vitest --run --config vitest.renderer.config.ts --project renderer --coverage` (the configs have since been renamed from `vitest.*.ts` to `vitest.*.config.ts`), so a breach of either fails a required check. The number is kept so existing references to "item #19" stay valid.
 
 ---
 
@@ -305,7 +298,7 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 **Files**: `scripts/test-cov.mjs` (the three `run(...)` calls), `vitest.workspace.ts`, `.github/workflows/checks.yml` (Coverage job).
 
-**Resolved ([#133](https://github.com/qodeca/erfana/issues/133), closed).** `scripts/test-cov.mjs` now runs each config scoped with `--project main|preload|renderer`, as the CI `Coverage` job does (the three projects live in `scripts/lib/test-cov-projects.mjs`), so each suite runs once. It runs all three passes before it exits and names every project that missed a floor, and it starts vitest through `process.execPath` rather than `npx`, so its output reaches a redirected log on Windows too. See [CI § Coverage](./ci.md). The number is kept so existing references to "item #20" stay valid.
+**Resolved ([#133](https://github.com/qodeca/erfana/issues/133), closed).** `scripts/test-cov.mjs` now runs each config scoped with `--project main|preload|renderer` (the main pass adds `--project main-perf`), as the CI `Coverage` job does (the three passes live in `scripts/lib/test-cov-projects.mjs`), so each suite runs once. It runs all three passes before it exits and names every project that missed a floor, and it starts vitest through `process.execPath` rather than `npx`, so its output reaches a redirected log on Windows too. See [CI § Coverage](./ci.md). The number is kept so existing references to "item #20" stay valid.
 
 **History**: recorded by the #60 change-set review. **Observed directly on 2026-09-15** and promoted to [#133](https://github.com/qodeca/erfana/issues/133): `vitest --run --config vitest.main.ts --coverage` reports 562 files / 13,847 tests (the whole workspace), while adding `--project main` gives 287 files / 6,972 tests. The same issue carries a second defect this entry did not know about — the script's `spawnSync(…, {stdio: 'inherit'})` output never reaches a redirected log on Windows, so a failing run prints only `Command failed (1): …` and never names the floor that missed.
 
@@ -362,7 +355,7 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 **Severity**: Medium — it is a main-process security boundary, though a notification-only one.
 
-**Impact**: `watchFile` gates on `filePath.startsWith(this.projectPath)` (`FileWatcherService.ts:112`) — no `path.resolve`, no trailing separator, and no `fs.realpath`. It is wrong in both directions: `/proj-evil/x.png` **passes** when the project is `/proj` (prefix match without a separator), and `/proj/../p2/x.png` fails closed. The read handlers next to it (`file:readFile`, `file:readImage`) went through `assertInsideProject` in #70 and now do the two-stage lexical + canonical check.
+**Impact**: `watchFile` gates on `filePath.startsWith(this.projectPath)` (`FileWatcherService.ts:126`) – no `path.resolve`, no trailing separator, and no `fs.realpath`. It is wrong in both directions: `/proj-evil/x.png` **passes** when the project is `/proj` (prefix match without a separator), and `/proj/../p2/x.png` fails closed. The read handlers next to it (`file:readFile`, `file:readImage`) went through `assertInsideProject` in #70 and now do the two-stage lexical + canonical check.
 
 **Why it was left alone in #70**: it is a shared boundary used by every watcher consumer and deserves its own tests and review pass rather than a drive-by edit inside a bugfix. The exposure is bounded — watching is a notification side channel, the *content* read behind it goes through the stricter guard, and the atomic re-arm path already re-validates the path with `classifyConfinement` before rebuilding a watcher (`watcher/atomicRearm.ts` → `AtomicRearmDeps.isPathConfined`).
 
@@ -444,7 +437,7 @@ The policy before the ratchet, as practised: *a file a change adds behaviour to 
 | `src/main/services/workers/git-status.worker.ts` | 520 | Pre-existing |
 | `src/renderer/src/hooks/useExternalFileDrop.ts` | 518 | Pre-existing |
 
-`FileWatcherService.ts` deliberately stayed under the cap (498 lines at the #70 measurement) by moving the watch factory, the unlink branch, the send loop and the subscriber counting into `src/main/services/watcher/`.
+`FileWatcherService.ts` deliberately stayed under the cap (498 lines at the #70 measurement) by moving the watch factory, the unlink branch, the send loop and the subscriber counting into `src/main/services/watcher/`. It has since grown past it: 581 lines, frozen there in `scripts/max-lines-baseline.json`.
 
 **Recommended Solution**: (#124 made the split below for both preview files; the rest stands.) `PreviewLiveView.ts` and `PreviewViewService.ts` were the entries gaining code fastest and the ones to split first – the lifecycle wiring, teardown and still-frame paths in the former and the suspend/resume policy in the latter are separable. `file-handlers.ts` remains a candidate: the project/file/stat/CRUD handler groups are independent. The `imageViewer.logic.ts` file is a candidate for the next pass that genuinely changes it.
 
@@ -496,7 +489,7 @@ Resolved by the #73 image-export work. The canonical extension list, the MIME ma
 - **No way to open an image file as text.** Once file opens route through `utils/openFileInPanel.ts`, an SVG always opens in the viewer. Hand-editing an SVG beside an agent is plausible, so a context-menu "Open as text" is worth a follow-up issue; it becomes a prerequisite if the Markdown-preview link path is migrated to the router as well.
 - **Two visual artefacts on refresh.** The degraded-state banner mounts above the content, so it pushes the image down and the `ResizeObserver` refires in fit mode (a second, small jump); and an animated GIF restarts from frame 0 when the source object is replaced.
 - **No visual-regression coverage for the new surfaces.** The status slot and the banner are transient states; baselines would flake. Descoped deliberately.
-- **The end-to-end proof of the fix has no CI gate.** `e2e/preview-refresh.e2e.ts` and `e2e/preview-refresh-terminal.e2e.ts` only run locally (item #5 above). The atomic-replace case is covered deterministically on CI by two main-process suites instead — `FileWatcherService.atomicSave.test.ts` (mocked) and `watcher/singleFileWatch.rename.integration.test.ts` (real chokidar, real rename).
+- **The end-to-end proof of the fix has no CI gate.** `e2e/preview-refresh.e2e.ts` and `e2e/preview-refresh-terminal.e2e.ts` run on CI only in the advisory `E2E (Linux, xvfb)` job on pull requests, which blocks nothing (item #5 above). The atomic-replace case is covered deterministically on CI by two main-process suites instead – `FileWatcherService.atomicSave.test.ts` (mocked) and `watcher/singleFileWatch.rename.integration.test.ts` (real chokidar, real rename).
 
 **Status**: Accepted; recorded by the #70 design (§9) and its review rounds.
 
@@ -542,7 +535,7 @@ Resolved by the #73 image-export work. The canonical extension list, the MIME ma
 
 **Impact**: `isTrustedSender` accepts the packaged app's exact `file://` renderer URL in production, but in development it accepts **any** URL on the dev-server origin. The image-export rasterize harness is served from that same origin (`${ELECTRON_RENDERER_URL}/imageExport.html`), so during development the harness page counts as a trusted sender for **every** gated channel, not just its own.
 
-**Problem**: Nothing reachable follows from it. The harness runs its own preload, which exposes four verbs (`ready`, `onRender`, `postResult`, `log`) and no `ipcRenderer` handle to build a fifth with, so there is no bridge from that page to a gated channel; and production pins the exact file URL, so the widening does not ship. It is recorded because the *reason* it is safe lives in a different file from the check itself, and a future harness preload that exposed one more verb would silently remove the only thing holding the line.
+**Problem**: Nothing reachable follows from it. The harness runs its own preload, which exposes three verbs (`ready`, `onRender`, `postResult` – `logging:log` is deliberately left out) and no `ipcRenderer` handle to build a fourth with, so there is no bridge from that page to a gated channel; and production pins the exact file URL, so the widening does not ship. It is recorded because the *reason* it is safe lives in a different file from the check itself, and a future harness preload that exposed one more verb would silently remove the only thing holding the line.
 
 **Recommended Solution**: tighten the dev branch of the predicate to compare the full URL, not the origin. Not done in #73 because the shared predicate guards every gated channel: narrowing it would ripple into all of them, in dev, for a path with no caller. If it is ever done, the harness needs its own allowance rather than an implicit one.
 
@@ -597,7 +590,7 @@ Resolved by the #73 image-export work. The canonical extension list, the MIME ma
 
 **Severity**: Low
 
-**Impact**: `PreviewRootRegistry.ts` calls `buildPreviewCsp(hosts)` without an `onReject` badge sink, so a host rejected at CSP-build time **on the registry path** emits no `allowlist-invalid` badge.
+**Impact**: `PreviewRootRegistry.ts` passes `buildPreviewCsp` an `onReject` sink (`reportCspRejection`) that only logs an unusable own token and ignores a rejected host, so a host rejected at CSP-build time **on the registry path** emits no `allowlist-invalid` badge.
 
 **Problem**: Unreachable in practice — the `PreviewAllowlistStore` validation gate already rejects such hosts before they reach the registry, so this is belt-and-braces only. Recorded as unreachable rather than fixed.
 
@@ -627,7 +620,7 @@ Resolved by the #73 image-export work. The canonical extension list, the MIME ma
 
 **Impact**: `previewFilterDecision.decideRequest` allows the `about:` scheme for every request type.
 
-**Problem**: Defense-in-depth only. When filed, the reason it was not exploitable was `frame-src 'none'`, the `will-navigate` handler and the sandbox. **#124 removed the first of those**: `frame-src` now names the page's own root token, so frames load. The reason must be re-verified rather than assumed – what still holds, read in code: `frame-src` admits no `about:` source, the frame guard allows only `about:blank` and `about:srcdoc` (documents the page itself writes, which carry nothing from outside it), and the sandbox and the `will-navigate` handler are unchanged. Narrowing to `data:`/`blob:` only was judged not worth churning security-critical filter code.
+**Problem**: Defense-in-depth only. When filed, the reason it was not exploitable was `frame-src 'none'`, the `will-navigate` handler and the sandbox. **#124 removed the first of those**: `frame-src` now names the page's own root token, so frames load. The reason must be re-verified rather than assumed – what still holds, read in code: `frame-src` admits no `about:` source, the frame guard (`subFrameRefusal` in `PreviewRequestFilter.ts`) lets any `about:` frame through – in practice `about:blank` and `about:srcdoc`, documents the page itself writes, which carry nothing from outside it, and the sandbox and the `will-navigate` handler are unchanged. Narrowing to `data:`/`blob:` only was judged not worth churning security-critical filter code.
 
 **Recommended Solution** (optional): narrow the allowed schemes if this filter is next opened for other reasons.
 
@@ -639,7 +632,7 @@ Resolved by the #73 image-export work. The canonical extension list, the MIME ma
 
 **Severity**: Low
 
-**Impact**: The post-load pipeline (`runPipeline`) can overlap itself when `did-finish-load` events arrive faster than a run completes, despite the reload-interval rate limit.
+**Impact**: The post-load pipeline (`run` in `previewLivePipeline.ts`, `runPipeline` when filed) can overlap itself when `did-finish-load` events arrive faster than a run completes, despite the reload-interval rate limit. The `runSerial` counter only keeps a superseded run from overwriting the frame-asset set; it does not stop the second run.
 
 **Recommended Solution**: add a single-flight guard so a run in progress absorbs a trailing request rather than starting a second concurrent run.
 
@@ -773,6 +766,8 @@ One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns 
 
 (all under `src/renderer/src/components/Panels/HtmlPreviewPanel/`)
 
+**Re-measured 2026-10-29**: five files have grown since the tables above – `PreviewViewService.pageScope.test.ts` is 504 lines, `PreviewSessionFactory.ts` 500, `PreviewViewService.ts` 472, `PreviewChromeBand.css` 509 and `HtmlPreviewPanel.tsx` 477. `usePreviewStillStore.ts` has not been split out.
+
 **Recommended Solution**: split on the next behaviour change, as planned above; do not grow the band stylesheet further without moving a block (the nav controls already live in `PreviewNavControls.css`).
 
 **Status**: Accepted for #124 (QG-6 A4, refreshed at Phase 10).
@@ -797,7 +792,7 @@ One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns 
 
 **Severity**: Low
 
-**Impact**: The rule "log an error's name and code, never its message" (a Node error quotes the path or URL it failed on) is correct at every site #124 touched, but each module writes its own helper: local `nameOf` / `codeOf` / `messageOf` / `errorFieldsOf`-style functions in `externalLinkConsent.ts`, `previewLivePipeline.ts`, `previewFrameEvents.ts`, `previewLiveTeardown.ts`, `PreviewLiveView.ts`, `previewLivePage.ts`, `previewViewEviction.ts`, `PreviewStillFrameCache.ts`, `PreviewSessionFactory.ts` and `previewEntryWatch.ts` (main), plus `previewTabMove.ts` (renderer). A new site copies whichever neighbour it lands next to.
+**Impact**: The rule "log an error's name and code, never its message" (a Node error quotes the path or URL it failed on) is correct at every site #124 touched, but each module writes its own helper: local `nameOf` / `codeOf` / `messageOf` / `errorFieldsOf`-style functions in `externalLinkConsent.ts`, `previewLivePipeline.ts`, `previewFrameEvents.ts`, `previewLiveTeardown.ts`, `PreviewLiveView.ts`, `previewLivePage.ts`, `previewViewEviction.ts`, `PreviewStillFrameCache.ts`, `PreviewSessionFactory.ts` and `previewEntryWatch.ts` (main), plus inline `error.name` reads in `previewTabMove.ts` (renderer). A new site copies whichever neighbour it lands next to.
 
 **Problem**: `redactedLogError` (`src/main/utils/redactUserInput.ts`) is not the shared answer as it stands: it rewrites only `INVALID_FILENAME` app errors and syscall-shaped errors with a quoted absolute path, and leaves a plain `Error` message untouched.
 
@@ -823,7 +818,7 @@ One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns 
 
 **Severity**: Low
 
-**Impact**: `src/main/services/preview/previewLiveVisibility.ts` (334 lines) and `previewLiveWiring.ts` (371) are reached only through the `PreviewLiveView` / `PreviewViewService` tests and e2e. `previewLiveVisibility.ts` owns the synchronous-hide invariant that keeps an untrusted page from covering Erfana's own permission prompt.
+**Impact**: `src/main/services/preview/previewLiveVisibility.ts` (334 lines when filed, 342 on 2026-10-29) and `previewLiveWiring.ts` (371 then, 434 now) are reached only through the `PreviewLiveView` / `PreviewViewService` tests and e2e. `previewLiveVisibility.ts` owns the synchronous-hide invariant that keeps an untrusted page from covering Erfana's own permission prompt.
 
 **Recommended Solution**: a direct test file for each, behind a per-file coverage floor.
 
@@ -948,9 +943,9 @@ One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns 
 
 **Severity**: Low
 
-**Impact**: Nothing lint-blocks `src/shared/**` from importing `src/main`, `src/renderer` or `electron`, or `src/main/ipc/**` from reaching preview internals past the `PreviewViewService` facade. No violation exists today.
+**Impact**: Half closed. The layer rules in `eslint.config.mjs` now lint-block `src/shared/**` from importing `src/main`, `src/renderer`, `src/preload` or `electron`, and `src/main` from importing the renderer or preload. Nothing yet lint-blocks `src/main/ipc/**` from reaching preview internals past the `PreviewViewService` facade, and some files do: `emit.ts` imports `previewInputForward` and `lifecycle-handlers.ts` imports `previewBoundsDropLog` by value.
 
-**Recommended Solution**: `@typescript-eslint/no-restricted-imports` blocks. The `src/main/ipc/**` block must repeat the existing `ipcMain` rule, because flat config replaces a rule per file – which means restructuring the config against the warning in `eslint.config.mjs`.
+**Recommended Solution**: a `@typescript-eslint/no-restricted-imports` pattern for preview internals in the `src/main/**` block, which already carries the `ipcMain` rule and the layer patterns (flat config replaces a rule per file, so it cannot be a separate block). The composition root `buildPreviewGraph.ts` needs an exception.
 
 **Status**: Accepted at #124 QG-6 (A9) – a repo-wide lint policy.
 
@@ -960,13 +955,13 @@ One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns 
 
 **Severity**: Low (the preload coverage gap: Medium)
 
-- **`src/preload/index.ts` is barely covered.** Measured at #124 QG-8: 54 % lines, 12.5 % functions. The preload project as a whole is at 64.45 % lines / 30.40 % functions, below the 80 % line target, entirely because of this file; #124's own `previewBridge.ts` is at 100 %. The preload floors were raised only to what is met today. **Update (v0.22.0)**: the project-wide preload floors are now the measured values rounded down, minus one point: 74 % lines, 53 % functions, 97 % branches and 74 % statements (`vitest.preload.config.ts`), so functions are still well under the target.
+- **`src/preload/index.ts` is barely covered.** Measured at #124 QG-8: 54 % lines, 12.5 % functions. The preload project as a whole is at 64.45 % lines / 30.40 % functions, below the 80 % line target, entirely because of this file; #124's own `previewBridge.ts` is at 100 %. The preload floors were raised only to what is met today. **Update (v0.22.0)**: the project-wide preload floors were set to the measured values rounded down, minus one point: 74 % lines, 53 % functions, 97 % branches and 74 % statements. **Update (2026-10-25)**: re-measured after the vitest 3 → 5 upgrade, which counts `index.ts` very differently; the floors in `vitest.preload.config.ts` are now 97 % lines, 97 % functions, 97 % branches and 98 % statements, so this gap is closed as measured.
 - **Prettier config and code disagree on arrow parentheses.** `.prettierrc.json` says `"arrowParens": "avoid"`, while most single-parameter arrows in `src/` are written with parentheses. Nothing runs `prettier --check` in CI, so the mismatch is invisible until someone runs `npm run format`, which would rewrite a large share of the tree. Decide which way, then either change the setting or reformat in one commit.
-- **The vitest advisory** (GHSA-82fw-gwwq-j7x9, three moderate dev-only findings in `vitest`, `@vitest/mocker` and `@vitest/coverage-v8`) needs a major upgrade and is tracked in [#126](https://github.com/qodeca/erfana/issues/126). Not shipped in the app.
-- ~~**electron-builder 26.16.1**, a non-major release after the pinned 26.15.3, was flagged by the #124 audit and not yet evaluated.~~ ✅ Done: `package.json` pins `electron-builder` 26.16.1, which ships with v0.22.0 (prepared for 0.21.0, [#163](https://github.com/qodeca/erfana/issues/163)) and cleared the nine build-time advisories the old `@electron/rebuild` pin held in place.
-- **`MonacoPage.focus()` clicks once, too early after mount** (`e2e/pages/monaco.page.ts`), so focus can land on the panel instead of the editor – the root cause of the pre-existing `markdown-toolbar.e2e.ts` flake. #124 fixed that spec locally (a `focusEditor()` retry); the shared page object still lacks the retry.
+- ~~**The vitest advisory** (GHSA-82fw-gwwq-j7x9, three moderate dev-only findings in `vitest`, `@vitest/mocker` and `@vitest/coverage-v8`) needs a major upgrade~~ – the major upgrade has landed: `package.json` now pins `vitest` and `@vitest/coverage-v8` at `^5.0.5` (tracked in [#126](https://github.com/qodeca/erfana/issues/126); that it clears the advisory is inferred, not re-audited here). Not shipped in the app.
+- ~~**electron-builder 26.16.1**, a non-major release after the pinned 26.15.3, was flagged by the #124 audit and not yet evaluated.~~ ✅ Done: `electron-builder` 26.16.1 (prepared for 0.21.0, [#163](https://github.com/qodeca/erfana/issues/163)) shipped with v0.22.0 and cleared the nine build-time advisories the old `@electron/rebuild` pin held in place; `package.json` now pins 26.18.0.
+- ~~**`MonacoPage.focus()` clicks once, too early after mount**~~ ✅ Done: `MonacoPage.focus()` (`e2e/pages/monaco.page.ts`) now clicks again until Monaco reports focus (`toPass({ timeout: 4000 })`).
 - **Four small review carry-overs:** `createMockMenuContext` (`ProjectTree/__test__/testUtils.ts`) has no `openInBrowser`, so tests pass an override; the `suggestedName` parameter of `exportPdf` in `PreviewViewService.ts` / `previewViewTypes.ts` is now a fallback and should be renamed `fallbackName`; the same-tab Find e2e checks the match total, not the "1 of 1" text; `e2e/pages/html-preview.navigation.ts` keeps its own `dismissAllToasts` copy instead of importing the shared one from `html-preview.browser.ts`.
-- **Main coverage instruments one shared file** (QG-11a Q10). The `vitest.main.config.ts` coverage `include` names `src/shared/ipc/browser-schema.ts` and no other `src/shared` module, so #124's shared modules (`src/shared/ipc/preview-navigation-schema.ts`, `dropReporter.ts`, `stablePathDigest.ts`, `previewNavKeys.ts`) cannot carry per-file floors. Fix: include `src/shared/**/*.ts` and add floors for those modules.
+- **Main coverage floors for shared modules** (QG-11a Q10). The `vitest.main.config.ts` coverage `include` now instruments all of `src/shared/**/*.{ts,tsx}`, but #124's shared modules (`src/shared/ipc/preview-navigation-schema.ts`, `dropReporter.ts`, `stablePathDigest.ts`, `previewNavKeys.ts`) still carry no per-file floor. Fix: add floors for those modules.
 
 **Status**: Open — recorded at #124 Phases 8–10 and QG-11a.
 

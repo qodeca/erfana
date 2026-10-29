@@ -1,0 +1,28 @@
+// Markdown structure lint for the user-facing docs (npm run lint:docs).
+// The scope matches docs/user-guide/claims.json: the guide and the six user pages beside it.
+{
+  "globs": [
+    "README.md",
+    "docs/user-guide/**/*.md",
+    "docs/getting-started.md",
+    "docs/keyboard-shortcuts.md",
+    "docs/settings.md",
+    "docs/troubleshooting.md",
+    "docs/quick-reference.md"
+  ],
+  "config": {
+    "default": true,
+    // Prose is one paragraph per line; wrapping is the editor's job.
+    "MD013": false,
+    // Every page starts with the SPDX header comment (REUSE.toml), so the H1 is not line 1.
+    "MD041": false,
+    // Repeated H3 names under different H2s ("What it does", "How to reach it") are the reference-page pattern.
+    "MD024": { "siblings_only": true },
+    // HTML the guide uses on purpose: <kbd> shortcut notation (Writing card), the README header and badges.
+    "MD033": { "allowed_elements": ["kbd", "br", "img", "a", "p", "picture", "source", "details", "summary", "sup", "sub", "strong", "div", "h1"] },
+    // Table pipes are aligned by content, not padded into columns.
+    "MD060": false,
+    // maintaining-this-guide.md: a reference feature is described under bold **What it does** / **How to reach it** lead-ins, not headings.
+    "MD036": false
+  }
+}

@@ -5,15 +5,15 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 
 # Edit and preview Markdown
 
-Use the view-mode buttons to work in the editor, preview, or both. Erfana autosaves after typing stops; if a file changes outside Erfana while you have unsaved edits, choose **Reload from Disk** or **Keep My Version**. With no local edits, Erfana reloads the disk change automatically.
+Use the view-mode buttons to work in the editor, preview, or both. Erfana autosaves 2 seconds after you stop typing. If a file changes outside Erfana while you have unsaved edits, choose **Reload from Disk** or **Keep My Version**. With no local edits, Erfana reloads the disk change automatically.
 
 **Before you start:** select a Markdown file in the project tree.
 
 ## Choose a view
 
-1. Select **Editor Only**, **Split Horizontal**, **Split Vertical**, or **Preview Only** on the toolbar.
-2. Use the formatting buttons or standard editor shortcuts while the editor has focus.
-3. Select **Find** to search the open document.
+1. Select **Editor Only**, **Split Horizontal (Preview Top)**, **Split Vertical (Side by Side)**, or **Preview Only** on the toolbar.
+2. In **Editor Only** or **Split Vertical (Side by Side)**, use the formatting buttons, such as **Bold** (<kbd>⌘B</kbd> / <kbd>Ctrl+B</kbd>).
+3. Select **Find** (<kbd>⌘F</kbd> / <kbd>Ctrl+F</kbd>) to search the open document.
 
 ![Screenshot of the Markdown view-mode toolbar with Split Vertical active.](../images/edit-and-preview/view-modes.png)
 ![Screenshot of a document in Split Horizontal view.](../images/edit-and-preview/split-horizontal.png)
@@ -24,7 +24,7 @@ Use the view-mode buttons to work in the editor, preview, or both. Erfana autosa
 
 ## What happens next / If something goes wrong
 
-The close prompt protects an unsaved buffer. Use [troubleshooting](../reference/troubleshooting.md) for an unavailable panel.
+If you close a tab with unsaved changes, Erfana asks first. Select **Close Without Saving** to discard them. Use [troubleshooting](../reference/troubleshooting.md) for an unavailable panel.
 
 ## Related
 

@@ -6,18 +6,23 @@
 ```typescript
 // MarkdownPreview.tsx – sanitizationSchema spreads hast-util-sanitize's defaultSchema
 // and extends it (e.g. the tel: href protocol)
-const rehypePlugins: PluggableList = [
+// buildRehypePlugins(lineOffset, linkSink) – memoised per frontmatter height
+return [
   rehypeRaw,  // Parse HTML in markdown
-  [rehypeSanitize, sanitizationSchema]  // Security sanitization
+  [rehypeSanitize, sanitizationSchema],  // Security sanitization
+  rehypeHeadingIds,  // after sanitize: no user-content- prefix on heading ids
+  [rehypeShiftLines, { offset: lineOffset }],  // line numbers past the frontmatter
+  [rehypeCollectLinks, { sink: linkSink }]  // internal links for the broken-link checks
 ]
 ```
 
 ### Custom Components
 ```typescript
 const components = {
-  div: withLineRange('div'),
-  section: withLineRange('section'),
-  img({ node, src, alt, title, width, height, ...props }) { /* inline handler with explicit attribute handling */ },
+  div: withRange('div'),  // withRange is withLineRange
+  section: withRange('section'),
+  img({ node, src, alt, title, width, height, ...props }) { /* renders <MarkdownImage> */ },
+  source() { return null },  // <picture><source> never rendered; falls back to its <img>
   // ... more components
 }
 ```
@@ -44,29 +49,24 @@ const components = {
 
 ## Image Handling
 
-Special handling for `<img>` elements:
+Special handling for `<img>` elements – the renderer hands every image to `MarkdownImage`, which classifies the `src` and reads project-relative files through the main process (see [Markdown Preview § Images](../editor/markdown-preview.md#images-71)):
 ```typescript
-// Explicitly preserve attributes
-img: ({ src, alt, title, width, height, ...props }) => (
-  <img
-    src={src}
-    alt={alt || ''}
-    title={title}
-    width={width}
-    height={height}
-    {...extractLineRange(props)}
-  />
-)
+img({ node, src, alt, title, width, height, ...props }) {
+  const range = extractRange(node)
+  return (
+    <MarkdownImage
+      src={src}
+      alt={alt}
+      title={title}
+      width={width}
+      height={height}
+      lineStart={range?.start}
+      lineEnd={range?.end}
+      rest={props}
+    />
+  )
+}
 ```
-
-## Performance Metrics
-
-| Document Size | HTML % | Overhead |
-|--------------|--------|----------|
-| 10KB | 0% | 0% |
-| 10KB | 20% | 15% |
-| 50KB | 50% | 33% |
-| 100KB | 70% | 37% |
 
 ## Common Issues
 
@@ -124,10 +124,11 @@ const customSchema = {
 
 ## Files
 
-- `MarkdownPreview.tsx` – `sanitizationSchema` and the `rehypePlugins` list (plugin configuration)
-- `MarkdownPreview.tsx` – the inline `img(...)` component handler
+- `MarkdownPreview.tsx` – `sanitizationSchema` and `buildRehypePlugins()` (plugin configuration)
+- `previewRehypePlugins.ts` – `rehypeHeadingIds`, `rehypeShiftLines`, `rehypeCollectLinks`
+- `MarkdownPreview.tsx` – the `img(...)` component handler; `MarkdownImage.tsx` does the work
 - `MarkdownPreview.tsx` – `withLineRange()` and the `components` map (component support)
-- `src/renderer/index.html` - CSP headers
+- `src/renderer/index.html` – CSP `<meta>` tag
 
 ## References
 

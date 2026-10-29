@@ -359,6 +359,8 @@ Cards: docs/designs/comments/html-comments/overlay.html (a11y note); docs/design
 
 **Problem.** On white HTML pages the 22% fill vanishes and the dark 1px line reads as a hyperlink (selection.css:30-36). Markdown draws the same object differently: a text-decoration that breaks at descenders, over `--color-brand-violet-muted`. That is exactly `--color-bg-selected` (design-tokens.css:94; markdown-comments.css:240-256), so 'commented' looks like 'selected'. Active fills differ (38% vs 40%). In forced colours both marks use Highlight/HighlightText, identical to the live selection (selection.css:39-41).
 
+> Status (2026-10-29): the selection and Markdown cards have since adopted the C-12 mark and its forced-colours mapping, so the card line numbers above describe the cards as reviewed on 2026-10-28, not as they are now.
+
 **Design.**
 
 New tokens in design-tokens.css:
@@ -567,7 +569,9 @@ Cards: docs/designs/comments/html-comments/toolbar.html; docs/designs/comments/h
 
 **Window hierarchy: disabled primary looks disabled, quote is clamped, labels stop covering text** – P1, surfaces: shared, html-shipped, markdown-proposed. Source findings: VIS-05, VIS-09, VIS-07.
 
-**Problem.** Disabled primary keeps its full accent fill; only the label dims (comments.css:182-183, verified), so blocked Save looks pressable. Quotes are `--text-md` `--color-text-bright` and unclamped (markdown-comments.css:402-411; selection.css:46-55), outranking the comment. The hover label sits above the outline and covers the line above, worst in tightly stacked Markdown (markdown-comments.css:277-284).
+**Problem.** Disabled primary keeps its full accent fill; only the label dims (CommentWindow.css:166-172 in the shipped window, verified), so blocked Save looks pressable. Quotes are `--text-md` `--color-text-bright` and unclamped (markdown-comments.css:357-366; selection.css:69-77), outranking the comment. The hover label sits above the outline and covers the line above, worst in tightly stacked Markdown.
+
+> Status (2026-10-29): the Markdown card has since dropped its floating label (the C-21 label change below); the HTML label is unchanged.
 
 **Design.**
 
@@ -663,7 +667,7 @@ Cards: docs/designs/comments/html-comments/window.html (pass layout); docs/desig
 
 **Group drawer rows by file; compact banner actions** – P2, surfaces: html-shipped, markdown-proposed. Source findings: STA-11, VIS-12.
 
-**Problem.** The drawer draws one heading from the first row (CommentDrawer.tsx:367-370), so frame rows sit under the page's heading, or the heading names a frame file. Banner actions use full-size buttons that stack unevenly (comments.css:316), giving the unsaved-source window four heavy buttons.
+**Problem.** The drawer draws one heading from the first row (CommentDrawer.tsx:367-370), so frame rows sit under the page's heading, or the heading names a frame file. Banner actions use full-size buttons that stack unevenly (CommentWindow.css:413-418), giving the unsaved-source window four heavy buttons.
 
 **Design.**
 

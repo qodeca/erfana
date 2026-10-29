@@ -158,7 +158,7 @@ export async function launch(opts: LaunchOptions = {}): Promise<Capture> {
  */
 export async function openProject(cap: Capture, { waitForShell = true } = {}): Promise<void> {
   const { page, sandbox: sb } = cap
-  await page.evaluate((p) => (window as unknown as { api: { file: { openProjectByPath: (p: string) => Promise<string> } } }).api.file.openProjectByPath(p), sb.project)
+  await page.evaluate((projectPath) => (window as unknown as { api: { file: { openProjectByPath: (request: { projectPath: string }) => Promise<string> } } }).api.file.openProjectByPath({ projectPath }), sb.project)
   await expect(page.getByTestId(TEST_IDS.PROJECT_TREE)).toBeVisible({ timeout: 20_000 })
   if (waitForShell) {
     await ensureTerminalOpen(page)

@@ -35,7 +35,7 @@ preload: {
 
 In electron-vite v5, dependency externalization is enabled by default for all targets. The preload must explicitly disable it with `externalizeDeps: false` to bundle dependencies inline.
 
-**Four entry points, not one.** Each privileged window gets the smallest bridge that does its job: the screenshot overlays get the overlay-only IPC verbs, and the image-export harness gets four (`ready`, `onRender`, `postResult`, `log`) and deliberately **not** `imageExport.run` – so a page whose whole purpose is decoding untrusted image bytes has no reachable route to the channel that writes files. The sealed HTML-preview page's preload exposes nothing to the page at all – it only tells main about link clicks and CSP refusals. All four entries are bundled the same way; all four must stay sandbox-safe.
+**Four entry points, not one.** Each privileged window gets the smallest bridge that does its job: the screenshot overlays get the overlay-only IPC verbs, and the image-export harness gets four (`ready`, `onRender`, `postResult`, `log`) and deliberately **not** `imageExport.run` – so a page whose whole purpose is decoding untrusted image bytes has no reachable route to the channel that writes files. The sealed HTML-preview page's preload exposes nothing to the page at all – it tells main about link clicks and CSP refusals, and hosts the HTML Preview comment overlay, whose `preview-page:commentState` listener is its one receive channel. All four entries are bundled the same way; all four must stay sandbox-safe.
 
 ---
 
@@ -71,9 +71,12 @@ Set `build.externalizeDeps: false` in the preload config, allowing Vite to bundl
 
 ### Result
 
-- `out/preload/index.js`: ~38 kB bundled (38,119 bytes as built for v0.17.0; v0.17.0 grew it by ~1 kB over v0.16.3 by adding the `api.system` bridge and `screenshot.getScreenPermission`; #73 adds the small `api.imageExport` bridge on top and the figure has not been re-measured)
-- `out/preload/screenshotOverlay.js`: ~1.3 kB bundled
-- `out/preload/imageExport.js`: small, and by construction dependency-free
+Sizes measured 2026-10-29 at `77decaea`:
+
+- `out/preload/index.js`: ~38 kB bundled (38,025 bytes)
+- `out/preload/screenshotOverlay.js`: ~1.8 kB bundled
+- `out/preload/imageExport.js`: ~1.5 kB, and by construction dependency-free
+- `out/preload/previewPage.js`: ~80 kB bundled (the link and CSP notes plus the comment overlay)
 - No external dependency requires
 - Compatible with sandboxing
 

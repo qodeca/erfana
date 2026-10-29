@@ -1,6 +1,6 @@
 # E2E selector catalog
 
-All `data-testid` attributes available for E2E testing – **350 testids** across 38 sections (counted against `testids.ts` on 2026-10-26).
+All `data-testid` attributes available for E2E testing – **351 testids** across 38 sections (counted against `testids.ts` and `commentTestids.ts` on 2026-10-29).
 
 **Related documentation**:
 - [E2E Testing Guide](./e2e-testing.md) – Main E2E documentation
@@ -8,6 +8,8 @@ All `data-testid` attributes available for E2E testing – **350 testids** acros
 - Spec #011 (archived) – Specification
 
 > **Scope of the automated check**: `testids.test.ts` asserts per-section counts against `testids.ts` – it validates the **source of truth, not this page**. Nothing fails when a table here drifts, so add the row by hand whenever you add a testid.
+>
+> **How the sections are grouped**: each heading's count is the number of constants in that group, matching the per-group `toHaveLength` assertions in `testids.test.ts`, which select constants by key prefix (`TERMINAL_`, `SCREEN_PERMISSION`, `TOAST` and so on). Two groups differ from the block layout of `testids.ts`: the screen permission dialog ids sit inside its `// Terminal Panel` block but are counted as their own group here, and the comment ids come from `commentTestids.ts`. The `// Name (N)` banner comments in `testids.ts` are not checked by any test, and six of them lag the real counts: Project Tree (16, really 17), Terminal Panel (14, really 18 with the screen permission ids), Dialogs - File Picker (5, really 6), Toast Notification (6, really 8), Settings Overlay (27, really 33) and HTML Preview Comments in `commentTestids.ts` (76, really 77).
 
 ---
 
@@ -560,7 +562,7 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 
 ---
 
-## HTML Preview comments (76 testids)
+## HTML Preview comments (77 testids)
 
 Constants: `TEST_IDS.COMMENT_*` (defined in `src/renderer/src/constants/commentTestids.ts`, spread into `TEST_IDS`). Rows, messages, threads and tags repeat – scope them with a parent locator (`drawer.getByTestId(…)`, `.nth(i)`).
 
@@ -668,6 +670,7 @@ Constants: `TEST_IDS.COMMENT_*` (defined in `src/renderer/src/constants/commentT
 | `comment-drawer-row-open` | A row's Open (the comment window) | static |
 | `comment-drawer-tag` | A tag on a row | static |
 | `comment-drawer-error` | List read error with Try again | static |
+| `comment-drawer-unread` | Note that main left files out of the list (its file count or byte budget) | static |
 
 **Settings**
 

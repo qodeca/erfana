@@ -52,16 +52,17 @@ Collapsible panels with chevron toggle (VS Code pattern).
 
 ### Pattern
 
-Header with ChevronDown/ChevronLeft icon (8px spacing). Click toggles visibility with 150ms rotation transition.
+Header with a ChevronDown (open) / ChevronLeft (closed) icon. Click toggles visibility; the icon is swapped, not rotated, and only the hover/active colours transition (`--transition-normal`).
 
-**Implementation** (`ProjectPanel.tsx` swaps the icon rather than rotating one):
+**Implementation** (`ProjectPanel.tsx`; the toggle is a `<span>` with a `title`, not a `<button>`):
 ```typescript
-const [show, setShow] = useState(true)
-
-<button className="control-panel-chevron" onClick={() => setShow(!show)}>
-  {show ? <ChevronDown size={16} strokeWidth={2} /> : <ChevronLeft size={16} strokeWidth={2} />}
-</button>
-{show && <div className="control-panel">{/* Controls */}</div>}
+<span
+  className="control-panel-chevron"
+  onClick={() => setShowControlPanel(!showControlPanel)}
+  title={showControlPanel ? 'Hide Filter Options' : 'Show Filter Options'}
+>
+  {showControlPanel ? <ChevronDown size={16} strokeWidth={2} /> : <ChevronLeft size={16} strokeWidth={2} />}
+</span>
 ```
 
 **CSS**: `.control-panel-chevron` (plus `:hover` / `:active`) in `ProjectPanel.css`
@@ -78,7 +79,7 @@ Hierarchical file tree with filtering, visual indicators, context menu operation
 - File filtering (All Files | Markdown Only) with recursive logic
 - Sensitive file detection (credentials, keys, certificates, dotfile secrets)
 - Hidden file styling (dotfiles, 70% opacity)
-- Context menu (Open as source, Open in default browser (both HTML files only), Cut, Copy, Paste, New File, New Folder, Rename, Import…, Delete, Reveal in Finder / Show in Explorer – built per node type by `context-menu/strategies.tsx`)
+- Context menu (Open as source, Open in default browser (both HTML files only), Cut, Copy, Paste, New File, New Folder, Rename, Import..., Delete, Reveal in Finder / Reveal in Explorer / Reveal in File Manager – built per node type by `context-menu/strategies.tsx`)
 - Auto-refresh via directory watching
 
 📚 **Full docs**: [Project Panel](./project-panel.md)
@@ -320,8 +321,8 @@ other panel id is derived, see `utils/openFileInPanel.ts`.
 
 ### Add Activity Bar Item
 
-1. Update `activityBarConfig.ts`: `{ id, icon, label, shortcut }`
-2. Map ID in `AppDockLayout.tsx`
+1. Update `activityBarConfig.ts`: `{ id, icon, label, tooltip, side, dockviewPanelId, order }` plus optional `keyboardShortcut`, `enabled`, `requiresProject`, `testId`, `badge`
+2. Map the component in the `splitviewComponents` registry in `AppDockLayout.tsx`
 3. Create splitview panel component
 
 ### Toggle Panel
@@ -481,7 +482,7 @@ Opens when clicking image files (PNG, JPG, GIF, WebP, SVG, BMP, ICO) in the proj
 - `imageViewer.logic.ts` - Pure functions for zoom, pan, keyboard actions
 - `imageViewerStatus.logic.ts` - Status precedence, clock formatting, all copy constants — including the export copy deck (tooltips, accessible names, busy names, announcements, toast titles)
 - `imageExportToast.logic.ts` - Pure `formatExportToast` plus the qualifier builders (#73). It composes, it does not author: every qualifier — which GIF frame, which ICO size, the SVG's 2x factor — is built from the structured `selection` the main process reported *after* the export, never from a guess about the file, so the toast cannot claim something the export did not do. A cancelled export produces no toast and no announcement at all. Basenames are middle-truncated, because `.toast-message` has a max width and no `overflow-wrap`
-- `ImageViewerPanel.module.css` - The one remaining CSS module in the app
+- `ImageViewerPanel.module.css` - The panel's styles, as a CSS module
 - `imageUtils.ts` (in `utils/`) - Image format detection, MIME types
 - Watch subscription comes from `src/renderer/src/hooks/useFileChangeSubscription.ts` — see [File Watching](./file-watching/README.md#single-file-watch-internals-70)
 

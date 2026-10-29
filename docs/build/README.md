@@ -1,6 +1,6 @@
 # Build Documentation
 
-**Last updated**: October 2026 (v0.22.0)
+**Last updated**: October 2026 (v0.23.1)
 
 This directory contains detailed documentation for Erfana's production build configuration.
 
@@ -61,13 +61,13 @@ npm ci
 # - Rebuild native modules (node-pty) for current platform
 ```
 
-**Important**: The `postinstall` script is `patch-package && electron-builder install-app-deps`. `patch-package` first applies the committed `patches/node-pty+1.1.0.patch` (which fixes two `node-pty` build failures on default-hardened Windows 11 — a `cmd.exe` current-directory resolution failure under `NoDefaultCurrentDirectoryInExePath=1` and an MSVC Spectre-libs requirement; see [windows.md](./windows.md#node-pty-build-failures-on-windows-11)), then `electron-builder install-app-deps` rebuilds native modules for Electron's Node.js version.
+**Important**: The `postinstall` script is `patch-package && install-electron && electron-builder install-app-deps`. `patch-package` first applies the committed `patches/node-pty+1.1.0.patch` (which fixes two `node-pty` build failures on default-hardened Windows 11 — a `cmd.exe` current-directory resolution failure under `NoDefaultCurrentDirectoryInExePath=1` and an MSVC Spectre-libs requirement; see [windows.md](./windows.md#node-pty-build-failures-on-windows-11)), then `install-electron` (the `electron` package's own bin) downloads the Electron binary, and `electron-builder install-app-deps` rebuilds native modules for Electron's Node.js version.
 
 > **Maintenance note**: the patch is keyed to the exact resolved version (`node-pty+1.1.0.patch`). When `node-pty` is bumped, regenerate the patch and re-commit it:
 > ```bash
 > npx patch-package node-pty --include '\.gyp$'
 > ```
-> CI installs with `npm ci --ignore-scripts`, so the `setup-node-with-retry` composite action runs `npx --no-install patch-package --error-on-fail` explicitly before its `npm rebuild` loop — `--error-on-fail` makes a stale patch (e.g. after an un-regenerated bump) fail the build loudly rather than silently skip.
+> CI installs with `npm ci --ignore-scripts`, so the `setup-node-with-retry` composite action runs `npx --no-install patch-package --error-on-fail` and `npx --no-install install-electron` explicitly before its `npm rebuild` loop — `--error-on-fail` makes a stale patch (e.g. after an un-regenerated bump) fail the build loudly rather than silently skip.
 
 ### Clean State (Recommended)
 
@@ -90,11 +90,9 @@ npm ci
 
 1. **prebuild**: `node scripts/prebuild.mjs` creates the `aproba` stub (automatic — npm runs it before `npm run build`, which both `build:mac` and `build:win` call)
 2. **Typecheck**: Verify TypeScript compilation
-3. **Vite Build**: Bundle application code (measured on the v0.17.0 tree). The main and preload targets are **multi-entry** — each extra `rollupOptions.input` key in [electron.vite.config.ts](../../electron.vite.config.ts) is a separately-loaded process/child, not a code-split chunk. The *why* lives with each feature (git status off the main thread, DOCX conversion in a killable child, per-display overlay windows); this list is the build-output inventory.
-   - Main process, entry `index`: ~319 kB minified, `out/main/index.js` (externalized dependencies), plus a shared chunk under `out/main/chunks/` (`git-schema-*.js`, ~3.5 kB)
-   - Main process, entry `git-status.worker`: ~7.5 kB, `out/main/git-status.worker.js` — the `worker_threads` worker that runs git status off the main thread (see [../api-services-features.md](../api-services-features.md) § GitStatusService)
-   - Main process, entry `docx/docx-convert.process`: ~1.4 kB, `out/main/docx/docx-convert.process.js` — the isolated, killable `utilityProcess` child that runs DOCX conversion out-of-thread (see [../api-services-features.md](../api-services-features.md) DocxService and the process-isolation decision in [../architecture.md](../architecture.md))
-   - Preload, four entries (re-measured 2026-09-15 at `e578f71f`): ~48 kB `out/preload/index.js` (main editor window), ~1.8 kB `out/preload/screenshotOverlay.js` (per-display area-select overlay windows), ~1.5 kB `out/preload/imageExport.js` (hidden image-export rasterize window) and ~2.6 kB `out/preload/previewPage.js` (the sealed HTML-preview page) – all bundled, see [preload.md](./preload.md)
+3. **Vite Build**: Bundle application code (sizes measured 2026-10-29 at `77decaea`). The main and preload targets are **multi-entry** — each extra `rollupOptions.input` key in [electron.vite.config.ts](../../electron.vite.config.ts) is a separately-loaded process/child, not a code-split chunk. The *why* lives with each feature (git status, comment parsing and link scanning off the main thread, DOCX conversion in a killable child, per-display overlay windows); this list is the build-output inventory.
+   - Main process, five entries: `index` (~670 kB, `out/main/index.js`, externalized dependencies, plus shared chunks under `out/main/chunks/`); `git-status.worker` (~8.5 kB) – the `worker_threads` worker that runs git status off the main thread (see [../api-services-features.md](../api-services-features.md) § GitStatusService); `comment-parse.worker` (~8.6 kB) – the HTML Preview comments parse worker; `preview-link-scan.worker` (~9 kB) – the HTML Preview link scan worker; and `docx/docx-convert.process` (~2.7 kB) – the isolated, killable `utilityProcess` child that runs DOCX conversion out-of-thread (see [../api-services-features.md](../api-services-features.md) DocxService and the process-isolation decision in [../architecture.md](../architecture.md))
+   - Preload, four entries: ~38 kB `out/preload/index.js` (main editor window), ~1.8 kB `out/preload/screenshotOverlay.js` (per-display area-select overlay windows), ~1.5 kB `out/preload/imageExport.js` (hidden image-export rasterize window) and ~80 kB `out/preload/previewPage.js` (the sealed HTML-preview page, including the comment overlay) – all bundled, see [preload.md](./preload.md)
    - Renderer, two entries: ~36 MB across `out/renderer/` (Monaco, Mermaid, xterm.js included; re-measured 2026-09-15). `index.html` is the app window; `imageExport.html` is the hidden rasterize harness for image export, a page of its own so it never loads the app or `window.api`
 4. **beforePack hook (v0.10.0)**: `scripts/ensure-media-binaries.js` downloads a hardcoded per-platform arch set of `ffmpeg-static` binaries — `x64` **and** `arm64` on macOS, `process.arch` on every other platform, independent of the configured build target — into a build cache at `release/.media-cache/<platform>-<arch>/`. Each is verified against a ~1 MB size floor and, where `FFMPEG_SHA256` carries a pin, a SHA-256. Only `darwin-x64` and `darwin-arm64` are pinned today; `win32-x64` falls back to size-only verification (see [fuses.md](./fuses.md#afterpack-also-stages-and-verifies-the-media-binaries)). This replaces the single-arch download-at-install pattern that produced the v0.9.6 video-transcription ENOENT. The cache is **not** `extraResources` — the copy into the bundle happens later, in `afterPack`.
 5. **electron-builder Package**: Create platform packages. `extraResources` holds exactly three things: `resources/tessdata` (offline OCR language data), `LICENSE`, and `THIRD-PARTY-LICENSES.md` (shipped to meet the GPL-3.0-only and third-party attribution obligations)
@@ -103,7 +101,7 @@ npm ci
    - Restore node-pty `spawn-helper` executable bit (`0755`)
    - Copy this pack's cached `ffmpeg` into `app/node_modules/ffmpeg-static/`, re-run the same verification at the packed path (size floor always; SHA-256 only on pinned arches — macOS today, not Windows), and chmod it plus every bundled `ffprobe`
    - Prune foreign-platform/arch `ffprobe-static` binaries (keeps only the target, ~260 MB saved on mac)
-   - Prune foreign node-pty prebuilds, and strip `.pdb` debug symbols from the kept Windows prebuild
+   - Prune foreign node-pty prebuilds, and strip `.pdb` debug symbols from the kept Windows prebuild; on Windows, also require the patched source-built `conpty.node` and delete the prebuild's unpatched copy (#305)
    - Each prune is keep-then-verify (fails the build rather than shipping a binary-less bundle)
    - Verify the packed `app/` tree against the `files:` allowlist — depth-1 entries, symlink containment, main-entry presence — and refuse to continue if it does not match (issue #43; see [fuses.md](./fuses.md#afterpack-also-verifies-the-packed-app-contents))
    - Last, verify the `extraFiles`/`extraResources` destinations beside and above `app/` (issue #55): a merged-config shape check (folding platform-scoped `--config.win.*` overrides), a fatal leak-name tripwire on both platforms, a full-sibling enumeration (fatal on macOS, advisory on Windows pending a real Windows packed-tree baseline), and a coarse repo-leak tripwire at the `extraFiles` dest. The Windows-advisory softening is deliberate — the Electron-owned sibling names were enumerated on macOS and CI never packs on Windows, so a fatal both-platforms enumeration could false-fail the first Windows release. See [fuses.md § Extra-content destinations](./fuses.md#extra-content-destinations--extrafiles--extraresources-issue-55)

@@ -13,7 +13,7 @@ Prompt templates send the selected text, with instructions, to the CLI agent run
 1. Right-click selected text in preview or editor
 2. Choose action: **Explain**, **Modify**, **Ask**, **Visualize**, or custom template
 3. Prompt sent to Terminal panel
-4. The prompt runs immediately: every shipped template sets `autoExecute: true`, so Erfana pastes it into the terminal and presses Enter
+4. The prompt runs immediately: the preview context-menu templates all set `autoExecute: true`, so Erfana pastes it into the terminal and presses Enter
 
 Templates split into two categories: **read-only** prompts (Explain, Ask, Prompt) produce a terminal response and leave the document untouched, and **mutation** prompts (Modify, Visualize, the three Mermaid templates) edit the file in place via the CLI agent's Edit tool — see [Mutation prompts and the apply-to-document footer](#mutation-prompts-and-the-apply-to-document-footer) (v0.10.0).
 
@@ -95,13 +95,7 @@ Expected response structure.
 
 ## Thinking Triggers
 
-Templates can include thinking triggers for Claude Code to enable deeper analysis:
-
-| Trigger | Token Budget | Usage |
-|---------|--------------|-------|
-| "think" | ~4,000 | Baseline analysis |
-| "think hard" | ~10,000 | Complex tasks |
-| "ultrathink" | ~32,000 | Very complex problems |
+Templates can include thinking phrases that ask the CLI agent for deeper analysis. How an agent responds to them is the agent's own behaviour, not Erfana's.
 
 **Applied in templates:**
 - `ask.md` and `editor-ask.md`: "Think about the question..."

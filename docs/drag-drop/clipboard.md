@@ -97,27 +97,26 @@ copy: (path: string, name: string, type: 'file' | 'directory') => {
 ### Paste Operation
 ```typescript
 // useClipboardStore.ts
-paste: async (targetPath: string) => {
-  const { itemPath, operation, itemName, itemType } = get()
+paste: async (targetPath: string, replaceExisting?: boolean) => {
+  const state = get()
 
-  if (!itemPath || !operation || !itemName || !itemType) {
+  if (!state.itemPath || !state.operation) {
     return { success: false, error: 'No item in clipboard' }
   }
 
   try {
-    if (operation === 'cut') {
-      // Move operation
-      const result = await window.api.file.moveItem(itemPath, targetPath, itemName)
-      clear() // Clear clipboard after cut
-      return { success: true, newPath: result.path }
+    let result: { path: string; isSymlink?: boolean }
+    if (state.operation === 'cut') {
+      // Move through the injected file operations, then clear the clipboard
+      result = await fileOps.moveItem({ sourcePath: state.itemPath, targetParentPath: targetPath, replaceExisting })
+      set({ itemPath: null, operation: null, itemName: null, itemType: null })
     } else {
-      // Copy operation
-      const result = await window.api.file.copyItem(itemPath, targetPath, itemName)
-      // Keep clipboard for multiple paste
-      return { success: true, newPath: result.path }
+      // Copy; the clipboard is kept for multiple pastes
+      result = await fileOps.copyItem({ sourcePath: state.itemPath, targetParentPath: targetPath })
     }
+    return { success: true, newPath: result.path, isSymlink: result.isSymlink }
   } catch (error) {
-    return { success: false, error: String(error) }
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
   }
 }
 ```
@@ -142,7 +141,7 @@ export class CopyCommand extends CommandBase { /* same shape; toast title 'Copie
 export class PasteIntoDirectoryCommand extends CommandBase {
   label = 'Paste'
   // Only offered on directory nodes. For a cut, checks `api.checkConflict` first and asks
-  // "Replace item?" via `dialogs.showConfirm`; then runs `clipboard.paste(targetPath, replaceExisting)`
+  // "Replace Item" via `dialogs.showConfirm`; then runs `clipboard.paste(targetPath, replaceExisting)`
   // inside `ctx.withWatcherPause` and refreshes the project tree on success.
 }
 ```
@@ -150,11 +149,11 @@ export class PasteIntoDirectoryCommand extends CommandBase {
 ## Validation
 
 Paste validation checks:
-- Clipboard must not be empty
-- Target folder must be selected
-- Cannot paste folder into itself or its descendants
-- Target path must exist
-- User confirmation required for overwrites (move operations)
+- Clipboard must not be empty (`hasClipboard()`)
+- A target folder must be selected – otherwise the toast "Select a folder to paste into"
+- Cannot move a folder into itself or its descendants (main: "Cannot move a folder into its own subfolder")
+- The target must be an existing folder inside the project (`file:moveItem` / `file:copyItem` resolve it with `mustExist: true, kind: 'directory'`)
+- User confirmation required for overwrites (cut only; a copy auto-numbers instead)
 
 See [validation.md](./validation.md) for detailed rules.
 

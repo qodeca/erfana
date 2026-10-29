@@ -1,5 +1,7 @@
 # Graph engine architecture – overview and components
 
+> **Status:** proposal, not shipped – no graph-engine code exists in `src/` on `develop`, and spec 004 (graph foundation) is still `draft` in `specs/registry.json`.
+
 > This is part 1 of the architecture documentation, split for readability.
 >
 > **Other parts:**

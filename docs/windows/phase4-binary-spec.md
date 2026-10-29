@@ -65,7 +65,7 @@ Contained files (flat inside the zip – 4 sidecar DLLs + binary + docs). The fi
 | `LICENSE.whisper-cpp` | 1,099 | `bcd8ec749126d45cb06737d0690295d73df4b6e7e194205bcf91190368f27285` |
 | `NOTICE.md` | 470 | `e05fe0b5480fcca3e9a7968c5a574ee8b86596fb49338525b5a94c897c0192c5` |
 
-The 4 DLLs are the **sidecar integrity set** – `WhisperModelManager.isBinaryInstalled()` verifies each one's SHA-256 on every startup; `LocalWhisperService.transcribe()` re-hashes them pre-spawn (TOCTOU close).
+The 4 DLLs are the **sidecar integrity set** – `WhisperModelManager.isBinaryInstalled()` verifies each one's SHA-256 every time `ensureBinary()` runs (the Settings download and the start of each transcription); `LocalWhisperService.runWhisper()` re-hashes them pre-spawn (TOCTOU close).
 
 ### Manifest
 
@@ -116,7 +116,7 @@ Full manifest:
 4. Minimum accepted `revisionIndex` (`MIN_REVISION_INDEX`, now `2`; bumps with each new pin).
 5. Two embedded minisign public keys (primary + rotation) — `src/main/services/whisper-pubkeys.ts`.
 
-On app startup / first transcription:
+On install (the Settings download, or the first transcription when the binary is missing):
 
 1. Fetch `manifest.json` + `manifest.json.minisig` → verify signature against either pubkey.
 2. Assert manifest `revisionIndex` ≥ `max(MIN_REVISION_INDEX, persisted lastSeenRevision)` (downgrade block).

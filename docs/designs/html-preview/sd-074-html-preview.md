@@ -2,6 +2,8 @@
 
 **Issue**: [#74](https://github.com/qodeca/erfana/issues/74) | **Branch**: `feature/74-html-preview` off `develop` | **Tier**: 2 | **Complexity**: complex
 
+**Status**: shipped – merged to `develop` in PR #76; later revised by [sd-074b](sd-074b-preview-navigation-and-multiview.md) (#79) and [#124](multi-page/design-issue-124.md). This is the pre-merge design record: the file names, line numbers and test names in §7 and §8 are the plan, not a map of the code today (for example the e2e specs are `e2e/html-preview-*.e2e.ts`, and `isTrustedSender` lives in `src/main/ipc/senderValidation.ts`).
+
 Revision 5 – round 1 addressed QG-4a X1–X22; round 2 the QG-4b judge verdicts; round 3 the
 verification review (NEW-1…NEW-14 + the dependency-graph rebuild); round 4 the double-CSP-application
 bug and its adjacent wording. Verified library facts carry a file:line citation.

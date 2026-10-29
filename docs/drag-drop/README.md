@@ -7,14 +7,14 @@ Erfana's project tree supports VS Code-style drag-drop file reorganization with:
 - **Drag folders into folders** - Nested hierarchy manipulation
 - **Keyboard shortcuts** - Ctrl+X/C/V for cut/copy/paste operations
 - **Cross-filesystem support** - Automatic fallback for moves across volumes
-- **Conflict resolution** - Automatic numbering for copy operations, confirm dialog for moves
+- **Conflict resolution** - Automatic numbering for copy operations; a pasted cut asks "Replace Item" first, while a drag onto a folder that already holds the name fails with an error toast
 - **Feedback** - Toast notifications (`showGlobalToast`) confirm cut, copy, move and copy results and report failures; there is no ARIA live announcer (see [visual-feedback.md § Accessibility](./visual-feedback.md#accessibility))
 
 ## Quick Start
 
 ### Mouse Operations
 1. **Move files/folders**: Click and drag items to new locations
-2. **Auto-scroll**: Drag near top/bottom edge to scroll (50px threshold, 60fps)
+2. **Auto-scroll**: Drag near the top or bottom edge to scroll – dnd-kit's own `DndContext` auto-scroll, driven by the live pointer
 3. **Auto-expand**: Hover over folder for 1 second to auto-expand during drag
 4. **Drop to root**: Drag items onto the project root folder (first item in tree)
 
@@ -25,20 +25,20 @@ Erfana's project tree supports VS Code-style drag-drop file reorganization with:
 | `Ctrl+X` (Windows/Linux)<br>`Cmd+X` (macOS) | Cut | Mark file/folder for move operation |
 | `Ctrl+C` (Windows/Linux)<br>`Cmd+C` (macOS) | Copy | Mark file/folder for copy operation |
 | `Ctrl+V` (Windows/Linux)<br>`Cmd+V` (macOS) | Paste | Move/copy marked item to selected folder |
-| `Enter` | Confirm | Confirm move operation in dialog |
-| `Escape` | Cancel | Cancel current drag or dialog |
+| `Enter` | Activate | Activates the focused button of the "Replace Item" dialog, which opens with Cancel focused |
+| `Escape` | Cancel | Closes the "Replace Item" dialog without replacing |
 
 **Notes**:
 - Cut items appear dimmed with dashed underline until pasted
 - Paste only works when a folder is selected in the tree
-- Keyboard operations work identically to mouse drag-drop
+- Keyboard and menu paste ask before replacing a same-named item; a mouse drag does not
 - All operations respect the same validation rules
 
 ### Context Menu
 Right-click any file/folder in the project tree:
 - **Cut** - Same as Ctrl+X
 - **Copy** - Same as Ctrl+C
-- **Paste** - Same as Ctrl+V (only enabled when clipboard has item and folder is selected)
+- **Paste** - Same as Ctrl+V (shown only on folders, and only when the clipboard holds an item)
 
 ## Documentation Structure
 
@@ -62,13 +62,13 @@ Right-click any file/folder in the project tree:
 - No jumping or shifting during drag operations
 - Custom tree-aware collision detection
 - Visual feedback with folder highlighting
-- Subtle pulse animation during auto-expand countdown
+- Folder stays highlighted during the 1 s auto-expand countdown (no pulse animation)
 
 ### Robust File Operations
 - Atomic operations with rollback on failure
 - Symlink detection and handling
 - Cross-filesystem move support (fallback to copy+delete)
-- Conflict resolution with user confirmation
+- Replace confirmation when a pasted cut meets an existing name
 
 ## References
 
@@ -142,11 +142,11 @@ A move takes the original out of a folder outside the project, so main asks firs
 
 ### Batch document filtering
 
-When multiple files are dropped simultaneously, document files (PDF, Office, images supported by LiteParse) are **filtered out** of the batch and not moved/copied. Instead:
-- A warning toast notifies the user that document files require individual import
-- Non-document files proceed with the normal move/copy/import flow
-- To import document files, drop them individually – this opens the DocumentImportDialog with OCR, language, screenshot, and DPI options
-- If LibreOffice is missing (or found in an unsafe location), a dependency-missing modal appears that opens Settings → Import tools
+When a drop is added with **Import**, it goes through `processFiles` in `src/renderer/src/hooks/useImport.ts`, which skips document files (PDF, Office, images supported by LiteParse) and audio/video files. Move and Copy do not filter by type. In the Import path:
+- A mixed drop shows a "Document files skipped" warning toast and imports the rest
+- A drop of only document files is refused with "Document files not supported in batch"
+- To import a document with OCR, language, screenshot and DPI options, use the Import command (toolbar button or a folder's **Import...** menu item), which opens the DocumentImportDialog for the one file picked
+- If LibreOffice is missing (or found in an unsafe location), a dependency-missing prompt points to Settings → Import tools
 
 See [ui-components.md](../ui-components.md) for DocumentImportDialog details.
 

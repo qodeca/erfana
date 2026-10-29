@@ -2,6 +2,8 @@
 
 > Part of [Source grounding research](README.md)
 > Related: [Missing specs and recommendations](missing-specs.md) | [Implementation roadmap](implementation-roadmap.md)
+>
+> **Status (2026-10-29)**: research record. "What's specified" below means the planned graph-engine design, not shipped code – Erfana has no full-text index, vector store or MCP server today, and the `search_notes` tool exists in no spec.
 
 ## 1. Executive summary
 

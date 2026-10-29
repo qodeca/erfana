@@ -106,6 +106,8 @@ Rules that follow from the diagram:
 
 ### 4.2 Module map
 
+> **As shipped (checked 2026-10-29):** a few planned files landed under other names. Drafts and keys live in `commentKeyStore.ts` (not `commentDraftStore.ts`); the IPC bundle is `src/main/ipc/preview/comment-handlers.ts`; the three toolbar toggles are one `CommentToolbarTools.tsx`; the "Add comment" menu is a `ContextMenu` inside `PreviewCommentsLayer.tsx` (no `CommentContextMenu.tsx`); and the page overlay is the folder `src/preload/previewPageComments/` (entry `index.ts`), not one file. The main-process comment work is split across many more `comment*.ts` modules than listed here.
+
 **Shared – `src/shared/htmlComments/`** (pure; no Electron, no `fs`; parse5 allowed). Not imported by the preload (preloads must be self-contained, `electron.vite.config.ts:22-45`).
 
 | File | Responsibility |
@@ -452,18 +454,18 @@ Rewrite `:699` ("no file-write path" → "no write path from the page; one user-
 | Comments list | Disclosure, `aria-expanded` + `aria-controls` | `messages-square` + count | "Comments, 3 open" |
 | Pins | Toggle, `aria-pressed`, default on, per tab, not persisted | `message-square` / `message-square-off` | "Show comment icons" |
 
-- Shortcut ⌥⌘M / Ctrl+Alt+M (notation per the Writing card; the shipping tooltip still spells out "Cmd+Option+M" – see §10.10). Match the **typed key** `m` with modifiers, never the physical key (AltGr+M types µ on German layouts). Verify Cmd+Option+M is not "Minimize All" on macOS.
+- Shortcut ⌥⌘M / Ctrl+Alt+M (notation per the Writing card; the shipping tooltip still spells out "Cmd+Option+M" – see §10.10). Match the **typed key** `m` with modifiers, never the physical key (AltGr+M types µ on German layouts) – except on macOS, where the physical KeyM stands in only when Option made the typed key something other than printable ASCII (§19 "One shortcut rule"). Verify Cmd+Option+M is not "Minimize All" on macOS.
   - *Rev 3 note:* the shortcut has three routes – main's forwarder (focus in the page), the panel root's `onKeyDown` (focus in the chrome) and `usePreviewGroupKeys` (focus on dockview's group element, where `group.focus()` leaves it after a tab switch; the panel renders in the overlay layer, outside that element). The third route acts only for the active tab and skips keys the root already saw; it also carries Back/Forward. Without it the toggle did nothing right after a preview tab became active (found on macOS).
 - Leave with Esc, the toggle or the shortcut. Esc order with focus in the page: open window → comment mode → existing "return to chip".
 - Mode indicators: pressed toggle; 2 px accent frame inside the page edge; top-centre tab "Comment mode – Esc to leave" (moves to the bottom when the pointer comes within 48 px). The band height never changes.
 - Cursor: system `crosshair`.
 - The mode belongs to the tab; it survives the save reload and same-tab navigation. Keyboard activation (`event.detail === 0`) moves focus into the page with the picker started.
-- The permission band card and `nav.css` narrow tiers are re-measured; at the minimal tier the Pins toggle leaves the row (it stays reachable in the drawer).
+- The permission band card and `nav.css` narrow tiers are re-measured; below 446 px (the narrow tier) the Pins toggle leaves the row (the drawer's "Show comment icons" checkbox does the same job).
 
 ### 10.2 Outline and label
 
 - Border box only, two-tone: 2 px accent ring with 1 px ink line on both sides. Selected: same ring + 12% accent fill.
-- Label `button#buy.cta.primary 120×40`, system monospace 11 px; ≤ 2 classes then `…`, ≤ 40 characters; tag in accent, rest paper, size grey; `dir="ltr"`. Suffixes ` · script`, ` · frame other.html`, ` · 2 comments`, `iframe · remote content`.
+- Label `button#buy.cta.primary 120×40`, system monospace 11 px; ≤ 2 classes then `…`, ≤ 40 characters; tag in accent, rest paper, size grey; `dir="ltr"`. Suffixes ` · script`, ` · frame other.html`, ` · 2 comments`; a frame that is not commentable inside reads `iframe · refused frame` / `iframe · inline frame` (below).
 - Above the element's top-left; flips below at the viewport top; clamped sideways.
 - Alt+↑ parent (stops at `<body>`, announces "Top of page"); Alt+↓ back down the path, else first child; the level holds while the pointer stays inside that box. Instant, no tween.
 - Same-project frame: its own elements; Alt+↑ from the frame's `<body>` moves to the `<iframe>` element in the parent (spike S8). Refused, `srcdoc` and about:blank frames: the `<iframe>` element itself, label `iframe · refused frame` / `iframe · inline frame`.
@@ -520,7 +522,7 @@ Resolved by Anna K. · 25 Oct     [Re-open] [v]
 
 ### 10.5 Pin (speech bubble, decision 33)
 
-Self-drawn inline SVG in the shadow root, sharp corners (viewBox path `M2 2H22V17H7L2 22Z`), body 20×16, hit target 24×24 (WCAG 2.5.8). The tail tip sits on the element's top-right corner, offset 4 px outward, clamped to the visible part of the element and the viewport.
+Self-drawn inline SVG in the shadow root, sharp corners (viewBox path `M2 2H22V17H7L2 22Z`), body 20×15, hit target 24×24 (WCAG 2.5.8). The tail tip sits on the element's top-right corner, offset 4 px outward, clamped to the visible part of the element and the viewport.
 
 | Content | Shown |
 |---|---|
@@ -625,7 +627,7 @@ Contrast numbers quoted in design-system cards go into `docs/design-system/claim
 | Pin | name "{n} comment(s) on {label}. Open." · damaged "Damaged comment on {label}. Open." · tooltip "{n} comments – click to open" |
 | Identity | §10.7 · "Enter a name to continue." · "That doesn't look like an email address." |
 | Settings | "Comments" · "Your name" – "Saved into HTML files next to each comment you write. Changing it affects new comments only." · "Your email (optional)" – "Also saved into the file. Leave empty to keep it out." · notice "Both are visible to anyone who can open the file – in the page source and in git history once pushed." · "Enter a name to add comments. Existing comments keep the name they were saved with." · feature flag "Comments in HTML preview" – "Lets you add comments to elements of a previewed page." · a settings write that failed: "Couldn't save this setting. Your text is still here – try again." |
-| Unavailable | toolbar tooltip "Comments are unavailable for this page: {reason}" · reasons "file too large" (over 25 MB, §19 Rev 4), "not a UTF-8 file", "file is a link", "inline frame (srcdoc)", "unresolved git conflict", "the page keeps removing Erfana's overlay", "couldn't prepare the page" |
+| Unavailable | toolbar tooltip "Comments are unavailable for this page: {reason}" · reasons "file too large" (over 25 MB, §19 Rev 4), "not a UTF-8 file", "page too large – it has too many elements", "the page keeps removing Erfana's overlay", "the page replaced its own document", "comments are turned off in Settings", "couldn't prepare the page" |
 | File gone / draft expired | "{file} no longer exists. Copy your text before closing." · "This comment window was open too long. Pick the element again – your text is kept." → "Pick again" |
 | Write refused | "Erfana can't write to {file} on this drive." |
 | File limits (rev 4) | save error: "Erfana adds comments only to files of up to 25 MB and 640,000 elements." · read-only reason: "Erfana adds comments only to files of up to 25 MB and 640,000 elements. {file} is larger, so its comments are read-only." |
@@ -671,7 +673,7 @@ Each code site that deviates carries `/* deviates: docs/design-system/system/<gr
 | R5 | Watcher latency (FSEvents vs ReadDirectoryChangesW), double events | Direct reload + hash-checked echo filter; tests wait on the e2e hook's `ready`, never on time |
 | R6 | Option vs Alt, Cmd vs Ctrl, AltGr layouts | Match `input.code` + `alt` for Alt+↑/↓; typed key for the toggle; per-OS modifier glyphs |
 | R7 | HiDPI, mixed-DPI monitors, host zoom | Clamp popups to the panel; spike S4; integer coordinates in e2e |
-| R8 | No `O_NOFOLLOW` on Windows (`previewPathResolve.ts:55`) | `lstat` refusal + dev/ino check + re-confine the real path |
+| R8 | No `O_NOFOLLOW` on Windows (`previewPathResolve.ts:70`) | `lstat` refusal + dev/ino check + re-confine the real path |
 | R9 | Path separators, `/var` vs `/private/var`, 8.3 names, NFD names on macOS | Native paths from main; `fileUtils` in the renderer; `realpath` / `realpathSync.native` in tests |
 | R10 | Same file open in a second window | v1 limitation; disk re-hash prevents a stale overwrite |
 | R11 | macOS first `capturePage` empty | Existing freeze handling (`HtmlPreviewPanel/CLAUDE.md`) |

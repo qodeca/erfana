@@ -26,7 +26,7 @@ Known issues, common problems, and solutions for Erfana's terminal panel.
 - Occurs when typing prompts, when Claude adds text, or reviewing diffs
 
 **Workarounds**:
-- **Built-in Helper**: Erfana v0.3.2+ includes a "Scroll to Bottom" button (⬇️ icon) in the terminal header to instantly jump to the latest output. Use this when Claude Code causes unwanted scroll jumping.
+- **Built-in Helper**: Erfana v0.3.2+ includes a "Scroll to bottom" button (⬇️ icon) in the terminal header to instantly jump to the latest output. Use this when Claude Code causes unwanted scroll jumping.
 - **Recommended**: Run Claude Code in a native terminal window (Terminal.app, iTerm2, etc.) instead of Erfana's integrated terminal
 - Resize Erfana window (temporarily fixes until next buffer redraw)
 - Select response options to pause scrolling during diffs
@@ -62,7 +62,7 @@ ModuleNotFoundError: No module named 'distutils'
 ```bash
 # Check if node-pty is available
 await window.api.terminal.isAvailable()
-// Returns: {available: boolean}
+// Returns: { success, available, initialized? }
 ```
 
 **Solution**:
@@ -109,7 +109,7 @@ webglAddon.onContextLoss(() => {
 2. ✅ WebGL renderer as primary (canvas fallback)
 3. ✅ useRef pattern to avoid cleanup issues
 
-**Implementation** (`TerminalPanel.tsx`):
+**Implementation** (`TerminalPanel/hooks/useXtermSession.ts`):
 ```typescript
 // Check visibility before init
 if (!isElementVisible(terminalRef.current)) {
@@ -160,7 +160,7 @@ const terminalIdRef = useRef<string | null>(null)
 
 ### Terminal Not Available
 
-**Symptom**: Terminal panel shows "Terminal Not Available" message
+**Symptom**: Terminal panel shows "Terminal not available" message
 
 **Check**:
 ```typescript
@@ -173,7 +173,7 @@ if (!result.available) {
 
 **Actions**:
 - Recheck (debounced) — attempts a quick availability check
-- Copy Fix Command — copies `npm rebuild node-pty --build-from-source`
+- Copy fix command — copies `npm rebuild node-pty --build-from-source`
 
 **Solution**: Rebuild node-pty
 ```bash

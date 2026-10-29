@@ -98,7 +98,7 @@ electron-builder runs three of Erfana's scripts across the packaging lifecycle:
 | Hook | Script | Purpose |
 |------|--------|---------|
 | `beforePack` | `scripts/ensure-media-binaries.js` | Downloads a hardcoded per-platform arch set of `ffmpeg-static` binaries (`x64` **and** `arm64` on macOS, the host arch elsewhere — not the configured target) into `release/.media-cache/<platform>-<arch>/`, verified by size floor plus a pinned SHA-256 on the arches listed in `FFMPEG_SHA256` (macOS only today; Windows is size-floor-only). CI installs with `npm ci --ignore-scripts`, so `ffmpeg-static`'s own postinstall download never ran. |
-| `afterPack` | `scripts/fuses.js` | Renames the bundle on a test build; prunes foreign-platform/arch `ffprobe-static` binaries and `node-pty` prebuilds (plus a `.pdb` strip on `win32`); restores the `node-pty` `spawn-helper` execute bit to `0755`; copies the cached per-arch `ffmpeg` into the bundle, re-runs the same size/hash verification at the packed path and chmods it along with every `ffprobe`; flips the Electron fuses and resets the ad-hoc Darwin signature; and finally asserts the packed `app/` tree matches the `files:` allowlist (issue #43). |
+| `afterPack` | `scripts/fuses.js` | On a test build, refuses a product name without the `(TEST BUILD)` suffix (the suffix comes from `build:mac:test`'s `-c.productName`, not a rename); checks the effective `asar` settings against the pinned ones; prunes foreign-platform/arch `ffprobe-static` binaries and `node-pty` prebuilds (plus a `.pdb` strip on `win32`); restores the `node-pty` `spawn-helper` execute bit to `0755`; copies the cached per-arch `ffmpeg` into the bundle, re-runs the same size/hash verification at the packed path and chmods it along with every `ffprobe`; flips the Electron fuses and resets the ad-hoc Darwin signature; and finally asserts the packed `app/` tree matches the `files:` allowlist (issue #43). |
 | `afterSign` | `scripts/resign.js` | Deep re-signs the entire `.app` bundle atomically. |
 
 ```yaml
@@ -166,6 +166,8 @@ files:
   - '!node_modules/jsdom/**'
   - '!node_modules/canvas/**'
   - '!node_modules/@mapbox/node-pre-gyp/**'
+  # platform and debug-file exclusions (LiteParse's Linux binaries, node-pty's
+  # .pdb files and conpty/ folder, build/Release link files) – see the YAML
 ```
 
 **At least one non-negated pattern must stay in this list.** Until [issue #43](https://github.com/qodeca/erfana/issues/43) it held sixteen patterns and every one of them was a negation, which app-builder-lib reads as *no includes given*:

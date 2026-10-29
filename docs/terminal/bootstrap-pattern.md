@@ -123,7 +123,7 @@ Before any Windows bootstrap is constructed, the cwd is validated and normalized
 **Renderer-Side Clear** (`TerminalPanel/hooks/useXtermSession.ts`):
 
 - Listens for `terminal:clear` on the bypass channel (`window.api.terminal.onClear`)
-- Clears xterm buffer and screen (`\x1b[2J\x1b[H`)
+- Clears xterm screen and scrollback (`\x1b[2J\x1b[3J\x1b[H`, `CLEAR_SEQUENCE`)
 - Confirms via `window.api.terminal.markClearComplete(terminalId)`
 
 **Bypass channel**: `terminal:clear` events are separate from the data stream — the marker never appears in the rendered terminal.
@@ -317,7 +317,7 @@ Handles: `C:\tools\pwsh\pwsh.exe`, `/c/Program Files/PowerShell/7/pwsh.exe` (Git
 - `src/shared/powershellQuote.ts` – PowerShell single-quote escaping shared by the bootstrap and the renderer's path quoting
 - `src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts` — clear handler + `markClearComplete` confirmation (sent once `TerminalPanel.tsx` reports its data listener attached)
 - `src/main/ipc/terminal-handlers.ts` — clear event bypass channel
-- `src/preload/index.ts` — `onClear()` and `markClearComplete()` API
+- `src/preload/terminalBridge.ts` — `onClear()` and `markClearComplete()` API
 
 ## Related documentation
 

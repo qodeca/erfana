@@ -57,7 +57,7 @@ Plan §"LocalWhisperService" §"Modified modules" commits to logging `{url, expe
 
 ### What
 
-`src/main/services/whisper-assets.ts:52` declares `type WhisperPlatform = 'darwin-universal' | 'win32-x64'` — a concatenated-string enum. The architecture review flagged that the original plan prescribed `{platform: NodeJS.Platform, arch: NodeJS.Architecture | 'universal'}` as a structural tuple. `WhisperModelManager.ts:337-338` further uses substring-sniffing (`spec.filename.includes('macos')`) to pick a manifest key, which is fragile across future filename renames.
+`src/main/services/whisper-assets.ts:52` declares `type WhisperPlatform = 'darwin-universal' | 'win32-x64'` — a concatenated-string enum. The architecture review flagged that the original plan prescribed `{platform: NodeJS.Platform, arch: NodeJS.Architecture | 'universal'}` as a structural tuple. `WhisperModelManager.ts:486` further uses substring-sniffing (`spec.filename.includes('macos')`) to pick a manifest key, which is fragile across future filename renames.
 
 ### Why deferred
 
@@ -91,7 +91,7 @@ Plan §"LocalWhisperService" §"Modified modules" commits to logging `{url, expe
 
 ### What
 
-`IWhisperModelManager` has 11 methods spanning binary-management (`ensureBinary`, `verifyInstalledBinary`, `isBinaryInstalled`), model-management (`ensureModel`, `isModelInstalled`, `listInstalledModels`, `deleteModel`, `getModelInfo`, `getModelPath`), and directory helpers (`getWhisperDir`, `getBinaryPath`). `LocalWhisperService` consumes 3 (`ensureBinary`, `ensureModel`, `verifyInstalledBinary`); renderer IPC handlers consume a disjoint set.
+`IWhisperModelManager` has 15 methods spanning binary-management (`ensureBinary`, `verifyInstalledBinary`, `isBinaryInstalled`), model-management (`ensureModel`, `isModelInstalled`, `listInstalledModels`, `deleteModel`, `getModelInfo`, `getModelPath`, `verifyInstalledModelFile`, `assertVerifiedModelUnchanged`), lifecycle (`dispose`, `cancelDownloads`), and directory helpers (`getWhisperDir`, `getBinaryPath`). `LocalWhisperService` consumes 5 (`ensureBinary`, `ensureModel`, `verifyInstalledBinary`, `verifyInstalledModelFile`, `assertVerifiedModelUnchanged`); renderer IPC handlers consume a disjoint set.
 
 ### Why deferred
 
@@ -137,9 +137,9 @@ Delivered via full-file rewrite of `src/main/services/WhisperModelManager.test.t
 
 Error-code paths (`WHISPER_DOWNGRADE_BLOCKED` / `WHISPER_SOURCE_PIN_DRIFT` / `WHISPER_MANIFEST_INVALID`) remain in `WhisperModelManager.downgrade.test.ts` per the test-file split policy — not duplicated here.
 
-### What
+### What (as found 2026-04-21, before the rewrite)
 
-`src/main/services/WhisperModelManager.test.ts` has 6 `.skip()` / `describe.skipIf` occurrences at lines 244, 269, 463, 751, 775, 866. The `describe.skipIf(process.platform !== 'darwin')('ensureBinary()', ...)` block at :463 in particular hides the entire ensureBinary suite on the `checks.yml` ubuntu-latest runner — meaning the pre-Phase-4 install-path tests run in CI **only** when a contributor triggers the macOS e2e workflow. B5b's new `WhisperModelManager.downgrade.test.ts` runs platform-neutrally, but the 5 pre-Phase-4 tests remain skipped with TODO comments referencing this issue.
+`src/main/services/WhisperModelManager.test.ts` had 6 `.skip()` / `describe.skipIf` occurrences at lines 244, 269, 463, 751, 775, 866. The `describe.skipIf(process.platform !== 'darwin')('ensureBinary()', ...)` block at :463 in particular hides the entire ensureBinary suite on the `checks.yml` ubuntu-latest runner — meaning the pre-Phase-4 install-path tests run in CI **only** when a contributor triggers the macOS e2e workflow. B5b's new `WhisperModelManager.downgrade.test.ts` runs platform-neutrally, but the 5 pre-Phase-4 tests remain skipped with TODO comments referencing this issue.
 
 ### Why deferred
 
@@ -160,7 +160,7 @@ Error-code paths (`WHISPER_DOWNGRADE_BLOCKED` / `WHISPER_SOURCE_PIN_DRIFT` / `WH
 - Pre-0.9.4 release: run the full `WhisperModelManager.test.ts` rewrite before merging the Phase 4 PR.
 - Post-merge: rewrite as Phase 5 follow-up, opening a GH issue referencing this D12 entry.
 
-### Risks if forgotten
+### Risks if forgotten (before the rewrite)
 
 - MEDIUM — the happy-path install flow has downgrade-protection + SHA-pin + error-code coverage via `WhisperModelManager.downgrade.test.ts`, but no test exercises the actual fetch → extract → chmod → sentinel-write sequence on Phase 4. A regression in ensureBinary's ordering (e.g. writing the sentinel before `verifyAllFiles` completes) would only be caught by manual UAT.
 
