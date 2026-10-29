@@ -1,7 +1,7 @@
 {
   "sequence": {
-    "current": 23,
-    "next": 24
+    "current": 24,
+    "next": 25
   },
   "registry": [
     {
@@ -360,12 +360,46 @@
         "e2e_test_designs": [],
         "issues": []
       }
+    },
+    {
+      "id": 24,
+      "tier": "T3",
+      "slug": "unified-comments",
+      "name": "Unified comments (HTML + Markdown Preview)",
+      "status": "active",
+      "scope": "feature",
+      "description": "One comment experience across Erfana: a shared comment base for the HTML and Markdown Previews with a seam for later text-file previews; Markdown Preview comments; text-selection comments in both; erfana:comment v1 with optional fields only, readable by v0.23.1; byte-exact saves; Claude Code gate; comments-v2 P0/P1 changes; one PR, one release.",
+      "created": "2026-10-29T19:00:00.000Z",
+      "path": "spec-t3-024-unified-comments",
+      "last_modified": "2026-10-29T22:05:00.000Z",
+      "sections_count": 3,
+      "requirements_count": 35,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [
+          "specs/spec-t3-024-unified-comments/architecture/001-shared-comment-base.md"
+        ],
+        "solution_specs": [],
+        "designs": [
+          "docs/designs/comments/comments-v2.md",
+          "docs/designs/comments/markdown-preview-comments.md",
+          "docs/designs/comments/selection-comments.md",
+          "docs/designs/comments/html-preview-comments.md"
+        ],
+        "ux": [],
+        "e2e_test_designs": [],
+        "issues": [
+          "#426",
+          "#429",
+          "#440"
+        ]
+      }
     }
   ],
   "metadata": {
     "schema_version": "3.0.0",
     "created": "2025-12-22T00:00:00.000Z",
-    "last_updated": "2026-10-29T12:00:00.000Z",
-    "version": 4
+    "last_updated": "2026-10-29T22:05:00.000Z",
+    "version": 12
   }
 }

@@ -1,0 +1,635 @@
+{
+  "spec_id": 24,
+  "slug": "unified-comments",
+  "tier": "T3",
+  "version": "0.5.1",
+  "created": "2026-10-29T19:00:00.000Z",
+  "updated": "2026-10-29T22:05:00.000Z",
+  "application": {
+    "name": "Unified comments (HTML + Markdown Preview)",
+    "domain": null,
+    "tech_stack": [
+      "Electron",
+      "React",
+      "TypeScript",
+      "remark/rehype",
+      "Playwright"
+    ]
+  },
+  "scope": {
+    "type": "feature",
+    "name": "Unified comments (HTML + Markdown Preview)"
+  },
+  "sections": [
+    {
+      "id": "01",
+      "file": "requirements/01-overview.md",
+      "title": "Overview",
+      "word_count": 1128
+    },
+    {
+      "id": "02",
+      "file": "requirements/02-requirements.md",
+      "title": "Requirements",
+      "word_count": 6784
+    },
+    {
+      "id": "03",
+      "file": "requirements/03-acceptance.md",
+      "title": "Acceptance",
+      "word_count": 4195
+    }
+  ],
+  "requirements_index": {
+    "024-FR-001": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-FR-002": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-FR-003": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-FR-004": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-FR-005": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-FR-006": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-FR-007": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-FR-008": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-FR-009": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-FR-010": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-FR-011": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-FR-012": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-FR-013": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-FR-014": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-FR-015": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-FR-016": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-FR-017": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-FR-018": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-FR-019": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-FR-020": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-FR-021": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-FR-022": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-FR-023": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-FR-024": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-FR-025": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-FR-026": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-FR-027": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-NFR-001": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-NFR-002": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-NFR-003": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-NFR-004": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-NFR-005": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-NFR-006": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-NFR-007": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-NFR-008": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "024-AC-001": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-002": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-003": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-004": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-005": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-006": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-007": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-008": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-009": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-010": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-011": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-012": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-013": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-014": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-015": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-016": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-017": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-018": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-019": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-020": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-021": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-022": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-023": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-024": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-025": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-026": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-027": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-028": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-029": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-030": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-031": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-032": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-033": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-034": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-035": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-036": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-037": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-038": {
+      "section": "03-acceptance",
+      "status": "active"
+    }
+  },
+  "requirement_sequences": {
+    "FR": 27,
+    "NFR": 8,
+    "AC": 38
+  },
+  "cross_references": [
+    {
+      "from": "024-FR-001",
+      "to": [
+        "024-AC-001"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-002",
+      "to": [
+        "024-AC-002"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-003",
+      "to": [
+        "024-AC-003"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-004",
+      "to": [
+        "024-AC-004",
+        "024-AC-005"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-005",
+      "to": [
+        "024-AC-006"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-006",
+      "to": [
+        "024-AC-007"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-007",
+      "to": [
+        "024-AC-008"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-008",
+      "to": [
+        "024-AC-009"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-009",
+      "to": [
+        "024-AC-010"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-010",
+      "to": [
+        "024-AC-011"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-011",
+      "to": [
+        "024-AC-012"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-012",
+      "to": [
+        "024-AC-013",
+        "024-AC-037"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-013",
+      "to": [
+        "024-AC-014",
+        "024-AC-038"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-014",
+      "to": [
+        "024-AC-015"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-015",
+      "to": [
+        "024-AC-016"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-016",
+      "to": [
+        "024-AC-017"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-017",
+      "to": [
+        "024-AC-018"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-018",
+      "to": [
+        "024-AC-019"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-019",
+      "to": [
+        "024-AC-020"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-020",
+      "to": [
+        "024-AC-021"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-021",
+      "to": [
+        "024-AC-022"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-022",
+      "to": [
+        "024-AC-023"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-023",
+      "to": [
+        "024-AC-031"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-024",
+      "to": [
+        "024-AC-032"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-025",
+      "to": [
+        "024-AC-033"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-026",
+      "to": [
+        "024-AC-034"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-027",
+      "to": [
+        "024-AC-035"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-NFR-001",
+      "to": [
+        "024-AC-024"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-NFR-002",
+      "to": [
+        "024-AC-025"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-NFR-003",
+      "to": [
+        "024-AC-026"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-NFR-004",
+      "to": [
+        "024-AC-027"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-NFR-005",
+      "to": [
+        "024-AC-028"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-NFR-006",
+      "to": [
+        "024-AC-029"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-NFR-007",
+      "to": [
+        "024-AC-030"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-NFR-008",
+      "to": [
+        "024-AC-036"
+      ],
+      "type": "traces"
+    }
+  ],
+  "statistics": {
+    "total_sections": 3,
+    "total_requirements": 35,
+    "total_words": 12107
+  },
+  "change_history": [
+    {
+      "version": "0.1.0",
+      "date": "2026-10-29T19:00:00.000Z",
+      "author": "Claude Code (erfana:spec)",
+      "changes": "Created from the 21 owner decisions of the 2026-10-29 grill session and the comments designs (HTML v0.23.1, Markdown, selection, comments-v2)."
+    },
+    {
+      "version": "0.2.0",
+      "date": "2026-10-29T19:30:00.000Z",
+      "author": "Claude Code (erfana:spec)",
+      "changes": "Applied the 11 review findings (owner-approved): overlay implementation left to the architect in FR-001/AC-001; one menu item 'Comment on selection' and written-out Markdown steps plus a not-commentable case in FR-004/AC-005; agent-note hint lines added to Naming contracts; pass rule and 'recorded check' defined in FR-017–019 and AC-018–020; 'Save file' wording in FR-015; separating line break in NFR-003/AC-026; gate minimum 11 samples; median in NFR-001; one-PR bullet in scope; gate dated before the format lock in AC-017."
+    },
+    {
+      "version": "0.3.0",
+      "date": "2026-10-29T19:50:00.000Z",
+      "author": "Claude Code (erfana:spec)",
+      "changes": "Applied 8 of 9 second-review findings (owner-approved): shared overlay behaviour suite in FR-001/AC-001; designs pinned at de29e70d; automated test is the default, recorded check only where a test cannot judge; HTML keeps 'element' as a listed difference; more selection cases in AC-004/AC-005; moved-target case in AC-014; menu names in Naming contracts; Damaged offers named in AC-015; 'one release' moved to Context. Declined by the owner: a scripted sameness comparison for FR-006 – sameness stays the owner's hands-on test."
+    },
+    {
+      "version": "0.4.0",
+      "date": "2026-10-29T20:30:00.000Z",
+      "author": "Claude Code (owner decisions)",
+      "changes": "Owner decisions on the architecture note's questions (2026-10-29): Q1 – a comment on a block quote is written before the whole quote (FR-003, AC-003); Q2 – the v0.23.1 writer may drop the agent-note hint lines, kept anchor.sel, restored by the next current-version save (FR-010, AC-011). Q4 (sealed-preload import widened to overlayCore, ADR 0006) recorded in architecture/001."
+    },
+    {
+      "version": "0.5.0",
+      "date": "2026-10-29T21:45:00.000Z",
+      "author": "Claude Code (erfana:expert-panel apply, owner-approved)",
+      "changes": "Applied the expert panel (data safety, security, UX, test, agent workflow, design review): new FR-023 (other tools' comments), FR-024 (no leaking marks), FR-025 (card approval first), FR-026 (straight-to-disk safety), FR-027 (menu matrix, state table), NFR-008 (bounded Markdown work), AC-031–AC-038; C-14/C-16/C-19/C-22 to Must; C-23 and screen-reader checks removed (#440); small Claude Code gate (2 of 3); hint escaping, shape-aware delete, Markdown block finder, baseHash, per-commit chain, pin classes, frozen-copy closure, corpus manifest, Windows runs, security checklist. Architecture note amended in its section 8."
+    },
+    {
+      "version": "0.5.1",
+      "date": "2026-10-29T22:05:00.000Z",
+      "author": "Claude Code (erfana:spec, owner-approved)",
+      "changes": "Applied the 17 v0.5.0 review findings: shape table, placement rules and per-kind @data become design/markdown-format.md deliverables approved before build; one HTML cross-element selection rule with AC-004 cases; target inside a generated region refused; Markdown size limit at least 2 MB; page-reachable preload surface defined with listed additions; only open comments must show Changed; outside-tool expectations recorded before development; agent-note content test; overview speed aligned to P50/P95; FR table traces; seam check script; up to 5 corpus targets per file, report attached; 200 property runs; kinds defined; note status Accepted, C-23 dropped from commit 14, offsets-only rows."
+    }
+  ]
+}
