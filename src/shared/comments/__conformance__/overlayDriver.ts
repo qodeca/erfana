@@ -48,6 +48,31 @@ export interface GesturePoint {
   readonly dy?: number
 }
 
+/** `point` in the host's viewport CSS pixels. */
+export function fixturePointOf({ target, dx = 0, dy = 0 }: GesturePoint): { readonly x: number; readonly y: number } {
+  const { left, top, width, height } = OVERLAY_FIXTURE[target].box
+  return { x: left + width / 2 + dx, y: top + height / 2 + dy }
+}
+
+/** How deep `target` sits in the fixture: 0 for `container`. */
+function fixtureDepth(target: OverlayTargetId): number {
+  const parent = OVERLAY_FIXTURE[target].parent
+  return parent === null ? 0 : fixtureDepth(parent) + 1
+}
+
+/**
+ * The innermost fixture target whose box holds the viewport point, or `null`.
+ * For a host that cannot hit-test a point (jsdom has no layout): it maps the
+ * suite's points onto its own elements, flat or nested, by this one rule.
+ */
+export function fixtureTargetAt(x: number, y: number): OverlayTargetId | null {
+  const holding = (Object.keys(OVERLAY_FIXTURE) as OverlayTargetId[]).filter(target => {
+    const { left, top, width, height } = OVERLAY_FIXTURE[target].box
+    return x >= left && x < left + width && y >= top && y < top + height
+  })
+  return holding.sort((a, b) => fixtureDepth(b) - fixtureDepth(a))[0] ?? null
+}
+
 /** Modifier keys held during a gesture. */
 export interface GestureModifiers {
   readonly shift?: boolean
@@ -74,6 +99,9 @@ export type OverlayLayer = 'menu' | 'window' | 'mode' | 'find'
 /** The layers a host may not own (it then leaves the method out and the suite skips, naming why). */
 export type HostedLayer = Exclude<OverlayLayer, 'mode'>
 
+/** A part of the overlay a host may leave out, with the reason it gives in `notOwned`. */
+export type OptionalPart = HostedLayer | 'modeIndicator' | 'floatingLabel'
+
 /**
  * One host's overlay, on the fixture, ready for one test. Gestures are trusted
  * user input, delivered as the browser would deliver them (pointer events,
@@ -84,10 +112,29 @@ export type HostedLayer = Exclude<OverlayLayer, 'mode'>
 export interface OverlayDriver {
   /** The host's name, for messages. */
   readonly host: string
-  /** What the label reads for each target in this host (`name size`, e.g. `button#buy.cta 100×30`). */
+  /**
+   * Whether the host draws a floating label at the outline (differences table
+   * D-05: the HTML overlay does; the Markdown host does not – its mode tab
+   * names the target). Without one, `labels` and `labelText` are the mode
+   * tab's words, and the label-format case skips with `notOwned.floatingLabel`.
+   */
+  readonly floatingLabel: boolean
+  /**
+   * What the label reads for each target in this host: the floating label's
+   * `name size` (e.g. `button#buy.cta 100×30`), or – with no floating label –
+   * the mode tab's words while that target is outlined.
+   */
   readonly labels: Readonly<Record<OverlayTargetId, string>>
-  /** Why each layer the host does not own is not here; read by the suite when it skips. */
-  readonly notOwned?: Readonly<Partial<Record<HostedLayer | 'modeIndicator', string>>>
+  /** The mode indicator's words while comment mode is on and nothing is outlined (A-03: each host's own text). */
+  readonly modeIndicatorIdle: string
+  /**
+   * Who a right-click outside comment mode belongs to (differences table
+   * D-11): `page` – the HTML page owns it; `menu` – the overlay asks for the
+   * Markdown Preview's own menu, comment items first, and the page never sees it.
+   */
+  readonly rightClickOutsideMode: 'page' | 'menu'
+  /** Why each part the host does not own is not here; read by the suite when it skips. */
+  readonly notOwned?: Readonly<Partial<Record<OptionalPart, string>>>
 
   /** Turn comment mode on, the way the host's toolbar or shortcut does. */
   modeOn(): void
@@ -134,16 +181,20 @@ export interface OverlayDriver {
   outlinedTarget(): OverlayTargetId | null
   /** Whether the outline is drawn in its selected (picked) state. */
   outlineSelected(): boolean
-  /** Hover `target` (in comment mode) and return the label it shows, `name size`; `null` when none is drawn. */
+  /**
+   * Hover `target` (in comment mode) and return the label it shows, `name size`
+   * – or the mode tab's words for a host with no floating label; `null` when
+   * none is drawn.
+   */
   labelText(target: OverlayTargetId): string | null
   /** The event types the page's own listeners saw during the last gesture or key press, in order. */
   pageSaw(): readonly string[]
 
   /** The top layer Esc would close now, or `null`. */
   openLayer(): OverlayLayer | null
-  /** Open a layer the host owns (`menu` and `window` on `target`). Optional: see `notOwned`. */
-  open?(layer: HostedLayer, target?: OverlayTargetId): void
+  /** Open a layer the host owns (`menu` and `window` on `target`), settled when it is shown. Optional: see `notOwned`. */
+  open?(layer: HostedLayer, target?: OverlayTargetId): void | Promise<void>
 
   /** Remove everything the driver added. */
-  dispose(): void
+  dispose(): void | Promise<void>
 }

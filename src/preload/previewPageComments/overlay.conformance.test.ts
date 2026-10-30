@@ -167,7 +167,11 @@ function driverOn(h: Harness): OverlayDriver {
 
   return {
     host: 'HTML Preview (page preload)',
+    floatingLabel: true,
     labels: HTML_LABELS,
+    // A-03: the v0.23.1 tab, pinned until the feat: commit that aligns it.
+    modeIndicatorIdle: 'Comment mode – Esc to leave',
+    rightClickOutsideMode: 'page',
     notOwned: {
       menu: 'the element menu is main’s native menu; the page is hidden behind a still frame while it is open and gets no key',
       window: 'the comment window is renderer UI over a still frame of the page; the page gets no key while it is open',
@@ -260,7 +264,7 @@ function driverOn(h: Harness): OverlayDriver {
   }
 }
 
-runOverlaySuite('HTML Preview', async () => {
+runOverlaySuite('HTML', async () => {
   const h = createHarness()
   mount(PAGE)
   // The token window is open while the page parses: let the registry see the fixture, then close it.

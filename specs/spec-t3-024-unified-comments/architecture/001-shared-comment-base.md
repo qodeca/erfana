@@ -34,10 +34,12 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | `parse` | same | split: the block classifier (header, damage reasons, readable compare) goes to `src/shared/comments/blocks.ts`; the parse5 comment walk goes to `htmlComments/htmlParse.ts` | S + H | Finding comment nodes depends on the HTML parser |
 | `anchor` | same | split: `resolveBlockTarget` goes to `src/shared/comments/reattach.ts`; the parse5 anchor builder stays | S + H | CSS paths come from the parse5 tree |
 | `htmlIndex`, `parseBounds`, `instrument`, `frameworkMarkers` | same | stay | H | parse5 tree, element tokens and framework roots exist only in HTML |
-| `index` (barrel) | same | stays as the HTML barrel; `src/shared/comments/index.ts` is new | S + H | – |
+| `index` (barrel) | same | stays as the HTML barrel; `src/shared/comments/index.ts` is new | S + H | Two barrels: the shared one exports the base only, so importing it never pulls in parse5 |
 | **New** `fileKind.ts`, `htmlKind.ts`, `selectionFind.ts` | – | `src/shared/comments/` | S (`htmlKind` is H) | `htmlKind` wraps the H modules above |
 | **New** `markdownComments/{mdIndex,slots,renderCheck,mdAnchor,markdownKind}.ts` | – | `src/shared/markdownComments/` | M | Markdown has no tags or ids in the source, so placement and re-attach are new (design §5, §6) |
 | **New** `src/shared/markdown/previewPipeline.ts` | inside `MarkdownPreview.tsx` | plugin list, sanitize schema, frontmatter split | M | One pipeline for the preview and main's render check |
+| **Added since** `agentNotes`, `noteLines`, `anchorSel`, `selectionWords`, `spokenExcerpt`, `cutText`, `targetIndex`, `commentableExtensions` (8) | – | `src/shared/comments/` | S | – |
+| **Added since** `markdownComments/{markdownLimits,mdCommentScan,mdHast,mdHints,mdLocate,mdRender,mdSlots,mdSource}.ts` (8) | – | `src/shared/markdownComments/` | M | Markdown's limits, comment tokenizer, rendered tree, target hint, locate, render check, slots and line coordinates: rules of the Markdown source, which has no tags or ids (design `markdown-format.md`; § 8 C3, C4, C7, C9, C11, C19) |
 
 ### Main process
 
@@ -49,6 +51,10 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | `commentStillCapture`, `commentReloadCoordinator`, `commentScripts`, `commentOverlayTheme` (4) | stay | H | Still images, reload and scroll restore exist only because the page runs in another process |
 | `commentDraftCore`, `commentDraftBuilder`, `commentDraftOpener` (3) | stay | H | They turn a page token into a target ("find target"). Markdown sends line, tag and ordinal instead (§3) |
 | `commentE2eHook` (1) | stays | H | It exposes served loads |
+| **Added since** `commentInsertIndent`, `commentListChange`, `commentPathConfine`, `commentRebuild`, `fileCommentPanels`, `fileCommentWatches`, `kindCommentJobs` (7) | `src/main/services/comments/` | S | – |
+| **Added since** `commentFileKinds`, `src/main/ipc/comments/file-comments.ts` (2) | `src/main/services/comments/`, `src/main/ipc/comments/` | S – composition roots | They name every registered kind; the base itself never imports a kind (§ 8 C24) |
+| **Added since** `markdown/markdownCommentJobs` (1) | `src/main/services/comments/markdown/` | M | The Markdown kind's jobs in the parse worker (§ 8 C19, C22) |
+| **Added since** `commentContextGate`, `commentDraftKeys`, `commentWordsCore`, `commentPickerSpeaker`, `htmlCommentJobs`, `htmlCommentParseClient` (6) | stay in `src/main/services/preview/comments/` | H | They check the page's right-click, draft words and picker steps against main's parse5 parse, and run the HTML kind's jobs in the parse worker – all about a page in another process |
 
 ### Overlay
 
@@ -58,6 +64,8 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | **New** `src/shared/comments/overlayCore/{pinLayout,gesture,modeState}.ts` | S | Pure rules both overlays run. No imports, no DOM |
 | **New** `src/renderer/src/components/Comments/overlay/{CommentOverlayLayer.tsx,useCommentMode.ts,targetPicker.ts,commentHighlights.ts}` | S (for renderer-hosted previews) | – |
 | **New** `src/renderer/src/components/Editor/markdownComments/markdownAdapter.ts` | M | Maps `data-line-start` blocks to targets |
+| **Added since** `src/renderer/src/components/Comments/overlay/{useCommentOverlayHost,useHostPointerKeys,useSelectionComments,previewAdapter,pickerKeys,hostTypes,hostParts,hostMenu,hostWindow,hostDrawer,domWords,commentContentAttrs}.ts` (12) | S (for renderer-hosted previews) | – |
+| **Added since** `src/renderer/src/components/Editor/markdownComments/{useMarkdownComments,MarkdownCommentsOverlay,MarkdownCommentsBand}.tsx` (3) | M | The Markdown Preview's composition root, the surfaces it draws in its pane, and its paused band (D-24: only the Markdown Preview draws the editor's unsaved text) |
 
 ### Renderer
 
@@ -68,6 +76,8 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | `usePreviewComments`, `PreviewCommentsLayer`, `commentLive` | split: shared `useComments.ts` and `CommentsHost.tsx`; the HTML parts become `HtmlPreviewPanel/comments/htmlCommentSource.ts` | S + H | Page-driven drafts, still images and main-driven mode changes exist only in HTML |
 | `useDrawerSheet` | stays | H | It hides the native view behind a full-width drawer (`usePreviewCoveredStore`) |
 | `services/preview/commentGateway.ts` and **new** `services/comments/fileCommentGateway.ts` | both implement one `CommentSource` interface | H / S | HTML is addressed per view, through page draft tokens. Text previews are addressed per file |
+| **Added since** `CommentWindowShell`, `CommentStepper`, `CommentWordsPicker`, `DamagedBlockView`, `ThreadStatus`, `CommentDrawerRow`, `CommentDrawerSort`, `CommentRemovedNote`, `commentRemovedOutside`, `commentCarriedDrafts`, `commentDockPlacement`, `commentCopyWords`, `commentWindowCopy`, `commentWindowStates`, `commentWords`, `useThreadSession` (16) | `src/renderer/src/components/Comments/` | S | – |
+| **Added since** `previewCommentRequests`, `usePreviewDraftKeepAlive` (2) | stay in `HtmlPreviewPanel/comments/` | H | A page draft token and the window it opens, and its keep-alive, exist only because the HTML page picks in another process |
 
 `commentCopy` keeps one string table with a `TargetNouns` map per preview (C-03), so both previews import one module (024-AC-008).
 

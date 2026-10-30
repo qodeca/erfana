@@ -22,6 +22,9 @@
  * - **C-15, C-20, C-22 (Markdown)** (commit 14) – the quieter toolbar and the
  *   drawer's icons checkbox, the three-cell filter and the sort menu, and a
  *   click on a commented paragraph opening its thread.
+ * - **024-AC-001 (Markdown)** – the Playwright half of the shared overlay
+ *   suite: each pin sits where the shared pin rule puts it for its block and
+ *   takes the hit there, and commented words carry the underline mark.
  *
  * Local gate only (e2e is not a required check). Condition-based waits only.
  */
@@ -36,6 +39,7 @@ import { ProjectTreePage } from './pages/project-tree.page'
 import { TabBarPage } from './pages/tab-bar.page'
 import { reviewer, setGlobalSetting } from './pages/html-preview.comments-ui'
 import { TEST_IDS } from '../src/renderer/src/constants/testids'
+import { PIN_BOX_PX, placePin, type Box } from '../src/shared/comments/overlayCore/pinLayout'
 
 const FILE = 'review.md'
 const TEXT = [
@@ -433,5 +437,87 @@ test.describe('Markdown Preview comments', () => {
     await expect(field).toHaveValue(NOTE)
     await page.keyboard.press('Escape')
     await expect(win).toHaveCount(0, { timeout: MD_COMMENT_BUDGET_MS })
+  })
+
+  test('024-AC-001 (Markdown) pins sit at their targets and commented words are underlined', async ({
+    windowWithTestProject
+  }) => {
+    const page = windowWithTestProject
+    const md = await openReview(page)
+
+    // Words in the first paragraph, from the right-click menu; then the whole closing paragraph, picked in comment mode.
+    const at = await md.selectWords('p', 3, 'paragraph of')
+    await page.mouse.click(at.x, at.y, { button: 'right' })
+    await page.getByTestId(TEST_IDS.COMMENT_MENU_SELECTION).click()
+    await md.saveNewComment(NOTE, FILE, NAME)
+    await md.modeOn()
+    // The first block moved the lines: find the paragraph by its text.
+    await md.content().locator('p', { hasText: 'Closing paragraph.' }).click()
+    await expect(page.getByRole('dialog', { name: 'New comment on paragraph' })).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await md.saveNewComment(NOTE, FILE, NAME)
+    await md.modeButton().click()
+    await expect(md.modeButton()).toHaveAttribute('aria-pressed', 'false')
+    await expect(md.icons()).toHaveCount(2, { timeout: MD_COMMENT_BUDGET_MS })
+
+    // Pins: each icon names its block (aria-details, C-11), and sits where the shared pin rule puts it
+    // for that block's box – the HTML overlay's rule (overlayCore/pinLayout) – and takes the hit there.
+    const drawn = await page.evaluate(() => {
+      const host = document.querySelector('[data-testid="comment-host-overlay"]')!.getBoundingClientRect()
+      const box = (r: DOMRect) => ({ left: r.left - host.left, top: r.top - host.top, width: r.width, height: r.height })
+      return {
+        viewport: { width: host.width, height: host.height },
+        pins: [...document.querySelectorAll<HTMLElement>('[data-testid="comment-host-icon"]')].map(icon => {
+          const block = document.querySelector(`[aria-details="${icon.id}"]`)
+          const r = icon.getBoundingClientRect()
+          const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+          return {
+            icon: box(r),
+            block: block === null ? null : box(block.getBoundingClientRect()),
+            text: block?.textContent?.trim() ?? null,
+            hit: hit !== null && icon.contains(hit)
+          }
+        })
+      }
+    })
+    expect(drawn.pins.map(pin => pin.text)).toEqual(['First paragraph of the review.', 'Closing paragraph.'])
+    const placed: Box[] = []
+    for (const pin of drawn.pins) {
+      const expected = placePin(pin.block!, placed, drawn.viewport, PIN_BOX_PX)
+      expect(expected, `${pin.text}: the pin rule places no pin`).not.toBeNull()
+      placed.push(expected!)
+      for (const side of ['left', 'top', 'width', 'height'] as const) {
+        expect(Math.abs(pin.icon[side] - expected![side]), `${pin.text}: pin ${side}`).toBeLessThanOrEqual(1)
+      }
+      expect(pin.hit, `${pin.text}: the pin does not take the hit at its centre`).toBe(true)
+    }
+
+    // The underline: the commented words – and only they – carry the comment mark, inside their paragraph,
+    // and the mark is drawn as an underline (D-08: a CSS custom highlight in the Markdown Preview).
+    await expect.poll(() => md.markedWords(), { timeout: MD_COMMENT_BUDGET_MS }).toEqual(['paragraph of'])
+    const mark = await page.evaluate(() => {
+      const range = [...CSS.highlights.get('erf-comment')!][0] as Range
+      const words = range.getBoundingClientRect()
+      const block = range.startContainer.parentElement!.closest('p')!.getBoundingClientRect()
+      const rule = [...document.styleSheets]
+        .flatMap(sheet => {
+          try {
+            return [...sheet.cssRules]
+          } catch {
+            return []
+          }
+        })
+        .find((r): r is CSSStyleRule => r instanceof CSSStyleRule && r.selectorText.includes('::highlight(erf-comment)'))
+      return {
+        inBlock:
+          words.width > 0 &&
+          words.left >= block.left - 1 &&
+          words.right <= block.right + 1 &&
+          words.top >= block.top - 1 &&
+          words.bottom <= block.bottom + 1,
+        decoration: rule?.style.cssText ?? ''
+      }
+    })
+    expect(mark.inBlock, 'the marked words are not inside their paragraph').toBe(true)
+    expect(mark.decoration).toMatch(/text-decoration:\s*underline/)
   })
 })
