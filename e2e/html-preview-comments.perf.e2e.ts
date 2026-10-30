@@ -20,7 +20,9 @@
  *   eventLoopUtilization`) and the longest stall (a 1 ms main-side probe)
  *   between a reload and its instrumented load(s) being registered. An upper
  *   bound of the parse's main-thread share: it also counts the load's IPC and
- *   this test's own polling. The unit-level gate on main-thread time per call
+ *   this test's own polling. The control is the same page without its block,
+ *   served raw with HTML comments turned off (OD-01 instruments every page
+ *   while they are on). The unit-level gate on main-thread time per call
  *   is `commentFileJobs.perf.test.ts` (R3-12).
  * - **F-003** right-click → the element menu shown with the still frame in
  *   place (≤ 150 ms budget, R3-6), 20 samples; and 200 pins on a page while
@@ -33,7 +35,7 @@
 
 import * as fs from 'fs'
 import * as path from 'path'
-import type { ElectronApplication, TestInfo } from '@playwright/test'
+import type { ElectronApplication, Page, TestInfo } from '@playwright/test'
 import { test, expect } from './fixtures/index'
 import { HtmlPreviewPage, PREVIEW_BUDGET_MS } from './pages/html-preview.page'
 import { commentLoads, newestLoad, waitForCommentLoad } from './pages/html-preview.comments'
@@ -188,12 +190,20 @@ async function timedReload(app: ElectronApplication, needle: string, guardMs = R
 }
 
 /**
- * Open a sized page and wait for its title. Up to 4 MB through
- * `openCommentPage`; a page with a longer `openMs` gets the same title wait
- * with that budget.
+ * Open a sized page and wait for its title. An instrumented page up to 4 MB
+ * through `openCommentPage`; a page with a longer `openMs`, or the raw
+ * control (comments off, so no comment panel), gets the same title wait with
+ * its own budget.
  */
-async function openSized(preview: HtmlPreviewPage, app: ElectronApplication, rel: string, title: string, openMs: number): Promise<void> {
-  if (openMs <= PREVIEW_BUDGET_MS) {
+async function openSized(
+  preview: HtmlPreviewPage,
+  app: ElectronApplication,
+  rel: string,
+  title: string,
+  openMs: number,
+  commented: boolean
+): Promise<void> {
+  if (commented && openMs <= PREVIEW_BUDGET_MS) {
     await openCommentPage(preview, app, rel, title)
     return
   }
@@ -206,6 +216,17 @@ async function openSized(preview: HtmlPreviewPage, app: ElectronApplication, rel
       })
       .toBe(title)
   )
+}
+
+/**
+ * Turn HTML comments on or off before a view is built. Since spec 024 OD-01
+ * every page is instrumented while comments are on – a page without a block
+ * too – so F-002's raw control is served raw only with the feature off. The
+ * view's session policy is chosen when it is built, so call this with no
+ * preview open. `afterEach` turns the feature back on.
+ */
+async function setCommentsFlag(page: Page, enabled: boolean): Promise<void> {
+  await setGlobalSetting(page, 'htmlPreview', { enabled: true, comments: { enabled } })
 }
 
 test.describe('HTML Preview comments – performance records (P7)', () => {
@@ -294,7 +315,8 @@ test.describe('HTML Preview comments – performance records (P7)', () => {
         ['raw', rawOf(size.rel), `-HPC-RAW-${size.label}-`]
       ] as const) {
         const target = HtmlPreviewPage.target(rel)
-        await openSized(preview, app, rel, title, size.openMs)
+        await setCommentsFlag(page, kind === 'instrumented')
+        await openSized(preview, app, rel, title, size.openMs, kind === 'instrumented')
         if (kind === 'instrumented') await waitForCommentLoad(app, rel, 'page', 1)
         const newest = async (): Promise<string | undefined> => newestLoad(await commentLoads(app), rel, 'page')?.loadId
         const runs: ReloadCost[] = []
@@ -318,6 +340,7 @@ test.describe('HTML Preview comments – performance records (P7)', () => {
       ['raw', rawOf(FRAME_HOST), '-HPC-RAW-FRAMES10-']
     ] as const) {
       const target = HtmlPreviewPage.target(rel)
+      await setCommentsFlag(page, kind === 'instrumented')
       await preview.open(rel)
       await preview.waitForTitled(title)
       const frameLoads = async (): Promise<number> => (await commentLoads(app)).filter(load => load.scope === 'frame').length
