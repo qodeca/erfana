@@ -27,7 +27,7 @@
   color: var(--color-text-primary);
 }
 
-/* Under a 640px panel: the whole width. "Show on page" then closes it first. */
+/* Under a 640px panel: the whole width. "Show in preview" then closes it first. */
 .erf-comment-drawer--full {
   flex-basis: 100%;
   min-inline-size: 0;

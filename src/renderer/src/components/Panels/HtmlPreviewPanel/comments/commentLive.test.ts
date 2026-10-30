@@ -16,8 +16,8 @@ describe('commentLive', () => {
       'Showing an element added by a script, inside ul on line 3.'
     )
     expect(pickerAnnouncement({ say: 'showing', element: { line: 5 } })).toBe('Showing an element, line 5.')
-    expect(pickerAnnouncement({ say: 'top' })).toBe('Top of page – no parent to select.')
-    expect(pickerAnnouncement({ say: 'no-child' })).toBe('No child elements.')
+    expect(pickerAnnouncement({ say: 'top' })).toBe('Top level – no parent to select.')
+    expect(pickerAnnouncement({ say: 'no-child' })).toBe('Nothing inside to select.')
     expect(pickerAnnouncement({})).toBeUndefined()
     expect(pickerAnnouncement({ say: 'showing' })).toBeUndefined()
   })

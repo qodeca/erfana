@@ -15,7 +15,7 @@ import type { CommentListState } from '../../stores/usePreviewCommentStore'
 import { damaged, fileView, message, thread } from '../Panels/HtmlPreviewPanel/comments/__test-helpers__/commentTestKit'
 import { resolveFocusReturnTarget } from '../Dialog/BaseDialog'
 import { COPY, DRAWER_COPY, unreadFilesText } from './commentCopy'
-import { COMMENT_LIST_COPY, MARKDOWN_COPY, MARKDOWN_WORDS } from './commentCopyWords'
+import { COMMENT_LIST_COPY, HTML_WORDS, MARKDOWN_COPY, MARKDOWN_WORDS } from './commentCopyWords'
 import { CommentWordsContext } from './commentWords'
 import {
   CommentDrawer,
@@ -110,13 +110,13 @@ describe('CommentDrawer', () => {
       expect(screen.getByTestId('comment-filter-cant-edit')).toHaveAttribute('aria-checked', 'true')
     })
 
-    it('row main action is Show on page; Open is the second Tab stop', async () => {
+    it('row main action is Show in preview (A-05); Open is the second Tab stop', async () => {
       const user = userEvent.setup()
       const { props } = setup()
       const [first] = rows()
       const main = within(first).getByTestId('comment-drawer-row-main')
       const open = within(first).getByTestId('comment-drawer-row-open')
-      expect(main).toHaveAttribute('title', COPY.showOnPage)
+      expect(main).toHaveAttribute('title', COPY.showInPreview)
       expect(main).toHaveAttribute('tabindex', '0')
       expect(open).toHaveAttribute('tabindex', '0')
       expect(open).toHaveAccessibleName('Open comments on button.cta')
@@ -173,7 +173,7 @@ describe('CommentDrawer', () => {
     it('has an empty state for the file and for each filter', async () => {
       const user = userEvent.setup()
       const { unmount } = setup({ list: ready([fileView()]) })
-      expect(screen.getByText(DRAWER_COPY.none)).toBeVisible()
+      expect(screen.getByText(HTML_WORDS.drawerNone)).toBeVisible()
       unmount()
       setup({ list: ready([fileView({ threads: [thread(1, { status: 'resolved' })] })]) })
       expect(screen.getByText(DRAWER_COPY.emptyOpen)).toBeVisible()
@@ -346,7 +346,7 @@ describe('CommentDrawer', () => {
       expect(props.onOpen).toHaveBeenCalledWith(expect.objectContaining({ threadKey: 't1' }))
     })
 
-    it('Enter on a windowed row is Show on page, focus staying in the list', async () => {
+    it('Enter on a windowed row is Show in preview, focus staying in the list', async () => {
       const user = userEvent.setup()
       const { props } = setup({ list: thousand() })
       mains()[0].focus()
@@ -561,7 +561,7 @@ describe('CommentDrawer', () => {
       const text = description.map(id => document.getElementById(id)?.textContent ?? '')
       expect(text[0]).toBe('on button.cta')
       expect(text).toContain('1 reply')
-      expect(text.at(-1)).toBe(COPY.showOnPage)
+      expect(text.at(-1)).toBe(COPY.showInPreview)
       // A row with no replies points at no reply count.
       const second = within(rows()[1]).getByTestId('comment-drawer-row-main')
       expect(second.getAttribute('aria-describedby')?.split(' ')).toHaveLength(4)

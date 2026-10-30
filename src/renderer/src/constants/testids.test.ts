@@ -340,10 +340,10 @@ describe('TEST_IDS', () => {
       expect(ids).toHaveLength(6)
     })
 
-    it('should have 132 comment IDs (HTML Preview, then the renderer-hosted previews)', async () => {
+    it('should have 131 comment IDs (HTML Preview, then the renderer-hosted previews)', async () => {
       const { TEST_IDS } = await getTestIds()
       const ids = Object.keys(TEST_IDS).filter((k) => k.startsWith('COMMENT_'))
-      expect(ids).toHaveLength(132)
+      expect(ids).toHaveLength(131)
     })
 
     it('should have 20 Markdown Toolbar IDs', async () => {

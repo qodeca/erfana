@@ -8,7 +8,7 @@
  *
  * @module HtmlPreviewPanel/comments/commentWindowHeading
  */
-import { COPY, frameFileText, scriptBuiltText, threadsTitle } from './commentCopy'
+import { COPY, frameFileText, scriptBuiltText } from './commentCopy'
 import { HTML_WORDS, type CommentWords } from './commentCopyWords'
 import { ancestorTag, elementLabel } from './commentFormat'
 import { WINDOW_COPY, headingQuote } from './commentWindowCopy'
@@ -82,8 +82,9 @@ export function headingOf(
       : file.frame
         ? frameFileText(file.displayPath)
         : null
+    // A-02: "New comment on element"; the selector stays in the context line (D-03).
     return {
-      title: COPY.newComment,
+      title: words.newCommentTitle(target.tag),
       context: `${label} · ${file.displayPath}, line ${target.line}`,
       note
     }
@@ -104,7 +105,7 @@ export function headingOf(
   }
   const label = first.runtime ? first.runtime.tag : elementLabel(first)
   return {
-    title: threadsTitle(label, selection.threads.length),
+    title: words.threadsTitle(first, selection.threads.length),
     context: lost ? WINDOW_COPY.notFoundContext(label, file) : `${label} · ${file}, line ${first.line}`,
     note: selection.file.frame ? frameFileText(file) : null
   }

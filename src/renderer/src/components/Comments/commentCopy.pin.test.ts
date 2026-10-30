@@ -86,10 +86,11 @@ const CALLS: Record<string, () => Record<string, string | copy.SaveFailureCopy>>
   fieldHint: () => ({ [FILE]: copy.fieldHint(FILE) }),
   tooLongText: () => ({ '4001': copy.tooLongText(4001), '12345': copy.tooLongText(12_345) }),
   savedAnnouncement: () => ({ [FILE]: copy.savedAnnouncement(FILE) }),
+  // A-02 (024-FR-006): the title's slot holds the target word, "element" in the HTML Preview – no longer the selector.
   threadsTitle: () => ({
-    one: copy.threadsTitle('button#buy.cta', 1),
-    two: copy.threadsTitle('button#buy.cta', 2),
-    zero: copy.threadsTitle('button#buy.cta', 0)
+    one: copy.threadsTitle('element', 1),
+    two: copy.threadsTitle('element', 2),
+    zero: copy.threadsTitle('element', 0)
   }),
   deleteCommentText: () => ({ [FILE]: copy.deleteCommentText(FILE) }),
   deleteThreadText: () => ({ '0': copy.deleteThreadText(0), '1': copy.deleteThreadText(1), '2': copy.deleteThreadText(2) }),
@@ -124,6 +125,11 @@ function tableStrings(table: Record<string, unknown>): Record<string, string> {
   for (const [key, value] of Object.entries(table)) {
     if (typeof value === 'string') out[key] = value
     else if (key === 'deleted') out[key] = copy.ANNOUNCE.deleted(FILE)
+    else if (table === copy.KIND_COPY) {
+      // D-04: each shared template with each preview's word in its slot.
+      const words = key === 'newCommentTitle' ? ['element', 'list item'] : ['an element', 'a paragraph']
+      for (const word of words) out[`${key} (${word})`] = (value as (word: string) => string)(word)
+    }
     else if (key === 'pickerShowing') {
       out[`${key} (tag)`] = copy.ANNOUNCE.pickerShowing({ tag: 'section', line: 12 })
       out[`${key} (no tag)`] = copy.ANNOUNCE.pickerShowing({ line: 12 })

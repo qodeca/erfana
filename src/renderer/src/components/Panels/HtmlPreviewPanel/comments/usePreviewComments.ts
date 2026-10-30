@@ -216,7 +216,7 @@ export function usePreviewComments({
       }
       pickerSteps.current = 0
       store.getState().patch(panelId, { mode: payload.on })
-      announce(payload.on ? ANNOUNCE.modeOn : ANNOUNCE.modeOff)
+      announce(payload.on ? HTML_WORDS.modeOn : ANNOUNCE.modeOff)
     })
     return () => {
       offDraft()
@@ -268,7 +268,7 @@ export function usePreviewComments({
       const on = !latestRef.current.mode
       if (on && refuse()) return
       void setMode(on, latestRef.current.showIcons).then(now => {
-        announce(now ? ANNOUNCE.modeOn : ANNOUNCE.modeOff)
+        announce(now ? HTML_WORDS.modeOn : ANNOUNCE.modeOff)
         // Keyboard activation moves focus into the page with the picker started (§10.1).
         if (now && byKeyboard) void previewGateway.focusPage(panelId).catch(() => {})
       })

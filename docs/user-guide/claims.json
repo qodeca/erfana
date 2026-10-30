@@ -18007,18 +18007,18 @@
       "quote": "A comment whose element is hidden right now is tagged **Not visible now**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:388",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:393",
       "match": "notVisible: 'Not visible now',"
     },
     {
       "id": "docs-html-preview-README/31",
       "audience": "developer",
       "doc": "docs/html-preview/README.md",
-      "quote": "one whose element is gone is tagged **Element not found**",
+      "quote": "one whose element is gone is tagged **Not found**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:389",
-      "match": "notFound: 'Element not found',"
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:394",
+      "match": "notFound: 'Not found',"
     },
     {
       "id": "docs-html-preview-README/32",
@@ -18077,7 +18077,7 @@
       "quote": "The **Show comment icons** button hides or shows the pins for this tab only",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:423",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:428",
       "match": "pins: 'Show comment icons',"
     },
     {
@@ -29066,7 +29066,7 @@
       "quote": "comment mode, pins, the Comments drawer, threads |",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:377",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:383",
       "match": "/** §10.10 \"Drawer\" strings. */",
       "test": "e2e/html-preview-comments.e2e.ts",
       "note": "Removed the (v0.23.0) version tag: no code line proves the release it shipped in. Checker also removed docs/html-preview/README.md from the Source column: a Markdown doc is not a code source."
@@ -29740,7 +29740,7 @@
       "quote": "Comments > Comments in HTML preview, Your name, Your email (optional)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:368",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:374",
       "match": "emailLabel: 'Your email (optional)',"
     },
     {
@@ -30444,7 +30444,7 @@
       "quote": "Turn HTML Preview comment mode on or off; leave it",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:457",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:294",
       "match": "Esc to leave."
     },
     {
@@ -32255,7 +32255,7 @@
       "quote": "Select **Comment mode** in the toolbar",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:421",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:426",
       "match": "mode: 'Comment mode'"
     },
     {
@@ -32285,7 +32285,7 @@
       "quote": "enter your name in **Before your first comment**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:332",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:338",
       "match": "title: 'Before your first comment'",
       "note": "Named the first-use dialog."
     },
@@ -32296,7 +32296,7 @@
       "quote": "and select **Continue**.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:343",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:349",
       "match": "continue: 'Continue'",
       "note": "Added the dialog's confirm button."
     },
@@ -35609,7 +35609,7 @@
       "quote": "select **Comment mode** in the toolbar",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:421",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:426",
       "match": "mode: 'Comment mode',"
     },
     {
@@ -35639,8 +35639,8 @@
       "quote": "<kbd>Esc</kbd> leaves comment mode.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:432",
-      "match": "click an element to comment, Esc to leave"
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:437",
+      "match": "or select text to comment, Esc to leave"
     },
     {
       "id": "user-guide-reference-html-preview/39",
@@ -35659,7 +35659,7 @@
       "quote": "in [Settings > Comments](settings.md#comments)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:359",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:365",
       "match": "title: 'Comments',"
     },
     {
@@ -35719,7 +35719,7 @@
       "quote": "the **Comments** drawer lists every comment",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:379",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:385",
       "match": "title: 'Comments',"
     },
     {
@@ -35729,7 +35729,7 @@
       "quote": "change it, or turn comments off, in [Settings > Comments]",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:360",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:366",
       "match": "flagLabel: 'Comments in HTML preview'"
     },
     {
@@ -39587,7 +39587,7 @@
       "quote": "Lets you comment on elements and selected text in previewed pages.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:362",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:368",
       "match": "flagHint: 'Lets you comment on elements and selected text in previewed pages.',",
       "note": "C-04 / 024-FR-022 reworded the HTML switch hint; the page showed the v0.23.1 text."
     },
@@ -39609,7 +39609,7 @@
       "quote": "| **Your name** | Empty |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:365",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:371",
       "match": "nameLabel: 'Your name',"
     },
     {
@@ -39619,7 +39619,7 @@
       "quote": "changing it affects new comments only",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:367",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:373",
       "match": "Changing it affects new comments only."
     },
     {
@@ -39640,7 +39640,7 @@
       "quote": "| **Your email (optional)** | Empty | Also saved into the file. Leave it empty to keep it out. |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:369",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:375",
       "match": "emailHint: 'Also saved into the file. Leave empty to keep it out.',"
     },
     {
@@ -39670,7 +39670,7 @@
       "quote": "in its source and in git history once pushed",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:371",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:377",
       "match": "in its source and in git history once pushed.",
       "note": "Spec 024 C-04: the Settings notice says \"its source\" for both previews, not \"the page source\"."
     },
@@ -43426,7 +43426,7 @@
       "quote": "Turns [comments in HTML preview](html-preview.md#comments) on or off",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:360",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:366",
       "match": "flagLabel: 'Comments in HTML preview',",
       "note": "Link text said 'HTML Preview comments' (title case); now follows the in-app label in sentence case."
     },
@@ -48686,7 +48686,7 @@
       "quote": "not ready: \"Comment mode – available once the page has loaded\"",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:422",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:427",
       "match": "Comment mode – available once the page has loaded"
     },
     {
@@ -48696,7 +48696,7 @@
       "quote": "\"Show comment icons – off: icons hidden on this page\"",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:425",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:430",
       "match": "Show comment icons – off: icons hidden on this page"
     },
     {
@@ -48906,10 +48906,9 @@
       "audience": "developer",
       "doc": "docs/designs/comments/comments-v2.md",
       "quote": "'Show on page', '640,000 elements'",
-      "status": "verified",
+      "status": "removed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:237",
-      "match": "showOnPage: 'Show on page'"
+      "note": "Describes the HTML string before spec 024; differences table A-05 renamed it to 'Show in preview' in both previews (commentCopy.ts COPY.showInPreview)."
     },
     {
       "id": "designs-comments-comments-v2/t06",
@@ -49052,7 +49051,7 @@
       "quote": "The picker says only 'Showing p, line 42.' (commentCopy.ts:463-466)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:473",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:477",
       "match": "`Showing ${tag ?? 'an element'}, line ${line}.`"
     },
     {
@@ -49204,10 +49203,9 @@
       "audience": "developer",
       "doc": "docs/designs/comments/comments-v2.md",
       "quote": "still say only 'click an element' (commentCopy.ts:379,427,452)",
-      "status": "verified",
+      "status": "removed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:384",
-      "match": "Turn on comment mode and click an element."
+      "note": "Describes the HTML strings before C-16; the mode tooltip, announcement and empty drawer now also teach selecting text (commentCopy.ts KIND_COPY, modeTooltip)."
     },
     {
       "id": "designs-comments-comments-v2/t35",
@@ -49988,7 +49986,7 @@
       "quote": "(its name says how many are open, for example \"Comments, 3 open, 1 needs attention\")",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:452",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:457",
       "match": "return `Comments, ${open} open, ${attention} ${attention === 1 ? 'needs' : 'need'} attention`"
     },
     {
@@ -50018,7 +50016,7 @@
       "quote": "A script in a page you preview can read them too.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:337",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:343",
       "match": "In HTML files, scripts on previewed pages can read them too."
     },
     {
@@ -50038,7 +50036,7 @@
       "quote": "Changing your name affects new comments only.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:367",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:373",
       "match": "'Saved into the file next to each comment you write. Changing it affects new comments only.',"
     },
     {
@@ -54716,7 +54714,7 @@
       "quote": "| comment | Comment mode: pin a note |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:421",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:426",
       "match": "mode: 'Comment mode',"
     },
     {
@@ -54746,7 +54744,7 @@
       "quote": "Check **Comments in HTML preview** or **Comments in Markdown preview**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:363",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:369",
       "match": "markdownFlagLabel: 'Comments in Markdown preview',"
     },
     {
@@ -54756,7 +54754,7 @@
       "quote": "such as **Comment on paragraph**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:348",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:356",
       "match": "commentOn: (noun: string): string => `Comment on ${noun}`,"
     },
     {
@@ -54766,7 +54764,7 @@
       "quote": "Select **Comment** next to the selection",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:387",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:395",
       "match": "button: 'Comment',"
     },
     {
@@ -54776,7 +54774,7 @@
       "quote": "choose **Comment on selection**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:384",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:392",
       "match": "commentOnSelection: 'Comment on selection',"
     },
     {
@@ -54786,7 +54784,7 @@
       "quote": "select them in **Narrow to words**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:388",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:396",
       "match": "narrow: 'Narrow to words',"
     },
     {
@@ -54796,7 +54794,7 @@
       "quote": "Select **Open**, **Resolved** or **Can't edit**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:420",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:428",
       "match": "filterCantEdit: \"Can't edit\","
     },
     {
@@ -54806,7 +54804,7 @@
       "quote": "choose **File order**, **Changed first** or **Latest activity**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:427",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:435",
       "match": "sortOrder: { file: 'File order', changed: 'Changed first', latest: 'Latest activity' }"
     },
     {
@@ -54816,7 +54814,7 @@
       "quote": "clear **Show comment icons and underlines**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:425",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:433",
       "match": "showIcons: 'Show comment icons and underlines',"
     },
     {
@@ -54906,7 +54904,7 @@
       "quote": "or **Go to editor**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:361",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:369",
       "match": "goToEditor: 'Go to editor',"
     },
     {
@@ -54916,7 +54914,7 @@
       "quote": "A Markdown file over 2 MB",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/markdownComments/markdownLimits.ts:25",
+      "source": "src/shared/markdownComments/markdownLimits.ts:28",
       "match": "export const MARKDOWN_COMMENT_MAX_BYTES = 2 * 1024 * 1024"
     },
     {
@@ -54926,7 +54924,7 @@
       "quote": "Erfana tries up to 4 places for a comment",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/markdownComments/markdownLimits.ts:45",
+      "source": "src/shared/markdownComments/markdownLimits.ts:48",
       "match": "export const MARKDOWN_COMMENT_MAX_SLOTS = 4"
     },
     {
@@ -54936,7 +54934,7 @@
       "quote": "A file over 2 MB or 100,000 lines",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/markdownComments/markdownLimits.ts:27",
+      "source": "src/shared/markdownComments/markdownLimits.ts:30",
       "match": "export const MARKDOWN_COMMENT_MAX_LINES = 100_000"
     },
     {
@@ -54946,7 +54944,7 @@
       "quote": "more than 32 levels deep",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/markdownComments/markdownLimits.ts:29",
+      "source": "src/shared/markdownComments/markdownLimits.ts:32",
       "match": "export const MARKDOWN_COMMENT_MAX_NESTING = 32"
     },
     {
@@ -54966,7 +54964,7 @@
       "quote": "A part between a tool's START and END markers can't take a comment",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:195",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:206",
       "match": "generated: 'This part is generated by a tool. Comment on the text before or after it.',"
     },
     {
@@ -54976,7 +54974,7 @@
       "quote": "lists every comment as **Open**, **Resolved** or **Can't edit**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:420",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:428",
       "match": "filterCantEdit: \"Can't edit\","
     },
     {
@@ -55006,7 +55004,7 @@
       "quote": "filtered by **Open**, **Resolved** and **Can't edit**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:420",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:428",
       "match": "filterCantEdit: \"Can't edit\","
     },
     {
@@ -55076,7 +55074,7 @@
       "quote": "| File size | 2 MiB (UTF-8 bytes) |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/markdownComments/markdownLimits.ts:25",
+      "source": "src/shared/markdownComments/markdownLimits.ts:28",
       "match": "export const MARKDOWN_COMMENT_MAX_BYTES = 2 * 1024 * 1024"
     },
     {
@@ -55086,7 +55084,7 @@
       "quote": "| 5,000 | `MARKDOWN_COMMENT_MAX_HTML_NODES` |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/markdownComments/markdownLimits.ts:41",
+      "source": "src/shared/markdownComments/markdownLimits.ts:44",
       "match": "export const MARKDOWN_COMMENT_MAX_HTML_NODES = 5_000"
     },
     {
@@ -55096,7 +55094,7 @@
       "quote": "| 256 | `MARKDOWN_COMMENT_MAX_HTML_NESTING` |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/markdownComments/markdownLimits.ts:31",
+      "source": "src/shared/markdownComments/markdownLimits.ts:34",
       "match": "export const MARKDOWN_COMMENT_MAX_HTML_NESTING = 256"
     },
     {
@@ -55106,7 +55104,7 @@
       "quote": "| 64 | `MARKDOWN_COMMENT_MAX_EMPHASIS_NESTING` |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/markdownComments/markdownLimits.ts:43",
+      "source": "src/shared/markdownComments/markdownLimits.ts:46",
       "match": "export const MARKDOWN_COMMENT_MAX_EMPHASIS_NESTING = 64"
     },
     {
@@ -55116,7 +55114,7 @@
       "quote": "| 100,000 characters | `MARKDOWN_SELECTION_SEARCH_MAX_CHARS` |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/markdownComments/markdownLimits.ts:47",
+      "source": "src/shared/markdownComments/markdownLimits.ts:50",
       "match": "export const MARKDOWN_SELECTION_SEARCH_MAX_CHARS = 100_000"
     },
     {

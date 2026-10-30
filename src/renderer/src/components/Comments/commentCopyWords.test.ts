@@ -207,14 +207,55 @@ describe('commentCopyWords', () => {
     }
   })
 
-  it('keeps the HTML words exactly as the HTML Preview showed them', () => {
+  // Changed expectation under 024-FR-006 (was "keeps the HTML words exactly as the HTML Preview showed them",
+  // with "New comment", "Show on page" and the old empty drawer): the aligned rows read the shared template.
+  it('keeps the HTML words the HTML Preview showed, apart from the rows the differences table aligns', () => {
     const target = { tag: 'div', classes: ['note'], line: 7 }
     expect(HTML_WORDS.noun('p')).toBe('element')
-    expect(HTML_WORDS.newCommentTitle('p')).toBe(COPY.newComment)
     expect(HTML_WORDS.menuLabel('p')).toBe(COPY.menuLabel)
-    expect(HTML_WORDS.showInPreview).toBe(COPY.showOnPage)
-    expect(HTML_WORDS.drawerNone).toBe(DRAWER_COPY.none)
+    expect(HTML_WORDS.notFoundTag).toBe(DRAWER_COPY.notFound)
     expect(HTML_WORDS.context(target, 'index.html')).toBe(`${HTML_WORDS.label(target)} · index.html, line 7`)
     for (const code of COMMENT_CODES) expect(HTML_WORDS.saveFailure(code, 'index.html')).toEqual(saveFailureCopy(code, 'index.html'))
+  })
+
+  it('024-AC-007 A-02 titles the window "{…} on element" in the HTML Preview, the kind noun in Markdown', () => {
+    const target = { tag: 'button', classes: ['cta'], line: 7 }
+    expect(HTML_WORDS.newCommentTitle('button')).toBe('New comment on element')
+    expect(HTML_WORDS.threadsTitle(target, 1)).toBe('Comment on element')
+    expect(HTML_WORDS.threadsTitle(target, 3)).toBe('Comments on element')
+    expect(MARKDOWN_WORDS.newCommentTitle('li')).toBe('New comment on list item')
+    expect(MARKDOWN_WORDS.threadsTitle({ tag: 'li', classes: [] }, 1)).toBe('Comment on list item')
+    // D-03: the selector is not a title word; it stays in the context line.
+    expect(HTML_WORDS.newCommentTitle('button')).not.toContain('button')
+    expect(HTML_WORDS.context(target, 'index.html')).toBe('button.cta · index.html, line 7')
+  })
+
+  it('024-AC-007 D-04 every aligned sentence is one template; only the {kind} word differs', () => {
+    const swap = (text: string): string => text.replace(/\ban element\b/g, 'a paragraph').replace(/\belement\b/g, 'paragraph')
+    expect(swap(HTML_WORDS.newCommentTitle('div'))).toBe(MARKDOWN_WORDS.newCommentTitle('p'))
+    expect(swap(HTML_WORDS.threadsTitle({ tag: 'div', classes: [] }, 2))).toBe(MARKDOWN_WORDS.threadsTitle({ tag: 'p', classes: [] }, 2))
+    expect(swap(HTML_WORDS.drawerNone)).toBe(MARKDOWN_WORDS.drawerNone)
+    expect(swap(HTML_WORDS.modeOn)).toBe(MARKDOWN_WORDS.modeOn)
+    expect(swap(HTML_WORDS.modeTooltip(true))).toBe(MARKDOWN_WORDS.modeTooltip(true))
+    expect(HTML_WORDS.modeTooltip(false)).toBe(MARKDOWN_WORDS.modeTooltip(false))
+    expect(HTML_WORDS.showInPreview).toBe(MARKDOWN_WORDS.showInPreview)
+    expect(HTML_WORDS.notFoundTag).toBe(MARKDOWN_WORDS.notFoundTag)
+  })
+
+  it('024-AC-007 A-05 A-06 A-08 A-10 C-16: the HTML Preview reads the table strings', () => {
+    expect(HTML_WORDS.showInPreview).toBe('Show in preview')
+    expect(HTML_WORDS.notFoundTag).toBe('Not found')
+    expect(HTML_WORDS.drawerNone).toBe(
+      'No comments in this file yet. Select text and right-click, or turn on comment mode and click an element.'
+    )
+    expect(MARKDOWN_WORDS.drawerNone).toBe(
+      'No comments in this file yet. Select text and right-click, or turn on comment mode and click a paragraph.'
+    )
+    expect(HTML_WORDS.modeOn).toBe('Comment mode on. Click an element, select text, or press Tab to pick one. Esc to leave.')
+    expect(HTML_WORDS.modeTooltip(true)).toMatch(
+      /^Comment mode \([^)]+\) – on: click an element or select text to comment, Esc to leave$/
+    )
+    expect(MARKDOWN_COPY.pickerTop).toBe('Top level – no parent to select.')
+    expect(MARKDOWN_COPY.pickerNoChild).toBe('Nothing inside to select.')
   })
 })

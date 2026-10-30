@@ -83,11 +83,13 @@ describe('CommentWindow – threads', () => {
   })
 
   describe('R-013 focus and title', () => {
-    it('titles the window by element and focuses the title', async () => {
+    // Changed expectation under 024-FR-006 A-02 (was the selector in the title: "Comment on button.cta").
+    it('024-AC-007 A-02 titles the window "Comment on element", the selector on its context line, and focuses the title', async () => {
       setup()
       const title = screen.getByTestId('comment-window-title')
-      expect(title).toHaveTextContent('Comment on button.cta')
-      expect(screen.getByRole('dialog', { name: 'Comment on button.cta' })).toBeVisible()
+      expect(title).toHaveTextContent('Comment on element')
+      expect(screen.getByRole('dialog', { name: 'Comment on element' })).toBeVisible()
+      expect(screen.getByText(/^button\.cta · index\.html, line \d+$/)).toBeVisible()
       await waitFor(() => expect(title).toHaveFocus())
     })
 
@@ -96,7 +98,7 @@ describe('CommentWindow – threads', () => {
         request: threadsRequest({ threadKeys: ['t1', 't2'] }),
         list: ready([fileView({ threads: [thread(1), thread(2)] })])
       })
-      expect(screen.getByTestId('comment-window-title')).toHaveTextContent('Comments on button.cta')
+      expect(screen.getByTestId('comment-window-title')).toHaveTextContent('Comments on element')
     })
 
     it('shows a reading state while the list is loading', () => {
@@ -620,7 +622,8 @@ describe('CommentWindow – threads', () => {
       await act(async () => answer({ ok: true, threadKey: null }))
     })
 
-    it('titles a script-built element by its own tag and notes a frame file', () => {
+    // Changed expectation under A-02 (was "Comment on li" in the title): the script-built tag stays on the context line.
+    it('names a script-built element by its own tag on the context line and notes a frame file', () => {
       setup({
         list: ready([
           fileView({
@@ -630,7 +633,7 @@ describe('CommentWindow – threads', () => {
           })
         ])
       })
-      expect(screen.getByTestId('comment-window-title')).toHaveTextContent('Comment on li')
+      expect(screen.getByTestId('comment-window-title')).toHaveTextContent('Comment on element')
       expect(screen.getByText('li · child.html, line 11')).toBeVisible()
       expect(screen.getByText('Saved in child.html.')).toBeVisible()
     })

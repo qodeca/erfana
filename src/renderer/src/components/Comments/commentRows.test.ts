@@ -38,7 +38,7 @@ describe('drawerRows', () => {
     const rows = drawerRows(files, new Set(['t1']))
     expect(tagsOf(rows.open[0])).toEqual([DRAWER_COPY.notVisible])
     expect(tagsOf(rows.open[1])).toEqual([DRAWER_COPY.notVisible])
-    // Still Show on page: the element exists, it is just not drawn.
+    // Still Show in preview: the element exists, it is just not drawn.
     expect(rows.open[0].main).toBe('reveal')
   })
 
@@ -63,7 +63,7 @@ describe('drawerRows', () => {
   })
 
   // Changed expectation under OD-04 (was "R-020 offers Show on page … Open in source otherwise" over Needs attention).
-  it('OD-04 offers Show on page for an attached thread and Open in source otherwise', () => {
+  it('OD-04 offers Show in preview for an attached thread and Open in source otherwise', () => {
     const rows = drawerRows(
       [
         fileView({

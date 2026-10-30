@@ -104,7 +104,8 @@ describe('CommentWindow – new comment', () => {
   describe('R-013 dialog role, focus and context line', () => {
     it('is a labelled dialog with the element and file on its context line', () => {
       setup()
-      const dialog = screen.getByRole('dialog', { name: COPY.newComment })
+      // A-02: "New comment on element" (was "New comment"); the selector stays on the context line.
+      const dialog = screen.getByRole('dialog', { name: 'New comment on element' })
       expect(dialog).toHaveAttribute('aria-modal', 'true')
       expect(within(dialog).getByText('button#buy.cta.primary · index.html, line 12')).toBeVisible()
       expect(screen.getByTestId('comment-window')).toHaveAttribute('data-view', 'new')

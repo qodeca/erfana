@@ -11,7 +11,7 @@
  * Keyboard (decided Rows card, plus the Welcome list's one exception):
  * Tab reaches Close, then the filter (one stop – arrows move the
  * selection), the checkbox, the sort menu, then the list ONCE. In the list ↑ ↓
- * Home End move; Enter or a click is "Show on page" with focus staying in
+ * Home End move; Enter or a click is "Show in preview" with focus staying in
  * the list ("Open in source" on a not-found, damaged or newer row); Tab once
  * more reaches that row's Open.
  *
@@ -31,7 +31,7 @@
  *
  * Layout: a flow sibling of the page placeholder (CommentDrawer.css), so the
  * native page shrinks beside it rather than covering it. Under a 640px panel
- * it takes the whole width, "Show on page" closes it first, and Esc closes it
+ * it takes the whole width, "Show in preview" closes it first, and Esc closes it
  * (it then covers everything, like a sheet).
  *
  * Focus return: the `<aside>` is a `data-focus-return` region, so a comment window opened from a

@@ -234,7 +234,7 @@ export const COPY = {
   saveChanges: 'Save changes',
   close: 'Close',
   open: 'Open',
-  showOnPage: 'Show on page',
+  showInPreview: 'Show in preview', // A-05: the Markdown words, in both
   openInSource: 'Open in source',
   tryAgain: 'Try again',
   pickAgain: 'Pick again',
@@ -285,16 +285,22 @@ export function savedAnnouncement(file: string): string {
   return `Comment saved to ${file}.`
 }
 
+/** Sentences both previews share with one `{kind}` slot (D-04, A-02, A-08, C-16): `noun` "element" / "list item", `clickTarget` "an element" / "a paragraph". */
+export const KIND_COPY = {
+  newCommentTitle: (noun: string): string => `New comment on ${noun}`,
+  drawerNone: (clickTarget: string): string =>
+    `No comments in this file yet. Select text and right-click, or turn on comment mode and click ${clickTarget}.`,
+  modeOn: (clickTarget: string): string =>
+    `Comment mode on. Click ${clickTarget}, select text, or press Tab to pick one. Esc to leave.`
+} as const
+
 /**
- * The window title (§10.10 "Window titles"; designer call: one thread reads
- * "Comment on", several "Comments on").
- *
- * @param label - The element label.
- * @param threads - Threads on that element.
- * @returns The title.
+ * A thread window's title (A-02, D-04; one thread "Comment on", several
+ * "Comments on"). `noun` is "element" in the HTML Preview, whose selector
+ * stays in the context line (D-03).
  */
-export function threadsTitle(label: string, threads: number): string {
-  return threads === 1 ? `Comment on ${label}` : `Comments on ${label}`
+export function threadsTitle(noun: string, threads: number): string {
+  return threads === 1 ? `Comment on ${noun}` : `Comments on ${noun}`
 }
 
 /** "Delete this comment? It is removed from {file}. Git history keeps earlier versions." */
@@ -381,12 +387,11 @@ export const DRAWER_COPY = {
   show: 'Show',
   showIcons: 'Show comment icons',
   loading: 'Reading comments…',
-  none: 'No comments in this file yet. Turn on comment mode and click an element.',
   emptyOpen: 'No open comments.',
   emptyResolved: 'No resolved comments.',
   emptyAttention: 'Nothing needs attention.',
   notVisible: 'Not visible now',
-  notFound: 'Element not found',
+  notFound: 'Not found', // A-10: one tag in both previews
   damaged: 'Damaged',
   resolved: 'Resolved',
   notOnScreen: "This element isn't on screen right now"
@@ -425,11 +430,11 @@ export const TOOL_COPY = {
   pinsOff: 'Show comment icons – off: icons hidden on this page'
 } as const
 
-/** The comment-mode toggle's tooltip in its two ordinary states. */
-export function modeTooltip(on: boolean): string {
+/** The comment-mode toggle's tooltip in its two ordinary states (C-16, D-04): `clickTarget` is the `{kind}` with its article. */
+export function modeTooltip(on: boolean, clickTarget = 'an element'): string {
   const key = commentModeShortcutLabel()
   return on
-    ? `Comment mode (${key}) – on: click an element to comment, Esc to leave`
+    ? `Comment mode (${key}) – on: click ${clickTarget} or select text to comment, Esc to leave`
     : `Comment mode (${key}) – off`
 }
 
@@ -454,7 +459,6 @@ export function listButtonName(open: number, attention: number, resolved = 0): s
 
 /** §10.10 "Announce". */
 export const ANNOUNCE = {
-  modeOn: 'Comment mode on. Click an element, or press Tab to pick one. Esc to leave.',
   modeOff: 'Comment mode off.',
   // not in §10.10
   resolved: 'Comment resolved.',
@@ -465,8 +469,8 @@ export const ANNOUNCE = {
   // keyboard picker (§10.8): spoken by the panel, never drawn in the page. The
   // element is named by what MAIN parsed – its tag and line – never by its ids
   // or classes, which are the page's words (security review S-L-A).
-  pickerTop: 'Top of page – no parent to select.',
-  pickerNoChild: 'No child elements.',
+  pickerTop: 'Top level – no parent to select.', // A-06: the Markdown sentences, in both
+  pickerNoChild: 'Nothing inside to select.',
   pickerShowing: ({ tag, line, added }: CommentPickerElement): string =>
     added
       ? `Showing an element added by a script, inside ${tag ?? 'an element'} on line ${line}.`

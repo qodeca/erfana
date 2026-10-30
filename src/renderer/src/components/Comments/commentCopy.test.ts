@@ -12,6 +12,8 @@ vi.mock('../../utils/platform', () => ({
 
 import {
   ANNOUNCE,
+  COPY,
+  DRAWER_COPY,
   FILE_LIMIT_TEXT,
   UNAVAILABLE_REASON_TEXT,
   commentModeAriaShortcut,
@@ -149,9 +151,10 @@ describe('commentCopy', () => {
     expect(unreadFilesText(3)).toContain('Comments from 3 files in this page')
   })
 
-  it('titles a thread window by count', () => {
-    expect(threadsTitle('button.cta', 1)).toBe('Comment on button.cta')
-    expect(threadsTitle('button.cta', 2)).toBe('Comments on button.cta')
+  // Changed expectation under 024-FR-006 A-02 (was the selector in the title: "Comment on button.cta").
+  it('titles a thread window by count, the target word in its {kind} slot', () => {
+    expect(threadsTitle('element', 1)).toBe('Comment on element')
+    expect(threadsTitle('element', 2)).toBe('Comments on element')
   })
 
   it('words the delete confirmations', () => {
@@ -169,8 +172,16 @@ describe('commentCopy', () => {
     expect(listButtonName(0, 0, 2)).toBe('Comments, none open')
   })
 
+  // Changed expectation under C-16 (was "– on: click an element to comment, Esc to leave").
   it('describes the mode in its tooltip', () => {
     expect(modeTooltip(false)).toBe('Comment mode (Ctrl+Alt+M) – off')
-    expect(modeTooltip(true)).toContain('– on: click an element to comment, Esc to leave')
+    expect(modeTooltip(true)).toBe('Comment mode (Ctrl+Alt+M) – on: click an element or select text to comment, Esc to leave')
+  })
+
+  it('024-AC-007 A-05 A-06 A-10: the drawer action, the picker ends and the not-found tag read the Markdown words', () => {
+    expect(COPY.showInPreview).toBe('Show in preview')
+    expect(ANNOUNCE.pickerTop).toBe('Top level – no parent to select.')
+    expect(ANNOUNCE.pickerNoChild).toBe('Nothing inside to select.')
+    expect(DRAWER_COPY.notFound).toBe('Not found')
   })
 })

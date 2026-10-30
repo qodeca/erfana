@@ -13,7 +13,8 @@
  * A component reads its preview's table from `CommentWordsContext`
  * (`commentWords.ts`). `HTML_WORDS` is the default, and every HTML value is the
  * string the HTML Preview showed before spec 024, except where the state table
- * rewords both previews (S-07, S-08, S-09 – the pin names each). No
+ * rewords both previews (S-07, S-08, S-09 – the pin names each) or the
+ * differences table aligns them ({@link KIND_COPY}, {@link HTML_WORDS}). No
  * Markdown string says "element", "page" or "block" (except "code block" and
  * "block quote"), names a bare tag, or uses "pin" or "pick" as a noun
  * (024-AC-008, `commentCopyWords.test.ts`).
@@ -32,8 +33,8 @@ import {
   COPY,
   DRAWER_COPY,
   FILE_LIMIT_TEXT,
+  KIND_COPY,
   TOOL_COPY,
-  commentModeShortcutLabel,
   deleteBlockText,
   modeTooltip,
   notFoundText,
@@ -133,6 +134,12 @@ export interface CommentWords {
   readonly saveFailure: (code: string, file: string, tag?: string, reason?: string) => SaveFailureCopy
 }
 
+/** The HTML Preview's `{kind}` (024-FR-007, D-04), bare and with its article. */
+const HTML_NOUN = 'element'
+const HTML_CLICK_TARGET = 'an element'
+/** What a Markdown click in comment mode is taught to land on (C-16, A-08). */
+const MARKDOWN_CLICK_TARGET = 'a paragraph'
+
 /** HTML reason lines the shared sentences do not cover (menu matrix § 3, C-19). */
 export const HTML_MENU_COPY = {
   /** M-08: `html`, `head`, template content, an element no comment can stand before. */
@@ -145,17 +152,21 @@ export const HTML_MENU_COPY = {
   refused: "Erfana doesn't add comments to this file."
 } as const
 
-/** The HTML Preview's words: exactly the strings it showed before spec 024. */
+/**
+ * The HTML Preview's words: the strings it showed before spec 024, except
+ * where the differences table aligns both previews (A-02, A-05, A-06, A-08,
+ * A-10, C-16) – there the shared template with "element" in its slot.
+ */
 export const HTML_WORDS: CommentWords = {
   preview: 'html',
-  noun: () => 'element',
+  noun: () => HTML_NOUN,
   label: target => elementLabel(target),
-  newCommentTitle: () => COPY.newComment,
-  threadsTitle: (target, count) => threadsTitle(elementLabel(target), count),
+  newCommentTitle: () => KIND_COPY.newCommentTitle(HTML_NOUN),
+  threadsTitle: (_target, count) => threadsTitle(HTML_NOUN, count),
   context: (target, file) => `${elementLabel(target)} · ${file}, line ${target.line}`,
   menuLabel: () => COPY.menuLabel,
-  showInPreview: COPY.showOnPage,
-  drawerNone: DRAWER_COPY.none,
+  showInPreview: COPY.showInPreview,
+  drawerNone: KIND_COPY.drawerNone(HTML_CLICK_TARGET),
   notFoundTag: DRAWER_COPY.notFound,
   notOnScreen: DRAWER_COPY.notOnScreen,
   notVisibleText: COPY.notVisibleText,
@@ -168,16 +179,16 @@ export const HTML_WORDS: CommentWords = {
   modeTooltip,
   noTarget: { label: COPY.menuLabel, reason: HTML_MENU_COPY.notCommentable },
   pinsOff: TOOL_COPY.pinsOff,
-  modeOn: ANNOUNCE.modeOn,
+  modeOn: KIND_COPY.modeOn(HTML_CLICK_TARGET),
   readOnlyReasonText,
   saveFailure: (code, file) => saveFailureCopy(code, file)
 }
 
 /** Markdown sentences that differ from the shared ones (C-03, menu matrix § 3, state table W-01, W-08). */
 export const MARKDOWN_COPY = {
-  showInPreview: 'Show in preview',
-  drawerNone: 'No comments in this file yet. Select text and click Comment, or turn on comment mode and click a paragraph.',
-  notFoundTag: 'Not found',
+  showInPreview: COPY.showInPreview,
+  drawerNone: KIND_COPY.drawerNone(MARKDOWN_CLICK_TARGET),
+  notFoundTag: DRAWER_COPY.notFound,
   notOnScreen: "This comment's target isn't on screen right now",
   notVisibleText:
     'This part is hidden right now – it may be inside a collapsed section. Its icon comes back when it shows.',
@@ -186,9 +197,9 @@ export const MARKDOWN_COPY = {
   deleteBlock: 'Delete damaged comment',
   deleteBlockAction: 'Delete damaged comment…',
   pinsOff: 'Show comment icons – off: icons hidden in this preview',
-  modeOn: 'Comment mode on. Click a paragraph, select text, or press Tab to pick one. Esc to leave.',
-  pickerTop: 'Top level – no parent to select.',
-  pickerNoChild: 'Nothing inside to select.',
+  modeOn: KIND_COPY.modeOn(MARKDOWN_CLICK_TARGET),
+  pickerTop: ANNOUNCE.pickerTop,
+  pickerNoChild: ANNOUNCE.pickerNoChild,
   frontmatter: "Comments can't be added to the frontmatter.",
   /** Not in the matrix: comment mode, a right-click off every block (a gap, the margin) – HTML M-08 in Markdown words. */
   noTarget: "This part of the preview can't hold a comment.",
@@ -210,10 +221,7 @@ export const MARKDOWN_COPY = {
   moved: (noun: string): string =>
     `This ${noun} changed in the file since you picked it. Pick it again – your text comes with you.`,
   expired: (noun: string): string => `This comment window was open too long. Pick the ${noun} again – your text is kept.`,
-  modeTooltip: (on: boolean): string => {
-    const key = commentModeShortcutLabel()
-    return on ? `Comment mode (${key}) – on: click a paragraph or select text to comment, Esc to leave` : `Comment mode (${key}) – off`
-  }
+  modeTooltip: (on: boolean): string => modeTooltip(on, MARKDOWN_CLICK_TARGET)
 } as const
 
 /**
@@ -273,7 +281,7 @@ export const MARKDOWN_WORDS: CommentWords = {
   preview: 'markdown',
   noun: markdownKindNoun,
   label: target => `${capitalise(markdownKindNoun(target.tag))} · line ${target.line}`,
-  newCommentTitle: tag => `New comment on ${markdownKindNoun(tag)}`,
+  newCommentTitle: tag => KIND_COPY.newCommentTitle(markdownKindNoun(tag)),
   threadsTitle: (target, count) => threadsTitle(markdownKindNoun(target.tag), count),
   context: (target, file) => `${file}, line ${target.line}`,
   menuLabel: tag => capitalise(markdownKindNoun(tag)),

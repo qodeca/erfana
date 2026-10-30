@@ -35,7 +35,7 @@ import {
   type FakeCommentsBridge
 } from './__test-helpers__/commentTestKit'
 import { ANNOUNCE, COPY, DRAWER_COPY } from '../../../Comments/commentCopy'
-import { COMMENT_LIST_COPY, SELECTION_COPY } from '../../../Comments/commentCopyWords'
+import { COMMENT_LIST_COPY, HTML_WORDS, SELECTION_COPY } from '../../../Comments/commentCopyWords'
 import { drawerRows } from '../../../Comments/commentRows'
 import { usePreviewComments, type PreviewComments } from './usePreviewComments'
 import { resetCommentPendingWrites } from '../../../Comments/commentPendingWrites'
@@ -277,7 +277,7 @@ describe('usePreviewComments', () => {
     expect(latest.toolbar.counts).toEqual({ open: 2, resolved: 0, attention: 1 })
     expect(latest.layer.notVisible).toEqual(['t2'])
     expect(latest.toolbar.mode).toBe(true)
-    await waitFor(() => expect(latest.layer.polite).toBe(ANNOUNCE.modeOn))
+    await waitFor(() => expect(latest.layer.polite).toBe(HTML_WORDS.modeOn))
     // A list that was never read is not re-read on a change event.
     expect(fake.bridge.list).not.toHaveBeenCalled()
   })
@@ -285,15 +285,15 @@ describe('usePreviewComments', () => {
   it('E-022 says where the page’s keyboard picker is, without touching the mode', async () => {
     render(<Harness onValue={onValue} />)
     act(() => fake.emitMode({ panelId: PANEL, on: true, reason: 'escape' }))
-    await waitFor(() => expect(latest.layer.polite).toBe(ANNOUNCE.modeOn))
+    await waitFor(() => expect(latest.layer.polite).toBe(HTML_WORDS.modeOn))
     act(() => fake.emitMode({ panelId: PANEL, on: false, reason: 'picker', say: 'showing', element: { tag: 'p', line: 12 } }))
     await waitFor(() => expect(latest.layer.polite).toBe('Showing p, line 12.'))
     // A picker event is not a mode change, whatever its `on` says.
     expect(latest.toolbar.mode).toBe(true)
     act(() => fake.emitMode({ panelId: PANEL, on: true, reason: 'picker', say: 'top' }))
-    await waitFor(() => expect(latest.layer.polite).toBe('Top of page – no parent to select.'))
+    await waitFor(() => expect(latest.layer.polite).toBe('Top level – no parent to select.'))
     act(() => fake.emitMode({ panelId: PANEL, on: true, reason: 'picker', say: 'no-child' }))
-    await waitFor(() => expect(latest.layer.polite).toBe('No child elements.'))
+    await waitFor(() => expect(latest.layer.polite).toBe('Nothing inside to select.'))
   })
 
   it('024-AC-004 C-16 (HTML) an open draft on words opens the window on them; a whole-element choice from the menu, on none', () => {
@@ -345,7 +345,7 @@ describe('usePreviewComments', () => {
           showIcons: true
         })
       )
-      await waitFor(() => expect(latest.layer.polite).toBe(ANNOUNCE.modeOn))
+      await waitFor(() => expect(latest.layer.polite).toBe(HTML_WORDS.modeOn))
       expect(focusPage).toHaveBeenCalledWith(PANEL)
     })
 
@@ -668,7 +668,7 @@ describe('usePreviewComments', () => {
       expect(useOverlayOccluderStore.getState().isOccluded()).toBe(false)
     })
 
-    it('Show on page reveals the thread and says when it is not on screen', async () => {
+    it('Show in preview reveals the thread and says when it is not on screen', async () => {
       render(<Harness onValue={onValue} />)
       act(() => latest.toolbar.onToggleDrawer())
       const [row] = drawerRows(
@@ -680,7 +680,7 @@ describe('usePreviewComments', () => {
       await waitFor(() => expect(latest.layer.polite).toBe(DRAWER_COPY.notOnScreen))
     })
 
-    it('Show on page closes a full-width drawer first', () => {
+    it('Show in preview closes a full-width drawer first', () => {
       render(<Harness onValue={onValue} width={500} />)
       act(() => latest.toolbar.onToggleDrawer())
       const [row] = drawerRows([fileView({ threads: [thread(1)] })], new Set()).open
@@ -688,7 +688,7 @@ describe('usePreviewComments', () => {
       expect(latest.drawer).toBeNull()
     })
 
-    it('H3 a full-width drawer closed by Show on page hands focus natively to the page', async () => {
+    it('H3 a full-width drawer closed by Show in preview hands focus natively to the page', async () => {
       render(<Harness onValue={onValue} width={500} />)
       act(() => latest.toolbar.onToggleDrawer())
       const [row] = drawerRows([fileView({ threads: [thread(1)] })], new Set()).open
@@ -696,7 +696,7 @@ describe('usePreviewComments', () => {
       await waitFor(() => expect(focusPage).toHaveBeenCalledWith(PANEL))
     })
 
-    it('a side drawer keeps focus on its row after Show on page', async () => {
+    it('a side drawer keeps focus on its row after Show in preview', async () => {
       render(<Harness onValue={onValue} />)
       act(() => latest.toolbar.onToggleDrawer())
       const [row] = drawerRows([fileView({ threads: [thread(1)] })], new Set()).open
@@ -743,7 +743,7 @@ describe('usePreviewComments', () => {
       act(() => latest.drawer?.onOpen(row))
       expect(fake.bridge.reveal).toHaveBeenCalledWith(PANEL, 't1')
       expect(latest.layer.request).toMatchObject({ kind: 'threads', threadKeys: ['t1'], opener: 'drawer' })
-      // Unlike Show on page, the window takes over: the drawer stays, and nothing is announced.
+      // Unlike Show in preview, the window takes over: the drawer stays, and nothing is announced.
       expect(latest.drawer).not.toBeNull()
       expect(latest.layer.polite).toBe('')
     })

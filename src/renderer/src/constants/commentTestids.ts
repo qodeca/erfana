@@ -167,7 +167,7 @@ export const COMMENT_TEST_IDS = {
   COMMENT_DRAWER_LIST: 'comment-drawer-list',
   /** A row */
   COMMENT_DRAWER_ROW: 'comment-drawer-row',
-  /** A row's main action (Show on page / Open in source) */
+  /** A row's main action (Show in preview / Open in source) */
   COMMENT_DRAWER_ROW_MAIN: 'comment-drawer-row-main',
   /** A row's Open (the comment window) */
   COMMENT_DRAWER_ROW_OPEN: 'comment-drawer-row-open',
