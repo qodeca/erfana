@@ -30,17 +30,33 @@ const SPEC = 'specs/spec-t3-024-unified-comments'
 export const REPORT = `${SPEC}/verification/history-check.md`
 const git = args => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28 })
 
-/** The commits the spec's history rules name (spec 024 build plan, architecture note § 7). */
-export const COMMITS = {
-  fix429: 'bd85057f',
-  fix426: 'c659911b',
-  frozenPin: '694b5638',
-  behaviourPin: '41f2814f',
-  firstMove: '23beed6e',
-  markdownComments: '4be9b6d5',
-  markdownLock: '9d42af15',
-  refresh81: 'fe39aa0c'
+/**
+ * The commits the spec's history rules name (spec 024 build plan, architecture
+ * note § 7), found by their subject line so a rebase that rewrites their SHAs
+ * does not break the check. A subject not on the branch resolves to a
+ * `missing:` marker, which no commit matches.
+ */
+export const COMMIT_SUBJECTS = {
+  fix429: 'fix(test): stop P-007 timing out under coverage (#429)',
+  fix426: "fix(e2e): wait for the reloaded page's overlay in E-019 (#426)",
+  frozenPin: 'test(comments): freeze the v0.23.1 comment parser and writer',
+  behaviourPin: 'test(comments): pin the v0.23.1 HTML comment behaviour',
+  firstMove: 'refactor(comments): move the parse5-free format core to src/shared/comments',
+  markdownComments: 'feat(comments): comments in the Markdown Preview',
+  markdownLock: 'feat(comments): lock the Markdown placement rules and agent note',
+  refresh81: 'docs(comments-v2): refresh § 8.1 against the current cards (spec 024, 024-FR-025)'
 }
+
+function resolveSubjects(subjects) {
+  const bySubject = new Map()
+  for (const line of git(['log', '--format=%h%x09%s', 'HEAD', '-n', '2000']).split('\n')) {
+    const tab = line.indexOf('\t')
+    if (tab > 0 && !bySubject.has(line.slice(tab + 1))) bySubject.set(line.slice(tab + 1), line.slice(0, tab))
+  }
+  return Object.fromEntries(Object.entries(subjects).map(([name, subject]) => [name, bySubject.get(subject) ?? `missing:${name}`]))
+}
+
+export const COMMITS = resolveSubjects(COMMIT_SUBJECTS)
 
 /**
  * Invariant pins (architecture note § 8 C26). A group starts at `since` when
@@ -285,7 +301,7 @@ function rule033Cards(base, commits, approvals) {
   const onTime = date !== null && ui !== undefined && date <= ui.date
   const signOff = /full sign-off .* on 2026-10-29/.test(approvals)
   // approvals § 2.3 step 1 also plans a dated history line in each card; reported, not a rule of 024-AC-033 here.
-  const noHistoryLine = decided.filter(c => !/owner approved the comments-v2 changes/.test(git(['show', `HEAD:${c}`])))
+  const noHistoryLine = decided.filter(c => !/owner approved the (?:comments-v2 changes|changes comments-v2 makes)/.test(git(['show', `HEAD:${c}`])))
   return {
     noHistoryLine,
     pass: unlisted.length === 0 && onTime && signOff,
