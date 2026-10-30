@@ -18,7 +18,10 @@ import {
 } from './markdownLimits'
 import { markdownKind } from './markdownKind'
 import { markdownSlots } from './mdSlots'
-import { mdOf, parseMd, targetBy } from './__test-helpers__/mdHarness'
+import type { MdTarget } from './mdIndex'
+import { applySplice, planSlotInsert, type SplicePlan } from '../comments/splice'
+import { createThread } from '../comments/thread'
+import { addComment, contextOf, MD_VIEW, mdOf, parseMd, pickOf, targetBy, written } from './__test-helpers__/mdHarness'
 
 const parsed = vi.hoisted(() => ({ calls: 0 }))
 
@@ -195,5 +198,108 @@ describe('024-AC-036 Markdown work is bounded', () => {
       MARKDOWN_COMMENT_MAX_EMPHASIS_NESTING: 64,
       MARKDOWN_COMMENT_MAX_SLOTS: 4
     })
+  })
+})
+
+/** Comments the file below holds: more than the HTML depth limit, as in the corpus file that was refused at about 257. */
+const OWN_BLOCK_COUNT = 320
+
+/** A section with a target of every kind a comment goes on: heading, paragraph, items, quote, table, rows and cells. */
+const commentedSection = (i: number): string =>
+  [
+    `## Section ${i}`,
+    '',
+    `Paragraph ${i} names the plan.`,
+    '',
+    `- First point ${i}.`,
+    `- Second point ${i}.`,
+    `- Third point ${i}.`,
+    '',
+    `> Quoted line ${i}.`,
+    '',
+    '| Name | Value |',
+    '|---|---|',
+    `| row ${i} | value ${i} |`,
+    ''
+  ].join('\n')
+
+/** Every third message has a blank line, a list and a tag in it: the readable lines a block may hold. */
+const messageOf = (i: number): string => (i % 3 === 0 ? `Please look at ${i}.\n\n- one\n- two <b>bold</b>` : `Check <code>${i}</code> here.`)
+
+/** {@link OWN_BLOCK_COUNT} comments, each where a save puts it, planned on one parse and spliced from the end. */
+function heavilyCommentedFile(): string {
+  const plain = Array.from({ length: 40 }, (_, i) => commentedSection(i + 1)).join('\n')
+  const doc = parseMd(plain)
+  const targets = mdOf(doc).elements.filter((t: MdTarget) => t.kind !== 'list').slice(0, OWN_BLOCK_COUNT)
+  const plans: SplicePlan[] = targets.map((target, i) => {
+    const slot = markdownKind.slots(doc, target)[0]
+    const anchor = markdownKind.anchorOf(doc, target, undefined, slot)
+    const data = createThread({ anchor, view: MD_VIEW, text: messageOf(i), context: contextOf(5_000 + i) })
+    const planned = planSlotInsert(doc, slot, data, markdownKind.refuseGrowth, markdownKind)
+    if (!planned.ok) throw new Error(`comment ${i} on ${target.path} not planned: ${planned.reason}`)
+    return planned.plan
+  })
+  return [...plans].sort((a, b) => b.start - a.start).reduce((text, plan) => applySplice(text, plan), plain)
+}
+
+const DIVS = '<div>'.repeat(MARKDOWN_COMMENT_MAX_HTML_NESTING + 1)
+
+/** Lines shaped like Erfana's block – its header, `inner`, its `-->` – each after `indent` (a blank line stays blank). */
+const ownShaped = (inner: readonly string[], indent = ''): string =>
+  [`${indent}<!-- erfana:comment v1 id=c-fake`, ...inner.map(line => (line === '' ? '' : indent + line)), `${indent}-->`].join('\n')
+
+/**
+ * Block-shaped text the parser could read as something other than a comment
+ * – so its tags may be real – and the rule that makes the scan count it.
+ */
+const OWN_SHAPED_BOMBS: ReadonlyArray<readonly [string, string]> = [
+  ['inside a fence', `\`\`\`\n${ownShaped(['status: open', `target: ${DIVS}`])}\n\`\`\`\n`],
+  ['after a declaration left open', `<!X\n\n${ownShaped([`target: ${DIVS}`])}\n`],
+  ['after a tag left open', `<span title='\n\n${ownShaped([`target: ${DIVS}`])}\n`],
+  ['holding an HTML comment end (`--!>`)', ownShaped(['a --!> b', `target: ${DIVS}`])],
+  ['holding an end tag', ownShaped(['a </title> b', `target: ${DIVS}`])],
+  ['holding a fence line', ownShaped(['```', `target: ${DIVS}`])],
+  ['with a line outside its indentation', `  <!-- erfana:comment v1 id=c-fake\n  status: open\nout ${DIVS}\n  -->\n`],
+  ['never closed', `<!-- erfana:comment v1 id=c-fake\ntarget: ${DIVS}\n`],
+  ['in a paragraph after a code span opens', `Text with a \`tick\n${ownShaped([`x\` ${DIVS}`], '    ')}\n`],
+  ['in a paragraph after a definition opens', `[a]: /url '\n${ownShaped([`x' ${DIVS}`], '    ')}\n`],
+  ['in a paragraph, with a blank line', `- item\n${ownShaped(['a', '', `x ${DIVS}`], '  ')}\n`],
+  ['in a paragraph, with a line that starts a block', `- item\n${ownShaped([`- ${DIVS}`], '  ')}\n`]
+]
+
+describe('024-AC-036 Erfana\'s own comment blocks are not raw HTML to the limit scan', () => {
+  it('024-AC-036 a file with 320 comments on every kind of target stays commentable', () => {
+    const text = heavilyCommentedFile()
+    expect((text.match(/^[ \t]*target: </gm) ?? []).length).toBe(OWN_BLOCK_COUNT)
+    expect(OWN_BLOCK_COUNT).toBeGreaterThan(MARKDOWN_COMMENT_MAX_HTML_NESTING)
+    expect(markdownLimitBreach(text)).toBeUndefined()
+    const doc = parseMd(text)
+    expect(doc.state.writable).toBe(true)
+    const ok = doc.state.blocks.filter(block => block.kind === 'ok')
+    expect(ok).toHaveLength(OWN_BLOCK_COUNT)
+    expect(ok.filter(block => block.target.state !== 'attached')).toEqual([])
+    // One more save still passes every check.
+    const next = written(addComment(text, pickOf(doc, targetBy(doc, 'paragraph', 'Paragraph 40'))))
+    expect(next.doc.state.blocks).toHaveLength(OWN_BLOCK_COUNT + 1)
+  }, 120_000)
+
+  it('024-AC-036 tags inside an own block after a blank line, or in a list item\'s text, are not counted', () => {
+    expect(markdownLimitBreach(`Intro.\n\n${ownShaped(['status: open', `target: ${DIVS}`, '', `  - ${DIVS}`])}\n\nTarget.\n`)).toBeUndefined()
+    expect(markdownLimitBreach(`- first\n${ownShaped(['status: open', `target: <ul> ${DIVS}`], '  ')}\n- second\n`)).toBeUndefined()
+    // Raw HTML outside the blocks still counts.
+    expect(markdownLimitBreach(`${ownShaped(['status: open'])}\n\n${DIVS}\n`)).toBe('html-nesting')
+  })
+
+  it.each(OWN_SHAPED_BOMBS)('024-AC-036 a block-shaped run %s is counted: read-only "too large" before any parse', (_name, text) => {
+    const checked = timedBreach(text)
+    expect(checked.breach).toBe('html-nesting')
+    expect(checked.ms).toBeLessThan(LIMIT_CHECK_MAX_MS)
+    expect(markdownKind.parse(text, 0).state.readOnlyReason).toBe('too-large')
+    expect(parsed.calls).toBe(0)
+  })
+
+  it('024-AC-036 many block openers that never close cost one pass', () => {
+    const openers = `${'<!-- erfana:comment v1 id=c-fake\nstatus: open\n'.repeat(40_000)}`
+    expect(timedBreach(openers).ms).toBeLessThan(LIMIT_CHECK_MAX_MS)
   })
 })

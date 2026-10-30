@@ -140,10 +140,9 @@ function planned<T>(kind: CommentFileKind, doc: KindDocument, targets: readonly 
 export function largeMarkdown(): { readonly plain: string; readonly text: string } {
   const plain = body(markdownSection, 24_001)
   const doc = markdownKind.parse(plain, 0)
-  // Paragraphs and headings only. The limit scan (`markdownLimits.ts`) counts each block's readable
-  // `target: <tag>` line as an unclosed raw-HTML element, so blocks on list items, rows and quotes
-  // (two such tags each) would push 200 comments past MARKDOWN_COMMENT_MAX_HTML_NESTING and the
-  // file would be read-only "too large" – reported with the timing run, not worked around here.
+  // Paragraphs and headings only, as in the first timing run, so the runs compare. (That run chose them
+  // because the limit scan counted each block's `target: <tag>` line as raw HTML; it no longer counts
+  // the inside of Erfana's own blocks – `markdownLimits.ts`.)
   const commentable = new Set(['paragraph', 'heading'])
   const targets = spread((doc.index as MdIndex).elements.filter(t => commentable.has(t.kind)), LARGE_FILE_COMMENTS)
   const text = planned(markdownKind, doc, targets, (target, i) => {

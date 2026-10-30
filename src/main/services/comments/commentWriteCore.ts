@@ -20,10 +20,12 @@
  * the spliced text, exactly one block more, the same or one fewer, the same
  * elements, and the written block reads back with the intended data.
  *
- * The file is parsed afresh, never taken from the document cache: re-locating
- * a draft runs backup-tier lookups whose budget is shared per parse
- * (`commentJobDocs.ts`). The verified result is a fresh parse of the new
- * bytes, so it goes INTO the cache – the list after the write finds it.
+ * The HTML writer parses the file afresh, never from the document cache:
+ * re-locating a draft runs backup-tier lookups whose budget is shared per
+ * parse (`commentJobDocs.ts`). A kind whose planning runs no such lookup may
+ * pass a cached reader ({@link WriteKind.read}; `kindCommentJobs.ts`). The
+ * verified result is a fresh parse of the new bytes, so it goes INTO the
+ * cache – the list after the write finds it.
  *
  * The file kind comes with the job's environment (spec 024 architecture note
  * 001 § 5): its parse, its own pre-write check, and its agent note and hints,
@@ -403,7 +405,10 @@ type ReadyPlan =
 /** The file kind a write runs for, and how it reads the bytes afresh. */
 export interface WriteKind {
   readonly kind: CommentFileKind
-  /** A fresh parse of `bytes`, never from the cache; {@link freshKindDocumentOf} when absent. */
+  /**
+   * How `bytes` are read for planning; {@link freshKindDocumentOf} when absent. From the cache only for a kind
+   * whose planning runs no budgeted lookup (module comment).
+   */
   readonly read?: (bytes: Uint8Array) => JobDocument<KindDocument>
 }
 

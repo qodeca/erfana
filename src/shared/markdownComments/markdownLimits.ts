@@ -17,7 +17,10 @@
  *
  * The scan over-counts rather than under-counts: it does not know which
  * lines are code, so a fence full of `<div>`s counts as raw HTML. A file
- * refused that way is read-only, never damaged.
+ * refused that way is read-only, never damaged. The one thing it leaves out
+ * of the HTML count is the inside of Erfana's own comment blocks, and only
+ * where the parser cannot read it as anything but a comment or code (see
+ * `ownBlockInteriors`).
  */
 import { utf8Length } from '../comments/encoding'
 
@@ -152,17 +155,23 @@ interface HtmlShape {
   readonly nodes: number
 }
 
+/** A range of the text the HTML count skips: `[start, end)`. */
+type SkippedRange = readonly [number, number]
+
 /**
  * Raw HTML over the whole text, in one scan: the depth is start tags minus
  * end tags, the count every construct {@link HTML_OPEN} finds. A tag split
  * over lines counts – `<div` then `>` on the next line is still a `<div>` to
- * the parser.
+ * the parser. Constructs inside `skipped` (sorted, disjoint) are not counted.
  */
-function htmlShape(text: string): HtmlShape {
+function htmlShape(text: string, skipped: readonly SkippedRange[]): HtmlShape {
   let depth = 0
   let max = 0
   let nodes = 0
+  let next = 0
   for (const match of text.matchAll(HTML_OPEN)) {
+    while (next < skipped.length && skipped[next][1] <= match.index) next += 1
+    if (next < skipped.length && skipped[next][0] <= match.index) continue
     nodes += 1
     const [whole, closing, name] = match
     if (name === undefined) continue
@@ -265,13 +274,134 @@ class FenceTracker {
   }
 }
 
+/** The first line of a block Erfana writes (`format.ts`): blanks, then the header and nothing else. */
+const OWN_OPENER = /^([ \t]*)<!-- erfana:comment v1 id=[\w-]+$/
+/** The last line of one, after the opener's blanks. */
+const OWN_CLOSER = '-->'
+/**
+ * Never inside a block Erfana writes (its text holds no `--`): an end of the
+ * comment in HTML (`--!>`) or Markdown (`-->`), and every way out of a
+ * raw-text or escapable raw-text element, of a Markdown HTML block of type 1,
+ * of a processing instruction or of CDATA. Any other end tag (`</b>` in a
+ * message) leaves none of them.
+ */
+const OWN_INTERIOR_BANNED =
+  /--|<\/(?:pre|script|style|textarea|title|xmp|iframe|noembed|noframes|noscript|plaintext)(?![A-Za-z0-9-])|\?>|\]\]>/i
+/** A line that could close a fence the block sits in. */
+const FENCE_LEAD = /^(?:`{3}|~{3})/
+/** A line that could end or split a paragraph the block sits in: any block start, or a setext or table underline. */
+const BLOCK_LEAD = /^[-#>`~*+_=|:<\d]/
+/** Text that could carry an inline construct of a paragraph over the opener: a tag, a code span, a table, a link or definition. */
+const PARAGRAPH_HAZARD = /[<`|[]/
+
+/** How sure the scan is that an opener starts a comment: after a blank line, or inside a paragraph so far free of hazards. */
+type OwnContext = 'after-blank' | 'in-paragraph'
+
+/**
+ * The index of the last line of the block Erfana wrote whose opener is line
+ * `i`, or -1 when line `i` is not one or a line of it could reach the parser
+ * as anything but comment or code text ({@link ownBlockInteriors}).
+ */
+function ownBlockEnd(lines: readonly string[], i: number, context: OwnContext): number {
+  const opener = OWN_OPENER.exec(lines[i])
+  if (opener === null || lines[i].includes('--', opener[1].length + 4)) return -1
+  const indent = opener[1]
+  for (let j = i + 1; j < lines.length; j += 1) {
+    const line = lines[j]
+    if (line.trim() === '') {
+      if (context === 'in-paragraph') return -1
+      continue
+    }
+    if (!line.startsWith(indent)) return -1
+    const rest = line.slice(indent.length)
+    if (rest.trimEnd() === OWN_CLOSER) return j
+    // Every opener holds `--`, so a look-ahead stops at the next one: the look-aheads never overlap.
+    if (OWN_INTERIOR_BANNED.test(rest)) return -1
+    const lead = rest.trimStart()
+    if (FENCE_LEAD.test(lead) || (context === 'in-paragraph' && BLOCK_LEAD.test(lead))) return -1
+  }
+  return -1
+}
+
+/** The offset of each line's first character; `lines` is `text` split at CR, LF and CRLF. */
+function lineStartsOf(text: string, lines: readonly string[]): number[] {
+  const starts: number[] = []
+  let offset = 0
+  for (const line of lines) {
+    starts.push(offset)
+    offset += line.length
+    offset += text[offset] === '\r' && text[offset + 1] === '\n' ? 2 : 1
+  }
+  return starts
+}
+
+/**
+ * The inside of every block Erfana wrote – after its `<!--`, to the end of
+ * its `-->` line – that the parser can read only as comment or code text, so
+ * the tags its readable lines name (`target: <li>`) and its messages hold are
+ * not counted as raw HTML. Without this, about 250 comments made a file
+ * "too large". The `<!--` itself still counts as one construct.
+ *
+ * Crafted text can make a block-shaped run of lines reach the parser as
+ * something else – inside a fence, an attribute value, a raw-text element, a
+ * declaration or a code span – and end there, so that the rest of it is
+ * Markdown with real tags. A block is skipped only when that cannot happen:
+ *
+ * - its opener is the line's blanks and the header alone, outside every fence
+ *   the scan sees, and no `<` before it is left without a `>` after it (no
+ *   tag, declaration or processing instruction is still open);
+ * - every line up to its `-->` line starts with the opener's blanks and holds
+ *   no {@link OWN_INTERIOR_BANNED} and no fence line;
+ * - after a blank line (or another block skipped that way) the opener starts
+ *   an HTML block or indented code, and both run to the `-->` line;
+ * - otherwise it sits in a paragraph (a list item's text, say). It may be an
+ *   inline comment then, so nothing since the blank line may hold a
+ *   {@link PARAGRAPH_HAZARD}, and no line of the block may be blank or start
+ *   with anything that could end the paragraph ({@link BLOCK_LEAD}).
+ *
+ * Any other block is counted as before: over-counted, never under-counted. A
+ * real block whose message has a blank line or starts a line with `-` is
+ * counted that way when it sits in a paragraph. One linear pass.
+ */
+function ownBlockInteriors(text: string, lines: readonly string[], fenced: Uint8Array): SkippedRange[] {
+  const starts = lineStartsOf(text, lines)
+  const skipped: SkippedRange[] = []
+  let afterBlank = true
+  let hazard = false
+  let tagOpen = false
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i]
+    if (line.trim() === '') {
+      afterBlank = true
+      hazard = false
+      continue
+    }
+    const context: OwnContext | undefined =
+      fenced[i] === 1 || tagOpen ? undefined : afterBlank ? 'after-blank' : hazard ? undefined : 'in-paragraph'
+    const end = context === undefined ? -1 : ownBlockEnd(lines, i, context)
+    if (end !== -1) {
+      // A block skipped in a paragraph has already cleared `afterBlank`; one after a blank line keeps it.
+      skipped.push([starts[i] + line.indexOf('<!--') + 4, starts[end] + lines[end].length])
+      i = end
+      continue
+    }
+    afterBlank = false
+    if (PARAGRAPH_HAZARD.test(line)) hazard = true
+    const lt = line.lastIndexOf('<')
+    const gt = line.lastIndexOf('>')
+    if (lt !== gt) tagOpen = lt > gt
+  }
+  return skipped
+}
+
 /** Why a Markdown file is past a limit, or `undefined` when it may be parsed. */
 export type MarkdownLimitBreach = 'bytes' | 'lines' | 'nesting' | 'html-nesting' | 'html-nodes' | 'emphasis-nesting'
 
 /**
- * Whether `text` may be parsed for comments: one linear pass, before any
+ * Whether `text` may be parsed for comments: linear passes, before any
  * parse (module comment). Fenced code lines are skipped by the container and
- * emphasis counts, never by the HTML count.
+ * emphasis counts, never by the HTML count; the inside of Erfana's own
+ * comment blocks is skipped by the HTML count only ({@link ownBlockInteriors}).
  */
 export function markdownLimitBreach(text: string): MarkdownLimitBreach | undefined {
   if (text.length > MARKDOWN_COMMENT_MAX_BYTES || utf8Length(text) > MARKDOWN_COMMENT_MAX_BYTES) return 'bytes'
@@ -280,13 +410,17 @@ export function markdownLimitBreach(text: string): MarkdownLimitBreach | undefin
   const containers = new ContainerDepth()
   const emphasis = new EmphasisDepth()
   const fences = new FenceTracker()
-  for (const line of lines) {
-    if (fences.line(line)) continue
+  const fenced = new Uint8Array(lines.length)
+  lines.forEach((line, i) => {
+    if (fences.line(line)) {
+      fenced[i] = 1
+      return
+    }
     containers.line(line)
     emphasis.line(line)
-  }
+  })
   if (containers.max > MARKDOWN_COMMENT_MAX_NESTING) return 'nesting'
-  const html = htmlShape(text)
+  const html = htmlShape(text, ownBlockInteriors(text, lines, fenced))
   if (html.depth > MARKDOWN_COMMENT_MAX_HTML_NESTING) return 'html-nesting'
   if (html.nodes > MARKDOWN_COMMENT_MAX_HTML_NODES) return 'html-nodes'
   if (emphasis.max > MARKDOWN_COMMENT_MAX_EMPHASIS_NESTING) return 'emphasis-nesting'

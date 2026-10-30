@@ -12,8 +12,14 @@
  * one line – `jobs.register(kind.id, createKindCommentJobTable(kind))` – and
  * the suites run the same table in process ({@link createInProcessKindJobs}).
  *
- * The list reads through the kind's slice of the document cache; the write
- * parses afresh and leaves its verified result there (`commentJobDocs.ts`).
+ * Both jobs read the file through the kind's slice of the document cache,
+ * and the write leaves its verified result there (`commentJobDocs.ts`). The
+ * write may plan on a cached document because a kind served by this table
+ * plans only on what its parse decided: the budgeted backup-tier lookups
+ * that make the HTML writer parse afresh (`planAdd`'s re-location of a page
+ * draft) run only for HTML documents, which have their own table. So a save
+ * right after the list – the usual order – parses the file once, for the
+ * verify, not twice (spec 024 024-NFR-001).
  */
 import type { CommentFileKind, KindDocument } from '../../../shared/comments/fileKind'
 import type { RandomBytes } from '../../../shared/comments/format'
@@ -33,7 +39,7 @@ export function createKindCommentJobTable(kind: CommentFileKind): CommentJobTabl
   return {
     list: { run: (bytes, job, env) => runListJob(kindDocumentOf(bytes, kind, env.cache), job) },
     write: {
-      run: (bytes, job, env) => runWriteJob(bytes, job, { ...env, kind }),
+      run: (bytes, job, env) => runWriteJob(bytes, job, { ...env, kind, read: read => kindDocumentOf(read, kind, env.cache) }),
       // The block bytes, when they own their buffer; a view into a larger one is copied.
       transferables: result => (result.ok ? rawTransferablesOf(result.insert) : [])
     }

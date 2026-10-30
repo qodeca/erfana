@@ -172,7 +172,11 @@ function isTooLargeState(doc: KindDocument): boolean {
  * ({@link freshDocumentOf}), which adds the parse5 token pre-checks.
  */
 export function freshKindDocumentOf(bytes: Uint8Array, kind: CommentFileKind): JobDocument<KindDocument> {
-  const hash = sha256HexOf(bytes)
+  return kindDocumentWithHash(bytes, kind, sha256HexOf(bytes))
+}
+
+/** {@link freshKindDocumentOf} with the hash of `bytes` already worked out. */
+function kindDocumentWithHash(bytes: Uint8Array, kind: CommentFileKind, hash: string): JobDocument<KindDocument> {
   if (bytes.length > PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES) return { ok: false, hash, refusal: 'too-large' }
   const decoded = decodeLossless(bytes)
   if (!decoded.ok) return { ok: false, hash, refusal: 'encoding' }
@@ -180,12 +184,16 @@ export function freshKindDocumentOf(bytes: Uint8Array, kind: CommentFileKind): J
   return isTooLargeState(doc) ? { ok: false, hash, refusal: 'too-large' } : { ok: true, hash, doc }
 }
 
-/** {@link freshKindDocumentOf} through `cache`: the read-only jobs (the list) of a kind. */
+/**
+ * {@link freshKindDocumentOf} through `cache`: a kind's list, and the
+ * planning read of its write (`kindCommentJobs.ts`), which runs no budgeted
+ * lookup of its own.
+ */
 export function kindDocumentOf(bytes: Uint8Array, kind: CommentFileKind, cache: KindDocCache<KindDocument>): JobDocument<KindDocument> {
   const hash = sha256HexOf(bytes)
   const cached = cache.get(hash)
   if (cached !== undefined) return { ok: true, hash, doc: cached }
-  const document = freshKindDocumentOf(bytes, kind)
+  const document = kindDocumentWithHash(bytes, kind, hash)
   if (document.ok) cache.set(hash, document.doc, bytes.length)
   return document
 }

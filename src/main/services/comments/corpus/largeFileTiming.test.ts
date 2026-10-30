@@ -9,10 +9,12 @@
  * - **list** – a cold `list` job (a fresh job runner, so no cached parse):
  *   the parse work between the preview being rendered and the pins being
  *   known, the floor of the "pins visible ≤ 0.5 s" budget;
- * - **save** – the `write` job of one add (Markdown: a pick; HTML: an add
- *   naming the draft made at pick time, untimed), main's `assembleSplice`,
- *   then the `list` of the new bytes (from the cache the write fills): the
- *   floor of the "saved comment visible ≤ 1 s" budget.
+ * - **save** – the `write` job of one add (Markdown: a pick, after the list
+ *   the app has always run on the file by then, untimed; HTML: an add naming
+ *   the draft made at pick time, untimed), main's `assembleSplice`, then the
+ *   `list` of the new bytes (from the cache the write fills): the floor of
+ *   the "saved comment visible ≤ 1 s" budget. The Markdown save with no list
+ *   before it is recorded too, not gated.
  *
  * What it does not time: IPC, the worker's message copy, the renderer's
  * draw and the `performance.mark` points of the e2e test 024-AC-024 names –
@@ -49,6 +51,9 @@ const PINS_BUDGET_MS = 500
 const SAVE_BUDGET_MS = 1_000
 const SUMMARY_START = '<!-- timing-summary'
 const SUMMARY_END = 'timing-summary -->'
+/** A hand-kept section between these markers (the before and after of changes) survives a rerun. */
+const HISTORY_START = '<!-- timing-history (kept by reruns) -->'
+const HISTORY_END = '<!-- /timing-history -->'
 const VIEW = { w: 900, h: 700, dpr: 2, x: 0, y: 0 }
 const ACT = { author: { name: 'Timing Reviewer', email: 'timing@example.invalid', role: 'human' as const }, nowMs: Date.UTC(2026, 9, 30, 12) }
 
@@ -60,6 +65,8 @@ interface KindTiming {
   readonly attached: number
   readonly listMs: number[]
   readonly saveMs: number[]
+  /** Markdown: the save with no list before it on the worker (a cold cache) – recorded, not gated. */
+  readonly saveColdMs?: number[]
 }
 
 interface TimingSummary {
@@ -102,12 +109,22 @@ async function markdownTiming(): Promise<KindTiming> {
   const picks = Array.from({ length: SAMPLES + WARM_UP }, (_, i) => pickOf(doc, paragraphs[Math.floor((i * paragraphs.length) / (SAMPLES + WARM_UP))]))
   const first = await listOf(createInProcessMarkdownJobs(), bytes)
   const listMs = await timed(async () => void (await listOf(createInProcessMarkdownJobs(), bytes)))
-  const saveMs = await timed(async i => {
-    const runner = createInProcessMarkdownJobs()
+  const save = async (runner: Runner, i: number): Promise<void> => {
     const out = await writeOf(runner, bytes, { op: 'pick', pick: picks[i], view: VIEW, text: 'Timing save.' })
     await listOf(runner, out)
-  })
-  return { kind: 'markdown', bytes: bytes.length, comments: first.summary.threads.length, attached: first.summary.threads.filter(t => t.attached).length, listMs, saveMs }
+  }
+  // The app lists a file's comments before any save on it, on the same worker: that list is not timed.
+  const saveMs: number[] = []
+  for (let i = 0; i < SAMPLES + WARM_UP; i += 1) {
+    const runner = createInProcessMarkdownJobs()
+    await listOf(runner, bytes)
+    const started = performance.now()
+    await save(runner, i)
+    if (i >= WARM_UP) saveMs.push(Math.round((performance.now() - started) * 10) / 10)
+  }
+  const saveColdMs = await timed(async i => save(createInProcessMarkdownJobs(), i))
+  const attached = first.summary.threads.filter(t => t.attached).length
+  return { kind: 'markdown', bytes: bytes.length, comments: first.summary.threads.length, attached, listMs, saveMs, saveColdMs }
 }
 
 async function htmlTiming(): Promise<KindTiming> {
@@ -145,7 +162,26 @@ function electronVersion(): string {
   }
 }
 
-function renderReport(summary: TimingSummary): string {
+/**
+ * The package conditions this run resolved with. Under vitest they include
+ * `development`, which loads the micromark packages' debug builds (with
+ * their assertions); the app's bundle loads the default ones.
+ */
+function packageConditions(): string {
+  const conditions = process.execArgv.flatMap((arg, i, all) => (arg === '--conditions' || arg === '-C' ? [all[i + 1]] : arg.startsWith('--conditions=') ? [arg.slice('--conditions='.length)] : []))
+  return conditions.length === 0 ? 'none' : conditions.join(', ')
+}
+
+/** The hand-kept section a rerun carries over from the report it replaces. */
+function keptHistory(): string | undefined {
+  if (!existsSync(REPORT)) return undefined
+  const report = readFileSync(REPORT, 'utf8')
+  const start = report.indexOf(HISTORY_START)
+  const end = report.indexOf(HISTORY_END)
+  return start < 0 || end < start ? undefined : report.slice(start, end + HISTORY_END.length)
+}
+
+function renderReport(summary: TimingSummary, history: string | undefined): string {
   const tables = summary.kinds.flatMap(k => [
     `### ${k.kind === 'markdown' ? 'Markdown' : 'HTML'} – ${k.bytes.toLocaleString('en')} bytes, ${k.comments} comments, ${k.attached} attached`,
     '',
@@ -153,8 +189,9 @@ function renderReport(summary: TimingSummary): string {
     '|---|---|---|---|---|---|',
     row('list (cold parse) – floor of "pins visible"', k.listMs, PINS_BUDGET_MS),
     row('save (write + list) – floor of "saved comment visible"', k.saveMs, SAVE_BUDGET_MS),
+    ...(k.saveColdMs === undefined ? [] : [row('save with no list before it (cold cache) – recorded only', k.saveColdMs, SAVE_BUDGET_MS)]),
     '',
-    `Samples (ms): list ${k.listMs.join(', ')}; save ${k.saveMs.join(', ')}`,
+    `Samples (ms): list ${k.listMs.join(', ')}; save ${k.saveMs.join(', ')}${k.saveColdMs === undefined ? '' : `; cold save ${k.saveColdMs.join(', ')}`}`,
     ''
   ])
   return [
@@ -169,18 +206,20 @@ function renderReport(summary: TimingSummary): string {
     '',
     `- Machine: ${platform()} ${release()}, ${cpus()[0]?.model ?? 'unknown CPU'} × ${cpus().length}`,
     `- Runtime: Node ${process.version} under vitest (the app's Electron is ${electronVersion()}; its bundled Node runs the same code in the parse worker)`,
+    `- Package conditions: ${packageConditions()} (with \`development\`, the micromark packages load their debug builds, with assertions; the app's bundle loads the default builds)`,
     `- Date: ${summary.date}`,
     `- Fixtures: seeded, generated by \`largeFixtures.ts\` – about ${LARGE_FILE_BYTES.toLocaleString('en')} bytes with ${LARGE_FILE_COMMENTS} comments each`,
-    '- Markdown comments sit on paragraphs and headings only: the limit scan (`markdownLimits.ts`) counts each block\'s readable `target: <tag>` line as an unclosed raw-HTML element, so 200 comments on list items, rows and quotes would pass `MARKDOWN_COMMENT_MAX_HTML_NESTING` and make the file read-only "too large" (reported with this run)',
+    '- Markdown comments sit on paragraphs and headings, as in the first run, so the runs compare',
     `- Samples: ${SAMPLES} per measure after ${WARM_UP} untimed warm-up runs`,
     '',
     '## What is timed',
     '',
-    'The parse work of the comment parse worker, on the calling thread: a cold `list` job (fresh runner, no cached parse), and a save – the `write` job of one add, main\'s `assembleSplice`, then the `list` of the new file. IPC, the worker message copy and the preview\'s drawing are **not** in these numbers, so they are a floor of the budgets, not the 024-AC-024 measurement itself. That one is the e2e timing between `performance.mark` points in the app, which needs renderer marks that do not exist yet.',
+    'The parse work of the comment parse worker, on the calling thread: a cold `list` job (fresh runner, no cached parse), and a save – the `write` job of one add, main\'s `assembleSplice`, then the `list` of the new file. Before a save the app has listed the file on the same worker – the HTML draft and the Markdown list run first, untimed – so a Markdown save plans on the cached parse; the Markdown save with no list before it is recorded on its own row. IPC, the worker message copy and the preview\'s drawing are **not** in these numbers, so they are a floor of the budgets, not the 024-AC-024 measurement itself. That one is the e2e timing between `performance.mark` points in the app, which needs renderer marks that do not exist yet.',
     '',
     '## Results',
     '',
     ...tables,
+    ...(history === undefined ? [] : [history, '']),
     '## macOS and Linux',
     '',
     '024-NFR-001 gates macOS and Linux and records Windows. The owner runs this on a Mac before merge (owner decision 2026-10-30), from the repository root on the pull request\'s final commit:',
@@ -212,7 +251,7 @@ function readSummary(): TimingSummary {
 describe.runIf(process.env.TIMING_RUN === '1')('large-file timing (measures, writes the report)', () => {
   it('times list and save on the 1 MB fixtures and writes verification/large-file-timing.md', async () => {
     const summary: TimingSummary = { platform: platform(), date: new Date().toISOString().slice(0, 10), kinds: [await markdownTiming(), await htmlTiming()] }
-    writeFileSync(REPORT, renderReport(summary))
+    writeFileSync(REPORT, renderReport(summary, keptHistory()))
   })
 })
 

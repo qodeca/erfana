@@ -86,23 +86,38 @@ export interface WordsRange {
  * Each of the three parts is normalised to NFC on its own, so the offsets
  * stay exact; a join that NFC would compose is left as it is, and the
  * format's own check refuses such words later ({@link chooseWords}).
+ *
+ * Linear in `raw`: the collapsed text is gathered in parts and joined once.
+ * Reading the length or the last character of a string built up character by
+ * character flattens it every time, which made an 800,000-character target
+ * take half a minute.
  */
 export function collapseRange(raw: string, start: number, end: number): WordsRange {
   const from = Math.max(0, Math.min(start, raw.length))
   const to = Math.max(from, Math.min(end, raw.length))
-  let out = ''
+  const parts: string[] = []
+  let length = 0
+  // Only a collapsed run ever writes ' ' (a raw ' ' is a space), so this is "the text so far ends in ' '".
+  let endsInSpace = false
   let outStart = -1
   let outEnd = -1
   for (let i = 0; i <= raw.length; i += 1) {
-    if (i === from) outStart = out.length
-    if (i === to) outEnd = out.length
+    if (i === from) outStart = length
+    if (i === to) outEnd = length
     if (i === raw.length) break
     const char = raw[i]
-    if (SPACE.test(char)) {
-      if (out !== '' && !out.endsWith(' ')) out += ' '
-    } else out += char
+    if (!SPACE.test(char)) {
+      parts.push(char)
+      length += 1
+      endsInSpace = false
+    } else if (length > 0 && !endsInSpace) {
+      parts.push(' ')
+      length += 1
+      endsInSpace = true
+    }
   }
-  if (out.endsWith(' ')) out = out.slice(0, -1)
+  let out = parts.join('')
+  if (endsInSpace) out = out.slice(0, -1)
   const clamp = (n: number): number => Math.min(n, out.length)
   const s = clamp(outStart)
   const e = Math.max(s, clamp(outEnd))

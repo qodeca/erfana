@@ -16,8 +16,8 @@ import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { ADA, FIXED_NOW, seededRandom } from '../../../../shared/comments/__fixtures__/commentTestData'
 import { analyzeCommentDocument as frozenAnalyze } from '../../../../shared/comments/__fixtures__/frozen-v0.23.1/parse'
-import { decodeLossless } from '../../../../shared/comments/encoding'
-import type { PickedTarget } from '../../../../shared/comments/fileKind'
+import { decodeLossless, encodeText } from '../../../../shared/comments/encoding'
+import type { CommentFileKind, KindDocument, PickedTarget } from '../../../../shared/comments/fileKind'
 import { createThread } from '../../../../shared/comments/thread'
 import { markdownKind } from '../../../../shared/markdownComments/markdownKind'
 import { markdownHints } from '../../../../shared/markdownComments/mdHints'
@@ -26,7 +26,9 @@ import type { MdSlot } from '../../../../shared/markdownComments/mdSlots'
 import { markdownTextHash } from '../../../../shared/markdownComments/mdLocate'
 import { MARKDOWN_COMMENT_MAX_BYTES } from '../../../../shared/markdownComments/markdownLimits'
 import { commentWorkerJobs } from '../../workers/comment-parse.worker'
+import { CommentDocCache, type KindDocCache } from '../commentJobDocs'
 import type { ListSummary } from '../commentListCore'
+import { createKindCommentJobTable } from '../kindCommentJobs'
 import { assembleSplice, type ThreadChange, type WriteJobResult } from '../commentWriteCore'
 import { createInProcessMarkdownJobs, markdownCommentJobTable, type MarkdownWriteJob } from './markdownCommentJobs'
 
@@ -390,6 +392,39 @@ describe('024-AC-036 the Markdown work runs in the parse worker', () => {
     const pick: PickedTarget = { lineStart: 1, lineEnd: 1, tag: 'p', ordinal: 1 }
     const write = await createInProcessMarkdownJobs().runJob(big, addJob(pick))
     expect(write).toEqual({ kind: 'write', ok: false, refusal: 'too-large' })
+  })
+
+  it('024-NFR-001 a save after the list plans on the cached parse: one more parse, for the verify, and the bytes of a cold save', () => {
+    let parses = 0
+    const counted: CommentFileKind = {
+      ...markdownKind,
+      parse: (text, bomLength) => {
+        parses += 1
+        return markdownKind.parse(text, bomLength)
+      }
+    }
+    const table = createKindCommentJobTable(counted)
+    const bytes = encodeText(EVERY_KIND)
+    const doc = markdownKind.parse(EVERY_KIND, 0)
+    const target = (doc.index as MdIndex).elements.find(t => t.kind === 'paragraph')!
+    const job = addJob(pickOf(doc.index as MdIndex, target))
+    const listed = (input: Uint8Array, cache: KindDocCache<KindDocument>): unknown => table.list.run(input, { kind: 'list' }, { cache })
+    const saved = (cache: KindDocCache<KindDocument>): WriteJobResult =>
+      table.write.run(bytes, job, { cache, random: seededRandom(9) }) as WriteJobResult
+
+    const cold = saved(new CommentDocCache().forKind('markdown'))
+    expect(parses).toBe(2)
+
+    parses = 0
+    const cache = new CommentDocCache().forKind<KindDocument>('markdown')
+    expect(listed(bytes, cache)).toMatchObject({ kind: 'list', ok: true })
+    expect(parses).toBe(1)
+    const warm = saved(cache)
+    expect(parses).toBe(2)
+    expect(warm).toEqual(cold)
+    if (!warm.ok) throw new Error(`write refused: ${warm.refusal}`)
+    expect(listed(assembleSplice(bytes, warm), cache)).toMatchObject({ kind: 'list', ok: true, summary: { threads: [{ threadId: warm.threadId }] } })
+    expect(parses).toBe(2)
   })
 
   it('a refused write hands no buffers over; a written one hands over the block bytes it owns', () => {
