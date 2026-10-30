@@ -158,7 +158,7 @@ function unavailableLog(now: () => number): DropReporter {
     emit: ({ context }) =>
       logger.warn('Preview comments unavailable for a page', {
         reason: context.reason,
-        file: context.panelId,
+        file: stablePathDigest(context.panelId),
         ...(context.suppressed === undefined ? {} : { suppressed: context.suppressed })
       })
   })

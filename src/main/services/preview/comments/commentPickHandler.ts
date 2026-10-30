@@ -44,6 +44,7 @@ import {
   type CommentAnchors,
   type CommentPick
 } from '../../../../shared/ipc/preview-comment-schema'
+import { stablePathDigest } from '../../../../shared/stablePathDigest'
 import { logger } from '../../LoggingService'
 import { samePathKey } from '../../comments/commentUnsavedSources'
 import type { CommentFrameLike, CommentFrames, FrameRecord } from './commentFrames'
@@ -130,7 +131,7 @@ function dropLog(now: () => number): DropReporter {
     emit: ({ context }) =>
       logger.warn('Preview comments: page signal dropped', {
         reason: context.reason,
-        panelId: context.panelId,
+        panelId: stablePathDigest(context.panelId),
         ...(context.suppressed === undefined ? {} : { suppressed: context.suppressed })
       })
   })

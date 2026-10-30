@@ -186,6 +186,14 @@ function htmlShape(text: string, skipped: readonly SkippedRange[]): HtmlShape {
   return { depth: max, nodes }
 }
 
+/**
+ * A blank line as CommonMark defines it: spaces and tabs only. `trim()` also
+ * strips U+00A0, form feed, vertical tab, U+2028 and U+FEFF, which the parser
+ * reads as text – a line of them would end a paragraph here but not in the
+ * parse, so the scan could under-count (security audit M-1, M-2).
+ */
+export const isBlankLine = (line: string): boolean => /^[ \t]*$/.test(line)
+
 const isEmphasis = (ch: string | undefined): boolean => ch === '*' || ch === '_'
 const isSpace = (ch: string | undefined): boolean => ch === undefined || /\s/.test(ch)
 /** CommonMark's punctuation: ASCII punctuation and Unicode P and S categories. */
@@ -214,7 +222,7 @@ class EmphasisDepth {
   max = 0
 
   line(line: string): void {
-    if (line.trim() === '') {
+    if (isBlankLine(line)) {
       this.depth = 0
       return
     }
@@ -263,7 +271,7 @@ class FenceTracker {
       const left = quotes < open.quotes || (lead.end < line.length && lead.columns < open.columns)
       if (!left) {
         const closes = fence !== null && fence[1][0] === open.marker[0] && fence[1].length >= open.marker.length
-        if (closes && rest.slice(fence![0].length).trim() === '') this.open = undefined
+        if (closes && isBlankLine(rest.slice(fence![0].length))) this.open = undefined
         return true
       }
       this.open = undefined
@@ -308,7 +316,7 @@ function ownBlockEnd(lines: readonly string[], i: number, context: OwnContext): 
   const indent = opener[1]
   for (let j = i + 1; j < lines.length; j += 1) {
     const line = lines[j]
-    if (line.trim() === '') {
+    if (isBlankLine(line)) {
       if (context === 'in-paragraph') return -1
       continue
     }
@@ -371,7 +379,7 @@ function ownBlockInteriors(text: string, lines: readonly string[], fenced: Uint8
   let tagOpen = false
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i]
-    if (line.trim() === '') {
+    if (isBlankLine(line)) {
       afterBlank = true
       hazard = false
       continue
