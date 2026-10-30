@@ -61,6 +61,7 @@ import { IdentityEditor } from './IdentityStep'
 import { useCommentAlert, useInnerStep } from './commentLive'
 import { onCommentWriteSettled, trackCommentWrite, useCommentWritePending } from './commentPendingWrites'
 import { draftKeyOf, type CommentWindowRequest } from './commentWindowTypes'
+import { useCommentWords } from './commentWords'
 import { TEST_IDS } from '../../constants/testids'
 
 /** Props for {@link NewCommentView}. */
@@ -113,6 +114,7 @@ export function NewCommentView({
   const [refusedUnsaved, setRefusedUnsaved] = useState(false)
   const guard = useCommentDirtyGuard(request.file.filePath)
   const alert = useCommentAlert()
+  const words = useCommentWords()
   const changeRef = useRef<HTMLButtonElement>(null)
   const focusChange = useRef(false)
   const mounted = useRef(true)
@@ -156,8 +158,8 @@ export function NewCommentView({
   }, [changingIdentity])
 
   /** A refused save – answered, or settled after a pending answer: say why, keep the text. */
-  const refused = (code: string): void => {
-    const copy = saveFailureCopy(code, file)
+  const refused = (code: string, reason?: string): void => {
+    const copy = words.saveFailure(code, file, request.target.tag, reason)
     if (copy.action === 'identity') {
       onIdentityRequired()
       return
@@ -218,7 +220,7 @@ export function NewCommentView({
     setSaving(false)
     if (answer.ok) onSaved()
     else if (answer.code === ErrorCode.COMMENT_SAVE_PENDING) alert(saveFailureCopy(answer.code, file).text)
-    else refused(answer.code)
+    else refused(answer.code, answer.reason)
   }
 
   const unsavedBanner = unsaved ? (

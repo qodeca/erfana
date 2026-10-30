@@ -56,7 +56,8 @@ import { ErrorCode } from '../../../../shared/errors'
 import { BaseDialog } from '../Dialog/BaseDialog'
 import { readZIndexToken } from '../../utils/overlayStack'
 import type { CommentListState } from '../../stores/usePreviewCommentStore'
-import { COPY, IDENTITY_COPY, readErrorText, saveFailureCopy, type SaveFailureCopy } from './commentCopy'
+import { COPY, IDENTITY_COPY, readErrorText, type SaveFailureCopy } from './commentCopy'
+import { useCommentWords } from './commentWords'
 import { visibleString } from './commentFormat'
 import { CommentStepsContext, replyDraftKey, useLiveText, type CommentSteps } from './commentLive'
 import {
@@ -106,6 +107,8 @@ export interface CommentWindowProps {
   readonly onPickAgain: () => void
   readonly onOpenInSource: (filePath: string, line: number) => void
   readonly onCopyRaw: (text: string) => void
+  /** Comments are paused (Markdown, 024-FR-015): writes are off and this says why. */
+  readonly pausedText?: string | null
 }
 
 /**
@@ -165,7 +168,8 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
   // Nothing to show yet: the file is not in the list, or its threads are not – in a list that predates the window.
   const waiting = selection === null || (selectionEmpty && !fresh)
   // Before any memoized callback: the compiler takes these calls as possible changes to `selection`.
-  const heading = headingOf(request, selection)
+  const words = useCommentWords()
+  const heading = headingOf(request, selection, words)
   const newComment = props.onNewComment ? newCommentFrom(request, selection) : null
 
   // A thread deleted from here, or a file gone: nothing left to show.
@@ -222,16 +226,17 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
   const { onRefresh } = props
   // Shown in banners and alerts through `visibleString`: bidi and invisible characters as tokens (S-L-B).
   const displayPath = selection?.file.displayPath ?? ''
+  const targetTag = selection?.threads[0]?.tag
   /** A write that did not land – refused, or still being written: say so. */
   const refused = useCallback(
-    (code: string) => {
-      const copy = saveFailureCopy(code, visibleString(displayPath))
+    (code: string, reason?: string) => {
+      const copy = words.saveFailure(code, visibleString(displayPath), targetTag, reason)
       setFailure(copy)
       alert(copy.text)
       // The list is stale: read it again so the next try uses fresh hashes.
       if (code === ErrorCode.COMMENT_BLOCK_CHANGED || code === ErrorCode.COMMENT_KEY_INVALID) onRefresh()
     },
-    [displayPath, alert, onRefresh]
+    [displayPath, alert, onRefresh, words, targetTag]
   )
 
   const run = useCallback(
@@ -251,7 +256,7 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
         props.onWritten(save, file)
         return true
       }
-      refused(result.code)
+      refused(result.code, result.reason)
       return false
     },
     [props, displayPath, refused]
@@ -398,7 +403,8 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
             onCopy={props.onCopyRaw}
             onOpenInSource={line => props.onOpenInSource(selection.file.filePath, line)}
             onClose={() => props.onClose()}
-            onNewComment={newComment !== null ? () => props.onNewComment?.(newComment) : undefined}
+            onNewComment={newComment !== null && !props.pausedText ? () => props.onNewComment?.(newComment) : undefined}
+            pausedText={props.pausedText ?? null}
           />
         )}
         {view === 'threads' && waiting && list.status === 'error' && (

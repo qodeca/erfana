@@ -3,7 +3,7 @@
 /**
  * HTML Preview comments – file safety, hostile pages and the edges of the
  * feature, through the real UI (docs/designs/comments/html-preview-comments.md §12.2
- * E-009 – E-013, E-015, E-019, E-020, E-022, E-023, E-027; decisions 4, 8,
+ * E-009 – E-013, E-015, E-019, E-022, E-023, E-027; decisions 4, 8,
  * 12, 14, 21, 24, 28, 32; §19 R3-6, R3-8, Rev 4 "folded sections").
  *
  * - **E-009** an "agent" edits the file while the comment window is open: the
@@ -31,7 +31,8 @@
  * - **E-019** element rectangles and `innerText` are the same before and after
  *   comments on `pre`, inline, CSS `white-space: pre` and SVG text targets
  *   (`comments/raw-text/`, R3-8).
- * - **E-020** the Markdown preview has no comment entry (decision 14).
+ * - E-020 ("the Markdown preview has no comment entry") is retired by spec
+ *   024 (024-FR-020): its successor is `markdown-preview-comments.e2e.ts`.
  * - **E-022** a PDF export of a commented page carries no pin; Find in page
  *   does not count the overlay's text.
  * - **E-023** with the feature flag off: no comment UI, the page served raw,
@@ -53,8 +54,6 @@ import { test, expect } from './fixtures/index'
 import { HtmlPreviewPage, PREVIEW_BUDGET_MS } from './pages/html-preview.page'
 import { evalInFrame } from './pages/html-preview.frames'
 import { SearchBarPage } from './pages/search-bar.page'
-import { EditorPanelPage } from './pages/editor-panel.page'
-import { ProjectTreePage } from './pages/project-tree.page'
 import {
   OVERLAY_HOSTS_EXPR,
   commentLoads,
@@ -98,7 +97,6 @@ const RAW = 'comments/raw-text/index.html'
 const REVIEW = 'comments/review.html'
 const MANY = 'comments/many.html'
 const FRAMED = 'comments/framed.html'
-const NOTES = 'notes.md'
 
 const REVIEWED = commentedPage()
 const REVIEW_TITLE = '-HPC-P3-'
@@ -199,17 +197,7 @@ test.use({
     [REVIEW]: REVIEWED.text,
     [MANY]: MANY_TEXT,
     [CARDS]: CARDS_PAGE.text,
-    [FRAMED]: FRAMED_TEXT,
-    [NOTES]: [
-      '# Notes',
-      '',
-      'A paragraph of the notes.',
-      '',
-      '<!-- erfana:comment v1 id=c-zzzzzzzzzzzzzzzz',
-      'status: open',
-      '-->',
-      ''
-    ].join('\n')
+    [FRAMED]: FRAMED_TEXT
   }
 })
 
@@ -679,23 +667,6 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     expect(text.split('erfana:comment v1').length - 1).toBe(commented.length)
     // Rendering unchanged: the same text, and every box where it was.
     await expect.poll(() => preview.eval(LAYOUT, target), { timeout: PREVIEW_BUDGET_MS }).toBe(before)
-  })
-
-  test('E-020 the Markdown preview has no comment entry', async ({ windowWithTestProject }) => {
-    const page = windowWithTestProject
-    const tree = new ProjectTreePage(page)
-    const panel = new EditorPanelPage(page)
-    await tree.fileRow(NOTES).click()
-    await panel.waitForReady()
-    await expect(panel.previewPane()).toContainText('A paragraph of the notes.', { timeout: PREVIEW_BUDGET_MS })
-    // A v1 block in Markdown renders nothing, and no comment tool or menu exists.
-    await expect(panel.previewPane()).not.toContainText('erfana:comment')
-    await expect(page.locator('[data-testid^="preview-band-comment"]')).toHaveCount(0)
-    await expect(page.getByTestId('comment-drawer')).toHaveCount(0)
-    await panel.previewPane().getByText('A paragraph of the notes.').click({ button: 'right' })
-    await expect(page.getByTestId('comment-context-menu')).toHaveCount(0)
-    await expect(page.getByTestId('comment-menu-add')).toHaveCount(0)
-    await page.keyboard.press('Escape')
   })
 
   test('E-022 a PDF export of a commented page carries no pin', async ({

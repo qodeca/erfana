@@ -1,0 +1,18 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * The Markdown Preview's paused band (spec 024 state table F-02, F-03): a
+ * full-width row between the toolbar and the preview, in the comment
+ * banner's look. Tokens only.
+ */
+
+.erf-md-comments-band {
+  flex-shrink: 0;
+  padding: var(--space-2) var(--space-6);
+  background-color: var(--color-bg-primary);
+  border-bottom: var(--border-width) solid var(--color-border-default);
+}
+
+.erf-md-comments-band .erf-comment-banner {
+  margin: 0;
+}

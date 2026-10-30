@@ -27,13 +27,8 @@ import type {
   CommentFileView,
   CommentThreadView
 } from '../../../../shared/ipc/preview-comment-schema'
-import {
-  COPY,
-  deleteBlockText,
-  notFoundText,
-  readOnlyReasonText,
-  type SaveFailureCopy
-} from './commentCopy'
+import { COPY, type SaveFailureCopy } from './commentCopy'
+import { useCommentWords } from './commentWords'
 import { visibleString } from './commentFormat'
 import { CommentBanner, DialogButton, VisibleText } from './CommentParts'
 import {
@@ -126,6 +121,7 @@ function DamagedBlockView({
   onCopy,
   onOpenInSource
 }: DamagedBlockProps): React.JSX.Element {
+  const words = useCommentWords()
   const labelId = useId()
   const [confirm, setConfirm] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -158,7 +154,7 @@ function DamagedBlockView({
       data-testid={TEST_IDS.COMMENT_DAMAGED}
     >
       <CommentBanner kind="warning">
-        {conflict ? COPY.conflictText : COPY.damagedText}
+        {conflict ? words.conflictText : words.damagedText}
       </CommentBanner>
       <span className="erf-comment-raw-label" id={labelId}>
         {COPY.rawLabel}
@@ -175,7 +171,7 @@ function DamagedBlockView({
       {confirm ? (
         <div className="erf-comment-confirm" role="group" aria-label="Confirm delete">
           <p className="erf-comment-confirm__text">
-            <VisibleText text={deleteBlockText(file.displayPath)} />
+            <VisibleText text={words.deleteBlockText(file.displayPath)} />
           </p>
           <div className="erf-comment-confirm__actions">
             <DialogButton
@@ -204,7 +200,7 @@ function DamagedBlockView({
                 })
               }}
             >
-              {COPY.deleteBlock}
+              {words.deleteBlock}
             </DialogButton>
           </div>
         </div>
@@ -223,7 +219,7 @@ function DamagedBlockView({
               onClick={() => setConfirm(true)}
               testId={TEST_IDS.COMMENT_DELETE_BLOCK}
             >
-              {COPY.deleteBlockAction}
+              {words.deleteBlockAction}
             </DialogButton>
           )}
         </div>
@@ -247,6 +243,11 @@ export interface ThreadsViewProps {
   readonly onClose: () => void
   /** A pin's draft is there: "New comment" adds a thread on the same element. */
   readonly onNewComment?: () => void
+  /**
+   * Comments are paused (Markdown, unsaved editor edits – 024-FR-015, F-02):
+   * every write is off, as for a read-only file, and this sentence says why.
+   */
+  readonly pausedText?: string | null
 }
 
 /**
@@ -266,8 +267,10 @@ export function ThreadsView({
   onCopy,
   onOpenInSource,
   onClose,
-  onNewComment
+  onNewComment,
+  pausedText = null
 }: ThreadsViewProps): React.JSX.Element {
+  const words = useCommentWords()
   const { file, threads, damaged, newer } = selection
   // A file name is the page author's: every sentence built from it shows its
   // bidi and invisible characters as `⟨U+202E⟩` tokens (S-L-B).
@@ -289,7 +292,7 @@ export function ThreadsView({
     panelId,
     fileKey: file.fileKey,
     file: fileName,
-    readOnly: !file.writable,
+    readOnly: !file.writable || pausedText !== null,
     now,
     locale,
     sharedNames,
@@ -314,21 +317,21 @@ export function ThreadsView({
             {failure.text}
           </CommentBanner>
         )}
-        {!file.writable && (
+        {(!file.writable || pausedText !== null) && (
           <CommentBanner kind="info" testId={TEST_IDS.COMMENT_READ_ONLY}>
-            {readOnlyReasonText(file.readOnlyReason, fileName)}
+            {pausedText ?? words.readOnlyReasonText(file.readOnlyReason, fileName)}
           </CommentBanner>
         )}
         {anyNotVisible && (
           <CommentBanner kind="info" testId={TEST_IDS.COMMENT_NOT_VISIBLE}>
-            {COPY.notVisibleText}
+            {words.notVisibleText}
           </CommentBanner>
         )}
         {threads.map(thread => (
           <div key={thread.threadKey}>
             {!thread.attached && (
               <CommentBanner kind="warning" testId={TEST_IDS.COMMENT_NOT_FOUND}>
-                {notFoundText(fileName, thread.line)}
+                {words.notFoundText(fileName, thread.line)}
                 <QuoteOf thread={thread} />
               </CommentBanner>
             )}

@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -40,6 +41,13 @@ export interface ContextMenuItem {
   shortcut?: string
   /** Optional test ID for automated UI testing */
   testId?: string
+  /**
+   * A second visible line inside the item, mainly to say why it is disabled
+   * (Menu card `#reason`, decided). The item names itself from its label
+   * (`aria-labelledby`) and points at the reason (`aria-describedby`);
+   * typeahead never matches it.
+   */
+  reason?: string
 }
 
 interface ContextMenuProps {
@@ -137,6 +145,8 @@ export function ContextMenu({ x, y, items, onClose, containerTestId, ariaLabel }
     return active instanceof HTMLElement && active !== document.body ? active : null
   })
   const portalRoot = document.getElementById('portal-root')
+  // Unique per menu, so the label and reason ids of two menus never clash.
+  const idBase = `cm${useId().replace(/[^\w-]/g, '')}`
   const itemRefs = useRef<Array<HTMLDivElement | null>>([])
   const [activeIndex, setActiveIndex] = useState(() => firstItem(items))
   // A parent may rebuild `items` while the menu is open (the tab menu
@@ -384,10 +394,12 @@ export function ContextMenu({ x, y, items, onClose, containerTestId, ariaLabel }
             ref={(node) => {
               itemRefs.current[index] = node
             }}
-            className={`context-menu-item ${item.danger ? 'danger' : ''} ${item.disabled ? 'disabled' : ''}`}
+            className={`context-menu-item ${item.danger ? 'danger' : ''} ${item.disabled ? 'disabled' : ''}${item.reason ? ' context-menu-item--described' : ''}`}
             role="menuitem"
             tabIndex={index === current ? 0 : -1}
             aria-disabled={item.disabled || undefined}
+            aria-labelledby={item.reason ? `${idBase}-${index}-label` : undefined}
+            aria-describedby={item.reason ? `${idBase}-${index}-reason` : undefined}
             // The hint is hidden below, so the shortcut reaches assistive tech
             // as a property of the item rather than as part of its name – in
             // ARIA key names (`Meta+C`), not the display glyphs (`⌘C`).
@@ -405,10 +417,17 @@ export function ContextMenu({ x, y, items, onClose, containerTestId, ariaLabel }
                 {item.icon}
               </span>
             )}
-            <span className="context-menu-label">{item.label}</span>
+            <span className="context-menu-label" id={item.reason ? `${idBase}-${index}-label` : undefined}>
+              {item.label}
+            </span>
             {item.shortcut && (
               <span className="context-menu-shortcut" aria-hidden="true">
                 {item.shortcut}
+              </span>
+            )}
+            {item.reason && (
+              <span className="context-menu-reason" id={`${idBase}-${index}-reason`} data-testid={TEST_IDS.COMMENT_MENU_REASON}>
+                {item.reason}
               </span>
             )}
           </div>

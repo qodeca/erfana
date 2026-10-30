@@ -9,6 +9,7 @@
  * @module HtmlPreviewPanel/comments/commentWindowHeading
  */
 import { COPY, frameFileText, scriptBuiltText, threadsTitle } from './commentCopy'
+import { HTML_WORDS, type CommentWords } from './commentCopyWords'
 import { ancestorTag, elementLabel } from './commentFormat'
 import type { CommentWindowRequest } from './commentWindowTypes'
 import type { selectThreads } from './ThreadsView'
@@ -60,14 +61,19 @@ export function newCommentFrom(
  *
  * @param request - The window's request.
  * @param selection - What the list holds for it.
+ * @param words - The preview's words; the Markdown Preview names a kind, never a tag (C-03, A-02).
  * @returns The heading; the window draws its text with `VisibleText`.
  */
 export function headingOf(
   request: CommentWindowRequest,
-  selection: ReturnType<typeof selectThreads>
+  selection: ReturnType<typeof selectThreads>,
+  words: CommentWords = HTML_WORDS
 ): Heading {
   if (request.kind === 'new') {
     const { target, file } = request
+    if (words.preview !== 'html') {
+      return { title: words.newCommentTitle(target.tag), context: words.context(target, file.displayPath), note: null }
+    }
     const label = target.runtime ? target.runtime.tag : elementLabel(target)
     const note = target.runtime
       ? scriptBuiltText(ancestorTag(target))
@@ -86,6 +92,9 @@ export function headingOf(
   if (first === undefined) {
     const line = selection.damaged[0]?.line ?? selection.newer[0]?.line ?? 1
     return { title: COPY.damagedComment, context: `${file}, line ${line}`, note: null }
+  }
+  if (words.preview !== 'html') {
+    return { title: words.threadsTitle(first, selection.threads.length), context: words.context(first, file), note: null }
   }
   const label = first.runtime ? first.runtime.tag : elementLabel(first)
   return {

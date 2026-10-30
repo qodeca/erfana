@@ -128,3 +128,32 @@
   background-color: var(--color-border-default);
   margin: 0 var(--space-4);
 }
+
+/*
+ * Comment tools (spec 024, differences table D-28): the Markdown toolbar's
+ * own 32 x 28 tools, one Tab stop each. Pressed (mode on, icons shown) and
+ * open (drawer) take the active view-mode look; unavailable is aria-disabled,
+ * so the tool keeps focus and its tooltip says why (C-19.1).
+ */
+.markdown-toolbar .erf-md-comment-tool[aria-pressed='true'],
+.markdown-toolbar .erf-md-comment-tool[aria-expanded='true'] {
+  background-color: var(--color-btn-primary-bg);
+  color: var(--color-btn-primary-text);
+}
+
+.markdown-toolbar .erf-md-comment-tool[aria-disabled='true'] {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+.markdown-toolbar .erf-md-comment-tool--count {
+  width: auto;
+  min-width: var(--btn-height-md);
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.markdown-toolbar .erf-md-comment-tool__attention {
+  color: var(--color-warning);
+}

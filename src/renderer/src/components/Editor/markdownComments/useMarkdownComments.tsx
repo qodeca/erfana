@@ -1,0 +1,188 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+/**
+ * Markdown Preview comments – the composition root for one editor panel
+ * (spec 024 commit 13; 024-FR-003, 024-FR-005, 024-FR-015, 024-FR-022).
+ *
+ * The panel stays glue: this hook binds the shared overlay host to the
+ * Markdown adapter and to `fileCommentGateway` for this panel and file, and
+ * hands back three ready nodes – the toolbar tools, the paused band and the
+ * pane overlay. The host's state lives here, above the view modes, so a
+ * draft, the drawer and the list outlive a switch to the editor or a split
+ * view and come back with the preview-only view (024-AC-006).
+ *
+ * - **Where:** `.md` and `.markdown` files, while "Comments in Markdown
+ *   preview" is on and the window has the bridge. Comment UI shows in the
+ *   preview-only view only (OD-03); the editor and split views show the raw
+ *   blocks and nothing else.
+ * - **Paused:** while any editor tab of this window holds unsaved edits to
+ *   the file (`useCommentDirtyGuard`), comments are read-only and the band
+ *   offers Save {file} – or Go to editor when the file also changed on disk.
+ *   The list is then read from the editor's text, for display only (C-09) –
+ *   unless that text is past the Markdown file limit, which main refuses to
+ *   take: then it reads the file on disk.
+ * - **Breaks:** nothing about `editor.preserveLineBreaks` is sent; main reads
+ *   the setting for its render check.
+ *
+ * @module Editor/markdownComments/useMarkdownComments
+ */
+import { useCallback, useMemo, useState, type RefObject } from 'react'
+import { utf8Length } from '../../../../../shared/comments/encoding'
+import { FILE_COMMENT_BUFFER_MAX_CHARS } from '../../../../../shared/ipc/file-comment-schema'
+import { isMarkdownPreviewCommentsEnabled } from '../../../../../shared/ipc/global-settings-schema'
+import { fileCommentGateway } from '../../../services/comments/fileCommentGateway'
+import { useGlobalSettingsStore } from '../../../stores/useGlobalSettingsStore'
+import { useProjectStore } from '../../../stores/useProjectStore'
+import { useCommentDirtyGuard } from '../../../hooks/useCommentDirtyGuard'
+import { getBasename, isMarkdownFile } from '../../../utils/fileUtils'
+import { CommentToolbarTools } from '../../Comments/CommentToolbarTools'
+import { MARKDOWN_WORDS, MD_SURFACE_COPY } from '../../Comments/commentCopyWords'
+import { CommentWordsContext } from '../../Comments/commentWords'
+import { useCommentOverlayHost, type RendererCommentSource } from '../../Comments/overlay/useCommentOverlayHost'
+import type { MonacoEditorHandle } from '../MonacoMarkdownEditor'
+import type { ViewMode } from '../MarkdownEditorPanel/types'
+import { createMarkdownAdapter } from './markdownAdapter'
+import { MarkdownCommentsBand } from './MarkdownCommentsBand'
+import { MarkdownCommentsOverlay } from './MarkdownCommentsOverlay'
+
+/** Options for {@link useMarkdownComments}. */
+export interface UseMarkdownCommentsOptions {
+  readonly panelId: string | undefined
+  /** The file the panel shows; `undefined` before it loaded. */
+  readonly filePath: string | undefined
+  /** The editor's text – what the preview renders. */
+  readonly content: string
+  readonly viewMode: ViewMode
+  readonly setViewMode: (mode: ViewMode) => void
+  readonly editorRef: RefObject<MonacoEditorHandle | null>
+  /** This panel is the active tab (gates the mode shortcut). */
+  readonly isActivePanel: boolean
+  /** dockview draws this panel. */
+  readonly isVisible: boolean
+}
+
+/** What the panel renders; each is `null` when it does not apply. */
+export interface MarkdownComments {
+  /** The comment tools for the Markdown toolbar (preview-only view). */
+  readonly tools: React.ReactNode
+  /** The paused band, above the preview. */
+  readonly band: React.ReactNode
+  /** The overlay for the preview pane (EditorContentLayout draws it in the preview-only view only). */
+  readonly overlay: React.ReactNode
+}
+
+/**
+ * Wires one editor panel's Markdown Preview comments.
+ *
+ * @param options - {@link UseMarkdownCommentsOptions}
+ * @returns {@link MarkdownComments}
+ */
+export function useMarkdownComments(options: UseMarkdownCommentsOptions): MarkdownComments {
+  const { panelId = '', filePath = '', content, viewMode, setViewMode, editorRef, isActivePanel, isVisible } = options
+  const settingOn = useGlobalSettingsStore(s => s.settings !== null && isMarkdownPreviewCommentsEnabled(s.settings))
+  const enabled = settingOn && panelId !== '' && filePath !== '' && isMarkdownFile(filePath) && fileCommentGateway.available()
+  const shown = viewMode === 'preview' && isVisible
+  const fileName = getBasename(filePath)
+
+  // The pane, from the overlay's hidden marker; the scroller is the preview beside it.
+  const [area, setArea] = useState<HTMLElement | null>(null)
+  const bindPane = useCallback((marker: HTMLElement | null) => setArea(marker?.parentElement ?? null), [])
+  const scroller = area?.querySelector<HTMLElement>(':scope > .markdown-preview') ?? null
+
+  // Rebuilt for a new scroller or text: in the preview-only view the text changes only on a reload.
+  const adapter = useMemo(
+    () =>
+      createMarkdownAdapter({
+        root: () => scroller?.querySelector<HTMLElement>('.markdown-preview-content') ?? null,
+        text: () => content
+      }),
+    [scroller, content]
+  )
+  const source = useMemo<RendererCommentSource>(
+    () => ({
+      list: bufferText => fileCommentGateway.list({ panelId, filePath, ...(bufferText === undefined ? {} : { bufferText }) }),
+      openDraft: () => fileCommentGateway.openDraft({ panelId, filePath }),
+      save: request => fileCommentGateway.save(request),
+      onChanged: callback =>
+        fileCommentGateway.onChanged(payload => {
+          if (payload.panelId === panelId) callback()
+        })
+    }),
+    [panelId, filePath]
+  )
+
+  // Paused while any editor of this window holds unsaved edits (F-02), or those and a change on disk (F-03).
+  const guard = useCommentDirtyGuard(enabled ? filePath : null)
+  const paused =
+    guard.state === 'clean'
+      ? null
+      : guard.state === 'conflict'
+        ? MD_SURFACE_COPY.pausedConflictReason(fileName)
+        : MD_SURFACE_COPY.paused(fileName)
+
+  // Main refuses a buffer past the Markdown file limit; the length check first spares the byte count.
+  const bufferListable = useMemo(
+    () => content.length <= FILE_COMMENT_BUFFER_MAX_CHARS && utf8Length(content) <= FILE_COMMENT_BUFFER_MAX_CHARS,
+    [content]
+  )
+
+  const openInSource = useCallback(
+    (line: number) => {
+      setViewMode('editor')
+      requestAnimationFrame(() => requestAnimationFrame(() => editorRef.current?.setPositionAndReveal(line)))
+    },
+    [setViewMode, editorRef]
+  )
+
+  const host = useCommentOverlayHost({
+    panelId,
+    filePath,
+    enabled,
+    shown,
+    activePanel: isActivePanel,
+    adapter,
+    source,
+    scroller,
+    area,
+    scrollerLabel: MD_SURFACE_COPY.previewName(fileName),
+    paused,
+    ...(paused === null || !bufferListable ? {} : { bufferText: content }),
+    onOpenInSource: openInSource
+  })
+
+  const goToEditor = useCallback(() => {
+    // This panel's own edits: its editor view. Another tab's: that tab.
+    if (useProjectStore.getState().dirtyPanelIds.has(panelId)) setViewMode('editor')
+    else guard.goToTab()
+  }, [panelId, setViewMode, guard])
+
+  if (!enabled) return { tools: null, band: null, overlay: null }
+  return {
+    tools:
+      viewMode === 'preview' ? (
+        <CommentWordsContext.Provider value={MARKDOWN_WORDS}>
+          <CommentToolbarTools {...host.toolbar} />
+        </CommentWordsContext.Provider>
+      ) : null,
+    band:
+      host.shown && guard.state !== 'clean' ? (
+        <MarkdownCommentsBand
+          file={fileName}
+          conflict={guard.state === 'conflict'}
+          onSave={() => void guard.save()}
+          onGoToEditor={goToEditor}
+        />
+      ) : null,
+    overlay: (
+      <MarkdownCommentsOverlay
+        host={host}
+        adapter={adapter}
+        filePath={filePath}
+        content={content}
+        bindPane={bindPane}
+        area={area}
+        scroller={scroller}
+      />
+    )
+  }
+}

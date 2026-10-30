@@ -835,7 +835,13 @@ export default [
   // (docs/designs/comments/html-preview-comments.md SEC-25). A separate rule from
   // `no-restricted-syntax`, so it adds to the blocks above instead of replacing them.
   {
-    files: ['src/renderer/src/components/Panels/HtmlPreviewPanel/comments/**/*.{ts,tsx}'],
+    // Spec 024 (024-NFR-005 item 2): every renderer comment folder – the shared
+    // base and the Markdown Preview's – is under the same ban.
+    files: [
+      'src/renderer/src/components/Panels/HtmlPreviewPanel/comments/**/*.{ts,tsx}',
+      'src/renderer/src/components/Comments/**/*.{ts,tsx}',
+      'src/renderer/src/components/Editor/markdownComments/**/*.{ts,tsx}'
+    ],
     rules: {
       'react/no-danger': 'error'
     }

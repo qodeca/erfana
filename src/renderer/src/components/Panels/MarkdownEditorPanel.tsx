@@ -50,19 +50,11 @@ import { MarkdownToolbar, EditorErrorBoundary } from '../Editor/MarkdownEditorPa
 import { EditorContentLayout } from './EditorContentLayout'
 import { DocumentStatsBar } from './DocumentStatsBar'
 import { EditorLoadError } from './EditorLoadError'
+import { useMarkdownComments } from '../Editor/markdownComments/useMarkdownComments'
 
 // Types and pure functions
 import type { ViewMode, EditorFile } from '../Editor/MarkdownEditorPanel/types'
-import {
-  calculateStats,
-  extractFileName,
-  getDefaultViewMode,
-  settleSavedFile,
-  shouldRecreateParentDirs,
-  shouldToastSaveError,
-  trackSaveInFlight,
-  type SaveTrigger
-} from './markdownEditorPanel.logic'
+import { calculateStats, extractFileName, getDefaultViewMode, settleSavedFile, shouldRecreateParentDirs, shouldToastSaveError, trackSaveInFlight, type SaveTrigger } from './markdownEditorPanel.logic'
 import { formatSaveError, loggableError } from '../../utils/errorUtils'
 import { formatTabTitle } from '../../utils/tabTitle'
 
@@ -498,6 +490,8 @@ export function MarkdownEditorPanel(
     enabled: isActivePanel
   })
 
+  // Markdown Preview comments (spec 024): toolbar tools, paused band, pane overlay – preview-only view.
+  const comments = useMarkdownComments({ panelId, filePath: currentFile?.path, content: currentFile?.content ?? '', viewMode, setViewMode, editorRef, isActivePanel, isVisible: isPanelVisible })
   // =========================================================================
   // Document Statistics
   // =========================================================================
@@ -667,8 +661,10 @@ export function MarkdownEditorPanel(
               onViewModeChange={setViewMode}
               onExportPdf={handleExportPdf}
               onExportDocx={handleExportDocx}
+              commentTools={comments.tools}
             />
           </EditorErrorBoundary>
+          {comments.band}
 
           {/* File conflict notification */}
           {externalChangeDetected && (
@@ -712,6 +708,7 @@ export function MarkdownEditorPanel(
             onPreviewRendered={handlePreviewRendered}
             onSelectionChange={setSelectedText}
             isVisible={isPanelVisible}
+            previewOverlay={comments.overlay}
           />
         </EditorErrorBoundary>
       ) : loadError ? (

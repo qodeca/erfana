@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * HTML Preview comments – the comments drawer
- * (docs/designs/comments/html-preview-comments.md decision 8, §10.6, §10.8; R-009,
- * R-020; docs/designs/comments/html-comments/drawer.html, proposed).
+ * Comments – the comments drawer, in both previews (docs/designs/comments/html-preview-comments.md
+ * decision 8, §10.6, §10.8; R-009, R-020; docs/designs/comments/html-comments/drawer.html).
+ * Its words come from the preview's `CommentWordsContext` (spec 024, C-03).
  *
- * The list of every comment on the page, and the GUARANTEED KEYBOARD ROUTE to
- * every thread: pins are not in the Tab order, and a hidden, resolved or lost
- * comment has no pin at all.
+ * The list of every comment in the file, and the GUARANTEED KEYBOARD ROUTE to every
+ * thread: icons are not in the Tab order, and a hidden, resolved or lost comment has none.
  *
  * Keyboard (decided Rows card, plus the Welcome list's one exception):
  * Tab reaches Close, then the filter (one stop – arrows move the selection),
@@ -27,10 +26,8 @@
  * it takes the whole width, "Show on page" closes it first, and Esc closes it
  * (it then covers everything, like a sheet).
  *
- * Focus return: the `<aside>` is a `data-focus-return` region, so a comment
- * window opened from a row whose row has since gone (deleted, re-filtered)
- * hands focus back into the drawer rather than to `<body>` (BaseDialog's
- * `resolveFocusReturnTarget`).
+ * Focus return: the `<aside>` is a `data-focus-return` region, so a comment window opened from a
+ * row that has since gone hands focus back into the drawer, not `<body>` (`resolveFocusReturnTarget`).
  *
  * @module HtmlPreviewPanel/comments/CommentDrawer
  */
@@ -42,6 +39,7 @@ import { COPY, DRAWER_COPY, readErrorText, unreadFilesText } from './commentCopy
 import { formatCommentTime, plural, visibleString } from './commentFormat'
 import { drawerRows, type DrawerFilter, type DrawerRow } from './commentRows'
 import { ActionButton, CommentBanner, VisibleText } from './CommentParts'
+import { useCommentWords } from './commentWords'
 import './CommentWindow.css'
 import './CommentDrawer.css'
 import { TEST_IDS } from '../../constants/testids'
@@ -124,7 +122,8 @@ export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
   const scrollRef = useRef<HTMLDivElement>(null)
   const asideRef = useRef<HTMLElement>(null)
   const notVisible = useMemo(() => new Set(props.notVisible), [props.notVisible])
-  const rows = useMemo(() => drawerRows(list.files, notVisible), [list.files, notVisible])
+  const words = useCommentWords()
+  const rows = useMemo(() => drawerRows(list.files, notVisible, words), [list.files, notVisible, words])
   const visible = rows[filter]
   const current = Math.min(active, Math.max(0, visible.length - 1))
   const windowed = list.status === 'ready' && visible.length > VIRTUALISE_ABOVE
@@ -244,7 +243,7 @@ export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
       </div>
     )
   } else if (rows.none) {
-    body = <p className="erf-comment-drawer__empty">{DRAWER_COPY.none}</p>
+    body = <p className="erf-comment-drawer__empty">{words.drawerNone}</p>
   } else if (visible.length === 0) {
     body = <p className="erf-comment-drawer__empty">{FILTERS.find(f => f.key === filter)?.empty}</p>
   } else {
@@ -410,7 +409,8 @@ function DrawerRowView({
   onMain,
   onOpen
 }: DrawerRowViewProps): React.JSX.Element {
-  const mainLabel = row.main === 'source' ? COPY.openInSource : COPY.showOnPage
+  const words = useCommentWords()
+  const mainLabel = row.main === 'source' ? COPY.openInSource : words.showInPreview
   const base = `${idPrefix}-row-${row.id.replace(/[^\w-]/g, '_')}`
   // The row's description: what Enter does, the excerpt, the reply count,
   // who and when, and the tags (M8) – `title` alone is not read once

@@ -1,0 +1,102 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * The renderer's comment overlay host (spec 024): a layer over the preview
+ * pane, outside the rendered content. It takes no pointer input itself – only
+ * its icons do – so the preview under it scrolls, selects and clicks as before.
+ *
+ * Tokens only; `border-radius: 0` (root CLAUDE.md § Design system). The
+ * outline is the Focus card's one ring (differences table D-06), drawn as a
+ * box so the content itself is never restyled.
+ */
+
+.erf-comment-host {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: var(--z-dropdown);
+}
+
+/* Comment mode: the preview reads as a picking surface. */
+.erf-comment-host--mode {
+  box-shadow: inset 0 0 0 var(--border-width-thick) var(--color-border-focus);
+}
+
+.erf-comment-host__tab {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  max-inline-size: calc(100% - var(--space-8));
+  padding: var(--space-1) var(--space-4);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background-color: var(--color-border-focus);
+  color: var(--color-bg-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  border-radius: 0;
+}
+
+.erf-comment-host__outline {
+  position: absolute;
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+  border-radius: 0;
+}
+
+.erf-comment-host__icon {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  pointer-events: auto;
+  cursor: pointer;
+  background-color: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  border: var(--border-width) solid var(--color-border-focus);
+  border-radius: 0;
+}
+
+.erf-comment-host__icon:hover {
+  background-color: var(--color-bg-hover-solid);
+}
+
+.erf-comment-host__count {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline-end: 0;
+  padding: 0 var(--space-1);
+  background-color: var(--color-border-focus);
+  color: var(--color-bg-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  line-height: var(--leading-none);
+}
+
+/* The drawer docks over the right edge of the pane. */
+.erf-comment-host__drawer {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  display: flex;
+  max-inline-size: 100%;
+  z-index: var(--z-sticky);
+}
+
+/* The picked target holds real focus and wears the one ring (C-08.3). The
+   attribute goes when the pick moves or the mode ends; a pick by keyboard is
+   focused from a key press, so :focus-visible matches it. */
+.markdown-preview-content [data-line-start][tabindex='-1']:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+/* The scroller is a tab stop while comments are live (C-08.1). */
+.markdown-preview[tabindex='0']:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--space-1) * -1);
+}

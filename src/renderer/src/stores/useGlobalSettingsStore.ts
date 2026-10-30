@@ -38,6 +38,8 @@ interface GlobalSettingsState {
   updateTerminalScreenReaderMode: (mode: TerminalScreenReaderMode) => Promise<void>
   /** HTML Preview comments on/off (`htmlPreview.comments.enabled`). */
   updateHtmlPreviewCommentsEnabled: (enabled: boolean) => Promise<void>
+  /** Markdown Preview comments on/off (`markdownPreview.comments.enabled`, spec 024). */
+  updateMarkdownPreviewCommentsEnabled: (enabled: boolean) => Promise<void>
   /**
    * The reviewer's identity for HTML Preview comments (app-level only).
    * Resolves `true` when it was stored, `false` when the write was refused
@@ -119,6 +121,10 @@ export const useGlobalSettingsStore = create<GlobalSettingsState>((set, get) => 
 
   updateHtmlPreviewCommentsEnabled: async (enabled: boolean) => {
     await get()._updateSection('htmlPreview', (current) => ({ ...current, comments: { enabled } }))
+  },
+
+  updateMarkdownPreviewCommentsEnabled: async (enabled: boolean) => {
+    await get()._updateSection('markdownPreview', (current) => ({ ...current, comments: { enabled } }))
   },
 
   updateCommentIdentity: async (identity: CommentIdentitySettings) => {

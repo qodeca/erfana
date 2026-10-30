@@ -29,9 +29,9 @@ import {
   TOOL_COPY,
   commentModeAriaShortcut,
   listButtonName,
-  modeTooltip,
   unavailableTooltip
 } from './commentCopy'
+import { useCommentWords } from './commentWords'
 import { TEST_IDS } from '../../constants/testids'
 
 /** Reasons that leave nothing readable: list and pins go `aria-disabled` too. */
@@ -59,7 +59,34 @@ export interface CommentToolbarToolsProps {
   readonly onToggleIcons: () => void
   readonly modeRef?: React.Ref<HTMLButtonElement>
   readonly listRef?: React.Ref<HTMLButtonElement>
+  /**
+   * The row the tools sit in (differences table D-28): the HTML Preview's
+   * permission band (default), or the Markdown toolbar's 32 × 28 tools.
+   */
+  readonly variant?: 'band' | 'toolbar'
+  /**
+   * Why no new comment can be written now (C-19.1, menu matrix § 2): the mode
+   * toggle goes `aria-disabled` with this sentence as its tooltip. The list
+   * and the icons stay usable – existing comments remain readable.
+   */
+  readonly modeUnavailableText?: string | null
 }
+
+/** Each tool's class, per row. */
+const TOOL_CLASS = {
+  band: {
+    mode: 'erf-band__tool erf-band__tool--toggle erf-band__tool--comment erf-band__tool--comment-first',
+    list: 'erf-band__tool erf-band__tool--toggle erf-band__tool--comment erf-band__tool--count',
+    icons: 'erf-band__tool erf-band__tool--toggle erf-band__tool--comment',
+    attention: 'erf-band__tool-attention'
+  },
+  toolbar: {
+    mode: 'toolbar-btn erf-md-comment-tool',
+    list: 'toolbar-btn erf-md-comment-tool erf-md-comment-tool--count',
+    icons: 'toolbar-btn erf-md-comment-tool',
+    attention: 'erf-md-comment-tool__attention'
+  }
+} as const
 
 /**
  * The comment tools, as one fragment for the band's leading slot.
@@ -85,15 +112,21 @@ export function CommentToolbarTools({
   onToggleDrawer,
   onToggleIcons,
   modeRef,
-  listRef
+  listRef,
+  variant = 'band',
+  modeUnavailableText = null
 }: CommentToolbarToolsProps): React.JSX.Element {
-  const modeBlocked = !ready || unavailable !== null
+  const words = useCommentWords()
+  const classes = TOOL_CLASS[variant]
+  const modeBlocked = !ready || unavailable !== null || modeUnavailableText !== null
   const modeTitle =
     unavailable !== null
       ? unavailableTooltip(unavailable)
-      : !ready
-        ? TOOL_COPY.modeNotReady
-        : modeTooltip(mode)
+      : modeUnavailableText !== null
+        ? modeUnavailableText
+        : !ready
+          ? TOOL_COPY.modeNotReady
+          : words.modeTooltip(mode)
   const readBlocked = unavailable !== null && UNREADABLE.has(unavailable)
   const open = counts?.open ?? 0
   const attention = counts?.attention ?? 0
@@ -104,7 +137,7 @@ export function CommentToolbarTools({
       <button
         ref={modeRef}
         type="button"
-        className="erf-band__tool erf-band__tool--toggle erf-band__tool--comment erf-band__tool--comment-first"
+        className={classes.mode}
         aria-label={TOOL_COPY.mode}
         aria-pressed={mode}
         aria-keyshortcuts={commentModeAriaShortcut()}
@@ -122,7 +155,7 @@ export function CommentToolbarTools({
       <button
         ref={listRef}
         type="button"
-        className="erf-band__tool erf-band__tool--toggle erf-band__tool--comment erf-band__tool--count"
+        className={classes.list}
         aria-label={listName}
         aria-expanded={drawerOpen}
         aria-controls={drawerOpen ? drawerId : undefined}
@@ -136,15 +169,15 @@ export function CommentToolbarTools({
       >
         {renderIcon('messages-square', { size: 16, 'aria-hidden': true })}
         {open > 0 && <span>{open}</span>}
-        {attention > 0 && <span className="erf-band__tool-attention">{`· !${attention}`}</span>}
+        {attention > 0 && <span className={classes.attention}>{`· !${attention}`}</span>}
       </button>
       <button
         type="button"
-        className="erf-band__tool erf-band__tool--toggle erf-band__tool--comment"
+        className={classes.icons}
         aria-label={TOOL_COPY.pins}
         aria-pressed={showIcons}
         aria-disabled={readBlocked ? 'true' : undefined}
-        title={showIcons ? TOOL_COPY.pinsOn : TOOL_COPY.pinsOff}
+        title={showIcons ? TOOL_COPY.pinsOn : words.pinsOff}
         data-testid={TEST_IDS.COMMENT_TOOL_ICONS}
         onClick={() => {
           if (!readBlocked) onToggleIcons()

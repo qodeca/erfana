@@ -190,5 +190,29 @@ export const COMMENT_TEST_IDS = {
   /** Visibility notice */
   COMMENT_SETTINGS_NOTICE: 'settings-comment-notice',
   /** Assertive region for blur-save errors */
-  COMMENT_SETTINGS_ALERT: 'settings-comment-alert'
+  COMMENT_SETTINGS_ALERT: 'settings-comment-alert',
+  /** Feature flag: Comments in Markdown preview (spec 024, 024-FR-022) */
+  COMMENT_SETTINGS_MD_TOGGLE: 'settings-toggle-md-comments',
+
+  // Renderer-hosted previews (spec 024 commit 13: the Markdown Preview)
+  /** A menu item's reason line (Menu card #reason) */
+  COMMENT_MENU_REASON: 'context-menu-reason',
+  /** Menu item outside comment mode: Comment on {kind} (menu matrix M-11) */
+  COMMENT_MENU_COMMENT_ON: 'comment-menu-comment-on',
+  /** Menu item on the frontmatter, always disabled (M-18) */
+  COMMENT_MENU_FRONTMATTER: 'comment-menu-frontmatter',
+  /** The overlay over a renderer-hosted preview (outside the exported content) */
+  COMMENT_HOST_OVERLAY: 'comment-host-overlay',
+  /** The outline around the outlined or picked target */
+  COMMENT_HOST_OUTLINE: 'comment-host-outline',
+  /** A comment icon (a real button, outside the Tab order – D-07) */
+  COMMENT_HOST_ICON: 'comment-host-icon',
+  /** The comment-mode tab (A-03) */
+  COMMENT_HOST_MODE_TAB: 'comment-host-mode-tab',
+  /** The paused band over the Markdown Preview (F-02, F-03) */
+  COMMENT_HOST_PAUSED: 'comment-host-paused',
+  /** Paused band: Save {file} */
+  COMMENT_HOST_PAUSED_SAVE: 'comment-host-paused-save',
+  /** Paused band, changed on disk: Go to editor */
+  COMMENT_HOST_PAUSED_GO_TO_EDITOR: 'comment-host-paused-go-to-editor'
 } as const

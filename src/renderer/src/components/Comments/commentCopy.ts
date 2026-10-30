@@ -329,10 +329,11 @@ export function frameFileText(file: string): string {
 /** §10.7 / §10.10 identity strings. */
 export const IDENTITY_COPY = {
   title: 'Before your first comment',
+  // C-04: one notice for both previews, shown once before the first comment in either.
   notice:
-    'Erfana writes your name – and your email, if you add one – into the HTML file next to each comment. ' +
-    'Anyone who can open the file can read them: in Erfana, in the page source, and in git history once the file is ' +
-    'committed and pushed. Scripts in pages previewed in this project can read them too. Deleting a comment later does ' +
+    'Erfana writes your name – and your email, if you add one – into the file next to each comment. ' +
+    "Anyone who can open the file can read them: in Erfana, in the file's source, and in git history once the file is " +
+    'committed and pushed. In HTML files, scripts on previewed pages can read them too. Deleting a comment later does ' +
     'not remove it from git history.',
   nameLabel: 'Name',
   nameHint: 'Shown next to your comments.',
@@ -357,13 +358,16 @@ export const SETTINGS_COPY = {
   title: 'Comments',
   flagLabel: 'Comments in HTML preview',
   flagHint: 'Lets you add comments to elements of a previewed page.',
+  // C-04 / 024-FR-022: the Markdown switch; selection words join the hints with commit 14.
+  markdownFlagLabel: 'Comments in Markdown preview',
+  markdownFlagHint: 'Lets you comment on paragraphs, list items and other parts of a Markdown file in the preview.',
   nameLabel: 'Your name',
   nameHint:
-    'Saved into HTML files next to each comment you write. Changing it affects new comments only.',
+    'Saved into the file next to each comment you write. Changing it affects new comments only.',
   emailLabel: 'Your email (optional)',
   emailHint: 'Also saved into the file. Leave empty to keep it out.',
   notice:
-    'Both are visible to anyone who can open the file – in the page source and in git history once pushed.',
+    'Both are visible to anyone who can open the file – in its source and in git history once pushed.',
   nameEmpty: 'Enter a name to add comments. Existing comments keep the name they were saved with.',
   // not in §10.10: the settings write failed.
   saveFailed: "Couldn't save this setting. Your text is still here – try again."

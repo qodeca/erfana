@@ -1,0 +1,238 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+/**
+ * Pointer and keyboard picking for the renderer's comment overlay host (spec
+ * 024 024-NFR-006, 024-AC-029; comments-v2 C-08; differences table D-31;
+ * menu matrix § 4).
+ *
+ * - **The mode shortcut** (Ctrl+Alt+M / Cmd+Option+M, `shared/commentModeKey`)
+ *   is a `window` listener, so it is gated by the active panel – dockview
+ *   keeps every tab mounted (src/renderer/CLAUDE.md).
+ * - **The scroller is a tab stop** (C-08.1) while the host is live; the
+ *   attribute is the scroller's, never the exported content's.
+ * - **In comment mode** the pointer outlines the target under it and a
+ *   click picks it (`overlayCore/gesture`: a drag of 4 px or more, or a
+ *   selection, is left alone – selection comments come with commit 14); the
+ *   click never reaches a link. The picker keys move real focus between
+ *   targets: the picked one takes `tabindex="-1"` and the Focus card's ring
+ *   (C-08.3). It keeps the attribute while it is the pick – so the menu and
+ *   the window hand focus back to it on close – and loses it when another
+ *   target is picked or the mode ends.
+ * - **The menu** opens on a right-click on a target, or from Shift+F10 / the
+ *   Menu key at the picked target (in comment mode) or the first target in
+ *   view (outside it). A right-click on a selection outside comment mode is
+ *   left to the preview's own menu until commit 14.
+ *
+ * @module components/Comments/overlay/useHostPointerKeys
+ */
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { classifyGesture, type GesturePoint } from '../../../../../shared/comments/overlayCore/gesture'
+import { commentModeKeyFromDomEvent, matchCommentModeKey } from '../../../../../shared/commentModeKey'
+import { useLatestRef } from '../../../hooks/useLatestRef'
+import { isMacOS } from '../../../utils/platform'
+import { MARKDOWN_COPY, MD_SURFACE_COPY } from '../commentCopyWords'
+import { firstTargetInView, movePicker, pickerStepOf } from './pickerKeys'
+import type { PreviewCommentAdapter } from './previewAdapter'
+
+/** Where a keyboard-opened menu sits: the target's top-left plus this (menu matrix § 4). */
+const MENU_KEY_OFFSET_PX = 4
+
+/** Options for {@link useHostPointerKeys}. */
+export interface HostPointerKeysOptions {
+  readonly live: boolean
+  readonly mode: boolean
+  readonly activePanel: boolean
+  readonly adapter: PreviewCommentAdapter
+  readonly scroller: HTMLElement | null
+  /** The scroller's accessible name (C-08.1). */
+  readonly scrollerLabel: string
+  /** A menu or a window is open: the mode shortcut waits. */
+  readonly windowOpen: boolean
+  readonly onToggleMode: (byKeyboard: boolean) => void
+  readonly onExit: () => void
+  readonly onPick: (target: HTMLElement) => void
+  readonly onMenu: (target: HTMLElement, at: { x: number; y: number }) => void
+  readonly onSay: (text: string) => void
+  readonly onScroll: () => void
+}
+
+/** What the host draws from pointer and keys. */
+export interface HostPointerKeys {
+  /** The target to outline: the picked one, else the one under the pointer. */
+  readonly outlined: HTMLElement | null
+  /** Pick and focus the first target in view (comment mode turned on from the keyboard). */
+  readonly focusFirst: () => void
+}
+
+/** Whether the document holds a non-empty selection. */
+function hasSelection(): boolean {
+  const selection = window.getSelection()
+  return selection !== null && !selection.isCollapsed && selection.toString().trim() !== ''
+}
+
+/**
+ * Pointer and keys for one live host.
+ *
+ * @param options - {@link HostPointerKeysOptions}
+ * @returns {@link HostPointerKeys}
+ */
+export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointerKeys {
+  const { live, mode, activePanel, adapter, scroller, scrollerLabel, windowOpen } = options
+  const [hover, setHover] = useState<HTMLElement | null>(null)
+  const [picked, setPicked] = useState<HTMLElement | null>(null)
+  const latest = useLatestRef(options)
+  const pickedRef = useLatestRef(picked)
+
+  // The target this hook gave `tabindex="-1"`: one at a time, removed when the pick moves or the mode ends.
+  const marked = useRef<HTMLElement | null>(null)
+  const unmark = useCallback(() => {
+    marked.current?.removeAttribute('tabindex')
+    marked.current = null
+  }, [])
+
+  /** Give `target` real focus and the ring (C-08.3). */
+  const focusTarget = useCallback(
+    (target: HTMLElement) => {
+      if (marked.current !== target) {
+        unmark()
+        if (!target.hasAttribute('tabindex')) {
+          target.setAttribute('tabindex', '-1')
+          marked.current = target
+        }
+      }
+      target.focus({ preventScroll: true })
+      target.scrollIntoView({ block: 'nearest' })
+      setPicked(target)
+      const words = latest.current.adapter.words
+      latest.current.onSay(MD_SURFACE_COPY.showing(words.noun(adapter.tagOf(target)), adapter.lineOf(target)))
+    },
+    [adapter, latest, unmark]
+  )
+
+  // Leaving the mode or the view (or unmounting) takes the attribute off the content again.
+  useEffect(() => {
+    if (mode && live) return unmark
+    unmark()
+    return undefined
+  }, [mode, live, unmark])
+
+  const focusFirst = useCallback(() => {
+    const first = firstTargetInView(adapter, latest.current.scroller?.getBoundingClientRect() ?? null)
+    if (first !== null) focusTarget(first)
+  }, [adapter, focusTarget, latest])
+
+  // Leaving the mode or the view drops the outline and the pick.
+  const [shownMode, setShownMode] = useState(mode && live)
+  if (shownMode !== (mode && live)) {
+    setShownMode(mode && live)
+    setHover(null)
+    setPicked(null)
+  }
+
+  // ---- the mode shortcut: the active panel's only ----
+  useEffect(() => {
+    if (!live || !activePanel || windowOpen) return undefined
+    const onKey = (event: KeyboardEvent): void => {
+      if (!matchCommentModeKey(commentModeKeyFromDomEvent(event), isMacOS())) return
+      event.preventDefault()
+      latest.current.onToggleMode(true)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [live, activePanel, windowOpen, latest])
+
+  // ---- the scroller: a tab stop with a name (C-08.1) ----
+  useEffect(() => {
+    if (!live || scroller === null) return undefined
+    const hadTabIndex = scroller.getAttribute('tabindex')
+    scroller.setAttribute('tabindex', '0')
+    scroller.setAttribute('aria-label', scrollerLabel)
+    return () => {
+      if (hadTabIndex === null) scroller.removeAttribute('tabindex')
+      else scroller.setAttribute('tabindex', hadTabIndex)
+      scroller.removeAttribute('aria-label')
+    }
+  }, [live, scroller, scrollerLabel])
+
+  // ---- pointer, keys and scroll on the scroller ----
+  const down = useRef<GesturePoint | null>(null)
+  useEffect(() => {
+    if (!live || scroller === null) return undefined
+    const targetOf = (event: Event): HTMLElement | null => latest.current.adapter.targetAt(event.target as Node | null)
+    const onScroll = (): void => latest.current.onScroll()
+    const onMove = (event: MouseEvent): void => {
+      if (latest.current.mode) setHover(targetOf(event))
+    }
+    const onLeave = (): void => setHover(null)
+    const onDown = (event: MouseEvent): void => {
+      down.current = event.button === 0 ? { x: event.clientX, y: event.clientY } : null
+    }
+    const onClick = (event: MouseEvent): void => {
+      if (!latest.current.mode || event.button !== 0) return
+      // In comment mode a click is a pick, never a link (the preview's own handlers do not run).
+      event.preventDefault()
+      event.stopPropagation()
+      const start = down.current ?? { x: event.clientX, y: event.clientY }
+      const gesture = classifyGesture({ down: start, up: { x: event.clientX, y: event.clientY }, selectionCollapsed: !hasSelection() })
+      const target = targetOf(event)
+      if (gesture === 'pick' && target !== null) latest.current.onPick(target)
+    }
+    const onContextMenu = (event: MouseEvent): void => {
+      if (!latest.current.mode && hasSelection()) return
+      const target = targetOf(event)
+      if (target === null) return
+      event.preventDefault()
+      event.stopPropagation()
+      latest.current.onMenu(target, { x: event.clientX, y: event.clientY })
+    }
+    const onKeyDown = (event: KeyboardEvent): void => {
+      const step = pickerStepOf(event)
+      if (step === null) return
+      const { mode: on, adapter: current } = latest.current
+      if (!on) {
+        if (step !== 'menu' || hasSelection()) return
+        const first = firstTargetInView(current, scroller.getBoundingClientRect())
+        if (first === null) return
+        event.preventDefault()
+        const box = first.getBoundingClientRect()
+        latest.current.onMenu(first, { x: box.left + MENU_KEY_OFFSET_PX, y: box.top + MENU_KEY_OFFSET_PX })
+        return
+      }
+      event.preventDefault()
+      event.stopPropagation()
+      const at = pickedRef.current
+      if (step === 'exit') latest.current.onExit()
+      else if (step === 'open') {
+        if (at !== null) latest.current.onPick(at)
+      } else if (step === 'menu') {
+        if (at === null) return
+        const box = at.getBoundingClientRect()
+        latest.current.onMenu(at, { x: box.left + MENU_KEY_OFFSET_PX, y: box.top + MENU_KEY_OFFSET_PX })
+      } else {
+        const move = movePicker(current, at, step, () => firstTargetInView(current, scroller.getBoundingClientRect()))
+        if ('target' in move) focusTarget(move.target)
+        else if (move.end === 'top') latest.current.onSay(MARKDOWN_COPY.pickerTop)
+        else if (move.end === 'no-child') latest.current.onSay(MARKDOWN_COPY.pickerNoChild)
+      }
+    }
+    scroller.addEventListener('scroll', onScroll, { passive: true })
+    scroller.addEventListener('mousemove', onMove)
+    scroller.addEventListener('mouseleave', onLeave)
+    scroller.addEventListener('mousedown', onDown, true)
+    scroller.addEventListener('click', onClick, true)
+    scroller.addEventListener('contextmenu', onContextMenu, true)
+    scroller.addEventListener('keydown', onKeyDown)
+    return () => {
+      scroller.removeEventListener('scroll', onScroll)
+      scroller.removeEventListener('mousemove', onMove)
+      scroller.removeEventListener('mouseleave', onLeave)
+      scroller.removeEventListener('mousedown', onDown, true)
+      scroller.removeEventListener('click', onClick, true)
+      scroller.removeEventListener('contextmenu', onContextMenu, true)
+      scroller.removeEventListener('keydown', onKeyDown)
+    }
+  }, [live, scroller, latest, pickedRef, focusTarget])
+
+  const outlined = picked !== null && picked.isConnected ? picked : hover
+  return { outlined, focusFirst }
+}

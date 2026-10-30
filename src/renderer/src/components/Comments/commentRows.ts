@@ -22,7 +22,7 @@
  */
 import type { CommentFileView } from '../../../../shared/ipc/preview-comment-schema'
 import { COPY, DRAWER_COPY, inFrameTag } from './commentCopy'
-import { elementLabel } from './commentFormat'
+import { HTML_WORDS, type CommentWords } from './commentCopyWords'
 
 /** A drawer filter. */
 export type DrawerFilter = 'open' | 'resolved' | 'attention'
@@ -72,11 +72,13 @@ export interface DrawerRows {
  *
  * @param files - Main's list.
  * @param notVisible - Thread keys main reported as not rendered right now.
+ * @param words - The preview's words (labels and tags, C-03); the HTML Preview's by default.
  * @returns Rows per filter.
  */
 export function drawerRows(
   files: readonly CommentFileView[],
-  notVisible: ReadonlySet<string>
+  notVisible: ReadonlySet<string>,
+  words: CommentWords = HTML_WORDS
 ): DrawerRows {
   const open: DrawerRow[] = []
   const resolved: DrawerRow[] = []
@@ -93,13 +95,13 @@ export function drawerRows(
       : []
     for (const thread of file.threads) {
       const [first] = thread.messages
-      const label = thread.runtime ? thread.runtime.tag : elementLabel(thread)
+      const label = thread.runtime ? thread.runtime.tag : words.label(thread)
       const tags: RowTag[] = [...frameTag]
       const hidden = thread.attached && (thread.notVisible || notVisible.has(thread.threadKey))
       if (hidden) tags.push({ text: DRAWER_COPY.notVisible, attention: false })
       const isResolved = thread.status === 'resolved'
       if (isResolved) tags.push({ text: DRAWER_COPY.resolved, attention: false })
-      if (!thread.attached) tags.push({ text: DRAWER_COPY.notFound, attention: true })
+      if (!thread.attached) tags.push({ text: words.notFoundTag, attention: true })
       const row: DrawerRow = {
         ...base,
         id: `${file.fileKey}/${thread.threadKey}`,
