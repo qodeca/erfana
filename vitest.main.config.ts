@@ -160,6 +160,10 @@ export default defineConfig({
         // measured 100/100/100/100 on 2026-10-30, Windows).
         'src/shared/comments/fileKind.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         'src/shared/comments/htmlKind.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Spec 024 overlayCore (ADR 0006): pure rules shared by both overlays; measured 100/100/100/100.
+        'src/shared/comments/overlayCore/pinLayout.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/overlayCore/modeState.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/overlayCore/gesture.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // The re-attach tables and quote readers split out of anchor.ts
         // (measured 100/100/100/100 on 2026-10-26, Windows).
         'src/shared/comments/anchorLookup.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },

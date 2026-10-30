@@ -79,7 +79,7 @@ const SECOND = createThread({
 
 /** The input file of `name`, as committed. */
 function pinInput(name: PinCase): Buffer {
-  return readFileSync(join(PINS, `${name}.input.html`))
+  return readFileSync(join(PINS, `${name}.input.html.txt`))
 }
 
 /** Decode, plan, splice the bytes and verify – the writer's path, without the disk. */
@@ -136,7 +136,7 @@ function runChain(input: Buffer): { steps: Record<PinStep, Buffer>; last: Buffer
   }
 }
 
-const expected = (name: PinCase, step: PinStep): Buffer => readFileSync(join(PINS, `${name}.${step}.html`))
+const expected = (name: PinCase, step: PinStep): Buffer => readFileSync(join(PINS, `${name}.${step}.html.txt`))
 
 describe('writer byte pins (invariant)', () => {
   it.each(PIN_CASES)('PIN-W-001 %s: every write step produces exactly its committed bytes', name => {
@@ -180,12 +180,12 @@ describe('writer byte pins (invariant)', () => {
   })
 
   it('PIN-W-006 the pins folder holds exactly the inputs and step files, nothing else', () => {
-    const want = PIN_CASES.flatMap(name => [`${name}.input.html`, ...PIN_STEPS.map(step => `${name}.${step}.html`)])
+    const want = PIN_CASES.flatMap(name => [`${name}.input.html.txt`, ...PIN_STEPS.map(step => `${name}.${step}.html.txt`)])
     expect(readdirSync(PINS).sort()).toEqual(want.sort())
   })
 
   it('PIN-W-007 git keeps the pin files’ bytes (`-text`, no line-ending conversion)', () => {
-    const file = relative(ROOT, join(PINS, 'crlf.input.html')).replaceAll('\\', '/')
+    const file = relative(ROOT, join(PINS, 'crlf.input.html.txt')).replaceAll('\\', '/')
     const out = execFileSync('git', ['check-attr', 'text', '--', file], { cwd: ROOT, encoding: 'utf8' })
     expect(out.trim()).toBe(`${file}: text: unset`)
   })
