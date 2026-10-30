@@ -27,8 +27,8 @@ exports[`commentCopy strings (characterisation) > PIN-C-010 every string on Wind
     "damagedComment": "Damaged comment",
     "damagedText": "Erfana can't read this comment, so it won't change it. Fix it in the source, or delete it.",
     "delete": "Delete…",
-    "deleteBlock": "Delete block",
-    "deleteBlockAction": "Delete block…",
+    "deleteBlock": "Delete damaged comment",
+    "deleteBlockAction": "Delete damaged comment…",
     "deleteComment": "Delete comment",
     "deleteThread": "Delete thread",
     "draftRestored": "Draft restored",
@@ -69,7 +69,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-010 every string on Wind
     "emptyResolved": "No resolved comments.",
     "loading": "Reading comments…",
     "notFound": "Not found",
-    "notOnScreen": "This element isn't on screen right now",
+    "notOnScreen": "This comment's target isn't on screen right now",
     "notVisible": "Not visible now",
     "resolved": "Resolved",
     "show": "Show",
@@ -120,7 +120,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-010 every string on Wind
     "mode": "Comment mode",
     "modeNotReady": "Comment mode – available once the page has loaded",
     "pins": "Show comment icons",
-    "pinsOff": "Show comment icons – off: icons hidden on this page",
+    "pinsOff": "Show comment icons – off: icons hidden in this preview",
     "pinsOn": "Show comment icons – on",
   },
   "UNAVAILABLE_REASON_TEXT": {
@@ -139,7 +139,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-010 every string on Wind
     "()": "Ctrl+Alt+M",
   },
   "deleteBlockText": {
-    "index.html": "Delete this damaged block? Erfana removes exactly the text shown above from index.html.",
+    "index.html": "Delete this damaged comment? Erfana removes exactly the text shown above from index.html.",
   },
   "deleteCommentText": {
     "index.html": "Delete this comment? It is removed from index.html. Git history keeps earlier versions.",
@@ -175,7 +175,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-010 every string on Wind
     "on": "Comment mode (Ctrl+Alt+M) – on: click an element or select text to comment, Esc to leave",
   },
   "notFoundText": {
-    "line 42": "Erfana can't find this element any more. The comment stays in index.html, line 42.",
+    "line 42": "Erfana can't find what this comment was about any more. The comment stays in index.html, line 42.",
   },
   "readErrorText": {
     "index.html": "Couldn't read comments from index.html.",
@@ -355,8 +355,8 @@ exports[`commentCopy strings (characterisation) > PIN-C-011 every string on macO
     "damagedComment": "Damaged comment",
     "damagedText": "Erfana can't read this comment, so it won't change it. Fix it in the source, or delete it.",
     "delete": "Delete…",
-    "deleteBlock": "Delete block",
-    "deleteBlockAction": "Delete block…",
+    "deleteBlock": "Delete damaged comment",
+    "deleteBlockAction": "Delete damaged comment…",
     "deleteComment": "Delete comment",
     "deleteThread": "Delete thread",
     "draftRestored": "Draft restored",
@@ -397,7 +397,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-011 every string on macO
     "emptyResolved": "No resolved comments.",
     "loading": "Reading comments…",
     "notFound": "Not found",
-    "notOnScreen": "This element isn't on screen right now",
+    "notOnScreen": "This comment's target isn't on screen right now",
     "notVisible": "Not visible now",
     "resolved": "Resolved",
     "show": "Show",
@@ -448,7 +448,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-011 every string on macO
     "mode": "Comment mode",
     "modeNotReady": "Comment mode – available once the page has loaded",
     "pins": "Show comment icons",
-    "pinsOff": "Show comment icons – off: icons hidden on this page",
+    "pinsOff": "Show comment icons – off: icons hidden in this preview",
     "pinsOn": "Show comment icons – on",
   },
   "UNAVAILABLE_REASON_TEXT": {
@@ -467,7 +467,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-011 every string on macO
     "()": "Cmd+Option+M",
   },
   "deleteBlockText": {
-    "index.html": "Delete this damaged block? Erfana removes exactly the text shown above from index.html.",
+    "index.html": "Delete this damaged comment? Erfana removes exactly the text shown above from index.html.",
   },
   "deleteCommentText": {
     "index.html": "Delete this comment? It is removed from index.html. Git history keeps earlier versions.",
@@ -503,7 +503,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-011 every string on macO
     "on": "Comment mode (Cmd+Option+M) – on: click an element or select text to comment, Esc to leave",
   },
   "notFoundText": {
-    "line 42": "Erfana can't find this element any more. The comment stays in index.html, line 42.",
+    "line 42": "Erfana can't find what this comment was about any more. The comment stays in index.html, line 42.",
   },
   "readErrorText": {
     "index.html": "Couldn't read comments from index.html.",

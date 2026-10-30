@@ -109,7 +109,7 @@ describe('Alt+↑ / Alt+↓ (J-002)', () => {
     expect(spoken()).toBe('showing footer#foot')
   })
 
-  it('J-002 stops at a leaf (“No child elements”) and at <body> (“Top of page”)', () => {
+  it('J-002 stops at a leaf (“Nothing inside to select”) and at <body> (“Top level”)', () => {
     userMove(10, 305)
     userKey({ key: 'ArrowDown', code: 'ArrowDown', altKey: true })
     expect(spoken()).toBe('no-child')

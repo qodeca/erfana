@@ -5559,11 +5559,9 @@
       "audience": "developer",
       "doc": "docs/design-system/README.md",
       "quote": "(`commentCopy.ts:253`, `:254`)",
-      "status": "fixed",
+      "status": "removed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:253",
-      "match": "deleteBlock: 'Delete block',",
-      "note": "Spec 024 S-08 reworded the conflict sentence to \"This comment contains…\"; the row now names only the two \"Delete block\" strings, at their current lines."
+      "note": "Defect fixed: spec 024 differences table § 4 renamed \"Delete block\" and \"Delete block…\" to \"Delete damaged comment\" in both previews, and the README row was removed."
     },
     {
       "id": "docs-design-system-README/55",
@@ -48693,11 +48691,11 @@
       "id": "designs-comments-html-preview-comments/t127",
       "audience": "developer",
       "doc": "docs/designs/comments/html-preview-comments.md",
-      "quote": "\"Show comment icons – off: icons hidden on this page\"",
+      "quote": "\"Show comment icons – off: icons hidden in this preview\"",
       "status": "verified",
       "evidence": "source",
       "source": "src/renderer/src/components/Comments/commentCopy.ts:430",
-      "match": "Show comment icons – off: icons hidden on this page"
+      "match": "Show comment icons – off: icons hidden in this preview"
     },
     {
       "id": "designs-comments-html-preview-comments/t128",
@@ -54754,7 +54752,7 @@
       "quote": "such as **Comment on paragraph**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:356",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:354",
       "match": "commentOn: (noun: string): string => `Comment on ${noun}`,"
     },
     {
@@ -54764,7 +54762,7 @@
       "quote": "Select **Comment** next to the selection",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:395",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:393",
       "match": "button: 'Comment',"
     },
     {
@@ -54774,7 +54772,7 @@
       "quote": "choose **Comment on selection**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:392",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:390",
       "match": "commentOnSelection: 'Comment on selection',"
     },
     {
@@ -54784,7 +54782,7 @@
       "quote": "select them in **Narrow to words**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:396",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:394",
       "match": "narrow: 'Narrow to words',"
     },
     {
@@ -54794,7 +54792,7 @@
       "quote": "Select **Open**, **Resolved** or **Can't edit**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:428",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:426",
       "match": "filterCantEdit: \"Can't edit\","
     },
     {
@@ -54804,7 +54802,7 @@
       "quote": "choose **File order**, **Changed first** or **Latest activity**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:435",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:433",
       "match": "sortOrder: { file: 'File order', changed: 'Changed first', latest: 'Latest activity' }"
     },
     {
@@ -54814,7 +54812,7 @@
       "quote": "clear **Show comment icons and underlines**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:433",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:431",
       "match": "showIcons: 'Show comment icons and underlines',"
     },
     {
@@ -54904,7 +54902,7 @@
       "quote": "or **Go to editor**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:369",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:367",
       "match": "goToEditor: 'Go to editor',"
     },
     {
@@ -54974,7 +54972,7 @@
       "quote": "lists every comment as **Open**, **Resolved** or **Can't edit**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:428",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:426",
       "match": "filterCantEdit: \"Can't edit\","
     },
     {
@@ -55004,7 +55002,7 @@
       "quote": "filtered by **Open**, **Resolved** and **Can't edit**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:428",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:426",
       "match": "filterCantEdit: \"Can't edit\","
     },
     {

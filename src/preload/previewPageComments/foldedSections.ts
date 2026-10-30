@@ -8,7 +8,7 @@
  * A closed `<details>` renders only its summary, so a comment on anything else
  * inside it has no pin and is "Not visible now". Two things open it:
  *
- * - {@link openAround}: a reveal ("Show on page", or a drawer row's Open) of
+ * - {@link openAround}: a reveal ("Show in preview", or a drawer row's Open) of
  *   such an element opens every closed `<details>` around it, outermost first,
  *   before the scroll and the render – so the pin draws and main hears
  *   "visible".

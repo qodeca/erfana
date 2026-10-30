@@ -479,7 +479,7 @@ Copy:
 - HTML tooltip: 'Comment mode (Ctrl+Alt+M) – on: click an element or select text to comment, Esc to leave'.
 - HTML announce: 'Comment mode on. Click an element, select text, or press Tab to pick one. Esc to leave.'
 - Markdown announce: 'Comment mode on. Click a paragraph, select text, or press Tab to pick one. Esc to leave.'
-- Empty drawer: HTML 'No comments in this file yet. Turn on comment mode, then click an element or select text.' Markdown 'No comments in this file yet. Select text and click Comment, or turn on comment mode and click a paragraph.'
+- Empty drawer (differences table A-08, one sentence for both): 'No comments in this file yet. Select text and right-click, or turn on comment mode and click {an element | a paragraph}.'
 
 Markdown right-click with no selection, outside comment mode: the menu gets 'Comment on {kind}' aimed at the nearest `[data-line-start]` block, then a separator and the prompt items. 'Copy selection' is hidden when nothing is selected.
 

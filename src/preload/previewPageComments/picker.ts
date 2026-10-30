@@ -6,7 +6,7 @@
  *
  * - Tab / Shift+Tab: the next / previous element at the same level, then the
  *   parent's next / previous sibling, climbing until one exists.
- * - Alt+↑: the parent, stopping at `<body>` ("Top of page").
+ * - Alt+↑: the parent, stopping at `<body>` ("Top level").
  * - Alt+↓: back down the path Alt+↑ came up, else the first child.
  *
  * Only elements a reader can see count: not `<script>`, `<style>` and other

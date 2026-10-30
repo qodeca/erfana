@@ -114,7 +114,7 @@ export const CommentPanelRequestSchema = z.object({ panelId: PanelIdSchema }).st
 export type CommentPanelRequest = z.infer<typeof CommentPanelRequestSchema>
 
 /**
- * `preview:commentCommand` – "Show on page" (§7.10), or keep an open
+ * `preview:commentCommand` – "Show in preview" (§7.10), or keep an open
  * new-comment window's draft alive (spec 024 C-14.2; main caps a draft's whole
  * life, `commentKeyStore.ts` `DRAFT_MAX_AGE_MS`).
  */

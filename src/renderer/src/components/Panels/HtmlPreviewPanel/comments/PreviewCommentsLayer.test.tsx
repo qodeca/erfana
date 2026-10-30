@@ -134,14 +134,15 @@ describe('PreviewCommentsLayer', () => {
     it('M-08 a part of the page that cannot hold a comment: the row\'s items for a writable file, disabled, in either mode', () => {
       for (const mode of [false, true]) {
         const { unmount } = setup({ menu: menuDraft({ ...NO_DRAFT, kind: mode ? 'open' : 'menu', reason: 'not-commentable' }), mode })
-        expectDisabledWithReason([mode ? COPY.addComment : MD_SURFACE_COPY.commentOn('element')], "This part of the page can't hold a comment.")
+        // Changed expectation under 024-FR-006 § 4 (was "This part of the page can't hold a comment.").
+        expectDisabledWithReason([mode ? COPY.addComment : MD_SURFACE_COPY.commentOn('element')], "This part of the preview can't hold a comment.")
         unmount()
       }
       // A main that sent no reason reads the same.
       setup({ menu: menuDraft({ ...NO_DRAFT, ...WORDS }), mode: true })
       expectDisabledWithReason(
         [SELECTION_COPY.commentOnSelection, SELECTION_COPY.commentOnWhole('element')],
-        "This part of the page can't hold a comment."
+        "This part of the preview can't hold a comment."
       )
     })
 

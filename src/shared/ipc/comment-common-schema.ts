@@ -201,7 +201,7 @@ export const CommentThreadViewSchema = z
     tag: z.string().max(TAG_MAX_CHARS),
     elementId: z.string().max(200).optional(),
     classes: z.array(z.string().max(100)).max(PREVIEW_LIMITS.COMMENT_MAX_CLASSES),
-    /** Found in the file now (else "Element not found"). */
+    /** Found in the file now (else "Not found"). */
     attached: z.boolean(),
     /** Found, but not rendered right now ("Not visible now", decision 30). */
     notVisible: z.boolean(),

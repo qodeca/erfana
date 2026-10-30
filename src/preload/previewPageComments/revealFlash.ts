@@ -4,7 +4,7 @@
  * Two small timers of the overlay (docs/designs/comments/html-preview-comments.md
  * §7.10, §10.8, §19 R3-4).
  *
- * - {@link RevealFlash}: "Show on page" highlights the element for
+ * - {@link RevealFlash}: "Show in preview" highlights the element for
  *   {@link REVEAL_FLASH_MS} – a static highlight, so reduced motion needs
  *   nothing – then asks for one more render to take it away.
  * - {@link HelloRepeater}: a frame list that does not match the page's frames

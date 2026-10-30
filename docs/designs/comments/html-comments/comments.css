@@ -549,7 +549,7 @@
   font-size: var(--text-base);
   color: var(--color-text-primary);
 }
-/* Under a 640px panel: the whole width. "Show on page" then closes it first. */
+/* Under a 640px panel: the whole width. "Show in preview" then closes it first. */
 .erf-comment-drawer--full { flex-basis: 100%; min-inline-size: 0; border-inline-start: 0; }
 
 .erf-comment-drawer__head { flex: 0 0 auto; display: flex; align-items: center; gap: var(--space-4);
@@ -604,7 +604,7 @@
 .erf-comment-list { list-style: none; margin: 0; padding: 0; }
 
 /* A row: a real button stretched behind the content (the Enter / click target,
-   "Show on page"), plus the Open button as the active row's second Tab stop –
+   "Show in preview"), plus the Open button as the active row's second Tab stop –
    the Welcome list's shape. On the html-comments screens the row is a Rows
    card row (.erf-row-list > .erf-row, row.css), which owns the ground, hover,
    the selected fill and lime edge, and the inline padding; this adds only the

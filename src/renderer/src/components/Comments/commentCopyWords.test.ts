@@ -189,8 +189,9 @@ describe('commentCopyWords', () => {
       ['read-only', 'index.html is read-only.'],
       ['not-owner', 'index.html is read-only.'],
       ['outside-project', "index.html is outside this project, so Erfana won't write to it."],
-      ['not-commentable', "This part of the page can't hold a comment."],
-      [undefined, "This part of the page can't hold a comment."]
+      // Changed expectation under 024-FR-006 § 4 (was "This part of the page can't hold a comment.").
+      ['not-commentable', "This part of the preview can't hold a comment."],
+      [undefined, "This part of the preview can't hold a comment."]
     ]
     for (const [reason, sentence] of MATRIX) expect(menuReasonText(reason, file), String(reason)).toBe(sentence)
   })
@@ -240,6 +241,23 @@ describe('commentCopyWords', () => {
     expect(HTML_WORDS.modeTooltip(false)).toBe(MARKDOWN_WORDS.modeTooltip(false))
     expect(HTML_WORDS.showInPreview).toBe(MARKDOWN_WORDS.showInPreview)
     expect(HTML_WORDS.notFoundTag).toBe(MARKDOWN_WORDS.notFoundTag)
+  })
+
+  it('024-AC-007 § 4: not found, delete damaged, not on screen, icons off and no target read the same in both previews', () => {
+    expect(HTML_WORDS.notFoundText('a.html', 4)).toBe(
+      "Erfana can't find what this comment was about any more. The comment stays in a.html, line 4."
+    )
+    expect(MARKDOWN_WORDS.notFoundText('a.html', 4)).toBe(HTML_WORDS.notFoundText('a.html', 4))
+    for (const words of [HTML_WORDS, MARKDOWN_WORDS]) {
+      expect(words.deleteBlock).toBe('Delete damaged comment')
+      expect(words.deleteBlockAction).toBe('Delete damaged comment…')
+      expect(words.deleteBlockText('a.html')).toBe(
+        'Delete this damaged comment? Erfana removes exactly the text shown above from a.html.'
+      )
+      expect(words.notOnScreen).toBe("This comment's target isn't on screen right now")
+      expect(words.pinsOff).toBe('Show comment icons – off: icons hidden in this preview')
+      expect(words.noTarget.reason).toBe("This part of the preview can't hold a comment.")
+    }
   })
 
   it('024-AC-007 A-05 A-06 A-08 A-10 C-16: the HTML Preview reads the table strings', () => {

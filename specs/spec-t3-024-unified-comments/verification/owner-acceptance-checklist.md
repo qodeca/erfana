@@ -17,7 +17,7 @@ Requirement: 024-FR-006 (acceptance 024-AC-007), with the definition-of-done ite
 | 1.5 | Toolbar: Comment mode toggle and the "7 comments" count, pressed look while on or open; no "Show comment icons" tool; the drawer has "Show comment icons and underlines" | ☐ | ☐ |
 | 1.6 | Empty drawer reads "No comments in this file yet. Select text and right-click, or turn on comment mode and click …" (A-08) | ☐ | ☐ |
 | 1.7 | The comment mark (fill and bar) looks the same, differs from your selection and from links | ☐ | ☐ |
-| 1.8 | Only the forced differences D-01 to D-33 differ – in particular: modal window in HTML, non-modal with edge tab in Markdown (D-01, D-02); selector labels in HTML (D-03); floating label only in HTML (D-05); ghost icon only in Markdown (D-12) | ☐ | ☐ |
+| 1.8 | Only the forced differences D-01 to D-35 differ – in particular: modal window in HTML, non-modal with edge tab in Markdown (D-01, D-02); selector labels in HTML (D-03); floating label only in HTML (D-05); ghost icon only in Markdown (D-12); the HTML comment-mode tab without a target name (D-34) | ☐ | ☐ |
 
 ## 2. Menus (menu matrix)
 

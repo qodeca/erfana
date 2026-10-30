@@ -233,7 +233,7 @@ export class PreviewCommentService implements CommentServiceApi {
     return { ok: true, files, ...(unread > 0 ? { unread } : {}), ...(unavailable === undefined ? {} : { unavailable }) }
   }
 
-  /** "Show on page" (`preview:commentCommand`): scroll the thread's pin into view in its frame. */
+  /** "Show in preview" (`preview:commentCommand`): scroll the thread's pin into view in its frame. */
   reveal(threadKey: string): CommentAck {
     const thread = this.keys.resolve(this.binding, threadKey, 'thread')
     if (!thread.ok) return { ok: false, code: ErrorCode.COMMENT_KEY_INVALID }

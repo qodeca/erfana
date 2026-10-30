@@ -250,8 +250,8 @@ export const COPY = {
   menuLabel: 'Element',
   deleteComment: 'Delete comment',
   deleteThread: 'Delete thread',
-  deleteBlock: 'Delete block',
-  deleteBlockAction: 'Delete block…',
+  deleteBlock: 'Delete damaged comment', // 024-FR-006 § 4: the Markdown words, in both
+  deleteBlockAction: 'Delete damaged comment…',
   copyRaw: 'Copy raw text',
   rawLabel: 'Raw text (read-only)',
   // Spec 024 state table S-07 and S-08: "comment", never "comment block" (the shared sentences).
@@ -313,14 +313,14 @@ export function deleteThreadText(replies: number): string {
   return `Delete this thread and its ${plural(replies, 'reply', 'replies')}?`
 }
 
-/** "Delete this damaged block? Erfana removes exactly the text shown above from {file}." */
+/** "Delete this damaged comment? Erfana removes exactly the text shown above from {file}." (both previews) */
 export function deleteBlockText(file: string): string {
-  return `Delete this damaged block? Erfana removes exactly the text shown above from ${file}.`
+  return `Delete this damaged comment? Erfana removes exactly the text shown above from ${file}.`
 }
 
-/** "Erfana can't find this element any more. The comment stays in {file}, line {n}." */
+/** Both previews; it names no target word, so no `{kind}` slot (differences table § 4). */
 export function notFoundText(file: string, line: number): string {
-  return `Erfana can't find this element any more. The comment stays in ${file}, line ${line}.`
+  return `Erfana can't find what this comment was about any more. The comment stays in ${file}, line ${line}.`
 }
 
 /** "Added by a script – saved before <{ancestor}>." */
@@ -394,7 +394,7 @@ export const DRAWER_COPY = {
   notFound: 'Not found', // A-10: one tag in both previews
   damaged: 'Damaged',
   resolved: 'Resolved',
-  notOnScreen: "This element isn't on screen right now"
+  notOnScreen: "This comment's target isn't on screen right now"
 } as const
 
 /** "Couldn't read comments from {file}." */
@@ -427,7 +427,7 @@ export const TOOL_COPY = {
   modeNotReady: 'Comment mode – available once the page has loaded',
   pins: 'Show comment icons',
   pinsOn: 'Show comment icons – on',
-  pinsOff: 'Show comment icons – off: icons hidden on this page'
+  pinsOff: 'Show comment icons – off: icons hidden in this preview'
 } as const
 
 /** The comment-mode toggle's tooltip in its two ordinary states (C-16, D-04): `clickTarget` is the `{kind}` with its article. */

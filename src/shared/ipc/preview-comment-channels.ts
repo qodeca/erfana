@@ -44,7 +44,7 @@ export const PreviewCommentChannels = {
   SET_MODE: 'preview:commentSetMode',
   /** Every comment of the page on screen and its same-project frames, read from disk. */
   LIST: 'preview:commentList',
-  /** A command for the page – today only "Show on page" (`reveal`). */
+  /** A command for the page – today only "Show in preview" (`reveal`). */
   COMMAND: 'preview:commentCommand',
   /** Add, reply, edit, resolve, re-open or delete – the only page-driven write (§7.6). */
   SAVE: 'preview:commentSave',
