@@ -119,6 +119,38 @@ describe('024-AC-038 review L-2 a delete removes one comment block and nothing e
     expect(insertBlanksFit(...removing(bang, 0, bang.length))).toBe(true)
   })
 
+  it('024-AC-038 code review M1 refused: blanks or a line break taken from mid-line, and an indent taken from the next line', () => {
+    // (a) The range starts at the blanks after "text": the line break would join "text" and the heading.
+    const mid = `text   ${BLOCK}\n# Heading\n`
+    expect(insertBlanksFit(...removing(mid, 4, mid.indexOf('#')))).toBe(false)
+    expect(insertBlanksFit(...removing(mid, mid.indexOf('<!--'), mid.indexOf('#')))).toBe(false)
+    // (b) The next line's indent goes with the block: an indented code block or nested item would change meaning.
+    const md = `${BLOCK}\n    code\n`
+    expect(insertBlanksFit(...removing(md, 0, md.indexOf('code')))).toBe(false)
+    // HTML gives back only the target's own indent, never more.
+    const page = `<main>\n    ${BLOCK}\n        <p>x</p>\n</main>\n`
+    expect(insertBlanksFit(...removing(page, page.indexOf('<!--'), page.indexOf('<p')))).toBe(false)
+    // A block alone in the middle of a line is still removable, with no blanks around it.
+    const inline = `<p>One ${BLOCK}<em>two</em></p>\n`
+    expect(insertBlanksFit(...removing(inline, inline.indexOf('<!--'), inline.indexOf('<em')))).toBe(true)
+  })
+
+  it('024-AC-038 security review M-1 an edit, reply or resolve replaces exactly one block, never more', () => {
+    const NEW = '<!-- erfana:comment v1 id=c-1 status=resolved -->'
+    const replacing = (text: string, from: number, to: number) =>
+      [encodeText(text), { byteStart: encodeText(text.slice(0, from)).length, byteEnd: encodeText(text.slice(0, to)).length, insert: encodeText(NEW) }] as const
+    const md = `Intro.\n\n${BLOCK}\nPara.\n`
+    const at = md.indexOf('<!--')
+    expect(insertBlanksFit(...replacing(md, at, at + BLOCK.length))).toBe(true)
+    // The whole file, the block and the next line, or page content: refused.
+    expect(insertBlanksFit(...replacing(md, 0, md.length))).toBe(false)
+    expect(insertBlanksFit(...replacing(md, at, md.length))).toBe(false)
+    expect(insertBlanksFit(...replacing(md, 0, 6))).toBe(false)
+    expect(insertBlanksFit(...replacing('<!-- prettier-ignore -->\n', 0, 24))).toBe(false)
+    // An add (an empty range) is not a replace.
+    expect(insertBlanksFit(...replacing(md, at, at))).toBe(true)
+  })
+
   it('024-AC-038 refused: a range that a "-->" or "--!>" inside would split into two nodes', () => {
     const split = `<!-- erfana:comment v1 id=c-1 --> <p>page</p> <!-- x -->`
     expect(insertBlanksFit(...removing(split, 0, split.length))).toBe(false)

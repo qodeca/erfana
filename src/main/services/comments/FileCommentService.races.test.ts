@@ -54,6 +54,17 @@ describe('L5: a list racing its cleanup records no panel and no watch', () => {
     expect((await h.listOk('notes.txt')).ok).toBe(true)
   })
 
+  it('024-AC-036 code review M2 a release keeps nothing once no list is confining: closed tabs leave no entry behind', async () => {
+    const opening = (h.service as unknown as { opening: Map<string, unknown> }).opening
+    for (let i = 0; i < 500; i++) h.service.release(h.caller(), `closed-${i}`)
+    expect(opening.size).toBe(0)
+    const listing = h.service.list(h.caller(), { panelId: PANEL, filePath: h.project.path('notes.txt') })
+    expect(opening.size).toBe(1)
+    h.service.release(h.caller(), PANEL)
+    expect(await listing).toEqual(NOT_OPEN)
+    expect(opening.size).toBe(0)
+  })
+
   it('another window closing does not refuse this window\'s list, and a later list of the closed window\'s id is served', async () => {
     const listing = h.service.list(h.caller(1), { panelId: PANEL, filePath: h.project.path('notes.txt') })
     h.service.forgetWindow(2)

@@ -83,13 +83,14 @@ const SMALL = { runs: RUNS, guardMs: RELOAD_GUARD_MS, openMs: PREVIEW_BUDGET_MS 
  * a main-process CPU profile shows Erfana's own JS idle through it (spec 024
  * F-002, 2026-10-30, docs/windows/known-flakes.md). F-002 asserts no time –
  * it records – so there the guards and the first open are long enough to let
- * every run finish; the runs and what they record are unchanged.
+ * every run finish – on any Windows host, as no time is asserted; the runs and
+ * what they record are unchanged.
  */
-const EMULATED_WINDOWS = process.platform === 'win32'
+const WINDOWS_HOST = process.platform === 'win32'
 const WIN_SMALL = { runs: RUNS, guardMs: 120_000, openMs: 120_000 }
 const WIN_LARGEST = { runs: 3, guardMs: 600_000, openMs: 600_000 }
-const small = EMULATED_WINDOWS ? WIN_SMALL : SMALL
-const largest = EMULATED_WINDOWS ? WIN_LARGEST : LARGEST
+const small = WINDOWS_HOST ? WIN_SMALL : SMALL
+const largest = WINDOWS_HOST ? WIN_LARGEST : LARGEST
 const SIZES = [
   { label: '0.5 MB', rel: 'comments/size-05.html', bytes: MB / 2, ...small },
   { label: '1 MB', rel: 'comments/size-1.html', bytes: MB, ...small },
@@ -309,7 +310,7 @@ test.describe('HTML Preview comments – performance records (P7)', () => {
     appWithTestProject
   }, testInfo) => {
     // The 25 MB page takes a minute or more per load on the emulated Windows box (LARGEST); the others under 3 s.
-    test.setTimeout(EMULATED_WINDOWS ? 5_400_000 : 1_800_000)
+    test.setTimeout(WINDOWS_HOST ? 5_400_000 : 1_800_000)
     const app = appWithTestProject
     const page = windowWithTestProject
     const preview = new HtmlPreviewPage(page, app)

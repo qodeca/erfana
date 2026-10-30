@@ -23,7 +23,10 @@
  *   blanks between the line's start and the splice point – the target's own
  *   indent, given back to it.
  * - **A delete** (an empty insert, review L-2): the bytes removed are one
- *   `erfana:comment` block and its own blanks and line break, nothing else.
+ *   `erfana:comment` block and its own blanks and line break, nothing else –
+ *   blanks and the break only when the block has its own line (code review M1).
+ * - **A replace** (an edit, reply, resolve or rebuild, security review M-1):
+ *   the bytes replaced are exactly one `erfana:comment` block.
  *
  * Blanks are ASCII, so the read bytes are scanned as bytes; a UTF-8 BOM at the
  * file's start counts as part of the line start.
@@ -88,7 +91,29 @@ function leadFits(lead: string, line: string): boolean {
  */
 export function insertBlanksFit(read: Uint8Array, splice: ByteSplice): boolean {
   if (splice.insert.length === 0) return removesOneBlock(read, splice)
+  // An edit, reply, resolve or rebuild replaces one block's bytes and nothing else (security review M-1).
+  if (splice.byteEnd > splice.byteStart && !replacesOneBlock(read, splice)) return false
   return insertFits(read, splice)
+}
+
+/** `read[byteStart, byteEnd)` as strict UTF-8, or `undefined` when it is not. */
+function rangeText(read: Uint8Array, splice: ByteSplice): string | undefined {
+  try {
+    return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(read.subarray(splice.byteStart, splice.byteEnd))
+  } catch {
+    return undefined
+  }
+}
+
+/** Whether `text` is one HTML comment node whose text starts with the `erfana:comment` header. */
+function isOneBlock(text: string): boolean {
+  return isOneCommentNode(text) && BLOCK_HEADER.test(text.slice(4))
+}
+
+/** A replace (a non-empty insert over a range): the bytes replaced are exactly one block, with no blanks around it. */
+function replacesOneBlock(read: Uint8Array, splice: ByteSplice): boolean {
+  const replaced = rangeText(read, splice)
+  return replaced !== undefined && isOneBlock(replaced)
 }
 
 /** Blanks before a removed block: its line-start indent (spaces, or a hand-written tab). */
@@ -114,14 +139,19 @@ function isOneCommentNode(block: string): boolean {
 
 function removesOneBlock(read: Uint8Array, splice: ByteSplice): boolean {
   if (splice.byteEnd <= splice.byteStart) return false
-  let removed: string
-  try {
-    removed = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(read.subarray(splice.byteStart, splice.byteEnd))
-  } catch {
-    return false
-  }
-  const block = removed.replace(REMOVED_LEAD, '').replace(REMOVED_TAIL, '')
-  return isOneCommentNode(block) && BLOCK_HEADER.test(block.slice(4))
+  const removed = rangeText(read, splice)
+  if (removed === undefined) return false
+  const lead = REMOVED_LEAD.exec(removed)?.[0] ?? ''
+  const tail = REMOVED_TAIL.exec(removed)?.[0]
+  const tailBlanks = tail === undefined ? '' : tail.replace(/^(?:\r\n|\r|\n)/, '')
+  const lineStart = lineStartOf(read, splice.byteStart)
+  const before = latin1(read, lineStart, splice.byteStart)
+  // Blanks before the block, or its line break, go only from a line start – or, the HTML own-lines shape, after
+  // nothing but the target's indent; the blanks after the break are then exactly that indent (code review M1).
+  const ownLine = lineStart === splice.byteStart || (lead === '' && /^[ \t]+$/.test(before))
+  if ((lead !== '' || tail !== undefined) && !ownLine) return false
+  if (tailBlanks !== '' && tailBlanks !== before) return false
+  return isOneBlock(removed.replace(REMOVED_LEAD, '').replace(REMOVED_TAIL, ''))
 }
 
 /** The blanks of a non-empty insert (module comment). */
