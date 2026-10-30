@@ -7,7 +7,7 @@
  * sent with the thread, opens on the stored words, and Save sends `sel` only
  * when the range moved – the words chosen, or `null` for the whole target.
  */
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CommentFileView, CommentSaveResult, CommentThreadView } from '../../../../shared/ipc/preview-comment-schema'
@@ -139,7 +139,10 @@ describe('024-AC-004 C-07 Narrow to words on Edit of the first message', () => {
     await narrow(user, 20, 33)
     await user.click(screen.getByTestId(TEST_IDS.COMMENT_EDIT_SAVE))
     expect(await screen.findByTestId(TEST_IDS.COMMENT_SAVE_ERROR)).toHaveTextContent(SELECTION_COPY.wordsNotInFile('element', 'index.html'))
-    expect(screen.getByTestId(TEST_IDS.COMMENT_WINDOW_POLITE)).toHaveTextContent(SELECTION_COPY.wordsNotInFile('element', 'index.html'))
+    // useLiveText empties the region, then sets the sentence a frame later: wait for it.
+    await waitFor(() =>
+      expect(screen.getByTestId(TEST_IDS.COMMENT_WINDOW_POLITE)).toHaveTextContent(SELECTION_COPY.wordsNotInFile('element', 'index.html'))
+    )
   })
 
   it('024-AC-005 C-07 C-03 in Markdown the field is labelled with the target\'s noun from its place', async () => {
