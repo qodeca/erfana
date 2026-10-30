@@ -105,7 +105,9 @@ export const CommentRefusalReasonSchema = z.enum([
   /** The thread already holds `COMMENT_MAX_REPLIES` replies (C-19). */
   'replies',
   /** The write would make the file larger than `COMMENT_FILE_MAX_BYTES` (C-19). */
-  'file-size'
+  'file-size',
+  /** The picked part of an HTML page cannot hold a comment: `html`, `head`, template content (menu matrix M-08). */
+  'not-commentable'
 ])
 export type CommentRefusalReason = z.infer<typeof CommentRefusalReasonSchema>
 

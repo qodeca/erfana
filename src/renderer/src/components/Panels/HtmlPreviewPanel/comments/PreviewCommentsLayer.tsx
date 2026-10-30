@@ -11,9 +11,10 @@
  * of the menu matrix (spec 024 `design/menu-matrix.md`, shared with the
  * Markdown Preview through `hostMenu.ts`): "Add comment" in comment mode
  * (M-03), "Comment on element" outside it (M-01, OD-01), and on a selection
- * "Comment on selection" then "Comment on the whole element" (M-02, M-04). A
- * disabled "Can't comment here" when main minted no draft. The window is
- * {@link CommentWindow}.
+ * "Comment on selection" then "Comment on the whole element" (M-02, M-04).
+ * When main minted no draft, or comments are unavailable for the page, the
+ * same items stay – disabled, each with its reason line (M-05, M-06, M-08,
+ * M-10; C-19). The window is {@link CommentWindow}.
  *
  * The live regions are mounted for the tab's whole life and empty until they
  * speak: a region created together with its text is not announced. Polite:
@@ -23,7 +24,7 @@
  */
 import { useRef } from 'react'
 import type { AnchorSelection } from '../../../../../../shared/comments/anchorSel'
-import { HTML_WORDS } from '../../../Comments/commentCopyWords'
+import { HTML_WORDS, menuReasonText } from '../../../Comments/commentCopyWords'
 import { hostMenuItems, hostMenuLabel } from '../../../Comments/overlay/hostMenu'
 import type { ContextMenuItem } from '../../../ContextMenu/ContextMenu'
 import type { DraftScope } from './previewCommentRequests'
@@ -31,12 +32,13 @@ import { TEST_IDS } from '../../../../constants/testids'
 import { renderIcon } from '../../../../utils/iconRegistry'
 import type {
   CommentSaveRequest,
-  CommentSaveResult
+  CommentSaveResult,
+  CommentUnavailableReason
 } from '../../../../../../shared/ipc/preview-comment-schema'
 import type { CommentIdentitySettings } from '../../../../../../shared/ipc/global-settings-schema'
 import type { CommentListState } from '../../../../stores/usePreviewCommentStore'
 import { ContextMenu } from '../../../ContextMenu/ContextMenu'
-import { COPY } from '../../../Comments/commentCopy'
+import { unavailableTooltip } from '../../../Comments/commentCopy'
 import type { Box } from '../../../Comments/commentPlacement'
 import type { IdentityFormData } from '../../../Comments/commentSchemas'
 import { CommentWindow } from '../../../Comments/CommentWindow'
@@ -50,6 +52,8 @@ export interface PreviewCommentsLayerProps {
   readonly menu: ElementDraft | null
   /** Comment mode is on: the menu without a selection says "Add comment", else "Comment on element" (default on). */
   readonly mode?: boolean
+  /** Why comments are unavailable for the page (M-10): every item is disabled with that sentence. */
+  readonly unavailable?: CommentUnavailableReason | null
   readonly request: CommentWindowRequest | null
   readonly list: CommentListState
   readonly identity: CommentIdentitySettings | null
@@ -96,30 +100,34 @@ export function PreviewCommentsLayer(props: PreviewCommentsLayerProps): React.JS
     chosen.current = false
   }
   const selection = menu?.selection === true
-  // The matrix gives labels and order; each item's action is set here, where the ref is written only on click.
-  const items: ContextMenuItem[] = canComment
-    ? hostMenuItems(
-        { mode: props.mode ?? true, tag: menu.target?.tag ?? '', blocked: null, refused: null, words: HTML_WORDS, selection },
-        { open: NO_ACTION, openWords: NO_ACTION }
-      ).map(item => ({
-        ...item,
-        icon: renderIcon('message-square-plus', { size: 16, 'aria-hidden': true }),
-        action: () => {
-          chosen.current = true
-          if (item.testId === TEST_IDS.COMMENT_MENU_SELECTION) props.onAddComment(menu, 'words')
-          else props.onAddComment(menu)
-        }
-      }))
-    : [
-        {
-          label: COPY.cantCommentHere,
-          disabled: true,
-          testId: 'comment-menu-disabled',
-          // ContextMenu never runs a disabled item; were it to, closing
-          // the menu is the only thing this item could mean.
-          action: closeMenu
-        }
-      ]
+  // M-10 first – nothing could be read, so nothing else is known – then main's refusal for this pick (M-05, M-06, M-08).
+  const unavailable = props.unavailable ?? null
+  const blocked =
+    menu === null
+      ? null
+      : unavailable !== null
+        ? unavailableTooltip(unavailable)
+        : canComment
+          ? null
+          : menuReasonText(menu.reason, menu.displayPath)
+  // The matrix gives labels and order, and keeps each item, disabled with its reason line, when it cannot be used.
+  // Each action is set here, where the ref is written only on click; ContextMenu never runs a disabled item.
+  const items: ContextMenuItem[] =
+    menu === null
+      ? []
+      : hostMenuItems(
+          { mode: props.mode ?? true, tag: menu.target?.tag ?? '', blocked, refused: null, words: HTML_WORDS, selection },
+          { open: NO_ACTION, openWords: NO_ACTION }
+        ).map(item => ({
+          ...item,
+          icon: renderIcon('message-square-plus', { size: 16, 'aria-hidden': true }),
+          action: () => {
+            if (blocked !== null) return
+            chosen.current = true
+            if (item.testId === TEST_IDS.COMMENT_MENU_SELECTION) props.onAddComment(menu, 'words')
+            else props.onAddComment(menu)
+          }
+        }))
   return (
     <>
       <div

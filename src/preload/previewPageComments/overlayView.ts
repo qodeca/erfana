@@ -9,7 +9,7 @@
  * - one speech-bubble pin per commented element (`pins.ts`);
  * - transparent click-shields over iframes that are not commentable inside;
  * - in the top frame in comment mode, the 2 px mode frame and the
- *   "Comment mode – Esc to leave" tab, which moves to the bottom edge while
+ *   "Comment mode · Esc to leave" tab, which moves to the bottom edge while
  *   the pointer is near the top;
  * - the reveal flash (a static highlight, so reduced motion needs nothing);
  * - comment marks over the words comments are about (spec 024 C-12), which
@@ -86,8 +86,13 @@ export interface ViewModel {
 /** The Comment button's label (comments-v2 C-16; `SELECTION_COPY.button`). */
 export const COMMENT_BUTTON_TEXT = 'Comment'
 
-/** The text of the mode tab (§10.10). */
-export const MODE_TAB_TEXT = 'Comment mode – Esc to leave'
+/**
+ * The text of the mode tab (§10.10). Differences table A-03: both previews
+ * read "Comment mode · Esc to leave" before a target is outlined; the HTML
+ * Preview names its target in the floating label instead (D-05), so its tab
+ * keeps this text.
+ */
+export const MODE_TAB_TEXT = 'Comment mode · Esc to leave'
 
 /** Gap between an element and its label. */
 const LABEL_GAP_PX = 2

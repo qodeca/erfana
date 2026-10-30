@@ -9,7 +9,8 @@
  * while the top frame paints the selected outline twice over; then the fresh
  * still is captured and the renderer told – the menu's point, the file it
  * would be saved into, and a single-use draft token with its element key, or
- * no token (the menu's disabled "Can't comment here"). For a pin: the threads
+ * no token and the refusal reason (the menu's items, disabled, each with its
+ * reason line – spec 024 menu matrix M-05, M-06, M-08, C-19). For a pin: the threads
  * and blocks standing on it, as keys, and a draft token for the window's "New
  * comment" on the same element – the blocks and the draft from ONE read and
  * one worker job (M4). The draft itself – real path, offset, hash, anchor –
@@ -31,7 +32,7 @@ import type { PreviewBounds } from '../../../../shared/ipc/preview-types'
 import type { HtmlFileJobRunner } from './htmlCommentJobs'
 import type { CommentBinding, CommentKeyStore } from '../../comments/commentKeyStore'
 import type { CommentFrameLike, FrameRecord } from './commentFrames'
-import { buildDraft, buildPin, draftKeyOf, type BuiltDraft, type BuiltPin, type CommentDraft } from './commentDraftBuilder'
+import { NOT_COMMENTABLE, buildDraft, buildPin, draftKeyOf, type BuiltDraft, type BuiltPin, type CommentDraft } from './commentDraftBuilder'
 import { menuPoint } from './commentMenuPoint'
 import type { PinGroup } from './commentPins'
 import { captureFreshStill, waitForPaint, type FreshStillDeps, type PickFramePlace } from './commentStillCapture'
@@ -164,7 +165,7 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
     const painted = paintAndCapture(place, pick)
     const built =
       entry === undefined
-        ? ({ ok: false } as const)
+        ? NOT_COMMENTABLE
         : await buildDraft({
             realRoot: deps.realRoot,
             file,
@@ -184,6 +185,8 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
       point: pointOf(pick, offset),
       ...display(file, frame),
       ...minted(built),
+      // C-19: a menu with no draft names why, so its items stay, disabled, with their reason line.
+      ...(built.ok ? {} : { reason: built.reason }),
       ...wordsOf(built, pick)
     })
   }
@@ -223,7 +226,7 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
    */
   function pinOf(frame: CommentFrameLike, file: FrameFile, entry: ElementTokenEntry | undefined, pin: PinGroup, pick: CommentPick, stacked: readonly ElementTokenEntry[]): Promise<BuiltPin> {
     const lead = entry ?? stacked[0]
-    if (lead === undefined) return Promise.resolve({ draft: { ok: false }, blocks: [] })
+    if (lead === undefined) return Promise.resolve({ draft: NOT_COMMENTABLE, blocks: [] })
     const onPin = entry === undefined ? undefined : pinPickOf(pin, pick)
     return buildPin({
       realRoot: deps.realRoot,

@@ -556,12 +556,18 @@ describe('CommentWindow – threads', () => {
       expect(screen.getByTestId('comment-delete-block')).toBeVisible()
     })
 
-    it('uses the conflict wording and offers no delete for conflict markers', () => {
-      setup({
+    it('S-08 uses the conflict wording for conflict markers, and offers Delete only while the file is writable', () => {
+      const { unmount } = setup({
         request: damagedRequest,
         list: ready([fileView({ damaged: [damaged(1, { reason: 'conflict-marker' })] })])
       })
       expect(screen.getByText(COPY.conflictText)).toBeVisible()
+      expect(screen.getByTestId('comment-delete-block')).toBeVisible()
+      unmount()
+      setup({
+        request: damagedRequest,
+        list: ready([fileView({ writable: false, damaged: [damaged(1, { reason: 'conflict-marker' })] })])
+      })
       expect(screen.queryByTestId('comment-delete-block')).toBeNull()
     })
 

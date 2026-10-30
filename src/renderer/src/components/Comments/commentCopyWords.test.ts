@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest'
 import { ErrorCode } from '../../../../shared/errors'
 import { COPY, DRAWER_COPY, saveFailureCopy } from './commentCopy'
 import {
+  HTML_MENU_COPY,
   HTML_WORDS,
   MARKDOWN_COPY,
   MARKDOWN_FILE_LIMIT_TEXT,
@@ -17,7 +18,8 @@ import {
   capitalise,
   markdownKindNoun,
   markdownReadOnlyReasonText,
-  markdownSaveFailureCopy
+  markdownSaveFailureCopy,
+  menuReasonText
 } from './commentCopyWords'
 
 /** Every tag main indexes in a Markdown file (`mdIndex.ts`), plus a raw-HTML section. */
@@ -173,6 +175,36 @@ describe('commentCopyWords', () => {
     )
     expect(markdownReadOnlyReasonText('too-many-blocks', FILE)).toBe(MARKDOWN_COPY.tooMany(FILE))
     expect(markdownReadOnlyReasonText('encoding', FILE)).toBe('Erfana can only add comments to UTF-8 files.')
+  })
+
+  it('C-19 M-05 M-06 M-08 M-10 each menu reason line is menu matrix § 3\'s sentence, word for word', () => {
+    const file = 'index.html'
+    const MATRIX: ReadonlyArray<[string | undefined, string]> = [
+      ['conflict-markers', 'index.html has unresolved git conflicts. Resolve them first.'],
+      ['unterminated-block', "A comment in index.html has no end, so Erfana won't add comments. Fix it in the source."],
+      ['too-many-blocks', 'index.html already has 500 comments, the most Erfana adds to one file. Delete resolved threads to add more.'],
+      ['too-large', 'Erfana adds comments only to files of up to 25 MB and 640,000 elements.'],
+      ['encoding', 'Erfana can only add comments to UTF-8 files.'],
+      ['link', "index.html is a link to another file, so Erfana won't write to it."],
+      ['read-only', 'index.html is read-only.'],
+      ['not-owner', 'index.html is read-only.'],
+      ['outside-project', "index.html is outside this project, so Erfana won't write to it."],
+      ['not-commentable', "This part of the page can't hold a comment."],
+      [undefined, "This part of the page can't hold a comment."]
+    ]
+    for (const [reason, sentence] of MATRIX) expect(menuReasonText(reason, file), String(reason)).toBe(sentence)
+  })
+
+  it('C-19 a reason the matrix has no row for still names a cause and a next step, never a bare refusal', () => {
+    expect(menuReasonText('target-moved', 'index.html')).toBe(HTML_MENU_COPY.moved('index.html'))
+    expect(menuReasonText('busy', 'index.html')).toBe(HTML_MENU_COPY.busy)
+    expect(menuReasonText('missing', 'index.html')).toBe('index.html no longer exists.')
+    for (const later of ['excluded', 'a-reason-from-a-later-main']) expect(menuReasonText(later, 'index.html')).toBe(HTML_MENU_COPY.refused)
+    for (const text of Object.values(HTML_MENU_COPY)) {
+      const sentence = typeof text === 'function' ? text('index.html') : text
+      expect(sentence).toMatch(/\.$/)
+      expect(sentence).not.toMatch(/comment block/)
+    }
   })
 
   it('keeps the HTML words exactly as the HTML Preview showed them', () => {

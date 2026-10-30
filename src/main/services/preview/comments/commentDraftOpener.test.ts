@@ -146,22 +146,48 @@ describe('commentDraftOpener', () => {
     for (const event of s.emitted) expect(JSON.stringify({ ...event, filePath: undefined })).not.toContain(root)
   })
 
-  it('an element with no tokened ancestor opens "can\'t comment here" – no token, no code', async () => {
+  it('M-08 an element with no tokened ancestor opens its menu with no token, no code, and the reason "not-commentable"', async () => {
     const s = await setup(commentedPage().text)
     await s.opener.element(s.top, s.record, undefined, pick({ kind: 'open', via: 'keyboard', point: { x: 1, y: 2 } }))
-    expect(s.emitted[0]).toMatchObject({ kind: 'open', point: { x: 1, y: 2 } })
+    expect(s.emitted[0]).toMatchObject({ kind: 'open', point: { x: 1, y: 2 }, reason: 'not-commentable' })
     expect(s.emitted[0]).not.toHaveProperty('draftToken')
     expect(s.emitted[0]).not.toHaveProperty('code')
+    expect(CommentDraftOpenedSchema.safeParse(s.emitted[0]).success).toBe(true)
   })
 
-  it('M-033 the file changed since the page loaded: no draft is minted, and the menu opens with none to offer', async () => {
+  it('M-033 the file changed since the page loaded: no draft is minted, and the menu opens with none to offer and says why', async () => {
     const s = await setup(commentedPage().text)
     await writeFile(s.path, `${commentedPage().text}\n<!-- edited -->`)
     const token = tokenOfTag(s.load.doc, 'p')
     await s.opener.element(s.top, s.record, s.tokens.lookup(s.record.loadId!, token), pick({ token, tag: 'p' }))
-    expect(s.emitted[0]).toMatchObject({ kind: 'menu', fileKey: expect.stringMatching(/^f/) })
+    expect(s.emitted[0]).toMatchObject({ kind: 'menu', fileKey: expect.stringMatching(/^f/), reason: 'target-moved' })
     for (const absent of ['draftToken', 'draftKey', 'target', 'code']) expect(s.emitted[0]).not.toHaveProperty(absent)
     expect(s.keys.size.drafts).toBe(0)
+  })
+
+  describe('a read-only file: the menu names the same refusal a save would meet (C-19)', () => {
+    // A complete hunk, its markers at the start of their lines.
+    const CONFLICT = '\n<<<<<<< HEAD\na\n=======\nb\n>>>>>>> x\n'
+
+    it('M-05 a right-click outside comment mode on a file with git conflicts mints no draft and sends "conflict-markers"', async () => {
+      const s = await setup(insertBefore(commentedPage().text, '<p id="para"', CONFLICT))
+      const token = tokenOfTag(s.load.doc, 'p')
+      await s.opener.element(s.top, s.record, s.tokens.lookup(s.record.loadId!, token), pick({ kind: 'context', token, tag: 'p', screen: { x: 1, y: 2 } }))
+      expect(s.emitted[0]).toMatchObject({ kind: 'menu', reason: 'conflict-markers' })
+      expect(s.emitted[0]).not.toHaveProperty('draftToken')
+      expect(CommentDraftOpenedSchema.safeParse(s.emitted[0]).success).toBe(true)
+      expect(s.keys.size.drafts).toBe(0)
+    })
+
+    it('M-06 on selected words the selection menu keeps its selection flag, with no draft and the reason', async () => {
+      const s = await setup(insertBefore(commentedPage().text, '<p id="para"', CONFLICT))
+      const token = tokenOfTag(s.load.doc, 'p')
+      const sel = { exact: 'x', prefix: '', suffix: '' }
+      await s.opener.element(s.top, s.record, s.tokens.lookup(s.record.loadId!, token), pick({ kind: 'context', token, tag: 'p', sel, screen: { x: 1, y: 2 } }))
+      expect(s.emitted[0]).toMatchObject({ kind: 'menu', selection: true, reason: 'conflict-markers' })
+      for (const absent of ['draftToken', 'words', 'wordsMissing']) expect(s.emitted[0]).not.toHaveProperty(absent)
+      expect(CommentDraftOpenedSchema.safeParse(s.emitted[0]).success).toBe(true)
+    })
   })
 
   it('a pin opens its open threads and the damaged blocks on the same element, as keys', async () => {

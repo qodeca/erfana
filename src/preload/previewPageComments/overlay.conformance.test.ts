@@ -169,8 +169,8 @@ function driverOn(h: Harness): OverlayDriver {
     host: 'HTML Preview (page preload)',
     floatingLabel: true,
     labels: HTML_LABELS,
-    // A-03: the v0.23.1 tab, pinned until the feat: commit that aligns it.
-    modeIndicatorIdle: 'Comment mode – Esc to leave',
+    // A-03: the decided tab, the same words as the Markdown Preview's before a target is outlined.
+    modeIndicatorIdle: 'Comment mode · Esc to leave',
     rightClickOutsideMode: 'page',
     notOwned: {
       menu: 'the element menu is main’s native menu; the page is hidden behind a still frame while it is open and gets no key',

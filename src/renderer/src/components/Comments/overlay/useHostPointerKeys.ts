@@ -13,11 +13,15 @@
  * - **In comment mode** the pointer outlines the target under it and a
  *   click picks it (`overlayCore/gesture`: a drag of 4 px or more, or a
  *   selection, selects words instead – 024-FR-004); the click never reaches
- *   a link. The picker keys move real focus between
+ *   a link, and the rest of the click family never reaches the preview's
+ *   content (`contentGuard.ts`). A pointer pick paints the target picked as
+ *   a key does – real focus and the Focus card's ring (D-06) – without
+ *   saying it. The picker keys move real focus between
  *   targets: the picked one takes `tabindex="-1"` and the Focus card's ring
  *   (C-08.3). It keeps the attribute while it is the pick – so the menu and
  *   the window hand focus back to it on close – and loses it when another
- *   target is picked or the mode ends.
+ *   target is picked or the mode ends. A picker key's release is kept from
+ *   the preview with its press (Esc's keyup too, OVL-E-01).
  * - **The menu** opens on a right-click on a target or a selection, or from
  *   Shift+F10 / the Menu key: at the picked target (in comment mode), at the
  *   selection's last line (outside it, C-08.5), else at the first target in
@@ -38,6 +42,7 @@ import { useLatestRef } from '../../../hooks/useLatestRef'
 import { isMacOS } from '../../../utils/platform'
 import { MARKDOWN_COPY, MD_SPOKEN_COPY } from '../commentCopyWords'
 import { clearPickTabIndex, setPickTabIndex } from './commentContentAttrs'
+import { guardContent } from './contentGuard'
 import { firstTargetInView, movePicker, pickerStepOf } from './pickerKeys'
 import type { PreviewCommentAdapter } from './previewAdapter'
 
@@ -87,6 +92,9 @@ export interface HostPointerKeys {
 /** Keyboard steps after the mode turns on that add the keys to what they say (C-10 "the first three steps"). */
 const HINTED_STEPS = 3
 
+/** One key across its press and release (the physical key; `key` where the engine gives no `code`). */
+const keyOf = (event: KeyboardEvent): string => (event.code === '' ? event.key : event.code)
+
 /** Whether the document holds a non-empty selection. */
 function hasSelection(): boolean {
   const selection = window.getSelection()
@@ -116,23 +124,32 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
   // Keyboard steps since the mode turned on: the first ones add the keys (C-10).
   const steps = useRef(0)
 
-  /** Give `target` real focus and the ring (C-08.3), and say it (C-10). */
-  const focusTarget = useCallback(
-    (target: HTMLElement, lead = false) => {
+  /** Make `target` the pick: real focus and the ring (C-08.3, D-06). */
+  const paintPicked = useCallback(
+    (target: HTMLElement) => {
       if (marked.current !== target) {
         unmark()
         // Marked, so exports and copies strip it (024-FR-024, `commentContentAttrs.ts`).
         if (setPickTabIndex(target)) marked.current = target
       }
-      target.focus({ preventScroll: true })
-      target.scrollIntoView({ block: 'nearest' })
+      // `focusVisible`: a pick by pointer wears the ring too – after a click the browser would not draw it (D-06).
+      target.focus({ preventScroll: true, focusVisible: true })
       setPicked(target)
+    },
+    [unmark]
+  )
+
+  /** Give `target` real focus and the ring (C-08.3), bring it into view, and say it (C-10). */
+  const focusTarget = useCallback(
+    (target: HTMLElement, lead = false) => {
+      paintPicked(target)
+      target.scrollIntoView({ block: 'nearest' })
       const spoken = latest.current.speak(target)
       const hint = steps.current < HINTED_STEPS ? MD_SPOKEN_COPY.hint : ''
       steps.current += 1
       latest.current.onSay(lead ? MD_SPOKEN_COPY.modeOnAt(spoken) + hint : spoken + hint)
     },
-    [latest, unmark]
+    [latest, paintPicked]
   )
 
   // Leaving the mode or the view (or unmounting) takes the attribute off the content again.
@@ -146,6 +163,8 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
   // C-08.2: the block holding the selection's anchor, else the first block in view.
   const focusFirst = useCallback(
     (lead = false) => {
+      // Asked a frame after the mode turned on: a pick, a menu or a window that came first keeps the focus.
+      if (pickedRef.current?.isConnected === true || latest.current.windowOpen) return
       const anchor = hasSelection() ? (window.getSelection()?.anchorNode ?? null) : null
       const held = anchor !== null && latest.current.scroller?.contains(anchor) ? adapter.targetAt(anchor) : null
       const first =
@@ -154,7 +173,7 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
           : firstTargetInView(adapter, latest.current.scroller?.getBoundingClientRect() ?? null)
       if (first !== null) focusTarget(first, lead)
     },
-    [adapter, focusTarget, latest]
+    [adapter, focusTarget, latest, pickedRef]
   )
 
   // Leaving the mode or the view drops the outline and the pick.
@@ -192,8 +211,11 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
 
   // ---- pointer, keys and scroll on the scroller ----
   const down = useRef<GesturePoint | null>(null)
+  // Keys whose press the picker took: their release is taken too (OVL-E-01).
+  const swallowedRef = useRef(new Set<string>())
   useEffect(() => {
     if (!live || scroller === null) return undefined
+    const swallowedKeys = swallowedRef.current
     const targetOf = (event: Event): HTMLElement | null => latest.current.adapter.targetAt(event.target as Node | null)
     const onScroll = (): void => latest.current.onScroll()
     const onMove = (event: MouseEvent): void => {
@@ -220,7 +242,11 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
       event.stopPropagation()
       const target = targetOf(event)
       if (mark !== null) latest.current.onOpenMark(mark, target)
-      else if (gesture === 'pick' && target !== null) latest.current.onPick(target, false)
+      else if (gesture === 'pick' && target !== null) {
+        // OVL-G-01 / D-06: a pointer pick is painted as the pick before the window opens (and hands focus back to it).
+        paintPicked(target)
+        latest.current.onPick(target, false)
+      }
     }
     const onContextMenu = (event: MouseEvent): void => {
       const target = targetOf(event)
@@ -231,6 +257,8 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
     }
     const onKeyDown = (event: KeyboardEvent): void => {
       const step = pickerStepOf(event)
+      // A press the preview keeps: a release left over from a swallowed one (focus moved before it came) is its own now.
+      if (step === null || !latest.current.mode) swallowedKeys.delete(keyOf(event))
       if (step === null) return
       const { mode: on, adapter: current } = latest.current
       if (!on) {
@@ -250,6 +278,7 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
       }
       event.preventDefault()
       event.stopPropagation()
+      swallowedKeys.add(keyOf(event))
       const at = pickedRef.current
       if (step === 'exit') latest.current.onExit()
       else if (step === 'open') {
@@ -266,6 +295,15 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
         else if (at !== null) latest.current.onSay(step === 'next' ? MD_SPOKEN_COPY.last : MD_SPOKEN_COPY.first)
       }
     }
+    // OVL-E-01: the release of a key whose press was the picker's never reaches the preview either.
+    const onKeyUp = (event: KeyboardEvent): void => {
+      if (swallowedKeys.delete(keyOf(event))) {
+        event.preventDefault()
+        event.stopPropagation()
+      }
+    }
+    const content = adapter.root?.() ?? null
+    const unguard = guardContent(content !== null && scroller.contains(content) ? content : scroller, () => latest.current.mode)
     scroller.addEventListener('scroll', onScroll, { passive: true })
     scroller.addEventListener('mousemove', onMove)
     scroller.addEventListener('mouseleave', onLeave)
@@ -273,7 +311,10 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
     scroller.addEventListener('click', onClick, true)
     scroller.addEventListener('contextmenu', onContextMenu, true)
     scroller.addEventListener('keydown', onKeyDown)
+    scroller.addEventListener('keyup', onKeyUp)
     return () => {
+      unguard()
+      swallowedKeys.clear()
       scroller.removeEventListener('scroll', onScroll)
       scroller.removeEventListener('mousemove', onMove)
       scroller.removeEventListener('mouseleave', onLeave)
@@ -281,8 +322,9 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
       scroller.removeEventListener('click', onClick, true)
       scroller.removeEventListener('contextmenu', onContextMenu, true)
       scroller.removeEventListener('keydown', onKeyDown)
+      scroller.removeEventListener('keyup', onKeyUp)
     }
-  }, [live, scroller, latest, pickedRef, focusTarget])
+  }, [live, scroller, adapter, latest, pickedRef, focusTarget, paintPicked])
 
   const outlined = picked !== null && picked.isConnected ? picked : hover
   return { outlined, focusFirst }

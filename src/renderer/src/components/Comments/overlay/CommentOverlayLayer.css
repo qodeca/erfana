@@ -89,7 +89,8 @@
 
 /* The picked target holds real focus and wears the one ring (C-08.3). The
    attribute goes when the pick moves or the mode ends; a pick by keyboard is
-   focused from a key press, so :focus-visible matches it. */
+   focused from a key press, so :focus-visible matches it; a pick by pointer
+   is focused with `focusVisible: true` (useHostPointerKeys.ts, D-06). */
 .markdown-preview-content [data-line-start][tabindex='-1']:focus-visible {
   outline: var(--border-width-thick) solid var(--color-border-focus);
   outline-offset: var(--space-1);

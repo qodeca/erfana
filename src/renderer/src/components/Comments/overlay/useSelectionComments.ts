@@ -139,13 +139,14 @@ export function useSelectionComments(options: SelectionCommentsOptions): Selecti
     const onKey = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') hide()
     }
-    scroller.addEventListener('mouseup', onUp)
+    // Capture: in comment mode the content guard keeps a release from the preview's content (`contentGuard.ts`).
+    scroller.addEventListener('mouseup', onUp, true)
     scroller.addEventListener('scroll', hide, { passive: true })
     scroller.addEventListener('keydown', onKey)
     document.addEventListener('selectionchange', onSelectionChange)
     return () => {
       clearTimeout(timer)
-      scroller.removeEventListener('mouseup', onUp)
+      scroller.removeEventListener('mouseup', onUp, true)
       scroller.removeEventListener('scroll', hide)
       scroller.removeEventListener('keydown', onKey)
       document.removeEventListener('selectionchange', onSelectionChange)

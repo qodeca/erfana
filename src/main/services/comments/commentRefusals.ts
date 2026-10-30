@@ -25,7 +25,7 @@
  * | `COMMENT_WRITE_UNSUPPORTED_FS` | the drive cannot rename or fsync (network and FUSE mounts) |
  * | `COMMENT_WRITE_FAILED` | anything else, including a file that kept changing during the save, a held file, a splice that failed its verification (fail closed), a parse the comment parse worker could not run (`busy`, `parse-failed`), a file that differed when read again after the rename (`changed-during-save`, C12), and a `file-comment:*` request from an untrusted sender or with a bad payload |
  * | `COMMENT_RENDER_CHANGED` | no slot the file kind offered kept the file's rendering (spec 024 § 5, C25) |
- * | `COMMENT_TARGET_MOVED` (also) | the target lies in a generated START/END region (`generated-region`, 024-FR-023) or in the frontmatter (`frontmatter`, M6) |
+ * | `COMMENT_TARGET_MOVED` (also) | the target lies in a generated START/END region (`generated-region`, 024-FR-023) or in the frontmatter (`frontmatter`, M6), or – a menu's reason only, never a save's – the picked part of an HTML page cannot hold a comment (`not-commentable`, menu matrix M-08) |
  * | `COMMENT_KEY_INVALID` (also) | a `file-comment:*` request for a file not open in that panel of the sender's window (`not-open`, C17), or an unknown, used or foreign draft token or key (`key-invalid`) |
  * | `COMMENT_DRAFT_EXPIRED` | a draft older than its time to live (`draft-expired`) |
  * | `COMMENT_PATH_REFUSED` (also) | a `file-comment:*` draft or save while comments are off in Settings for the file's preview (`comments-off`, 024-FR-022) |
@@ -107,7 +107,8 @@ const CODES: Readonly<Record<CommentRefusal, CommentErrorCode>> = {
   'draft-expired': ErrorCode.COMMENT_DRAFT_EXPIRED,
   'comments-off': ErrorCode.COMMENT_PATH_REFUSED,
   replies: ErrorCode.COMMENT_LIMIT,
-  'file-size': ErrorCode.COMMENT_LIMIT
+  'file-size': ErrorCode.COMMENT_LIMIT,
+  'not-commentable': ErrorCode.COMMENT_TARGET_MOVED
 }
 
 /** The `ErrorCode` a refusal reaches the renderer as. */

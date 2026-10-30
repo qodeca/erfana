@@ -98,7 +98,7 @@ export interface PageSignalSinks {
   /** The keyboard picker moved, in comment mode: the window's live region says it. */
   step(step: PickerStepEvent): void
   icon(frame: CommentFrameLike, record: FrameRecord, pinKey: string, pick: CommentPick): void
-  /** `entry` absent: the element has no tokened ancestor ("Can't comment here"). */
+  /** `entry` absent: the element has no tokened ancestor – its menu says it cannot hold a comment (M-08). */
   element(frame: CommentFrameLike, record: FrameRecord, entry: ElementTokenEntry | undefined, pick: CommentPick): void
   anchors(frame: CommentFrameLike, record: FrameRecord, anchors: CommentAnchors): void
 }

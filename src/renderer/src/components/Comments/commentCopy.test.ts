@@ -48,16 +48,14 @@ describe('commentCopy', () => {
     expect(saveShortcutAria()).toBe('Control+Enter')
   })
 
-  describe('R-021 unavailable tooltip with each reason', () => {
+  describe('R-021 M-10 unavailable sentence with each reason – "for this file" (menu matrix § 3)', () => {
     it.each(CommentUnavailableReasonSchema.options)('has wording for %s', reason => {
-      const text = unavailableTooltip(reason)
-      expect(text.startsWith('Comments are unavailable for this page: ')).toBe(true)
-      expect(text).toContain(UNAVAILABLE_REASON_TEXT[reason])
+      expect(unavailableTooltip(reason)).toBe(`Comments are unavailable for this file: ${UNAVAILABLE_REASON_TEXT[reason]}.`)
     })
 
     it('falls back to the prepare-failed wording for an unknown reason', () => {
       expect(unavailableTooltip('???' as never)).toBe(
-        `Comments are unavailable for this page: ${UNAVAILABLE_REASON_TEXT['prepare-failed']}`
+        `Comments are unavailable for this file: ${UNAVAILABLE_REASON_TEXT['prepare-failed']}.`
       )
     })
   })

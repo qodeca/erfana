@@ -90,15 +90,81 @@ describe('PreviewCommentsLayer', () => {
       expect(props.onAddComment).not.toHaveBeenCalled()
     })
 
-    it('shows a disabled "Can\'t comment here" when there is no draft', async () => {
-      const user = userEvent.setup()
-      const { props } = setup({
-        menu: menuDraft({ draftToken: undefined, draftKey: undefined, target: undefined })
+  })
+
+  describe('C-19 024-FR-027 a disabled item keeps its action name and shows its reason line (HTML)', () => {
+    const NO_DRAFT = { draftToken: undefined, draftKey: undefined, target: undefined }
+    const CONFLICTS = 'index.html has unresolved git conflicts. Resolve them first.'
+    const WORDS = { selection: true as const }
+
+    /** Every item: its label, disabled, named from its label and described by its visible reason line. */
+    function expectDisabledWithReason(labels: readonly string[], reason: string): void {
+      const items = screen.getAllByRole('menuitem')
+      expect(items.map(item => item.querySelector('.context-menu-label')?.textContent ?? item.textContent)).toEqual(labels)
+      items.forEach((item, i) => {
+        expect(item).toHaveAttribute('aria-disabled', 'true')
+        expect(item).toHaveAccessibleName(labels[i])
+        expect(item).toHaveAccessibleDescription(reason)
+        expect(item).toHaveTextContent(reason)
       })
-      const item = screen.getByRole('menuitem', { name: COPY.cantCommentHere })
-      expect(item).toHaveAttribute('aria-disabled', 'true')
-      await user.click(item)
+    }
+
+    it('M-05 outside comment mode on a read-only file: "Comment on element", disabled, with the reason main named', async () => {
+      const user = userEvent.setup()
+      const { props } = setup({ menu: menuDraft({ ...NO_DRAFT, reason: 'conflict-markers' }), mode: false })
+      expect(screen.getByRole('menu', { name: COPY.menuLabel })).toBeVisible()
+      expectDisabledWithReason([MD_SURFACE_COPY.commentOn('element')], CONFLICTS)
+      await user.click(screen.getAllByRole('menuitem')[0])
       expect(props.onAddComment).not.toHaveBeenCalled()
+    })
+
+    it('M-06 outside comment mode on a selection in a read-only file: both selection items, each disabled with its own reason line', async () => {
+      const user = userEvent.setup()
+      const { props } = setup({ menu: menuDraft({ ...NO_DRAFT, ...WORDS, reason: 'unterminated-block' }), mode: false })
+      expect(screen.getByRole('menu', { name: SELECTION_COPY.menuLabel })).toBeVisible()
+      const reason = "A comment in index.html has no end, so Erfana won't add comments. Fix it in the source."
+      expectDisabledWithReason([SELECTION_COPY.commentOnSelection, SELECTION_COPY.commentOnWhole('element')], reason)
+      // Two items, two reason lines – never one shared element.
+      const [first, second] = screen.getAllByRole('menuitem')
+      expect(first.getAttribute('aria-describedby')).not.toBe(second.getAttribute('aria-describedby'))
+      for (const item of [first, second]) await user.click(item)
+      expect(props.onAddComment).not.toHaveBeenCalled()
+    })
+
+    it('M-08 a part of the page that cannot hold a comment: the row\'s items for a writable file, disabled, in either mode', () => {
+      for (const mode of [false, true]) {
+        const { unmount } = setup({ menu: menuDraft({ ...NO_DRAFT, kind: mode ? 'open' : 'menu', reason: 'not-commentable' }), mode })
+        expectDisabledWithReason([mode ? COPY.addComment : MD_SURFACE_COPY.commentOn('element')], "This part of the page can't hold a comment.")
+        unmount()
+      }
+      // A main that sent no reason reads the same.
+      setup({ menu: menuDraft({ ...NO_DRAFT, ...WORDS }), mode: true })
+      expectDisabledWithReason(
+        [SELECTION_COPY.commentOnSelection, SELECTION_COPY.commentOnWhole('element')],
+        "This part of the page can't hold a comment."
+      )
+    })
+
+    it('M-10 comments unavailable for this file: the row\'s items, each disabled with "Comments are unavailable for this file: {reason}."', async () => {
+      const user = userEvent.setup()
+      // Even a draft main minted is not offered: nothing could be read.
+      const { props, unmount } = setup({ menu: menuDraft(), mode: false, unavailable: 'too-large' })
+      expectDisabledWithReason([MD_SURFACE_COPY.commentOn('element')], 'Comments are unavailable for this file: file too large.')
+      await user.click(screen.getAllByRole('menuitem')[0])
+      expect(props.onAddComment).not.toHaveBeenCalled()
+      unmount()
+      setup({ menu: menuDraft({ ...NO_DRAFT, ...WORDS, reason: 'encoding' }), mode: false, unavailable: 'overlay-removed' })
+      expectDisabledWithReason(
+        [SELECTION_COPY.commentOnSelection, SELECTION_COPY.commentOnWhole('element')],
+        "Comments are unavailable for this file: the page keeps removing Erfana's overlay."
+      )
+    })
+
+    it('a writable file keeps every item enabled, with no reason line', () => {
+      setup({ menu: menuDraft(), mode: false, unavailable: null })
+      const [item] = screen.getAllByRole('menuitem')
+      expect(item).not.toHaveAttribute('aria-disabled')
+      expect(item).not.toHaveAttribute('aria-describedby')
     })
   })
 

@@ -269,7 +269,8 @@ describe('usePreviewComments', () => {
   })
 
   it('applies counts, anchors and main’s mode changes, announcing the mode', async () => {
-    render(<Harness onValue={onValue} />)
+    // Not ready yet: the list is read once the page has loaded (M-07), so it is still unread here.
+    render(<Harness onValue={onValue} ready={false} />)
     act(() => fake.emitChanged({ panelId: PANEL, counts: { open: 2, resolved: 0, attention: 1 } }))
     act(() => fake.emitAnchors({ panelId: PANEL, notVisible: ['t2'] }))
     act(() => fake.emitMode({ panelId: PANEL, on: true, reason: 'escape' }))
@@ -447,20 +448,89 @@ describe('usePreviewComments', () => {
     })
   })
 
+  describe('menu matrix § 2 and § 3 – a file that cannot take a new comment (HTML)', () => {
+    const CONFLICTED = fileView({ writable: false, readOnlyReason: 'conflict-markers' })
+    const MODE_BLOCKED = 'Comment mode is unavailable: index.html has unresolved git conflicts. Resolve them first.'
+
+    it('M-07 the page\'s file is read-only: the toggle is unavailable with its reason, and asking for the mode only says why', async () => {
+      fake.bridge.list.mockResolvedValue({ ok: true, files: [CONFLICTED] })
+      render(<Harness onValue={onValue} />)
+      // Read once the page is ready – the drawer was never opened.
+      await waitFor(() => expect(latest.toolbar.modeUnavailableText).toBe(MODE_BLOCKED))
+      expect(latest.drawer).toBeNull()
+      act(() => latest.toolbar.onToggleMode(true))
+      await waitFor(() => expect(latest.layer.polite).toBe(MODE_BLOCKED))
+      expect(fake.bridge.setMode).not.toHaveBeenCalled()
+      expect(latest.toolbar.mode).toBe(false)
+    })
+
+    it('M-07 the shortcut is refused the same way while the page\'s file is read-only', async () => {
+      fake.bridge.list.mockResolvedValue({ ok: true, files: [CONFLICTED] })
+      const { getByTestId } = render(<Harness onValue={onValue} />)
+      await waitFor(() => expect(latest.toolbar.modeUnavailableText).toBe(MODE_BLOCKED))
+      fireEvent.keyDown(getByTestId('root'), { key: 'm', ctrlKey: true, altKey: true })
+      await waitFor(() => expect(latest.layer.polite).toBe(MODE_BLOCKED))
+      expect(fake.bridge.setMode).not.toHaveBeenCalled()
+    })
+
+    it('M-07 a mode that was on turns off when the file becomes read-only, saying the same sentence', async () => {
+      render(<Harness onValue={onValue} />)
+      await waitFor(() => expect(fake.bridge.list).toHaveBeenCalledTimes(1))
+      act(() => fake.emitMode({ panelId: PANEL, on: true, reason: 'shortcut' }))
+      expect(latest.toolbar.mode).toBe(true)
+      expect(latest.toolbar.modeUnavailableText).toBeNull()
+      // The file gains a conflict; main's change event re-reads the list.
+      fake.bridge.list.mockResolvedValue({ ok: true, files: [CONFLICTED] })
+      act(() => fake.emitChanged({ panelId: PANEL, counts: { open: 0, resolved: 0, attention: 0 } }))
+      await waitFor(() => expect(fake.bridge.setMode).toHaveBeenCalledWith(expect.objectContaining({ panelId: PANEL, on: false })))
+      await waitFor(() => expect(latest.layer.polite).toBe(MODE_BLOCKED))
+      expect(latest.toolbar.mode).toBe(false)
+    })
+
+    it('M-07 only the page\'s own file decides: a read-only frame file leaves the mode available', async () => {
+      fake.bridge.list.mockResolvedValue({ ok: true, files: [fileView(), fileView({ fileKey: 'f2', displayPath: 'frame.html', frame: true, writable: false, readOnlyReason: 'link' })] })
+      render(<Harness onValue={onValue} />)
+      await waitFor(() => expect(latest.layer.list.status).toBe('ready'))
+      expect(latest.toolbar.modeUnavailableText).toBeNull()
+    })
+
+    it('M-07 a file read-only for another reason names it (a comment with no end)', async () => {
+      fake.bridge.list.mockResolvedValue({ ok: true, files: [fileView({ writable: false, readOnlyReason: 'unterminated-block' })] })
+      render(<Harness onValue={onValue} />)
+      await waitFor(() =>
+        expect(latest.toolbar.modeUnavailableText).toBe(
+          "Comment mode is unavailable: A comment in index.html has no end, so Erfana won't add comments. Fix it in the source."
+        )
+      )
+    })
+
+    it('M-05 M-10 the menu gets main\'s refusal reason and the tab\'s unavailable reason', () => {
+      render(<Harness onValue={onValue} />)
+      act(() => fake.emitDraft(menuDraft({ draftToken: undefined, draftKey: undefined, target: undefined, reason: 'read-only' })))
+      expect(latest.layer.menu).toMatchObject({ reason: 'read-only' })
+      expect(latest.layer.unavailable).toBeNull()
+      act(() => fake.emitChanged({ panelId: PANEL, counts: { open: 0, resolved: 0, attention: 0 }, unavailable: 'encoding' }))
+      expect(latest.layer.unavailable).toBe('encoding')
+    })
+  })
+
   describe('drawer', () => {
     it('opens, reads the list and refreshes on a change event', async () => {
       fake.bridge.list.mockResolvedValue({ ok: true, files: [fileView({ threads: [thread(1)] })] })
       render(<Harness onValue={onValue} />)
       expect(latest.drawer).toBeNull()
+      // The page is ready: the list is read before the drawer opens (M-07).
+      await waitFor(() => expect(fake.bridge.list).toHaveBeenCalledTimes(1))
       act(() => latest.toolbar.onToggleDrawer())
       expect(latest.drawer).not.toBeNull()
       await waitFor(() => expect(latest.drawer?.list.status).toBe('ready'))
+      await waitFor(() => expect(fake.bridge.list).toHaveBeenCalledTimes(2))
       act(() =>
         fake.emitChanged({ panelId: PANEL, counts: { open: 1, resolved: 0, attention: 0 } })
       )
-      await waitFor(() => expect(fake.bridge.list).toHaveBeenCalledTimes(2))
-      act(() => latest.drawer?.onRetry())
       await waitFor(() => expect(fake.bridge.list).toHaveBeenCalledTimes(3))
+      act(() => latest.drawer?.onRetry())
+      await waitFor(() => expect(fake.bridge.list).toHaveBeenCalledTimes(4))
       act(() => latest.drawer?.onClose())
       expect(latest.drawer).toBeNull()
     })
@@ -527,9 +597,10 @@ describe('usePreviewComments', () => {
     it('re-reads on a page change while open', async () => {
       const { rerender } = render(<Harness onValue={onValue} />)
       act(() => latest.toolbar.onToggleDrawer())
-      await waitFor(() => expect(fake.bridge.list).toHaveBeenCalledTimes(1))
-      rerender(<Harness onValue={onValue} filePath="/project/about.html" />)
+      // Once when the page is ready, once when the drawer opens.
       await waitFor(() => expect(fake.bridge.list).toHaveBeenCalledTimes(2))
+      rerender(<Harness onValue={onValue} filePath="/project/about.html" />)
+      await waitFor(() => expect(fake.bridge.list).toHaveBeenCalledTimes(3))
     })
 
     it('goes full width in a narrow panel and hides its own page – through its panel gate', () => {

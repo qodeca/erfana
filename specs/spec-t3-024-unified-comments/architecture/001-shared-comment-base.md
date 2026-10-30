@@ -64,7 +64,7 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | **New** `src/shared/comments/overlayCore/{pinLayout,gesture,modeState}.ts` | S | Pure rules both overlays run. No imports, no DOM |
 | **New** `src/renderer/src/components/Comments/overlay/{CommentOverlayLayer.tsx,useCommentMode.ts,targetPicker.ts,commentHighlights.ts}` | S (for renderer-hosted previews) | – |
 | **New** `src/renderer/src/components/Editor/markdownComments/markdownAdapter.ts` | M | Maps `data-line-start` blocks to targets |
-| **Added since** `src/renderer/src/components/Comments/overlay/{useCommentOverlayHost,useHostPointerKeys,useSelectionComments,previewAdapter,pickerKeys,hostTypes,hostParts,hostMenu,hostWindow,hostDrawer,domWords,commentContentAttrs}.ts` (12) | S (for renderer-hosted previews) | – |
+| **Added since** `src/renderer/src/components/Comments/overlay/{useCommentOverlayHost,useHostPointerKeys,useSelectionComments,previewAdapter,pickerKeys,hostTypes,hostParts,hostMenu,hostWindow,hostDrawer,domWords,commentContentAttrs,contentGuard}.ts` (13) | S (for renderer-hosted previews) | – |
 | **Added since** `src/renderer/src/components/Editor/markdownComments/{useMarkdownComments,MarkdownCommentsOverlay,MarkdownCommentsBand}.tsx` (3) | M | The Markdown Preview's composition root, the surfaces it draws in its pane, and its paused band (D-24: only the Markdown Preview draws the editor's unsaved text) |
 
 ### Renderer
@@ -78,6 +78,7 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | `services/preview/commentGateway.ts` and **new** `services/comments/fileCommentGateway.ts` | both implement one `CommentSource` interface | H / S | HTML is addressed per view, through page draft tokens. Text previews are addressed per file |
 | **Added since** `CommentWindowShell`, `CommentStepper`, `CommentWordsPicker`, `DamagedBlockView`, `ThreadStatus`, `CommentDrawerRow`, `CommentDrawerSort`, `CommentRemovedNote`, `commentRemovedOutside`, `commentCarriedDrafts`, `commentDockPlacement`, `commentCopyWords`, `commentWindowCopy`, `commentWindowStates`, `commentWords`, `useThreadSession` (16) | `src/renderer/src/components/Comments/` | S | – |
 | **Added since** `previewCommentRequests`, `usePreviewDraftKeepAlive` (2) | stay in `HtmlPreviewPanel/comments/` | H | A page draft token and the window it opens, and its keep-alive, exist only because the HTML page picks in another process |
+| **Added since** `usePreviewModeBlock` (1) | stays in `HtmlPreviewPanel/comments/` | H | M-07: main holds the HTML comment mode, so turning it off for a read-only page goes through main's mode request; the Markdown host keeps its mode in the renderer |
 
 `commentCopy` keeps one string table with a `TargetNouns` map per preview (C-03), so both previews import one module (024-AC-008).
 

@@ -23,7 +23,8 @@ import {
 import { cutText } from '../../../shared/comments/cutText'
 import type { TargetVia } from '../../../shared/comments/reattach'
 import type { IndexedTarget } from '../../../shared/comments/targetIndex'
-import type { MdIndex } from '../../../shared/markdownComments/mdIndex'
+import { innerTargetOf } from '../../../shared/markdownComments/mdAnchor'
+import type { MdIndex, MdTarget } from '../../../shared/markdownComments/mdIndex'
 import { positionTargetOf } from '../../../shared/markdownComments/mdLocate'
 import { changeOf, type ListedChange } from './commentListChange'
 import { rebuildViewOf } from './commentRebuild'
@@ -203,14 +204,34 @@ function threadOf(doc: KindDocument, block: OkBlock, line: number): ListedThread
   }
 }
 
+/**
+ * The element a thread's icon is drawn on: in Markdown, the inner target its
+ * anchor names below the carrier (list item 1, a row or cell, a block in a
+ * quote, an image – markdown-format.md § 5 "Inner target"), so the icon and
+ * its name say what the comment is about, as the window did. A placement
+ * names its element by line and tag only, so the inner target is used only
+ * where that pair finds it – the first of its tag on its line (a table's
+ * third cell is not). Else, or when the inner target is gone, the carrier.
+ */
+function placedOn(doc: KindDocument, block: OkBlock, carrier: IndexedTarget): IndexedTarget {
+  const runtime = block.data.anchor.runtime
+  const index = doc.index
+  if (runtime === undefined || !isMarkdownIndex(index)) return carrier
+  const inner = innerTargetOf(index, carrier as MdTarget, runtime)
+  if (inner === undefined) return carrier
+  const firstOnLine = index.elements.find(el => el.line === inner.line && el.tag === inner.tag)
+  return firstOnLine === inner ? inner : carrier
+}
+
 /** Each attached thread's target line, in block order. */
 function placementsOf(doc: KindDocument, line: (offset: number) => number): ListedPlacement[] {
   const placements: ListedPlacement[] = []
   for (const block of doc.state.blocks) {
     if (block.kind !== 'ok') continue
     // An open Markdown comment whose target only changed its text keeps its icon there (C-06).
-    const target = shownTarget(doc, block).found?.el
-    if (target === undefined) continue
+    const carrier = shownTarget(doc, block).found?.el
+    if (carrier === undefined) continue
+    const target = placedOn(doc, block, carrier)
     const sel = anchorSelectionOf(block.data.anchor)
     placements.push({ threadId: block.data.id, line: line(target.start), tag: target.tag, ...(sel === undefined ? {} : { sel }) })
   }

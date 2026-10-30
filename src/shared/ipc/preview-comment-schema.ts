@@ -29,6 +29,7 @@ import {
   COMMENT_PATH_MAX_CHARS,
   CommentFileViewSchema,
   CommentMessageTextSchema as MessageTextSchema,
+  CommentRefusalReasonSchema,
   commentThreadOpSchemas
 } from './comment-common-schema'
 import type { CommentSaveResult } from './comment-common-schema'
@@ -244,10 +245,11 @@ const DraftSchema = {
 }
 
 /**
- * `preview:commentDraftOpened` (§7.3, §7.4, §7.7). No reason rides along when
- * there is no draft – the menu's only refusal is "Can't comment here" – and no
- * unsaved-source flag: the window's own guard follows the editor tab live
- * (§19 "Draft event fields").
+ * `preview:commentDraftOpened` (§7.3, §7.4, §7.7). A menu with no draft names
+ * why in `reason` – main's refusal reason, never text – so each item stays
+ * visible, disabled, with its reason line (spec 024 menu matrix M-05, M-06,
+ * M-08, M-10; comments-v2 C-19). No unsaved-source flag: the window's own
+ * guard follows the editor tab live (§19 "Draft event fields").
  */
 export const CommentDraftOpenedSchema = z
   .discriminatedUnion('kind', [
@@ -258,8 +260,10 @@ export const CommentDraftOpenedSchema = z
         /** Host-window CSS pixels, already clamped to the panel. */
         point: CommentPointSchema,
         ...DisplaySchema,
-        /** Absent: the menu shows a disabled "Can't comment here". */
+        /** Absent: the menu's items are disabled, each with the reason line for `reason`. */
         ...DraftSchema,
+        /** Why main minted no draft (C-19): only without one; the renderer words it (`menuReasonText`). */
+        reason: CommentRefusalReasonSchema.optional(),
         /** The pick was made on a text selection: the menu is the selection menu (M-02, M-04). */
         selection: z.literal(true).optional(),
         /** The target's text, and the selected words in it when main found them there (024-FR-004). */
@@ -295,6 +299,9 @@ export const CommentDraftOpenedSchema = z
     event => event.kind === 'icon' || event.draftToken !== undefined || (event.words === undefined && event.wordsMissing === undefined),
     { message: 'words come with a draft' }
   )
+  .refine(event => event.kind === 'icon' || event.draftToken === undefined || event.reason === undefined, {
+    message: 'a reason comes only without a draft'
+  })
 export type CommentDraftOpened = z.infer<typeof CommentDraftOpenedSchema>
 
 /** `preview:commentsChanged` – the toolbar badge and the unavailable state (§10.1, §10.10). */

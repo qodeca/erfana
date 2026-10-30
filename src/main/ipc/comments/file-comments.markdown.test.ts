@@ -249,3 +249,58 @@ describe('024-AC-005 a selection comment on a second list item (a line-start slo
     expect(after).toContain('"sel":{"exact":"beta","prefix":"","suffix":" release notes"}')
   })
 })
+
+describe('024-AC-003 (Markdown) the icon names the inner target (markdown-format.md § 5)', () => {
+  /** Save one comment on the target the Markdown adapter would pick, and list the file again. */
+  async function commentOn(rel: string, text: string, target: Omit<PickedTargetRequest, 'baseHash'>) {
+    await project.write(rel, text)
+    await listOk(rel)
+    const draft = await service.openDraft(caller(), { panelId: PANEL, filePath: project.path(rel) })
+    if (!draft.ok) throw new Error(`draft refused: ${draft.code}`)
+    const saved = await service.save(caller(), {
+      panelId: PANEL,
+      filePath: project.path(rel),
+      op: 'add',
+      draftToken: draft.draftToken,
+      target: { ...target, baseHash: markdownTextHash(text) },
+      text: 'Check this.',
+      view: VIEW
+    })
+    expect(saved).toMatchObject({ ok: true })
+    return listOk(rel)
+  }
+
+  it('024-AC-003 (Markdown) a comment on list item 1 is labelled as the list item, not the list it is written before', async () => {
+    const text = ['# Plan', '', '- Freeze the API on Monday.', '- Run the load test.', ''].join('\n')
+    const listed = await commentOn('item1.md', text, {
+      lineStart: 3,
+      lineEnd: 3,
+      tag: 'li',
+      ordinal: 1,
+      quote: { exact: 'Freeze the API on Monday.', prefix: '', suffix: '' }
+    })
+    // The block sits before the whole list and its anchor names the list, with the item as the inner target …
+    const after = (await project.read('item1.md')).toString('utf8')
+    expect(after).toContain('target: <ul> (comment is about <li> at li:nth-of-type(1) inside this element)')
+    const [thread] = listed.file.threads
+    expect(thread).toMatchObject({ tag: 'ul', runtime: { tag: 'li', path: 'li:nth-of-type(1)' } })
+    // … and the icon is drawn on, and named after, the item the window said ("New comment on list item").
+    const itemLine = after.split('\n').indexOf('- Freeze the API on Monday.') + 1
+    expect(listed.placements).toEqual([{ threadKey: thread.threadKey, line: itemLine, tag: 'li' }])
+  })
+
+  it('024-AC-003 (Markdown) a comment on a table cell past the first stays on the table: a placement cannot name that cell', async () => {
+    const text = ['| a | b |', '| - | - |', '| one | two |', ''].join('\n')
+    const listed = await commentOn('cells.md', text, {
+      lineStart: 3,
+      lineEnd: 3,
+      tag: 'td',
+      ordinal: 2,
+      quote: { exact: 'two', prefix: '', suffix: '' }
+    })
+    const [thread] = listed.file.threads
+    expect(thread).toMatchObject({ tag: 'table', runtime: { tag: 'td' } })
+    const headerLine = (await project.read('cells.md')).toString('utf8').split('\n').indexOf('| a | b |') + 1
+    expect(listed.placements).toEqual([{ threadKey: thread.threadKey, line: headerLine, tag: 'table' }])
+  })
+})

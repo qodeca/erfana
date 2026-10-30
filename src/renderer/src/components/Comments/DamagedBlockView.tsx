@@ -8,7 +8,7 @@
  * Read-only and never overwritten without a user action (024-FR-014): why,
  * the raw text in a read-only well, Copy raw text, Open in source, and Delete
  * damaged comment… where main allows it (a terminated block in a writable
- * file). Conflict markers get their own wording and no delete.
+ * file). Conflict markers get their own wording and no Rebuild (S-08).
  *
  * **Rebuild from data…** (OD-05) is offered only when main says the block's
  * `@data` is valid and only its readable lines or header id disagree with it
@@ -124,10 +124,12 @@ export function DamagedBlockView({ block, file, panelId, run, onCopy, onOpenInSo
   const focusBack = useRef<Step>('none')
   const conflict = block.reason === 'conflict-marker'
   // Main deletes a damaged block only when it is terminated and the file is
-  // writable (§7.6 step 6); an unterminated block or a conflict is fixed in source.
-  const deletable = file.writable && !conflict && block.reason !== 'unterminated'
+  // writable (§7.6 step 6); an unterminated block is fixed in source. A block
+  // damaged by a merge is deletable too while the file is writable – no complete
+  // conflict hunk – (state table S-08).
+  const deletable = file.writable && block.reason !== 'unterminated'
   // OD-05: only when main found valid @data the readable lines disagree with.
-  const rebuildable = file.writable && block.rebuild !== undefined
+  const rebuildable = file.writable && !conflict && block.rebuild !== undefined
   useEffect(() => {
     if (step !== 'none') cancelRef.current?.focus()
     else if (focusBack.current !== 'none') {

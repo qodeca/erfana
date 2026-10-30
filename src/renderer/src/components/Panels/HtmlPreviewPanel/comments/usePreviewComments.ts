@@ -52,6 +52,7 @@ import { useRemovedOutside } from '../../../Comments/commentRemovedOutside'
 import { newCommentRequest, withWords } from './previewCommentRequests'
 import { pickerAnnouncement } from './commentLive'
 import { usePreviewDraftKeepAlive } from './usePreviewDraftKeepAlive'
+import { usePreviewModeBlock } from './usePreviewModeBlock'
 import type { PreviewKeyEventLike } from '../hooks/usePreviewGroupKeys'
 
 /** Options for {@link usePreviewComments}. */
@@ -233,9 +234,6 @@ export function usePreviewComments({
     setMenu(null)
     setRequest(null)
   }
-  useEffect(() => {
-    if (latestRef.current.drawerOpen) void refreshList()
-  }, [filePath, refreshList, latestRef])
 
   // Tab hidden (§19 Rev 4): the menu pointed at a page no longer shown, so it goes; the
   // window's request is KEPT, only withheld from the layer, and returns with the tab.
@@ -264,16 +262,18 @@ export function usePreviewComments({
     [panelId, store, latestRef]
   )
 
+  const { text: modeBlocked, refuse } = usePreviewModeBlock({ live: enabled && ready, filePath, readList: refreshList, files: state.list.files, mode: state.mode, announce, turnOff: () => void setMode(false, latestRef.current.showIcons) })
   const toggleMode = useCallback(
     (byKeyboard: boolean) => {
       const on = !latestRef.current.mode
+      if (on && refuse()) return
       void setMode(on, latestRef.current.showIcons).then(now => {
         announce(now ? ANNOUNCE.modeOn : ANNOUNCE.modeOff)
         // Keyboard activation moves focus into the page with the picker started (§10.1).
         if (now && byKeyboard) void previewGateway.focusPage(panelId).catch(() => {})
       })
     },
-    [setMode, announce, panelId, latestRef]
+    [setMode, announce, panelId, latestRef, refuse]
   )
 
   const setDrawerOpen = useCallback(
@@ -359,6 +359,7 @@ export function usePreviewComments({
     counts: state.counts,
     ready,
     unavailable: state.unavailable,
+    modeUnavailableText: modeBlocked, // M-07
     onToggleMode: toggleMode,
     onToggleDrawer: () => setDrawerOpen(!latestRef.current.drawerOpen),
     listRef: listButtonRef
@@ -425,6 +426,7 @@ export function usePreviewComments({
         if (!chosen) focusPageSoon(panelId)
       },
       mode: state.mode,
+      unavailable: state.unavailable,
       onAddComment: (draft: ElementDraft, scope = 'whole') => {
         const next = newCommentRequest(panelId, draft, scope)
         if (next === null) return
@@ -457,18 +459,14 @@ export function usePreviewComments({
         closeWindow(false)
         openInSource(path, line)
       },
-      onCopyRaw: (text: string) => {
-        void textClipboard.writeText(text).then(ok => {
-          if (ok) announce(COPY.rawCopied)
-          else alert(COPY.copyFailed)
-        })
-      }
+      onCopyRaw: (text: string) => void textClipboard.writeText(text).then(ok => (ok ? announce(COPY.rawCopied) : alert(COPY.copyFailed)))
     }),
     [
       menu,
       request,
       visible,
       state.mode,
+      state.unavailable,
       state.list,
       identity,
       state.notVisible,

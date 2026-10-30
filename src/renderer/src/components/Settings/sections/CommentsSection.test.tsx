@@ -236,6 +236,14 @@ describe('CommentsSection – R-014', () => {
     }
   })
 
+  it('C-04 (HTML) the HTML switch is described with comments-v2 C-04\'s exact text, naming selected text', () => {
+    render(<CommentsSection />)
+    const flag = screen.getByTestId('settings-toggle-html-comments')
+    expect(flag).toHaveAccessibleName('Comments in HTML preview')
+    expect(flag).toHaveAccessibleDescription('Lets you comment on elements and selected text in previewed pages.')
+    expect(SETTINGS_COPY.flagHint).toBe('Lets you comment on elements and selected text in previewed pages.')
+  })
+
   it('is inert before settings load', () => {
     useGlobalSettingsStore.setState({ settings: null })
     render(<CommentsSection />)

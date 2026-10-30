@@ -12,7 +12,8 @@
  *
  * A component reads its preview's table from `CommentWordsContext`
  * (`commentWords.ts`). `HTML_WORDS` is the default, and every HTML value is the
- * string the HTML Preview showed before spec 024, so its pin is unchanged. No
+ * string the HTML Preview showed before spec 024, except where the state table
+ * rewords both previews (S-07, S-08, S-09 – the pin names each). No
  * Markdown string says "element", "page" or "block" (except "code block" and
  * "block quote"), names a bare tag, or uses "pin" or "pick" as a noun
  * (024-AC-008, `commentCopyWords.test.ts`).
@@ -30,6 +31,7 @@ import {
   ANNOUNCE,
   COPY,
   DRAWER_COPY,
+  FILE_LIMIT_TEXT,
   TOOL_COPY,
   commentModeShortcutLabel,
   deleteBlockText,
@@ -196,6 +198,70 @@ export const MARKDOWN_COPY = {
     return on ? `Comment mode (${key}) – on: click a paragraph or select text to comment, Esc to leave` : `Comment mode (${key}) – off`
   }
 } as const
+
+/** HTML reason lines the shared sentences do not cover (menu matrix § 3, C-19). */
+export const HTML_MENU_COPY = {
+  /** M-08: `html`, `head`, template content, an element no comment can stand before. */
+  notCommentable: "This part of the page can't hold a comment.",
+  /** Not in the matrix: the file changed since the page was served, so the pick no longer names its element. */
+  moved: (file: string): string => `${file} changed since the page loaded. Reload the preview to comment on it.`,
+  /** Not in the matrix: the parse did not run (a full queue, a crash) – nothing about the file itself. */
+  busy: "Erfana couldn't read the file just now. Try again in a moment.",
+  /** Not in the matrix: any other refusal the menu can meet. */
+  refused: "Erfana doesn't add comments to this file."
+} as const
+
+/**
+ * Why no new comment can be written – a disabled menu item's reason line and,
+ * through `MD_SURFACE_COPY.modeUnavailable`, the comment-mode toggle's
+ * (menu matrix § 2, § 3; C-19: the menu and the window say the same sentence
+ * for the same reason). `reason` is main's refusal code (the draft event's
+ * `reason`, or a listed file's `readOnlyReason`); `undefined` with no draft
+ * is a part of the page that cannot hold a comment.
+ *
+ * @param reason - Main's refusal reason; a reason a later main adds reads as {@link HTML_MENU_COPY}.refused.
+ * @param file - The file, as the reader knows it.
+ * @returns The reason line, ending with its full stop.
+ *
+ * @example
+ * ```ts
+ * menuReasonText('conflict-markers', 'index.html') // 'index.html has unresolved git conflicts. Resolve them first.'
+ * ```
+ */
+export function menuReasonText(reason: string | undefined, file: string): string {
+  switch (reason) {
+    case undefined:
+    case 'not-commentable':
+      return HTML_MENU_COPY.notCommentable
+    case 'conflict-markers':
+      return `${file} has unresolved git conflicts. Resolve them first.`
+    case 'unterminated-block':
+      return MARKDOWN_COPY.unterminated(file)
+    case 'too-many-blocks':
+      return MARKDOWN_COPY.tooMany(file)
+    case 'too-large':
+      return FILE_LIMIT_TEXT
+    case 'encoding':
+      return 'Erfana can only add comments to UTF-8 files.'
+    case 'link':
+      return `${file} is a link to another file, so Erfana won't write to it.`
+    case 'read-only':
+    case 'not-owner':
+      return `${file} is read-only.`
+    case 'outside-project':
+      return `${file} is outside this project, so Erfana won't write to it.`
+    case 'missing':
+      return `${file} no longer exists.`
+    case 'target-moved':
+    case 'changed':
+      return HTML_MENU_COPY.moved(file)
+    case 'busy':
+    case 'parse-failed':
+      return HTML_MENU_COPY.busy
+    default:
+      return HTML_MENU_COPY.refused
+  }
+}
 
 /** The Markdown Preview's words (C-03 kind nouns; differences table D-03, D-04, D-13). */
 export const MARKDOWN_WORDS: CommentWords = {

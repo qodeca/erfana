@@ -76,13 +76,15 @@ export const UNAVAILABLE_REASON_TEXT: Readonly<Record<CommentUnavailableReason, 
 }
 
 /**
- * The toolbar's "unavailable" tooltip (§10.10 "Unavailable").
+ * The "unavailable" sentence (§10.10 "Unavailable", reworded by spec 024 menu
+ * matrix M-10 and § 3 "Nothing could be read"): the toolbar's tooltip and the
+ * reason line of each disabled menu item – one sentence for both (C-19).
  *
  * @param reason - Main's reason.
- * @returns `Comments are unavailable for this page: {reason}`.
+ * @returns `Comments are unavailable for this file: {reason}.`
  */
 export function unavailableTooltip(reason: CommentUnavailableReason): string {
-  return `Comments are unavailable for this page: ${UNAVAILABLE_REASON_TEXT[reason] ?? UNAVAILABLE_REASON_TEXT['prepare-failed']}`
+  return `Comments are unavailable for this file: ${UNAVAILABLE_REASON_TEXT[reason] ?? UNAVAILABLE_REASON_TEXT['prepare-failed']}.`
 }
 
 /**
@@ -245,7 +247,6 @@ export const COPY = {
   // were discarded, or saved some other way we cannot tell apart).
   unsavedGone: 'The other tab has no unsaved changes now. You can add your comment.',
   addComment: 'Add comment',
-  cantCommentHere: "Can't comment here",
   menuLabel: 'Element',
   deleteComment: 'Delete comment',
   deleteThread: 'Delete thread',
@@ -253,14 +254,13 @@ export const COPY = {
   deleteBlockAction: 'Delete block…',
   copyRaw: 'Copy raw text',
   rawLabel: 'Raw text (read-only)',
-  damagedText:
-    "Erfana can't read this comment block, so it won't change it. Fix it in the source, or delete it.",
-  conflictText: 'This block contains git conflict markers. Resolve the conflict in the source.',
+  // Spec 024 state table S-07 and S-08: "comment", never "comment block" (the shared sentences).
+  damagedText: "Erfana can't read this comment, so it won't change it. Fix it in the source, or delete it.",
+  conflictText: 'This comment contains git conflict markers. Resolve the conflict in the source.',
   notVisibleText:
     "This element isn't on screen right now – it may be on another slide or tab. Its icon comes back when it does.",
-  // not in §10.10
-  newerText:
-    'A newer version of Erfana wrote this comment, so this version only shows it. Update Erfana to change it, or edit it in the source.',
+  // Spec 024 state table S-09.
+  newerText: 'A newer version of Erfana wrote this comment, so it is read-only here.',
   newerTag: 'Newer format – read-only',
   attachedTo: 'It was attached to:',
   rawCopied: 'Raw text copied.',
@@ -358,8 +358,8 @@ export const IDENTITY_COPY = {
 export const SETTINGS_COPY = {
   title: 'Comments',
   flagLabel: 'Comments in HTML preview',
-  flagHint: 'Lets you add comments to elements of a previewed page.',
-  // C-04 / 024-FR-022: the Markdown switch. The HTML hint gains "selected text" when the HTML Preview has selection comments.
+  // C-04 / 024-FR-022: both switches name selected text, which both previews comment on.
+  flagHint: 'Lets you comment on elements and selected text in previewed pages.',
   markdownFlagLabel: 'Comments in Markdown preview',
   markdownFlagHint: 'Lets you comment on paragraphs, list items and selected text.',
   nameLabel: 'Your name',
