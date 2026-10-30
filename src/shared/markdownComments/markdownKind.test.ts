@@ -12,7 +12,8 @@ import { isKindRefusal } from '../comments/fileKind'
 import { applySplice, planDelete, planSlotInsert, type SplicePlan } from '../comments/splice'
 import { createThread } from '../comments/thread'
 import { markdownKind, markdownKindWith, markdownOriginOf } from './markdownKind'
-import { markdownSelection } from './mdAnchor'
+import { markdownSelection, selectableText } from './mdAnchor'
+import { MARKDOWN_SELECTION_SEARCH_MAX_CHARS } from './markdownLimits'
 import { MdIndex, type MdTarget } from './mdIndex'
 import { findMarkdownTarget, markdownTextHash } from './mdLocate'
 import { markdownSlots } from './mdSlots'
@@ -345,6 +346,19 @@ describe('selection (024-FR-004)', () => {
     const run = 'a'.repeat(40)
     const same = parseMd(`${run}Q${run}Q${run}\n`)
     expect(markdownSelection(mdOf(same), targetBy(same, 'paragraph'), { exact: 'Q', prefix: '', suffix: '' })).toBeUndefined()
+  })
+
+  it('024-AC-036 a target whose rendered text is past the search limit is not searched: the words are dropped', () => {
+    const words = (n: number): string => 'word '.repeat(Math.ceil(n / 5)).slice(0, n - 1) + '.'
+    const at = parseMd(`${words(MARKDOWN_SELECTION_SEARCH_MAX_CHARS)} tail\n`)
+    const over = targetBy(at, 'paragraph')
+    expect(over.textEnd - over.textStart).toBeGreaterThan(MARKDOWN_SELECTION_SEARCH_MAX_CHARS)
+    expect(selectableText(mdOf(at), over)).toBeUndefined()
+    expect(markdownSelection(mdOf(at), over, { exact: 'tail', prefix: '', suffix: '' })).toBeUndefined()
+    const within = parseMd(`${words(MARKDOWN_SELECTION_SEARCH_MAX_CHARS - 10)} tail\n`)
+    const under = targetBy(within, 'paragraph')
+    expect(under.textEnd - under.textStart).toBeLessThanOrEqual(MARKDOWN_SELECTION_SEARCH_MAX_CHARS)
+    expect(markdownSelection(mdOf(within), under, { exact: 'tail', prefix: '', suffix: '' })).toMatchObject({ exact: 'tail', suffix: '' })
   })
 
   it('024-AC-003 a valid selection is stored as anchor.sel with its words hint', () => {

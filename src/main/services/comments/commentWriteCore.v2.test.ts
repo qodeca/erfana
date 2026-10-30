@@ -6,10 +6,10 @@
  * dropped). Runs the real Markdown kind and write core in process: add a
  * comment, change or damage the file, then list and write again.
  */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ADA, FIXED_NOW, seededRandom } from '../../../shared/comments/__fixtures__/commentTestData'
 import { decodeLossless, encodeText } from '../../../shared/comments/encoding'
-import type { PickedTarget } from '../../../shared/comments/fileKind'
+import type { CommentFileKind, PickedTarget } from '../../../shared/comments/fileKind'
 import type { TextQuote } from '../../../shared/comments/format'
 import { markdownKind } from '../../../shared/markdownComments/markdownKind'
 import type { MdIndex } from '../../../shared/markdownComments/mdIndex'
@@ -17,7 +17,7 @@ import { markdownTextHash } from '../../../shared/markdownComments/mdLocate'
 import { createInProcessMarkdownJobs } from './markdown/markdownCommentJobs'
 import { rebuildDataOf, rebuildViewOf } from './commentRebuild'
 import type { ListSummary } from './commentListCore'
-import { assembleSplice, type WritePlanRequest } from './commentWriteCore'
+import { assembleSplice, runWriteJob, type ByteSplice, type WritePlanRequest } from './commentWriteCore'
 
 const VIEW = { w: 900, h: 700, dpr: 2, x: 0, y: 0 }
 const DOC = '# Plan\n\nWe ship by Friday.\n'
@@ -155,5 +155,58 @@ describe('OD-05 Rebuild from data', () => {
   it('OD-05 only readable and id mismatches are rebuildable', () => {
     expect(rebuildViewOf('<!-- erfana:comment v1 -->', 'bad-json')).toBeUndefined()
     expect(rebuildDataOf('<!-- erfana:comment v1 -->', 'bad-json')).toBeUndefined()
+  })
+})
+
+describe('runWriteJob refusals (024-AC-038)', () => {
+  /** The `write` job on `text`, with `kind`'s fresh parse – no cached reader. */
+  const run = (text: string, request: WritePlanRequest, kind: CommentFileKind = markdownKind) =>
+    runWriteJob(encodeText(text), { kind: 'write', request, act: ACT }, { kind, random: seededRandom(7) })
+  const pick = (text: string): WritePlanRequest => ({ op: 'pick', pick: pickOn(text), view: VIEW, text: 'Please look.' })
+
+  it('OD-05 of two identical damaged blocks, the one at the start the window read is rebuilt', async () => {
+    const good = await commented()
+    const damaged = good.replace('  Please look.\n@data', '  Please lok.\n@data')
+    const [block] = (await list(damaged)).damaged
+    const raw = damaged.slice(block.start, damaged.indexOf('-->', block.start) + 3)
+    const twice = `${damaged}\n${raw}\n\nMore.\n`
+    const both = (await list(twice)).damaged
+    expect(both.map(b => b.rawHash)).toEqual([block.rawHash, block.rawHash])
+    const result = run(twice, { op: 'rebuild', rawHash: block.rawHash, start: block.start })
+    expect(result).toMatchObject({ ok: true, byteStart: block.start })
+    const out = decodeLossless(assembleSplice(encodeText(twice), result as ByteSplice))
+    if (!out.ok) throw new Error('decode')
+    expect(out.text.startsWith(good)).toBe(true)
+  })
+
+  it('a page draft names HTML offsets and anchors: on a Markdown file it is invalid, and nothing is planned', () => {
+    const draft = { offset: 0, fileHash: 'a'.repeat(64), anchor: { tag: 'p', path: '' } }
+    expect(run(DOC, { op: 'add', draft, view: VIEW, text: 'x' })).toEqual({ kind: 'write', ok: false, refusal: 'invalid' })
+  })
+
+  it('a kind that offers no slot for the target it found refuses the save as target-moved', () => {
+    expect(run(DOC, pick(DOC), { ...markdownKind, slots: () => [] })).toEqual({ kind: 'write', ok: false, refusal: 'target-moved' })
+  })
+
+  it('a kind\'s growth refusal at a slot refuses the save with its reason, before anything is verified', () => {
+    const verify = vi.fn(markdownKind.verify)
+    const refusing: CommentFileKind = { ...markdownKind, refuseGrowth: () => 'meta-charset', verify }
+    expect(run(DOC, pick(DOC), refusing)).toEqual({ kind: 'write', ok: false, refusal: 'meta-charset' })
+    expect(verify).not.toHaveBeenCalled()
+  })
+
+  it('C25 a slot failing a shared check refuses as verify-failed – never tried at the next slot as render-changed', () => {
+    // A parse that loses the new block: the block count check fails before the kind's own check runs.
+    const verify = vi.fn(markdownKind.verify)
+    const losing: CommentFileKind = {
+      ...markdownKind,
+      verify,
+      parse: (text, bom) => {
+        const doc = markdownKind.parse(text, bom)
+        return text.includes('erfana:comment') ? { ...doc, state: { ...doc.state, blocks: [] } } : doc
+      }
+    }
+    expect(run(DOC, pick(DOC), losing)).toEqual({ kind: 'write', ok: false, refusal: 'verify-failed' })
+    expect(verify).not.toHaveBeenCalled()
   })
 })

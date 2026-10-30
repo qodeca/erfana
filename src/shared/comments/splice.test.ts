@@ -10,7 +10,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   ADA,
   BOM,
@@ -40,6 +40,7 @@ import {
   type SplicePlan
 } from '../htmlComments/splice'
 import { addReply, editMessage, setStatus } from './thread'
+import * as shared from './splice'
 
 const CONTEXTS = join(__dirname, '__fixtures__', 'contexts')
 const COMPAT = join(__dirname, '__fixtures__', 'v1-compat')
@@ -467,6 +468,53 @@ describe('plan refusals', () => {
         data: addReply(roomyBlock.data, 'A reply', context)
       })
     ).toMatchObject({ ok: true })
+  })
+})
+
+describe('planRebuild (OD-05 "Rebuild from data…")', () => {
+  const html = readFileSync(join(COMPAT, 'c04-damaged-and-newer.html'), 'utf8')
+  const doc = analyzeCommentDocument(html)
+  const damaged = doc.state.blocks.find(b => b.kind === 'damaged' && b.reason === 'readable-mismatch')!
+  const headerId = damaged.kind === 'damaged' ? damaged.headerId! : ''
+  const data = makeComment({ id: headerId, anchor: { tag: 'li', path: '' } })
+  const request = { start: damaged.nodeRange[0], rawHash: damaged.rawHash, data }
+
+  it('OD-05 replaces only the damaged block\'s comment node, in its own layout, with the block the data serializes to', () => {
+    const planned = shared.planRebuild(doc, request)
+    if (!planned.ok) throw new Error(planned.reason)
+    expect(planned.plan).toMatchObject({ op: 'replace', start: damaged.nodeRange[0], end: damaged.nodeRange[1], data })
+    const after = analyzeCommentDocument(applySplice(html, planned.plan))
+    const rebuilt = after.state.blocks.find(b => b.nodeRange[0] === damaged.nodeRange[0])
+    expect(rebuilt).toMatchObject({ kind: 'ok', data: { id: headerId } })
+    // Its second line keeps the damaged block's indent; nothing outside the node moved.
+    expect(planned.plan.insert.split('\n')[1]).toMatch(/^ {4}note to agents/)
+    expect(applySplice(html, planned.plan).slice(0, damaged.nodeRange[0])).toBe(html.slice(0, damaged.nodeRange[0]))
+    expect(verifyCommentSplice(doc, applySplice(html, planned.plan), planned.plan)).toMatchObject({ ok: true })
+  })
+
+  it('OD-05 refuses a read-only file, an unknown start, a block that is not damaged and bytes that changed', () => {
+    const locked = analyzeCommentDocument(readFileSync(join(COMPAT, 'c06-conflict-hunk.html'), 'utf8'))
+    expect(shared.planRebuild(locked, request)).toEqual({ ok: false, reason: 'read-only' })
+    expect(shared.planRebuild(doc, { ...request, start: 3 })).toEqual({ ok: false, reason: 'not-found' })
+    const ok = doc.state.blocks.find(b => b.kind === 'ok')!
+    expect(shared.planRebuild(doc, { ...request, start: ok.nodeRange[0], rawHash: ok.rawHash })).toEqual({ ok: false, reason: 'not-editable' })
+    const newer = doc.state.blocks.find(b => b.kind === 'newer')!
+    expect(shared.planRebuild(doc, { ...request, start: newer.nodeRange[0], rawHash: newer.rawHash })).toEqual({ ok: false, reason: 'not-editable' })
+    expect(shared.planRebuild(doc, { ...request, rawHash: 'f'.repeat(64) })).toEqual({ ok: false, reason: 'stale' })
+  })
+
+  it('OD-05 data that does not serialize, and a kind\'s growth refusal, write nothing', () => {
+    expect(shared.planRebuild(doc, { ...request, data: makeComment({ id: 'c-x' }) })).toEqual({ ok: false, reason: 'invalid' })
+    expect(shared.planRebuild(doc, request, () => 'meta-charset')).toEqual({ ok: false, reason: 'meta-charset' })
+  })
+
+  it('C1 given a kind\'s note, the rebuilt block carries that note and the hints built from the data', () => {
+    const hints = vi.fn(() => ['hint: rebuilt'])
+    const planned = shared.planRebuild(doc, request, undefined, { agentNote: ['note to agents: the kind\'s own'], hints })
+    if (!planned.ok) throw new Error(planned.reason)
+    expect(planned.plan.insert).toContain('note to agents: the kind\'s own')
+    expect(planned.plan.insert).toContain('hint: rebuilt')
+    expect(hints).toHaveBeenCalledWith(data, doc)
   })
 })
 

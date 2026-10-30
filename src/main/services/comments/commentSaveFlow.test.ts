@@ -238,4 +238,106 @@ describe('commentSaveFlow thread and block changes', () => {
     await k.save({ ...target(k), op: 'reply', text: 'x' })
     expect(k.landed).toHaveBeenCalledWith({ realPath: PAGE, fileHash: 'h1' })
   })
+
+  it('C-13 "Reply and resolve" asks the writer for the reply and the resolve in one change', async () => {
+    const k = keyed()
+    await k.save({ ...target(k), op: 'reply', text: 'Done', resolve: true })
+    expect(k.writer.changeThread).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ change: { op: 'reply', text: 'Done', resolve: true } }))
+  })
+
+  it('C-07 an edit that carries words, or null for the whole target, hands them to the writer as sent', async () => {
+    const k = keyed()
+    const sel = { exact: 'Buy', prefix: '', suffix: '' }
+    await k.save({ ...target(k), op: 'editMessage', messageId: 'm-abcdefghijklmnop', text: 'E', sel })
+    await k.save({ ...target(k), op: 'editMessage', messageId: 'm-abcdefghijklmnop', text: 'E', sel: null })
+    expect(k.writer.changeThread).toHaveBeenNthCalledWith(1, expect.objectContaining({ change: { op: 'editMessage', messageId: 'm-abcdefghijklmnop', text: 'E', sel } }))
+    expect(k.writer.changeThread).toHaveBeenNthCalledWith(2, expect.objectContaining({ change: { op: 'editMessage', messageId: 'm-abcdefghijklmnop', text: 'E', sel: null } }))
+  })
+
+  it('024-AC-004 C-07 an edit whose words were not kept says so in its answer', async () => {
+    const k = keyed()
+    k.writer.changeThread.mockResolvedValueOnce({ ...wrote('c-1'), wordsDropped: true } as unknown as CommentWriteResult)
+    expect(await k.save({ ...target(k), op: 'editMessage', messageId: 'm-abcdefghijklmnop', text: 'E', sel: null })).toEqual({
+      ok: true,
+      threadKey: k.threadKey,
+      wordsDropped: true
+    })
+  })
+})
+
+describe('commentSaveFlow rebuildBlock (OD-05)', () => {
+  function rebuilding(withRebuild = true) {
+    const keys = new CommentKeyStore<CommentDraft>()
+    const next = () => Promise.resolve(wrote('c-1'))
+    const rebuildDamagedBlock = vi.fn(next)
+    const writer = {
+      add: vi.fn(next),
+      changeThread: vi.fn(next),
+      deleteDamagedBlock: vi.fn(next),
+      ...(withRebuild ? { rebuildDamagedBlock } : {})
+    }
+    const landed = vi.fn()
+    const save = createCommentSaveFlow({
+      binding: BINDING,
+      realRoot: '/p',
+      keys,
+      writer,
+      captureScroll: async () => SCROLL,
+      currentPage: () => PAGE,
+      landed
+    })
+    const fileKey = keys.keyFor(BINDING, { kind: 'file', realPath: PAGE })
+    const blockKey = keys.keyFor(BINDING, { kind: 'block', realPath: PAGE, rawHash: HASH, start: 42 })
+    const otherFile = keys.keyFor(BINDING, { kind: 'file', realPath: '/p/other.html' })
+    const request = { panelId: 'panel', op: 'rebuildBlock' as const, fileKey, blockKey, rawHash: HASH }
+    return { save, rebuildDamagedBlock, landed, request, otherFile, keys }
+  }
+
+  it('rebuilds the block its key and hash name, keeping it open when no status is sent', async () => {
+    const r = rebuilding()
+    expect(await r.save(r.request)).toEqual({ ok: true, threadKey: null })
+    expect(r.rebuildDamagedBlock).toHaveBeenCalledExactlyOnceWith({ file: { realRoot: '/p', filePath: PAGE }, rawHash: HASH, start: 42 })
+    expect(r.landed).toHaveBeenCalledWith({ realPath: PAGE, fileHash: 'h1', scroll: SCROLL, page: PAGE })
+  })
+
+  it('"Mark resolved" passes the status on to the writer', async () => {
+    const r = rebuilding()
+    await r.save({ ...r.request, status: 'resolved' })
+    expect(r.rebuildDamagedBlock).toHaveBeenCalledWith({ file: { realRoot: '/p', filePath: PAGE }, rawHash: HASH, start: 42, status: 'resolved' })
+  })
+
+  it('SEC-08 refuses a block of another file, a hash that no longer matches, a wrong kind of key, and a writer that cannot rebuild', async () => {
+    const invalid = { ok: false, code: ErrorCode.COMMENT_KEY_INVALID }
+    const r = rebuilding()
+    expect(await r.save({ ...r.request, fileKey: r.otherFile })).toEqual(invalid)
+    expect(await r.save({ ...r.request, rawHash: 'b'.repeat(64) })).toEqual(invalid)
+    expect(await r.save({ ...r.request, blockKey: r.request.fileKey })).toEqual(invalid)
+    expect(await r.save({ ...r.request, fileKey: 'funknown' })).toEqual(invalid)
+    expect(r.rebuildDamagedBlock).not.toHaveBeenCalled()
+    const without = rebuilding(false)
+    expect(await without.save(without.request)).toEqual(invalid)
+    expect(without.landed).not.toHaveBeenCalled()
+  })
+})
+
+describe('commentSaveFlow without a late-settle listener', () => {
+  it('a late landing still reloads, and a late refusal or throw is only logged', async () => {
+    const keys = new CommentKeyStore<CommentDraft>()
+    const settles: Array<(result: CommentWriteResult) => void> = []
+    const fails: Array<(error: Error) => void> = []
+    const pending = () => new Promise<CommentWriteResult>((resolve, reject) => { settles.push(resolve); fails.push(reject) })
+    const writer = { add: vi.fn(pending), changeThread: vi.fn(pending), deleteDamagedBlock: vi.fn(pending) }
+    const landed = vi.fn()
+    const save = createCommentSaveFlow({ binding: BINDING, realRoot: '/p', keys, writer, captureScroll: async () => undefined, currentPage: () => PAGE, landed, timeoutMs: 20 })
+    const add = (): Promise<unknown> => save({ panelId: 'panel', op: 'add', draftToken: keys.mintDraft(BINDING, draft({ pageRealPath: undefined })), text: 'Hi' })
+    expect(await add()).toEqual({ ok: false, code: ErrorCode.COMMENT_SAVE_PENDING })
+    expect(await add()).toEqual({ ok: false, code: ErrorCode.COMMENT_SAVE_PENDING })
+    expect(await add()).toEqual({ ok: false, code: ErrorCode.COMMENT_SAVE_PENDING })
+    settles[0](wrote())
+    settles[1]({ ok: false, code: ErrorCode.COMMENT_TARGET_MOVED } as unknown as CommentWriteResult)
+    fails[2](new Error('EIO'))
+    await new Promise(resolve => setTimeout(resolve, 0))
+    // No scroll and no page recorded: the landing restores nothing.
+    expect(landed).toHaveBeenCalledExactlyOnceWith({ realPath: PAGE, fileHash: 'h1' })
+  })
 })

@@ -70,6 +70,23 @@ describe('commentE2eHook', () => {
     }
   })
 
+  it('L-1 with the hook on, no cursor set, or one coordinate that is not a finite number, reads as no cursor', () => {
+    const globals = globalThis as Record<string, unknown>
+    vi.stubEnv('ERFANA_E2E_TEST_HOOKS', '1')
+    delete globals[COMMENT_E2E_CURSOR_KEY]
+    try {
+      expect(e2eCursor()).toBeUndefined()
+      globals[COMMENT_E2E_CURSOR_KEY] = { x: 1, y: '2' }
+      expect(e2eCursor()).toBeUndefined()
+      globals[COMMENT_E2E_CURSOR_KEY] = { x: 1, y: Number.POSITIVE_INFINITY }
+      expect(e2eCursor()).toBeUndefined()
+      globals[COMMENT_E2E_CURSOR_KEY] = { x: 0, y: -0.5 }
+      expect(e2eCursor()).toEqual({ x: 0, y: -0.5 })
+    } finally {
+      delete globals[COMMENT_E2E_CURSOR_KEY]
+    }
+  })
+
   it('is gated on an unpackaged build and ERFANA_E2E_TEST_HOOKS=1', () => {
     vi.stubEnv('ERFANA_E2E_TEST_HOOKS', '1')
     expect(commentE2eHookEnabled()).toBe(true)

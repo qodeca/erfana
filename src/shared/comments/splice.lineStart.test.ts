@@ -7,7 +7,7 @@
  * `line-start` shape, the shape-aware read-back and the kind hooks, on an
  * index that is not HTML.
  */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { PREVIEW_LIMITS } from '../preview-limits'
 import type { KindDocument, Slot } from './fileKind'
 import { fixedId, makeComment } from './__fixtures__/commentTestData'
@@ -83,6 +83,16 @@ describe('kind hooks', () => {
   it('a growth check refuses the insert', () => {
     const result = planSlotInsert(lineDocument('a\n'), lineSlot(0, ''), DATA, () => 'meta-charset')
     expect(result).toEqual({ ok: false, reason: 'meta-charset' })
+  })
+
+  it('C1 a kind\'s hints get the document written into when it is a kind\'s parse, and nothing for a bare text and state', () => {
+    const hints = vi.fn((_data: unknown, _doc?: KindDocument): readonly string[] => ['hint: about the target'])
+    const note = { agentNote: ['note to agents: a test kind.'], hints }
+    const doc = lineDocument('a\n')
+    const planned = planSlotInsert(doc, lineSlot(0, ''), DATA, undefined, note)
+    expect(planned.ok && planned.plan.insert).toContain('hint: about the target')
+    planSlotInsert({ text: doc.text, state: doc.state }, lineSlot(0, ''), DATA, undefined, note)
+    expect(hints.mock.calls.map(([, given]) => given)).toEqual([doc, undefined])
   })
 
   it('a serialize failure is the plan failure', () => {
