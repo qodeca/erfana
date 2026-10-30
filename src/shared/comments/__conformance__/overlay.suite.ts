@@ -140,24 +140,23 @@ export function runOverlaySuite(name: string, makeDriver: () => OverlayDriver | 
         expect(d.picks()).toEqual([open('inner')])
       })
 
-      it('OVL-G-06 a drag of 4 px inside one target picks it, selects nothing (v0.23.1; 024-FR-004 makes it select)', () => {
+      it('OVL-G-06 024-FR-004 a drag of 4 px inside one target selects: nothing is picked, the page sees nothing', () => {
         d.drag({ target: 'inner', dx: -2 }, { target: 'inner', dx: 2 })
-        expect(d.picks()).toEqual([open('inner')])
-        expect(d.selectedText()).toBe('')
+        expect(d.picks()).toEqual([])
         expect(d.pageSaw()).toEqual([])
       })
 
-      it('OVL-G-07 a drag across two targets picks their nearest common container (v0.23.1; 024-FR-004 makes it select)', () => {
+      it('OVL-G-07 024-FR-004 a drag across two targets selects: nothing is picked', () => {
         d.drag({ target: 'first', dx: 100 }, { target: 'second', dx: 100 })
-        expect(d.picks()).toEqual([open('container')])
-        expect(d.selectedText()).toBe('')
+        expect(d.picks()).toEqual([])
       })
 
-      it('OVL-G-08 a click with a non-collapsed selection still picks (v0.23.1; 024-FR-004 makes it keep the selection)', () => {
+      it('OVL-G-08 024-FR-004 a click that ends with a non-collapsed selection keeps it and picks nothing', () => {
         d.selectText('second')
         expect(d.selectedText()).not.toBe('')
         d.click('inner')
-        expect(d.picks()).toEqual([open('inner')])
+        expect(d.picks()).toEqual([])
+        expect(d.selectedText()).not.toBe('')
       })
 
       it('OVL-G-09 Shift+click picks like a click (v0.23.1)', () => {

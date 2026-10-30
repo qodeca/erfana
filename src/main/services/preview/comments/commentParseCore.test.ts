@@ -235,6 +235,17 @@ describe('instrumentDocument – blocks resolved to tokens (§6 "On every load")
     expect(byId.get(fixedId('c-', 1))?.status).toBe('open')
   })
 
+  it('C-06 (HTML) pin: an open thread whose element text changed is marked changed; the others, and resolved ones, are not', () => {
+    const { text } = commentedPage()
+    expect(expectInstrumented(instrumentDocument(encodeText(text))).blocks.some(b => b.changed === true)).toBe(false)
+    const edited = text.replace('>Buy now</button>', '>Buy later</button>').replace('>Fresh coffee</h1>', '>Old coffee</h1>')
+    const byId = new Map(expectInstrumented(instrumentDocument(encodeText(edited))).blocks.map(b => [b.id, b]))
+    // The button's open thread is Changed; the heading's thread is resolved – history, never changed.
+    expect(byId.get(fixedId('c-', 1))?.changed).toBe(true)
+    expect(byId.get(fixedId('c-', 2))?.changed).toBeUndefined()
+    expect(byId.get(fixedId('c-', 3))?.changed).toBeUndefined()
+  })
+
   it('an orphaned block has no target', () => {
     const block = commentOn(BASE_PAGE, 'button', 0, {
       id: fixedId('c-', 9),

@@ -97,6 +97,33 @@ describe('commentDraftOpener', () => {
     expect(s.keys.size.drafts).toBe(1)
   })
 
+  it('OD-01 024-AC-004 a right-click outside comment mode on words opens the selection menu, with the text main parsed and the range of the words', async () => {
+    const s = await setup(commentedPage().text)
+    const token = tokenOfTag(s.load.doc, 'p')
+    const entry = s.tokens.lookup(s.record.loadId!, token)
+    await s.opener.element(s.top, s.record, entry, pick({ kind: 'context', token, tag: 'p', screen: { x: 1, y: 2 } }))
+    const plain = s.emitted[0]
+    expect(plain).toMatchObject({ kind: 'menu' })
+    expect(plain).not.toHaveProperty('selection')
+    const words = plain.kind === 'icon' ? undefined : plain.words
+    expect(words).toMatchObject({ start: 0, end: 0, cut: false })
+    const exact = words!.text.split(' ').slice(0, 2).join(' ')
+    await s.opener.element(s.top, s.record, entry, pick({ kind: 'context', token, tag: 'p', sel: { exact, prefix: '', suffix: '' } }))
+    const selected = s.emitted[1]
+    expect(selected).toMatchObject({ kind: 'menu', selection: true, words: { text: words!.text, start: 0, end: exact.length } })
+    expect(CommentDraftOpenedSchema.safeParse(selected).success).toBe(true)
+  })
+
+  it('C-22 (HTML) a comment-mode click on an element with open threads opens its threads, not a new comment', async () => {
+    const s = await setup(commentedPage().text)
+    const [key, pin] = [...s.record.pins][0]
+    const entry = s.tokens.lookup(s.record.loadId!, pin.token)
+    await s.opener.element(s.top, s.record, entry, pick({ kind: 'open', token: pin.token, tag: entry!.tagName }))
+    expect(s.emitted).toHaveLength(1)
+    expect(s.emitted[0]).toMatchObject({ kind: 'icon', threadKeys: [expect.any(String)] })
+    expect(key).toBeTruthy()
+  })
+
   it('M1 two id-less elements on one line get two element keys; the same element picked again gets its own back, and no path shows', async () => {
     const html = '<!doctype html><html><body>\n<div>first</div><div>second</div>\n</body></html>'
     const s = await setup(html)
@@ -147,6 +174,20 @@ describe('commentDraftOpener', () => {
     const openKey = [...s.record.pins].find(([, pin]) => pin.threadIds.length > 0)![0]
     await s.opener.icon(s.top, s.record, openKey, pick({ kind: 'icon', key: openKey }))
     expect(s.emitted[1]).toMatchObject({ kind: 'icon', threadKeys: [expect.stringMatching(/^t/)], blockKeys: [] })
+  })
+
+  it('C-17 (HTML) a stack pin opens the threads and blocks of every pin merged into it, in document order; unknown keys add nothing', async () => {
+    const html = insertBefore(commentedPage().text, '<p id="para"', damagedBlock('c-9'))
+    const s = await setup(html)
+    const openKey = [...s.record.pins].find(([, pin]) => pin.threadIds.length > 0)![0]
+    const damagedKey = [...s.record.pins].find(([, pin]) => pin.attention > 0)![0]
+    await s.opener.icon(s.top, s.record, openKey, pick({ kind: 'icon', key: openKey, stack: [damagedKey, 'p-none'] }))
+    expect(s.emitted[0]).toMatchObject({ kind: 'icon', threadKeys: [expect.stringMatching(/^t/)], blockKeys: [expect.stringMatching(/^b/)] })
+    // A merged pin on a load main no longer knows adds no blocks.
+    const anyRecord = createCommentDraftOpener({ ...s.deps, isCurrent: () => true })
+    await anyRecord.icon(s.top, { ...s.record, loadId: undefined }, openKey, pick({ kind: 'icon', key: openKey, stack: [damagedKey] }))
+    expect(s.emitted).toHaveLength(2)
+    expect(s.emitted[1]).toMatchObject({ blockKeys: [] })
   })
 
   it('§10.4 a pin offers "New comment": a draft on the pin\'s element, bound to this view, with its element key and target', async () => {

@@ -32,6 +32,7 @@ import type { HtmlFileJobRunner } from './htmlCommentJobs'
 import { jobFailureRefusal, refusalCode } from '../../comments/commentRefusals'
 import { samePathKey } from '../../comments/commentUnsavedSources'
 import type { ElementTokenEntry } from './ElementTokenTable'
+import type { DraftWordsPart } from './commentWordsCore'
 import type { FrameFile } from './frameFileMap'
 
 export { cutText } from '../../../../shared/comments/cutText'
@@ -53,11 +54,13 @@ export interface CommentDraft {
   readonly view: CommentView
   /** The page's real path when the pick was made: a save restores only onto that page. */
   readonly pageRealPath?: string
+  /** The target's text the window chose its words from: a save keeps words found once in it (024-FR-004). */
+  readonly wordsText?: string
 }
 
 /** A built draft, or why there is none (`code` absent: the element cannot take comments). */
 export type BuiltDraft =
-  | { readonly ok: true; readonly draft: CommentDraft; readonly target: DraftTargetView }
+  | ({ readonly ok: true; readonly draft: CommentDraft; readonly target: DraftTargetView } & DraftWordsPart)
   | { readonly ok: false; readonly code?: ErrorCode }
 
 /** What a draft is built from. */
@@ -79,7 +82,10 @@ const MOVED = { ok: false, code: ErrorCode.COMMENT_TARGET_MOVED } as const
 function pickPartOf(pick: CommentPick): DraftPickPart {
   return {
     ...(pick.runtime === undefined ? {} : { runtime: pick.runtime }),
-    ...(pick.ws === undefined ? {} : { ws: pick.ws })
+    ...(pick.ws === undefined ? {} : { ws: pick.ws }),
+    ...(pick.sel === undefined ? {} : { sel: pick.sel }),
+    ...(pick.long === undefined ? {} : { long: pick.long }),
+    ...(pick.crossed === undefined ? {} : { crossed: pick.crossed })
   }
 }
 
@@ -182,7 +188,14 @@ function draftFrom(input: Omit<DraftInput, 'pick' | 'jobs'>, pick: CommentPick, 
     anchor: built.anchor,
     ...(built.ws === undefined ? {} : { ws: built.ws }),
     view: pick.view,
-    ...(input.pageRealPath === undefined ? {} : { pageRealPath: input.pageRealPath })
+    ...(input.pageRealPath === undefined ? {} : { pageRealPath: input.pageRealPath }),
+    ...(built.words === undefined ? {} : { wordsText: built.words.text })
   }
-  return { ok: true, draft, target: built.target }
+  return {
+    ok: true,
+    draft,
+    target: built.target,
+    ...(built.words === undefined ? {} : { words: built.words }),
+    ...(built.wordsMissing === undefined ? {} : { wordsMissing: built.wordsMissing })
+  }
 }

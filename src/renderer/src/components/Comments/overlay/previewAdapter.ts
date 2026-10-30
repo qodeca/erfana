@@ -45,4 +45,12 @@ export interface PreviewCommentAdapter {
   describe(target: HTMLElement): PickedTargetRequest | null
   /** The element a listed thread is attached to now, or `null` when it is not rendered. */
   attach(placement: ThreadPlacement): HTMLElement | null
+  /** The rendered text column (C-18: a docked window sits in the margin beside it); `null` when unmounted. */
+  root?(): HTMLElement | null
+  /**
+   * A refusal the pick already knows, before anything is typed (W-08): the
+   * target lies in a generated START/END region (024-FR-023). `null` when
+   * none is known – main still decides at save.
+   */
+  refusalOf?(target: HTMLElement): 'generated-region' | null
 }

@@ -60,6 +60,8 @@ export interface CommentServiceApi {
   setMode(on: boolean, showIcons: boolean): Promise<CommentSetModeResult>
   list(): Promise<CommentListResult>
   reveal(threadKey: string): CommentAck
+  /** C-14.2: keep an open new-comment window's draft alive. */
+  keepDraft(draftToken: string): CommentAck
   save(request: CommentSaveRequest): Promise<CommentSaveResult>
   e2eState(): CommentE2ePanelState
 }

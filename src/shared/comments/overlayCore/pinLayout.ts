@@ -42,10 +42,16 @@ export const PIN_TIP_OFFSET_PX = 4
  * mode's 2 px frame along it.
  */
 export const PIN_EDGE_INSET_PX = PIN_TIP_OFFSET_PX
-/** How far an overlapping pin moves left along the top edge (§10.5). */
-export const PIN_STEP_PX = 22
-/** Steps an overlapping pin may take before it stays put, overlapping (bounds the search). */
+/**
+ * How far an overlapping pin moves left along the top edge (§10.5; C-17): the
+ * 24 px hit box plus a 2 px gap (`--btn-height-sm` + `--space-1`), so
+ * neighbouring hit areas never overlap (v0.23.1 stepped 22 px, overlapping by 2).
+ */
+export const PIN_STEP_PX = 26
+/** Steps an overlapping pin may take in {@link placePin} before it stays put, overlapping (bounds the search). */
 export const PIN_MAX_STEPS = 8
+/** C-17: pins per crowded spot in {@link layoutPins}; the rest merge into one stack pin after them. */
+export const PIN_ROW_CAP = 3
 
 /** The part of `box` inside the viewport, or `null` when none is. */
 export function clipToViewport(box: Box, viewport: Viewport): Box | null {
@@ -67,15 +73,37 @@ export function overlaps(a: Box, b: Box): boolean {
   )
 }
 
-/** The drawn bubble inside a pin's hit box: the view box's 2–22 units. */
-function bodyOf(box: Box, scale: number): Box {
-  const inset = PIN_TIP.x * scale
-  return { left: box.left + inset, top: box.top + inset, width: box.width - 2 * inset, height: box.height - 2 * inset }
-}
-
 /** `value` within `min`..`max`; `min` wins when the range is empty. */
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), Math.max(min, max))
+}
+
+/**
+ * Where a pin for `element` goes with nothing in its way: the tail tip
+ * {@link PIN_TIP_OFFSET_PX} outward from the top-right corner of the
+ * element's visible part, the box clamped {@link PIN_EDGE_INSET_PX} inside
+ * each viewport edge; `null` when no part of the element is in `viewport`.
+ * The tip scales with `size / PIN_BOX_PX`; the insets do not.
+ */
+function startOf(element: Box, viewport: Viewport, size: number): Box | null {
+  const visible = clipToViewport(element, viewport)
+  if (visible === null) return null
+  const scale = size / PIN_BOX_PX
+  const inset = PIN_EDGE_INSET_PX
+  const left = clamp(visible.left + visible.width + PIN_TIP_OFFSET_PX - PIN_TIP.x * scale, inset, viewport.width - size - inset)
+  const top = clamp(visible.top - PIN_TIP_OFFSET_PX - PIN_TIP.y * scale, inset, viewport.height - size - inset)
+  return { left, top, width: size, height: size }
+}
+
+/** `box` moved `steps` pin steps left (scaled with its size); `null` when that crosses the left inset. */
+function stepped(box: Box, steps: number): Box | null {
+  const left = box.left - steps * PIN_STEP_PX * (box.width / PIN_BOX_PX)
+  return left < PIN_EDGE_INSET_PX ? null : { left, top: box.top, width: box.width, height: box.height }
+}
+
+/** The boxes in the row of `box`: only those can be in its way. */
+function rowOf(boxes: readonly Box[], box: Box): Box[] {
+  return boxes.filter(other => Math.abs(other.top - box.top) < box.height)
 }
 
 /**
@@ -83,15 +111,14 @@ function clamp(value: number, min: number, max: number): number {
  * border box is `element`; `null` when no part of the element is in
  * `viewport`.
  *
- * The tail tip goes {@link PIN_TIP_OFFSET_PX} outward from the top-right
- * corner of the element's visible part, and the box is clamped
- * {@link PIN_EDGE_INSET_PX} inside each viewport edge. A pin whose drawn
- * bubble would overlap one in `placed` (the pins already placed, in document
- * order, so an ancestor keeps the corner) moves left in
- * {@link PIN_STEP_PX} steps, never past the left inset. Only pins of its own
- * row count, and it takes at most {@link PIN_MAX_STEPS} steps – past that it
- * stays put, overlapping – so hundreds of pins in one row cost little.
- * `PIN_STEP_PX` and the tip scale with `size / PIN_BOX_PX`; the insets do not.
+ * The pin starts where {@link startOf} puts it. One whose hit box would
+ * overlap one in `placed` (the pins already placed, in document order, so an
+ * ancestor keeps the corner) moves left in {@link PIN_STEP_PX} steps, never
+ * past the left inset. Only pins of its own row count, and it takes at most
+ * {@link PIN_MAX_STEPS} steps – past that it stays put, overlapping – so
+ * hundreds of pins in one row cost little. Collisions run after the clamp:
+ * every full-width element's pin lands on the same clamped spot, so one in the
+ * same row steps left like any other.
  */
 export function placePin(
   element: Box,
@@ -99,25 +126,54 @@ export function placePin(
   viewport: Viewport,
   size: number = PIN_BOX_PX
 ): Box | null {
-  const visible = clipToViewport(element, viewport)
-  if (visible === null) return null
-  const scale = size / PIN_BOX_PX
-  const inset = PIN_EDGE_INSET_PX
-  const tipX = visible.left + visible.width + PIN_TIP_OFFSET_PX
-  const tipY = visible.top - PIN_TIP_OFFSET_PX
-  let left = clamp(tipX - PIN_TIP.x * scale, inset, viewport.width - size - inset)
-  const top = clamp(tipY - PIN_TIP.y * scale, inset, viewport.height - size - inset)
-  const at = (x: number): Box => ({ left: x, top, width: size, height: size })
-  // Collisions are judged on the drawn bubble (20 px inside the 24 px hit
-  // box), so pins 22 px apart sit side by side with a 2 px gap. They run
-  // after the clamp: every full-width element's pin lands on the same
-  // clamped spot, so one in the same row steps left like any other.
-  const row = placed.filter(box => Math.abs(box.top - top) < size).map(box => bodyOf(box, scale))
-  const step = PIN_STEP_PX * scale
-  for (let moves = 0; moves < PIN_MAX_STEPS && left - step >= inset; moves += 1) {
-    const body = bodyOf(at(left), scale)
-    if (!row.some(other => overlaps(other, body))) break
-    left -= step
+  const start = startOf(element, viewport, size)
+  if (start === null) return null
+  const row = rowOf(placed, start)
+  let box = start
+  for (let moves = 1; moves <= PIN_MAX_STEPS && row.some(other => overlaps(other, box)); moves += 1) {
+    const next = stepped(start, moves)
+    if (next === null) break
+    box = next
   }
-  return at(left)
+  return box
+}
+
+/** One slot of {@link layoutPins}: a pin, or the stack pin of a crowded row. */
+export interface PinSlot {
+  readonly box: Box
+  /** Indexes into the elements given: one for a pin; every merged one for a stack, in document order. */
+  readonly members: readonly number[]
+  readonly stack: boolean
+}
+
+/**
+ * The pins of `elements` (border boxes, in document order) with C-17's row
+ * cap. A pin steps left as {@link placePin}'s does, but at most
+ * {@link PIN_ROW_CAP} pins share one crowded spot: an element that finds no
+ * free spot among them merges into a stack pin one step further left ("+3"),
+ * which a later element joins when its own stack spot overlaps it. Pins never
+ * overlap each other; a stack pressed against the left inset may sit over a
+ * pin. Elements wholly off screen get no slot.
+ */
+export function layoutPins(elements: readonly Box[], viewport: Viewport, size: number = PIN_BOX_PX): PinSlot[] {
+  const slots: { box: Box; members: number[]; stack: boolean }[] = []
+  elements.forEach((element, index) => {
+    const start = startOf(element, viewport, size)
+    if (start === null) return
+    const row = slots.filter(slot => Math.abs(slot.box.top - start.top) < size)
+    for (let steps = 0; steps < PIN_ROW_CAP; steps += 1) {
+      const box = steps === 0 ? start : stepped(start, steps)
+      if (box === null) break
+      if (!row.some(slot => overlaps(slot.box, box))) {
+        slots.push({ box, members: [index], stack: false })
+        return
+      }
+    }
+    const spot = stepped(start, PIN_ROW_CAP) ?? { left: PIN_EDGE_INSET_PX, top: start.top, width: size, height: size }
+    const stack = row.find(slot => slot.stack && overlaps(slot.box, spot))
+    // No `undefined` here: the core names no global (contract test).
+    if (stack) stack.members.push(index)
+    else slots.push({ box: spot, members: [index], stack: true })
+  })
+  return slots
 }

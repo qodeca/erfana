@@ -180,6 +180,7 @@ describe('R-012 comments tokens', () => {
       '1px': 'the visually-hidden live-region box (1 x 1, not a stroke)',
       '12%': 'selected-element fill mix',
       '24%': 'flash fill mix',
+      '35%': 'comment mark fill mix (C-12: --color-comment-mark is the accent at 35%)',
       '50%': 'centring and the visually-hidden clip',
       '100%': 'pin SVG fills its button',
       '1.5': 'pin stroke width (SVG user units)',

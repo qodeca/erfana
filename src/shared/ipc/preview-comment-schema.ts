@@ -34,6 +34,7 @@ import type { CommentSaveResult } from './comment-common-schema'
 import {
   CommentKeySchema as KeySchema,
   CommentPickerSaySchema as PickerSaySchema,
+  CommentPickSelSchema,
   CommentPointSchema,
   CommentRuntimeTagSchema as RuntimeTagSchema,
   CommentTagNameSchema as TagNameSchema
@@ -49,12 +50,13 @@ export {
   CommentOverlayLossSchema,
   CommentPickRuntimeSchema,
   CommentPickSchema,
+  CommentPickSelSchema,
   CommentPickViewSchema,
   CommentPointSchema,
   PICK_RUNTIME_TAG_MAX_CHARS
 } from './preview-comment-page-schema'
 export type { CommentAnchors, CommentBox, CommentOverlayLoss, CommentPick } from './preview-comment-page-schema'
-export type { CommentPickRuntime, CommentPickView, CommentPoint } from './preview-comment-page-schema'
+export type { CommentPickRuntime, CommentPickSel, CommentPickView, CommentPoint } from './preview-comment-page-schema'
 // One definition with the file-comment family (spec 024 architecture note 001 § 4).
 export {
   COMMENT_PATH_MAX_CHARS,
@@ -71,6 +73,12 @@ export const COMMENT_DRAFT_TOKEN_PATTERN = /^[0-9a-f]{32}$/
 export const COMMENT_DRAFT_KEY_PATTERN = /^[0-9a-f]{32}$/
 /** Files one window may report as holding unsaved editor changes. */
 export const COMMENT_UNSAVED_SOURCES_MAX = 500
+/**
+ * Characters of a target's text a draft carries for the words of a new
+ * comment (spec 024 024-FR-004, C-07 "Narrow to words"). A longer text is
+ * sent as the part around the selected words, or not at all.
+ */
+export const COMMENT_WORDS_TEXT_MAX_CHARS = 10_000
 
 // ---------------------------------------------------------------------------
 // Renderer → main
@@ -103,10 +111,17 @@ export type CommentSetModeRequest = z.infer<typeof CommentSetModeRequestSchema>
 export const CommentPanelRequestSchema = z.object({ panelId: PanelIdSchema }).strict()
 export type CommentPanelRequest = z.infer<typeof CommentPanelRequestSchema>
 
-/** `preview:commentCommand` – "Show on page" (§7.10). */
-export const CommentCommandRequestSchema = z
-  .object({ panelId: PanelIdSchema, command: z.literal('reveal'), threadKey: KeySchema })
-  .strict()
+/**
+ * `preview:commentCommand` – "Show on page" (§7.10), or keep an open
+ * new-comment window's draft alive (spec 024 C-14.2; main caps a draft's whole
+ * life, `commentKeyStore.ts` `DRAFT_MAX_AGE_MS`).
+ */
+export const CommentCommandRequestSchema = z.discriminatedUnion('command', [
+  z.object({ panelId: PanelIdSchema, command: z.literal('reveal'), threadKey: KeySchema }).strict(),
+  z
+    .object({ panelId: PanelIdSchema, command: z.literal('keep-draft'), draftToken: z.string().regex(COMMENT_DRAFT_TOKEN_PATTERN) })
+    .strict()
+])
 export type CommentCommandRequest = z.infer<typeof CommentCommandRequestSchema>
 
 /** `preview:commentSave` – one operation; the author comes from main's settings, never from here. */
@@ -116,7 +131,9 @@ export const CommentSaveRequestSchema = z.discriminatedUnion('op', [
       panelId: PanelIdSchema,
       op: z.literal('add'),
       draftToken: z.string().regex(COMMENT_DRAFT_TOKEN_PATTERN),
-      text: MessageTextSchema
+      text: MessageTextSchema,
+      /** The words the comment is about (024-FR-004); main keeps them only when they are in its own text of the target. */
+      sel: CommentPickSelSchema.optional()
     })
     .strict(),
   ...commentThreadOpSchemas
@@ -197,6 +214,24 @@ export const CommentDraftTargetViewSchema = z
   .strict()
 
 /**
+ * The target's text and the selected range in it, from MAIN's parse of the
+ * file (spec 024 024-FR-004, C-07): what the window's words and its Narrow to
+ * words field show. Collapsed as a selection reads it
+ * (`shared/comments/selectionWords.ts`); `start === end`: no words chosen.
+ * `cut`: the selection ran past the target and was cut to it.
+ */
+export const CommentDraftWordsSchema = z
+  .object({
+    text: z.string().max(COMMENT_WORDS_TEXT_MAX_CHARS),
+    start: z.number().int().min(0).max(COMMENT_WORDS_TEXT_MAX_CHARS),
+    end: z.number().int().min(0).max(COMMENT_WORDS_TEXT_MAX_CHARS),
+    cut: z.boolean()
+  })
+  .strict()
+  .refine(words => words.start <= words.end && words.end <= words.text.length, { message: 'a range inside the text' })
+export type CommentDraftWords = z.infer<typeof CommentDraftWordsSchema>
+
+/**
  * A draft, as the renderer holds it: the single-use token, the element key the
  * window keeps typed text under for the session (§10.4 "Draft restored"), and
  * what the window shows for the element. All three or none.
@@ -223,7 +258,13 @@ export const CommentDraftOpenedSchema = z
         point: CommentPointSchema,
         ...DisplaySchema,
         /** Absent: the menu shows a disabled "Can't comment here". */
-        ...DraftSchema
+        ...DraftSchema,
+        /** The pick was made on a text selection: the menu is the selection menu (M-02, M-04). */
+        selection: z.literal(true).optional(),
+        /** The target's text, and the selected words in it when main found them there (024-FR-004). */
+        words: CommentDraftWordsSchema.optional(),
+        /** Words were selected, but they are not in the file as written (a script added them): the window says so. */
+        wordsMissing: z.literal(true).optional()
       })
       .strict(),
     z
@@ -249,6 +290,10 @@ export const CommentDraftOpenedSchema = z
     },
     { message: 'a draft comes with its key and its target' }
   )
+  .refine(
+    event => event.kind === 'icon' || event.draftToken !== undefined || (event.words === undefined && event.wordsMissing === undefined),
+    { message: 'words come with a draft' }
+  )
 export type CommentDraftOpened = z.infer<typeof CommentDraftOpenedSchema>
 
 /** `preview:commentsChanged` – the toolbar badge and the unavailable state (§10.1, §10.10). */
@@ -273,13 +318,29 @@ export const CommentAnchorStatusSchema = z
   .strict()
 export type CommentAnchorStatus = z.infer<typeof CommentAnchorStatusSchema>
 
+/** The spoken kind of a picked element (comments-v2 C-10), from main's own table – never page text. */
+export const CommentPickerRoleSchema = z.enum([
+  'paragraph', 'list item', 'list', 'table', 'table row', 'table cell', 'image', 'button', 'link', 'section', 'article',
+  'navigation', 'header', 'footer', 'aside', 'main', 'block quote', 'code block', 'figure', 'form', 'element',
+  'heading level 1', 'heading level 2', 'heading level 3', 'heading level 4', 'heading level 5', 'heading level 6'
+])
+export type CommentPickerRole = z.infer<typeof CommentPickerRoleSchema>
+
 /**
  * Where the keyboard picker stopped, as MAIN's token table has it – the tag main parsed and the line of its start
  * tag; `added`: the element reached lies below it (a script built it). Never page text (security review S-L-A); a
- * parsed tag no tag name can spell is left out.
+ * parsed tag no tag name can spell is left out. C-10 adds its spoken kind and its open comments, both main's.
  */
 export const CommentPickerElementSchema = z
-  .object({ tag: TagNameSchema.optional(), line: z.number().int().min(1), added: z.literal(true).optional() })
+  .object({
+    tag: TagNameSchema.optional(),
+    line: z.number().int().min(1),
+    added: z.literal(true).optional(),
+    /** C-10: the kind main names the element by (absent for a script-built one). */
+    role: CommentPickerRoleSchema.optional(),
+    /** C-10: open comments on the element. */
+    comments: z.number().int().min(1).max(PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE).optional()
+  })
   .strict()
 export type CommentPickerElement = z.infer<typeof CommentPickerElementSchema>
 
@@ -308,7 +369,9 @@ export const CommentSaveOpSchema = z.enum([
   'deleteMessage',
   'setStatus',
   'deleteThread',
-  'deleteBlock'
+  'deleteBlock',
+  // OD-05: named by its block key, as a block delete is.
+  'rebuildBlock'
 ])
 export type CommentSaveOp = z.infer<typeof CommentSaveOpSchema>
 
@@ -324,7 +387,7 @@ function namedByItsOwnKey(event: {
 }): boolean {
   const named = { draftToken: event.draftToken !== undefined, threadKey: event.threadKey !== undefined, blockKey: event.blockKey !== undefined }
   if (event.op === 'add') return named.draftToken && !named.threadKey && !named.blockKey
-  if (event.op === 'deleteBlock') return named.blockKey && !named.draftToken && !named.threadKey
+  if (event.op === 'deleteBlock' || event.op === 'rebuildBlock') return named.blockKey && !named.draftToken && !named.threadKey
   return named.threadKey && !named.draftToken && !named.blockKey
 }
 
@@ -357,6 +420,8 @@ export interface PreviewCommentsBridge {
   setMode(request: CommentSetModeRequest): Promise<CommentSetModeResult>
   list(panelId: string): Promise<CommentListResult>
   reveal(panelId: string, threadKey: string): Promise<CommentAck>
+  /** C-14.2: keep the open new-comment window's draft alive. */
+  keepDraft(panelId: string, draftToken: string): Promise<CommentAck>
   save(request: CommentSaveRequest): Promise<CommentSaveResult>
   setUnsavedSources(paths: readonly string[]): Promise<CommentAck>
   onDraftOpened(callback: (payload: CommentDraftOpened) => void): () => void

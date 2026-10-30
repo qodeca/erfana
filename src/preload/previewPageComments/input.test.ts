@@ -72,13 +72,14 @@ const picks = (): Array<Record<string, unknown>> =>
   (h.sent(COMMENT_PICK_CHANNEL) as Array<Record<string, unknown>>).filter(p => p.kind !== 'step')
 
 describe('the guards', () => {
-  it('J-004 in comment mode every click-family event is stopped in capture; contextmenu keeps its default', () => {
+  it('J-004 in comment mode every click-family event is stopped in capture; contextmenu and a primary press keep their default (024-FR-004: a drag selects)', () => {
     const page = pageListeners()
     h.state({ mode: true })
     const events = GUARDED_EVENTS.map(type => userMouse(byId('cta'), type, { x: 120, y: 110 }))
     page.remove()
     expect(page.seen).toEqual([])
-    for (const event of events) expect(event.defaultPrevented).toBe(event.type !== 'contextmenu')
+    const kept = new Set(['contextmenu', 'pointerdown', 'mousedown'])
+    for (const event of events) expect(event.defaultPrevented, event.type).toBe(!kept.has(event.type))
   })
 
   it('J-004 out of comment mode the page’s own handlers run and nothing is prevented', () => {

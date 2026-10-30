@@ -58,6 +58,20 @@ export type CommentWindowRequest =
       readonly opener: WindowOpener
       /** The target's text and the selected words; absent where the preview cannot offer words (HTML for now). */
       readonly words?: NewCommentWords
+      /** Words were selected but are not in the file as written (HTML, 024-AC-004 (g)): the window says so. */
+      readonly wordsMissing?: true
+      /**
+       * The tag of the target's parent that can hold a comment, when there is
+       * one: a render-check refusal offers "Comment on the whole {parent}"
+       * (C-19.3, state table W-07).
+       */
+      readonly parentTag?: string
+      /**
+       * The pick already knows no comment can be written here – the target is
+       * inside a generated START/END region (024-FR-023, W-08): the window
+       * opens with the refusal and Save blocked, before anything is typed.
+       */
+      readonly refused?: 'generated-region'
     }
   | {
       readonly kind: 'threads'

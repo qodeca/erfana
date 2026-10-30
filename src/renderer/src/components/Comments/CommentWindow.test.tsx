@@ -434,14 +434,21 @@ describe('CommentWindow – new comment', () => {
       expect(commentDrafts.get(draftKeyOf(newRequest()))).toBe('Still here')
     })
 
-    it('target moved: the window says to pick again and offers Close', async () => {
+    // C-14.1 changed this case: a moved target no longer ends at Close – the text travels with Pick again (W-01).
+    it('C-14 (HTML) target moved: the window keeps the text and offers Cancel, then Pick again', async () => {
       const user = userEvent.setup()
-      setup({
+      const { props } = setup({
         onSave: vi.fn(async () => ({ ok: false as const, code: ErrorCode.COMMENT_TARGET_MOVED }))
       })
       await user.type(field(), 'x')
       await user.click(saveButton())
-      expect(await screen.findByTestId('comment-close')).toBeVisible()
+      expect(await screen.findByTestId('comment-save-error')).toHaveTextContent(
+        'This element changed in the file since you picked it. Pick it again – your text comes with you.'
+      )
+      expect(screen.getByTestId('comment-cancel')).toBeVisible()
+      await user.click(screen.getByTestId('comment-pick-again'))
+      expect(props.onPickAgain).toHaveBeenCalled()
+      expect(field()).toHaveValue('x')
     })
   })
 

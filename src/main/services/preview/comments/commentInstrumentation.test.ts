@@ -126,14 +126,16 @@ describe('decideCommentServing – M-060 gates', () => {
       action: 'raw',
       reason: 'too-large'
     })
-    // A large file nobody expects comments in gets no reason at all.
+    // OD-01: any page can take a comment now, so a large one without blocks says why it cannot too.
     expect(decideCommentServing(request({ body: Buffer.alloc(big.length, 0x20) }), on)).toEqual({
-      action: 'raw'
+      action: 'raw',
+      reason: 'too-large'
     })
   })
 
-  it('M-060 no erfana:comment and comment mode off → raw; comment mode on → instrumented', () => {
-    expect(decideCommentServing(request({ body: PLAIN }), on)).toEqual({ action: 'raw' })
+  it('M-060 OD-01 a page with no erfana:comment is instrumented with comment mode off too, so its menu can comment', () => {
+    // OD-01 (spec 024): was raw with the mode off; every page is instrumented while the feature is on.
+    expect(decideCommentServing(request({ body: PLAIN }), on)).toEqual({ action: 'instrument', scope: 'page' })
     expect(
       decideCommentServing(request({ body: PLAIN }), { enabled: true, commentMode: true })
     ).toEqual({
@@ -178,19 +180,19 @@ describe('createPreviewCommentServing', () => {
 
   it('serves raw bytes, unregistered, for every gate that says raw', async () => {
     const { serving: s, client } = serving()
-    expect(await s.bodyFor(request({ body: PLAIN }))).toBe(PLAIN)
+    expect(await s.bodyFor(request({ body: PLAIN, ext: '.txt' }))).toBe(PLAIN)
     expect(await s.bodyFor(request({ requestClass: 'subresource' }))).toBe(COMMENTED)
     expect(client.instrument).not.toHaveBeenCalled()
     expect(s.tokens.size).toBe(0)
     expect(s.unavailableReason(REAL_PATH)).toBeUndefined()
   })
 
-  it('comment mode instruments a page without blocks', async () => {
+  it('OD-01 a page without blocks is instrumented with comment mode on and off', async () => {
     const { serving: s } = serving()
     s.setCommentMode(true)
     expect((await s.bodyFor(request({ body: PLAIN })))?.toString('utf8')).toMatch(HAS_TOKEN)
     s.setCommentMode(false)
-    expect(await s.bodyFor(request({ body: PLAIN }))).toBe(PLAIN)
+    expect((await s.bodyFor(request({ body: PLAIN })))?.toString('utf8')).toMatch(HAS_TOKEN)
   })
 
   it('records why comments are unavailable, logs it as a code and a digest, and clears it on success', async () => {

@@ -204,6 +204,7 @@ export function installCommentsBridge(): FakeCommentsBridge {
     })),
     list: vi.fn(async () => ({ ok: true as const, files: [] as CommentFileView[] })),
     reveal: vi.fn(async () => ({ ok: true as const })),
+    keepDraft: vi.fn(async () => ({ ok: true as const })),
     save: vi.fn(async () => ({ ok: true as const, threadKey: 't9' })),
     setUnsavedSources: vi.fn(async () => ({ ok: true as const })),
     onDraftOpened: vi.fn(subscribe(listeners.draft)),

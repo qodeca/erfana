@@ -97,6 +97,26 @@ export class MarkdownCommentsPage {
     return this.overlay().getByTestId(TEST_IDS.COMMENT_SELECTION_BUTTON)
   }
 
+  /** A drawer filter cell (C-15, OD-04). */
+  filter(which: 'open' | 'resolved' | 'cantEdit'): Locator {
+    const ids = {
+      open: TEST_IDS.COMMENT_FILTER_OPEN,
+      resolved: TEST_IDS.COMMENT_FILTER_RESOLVED,
+      cantEdit: TEST_IDS.COMMENT_FILTER_CANT_EDIT
+    }
+    return this.drawer().getByTestId(ids[which])
+  }
+
+  /** The drawer's sort menu button (C-15). */
+  sortButton(): Locator {
+    return this.drawer().getByTestId(TEST_IDS.COMMENT_DRAWER_SORT)
+  }
+
+  /** The drawer's "Show comment icons and underlines" checkbox (C-20). */
+  iconsCheckbox(): Locator {
+    return this.drawer().getByTestId(TEST_IDS.COMMENT_DRAWER_SHOW_ICONS)
+  }
+
   /** The texts of the ranges the comment mark paints now (CSS Custom Highlight API). */
   async markedWords(): Promise<string[]> {
     return this.page.evaluate(() => {

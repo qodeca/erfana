@@ -23,7 +23,14 @@
  *
  * In comment mode a trusted click-family event is stopped
  * (`stopImmediatePropagation`) and its default prevented – except
- * `contextmenu`, whose default the native view has none of. Touches are
+ * `contextmenu`, whose default the native view has none of, and a primary
+ * press on the page, whose default starts a text selection: in comment mode a
+ * drag selects words (spec 024 024-FR-004). The click that ends it is still
+ * prevented, so a link or a button under it does nothing.
+ *
+ * Outside comment mode a trusted `contextmenu` passes to the page untouched;
+ * the controller hears of it and, only if no page listener cancelled it, asks
+ * main for Erfana's menu (OD-01). Touches are
  * stopped too (passive: the click they make is what gets cancelled), and so is
  * the release of every key whose press was a picker action. A click on a pin
  * is stopped in any mode, so a pin click never reaches the page. Wheel and
@@ -66,6 +73,11 @@ const USER_INPUT_EVENTS = ['wheel', 'pointerdown', 'keydown'] as const
 
 const CAPTURE: AddEventListenerOptions = Object.freeze({ capture: true })
 const PASSIVE: AddEventListenerOptions = Object.freeze({ capture: true, passive: true })
+
+/** A primary press, whose default starts a selection. */
+function isPrimaryPress(event: Event): boolean {
+  return (event.type === 'pointerdown' || event.type === 'mousedown') && (event as MouseEvent).button === 0
+}
 
 /**
  * Stop an event from reaching the page. The ONLY place this preload calls
@@ -128,8 +140,13 @@ function handlersOf(controller: CommentController): Handlers {
     guarded(event) {
       if (!event.isTrusted) return
       const onOverlay = controller.isOverlayEvent(event)
-      if (!controller.mode && !onOverlay) return
-      swallow(event)
+      if (!controller.mode && !onOverlay) {
+        if (event.type === 'contextmenu') controller.pageContextMenu(event as MouseEvent)
+        return
+      }
+      // A primary press on the page keeps its default: it may start a selection (024-FR-004).
+      if (!onOverlay && isPrimaryPress(event)) event.stopImmediatePropagation()
+      else swallow(event)
       if (!(event instanceof MouseEvent)) return
       if (onOverlay) controller.overlayEvent(event)
       else controller.pageEvent(event)

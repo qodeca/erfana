@@ -11,6 +11,7 @@ import { INITIAL_PANEL_COMMENT_STATE } from '../../../../stores/usePreviewCommen
 import { useOverlayOccluderStore } from '../../../../stores/useOverlayOccluderStore'
 import { menuDraft, newRequest, threadsRequest } from './__test-helpers__/commentTestKit'
 import { COPY } from '../../../Comments/commentCopy'
+import { MD_SURFACE_COPY, SELECTION_COPY } from '../../../Comments/commentCopyWords'
 import { PreviewCommentsLayer, type PreviewCommentsLayerProps } from './PreviewCommentsLayer'
 
 function setup(patch: Partial<PreviewCommentsLayerProps> = {}) {
@@ -98,6 +99,42 @@ describe('PreviewCommentsLayer', () => {
       expect(item).toHaveAttribute('aria-disabled', 'true')
       await user.click(item)
       expect(props.onAddComment).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('OD-01 024-AC-004 the menu matrix in the HTML Preview', () => {
+    const WORDS = { text: 'We ship the beta to ten customers', start: 20, end: 33, cut: false }
+
+    it('OD-01 outside comment mode the one item is "Comment on element" (M-01)', async () => {
+      const user = userEvent.setup()
+      const draft = menuDraft()
+      const { props } = setup({ menu: draft, mode: false })
+      expect(screen.getByRole('menu', { name: COPY.menuLabel })).toBeVisible()
+      const items = screen.getAllByRole('menuitem')
+      expect(items).toHaveLength(1)
+      expect(items[0]).toHaveTextContent(MD_SURFACE_COPY.commentOn('element'))
+      await user.click(items[0])
+      expect(props.onAddComment).toHaveBeenCalledWith(draft)
+    })
+
+    it('024-AC-004 C-07 (HTML) on a selection: "Comment on selection" then "Comment on the whole element", in a menu named Selection (M-02, M-04)', async () => {
+      const user = userEvent.setup()
+      const draft = menuDraft({ selection: true, words: WORDS })
+      for (const mode of [false, true]) {
+        const { props, unmount } = setup({ menu: draft, mode })
+        expect(screen.getByRole('menu', { name: SELECTION_COPY.menuLabel })).toBeVisible()
+        const items = screen.getAllByRole('menuitem')
+        expect(items.map(item => item.textContent)).toEqual([
+          SELECTION_COPY.commentOnSelection,
+          SELECTION_COPY.commentOnWhole('element')
+        ])
+        await user.click(items[0])
+        expect(props.onAddComment).toHaveBeenCalledWith(draft, 'words')
+        unmount()
+      }
+      const { props } = setup({ menu: draft, mode: false })
+      await user.click(screen.getByRole('menuitem', { name: SELECTION_COPY.commentOnWhole('element') }))
+      expect(props.onAddComment).toHaveBeenCalledWith(draft)
     })
   })
 

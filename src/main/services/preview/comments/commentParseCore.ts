@@ -34,6 +34,7 @@
  * time at 4 MB).
  */
 import { createHash } from 'node:crypto'
+import { anchorSelectionOf, type AnchorSelection } from '../../../../shared/comments/anchorSel'
 import {
   HtmlParseLimitError,
   decodeLossless,
@@ -44,11 +45,14 @@ import {
   instrumentHtml,
   mintElementToken,
   parseIndexedBlocks,
+  type CommentAnchor,
   type HtmlIndex,
   type ParsedBlock,
   type RandomBytes
 } from '../../../../shared/htmlComments'
 import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
+import type { TargetVia } from '../../../../shared/comments/reattach'
+import { changeOf } from '../../comments/commentListChange'
 
 /** Characters in one element token (`ELEMENT_TOKEN_PATTERN`). */
 export const TOKEN_CHARS = 12
@@ -73,6 +77,10 @@ export interface CommentLoadBlock {
   readonly target: number
   /** A JS-built target below its in-file element (§5.6, R3-11): where the preload looks. */
   readonly runtime?: { readonly path: string; readonly tag: string }
+  /** An open thread's valid `anchor.sel`: the words the page marks (spec 024 C-12). */
+  readonly sel?: AnchorSelection
+  /** An open thread whose target no longer reads as stored – Changed or Words changed (C-06): its pin is notched. */
+  readonly changed?: true
 }
 
 /** A served document's token table and blocks. */
@@ -198,6 +206,12 @@ export function positionTarget(
   return index.elementAt(pos)?.start ?? NO_TARGET
 }
 
+/** The list's own C-06 rule (`commentListChange.ts`), so a pin and its drawer row agree. */
+function isChanged(index: HtmlIndex, target: { readonly startOffset: number; readonly via?: TargetVia }, anchor: CommentAnchor): boolean {
+  const el = index.elementAt(target.startOffset)
+  return el !== undefined && changeOf({ index, target: el, anchor, via: target.via, html: true }) !== undefined
+}
+
 /** Reduce the parsed blocks to pin data, each pointing at its element's token. */
 function loadBlocks(index: HtmlIndex, offsets: Int32Array): CommentLoadBlock[] {
   const { blocks } = parseIndexedBlocks(index)
@@ -209,12 +223,16 @@ function loadBlocks(index: HtmlIndex, offsets: Int32Array): CommentLoadBlock[] {
           ? tokenIndexAt(offsets, block.target.startOffset)
           : NO_TARGET
       const runtime = block.data.anchor.runtime
+      const sel = block.data.status === 'open' ? anchorSelectionOf(block.data.anchor) : undefined
+      const changed = block.data.status === 'open' && block.target.state === 'attached' && isChanged(index, block.target, block.data.anchor)
       return {
         kind: 'ok',
         id: block.data.id,
         status: block.data.status,
         target,
-        ...(runtime ? { runtime: { path: runtime.path, tag: runtime.tag } } : {})
+        ...(runtime ? { runtime: { path: runtime.path, tag: runtime.tag } } : {}),
+        ...(sel ? { sel: { exact: sel.exact, prefix: sel.prefix, suffix: sel.suffix } } : {}),
+        ...(changed ? { changed: true as const } : {})
       }
     }
     const start = positionTarget(index, block.nodeRange[1], blockEnds)

@@ -161,14 +161,25 @@
 }
 
 /* aria-disabled, never disabled: "Saving…" keeps focus where the user pressed.
-   The dim goes on the label, never the button, so the focus ring keeps full
-   strength – the Permission band card's rule. */
+   Busy ("Saving…", aria-busy) keeps full strength – the Buttons card's busy
+   state (C-21). Blocked (a field is empty, the source is unsaved) is the
+   card's blocked state: the label AND the fill are dimmed, never the button
+   itself, so the focus ring keeps full strength – the Permission band card's
+   rule. */
 .erf-comment-window .dialog-btn[aria-disabled='true'] {
   cursor: default;
   transform: none;
 }
-.erf-comment-window .dialog-btn[aria-disabled='true'] > span {
+.erf-comment-window .dialog-btn[aria-disabled='true']:not([aria-busy='true']) {
+  cursor: not-allowed;
+}
+.erf-comment-window .dialog-btn[aria-disabled='true']:not([aria-busy='true']) > span {
   opacity: var(--opacity-disabled);
+}
+.erf-comment-window .dialog-btn-primary[aria-disabled='true']:not([aria-busy='true']),
+.erf-comment-window .dialog-btn-primary[aria-disabled='true']:not([aria-busy='true']):hover,
+.erf-comment-window .dialog-btn-primary[aria-disabled='true']:not([aria-busy='true']):active {
+  background: color-mix(in srgb, var(--color-btn-primary-bg) calc(var(--opacity-disabled) * 100%), transparent);
 }
 
 /* ---------- icon buttons: close and the per-message actions ---------- */
@@ -508,7 +519,8 @@
   gap: var(--space-4);
   margin-block-start: var(--space-4);
 }
-.erf-comment-thread__actions > :last-child {
+/* The last button, not the last child: a blocked button's hidden reason may follow it. */
+.erf-comment-thread__actions > .dialog-btn:last-of-type {
   margin-inline-start: auto;
 }
 
@@ -697,6 +709,142 @@
   }
 }
 
+/* ---------- comments-v2 window states (C-05, C-06, C-13, C-14, C-18, OD-05) ---------- */
+
+/* C-18: the Markdown Preview's window is docked, not modal – no shell, no
+   catcher; it sits over the preview pane at the dialog rung, placed by
+   `placeDocked` in viewport pixels. */
+.erf-comment-window--docked {
+  position: fixed;
+  z-index: var(--z-dialog);
+}
+.erf-comment-window--docked:focus {
+  outline: none;
+}
+
+/* C-18: the edge tab a docked window folds to while its target is scrolled away. */
+.erf-comment-edge-tab {
+  position: fixed;
+  z-index: var(--z-dialog);
+  block-size: var(--btn-height-md);
+  padding: 0 var(--space-6);
+  transform: translateX(-100%);
+  background: var(--color-bg-elevated);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.erf-comment-edge-tab--below {
+  transform: translate(-100%, -100%);
+}
+.erf-comment-edge-tab:hover {
+  background: var(--color-bg-hover-solid);
+}
+.erf-comment-edge-tab:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+/* C-13: ‹ 3 of 12 › right of the title, a muted mono count between two icon buttons. */
+.erf-comment-stepper {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.erf-comment-stepper__count {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+}
+.erf-comment-icon-btn[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+.erf-comment-icon-btn[aria-disabled='true'] > svg {
+  opacity: var(--opacity-disabled);
+}
+
+/* W-11: "All open comments are resolved". */
+.erf-comment-done {
+  margin: var(--space-8) 0 0;
+  color: var(--color-text-primary);
+}
+
+/* C-05: "The comment itself is on line {n} of {file}." under the not-found banner. */
+.erf-comment-status-line {
+  margin-block: calc(var(--space-8) * -1 + var(--space-3)) var(--space-8);
+}
+
+/* C-06: Was / Now in the quote style; Was struck through and tertiary. */
+.erf-comment-status {
+  margin-block-end: var(--space-8);
+}
+.erf-comment-status .erf-comment-banner {
+  margin-block-end: var(--space-6);
+}
+.erf-comment-wasnow {
+  display: grid;
+  gap: var(--space-4);
+}
+.erf-comment-wasnow__label {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+.erf-comment-wasnow__was {
+  text-decoration: line-through;
+  color: var(--color-text-tertiary);
+}
+
+/* W-03: "New since you opened" – a rule with its words. */
+.erf-comment-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin: var(--space-6) 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+.erf-comment-divider::before,
+.erf-comment-divider::after {
+  content: '';
+  flex: 1 1 auto;
+  border-block-start: var(--border-width) solid var(--color-border-default);
+}
+
+/* OD-05: the rebuild confirmation – each differing line as the file and the data have it. */
+.erf-comment-rebuild {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border-default);
+}
+.erf-comment-rebuild__lines {
+  margin: var(--space-6) 0 0;
+}
+.erf-comment-rebuild__pair {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-2) var(--space-6);
+}
+.erf-comment-rebuild__pair + .erf-comment-rebuild__pair {
+  margin-block-start: var(--space-4);
+}
+.erf-comment-rebuild__pair dt {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+.erf-comment-rebuild__pair dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
 /* ---------- the words of a new comment (spec 024 024-FR-004; comments-v2 C-07, C-21) ---------- */
 
 .erf-comment-words-area {
@@ -757,6 +905,10 @@
 .erf-comment-narrow__field:focus-visible {
   outline: var(--border-width-thick) solid var(--color-border-focus);
   outline-offset: var(--space-1);
+}
+/* C-21: the quote is set in the preview's face – the Markdown Preview's serif (HTML keeps the system sans). */
+.erf-comment-words--md .erf-comment-words__text {
+  font-family: var(--font-serif);
 }
 .erf-comment-narrow__result {
   margin: 0;

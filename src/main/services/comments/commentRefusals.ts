@@ -10,7 +10,7 @@
  *
  * | Code | Meaning |
  * |---|---|
- * | `COMMENT_PATH_REFUSED` | not a file comments may be written to: not absolute, outside the project, a never-served path (`node_modules`, `dist`, `out`, `coverage`, `.git`, dot-folders), not a registered comment file kind (`.html`/`.htm`), a real name of another kind than the requested one, an NTFS stream name, an 8.3 short name |
+ * | `COMMENT_PATH_REFUSED` | not a file comments may be written to: not absolute, outside the project (a folder inside it is never refused for its name – OD-07), not a registered comment file kind (`.html`/`.htm`, `.md`/`.markdown`), a real name of another kind than the requested one, an NTFS stream name, an 8.3 short name |
  * | `COMMENT_FILE_GONE` | the file, or a folder on its path, no longer exists |
  * | `COMMENT_WRITE_REFUSED_LINK` | the file is a symlink or has other hard links |
  * | `COMMENT_FILE_TOO_LARGE` | over `COMMENT_FILE_MAX_BYTES` (25 MB, every page the preview serves – §19 Rev 4) |
@@ -29,6 +29,7 @@
  * | `COMMENT_KEY_INVALID` (also) | a `file-comment:*` request for a file not open in that panel of the sender's window (`not-open`, C17), or an unknown, used or foreign draft token or key (`key-invalid`) |
  * | `COMMENT_DRAFT_EXPIRED` | a draft older than its time to live (`draft-expired`) |
  * | `COMMENT_PATH_REFUSED` (also) | a `file-comment:*` draft or save while comments are off in Settings for the file's preview (`comments-off`, 024-FR-022) |
+ * | `COMMENT_LIMIT` (also) | a reply to a thread that already holds 200 replies (`replies`), or a write that would make the file larger than 25 MB (`file-size`) – each worded on its own (C-19) |
  *
  * `COMMENT_DRAFT_EXPIRED` and `COMMENT_KEY_INVALID` belong to the draft and
  * key layer (P5), which runs before a write is attempted. `COMMENT_SAVE_PENDING`
@@ -104,7 +105,9 @@ const CODES: Readonly<Record<CommentRefusal, CommentErrorCode>> = {
   'not-open': ErrorCode.COMMENT_KEY_INVALID,
   'key-invalid': ErrorCode.COMMENT_KEY_INVALID,
   'draft-expired': ErrorCode.COMMENT_DRAFT_EXPIRED,
-  'comments-off': ErrorCode.COMMENT_PATH_REFUSED
+  'comments-off': ErrorCode.COMMENT_PATH_REFUSED,
+  replies: ErrorCode.COMMENT_LIMIT,
+  'file-size': ErrorCode.COMMENT_LIMIT
 }
 
 /** The `ErrorCode` a refusal reaches the renderer as. */

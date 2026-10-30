@@ -136,17 +136,66 @@
 /* Commented words (024-FR-004; C-12 on the Text highlights card): the fill
    and a continuous bar, painted by the Custom Highlight API so the content
    is never changed (commentHighlights.ts). Below Find in paint order. */
-::highlight(erf-comment) {
+::highlight(erf-comment),
+::highlight(erf-comment-active),
+::highlight(erf-comment-changed) {
   background-color: var(--color-comment-mark);
   text-decoration: underline var(--comment-mark-bar-width) var(--color-comment-mark-bar);
   text-decoration-skip-ink: none;
   text-underline-offset: var(--space-2);
 }
 
+/* The open thread's words: the same fill and a double bar, never a stronger
+   fill (R-01); in Markdown the words also take the emphasis ink. */
+::highlight(erf-comment-active) {
+  text-decoration-style: double;
+  color: var(--color-text-emphasis);
+}
+
+/* The words of a Changed thread (C-06): the same fill, a dashed accent bar –
+   a shape, not a colour only. */
+::highlight(erf-comment-changed) {
+  text-decoration-style: dashed;
+}
+
+/* A Changed thread's icon (C-06): a filled corner notch top-left, the shape
+   that says "changed" without colour. */
+.erf-comment-host__icon--changed::before {
+  content: '';
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  border-block-start: var(--space-2) solid var(--color-border-focus);
+  border-inline-end: var(--space-2) solid transparent;
+}
+
+/* The live selection is never the mark's look (C-12): the selection keeps its
+   own token, so "commented" and "selected" read apart. */
+.markdown-preview-content ::selection {
+  background-color: var(--color-bg-selected);
+  color: var(--color-text-emphasis);
+}
+
 @media (forced-colors: active) {
-  ::highlight(erf-comment) {
+  ::highlight(erf-comment),
+  ::highlight(erf-comment-active) {
     background-color: Mark;
     color: MarkText;
     text-decoration-color: CanvasText;
+  }
+
+  ::highlight(erf-comment-changed) {
+    background-color: Mark;
+    color: MarkText;
+    text-decoration-color: CanvasText;
+  }
+
+  .erf-comment-host__icon--changed::before {
+    border-block-start-color: CanvasText;
+  }
+
+  .markdown-preview-content ::selection {
+    background-color: Highlight;
+    color: HighlightText;
   }
 }

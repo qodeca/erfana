@@ -134,9 +134,11 @@ describe('CommentWindow – threads', () => {
       rerender(<CommentWindow {...props} list={ready([fileView({ threads: [thread(1)] })], 4)} />)
       expect(screen.getAllByTestId('comment-thread')).toHaveLength(1)
       expect(props.onClose).not.toHaveBeenCalled()
-      // A later list without it: the thread is gone, and so is the window.
+      // A later list without it: removed outside Erfana while shown – C-14.5 changed this from a silent
+      // close: the window stays, read-only, and says so (W-04).
       rerender(<CommentWindow {...props} list={ready([fileView({ threads: [] })], 5)} />)
-      expect(props.onClose).toHaveBeenCalledTimes(1)
+      expect(props.onClose).not.toHaveBeenCalled()
+      expect(screen.getByTestId('comment-removed')).toBeVisible()
     })
 
     it('M2 a list that failed after the window opened says so instead of "Reading"', () => {
@@ -760,11 +762,13 @@ describe('CommentWindow – threads', () => {
       expect(screen.queryByText(COPY.attachedTo)).toBeNull()
     })
 
-    it('says the element is gone and keeps the thread usable', () => {
+    // C-05 changed this wording: not found reads as a possible success, and where the comment is follows it.
+    it('C-05 (HTML) says the element is gone as a possible success and keeps the thread usable', () => {
       setup({ list: ready([fileView({ threads: [thread(1, { attached: false })] })]) })
       expect(screen.getByTestId('comment-not-found')).toHaveTextContent(
-        "Erfana can't find this element any more. The comment stays in index.html, line 11."
+        'This element is no longer in index.html – it may have been removed or rewritten as asked. Check, then resolve.'
       )
+      expect(screen.getByTestId('comment-comment-line')).toHaveTextContent('The comment itself is on line 11 of index.html.')
       expect(screen.getByTestId('comment-reply-field')).toBeVisible()
     })
 

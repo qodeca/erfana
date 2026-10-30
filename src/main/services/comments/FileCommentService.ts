@@ -240,6 +240,13 @@ export class FileCommentService {
       if (!block.ok || block.value.realPath !== panel.realPath) return KEY_INVALID
       return this.answer(panel, await this.writer.deleteDamagedBlock({ file, rawHash: request.rawHash, start: block.value.start }))
     }
+    if (request.op === 'rebuildBlock') {
+      // OD-05: named by its block key, as a block delete is.
+      const block = panel.keys.resolve(panel.binding, request.blockKey, 'block')
+      if (!block.ok || block.value.realPath !== panel.realPath) return KEY_INVALID
+      const status = request.status === undefined ? {} : { status: request.status }
+      return this.answer(panel, await this.writer.rebuildDamagedBlock({ file, rawHash: request.rawHash, start: block.value.start, ...status }))
+    }
     const thread = panel.keys.resolve(panel.binding, request.threadKey, 'thread')
     if (!thread.ok || thread.value.realPath !== panel.realPath) return KEY_INVALID
     const result = await this.writer.changeThread({ file, threadId: thread.value.threadId, rawHash: request.rawHash, change: changeOf(request) })
@@ -256,7 +263,7 @@ export class FileCommentService {
     if (!result.ok) return { ok: false, code: result.code, reason: result.reason }
     const threadKey =
       result.threadId === null ? null : panel.keys.keyFor(panel.binding, { kind: 'thread', realPath: panel.realPath, threadId: result.threadId })
-    return { ok: true, threadKey }
+    return result.wordsDropped === true ? { ok: true, threadKey, wordsDropped: true } : { ok: true, threadKey }
   }
 
   /** The sender's panel showing exactly `filePath`, or why not (C17). */

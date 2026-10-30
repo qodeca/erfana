@@ -28,6 +28,7 @@ import { TEST_IDS } from '../../constants/testids'
 import { useLatestRef } from '../../hooks/useLatestRef'
 import { SELECTION_COPY } from './commentCopyWords'
 import { VisibleText } from './CommentParts'
+import { useCommentWords } from './commentWords'
 import type { NewCommentWords } from './commentWindowTypes'
 
 /** Characters from which the quote may need its Show all button (the clamp is three lines). */
@@ -68,6 +69,8 @@ export function CommentWordsPicker(props: CommentWordsPickerProps): React.JSX.El
   const labelId = useId()
   const regionId = useId()
   const fieldRef = useRef<HTMLTextAreaElement>(null)
+  // C-21: the quote is set in the preview's own face – the system sans in HTML, the preview's serif in Markdown.
+  const markdown = useCommentWords().preview === 'markdown'
 
   // Opened: the field shows the current range selected (a mouse selection's, R-05).
   // Only on opening: later ranges come from the field itself.
@@ -88,7 +91,7 @@ export function CommentWordsPicker(props: CommentWordsPickerProps): React.JSX.El
       {exact !== null && (
         <div
           id={quoteId}
-          className={`erf-comment-words${quoteOpen ? ' erf-comment-words--open' : ''}`}
+          className={`erf-comment-words${markdown ? ' erf-comment-words--md' : ''}${quoteOpen ? ' erf-comment-words--open' : ''}`}
           data-testid={TEST_IDS.COMMENT_WORDS}
         >
           <span className="erf-comment-words__text">

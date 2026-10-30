@@ -121,6 +121,24 @@ describe('commentPickHandler element picks', () => {
     expect(h.out.icon).toHaveBeenCalledTimes(1)
   })
 
+  it('OD-01 a right-click outside comment mode (a context pick) opens the menu through the element checks; in comment mode it is dropped', async () => {
+    const h = await setup()
+    const token = tokenOfTag(h.page.doc, 'button')
+    const words = { sel: { exact: 'Buy', prefix: '', suffix: ' now' } }
+    h.setMode(false)
+    h.handler.pick(eventFrom(h.top), menuPick(token, 'button', { kind: 'context', ...words }))
+    expect(h.out.element).toHaveBeenCalledTimes(1)
+    expect(h.out.element.mock.calls[0][3]).toMatchObject({ kind: 'context', ...words })
+    // A forged token or tag outside the mode opens nothing either (SEC-04, R3-13 L5).
+    h.handler.pick(eventFrom(h.top), menuPick('zzzzzzzzzzzz', 'button', { kind: 'context' }))
+    h.handler.pick(eventFrom(h.top), menuPick(token, 'p', { kind: 'context' }))
+    expect(h.out.element).toHaveBeenCalledTimes(1)
+    h.setMode(true)
+    h.handler.pick(eventFrom(h.top), menuPick(token, 'button', { kind: 'context' }))
+    expect(h.out.element).toHaveBeenCalledTimes(1)
+    expect(JSON.stringify(vi.mocked(logger.warn).mock.calls)).toContain('mode-on')
+  })
+
   it('M-033 SEC-04 a forged, unknown or stale token opens nothing', async () => {
     const h = await setup()
     h.handler.pick(eventFrom(h.top), menuPick('zzzzzzzzzzzz', 'button'))
@@ -203,6 +221,26 @@ describe('commentPickHandler pins, control picks and budgets', () => {
     h.handler.pick(eventFrom(h.child), { kind: 'icon', via: 'pointer', key, view: VIEW })
     expect(h.out.icon).toHaveBeenCalledTimes(1)
     expect(h.out.icon.mock.calls[0][2]).toBe(key)
+  })
+
+  it('C-17 (HTML) a stack pin is opened only when every key it names is one of the frame’s own pins', async () => {
+    const h = await setup()
+    const [key] = [...h.frames.get(1)!.pins.keys()]
+    h.handler.pick(eventFrom(h.top), { kind: 'icon', via: 'pointer', key, stack: ['p999'], view: VIEW })
+    expect(h.out.icon).not.toHaveBeenCalled()
+    h.handler.pick(eventFrom(h.top), { kind: 'icon', via: 'pointer', key, stack: [key], view: VIEW })
+    expect(h.out.icon).toHaveBeenCalledTimes(1)
+  })
+
+  it('C-10 (HTML) a step counts the open comments main pinned on the element itself, never on a script-built one below it', async () => {
+    const h = await setup()
+    const [pin] = [...h.frames.get(1)!.pins.values()]
+    const step = { kind: 'step', via: 'keyboard', say: 'showing', token: pin.token, view: VIEW }
+    h.handler.pick(eventFrom(h.top), step)
+    expect(h.out.step).toHaveBeenLastCalledWith(expect.objectContaining({ say: 'showing', comments: pin.threadIds.length }))
+    expect(pin.threadIds.length).toBeGreaterThan(0)
+    h.handler.pick(eventFrom(h.top), { ...step, added: true })
+    expect(h.out.step.mock.lastCall?.[0]).not.toHaveProperty('comments')
   })
 
   it('exit leaves the mode only while it is on; parent asks only from a child frame', async () => {

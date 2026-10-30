@@ -12,16 +12,32 @@
  */
 import type { CommentModeChanged } from '../../../../../../shared/ipc/preview-comment-schema'
 import { ANNOUNCE } from '../../../Comments/commentCopy'
+import { MD_SPOKEN_COPY } from '../../../Comments/commentCopyWords'
+
+/** Steps after the mode turns on that add the keys to use (C-10 "the first three steps"). */
+export const PICKER_HINT_STEPS = 3
 
 /**
  * §10.10 "Announce" – where the page's keyboard picker moved (§10.8, E-022).
  * The page holds no live region (Find in page would count its text), so main
  * passes each step on and the window's polite region says it.
  *
+ * C-10: an element of the file is named by main's kind and line and its
+ * open comments – "Paragraph, line 42. 2 comments." (its first words are not
+ * sent: see `commentPickerStep.ts`)
+ * – the same sentence as the Markdown picker; the first
+ * {@link PICKER_HINT_STEPS} steps add the keys. A script-built element keeps
+ * "Showing an element added by a script, inside …".
+ *
+ * @param step - Steps said since the mode turned on (0 for the first).
  * @returns The sentence, or `undefined` for an event that is not a picker step.
  */
-export function pickerAnnouncement(event: Pick<CommentModeChanged, 'say' | 'element'>): string | undefined {
+export function pickerAnnouncement(event: Pick<CommentModeChanged, 'say' | 'element'>, step = PICKER_HINT_STEPS): string | undefined {
   if (event.say === 'top') return ANNOUNCE.pickerTop
   if (event.say === 'no-child') return ANNOUNCE.pickerNoChild
-  return event.say === 'showing' && event.element !== undefined ? ANNOUNCE.pickerShowing(event.element) : undefined
+  const element = event.say === 'showing' ? event.element : undefined
+  if (element === undefined) return undefined
+  if (element.added === true || element.role === undefined) return ANNOUNCE.pickerShowing(element)
+  const sentence = MD_SPOKEN_COPY.target(element.role, element.line, '', element.comments ?? 0)
+  return step < PICKER_HINT_STEPS ? `${sentence}${MD_SPOKEN_COPY.hint}` : sentence
 }

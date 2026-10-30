@@ -40,6 +40,9 @@ import { samePathKey } from '../../comments/commentUnsavedSources'
 import type { ElementTokenEntry, ElementTokenTable } from './ElementTokenTable'
 import type { FrameFile } from './frameFileMap'
 
+/** A draft event of kind `menu` or `open`. */
+type ElementDraftOpened = Extract<CommentDraftOpened, { kind: 'menu' | 'open' }>
+
 /** Where the menu point and the still come from. */
 export interface DraftOpenerGeometry {
   readonly viewRect: () => PreviewBounds | null
@@ -98,6 +101,20 @@ export function pinPickOf(pin: PinGroup, pick: CommentPick): CommentPick | undef
   return runtime.success ? { ...base, runtime: runtime.data } : undefined
 }
 
+/**
+ * The pin whose open threads stand on the element a comment-mode click picked
+ * (C-22): such a click opens those threads rather than a blank new comment.
+ * Only a plain click on the element itself – not a menu, not words, not a
+ * script-built element below it.
+ */
+export function openThreadsOn(record: Pick<FrameRecord, 'pins'>, pick: CommentPick): string | undefined {
+  if (pick.kind !== 'open' || pick.sel !== undefined || pick.runtime !== undefined || pick.token === undefined) return undefined
+  for (const [key, pin] of record.pins) {
+    if (pin.token === pick.token && pin.runtime === undefined && pin.threadIds.length > 0) return key
+  }
+  return undefined
+}
+
 /** Build one view's opener. */
 export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpener {
   const { geometry } = deps
@@ -140,6 +157,8 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
     entry: ElementTokenEntry | undefined,
     pick: CommentPick
   ): Promise<void> {
+    const commented = openThreadsOn(record, pick)
+    if (commented !== undefined) return icon(frame, record, commented, pick)
     const file = record.file!
     const place = placeOf(frame, deps.mainFrame())
     const painted = paintAndCapture(place, pick)
@@ -160,10 +179,12 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
     if (!stillCurrent(record, file)) return
     deps.emit({
       panelId: deps.panelId,
-      kind: pick.kind as 'menu' | 'open',
+      // A right-click outside comment mode (OD-01) opens the same menu.
+      kind: pick.kind === 'open' ? 'open' : 'menu',
       point: pointOf(pick, offset),
       ...display(file, frame),
-      ...minted(built)
+      ...minted(built),
+      ...wordsOf(built, pick)
     })
   }
 
@@ -171,6 +192,17 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
   function minted(built: BuiltDraft): Pick<CommentDraftOpened, 'draftToken' | 'draftKey' | 'target'> {
     if (!built.ok) return {}
     return { draftToken: deps.keys.mintDraft(deps.binding, built.draft), draftKey: draftKeyOf(built.draft), target: built.target }
+  }
+
+  /** A built draft's words for a menu or the window (024-FR-004); whether the pick was made on a selection. */
+  function wordsOf(built: BuiltDraft, pick: CommentPick): Pick<ElementDraftOpened, 'selection' | 'words' | 'wordsMissing'> {
+    const selection = pick.sel === undefined ? {} : { selection: true as const }
+    if (!built.ok) return selection
+    return {
+      ...selection,
+      ...(built.words === undefined ? {} : { words: built.words }),
+      ...(built.wordsMissing === undefined ? {} : { wordsMissing: built.wordsMissing })
+    }
   }
 
   /**
@@ -203,14 +235,33 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
     })
   }
 
+  /** The damaged and newer blocks of the other pins of a stack (C-17): blocks only, no draft. */
+  async function stackedBlocks(frame: CommentFrameLike, record: FrameRecord, file: FrameFile, pins: readonly PinGroup[]): Promise<BuiltPin['blocks']> {
+    const blocks: Array<BuiltPin['blocks'][number]> = []
+    for (const pin of pins) {
+      const entry = record.loadId === undefined ? undefined : deps.tokens.lookup(record.loadId, pin.token)
+      if (entry === undefined || pin.attention === 0) continue
+      const common = { realRoot: deps.realRoot, file, entry, frame: frame.parent !== null, pageRealPath: deps.currentPage() }
+      blocks.push(...(await buildPin({ ...common, blocks: true, jobs: deps.jobs, platform: deps.platform })).blocks)
+    }
+    return blocks
+  }
+
+  /**
+   * A pin's threads and blocks, and a draft on its element for "New comment".
+   * A stack pin's click (C-17) names the other pins merged into it: their
+   * threads and blocks follow the first pin's, in document order.
+   */
   async function icon(frame: CommentFrameLike, record: FrameRecord, pinKey: string, pick: CommentPick): Promise<void> {
     const pin = record.pins.get(pinKey)
     const file = record.file
     if (pin === undefined || file === undefined) return
     const { realPath } = file
+    const stacked = (pick.stack ?? []).flatMap(key => record.pins.get(key) ?? [])
     const entry = record.loadId === undefined ? undefined : deps.tokens.lookup(record.loadId, pin.token)
     const painted = paintAndCapture(placeOf(frame, deps.mainFrame()), pick)
     const built = await pinOf(frame, file, entry, pin, pick)
+    const blocks = [...built.blocks, ...(await stackedBlocks(frame, record, file, stacked))]
     const offset = await painted
     if (!stillCurrent(record, file)) return
     deps.emit({
@@ -218,8 +269,8 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
       kind: 'icon',
       point: pointOf(pick, offset),
       ...display(file, frame),
-      threadKeys: pin.threadIds.map(threadId => deps.keys.keyFor(deps.binding, { kind: 'thread', realPath, threadId })),
-      blockKeys: built.blocks.map(({ rawHash, start }) => deps.keys.keyFor(deps.binding, { kind: 'block', realPath, rawHash, start })),
+      threadKeys: [pin, ...stacked].flatMap(p => p.threadIds).map(threadId => deps.keys.keyFor(deps.binding, { kind: 'thread', realPath, threadId })),
+      blockKeys: blocks.map(({ rawHash, start }) => deps.keys.keyFor(deps.binding, { kind: 'block', realPath, rawHash, start })),
       ...minted(built.draft)
     })
   }

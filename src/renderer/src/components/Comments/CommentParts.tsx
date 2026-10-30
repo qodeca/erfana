@@ -131,6 +131,8 @@ export interface CommentFieldProps {
   readonly readOnly?: boolean
   readonly textareaRef?: React.Ref<HTMLTextAreaElement>
   readonly testId?: string
+  /** The field's id, when the caller points at its error (`{id}-e`); a fresh one otherwise. */
+  readonly fieldId?: string
 }
 
 /**
@@ -153,9 +155,11 @@ export function CommentField({
   restored = false,
   readOnly = false,
   textareaRef,
-  testId
+  testId,
+  fieldId
 }: CommentFieldProps): React.JSX.Element {
-  const id = useId()
+  const ownId = useId()
+  const id = fieldId ?? ownId
   const count = [...value].length
   const state = counterState(count)
   const describedBy = [error ? `${id}-e` : null, `${id}-h`, `${id}-c`].filter(Boolean).join(' ')
@@ -290,8 +294,17 @@ export interface DialogButtonProps {
   readonly variant: 'primary' | 'secondary' | 'danger'
   readonly children: string
   readonly onClick: () => void
-  /** `aria-disabled`, never `disabled`: focus stays, the press is ignored. */
+  /** `aria-disabled`, never `disabled`: focus stays, the press is ignored. Busy keeps full strength (`aria-busy`). */
   readonly busy?: boolean
+  /**
+   * Blocked: what is missing before the button can run ("Write a comment
+   * first."). The Buttons card's blocked state (C-21): `aria-disabled`, the
+   * label and fill dimmed, the reason tied with `aria-describedby`; the focus
+   * ring keeps full strength. Ignored while `busy`.
+   */
+  readonly blocked?: string | null
+  /** Blocked, and the reason is already on screen in the element with this id (a field's error): it describes the button. */
+  readonly blockedBy?: string | null
   readonly title?: string
   readonly keyShortcut?: string
   readonly buttonRef?: React.Ref<HTMLButtonElement>
@@ -315,24 +328,38 @@ export function DialogButton({
   children,
   onClick,
   busy = false,
+  blocked = null,
+  blockedBy = null,
   title,
   keyShortcut,
   buttonRef,
   testId
 }: DialogButtonProps): React.JSX.Element {
+  const reasonId = useId()
+  const shownReason = !busy && blockedBy !== null && blockedBy !== ''
+  const isBlocked = !busy && !shownReason && blocked !== null && blocked !== ''
   return (
-    <button
-      ref={buttonRef}
-      type="button"
-      className={`dialog-btn dialog-btn-${variant}`}
-      aria-disabled={busy ? 'true' : undefined}
-      title={title}
-      aria-keyshortcuts={keyShortcut}
-      data-testid={testId}
-      onClick={onClick}
-    >
-      <span>{children}</span>
-    </button>
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        className={`dialog-btn dialog-btn-${variant}`}
+        aria-disabled={busy || isBlocked || shownReason ? 'true' : undefined}
+        aria-busy={busy ? 'true' : undefined}
+        aria-describedby={isBlocked ? reasonId : shownReason ? (blockedBy ?? undefined) : undefined}
+        title={title}
+        aria-keyshortcuts={keyShortcut}
+        data-testid={testId}
+        onClick={onClick}
+      >
+        <span>{children}</span>
+      </button>
+      {isBlocked && (
+        <span className="erf-comment-sr" id={reasonId}>
+          {blocked}
+        </span>
+      )}
+    </>
   )
 }
 

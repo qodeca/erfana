@@ -158,4 +158,15 @@ describe('markdownAdapter', () => {
     expect(collapsedText('é')).toBe('é')
     expect(collapsedText('x'.repeat(250))).toHaveLength(200)
   })
+
+  it('C-19 (Markdown) W-08 a block inside a generated START/END region is refused at the pick, as main refuses it; one outside is not', () => {
+    const text = ['# Top', '', '<!-- START toc -->', '', 'Generated line.', '', '<!-- END toc -->', '', 'Own words.', ''].join('\n')
+    const { adapter, root } = renderPreview(text)
+    const generated = root.querySelector<HTMLElement>('p[data-line-start="5"]')!
+    const own = root.querySelector<HTMLElement>('p[data-line-start="9"]')!
+    expect(adapter.refusalOf?.(generated)).toBe('generated-region')
+    expect(locateMarkdownTarget(indexMarkdown(text, 0), adapter.describe(generated)!)).toEqual({ refused: 'generated-region' })
+    expect(adapter.refusalOf?.(own)).toBeNull()
+    expect(adapter.root?.()).toBe(root)
+  })
 })

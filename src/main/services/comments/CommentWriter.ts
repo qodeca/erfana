@@ -139,8 +139,14 @@ export interface DeleteDamagedBlockRequest {
   readonly start?: number
 }
 
+/** Rebuild a hand-damaged block from its own valid `@data` (OD-05, "Rebuild from data…"). */
+export interface RebuildDamagedBlockRequest extends DeleteDamagedBlockRequest {
+  /** "Mark resolved": write the status the readable line claims; absent or `'open'` re-renders the lines only. */
+  readonly status?: 'open' | 'resolved'
+}
+
 /** The operation a save performed, as logged. */
-export type CommentWriteOp = 'add' | ThreadChange['op'] | 'deleteBlock'
+export type CommentWriteOp = 'add' | ThreadChange['op'] | 'deleteBlock' | 'rebuildBlock'
 
 export type CommentWriteResult =
   | {
@@ -151,6 +157,8 @@ export type CommentWriteResult =
       readonly fileHash: string
       /** The thread written; `null` when the operation removed its block. */
       readonly threadId: string | null
+      /** An add's selected words were not kept: the comment is on the whole target (024-FR-004). */
+      readonly wordsDropped?: true
     }
   | { readonly ok: false; readonly code: CommentErrorCode; readonly reason: CommentRefusal }
 
@@ -309,6 +317,23 @@ export class CommentWriter {
     })
   }
 
+  /** OD-05: re-render a hand-damaged block from its valid `@data`; only offered, and only run, on the reader's action. */
+  rebuildDamagedBlock(request: RebuildDamagedBlockRequest): Promise<CommentWriteResult> {
+    const resolve = request.status === 'resolved'
+    return this.run({
+      op: 'rebuildBlock',
+      file: request.file,
+      // "Mark resolved" records who resolved it, as Resolve does.
+      needsAuthor: resolve,
+      request: {
+        op: 'rebuild',
+        rawHash: request.rawHash,
+        ...(request.start === undefined ? {} : { start: request.start }),
+        ...(resolve ? { status: 'resolved' as const } : {})
+      }
+    })
+  }
+
   private async run(job: WriteJob): Promise<CommentWriteResult> {
     const confined = await this.confine(job)
     if (!confined.ok) return this.refuse(job, job.file.filePath, confined)
@@ -366,7 +391,7 @@ export class CommentWriter {
     // Rebuilt from the bytes read – and the strict write below re-reads the file and
     // requires these very bytes on disk: outside the block, the bytes written are the bytes read.
     const out = assembleSplice(read, planned)
-    if (out.length > PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES) return refused('limit')
+    if (out.length > PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES) return refused('file-size')
     const written = await atomicWriteBytesStrict(realPath, out, {
       expectedHash: planned.inputHash,
       expectedBytes: read,
@@ -378,7 +403,8 @@ export class CommentWriter {
     })
     if (!written.ok) return refused(strictWriteRefusal(written.reason), written.errno)
     if (!(await this.stillWritten(realPath, out))) return refused('changed-during-save')
-    return { ok: true, realPath: written.path, fileHash: planned.outputHash, threadId: planned.threadId }
+    const words = planned.wordsDropped === true ? { wordsDropped: true as const } : {}
+    return { ok: true, realPath: written.path, fileHash: planned.outputHash, threadId: planned.threadId, ...words }
   }
 
   /** Step 7 (C12): the file holds the bytes just written when read again; a failed read counts as changed. */

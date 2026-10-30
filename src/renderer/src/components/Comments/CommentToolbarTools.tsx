@@ -1,40 +1,45 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * HTML Preview comments – the three toolbar tools after Find
+ * Comments – the two toolbar tools after Find, in both previews
  * (docs/designs/comments/html-preview-comments.md §10.1, §10.10; R-010, R-021;
- * docs/designs/comments/html-comments/toolbar.html, proposed).
+ * comments-v2 C-15, C-20, OD-04, R-14, R-19; spec 024 state table § 1
+ * "Toolbar"; docs/designs/comments/html-comments/toolbar.html, decided D-2).
  *
  * | Tool | Pattern | Accessible name |
  * |---|---|---|
  * | Comment mode | toggle, `aria-pressed` | "Comment mode" – never changes |
- * | Comments | disclosure, `aria-expanded` + `aria-controls`, open count, `· !n` | "Comments, 3 open, 1 need attention" |
- * | Show comment icons | toggle, `aria-pressed`, default on, per tab | "Show comment icons" |
+ * | Comments count | disclosure, `aria-expanded` + `aria-controls` | its visible text first: "7 comments, 4 changed, 1 damaged" |
+ *
+ * C-20, the quieter toolbar: "Show comment icons" left the row at every tier
+ * – it is the drawer's checkbox now – and the list tool is a labelled count,
+ * "7 comments" with the ▲ attention counter for damaged comments beside it
+ * (C-15, the Badges card's `.erf-counter--attention`; the ▲ is generated
+ * content with empty alternative text, so the words are in the tool's name).
+ * At the narrow tier (a container under 446px) it is the icon and the
+ * number. The count carries no `title` that repeats its name. While the
+ * drawer is open the count wears the pressed signature, like every on/off
+ * tool in the row (R-19) – it stays a disclosure.
  *
  * Unavailable is `aria-disabled`, never `disabled`: the tool keeps focus and
- * its tooltip, which says why (the Permission band card's rule). Designer
- * call: the list and the pins tool stay usable when the page cannot take
- * comments but its comments can still be read (the overlay keeps being
- * removed, the page is over the element cap) – they take the same state only
- * when nothing can be read.
+ * its tooltip, which says why (the Permission band card's rule). The count
+ * stays usable when the page cannot take comments but its comments can still
+ * be read; it takes the same state only when nothing can be read.
  *
  * There is deliberately no "Send to agent" control (decision 9, R-011).
  *
- * @module HtmlPreviewPanel/comments/CommentToolbarTools
+ * @module components/Comments/CommentToolbarTools
  */
 import { renderIcon } from '../../utils/iconRegistry'
 import type { CommentUnavailableReason } from '../../../../shared/ipc/preview-comment-schema'
 import type { CommentCounts } from '../../stores/usePreviewCommentStore'
-import {
-  TOOL_COPY,
-  commentModeAriaShortcut,
-  listButtonName,
-  unavailableTooltip
-} from './commentCopy'
+import { TOOL_COPY, commentModeAriaShortcut, unavailableTooltip } from './commentCopy'
+import { COMMENT_LIST_COPY } from './commentCopyWords'
 import { useCommentWords } from './commentWords'
 import { TEST_IDS } from '../../constants/testids'
+import './CommentToolbarTools.css'
 
-/** Reasons that leave nothing readable: list and pins go `aria-disabled` too. */
+/** Reasons that leave nothing readable: the count goes `aria-disabled` too. */
 const UNREADABLE: ReadonlySet<CommentUnavailableReason> = new Set([
   'disabled',
   'too-large',
@@ -45,18 +50,27 @@ const UNREADABLE: ReadonlySet<CommentUnavailableReason> = new Set([
 /** Props for {@link CommentToolbarTools}. */
 export interface CommentToolbarToolsProps {
   readonly mode: boolean
-  readonly showIcons: boolean
+  /** @deprecated C-20: the icons toggle is the drawer's checkbox now; ignored here. */
+  readonly showIcons?: boolean
   readonly drawerOpen: boolean
   /** The drawer's element id (`aria-controls`). */
   readonly drawerId: string
+  /**
+   * The count (OD-04): `open` is every open comment, found or not (S-01 –
+   * S-05); `attention` is the damaged comments only (S-07, S-08), the ▲
+   * badge. Newer-format comments count in neither.
+   */
   readonly counts: CommentCounts | null
+  /** Open comments that are Changed or Words changed (C-06): the name adds ", {n} changed". */
+  readonly changed?: number
   /** The page has loaded (comment mode needs a live page). */
   readonly ready: boolean
   readonly unavailable: CommentUnavailableReason | null
   /** `byKeyboard`: a keyboard activation (`detail === 0`), which moves focus into the page. */
   readonly onToggleMode: (byKeyboard: boolean) => void
   readonly onToggleDrawer: () => void
-  readonly onToggleIcons: () => void
+  /** @deprecated C-20: the icons toggle is the drawer's checkbox now; ignored here. */
+  readonly onToggleIcons?: () => void
   readonly modeRef?: React.Ref<HTMLButtonElement>
   readonly listRef?: React.Ref<HTMLButtonElement>
   /**
@@ -66,8 +80,8 @@ export interface CommentToolbarToolsProps {
   readonly variant?: 'band' | 'toolbar'
   /**
    * Why no new comment can be written now (C-19.1, menu matrix § 2): the mode
-   * toggle goes `aria-disabled` with this sentence as its tooltip. The list
-   * and the icons stay usable – existing comments remain readable.
+   * toggle goes `aria-disabled` with this sentence as its tooltip. The count
+   * stays usable – existing comments remain readable.
    */
   readonly modeUnavailableText?: string | null
 }
@@ -76,15 +90,11 @@ export interface CommentToolbarToolsProps {
 const TOOL_CLASS = {
   band: {
     mode: 'erf-band__tool erf-band__tool--toggle erf-band__tool--comment erf-band__tool--comment-first',
-    list: 'erf-band__tool erf-band__tool--toggle erf-band__tool--comment erf-band__tool--count',
-    icons: 'erf-band__tool erf-band__tool--toggle erf-band__tool--comment',
-    attention: 'erf-band__tool-attention'
+    list: 'erf-band__tool erf-band__tool--toggle erf-band__tool--comment erf-band__tool--count erf-comment-count'
   },
   toolbar: {
     mode: 'toolbar-btn erf-md-comment-tool',
-    list: 'toolbar-btn erf-md-comment-tool erf-md-comment-tool--count',
-    icons: 'toolbar-btn erf-md-comment-tool',
-    attention: 'erf-md-comment-tool__attention'
+    list: 'toolbar-btn erf-md-comment-tool erf-md-comment-tool--count erf-comment-count'
   }
 } as const
 
@@ -92,7 +102,7 @@ const TOOL_CLASS = {
  * The comment tools, as one fragment for the band's leading slot.
  *
  * @param props - {@link CommentToolbarToolsProps}
- * @returns Three band tools.
+ * @returns Two tools: Comment mode and the count.
  *
  * @example
  * ```tsx
@@ -102,15 +112,14 @@ const TOOL_CLASS = {
  */
 export function CommentToolbarTools({
   mode,
-  showIcons,
   drawerOpen,
   drawerId,
   counts,
+  changed = 0,
   ready,
   unavailable,
   onToggleMode,
   onToggleDrawer,
-  onToggleIcons,
   modeRef,
   listRef,
   variant = 'band',
@@ -129,8 +138,8 @@ export function CommentToolbarTools({
           : words.modeTooltip(mode)
   const readBlocked = unavailable !== null && UNREADABLE.has(unavailable)
   const open = counts?.open ?? 0
-  const attention = counts?.attention ?? 0
-  const listName = listButtonName(open, attention, counts?.resolved ?? 0)
+  const damaged = counts?.attention ?? 0
+  const listName = COMMENT_LIST_COPY.countName(open, changed, damaged)
 
   return (
     <>
@@ -160,32 +169,20 @@ export function CommentToolbarTools({
         aria-expanded={drawerOpen}
         aria-controls={drawerOpen ? drawerId : undefined}
         aria-disabled={readBlocked ? 'true' : undefined}
-        title={readBlocked && unavailable !== null ? unavailableTooltip(unavailable) : listName}
+        // Only a reason gets a tooltip; the name is the visible text (C-20).
+        title={readBlocked && unavailable !== null ? unavailableTooltip(unavailable) : undefined}
         data-testid={TEST_IDS.COMMENT_TOOL_LIST}
         onClick={() => {
           if (readBlocked && !drawerOpen) return
           onToggleDrawer()
         }}
       >
-        {renderIcon('messages-square', { size: 16, 'aria-hidden': true })}
-        {open > 0 && <span>{open}</span>}
-        {attention > 0 && <span className={classes.attention}>{`· !${attention}`}</span>}
-      </button>
-      <button
-        type="button"
-        className={classes.icons}
-        aria-label={TOOL_COPY.pins}
-        aria-pressed={showIcons}
-        aria-disabled={readBlocked ? 'true' : undefined}
-        title={showIcons ? TOOL_COPY.pinsOn : words.pinsOff}
-        data-testid={TEST_IDS.COMMENT_TOOL_ICONS}
-        onClick={() => {
-          if (!readBlocked) onToggleIcons()
-        }}
-      >
-        {showIcons
-          ? renderIcon('message-square', { size: 16, 'aria-hidden': true })
-          : renderIcon('message-square-off', { size: 16, 'aria-hidden': true })}
+        <span className="erf-comment-count__icon" aria-hidden="true">
+          {renderIcon('messages-square', { size: 16, 'aria-hidden': true })}
+        </span>
+        <span className="erf-comment-count__text">{COMMENT_LIST_COPY.count(open)}</span>
+        {open > 0 && <span className="erf-comment-count__number">{open}</span>}
+        {damaged > 0 && <span className="erf-counter erf-counter--attention">{damaged}</span>}
       </button>
     </>
   )

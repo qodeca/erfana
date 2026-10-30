@@ -61,8 +61,17 @@ describe('groupPins', () => {
   })
 })
 
+describe('C-06 (HTML) pin changed', () => {
+  it('C-06 (HTML) pin: a pin is changed when one of its open threads is, and says nothing otherwise', () => {
+    const changed = { ...open('c-1', 'aaaaaaaaaaaa'), changed: true as const }
+    const [pin, other] = groupPins({ blocks: [open('c-2', 'aaaaaaaaaaaa'), changed, open('c-3', 'bbbbbbbbbbbb')] })
+    expect(pin.changed).toBe(true)
+    expect(other).not.toHaveProperty('changed')
+  })
+})
+
 describe('countsOf and addCounts', () => {
-  it('counts open, resolved and what needs attention – an orphaned open thread included', () => {
+  it('OD-04 counts every open thread as open, found or not; attention is damaged blocks only; newer-format blocks in neither', () => {
     const blocks: Block[] = [
       open('c-1', 'aaaaaaaaaaaa'),
       open('c-2'),
@@ -70,7 +79,7 @@ describe('countsOf and addCounts', () => {
       { kind: 'damaged' },
       { kind: 'newer', token: 'bbbbbbbbbbbb' }
     ]
-    expect(countsOf({ blocks })).toEqual({ open: 1, resolved: 1, attention: 3 })
+    expect(countsOf({ blocks })).toEqual({ open: 2, resolved: 1, attention: 1 })
     expect(addCounts([{ open: 1, resolved: 2, attention: 3 }, { open: 4, resolved: 0, attention: 1 }])).toEqual({ open: 5, resolved: 2, attention: 4 })
     expect(addCounts([])).toEqual(NO_COUNTS)
   })

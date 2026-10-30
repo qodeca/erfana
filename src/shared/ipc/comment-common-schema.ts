@@ -27,6 +27,10 @@ import { PanelIdSchema } from './preview-schema'
 export const COMMENT_PATH_MAX_CHARS = 4_096
 /** Characters of a damaged block's raw text sent to the renderer; longer is cut and flagged. */
 export const COMMENT_RAW_PREVIEW_MAX_CHARS = 65_536
+/** Characters of one line a rebuild confirmation shows (OD-05); longer is cut. */
+export const REBUILD_LINE_MAX_CHARS = 2_000
+/** Differing lines a rebuild confirmation lists at most (OD-05). */
+export const REBUILD_LINES_MAX = 32
 
 /** A message's text: 1 to `COMMENT_MESSAGE_MAX_CHARS` code points, not blank. */
 export const CommentMessageTextSchema = z
@@ -97,7 +101,11 @@ export const CommentRefusalReasonSchema = z.enum([
   /** A draft older than its time to live. */
   'draft-expired',
   /** Comments are off in Settings for this file's preview (024-FR-022). */
-  'comments-off'
+  'comments-off',
+  /** The thread already holds `COMMENT_MAX_REPLIES` replies (C-19). */
+  'replies',
+  /** The write would make the file larger than `COMMENT_FILE_MAX_BYTES` (C-19). */
+  'file-size'
 ])
 export type CommentRefusalReason = z.infer<typeof CommentRefusalReasonSchema>
 
@@ -109,7 +117,18 @@ export type CommentReasonedRefusal = z.infer<typeof CommentReasonedRefusalSchema
 
 /** A save's answer: the thread written (`null` when the block is gone), or a refusal with its reason. */
 export const CommentSaveResultSchema = z.union([
-  z.object({ ok: z.literal(true), threadKey: KeySchema.nullable() }).strict(),
+  z
+    .object({
+      ok: z.literal(true),
+      threadKey: KeySchema.nullable(),
+      /**
+       * The selected words were not kept – main's own parse did not find them
+       * once – so the comment is on the whole target (024-FR-004). The window
+       * says so before it closes.
+       */
+      wordsDropped: z.literal(true).optional()
+    })
+    .strict(),
   CommentReasonedRefusalSchema
 ])
 export type CommentSaveResult = z.infer<typeof CommentSaveResultSchema>
@@ -122,7 +141,8 @@ const threadTarget = { panelId: PanelIdSchema, fileKey: KeySchema, threadKey: Ke
  * requests are a discriminated union of their own `add` and these.
  */
 export const commentThreadOpSchemas = [
-  z.object({ ...threadTarget, op: z.literal('reply'), text: CommentMessageTextSchema }).strict(),
+  // `resolve`: "Reply and resolve" – the reply and the resolve in one write (comments-v2 C-13).
+  z.object({ ...threadTarget, op: z.literal('reply'), text: CommentMessageTextSchema, resolve: z.literal(true).optional() }).strict(),
   z
     .object({ ...threadTarget, op: z.literal('editMessage'), messageId: MessageIdSchema, text: CommentMessageTextSchema })
     .strict(),
@@ -136,6 +156,18 @@ export const commentThreadOpSchemas = [
       fileKey: KeySchema,
       blockKey: KeySchema,
       rawHash: CommentRawHashSchema
+    })
+    .strict(),
+  // OD-05 "Rebuild from data…": re-render a hand-damaged block's readable lines from its valid
+  // `@data`; `status: 'resolved'` is "Mark resolved" (the status its line claims), `'open'` "Keep open".
+  z
+    .object({
+      panelId: PanelIdSchema,
+      op: z.literal('rebuildBlock'),
+      fileKey: KeySchema,
+      blockKey: KeySchema,
+      rawHash: CommentRawHashSchema,
+      status: z.enum(['open', 'resolved']).optional()
     })
     .strict()
 ] as const
@@ -192,7 +224,29 @@ export const CommentThreadViewSchema = z
       })
       .strict()
       .optional(),
-    messages: z.array(MessageViewSchema).min(1).max(PREVIEW_LIMITS.COMMENT_MAX_REPLIES + 1)
+    messages: z.array(MessageViewSchema).min(1).max(PREVIEW_LIMITS.COMMENT_MAX_REPLIES + 1),
+    /**
+     * Derived, never written (comments-v2 C-06; state table S-03, S-04): the
+     * target's text is not what the comment stored (`changed`), or the words
+     * a selection comment is about are gone from it (`words`). `was` is the
+     * stored text, `now` the text there now – absent when no words are found.
+     * Both visible like `quote`.
+     */
+    change: z
+      .object({
+        state: z.enum(['changed', 'words']),
+        was: z
+          .string()
+          .max(PREVIEW_LIMITS.COMMENT_QUOTE_MAX_CHARS)
+          .refine(text => visibleInline(text) === text),
+        now: z
+          .string()
+          .max(PREVIEW_LIMITS.COMMENT_QUOTE_MAX_CHARS)
+          .refine(text => visibleInline(text) === text)
+          .optional()
+      })
+      .strict()
+      .optional()
   })
   .strict()
 export type CommentThreadView = z.infer<typeof CommentThreadViewSchema>
@@ -234,7 +288,24 @@ export const CommentFileViewSchema = z
             reason: DamageReasonSchema,
             line: z.number().int().min(1),
             raw: z.string().max(COMMENT_RAW_PREVIEW_MAX_CHARS),
-            rawTruncated: z.literal(true).optional()
+            rawTruncated: z.literal(true).optional(),
+            /**
+             * OD-05: the block's `@data` is valid and only its readable lines or
+             * header id disagree with it (`readable-mismatch`, `id-mismatch`), so
+             * it can be rebuilt from the data. `lines` pairs each differing line
+             * as the file has it and as the data renders it; `claims: 'resolved'`
+             * when only the `status:` line differs and it says resolved.
+             */
+            rebuild: z
+              .object({
+                lines: z
+                  .array(z.object({ file: z.string().max(REBUILD_LINE_MAX_CHARS), data: z.string().max(REBUILD_LINE_MAX_CHARS) }).strict())
+                  .min(1)
+                  .max(REBUILD_LINES_MAX),
+                claims: z.literal('resolved').optional()
+              })
+              .strict()
+              .optional()
           })
           .strict()
       )

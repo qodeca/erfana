@@ -21,6 +21,12 @@ import {
   type CommentThreadView
 } from '../../../shared/ipc/preview-comment-schema'
 import { cutText } from '../../../shared/comments/cutText'
+import type { TargetVia } from '../../../shared/comments/reattach'
+import type { IndexedTarget } from '../../../shared/comments/targetIndex'
+import type { MdIndex } from '../../../shared/markdownComments/mdIndex'
+import { positionTargetOf } from '../../../shared/markdownComments/mdLocate'
+import { changeOf, type ListedChange } from './commentListChange'
+import { rebuildViewOf } from './commentRebuild'
 import type { JobDocument } from './commentJobDocs'
 import type { CommentRefusal } from './commentRefusals'
 
@@ -109,10 +115,61 @@ export function storedQuoteOf(anchor: CommentAnchor): string | undefined {
   return shown === '' ? undefined : shown
 }
 
-function threadOf(block: Extract<ParsedBlock, { kind: 'ok' }>, line: number): ListedThread {
+type OkBlock = Extract<ParsedBlock, { kind: 'ok' }>
+
+/** True when the index is a Markdown file's: it has a body line. */
+function isMarkdownIndex(index: KindDocument['index']): index is MdIndex {
+  return 'bodyLine' in index
+}
+
+/** Where a block's target is now, and how it was found. */
+interface FoundTarget {
+  readonly el: IndexedTarget
+  /** Absent when only the block's position names it. */
+  readonly via?: TargetVia
+}
+
+/**
+ * The target a block is on now: the parse's, or – in a Markdown file whose
+ * target only changed its text – the one at the block's position
+ * (`positionTargetOf`, no `via`), so the comment reads as Changed rather than
+ * Not found (C-06). The parse itself is never changed.
+ */
+function currentTarget(doc: KindDocument, block: OkBlock): FoundTarget | undefined {
+  if (block.target.state === 'attached') {
+    const el = doc.index.elementAt(block.target.startOffset)
+    return el === undefined ? undefined : { el, via: block.target.via }
+  }
+  if (!isMarkdownIndex(doc.index)) return undefined
+  const el = positionTargetOf(doc.index, block.nodeRange[1], block.data.anchor.tag)
+  return el === undefined ? undefined : { el }
+}
+
+/** The derived change of an open thread (C-06); a resolved thread is history and gets none. */
+function threadChange(doc: KindDocument, block: OkBlock, found: FoundTarget | undefined): ListedChange | undefined {
+  if (found === undefined || block.data.status !== 'open') return undefined
+  return changeOf({
+    index: doc.index,
+    target: found.el,
+    anchor: block.data.anchor,
+    via: found.via,
+    html: !isMarkdownIndex(doc.index)
+  })
+}
+
+/** The target an open thread is shown on: the parse's, or a Markdown position whose text changed (C-06). */
+function shownTarget(doc: KindDocument, block: OkBlock): { readonly found?: FoundTarget; readonly change?: ListedChange } {
+  const found = currentTarget(doc, block)
+  const change = threadChange(doc, block, found)
+  if (found === undefined || (block.target.state !== 'attached' && change === undefined)) return {}
+  return change === undefined ? { found } : { found, change }
+}
+
+function threadOf(doc: KindDocument, block: OkBlock, line: number): ListedThread {
   const { data } = block
   const runtime = data.anchor.runtime
   const quote = storedQuoteOf(data.anchor)
+  const { found, change } = shownTarget(doc, block)
   return {
     threadId: data.id,
     rawHash: block.rawHash,
@@ -122,7 +179,8 @@ function threadOf(block: Extract<ParsedBlock, { kind: 'ok' }>, line: number): Li
     tag: data.anchor.tag,
     ...(data.anchor.id === undefined ? {} : { elementId: data.anchor.id }),
     classes: [...(data.anchor.cls ?? [])],
-    attached: block.target.state === 'attached',
+    // A Markdown target found only by its position is attached, and Changed (C-06).
+    attached: block.target.state === 'attached' || found !== undefined,
     ...(quote === undefined ? {} : { quote }),
     ...(runtime === undefined
       ? {}
@@ -140,7 +198,8 @@ function threadOf(block: Extract<ParsedBlock, { kind: 'ok' }>, line: number): Li
       at: message.at,
       text: message.text,
       ...(message.edited === undefined ? {} : { edited: message.edited })
-    }))
+    })),
+    ...(change === undefined ? {} : { change })
   }
 }
 
@@ -148,8 +207,9 @@ function threadOf(block: Extract<ParsedBlock, { kind: 'ok' }>, line: number): Li
 function placementsOf(doc: KindDocument, line: (offset: number) => number): ListedPlacement[] {
   const placements: ListedPlacement[] = []
   for (const block of doc.state.blocks) {
-    if (block.kind !== 'ok' || block.target.state !== 'attached') continue
-    const target = doc.index.elementAt(block.target.startOffset)
+    if (block.kind !== 'ok') continue
+    // An open Markdown comment whose target only changed its text keeps its icon there (C-06).
+    const target = shownTarget(doc, block).found?.el
     if (target === undefined) continue
     const sel = anchorSelectionOf(block.data.anchor)
     placements.push({ threadId: block.data.id, line: line(target.start), tag: target.tag, ...(sel === undefined ? {} : { sel }) })
@@ -166,11 +226,21 @@ function summaryOf(doc: KindDocument, job: ListJob | undefined): ListSummary {
     const start = block.nodeRange[0]
     const at = line(start)
     if (block.kind === 'ok') {
-      threads.push(threadOf(block, at))
+      threads.push(threadOf(doc, block, at))
     } else if (block.kind === 'damaged') {
       const raw = doc.text.slice(start, block.nodeRange[1])
       const cut = cutText(raw, COMMENT_RAW_PREVIEW_MAX_CHARS)
-      damaged.push({ rawHash: block.rawHash, start, reason: block.reason, line: at, raw: cut, ...(cut.length < raw.length ? { rawTruncated: true as const } : {}) })
+      // OD-05: a hand-damaged block with valid @data can be rebuilt from it – offered, never done here.
+      const rebuild = doc.state.writable ? rebuildViewOf(raw, block.reason) : undefined
+      damaged.push({
+        rawHash: block.rawHash,
+        start,
+        reason: block.reason,
+        line: at,
+        raw: cut,
+        ...(cut.length < raw.length ? { rawTruncated: true as const } : {}),
+        ...(rebuild === undefined ? {} : { rebuild })
+      })
     } else {
       newer.push({ rawHash: block.rawHash, start, version: block.version, line: at })
     }

@@ -11,37 +11,24 @@
  */
 import { reduceCommentMode, type CommentModeStep } from '../../shared/comments/overlayCore/modeState'
 import { AnchorReporter } from './anchors'
-import {
-  COMMENT_HELLO_CHANNEL,
-  COMMENT_PICK_CHANNEL,
-  CONTROL_PICKS_PER_SECOND,
-  HELLO_REPEAT_MAX,
-  HELLO_REPEAT_MIN_MS,
-  MODE_TAB_AVOID_PX,
-  REVEAL_FLASH_MS
-} from './constants'
-import {
-  EMPTY_FRAME_MAP,
-  iframeOfKey,
-  iframeSuffix,
-  isFrameElement,
-  mapChildFrames,
-  shieldsOf,
-  type FrameElement,
-  type FrameMap,
-  type Shield
-} from './frames'
+import { COMMENT_HELLO_CHANNEL, COMMENT_PICK_CHANNEL, CONTROL_PICKS_PER_SECOND, MODE_TAB_AVOID_PX } from './constants'
+import { EMPTY_FRAME_MAP, iframeOfKey, mapChildFrames, shieldsOf, suffixFor, type FrameMap, type Shield } from './frames'
 import { openAround, SectionRestore } from './foldedSections'
-import { boxOf, clipToViewport, contains, outlineBox, viewportOf, type Point, type Viewport } from './geometry'
+import { boxOf, clipToViewport, viewportOf, type Box, type Point, type Viewport } from './geometry'
 import { IconResolver } from './iconResolver'
-import { labelOf, labelText, type LabelSuffix } from './label'
+import { labelOf, labelText } from './label'
 import { OverlayHost } from './overlayHost'
 import { overlayCss } from './overlayStyles'
-import { OverlayView, type OutlineModel } from './overlayView'
+import { OverlayView, outlineModelOf, type OutlineModel } from './overlayView'
 import { PickHold } from './pickHold'
-import { firstChildOf, parentOf, pickableExcept, stepOf, type PickablePredicate } from './picker'
-import { describeTarget, elementPoint, PickLimiter, screenOf, StepSender, stepElementOf, viewOf, type PickKind, type PickPayload } from './picks'
-import { placePins, type PinPlacement } from './pins'
+import { levelDown, levelUp, pickableExcept, stepOf, type LevelMove, type PickablePredicate } from './picker'
+import { MarkResolver, type MarkPlacement } from './marks'
+import { elementOfHit, hitAt, type OverlayHit } from './overlayHits'
+import { HelloRepeater, RevealFlash } from './revealFlash'
+import { describeTarget, elementPoint, PickLimiter, screenOf, stackPart, StepSender, stepElementOf, viewOf, wordsPart, type PickKind, type PickPayload } from './picks'
+import { SelectionButton } from './selectionButton'
+import { readSelection, type PageWords } from './words'
+import { placePins, type PinInput, type PinPlacement } from './pins'
 import { CursorSheet, PageWatch, RenderScheduler, ScrollRestore } from './scheduling'
 import { IDLE_STATE, parseCommentState, pxOf, type CommentState } from './state'
 import { TokenRegistry } from './tokens'
@@ -56,10 +43,7 @@ export interface ControllerDeps {
   readonly isTop: boolean
 }
 
-/** A pin or a shield under the pointer. */
-export type OverlayHit =
-  | { readonly kind: 'pin'; readonly pin: PinPlacement }
-  | { readonly kind: 'shield'; readonly iframe: FrameElement }
+export type { OverlayHit } from './overlayHits'
 
 /** A keyboard picker action (`input.ts` maps keys to these). */
 export type PickerAction = 'next' | 'previous' | 'up' | 'down' | 'open' | 'menu' | 'exit'
@@ -91,11 +75,14 @@ export class CommentController {
   private selected: Element | null = null
   private pointer: Point | null = null
   private pins: PinPlacement[] = []
+  private marks: MarkPlacement[] = []
+  private readonly markResolver: MarkResolver
+  /** The Comment button over a selection (C-16) and the box it was last drawn in. */
+  private readonly button: SelectionButton
+  private buttonBox: Box | null = null
   private shields: Shield[] = []
-  private flash: { readonly element: Element; readonly until: number } | null = null
-  private flashTimer: ReturnType<typeof setTimeout> | null = null
-  private hellos = 0
-  private lastHelloAt = Number.NEGATIVE_INFINITY
+  private readonly flash: RevealFlash
+  private readonly hellos: HelloRepeater
   private keyboardMenuAt = Number.NEGATIVE_INFINITY
   private ready = false
 
@@ -117,6 +104,10 @@ export class CommentController {
     this.sections = new SectionRestore(deps.win, doc, now)
     this.pickable = pickableExcept(element => this.host.isHost(element))
     this.icons = new IconResolver(this.tokens, () => this.watch.version)
+    this.markResolver = new MarkResolver(() => this.watch.version)
+    this.button = new SelectionButton(deps.win)
+    this.flash = new RevealFlash(now, () => this.scheduler.soon())
+    this.hellos = new HelloRepeater(now, deps.send)
   }
 
   /** Comment mode is on for this frame. */
@@ -183,13 +174,11 @@ export class CommentController {
     return event.composedPath().some(target => this.host.isHost(target))
   }
 
-  /** The pin or shield at `point`, topmost first. */
+  /** The Comment button, pin, mark (in comment mode) or shield at `point`, topmost first. */
   overlayHit(point: Point): OverlayHit | null {
-    for (let i = this.pins.length - 1; i >= 0; i -= 1) {
-      if (contains(this.pins[i].box, point)) return { kind: 'pin', pin: this.pins[i] }
-    }
-    const shield = this.shields.find(s => contains(s.box, point))
-    return shield === undefined ? null : { kind: 'shield', iframe: shield.frame }
+    const words = this.button.current
+    const button = words !== null && this.buttonBox !== null ? { words, box: this.buttonBox } : null
+    return hitAt({ button, pins: this.pins, marks: this.state.mode ? this.marks : [], shields: this.shields }, point)
   }
 
   /** A trusted pointer move. */
@@ -228,8 +217,15 @@ export class CommentController {
     const hit = this.overlayHit({ x: event.clientX, y: event.clientY })
     if (hit === null) return
     const primaryClick = event.type === 'click' && event.button === 0 && event.detail > 0
-    if (hit.kind === 'pin') {
-      if (primaryClick) this.pickIcon(hit.pin, event)
+    if (hit.kind === 'pin' || hit.kind === 'mark') {
+      // A mark acts as its pin; a stack pin names every pin merged into it (C-17).
+      const { key, element } = hit.kind === 'pin' ? hit.pin : hit.mark
+      if (primaryClick) this.pickIcon(key, element, event, hit.kind === 'pin' ? hit.pin.members : undefined)
+      return
+    }
+    // The Comment button opens the window on its words (C-16).
+    if (hit.kind === 'button') {
+      if (primaryClick) this.pickElement('open', hit.words.target, event, hit.words)
       return
     }
     // A shield exists only in comment mode (`shieldsOf`).
@@ -237,19 +233,42 @@ export class CommentController {
     if (event.type === 'contextmenu') this.pickElement('menu', hit.iframe, event)
   }
 
-  /** A trusted click or context menu on the page, in comment mode. */
+  /**
+   * A trusted press, click or context menu on the page, in comment mode. A
+   * drag selects words and shows the Comment button; a click picks (024-FR-004,
+   * overlayCore `gesture`). With words selected, the menu is about them.
+   */
   pageEvent(event: MouseEvent): void {
     const target = event.target instanceof Element ? event.target : null
     if (target === null) return
     const element = this.current?.contains(target) === true ? this.current : target
+    const at = { x: event.clientX, y: event.clientY }
+    if (event.type === 'mousedown' && event.button === 0) this.button.press(at)
     if (event.type === 'contextmenu') {
       // Shift+F10 / the Menu key also fire a contextmenu: the key already picked.
       if (this.deps.now() - this.keyboardMenuAt < 1_000) return
-      this.pickElement('menu', element, event)
+      const words = this.selectionWords()
+      this.pickElement('menu', words?.target ?? element, event, words)
     }
     if (event.type === 'click' && event.button === 0 && event.detail > 0) {
-      this.pickElement('open', element, event)
+      if (this.button.release(at, this.selectionWords())) this.scheduler.soon()
+      else this.pickElement('open', element, event)
     }
+  }
+
+  /**
+   * A trusted right-click outside comment mode (OD-01): read now, and sent
+   * as a `context` pick after the dispatch only when no page listener
+   * cancelled it – on the selected words, or the element under the pointer.
+   */
+  pageContextMenu(event: MouseEvent): void {
+    if (this.state.mode || !this.state.commentable || !(event.target instanceof Element)) return
+    const words = this.selectionWords()
+    const target = describeTarget(this.tokens, words?.target ?? event.target)
+    const payload: PickPayload = { kind: 'context', via: 'pointer', ...target, ...wordsPart(words, target), screen: screenOf(event), view: viewOf(this.deps.win) }
+    setTimeout(() => {
+      if (!event.defaultPrevented) this.sendPick(payload)
+    }, 0)
   }
 
   /** A keyboard picker action, in comment mode. */
@@ -265,12 +284,14 @@ export class CommentController {
       const next = stepOf(current, action === 'next', this.body(), this.pickable)
       if (next !== null) this.moveTo(next)
     } else if (action === 'up') {
-      this.stepUp(current)
+      this.stepLevel(levelUp(current, this.body(), this.downPath, this.deps.isTop))
     } else if (action === 'down') {
-      this.stepDown(current)
+      this.stepLevel(levelDown(current, this.downPath, this.pickable))
     } else {
       if (action === 'menu') this.keyboardMenuAt = this.deps.now()
-      this.pickElement(action, current)
+      // With the Comment button showing, Enter and the menu are about its words (C-16).
+      const words = this.button.current
+      this.pickElement(action, words?.target ?? current, undefined, words)
     }
   }
 
@@ -290,7 +311,7 @@ export class CommentController {
     this.restorer.cancel()
     this.sections.cancel()
     this.cursor.set(false)
-    if (this.flashTimer !== null) clearTimeout(this.flashTimer)
+    this.flash.dispose()
     this.host.dispose()
   }
 
@@ -300,7 +321,7 @@ export class CommentController {
 
   private hitElement(point: Point): Element | null {
     const hit = this.overlayHit(point)
-    if (hit !== null) return hit.kind === 'pin' ? hit.pin.element : hit.iframe
+    if (hit !== null) return elementOfHit(hit)
     const { doc } = this.deps
     const element = doc.elementFromPoint(point.x, point.y)
     return element === null || this.host.isHost(element) ? null : element
@@ -334,44 +355,36 @@ export class CommentController {
     this.steps.say('showing', stepElementOf(this.tokens, element), viewOf(this.deps.win))
   }
 
-  private stepUp(current: Element): void {
-    const parent = parentOf(current, this.body())
-    if (parent === null) {
-      // Out of a frame's <body>: main hands the picker to the parent's <iframe>.
-      if (!this.deps.isTop) this.sendPick({ kind: 'parent', via: 'keyboard', view: viewOf(this.deps.win) })
-      else this.steps.say('top', undefined, viewOf(this.deps.win))
-      return
+  /** An Alt+↑ / Alt+↓ step; out of a frame's <body>, main hands the picker to the parent's <iframe>. */
+  private stepLevel(move: LevelMove): void {
+    const view = viewOf(this.deps.win)
+    if (move.kind === 'parent-frame') this.sendPick({ kind: 'parent', via: 'keyboard', view })
+    else if (move.kind === 'say') this.steps.say(move.say, undefined, view)
+    else {
+      this.moveTo(move.element)
+      this.downPath = [...move.path]
     }
-    const path = [...this.downPath, current]
-    this.moveTo(parent)
-    this.downPath = path
   }
 
-  private stepDown(current: Element): void {
-    const back = this.downPath.at(-1)
-    if (back !== undefined && back.parentElement === current && back.isConnected) {
-      const path = this.downPath.slice(0, -1)
-      this.moveTo(back)
-      this.downPath = path
-      return
-    }
-    const child = firstChildOf(current, this.pickable)
-    if (child === null) this.steps.say('no-child', undefined, viewOf(this.deps.win))
-    else this.moveTo(child)
-  }
-
-  private pickElement(kind: Extract<PickKind, 'menu' | 'open'>, element: Element, event?: MouseEvent): void {
+  private pickElement(kind: Extract<PickKind, 'menu' | 'open'>, element: Element, event?: MouseEvent, words: PageWords | null = null): void {
     if (!this.state.commentable) return
     const where = event === undefined ? { point: elementPoint(element) } : { screen: screenOf(event) }
     const via = event === undefined ? 'keyboard' : 'pointer'
+    const target = describeTarget(this.tokens, element)
+    this.button.hide()
     this.paintSelected(element)
-    this.sendPick({ kind, via, ...describeTarget(this.tokens, element), ...where, view: viewOf(this.deps.win) })
+    this.sendPick({ kind, via, ...target, ...wordsPart(words, target), ...where, view: viewOf(this.deps.win) })
   }
 
-  /** Pins exist only in a commentable frame: a non-commentable state carries no icons. */
-  private pickIcon(pin: PinPlacement, event: MouseEvent): void {
-    this.paintSelected(pin.element)
-    this.sendPick({ kind: 'icon', via: 'pointer', key: pin.key, screen: screenOf(event), view: viewOf(this.deps.win) })
+  /** The page's selected words, if any (never in the overlay). */
+  private selectionWords(): PageWords | null {
+    return readSelection(this.deps.win, node => this.host.isHost(node))
+  }
+
+  /** Pins and marks exist only in a commentable frame: a non-commentable state carries no icons. */
+  private pickIcon(key: string, element: Element, event: MouseEvent, members?: readonly PinInput[]): void {
+    this.paintSelected(element)
+    this.sendPick({ kind: 'icon', via: 'pointer', key, ...stackPart(members), screen: screenOf(event), view: viewOf(this.deps.win) })
   }
 
   /** The selected outline must be painted before main captures the still (§3, R3-6). */
@@ -400,6 +413,14 @@ export class CommentController {
     if (!step.on) {
       this.select(null, false)
       this.pointer = null
+      this.button.hide()
+      return
+    }
+    // Turned on with words selected: the mode only comes on, around them, with the Comment button (C-16).
+    const words = this.selectionWords()
+    if (words !== null) {
+      this.current = words.target
+      this.button.show(words)
     }
   }
 
@@ -408,13 +429,7 @@ export class CommentController {
     if (element === undefined) return
     openAround(element)
     element.scrollIntoView({ block: 'center' })
-    this.flash = { element, until: this.deps.now() + REVEAL_FLASH_MS }
-    if (this.flashTimer !== null) clearTimeout(this.flashTimer)
-    this.flashTimer = setTimeout(() => {
-      this.flash = null
-      this.flashTimer = null
-      this.scheduler.soon()
-    }, REVEAL_FLASH_MS)
+    this.flash.start(element)
     this.renderNow()
   }
 
@@ -425,32 +440,12 @@ export class CommentController {
     this.anchors.markUnavailable('overlay-removed')
   }
 
-  private commentsOn(element: Element): number {
-    return this.pins.reduce((sum, pin) => sum + (pin.element === element ? pin.count : 0), 0)
-  }
-
-  private suffixOf(element: Element): LabelSuffix {
-    if (isFrameElement(element)) return iframeSuffix(this.frameMap, element)
-    const scripted = this.tokens.tokenOf(element) === undefined && this.tokens.nearestTokened(element) !== undefined
-    return scripted ? { kind: 'script' } : { kind: 'none' }
-  }
-
   private outlineOf(viewport: Viewport): OutlineModel | null {
     const element = this.current
     if (!this.state.mode || element === null || !element.isConnected) return null
-    const box = boxOf(element)
-    const outlined = outlineBox(box, viewport, this.deps.win.devicePixelRatio)
-    if (outlined === null) return null
-    const label = labelOf(element, box, this.suffixOf(element), this.commentsOn(element))
-    return { box: outlined, selected: element === this.selected, label }
-  }
-
-  private requestHello(): void {
-    const now = this.deps.now()
-    if (this.hellos >= HELLO_REPEAT_MAX || now - this.lastHelloAt < HELLO_REPEAT_MIN_MS) return
-    this.hellos += 1
-    this.lastHelloAt = now
-    this.deps.send(COMMENT_HELLO_CHANNEL, {})
+    const comments = this.pins.flatMap(pin => pin.members ?? [pin]).reduce((sum, pin) => sum + (pin.element === element ? pin.count : 0), 0)
+    const suffix = suffixFor(element, this.frameMap, this.tokens)
+    return outlineModelOf(element, element === this.selected, viewport, this.deps.win.devicePixelRatio, suffix, comments)
   }
 
   /** One render pass. */
@@ -459,7 +454,7 @@ export class CommentController {
     if (doc.documentElement === null) return
     const viewport = viewportOf(win)
     this.frameMap = mapChildFrames(win, doc, this.state.childFrames)
-    if (this.frameMap.mismatch) this.requestHello()
+    if (this.frameMap.mismatch) this.hellos.request()
     const icons = this.icons.resolve(this.state.icons)
     if (this.state.commentable) this.anchors.update(icons.map(r => ({ key: r.icon.key, visible: r.visible })))
     const pinned = this.state.showIcons ? icons.filter(r => r.visible) : []
@@ -468,10 +463,13 @@ export class CommentController {
       viewport,
       pxOf(this.state.theme.pinTarget)
     )
+    this.marks = this.markResolver.place(pinned, viewport)
+    const theme = this.state.theme
+    this.buttonBox = this.state.mode ? this.button.box(viewport, pxOf(theme.pinTarget) + 2 * pxOf(theme.space1), pxOf(theme.space4)) : null
     this.shields = this.state.mode ? shieldsOf(doc, this.frameMap, viewport) : []
     this.watch.observeSizes(pinned.map(r => r.element as Element))
-    const flash = this.flash !== null && this.flash.until > this.deps.now() ? this.flash.element : null
-    const needed = this.state.mode || this.pins.length > 0 || flash !== null
+    const flash = this.flash.current()
+    const needed = this.state.mode || this.pins.length > 0 || this.marks.length > 0 || flash !== null
     if (!needed && this.view === null) return
     const root = this.host.ensure()
     if (root === null) return
@@ -483,14 +481,17 @@ export class CommentController {
       {
         outline: this.outlineOf(viewport),
         pins: this.pins,
-        pinLabel: pin => labelText(labelOf(pin.element, boxOf(pin.element), this.suffixOf(pin.element), 0)),
+        pinLabel: pin => labelText(labelOf(pin.element, boxOf(pin.element), suffixFor(pin.element, this.frameMap, this.tokens), 0)),
         selected: this.selected,
         shields: this.shields.map(s => s.box),
         indicator: {
           visible: this.state.mode && this.deps.isTop,
           bottom: this.pointer !== null && this.pointer.y < MODE_TAB_AVOID_PX
         },
-        flash: flash === null ? null : clipToViewport(boxOf(flash), viewport)
+        flash: flash === null ? null : clipToViewport(boxOf(flash), viewport),
+        marks: this.marks,
+        marksClickable: this.state.mode,
+        button: this.buttonBox
       },
       viewport
     )

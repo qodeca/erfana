@@ -325,5 +325,82 @@ export const SELECTION_COPY = {
     `These words appear more than once in this ${noun} with the same text around them, so Erfana could not find them again. Select more words, or comment on the whole ${noun}.`,
   blank: (noun: string): string => `Only spaces are selected. Select some words, or comment on the whole ${noun}.`,
   wordsDropped: (noun: string, file: string): string =>
-    `Comment saved on the whole ${noun} – the selected words are not in ${file} as written.`
+    `Comment saved on the whole ${noun} – the selected words are not in ${file} as written.`,
+  /** HTML, 024-AC-004 (g): words a script added are not in the file, so the new comment is on the whole element. */
+  wordsNotInFile: (file: string): string =>
+    `The selected words are not in ${file} as written, so this comment is about the whole element.`
+} as const
+
+/** The drawer's order of rows (C-15 sort menu). */
+export type CommentSortOrder = 'file' | 'changed' | 'latest'
+
+/**
+ * The comment list in both previews – the drawer and the toolbar's count
+ * (comments-v2 C-15, C-20, OD-04, OD-06; state table § 1 "Toolbar", § 2
+ * "Drawer note"; R-09, R-14).
+ */
+export const COMMENT_LIST_COPY = {
+  /** The filter's group name; no longer drawn (C-15). */
+  filterGroup: 'Show',
+  filterOpen: 'Open',
+  filterResolved: 'Resolved',
+  /** OD-04: damaged and newer-format comments. */
+  filterCantEdit: "Can't edit",
+  emptyCantEdit: 'Every comment in this file can be edited.',
+  changedTag: 'Changed',
+  wordsChangedTag: 'Words changed',
+  /** C-20: the drawer's checkbox, which took over from the toolbar's icons toggle. */
+  showIcons: 'Show comment icons and underlines',
+  sortMenu: 'Sort comments',
+  sortOrder: { file: 'File order', changed: 'Changed first', latest: 'Latest activity' } as Readonly<Record<CommentSortOrder, string>>,
+  sortButton: (order: CommentSortOrder): string => `Sort: ${COMMENT_LIST_COPY.sortOrder[order]}`,
+  /** The toolbar count's visible text: "Comments" with none, else "7 comments" (the ▲ counter is drawn beside it). */
+  count: (open: number): string => (open === 0 ? 'Comments' : plural(open, 'comment', 'comments')),
+  /** Its accessible name: the visible text first, then only the non-zero parts (R-14, WCAG 2.5.3). */
+  countName: (open: number, changed: number, damaged: number): string =>
+    [COMMENT_LIST_COPY.count(open), changed > 0 ? `${changed} changed` : '', damaged > 0 ? `${damaged} damaged` : '']
+      .filter(part => part !== '')
+      .join(', '),
+  /** A row's description, after its name (C-10): what it is on. */
+  rowOn: (label: string): string => `on ${label}`,
+  /** OD-06: the drawer note. */
+  removed: (count: number, file: string): string =>
+    `${plural(count, 'open comment', 'open comments')} ${count === 1 ? 'was' : 'were'} removed from ${file} outside Erfana.`,
+  removedShow: 'Show',
+  removedHide: 'Hide',
+  removedDismiss: 'Dismiss',
+  removedList: 'Comments removed outside Erfana',
+  copyText: 'Copy text',
+  textCopied: 'Text copied.',
+  copyTextFailed: "Couldn't copy the text."
+} as const
+
+/**
+ * What the Markdown picker says (comments-v2 C-10, C-16; Markdown words, C-03):
+ * the target's kind, line, opening words and open comments – main's facts and
+ * the rendered text, never a class or an id.
+ */
+export const MD_SPOKEN_COPY = {
+  /** "Paragraph, line 42: “We ship the beta…”. 2 comments." */
+  target: (noun: string, line: number, excerpt: string, comments: number): string =>
+    `${capitalise(noun)}, line ${line}${excerpt === '' ? '' : `: “${excerpt}”`}.${comments > 0 ? ` ${plural(comments, 'comment', 'comments')}.` : ''}`,
+  /** Added to the first steps after the mode turns on. */
+  hint: ' Enter to comment, Shift+F10 for the menu.',
+  /** Tab at either end of the preview. */
+  last: 'End of the preview – Shift+Tab goes back.',
+  first: 'Start of the preview.',
+  /** C-16: turning the mode on with words selected only turns the mode on. */
+  modeOnSelected: 'Comment mode on. Text is selected – press Enter or click Comment to comment on it.',
+  /** C-10: the keyboard entry, in one sentence. */
+  modeOnAt: (target: string): string => `Comment mode on. ${target}`
+} as const
+
+/** Characters of a target's text the picker speaks (C-10 "first 60 characters"). */
+export const SPOKEN_EXCERPT_MAX_CHARS = 60
+
+/** The Changed state on the overlay's icons (comments-v2 C-06; the notch is the shape, these words the name). */
+export const CHANGE_MARK_COPY = {
+  /** "2 comments on list item, line 18, 1 changed. Open." */
+  iconName: (count: number, noun: string, line: number, changed: number): string =>
+    `${plural(count, 'comment', 'comments')} on ${noun}, line ${line}, ${changed} changed. Open.`
 } as const

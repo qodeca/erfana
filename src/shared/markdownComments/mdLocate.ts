@@ -110,6 +110,30 @@ function lineAfter(index: MdIndex, end: number, skip: ReadonlyMap<number, MdBloc
   return line
 }
 
+const commentOnlyCache = new WeakMap<MdIndex, Map<number, MdBlock>>()
+
+/**
+ * The target of `tag` at a block's position – the next line after it, as the
+ * position rule reads it – WHATEVER its text is now. Never used to attach a
+ * block (the resolver below still asks for the stored quote): a comment list
+ * reads it as "Changed" rather than "Not found" when only the text moved on
+ * (comments-v2 C-06, spec 024 state table S-03).
+ *
+ * @param index - The file's index.
+ * @param nodeEnd - Offset just after the block's comment node.
+ * @param tag - The tag the block stored.
+ * @returns The target there, or `undefined`.
+ */
+export function positionTargetOf(index: MdIndex, nodeEnd: number, tag: string): MdTarget | undefined {
+  let skip = commentOnlyCache.get(index)
+  if (skip === undefined) {
+    skip = commentOnlyByLine(index.root)
+    commentOnlyCache.set(index, skip)
+  }
+  const line = lineAfter(index, nodeEnd, skip)
+  return index.elements.find(target => target.line - 1 === line && target.tag === tag)
+}
+
 /** The block target resolver of a Markdown file: a corroborated position, then the text alone. */
 export function markdownBlockResolver(index: MdIndex): BlockTargetResolver {
   const skip = commentOnlyByLine(index.root)

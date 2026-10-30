@@ -29,7 +29,7 @@
  *
  * @module HtmlPreviewPanel/comments/CommentThread
  */
-import { useEffect, useId, useRef, useState } from 'react'
+import { Fragment, useEffect, useId, useRef, useState } from 'react'
 import { renderIcon } from '../../utils/iconRegistry'
 import type {
   CommentSaveRequest,
@@ -43,6 +43,7 @@ import { onCommentWriteSettled, useCommentWritePending } from './commentPendingW
 import { CommentMessageView } from './CommentMessage'
 import { validateCommentText } from './commentSchemas'
 import { CommentField, DialogButton, VisibleText } from './CommentParts'
+import { WINDOW_COPY } from './commentWindowCopy'
 import { TEST_IDS } from '../../constants/testids'
 
 /** A write the thread asks the window to make; resolves whether it was saved. */
@@ -80,16 +81,32 @@ export interface ThreadContext {
   readonly focusAfter: FocusAfter | null
   /** Ask for (or, with `null`, drop) the focus after a status change. */
   readonly setFocusAfter: (next: FocusAfter | null) => void
+  /**
+   * The stepper is shown over one open thread (C-13, R-06): its Resolve is
+   * the foot's "Resolve and next", so the thread offers none of its own.
+   */
+  readonly stepFoot?: boolean
+  /** Message ids each thread had when the window first showed it (W-03 "New since you opened"). */
+  readonly seen?: ReadonlyMap<string, ReadonlySet<string>>
+  /** The file changed under the window (W-03): the divider is drawn. */
+  readonly updated?: boolean
 }
 
 /** Props for {@link CommentThread}. */
 export interface CommentThreadProps {
   readonly ctx: ThreadContext
   readonly thread: CommentThreadView
+  /**
+   * Resolve leads: primary, last, and focused when the window opens – the
+   * states that usually mean the work was done (C-05, C-06: S-03 – S-05).
+   */
+  readonly resolveLeads?: boolean
+  /** Takes the leading Resolve, for the window's first focus. */
+  readonly resolveRef?: React.Ref<HTMLButtonElement>
 }
 
 /** A reply box with Resolve: the open thread's foot. */
-function ReplyBox({ ctx, thread }: CommentThreadProps): React.JSX.Element {
+function ReplyBox({ ctx, thread, resolveLeads = false, resolveRef }: CommentThreadProps): React.JSX.Element {
   const key = replyDraftKey(ctx.panelId, ctx.fileKey, thread.threadKey)
   const [text, setText] = useState(() => commentDrafts.get(key))
   const [error, setError] = useState<string | null>(null)
@@ -145,6 +162,76 @@ function ReplyBox({ ctx, thread }: CommentThreadProps): React.JSX.Element {
     if (!ok) setFocusAfter(null)
   }
 
+  // "Reply and resolve" (C-13): one write that adds the reply and resolves the thread.
+  const replyAndResolve = async (): Promise<void> => {
+    if (busy || pending) return
+    const result = validateCommentText(text)
+    if (!result.ok) {
+      setError(result.error)
+      fieldRef.current?.focus()
+      return
+    }
+    setBusy(true)
+    setFocusAfter({ threadKey: thread.threadKey, target: 'reopen' })
+    const ok = await ctx.run({ ...target, op: 'reply', text: result.text, resolve: true })
+    setBusy(false)
+    if (ok) {
+      setText('')
+      commentDrafts.clear(key)
+    } else setFocusAfter(null)
+  }
+
+  const hasText = text.trim() !== ''
+  // C-21: an empty reply is blocked – dimmed, and it says what is missing.
+  const replyBlocked = hasText ? null : WINDOW_COPY.writeReplyFirst
+  const resolveButton = (
+    <DialogButton
+      variant={resolveLeads ? 'primary' : 'secondary'}
+      buttonRef={resolveRef}
+      onClick={() => void resolve()}
+      testId={TEST_IDS.COMMENT_RESOLVE}
+    >
+      {COPY.resolve}
+    </DialogButton>
+  )
+  const replyAndResolveButton = hasText ? (
+    <DialogButton variant="secondary" busy={busy || pending} onClick={() => void replyAndResolve()} testId={TEST_IDS.COMMENT_REPLY_RESOLVE}>
+      {WINDOW_COPY.replyAndResolve}
+    </DialogButton>
+  ) : null
+  const replyButton = (
+    <DialogButton
+      variant={ctx.replyIsPrimary && !resolveLeads ? 'primary' : 'secondary'}
+      busy={busy || pending}
+      blocked={replyBlocked}
+      title={`${COPY.reply} (${saveShortcutLabel()})`}
+      keyShortcut={saveShortcutAria()}
+      onClick={() => void reply()}
+      testId={TEST_IDS.COMMENT_REPLY}
+    >
+      {busy || pending ? COPY.saving : COPY.reply}
+    </DialogButton>
+  )
+  // One row, primary last: Resolve leads in S-03 – S-05; with the stepper it is the foot's (R-06).
+  const actions = ctx.stepFoot ? (
+    <>
+      {replyAndResolveButton}
+      {replyButton}
+    </>
+  ) : resolveLeads ? (
+    <>
+      {replyAndResolveButton}
+      {replyButton}
+      {resolveButton}
+    </>
+  ) : (
+    <>
+      {resolveButton}
+      {replyAndResolveButton}
+      {replyButton}
+    </>
+  )
+
   return (
     <div className="erf-comment-thread__reply">
       <CommentField
@@ -163,22 +250,25 @@ function ReplyBox({ ctx, thread }: CommentThreadProps): React.JSX.Element {
         textareaRef={fieldRef}
         testId={TEST_IDS.COMMENT_REPLY_FIELD}
       />
-      <div className="erf-comment-thread__actions">
-        <DialogButton variant="secondary" onClick={() => void resolve()} testId={TEST_IDS.COMMENT_RESOLVE}>
-          {COPY.resolve}
-        </DialogButton>
-        <DialogButton
-          variant={ctx.replyIsPrimary ? 'primary' : 'secondary'}
-          busy={busy || pending}
-          title={`${COPY.reply} (${saveShortcutLabel()})`}
-          keyShortcut={saveShortcutAria()}
-          onClick={() => void reply()}
-          testId={TEST_IDS.COMMENT_REPLY}
-        >
-          {busy || pending ? COPY.saving : COPY.reply}
-        </DialogButton>
-      </div>
+      <div className="erf-comment-thread__actions">{actions}</div>
     </div>
+  )
+}
+
+/** "New since you opened" above the first message the window had not seen, after the file changed (W-03). */
+function isFirstNew(ctx: ThreadContext, thread: CommentThreadView, index: number): boolean {
+  const seen = ctx.seen?.get(thread.threadKey)
+  if (ctx.updated !== true || seen === undefined) return false
+  const firstNew = thread.messages.findIndex(message => !seen.has(message.id))
+  return firstNew > 0 && firstNew === index
+}
+
+/** The W-03 divider. */
+function NewSince(): React.JSX.Element {
+  return (
+    <p className="erf-comment-divider" role="separator" data-testid={TEST_IDS.COMMENT_NEW_SINCE}>
+      <span>{WINDOW_COPY.newSince}</span>
+    </p>
   )
 }
 
@@ -189,7 +279,7 @@ function ReplyBox({ ctx, thread }: CommentThreadProps): React.JSX.Element {
  * @param props - {@link CommentThreadProps}
  * @returns The thread section.
  */
-export function CommentThread({ ctx, thread }: CommentThreadProps): React.JSX.Element {
+export function CommentThread({ ctx, thread, resolveLeads, resolveRef }: CommentThreadProps): React.JSX.Element {
   const [first, ...replies] = thread.messages
   return (
     <section
@@ -200,18 +290,15 @@ export function CommentThread({ ctx, thread }: CommentThreadProps): React.JSX.El
       <CommentMessageView ctx={ctx} thread={thread} message={first} first />
       {replies.length > 0 && (
         <div className="erf-comment-replies">
-          {replies.map(message => (
-            <CommentMessageView
-              key={message.id}
-              ctx={ctx}
-              thread={thread}
-              message={message}
-              first={false}
-            />
+          {replies.map((message, i) => (
+            <Fragment key={message.id}>
+              {isFirstNew(ctx, thread, i + 1) && <NewSince />}
+              <CommentMessageView ctx={ctx} thread={thread} message={message} first={false} />
+            </Fragment>
           ))}
         </div>
       )}
-      {!ctx.readOnly && <ReplyBox ctx={ctx} thread={thread} />}
+      {!ctx.readOnly && <ReplyBox ctx={ctx} thread={thread} resolveLeads={resolveLeads} resolveRef={resolveRef} />}
     </section>
   )
 }

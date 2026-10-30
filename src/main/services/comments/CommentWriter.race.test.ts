@@ -316,7 +316,8 @@ describe('file-system failures and fail-closed verification', () => {
       text: 'x'
     })
 
-    expect(result).toEqual({ ok: false, code: ErrorCode.COMMENT_LIMIT, reason: 'limit' })
+    // Changed expectation under C-19 (was reason 'limit'): the file-size limit is worded on its own.
+    expect(result).toEqual({ ok: false, code: ErrorCode.COMMENT_LIMIT, reason: 'file-size' })
     expect(hooks.tempOpens).toBe(0)
   })
 

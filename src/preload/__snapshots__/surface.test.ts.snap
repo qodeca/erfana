@@ -269,6 +269,7 @@ exports[`preload surface > window.api.preview exposes the expected members 1`] =
 
 exports[`preload surface > window.api.previewComments exposes the expected members 1`] = `
 [
+  "keepDraft",
   "list",
   "onAnchorStatus",
   "onCommentsChanged",

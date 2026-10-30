@@ -19,6 +19,9 @@
  * - **024-AC-005** (commit 14) – words selected and commented from the
  *   right-click menu, and by a drag in comment mode and the Comment button:
  *   `anchor.sel` is on disk and the words are marked.
+ * - **C-15, C-20, C-22 (Markdown)** (commit 14) – the quieter toolbar and the
+ *   drawer's icons checkbox, the three-cell filter and the sort menu, and a
+ *   click on a commented paragraph opening its thread.
  *
  * Local gate only (e2e is not a required check). Condition-based waits only.
  */
@@ -117,7 +120,7 @@ test.describe('Markdown Preview comments', () => {
     await expect(md.announce()).toHaveText('Comment resolved.', { timeout: MD_COMMENT_BUDGET_MS })
     expect(await fsp.readFile(file, 'utf-8')).toContain(`status: resolved by ${NAME}`)
     await page.getByTestId('comment-reopen').click()
-    await expect(md.announce()).toHaveText('Comment re-opened.', { timeout: MD_COMMENT_BUDGET_MS })
+    await expect(md.announce()).toHaveText('Comment reopened.', { timeout: MD_COMMENT_BUDGET_MS })
 
     // Deleting the first message deletes the thread; the bytes come back.
     await md.messageAction(0, 'Delete…')
@@ -142,7 +145,10 @@ test.describe('Markdown Preview comments', () => {
     await expect(md.target('h1', 1)).toBeFocused({ timeout: MD_COMMENT_BUDGET_MS })
     await page.keyboard.press('Tab')
     await expect(md.target('p', 3)).toBeFocused()
-    await expect(md.announce()).toHaveText('Showing paragraph, line 3.')
+    // C-10: the step names the kind, line and opening words (was "Showing paragraph, line 3.").
+    await expect(md.announce()).toHaveText(
+      'Paragraph, line 3: “First paragraph of the review.”. Enter to comment, Shift+F10 for the menu.'
+    )
     await page.keyboard.press('Tab')
     await expect(md.target('ul', 5)).toBeFocused()
     await page.keyboard.press('Alt+ArrowDown')
@@ -276,5 +282,144 @@ test.describe('Markdown Preview comments', () => {
 
     const written = await fsp.readFile(file, 'utf-8')
     expect(written).toMatch(/"sel":\{"exact":"[^"]*beta"/)
+  })
+
+  /** Comment on a target in comment mode and leave the mode on. */
+  async function commentOn(md: MarkdownCommentsPage, tag: string, line: number): Promise<void> {
+    await md.modeOn()
+    await md.target(tag, line).click()
+    await expect(md.window()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await md.saveNewComment(NOTE, FILE, NAME)
+  }
+
+  test('C-20 (Markdown) a quieter toolbar: Comment mode and a labelled count; icons and underlines are the drawer checkbox', async ({
+    windowWithTestProject
+  }) => {
+    const page = windowWithTestProject
+    const md = await openReview(page)
+    // No "Show comment icons" tool in the row; with no comments the count reads "Comments".
+    await expect(md.editor.toolbar().getByTestId(TEST_IDS.COMMENT_TOOL_ICONS)).toHaveCount(0)
+    await expect(md.listButton()).toHaveAccessibleName('Comments')
+    await commentOn(md, 'li', 5)
+    await expect(md.listButton()).toHaveAccessibleName('1 comment', { timeout: MD_COMMENT_BUDGET_MS })
+    await expect(md.listButton()).toContainText('1 comment')
+    await expect(md.listButton()).not.toHaveAttribute('title')
+
+    await md.listButton().click()
+    await expect(md.listButton()).toHaveAttribute('aria-expanded', 'true')
+    await expect(md.drawer()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await expect(md.icons()).toHaveCount(1)
+    await md.iconsCheckbox().uncheck()
+    await expect(md.icons()).toHaveCount(0)
+    await md.iconsCheckbox().check()
+    await expect(md.icons()).toHaveCount(1)
+  })
+
+  test('C-15 (Markdown) the drawer filter is three cells on one row, and the sort menu orders the rows', async ({
+    windowWithTestProject
+  }) => {
+    const page = windowWithTestProject
+    const md = await openReview(page)
+    await commentOn(md, 'p', 3)
+    await md.listButton().click()
+    await expect(md.drawer()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+
+    await expect(md.filter('open')).toHaveText('Open 1')
+    await expect(md.filter('resolved')).toHaveText('Resolved 0')
+    await expect(md.filter('cantEdit')).toHaveText("Can't edit 0")
+    // One row, equal widths: every cell shares the first cell's top and width (within a pixel).
+    const boxes = await Promise.all((['open', 'resolved', 'cantEdit'] as const).map(which => md.filter(which).boundingBox()))
+    for (const box of boxes) {
+      expect(Math.abs(box!.y - boxes[0]!.y)).toBeLessThanOrEqual(1)
+      expect(Math.abs(box!.width - boxes[0]!.width)).toBeLessThanOrEqual(1)
+    }
+    await expect(md.drawer().getByRole('radiogroup', { name: 'Show' })).toBeVisible()
+
+    await expect(md.sortButton()).toHaveText(/Sort: File order/)
+    await md.sortButton().click()
+    const menu = page.getByRole('menu', { name: 'Sort comments' })
+    await expect(menu).toBeVisible()
+    await expect(menu.getByRole('menuitem')).toHaveText(['File order', 'Changed first', 'Latest activity'])
+    await menu.getByRole('menuitem', { name: 'Latest activity' }).click()
+    await expect(md.sortButton()).toHaveText(/Sort: Latest activity/)
+    await expect(md.sortButton()).toBeFocused()
+  })
+
+  test('C-22 (Markdown) in comment mode a click on a commented paragraph opens its thread, not a blank new comment', async ({
+    windowWithTestProject
+  }) => {
+    const page = windowWithTestProject
+    const md = await openReview(page)
+    await commentOn(md, 'p', 3)
+    // The block went in before the paragraph: find it again by its text.
+    const paragraph = md.content().locator('p', { hasText: 'First paragraph of the review.' })
+    await expect(md.modeButton()).toHaveAttribute('aria-pressed', 'true')
+    await paragraph.click()
+    const win = md.window()
+    await expect(win).toHaveAttribute('data-view', 'threads', { timeout: MD_COMMENT_BUDGET_MS })
+    await expect(win.getByTestId('comment-message')).toHaveCount(1)
+    await expect(win.getByTestId('comment-message').first()).toContainText(NOTE)
+    await page.keyboard.press('Escape')
+    await expect(win).toHaveCount(0, { timeout: MD_COMMENT_BUDGET_MS })
+    // A paragraph with no comment still opens a new one.
+    await md.content().locator('p', { hasText: 'Closing paragraph.' }).click()
+    await expect(win).toHaveAttribute('data-view', 'new', { timeout: MD_COMMENT_BUDGET_MS })
+  })
+  test('C-13 (Markdown) the stepper walks the open comments: Alt+F9, Resolve and next, then all resolved', async ({
+    windowWithTestProject
+  }) => {
+    const page = windowWithTestProject
+    const md = await openReview(page)
+    await commentOn(md, 'p', 3)
+    // A second comment, found by its text: the first block moved the lines.
+    await md.content().locator('p', { hasText: 'Closing paragraph.' }).click()
+    await expect(md.window()).toHaveAttribute('data-view', 'new', { timeout: MD_COMMENT_BUDGET_MS })
+    await md.saveNewComment(NOTE, FILE, NAME)
+
+    await md.content().locator('p', { hasText: 'First paragraph of the review.' }).click()
+    const win = md.window()
+    await expect(win).toHaveAttribute('data-view', 'threads', { timeout: MD_COMMENT_BUDGET_MS })
+    const stepper = win.getByTestId(TEST_IDS.COMMENT_STEPPER)
+    await expect(stepper).toContainText('1 of 2')
+    await page.keyboard.press('Alt+F9')
+    await expect(stepper).toContainText('2 of 2')
+    await expect(win.getByTestId(TEST_IDS.COMMENT_WINDOW_POLITE)).toHaveText(/Comment 2 of 2, on paragraph, line \d+\./)
+    await expect(win.getByTestId(TEST_IDS.COMMENT_WINDOW_TITLE)).toBeFocused()
+    await page.keyboard.press('Alt+Shift+F9')
+    await expect(stepper).toContainText('1 of 2')
+
+    // Resolve and next: one write, then the other comment – the last open one, so no stepper.
+    await win.getByTestId(TEST_IDS.COMMENT_RESOLVE_NEXT).click()
+    await expect(md.announce()).toHaveText('Comment resolved.', { timeout: MD_COMMENT_BUDGET_MS })
+    await expect(stepper).toHaveCount(0, { timeout: MD_COMMENT_BUDGET_MS })
+    await win.getByTestId(TEST_IDS.COMMENT_RESOLVE).click()
+    await expect(win.getByTestId(TEST_IDS.COMMENT_ALL_DONE)).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await expect(win.getByTestId(TEST_IDS.COMMENT_CLOSE)).toBeFocused()
+  })
+
+  test('C-18 (Markdown) the comment window is non-modal: F6 moves between it and the preview, Esc closes it', async ({
+    windowWithTestProject
+  }) => {
+    const page = windowWithTestProject
+    const md = await openReview(page)
+    await md.modeOn()
+    await md.target('p', 3).click()
+    const win = md.window()
+    await md.passIdentity(NAME)
+    await expect(win).toHaveAttribute('role', 'dialog')
+    await expect(win).not.toHaveAttribute('aria-modal', 'true')
+    await expect(win).toHaveClass(/erf-comment-window--docked/)
+    // No occluder: the preview is not covered while the window is open.
+    await expect(page.locator('.dialog-overlay')).toHaveCount(0)
+    const field = win.getByTestId(TEST_IDS.COMMENT_NEW_FIELD)
+    await expect(field).toBeFocused()
+    await field.fill(NOTE)
+    await page.keyboard.press('F6')
+    await expect(md.preview()).toBeFocused()
+    await page.keyboard.press('F6')
+    await expect(field).toBeFocused()
+    await expect(field).toHaveValue(NOTE)
+    await page.keyboard.press('Escape')
+    await expect(win).toHaveCount(0, { timeout: MD_COMMENT_BUDGET_MS })
   })
 })

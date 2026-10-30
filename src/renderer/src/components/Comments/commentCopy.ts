@@ -225,7 +225,8 @@ export const COPY = {
   saving: 'Saving…',
   reply: 'Reply',
   resolve: 'Resolve',
-  reopen: 'Re-open',
+  // C-19.4: the status action is "Reopen"; errors never say it.
+  reopen: 'Reopen',
   edit: 'Edit',
   delete: 'Delete…',
   saveChanges: 'Save changes',
@@ -457,7 +458,9 @@ export const ANNOUNCE = {
   modeOff: 'Comment mode off.',
   // not in §10.10
   resolved: 'Comment resolved.',
-  reopened: 'Comment re-opened.',
+  reopened: 'Comment reopened.',
+  // OD-05: a damaged comment rebuilt from its data line.
+  rebuilt: 'Comment rebuilt.',
   deleted: (file: string): string => `Comment deleted from ${file}.`,
   // keyboard picker (§10.8): spoken by the panel, never drawn in the page. The
   // element is named by what MAIN parsed – its tag and line – never by its ids
@@ -480,6 +483,9 @@ export const ANNOUNCE = {
  */
 export function writtenAnnouncement(save: CommentSaveRequest, file: string): string {
   if (save.op === 'setStatus') return save.status === 'resolved' ? ANNOUNCE.resolved : ANNOUNCE.reopened
+  // "Reply and resolve" (C-13): the reply landed and the thread is resolved.
+  if (save.op === 'reply' && save.resolve === true) return ANNOUNCE.resolved
+  if (save.op === 'rebuildBlock') return ANNOUNCE.rebuilt
   if (save.op === 'deleteMessage' || save.op === 'deleteThread' || save.op === 'deleteBlock') {
     return ANNOUNCE.deleted(file)
   }

@@ -4,6 +4,7 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-001 the page sch
 {
   "COMMENT_ANCHOR_KEYS_MAX": 500,
   "COMMENT_KEY_MAX_CHARS": 40,
+  "COMMENT_PICK_STACK_MAX": 20,
   "CommentAnchorsSchema": {
     "jsonSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -215,6 +216,10 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-001 the page sch
           ],
           "type": "object",
         },
+        "crossed": {
+          "const": true,
+          "type": "boolean",
+        },
         "key": {
           "maxLength": 40,
           "minLength": 1,
@@ -229,8 +234,13 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-001 the page sch
             "parent",
             "exit",
             "step",
+            "context",
           ],
           "type": "string",
+        },
+        "long": {
+          "const": true,
+          "type": "boolean",
         },
         "point": {
           "additionalProperties": false,
@@ -333,6 +343,43 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-001 the page sch
           ],
           "type": "object",
         },
+        "sel": {
+          "additionalProperties": false,
+          "properties": {
+            "exact": {
+              "maxLength": 400,
+              "minLength": 1,
+              "type": "string",
+            },
+            "prefix": {
+              "maxLength": 64,
+              "minLength": 0,
+              "type": "string",
+            },
+            "suffix": {
+              "maxLength": 64,
+              "minLength": 0,
+              "type": "string",
+            },
+          },
+          "required": [
+            "exact",
+            "prefix",
+            "suffix",
+          ],
+          "type": "object",
+        },
+        "stack": {
+          "items": {
+            "maxLength": 40,
+            "minLength": 1,
+            "pattern": "^[\\w-]+$",
+            "type": "string",
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "type": "array",
+        },
         "tag": {
           "maxLength": 128,
           "minLength": 1,
@@ -411,12 +458,52 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-001 the page sch
       "type": "object",
     },
     "refinements": [
+      "only a menu, open or context pick on a tokened element carries words",
+      "only words are long or crossed",
       "a pin pick names its key",
+      "only a pin pick names a stack",
       "only a step says, and it says something",
       "a showing step names its element by token, and only it does",
       "only a showing step reaches an added element",
       "a runtime element is described below a tokened ancestor",
       "(no message)",
+      "too long",
+      "too long",
+      "too long",
+    ],
+  },
+  "CommentPickSelSchema": {
+    "jsonSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "exact": {
+          "maxLength": 400,
+          "minLength": 1,
+          "type": "string",
+        },
+        "prefix": {
+          "maxLength": 64,
+          "minLength": 0,
+          "type": "string",
+        },
+        "suffix": {
+          "maxLength": 64,
+          "minLength": 0,
+          "type": "string",
+        },
+      },
+      "required": [
+        "exact",
+        "prefix",
+        "suffix",
+      ],
+      "type": "object",
+    },
+    "refinements": [
+      "too long",
+      "too long",
+      "too long",
     ],
   },
   "CommentPickViewSchema": {
@@ -543,6 +630,7 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
   "COMMENT_PATH_MAX_CHARS": 4096,
   "COMMENT_RAW_PREVIEW_MAX_CHARS": 65536,
   "COMMENT_UNSAVED_SOURCES_MAX": 500,
+  "COMMENT_WORDS_TEXT_MAX_CHARS": 10000,
   "CommentAckSchema": {
     "jsonSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -864,30 +952,58 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
   "CommentCommandRequestSchema": {
     "jsonSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "additionalProperties": false,
-      "properties": {
-        "command": {
-          "const": "reveal",
-          "type": "string",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "const": "reveal",
+              "type": "string",
+            },
+            "panelId": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string",
+            },
+            "threadKey": {
+              "maxLength": 40,
+              "minLength": 1,
+              "pattern": "^[\\w-]+$",
+              "type": "string",
+            },
+          },
+          "required": [
+            "panelId",
+            "command",
+            "threadKey",
+          ],
+          "type": "object",
         },
-        "panelId": {
-          "maxLength": 256,
-          "minLength": 1,
-          "type": "string",
+        {
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "const": "keep-draft",
+              "type": "string",
+            },
+            "draftToken": {
+              "pattern": "^[0-9a-f]{32}$",
+              "type": "string",
+            },
+            "panelId": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          "required": [
+            "panelId",
+            "command",
+            "draftToken",
+          ],
+          "type": "object",
         },
-        "threadKey": {
-          "maxLength": 40,
-          "minLength": 1,
-          "pattern": "^[\\w-]+$",
-          "type": "string",
-        },
-      },
-      "required": [
-        "panelId",
-        "command",
-        "threadKey",
       ],
-      "type": "object",
     },
     "refinements": [],
   },
@@ -955,6 +1071,10 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
               ],
               "type": "object",
             },
+            "selection": {
+              "const": true,
+              "type": "boolean",
+            },
             "target": {
               "additionalProperties": false,
               "properties": {
@@ -1015,6 +1135,39 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
                 "excerpt",
               ],
               "type": "object",
+            },
+            "words": {
+              "additionalProperties": false,
+              "properties": {
+                "cut": {
+                  "type": "boolean",
+                },
+                "end": {
+                  "maximum": 10000,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "start": {
+                  "maximum": 10000,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "text": {
+                  "maxLength": 10000,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "text",
+                "start",
+                "end",
+                "cut",
+              ],
+              "type": "object",
+            },
+            "wordsMissing": {
+              "const": true,
+              "type": "boolean",
             },
           },
           "required": [
@@ -1184,6 +1337,8 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
     },
     "refinements": [
       "a draft comes with its key and its target",
+      "words come with a draft",
+      "a range inside the text",
     ],
   },
   "CommentDraftTargetViewSchema": {
@@ -1251,6 +1406,41 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
     },
     "refinements": [],
   },
+  "CommentDraftWordsSchema": {
+    "jsonSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "cut": {
+          "type": "boolean",
+        },
+        "end": {
+          "maximum": 10000,
+          "minimum": 0,
+          "type": "integer",
+        },
+        "start": {
+          "maximum": 10000,
+          "minimum": 0,
+          "type": "integer",
+        },
+        "text": {
+          "maxLength": 10000,
+          "type": "string",
+        },
+      },
+      "required": [
+        "text",
+        "start",
+        "end",
+        "cut",
+      ],
+      "type": "object",
+    },
+    "refinements": [
+      "a range inside the text",
+    ],
+  },
   "CommentFileViewSchema": {
     "jsonSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1297,6 +1487,42 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
                   "unterminated",
                 ],
                 "type": "string",
+              },
+              "rebuild": {
+                "additionalProperties": false,
+                "properties": {
+                  "claims": {
+                    "const": "resolved",
+                    "type": "string",
+                  },
+                  "lines": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "data": {
+                          "maxLength": 2000,
+                          "type": "string",
+                        },
+                        "file": {
+                          "maxLength": 2000,
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "file",
+                        "data",
+                      ],
+                      "type": "object",
+                    },
+                    "maxItems": 32,
+                    "minItems": 1,
+                    "type": "array",
+                  },
+                },
+                "required": [
+                  "lines",
+                ],
+                "type": "object",
               },
             },
             "required": [
@@ -1377,6 +1603,31 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
             "properties": {
               "attached": {
                 "type": "boolean",
+              },
+              "change": {
+                "additionalProperties": false,
+                "properties": {
+                  "now": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "state": {
+                    "enum": [
+                      "changed",
+                      "words",
+                    ],
+                    "type": "string",
+                  },
+                  "was": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "state",
+                  "was",
+                ],
+                "type": "object",
               },
               "classes": {
                 "items": {
@@ -1567,6 +1818,8 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
     },
     "refinements": [
       "(no message)",
+      "(no message)",
+      "(no message)",
     ],
   },
   "CommentHelloSchema": {
@@ -1630,6 +1883,42 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
                             "unterminated",
                           ],
                           "type": "string",
+                        },
+                        "rebuild": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "claims": {
+                              "const": "resolved",
+                              "type": "string",
+                            },
+                            "lines": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "data": {
+                                    "maxLength": 2000,
+                                    "type": "string",
+                                  },
+                                  "file": {
+                                    "maxLength": 2000,
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "file",
+                                  "data",
+                                ],
+                                "type": "object",
+                              },
+                              "maxItems": 32,
+                              "minItems": 1,
+                              "type": "array",
+                            },
+                          },
+                          "required": [
+                            "lines",
+                          ],
+                          "type": "object",
                         },
                       },
                       "required": [
@@ -1710,6 +1999,31 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
                       "properties": {
                         "attached": {
                           "type": "boolean",
+                        },
+                        "change": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "now": {
+                              "maxLength": 200,
+                              "type": "string",
+                            },
+                            "state": {
+                              "enum": [
+                                "changed",
+                                "words",
+                              ],
+                              "type": "string",
+                            },
+                            "was": {
+                              "maxLength": 200,
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "state",
+                            "was",
+                          ],
+                          "type": "object",
                         },
                         "classes": {
                           "items": {
@@ -2120,6 +2434,8 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
     },
     "refinements": [
       "(no message)",
+      "(no message)",
+      "(no message)",
     ],
   },
   "CommentModeChangedSchema": {
@@ -2134,10 +2450,47 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
               "const": true,
               "type": "boolean",
             },
+            "comments": {
+              "maximum": 500,
+              "minimum": 1,
+              "type": "integer",
+            },
             "line": {
               "maximum": 9007199254740991,
               "minimum": 1,
               "type": "integer",
+            },
+            "role": {
+              "enum": [
+                "paragraph",
+                "list item",
+                "list",
+                "table",
+                "table row",
+                "table cell",
+                "image",
+                "button",
+                "link",
+                "section",
+                "article",
+                "navigation",
+                "header",
+                "footer",
+                "aside",
+                "main",
+                "block quote",
+                "code block",
+                "figure",
+                "form",
+                "element",
+                "heading level 1",
+                "heading level 2",
+                "heading level 3",
+                "heading level 4",
+                "heading level 5",
+                "heading level 6",
+              ],
+              "type": "string",
             },
             "tag": {
               "maxLength": 128,
@@ -2317,6 +2670,10 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
           ],
           "type": "object",
         },
+        "crossed": {
+          "const": true,
+          "type": "boolean",
+        },
         "key": {
           "maxLength": 40,
           "minLength": 1,
@@ -2331,8 +2688,13 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
             "parent",
             "exit",
             "step",
+            "context",
           ],
           "type": "string",
+        },
+        "long": {
+          "const": true,
+          "type": "boolean",
         },
         "point": {
           "additionalProperties": false,
@@ -2435,6 +2797,43 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
           ],
           "type": "object",
         },
+        "sel": {
+          "additionalProperties": false,
+          "properties": {
+            "exact": {
+              "maxLength": 400,
+              "minLength": 1,
+              "type": "string",
+            },
+            "prefix": {
+              "maxLength": 64,
+              "minLength": 0,
+              "type": "string",
+            },
+            "suffix": {
+              "maxLength": 64,
+              "minLength": 0,
+              "type": "string",
+            },
+          },
+          "required": [
+            "exact",
+            "prefix",
+            "suffix",
+          ],
+          "type": "object",
+        },
+        "stack": {
+          "items": {
+            "maxLength": 40,
+            "minLength": 1,
+            "pattern": "^[\\w-]+$",
+            "type": "string",
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "type": "array",
+        },
         "tag": {
           "maxLength": 128,
           "minLength": 1,
@@ -2513,12 +2912,52 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
       "type": "object",
     },
     "refinements": [
+      "only a menu, open or context pick on a tokened element carries words",
+      "only words are long or crossed",
       "a pin pick names its key",
+      "only a pin pick names a stack",
       "only a step says, and it says something",
       "a showing step names its element by token, and only it does",
       "only a showing step reaches an added element",
       "a runtime element is described below a tokened ancestor",
       "(no message)",
+      "too long",
+      "too long",
+      "too long",
+    ],
+  },
+  "CommentPickSelSchema": {
+    "jsonSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "exact": {
+          "maxLength": 400,
+          "minLength": 1,
+          "type": "string",
+        },
+        "prefix": {
+          "maxLength": 64,
+          "minLength": 0,
+          "type": "string",
+        },
+        "suffix": {
+          "maxLength": 64,
+          "minLength": 0,
+          "type": "string",
+        },
+      },
+      "required": [
+        "exact",
+        "prefix",
+        "suffix",
+      ],
+      "type": "object",
+    },
+    "refinements": [
+      "too long",
+      "too long",
+      "too long",
     ],
   },
   "CommentPickViewSchema": {
@@ -2579,10 +3018,47 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
           "const": true,
           "type": "boolean",
         },
+        "comments": {
+          "maximum": 500,
+          "minimum": 1,
+          "type": "integer",
+        },
         "line": {
           "maximum": 9007199254740991,
           "minimum": 1,
           "type": "integer",
+        },
+        "role": {
+          "enum": [
+            "paragraph",
+            "list item",
+            "list",
+            "table",
+            "table row",
+            "table cell",
+            "image",
+            "button",
+            "link",
+            "section",
+            "article",
+            "navigation",
+            "header",
+            "footer",
+            "aside",
+            "main",
+            "block quote",
+            "code block",
+            "figure",
+            "form",
+            "element",
+            "heading level 1",
+            "heading level 2",
+            "heading level 3",
+            "heading level 4",
+            "heading level 5",
+            "heading level 6",
+          ],
+          "type": "string",
         },
         "tag": {
           "maxLength": 128,
@@ -2595,6 +3071,42 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
         "line",
       ],
       "type": "object",
+    },
+    "refinements": [],
+  },
+  "CommentPickerRoleSchema": {
+    "jsonSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "enum": [
+        "paragraph",
+        "list item",
+        "list",
+        "table",
+        "table row",
+        "table cell",
+        "image",
+        "button",
+        "link",
+        "section",
+        "article",
+        "navigation",
+        "header",
+        "footer",
+        "aside",
+        "main",
+        "block quote",
+        "code block",
+        "figure",
+        "form",
+        "element",
+        "heading level 1",
+        "heading level 2",
+        "heading level 3",
+        "heading level 4",
+        "heading level 5",
+        "heading level 6",
+      ],
+      "type": "string",
     },
     "refinements": [],
   },
@@ -2633,6 +3145,7 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
         "setStatus",
         "deleteThread",
         "deleteBlock",
+        "rebuildBlock",
       ],
       "type": "string",
     },
@@ -2657,6 +3170,32 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
               "maxLength": 256,
               "minLength": 1,
               "type": "string",
+            },
+            "sel": {
+              "additionalProperties": false,
+              "properties": {
+                "exact": {
+                  "maxLength": 400,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "prefix": {
+                  "maxLength": 64,
+                  "minLength": 0,
+                  "type": "string",
+                },
+                "suffix": {
+                  "maxLength": 64,
+                  "minLength": 0,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "exact",
+                "prefix",
+                "suffix",
+              ],
+              "type": "object",
             },
             "text": {
               "maxLength": 8000,
@@ -2693,6 +3232,10 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
             "rawHash": {
               "pattern": "^[0-9a-f]{64}$",
               "type": "string",
+            },
+            "resolve": {
+              "const": true,
+              "type": "boolean",
             },
             "text": {
               "maxLength": 8000,
@@ -2930,10 +3473,58 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
           ],
           "type": "object",
         },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "blockKey": {
+              "maxLength": 40,
+              "minLength": 1,
+              "pattern": "^[\\w-]+$",
+              "type": "string",
+            },
+            "fileKey": {
+              "maxLength": 40,
+              "minLength": 1,
+              "pattern": "^[\\w-]+$",
+              "type": "string",
+            },
+            "op": {
+              "const": "rebuildBlock",
+              "type": "string",
+            },
+            "panelId": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string",
+            },
+            "rawHash": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string",
+            },
+            "status": {
+              "enum": [
+                "open",
+                "resolved",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "panelId",
+            "op",
+            "fileKey",
+            "blockKey",
+            "rawHash",
+          ],
+          "type": "object",
+        },
       ],
     },
     "refinements": [
       "empty",
+      "too long",
+      "too long",
+      "too long",
       "too long",
     ],
   },
@@ -2960,6 +3551,10 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
                   "type": "null",
                 },
               ],
+            },
+            "wordsDropped": {
+              "const": true,
+              "type": "boolean",
             },
           },
           "required": [
@@ -3189,6 +3784,8 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
                 "key-invalid",
                 "draft-expired",
                 "comments-off",
+                "replies",
+                "file-size",
               ],
               "type": "string",
             },
@@ -3403,6 +4000,7 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
             "setStatus",
             "deleteThread",
             "deleteBlock",
+            "rebuildBlock",
           ],
           "type": "string",
         },
@@ -3681,6 +4279,31 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
         "attached": {
           "type": "boolean",
         },
+        "change": {
+          "additionalProperties": false,
+          "properties": {
+            "now": {
+              "maxLength": 200,
+              "type": "string",
+            },
+            "state": {
+              "enum": [
+                "changed",
+                "words",
+              ],
+              "type": "string",
+            },
+            "was": {
+              "maxLength": 200,
+              "type": "string",
+            },
+          },
+          "required": [
+            "state",
+            "was",
+          ],
+          "type": "object",
+        },
         "classes": {
           "items": {
             "maxLength": 100,
@@ -3850,6 +4473,8 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
       "type": "object",
     },
     "refinements": [
+      "(no message)",
+      "(no message)",
       "(no message)",
     ],
   },

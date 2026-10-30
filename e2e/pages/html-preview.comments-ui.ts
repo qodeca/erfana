@@ -188,8 +188,9 @@ export class CommentChrome {
     return this.drawer().getByTestId('comment-drawer-row')
   }
 
-  filter(key: 'open' | 'resolved' | 'attention'): Locator {
-    return this.drawer().getByTestId(`comment-filter-${key}`)
+  /** A drawer filter (OD-04: Open, Resolved, Can't edit). */
+  filter(key: 'open' | 'resolved' | 'cantEdit'): Locator {
+    return this.drawer().getByTestId(`comment-filter-${key === 'cantEdit' ? 'cant-edit' : key}`)
   }
 
   announce(): Locator {
@@ -252,6 +253,15 @@ export class CommentChrome {
     await this.page.getByTestId('comment-save').click()
     await expect(win).toHaveCount(0, { timeout: PREVIEW_BUDGET_MS })
     await expect(this.announce()).toHaveText(`Comment saved to ${file}.`, { timeout: PREVIEW_BUDGET_MS })
+  }
+
+  /**
+   * A window action in the header's "More actions" menu (C-13, C-19: with the
+   * comment stepper the foot keeps Close and Resolve and next only).
+   */
+  async moreAction(testId: string): Promise<void> {
+    await this.window().getByTestId('comment-more-actions').click()
+    await this.page.getByTestId(testId).click()
   }
 
   /** Open a message's `…` menu in the window and choose `item` ("Edit" or "Delete…"). */
@@ -441,6 +451,40 @@ export async function mouseAt(
     wc.sendInputEvent({ type: 'mouseUp', x, y, globalX, globalY, button: which, clickCount: 1 })
     return true
   }, { x: point.x, y: point.y, which: button, urlIncludes: target.urlIncludes })
+}
+
+/**
+ * A trusted left-button drag from `from` to `to` (top-level viewport CSS px)
+ * in steps, so Chromium selects the text it crosses (spec 024 024-FR-004: a
+ * drag selects, in comment mode too). The release makes the page's click.
+ */
+export async function dragInPage(
+  app: ElectronApplication,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  target: PreviewTarget = {}
+): Promise<boolean> {
+  return app.evaluate(({ webContents }, { a, b, urlIncludes }) => {
+    const wc = webContents.getAllWebContents().find((c) => {
+      try {
+        const url = c.getURL()
+        return url.startsWith('erfana-preview://') && (urlIncludes === undefined || url.includes(urlIncludes))
+      } catch {
+        return false
+      }
+    })
+    if (!wc) return false
+    const STEPS = 8
+    wc.sendInputEvent({ type: 'mouseMove', x: a.x, y: a.y })
+    wc.sendInputEvent({ type: 'mouseDown', x: a.x, y: a.y, button: 'left', clickCount: 1 })
+    for (let i = 1; i <= STEPS; i += 1) {
+      const x = Math.round(a.x + ((b.x - a.x) * i) / STEPS)
+      const y = Math.round(a.y + ((b.y - a.y) * i) / STEPS)
+      wc.sendInputEvent({ type: 'mouseMove', x, y, button: 'left', modifiers: ['leftbuttondown'] })
+    }
+    wc.sendInputEvent({ type: 'mouseUp', x: b.x, y: b.y, button: 'left', clickCount: 1 })
+    return true
+  }, { a: from, b: to, urlIncludes: target.urlIncludes })
 }
 
 /**

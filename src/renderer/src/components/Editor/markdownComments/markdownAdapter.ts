@@ -26,10 +26,19 @@
  *   (`quoteText.ts`'s rule), and `baseHash` is `markdownTextHash` of the text
  *   the preview rendered. Main uses the line while the hash matches its own
  *   parse, else the one target with that quote (C7).
+ * - **A known refusal** (W-08): main refuses a target inside a generated
+ *   START/END region (024-FR-023). The preview drops those comments, so the
+ *   adapter runs main's own index and locate rules (`mdIndex.ts`,
+ *   `mdLocate.ts`) on the rendered text – once per text, and only when a
+ *   new comment is opened – so the window opens with the refusal instead of
+ *   after the reader typed. A text past the comment limits is not indexed
+ *   (main makes it read-only anyway).
  *
  * @module Editor/markdownComments/markdownAdapter
  */
-import { markdownTextHash } from '../../../../../shared/markdownComments/mdLocate'
+import { markdownLimitBreach } from '../../../../../shared/markdownComments/markdownLimits'
+import { indexMarkdown, type MdIndex } from '../../../../../shared/markdownComments/mdIndex'
+import { locateMarkdownTarget, markdownTextHash } from '../../../../../shared/markdownComments/mdLocate'
 import { PREVIEW_LIMITS } from '../../../../../shared/preview-limits'
 import type { PickedTargetRequest, ThreadPlacement } from '../../../../../shared/ipc/file-comment-schema'
 import { MARKDOWN_COPY, MARKDOWN_WORDS } from '../../Comments/commentCopyWords'
@@ -135,6 +144,15 @@ export function createMarkdownAdapter(source: MarkdownAdapterSource): PreviewCom
     return hashed.hash
   }
 
+  // Main's index of the rendered text, for the W-08 refusal; rebuilt only when the text changes.
+  let indexed: { text: string; index: MdIndex | null } | null = null
+  const indexOf = (text: string): MdIndex | null => {
+    if (indexed?.text !== text) {
+      indexed = { text, index: markdownLimitBreach(text) === undefined ? indexMarkdown(text, text.startsWith('﻿') ? 1 : 0) : null }
+    }
+    return indexed.index
+  }
+
   const targetsInOrder = (): HTMLElement[] => {
     const root = source.root()
     if (root === null) return []
@@ -194,6 +212,14 @@ export function createMarkdownAdapter(source: MarkdownAdapterSource): PreviewCom
   const attach = (placement: ThreadPlacement): HTMLElement | null =>
     targetsInOrder().find(el => lineOf(el) === placement.line && tagOf(el) === placement.tag) ?? null
 
+  const refusalOf = (target: HTMLElement): 'generated-region' | null => {
+    const pick = describe(target)
+    const index = pick === null ? null : indexOf(source.text())
+    if (pick === null || index === null) return null
+    const found = locateMarkdownTarget(index, pick)
+    return 'refused' in found && found.refused === 'generated-region' ? 'generated-region' : null
+  }
+
   return {
     words: MARKDOWN_WORDS,
     targetAt,
@@ -204,6 +230,8 @@ export function createMarkdownAdapter(source: MarkdownAdapterSource): PreviewCom
     lineOf,
     canComment,
     describe,
-    attach
+    attach,
+    root: source.root,
+    refusalOf
   }
 }

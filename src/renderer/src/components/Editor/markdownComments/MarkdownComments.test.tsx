@@ -25,8 +25,9 @@ import { editorSaveRegistry } from '../../../services/editorSaveRegistry'
 import { usePreviewCommentStore } from '../../../stores/usePreviewCommentStore'
 import { useProjectStore } from '../../../stores/useProjectStore'
 import { TEST_IDS } from '../../../constants/testids'
-import { MARKDOWN_COPY, MD_SURFACE_COPY } from '../../Comments/commentCopyWords'
+import { MARKDOWN_COPY, MD_SPOKEN_COPY, MD_SURFACE_COPY } from '../../Comments/commentCopyWords'
 import { IDENTITY_COPY } from '../../Comments/commentCopy'
+import { htmlWithoutCommentAttributes } from '../../Comments/overlay/commentContentAttrs'
 import type { ViewMode } from '../MarkdownEditorPanel/types'
 import {
   DRAFT_TOKEN,
@@ -221,7 +222,9 @@ describe('Markdown Preview comments', () => {
       renderPanel()
       const icon = await screen.findByTestId(TEST_IDS.COMMENT_HOST_ICON)
       expect(icon).toHaveAccessibleName('1 comment on list item, line 9. Open.')
-      await user.click(screen.getByTestId(TEST_IDS.COMMENT_TOOL_ICONS))
+      // C-20: the icons toggle is the drawer's checkbox now (was the toolbar's Show comment icons).
+      await user.click(screen.getByTestId(TEST_IDS.COMMENT_TOOL_LIST))
+      await user.click(await screen.findByTestId(TEST_IDS.COMMENT_DRAWER_SHOW_ICONS))
       expect(screen.queryByTestId(TEST_IDS.COMMENT_HOST_ICON)).toBeNull()
     })
   })
@@ -240,7 +243,10 @@ describe('Markdown Preview comments', () => {
       await waitFor(() => expect(polite()).toHaveTextContent(MARKDOWN_COPY.pickerTop))
       await user.keyboard('{Tab}')
       expect(paragraph()).toHaveFocus()
-      await waitFor(() => expect(polite()).toHaveTextContent(MD_SURFACE_COPY.showing('paragraph', 6)))
+      // C-10: the step says the kind, line and opening words (was "Showing paragraph, line 6."), with the keys at first.
+      await waitFor(() =>
+        expect(polite()).toHaveTextContent(MD_SPOKEN_COPY.target('paragraph', 6, 'First paragraph.', 0) + MD_SPOKEN_COPY.hint)
+      )
       await user.keyboard('{Alt>}{ArrowDown}{/Alt}')
       await waitFor(() => expect(polite()).toHaveTextContent(MARKDOWN_COPY.pickerNoChild))
       await user.keyboard('{Tab}')
@@ -444,7 +450,8 @@ describe('Markdown Preview comments', () => {
       await turnModeOn(user)
       fireEvent.mouseMove(paragraph())
       expect(await screen.findByTestId(TEST_IDS.COMMENT_HOST_OUTLINE)).toBeInTheDocument()
-      expect(content().innerHTML).toBe(before)
+      // C-11: the host's marked aria-details and tabindex are the only change, and every export and copy strips them.
+      expect(htmlWithoutCommentAttributes(content())).toBe(before)
       const scroller = document.querySelector('.markdown-preview')!
       expect(scroller.querySelector('[data-testid^="comment-"]')).toBeNull()
       expect(scroller.textContent).not.toMatch(/Comment mode|comment on/i)

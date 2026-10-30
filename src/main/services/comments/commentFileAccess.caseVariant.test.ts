@@ -113,15 +113,18 @@ describe('§19 Rev 4 a path naming the project root in another letter case', () 
     expect(result).toEqual(refused('outside-project'))
   })
 
-  it.for(FOLDING_PLATFORMS)('%s rules: the never-served rules still hold below the root', async platform => {
+  // Changed expectation under OD-07 (was "the never-served rules still hold below the root", refused as excluded).
+  it.for(FOLDING_PLATFORMS)('OD-07 %s rules: a dot-folder or dependency folder below the root is no refusal', async platform => {
     await mkdir(project.path('node_modules'))
     await mkdir(project.path('.hidden'))
-    await project.write(join('node_modules', 'x.html'), PAGE)
-    await project.write(join('.hidden', 'x.html'), PAGE)
+    const pages = {
+      node_modules: await project.write(join('node_modules', 'x.html'), PAGE),
+      '.hidden': await project.write(join('.hidden', 'x.html'), PAGE)
+    }
 
-    for (const folder of ['node_modules', 'Node_Modules', '.hidden']) {
+    for (const [folder, page] of Object.entries(pages)) {
       const result = await confineCommentFile({ realRoot: project.root, filePath: join(variantRoot, folder, 'x.html') }, { platform })
-      expect(result, folder).toEqual(refused('excluded'))
+      expect(result, folder).toMatchObject({ ok: true, realPath: page })
     }
   })
 

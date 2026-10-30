@@ -15,18 +15,21 @@
  *     same case rule (`pathBelowRoot`), never by `path.relative`, which
  *     compares by the host's rule: on macOS a path naming the root in another
  *     letter case passed this check and then came back from `relative` as
- *     `../proj/…`, refused as excluded (§19 Rev 4 "case-only path
+ *     `../proj/…`, refused (§19 Rev 4 "case-only path
  *     differences on macOS");
  *  2. a name a registered comment file kind claims (`commentFileKinds.ts`;
  *     today `.html`/`.htm`); on Windows no NTFS alternate-stream name
  *     (`index.html:x.html`, `index.html::$DATA`) and no 8.3 short-name
  *     segment below the root;
- *  3. no never-served segment (`node_modules`, `dist`, `out`, `coverage`,
- *     `.git`, any dot-folder) – the same rules the protocol layer serves by,
- *     so a page the preview cannot show is never written;
- *  4. `confinePath` without `allowBuildDirs` against the root's own
- *     `fs.promises.realpath`: the parent and then the full path resolved, and
- *     every rule re-run on the resolved path. The DECIDING containment check
+ *  3. NO folder rule (comments-v2 OD-07, 2026-10-28): a file in a dot-folder,
+ *     `node_modules`, `dist`, `out` or `coverage` is commented like any other,
+ *     in both previews – "if a file can be opened, it can be commented". The
+ *     preview's never-served list still decides what a page may LOAD; it no
+ *     longer limits commenting. A secret such as `.env` stays out by rule 2;
+ *  4. `confineCommentPath` against the root's own `fs.promises.realpath`: the
+ *     parent and then the full path resolved, with every escape rule of the
+ *     preview's `confinePath` and none of its folder rules, and rules 1–2
+ *     re-run on the resolved name (rule 5). The DECIDING containment check
  *     is then made here as well, exactly: the two realpaths compared code unit
  *     for code unit with a segment boundary (`realPathWithin`). The lexical
  *     check folds case on Windows and macOS, and JavaScript's folding is not
@@ -64,9 +67,10 @@ import {
 } from '../../utils/atomicWriteBytesStrict'
 import { hostPathFlavour, pathBelowRoot, type PathFlavour } from '../../utils/pathCompare'
 import { namesAlternateDataStream } from '../browserLaunch/BrowserLaunchService'
-import { hasDotSegment, hasShortNameAlias, isInExcludedDirectory } from '../preview/previewExclusion'
-import { confinePath, realPathWithin } from '../preview/previewPathResolve'
+import { hasShortNameAlias } from '../preview/previewExclusion'
+import { realPathWithin } from '../preview/previewPathResolve'
 import { commentFileKinds, type CommentFileKindLookup } from './commentFileKinds'
+import { confineCommentPath } from './commentPathConfine'
 import { refused, type CommentRefusal, type Refused } from './commentRefusals'
 
 /** The file a comment operation is about. */
@@ -160,7 +164,7 @@ function isFullyQualified(filePath: string): boolean {
   return isAbsolute(filePath) && resolve(filePath) === normalize(filePath)
 }
 
-/** Rules 1–3: no file-system access. */
+/** Rules 1–2 (rule 3 has no folder to refuse, OD-07): no file-system access. */
 function lexicalRefusal(
   target: CommentFileTarget,
   platform: NodeJS.Platform,
@@ -175,7 +179,6 @@ function lexicalRefusal(
   const byName = nameRefusal(filePath, platform, kinds)
   if (byName) return byName
   if (hasShortNameAlias(rel, platform)) return 'short-name'
-  if (hasDotSegment(rel) || isInExcludedDirectory(rel)) return 'excluded'
   return null
 }
 
@@ -208,11 +211,11 @@ export async function confineCommentFile(
   } catch (error) {
     return fsRefusal(error)
   }
-  const verdict = await confinePath(root, target.filePath)
+  const verdict = await confineCommentPath(root, target.filePath)
   if (!verdict.ok) {
     return refused(verdict.reason === 'escape' ? 'outside-project' : verdict.reason)
   }
-  // Rule 4's deciding check, here and not only inside confinePath (see the module comment)
+  // Rule 4's deciding check, here and not only inside confineCommentPath (see the module comment)
   if (realPathWithin(root, verdict.realTarget) === undefined) return refused('outside-project')
   const byRealName = realNameRefusal(target.filePath, verdict.realTarget, platform, kinds)
   if (byRealName) return refused(byRealName)

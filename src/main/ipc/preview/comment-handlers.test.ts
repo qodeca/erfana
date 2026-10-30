@@ -45,6 +45,7 @@ function service(overrides: Partial<CommentServiceApi> = {}): CommentServiceApi 
     setMode: vi.fn(async (on: boolean, showIcons: boolean) => ({ ok: true as const, on, showIcons })),
     list: vi.fn(async () => ({ ok: true as const, files: [] })),
     reveal: vi.fn(() => ({ ok: true as const })),
+    keepDraft: vi.fn(() => ({ ok: true as const })),
     save: vi.fn(async () => ({ ok: true as const, threadKey: 't1' })),
     e2eState: vi.fn(),
     ...overrides
@@ -147,6 +148,27 @@ describe('preview comment handlers', () => {
     })
     expect(await invoke(PreviewCommentChannels.LIST, { panelId: PANEL })).toEqual(KEY_INVALID)
     expect(JSON.stringify(vi.mocked(logger.error).mock.calls)).not.toContain('secret.html')
+  })
+
+  it('C-14 (HTML) keep-draft renews a draft of the sender\'s own panel only, and the strict schema refuses anything else', async () => {
+    const { svc } = register()
+    expect(await invoke(PreviewCommentChannels.COMMAND, { panelId: PANEL, command: 'keep-draft', draftToken: DRAFT })).toEqual({ ok: true })
+    expect(svc.keepDraft).toHaveBeenCalledExactlyOnceWith(DRAFT)
+    for (const bad of [
+      { panelId: PANEL, command: 'keep-draft', draftToken: 'not-a-token' },
+      { panelId: PANEL, command: 'keep-draft', draftToken: DRAFT, threadKey: 't1' },
+      { panelId: PANEL, command: 'keep-draft' },
+      { panelId: PANEL, command: 'reveal', draftToken: DRAFT }
+    ]) {
+      expect(await invoke(PreviewCommentChannels.COMMAND, bad), JSON.stringify(bad)).toEqual(KEY_INVALID)
+    }
+    expect(svc.keepDraft).toHaveBeenCalledTimes(1)
+    expect(svc.reveal).not.toHaveBeenCalled()
+    dispose?.()
+    const foreign = service({ windowId: 2 })
+    register({ svc: foreign })
+    expect(await invoke(PreviewCommentChannels.COMMAND, { panelId: PANEL, command: 'keep-draft', draftToken: DRAFT })).toEqual(KEY_INVALID)
+    expect(foreign.keepDraft).not.toHaveBeenCalled()
   })
 
   it('a window\'s unsaved files are forgotten when it closes, and watched once', async () => {

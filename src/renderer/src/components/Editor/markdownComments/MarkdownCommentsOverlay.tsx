@@ -76,6 +76,8 @@ export function MarkdownCommentsOverlay(props: MarkdownCommentsOverlayProps): Re
           onOpenThreads={host.openThreads}
           selectionButton={host.selectionButton}
           onSelectionButton={host.onSelectionButton}
+          markOwner={host.markOwner}
+          activeThreads={host.activeThreads}
         />
       )}
       {host.drawer !== null && (

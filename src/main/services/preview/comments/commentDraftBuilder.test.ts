@@ -86,12 +86,12 @@ describe('buildDraft', () => {
     expect(await draftFor('index.html', conflicted, 'button')).toEqual({ ok: false, code: ErrorCode.COMMENT_FILE_CONFLICTED })
   })
 
-  it('M-055 a page in a dot-folder or dist/ is never a draft; a gitignored page is', async () => {
+  it('M-055 OD-07 a page in a dot-folder, dist/ or a gitignored file is a draft like any other (no folder refusal)', async () => {
     await mkdir(project.path('.hidden'))
     await mkdir(project.path('dist'))
     await writeFile(project.path('.gitignore'), 'ignored.html\n')
-    expect(await draftFor(join('.hidden', 'page.html'), PAGE, 'button')).toEqual({ ok: false, code: ErrorCode.COMMENT_PATH_REFUSED })
-    expect(await draftFor(join('dist', 'page.html'), PAGE, 'button')).toEqual({ ok: false, code: ErrorCode.COMMENT_PATH_REFUSED })
+    expect((await draftFor(join('.hidden', 'page.html'), PAGE, 'button')).ok).toBe(true)
+    expect((await draftFor(join('dist', 'page.html'), PAGE, 'button')).ok).toBe(true)
     expect((await draftFor('ignored.html', PAGE, 'button')).ok).toBe(true)
   })
 

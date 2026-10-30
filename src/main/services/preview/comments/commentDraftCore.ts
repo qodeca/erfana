@@ -43,6 +43,7 @@ import type { CommentPick } from '../../../../shared/ipc/preview-comment-schema'
 import { writableRefusal, type JobDocument } from '../../comments/commentJobDocs'
 import { positionTarget } from './commentParseCore'
 import type { CommentRefusal } from '../../comments/commentRefusals'
+import { draftWordsOf, type DraftWordsPart } from './commentWordsCore'
 
 /** Characters of the start-tag excerpt the menu shows (§10.4). */
 export const EXCERPT_MAX_CHARS = 200
@@ -69,7 +70,7 @@ export interface DraftEntry {
 }
 
 /** The parts of a pick the parse needs; the rest stays on main. */
-export type DraftPickPart = Pick<CommentPick, 'runtime' | 'ws'>
+export type DraftPickPart = Pick<CommentPick, 'runtime' | 'ws' | 'sel' | 'long' | 'crossed'>
 
 /** Build a draft for a token's element. */
 export interface DraftJob {
@@ -83,7 +84,7 @@ export interface DraftJob {
  * element cannot take comments ("can't comment here").
  */
 export type DraftJobResult =
-  | {
+  | ({
       readonly kind: 'draft'
       readonly ok: true
       /** UTF-16 offset of the start tag the block goes before. */
@@ -92,7 +93,7 @@ export type DraftJobResult =
       readonly anchor: CommentAnchor
       readonly ws?: 'collapse' | 'preserve'
       readonly target: DraftTargetView
-    }
+    } & DraftWordsPart)
   | { readonly kind: 'draft'; readonly ok: false; readonly refusal?: CommentRefusal }
 
 /** A damaged or newer block by its hash and start offset – main turns it into a key. */
@@ -204,7 +205,9 @@ export function runDraftJob(document: JobDocument, job: DraftJob): DraftJobResul
     fileHash: hash,
     anchor,
     ...(ws === undefined ? {} : { ws }),
-    target: targetViewOf(doc.text, anchorEl, anchor)
+    target: targetViewOf(doc.text, anchorEl, anchor),
+    // The words: the target's own text only – none for an element a script built (024-FR-004).
+    ...draftWordsOf(doc.index, el, job.pick, job.pick.runtime !== undefined || placement.kind === 'framework')
   }
 }
 

@@ -44,10 +44,14 @@ import type { CommentToolbarToolsProps } from '../../../Comments/CommentToolbarT
 import { pinDraftOf, type CommentWindowRequest, type ElementDraft } from '../../../Comments/commentWindowTypes'
 import { useCommentSettleNotices } from '../../../Comments/useCommentSettleNotices'
 import { useDrawerSheet } from './useDrawerSheet'
-import type { DrawerRow } from '../../../Comments/commentRows'
+import { listCounts, type DrawerRow } from '../../../Comments/commentRows'
 import type { PreviewCommentsLayerProps } from './PreviewCommentsLayer'
 import { useLiveText } from '../../../Comments/commentLive'
+import { COMMENT_LIST_COPY, HTML_WORDS } from '../../../Comments/commentCopyWords'
+import { useRemovedOutside } from '../../../Comments/commentRemovedOutside'
+import { newCommentRequest, withWords } from './previewCommentRequests'
 import { pickerAnnouncement } from './commentLive'
+import { usePreviewDraftKeepAlive } from './usePreviewDraftKeepAlive'
 import type { PreviewKeyEventLike } from '../hooks/usePreviewGroupKeys'
 
 /** Options for {@link usePreviewComments}. */
@@ -125,6 +129,11 @@ export function usePreviewComments({
   const [polite, announce] = useLiveText()
   const [assertive, alert] = useLiveText()
   const listButtonRef = useRef<HTMLButtonElement>(null)
+  const pickerSteps = useRef(0) // C-10: picker steps said since the mode last changed (the first ones add the keys).
+  // OD-06: open comments that a list no longer holds, and Erfana did not delete.
+  const removed = useRemovedOutside(state.list, HTML_WORDS)
+  const keepDraft = usePreviewDraftKeepAlive(panelId, request?.kind === 'new' ? request.draftToken : null)
+  const { ownDelete } = removed
   // The state as of the last commit, for event handlers and async answers.
   const latestRef = useLatestRef(state)
 
@@ -165,24 +174,11 @@ export function usePreviewComments({
         void refreshList()
         return
       }
-      // Decision 19: a left-click pick opens the window directly, no menu.
-      if (
-        payload.kind === 'open' &&
-        payload.draftToken !== undefined &&
-        payload.draftKey !== undefined &&
-        payload.target !== undefined
-      ) {
+      // Decision 19: a left-click pick opens the window directly, no menu – on the words when it was the Comment button.
+      const opened = payload.kind === 'open' ? newCommentRequest(panelId, payload, 'words') : null
+      if (opened !== null) {
         setMenu(null)
-        setRequest({
-          kind: 'new',
-          panelId,
-          draftToken: payload.draftToken,
-          draftKey: payload.draftKey,
-          target: payload.target,
-          file: payload,
-          point: payload.point,
-          opener: 'page'
-        })
+        setRequest(opened)
         return
       }
       setMenu(payload)
@@ -212,10 +208,12 @@ export function usePreviewComments({
       if (payload.panelId !== panelId) return
       // The page's keyboard picker moved: the page holds no live region (E-022), so it is said here.
       if (payload.reason === 'picker') {
-        const say = pickerAnnouncement(payload)
+        const say = pickerAnnouncement(payload, pickerSteps.current)
+        if (payload.say === 'showing') pickerSteps.current += 1
         if (say !== undefined) announce(say)
         return
       }
+      pickerSteps.current = 0
       store.getState().patch(panelId, { mode: payload.on })
       announce(payload.on ? ANNOUNCE.modeOn : ANNOUNCE.modeOff)
     })
@@ -277,10 +275,6 @@ export function usePreviewComments({
     },
     [setMode, announce, panelId, latestRef]
   )
-
-  const toggleIcons = useCallback(() => {
-    void setMode(latestRef.current.mode, !latestRef.current.showIcons)
-  }, [setMode, latestRef])
 
   const setDrawerOpen = useCallback(
     (open: boolean) => {
@@ -355,9 +349,11 @@ export function usePreviewComments({
     [enabled, ready, menu, request, toggleMode]
   )
 
+  // C-06: the count's name adds how many open comments changed, from the list main last sent.
+  const changed = useMemo(() => listCounts(state.list.files).changed, [state.list.files])
   const toolbar: CommentToolbarToolsProps = {
     mode: state.mode,
-    showIcons: state.showIcons,
+    changed,
     drawerOpen: state.drawerOpen,
     drawerId,
     counts: state.counts,
@@ -365,7 +361,6 @@ export function usePreviewComments({
     unavailable: state.unavailable,
     onToggleMode: toggleMode,
     onToggleDrawer: () => setDrawerOpen(!latestRef.current.drawerOpen),
-    onToggleIcons: toggleIcons,
     listRef: listButtonRef
   }
 
@@ -403,7 +398,13 @@ export function usePreviewComments({
               }
             })
           },
-          onRetry: () => void refreshList()
+          onRetry: () => void refreshList(),
+          // OD-06: the removed-outside note, and its Copy text.
+          removed: removed.removed,
+          onDismissRemoved: removed.dismiss,
+          onCopyText: text => {
+            void textClipboard.writeText(text).then(ok => (ok ? announce(COMMENT_LIST_COPY.textCopied) : alert(COMMENT_LIST_COPY.copyTextFailed)))
+          }
         }
       : null
 
@@ -423,19 +424,11 @@ export function usePreviewComments({
         setMenu(null)
         if (!chosen) focusPageSoon(panelId)
       },
-      onAddComment: (draft: ElementDraft) => {
-        const { draftToken, draftKey, target } = draft
-        if (draftToken === undefined || draftKey === undefined || target === undefined) return
-        setRequest({
-          kind: 'new',
-          panelId,
-          draftToken,
-          draftKey,
-          target,
-          file: draft,
-          point: draft.point,
-          opener: 'page'
-        })
+      mode: state.mode,
+      onAddComment: (draft: ElementDraft, scope = 'whole') => {
+        const next = newCommentRequest(panelId, draft, scope)
+        if (next === null) return
+        setRequest(next)
       },
       onCloseWindow: closeWindow,
       onNewComment: next => setRequest(next),
@@ -445,9 +438,15 @@ export function usePreviewComments({
           authorEmail: data.email === '' ? undefined : data.email,
           identityNoticeSeen: true
         }),
-      onSave: save => commentGateway.save(save),
+      onSave: (save, sel) => {
+        // OD-06: a thread Erfana removes itself is never "removed outside Erfana".
+        if (save.op === 'deleteThread' || save.op === 'deleteMessage') ownDelete(save.threadKey)
+        return keepDraft(save).then(() => commentGateway.save(withWords(save, sel)))
+      },
       onWritten,
       onRefresh: () => void refreshList(),
+      // C-13: a step brings its thread's element into view behind the window, as the drawer's Open does.
+      onReveal: (threadKey: string) => void commentGateway.reveal(panelId, threadKey),
       onPickAgain: () => {
         closeWindow()
         if (!latestRef.current.mode) void setMode(true, latestRef.current.showIcons)
@@ -469,6 +468,7 @@ export function usePreviewComments({
       menu,
       request,
       visible,
+      state.mode,
       state.list,
       identity,
       state.notVisible,
@@ -484,7 +484,9 @@ export function usePreviewComments({
       openInSource,
       announce,
       alert,
-      latestRef
+      latestRef,
+      ownDelete,
+      keepDraft
     ]
   )
 

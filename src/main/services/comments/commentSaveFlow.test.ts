@@ -83,6 +83,16 @@ describe('commentSaveFlow add', () => {
     expect(f.landed.mock.calls[0][0]).toMatchObject({ frameRestore: { realPath: PAGE, x: 5, y: 9 } })
   })
 
+  it('024-AC-004 (h) a write that dropped the selected words says so in its answer', async () => {
+    const f = flow(Promise.resolve({ ...wrote(), wordsDropped: true } as unknown as CommentWriteResult))
+    const token = f.keys.mintDraft(BINDING, draft())
+    expect(await f.save({ panelId: 'panel', op: 'add', draftToken: token, text: 'Hi' })).toEqual({
+      ok: true,
+      threadKey: expect.stringMatching(/^t/),
+      wordsDropped: true
+    })
+  })
+
   it('M-057 a refused write hands the draft back for the next try, and the code reaches the renderer', async () => {
     const f = flow(Promise.resolve({ ok: false, code: ErrorCode.COMMENT_TARGET_MOVED } as unknown as CommentWriteResult))
     const token = f.keys.mintDraft(BINDING, draft())

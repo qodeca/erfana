@@ -298,11 +298,11 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     const before = await diskBytes(file)
 
     await openCommentPage(preview, app, DAMAGED, '-HPC-DAMAGED-')
-    await expect(chrome.listButton()).toHaveAccessibleName('Comments, 0 open, 3 need attention', { timeout: PREVIEW_BUDGET_MS })
-    await expect(chrome.listButton()).toContainText('· !3')
+    // OD-04: the count is damaged blocks only; the newer-format block counts in neither.
+    await expect(chrome.listButton()).toHaveAccessibleName('Comments, 2 damaged', { timeout: PREVIEW_BUDGET_MS })
     await chrome.openDrawer()
-    await chrome.filter('attention').click()
-    await expect(chrome.filter('attention')).toContainText('Needs attention 3')
+    await chrome.filter('cantEdit').click()
+    await expect(chrome.filter('cantEdit')).toContainText("Can't edit")
     const rows = chrome.drawerRows()
     await expect(rows).toHaveCount(3, { timeout: PREVIEW_BUDGET_MS })
     await expect(rows.getByTestId('comment-drawer-tag')).toHaveText(['Damaged', 'Damaged', 'Newer format – read-only'])
@@ -340,7 +340,7 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     const conflict = new CommentChrome(page, preview, 'conflict.html')
     await openCommentPage(preview, app, CONFLICT, '-HPC-CONFLICT-')
     await conflict.openDrawer()
-    await conflict.filter('attention').click()
+    await conflict.filter('cantEdit').click()
     await conflict.drawerRows().first().getByTestId('comment-drawer-row-open').click()
     await expect(win.getByTestId('comment-damaged')).toContainText('git conflict markers', { timeout: PREVIEW_BUDGET_MS })
     await expect(win.getByTestId('comment-read-only')).toBeVisible()
@@ -353,7 +353,7 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     const unterminated = new CommentChrome(page, preview, 'unterminated.html')
     await openCommentPage(preview, app, UNTERMINATED, '-HPC-UNTERMINATED-')
     await unterminated.openDrawer()
-    await unterminated.filter('attention').click()
+    await unterminated.filter('cantEdit').click()
     await unterminated.drawerRows().first().getByTestId('comment-drawer-row-open').click()
     await expect(win.getByTestId('comment-damaged')).toHaveCount(1, { timeout: PREVIEW_BUDGET_MS })
     await expect(win.getByTestId('comment-delete-block')).toHaveCount(0)
@@ -421,13 +421,14 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     await fsp.writeFile(file, text.replace('<button id="cta" class="btn">Buy now</button>', '<span id="gone">Sold out</span>'), 'utf-8')
     await expect.poll(() => preview.eval("String(document.getElementById('gone') !== null)", target), { timeout: PREVIEW_BUDGET_MS }).toBe('true')
 
+    // OD-04: a not-found open comment stays under Open, with its tag.
     await chrome.openDrawer()
-    await chrome.filter('attention').click()
+    await chrome.filter('open').click()
     const row = chrome.drawerRows().filter({ has: page.getByTestId('comment-drawer-tag').filter({ hasText: 'Element not found' }) })
     await expect(row).toHaveCount(1, { timeout: PREVIEW_BUDGET_MS })
     await row.getByTestId('comment-drawer-row-open').click()
     const win = chrome.window()
-    await expect(win.getByTestId('comment-not-found')).toContainText("Erfana can't find this element any more", { timeout: PREVIEW_BUDGET_MS })
+    await expect(win.getByTestId('comment-not-found')).toContainText('This element is no longer in', { timeout: PREVIEW_BUDGET_MS })
     await expect(win.getByTestId('comment-not-found-quote')).toHaveText('Buy now')
     // Decision 21: nothing was moved or deleted.
     const after = await fsp.readFile(file, 'utf-8')
@@ -466,12 +467,12 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
       .toEqual([[onFirst, false], ...onOthers.map(id => [id, true])])
 
     await chrome.openDrawer()
-    await chrome.filter('attention').click()
+    await chrome.filter('open').click()
     const notFound = chrome.drawerRows().filter({ has: page.getByTestId('comment-drawer-tag').filter({ hasText: 'Element not found' }) })
     await expect(notFound).toHaveCount(1, { timeout: PREVIEW_BUDGET_MS })
     await notFound.getByTestId('comment-drawer-row-open').click()
     const win = chrome.window()
-    await expect(win.getByTestId('comment-not-found')).toContainText("Erfana can't find this element any more", { timeout: PREVIEW_BUDGET_MS })
+    await expect(win.getByTestId('comment-not-found')).toContainText('This element is no longer in', { timeout: PREVIEW_BUDGET_MS })
     await expect(win.getByTestId('comment-not-found-quote')).toHaveText('Roasted to order We roast only what we sell that week.')
     // Decision 21: nothing was moved or deleted.
     const after = await fsp.readFile(file, 'utf-8')
@@ -491,7 +492,7 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
 
     await openCommentPage(preview, app, MANY, '-HPC-MANY-')
     await waitForCommentLoad(app, MANY, 'page', MANY_COUNT)
-    await expect(chrome.listButton()).toHaveAccessibleName(`Comments, ${MANY_COUNT} open`, { timeout: PREVIEW_BUDGET_MS })
+    await expect(chrome.listButton()).toHaveAccessibleName(`${MANY_COUNT} comments`, { timeout: PREVIEW_BUDGET_MS })
     await expectPin(app, 'p-0', true, target)
     await expectPin(app, 'p-1', true, target)
 

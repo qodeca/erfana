@@ -35,6 +35,7 @@ import {
   type FakeCommentsBridge
 } from './__test-helpers__/commentTestKit'
 import { ANNOUNCE, COPY, DRAWER_COPY } from '../../../Comments/commentCopy'
+import { COMMENT_LIST_COPY, SELECTION_COPY } from '../../../Comments/commentCopyWords'
 import { drawerRows } from '../../../Comments/commentRows'
 import { usePreviewComments, type PreviewComments } from './usePreviewComments'
 import { resetCommentPendingWrites } from '../../../Comments/commentPendingWrites'
@@ -284,6 +285,43 @@ describe('usePreviewComments', () => {
     await waitFor(() => expect(latest.layer.polite).toBe('No child elements.'))
   })
 
+  it('024-AC-004 C-16 (HTML) an open draft on words opens the window on them; a whole-element choice from the menu, on none', () => {
+    const words = { text: 'We ship the beta to ten customers', start: 20, end: 33, cut: false }
+    render(<Harness onValue={onValue} />)
+    act(() => fake.emitDraft(menuDraft({ kind: 'open', selection: true, words })))
+    expect(latest.layer.request).toMatchObject({ kind: 'new', words })
+    act(() => latest.layer.onCloseWindow())
+    const menu = menuDraft({ selection: true, words })
+    act(() => fake.emitDraft(menu))
+    act(() => latest.layer.onAddComment(menu))
+    expect(latest.layer.request).toMatchObject({ kind: 'new', words: { ...words, start: 0, end: 0 } })
+  })
+
+  it('024-AC-004 (g) words main could not find in the file: the window opens on the whole element and says so', async () => {
+    render(<Harness onValue={onValue} />)
+    act(() => fake.emitDraft(menuDraft({ kind: 'open', selection: true, wordsMissing: true })))
+    // The window says so itself (owner rule, 024-FR-004): the request carries it, the panel announces nothing.
+    expect(latest.layer.request).toMatchObject({ kind: 'new', wordsMissing: true })
+    expect(latest.layer.request).not.toHaveProperty('words')
+    // "Comment on the whole element" from a menu on such words asks for no notice.
+    const menu = menuDraft({ selection: true, wordsMissing: true })
+    act(() => latest.layer.onCloseWindow())
+    act(() => fake.emitDraft(menu))
+    act(() => latest.layer.onAddComment(menu))
+    expect(latest.layer.request).not.toHaveProperty('wordsMissing')
+    expect(latest.layer.polite).not.toBe(SELECTION_COPY.wordsNotInFile('index.html'))
+  })
+
+  it('024-AC-004 a save sends the words the window chose as sel', async () => {
+    render(<Harness onValue={onValue} />)
+    const add = { panelId: PANEL, op: 'add' as const, draftToken: 'a'.repeat(32), text: 'Hi' }
+    const sel = { exact: 'ten customers', prefix: 'to ', suffix: '' }
+    await act(async () => {
+      await latest.layer.onSave(add, sel)
+    })
+    expect(fake.bridge.save).toHaveBeenLastCalledWith({ ...add, sel })
+  })
+
   describe('R-010 / R-023 mode', () => {
     it('toggles through main and announces it; a keyboard toggle hands focus to the page', async () => {
       render(<Harness onValue={onValue} />)
@@ -332,9 +370,10 @@ describe('usePreviewComments', () => {
       expect(latest.layer.request).toBeNull()
     })
 
-    it('toggles icons with the mode kept', async () => {
+    it('C-20 (HTML) the icons switch in the drawer toggles icons with the mode kept', async () => {
       render(<Harness onValue={onValue} />)
-      act(() => latest.toolbar.onToggleIcons())
+      act(() => latest.toolbar.onToggleDrawer())
+      act(() => latest.drawer?.onShowIconsChange(false))
       await waitFor(() =>
         expect(fake.bridge.setMode).toHaveBeenCalledWith({
           panelId: PANEL,
@@ -342,7 +381,8 @@ describe('usePreviewComments', () => {
           showIcons: false
         })
       )
-      expect(latest.toolbar.showIcons).toBe(false)
+      await waitFor(() => expect(latest.drawer?.showIcons).toBe(false))
+      expect(latest.toolbar).not.toHaveProperty('onToggleIcons')
     })
 
     it('Ctrl+Alt+M on the panel toggles the mode', async () => {
@@ -413,6 +453,44 @@ describe('usePreviewComments', () => {
       await waitFor(() => expect(fake.bridge.list).toHaveBeenCalledTimes(3))
       act(() => latest.drawer?.onClose())
       expect(latest.drawer).toBeNull()
+    })
+
+    it('C-13 (HTML) a step in the window reveals its thread on the page', async () => {
+      render(<Harness onValue={onValue} />)
+      act(() => latest.layer.onReveal?.('t2'))
+      await waitFor(() => expect(fake.bridge.reveal).toHaveBeenCalledWith(PANEL, 't2'))
+    })
+
+    it('C-06 (HTML) the count names how many open comments changed, from the list main sent', async () => {
+      const change = { state: 'changed' as const, was: 'Buy', now: 'Order' }
+      fake.bridge.list.mockResolvedValue({
+        ok: true,
+        files: [fileView({ threads: [thread(1, { change }), thread(2), thread(3, { status: 'resolved', change })] })]
+      })
+      render(<Harness onValue={onValue} />)
+      expect(latest.toolbar.changed).toBe(0)
+      act(() => latest.toolbar.onToggleDrawer())
+      await waitFor(() => expect(latest.toolbar.changed).toBe(1))
+    })
+
+    it('OD-06 (HTML) an open comment removed outside Erfana is noted in the drawer; one Erfana deleted is not; Copy text and dismiss', async () => {
+      fake.bridge.list.mockResolvedValue({ ok: true, files: [fileView({ threads: [thread(1), thread(2)] })] })
+      render(<Harness onValue={onValue} />)
+      act(() => latest.toolbar.onToggleDrawer())
+      await waitFor(() => expect(latest.drawer?.list.status).toBe('ready'))
+      const [one, two] = [thread(1), thread(2)]
+      await act(async () => {
+        await latest.layer.onSave({ panelId: PANEL, op: 'deleteThread', fileKey: 'f1', threadKey: two.threadKey, rawHash: 'h' } as never)
+      })
+      fake.bridge.list.mockResolvedValue({ ok: true, files: [fileView({ threads: [] })] })
+      act(() => latest.drawer?.onRetry())
+      await waitFor(() => expect(latest.drawer?.removed).toHaveLength(1))
+      expect(latest.drawer?.removed?.[0]).toMatchObject({ threadKey: one.threadKey })
+      act(() => latest.drawer?.onCopyText?.('text'))
+      expect(mocks.writeText).toHaveBeenCalledWith('text')
+      await waitFor(() => expect(latest.layer.polite).toBe(COMMENT_LIST_COPY.textCopied))
+      act(() => latest.drawer?.onDismissRemoved?.())
+      expect(latest.drawer?.removed).toEqual([])
     })
 
     it('E-005 an anchor status after the list wins over the flag the list was read with', async () => {
@@ -550,7 +628,7 @@ describe('usePreviewComments', () => {
     it('a block row has nothing to reveal and opens in source', () => {
       render(<Harness onValue={onValue} />)
       act(() => latest.toolbar.onToggleDrawer())
-      const [row] = drawerRows([fileView({ damaged: [damaged(1)] })], new Set()).attention
+      const [row] = drawerRows([fileView({ damaged: [damaged(1)] })], new Set()).cantEdit
       act(() => latest.drawer?.onReveal(row))
       expect(fake.bridge.reveal).not.toHaveBeenCalled()
       act(() => latest.drawer?.onOpenInSource(row))
@@ -563,7 +641,7 @@ describe('usePreviewComments', () => {
     it('Open opens the threads window from the drawer', () => {
       render(<Harness onValue={onValue} />)
       act(() => latest.toolbar.onToggleDrawer())
-      const [row] = drawerRows([fileView({ damaged: [damaged(1)] })], new Set()).attention
+      const [row] = drawerRows([fileView({ damaged: [damaged(1)] })], new Set()).cantEdit
       act(() => latest.drawer?.onOpen(row))
       expect(latest.layer.request).toMatchObject({
         kind: 'threads',
@@ -691,7 +769,7 @@ describe('usePreviewComments', () => {
     it("the drawer's Open in source leaves the drawer open", () => {
       render(<Harness onValue={onValue} />)
       act(() => latest.toolbar.onToggleDrawer())
-      const [row] = drawerRows([fileView({ damaged: [damaged(1)] })], new Set()).attention
+      const [row] = drawerRows([fileView({ damaged: [damaged(1)] })], new Set()).cantEdit
       act(() => latest.drawer?.onOpenInSource(row))
       expect(mocks.openFileInPanel).toHaveBeenCalled()
       expect(latest.drawer).not.toBeNull()

@@ -51,6 +51,16 @@ export const RUNTIME_PATH_MAX_CHARS = 1_024
 export const QUOTE_MAX_CHARS = 200
 /** Characters of a quote's prefix and suffix (`QUOTE_CONTEXT_CHARS` in `anchor.ts`). */
 export const QUOTE_CONTEXT_CHARS = 32
+/** Code points of a pick's selected words (`SEL_EXACT_MAX_CHARS` in `anchorSel.ts`, spec 024 024-FR-004). */
+export const SEL_EXACT_MAX_CHARS = 200
+/** Code points of the context on each side of them (`SEL_CONTEXT_MAX_CHARS` in `anchorSel.ts`). */
+export const SEL_CONTEXT_MAX_CHARS = 32
+/** Marked words one pin may carry (`PIN_WORDS_MAX` in `commentPins.ts`, C-12). */
+export const PIN_WORDS_MAX = 20
+/** Keys of the other pins a stack pin's click names (`COMMENT_PICK_STACK_MAX` in the pick schema, C-17). */
+export const PIN_STACK_KEYS_MAX = 20
+/** Characters of a target's text read for its words; a longer target is commented whole. */
+export const WORDS_TEXT_MAX_CHARS = 200_000
 /** Characters of the `#hash` sent with a pick (`PREVIEW_LIMITS.COMMENT_VIEW_HASH_MAX_CHARS`). */
 export const VIEW_HASH_MAX_CHARS = 512
 /** Characters of a tag name (`TAG_MAX_CHARS` in `format.ts` is larger; §8 caps the pick at 32). */
@@ -108,6 +118,7 @@ export {
   PIN_BOX_PX,
   PIN_EDGE_INSET_PX,
   PIN_MAX_STEPS,
+  PIN_ROW_CAP,
   PIN_STEP_PX,
   PIN_TIP,
   PIN_TIP_OFFSET_PX

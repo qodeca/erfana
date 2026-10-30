@@ -1,0 +1,79 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * The comment count in both previews' toolbars (comments-v2 C-15, C-20) and
+ * the ▲ attention counter it shares with the drawer's damaged rows.
+ *
+ * The counter is the Badges card's attention counter
+ * (docs/design-system/system/components/badge/index.html#counter, proposed):
+ * an amber fill, ink text, and a ▲ drawn as generated content with empty
+ * alternative text, so the words stay in the parent's accessible name and the
+ * meaning never rests on colour. Tokens only; `border-radius: 0`.
+ */
+
+.erf-counter {
+  display: inline-block;
+  min-inline-size: var(--space-8);
+  padding: 0 var(--space-3);
+  border: var(--border-width) solid var(--color-border-default);
+  border-radius: 0;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-normal);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.erf-counter--attention {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  border-color: var(--color-warning);
+  background: var(--color-warning);
+  color: var(--color-text-on-accent);
+}
+
+.erf-counter--attention::before {
+  content: '\25B2' / '';
+  font-size: var(--text-xs);
+  line-height: var(--leading-none);
+}
+
+@media (forced-colors: active) {
+  .erf-counter--attention {
+    border-color: CanvasText;
+  }
+}
+
+/* Full and compact tiers: the words, "7 comments". */
+.erf-comment-count {
+  gap: var(--space-2);
+}
+
+.erf-comment-count__text {
+  font-family: var(--font-sans);
+  white-space: nowrap;
+}
+
+.erf-comment-count__icon,
+.erf-comment-count__number {
+  display: none;
+}
+
+/* The narrow tier (the band's container under 446px): the icon and the number. */
+@container (width < 446px) {
+  .erf-comment-count__icon {
+    display: inline-flex;
+  }
+
+  .erf-comment-count__number {
+    display: inline;
+  }
+
+  .erf-comment-count__text {
+    display: none;
+  }
+}

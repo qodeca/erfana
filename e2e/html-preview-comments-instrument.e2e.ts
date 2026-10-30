@@ -180,7 +180,7 @@ test.describe('HTML Preview comments – instrumentation (P3 exit)', () => {
     expect(bytesOf(testProject.path, PAGE).equals(before)).toBe(true)
   })
 
-  test('a page without blocks is served as it is on disk', async ({
+  test('OD-01 a page without blocks is instrumented too, with no blocks, so a right-click can start its first comment', async ({
     windowWithTestProject,
     appWithTestProject
   }) => {
@@ -188,8 +188,11 @@ test.describe('HTML Preview comments – instrumentation (P3 exit)', () => {
     await openTitled(preview, PLAIN, PLAIN_TITLE)
 
     expect(await preview.eval(DOM_TOKENS_EXPR, HtmlPreviewPage.target(PLAIN))).toBe('[]')
+    // OD-01 (spec 024): every page is instrumented while HTML comments are on – it was served raw before.
     const loads = await commentLoads(appWithTestProject)
-    expect(loads.filter(load => namesFile(load.realPath, PLAIN))).toEqual([])
+    const plain = loads.filter(load => namesFile(load.realPath, PLAIN))
+    expect(plain.map(load => ({ scope: load.scope, blocks: load.blocks }))).toEqual([{ scope: 'page', blocks: [] }])
+    expect(plain[0].tokenCount).toBeGreaterThan(0)
     expect(await commentUnavailable(appWithTestProject)).toEqual([])
   })
 
@@ -220,10 +223,10 @@ test.describe('HTML Preview comments – instrumentation (P3 exit)', () => {
     )
     expect(picked).toEqual(blockTokens(load))
 
-    // The host page has no blocks: it is served raw, and only the frame's load exists.
+    // The host page has no blocks: under OD-01 it is instrumented too, as a page load with no blocks.
     expect(await preview.eval(DOM_TOKENS_EXPR, target)).toBe('[]')
     const loads = await commentLoads(appWithTestProject)
-    expect(loads.filter(l => namesFile(l.realPath, FRAMED))).toEqual([])
+    expect(loads.filter(l => namesFile(l.realPath, FRAMED)).map(l => ({ scope: l.scope, blocks: l.blocks }))).toEqual([{ scope: 'page', blocks: [] }])
     expect(loads.filter(l => namesFile(l.realPath, PAGE)).map(l => l.scope)).toEqual(['frame'])
   })
 

@@ -52,8 +52,7 @@ import {
   saveShortcutLabel,
   tooLongText,
   unsavedConflictText,
-  unsavedSourceText,
-  type SaveFailureCopy
+  unsavedSourceText
 } from './commentCopy'
 import { counterState, countCharacters, visibleString } from './commentFormat'
 import { validateCommentText, type IdentityFormData } from './commentSchemas'
@@ -70,6 +69,8 @@ import { draftKeyOf, type CommentWindowRequest } from './commentWindowTypes'
 import { useCommentWords } from './commentWords'
 import { CommentWordsPicker, type WordsSpan } from './CommentWordsPicker'
 import { SELECTION_COPY } from './commentCopyWords'
+import { carriedDrafts } from './commentCarriedDrafts'
+import { WINDOW_COPY, saveBlockedReason, windowRefusal, type RefusalCopy } from './commentWindowCopy'
 import { TEST_IDS } from '../../constants/testids'
 
 /** Props for {@link NewCommentView}. */
@@ -90,6 +91,13 @@ export interface NewCommentViewProps {
   /** "Pick again": close, keep the text, comment mode on. */
   readonly onPickAgain: () => void
   readonly textareaRef: React.RefObject<HTMLTextAreaElement>
+  /**
+   * "Comment on the whole {parent}" after a render-check refusal (C-19.3,
+   * W-07): the text is carried, and the caller opens the window on the parent.
+   */
+  readonly onRetarget?: () => void
+  /** The write landed but the window stays open to say so (words dropped): read the list again. */
+  readonly onRefresh?: () => void
 }
 
 /**
@@ -109,15 +117,21 @@ export function NewCommentView({
   onCancel,
   onLeave,
   onPickAgain,
-  textareaRef
+  textareaRef,
+  onRetarget,
+  onRefresh
 }: NewCommentViewProps): React.JSX.Element {
   const key = draftKeyOf(request)
   // Every sentence naming the file shows its bidi and invisible characters as tokens (S-L-B).
   const file = visibleString(request.file.displayPath)
-  const [text, setText] = useState(() => commentDrafts.get(key))
+  // W-02: a window with no text of its own takes the panel's carried draft (C-14.1).
+  const [carried] = useState(() => (commentDrafts.get(key) === '' ? carriedDrafts.peek(request.panelId) : null))
+  const [text, setText] = useState(() => carried ?? commentDrafts.get(key))
   const [restored] = useState(() => commentDrafts.get(key) !== '')
   const [fieldError, setFieldError] = useState<string | null>(null)
-  const [failure, setFailure] = useState<SaveFailureCopy | null>(null)
+  const [failure, setFailure] = useState<RefusalCopy | null>(null)
+  // 024-FR-004: main did not keep the words – saved on the whole target; the window says so before it closes.
+  const [dropped, setDropped] = useState(false)
   const [saving, setSaving] = useState(false)
   const [changingIdentity, setChangingIdentity] = useState(false)
   const [refusedUnsaved, setRefusedUnsaved] = useState(false)
@@ -125,7 +139,9 @@ export function NewCommentView({
   const alert = useCommentAlert()
   const words = useCommentWords()
   const changeRef = useRef<HTMLButtonElement>(null)
+  const doneRef = useRef<HTMLButtonElement>(null)
   const quoteId = useId()
+  const fieldId = useId()
   const [span, setSpan] = useState<WordsSpan>(() => ({ start: request.words?.start ?? 0, end: request.words?.end ?? 0 }))
   const [untouched, setUntouched] = useState(true)
   const choice: WordsChoice = request.words === undefined ? { kind: 'whole' } : chooseWords({ text: request.words.text, ...span })
@@ -137,6 +153,17 @@ export function NewCommentView({
     },
     []
   )
+  // The next new-comment window spends the slot (C-14.1): the carried text is this window's now,
+  // kept under its own key – or, when it has text of its own, the slot is simply dropped.
+  const { panelId } = request
+  useEffect(() => {
+    carriedDrafts.clear(panelId)
+    if (carried !== null) commentDrafts.set(key, carried)
+  }, [carried, panelId, key])
+  // Saved on the whole target (words dropped): Close takes focus, the way out.
+  useEffect(() => {
+    if (dropped) doneRef.current?.focus()
+  }, [dropped])
 
   // Main refused for unsaved changes: blocked until the guard sees the tab
   // saved (by the button, Cmd+S or autosave).
@@ -149,7 +176,20 @@ export function NewCommentView({
   const pending = useCommentWritePending(request.panelId, key) && !saving
   // No second Save once the draft is spent.
   const closedOff = failure?.action === 'close' || failure?.action === 'pick-again'
-  const saveBlocked = saving || pending || unsaved || fieldBlocked || closedOff
+  // W-08: the pick already knows this part is generated – refused before anything is typed.
+  const generated = request.refused === 'generated-region' ? words.saveFailure(ErrorCode.COMMENT_TARGET_MOVED, file, request.target.tag, 'generated-region').text : null
+  // C-21: what a blocked Save is waiting for, read with the button.
+  const blockedReason = saveBlockedReason({
+    generated,
+    unsaved,
+    file,
+    text,
+    over: counterState(count) === 'over',
+    choice: choice.kind,
+    noun: words.noun(request.target.tag)
+  })
+  const fieldShowsError = fieldError !== null || counterState(count) === 'over'
+  const saveBlocked = saving || pending || unsaved || fieldBlocked || closedOff || generated !== null
   const clearedText =
     guard.cleared === 'saved' ? COPY.unsavedCleared : guard.cleared === 'clean' ? COPY.unsavedGone : null
 
@@ -173,7 +213,7 @@ export function NewCommentView({
 
   /** A refused save – answered, or settled after a pending answer: say why, keep the text. */
   const refused = (code: string, reason?: string): void => {
-    const copy = words.saveFailure(code, file, request.target.tag, reason)
+    const copy = windowRefusal(words, code, file, request.target.tag, reason, request.parentTag)
     if (copy.action === 'identity') {
       onIdentityRequired()
       return
@@ -203,7 +243,11 @@ export function NewCommentView({
   )
 
   const save = async (): Promise<void> => {
-    if (saving || pending || closedOff) return
+    if (saving || pending || closedOff || dropped) return
+    if (generated !== null) {
+      alert(generated)
+      return
+    }
     const result = validateCommentText(text)
     if (!result.ok) {
       setFieldError(result.error)
@@ -238,7 +282,12 @@ export function NewCommentView({
     if (answer.ok) commentDrafts.clear(key)
     if (!mounted.current) return
     setSaving(false)
-    if (answer.ok) onSaved()
+    if (answer.ok && answer.wordsDropped === true) {
+      // Saved on the whole target: the window says so (024-FR-004), and closes on Close.
+      setDropped(true)
+      alert(SELECTION_COPY.wordsDropped(words.noun(request.target.tag), file))
+      onRefresh?.()
+    } else if (answer.ok) onSaved()
     else if (answer.code === ErrorCode.COMMENT_SAVE_PENDING) alert(saveFailureCopy(answer.code, file).text)
     else refused(answer.code, answer.reason)
   }
@@ -286,6 +335,14 @@ export function NewCommentView({
     <>
       <div className="erf-comment-window__body">
         {unsavedBanner}
+        {request.wordsMissing === true && (
+          <CommentBanner kind="info" testId={TEST_IDS.COMMENT_WORDS_MISSING}>{SELECTION_COPY.wordsNotInFile(file)}</CommentBanner>
+        )}
+        {generated !== null && (
+          <CommentBanner kind="error" testId={TEST_IDS.COMMENT_SAVE_ERROR}>
+            {generated}
+          </CommentBanner>
+        )}
         {request.words !== undefined && (
           <CommentWordsPicker
             words={request.words}
@@ -316,8 +373,14 @@ export function NewCommentView({
           restored={restored}
           readOnly={pending}
           textareaRef={textareaRef}
+          fieldId={fieldId}
           testId={TEST_IDS.COMMENT_NEW_FIELD}
         />
+        {carried !== null && (
+          <p className="erf-comment-note" data-testid={TEST_IDS.COMMENT_CARRIED}>
+            {WINDOW_COPY.carried}
+          </p>
+        )}
         {changingIdentity ? (
           <IdentityEditor
             initialName={authorName}
@@ -349,7 +412,11 @@ export function NewCommentView({
             </button>
           </p>
         )}
-        {pending ? (
+        {dropped ? (
+          <CommentBanner kind="success" after testId={TEST_IDS.COMMENT_WORDS_DROPPED}>
+            {SELECTION_COPY.wordsDropped(words.noun(request.target.tag), file)}
+          </CommentBanner>
+        ) : pending ? (
           <CommentBanner kind="info" after testId={TEST_IDS.COMMENT_SAVE_ERROR}>
             {saveFailureCopy(ErrorCode.COMMENT_SAVE_PENDING, file).text}
           </CommentBanner>
@@ -360,9 +427,16 @@ export function NewCommentView({
               after
               testId={TEST_IDS.COMMENT_SAVE_ERROR}
               actions={
-                failure.action === 'pick-again' ? (
-                  <DialogButton variant="secondary" onClick={onPickAgain}>
-                    {COPY.pickAgain}
+                failure.retarget === true && request.parentTag !== undefined && onRetarget !== undefined ? (
+                  <DialogButton
+                    variant="secondary"
+                    testId={TEST_IDS.COMMENT_RETARGET}
+                    onClick={() => {
+                      carriedDrafts.put(request.panelId, text)
+                      onRetarget()
+                    }}
+                  >
+                    {WINDOW_COPY.commentOnWhole(words.noun(request.parentTag))}
                   </DialogButton>
                 ) : undefined
               }
@@ -373,7 +447,28 @@ export function NewCommentView({
         )}
       </div>
       <div className="erf-comment-window__foot">
-        {pending || failure?.action === 'close' ? (
+        {dropped ? (
+          <DialogButton variant="primary" buttonRef={doneRef} onClick={onSaved} testId={TEST_IDS.COMMENT_CLOSE}>
+            {COPY.close}
+          </DialogButton>
+        ) : failure?.action === 'pick-again' && !pending ? (
+          <>
+            <DialogButton variant="secondary" onClick={onCancel} testId={TEST_IDS.COMMENT_CANCEL}>
+              {COPY.cancel}
+            </DialogButton>
+            {/* C-14.1: Pick again is the way on – the text travels to the next window (W-01, W-02). */}
+            <DialogButton
+              variant="primary"
+              testId={TEST_IDS.COMMENT_PICK_AGAIN}
+              onClick={() => {
+                carriedDrafts.put(request.panelId, text)
+                onPickAgain()
+              }}
+            >
+              {COPY.pickAgain}
+            </DialogButton>
+          </>
+        ) : pending || failure?.action === 'close' ? (
           <DialogButton variant="secondary" onClick={onCancel} testId={TEST_IDS.COMMENT_CLOSE}>
             {COPY.close}
           </DialogButton>
@@ -385,7 +480,10 @@ export function NewCommentView({
             {!closedOff && (
               <DialogButton
                 variant="primary"
-                busy={saveBlocked}
+                busy={saving || pending}
+                blocked={saveBlocked ? (blockedReason ?? WINDOW_COPY.writeCommentFirst) : null}
+                // The field's own error already says it: that line describes Save, not a second copy.
+                blockedBy={saveBlocked && fieldShowsError ? `${fieldId}-e` : null}
                 title={`${COPY.save} (${saveShortcutLabel()})`}
                 keyShortcut={saveShortcutAria()}
                 onClick={() => void save()}

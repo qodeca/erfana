@@ -62,7 +62,7 @@ const reports = (): unknown[] => h.sent(COMMENT_ANCHORS_CHANNEL)
 describe('pins (J-005)', () => {
   it('draws one pin per element, outside comment mode too', () => {
     h.state({ showIcons: true, icons: [icon('a', 2), icon('b', 3, { count: 4 })] })
-    expect(pins().map(p => p.getAttribute('aria-label'))).toEqual([
+    expect(pins().map(p => p.dataset.name)).toEqual([
       '1 comment on div#s1.slide. Open.',
       '4 comments on div#s2.slide. Open.'
     ])
@@ -113,7 +113,7 @@ describe('visibility reports (J-006)', () => {
     await microtasks()
     await vi.advanceTimersByTimeAsync(ANCHOR_CHECK_MIN_MS + RENDER_FALLBACK_MS)
     expect(reports().at(-1)).toEqual({ visible: ['two'], hidden: ['one'] })
-    expect(pins().map(p => p.getAttribute('aria-label'))).toEqual(['1 comment on div#s2.slide.active. Open.'])
+    expect(pins().map(p => p.dataset.name)).toEqual(['1 comment on div#s2.slide.active. Open.'])
   })
 
   it('J-006 a 0×0 element is not visible now, though checkVisibility passes it', () => {

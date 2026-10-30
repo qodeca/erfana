@@ -16,6 +16,9 @@ import {
   OPEN_SECTIONS_MAX,
   PICK_TAG_MAX_CHARS,
   PIN_KEY_MAX_CHARS,
+  PIN_WORDS_MAX,
+  SEL_CONTEXT_MAX_CHARS,
+  SEL_EXACT_MAX_CHARS,
   RUNTIME_PATH_MAX_CHARS,
   SECTIONS_SCANNED_MAX,
   TOKEN_PATTERN
@@ -78,6 +81,17 @@ export interface IconState {
   /** Open threads on the element; a damaged block counts as one. */
   readonly count: number
   readonly status: 'open' | 'damaged'
+  /** The words its open threads are about (spec 024 C-12): page text, which the overlay marks. */
+  readonly words?: readonly IconWords[]
+  /** C-06: one of its threads' targets changed – the pin is notched. */
+  readonly changed?: true
+}
+
+/** Marked words: `anchor.sel`'s shape. */
+export interface IconWords {
+  readonly exact: string
+  readonly prefix: string
+  readonly suffix: string
 }
 
 /** One child frame, in `WebFrameMain.frames` order (§19 R3-4). */
@@ -172,6 +186,24 @@ function parseRuntime(raw: unknown): IconRuntime | undefined | null {
   return { path, tag }
 }
 
+/** A string of at most `max` UTF-16 units (main caps code points; twice that bounds the units). */
+function isText(value: unknown, min: number, max: number): value is string {
+  return typeof value === 'string' && value.length >= min && value.length <= max * 2
+}
+
+/** At most {@link PIN_WORDS_MAX} well-formed words; anything else is left out. */
+function parseWords(raw: unknown): IconWords[] {
+  if (!Array.isArray(raw)) return []
+  const words: IconWords[] = []
+  for (const item of raw.slice(0, PIN_WORDS_MAX)) {
+    if (!isBag(item)) continue
+    const { exact, prefix, suffix } = item
+    if (!isText(exact, 1, SEL_EXACT_MAX_CHARS) || !isText(prefix, 0, SEL_CONTEXT_MAX_CHARS) || !isText(suffix, 0, SEL_CONTEXT_MAX_CHARS)) continue
+    words.push({ exact, prefix, suffix })
+  }
+  return words
+}
+
 function parseIcon(raw: unknown): IconState | null {
   if (!isBag(raw)) return null
   const { key, token, count, status } = raw
@@ -180,7 +212,9 @@ function parseIcon(raw: unknown): IconState | null {
   if (status !== 'open' && status !== 'damaged') return null
   const runtime = parseRuntime(raw.runtime)
   if (runtime === null) return null
-  return { key, token, count, status, ...(runtime ? { runtime } : {}) }
+  const words = parseWords(raw.words)
+  const changed = raw.changed === true ? { changed: true as const } : {}
+  return { key, token, count, status, ...(runtime ? { runtime } : {}), ...(words.length > 0 ? { words } : {}), ...changed }
 }
 
 function parseIcons(raw: unknown): IconState[] {

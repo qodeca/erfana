@@ -235,5 +235,73 @@ export const COMMENT_TEST_IDS = {
   /** New-comment window: the result line, Comment on: “…” */
   COMMENT_NARROW_RESULT: 'comment-narrow-result',
   /** New-comment window: Whole {kind}, which clears the words */
-  COMMENT_NARROW_WHOLE: 'comment-narrow-whole'
+  COMMENT_NARROW_WHOLE: 'comment-narrow-whole',
+  // The drawer and the toolbar after comments-v2 (spec 024 commit 14: C-15, OD-04, OD-06)
+  /** Filter: Can't edit (OD-04; replaces Needs attention) */
+  COMMENT_FILTER_CANT_EDIT: 'comment-filter-cant-edit',
+  /** The drawer's sort menu button (C-15); its items add `-file`, `-changed`, `-latest`, its menu `-menu` */
+  COMMENT_DRAWER_SORT: 'comment-drawer-sort',
+  /** Drawer note: open comments removed outside Erfana (OD-06) */
+  COMMENT_DRAWER_REMOVED: 'comment-drawer-removed',
+  /** The note's Show / Hide */
+  COMMENT_DRAWER_REMOVED_SHOW: 'comment-drawer-removed-show',
+  /** The note's Dismiss */
+  COMMENT_DRAWER_REMOVED_DISMISS: 'comment-drawer-removed-dismiss',
+  /** A removed comment's Copy text */
+  COMMENT_DRAWER_REMOVED_COPY: 'comment-drawer-removed-copy',
+  // The comment window after comments-v2 (spec 024 commit 14: C-05, C-06, C-13, C-14, C-18, C-19, OD-05)
+  /** C-06: the Changed / Words changed note above a thread */
+  COMMENT_CHANGED: 'comment-changed',
+  /** C-06: the Was box */
+  COMMENT_WAS: 'comment-was',
+  /** C-06: the Now box */
+  COMMENT_NOW: 'comment-now',
+  /** C-05: "The comment itself is on line {n} of {file}." */
+  COMMENT_COMMENT_LINE: 'comment-comment-line',
+  /** C-13: Reply and resolve */
+  COMMENT_REPLY_RESOLVE: 'comment-reply-resolve',
+  /** C-13: Resolve and next, in the foot */
+  COMMENT_RESOLVE_NEXT: 'comment-resolve-next',
+  /** C-13: the stepper group in the head */
+  COMMENT_STEPPER: 'comment-stepper',
+  /** C-13: Previous comment */
+  COMMENT_STEP_PREVIOUS: 'comment-step-previous',
+  /** C-13: Next comment */
+  COMMENT_STEP_NEXT: 'comment-step-next',
+  /** C-13: the head's More actions (…) button */
+  COMMENT_MORE_ACTIONS: 'comment-more-actions',
+  /** W-11: All open comments are resolved */
+  COMMENT_ALL_DONE: 'comment-all-done',
+  /** W-02: Your text from the last comment is here. */
+  COMMENT_CARRIED: 'comment-carried',
+  /** W-01: Pick again, in the foot */
+  COMMENT_PICK_AGAIN: 'comment-pick-again',
+  /** W-03: Updated from {file} just now */
+  COMMENT_UPDATED: 'comment-updated',
+  /** W-03: the New since you opened divider */
+  COMMENT_NEW_SINCE: 'comment-new-since',
+  /** W-04: removed outside Erfana while open */
+  COMMENT_REMOVED: 'comment-removed',
+  /** W-04: Copy text */
+  COMMENT_COPY_TEXT: 'comment-copy-text',
+  /** W-07: Comment on the whole {parent} */
+  COMMENT_RETARGET: 'comment-retarget',
+  /** 024-FR-004: saved on the whole target – the words were not kept */
+  COMMENT_WORDS_DROPPED: 'comment-words-dropped',
+  /** C-18: the docked window's edge tab */
+  COMMENT_EDGE_TAB: 'comment-edge-tab',
+  /** The window's polite live region (a step's announcement) */
+  COMMENT_WINDOW_POLITE: 'comment-window-polite',
+  /** OD-05: Rebuild from data… */
+  COMMENT_REBUILD: 'comment-rebuild',
+  /** OD-05: the rebuild confirmation */
+  COMMENT_REBUILD_CONFIRM: 'comment-rebuild-confirm',
+  /** OD-05: Rebuild comment */
+  COMMENT_REBUILD_RUN: 'comment-rebuild-run',
+  /** OD-05: Keep open (only the status line differs) */
+  COMMENT_REBUILD_KEEP_OPEN: 'comment-rebuild-keep-open',
+  /** OD-05: Mark resolved (only the status line differs) */
+  COMMENT_REBUILD_MARK_RESOLVED: 'comment-rebuild-mark-resolved',
+  /** 024-AC-004 (g): the selected words are not in the file – the window says the comment is on the whole target */
+  COMMENT_WORDS_MISSING: 'comment-words-missing'
 } as const

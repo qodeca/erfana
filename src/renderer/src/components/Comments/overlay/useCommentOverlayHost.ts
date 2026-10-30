@@ -5,7 +5,7 @@
  * 024 architecture note 001 § 2 option C, § 3; 024-FR-001, 024-FR-002).
  *
  * One behaviour, two hosts: the HTML Preview's overlay runs in its sealed
- * preload; this hook is the other host, driven by a {@link PreviewCommentAdapter}
+ * preload; this hook is the other host, driven by a `PreviewCommentAdapter`
  * and a {@link RendererCommentSource}, so a later `<!-- -->` text preview
  * plugs in with its own adapter and nothing here changes. It owns:
  *
@@ -17,7 +17,14 @@
  * - **the menu and the window** – the target's menu (`hostMenu.ts`) and the
  *   shared `CommentWindow`, whose `add` is completed here with the adapter's
  *   description of the target (main locates it, C7);
- * - pointer and keyboard picking – `useHostPointerKeys.ts`.
+ * - pointer and keyboard picking – `useHostPointerKeys.ts`. A pick on a
+ *   target with open threads opens them, not a blank new comment (C-22);
+ *   a click on commented words opens that thread (C-17); the menu's "Add
+ *   comment" stays the explicit new thread. Turning the mode on with words
+ *   selected only turns it on and shows the Comment button (C-16);
+ * - the removed-outside note (OD-06, `commentRemovedOutside.ts`);
+ * - the window's dock, its reveal of a stepped-to thread, the parent retarget
+ *   and the draft keep-alive (C-18, C-13, W-07, C-14.2 – `hostWindow.ts`).
  *
  * Nothing here writes to the preview's content: outline, icons and the mode
  * tab are drawn by `CommentOverlayLayer` outside it (024-FR-024).
@@ -26,14 +33,7 @@
  */
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { CommentSaveRequest } from '../../../../../shared/ipc/preview-comment-schema'
-import type {
-  FileCommentListResult,
-  FileCommentOpenDraftResult,
-  FileCommentSaveRequest,
-  FileCommentSaveResult,
-  PickedTargetRequest,
-  ThreadPlacement
-} from '../../../../../shared/ipc/file-comment-schema'
+import type { FileCommentSaveResult, PickedTargetRequest, ThreadPlacement } from '../../../../../shared/ipc/file-comment-schema'
 import { reduceCommentMode } from '../../../../../shared/comments/overlayCore/modeState'
 import { useGlobalSettingsStore } from '../../../stores/useGlobalSettingsStore'
 import { usePanelCommentState, usePreviewCommentStore } from '../../../stores/usePreviewCommentStore'
@@ -42,92 +42,28 @@ import { textClipboard } from '../../../services/textClipboard'
 import { getBasename } from '../../../utils/fileUtils'
 import { ANNOUNCE, COPY, writtenAnnouncement } from '../commentCopy'
 import { ErrorCode } from '../../../../../shared/errors'
-import { MARKDOWN_COPY, MD_SURFACE_COPY, SELECTION_COPY } from '../commentCopyWords'
+import { COMMENT_LIST_COPY, MARKDOWN_COPY, MD_SPOKEN_COPY, MD_SURFACE_COPY, SELECTION_COPY } from '../commentCopyWords'
+import { listCounts } from '../commentRows'
+import { useRemovedOutside } from '../commentRemovedOutside'
 import type { CommentDrawerProps } from '../CommentDrawer'
 import type { CommentToolbarToolsProps } from '../CommentToolbarTools'
 import type { CommentWindowProps } from '../CommentWindow'
 import type { CommentWindowRequest, NewCommentWords } from '../commentWindowTypes'
 import { useLiveText } from '../commentLive'
-import type { CommentFileView } from '../../../../../shared/ipc/comment-common-schema'
-import type { ContextMenuItem } from '../../ContextMenu/ContextMenu'
 import type { AnchorSelection } from '../../../../../shared/comments/anchorSel'
+import { commentMarkAt } from './commentHighlights'
 import { targetText } from './domWords'
-import { countsOf, draftKeyOf, pointOf, viewOf } from './hostParts'
+import { blockWindowRequest, rowTarget } from './hostDrawer'
+import { countsOf, draftKeyOf, pointOf, spokenTarget, threadsOn, viewOf } from './hostParts'
 import { hostMenuItems, hostMenuLabel } from './hostMenu'
-import { useSelectionComments, useWordsCheck, type SelectionButton } from './useSelectionComments'
-import type { PreviewCommentAdapter } from './previewAdapter'
+import { drawn, newRequestExtras, threadTarget, useDraftKeepAlive, type HostDock } from './hostWindow'
+import type { CommentOverlayHost, CommentOverlayHostOptions, HostMenu } from './hostTypes'
+import { useSelectionComments, useWordsCheck } from './useSelectionComments'
 import { useHostPointerKeys } from './useHostPointerKeys'
 
-/** One file's comments as the host reads and writes them (`fileCommentGateway`, bound to a panel and a file). */
-export interface RendererCommentSource {
-  readonly list: (bufferText?: string) => Promise<FileCommentListResult>
-  readonly openDraft: () => Promise<FileCommentOpenDraftResult>
-  readonly save: (request: FileCommentSaveRequest) => Promise<FileCommentSaveResult>
-  /** Called when main says the file changed on disk; returns the unsubscribe. */
-  readonly onChanged: (callback: () => void) => () => void
-}
+export type { CommentOverlayHost, CommentOverlayHostOptions, HostMenu, RendererCommentSource } from './hostTypes'
 
-/** Options for {@link useCommentOverlayHost}. */
-export interface CommentOverlayHostOptions {
-  readonly panelId: string
-  readonly filePath: string
-  /** Comments are on for this preview (Settings, bridge, file kind). Off: nothing at all. */
-  readonly enabled: boolean
-  /** The preview is shown where comments live (Markdown: preview-only view, tab visible). */
-  readonly shown: boolean
-  /** This panel is the active one: the mode shortcut is its own (src/renderer/CLAUDE.md). */
-  readonly activePanel: boolean
-  readonly adapter: PreviewCommentAdapter
-  readonly source: RendererCommentSource
-  /** The scrolling element of the preview: pointer, keys and scroll are read there. */
-  readonly scroller: HTMLElement | null
-  /** The pane the overlay covers: its box is the overlay's and the window's area. */
-  readonly area: HTMLElement | null
-  /** The scroller's accessible name while live (C-08.1). */
-  readonly scrollerLabel: string
-  /** Why comments are paused (unsaved editor edits, F-02/F-03), or `null`. */
-  readonly paused: string | null
-  /** The editor's text while it differs from the file: listed for display only (C-09). */
-  readonly bufferText?: string
-  readonly onOpenInSource: (line: number) => void
-}
-
-/** The open menu: where, about what, and its comment items. */
-export interface HostMenu {
-  readonly x: number
-  readonly y: number
-  readonly label: string
-  readonly items: ContextMenuItem[]
-  readonly mode: boolean
-  readonly target: HTMLElement
-  /** The selected text, when the menu is about a selection (the prompt items and Copy selection read it). */
-  readonly selectedText?: string
-}
-
-/** Everything the preview draws for comments. */
-export interface CommentOverlayHost {
-  readonly enabled: boolean
-  readonly shown: boolean
-  readonly mode: boolean
-  readonly showIcons: boolean
-  readonly toolbar: CommentToolbarToolsProps
-  readonly drawer: CommentDrawerProps | null
-  readonly menu: HostMenu | null
-  readonly closeMenu: () => void
-  readonly window: CommentWindowProps | null
-  readonly polite: string
-  readonly assertive: string
-  /** The target under the pointer or picked by key in comment mode. */
-  readonly outlined: HTMLElement | null
-  readonly placements: readonly ThreadPlacement[]
-  readonly file: CommentFileView | null
-  /** Open the thread window on these threads (an icon). */
-  readonly openThreads: (threadKeys: readonly string[], anchor: HTMLElement | null) => void
-  readonly scrollTick: number
-  /** The Comment button over a selection (C-16), while it shows, and what it does. */
-  readonly selectionButton: SelectionButton | null
-  readonly onSelectionButton: () => void
-}
+const NO_THREADS: readonly string[] = []
 
 /**
  * Wires one renderer-hosted preview's comments.
@@ -153,13 +89,18 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
   // Main said comments are off in Settings (a race with another window's switch): nothing listed, no new comment.
   const [off, setOff] = useState(false)
   const picks = useRef(new Map<string, PickedTargetRequest>())
+  // The picked element of each new-comment draft: the dock follows it, a retarget climbs from it.
+  const pickedTargets = useRef(new Map<string, HTMLElement>())
   const listButtonRef = useRef<HTMLButtonElement>(null)
   const modeButtonRef = useRef<HTMLButtonElement>(null)
   const optionsRef = useLatestRef(options)
   // Set once the pointer hook exists: the mode toggle moves focus with it.
-  const focusFirst = useRef<() => void>(() => {})
+  const focusFirst = useRef<(lead?: boolean) => void>(() => {})
+  const markOwner = `marks-${drawerId}`
 
   const file = state.list.files[0] ?? null
+  const removed = useRemovedOutside(state.list, words)
+  const { ownDelete } = removed
   const fileName = file?.displayPath ?? getBasename(filePath)
   const readOnly = file !== null && !file.writable ? words.readOnlyReasonText(file.readOnlyReason, fileName) : null
   // Off and read-only win over paused: saving the editor would not make the file writable (state table § 4).
@@ -211,6 +152,8 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
     }
   }, [state.mode, live, blocked, panelId, store, announce])
 
+  const selection = useSelectionComments({ live, blocked, adapter, scroller, area })
+
   const toggleMode = useCallback(
     (byKeyboard: boolean) => {
       const on = !(store.getState().panels.get(panelId)?.mode ?? false)
@@ -219,10 +162,18 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
         return
       }
       setMode(on)
-      announce(on ? words.modeOn : ANNOUNCE.modeOff)
-      if (on && byKeyboard) requestAnimationFrame(() => focusFirst.current())
+      // C-16: words selected in view – the mode only turns on, with the Comment button over them.
+      const selected = on && selection.showButton()
+      announce(!on ? ANNOUNCE.modeOff : selected ? MD_SPOKEN_COPY.modeOnSelected : words.modeOn)
+      if (on && byKeyboard) {
+        requestAnimationFrame(() => {
+          // C-10: one sentence on keyboard entry; with words selected, the button's sentence stays the last word.
+          focusFirst.current(!selected)
+          if (selected) announce(MD_SPOKEN_COPY.modeOnSelected)
+        })
+      }
     },
-    [panelId, store, blocked, setMode, announce, words]
+    [panelId, store, blocked, setMode, announce, words, selection]
   )
 
   // ---- the new-comment window ----
@@ -239,6 +190,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
         return
       }
       picks.current.set(draft.draftToken, pick)
+      pickedTargets.current.set(draft.draftToken, target)
       setRequest({
         kind: 'new',
         panelId,
@@ -254,7 +206,8 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
         point: pointOf(target, optionsRef.current.area),
         opener,
         // The target's text, for the words and Narrow to words (C-07); a selection brings its range.
-        words: chosen ?? { text: targetText(target), start: 0, end: 0, cut: false }
+        words: chosen ?? { text: targetText(target), start: 0, end: 0, cut: false },
+        ...newRequestExtras(target, adapter)
       })
     },
     [blocked, adapter, store, panelId, optionsRef, alert, words, fileName, filePath]
@@ -281,7 +234,20 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
     [store, panelId, optionsRef]
   )
 
-  const selection = useSelectionComments({ live, blocked, adapter, scroller, area })
+  // C-22: a pick on a target with open threads opens them; Enter on the target holding the selection opens the words.
+  const pickTarget = useCallback(
+    (target: HTMLElement, byKey: boolean) => {
+      const words = byKey ? selection.read() : null
+      if (words !== null && words.target === target && words.refused === null) {
+        void openNew(target, 'page', words.words)
+        return
+      }
+      const open = threadsOn(target, adapter, placements, file)
+      if (open.length > 0) openThreads(open, target)
+      else void openNew(target, 'page')
+    },
+    [selection, adapter, placements, file, openThreads, openNew]
+  )
 
   // With words selected the menu is about them (M-12, M-14, M-16, M-19, M-21); the target is where they start.
   const openMenu = useCallback(
@@ -327,7 +293,10 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
       announce(ANNOUNCE.modeOff)
       modeButtonRef.current?.focus()
     },
-    onPick: target => void openNew(target, 'page'),
+    onPick: pickTarget,
+    speak: target => spokenTarget(target, adapter, placements, file),
+    markAt: (x, y) => commentMarkAt(markOwner, x, y),
+    onOpenMark: (threadKey, at) => openThreads([threadKey], at),
     onMenu: openMenu,
     selectionRect: () => selection.read()?.rect ?? null,
     onSay: announce,
@@ -338,6 +307,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
   }, [pointer.focusFirst])
 
   // ---- writes ----
+  const liveDraft = useDraftKeepAlive(request?.kind === 'new' ? request.draftToken : null, () => optionsRef.current.source.openDraft())
   const expectWords = useWordsCheck(placements, tag => announce(SELECTION_COPY.wordsDropped(words.noun(tag), fileName)))
   const save = useCallback(
     (request: CommentSaveRequest, sel?: AnchorSelection): Promise<FileCommentSaveResult> => {
@@ -347,18 +317,25 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
         if (!answer.ok && answer.reason === 'changed-during-save') void refreshList()
         return answer
       }
+      // OD-06: a thread Erfana removes itself is never "removed outside Erfana".
+      if (request.op === 'deleteThread' || request.op === 'deleteMessage') ownDelete(request.threadKey)
       if (request.op !== 'add') return src.save(request).then(relistOnUnconfirmed)
       const target = picks.current.get(request.draftToken)
       if (target === undefined) return Promise.resolve({ ok: false, code: ErrorCode.COMMENT_KEY_INVALID, reason: 'key-invalid' })
       const words = sel === undefined ? {} : { sel }
-      const add = { panelId: id, filePath: path, op: 'add' as const, draftToken: request.draftToken, target, ...words }
-      return src.save({ ...add, text: request.text, view: viewOf(el) }).then(answer => {
+      // C-14.2: the newest draft of the open window, renewed first when it may have lapsed.
+      return liveDraft(request.draftToken).then(async draftToken => {
+        const add = { panelId: id, filePath: path, op: 'add' as const, draftToken, target, ...words }
+        const answer = await src.save({ ...add, text: request.text, view: viewOf(el) })
         // Main keeps the words only where its own parse finds them once (024-FR-004): checked on the next list.
-        if (answer.ok && sel !== undefined && answer.threadKey !== null) expectWords(answer.threadKey, target.tag)
+        // When main already said it dropped them, the window says so – the host does not say it twice.
+        if (answer.ok && sel !== undefined && answer.threadKey !== null && answer.wordsDropped !== true) {
+          expectWords(answer.threadKey, target.tag)
+        }
         return relistOnUnconfirmed(answer)
       })
     },
-    [optionsRef, refreshList, expectWords]
+    [optionsRef, refreshList, expectWords, ownDelete, liveDraft]
   )
 
   const closeWindow = useCallback(() => setRequest(null), [])
@@ -367,6 +344,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
       announce(writtenAnnouncement(written, name || fileName))
       if (written.op === 'add') {
         picks.current.delete(written.draftToken)
+        pickedTargets.current.delete(written.draftToken)
         setRequest(null)
       }
       void refreshList()
@@ -383,22 +361,36 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
     [panelId, store, refreshList]
   )
 
+  // C-18: the docked window follows its target and sits beside the text column; F6 goes to the scroller.
+  const placementsRef = useLatestRef(placements)
+  const dock = useMemo<HostDock>(
+    () => ({
+      anchor: threadKey => {
+        if (threadKey !== null) return drawn(threadTarget(threadKey, placementsRef.current, adapter))
+        return drawn(request?.kind === 'new' ? (pickedTargets.current.get(request.draftToken) ?? null) : null)
+      },
+      column: () => adapter.root?.() ?? null,
+      preview: () => optionsRef.current.scroller
+    }),
+    [adapter, placementsRef, optionsRef, request]
+  )
+
   const outlined = mode ? pointer.outlined : null
   const counts = useMemo(() => countsOf(file), [file])
+  const changed = useMemo(() => (file === null ? 0 : listCounts([file]).changed), [file])
 
   const toolbar: CommentToolbarToolsProps = {
     mode,
-    showIcons: state.showIcons,
     drawerOpen: state.drawerOpen,
     drawerId,
     counts,
+    changed,
     ready: true,
     unavailable: null,
     variant: 'toolbar',
     modeUnavailableText: blocked === null ? null : MD_SURFACE_COPY.modeUnavailable(blocked),
     onToggleMode: toggleMode,
     onToggleDrawer: () => setDrawerOpen(!store.getState().panels.get(panelId)?.drawerOpen),
-    onToggleIcons: () => store.getState().patch(panelId, { showIcons: !state.showIcons }),
     modeRef: modeButtonRef,
     listRef: listButtonRef
   }
@@ -414,29 +406,23 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
           pageFile: fileName,
           onClose: () => setDrawerOpen(false),
           onShowIconsChange: show => store.getState().patch(panelId, { showIcons: show }),
-          onReveal: row => {
-            const placement = placements.find(p => p.threadKey === row.threadKey)
-            const el = placement === undefined ? null : adapter.attach(placement)
-            el?.scrollIntoView({ block: 'center' })
-          },
+          onReveal: row => rowTarget(row, placements, adapter)?.scrollIntoView({ block: 'center' }),
           onOpenInSource: row => options.onOpenInSource(row.line),
           onOpen: row => {
             if (row.threadKey !== undefined) openThreads([row.threadKey], null, 'drawer')
             else if (file !== null && row.blockKey !== undefined) {
-              setRequest({
-                kind: 'threads',
-                panelId,
-                fileKey: file.fileKey,
-                threadKeys: [],
-                blockKeys: [row.blockKey],
-                point: pointOf(null, area),
-                opener: 'drawer',
-                listAfter: state.list.generation ?? 0,
-                file: { fileKey: file.fileKey, displayPath: file.displayPath, filePath: file.filePath, frame: false }
-              })
+              setRequest(blockWindowRequest(file, row.blockKey, panelId, area, state.list.generation ?? 0))
             }
           },
-          onRetry: () => void refreshList()
+          onRetry: () => void refreshList(),
+          // OD-06: the removed-outside note, and its Copy text.
+          removed: removed.removed,
+          onDismissRemoved: removed.dismiss,
+          onCopyText: text => {
+            void textClipboard
+              .writeText(text)
+              .then(ok => (ok ? announce(COMMENT_LIST_COPY.textCopied) : alert(COMMENT_LIST_COPY.copyTextFailed)))
+          }
         }
       : null
 
@@ -473,7 +459,16 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
           onCopyRaw: text => {
             void textClipboard.writeText(text).then(ok => (ok ? announce(COPY.rawCopied) : alert(COPY.copyFailed)))
           },
-          pausedText: paused
+          pausedText: paused,
+          dock,
+          // C-13: a step reached this thread – bring its target into view.
+          onReveal: threadKey => threadTarget(threadKey, placements, adapter)?.scrollIntoView({ block: 'center' }),
+          // W-07: "Comment on the whole {parent}".
+          onRetarget: from => {
+            const picked = pickedTargets.current.get(from.draftToken)
+            const parent = picked === undefined ? null : adapter.parentOf(picked)
+            if (parent !== null) void openNew(parent, from.opener)
+          }
         }
       : null
 
@@ -495,6 +490,8 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
     openThreads,
     scrollTick,
     selectionButton: request === null && menu === null ? selection.button : null,
-    onSelectionButton
+    onSelectionButton,
+    markOwner,
+    activeThreads: live && request?.kind === 'threads' ? request.threadKeys : NO_THREADS
   }
 }

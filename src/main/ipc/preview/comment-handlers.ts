@@ -131,7 +131,11 @@ export function registerPreviewCommentHandlers(deps: PreviewCommentHandlerDeps):
     request: CommentCommandRequestSchema,
     result: CommentAckSchema,
     refused: KEY_INVALID,
-    run: (request, window) => registry.get(request.panelId, window.id)?.reveal(request.threadKey) ?? KEY_INVALID
+    run: (request, window) => {
+      const service = registry.get(request.panelId, window.id)
+      if (service === undefined) return KEY_INVALID
+      return request.command === 'reveal' ? service.reveal(request.threadKey) : service.keepDraft(request.draftToken)
+    }
   })
 
   register({

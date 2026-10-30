@@ -399,7 +399,8 @@ describe('CommentWriter limits (M-015)', () => {
     })
     const long = await addOn(writer, 'index.html', 'buy', 'x'.repeat(PREVIEW_LIMITS.COMMENT_MESSAGE_MAX_CHARS + 1))
 
-    expect(reply).toEqual({ ok: false, code: ErrorCode.COMMENT_LIMIT, reason: 'limit' })
+    // Changed expectation under C-19 (was reason 'limit'): the reply limit is worded on its own.
+    expect(reply).toEqual({ ok: false, code: ErrorCode.COMMENT_LIMIT, reason: 'replies' })
     expect(long).toEqual({ ok: false, code: ErrorCode.COMMENT_LIMIT, reason: 'limit' })
     expect(await snapshot(project.path('index.html'))).toEqual(before)
   })

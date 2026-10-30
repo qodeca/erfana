@@ -87,7 +87,8 @@ export interface SaveFlowDeps<D extends SaveDraft, S> {
   readonly binding: CommentBinding
   readonly realRoot: string
   readonly keys: CommentKeyStore<D>
-  readonly writer: Pick<CommentWriter, 'add' | 'changeThread' | 'deleteDamagedBlock'>
+  // `rebuildDamagedBlock` (OD-05) is optional: a writer without it refuses a rebuild as an unknown key.
+  readonly writer: Pick<CommentWriter, 'add' | 'changeThread' | 'deleteDamagedBlock'> & Partial<Pick<CommentWriter, 'rebuildDamagedBlock'>>
   /** The view's scroll before a write (the reload coordinator). */
   readonly captureScroll: () => Promise<S | undefined>
   /** The page on screen, where a thread change's restore lands. */
@@ -107,10 +108,10 @@ const refused = (code: ErrorCode): Refused => ({ ok: false, code })
 const INVALID = refused(ErrorCode.COMMENT_KEY_INVALID)
 
 /** The thread change a non-add request asks for. */
-export function changeOf(request: Exclude<CommentSaveRequest, { op: 'add' | 'deleteBlock' }>): ThreadChange {
+export function changeOf(request: Exclude<CommentSaveRequest, { op: 'add' | 'deleteBlock' | 'rebuildBlock' }>): ThreadChange {
   switch (request.op) {
     case 'reply':
-      return { op: 'reply', text: request.text }
+      return request.resolve === true ? { op: 'reply', text: request.text, resolve: true } : { op: 'reply', text: request.text }
     case 'editMessage':
       return { op: 'editMessage', messageId: request.messageId, text: request.text }
     case 'deleteMessage':
@@ -216,7 +217,9 @@ export function createCommentSaveFlow<D extends SaveDraft, S>(
     )
     if (!done.ok) return done
     const threadId = done.result.threadId as string
-    return { ok: true, threadKey: deps.keys.keyFor(deps.binding, { kind: 'thread', realPath: draft.realPath, threadId }) }
+    const threadKey = deps.keys.keyFor(deps.binding, { kind: 'thread', realPath: draft.realPath, threadId })
+    // The selected words were not kept (024-FR-004): the window says so.
+    return done.result.wordsDropped === true ? { ok: true, threadKey, wordsDropped: true } : { ok: true, threadKey }
   }
 
   async function change(request: Exclude<CommentSaveRequest, { op: 'add' }>): Promise<CommentSaveResult> {
@@ -230,6 +233,16 @@ export function createCommentSaveFlow<D extends SaveDraft, S>(
       const scroll = await deps.captureScroll()
       write = deps.writer.deleteDamagedBlock({ file: { realRoot: deps.realRoot, filePath: realPath }, rawHash: request.rawHash, start: block.value.start })
       return finish(write, scroll, null, { op: 'deleteBlock', blockKey: request.blockKey })
+    }
+    if (request.op === 'rebuildBlock') {
+      // OD-05: a hand-damaged block rebuilt from its own @data, named by its block key.
+      const block = deps.keys.resolve(deps.binding, request.blockKey, 'block')
+      const rebuild = deps.writer.rebuildDamagedBlock?.bind(deps.writer)
+      if (rebuild === undefined || !block.ok || !same(block.value.realPath, realPath) || block.value.rawHash !== request.rawHash) return INVALID
+      const scroll = await deps.captureScroll()
+      const status = request.status === undefined ? {} : { status: request.status }
+      write = rebuild({ file: { realRoot: deps.realRoot, filePath: realPath }, rawHash: request.rawHash, start: block.value.start, ...status })
+      return finish(write, scroll, null, { op: 'rebuildBlock', blockKey: request.blockKey })
     }
     const thread = deps.keys.resolve(deps.binding, request.threadKey, 'thread')
     if (!thread.ok || !same(thread.value.realPath, realPath)) return INVALID

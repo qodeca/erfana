@@ -334,12 +334,25 @@ describe('SEC-10 refused targets keep every byte', () => {
     ['a dot-folder', ['.hidden', 'page.html']],
     ['a dot-file', ['.page.html']],
     ['.git', ['.git', 'page.html']]
-  ])('SEC-10 a never-served path (%s) is never written', async (_name, segments) => {
+  ])('OD-07 a page in a build, dependency or hidden place (%s) is written like any other', async (_name, segments) => {
+    // Changed expectation under OD-07 (was "SEC-10 a never-served path (%s) is never written", refused as excluded).
+    await mkdir(project.path(...segments.slice(0, -1)), { recursive: true })
+    const path = await project.write(join(...segments), PAGE)
+
+    expect(await addAt(path)).toMatchObject({ ok: true, realPath: path })
+    expect(blocksOf(await project.read(join(...segments)))).toHaveLength(1)
+  })
+
+  it.each([
+    ['.env', ['.env']],
+    ['.git/config', ['.git', 'config']],
+    ['a dot-folder script', ['.hidden', 'run.sh']]
+  ])('OD-07 a file no comment kind claims (%s) is still refused by its name, with no folder rule', async (_name, segments) => {
     await mkdir(project.path(...segments.slice(0, -1)), { recursive: true })
     const path = await project.write(join(...segments), PAGE)
     const before = await snapshot(path)
 
-    expect(await addAt(path)).toEqual(refusedPath('excluded'))
+    expect(await addAt(path)).toEqual(refusedPath('not-html'))
     expect(await snapshot(path)).toEqual(before)
   })
 

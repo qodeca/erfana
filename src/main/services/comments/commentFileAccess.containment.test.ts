@@ -2,21 +2,20 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The deciding containment check of `confineCommentFile` holds on its own
- * (security review F1): even when `confinePath` answers that a file outside
- * the root is fine, the exact compare of the two realpaths refuses it.
+ * (security review F1): even when the early confinement answers that a file
+ * outside the root is fine, the exact compare of the two realpaths refuses it.
  *
- * Split from `commentFileAccess.test.ts` because the module-scope
- * `previewPathResolve` mock hoists (docs/windows/contributing.md, test-file
- * split policy). `realPathWithin` stays real; only `confinePath` is replaced.
+ * Split from `commentFileAccess.test.ts` because the module-scope mock hoists
+ * (docs/windows/contributing.md, test-file split policy). `realPathWithin`
+ * stays real; only the early confinement is replaced – since OD-07 that is
+ * `confineCommentPath` (no folder rules), which took over from the preview's
+ * `confinePath`; the mock follows it, the assertion is unchanged.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 const hooks = vi.hoisted(() => ({ confinePath: vi.fn() }))
 
-vi.mock('../preview/previewPathResolve', async importOriginal => {
-  const actual = await importOriginal<typeof import('../preview/previewPathResolve')>()
-  return { ...actual, confinePath: hooks.confinePath }
-})
+vi.mock('./commentPathConfine', () => ({ confineCommentPath: hooks.confinePath }))
 
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'

@@ -73,3 +73,26 @@ export function firstChildOf(element: Element, ok: PickablePredicate): Element |
   }
   return null
 }
+
+/** Where an Alt+↑ / Alt+↓ step goes: an element (with the path back down), out of the frame, or nowhere. */
+export type LevelMove =
+  | { readonly kind: 'move'; readonly element: Element; readonly path: readonly Element[] }
+  | { readonly kind: 'parent-frame' }
+  | { readonly kind: 'say'; readonly say: 'top' | 'no-child' }
+
+/** Alt+↑ from `current`: its parent, out of a frame's `<body>`, or "top of page"; `path` is the way back down. */
+export function levelUp(current: Element, body: Element, path: readonly Element[], isTop: boolean): LevelMove {
+  const parent = parentOf(current, body)
+  if (parent !== null) return { kind: 'move', element: parent, path: [...path, current] }
+  return isTop ? { kind: 'say', say: 'top' } : { kind: 'parent-frame' }
+}
+
+/** Alt+↓ from `current`: back down the path Alt+↑ came up, else the first child, else "no child". */
+export function levelDown(current: Element, path: readonly Element[], ok: PickablePredicate): LevelMove {
+  const back = path.at(-1)
+  if (back !== undefined && back.parentElement === current && back.isConnected) {
+    return { kind: 'move', element: back, path: path.slice(0, -1) }
+  }
+  const child = firstChildOf(current, ok)
+  return child === null ? { kind: 'say', say: 'no-child' } : { kind: 'move', element: child, path: [] }
+}

@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest'
 import { ErrorCode } from '../../../shared/errors'
 import { COMMENT_DRAFT_TOKEN_PATTERN } from '../../../shared/ipc/preview-comment-schema'
-import { CommentKeyStore, DRAFT_TTL_MS, MAX_DRAFTS, MAX_KEYS, MAX_KEYS_HARD, type CommentBinding } from './commentKeyStore'
+import { CommentKeyStore, DRAFT_MAX_AGE_MS, DRAFT_TTL_MS, MAX_DRAFTS, MAX_KEYS, MAX_KEYS_HARD, type CommentBinding } from './commentKeyStore'
 
 const BINDING: CommentBinding = { windowId: 1, panelId: 'html-preview-a', session: 7 }
 const OTHER_WINDOW: CommentBinding = { ...BINDING, windowId: 2 }
@@ -100,6 +100,47 @@ describe('CommentKeyStore drafts', () => {
     expect(store.claimDraft(idle, BINDING)).toEqual(KEY_INVALID)
     store.settleDraft(saving, false)
     expect(store.claimDraft(saving, BINDING).ok).toBe(true)
+  })
+
+  it('C-14 (HTML) an open window keeps its draft alive: the ten minutes start again, a slept-through lapse included', () => {
+    const time = clock()
+    const store = new CommentKeyStore<string>({ now: time.now })
+    const token = store.mintDraft(BINDING, 'draft')
+    time.advance(DRAFT_TTL_MS - 1)
+    expect(store.touchDraft(token, BINDING)).toEqual({ ok: true, value: true })
+    time.advance(DRAFT_TTL_MS - 1)
+    expect(store.claimDraft(token, BINDING).ok).toBe(true)
+    store.settleDraft(token, false)
+    // The machine slept past the TTL: the still-held draft is renewed before Save.
+    time.advance(DRAFT_TTL_MS + 1)
+    expect(store.claimDraft(token, BINDING)).toEqual({ ok: false, code: ErrorCode.COMMENT_DRAFT_EXPIRED })
+    expect(store.touchDraft(token, BINDING).ok).toBe(true)
+    expect(store.claimDraft(token, BINDING).ok).toBe(true)
+  })
+
+  it('C-14 (HTML) a keep-alive never passes the day cap, and never touches an unknown or foreign draft', () => {
+    const time = clock()
+    const store = new CommentKeyStore<string>({ now: time.now })
+    const token = store.mintDraft(BINDING, 'draft')
+    for (const foreign of [OTHER_WINDOW, OTHER_PANEL, OTHER_SESSION]) expect(store.touchDraft(token, foreign)).toEqual(KEY_INVALID)
+    expect(store.touchDraft('0'.repeat(32), BINDING)).toEqual(KEY_INVALID)
+    for (let spent = 0; spent + DRAFT_TTL_MS / 2 <= DRAFT_MAX_AGE_MS; spent += DRAFT_TTL_MS / 2) {
+      time.advance(DRAFT_TTL_MS / 2)
+      expect(store.touchDraft(token, BINDING).ok).toBe(true)
+    }
+    time.advance(DRAFT_TTL_MS / 2)
+    expect(store.touchDraft(token, BINDING)).toEqual({ ok: false, code: ErrorCode.COMMENT_DRAFT_EXPIRED })
+    expect(store.claimDraft(token, BINDING)).toEqual({ ok: false, code: ErrorCode.COMMENT_DRAFT_EXPIRED })
+  })
+
+  it('C-14 (HTML) a kept-alive draft is the newest: MAX_DRAFTS forgets the others first', () => {
+    const store = new CommentKeyStore<number>({ random: counterRandom() })
+    const kept = store.mintDraft(BINDING, 0)
+    const other = store.mintDraft(BINDING, 1)
+    store.touchDraft(kept, BINDING)
+    for (let i = 2; i <= MAX_DRAFTS; i++) store.mintDraft(BINDING, i)
+    expect(store.claimDraft(other, BINDING)).toEqual(KEY_INVALID)
+    expect(store.claimDraft(kept, BINDING).ok).toBe(true)
   })
 })
 

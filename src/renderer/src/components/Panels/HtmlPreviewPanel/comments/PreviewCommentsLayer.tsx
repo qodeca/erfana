@@ -7,9 +7,12 @@
  * R-013).
  *
  * The menu is the shared `ContextMenu` – its `useOccluder('menu', true)`
- * swaps the native page for a still while it is open – with ONE item, "Add
- * comment", or a disabled "Can't comment here" when main minted no draft
- * (decision 14: no other menu item in v1). The window is
+ * swaps the native page for a still while it is open – with the comment items
+ * of the menu matrix (spec 024 `design/menu-matrix.md`, shared with the
+ * Markdown Preview through `hostMenu.ts`): "Add comment" in comment mode
+ * (M-03), "Comment on element" outside it (M-01, OD-01), and on a selection
+ * "Comment on selection" then "Comment on the whole element" (M-02, M-04). A
+ * disabled "Can't comment here" when main minted no draft. The window is
  * {@link CommentWindow}.
  *
  * The live regions are mounted for the tab's whole life and empty until they
@@ -19,6 +22,12 @@
  * @module HtmlPreviewPanel/comments/PreviewCommentsLayer
  */
 import { useRef } from 'react'
+import type { AnchorSelection } from '../../../../../../shared/comments/anchorSel'
+import { HTML_WORDS } from '../../../Comments/commentCopyWords'
+import { hostMenuItems, hostMenuLabel } from '../../../Comments/overlay/hostMenu'
+import type { ContextMenuItem } from '../../../ContextMenu/ContextMenu'
+import type { DraftScope } from './previewCommentRequests'
+import { TEST_IDS } from '../../../../constants/testids'
 import { renderIcon } from '../../../../utils/iconRegistry'
 import type {
   CommentSaveRequest,
@@ -33,9 +42,14 @@ import type { IdentityFormData } from '../../../Comments/commentSchemas'
 import { CommentWindow } from '../../../Comments/CommentWindow'
 import type { CommentWindowRequest, ElementDraft } from '../../../Comments/commentWindowTypes'
 
+/** The matrix's actions are replaced by the layer's own (see the items below). */
+const NO_ACTION = (): void => {}
+
 /** Props for {@link PreviewCommentsLayer}. */
 export interface PreviewCommentsLayerProps {
   readonly menu: ElementDraft | null
+  /** Comment mode is on: the menu without a selection says "Add comment", else "Comment on element" (default on). */
+  readonly mode?: boolean
   readonly request: CommentWindowRequest | null
   readonly list: CommentListState
   readonly identity: CommentIdentitySettings | null
@@ -45,18 +59,22 @@ export interface PreviewCommentsLayerProps {
   readonly getArea: () => Box | null
   /** `chosen`: an item ran (focus goes on with it); else focus returns to the page. */
   readonly onMenuClose: (chosen: boolean) => void
-  readonly onAddComment: (draft: ElementDraft) => void
+  /** An item ran: open the window on the selected words, or on the whole element (the default). */
+  readonly onAddComment: (draft: ElementDraft, scope?: DraftScope) => void
   /** `returnFocus: false` when the caller moves focus itself ("Go to tab"). */
   readonly onCloseWindow: (returnFocus?: boolean) => void
   /** A pin's thread view chose "New comment": show the new-comment view instead. */
   readonly onNewComment: (request: Extract<CommentWindowRequest, { kind: 'new' }>) => void
   readonly onSaveIdentity: (identity: IdentityFormData) => Promise<boolean>
-  readonly onSave: (request: CommentSaveRequest) => Promise<CommentSaveResult>
+  /** Write; a new comment's chosen words ride along as `sel` (024-FR-004). */
+  readonly onSave: (request: CommentSaveRequest, sel?: AnchorSelection) => Promise<CommentSaveResult>
   readonly onWritten: (request: CommentSaveRequest, file: string) => void
   readonly onRefresh: () => void
   readonly onPickAgain: () => void
   readonly onOpenInSource: (filePath: string, line: number) => void
   readonly onCopyRaw: (text: string) => void
+  /** A step in the window reached this thread (C-13): show its element on the page. */
+  readonly onReveal?: (threadKey: string) => void
   /** Injected clock for the window's times (tests). */
   readonly now?: () => Date
 }
@@ -77,6 +95,31 @@ export function PreviewCommentsLayer(props: PreviewCommentsLayerProps): React.JS
     props.onMenuClose(chosen.current)
     chosen.current = false
   }
+  const selection = menu?.selection === true
+  // The matrix gives labels and order; each item's action is set here, where the ref is written only on click.
+  const items: ContextMenuItem[] = canComment
+    ? hostMenuItems(
+        { mode: props.mode ?? true, tag: menu.target?.tag ?? '', blocked: null, refused: null, words: HTML_WORDS, selection },
+        { open: NO_ACTION, openWords: NO_ACTION }
+      ).map(item => ({
+        ...item,
+        icon: renderIcon('message-square-plus', { size: 16, 'aria-hidden': true }),
+        action: () => {
+          chosen.current = true
+          if (item.testId === TEST_IDS.COMMENT_MENU_SELECTION) props.onAddComment(menu, 'words')
+          else props.onAddComment(menu)
+        }
+      }))
+    : [
+        {
+          label: COPY.cantCommentHere,
+          disabled: true,
+          testId: 'comment-menu-disabled',
+          // ContextMenu never runs a disabled item; were it to, closing
+          // the menu is the only thing this item could mean.
+          action: closeMenu
+        }
+      ]
   return (
     <>
       <div
@@ -94,29 +137,10 @@ export function PreviewCommentsLayer(props: PreviewCommentsLayerProps): React.JS
         <ContextMenu
           x={menu.point.x}
           y={menu.point.y}
-          ariaLabel={COPY.menuLabel}
+          ariaLabel={hostMenuLabel({ tag: menu.target?.tag ?? '', words: HTML_WORDS, selection })}
           containerTestId="comment-context-menu"
           onClose={closeMenu}
-          items={[
-            canComment
-              ? {
-                  label: COPY.addComment,
-                  icon: renderIcon('message-square-plus', { size: 16, 'aria-hidden': true }),
-                  testId: 'comment-menu-add',
-                  action: () => {
-                    chosen.current = true
-                    props.onAddComment(menu)
-                  }
-                }
-              : {
-                  label: COPY.cantCommentHere,
-                  disabled: true,
-                  testId: 'comment-menu-disabled',
-                  // ContextMenu never runs a disabled item; were it to, closing
-                  // the menu is the only thing this item could mean.
-                  action: closeMenu
-                }
-          ]}
+          items={items}
         />
       )}
       {request !== null && (
@@ -142,6 +166,7 @@ export function PreviewCommentsLayer(props: PreviewCommentsLayerProps): React.JS
           onPickAgain={props.onPickAgain}
           onOpenInSource={props.onOpenInSource}
           onCopyRaw={props.onCopyRaw}
+          onReveal={props.onReveal}
         />
       )}
     </>

@@ -226,8 +226,8 @@ describe('M-060 – what is served raw', () => {
     expect(harness.comments.tokens.size).toBe(0)
   })
 
-  it('a page without erfana:comment, comment mode off: raw', async () => {
-    expect(await (await harness.loadDocument('plain.html')).text()).not.toMatch(HAS_TOKEN)
+  it('OD-01 a page without erfana:comment is instrumented with comment mode off too (was raw)', async () => {
+    expect(await (await harness.loadDocument('plain.html')).text()).toMatch(HAS_TOKEN)
     harness.comments.setCommentMode(true)
     expect(await (await harness.loadDocument('plain.html')).text()).toMatch(HAS_TOKEN)
   })

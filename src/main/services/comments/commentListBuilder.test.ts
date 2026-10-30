@@ -184,7 +184,8 @@ describe('buildCommentList', () => {
     expect(file.damaged[0].rawTruncated).toBe(true)
   })
 
-  it('lists a missing or non-UTF-8 file read-only with its reason, and leaves a never-served path out', async () => {
+  // Changed expectation under OD-07 (was "… and leaves a never-served path out"): a dot-folder's file is listed.
+  it('OD-07 lists a missing or non-UTF-8 file read-only with its reason, and a dot-folder file like any other', async () => {
     const gone = project.path('gone.html')
     const latin = await project.write('latin.html', Buffer.from([0x3c, 0x70, 0x3e, 0xe9, 0x3c, 0x2f, 0x70, 0x3e]))
     await mkdir(project.path('.hidden'))
@@ -193,7 +194,8 @@ describe('buildCommentList', () => {
     const files = await list([{ path: gone }, { path: latin, frame: true }, { path: hidden }])
     expect(files.map(file => [file.displayPath, file.writable, file.readOnlyReason, file.frame])).toEqual([
       ['gone.html', false, 'missing', false],
-      ['latin.html', false, 'encoding', true]
+      ['latin.html', false, 'encoding', true],
+      ['.hidden/page.html', true, undefined, false]
     ])
     expect(files[0].threads).toEqual([])
   })

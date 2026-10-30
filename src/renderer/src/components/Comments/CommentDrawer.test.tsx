@@ -2,8 +2,10 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The comments drawer (docs/designs/comments/html-preview-comments.md §10.5; R-009,
- * R-020).
+ * R-020; comments-v2 C-03, C-10, C-15, C-20, OD-04, OD-06).
  */
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -13,6 +15,8 @@ import type { CommentListState } from '../../stores/usePreviewCommentStore'
 import { damaged, fileView, message, thread } from '../Panels/HtmlPreviewPanel/comments/__test-helpers__/commentTestKit'
 import { resolveFocusReturnTarget } from '../Dialog/BaseDialog'
 import { COPY, DRAWER_COPY, unreadFilesText } from './commentCopy'
+import { COMMENT_LIST_COPY, MARKDOWN_COPY, MARKDOWN_WORDS } from './commentCopyWords'
+import { CommentWordsContext } from './commentWords'
 import {
   CommentDrawer,
   DRAWER_ROW_ESTIMATE_PX,
@@ -67,13 +71,14 @@ describe('CommentDrawer', () => {
       await waitFor(() => expect(screen.getByTestId('comment-drawer-close')).toHaveFocus())
     })
 
-    it('counts each filter and starts on Open, in file order', () => {
+    // Changed expectation under OD-04 (was "Open 2" and "Needs attention 3"): a not-found thread is Open.
+    it('OD-04 counts each filter – Open, Resolved, Can\'t edit – and starts on Open, in file order', () => {
       setup()
-      expect(screen.getByTestId('comment-filter-open')).toHaveTextContent('Open 2')
+      expect(screen.getByTestId('comment-filter-open')).toHaveTextContent('Open 3')
       expect(screen.getByTestId('comment-filter-resolved')).toHaveTextContent('Resolved 1')
-      expect(screen.getByTestId('comment-filter-attention')).toHaveTextContent('Needs attention 3')
+      expect(screen.getByTestId('comment-filter-cant-edit')).toHaveTextContent("Can't edit 2")
       expect(screen.getByTestId('comment-filter-open')).toHaveAttribute('aria-checked', 'true')
-      expect(rows()).toHaveLength(2)
+      expect(rows()).toHaveLength(3)
       expect(within(rows()[0]).getByText('1 reply')).toBeVisible()
       expect(
         screen.getByText('index.html', { selector: '.erf-comment-drawer__file' })
@@ -94,14 +99,15 @@ describe('CommentDrawer', () => {
       expect(rows()).toHaveLength(1)
       expect(screen.getByTestId('comment-filter-resolved')).toHaveFocus()
       await user.keyboard('{ArrowRight}')
-      expect(screen.getByTestId('comment-filter-attention')).toHaveAttribute('aria-checked', 'true')
-      expect(rows()).toHaveLength(3)
+      // OD-04: the third cell is Can't edit (was Needs attention with 3 rows).
+      expect(screen.getByTestId('comment-filter-cant-edit')).toHaveAttribute('aria-checked', 'true')
+      expect(rows()).toHaveLength(2)
       await user.keyboard('{ArrowRight}')
       expect(screen.getByTestId('comment-filter-open')).toHaveAttribute('aria-checked', 'true')
       await user.keyboard('{ArrowLeft}')
-      expect(screen.getByTestId('comment-filter-attention')).toHaveAttribute('aria-checked', 'true')
+      expect(screen.getByTestId('comment-filter-cant-edit')).toHaveAttribute('aria-checked', 'true')
       await user.keyboard('{a}')
-      expect(screen.getByTestId('comment-filter-attention')).toHaveAttribute('aria-checked', 'true')
+      expect(screen.getByTestId('comment-filter-cant-edit')).toHaveAttribute('aria-checked', 'true')
     })
 
     it('row main action is Show on page; Open is the second Tab stop', async () => {
@@ -171,8 +177,9 @@ describe('CommentDrawer', () => {
       unmount()
       setup({ list: ready([fileView({ threads: [thread(1, { status: 'resolved' })] })]) })
       expect(screen.getByText(DRAWER_COPY.emptyOpen)).toBeVisible()
-      await user.click(screen.getByTestId('comment-filter-attention'))
-      expect(screen.getByText(DRAWER_COPY.emptyAttention)).toBeVisible()
+      // OD-04, R-09: the third cell's empty state (was "Nothing needs attention.").
+      await user.click(screen.getByTestId('comment-filter-cant-edit'))
+      expect(screen.getByText(COMMENT_LIST_COPY.emptyCantEdit)).toBeVisible()
       await user.click(screen.getByTestId('comment-filter-resolved'))
       expect(rows()).toHaveLength(1)
     })
@@ -365,15 +372,25 @@ describe('CommentDrawer', () => {
   })
 
   describe('R-020 tags and actions per row kind', () => {
-    it('tags Element not found, Damaged and Newer format separately and opens them in source', async () => {
+    // Changed expectation under OD-04 (was "tags Element not found, Damaged and Newer format separately",
+    // all three under Needs attention).
+    it('OD-04 Not found is a neutral Open row; Damaged (▲ counter) and Newer format are Can\'t edit; all open in source', async () => {
       const user = userEvent.setup()
       const { props } = setup()
-      await user.click(screen.getByTestId('comment-filter-attention'))
-      const tags = rows().map(r => within(r).getByTestId('comment-drawer-tag').textContent)
-      expect(tags).toEqual([DRAWER_COPY.notFound, DRAWER_COPY.damaged, COPY.newerTag])
+      const notFound = rows()[2]
+      const notFoundTag = within(notFound).getByTestId('comment-drawer-tag')
+      expect(notFoundTag).toHaveTextContent(DRAWER_COPY.notFound)
+      expect(notFoundTag).toHaveClass('erf-comment-tag')
+      expect(notFoundTag).not.toHaveClass('erf-counter--attention')
+      expect(within(notFound).getByTestId('comment-drawer-row-main')).toHaveAttribute('title', COPY.openInSource)
+      await user.click(screen.getByTestId('comment-filter-cant-edit'))
+      const tags = rows().map(r => within(r).getByTestId('comment-drawer-tag'))
+      expect(tags.map(tag => tag.textContent)).toEqual([DRAWER_COPY.damaged, COPY.newerTag])
+      expect(tags[0]).toHaveClass('erf-counter', 'erf-counter--attention')
+      expect(tags[1]).not.toHaveClass('erf-counter--attention')
       const mains = screen.getAllByTestId('comment-drawer-row-main')
       expect(mains.every(m => m.title === COPY.openInSource)).toBe(true)
-      await user.click(mains[1])
+      await user.click(mains[0])
       expect(props.onOpenInSource).toHaveBeenCalledWith(
         expect.objectContaining({ blockKey: 'b1', line: 41 })
       )
@@ -381,19 +398,180 @@ describe('CommentDrawer', () => {
     })
   })
 
+  describe('C-15 the three-cell filter and the sort menu', () => {
+    // The shared ContextMenu portals into #portal-root, as the app's index.html provides.
+    let portalRoot: HTMLDivElement
+    beforeEach(() => {
+      portalRoot = document.createElement('div')
+      portalRoot.id = 'portal-root'
+      document.body.appendChild(portalRoot)
+    })
+    afterEach(() => portalRoot.remove())
+
+    it('C-15 the filter is three equal cells with no visible "Show"; Show names the group', () => {
+      setup()
+      const group = screen.getByRole('radiogroup', { name: COMMENT_LIST_COPY.filterGroup })
+      expect(within(group).getAllByRole('radio')).toHaveLength(3)
+      expect(group).not.toHaveTextContent(/^Show/)
+      expect(screen.queryByText(DRAWER_COPY.show, { selector: 'span' })).toBeNull()
+      expect(within(group).getByRole('radio', { name: "Can't edit 2" })).toBeVisible()
+      const css = readFileSync(resolve(__dirname, 'CommentDrawer.css'), 'utf8')
+      expect(css).toMatch(/\.erf-comment-filter \{[^}]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/)
+    })
+
+    it('C-15 a damaged tag is never amber text: the ▲ counter replaces the warning-tinted tag', () => {
+      const css = readFileSync(resolve(__dirname, 'CommentDrawer.css'), 'utf8')
+      expect(css).not.toMatch(/\.erf-comment-tag--attention\s*\{/)
+    })
+
+    it('C-15 the sort menu orders the rows: file order, changed first, latest activity', async () => {
+      const user = userEvent.setup()
+      setup({
+        list: ready([
+          fileView({
+            threads: [
+              thread(1, { messages: [message(1, { at: '2026-10-01T10:00:00Z' })] }),
+              thread(2, { messages: [message(2, { at: '2026-10-03T10:00:00Z' })], change: { state: 'changed', was: 'Old' } }),
+              thread(3, { messages: [message(3, { at: '2026-10-09T10:00:00Z' })] })
+            ]
+          })
+        ])
+      })
+      const excerpts = () => rows().map(r => r.querySelector('.erf-comment-row__excerpt')?.textContent)
+      const sort = screen.getByTestId('comment-drawer-sort')
+      expect(sort).toHaveTextContent('Sort: File order')
+      expect(sort).toHaveAttribute('aria-haspopup', 'menu')
+      expect(excerpts()).toEqual(['Message 1', 'Message 2', 'Message 3'])
+      await user.click(sort)
+      expect(sort).toHaveAttribute('aria-expanded', 'true')
+      const menu = screen.getByRole('menu', { name: COMMENT_LIST_COPY.sortMenu })
+      expect(within(menu).getAllByRole('menuitem').map(item => item.textContent)).toEqual([
+        'File order',
+        'Changed first',
+        'Latest activity'
+      ])
+      await user.click(within(menu).getByRole('menuitem', { name: 'Changed first' }))
+      expect(sort).toHaveTextContent('Sort: Changed first')
+      expect(excerpts()).toEqual(['Message 2', 'Message 1', 'Message 3'])
+      expect(within(rows()[0]).getByTestId('comment-drawer-tag')).toHaveTextContent(COMMENT_LIST_COPY.changedTag)
+      await user.click(sort)
+      await user.click(screen.getByRole('menuitem', { name: 'Latest activity' }))
+      expect(excerpts()).toEqual(['Message 3', 'Message 2', 'Message 1'])
+    })
+  })
+
+  describe('C-20 the icons toggle lives in the drawer', () => {
+    it('C-20 the checkbox says it shows icons and underlines', async () => {
+      const user = userEvent.setup()
+      const { props } = setup()
+      const box = screen.getByRole('checkbox', { name: COMMENT_LIST_COPY.showIcons })
+      expect(box).toBeChecked()
+      await user.click(box)
+      expect(props.onShowIconsChange).toHaveBeenCalledWith(false)
+    })
+  })
+
+  describe('OD-06 comments removed outside Erfana', () => {
+    const removed = [
+      { threadKey: 'r1', text: 'Fix the date', author: 'Ada Lovelace', label: 'p.lede' },
+      { threadKey: 'r2', text: 'Shorter title', author: 'Grace Hopper', label: 'h1' }
+    ]
+
+    it('OD-06 no note when nothing was removed', () => {
+      setup()
+      expect(screen.queryByTestId('comment-drawer-removed')).toBeNull()
+    })
+
+    it('OD-06 an info note above the list, Show unfolds a read-only list with Copy text, Dismiss hides it', async () => {
+      const user = userEvent.setup()
+      const onDismissRemoved = vi.fn()
+      const onCopyText = vi.fn()
+      setup({ removed, onDismissRemoved, onCopyText })
+      const note = screen.getByTestId('comment-drawer-removed')
+      expect(note).toHaveTextContent('2 open comments were removed from index.html outside Erfana.')
+      expect(note).toHaveClass('erf-comment-banner--info')
+      expect(screen.getByTestId('comment-drawer').querySelector('.erf-comment-drawer__scroll')?.contains(note)).toBe(false)
+      const show = screen.getByTestId('comment-drawer-removed-show')
+      expect(show).toHaveAttribute('aria-expanded', 'false')
+      await user.click(show)
+      expect(show).toHaveAttribute('aria-expanded', 'true')
+      expect(show).toHaveTextContent(COMMENT_LIST_COPY.removedHide)
+      const list = screen.getByRole('list', { name: COMMENT_LIST_COPY.removedList })
+      expect(within(list).getAllByRole('listitem')).toHaveLength(2)
+      expect(list).toHaveTextContent('Fix the date')
+      expect(list).toHaveTextContent('Grace Hopper · h1')
+      // Read-only: nothing in it edits; Copy text is the one action per comment.
+      expect(within(list).queryByRole('textbox')).toBeNull()
+      await user.click(within(list).getByRole('button', { name: 'Copy text, Grace Hopper' }))
+      expect(onCopyText).toHaveBeenCalledWith('Shorter title')
+      await user.click(screen.getByTestId('comment-drawer-removed-dismiss'))
+      expect(onDismissRemoved).toHaveBeenCalled()
+    })
+
+    it('OD-06 one removed comment reads in the singular', () => {
+      setup({ removed: removed.slice(0, 1) })
+      expect(screen.getByTestId('comment-drawer-removed')).toHaveTextContent(
+        '1 open comment was removed from index.html outside Erfana.'
+      )
+    })
+  })
+
+  describe('C-03 (drawer) one noun system in Markdown', () => {
+    it('C-03 (drawer) Markdown rows say the kind and line, Show in preview, and no element, page or block', () => {
+      render(
+        <CommentWordsContext.Provider value={MARKDOWN_WORDS}>
+          <CommentDrawer
+            {...setup().props}
+            id="drawer-md"
+            pageFile="notes.md"
+            list={ready([
+              fileView({
+                displayPath: 'notes.md',
+                threads: [thread(1, { tag: 'li', classes: [], line: 14 }), thread(2, { tag: 'p', classes: [], line: 20, attached: false })],
+                damaged: [damaged(1)]
+              })
+            ])}
+          />
+        </CommentWordsContext.Provider>
+      )
+      const drawer = screen.getAllByTestId('comment-drawer').find(el => el.id === 'drawer-md')!
+      const mdRows = within(drawer).getAllByTestId('comment-drawer-row')
+      expect(within(mdRows[0]).getByText('List item · line 14')).toBeVisible()
+      expect(within(mdRows[0]).getByTestId('comment-drawer-row-main')).toHaveAttribute('title', MARKDOWN_COPY.showInPreview)
+      expect(within(mdRows[1]).getByTestId('comment-drawer-tag')).toHaveTextContent(MARKDOWN_COPY.notFoundTag)
+      const said = [
+        drawer.textContent ?? '',
+        ...within(drawer)
+          .getAllByRole('button')
+          .map(button => button.getAttribute('aria-label') ?? button.getAttribute('title') ?? '')
+      ].join(' ')
+      expect(said).not.toMatch(/\belements?\b|\bpages?\b|\bblocks?\b/i)
+    })
+  })
+
   describe('round 3: description, focus return, Esc, ids, tokens', () => {
-    it('M8 a row describes what Enter does, the excerpt, the replies, who and when, and its tags', () => {
+    // Changed expectation under C-10 (was "M8 a row describes what Enter does, the excerpt, …" with the action
+    // first and the excerpt in the description): the excerpt is the row's name, the description starts with its target.
+    it('C-10 a row is named by its first message and described by its target, replies, who and when, tags and action', () => {
       setup()
       const main = within(rows()[0]).getByTestId('comment-drawer-row-main')
       expect(main).not.toHaveAttribute('aria-keyshortcuts')
+      expect(main).toHaveAccessibleName('Message 1')
       const description = main.getAttribute('aria-describedby')?.split(' ') ?? []
       const text = description.map(id => document.getElementById(id)?.textContent ?? '')
-      expect(text[0]).toBe(COPY.showOnPage)
+      expect(text[0]).toBe('on button.cta')
       expect(text).toContain('1 reply')
-      expect(text.join(' ')).toContain('Message 1')
+      expect(text.at(-1)).toBe(COPY.showOnPage)
       // A row with no replies points at no reply count.
       const second = within(rows()[1]).getByTestId('comment-drawer-row-main')
       expect(second.getAttribute('aria-describedby')?.split(' ')).toHaveLength(4)
+    })
+
+    it('C-10 a damaged row has no message, so its label names it', async () => {
+      const user = userEvent.setup()
+      setup()
+      await user.click(screen.getByTestId('comment-filter-cant-edit'))
+      expect(within(rows()[0]).getByTestId('comment-drawer-row-main')).toHaveAccessibleName('index.html, line 41')
     })
 
     it('M5 the drawer is a focus-return region that hands focus to its first control', () => {

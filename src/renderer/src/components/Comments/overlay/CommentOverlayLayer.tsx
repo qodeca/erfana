@@ -20,18 +20,30 @@
  * The words of an open selection comment are marked through the Custom
  * Highlight API (`commentHighlights.ts`, C-12) while they can be found in
  * their target; a resolved or hidden thread marks nothing (state table
- * S-01, S-06). The Comment button over a selection (C-16) is drawn here too.
+ * S-01, S-06). The open window's threads and the threads of a hovered icon
+ * wear the active mark (C-17 "underline and icon act as one"; R-01). The
+ * marks keep their thread keys under the host's `markOwner`, so the host can
+ * open the thread under a click (C-17). The Comment button over a selection
+ * (C-16) is drawn here too.
+ *
+ * A thread whose target changed since the comment (C-06) gives its icon a
+ * corner notch and "N changed" in its name, and its words a dashed bar.
+ * Each icon's block carries `aria-details` pointing at the icon (C-11), so a
+ * screen reader says "has details" while reading; it is the one attribute
+ * written into the content, marked so exports and copies strip it
+ * (`commentContentAttrs.ts`).
  *
  * @module components/Comments/overlay/CommentOverlayLayer
  */
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { placePin, PIN_BOX_PX, type Box } from '../../../../../shared/comments/overlayCore/pinLayout'
 import type { ThreadPlacement } from '../../../../../shared/ipc/file-comment-schema'
 import type { CommentFileView } from '../../../../../shared/ipc/comment-common-schema'
 import { renderIcon } from '../../../utils/iconRegistry'
 import { TEST_IDS } from '../../../constants/testids'
-import { MD_SURFACE_COPY, SELECTION_COPY } from '../commentCopyWords'
-import { setCommentMarks } from './commentHighlights'
+import { CHANGE_MARK_COPY, MD_SURFACE_COPY, SELECTION_COPY } from '../commentCopyWords'
+import { clearCommentDetails, copyWithoutCommentAttributes, setCommentDetails } from './commentContentAttrs'
+import { setCommentMarks, type CommentMark } from './commentHighlights'
 import { rangeOfWords } from './domWords'
 import type { PreviewCommentAdapter } from './previewAdapter'
 import type { SelectionButton } from './useSelectionComments'
@@ -57,6 +69,10 @@ export interface CommentOverlayLayerProps {
   /** The Comment button over a selection, while it shows (C-16). */
   readonly selectionButton?: SelectionButton | null
   readonly onSelectionButton?: () => void
+  /** The key the marks are registered under; the host hit-tests clicks against it (C-17). */
+  readonly markOwner?: string
+  /** Threads whose window is open: their words wear the active mark (R-01). */
+  readonly activeThreads?: readonly string[]
 }
 
 /** One drawn icon. */
@@ -66,6 +82,8 @@ interface IconSpot {
   readonly element: HTMLElement
   readonly threadKeys: readonly string[]
   readonly name: string
+  /** At least one of its threads is Changed or Words changed (C-06). */
+  readonly changed: boolean
 }
 
 /** `el`'s border box, relative to `area`'s. */
@@ -77,7 +95,9 @@ function relativeBox(el: HTMLElement, area: DOMRect): Box {
 /** Open, attached threads grouped by the element they are attached to, in document order. */
 function iconSpots(props: CommentOverlayLayerProps, area: DOMRect): IconSpot[] {
   const { adapter, placements, file } = props
-  const open = new Set(file?.threads.filter(t => t.status === 'open' && t.attached).map(t => t.threadKey) ?? [])
+  const openThreads = file?.threads.filter(t => t.status === 'open' && t.attached) ?? []
+  const open = new Set(openThreads.map(t => t.threadKey))
+  const changedKeys = new Set(openThreads.filter(t => t.change !== undefined).map(t => t.threadKey))
   const byElement = new Map<HTMLElement, string[]>()
   for (const placement of placements) {
     if (!open.has(placement.threadKey)) continue
@@ -96,33 +116,43 @@ function iconSpots(props: CommentOverlayLayerProps, area: DOMRect): IconSpot[] {
     if (box === null) continue
     placed.push(box)
     const noun = adapter.words.noun(adapter.tagOf(element))
+    const line = adapter.lineOf(element)
+    const changed = threadKeys.filter(key => changedKeys.has(key)).length
     spots.push({
       key: threadKeys.join(','),
       box,
       element,
       threadKeys,
-      name: MD_SURFACE_COPY.iconName(threadKeys.length, noun, adapter.lineOf(element))
+      name: changed > 0 ? CHANGE_MARK_COPY.iconName(threadKeys.length, noun, line, changed) : MD_SURFACE_COPY.iconName(threadKeys.length, noun, line),
+      changed: changed > 0
     })
   }
   return spots
 }
 
-/** The words of open, attached selection comments, as ranges in the rendered content now. */
-function markedRanges(
+/** The words of open, attached selection comments, as marks in the rendered content now. */
+function commentMarks(
   adapter: PreviewCommentAdapter,
   placements: readonly ThreadPlacement[],
-  file: CommentFileView | null
-): Range[] {
-  const open = new Set(file?.threads.filter(t => t.status === 'open' && t.attached).map(t => t.threadKey) ?? [])
-  const ranges: Range[] = []
+  file: CommentFileView | null,
+  active: ReadonlySet<string>
+): CommentMark[] {
+  const openThreads = file?.threads.filter(t => t.status === 'open' && t.attached) ?? []
+  const open = new Set(openThreads.map(t => t.threadKey))
+  const changed = new Set(openThreads.filter(t => t.change?.state === 'changed').map(t => t.threadKey))
+  const marks: CommentMark[] = []
   for (const placement of placements) {
     if (placement.sel === undefined || !open.has(placement.threadKey)) continue
     const element = adapter.attach(placement)
     const range = element === null ? null : rangeOfWords(element, placement.sel)
-    if (range !== null) ranges.push(range)
+    if (range === null) continue
+    const { threadKey } = placement
+    marks.push({ range, threadKey, active: active.has(threadKey), changed: changed.has(threadKey) })
   }
-  return ranges
+  return marks
 }
+
+const NO_THREADS: readonly string[] = []
 
 /**
  * The overlay layer.
@@ -153,17 +183,41 @@ export function CommentOverlayLayer(props: CommentOverlayLayerProps): React.JSX.
     }
   }, [content])
 
-  // The marks follow the list, the icons toggle and every redraw of the content.
-  const owner = useId()
+  // The marks follow the list, the icons toggle, the open window, a hovered icon and every redraw of the content.
+  const ownId = useId()
+  const owner = props.markOwner ?? ownId
   const { placements, file } = props
+  const [hovered, setHovered] = useState<readonly string[]>(NO_THREADS)
+  const activeThreads = props.activeThreads ?? NO_THREADS
   useEffect(() => {
-    setCommentMarks(owner, showIcons ? markedRanges(adapter, placements, file) : [])
-  }, [owner, showIcons, adapter, placements, file, resized])
+    const active = new Set([...activeThreads, ...hovered])
+    setCommentMarks(owner, showIcons ? commentMarks(adapter, placements, file, active) : [])
+  }, [owner, showIcons, adapter, placements, file, resized, activeThreads, hovered])
   useEffect(() => () => setCommentMarks(owner, []), [owner])
 
   const areaBox = area?.getBoundingClientRect() ?? null
   const spots = areaBox !== null && showIcons ? iconSpots(props, areaBox) : []
   const outline = areaBox !== null && mode && outlined !== null && outlined.isConnected ? relativeBox(outlined, areaBox) : null
+  // C-11: each icon's block points at it; taken back when the icon goes.
+  const iconBase = `erf-comment-icon-${useId().replace(/[^\w-]/g, '')}`
+  const iconId = (spot: IconSpot): string => `${iconBase}-${spot.key.replace(/[^\w-]/g, '_')}`
+  const detailed = useRef(new Map<HTMLElement, string>())
+  useEffect(() => {
+    const next = new Map(spots.map(spot => [spot.element, iconId(spot)]))
+    for (const [element] of detailed.current) if (!next.has(element)) clearCommentDetails(element)
+    for (const [element, id] of next) setCommentDetails(element, id)
+    detailed.current = next
+  })
+  useEffect(() => () => detailed.current.forEach((_id, element) => clearCommentDetails(element)), [])
+  // 024-FR-024: a copy of the content never carries what the host wrote into it.
+  useEffect(() => {
+    if (content === null) return undefined
+    const doc = content.ownerDocument
+    const onCopy = (event: ClipboardEvent): void => void copyWithoutCommentAttributes(event, content)
+    doc.addEventListener('copy', onCopy)
+    return () => doc.removeEventListener('copy', onCopy)
+  }, [content])
+
   const tab = mode
     ? MD_SURFACE_COPY.modeTab(outlined === null ? null : { noun: adapter.words.noun(adapter.tagOf(outlined)), line: adapter.lineOf(outlined) })
     : null
@@ -208,12 +262,16 @@ export function CommentOverlayLayer(props: CommentOverlayLayerProps): React.JSX.
           key={spot.key}
           type="button"
           tabIndex={-1}
-          className="erf-comment-host__icon"
+          id={iconId(spot)}
+          className={`erf-comment-host__icon${spot.changed ? ' erf-comment-host__icon--changed' : ''}`}
           style={{ left: spot.box.left, top: spot.box.top, width: spot.box.width, height: spot.box.height }}
           aria-label={spot.name}
           title={spot.name}
           data-testid={TEST_IDS.COMMENT_HOST_ICON}
           onClick={() => props.onOpenThreads(spot.threadKeys, spot.element)}
+          // C-17: hovering an icon raises all its words to the active mark.
+          onMouseEnter={() => setHovered(spot.threadKeys)}
+          onMouseLeave={() => setHovered(NO_THREADS)}
         >
           {renderIcon('message-square', { size: 16, 'aria-hidden': true })}
           {spot.threadKeys.length > 1 && (

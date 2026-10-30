@@ -9,10 +9,18 @@
  * thread: icons are not in the Tab order, and a hidden, resolved or lost comment has none.
  *
  * Keyboard (decided Rows card, plus the Welcome list's one exception):
- * Tab reaches Close, then the filter (one stop – arrows move the selection),
- * the checkbox, then the list ONCE. In the list ↑ ↓ Home End move; Enter or a
- * click is "Show on page" with focus staying in the list ("Open in source" on
- * a not-found, damaged or newer row); Tab once more reaches that row's Open.
+ * Tab reaches Close, then the filter (one stop – arrows move the
+ * selection), the checkbox, the sort menu, then the list ONCE. In the list ↑ ↓
+ * Home End move; Enter or a click is "Show on page" with focus staying in
+ * the list ("Open in source" on a not-found, damaged or newer row); Tab once
+ * more reaches that row's Open.
+ *
+ * comments-v2 (spec 024): the filter is three equal cells on one row – Open,
+ * Resolved, Can't edit (C-15, OD-04) – with "Show" kept as the group's name
+ * only; the sort menu beside the checkbox orders a filter's rows (C-15); the checkbox
+ * "Show comment icons and underlines" is the only icons toggle (C-20); and
+ * open comments removed outside Erfana get a session-only note above the
+ * list (OD-06, `CommentRemovedNote.tsx`).
  *
  * Above {@link VIRTUALISE_ABOVE} rows the list is windowed (§10.6 "Rows
  * virtualised above ~200 items"): only the rows in and around the viewport
@@ -36,12 +44,18 @@ import { defaultRangeExtractor, useVirtualizer, type Range } from '@tanstack/rea
 import { renderIcon } from '../../utils/iconRegistry'
 import type { CommentListState } from '../../stores/usePreviewCommentStore'
 import { COPY, DRAWER_COPY, readErrorText, unreadFilesText } from './commentCopy'
-import { formatCommentTime, plural, visibleString } from './commentFormat'
-import { drawerRows, type DrawerFilter, type DrawerRow } from './commentRows'
+import { COMMENT_LIST_COPY, type CommentSortOrder } from './commentCopyWords'
+import { formatCommentTime } from './commentFormat'
+import { DRAWER_FILTERS, drawerRows, sortRows, type DrawerFilter, type DrawerRow } from './commentRows'
 import { ActionButton, CommentBanner, VisibleText } from './CommentParts'
+import { DrawerRowView, type RowPlacement } from './CommentDrawerRow'
+import { CommentDrawerSort } from './CommentDrawerSort'
+import { CommentRemovedNote } from './CommentRemovedNote'
+import type { RemovedComment } from './commentRemovedOutside'
 import { useCommentWords } from './commentWords'
 import './CommentWindow.css'
 import './CommentDrawer.css'
+import './CommentToolbarTools.css'
 import { TEST_IDS } from '../../constants/testids'
 
 /** A list longer than this is windowed (§10.6 "Rows virtualised above ~200 items"). */
@@ -60,14 +74,15 @@ const OVERSCAN_ROWS = 8
 const FILTER_TEST_IDS: Readonly<Record<DrawerFilter, string>> = {
   open: TEST_IDS.COMMENT_FILTER_OPEN,
   resolved: TEST_IDS.COMMENT_FILTER_RESOLVED,
-  attention: TEST_IDS.COMMENT_FILTER_ATTENTION
+  cantEdit: TEST_IDS.COMMENT_FILTER_CANT_EDIT
 }
 
-const FILTERS: ReadonlyArray<{ key: DrawerFilter; label: string; empty: string }> = [
-  { key: 'open', label: 'Open', empty: DRAWER_COPY.emptyOpen },
-  { key: 'resolved', label: 'Resolved', empty: DRAWER_COPY.emptyResolved },
-  { key: 'attention', label: 'Needs attention', empty: DRAWER_COPY.emptyAttention }
-]
+/** Each filter's label and its empty sentence (OD-04, R-09). */
+const FILTER_COPY: Readonly<Record<DrawerFilter, { label: string; empty: string }>> = {
+  open: { label: COMMENT_LIST_COPY.filterOpen, empty: DRAWER_COPY.emptyOpen },
+  resolved: { label: COMMENT_LIST_COPY.filterResolved, empty: DRAWER_COPY.emptyResolved },
+  cantEdit: { label: COMMENT_LIST_COPY.filterCantEdit, empty: COMMENT_LIST_COPY.emptyCantEdit }
+}
 
 /** Props for {@link CommentDrawer}. */
 export interface CommentDrawerProps {
@@ -91,7 +106,14 @@ export interface CommentDrawerProps {
   /** The row's Open: the comment window. */
   readonly onOpen: (row: DrawerRow) => void
   readonly onRetry: () => void
+  /** Open comments removed outside Erfana since the note was dismissed (OD-06); none by default. */
+  readonly removed?: readonly RemovedComment[]
+  readonly onDismissRemoved?: () => void
+  /** Copy a removed comment's text (OD-06 "Copy text"). */
+  readonly onCopyText?: (text: string) => void
 }
+
+const NONE_REMOVED: readonly RemovedComment[] = []
 
 /**
  * The comments drawer.
@@ -108,6 +130,7 @@ export interface CommentDrawerProps {
 export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
   const { list } = props
   const [filter, setFilter] = useState<DrawerFilter>('open')
+  const [order, setOrder] = useState<CommentSortOrder>('file')
   const [active, setActive] = useState(0)
   const [now] = useState(() => (props.now ?? (() => new Date()))())
   // Row ids are per drawer: two tabs' drawers may list the same file (L15).
@@ -116,7 +139,7 @@ export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
   const filterRefs = useRef<Record<DrawerFilter, HTMLButtonElement | null>>({
     open: null,
     resolved: null,
-    attention: null
+    cantEdit: null
   })
   const closeRef = useRef<HTMLButtonElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -124,7 +147,7 @@ export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
   const notVisible = useMemo(() => new Set(props.notVisible), [props.notVisible])
   const words = useCommentWords()
   const rows = useMemo(() => drawerRows(list.files, notVisible, words), [list.files, notVisible, words])
-  const visible = rows[filter]
+  const visible = useMemo(() => sortRows(rows[filter], order), [rows, filter, order])
   const current = Math.min(active, Math.max(0, visible.length - 1))
   const windowed = list.status === 'ready' && visible.length > VIRTUALISE_ABOVE
 
@@ -202,8 +225,8 @@ export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
     const step: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }
     if (!(event.key in step)) return
     event.preventDefault()
-    const at = FILTERS.findIndex(f => f.key === filter)
-    chooseFilter(FILTERS[(at + step[event.key] + FILTERS.length) % FILTERS.length].key)
+    const at = DRAWER_FILTERS.indexOf(filter)
+    chooseFilter(DRAWER_FILTERS[(at + step[event.key] + DRAWER_FILTERS.length) % DRAWER_FILTERS.length])
   }
 
   const onListKeyDown = (event: React.KeyboardEvent): void => {
@@ -245,7 +268,7 @@ export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
   } else if (rows.none) {
     body = <p className="erf-comment-drawer__empty">{words.drawerNone}</p>
   } else if (visible.length === 0) {
-    body = <p className="erf-comment-drawer__empty">{FILTERS.find(f => f.key === filter)?.empty}</p>
+    body = <p className="erf-comment-drawer__empty">{FILTER_COPY[filter].empty}</p>
   } else {
     const rowView = (row: DrawerRow, index: number, place?: RowPlacement): React.JSX.Element => (
       <DrawerRowView
@@ -269,7 +292,7 @@ export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
         className={`erf-comment-list${windowed ? ' erf-comment-list--windowed' : ''}`}
         // The sizer: as tall as every row together, so the scrollbar is true.
         style={windowed ? { blockSize: virtualizer.getTotalSize() } : undefined}
-        aria-label={`${FILTERS.find(f => f.key === filter)?.label} comments`}
+        aria-label={`${FILTER_COPY[filter].label} comments`}
         onKeyDown={onListKeyDown}
         data-testid={TEST_IDS.COMMENT_DRAWER_LIST}
       >
@@ -321,13 +344,11 @@ export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
         <div
           className="erf-comment-filter"
           role="radiogroup"
-          aria-labelledby={`${props.id}-show`}
+          // C-15: "Show" names the group but is no longer drawn – three cells fit one row.
+          aria-label={COMMENT_LIST_COPY.filterGroup}
           onKeyDown={onFilterKeyDown}
         >
-          <span className="erf-comment-filter__label" id={`${props.id}-show`}>
-            {DRAWER_COPY.show}
-          </span>
-          {FILTERS.map(({ key, label }) => (
+          {DRAWER_FILTERS.map(key => (
             <button
               key={key}
               ref={node => {
@@ -341,22 +362,38 @@ export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
               data-testid={FILTER_TEST_IDS[key]}
               onClick={() => chooseFilter(key)}
             >
-              {`${label} `}
+              <span className="erf-comment-filter__label-text">{FILTER_COPY[key].label}</span>{' '}
               <span className="erf-comment-filter__count">{rows[key].length}</span>
             </button>
           ))}
         </div>
-        <label className="erf-comment-drawer__check">
-          <input
-            className="erf-comment-check"
-            type="checkbox"
-            checked={props.showIcons}
-            onChange={event => props.onShowIconsChange(event.target.checked)}
-            data-testid={TEST_IDS.COMMENT_DRAWER_SHOW_ICONS}
+        <div className="erf-comment-drawer__options">
+          <label className="erf-comment-drawer__check">
+            <input
+              className="erf-comment-check"
+              type="checkbox"
+              checked={props.showIcons}
+              onChange={event => props.onShowIconsChange(event.target.checked)}
+              data-testid={TEST_IDS.COMMENT_DRAWER_SHOW_ICONS}
+            />
+            {COMMENT_LIST_COPY.showIcons}
+          </label>
+          {/* After Close in the DOM, so Close stays the drawer's first control (M5). */}
+          <CommentDrawerSort
+            order={order}
+            onChange={next => {
+              setOrder(next)
+              setActive(0)
+            }}
           />
-          {DRAWER_COPY.showIcons}
-        </label>
+        </div>
       </div>
+      <CommentRemovedNote
+        removed={props.removed ?? NONE_REMOVED}
+        file={props.pageFile}
+        onDismiss={() => props.onDismissRemoved?.()}
+        onCopy={text => props.onCopyText?.(text)}
+      />
       {list.status === 'ready' && list.unread !== undefined && (
         <div className="erf-comment-drawer__note">
           <CommentBanner kind="info" testId={TEST_IDS.COMMENT_DRAWER_UNREAD}>{unreadFilesText(list.unread)}</CommentBanner>
@@ -365,136 +402,10 @@ export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
       <div className="erf-comment-drawer__scroll" ref={scrollRef}>
         {list.status === 'ready' && visible.length > 0 && (
           // A file name is the page author's: bidi and invisible characters drawn as tokens (S-L-B).
-          <p className="erf-comment-drawer__file"><VisibleText text={rows[filter][0].displayPath} /></p>
+          <p className="erf-comment-drawer__file"><VisibleText text={visible[0].displayPath} /></p>
         )}
         {body}
       </div>
     </aside>
-  )
-}
-
-/** Where a windowed row sits, and how it reports its height. */
-interface RowPlacement {
-  /** Offset from the top of the list, in CSS px. */
-  readonly top: number
-  /** The whole list's length: a screen reader hears "row 412 of 1,000". */
-  readonly setSize: number
-  /** The virtualizer's measuring ref (reads `data-index`). */
-  readonly measure: (element: Element | null) => void
-}
-
-/** Props for {@link DrawerRowView}. */
-interface DrawerRowViewProps {
-  readonly row: DrawerRow
-  /** Makes the row's element ids unique to this drawer. */
-  readonly idPrefix: string
-  /** The row's index in the filtered list. */
-  readonly index: number
-  readonly active: boolean
-  /** Present only in a windowed list. */
-  readonly place?: RowPlacement
-  readonly time: string
-  readonly onMain: () => void
-  readonly onOpen: () => void
-}
-
-/** One row: a stretched main button behind the content, and Open. */
-function DrawerRowView({
-  row,
-  idPrefix,
-  index,
-  active,
-  place,
-  time,
-  onMain,
-  onOpen
-}: DrawerRowViewProps): React.JSX.Element {
-  const words = useCommentWords()
-  const mainLabel = row.main === 'source' ? COPY.openInSource : words.showInPreview
-  const base = `${idPrefix}-row-${row.id.replace(/[^\w-]/g, '_')}`
-  // The row's description: what Enter does, the excerpt, the reply count,
-  // who and when, and the tags (M8) – `title` alone is not read once
-  // `aria-describedby` is set.
-  const describedBy = [
-    `${base}-a`,
-    `${base}-x`,
-    row.replies > 0 ? `${base}-r` : null,
-    `${base}-m`,
-    `${base}-t`
-  ]
-    .filter(Boolean)
-    .join(' ')
-  return (
-    <li
-      ref={place?.measure}
-      className={`erf-comment-row${active ? ' erf-comment-row--active' : ''}`}
-      // Positioning a windowed row is per-row geometry, not styling.
-      style={place ? { transform: `translateY(${place.top}px)` } : undefined}
-      data-index={place ? index : undefined}
-      aria-setsize={place?.setSize}
-      aria-posinset={place ? index + 1 : undefined}
-      data-testid={TEST_IDS.COMMENT_DRAWER_ROW}
-    >
-      <button
-        type="button"
-        className="erf-comment-row__main"
-        tabIndex={active ? 0 : -1}
-        data-row-index={index}
-        aria-labelledby={`${base}-l`}
-        aria-describedby={describedBy}
-        title={mainLabel}
-        data-row-main
-        data-testid={TEST_IDS.COMMENT_DRAWER_ROW_MAIN}
-        onClick={onMain}
-      />
-      <div className="erf-comment-row__line">
-        <span className="erf-comment-row__label" id={`${base}-l`} dir="ltr">
-          <VisibleText text={row.label} />
-        </span>
-        <span className="erf-comment-sr" id={`${base}-a`}>
-          {mainLabel}
-        </span>
-        {row.replies > 0 && (
-          <span className="erf-comment-row__count" id={`${base}-r`}>
-            {plural(row.replies, 'reply', 'replies')}
-          </span>
-        )}
-        <span id={`${base}-t`}>
-          {row.tags.map(tag => (
-            <span
-              key={tag.text}
-              className={`erf-comment-tag${tag.attention ? ' erf-comment-tag--attention' : ''}`}
-              data-testid={TEST_IDS.COMMENT_DRAWER_TAG}
-            >
-              {tag.attention && renderIcon('alert-triangle', { size: 12, 'aria-hidden': true })}
-              {tag.text}
-            </span>
-          ))}
-        </span>
-      </div>
-      <p className="erf-comment-row__excerpt" id={`${base}-x`} dir="auto">
-        <VisibleText text={row.excerpt} />
-      </p>
-      <p className="erf-comment-row__meta" id={`${base}-m`}>
-        {row.author !== '' && (
-          <>
-            <bdi>
-              <VisibleText text={row.author} />
-            </bdi>
-            {` · ${time}`}
-          </>
-        )}
-      </p>
-      <button
-        type="button"
-        className="erf-comment-action erf-comment-row__open"
-        tabIndex={active ? 0 : -1}
-        aria-label={`Open comments on ${visibleString(row.label)}`}
-        data-testid={TEST_IDS.COMMENT_DRAWER_ROW_OPEN}
-        onClick={onOpen}
-      >
-        {COPY.open}
-      </button>
-    </li>
   )
 }

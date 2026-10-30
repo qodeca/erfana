@@ -11,6 +11,7 @@
 import { COPY, frameFileText, scriptBuiltText, threadsTitle } from './commentCopy'
 import { HTML_WORDS, type CommentWords } from './commentCopyWords'
 import { ancestorTag, elementLabel } from './commentFormat'
+import { WINDOW_COPY, headingQuote } from './commentWindowCopy'
 import type { CommentWindowRequest } from './commentWindowTypes'
 import type { selectThreads } from './ThreadsView'
 
@@ -72,7 +73,8 @@ export function headingOf(
   if (request.kind === 'new') {
     const { target, file } = request
     if (words.preview !== 'html') {
-      return { title: words.newCommentTitle(target.tag), context: words.context(target, file.displayPath), note: null }
+      const title = words.newCommentTitle(target.tag) + headingText(target.tag, request.words?.text)
+      return { title, context: words.context(target, file.displayPath), note: null }
     }
     const label = target.runtime ? target.runtime.tag : elementLabel(target)
     const note = target.runtime
@@ -93,13 +95,29 @@ export function headingOf(
     const line = selection.damaged[0]?.line ?? selection.newer[0]?.line ?? 1
     return { title: COPY.damagedComment, context: `${file}, line ${line}`, note: null }
   }
+  // C-05: a lost target says so on the context line; where the comment itself is follows the banner.
+  const lost = selection.threads.length > 0 && selection.threads.every(thread => !thread.attached && thread.status === 'open')
   if (words.preview !== 'html') {
-    return { title: words.threadsTitle(first, selection.threads.length), context: words.context(first, file), note: null }
+    const title = words.threadsTitle(first, selection.threads.length) + headingText(first.tag, first.quote)
+    const context = lost ? WINDOW_COPY.notFoundContext(words.noun(first.tag), file) : words.context(first, file)
+    return { title, context, note: null }
   }
   const label = first.runtime ? first.runtime.tag : elementLabel(first)
   return {
     title: threadsTitle(label, selection.threads.length),
-    context: `${label} · ${file}, line ${first.line}`,
+    context: lost ? WINDOW_COPY.notFoundContext(label, file) : `${label} · ${file}, line ${first.line}`,
     note: selection.file.frame ? frameFileText(file) : null
   }
+}
+
+/**
+ * C-03: a Markdown title names a heading by its text, cut at 40 characters –
+ * 'Comments on H2 heading “Next steps”'. Other kinds add nothing.
+ *
+ * @param tag - The target's tag.
+ * @param text - The heading's text, as stored or as rendered.
+ * @returns ` “text”`, or `''`.
+ */
+export function headingText(tag: string, text: string | undefined): string {
+  return /^h[1-6]$/i.test(tag) ? headingQuote(text) : ''
 }

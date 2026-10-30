@@ -34,10 +34,10 @@ import type { NewCommentWords } from './commentWindowTypes'
 
 const TEXT = 'We ship the beta to ten customers by Friday.'
 
-function setup(words: NewCommentWords | undefined) {
+function setup(words: NewCommentWords | undefined, extra: { readonly wordsMissing?: true } = {}) {
   const onSave = vi.fn(async (): Promise<CommentSaveResult> => ({ ok: true, threadKey: 't1' }))
   const props: CommentWindowProps = {
-    request: { ...newRequest(), ...(words === undefined ? {} : { words }) },
+    request: { ...newRequest(), ...(words === undefined ? {} : { words }), ...extra },
     list: INITIAL_PANEL_COMMENT_STATE.list,
     identity: { authorName: 'Ada', identityNoticeSeen: true },
     notVisible: [],
@@ -71,6 +71,11 @@ describe('CommentWindow – the words of a new comment', () => {
     portalRoot.remove()
     commentDrafts.reset()
     resetCommentPendingWrites()
+  })
+
+  it('024-AC-004 (g) words not in the file as written: the window itself says the comment is on the whole element', () => {
+    setup({ text: TEXT, start: 0, end: 0, cut: false }, { wordsMissing: true })
+    expect(screen.getByTestId(TEST_IDS.COMMENT_WORDS_MISSING)).toHaveTextContent(SELECTION_COPY.wordsNotInFile('index.html'))
   })
 
   it('024-AC-005: without words from the preview there is no quote and no field – the shipped HTML window', () => {

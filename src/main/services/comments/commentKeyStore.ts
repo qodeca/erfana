@@ -13,7 +13,8 @@
  * an unknown key, a key of another window, panel or view, a key of another
  * kind – is `COMMENT_KEY_INVALID`, without saying which.
  *
- * Drafts are single use and live ten minutes: a claim marks the draft in
+ * Drafts are single use and live ten minutes – an open window keeps its own
+ * draft alive, up to a day (`touchDraft`, C-14.2): a claim marks the draft in
  * flight (a second save of the same draft is refused while the first runs),
  * and only a save that wrote consumes it – a refused save leaves the draft for
  * the next try, with the window's text (M-057). An expired draft is
@@ -36,6 +37,11 @@ import { ErrorCode } from '../../../shared/errors'
 
 /** How long a draft may wait for its Save (§7.5 step 1). */
 export const DRAFT_TTL_MS = 10 * 60 * 1000
+/**
+ * How long a kept-alive draft may live at most, from its mint (C-14.2): an open
+ * window renews its draft ({@link CommentKeyStore.touchDraft}), but never past this.
+ */
+export const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000
 /** Drafts one view holds; the oldest is forgotten past this. */
 export const MAX_DRAFTS = 64
 /** Keys one view holds; past this the oldest not handed out or used since the current list began is forgotten. */
@@ -81,6 +87,8 @@ interface DraftRecord<D> {
   readonly binding: CommentBinding
   readonly draft: D
   readonly mintedAt: number
+  /** The mint, or the newest keep-alive (C-14.2): the TTL runs from here. */
+  renewedAt: number
   inFlight: boolean
 }
 
@@ -151,7 +159,8 @@ export class CommentKeyStore<D> {
   /** Mint a draft token (128 random bits, lower-case hex). */
   mintDraft(binding: CommentBinding, draft: D): string {
     const token = hex(this.random(16))
-    this.drafts.set(token, { binding, draft, mintedAt: this.now(), inFlight: false })
+    const now = this.now()
+    this.drafts.set(token, { binding, draft, mintedAt: now, renewedAt: now, inFlight: false })
     trim(this.drafts, MAX_DRAFTS, { spare: record => record.inFlight })
     return token
   }
@@ -160,11 +169,28 @@ export class CommentKeyStore<D> {
   claimDraft(token: string, binding: CommentBinding): KeyLookup<D> {
     const record = this.drafts.get(token)
     if (record === undefined || !sameBinding(record.binding, binding) || record.inFlight) return INVALID
-    if (this.now() - record.mintedAt > DRAFT_TTL_MS) {
-      return { ok: false, code: ErrorCode.COMMENT_DRAFT_EXPIRED }
-    }
+    if (this.expired(record)) return { ok: false, code: ErrorCode.COMMENT_DRAFT_EXPIRED }
     record.inFlight = true
     return { ok: true, value: record.draft }
+  }
+
+  /**
+   * Keep an open window's draft alive (C-14.2 "drafts never silently expire"):
+   * its {@link DRAFT_TTL_MS} starts again, and it becomes the newest draft, so
+   * {@link MAX_DRAFTS} forgets others first. A draft past its TTL that is still
+   * held is renewed too – a window left open while the machine slept – but
+   * never one older than {@link DRAFT_MAX_AGE_MS}.
+   *
+   * @returns `COMMENT_KEY_INVALID` for an unknown or foreign token, `COMMENT_DRAFT_EXPIRED` past the cap.
+   */
+  touchDraft(token: string, binding: CommentBinding): KeyLookup<true> {
+    const record = this.drafts.get(token)
+    if (record === undefined || !sameBinding(record.binding, binding)) return INVALID
+    const now = this.now()
+    if (now - record.mintedAt > DRAFT_MAX_AGE_MS) return { ok: false, code: ErrorCode.COMMENT_DRAFT_EXPIRED }
+    record.renewedAt = now
+    touch(this.drafts, token, record)
+    return { ok: true, value: true }
   }
 
   /** The save settled: a write consumes the draft, a refusal hands it back. */
@@ -173,6 +199,12 @@ export class CommentKeyStore<D> {
     if (record === undefined) return
     if (consumed) this.drafts.delete(token)
     else record.inFlight = false
+  }
+
+  /** Past its TTL since the newest renewal, or past its whole-life cap. */
+  private expired(record: DraftRecord<D>): boolean {
+    const now = this.now()
+    return now - record.renewedAt > DRAFT_TTL_MS || now - record.mintedAt > DRAFT_MAX_AGE_MS
   }
 
   /** A comment list begins: every key it hands out, and every key used from now on, is kept until the next list. */

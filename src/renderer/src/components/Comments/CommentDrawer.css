@@ -57,21 +57,25 @@
   border-block-end: var(--border-width) solid var(--color-border-default);
 }
 
-/* "Show": a radio group drawn as segments; selected = the Rows card's
-   signature (fill + 2px lime edge), a shape, not a colour. */
+/* "Show": a radio group drawn as three equal segments on one row (comments-v2
+   C-15, the Segmented card); "Show" is the group's name, not drawn. Selected =
+   the Rows card's signature (fill + 2px lime edge), a shape, not a colour. */
 .erf-comment-filter {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-2);
   margin: 0 0 var(--space-4);
 }
-.erf-comment-filter__label {
-  margin-inline-end: var(--space-2);
-  font-size: var(--text-sm);
-  color: var(--color-text-tertiary);
+.erf-comment-filter__label-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .erf-comment-filter__option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-inline-size: 0;
   block-size: var(--btn-height-sm);
   padding: 0 var(--space-4);
   background: transparent;
@@ -255,9 +259,49 @@
   color: var(--color-text-primary);
   white-space: nowrap;
 }
-.erf-comment-tag--attention {
-  border-color: var(--color-warning-border);
-  color: var(--color-warning);
+/* A damaged row's tag is the ▲ attention counter (CommentToolbarTools.css,
+   C-15): amber never appears as tinted text beside the active row's lime edge. */
+
+/* The checkbox and the sort menu (C-15) on one row above the list. */
+.erf-comment-drawer__options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+.erf-comment-drawer__sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+
+/* "“was” → “now”" under a words-changed row's excerpt (C-06, R-11). */
+.erf-comment-row__words {
+  position: relative;
+  pointer-events: none;
+  grid-column: 1;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+/* OD-06: the removed comments, unfolded under the note – read-only. */
+.erf-comment-removed {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+}
+.erf-comment-removed__item {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-4) 0;
+  border-block-start: var(--border-width) solid var(--color-border-subtle);
+}
+.erf-comment-removed__item > .erf-comment-action {
+  justify-self: start;
 }
 
 .erf-comment-drawer__empty {

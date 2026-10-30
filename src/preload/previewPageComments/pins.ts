@@ -13,22 +13,22 @@
  * element scrolled partly off keeps its pin at the viewport edge, one fully
  * off has none.
  *
- * A pin whose box would overlap one already placed moves left along the top
- * edge in 22 px steps, never past the left inset; elements are placed in
- * document order, so an ancestor keeps the corner and its descendant moves.
- * The search is bounded: a pin is
- * compared with the pins of its own row only, and takes at most
- * `PIN_MAX_STEPS` steps – past that it stays put, overlapping – so a
- * page with hundreds of pins in one row costs little per render. Only
+ * A pin whose hit box would overlap one already placed moves left along the
+ * top edge in 26 px steps (24 + 2, C-17), never past the left inset; elements
+ * are placed in document order, so an ancestor keeps the corner and its
+ * descendant moves. At most `PIN_ROW_CAP` pins share a crowded spot: the
+ * rest of the row merges into one stack pin, "+3", whose click opens all
+ * their threads (C-17). A pin is compared with the slots of its own row only,
+ * so a page with hundreds of pins in one row costs little per render. Only
  * elements that are rendered and on screen get a pin (the caller filters);
  * resolved threads never reach here – main counts open threads only, so a
  * count of 0 draws nothing.
  *
- * The placement rule itself is the shared overlay core's `placePin` (spec
+ * The placement rule itself is the shared overlay core's `layoutPins` (spec
  * 024), so every preview's pins land alike; this module orders the elements
  * and draws the pins.
  */
-import { placePin } from '../../shared/comments/overlayCore/pinLayout'
+import { layoutPins } from '../../shared/comments/overlayCore/pinLayout'
 import { PIN_BODY, PIN_BOX_PX, PIN_PATH } from './constants'
 import type { Box, Viewport } from './geometry'
 
@@ -48,14 +48,16 @@ export function showText(el: Element, text: string): void {
   if (el.getAttribute(TEXT_ATTRIBUTE) !== text) el.setAttribute(TEXT_ATTRIBUTE, text)
 }
 
-/** What a pin shows: two "text lines" for one thread, a number, `9+`, or `!` (damaged). */
-export type PinContent = 'lines' | '!' | '9+' | `${number}`
+/** What a pin shows: two "text lines" for one thread, a number, `9+`, `!` (damaged), or `+3` (a stack, C-17). */
+export type PinContent = 'lines' | '!' | '9+' | `${number}` | `+${number}`
 
 /** One element that has a pin, before placement. */
 export interface PinInput {
   readonly key: string
   readonly count: number
   readonly status: 'open' | 'damaged'
+  /** C-06: a thread's target changed – a notched pin (a shape, not a colour). */
+  readonly changed?: true
   readonly element: Element
   /** The element's border box. */
   readonly box: Box
@@ -66,11 +68,17 @@ export interface PinPlacement {
   readonly key: string
   readonly count: number
   readonly status: 'open' | 'damaged'
+  readonly changed?: true
   readonly element: Element
   readonly content: PinContent
   /** The pin's hit box, `size` × `size`. */
   readonly box: Box
+  /** A stack pin (C-17): every pin merged into it, in document order; the first gives its key and element. */
+  readonly members?: readonly PinInput[]
 }
+
+/** Stack pins show at most this many more (C-17 "+3"). */
+const STACK_SHOWN_MAX = 99
 
 /** What a pin with `count` open threads shows, or `null` when it is not drawn. */
 export function pinContent(count: number, status: 'open' | 'damaged'): PinContent | null {
@@ -95,28 +103,38 @@ export function placePins(
   viewport: Viewport,
   size: number = PIN_BOX_PX
 ): PinPlacement[] {
-  const placed: PinPlacement[] = []
-  /** The boxes of `placed`, in the same order: what a later pin steps away from. */
-  const boxes: Box[] = []
-  for (const input of [...inputs].sort(documentOrder)) {
+  const drawn = [...inputs].sort(documentOrder).flatMap(input => {
     const content = pinContent(input.count, input.status)
-    if (content === null) continue
-    const box = placePin(input.box, boxes, viewport, size)
-    if (box === null) continue
-    boxes.push(box)
-    placed.push({ ...input, content, box })
-  }
-  return placed
+    return content === null ? [] : [{ input, content }]
+  })
+  return layoutPins(
+    drawn.map(({ input }) => input.box),
+    viewport,
+    size
+  ).map(({ box, members, stack }): PinPlacement => {
+    const { input, content } = drawn[members[0]]
+    if (!stack) return { ...input, content, box }
+    const merged = members.map(index => drawn[index].input)
+    return {
+      ...input,
+      status: merged.some(member => member.status === 'damaged') ? 'damaged' : 'open',
+      content: `+${Math.min(merged.length, STACK_SHOWN_MAX)}`,
+      box,
+      members: merged
+    }
+  })
 }
 
-/** The pin's accessible name (§10.10 "Pin"). */
+/** The pin's name (§10.10 "Pin"): kept as `data-name` since pins are visual only (C-11). */
 export function pinName(pin: PinPlacement, label: string): string {
+  if (pin.members !== undefined) return `${pin.members.length} more commented elements here. Open.`
   if (pin.status === 'damaged') return `Damaged comment on ${label}. Open.`
-  return `${pin.count} ${pin.count === 1 ? 'comment' : 'comments'} on ${label}. Open.`
+  return `${pin.count} ${pin.count === 1 ? 'comment' : 'comments'} on ${label}${pin.changed === true ? ', changed' : ''}. Open.`
 }
 
 /** The pin's tooltip (§10.5 "Hover"). */
 export function pinTooltip(pin: PinPlacement): string {
+  if (pin.members !== undefined) return `${pin.members.length} more commented elements – click to open`
   if (pin.status === 'damaged') return 'Damaged comment – click to open'
   return `${pin.count} ${pin.count === 1 ? 'comment' : 'comments'} – click to open`
 }
@@ -168,14 +186,16 @@ export function drawPin(
   }
   el.className = [
     'erf-hpc-pin',
+    pin.members === undefined ? '' : 'erf-hpc-pin--stack',
+    pin.members === undefined && pin.changed === true ? 'erf-hpc-pin--changed' : '',
     pin.status === 'damaged' ? 'erf-hpc-pin--damaged' : '',
     options.selected ? 'erf-hpc-pin--selected' : ''
   ]
     .filter(Boolean)
     .join(' ')
-  el.setAttribute('role', 'button')
-  el.tabIndex = -1
-  el.setAttribute('aria-label', pinName(pin, options.label))
+  // Visual only (C-11, D-07): no role, no tab stop; the layer is aria-hidden. The
+  // name stays as data for the overlay's own tests and tools, never for assistive tech.
+  el.dataset.name = pinName(pin, options.label)
   el.title = pinTooltip(pin)
   el.style.left = `${pin.box.left}px`
   el.style.top = `${pin.box.top}px`

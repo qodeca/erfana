@@ -26,6 +26,10 @@
  *   recorded it at the frame's last navigation (SEC-09), and the tag the page
  *   says the tokened element has is the tag main recorded for the token
  *   (R3-13 L5) – a token moved onto another element is refused;
+ * - for a `context` pick – the reader's right-click outside comment mode that
+ *   the page did not cancel (OD-01) – comment mode is OFF (in the mode the
+ *   preload sends `menu`), and the element checks above hold: it only ever
+ *   opens a menu;
  * - for a pin pick: the key is one of the frame's pins;
  * - for a keyboard-picker step that reached an element: comment mode is on,
  *   and the token passes the element pick's frame and file checks, so the
@@ -199,7 +203,9 @@ export function createCommentPickHandler(deps: PickHandlerDeps): CommentPickHand
     // The schema puts a token on every `showing` step.
     const entry = entryOf(record, pick.token as string)
     if (typeof entry === 'string') return drop(entry)
-    deps.sinks.step({ say: 'showing', entry, ...(pick.added ? { added: true as const } : {}) })
+    // C-10: the open comments on the element itself, from main's own pins.
+    const comments = pick.added ? 0 : [...record.pins.values()].reduce((sum, pin) => sum + (pin.token === pick.token && pin.runtime === undefined ? pin.threadIds.length : 0), 0)
+    deps.sinks.step({ say: 'showing', entry, ...(pick.added ? { added: true as const } : {}), ...(comments > 0 ? { comments } : {}) })
   }
 
   function route(frame: CommentFrameLike, pick: CommentPick): void {
@@ -223,11 +229,13 @@ export function createCommentPickHandler(deps: PickHandlerDeps): CommentPickHand
     if (record === undefined || !deps.frames.isCommentable(record)) return drop('not-commentable')
     if (pick.kind === 'icon') {
       const key = pick.key as string
-      if (!record.pins.has(key)) return drop('unknown-pin')
+      // A stack pin's click (C-17) names only pins main sent this frame, like its own.
+      if (!record.pins.has(key) || pick.stack?.some(other => !record.pins.has(other)) === true) return drop('unknown-pin')
       deps.sinks.icon(frame, record, key, pick)
       return
     }
-    if (!deps.mode()) return drop('mode-off')
+    // A menu or open pick comes only in comment mode; a right-click outside it only out of it (OD-01).
+    if (deps.mode() !== (pick.kind !== 'context')) return drop(pick.kind === 'context' ? 'mode-on' : 'mode-off')
     elementPick(frame, record, pick)
   }
 

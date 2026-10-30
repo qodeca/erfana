@@ -77,7 +77,10 @@ import {
   type PickedTarget
 } from '../../../shared/comments/fileKind'
 import type { TextQuote } from '../../../shared/comments/format'
-import { insertRefusal, planReplace, planSlotInsert, verifyKindSplice, type VerifyFailure } from '../../../shared/comments/splice'
+import { isAnchorSelection } from '../../../shared/comments/anchorSel'
+import { collapseRange, occurrencesInContext } from '../../../shared/comments/selectionWords'
+import { insertRefusal, planRebuild, planReplace, planSlotInsert, verifyKindSplice, type VerifyFailure } from '../../../shared/comments/splice'
+import { rebuildDataOf } from './commentRebuild'
 import { freshKindDocumentOf, sha256HexOf, writableRefusal, type JobDocument, type KindDocCache } from './commentJobDocs'
 import type { CommentRefusal } from './commentRefusals'
 
@@ -98,7 +101,8 @@ export interface CommentDraftTarget {
 
 /** One change to an existing thread (§7.7). Deleting the first message deletes the thread. */
 export type ThreadChange =
-  | { readonly op: 'reply'; readonly text: string }
+  /** `resolve`: the reply and the resolve in one write ("Reply and resolve", C-13). */
+  | { readonly op: 'reply'; readonly text: string; readonly resolve?: true }
   | { readonly op: 'editMessage'; readonly messageId: string; readonly text: string }
   | { readonly op: 'deleteMessage'; readonly messageId: string }
   | { readonly op: 'setStatus'; readonly status: CommentData['status'] }
@@ -117,6 +121,8 @@ export type WritePlanRequest =
     }
   | { readonly op: 'thread'; readonly threadId: string; readonly rawHash: string; readonly change: ThreadChange }
   | { readonly op: 'deleteBlock'; readonly rawHash: string; readonly start?: number }
+  /** OD-05: rebuild a damaged block from its own valid `@data`; `status: 'resolved'` is "Mark resolved". */
+  | { readonly op: 'rebuild'; readonly rawHash: string; readonly start?: number; readonly status?: CommentData['status'] }
 
 /** Who acts and when. `author` is set whenever the edit writes one; `nowMs` is epoch milliseconds. */
 export interface WriteAct {
@@ -152,6 +158,8 @@ export type WriteJobResult =
       readonly outputHash: string
       /** The thread written; `null` when the edit removed its block. */
       readonly threadId: string | null
+      /** An add asked for words the kind did not keep: the comment is on the whole target (024-FR-004). */
+      readonly wordsDropped?: true
     })
   | { readonly kind: 'write'; readonly ok: false; readonly refusal: CommentRefusal }
 
@@ -184,7 +192,14 @@ const SHARED_VERIFY_FAILURES: ReadonlySet<VerifyFailure> = new Set<VerifyFailure
  * to the next.
  */
 type Planned =
-  | { readonly ok: true; readonly plans: readonly SplicePlan[]; readonly threadId: string | null; readonly slotted?: true }
+  | {
+      readonly ok: true
+      readonly plans: readonly SplicePlan[]
+      readonly threadId: string | null
+      readonly slotted?: true
+      /** A `pick` asked for words its first anchor does not keep. */
+      readonly wordsDropped?: true
+    }
   | { readonly ok: false; readonly refusal: CommentRefusal }
 
 const refuse = (refusal: CommentRefusal): { readonly ok: false; readonly refusal: CommentRefusal } => ({ ok: false, refusal })
@@ -258,10 +273,26 @@ function planAdd(request: Extract<WritePlanRequest, { op: 'add' }>, kind: Commen
   const { draft } = request
   const el = hash === draft.fileHash ? doc.index.elementAt(draft.offset) : relocate(doc, draft.anchor)
   if (!el || el.tag !== draft.anchor.tag) return refuse('target-moved')
-  // The stored anchor is rebuilt from the bytes being written; only `runtime` comes from the draft
-  const anchor = buildDraftAnchor(doc.index, el, draft.anchor.runtime)
+  // The stored anchor is rebuilt from the bytes being written; only `runtime` comes from the draft,
+  // and its selected words (024-FR-004) only when these bytes still hold them once, in context.
+  const sel = draft.anchor.runtime === undefined ? keptSelection(doc, el, draft.anchor.sel) : undefined
+  const anchor = { ...buildDraftAnchor(doc.index, el, draft.anchor.runtime), ...(sel === undefined ? {} : { sel }) }
   const data = createThread({ anchor, view: request.view, text: request.text, context: context() })
-  return fromPlan(planInsert(doc, { targetStart: el.start, data, ws: draft.ws }, kind), data.id)
+  const planned = fromPlan(planInsert(doc, { targetStart: el.start, data, ws: draft.ws }, kind), data.id)
+  const dropped = planned.ok && draft.anchor.sel !== undefined && sel === undefined
+  return dropped ? { ...planned, wordsDropped: true } : planned
+}
+
+/**
+ * `sel` when it is a valid `anchor.sel` found exactly once, in its context, in
+ * `el`'s readable text in `doc` – collapsed as a selection reads it, the text
+ * the window chose the words from (spec 024 024-FR-004). Else `undefined`: the
+ * words are gone or now ambiguous, and the comment goes on the whole element.
+ */
+function keptSelection(doc: CommentDocument, el: IndexedElement, sel: unknown): TextQuote | undefined {
+  if (!isAnchorSelection(sel)) return undefined
+  const text = collapseRange(doc.index.visibleText.slice(el.textStart, el.textEnd), 0, 0).text
+  return occurrencesInContext(text, sel).length === 1 ? { exact: sel.exact, prefix: sel.prefix, suffix: sel.suffix } : undefined
 }
 
 /** True when `doc` is the HTML kind's document – the only one a page draft fits. */
@@ -290,14 +321,33 @@ function planPick(request: Extract<WritePlanRequest, { op: 'pick' }>, kind: Comm
     if (!planned.ok) return refuse(PLAN_REFUSALS[planned.reason])
     plans.push(planned.plan)
   }
-  return { ok: true, plans, threadId: first.id, slotted: true }
+  const dropped = request.sel !== undefined && first.anchor.sel === undefined
+  return { ok: true, plans, threadId: first.id, slotted: true, ...(dropped ? { wordsDropped: true as const } : {}) }
+}
+
+/**
+ * OD-05: rebuild a hand-damaged block from its own `@data`, offered only for
+ * `readable-mismatch` and `id-mismatch` with valid data (`commentRebuild.ts`).
+ * "Mark resolved" writes the status the readable line claims; the data is
+ * otherwise exactly the block's.
+ */
+function planRebuildDamaged(request: Extract<WritePlanRequest, { op: 'rebuild' }>, kind: CommentFileKind, doc: KindDocument, context: () => ThreadContext): Planned {
+  const damaged = doc.state.blocks.filter(b => b.kind === 'damaged' && b.rawHash === request.rawHash)
+  const block = damaged.length === 1 ? damaged[0] : damaged.find(b => b.nodeRange[0] === request.start)
+  if (block?.kind !== 'damaged') return refuse('block-changed')
+  const own = rebuildDataOf(doc.text.slice(block.nodeRange[0], block.nodeRange[1]), block.reason)
+  if (own === undefined) return refuse('block-changed')
+  const data = request.status === 'resolved' && own.status !== 'resolved' ? setStatus(own, 'resolved', context()) : own
+  return fromPlan(planRebuild(doc, { start: block.nodeRange[0], rawHash: request.rawHash, data }, kind.refuseGrowth, kind), data.id)
 }
 
 /** The thread after `change`: `null` removes the block, `undefined` means the message is gone. */
 function changedData(data: CommentData, change: ThreadChange, act: WriteAct, context: () => ThreadContext): CommentData | null | undefined {
   switch (change.op) {
-    case 'reply':
-      return addReply(data, change.text, context())
+    case 'reply': {
+      const replied = addReply(data, change.text, context())
+      return change.resolve === true ? setStatus(replied, 'resolved', context()) : replied
+    }
     case 'editMessage':
       return editMessage(data, change.messageId, change.text, new Date(act.nowMs))
     case 'deleteMessage':
@@ -313,6 +363,8 @@ function planThreadChange(request: Extract<WritePlanRequest, { op: 'thread' }>, 
   const { threadId, rawHash } = request
   const block = doc.state.blocks.find(b => b.kind === 'ok' && b.data.id === threadId)
   if (block?.kind !== 'ok' || block.rawHash !== rawHash) return refuse('block-changed')
+  // A full thread is worded on its own: "Start a new comment instead" (C-19).
+  if (request.change.op === 'reply' && block.data.msgs.length > PREVIEW_LIMITS.COMMENT_MAX_REPLIES) return refuse('replies')
   const next = changedData(block.data, request.change, act, context)
   if (next === undefined) return refuse('block-changed')
   if (next === null) return fromPlan(planDelete(doc, { block: { id: threadId }, rawHash }), null)
@@ -338,6 +390,8 @@ function planOf(job: WriteJob, kind: CommentFileKind, doc: KindDocument, hash: s
       return planThreadChange(request, kind, doc, act, context)
     case 'deleteBlock':
       return planDeleteDamaged(request, doc)
+    case 'rebuild':
+      return planRebuildDamaged(request, kind, doc, context)
   }
 }
 
@@ -380,7 +434,8 @@ function spliceVerified(bytes: Uint8Array, kind: CommentFileKind, origin: KindOr
   const byteStart = utf8Length(origin.text, 0, plan.start)
   const splice: ByteSplice = { byteStart, byteEnd: byteStart + utf8Length(origin.text, plan.start, plan.end), insert: encodeText(plan.insert) }
   const out = assembleSplice(bytes, splice)
-  if (out.length > PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES) return refuse('limit')
+  // Its own reason, so the window can say the file would grow past its size (C-19).
+  if (out.length > PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES) return refuse('file-size')
   const text = applySplice(origin.text, plan)
   const decoded = decodeLossless(out)
   if (!verifySpliceBytes(bytes, out, origin.text, plan) || !decoded.ok || decoded.text !== text) return refuse('verify-failed')
@@ -420,5 +475,6 @@ export function runWriteJob(bytes: Uint8Array, job: WriteJob, env: WriteJobEnv):
   if (!spliced.ok) return { kind: 'write', ok: false, refusal: spliced.refusal }
   const outputHash = sha256HexOf(spliced.out)
   env.cache?.set(outputHash, spliced.doc, spliced.out.length)
-  return { kind: 'write', ok: true, ...spliced.splice, inputHash: ready.hash, outputHash, threadId: ready.threadId }
+  const words = ready.wordsDropped === true ? { wordsDropped: true as const } : {}
+  return { kind: 'write', ok: true, ...spliced.splice, inputHash: ready.hash, outputHash, threadId: ready.threadId, ...words }
 }

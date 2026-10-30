@@ -17,9 +17,10 @@
  * - what the renderer is told (`commentPanelStatus.ts`), only ever the window
  *   that owns the view.
  *
- * Comment mode on over a page served without tokens – a file with no comments
- * yet is served raw while the mode is off – reloads the view once, keeping the
- * reader's place, so its elements can be picked.
+ * Comment mode on over a page served without tokens – one loaded before the
+ * feature was turned on (every page is instrumented while it is on, OD-01) –
+ * reloads the view once, keeping the reader's place, so its elements can be
+ * picked.
  *
  * Nothing the page sends writes, and nothing sent to the page carries a path,
  * a comment's text or an author.
@@ -43,11 +44,11 @@ import { CommentWriter, type CommentWriterDeps } from '../../comments/CommentWri
 import { registerCommentE2eSource } from './commentE2eHook'
 import { CommentFrames, type CommentFrameLike, type FrameRecord } from './commentFrames'
 import { createCommentFrameBroadcaster, type CommentFrameBroadcaster, type CommentStateExtras } from './commentFrameBroadcaster'
-import { CommentKeyStore, type CommentBinding } from '../../comments/commentKeyStore'
+import type { CommentBinding } from '../../comments/commentKeyStore'
+import { CommentDraftKeys } from './commentDraftKeys'
 import { createCommentPickHandler, type CommentPickHandler, type PageSignalEvent } from './commentPickHandler'
 import { pickerStepOf, type PickerStepInput } from './commentPickerStep'
 import { createCommentDraftOpener, type CommentDraftOpener, type DraftOpenerGeometry } from './commentDraftOpener'
-import type { CommentDraft } from './commentDraftBuilder'
 import { buildCommentList } from '../../comments/commentListBuilder'
 import { accentRgb } from './commentOverlayTheme'
 import { createCommentPanelStatus, type CommentPanelStatus } from './commentPanelStatus'
@@ -89,7 +90,7 @@ export interface PreviewCommentServiceDeps {
   /** Resolve a frame from its process and routing ids; `webFrameMain.fromId` by default. */
   readonly frameFromIds?: FrameFromIds
   /** The writer; a real `CommentWriter` by default. */
-  readonly createWriter?: (deps: CommentWriterDeps) => Pick<CommentWriter, 'add' | 'changeThread' | 'deleteDamagedBlock'>
+  readonly createWriter?: (deps: CommentWriterDeps) => Pick<CommentWriter, 'add' | 'changeThread' | 'deleteDamagedBlock'> & Partial<Pick<CommentWriter, 'rebuildDamagedBlock'>>
 }
 
 const electronFrameFromIds: FrameFromIds = (processId, routingId) =>
@@ -110,7 +111,7 @@ export class PreviewCommentService implements CommentServiceApi {
   private readonly binding: CommentBinding
   private readonly jobs: HtmlFileJobRunner
   private readonly frames: CommentFrames
-  private readonly keys = new CommentKeyStore<CommentDraft>()
+  private readonly keys = new CommentDraftKeys()
   private readonly status: CommentPanelStatus
   private readonly broadcaster: CommentFrameBroadcaster
   private readonly coordinator: CommentReloadCoordinator
@@ -246,9 +247,15 @@ export class PreviewCommentService implements CommentServiceApi {
     return { ok: false, code: ErrorCode.COMMENT_TARGET_MOVED }
   }
 
+  /** Keep an open new-comment window's draft alive (`preview:commentCommand` `keep-draft`, C-14.2). */
+  keepDraft(draftToken: string): CommentAck {
+    const touched = this.keys.touchDraft(draftToken, this.binding)
+    return touched.ok ? { ok: true } : { ok: false, code: touched.code }
+  }
+
   /** One write (`preview:commentSave`). */
   save(request: CommentSaveRequest): Promise<CommentSaveResult> {
-    return this.saveFlow(request)
+    return this.keys.withWords(request, this.saveFlow)
   }
 
   /**

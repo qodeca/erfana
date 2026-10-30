@@ -272,6 +272,36 @@ export function planReplace(
   }
 }
 
+/** Rebuild a damaged block from its own valid `@data` (comments-v2 OD-05). */
+export interface RebuildRequest {
+  /** The damaged block's `<!--` offset. */
+  readonly start: number
+  readonly rawHash: string
+  /** The data to write: the block's `@data`, its status changed only by "Mark resolved". */
+  readonly data: CommentData
+}
+
+/**
+ * Plan the rebuild of one damaged block (OD-05, "Rebuild from data…"): its
+ * comment node is replaced by the block serialized from `data` in the
+ * block's own layout – as an edit of an `ok` block is – so only the comment
+ * node changes. Only a damaged block whose bytes still match is rebuilt; the
+ * caller decides it may be (valid `@data`, readable lines or id out of step).
+ */
+export function planRebuild(doc: SpliceDocument, request: RebuildRequest, check?: GrowthCheck, note?: BlockNote): PlanResult {
+  if (!doc.state.writable) return fail('read-only')
+  const block = findBlock(doc.state, { start: request.start })
+  if (!block) return fail('not-found')
+  if (block.kind !== 'damaged') return fail('not-editable')
+  if (block.rawHash !== request.rawHash) return fail('stale')
+  const serialized = serializeBlock(request.data, blockLayout(doc.text, block), noteLinesOf(request.data, note, doc))
+  if (!serialized.ok) return fail(serialized.reason)
+  const refused = check?.(doc.text, block.nodeRange, serialized.block)
+  if (refused) return fail(refused)
+  const [start, end] = block.nodeRange
+  return { ok: true, plan: { op: 'replace', start, end, insert: serialized.block, data: request.data } }
+}
+
 /**
  * Plan the removal of one block: an `ok` block, or a damaged one whose bytes
  * still match (§7.6 step 6, "Delete block"). The range is the block's

@@ -13,8 +13,10 @@
  * 2. the request is a GET of an `.html`/`.htm` file;
  * 3. it is a document load: no `user-agent` header (the request class, R3-1)
  *    AND the ledger note says page (`mainFrame`) or frame (`subFrame`);
- * 4. comments are expected: comment mode is on for the view, or the bytes
- *    contain `erfana:comment`;
+ * 4. (spec 024 OD-01) no longer "comments are expected": while the feature is
+ *    on every page is instrumented, so a right-click outside comment mode can
+ *    comment on a page with no comments yet. Comment mode is still tracked
+ *    for the view (`setCommentMode`);
  * 5. the file is at most `COMMENT_FILE_MAX_BYTES` (25 MB, every page the
  *    preview serves), has at most `COMMENT_MAX_TOKENS_PER_DOCUMENT` start
  *    tags (counted before the parse), decodes losslessly as UTF-8, and does
@@ -35,7 +37,6 @@
  * handed back, and when the worker died holding it (a timeout, a crash)
  * `bodyFor` answers `undefined` – the handler reads the file again.
  */
-import { BLOCK_MARKER } from '../../../../shared/htmlComments'
 import { createDropReporter, type DropReporter } from '../../../../shared/dropReporter'
 import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
 import { stablePathDigest } from '../../../../shared/stablePathDigest'
@@ -101,8 +102,7 @@ export function decideCommentServing(
 ): CommentServeDecision {
   if (!state.enabled || request.method !== 'GET') return RAW
   if (!COMMENTABLE_EXTENSIONS.has(request.ext) || request.requestClass !== 'navigation') return RAW
-  const expected = state.commentMode || request.body.includes(BLOCK_MARKER)
-  if (!expected) return RAW
+  // OD-01: no "comments expected" gate – a page with no comments is commentable from its menu too.
   if (request.noteType === undefined) return { action: 'raw', reason: 'request-unknown' }
   const scope = scopeOf(request.noteType)
   // An `<object>`/`<embed>` document: header-less, but never a commentable frame.

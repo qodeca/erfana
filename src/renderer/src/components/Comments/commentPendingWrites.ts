@@ -94,7 +94,7 @@ let unlisten: (() => void) | null = null
  */
 export function writeKeyOf(request: CommentSaveRequest): string {
   if (request.op === 'add') return request.draftToken
-  if (request.op === 'deleteBlock') return request.blockKey
+  if (request.op === 'deleteBlock' || request.op === 'rebuildBlock') return request.blockKey
   return request.threadKey
 }
 

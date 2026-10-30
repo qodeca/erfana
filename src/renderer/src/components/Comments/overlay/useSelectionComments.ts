@@ -85,6 +85,12 @@ export interface SelectionComments {
   /** The current selection (menu, keyboard, button click). */
   readonly read: () => SelectionPick | null
   readonly hideButton: () => void
+  /**
+   * Draw the Comment button over the current selection now (C-16: turning
+   * comment mode on with words selected shows it); `false` when no selection
+   * in a commentable target is in view, so it is ignored.
+   */
+  readonly showButton: () => boolean
 }
 
 /**
@@ -101,20 +107,25 @@ export function useSelectionComments(options: SelectionCommentsOptions): Selecti
   const read = useCallback(() => readSelection(latest.current.adapter, latest.current.scroller), [latest])
   const hideButton = useCallback(() => setButton(null), [])
 
+  // The button over the selection's last line, when the selection can take a comment (and, asked for, is in view).
+  const place = useCallback((inViewOnly = false): boolean => {
+    const pick = readSelection(latest.current.adapter, latest.current.scroller)
+    const area = latest.current.area?.getBoundingClientRect()
+    const outOfView =
+      inViewOnly && pick?.rect != null && area !== undefined && (pick.rect.bottom <= area.top || pick.rect.top >= area.bottom)
+    if (pick === null || pick.refused !== null || latest.current.blocked !== null || pick.rect === null || area === undefined || outOfView) {
+      setButton(null)
+      return false
+    }
+    const top = pick.rect.top - area.top
+    const below = top < FLIP_BELOW_PX
+    setButton({ x: Math.max(0, pick.rect.right - area.left), y: below ? pick.rect.bottom - area.top : top, below })
+    return true
+  }, [latest])
+
   useEffect(() => {
     if (!live || scroller === null) return undefined
     let timer: ReturnType<typeof setTimeout> | undefined
-    const place = (): void => {
-      const pick = readSelection(latest.current.adapter, scroller)
-      const area = latest.current.area?.getBoundingClientRect()
-      if (pick === null || pick.refused !== null || latest.current.blocked !== null || pick.rect === null || area === undefined) {
-        setButton(null)
-        return
-      }
-      const top = pick.rect.top - area.top
-      const below = top < FLIP_BELOW_PX
-      setButton({ x: Math.max(0, pick.rect.right - area.left), y: below ? pick.rect.bottom - area.top : top, below })
-    }
     const onUp = (event: MouseEvent): void => {
       if (event.button !== 0) return
       clearTimeout(timer)
@@ -139,9 +150,10 @@ export function useSelectionComments(options: SelectionCommentsOptions): Selecti
       scroller.removeEventListener('keydown', onKey)
       document.removeEventListener('selectionchange', onSelectionChange)
     }
-  }, [live, scroller, latest])
+  }, [live, scroller, place])
 
-  return { button: live ? button : null, read, hideButton }
+  const showButton = useCallback(() => place(true), [place])
+  return { button: live ? button : null, read, hideButton, showButton }
 }
 
 /**
