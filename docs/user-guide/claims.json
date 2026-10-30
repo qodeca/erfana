@@ -32,6 +32,9 @@
     "docs/user-guide/how-erfana-works-with-agents.md": {
       "diataxis": "explanation"
     },
+    "docs/user-guide/how-to/comment-on-a-preview.md": {
+      "diataxis": "how-to"
+    },
     "docs/user-guide/how-to/edit-and-preview-markdown.md": {
       "diataxis": "how-to"
     },
@@ -17989,10 +17992,11 @@
       "audience": "developer",
       "doc": "docs/html-preview/README.md",
       "quote": "filtered by **Open**, **Resolved** and **Needs attention**",
-      "status": "verified",
+      "status": "removed",
       "evidence": "source",
       "source": "src/renderer/src/components/Comments/CommentDrawer.tsx:71",
-      "match": "{ key: 'attention', label: 'Needs attention', empty: DRAWER_COPY.emptyAttention }"
+      "match": "{ key: 'attention', label: 'Needs attention', empty: DRAWER_COPY.emptyAttention }",
+      "note": "Spec 024 OD-04 regrouped the drawer: Open, Resolved, Can't edit. Replaced by docs-html-preview-README/s024-01."
     },
     {
       "id": "docs-html-preview-README/30",
@@ -30371,12 +30375,12 @@
       "id": "user-guide-feature-inventory/222",
       "audience": "user",
       "doc": "docs/user-guide/feature-inventory.md",
-      "quote": "| all | M/services/preview/comments/, HtmlPreviewPanel/comments/ |",
+      "quote": "| all | M/services/comments/, M/services/preview/comments/, R/components/Comments/, HtmlPreviewPanel/comments/ |",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/CommentWriter.ts:4",
-      "match": "CommentWriter",
-      "note": "Source column also cited docs/html-preview/README.md, a Markdown doc; removed."
+      "source": "src/main/services/comments/CommentWriter.ts:252",
+      "match": "export class CommentWriter",
+      "note": "Spec 024 moved the shared write path to src/main/services/comments/ and the shared UI to components/Comments/; the Source column follows."
     },
     {
       "id": "user-guide-feature-inventory/223",
@@ -35589,10 +35593,11 @@
       "audience": "user",
       "doc": "docs/user-guide/reference/html-preview.md",
       "quote": "lists every comment as Open, Resolved or Needs attention",
-      "status": "verified",
+      "status": "removed",
       "evidence": "source",
       "source": "src/renderer/src/components/Comments/CommentDrawer.tsx:71",
-      "match": "label: 'Needs attention'"
+      "match": "label: 'Needs attention'",
+      "note": "Spec 024 OD-04 regrouped the drawer: Open, Resolved, Can't edit. Replaced by user-guide-reference-html-preview/s024-01."
     },
     {
       "id": "user-guide-reference-html-preview/35",
@@ -39586,11 +39591,12 @@
       "id": "user-guide-reference-settings/41",
       "audience": "user",
       "doc": "docs/user-guide/reference/settings.md",
-      "quote": "the two fields below keep their values but cannot be edited",
-      "status": "verified",
+      "quote": "With both switches off, this field and the next keep their values but cannot be edited.",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/sections/CommentsSection.tsx:160",
-      "match": "disabled={!enabled}"
+      "source": "src/renderer/src/components/Settings/sections/CommentsSection.tsx:191",
+      "match": "disabled={!identityUsable}",
+      "note": "Spec 024: the name and email take input while either preview's switch is on; the row moved from the HTML switch to Your name."
     },
     {
       "id": "user-guide-reference-settings/42",
@@ -39657,11 +39663,12 @@
       "id": "user-guide-reference-settings/48",
       "audience": "user",
       "doc": "docs/user-guide/reference/settings.md",
-      "quote": "in the page source and in git history once pushed",
-      "status": "verified",
+      "quote": "in its source and in git history once pushed",
+      "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:366",
-      "match": "in the page source and in git history once pushed."
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:371",
+      "match": "in its source and in git history once pushed.",
+      "note": "Spec 024 C-04: the Settings notice says \"its source\" for both previews, not \"the page source\"."
     },
     {
       "id": "user-guide-reference-settings/49",
@@ -50089,10 +50096,11 @@
       "audience": "developer",
       "doc": "docs/html-preview/README.md",
       "quote": "An editor tab in another Erfana window is not seen by the unsaved-changes guard.",
-      "status": "verified",
+      "status": "removed",
       "evidence": "source",
       "source": "src/main/services/preview/comments/commentUnsavedSources.ts:23",
-      "match": "Per window, as the design scopes it: a dirty tab in another window is not"
+      "match": "Per window, as the design scopes it: a dirty tab in another window is not",
+      "note": "Spec 024 C6: the unsaved-changes guard now asks every window. Replaced by docs-html-preview-README/s024-02."
     },
     {
       "id": "docs-html-preview-README/t70",
@@ -54709,6 +54717,396 @@
       "evidence": "source",
       "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:844",
       "match": "'Capture window screenshot'"
+    },
+    {
+      "id": "user-guide-how-to-comment-on-a-preview/01",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/comment-on-a-preview.md",
+      "quote": "Check **Comments in HTML preview** or **Comments in Markdown preview**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:363",
+      "match": "markdownFlagLabel: 'Comments in Markdown preview',"
+    },
+    {
+      "id": "user-guide-how-to-comment-on-a-preview/02",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/comment-on-a-preview.md",
+      "quote": "such as **Comment on paragraph**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:276",
+      "match": "commentOn: (noun: string): string => `Comment on ${noun}`,"
+    },
+    {
+      "id": "user-guide-how-to-comment-on-a-preview/03",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/comment-on-a-preview.md",
+      "quote": "Select **Comment** next to the selection",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:315",
+      "match": "button: 'Comment',"
+    },
+    {
+      "id": "user-guide-how-to-comment-on-a-preview/04",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/comment-on-a-preview.md",
+      "quote": "choose **Comment on selection**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:312",
+      "match": "commentOnSelection: 'Comment on selection',"
+    },
+    {
+      "id": "user-guide-how-to-comment-on-a-preview/05",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/comment-on-a-preview.md",
+      "quote": "select them in **Narrow to words**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:316",
+      "match": "narrow: 'Narrow to words',"
+    },
+    {
+      "id": "user-guide-how-to-comment-on-a-preview/06",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/comment-on-a-preview.md",
+      "quote": "Select **Open**, **Resolved** or **Can't edit**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:348",
+      "match": "filterCantEdit: \"Can't edit\","
+    },
+    {
+      "id": "user-guide-how-to-comment-on-a-preview/07",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/comment-on-a-preview.md",
+      "quote": "choose **File order**, **Changed first** or **Latest activity**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:355",
+      "match": "sortOrder: { file: 'File order', changed: 'Changed first', latest: 'Latest activity' }"
+    },
+    {
+      "id": "user-guide-how-to-comment-on-a-preview/08",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/comment-on-a-preview.md",
+      "quote": "clear **Show comment icons and underlines**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:353",
+      "match": "showIcons: 'Show comment icons and underlines',"
+    },
+    {
+      "id": "user-guide-how-to-comment-on-a-preview/09",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/comment-on-a-preview.md",
+      "quote": "select **Previous comment** or **Next comment**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:47",
+      "match": "next: 'Next comment',"
+    },
+    {
+      "id": "user-guide-how-to-comment-on-a-preview/10",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/comment-on-a-preview.md",
+      "quote": "<kbd>⌥F9</kbd> / <kbd>Alt+F9</kbd> for the next one",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Comments/CommentStepper.tsx:41",
+      "match": "return event.shiftKey ? 'previous' : 'next'"
+    },
+    {
+      "id": "user-guide-how-to-comment-on-a-preview/11",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/comment-on-a-preview.md",
+      "quote": "**Resolve and next** resolves the comment and moves on",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:51",
+      "match": "resolveAndNext: 'Resolve and next',"
+    },
+    {
+      "id": "user-guide-how-to-comment-on-a-preview/12",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/comment-on-a-preview.md",
+      "quote": "**Reply and resolve** sends your reply",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:52",
+      "match": "replyAndResolve: 'Reply and resolve',"
+    },
+    {
+      "id": "user-guide-how-to-comment-on-a-preview/13",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/comment-on-a-preview.md",
+      "quote": "Select **Rebuild from data…**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:91",
+      "match": "rebuildAction: 'Rebuild from data…',"
+    },
+    {
+      "id": "user-guide-how-to-comment-on-a-preview/14",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/comment-on-a-preview.md",
+      "quote": "**The file says** and **The data says**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:94",
+      "match": "dataSays: 'The data says',"
+    },
+    {
+      "id": "user-guide-how-to-comment-on-a-preview/15",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/comment-on-a-preview.md",
+      "quote": "Select **Rebuild comment**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:95",
+      "match": "rebuild: 'Rebuild comment',"
+    },
+    {
+      "id": "user-guide-how-to-comment-on-a-preview/16",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/comment-on-a-preview.md",
+      "quote": "choose **Mark resolved** or **Keep open** instead",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:97",
+      "match": "keepOpen: 'Keep open'"
+    },
+    {
+      "id": "user-guide-how-to-comment-on-a-preview/17",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/comment-on-a-preview.md",
+      "quote": "or **Go to editor**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:289",
+      "match": "goToEditor: 'Go to editor',"
+    },
+    {
+      "id": "user-guide-how-to-comment-on-a-preview/18",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/comment-on-a-preview.md",
+      "quote": "A Markdown file over 2 MB",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/shared/markdownComments/markdownLimits.ts:25",
+      "match": "export const MARKDOWN_COMMENT_MAX_BYTES = 2 * 1024 * 1024"
+    },
+    {
+      "id": "user-guide-reference-markdown-preview/s024-01",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/markdown-preview.md",
+      "quote": "Erfana tries up to 4 places for a comment",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/shared/markdownComments/markdownLimits.ts:45",
+      "match": "export const MARKDOWN_COMMENT_MAX_SLOTS = 4"
+    },
+    {
+      "id": "user-guide-reference-markdown-preview/s024-02",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/markdown-preview.md",
+      "quote": "A file over 2 MB or 100,000 lines",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/shared/markdownComments/markdownLimits.ts:27",
+      "match": "export const MARKDOWN_COMMENT_MAX_LINES = 100_000"
+    },
+    {
+      "id": "user-guide-reference-markdown-preview/s024-03",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/markdown-preview.md",
+      "quote": "more than 32 levels deep",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/shared/markdownComments/markdownLimits.ts:29",
+      "match": "export const MARKDOWN_COMMENT_MAX_NESTING = 32"
+    },
+    {
+      "id": "user-guide-reference-markdown-preview/s024-04",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/markdown-preview.md",
+      "quote": "<kbd>F6</kbd> moves between the window and the preview",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Comments/CommentWindowShell.tsx:138",
+      "match": "if (event.key !== 'F6'"
+    },
+    {
+      "id": "user-guide-reference-markdown-preview/s024-05",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/markdown-preview.md",
+      "quote": "A part between a tool's START and END markers can't take a comment",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:176",
+      "match": "generated: 'This part is generated by a tool. Comment on the text before or after it.',"
+    },
+    {
+      "id": "user-guide-reference-html-preview/s024-01",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/html-preview.md",
+      "quote": "lists every comment as **Open**, **Resolved** or **Can't edit**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:348",
+      "match": "filterCantEdit: \"Can't edit\","
+    },
+    {
+      "id": "user-guide-reference-settings/s024-01",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/settings.md",
+      "quote": "| **Comments in Markdown preview** | On |",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/shared/ipc/global-settings-schema.ts:106",
+      "match": "return settings.markdownPreview?.comments?.enabled !== false"
+    },
+    {
+      "id": "user-guide-reference-keyboard-shortcuts/s024-01",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/keyboard-shortcuts.md",
+      "quote": "<kbd>⌥F9</kbd> / <kbd>Alt+F9</kbd> moves to the next open comment",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Comments/CommentStepper.tsx:41",
+      "match": "return event.shiftKey ? 'previous' : 'next'"
+    },
+    {
+      "id": "docs-html-preview-README/s024-01",
+      "audience": "developer",
+      "doc": "docs/html-preview/README.md",
+      "quote": "filtered by **Open**, **Resolved** and **Can't edit**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:348",
+      "match": "filterCantEdit: \"Can't edit\","
+    },
+    {
+      "id": "docs-html-preview-README/s024-02",
+      "audience": "developer",
+      "doc": "docs/html-preview/README.md",
+      "quote": "the unsaved-changes guard sees editor tabs in every Erfana window",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/comments/commentUnsavedSources.ts:42",
+      "match": "export const UNSAVED_LOOKUP_MAX_WAIT_MS = 250"
+    },
+    {
+      "id": "docs-security/s024-01",
+      "audience": "developer",
+      "doc": "docs/security.md",
+      "quote": "within 4 DIP of the reported point",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/preview/comments/commentContextGate.ts:24",
+      "match": "export const CONTEXT_CURSOR_SLACK_DIP = 4"
+    },
+    {
+      "id": "docs-security/s024-02",
+      "audience": "developer",
+      "doc": "docs/security.md",
+      "quote": "(at most 20, `COMMENT_PICK_STACK_MAX`)",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/shared/ipc/preview-comment-page-schema.ts:33",
+      "match": "export const COMMENT_PICK_STACK_MAX = 20"
+    },
+    {
+      "id": "docs-security/s024-03",
+      "audience": "developer",
+      "doc": "docs/security.md",
+      "quote": "at most 64 panels per window",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/comments/fileCommentPanels.ts:25",
+      "match": "export const FILE_COMMENT_PANELS_PER_WINDOW_MAX = 64"
+    },
+    {
+      "id": "docs-security/s024-04",
+      "audience": "developer",
+      "doc": "docs/security.md",
+      "quote": "at most 64 watched files for the whole process",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/comments/fileCommentWatches.ts:21",
+      "match": "export const FILE_COMMENT_WATCHES_MAX = 64"
+    },
+    {
+      "id": "docs-security/s024-05",
+      "audience": "developer",
+      "doc": "docs/security.md",
+      "quote": "waits at most 250 ms (`UNSAVED_LOOKUP_MAX_WAIT_MS`)",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/comments/commentUnsavedSources.ts:42",
+      "match": "export const UNSAVED_LOOKUP_MAX_WAIT_MS = 250"
+    },
+    {
+      "id": "docs-security/s024-06",
+      "audience": "developer",
+      "doc": "docs/security.md",
+      "quote": "| File size | 2 MiB (UTF-8 bytes) |",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/shared/markdownComments/markdownLimits.ts:25",
+      "match": "export const MARKDOWN_COMMENT_MAX_BYTES = 2 * 1024 * 1024"
+    },
+    {
+      "id": "docs-security/s024-07",
+      "audience": "developer",
+      "doc": "docs/security.md",
+      "quote": "| 5,000 | `MARKDOWN_COMMENT_MAX_HTML_NODES` |",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/shared/markdownComments/markdownLimits.ts:41",
+      "match": "export const MARKDOWN_COMMENT_MAX_HTML_NODES = 5_000"
+    },
+    {
+      "id": "docs-security/s024-08",
+      "audience": "developer",
+      "doc": "docs/security.md",
+      "quote": "| 256 | `MARKDOWN_COMMENT_MAX_HTML_NESTING` |",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/shared/markdownComments/markdownLimits.ts:31",
+      "match": "export const MARKDOWN_COMMENT_MAX_HTML_NESTING = 256"
+    },
+    {
+      "id": "docs-security/s024-09",
+      "audience": "developer",
+      "doc": "docs/security.md",
+      "quote": "| 64 | `MARKDOWN_COMMENT_MAX_EMPHASIS_NESTING` |",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/shared/markdownComments/markdownLimits.ts:43",
+      "match": "export const MARKDOWN_COMMENT_MAX_EMPHASIS_NESTING = 64"
+    },
+    {
+      "id": "docs-security/s024-10",
+      "audience": "developer",
+      "doc": "docs/security.md",
+      "quote": "| 100,000 characters | `MARKDOWN_SELECTION_SEARCH_MAX_CHARS` |",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/shared/markdownComments/markdownLimits.ts:47",
+      "match": "export const MARKDOWN_SELECTION_SEARCH_MAX_CHARS = 100_000"
+    },
+    {
+      "id": "docs-security/s024-11",
+      "audience": "developer",
+      "doc": "docs/security.md",
+      "quote": "mints a fresh draft every 4 minutes",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Comments/overlay/hostWindow.ts:39",
+      "match": "export const DRAFT_REFRESH_MS = 4 * 60 * 1000"
     }
   ],
   "reviewed": {

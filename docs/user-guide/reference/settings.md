@@ -89,15 +89,16 @@ Remote-host approvals belong to each project. An approved host is saved to `.erf
 
 ## Comments
 
-**What it does:** Turns [comments in HTML preview](html-preview.md#comments) on or off and sets the name and email saved with each comment you write. **How to reach it:** **Settings > Comments**, right below HTML preview.
+**What it does:** Turns [comments in HTML preview](html-preview.md#comments) on or off, does the same for [comments in Markdown preview](markdown-preview.md#comments), and sets the name and email saved with each comment you write in either preview. **How to reach it:** **Settings > Comments**, right below HTML preview.
 
 | Option | Default | Effect |
 | --- | --- | --- |
-| **Comments in HTML preview** | On | Lets you add comments to elements of a previewed page. When off, previews have no comment mode and no pins; comments already in your files are left alone, and the two fields below keep their values but cannot be edited. |
-| **Your name** | Empty | Saved into HTML files next to each comment you write; changing it affects new comments only. Leave it empty and Erfana asks for a name the next time you comment. |
+| **Comments in HTML preview** | On | Lets you add comments to elements of a previewed page. When off, previews have no comment mode and no pins; comments already in your files are left alone. |
+| **Comments in Markdown preview** | On | Lets you comment on paragraphs, list items and selected text in the Markdown **Preview Only** view. When off, the Markdown preview has no comment mode, icons or comment count; comments already in your files are left alone. |
+| **Your name** | Empty | Saved into the file next to each comment you write, in either preview; changing it affects new comments only. Leave it empty and Erfana asks for a name the next time you comment. With both switches off, this field and the next keep their values but cannot be edited. |
 | **Your email (optional)** | Empty | Also saved into the file. Leave it empty to keep it out. |
 
-Each field is saved when you leave it. Both are stored in Erfana's own settings (`~/.erfana/settings.json`), never in the project, and both are visible to anyone who can open the file – in the page source and in git history once pushed.
+Each field is saved when you leave it. Both are stored in Erfana's own settings (`~/.erfana/settings.json`), never in the project, and both are visible to anyone who can open the file – in its source and in git history once pushed.
 
 ## Terminal
 

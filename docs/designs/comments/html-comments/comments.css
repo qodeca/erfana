@@ -5,7 +5,7 @@
  * drawer, the identity step and the Settings section.
  *
  * ADOPTED – shipped in v0.23.1. The rules live in
- * src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentWindow.css
+ * src/renderer/src/components/Comments/CommentWindow.css
  * and CommentDrawer.css; the toolbar rules in PreviewNavControls.css (synced to
  * the Permission band card as nav.css), and the Settings rules in
  * SettingsOverlay.css. This file is an ILLUSTRATIVE MIRROR of those rules so the

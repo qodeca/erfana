@@ -30,3 +30,4 @@ If you close a tab with unsaved changes, Erfana asks first. Select **Close Witho
 
 - [Editor reference](../reference/editor.md)
 - [Markdown preview reference](../reference/markdown-preview.md)
+- [Comment on a preview](comment-on-a-preview.md) – comments in the **Preview Only** view

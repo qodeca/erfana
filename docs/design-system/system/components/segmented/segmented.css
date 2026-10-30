@@ -5,9 +5,9 @@
  *
  * PROPOSED – not adopted. The first shipping instance is the comment drawer's
  * "Show" filter:
- *   src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentDrawer.css
+ *   src/renderer/src/components/Comments/CommentDrawer.css
  *   (.erf-comment-filter, .erf-comment-filter__option, .erf-comment-filter__count)
- *   src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentWindow.css
+ *   src/renderer/src/components/Comments/CommentWindow.css
  *   (its forced-colours edge)
  * Adopting is a MOVE: that rule set becomes this file, and
  * scripts/design-sync.mjs syncs it back here. Classes are prefixed erf-.

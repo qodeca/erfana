@@ -6,6 +6,7 @@
 > Inputs: owner interview (grill-me, depth full, 35 locked decisions), an online survey of 20+ commenting tools, and four specialist designs (architecture, UX, security, test strategy). Conflicts between those designs are resolved in §3.
 > Revision 2 (2026-10-25): folds in three plan reviews – correctness against the code, coverage of the decisions, and risk/sequencing. Their blockers are fixed in place; §18 lists what changed.
 > Revision 3 (2026-10-26): folds in the P0 spike results ([docs/spikes/html-preview-comments.md](../../spikes/html-preview-comments.md)). **§19 is authoritative where it conflicts with earlier sections.**
+> **Paths moved (spec 024, 2026-10-30):** the module paths below are as shipped in v0.23.1. Spec 024 moved the parts both previews share: the parse5-free format core from `src/shared/htmlComments/` to `src/shared/comments/`, the write path, lock, key store and parse worker from `src/main/services/preview/comments/` to `src/main/services/comments/`, and the comment window, drawer, toolbar tools and copy from `src/renderer/src/components/Panels/HtmlPreviewPanel/comments/` to `src/renderer/src/components/Comments/`. The module map is [spec 024 architecture note 001](../../../specs/spec-t3-024-unified-comments/architecture/001-shared-comment-base.md) § 1.
 
 ## 1. Summary
 
