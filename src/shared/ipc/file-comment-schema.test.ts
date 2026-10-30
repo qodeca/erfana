@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest'
 import { SEL_CONTEXT_MAX_CHARS, SEL_EXACT_MAX_CHARS } from '../comments/anchorSel'
 import { ANCHOR_ID_MAX_CHARS, ANCHOR_PATH_MAX_CHARS, TAG_MAX_CHARS } from '../comments/format'
 import { ErrorCode } from '../errors'
+import { MARKDOWN_COMMENT_MAX_BYTES } from '../markdownComments/markdownLimits'
 import { PREVIEW_LIMITS } from '../preview-limits'
 import { COMMENT_PATH_MAX_CHARS, CommentSaveResultSchema } from './comment-common-schema'
 import {
@@ -37,8 +38,10 @@ describe('024-AC-028 item 5: every new field has a named cap', () => {
     expect(ok(FileCommentOpenDraftRequestSchema, { panelId: 'p', filePath: '' })).toBe(false)
   })
 
-  it('bufferText: the comment file limit, in characters and in UTF-8 bytes', () => {
-    expect(FILE_COMMENT_BUFFER_MAX_CHARS).toBe(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES)
+  it('bufferText: the Markdown file limit (2 MB), in characters and in UTF-8 bytes – not the 25 MB comment file limit', () => {
+    // Security audit of 8a4e442e, L2: no kind of this family parses more, so no more is accepted.
+    expect(FILE_COMMENT_BUFFER_MAX_CHARS).toBe(MARKDOWN_COMMENT_MAX_BYTES)
+    expect(FILE_COMMENT_BUFFER_MAX_CHARS).toBeLessThan(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES)
     const request = (bufferText: string) => ({ panelId: 'p', filePath: '/a.md', bufferText })
     expect(ok(FileCommentListRequestSchema, request('a'.repeat(FILE_COMMENT_BUFFER_MAX_CHARS)))).toBe(true)
     expect(ok(FileCommentListRequestSchema, request('a'.repeat(FILE_COMMENT_BUFFER_MAX_CHARS + 1)))).toBe(false)

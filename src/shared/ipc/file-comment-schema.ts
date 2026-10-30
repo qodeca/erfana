@@ -21,6 +21,7 @@ import { z } from 'zod'
 import { codePointLength, ANCHOR_ID_MAX_CHARS, ANCHOR_PATH_MAX_CHARS } from '../comments/format'
 import { SEL_CONTEXT_MAX_CHARS, SEL_EXACT_MAX_CHARS } from '../comments/anchorSel'
 import { utf8Length } from '../comments/encoding'
+import { MARKDOWN_COMMENT_MAX_BYTES } from '../markdownComments/markdownLimits'
 import { PREVIEW_LIMITS } from '../preview-limits'
 import {
   COMMENT_PATH_MAX_CHARS,
@@ -39,8 +40,14 @@ import {
 import { COMMENT_DRAFT_TOKEN_PATTERN } from './preview-comment-schema'
 import { PanelIdSchema } from './preview-schema'
 
-/** Characters of the editor's unsaved text sent for display: the comment file limit (C18). */
-export const FILE_COMMENT_BUFFER_MAX_CHARS = PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES
+/**
+ * Characters (and UTF-8 bytes) of the editor's unsaved text sent for display:
+ * the largest file any kind of this family parses – Markdown's limit (C18),
+ * not the 25 MB comment file limit, so a renderer cannot make main encode
+ * and hand the worker text no kind would parse. A kind added to the family
+ * with a larger limit raises this (shared code cannot read main's registry).
+ */
+export const FILE_COMMENT_BUFFER_MAX_CHARS = MARKDOWN_COMMENT_MAX_BYTES
 /** Highest 1-based source line a pick may name. */
 export const FILE_COMMENT_LINE_MAX = 10_000_000
 /** Highest ordinal a pick may name: which target with its tag on its first line. */

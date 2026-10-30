@@ -10,9 +10,10 @@
  * and every block written carries that kind's agent note and hints.
  *
  * Every save, whatever the operation:
- *  1. confines the file (`commentFileAccess`, §7.6 step 1) and takes the lock
- *     for its real path and its dev/ino (`commentFileLock`), so two saves on
- *     one file run one after the other;
+ *  1. confines the file (`commentFileAccess`, §7.6 step 1) – refusing as
+ *     `changed` when it no longer resolves to the caller's `expectedRealPath`
+ *     – and takes the lock for its real path and its dev/ino
+ *     (`commentFileLock`), so two saves on one file run one after the other;
  *  2. refuses when an editor holds unsaved changes for the file (decision 13),
  *     and reads the author from Erfana's own settings when the operation
  *     writes one – a request never carries an author (§7.5 step 2);
@@ -312,6 +313,9 @@ export class CommentWriter {
     const confined = await this.confine(job)
     if (!confined.ok) return this.refuse(job, job.file.filePath, confined)
     const { realPath } = confined
+    // The path must still name the file the caller confined it to: a swapped folder redirects nothing
+    const { expectedRealPath } = job.file
+    if (expectedRealPath !== undefined && realPath !== expectedRealPath) return this.refuse(job, expectedRealPath, refused('changed'))
     const kind = this.kinds.kindOfName(basename(realPath))
     // Confinement already refused a name no kind claims; this keeps the type honest.
     if (kind === undefined) return this.refuse(job, realPath, refused('not-html'))

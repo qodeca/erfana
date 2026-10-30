@@ -8,7 +8,8 @@
  * The Markdown pipeline is not linear in every input. Measured on the repo's
  * pipeline (Windows 11, 2026-10-30): nested list items 1,000 deep take 52 s,
  * block quotes 5,000 deep, raw `<div>`s 2,000 deep and emphasis 3,000 deep
- * overflow the stack. So a file past any limit below is read-only "too
+ * overflow the stack, and 10,000 raw-HTML tags inline in one paragraph take
+ * seconds (see {@link MARKDOWN_COMMENT_MAX_HTML_NODES}). So a file past any limit below is read-only "too
  * large", decided by one linear scan of the text – the parser is never
  * called on it. Real files stay far inside: the limits are about ten times
  * what a long hand-written document uses (the corpus run of 024-NFR-003 will
@@ -28,7 +29,17 @@ export const MARKDOWN_COMMENT_MAX_LINES = 100_000
 export const MARKDOWN_COMMENT_MAX_NESTING = 32
 /** Deepest raw-HTML element nesting, counted over the whole file. */
 export const MARKDOWN_COMMENT_MAX_HTML_NESTING = 256
-/** Most emphasis delimiter runs left open at once in one paragraph. */
+/**
+ * Most raw-HTML constructs in a file: start, end, void and self-closing tags,
+ * and `<!`/`<?` openers (comments, declarations, CDATA, processing
+ * instructions). The parse is superlinear in them – 10,000 tags inline in
+ * one paragraph took 1.3 s to index and up to 5.8 s for a full add (Windows
+ * 11, 2026-10-30), too close to the parse worker's 10 s budget on a slower
+ * box; at 5,000 the worst shape measured indexed in 0.5 s and added in
+ * about 2 s. A hand-written document uses a few hundred.
+ */
+export const MARKDOWN_COMMENT_MAX_HTML_NODES = 5_000
+/** Most emphasis delimiters (`*`, `_`) left open at once in one paragraph. */
 export const MARKDOWN_COMMENT_MAX_EMPHASIS_NESTING = 64
 /** Slots one save tries at most (design § 4.5). */
 export const MARKDOWN_COMMENT_MAX_SLOTS = 4
@@ -41,38 +52,62 @@ const VOID_TAGS = new Set([
 ])
 
 const LIST_MARKER = /^(?:[-*+]|\d{1,9}[.)])(?=[ \t]|$)/
-const TAG = /<(\/?)([A-Za-z][A-Za-z0-9-]*)[^<>]*?(\/?)>/g
+/** {@link LIST_MARKER} at `lastIndex`, so a line is never sliced per marker. */
+const LIST_MARKER_AT = /(?:[-*+]|\d{1,9}[.)])(?=[ \t]|$)/y
+/**
+ * A raw-HTML construct's start: `<!` or `<?` (no groups), or a start or end
+ * tag's `<name`, ended by a blank, `/`, `>` or the end of the text – the rest
+ * of the tag may be on later lines. The negative lookahead stops the name
+ * from backtracking, so a long `<aaaa…` costs one pass.
+ */
+const HTML_OPEN = /<(?:[!?]|(\/?)([A-Za-z][A-Za-z0-9-]*)(?![A-Za-z0-9-])(?=[\s/>]|$))/g
 const FENCE = /^ {0,3}(`{3,}|~{3,})/
 
-/** Columns of leading blanks, tab stops of 4, and where the blanks end. */
-function leadingColumns(line: string): { readonly columns: number; readonly end: number } {
-  let columns = 0
-  let i = 0
-  for (; i < line.length; i += 1) {
-    if (line[i] === ' ') columns += 1
-    else if (line[i] === '\t') columns += 4 - (columns % 4)
-    else break
-  }
-  return { columns, end: i }
+/** The column of index `end` of `line`, tab stops of 4 counted from the line's start. */
+function columnAt(line: string, end: number): number {
+  let column = 0
+  for (let i = 0; i < end; i += 1) column += line[i] === '\t' ? 4 - (column % 4) : 1
+  return column
 }
 
-/** Block quote markers and list markers this line opens, read left to right. */
+/**
+ * Columns of the blanks from index `from` of `line`, and where they end. Tab
+ * stops are counted from the line's start, not from `from`: a tab after a
+ * `>` marker is as wide as it is on screen.
+ */
+function leadingColumns(line: string, from = 0): { readonly columns: number; readonly end: number } {
+  const start = columnAt(line, from)
+  let column = start
+  let i = from
+  for (; i < line.length; i += 1) {
+    if (line[i] === ' ') column += 1
+    else if (line[i] === '\t') column += 4 - (column % 4)
+    else break
+  }
+  return { columns: column - start, end: i }
+}
+
+/**
+ * Block quote markers and list markers this line opens, read left to right.
+ * Every one counts whatever the blanks between them: CommonMark nests a list
+ * item after up to four spaces and a quote after its optional space plus
+ * three, and over-counting is this module's policy.
+ */
 function markersOnLine(line: string): number {
-  let rest = line
   let count = 0
+  let i = 0
   for (;;) {
-    const lead = leadingColumns(rest)
-    if (lead.columns > 3 && count > 0) return count
-    const after = rest.slice(lead.end)
-    if (after.startsWith('>')) {
+    while (line[i] === ' ' || line[i] === '\t') i += 1
+    if (line[i] === '>') {
       count += 1
-      rest = after.slice(1)
+      i += 1
       continue
     }
-    const marker = LIST_MARKER.exec(after)
+    LIST_MARKER_AT.lastIndex = i
+    const marker = LIST_MARKER_AT.exec(line)
     if (marker === null) return count
     count += 1
-    rest = after.slice(marker[0].length)
+    i += marker[0].length
   }
 }
 
@@ -97,26 +132,74 @@ class ContainerDepth {
   }
 }
 
-/** Running raw-HTML element depth over the whole file: start tags minus end tags. */
-class HtmlDepth {
-  private depth = 0
-  max = 0
-
-  line(line: string): void {
-    if (!line.includes('<')) return
-    for (const match of line.matchAll(TAG)) {
-      const [, closing, name, selfClosing] = match
-      if (VOID_TAGS.has(name.toLowerCase()) || selfClosing === '/') continue
-      this.depth = closing === '/' ? Math.max(0, this.depth - 1) : this.depth + 1
-      this.max = Math.max(this.max, this.depth)
-    }
+/**
+ * Whether the tag whose name ends at `from` closes itself (`<x … />`): its
+ * end is the first `>` before the next `<`. No end counts as an open tag
+ * (over-counting). Each call stops at the next `<`, where the next tag
+ * starts, so the calls of one scan cover the text once.
+ */
+function selfCloses(text: string, from: number): boolean {
+  for (let i = from; i < text.length; i += 1) {
+    if (text[i] === '<') return false
+    if (text[i] === '>') return text[i - 1] === '/'
   }
+  return false
+}
+
+/** Raw HTML over the whole text: its deepest element nesting, and how many constructs it holds. */
+interface HtmlShape {
+  readonly depth: number
+  readonly nodes: number
+}
+
+/**
+ * Raw HTML over the whole text, in one scan: the depth is start tags minus
+ * end tags, the count every construct {@link HTML_OPEN} finds. A tag split
+ * over lines counts – `<div` then `>` on the next line is still a `<div>` to
+ * the parser.
+ */
+function htmlShape(text: string): HtmlShape {
+  let depth = 0
+  let max = 0
+  let nodes = 0
+  for (const match of text.matchAll(HTML_OPEN)) {
+    nodes += 1
+    const [whole, closing, name] = match
+    if (name === undefined) continue
+    if (closing === '/') {
+      depth = Math.max(0, depth - 1)
+      continue
+    }
+    if (VOID_TAGS.has(name.toLowerCase()) || selfCloses(text, match.index + whole.length)) continue
+    depth += 1
+    max = Math.max(max, depth)
+  }
+  return { depth: max, nodes }
 }
 
 const isEmphasis = (ch: string | undefined): boolean => ch === '*' || ch === '_'
 const isSpace = (ch: string | undefined): boolean => ch === undefined || /\s/.test(ch)
+/** CommonMark's punctuation: ASCII punctuation and Unicode P and S categories. */
+const isPunctuation = (ch: string | undefined): boolean => ch !== undefined && /[\p{P}\p{S}]/u.test(ch)
 
-/** Emphasis runs left open in one paragraph: a run before a word opens, a run after one closes. */
+/**
+ * What a delimiter run between `before` and `after` does, by CommonMark's
+ * flanking rules: +1 opens, -1 closes, 0 neither. A run flanking both ways
+ * between two punctuation marks (`(*(`) may open, so it counts as opening;
+ * one inside a word (`a*b`) pairs with its neighbour and counts as neither.
+ */
+function emphasisRole(before: string | undefined, after: string | undefined): 1 | -1 | 0 {
+  const left = !isSpace(after) && (!isPunctuation(after) || isSpace(before) || isPunctuation(before))
+  const right = !isSpace(before) && (!isPunctuation(before) || isSpace(after) || isPunctuation(after))
+  if (left && !right) return 1
+  if (right && !left) return -1
+  return left && isPunctuation(before) && isPunctuation(after) ? 1 : 0
+}
+
+/**
+ * Emphasis delimiters left open in one paragraph. Each delimiter of a run
+ * counts, not the run: `*`×6000 before a word nests about 3000 deep.
+ */
 class EmphasisDepth {
   private depth = 0
   max = 0
@@ -133,10 +216,8 @@ class EmphasisDepth {
       }
       let end = i
       while (isEmphasis(line[end])) end += 1
-      const opens = isSpace(line[i - 1]) && !isSpace(line[end])
-      const closes = !isSpace(line[i - 1]) && isSpace(line[end])
-      if (opens) this.depth += 1
-      else if (closes) this.depth = Math.max(0, this.depth - 1)
+      const role = emphasisRole(line[i - 1], line[end])
+      this.depth = Math.max(0, this.depth + role * (end - i))
       this.max = Math.max(this.max, this.depth)
       i = end
     }
@@ -166,11 +247,11 @@ class FenceTracker {
     const prefix = QUOTE_PREFIX.exec(line)![0]
     const quotes = prefix.split('>').length - 1
     const rest = line.slice(prefix.length)
-    const lead = leadingColumns(rest)
+    const lead = leadingColumns(line, prefix.length)
     const fence = FENCE.exec(rest)
     const open = this.open
     if (open !== undefined) {
-      const left = quotes < open.quotes || (lead.end < rest.length && lead.columns < open.columns)
+      const left = quotes < open.quotes || (lead.end < line.length && lead.columns < open.columns)
       if (!left) {
         const closes = fence !== null && fence[1][0] === open.marker[0] && fence[1].length >= open.marker.length
         if (closes && rest.slice(fence![0].length).trim() === '') this.open = undefined
@@ -185,7 +266,7 @@ class FenceTracker {
 }
 
 /** Why a Markdown file is past a limit, or `undefined` when it may be parsed. */
-export type MarkdownLimitBreach = 'bytes' | 'lines' | 'nesting' | 'html-nesting' | 'emphasis-nesting'
+export type MarkdownLimitBreach = 'bytes' | 'lines' | 'nesting' | 'html-nesting' | 'html-nodes' | 'emphasis-nesting'
 
 /**
  * Whether `text` may be parsed for comments: one linear pass, before any
@@ -197,17 +278,17 @@ export function markdownLimitBreach(text: string): MarkdownLimitBreach | undefin
   const lines = text.split(/\r\n|\r|\n/)
   if (lines.length > MARKDOWN_COMMENT_MAX_LINES) return 'lines'
   const containers = new ContainerDepth()
-  const html = new HtmlDepth()
   const emphasis = new EmphasisDepth()
   const fences = new FenceTracker()
   for (const line of lines) {
-    html.line(line)
     if (fences.line(line)) continue
     containers.line(line)
     emphasis.line(line)
   }
   if (containers.max > MARKDOWN_COMMENT_MAX_NESTING) return 'nesting'
-  if (html.max > MARKDOWN_COMMENT_MAX_HTML_NESTING) return 'html-nesting'
+  const html = htmlShape(text)
+  if (html.depth > MARKDOWN_COMMENT_MAX_HTML_NESTING) return 'html-nesting'
+  if (html.nodes > MARKDOWN_COMMENT_MAX_HTML_NODES) return 'html-nodes'
   if (emphasis.max > MARKDOWN_COMMENT_MAX_EMPHASIS_NESTING) return 'emphasis-nesting'
   return undefined
 }

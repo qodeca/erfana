@@ -97,6 +97,16 @@ export class FileCommentPanels {
     return found
   }
 
+  /** Forget one panel (its file's comments were turned off). @returns The panel forgotten, if it was recorded. */
+  forget(windowId: number, panelId: string): FileCommentPanel | undefined {
+    const panels = this.byWindow.get(windowId)
+    const panel = panels?.get(panelId)
+    if (panels === undefined || panel === undefined) return undefined
+    panels.delete(panelId)
+    panel.keys.clear()
+    return panel
+  }
+
   /** The window closed: forget its panels. @returns The panels forgotten. */
   forgetWindow(windowId: number): FileCommentPanel[] {
     const panels = [...(this.byWindow.get(windowId)?.values() ?? [])]

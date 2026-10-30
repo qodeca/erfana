@@ -371,16 +371,36 @@ class IndexBuilder {
     if (record) this.addTarget(block, 'image', record, start)
   }
 
-  /** START/END regions among the comment-only HTML blocks directly inside `container` (design § 4.4). */
+  /**
+   * START/END regions among the comment-only HTML blocks directly inside
+   * `container` (design § 4.4): each START pairs with the first END of its
+   * name after it. One pass – the STARTs still waiting are kept by name – so
+   * a file of many STARTs costs linear time, not a search per START.
+   */
   private pairRegions(container: MdBlock): void {
     const comments = container.children.filter(child => child.type === 'html').flatMap(child => child.comments)
+    const waiting = new Map<string, number[]>()
+    const ends: Array<number | undefined> = []
     comments.forEach((comment, i) => {
+      const endName = regionEndName(comment.data)
+      if (endName !== undefined) closeRegions(waiting, endName, comment.end, ends)
       const name = regionStartName(comment.data)
       if (name === undefined) return
-      const close = comments.slice(i + 1).find(next => regionEndName(next.data) === name)
-      if (close) this.regions.push({ start: comment.start, end: close.end })
+      const starts = waiting.get(name)
+      if (starts === undefined) waiting.set(name, [i])
+      else starts.push(i)
+    })
+    comments.forEach((comment, i) => {
+      const end = ends[i]
+      if (end !== undefined) this.regions.push({ start: comment.start, end })
     })
   }
+}
+
+/** An END named `name` at `end` closes every START of that name still waiting (`pairRegions`). */
+function closeRegions(waiting: Map<string, number[]>, name: string, end: number, ends: Array<number | undefined>): void {
+  for (const start of waiting.get(name) ?? []) ends[start] = end
+  waiting.delete(name)
 }
 
 /** Parse a decoded Markdown file (`bomLength` 1 when it starts with a BOM) for comments. */

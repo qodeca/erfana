@@ -52,6 +52,7 @@ import { isTrustedSender as defaultIsTrustedSender } from '../senderValidation'
 export interface FileCommentHostWindow {
   readonly id: number
   once(event: 'closed', listener: () => void): unknown
+  isDestroyed(): boolean
 }
 
 /** Injected collaborators. */
@@ -120,17 +121,25 @@ export function registerFileCommentHandlers(deps: FileCommentHandlerDeps): () =>
     })
   }
 
-  /** Steps 4–5: the caller and the confined path, or why not. */
+  /**
+   * Steps 4–5: the caller and the confined path, or why not. The window's
+   * close is watched BEFORE the confinement awaits, so a panel the service
+   * records for it is always forgotten; a window that closed, or a project
+   * that changed, while the path was confined is refused – the service would
+   * otherwise record a panel and a watch that no cleanup ever releases.
+   */
   async function callerOf(
     event: IpcMainInvokeEvent,
     filePath: string | undefined
   ): Promise<{ readonly caller: FileCommentCaller; readonly filePath?: string } | CommentReasonedRefusal> {
     const window = resolveWindow(event)
     const snapshot = session.current()
-    if (window === null) return refusal('not-open')
+    if (window === null || window.isDestroyed()) return refusal('not-open')
     if (snapshot === null) return refusal('outside-project')
     const caller: FileCommentCaller = { windowId: window.id, root: snapshot.root, realRoot: snapshot.realRoot }
     if (filePath === undefined) return { caller }
+    watchClose(window)
+    let requested: string
     try {
       const resolved = await resolveConfinedPath(
         filePath,
@@ -138,11 +147,12 @@ export function registerFileCommentHandlers(deps: FileCommentHandlerDeps): () =>
         { mode: 'project', mustExist: true, kind: 'file' },
         confinement
       )
-      watchClose(window)
-      return { caller, filePath: resolved.requested }
+      requested = resolved.requested
     } catch (error) {
       return confinementRefusal(error)
     }
+    if (window.isDestroyed() || session.current()?.generation !== snapshot.generation) return refusal('not-open')
+    return { caller, filePath: requested }
   }
 
   function register<Request>(route: FileCommentRoute<Request>): void {

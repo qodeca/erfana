@@ -78,6 +78,14 @@ export interface CommentFileTarget {
    * (never a URL or a path from the page).
    */
   readonly filePath: string
+  /**
+   * The real path the caller confined `filePath` to earlier (a panel's
+   * listed file). The writer confines `filePath` again and refuses as
+   * `changed` when it no longer resolves there – a folder on the path
+   * swapped for a link inside the project must not redirect the write.
+   * Confinement itself does not read it.
+   */
+  readonly expectedRealPath?: string
 }
 
 /** A file read for comments: its real path and its exact bytes, not yet decoded. */

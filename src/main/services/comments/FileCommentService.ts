@@ -6,7 +6,8 @@
  * 024-FR-012, 024-FR-013, 024-FR-026).
  *
  * - **list** confines the file to the open project and to a kind of this
- *   family (`fileCommentKinds`), records that the sender's panel shows it
+ *   family (`fileCommentKinds`) whose comments are on in Settings (else
+ *   `comments-off`: no parse, no watch), records that the sender's panel shows it
  *   (`fileCommentPanels.ts`), watches it, and answers its comments with
  *   main-minted keys and where each attached thread's target is. The parse
  *   runs in the comment parse worker, in the file's kind's `list` job. The
@@ -43,7 +44,7 @@ import { stablePathDigest } from '../../../shared/stablePathDigest'
 import { createRearmingSingleFileWatcher } from '../watcher/rearmingSingleFileWatch'
 import { logger } from '../LoggingService'
 import { CommentWriter, type CommentIdentity, type CommentWriteResult, type CommentWriterDeps } from './CommentWriter'
-import { confineCommentFile, readConfinedCommentBytes } from './commentFileAccess'
+import { confineCommentFile, readConfinedCommentBytes, type CommentFileTarget } from './commentFileAccess'
 import { sharedCommentParseClient } from './CommentParseWorkerAdapter'
 import type { CommentFileJob, CommentFileJobRunner } from './commentFileJobs'
 import type { CommentFileKindLookup } from './commentFileKinds'
@@ -81,8 +82,9 @@ export interface FileCommentServiceDeps {
   readonly jobs?: CommentFileJobRunner
   /**
    * Whether comments are on in Settings for `kind`'s preview, read per call;
-   * on by default. Off refuses a draft and every save (`comments-off`) – the
-   * list still answers, so an open panel can show what the file holds.
+   * on by default. Off refuses the list, a draft and every save
+   * (`comments-off`): the list parses nothing and watches nothing, as the
+   * HTML family's sealed box (owner decision, 2026-10-30).
    */
   readonly isKindEnabled?: (kind: CommentFileKind) => boolean
   /** A kind's own write-job fields from the app settings (Markdown's `breaks`), read per save. */
@@ -123,6 +125,10 @@ export class FileCommentService {
   private readonly writer: CommentWriter
   private readonly runners = new Map<string, CommentFileJobRunner>()
   private stamp = 0
+  /** Grows with every project change ({@link FileCommentService.clear}). */
+  private projectEpoch = 0
+  /** Grows with each window's close ({@link FileCommentService.forgetWindow}), per window. */
+  private readonly windowEpochs = new Map<number, number>()
 
   constructor(private readonly deps: FileCommentServiceDeps) {
     this.panels = new FileCommentPanels(deps.keys)
@@ -190,13 +196,15 @@ export class FileCommentService {
     return this.changeExisting(caller, panel, request)
   }
 
-  /** The window closed: forget its panels and release their watches. */
+  /** The window closed: forget its panels and release their watches; a list still running for it records nothing. */
   forgetWindow(windowId: number): void {
+    this.windowEpochs.set(windowId, (this.windowEpochs.get(windowId) ?? 0) + 1)
     this.release(this.panels.forgetWindow(windowId))
   }
 
-  /** The project changed: forget every panel and close every watch. */
+  /** The project changed: forget every panel and close every watch; a list still running records nothing. */
   async clear(): Promise<void> {
+    this.projectEpoch += 1
     this.panels.clear()
     await this.watches.closeAll()
   }
@@ -212,19 +220,21 @@ export class FileCommentService {
       return KEY_INVALID
     }
     const result = await this.writer.addPicked({
-      file: { realRoot: caller.realRoot, filePath: panel.requestedPath },
+      file: writeTargetOf(caller, panel),
       pick: request.target,
       ...(request.sel === undefined ? {} : { sel: request.sel }),
       view: request.view,
       text: request.text
     })
-    // Only a write consumes the draft: a refusal leaves it, with the window's text, for the next try.
-    panel.keys.settleDraft(request.draftToken, result.ok)
+    // A write consumes the draft – also one whose bytes changed right after the rename
+    // (`changed-during-save`): its thread landed, so a retry would add a second. Any
+    // other refusal wrote nothing and leaves the draft, with the window's text, for the next try.
+    panel.keys.settleDraft(request.draftToken, result.ok || result.reason === 'changed-during-save')
     return this.answer(panel, result)
   }
 
   private async changeExisting(caller: FileCommentCaller, panel: FileCommentPanel, request: ThreadOp): Promise<CommentSaveResult> {
-    const file = { realRoot: caller.realRoot, filePath: panel.requestedPath }
+    const file = writeTargetOf(caller, panel)
     if (request.op === 'deleteBlock') {
       const block = panel.keys.resolve(panel.binding, request.blockKey, 'block')
       if (!block.ok || block.value.realPath !== panel.realPath) return KEY_INVALID
@@ -237,7 +247,7 @@ export class FileCommentService {
   }
 
   /** Comments are on in Settings for the panel's kind. */
-  private enabled(panel: FileCommentPanel): boolean {
+  private enabled(panel: Pick<FileCommentPanel, 'kind'>): boolean {
     return this.deps.isKindEnabled?.(panel.kind) ?? true
   }
 
@@ -258,16 +268,30 @@ export class FileCommentService {
     return confined.realPath === panel.realPath ? panel : NOT_OPEN
   }
 
-  /** Confine `filePath` and record that the sender's panel shows it; watch it. */
+  /**
+   * Confine `filePath` and record that the sender's panel shows it; watch it.
+   * Refused – recording and watching nothing – when the window closed or the
+   * project changed while the path was confined (the cleanup already ran, so
+   * a record made now would never be released), and when comments are off
+   * for the file's kind: then the panel's earlier record is dropped too.
+   */
   private async openPanel(
     caller: FileCommentCaller,
     panelId: string,
     filePath: string
   ): Promise<{ readonly ok: true; readonly panel: FileCommentPanel } | CommentReasonedRefusal> {
+    const projectEpoch = this.projectEpoch
+    const windowEpoch = this.windowEpochs.get(caller.windowId)
     const confined = await this.confine(caller, filePath)
+    if (projectEpoch !== this.projectEpoch || windowEpoch !== this.windowEpochs.get(caller.windowId)) return NOT_OPEN
     if (!confined.ok) return confined
     const kind = this.deps.kinds.kindOfName(confined.realPath)
     if (kind === undefined) return refusal('not-html')
+    if (!this.enabled({ kind })) {
+      const dropped = this.panels.forget(caller.windowId, panelId)
+      if (dropped !== undefined) this.release([dropped])
+      return COMMENTS_OFF
+    }
     const { panel, released } = this.panels.open(caller.windowId, panelId, { realPath: confined.realPath, requestedPath: resolve(filePath), kind })
     this.release(released)
     this.watches.subscribe(panel.realPath, subscriberOf(panel))
@@ -326,6 +350,15 @@ export class FileCommentService {
       this.deps.send(panel.binding.windowId, { panelId: panel.binding.panelId, filePath: panel.requestedPath, stamp: this.stamp })
     }
   }
+}
+
+/**
+ * What the writer is given for the panel's file: the path as the panel names
+ * it, and the real path it was listed at, which the writer's fresh
+ * confinement must reach again (a swapped folder is refused, not followed).
+ */
+function writeTargetOf(caller: FileCommentCaller, panel: FileCommentPanel): CommentFileTarget {
+  return { realRoot: caller.realRoot, filePath: panel.requestedPath, expectedRealPath: panel.realPath }
 }
 
 /** A panel as a watch subscriber. */

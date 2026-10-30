@@ -7,7 +7,7 @@
  * Markdown job table run in-process, through `FileCommentService` on a temp
  * `.md` file. A full lifecycle leaves the file's bytes as they were; the
  * "preserve line breaks" setting reaches every Markdown write; comments off in
- * Settings refuse a draft and a save; `.html` and `.txt` are refused by name.
+ * Settings refuse the list, a draft and a save; `.html` and `.txt` are refused by name.
  * `electron` is mocked because the composition module imports the handlers.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -44,6 +44,7 @@ const SOFT_BREAKS = 'Line one\nline two\n\nNext.\n'
 let project: TempProject
 let settings: GlobalSettings
 let writeJobs: CommentFileJob[]
+let listJobs: number
 let service: FileCommentService
 
 /** The production settings row for a kind, as `file-comments.ts` wires it. */
@@ -55,6 +56,7 @@ function recordingJobs(): CommentFileJobRunner {
   return {
     runJob: (bytes, job) => {
       if (job.kind === 'write') writeJobs.push(job)
+      if (job.kind === 'list') listJobs += 1
       return inner.runJob(bytes, job)
     }
   } as CommentFileJobRunner
@@ -96,6 +98,7 @@ beforeEach(async () => {
   project = await makeProject()
   settings = GlobalSettingsSchema.parse({})
   writeJobs = []
+  listJobs = 0
   service = new FileCommentService({
     kinds: fileCommentKinds,
     unsaved: { hasAny: async () => false },
@@ -159,7 +162,9 @@ describe('024-AC-003 Markdown through the file-comment service', () => {
 })
 
 describe('Markdown comments off in Settings (024-FR-022)', () => {
-  it('refuses a draft and every save with comments-off; the list still answers', async () => {
+  const off = { ok: false, code: ErrorCode.COMMENT_PATH_REFUSED, reason: 'comments-off' }
+
+  it('refuses a draft and every save with comments-off', async () => {
     await project.write('plan.md', PLAN)
     await listOk('plan.md')
     expect(await addOn('plan.md', 6, 'Before.')).toMatchObject({ ok: true })
@@ -168,14 +173,31 @@ describe('Markdown comments off in Settings (024-FR-022)', () => {
     const original = await project.read('plan.md')
 
     settings = GlobalSettingsSchema.parse({ markdownPreview: { comments: { enabled: false } } })
-    const off = { ok: false, code: ErrorCode.COMMENT_PATH_REFUSED, reason: 'comments-off' }
     expect(await service.openDraft(caller(), { panelId: PANEL, filePath: project.path('plan.md') })).toEqual(off)
     expect(
       await service.save(caller(), { panelId: PANEL, fileKey: listed.file.fileKey, threadKey: thread.threadKey, rawHash: thread.rawHash, op: 'reply', text: 'x' })
     ).toEqual(off)
-    expect((await listOk('plan.md')).file.threads).toHaveLength(1)
     expect((await project.read('plan.md')).equals(original)).toBe(true)
     expect(writeJobs.length).toBe(1)
+  })
+
+  it('owner decision 2026-10-30: the list refuses too – no parse, no watch, and the panel\'s earlier watch is released', async () => {
+    await project.write('plan.md', PLAN)
+    await project.write('other.md', PLAN)
+    await listOk('plan.md')
+    expect(service.watchCount).toBe(1)
+    settings = GlobalSettingsSchema.parse({ markdownPreview: { comments: { enabled: false } } })
+    const jobsBefore = listJobs
+    expect(await service.list(caller(), { panelId: PANEL, filePath: project.path('plan.md') })).toEqual(off)
+    expect(await service.list(caller(), { panelId: 'editor-panel-2', filePath: project.path('other.md') })).toEqual(off)
+    expect(listJobs).toBe(jobsBefore)
+    expect(service.watchCount).toBe(0)
+    // The panel is no longer recorded: a thread key or a draft names nothing
+    expect(await service.openDraft(caller(), { panelId: PANEL, filePath: project.path('plan.md') })).toMatchObject({ ok: false, reason: 'not-open' })
+    // Back on, the list answers again
+    settings = GlobalSettingsSchema.parse({})
+    expect((await listOk('plan.md')).file.writable).toBe(true)
+    expect(listJobs).toBe(jobsBefore + 1)
   })
 })
 

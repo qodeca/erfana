@@ -306,6 +306,52 @@ describe('024-AC-038 the other error paths', () => {
     hooks.afterWrite = path => writeFile(path, 'Someone else wrote this.\n')
     expect(await addAfterList()).toEqual(refused(ErrorCode.COMMENT_WRITE_FAILED, 'changed-during-save'))
   })
+
+  it('L6 changed-during-save consumes the draft: a retry with the same token adds no second thread', async () => {
+    await setUp()
+    await h.listOk('notes.txt')
+    const draft = await h.service.openDraft(h.caller(), { panelId: PANEL, filePath: h.project.path('notes.txt') })
+    if (!draft.ok) throw new Error('no draft')
+    const addWithDraft = () =>
+      h.service.save(h.caller(), {
+        panelId: PANEL,
+        filePath: h.project.path('notes.txt'),
+        op: 'add',
+        draftToken: draft.draftToken,
+        target: pickOn(3),
+        text: 'Typed text that must be kept.',
+        view: VIEW
+      })
+    // An outside writer touches the file right after the rename, keeping the landed thread.
+    hooks.afterWrite = async path => writeFile(path, `${(await readFile(path)).toString('utf8')}Appended.\n`)
+    expect(await addWithDraft()).toEqual(refused(ErrorCode.COMMENT_WRITE_FAILED, 'changed-during-save'))
+    hooks.afterWrite = null
+    const afterFirst = await h.project.read('notes.txt')
+    expect(await addWithDraft()).toEqual(refused(ErrorCode.COMMENT_KEY_INVALID, 'key-invalid'))
+    expect(await h.project.read('notes.txt')).toEqual(afterFirst)
+    expect((await h.listOk('notes.txt')).file.threads).toHaveLength(1)
+  })
+
+  it('L6 any other refusal leaves the draft for the next try', async () => {
+    await setUp()
+    await h.listOk('notes.txt')
+    const draft = await h.service.openDraft(h.caller(), { panelId: PANEL, filePath: h.project.path('notes.txt') })
+    if (!draft.ok) throw new Error('no draft')
+    const addWithDraft = () =>
+      h.service.save(h.caller(), {
+        panelId: PANEL,
+        filePath: h.project.path('notes.txt'),
+        op: 'add',
+        draftToken: draft.draftToken,
+        target: pickOn(3),
+        text: 'Typed text that must be kept.',
+        view: VIEW
+      })
+    hooks.refuse = { ok: false, reason: 'busy' }
+    expect(await addWithDraft()).toEqual(refused(ErrorCode.COMMENT_WRITE_FAILED, 'busy'))
+    hooks.refuse = null
+    expect(await addWithDraft()).toMatchObject({ ok: true })
+  })
 })
 
 describe('024-AC-034 (b) another window\'s unsaved edits refuse the save in main', () => {

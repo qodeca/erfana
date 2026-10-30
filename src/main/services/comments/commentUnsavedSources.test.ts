@@ -109,6 +109,27 @@ describe('commentUnsavedSources', () => {
     expect(isReportablePath(String.raw`\\.\C:\proj\a.html`, String.raw`\\.\C:\proj`, 'win32')).toBe(false)
   })
 
+  it('L4 hasAny does not wait on a lookup that never settles: past its bound it answers unsaved (fail closed)', async () => {
+    const page = project.path('real', 'index.html')
+    const sources = createCommentUnsavedSources({
+      projectRoot: () => project.root,
+      realpath: () => new Promise<string>(() => {}),
+      lookupMaxWaitMs: 20
+    })
+    void sources.set(2, [page])
+    const started = performance.now()
+    expect(await sources.hasAny(project.path('real', 'other.html'))).toBe(true)
+    expect(performance.now() - started).toBeLessThan(1000)
+  })
+
+  it('L4 hasAny answers from settled lookups inside its bound', async () => {
+    const page = project.path('real', 'index.html')
+    const sources = createCommentUnsavedSources({ projectRoot: () => project.root, lookupMaxWaitMs: 5000 })
+    await sources.set(1, [page])
+    expect(await sources.hasAny(page)).toBe(true)
+    expect(await sources.hasAny(project.path('real', 'other.html'))).toBe(false)
+  })
+
   it('compares case-blind on Windows and macOS only', () => {
     expect(samePathKey('/P/Index.HTML', 'win32')).toBe(samePathKey('/p/index.html', 'win32'))
     expect(samePathKey('/P/Index.HTML', 'darwin')).toBe(samePathKey('/p/index.html', 'darwin'))

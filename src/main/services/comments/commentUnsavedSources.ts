@@ -28,9 +28,18 @@
 import { realpath } from 'node:fs/promises'
 import { isAbsolute, normalize, resolve } from 'node:path'
 import { isInsideRoot } from '../../utils/pathCompare'
+import { withTimeout } from '../../utils/withTimeout'
 
 /** Resolve one path; defaults to `fs.promises.realpath`. */
 export type RealpathFn = (path: string) => Promise<string>
+
+/**
+ * Longest {@link CommentUnsavedSources.hasAny} waits on reports still being
+ * resolved. Past it the answer is "unsaved" – fail closed, so the save is
+ * refused and can be retried – rather than holding a write open while a slow
+ * lookup decides (security audit of 8a4e442e, L4).
+ */
+export const UNSAVED_LOOKUP_MAX_WAIT_MS = 250
 
 /** Win32 device and namespace prefixes (`\\?\`, `\\.\`, `\??\`), either separator. */
 const WIN_DEVICE_PREFIX = /^[\\/]{2}[?.](?:[\\/]|$)|^[\\/]\?\?(?:[\\/]|$)/
@@ -58,7 +67,11 @@ export interface CommentUnsavedSources {
   set(windowId: number, paths: readonly string[]): Promise<void>
   /** Whether `windowId` holds unsaved changes for the real path `realPath`. */
   has(windowId: number, realPath: string): Promise<boolean>
-  /** Whether any window holds unsaved changes for the real path `realPath` (024-FR-026). */
+  /**
+   * Whether any window holds unsaved changes for the real path `realPath`
+   * (024-FR-026). `true` when a report is still being resolved after
+   * {@link UNSAVED_LOOKUP_MAX_WAIT_MS}.
+   */
   hasAny(realPath: string): Promise<boolean>
   /** The window is gone. */
   forget(windowId: number): void
@@ -70,12 +83,15 @@ export interface CommentUnsavedSourcesDeps {
   readonly projectRoot: () => string | null
   readonly realpath?: RealpathFn
   readonly platform?: NodeJS.Platform
+  /** {@link UNSAVED_LOOKUP_MAX_WAIT_MS} by default. */
+  readonly lookupMaxWaitMs?: number
 }
 
 /** Build the record. */
 export function createCommentUnsavedSources(deps: CommentUnsavedSourcesDeps): CommentUnsavedSources {
   const toReal = deps.realpath ?? (path => realpath(path))
   const platform = deps.platform ?? process.platform
+  const maxWaitMs = deps.lookupMaxWaitMs ?? UNSAVED_LOOKUP_MAX_WAIT_MS
   /** The newest `set` per window is the one asked, even while an older one still resolves. */
   const byWindow = new Map<number, Promise<ReadonlySet<string>>>()
 
@@ -106,8 +122,9 @@ export function createCommentUnsavedSources(deps: CommentUnsavedSourcesDeps): Co
     },
     async hasAny(realPath) {
       const key = samePathKey(realPath, platform)
-      const lists = await Promise.all(byWindow.values())
-      return lists.some(list => list.has(key))
+      const answer = Promise.all(byWindow.values()).then(lists => lists.some(list => list.has(key)))
+      // resolveAll never rejects, so only the timer can make this throw
+      return withTimeout(answer, maxWaitMs, 'unsaved-files lookup').catch(() => true)
     },
     forget(windowId) {
       byWindow.delete(windowId)

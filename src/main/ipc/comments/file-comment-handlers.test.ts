@@ -13,9 +13,11 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ErrorCode } from '../../../shared/errors'
 import { FileCommentChannels } from '../../../shared/ipc/file-comment-channels'
+import { FILE_COMMENT_BUFFER_MAX_CHARS } from '../../../shared/ipc/file-comment-schema'
 import { logger } from '../../services/LoggingService'
 import type { FileCommentService } from '../../services/comments/FileCommentService'
 import type { ProjectSessionSnapshot } from '../../services/session/ProjectSession'
+import { defaultConfinementDeps } from '../confinement/resolveConfinedPath'
 import { registerFileCommentHandlers, type FileCommentHostWindow } from './file-comment-handlers'
 
 type Handler = (event: unknown, arg: unknown) => Promise<unknown>
@@ -61,16 +63,53 @@ function fakeService(): { [K in 'list' | 'openDraft' | 'save' | 'forgetWindow']:
   }
 }
 
-function register(options: { trusted?: boolean; window?: FileCommentHostWindow | null; snapshot?: ProjectSessionSnapshot | null } = {}) {
+/** A window that is open until `destroyed` is set. */
+function hostWindow(): FileCommentHostWindow & { destroyed: boolean } {
+  return {
+    id: 7,
+    destroyed: false,
+    once: (_event, listener) => closed.push(listener),
+    isDestroyed() {
+      return this.destroyed
+    }
+  }
+}
+
+interface RegisterOptions {
+  trusted?: boolean
+  window?: FileCommentHostWindow | null
+  snapshot?: ProjectSessionSnapshot | null
+  /** The session's current snapshot, read on every call (a project switch mid-request). */
+  current?: () => ProjectSessionSnapshot | null
+  /** Runs inside the confinement check's first file-system call. */
+  duringConfinement?: () => void
+}
+
+function register(options: RegisterOptions = {}) {
   const service = fakeService()
-  const window: FileCommentHostWindow = { id: 7, once: (_event, listener) => closed.push(listener) }
+  const window = hostWindow()
   const snapshot: ProjectSessionSnapshot | null =
     options.snapshot === undefined ? { generation: 1, root, realRoot: root, caseSensitive: process.platform === 'linux', ownerWebContentsId: null } : options.snapshot
+  const during = options.duringConfinement
   dispose = registerFileCommentHandlers({
     service: service as unknown as Pick<FileCommentService, 'list' | 'openDraft' | 'save' | 'forgetWindow'>,
-    session: { current: () => snapshot },
+    session: { current: options.current ?? (() => snapshot) },
     isTrustedSender: () => options.trusted !== false,
-    resolveWindow: () => (options.window === undefined ? window : options.window)
+    resolveWindow: () => (options.window === undefined ? window : options.window),
+    ...(during === undefined
+      ? {}
+      : {
+          confinement: {
+            ...defaultConfinementDeps,
+            fs: {
+              ...defaultConfinementDeps.fs,
+              realpath: async target => {
+                during()
+                return defaultConfinementDeps.fs.realpath(target)
+              }
+            }
+          }
+        })
   })
   return service
 }
@@ -115,6 +154,43 @@ describe('file-comment handlers', () => {
     expect(service.forgetWindow).toHaveBeenCalledWith(7)
   })
 
+  it('L5: a window closing while the path is confined is refused, and its close was already watched', async () => {
+    const window = hostWindow()
+    const service = register({
+      window,
+      duringConfinement: () => {
+        window.destroyed = true
+      }
+    })
+    expect(await invoke(FileCommentChannels.LIST, { panelId: PANEL, filePath: join(root, 'notes.txt') })).toEqual(
+      refused(ErrorCode.COMMENT_KEY_INVALID, 'not-open')
+    )
+    expect(service.list).not.toHaveBeenCalled()
+    // The close listener was registered before the await, so the service forgets the window
+    expect(closed).toHaveLength(1)
+    closed[0]()
+    expect(service.forgetWindow).toHaveBeenCalledWith(7)
+    // A window already gone is refused before any work
+    expect(await invoke(FileCommentChannels.LIST, { panelId: PANEL, filePath: join(root, 'notes.txt') })).toEqual(
+      refused(ErrorCode.COMMENT_KEY_INVALID, 'not-open')
+    )
+  })
+
+  it('L5: a project switch while the path is confined is refused; the service never runs', async () => {
+    const base: ProjectSessionSnapshot = { generation: 1, root, realRoot: root, caseSensitive: process.platform === 'linux', ownerWebContentsId: null }
+    let current = base
+    const service = register({
+      current: () => current,
+      duringConfinement: () => {
+        current = { ...base, generation: 2 }
+      }
+    })
+    expect(await invoke(FileCommentChannels.LIST, { panelId: PANEL, filePath: join(root, 'notes.txt') })).toEqual(
+      refused(ErrorCode.COMMENT_KEY_INVALID, 'not-open')
+    )
+    expect(service.list).not.toHaveBeenCalled()
+  })
+
   it('024-AC-038 an untrusted sender is refused before the payload is read', async () => {
     const service = register({ trusted: false })
     const poisoned = new Proxy({}, { get: () => { throw new Error('payload was read') } })
@@ -129,7 +205,7 @@ describe('file-comment handlers', () => {
   it.each([
     ['an unknown field', { panelId: PANEL, filePath: '/x.txt', extra: 1 }],
     ['an over-long path', { panelId: PANEL, filePath: `/${'a'.repeat(5000)}.txt` }],
-    ['a buffer over the file limit', { panelId: PANEL, filePath: '/x.txt', bufferText: 'a'.repeat(25 * 1024 * 1024 + 1) }]
+    ['a buffer over the file limit', { panelId: PANEL, filePath: '/x.txt', bufferText: 'a'.repeat(FILE_COMMENT_BUFFER_MAX_CHARS + 1) }]
   ])('024-AC-038 a malformed list (%s) is refused; logs carry issue codes only', async (_name, payload) => {
     const service = register()
     expect(await invoke(FileCommentChannels.LIST, payload)).toEqual(refused(ErrorCode.COMMENT_WRITE_FAILED, 'bad-request'))
