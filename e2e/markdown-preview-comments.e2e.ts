@@ -169,8 +169,9 @@ test.describe('Markdown Preview comments', () => {
     await expect(win).toHaveCount(0, { timeout: MD_COMMENT_BUDGET_MS })
     await expect.poll(async () => (await fsp.readFile(file, 'utf-8')).includes(NOTE), { timeout: MD_COMMENT_BUDGET_MS }).toBe(true)
 
-    // Focus came back to the list item; Esc leaves comment mode for the toggle.
-    await expect(md.target('li', 5)).toBeFocused({ timeout: MD_COMMENT_BUDGET_MS })
+    // Focus came back to the list item; Esc leaves comment mode for the toggle. The block went in above
+    // the item, so the redraw after the save moves it down: find it by its words, not its line.
+    await expect(md.content().locator('li', { hasText: 'alpha' })).toBeFocused({ timeout: MD_COMMENT_BUDGET_MS })
     await page.keyboard.press('Escape')
     await expect(md.modeButton()).toHaveAttribute('aria-pressed', 'false')
     await expect(md.modeButton()).toBeFocused()

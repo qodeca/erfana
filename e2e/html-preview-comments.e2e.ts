@@ -576,7 +576,9 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     // "Resolve and next": the thread is written resolved and the window steps to the other
     // open comment (em#when), saying where it landed; the pin goes.
     await page.getByTestId('comment-resolve-next').click()
-    await expect(win.getByTestId('comment-window-polite')).toHaveText(/^Comment 1 of 2, on element, line \d+\.$/, { timeout: PREVIEW_BUDGET_MS })
+    // Changed expectation under code review M-B (2026-10-30): the step counts the thread just resolved
+    // as resolved, so one open comment is left – "1 of 1", not the stale "1 of 2".
+    await expect(win.getByTestId('comment-window-polite')).toHaveText(/^Comment 1 of 1, on element, line \d+\.$/, { timeout: PREVIEW_BUDGET_MS })
     await expect(win.getByRole('heading', { level: 2 })).toHaveText('Comment on element') // A-02: the selector stays in the context line
     await expect.poll(async () => (await fsp.readFile(file, 'utf-8')).split('"status":"resolved"').length - 1, { timeout: PREVIEW_BUDGET_MS }).toBe(2)
     await page.getByTestId('comment-close').click()
