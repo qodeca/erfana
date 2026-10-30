@@ -6,8 +6,9 @@
  * §7.3 step 3, decisions 16–17, 34, §19 R3-8, R3-11, R3-12; tests M-033,
  * M-054, M-055).
  *
- * Runs in the comment parse worker as the `draft` and `pin` jobs
- * (`commentFileJobs.ts`), so no page – up to 25 MB – parses on the main thread.
+ * Runs in the comment parse worker as the `draft` and `pin` jobs of the HTML
+ * kind's table (`htmlCommentJobs.ts`), so no page – up to 25 MB – parses on
+ * the main thread.
  * A pin click is ONE job on one read: the blocks standing on the pin's element
  * and the draft for its "New comment" come from the same parse (§19 "One pin
  * job") – a 25 MB page does not fit the worker's document cache, so two jobs

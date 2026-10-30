@@ -53,6 +53,7 @@ import { PREVIEW_LIMITS } from '../../../shared/preview-limits'
 import { stablePathDigest } from '../../../shared/stablePathDigest'
 import { codePointLength, type CommentAuthor, type CommentView } from '../../../shared/htmlComments'
 import { hasRefusedIdentityChar } from '../../../shared/comments/identity'
+import { htmlKind } from '../../../shared/comments/htmlKind'
 import { atomicWriteBytesStrict, errnoOf, fileIdKey } from '../../utils/atomicWriteBytesStrict'
 import { logger } from '../LoggingService'
 import { sharedCommentParseClient } from './CommentParseWorkerAdapter'
@@ -62,7 +63,7 @@ import {
   type CommentFileTarget,
   type ConfineResult
 } from './commentFileAccess'
-import type { CommentFileJobRunner } from './commentFileJobs'
+import type { CommentFileJob, CommentFileJobRunner } from './commentFileJobs'
 import { commentFileLock } from './commentFileLock'
 import {
   jobFailureRefusal,
@@ -142,8 +143,9 @@ export interface CommentWriterDeps {
   readonly now?: () => Date
   /**
    * Where the parse, the plan and the verification run: the process-wide
-   * comment parse worker by default. A suite passes the in-process runner
-   * (`createInProcessCommentFileJobs`), with a seeded id source.
+   * comment parse worker, with the HTML kind's jobs, by default. A suite
+   * passes the in-process runner (`createInProcessCommentFileJobs`), with a
+   * seeded id source.
    */
   readonly jobs?: CommentFileJobRunner
   /** `process.platform`; a test sets `win32` on any host for the Windows path rules. */
@@ -193,7 +195,8 @@ export class CommentWriter {
     this.platform = deps.platform ?? process.platform
     this.log = deps.log ?? logger
     this.now = deps.now ?? (() => new Date())
-    this.jobs = deps.jobs ?? sharedCommentParseClient()
+    // Files are HTML until the writer takes a kind per file (architecture note 001 § 5).
+    this.jobs = deps.jobs ?? sharedCommentParseClient().runnerFor<CommentFileJob>(htmlKind.id)
   }
 
   /** Add a new thread before the draft's element. Requires an identity. */

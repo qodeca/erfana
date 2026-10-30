@@ -63,7 +63,7 @@ import {
   type SplicePlan,
   type ThreadContext
 } from '../../../shared/htmlComments'
-import { freshDocumentOf, sha256HexOf, writableRefusal, type CommentDocCache } from './commentJobDocs'
+import { freshDocumentOf, sha256HexOf, writableRefusal, type KindDocCache } from './commentJobDocs'
 import type { CommentRefusal } from './commentRefusals'
 
 /** What a draft recorded about its element when the pick was made (P5). */
@@ -301,7 +301,7 @@ function spliceVerified(
 }
 
 /** The `write` job on the bytes main read. `cache` receives the verified new file's parse. */
-export function runWriteJob(bytes: Uint8Array, job: WriteJob, env: { readonly cache?: CommentDocCache; readonly random?: RandomBytes }): WriteJobResult {
+export function runWriteJob(bytes: Uint8Array, job: WriteJob, env: { readonly cache?: KindDocCache<CommentDocument>; readonly random?: RandomBytes }): WriteJobResult {
   const ready = planOnFreshParse(bytes, job, env.random)
   if (!ready.ok) return { kind: 'write', ok: false, refusal: ready.refusal }
   const spliced = spliceVerified(bytes, ready.origin, ready.plan)

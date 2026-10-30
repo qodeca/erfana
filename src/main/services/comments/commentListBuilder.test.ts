@@ -15,7 +15,8 @@ import { BASE_PAGE, commentedPage, damagedBlock, insertBefore, newerBlock } from
 import { makeProject, type TempProject } from '../preview/comments/__test-helpers__/commentWriterHarness'
 import { frameFile } from '../preview/comments/__test-helpers__/commentServiceHarness'
 import { CommentKeyStore, type CommentBinding } from './commentKeyStore'
-import { createInProcessCommentFileJobs, type CommentFileJob } from './commentFileJobs'
+import type { CommentFileJob } from './commentFileJobs'
+import { createInProcessCommentFileJobs } from '../preview/comments/htmlCommentJobs'
 import { buildCommentList, COMMENT_LIST_MAX_BYTES, COMMENT_LIST_MAX_FILES } from './commentListBuilder'
 
 vi.mock('../LoggingService', () => ({

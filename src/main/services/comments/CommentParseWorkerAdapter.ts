@@ -5,25 +5,27 @@
  * (docs/designs/comments/html-preview-comments.md §19 R3-12; pattern
  * `src/main/services/GitStatusWorkerAdapter.ts`).
  *
- * ONE worker for the whole process, started lazily and warmed when the first
- * HTML preview opens with comments on (`warm`), so the first commented page
- * does not pay the worker's start-up and JIT warm-up (about 0.5 s, spike S9).
- * One worker with a serial queue, not a pool: a pool of four halved warm
- * latency but cost 1.2 s cold (S9).
+ * ONE worker for the whole process and every file kind, started lazily and
+ * warmed when the first preview opens with comments on (`warm`), so the first
+ * commented page does not pay the worker's start-up and JIT warm-up (about
+ * 0.5 s, spike S9). One worker with a serial queue, not a pool: a pool of four
+ * halved warm latency but cost 1.2 s cold (S9).
  *
- * The same worker runs the comment file jobs (`runJob`, `commentFileJobs.ts`):
- * the parse a pick, a pin, a list or a write needs, so none of them parses a
- * page on the main thread either. They share the queue and its limits with
- * the instrumentation of served pages.
+ * The client knows no file kind (spec 024 architecture note 001 § 8 C22):
+ * `run` sends one job of one kind's table (`commentFileJobs.ts`) and checks
+ * the answer is that job's; each kind wraps it in its own typed view (HTML:
+ * `preview/comments/htmlCommentParseClient.ts`), and {@link runnerFor} is the
+ * plain one. Every job of every kind shares the queue and its limits.
  *
- * `instrument` and `runJob` never reject. Every failure is a `failed` result
- * – for `instrument` the caller serves the raw bytes (or reads them again,
- * when they were lent and lost):
+ * `run` never rejects. Every failure is a `failed` result – for a served page
+ * the caller serves the raw bytes (or reads them again, when they were lent
+ * and lost):
  * - `busy` – the queue is full (count or bytes), so a page with many large
  *   frames cannot park unbounded copies in main memory;
  * - `timeout` – no answer in time; the worker is terminated;
  * - `crashed` – the worker died (an error, an out-of-memory stop, an exit);
- * - `error` – the worker threw on this document, or answered nonsense;
+ * - `error` – the worker threw on this document, or answered nonsense – an
+ *   answer to another job, or one its kind's check refuses;
  * - `poisoned` – these bytes stopped a worker before, so they are not parsed
  *   again (the file is served raw, "comments unavailable");
  * - `unavailable` – no worker: its bundle is missing, or workers died too
@@ -61,8 +63,15 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { Worker } from 'node:worker_threads'
 import { logger } from '../LoggingService'
-import type { CommentFileJob, CommentFileJobRunner, CommentJobFailure, CommentJobOutcome, JobResultOf } from './commentFileJobs'
-import type { InstrumentOutcome } from '../preview/comments/commentParseCore'
+import type { CommentFileKindId } from '../../../shared/comments/fileKind'
+import type {
+  CommentFileJobRunner,
+  CommentJob,
+  CommentJobFailed,
+  CommentJobFailure,
+  CommentJobOutcome,
+  JobResultOf
+} from './commentFileJobs'
 import {
   COMMENT_PARSE_WORKER_ROLE,
   MAX_POISONED_HASHES,
@@ -80,9 +89,15 @@ export interface HandedBack {
   readonly raw?: Uint8Array
 }
 
-/** What {@link CommentParseClient.instrument} resolves to; `raw` only when the bytes were lent and came back. */
-export type CommentParseResult =
-  (InstrumentOutcome | { readonly kind: 'failed'; readonly failure: CommentParseFailure }) & HandedBack
+/** A file kind's check of an answer that names the right job: `false` makes it an `error`. */
+export type CommentJobAnswerCheck<R> = (result: R) => boolean
+
+/** A tiny job that makes the worker load a kind's parser and JIT the pipeline ({@link CommentParseClient.warm}). */
+export interface CommentWarmUp {
+  readonly fileKind: CommentFileKindId
+  readonly bytes: Uint8Array
+  readonly job: CommentJob
+}
 
 /** The slice of a `worker_threads.Worker` the client uses. Structural for tests. */
 export interface CommentParseWorkerLike {
@@ -147,13 +162,9 @@ export const WORKER_HEAP_MB = 2_048
 export const LEND_MIN_BYTES = 64 * 1024
 /** The bundle `electron.vite.config.ts` builds next to `index.js`. */
 const WORKER_FILE = 'comment-parse.worker.js'
-/** A tiny document that makes the worker load parse5 and JIT the pipeline. */
-const WARM_UP_BYTES = new TextEncoder().encode(
-  '<!doctype html><title>w</title><p id=a class=b>w</p>'
-)
 
 /** What a waiting request is answered with: the reply it accepts, else `failed`. */
-type Settled = CommentParseReply | { readonly kind: 'failed'; readonly failure: CommentParseFailure }
+type Settled = CommentParseReply | CommentJobFailed
 
 /** A settled request, with the caller's bytes when they were lent and handed back. */
 interface Answer {
@@ -171,27 +182,27 @@ interface PendingRequest {
   hash?: string
 }
 
-const failed = (failure: CommentParseFailure): { readonly kind: 'failed'; readonly failure: CommentParseFailure } => ({
-  kind: 'failed',
-  failure
-})
+const failed = (failure: CommentParseFailure): CommentJobFailed => ({ kind: 'failed', failure })
 
 /** `value` with the handed-back bytes, when there are any. */
 function withRaw<T extends object>(value: T, raw: Uint8Array | undefined): T & HandedBack {
   return raw === undefined ? value : { ...value, raw }
 }
 
-/** The instrument outcome a reply carries, or `error` for any other reply. */
-function instrumentOutcomeOf({ settled, raw }: Answer): CommentParseResult {
+/**
+ * The answer a reply carries, when it answers a job of `kind` and passes the
+ * kind's `check`; else `error`. The cast is the trust boundary: the worker is
+ * our own bundle, its answer names the job asked, and `check` vets the rest.
+ */
+function outcomeOf<J extends CommentJob>(
+  { settled, raw }: Answer,
+  kind: J['kind'],
+  check: CommentJobAnswerCheck<JobResultOf<J>> | undefined
+): CommentJobOutcome<J> {
   if ('kind' in settled) return withRaw(settled, raw)
-  return withRaw(settled.type === 'result' ? settled.outcome : failed('error'), raw)
-}
-
-/** The job answer a reply carries, when it answers a job of `kind`; else `error`. */
-function jobOutcomeOf<J extends CommentFileJob>({ settled, raw }: Answer, kind: J['kind']): CommentJobOutcome<J> {
-  if ('kind' in settled) return withRaw(settled, raw)
-  const result = settled.type === 'job' && settled.result.kind === kind ? (settled.result as JobResultOf<J>) : failed('error')
-  return withRaw(result, raw)
+  if (settled.type !== 'job' || settled.result.kind !== kind) return withRaw(failed('error'), raw)
+  const result = settled.result as JobResultOf<J>
+  return withRaw(check === undefined || check(result) ? result : failed('error'), raw)
 }
 
 /**
@@ -218,8 +229,8 @@ function defaultCreateWorker(): CommentParseWorkerLike | null {
   })
 }
 
-/** The process-wide comment parse client; also the production {@link CommentFileJobRunner}. */
-export class CommentParseClient implements CommentFileJobRunner {
+/** The process-wide comment parse client, for every file kind. */
+export class CommentParseClient {
   private readonly createWorker: () => CommentParseWorkerLike | null
   private readonly timeoutMs: number
   private readonly timeoutPerMbMs: number
@@ -254,24 +265,31 @@ export class CommentParseClient implements CommentFileJobRunner {
     return !this.disabled
   }
 
-  /** Start the worker and run one tiny parse, so the first real page finds it warm. */
-  warm(): void {
+  /** Start the worker and run `warmUp`, so the first real file finds it warm. Nothing once it runs. */
+  warm(warmUp: CommentWarmUp): void {
     if (this.worker !== null || this.disabled) return
-    void this.instrument(WARM_UP_BYTES)
+    void this.run(warmUp.fileKind, warmUp.bytes, warmUp.job)
   }
 
   /**
-   * Instrument one document in the worker. Never rejects. `bytes` may be lent
-   * (module comment): read them back from the result's `raw`, never from the
-   * caller's view.
+   * Run `job` of file kind `fileKind`'s table on `bytes` in the worker. Never
+   * rejects. The answer counts only when it names `job`'s kind and passes
+   * `check`; else it is an `error`. `bytes` may be lent (module comment): read
+   * them back from the result's `raw`, never from the caller's view.
    */
-  async instrument(bytes: Uint8Array): Promise<CommentParseResult> {
-    return instrumentOutcomeOf(await this.request(bytes, (id, sent) => ({ type: 'instrument', id, bytes: sent })))
+  async run<J extends CommentJob>(
+    fileKind: CommentFileKindId,
+    bytes: Uint8Array,
+    job: J,
+    check?: CommentJobAnswerCheck<JobResultOf<J>>
+  ): Promise<CommentJobOutcome<J>> {
+    const answer = await this.request(bytes, (id, sent) => ({ type: 'job', id, fileKind, bytes: sent, job }))
+    return outcomeOf<J>(answer, job.kind, check)
   }
 
-  /** Run one comment file job on `bytes` in the worker. Never rejects. `bytes` may be lent, as for {@link instrument}. */
-  async runJob<J extends CommentFileJob>(bytes: Uint8Array, job: J): Promise<CommentJobOutcome<J>> {
-    return jobOutcomeOf<J>(await this.request(bytes, (id, sent) => ({ type: 'job', id, bytes: sent, job })), job.kind)
+  /** File kind `fileKind`'s jobs `J` as a plain runner over {@link run}. */
+  runnerFor<J extends CommentJob>(fileKind: CommentFileKindId): CommentFileJobRunner<J> {
+    return { runJob: (bytes, job) => this.run(fileKind, bytes, job) }
   }
 
   /** Queue one request for the worker; resolves with its reply, or why there is none. */

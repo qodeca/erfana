@@ -160,6 +160,12 @@ export default defineConfig({
         // measured 100/100/100/100 on 2026-10-30, Windows).
         'src/shared/comments/fileKind.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         'src/shared/comments/htmlKind.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Spec 024 format additions (commit 11, C1, C-01, C-02): `anchor.sel`, the
+        // agent-note-line encoder and hints, and the per-kind agent notes
+        // (measured 100/100/100/100 each on 2026-10-30, Windows, comment suites).
+        'src/shared/comments/anchorSel.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/noteLines.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/agentNotes.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // Spec 024 overlayCore (ADR 0006): pure rules shared by both overlays; measured 100/100/100/100.
         'src/shared/comments/overlayCore/pinLayout.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         'src/shared/comments/overlayCore/modeState.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
@@ -218,6 +224,16 @@ export default defineConfig({
         'src/main/services/comments/commentParseWorker.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/95.23/95.91/97.19
         'src/main/services/comments/CommentParseWorkerAdapter.ts': { lines: 98, functions: 93, branches: 93, statements: 95 },
+        // The parse worker split into a shared runner plus per-kind jobs (spec 024
+        // architecture note 001 § 8 C22): the entry that registers every kind's
+        // job table, the HTML kind's table, and its typed view of the client
+        // (2026-10-30, Windows, on the comment and preview suites).
+        // measured 100/100/100/100
+        'src/main/services/workers/comment-parse.worker.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/preview/comments/htmlCommentJobs.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/preview/comments/htmlCommentParseClient.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/94.44/100
         'src/main/services/preview/comments/ElementTokenTable.ts': { lines: 98, functions: 98, branches: 92, statements: 98 },
         // measured 100/100/93.75/100

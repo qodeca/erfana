@@ -35,7 +35,8 @@ import {
   snapshot,
   type TempProject
 } from '../preview/comments/__test-helpers__/commentWriterHarness'
-import { createInProcessCommentFileJobs, type CommentFileJob, type CommentFileJobRunner, type CommentJobOutcome } from './commentFileJobs'
+import type { CommentFileJob, CommentFileJobRunner, CommentJobOutcome } from './commentFileJobs'
+import { createInProcessCommentFileJobs } from '../preview/comments/htmlCommentJobs'
 import { commentFileLock } from './commentFileLock'
 import { CommentWriter, type CommentWriteResult } from './CommentWriter'
 

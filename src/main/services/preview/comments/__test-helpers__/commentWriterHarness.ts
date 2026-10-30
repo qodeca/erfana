@@ -27,7 +27,7 @@ import {
   seededRandom
 } from '../../../../../shared/comments/__fixtures__/commentTestData'
 import { sha256Hex } from '../../../../utils/atomicWriteBytesStrict'
-import { createInProcessCommentFileJobs } from '../../../comments/commentFileJobs'
+import { createInProcessCommentFileJobs } from '../htmlCommentJobs'
 import {
   CommentWriter,
   type CommentDraftTarget,

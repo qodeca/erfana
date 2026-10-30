@@ -16,7 +16,7 @@ import { makeProject, PAGE, type TempProject } from './__test-helpers__/commentW
 import { damagedBlock, insertBefore } from './__test-helpers__/commentedPages'
 import { frameFile, serveLoad, tokenOfTag } from './__test-helpers__/commentServiceHarness'
 import { buildDraft, buildPin, cutText, EXCERPT_MAX_CHARS, lineAt } from './commentDraftBuilder'
-import { createInProcessCommentFileJobs, type CommentFileJobRunner } from '../../comments/commentFileJobs'
+import { createInProcessCommentFileJobs, type HtmlFileJobRunner } from './htmlCommentJobs'
 import { ElementTokenTable } from './ElementTokenTable'
 
 vi.mock('../../LoggingService', () => ({
@@ -181,7 +181,7 @@ describe('buildPin (M4)', () => {
   const PINNED = insertBefore(PAGE, '<button', `${damagedBlock('d1')}\n    `)
 
   /** Serve `html`, then build the pin on the first `tag`, counting the jobs it runs. */
-  async function pinFor(html: string, tag: string, options: { pick: boolean; blocks: boolean; jobs?: CommentFileJobRunner; change?: (path: string) => Promise<void> }) {
+  async function pinFor(html: string, tag: string, options: { pick: boolean; blocks: boolean; jobs?: HtmlFileJobRunner; change?: (path: string) => Promise<void> }) {
     const path = await project.write('index.html', html)
     const tokens = new ElementTokenTable()
     const { loadId, doc } = serveLoad(tokens, html, path)
@@ -196,7 +196,7 @@ describe('buildPin (M4)', () => {
       ...(options.pick ? { pick: { kind: 'icon', via: 'pointer', token, tag, view: VIEW } as CommentPick } : {}),
       blocks: options.blocks,
       frame: false,
-      jobs: { runJob } as CommentFileJobRunner
+      jobs: { runJob } as HtmlFileJobRunner
     })
     return { built, runJob }
   }

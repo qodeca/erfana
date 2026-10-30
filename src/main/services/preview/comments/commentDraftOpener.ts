@@ -28,7 +28,7 @@
  */
 import { CommentPickRuntimeSchema, type CommentDraftOpened, type CommentPick } from '../../../../shared/ipc/preview-comment-schema'
 import type { PreviewBounds } from '../../../../shared/ipc/preview-types'
-import type { CommentFileJobRunner } from '../../comments/commentFileJobs'
+import type { HtmlFileJobRunner } from './htmlCommentJobs'
 import type { CommentBinding, CommentKeyStore } from '../../comments/commentKeyStore'
 import type { CommentFrameLike, FrameRecord } from './commentFrames'
 import { buildDraft, buildPin, draftKeyOf, type BuiltDraft, type BuiltPin, type CommentDraft } from './commentDraftBuilder'
@@ -64,7 +64,7 @@ export interface DraftOpenerDeps {
   readonly currentPage: () => string
   readonly emit: (payload: CommentDraftOpened) => void
   /** Where the parse runs: the comment parse worker in the app. */
-  readonly jobs: CommentFileJobRunner
+  readonly jobs: HtmlFileJobRunner
   /** False once the view is disposed or `record` is no longer its frame's: nothing is minted or sent then. */
   readonly isCurrent: (record: FrameRecord) => boolean
   readonly platform?: NodeJS.Platform

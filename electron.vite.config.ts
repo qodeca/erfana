@@ -232,8 +232,8 @@ export default defineConfig({
         input: {
           index: resolve('src/main/index.ts'),
           'git-status.worker': resolve('src/main/services/workers/git-status.worker.ts'),
-          // HTML Preview comments: the persistent parse worker (design §19 R3-12).
-          'comment-parse.worker': resolve('src/main/services/comments/commentParseWorker.ts'),
+          // Comments: the persistent parse worker and its file-kind composition root (design §19 R3-12; spec 024 C22).
+          'comment-parse.worker': resolve('src/main/services/workers/comment-parse.worker.ts'),
           // HTML Preview auto-refresh: the link scan worker, so no page is scanned on main (#124 audit).
           'preview-link-scan.worker': resolve('src/main/services/preview/previewLinkScanWorker.ts'),
           // DOCX conversion runs in a killable utilityProcess child (#1 lens-review).

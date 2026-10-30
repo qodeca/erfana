@@ -37,8 +37,8 @@ import type {
 } from '../../../../shared/ipc/preview-comment-schema'
 import { logger } from '../../LoggingService'
 import type { PreviewCommentServing } from './commentInstrumentation'
-import type { CommentFileJobRunner } from '../../comments/commentFileJobs'
-import { sharedCommentParseClient } from '../../comments/CommentParseWorkerAdapter'
+import type { HtmlFileJobRunner } from './htmlCommentJobs'
+import { sharedHtmlCommentParseClient } from './htmlCommentParseClient'
 import { CommentWriter, type CommentWriterDeps } from '../../comments/CommentWriter'
 import { registerCommentE2eSource } from './commentE2eHook'
 import { CommentFrames, type CommentFrameLike, type FrameRecord } from './commentFrames'
@@ -108,7 +108,7 @@ export class PreviewCommentService implements CommentServiceApi {
   private lastNotVisible = ''
   private disposed = false
   private readonly binding: CommentBinding
-  private readonly jobs: CommentFileJobRunner
+  private readonly jobs: HtmlFileJobRunner
   private readonly frames: CommentFrames
   private readonly keys = new CommentKeyStore<CommentDraft>()
   private readonly status: CommentPanelStatus
@@ -123,7 +123,7 @@ export class PreviewCommentService implements CommentServiceApi {
     this.panelId = deps.panelId
     this.windowId = deps.windowId
     this.binding = { windowId: deps.windowId, panelId: deps.panelId, session: deps.session }
-    this.jobs = deps.shared.jobs ?? sharedCommentParseClient()
+    this.jobs = deps.shared.jobs ?? sharedHtmlCommentParseClient()
     const { tokens } = deps.serving
     const mainFrame = (): CommentFrameLike | undefined => deps.contents.mainFrame as CommentFrameLike | undefined
     const files = createFrameFileMap({ token: deps.token, realRoot: deps.realRoot, projectPath: deps.projectPath, platform: deps.platform })

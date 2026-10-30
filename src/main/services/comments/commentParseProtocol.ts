@@ -2,49 +2,43 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The message contract between main and the comment parse worker
- * (docs/designs/comments/html-preview-comments.md §19 R3-12).
+ * (docs/designs/comments/html-preview-comments.md §19 R3-12; spec 024
+ * architecture note 001 § 8 C22).
+ *
+ * It knows no file kind: a request names a file kind id and a job – its
+ * `kind` and its payload – and an answer is that job's result, whose `kind`
+ * names the job it answers. What a job's result must hold is the file kind's
+ * own business: main checks it where it asked (`CommentParseClient.run`).
  *
  * Its own module so the main bundle imports the contract without importing
- * the worker entry (`commentParseWorker.ts`), which would make the main
- * bundle load the worker's chunk at start-up.
+ * the worker entry, which would make the main bundle load the worker's chunk
+ * at start-up.
  */
-import type { CommentFileJob, CommentFileJobResult } from './commentFileJobs'
-import { TOKEN_CHARS, type InstrumentOutcome } from '../preview/comments/commentParseCore'
+import type { CommentFileKindId } from '../../../shared/comments/fileKind'
+import type { AnyCommentJobHandler, CommentJob, CommentJobLookup, CommentJobResult } from './commentFileJobs'
 
 /** The `workerData.role` the adapter starts the worker with; the worker answers only then. */
 export const COMMENT_PARSE_WORKER_ROLE = 'erfana-comment-parse'
-
-/** Every job kind, checked complete against the job union; types only cross from the job module. */
-const JOB_KINDS = { draft: true, pin: true, list: true, write: true } satisfies Record<CommentFileJob['kind'], true>
-const COMMENT_FILE_JOB_KINDS: ReadonlySet<string> = new Set(Object.keys(JOB_KINDS))
 
 /** Content hashes main sends with a request, at most (`CommentParseWorkerAdapter.ts` keeps as many). */
 export const MAX_POISONED_HASHES = 64
 const CONTENT_HASH = /^[0-9a-f]{64}$/
 
-/**
- * What every request carries besides its work: the SHA-256 of each content
- * that stopped a worker before (security review S-M). The worker answers
- * `poisoned` for those instead of parsing them again.
- */
-interface RequestCommon {
+/** Main → worker: run one job of one file kind's table on bytes main read. */
+export interface CommentParseRequest {
+  readonly type: 'job'
   readonly id: number
+  /**
+   * The SHA-256 of each content that stopped a worker before (security review
+   * S-M). The worker answers `poisoned` for those instead of parsing them again.
+   */
   readonly poisoned?: readonly string[]
+  /** The file kind whose table runs the job: an id, never a path (`commentJobDocs.ts`). */
+  readonly fileKind: CommentFileKindId
+  /** The file's bytes as main read them (transferred). */
+  readonly bytes: Uint8Array
+  readonly job: CommentJob
 }
-
-/** Main → worker: instrument a served document, or run a comment file job (`commentFileJobs.ts`). */
-export type CommentParseRequest =
-  | (RequestCommon & {
-      readonly type: 'instrument'
-      /** The served document's bytes (transferred). */
-      readonly bytes: Uint8Array
-    })
-  | (RequestCommon & {
-      readonly type: 'job'
-      /** The file's bytes as main read them (transferred). */
-      readonly bytes: Uint8Array
-      readonly job: CommentFileJob
-    })
 
 /**
  * Worker → main, before any work on a request: the SHA-256 of its bytes. Not
@@ -63,15 +57,14 @@ export interface CommentParseBegin {
  * (`CommentParseWorkerAdapter.ts`).
  */
 export type CommentParseReply =
-  | { readonly type: 'result'; readonly id: number; readonly outcome: InstrumentOutcome; readonly raw?: Uint8Array }
-  | { readonly type: 'job'; readonly id: number; readonly result: CommentFileJobResult; readonly raw?: Uint8Array }
+  | { readonly type: 'job'; readonly id: number; readonly result: CommentJobResult; readonly raw?: Uint8Array }
   | { readonly type: 'error'; readonly id: number; readonly raw?: Uint8Array }
   /** The content stopped a worker before: not parsed again (S-M). */
   | { readonly type: 'poisoned'; readonly id: number; readonly raw?: Uint8Array }
 
-/** True when `job` names a known job kind; its fields are the job module's to read. */
-function isJob(job: unknown): job is CommentFileJob {
-  return typeof job === 'object' && job !== null && COMMENT_FILE_JOB_KINDS.has((job as { kind?: unknown }).kind as string)
+/** True when `value` is an object whose `kind` is a string: a job, or a job's answer. */
+function isKinded(value: unknown): value is { readonly kind: string } {
+  return typeof value === 'object' && value !== null && typeof (value as { kind?: unknown }).kind === 'string'
 }
 
 /** True when `poisoned` is absent, or a short list of content hashes. */
@@ -84,12 +77,28 @@ function isPoisonList(poisoned: unknown): boolean {
   )
 }
 
-/** True when `message` is a well-formed {@link CommentParseRequest}. */
-export function isParseRequest(message: unknown): message is CommentParseRequest {
-  if (typeof message !== 'object' || message === null) return false
-  const { type, id, bytes, poisoned } = message as { type?: unknown; id?: unknown; bytes?: unknown; poisoned?: unknown }
-  if (!Number.isSafeInteger(id) || !(bytes instanceof Uint8Array) || !isPoisonList(poisoned)) return false
-  return type === 'instrument' || (type === 'job' && isJob((message as { job?: unknown }).job))
+/**
+ * The handler of a well-formed {@link CommentParseRequest} for a job `jobs`
+ * knows; `undefined` for anything else, which the worker ignores.
+ */
+export function requestHandlerOf(message: unknown, jobs: CommentJobLookup): AnyCommentJobHandler | undefined {
+  if (typeof message !== 'object' || message === null) return undefined
+  const { type, id, bytes, poisoned, fileKind, job } = message as {
+    type?: unknown
+    id?: unknown
+    bytes?: unknown
+    poisoned?: unknown
+    fileKind?: unknown
+    job?: unknown
+  }
+  if (type !== 'job' || !Number.isSafeInteger(id) || !(bytes instanceof Uint8Array) || !isPoisonList(poisoned)) return undefined
+  if (typeof fileKind !== 'string' || !isKinded(job)) return undefined
+  return jobs.handlerOf(fileKind, job.kind)
+}
+
+/** True when `message` is a well-formed {@link CommentParseRequest} for a job `jobs` knows. */
+export function isParseRequest(message: unknown, jobs: CommentJobLookup): message is CommentParseRequest {
+  return requestHandlerOf(message, jobs) !== undefined
 }
 
 /** True when `message` is a well-formed {@link CommentParseBegin}. */
@@ -100,45 +109,15 @@ export function isParseBegin(message: unknown): message is CommentParseBegin {
 }
 
 /**
- * True when an `ok` outcome's table is internally consistent: one token of
- * {@link TOKEN_CHARS} characters, one offset, one line and one tag code per
- * element.
- * The token table's aligned lookup relies on it, so main checks it at the
- * boundary instead of trusting the other thread.
+ * True when `message` is a well-formed {@link CommentParseReply}. A job
+ * answer needs only a `kind`: whether it answers the job asked, and holds
+ * what that job promises, the client checks against its request.
  */
-function isConsistentTable(outcome: InstrumentOutcome & { kind: 'ok' }): boolean {
-  const { html, tokens, offsets, lines, tagCodes, tagNames, blocks, fileHash } = outcome
-  return (
-    html instanceof Uint8Array &&
-    offsets instanceof Int32Array &&
-    lines instanceof Uint32Array &&
-    tagCodes instanceof Uint32Array &&
-    typeof tokens === 'string' &&
-    typeof fileHash === 'string' &&
-    tokens.length === offsets.length * TOKEN_CHARS &&
-    tagCodes.length === offsets.length &&
-    lines.length === offsets.length &&
-    Array.isArray(tagNames) &&
-    Array.isArray(blocks)
-  )
-}
-
-/** True when `result` names a known job kind; the client checks it is the kind it asked for. */
-function isJobResult(result: unknown): result is CommentFileJobResult {
-  return typeof result === 'object' && result !== null && COMMENT_FILE_JOB_KINDS.has((result as { kind?: unknown }).kind as string)
-}
-
-/** True when `message` is a well-formed {@link CommentParseReply}. */
 export function isParseReply(message: unknown): message is CommentParseReply {
   if (typeof message !== 'object' || message === null) return false
   const { type, id, raw } = message as { type?: unknown; id?: unknown; raw?: unknown }
   if (!Number.isSafeInteger(id)) return false
   if (raw !== undefined && !(raw instanceof Uint8Array)) return false
   if (type === 'error' || type === 'poisoned') return true
-  if (type === 'job') return isJobResult((message as { result?: unknown }).result)
-  if (type !== 'result') return false
-  const outcome = (message as { outcome?: InstrumentOutcome }).outcome
-  if (typeof outcome !== 'object' || outcome === null) return false
-  if (outcome.kind === 'unavailable') return typeof outcome.reason === 'string'
-  return outcome.kind === 'ok' && isConsistentTable(outcome)
+  return type === 'job' && isKinded((message as { result?: unknown }).result)
 }

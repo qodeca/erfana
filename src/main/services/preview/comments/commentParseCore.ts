@@ -6,8 +6,9 @@
  * §6 "On every load", §19 R3-12, R3-13).
  *
  * Pure apart from its random source and a hash: no Electron, no file system,
- * no worker API, so it is unit-tested directly and the worker shell
- * (`commentParseWorker.ts`) only moves messages.
+ * no worker API, so it is unit-tested directly and the worker runner
+ * (`commentParseWorker.ts`) only moves messages; it runs as the HTML kind's
+ * `instrument` job (`htmlCommentJobs.ts`).
  *
  * One pass, from the bytes actually served:
  * 1. size cap, a start-tag count over the token cap or an attribute flood

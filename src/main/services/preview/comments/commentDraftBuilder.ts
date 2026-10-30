@@ -28,7 +28,7 @@ import { stablePathDigest } from '../../../../shared/stablePathDigest'
 import { logger } from '../../LoggingService'
 import type { DraftJobResult, DraftPickPart, DraftTargetView, PinBlock } from './commentDraftCore'
 import { loadCommentBytes } from '../../comments/commentFileAccess'
-import type { CommentFileJobRunner } from '../../comments/commentFileJobs'
+import type { HtmlFileJobRunner } from './htmlCommentJobs'
 import { jobFailureRefusal, refusalCode } from '../../comments/commentRefusals'
 import { samePathKey } from '../../comments/commentUnsavedSources'
 import type { ElementTokenEntry } from './ElementTokenTable'
@@ -69,7 +69,7 @@ export interface DraftInput {
   readonly frame: boolean
   readonly pageRealPath?: string
   /** Where the parse runs: the comment parse worker in the app. */
-  readonly jobs: CommentFileJobRunner
+  readonly jobs: HtmlFileJobRunner
   readonly platform?: NodeJS.Platform
 }
 

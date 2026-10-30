@@ -14,9 +14,12 @@
  * Tests, test helpers and fixtures are not part of the base and are not
  * scanned: a shared module's test may drive it through the HTML kind.
  *
- * PENDING lists the imports the parse-worker split of C22 ("a shared runner
- * plus per-kind jobs") will remove. It may only shrink: a listed import that
- * is gone fails the test, so the entry must be deleted with it.
+ * PENDING lists imports that are known to cross the boundary and are waiting
+ * to be removed. It is empty since the parse-worker split of C22 ("a shared
+ * runner plus per-kind jobs"): the worker entry that registers each kind's
+ * jobs is a composition root outside the base
+ * (`src/main/services/workers/comment-parse.worker.ts`, § 8 C24). It may only
+ * shrink: a listed import that is gone fails the test.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
@@ -46,18 +49,8 @@ const ALIASES: ReadonlyArray<readonly [string, string]> = [
   ['@renderer/', 'src/renderer/src/']
 ]
 
-/**
- * `importing file → imported HTML-only module` (repo-relative, `/`-separated,
- * no extension), waiting for the C22 parse-worker split: the worker, its
- * protocol, its client and its job dispatcher still carry the HTML
- * instrumentation and the draft and pin jobs.
- */
-const PENDING: ReadonlySet<string> = new Set([
-  'src/main/services/comments/CommentParseWorkerAdapter.ts → src/main/services/preview/comments/commentParseCore',
-  'src/main/services/comments/commentFileJobs.ts → src/main/services/preview/comments/commentDraftCore',
-  'src/main/services/comments/commentParseProtocol.ts → src/main/services/preview/comments/commentParseCore',
-  'src/main/services/comments/commentParseWorker.ts → src/main/services/preview/comments/commentParseCore'
-])
+/** `importing file → imported HTML-only module` (repo-relative, `/`-separated, no extension); none left. */
+const PENDING: ReadonlySet<string> = new Set<string>([])
 
 const SOURCE = /\.(ts|tsx|mts|cts|js|mjs)$/
 const TEST = /\.test\.(ts|tsx|mts|cts|js|mjs)$/

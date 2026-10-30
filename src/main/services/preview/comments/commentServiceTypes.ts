@@ -20,7 +20,7 @@ import type {
   CommentSetModeResult,
   CommentsChanged
 } from '../../../../shared/ipc/preview-comment-schema'
-import type { CommentFileJobRunner } from '../../comments/commentFileJobs'
+import type { HtmlFileJobRunner } from './htmlCommentJobs'
 import type { CommentIdentity } from '../../comments/CommentWriter'
 import type { CommentUnsavedSources } from '../../comments/commentUnsavedSources'
 
@@ -103,5 +103,5 @@ export interface PreviewCommentShared {
   /** The cursor on screen (`screen.getCursorScreenPoint`), for a pick without a screen point. */
   readonly cursor?: () => { readonly x: number; readonly y: number }
   /** Where every comment parse runs; the process-wide comment parse worker by default (§19 R3-12). */
-  readonly jobs?: CommentFileJobRunner
+  readonly jobs?: HtmlFileJobRunner
 }

@@ -1,126 +1,102 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The persistent comment parse worker (docs/designs/comments/html-preview-comments.md
- * §19 R3-12; pattern `src/main/services/workers/git-status.worker.ts`).
+ * The persistent comment parse worker's shared runner
+ * (docs/designs/comments/html-preview-comments.md §19 R3-12; spec 024
+ * architecture note 001 § 8 C22; pattern `src/main/services/workers/git-status.worker.ts`).
  *
- * Built as its own main-process bundle entry (`comment-parse.worker`,
- * electron.vite.config.ts) and started by `CommentParseWorkerAdapter.ts`. It
- * runs the parse5 pass of every instrumented document off the main thread: a
+ * The worker runs the parse of every commented file off the main thread: a
  * 4 MB page costs about 380 ms of parsing and a dense 25 MB page about 5 s,
  * which on the main thread would freeze every window (spike S9, §19 Rev 4).
  *
- * The shell only moves messages; the work is `instrumentDocument`
- * (`commentParseCore.ts`) for a served page, and `runCommentFileJob`
- * (`commentFileJobs.ts`) for the parse a pick, a pin, a list or a write needs
- * – with one document cache for the worker's life (`commentJobDocs.ts`).
+ * The runner knows no file kind. A request names a file kind id and a job;
+ * the runner looks the job up in the {@link CommentJobLookup} the entry built
+ * – every kind's table, registered at the composition root
+ * (`src/main/services/workers/comment-parse.worker.ts`, the
+ * `comment-parse.worker` bundle of electron.vite.config.ts, started by
+ * `CommentParseWorkerAdapter.ts`) – and runs it with that kind's slice of one
+ * document cache for the worker's life (`commentJobDocs.ts`). A request for a
+ * kind or a job no table names is not a request: it is ignored.
+ *
  * Requests are handled one at a time, in order. Before any work the worker
- * tells main the SHA-256 of the request's bytes (`begin`): when a page kills
+ * tells main the SHA-256 of the request's bytes (`begin`): when a file kills
  * it (out of memory, or main's time limit), main knows which content did and
  * sends that hash back with every later request, and the worker answers
  * `poisoned` for it without parsing it again (security review S-M). A throw
- * answers `error` with no text (nothing from the page reaches a log). The
- * result's large buffers
- * are transferred, not copied, and every reply hands the request's own bytes
- * back as `raw` – main may have lent them rather than copied them
- * (`CommentParseWorkerAdapter.ts`, §19 Rev 4).
- *
- * It starts listening only when its `workerData` names its role, so the module
- * can be imported anywhere – a test runner's own worker thread included –
- * without answering messages that are not addressed to it.
+ * answers `error` with no text (nothing from the file reaches a log). The
+ * buffers a handler names are transferred, not copied, and every reply hands
+ * the request's own bytes back as `raw` – main may have lent them rather than
+ * copied them (`CommentParseWorkerAdapter.ts`, §19 Rev 4).
  */
-import { parentPort, workerData } from 'node:worker_threads'
-import { runCommentFileJob, type CommentFileJobResult } from './commentFileJobs'
+import type { CommentJobLookup } from './commentFileJobs'
 import { CommentDocCache, sha256HexOf } from './commentJobDocs'
-import { instrumentDocument, type InstrumentOutcome } from '../preview/comments/commentParseCore'
 import {
   COMMENT_PARSE_WORKER_ROLE,
-  isParseRequest,
+  requestHandlerOf,
   type CommentParseBegin,
   type CommentParseReply,
   type CommentParseRequest
 } from './commentParseProtocol'
 
-/** The slice of a `MessagePort` the shell uses. */
+/** The slice of a `MessagePort` the runner uses. */
 export interface CommentParsePort {
   on(event: 'message', listener: (message: unknown) => void): unknown
   postMessage(message: CommentParseReply | CommentParseBegin, transfer?: ArrayBuffer[]): void
 }
 
-/** The buffers of an outcome that can move to main without a copy. */
-function transferablesOf(outcome: InstrumentOutcome): ArrayBuffer[] {
-  if (outcome.kind !== 'ok') return []
-  return [outcome.html.buffer, outcome.offsets.buffer, outcome.lines.buffer, outcome.tagCodes.buffer] as ArrayBuffer[]
+/** What a worker answers with: every kind's jobs, and the one document cache they share. */
+export interface CommentParseWorkerContext {
+  readonly jobs: CommentJobLookup
+  readonly cache: CommentDocCache
 }
 
 /**
- * A job answer's buffer that can move without a copy: the write's block bytes,
- * when they own theirs. A view into a larger buffer (a pooled `Buffer`, say)
- * is copied instead – moving it would take the rest of that buffer with it.
- */
-export function jobTransferablesOf(result: CommentFileJobResult): ArrayBuffer[] {
-  if (result.kind !== 'write' || !result.ok) return []
-  const { insert } = result
-  return insert.byteOffset === 0 && insert.byteLength === insert.buffer.byteLength ? [insert.buffer as ArrayBuffer] : []
-}
-
-/**
- * The request's bytes as they go back: moved when they own their buffer
- * (they always do – main lends a whole buffer or sends its own copy), else
- * copied here, off the main thread.
+ * A view's buffer when it can move without a copy: when the view owns all of
+ * it. A view into a larger buffer (a pooled `Buffer`, say) is copied instead –
+ * moving it would take the rest of that buffer with it. Every reply moves the
+ * request's bytes back this way (main lends a whole buffer or sends its own
+ * copy), and a handler may name its answer's buffers the same way.
  */
 export function rawTransferablesOf(raw: Uint8Array): ArrayBuffer[] {
   return raw.byteOffset === 0 && raw.byteLength === raw.buffer.byteLength ? [raw.buffer as ArrayBuffer] : []
 }
 
-/** The documents this worker parsed for jobs, by content hash. */
-const jobDocuments = new CommentDocCache()
-
-/** The reply to one request, with what it transfers. Throws when the work does. */
-function replyTo(request: CommentParseRequest, cache: CommentDocCache): [CommentParseReply, ArrayBuffer[]] {
-  const raw = request.bytes
-  if (request.type === 'job') {
-    const result = runCommentFileJob(raw, request.job, { cache })
-    return [{ type: 'job', id: request.id, result, raw }, [...jobTransferablesOf(result), ...rawTransferablesOf(raw)]]
-  }
-  const outcome = instrumentDocument(raw)
-  return [{ type: 'result', id: request.id, outcome, raw }, [...transferablesOf(outcome), ...rawTransferablesOf(raw)]]
-}
-
 /**
- * Answer one request on `port`; anything that is not a request is ignored.
- * Never throws. `cache` is the worker's document cache; a suite passes its own.
+ * Answer one request on `port`; anything that is not a request for a job
+ * `context.jobs` knows is ignored. Never throws.
  */
-export function answerParseRequest(port: CommentParsePort, message: unknown, cache: CommentDocCache = jobDocuments): void {
-  if (!isParseRequest(message)) return
+export function answerParseRequest(port: CommentParsePort, message: unknown, context: CommentParseWorkerContext): void {
+  const handler = requestHandlerOf(message, context.jobs)
+  if (handler === undefined) return
+  const request = message as CommentParseRequest
+  const raw = request.bytes
   // Which content this is, before any work: if the work below kills this worker, main stops sending it.
-  const hash = sha256HexOf(message.bytes)
-  port.postMessage({ type: 'begin', id: message.id, hash })
-  if (message.poisoned?.includes(hash) === true) {
-    port.postMessage({ type: 'poisoned', id: message.id, raw: message.bytes }, rawTransferablesOf(message.bytes))
+  const hash = sha256HexOf(raw)
+  port.postMessage({ type: 'begin', id: request.id, hash })
+  if (request.poisoned?.includes(hash) === true) {
+    port.postMessage({ type: 'poisoned', id: request.id, raw }, rawTransferablesOf(raw))
     return
   }
   let reply: [CommentParseReply, ArrayBuffer[]]
   try {
-    reply = replyTo(message, cache)
+    const result = handler.run(raw, request.job, { cache: context.cache.forKind(request.fileKind) })
+    const moved = [...(handler.transferables?.(result) ?? []), ...rawTransferablesOf(raw)]
+    reply = [{ type: 'job', id: request.id, result, raw }, moved]
   } catch {
-    port.postMessage({ type: 'error', id: message.id, raw: message.bytes }, rawTransferablesOf(message.bytes))
+    port.postMessage({ type: 'error', id: request.id, raw }, rawTransferablesOf(raw))
     return
   }
   port.postMessage(...reply)
 }
 
-/** Start answering requests on `port`. */
-export function startCommentParseWorker(port: CommentParsePort): void {
-  port.on('message', message => answerParseRequest(port, message))
+/** Start answering requests on `port` with `jobs`, and a document cache for the worker's life. */
+export function startCommentParseWorker(port: CommentParsePort, jobs: CommentJobLookup): void {
+  const context: CommentParseWorkerContext = { jobs, cache: new CommentDocCache() }
+  port.on('message', message => answerParseRequest(port, message, context))
 }
 
 /** True when this thread was started as the comment parse worker. */
 export function isCommentParseWorker(data: unknown, port: unknown): boolean {
   const role = (data as { role?: unknown } | null | undefined)?.role
   return port !== null && port !== undefined && role === COMMENT_PARSE_WORKER_ROLE
-}
-
-if (isCommentParseWorker(workerData, parentPort)) {
-  startCommentParseWorker(parentPort as unknown as CommentParsePort)
 }

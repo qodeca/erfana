@@ -6,14 +6,18 @@
  * timeout, and M-068 with security review S-M – the content a worker died on
  * is poisoned, a dead worker is replaced after a back-off, and too many deaths
  * leave comments unavailable. The worker is a fake that answers with the real
- * pipeline in-process, so these tests drive every failure on purpose.
+ * HTML job table in-process, so these tests drive every failure on purpose;
+ * the client is driven through the HTML kind's view of it
+ * (`htmlCommentParseClient.ts`), as production drives it.
  */
 import { EventEmitter } from 'node:events'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { encodeText } from '../../../shared/htmlComments'
-import { runCommentFileJob } from './commentFileJobs'
 import { CommentDocCache, sha256HexOf } from './commentJobDocs'
 import { instrumentDocument } from '../preview/comments/commentParseCore'
+import { htmlCommentJobTable } from '../preview/comments/htmlCommentJobs'
+import { HtmlCommentParseClient, sharedHtmlCommentParseClient } from '../preview/comments/htmlCommentParseClient'
+import type { AnyCommentJobTable } from './commentFileJobs'
 import { MAX_POISONED_HASHES, type CommentParseRequest } from './commentParseProtocol'
 import {
   CommentParseClient,
@@ -60,11 +64,9 @@ class FakeWorker extends EventEmitter implements CommentParseWorkerLike {
       this.emit('message', { type: 'poisoned', id })
       return
     }
-    if (request.type === 'job') {
-      this.emit('message', { type: 'job', id, result: runCommentFileJob(request.bytes, request.job, { cache: new CommentDocCache() }) })
-      return
-    }
-    this.emit('message', { type: 'result', id, outcome: instrumentDocument(request.bytes) })
+    const handler = (htmlCommentJobTable as unknown as AnyCommentJobTable)[request.job.kind]
+    const cache = new CommentDocCache().forKind(request.fileKind)
+    this.emit('message', { type: 'job', id, result: handler.run(request.bytes, request.job, { cache }) })
   }
   terminate(): Promise<number> {
     this.terminated = true
@@ -89,7 +91,7 @@ function makeClient(
   const workers: FakeWorker[] = []
   /** The client's clock, moved by hand (ms). */
   const clock = { now: 0 }
-  const client = new CommentParseClient({
+  const parse = new CommentParseClient({
     createWorker: () => {
       const worker = new FakeWorker(options.auto ?? true)
       workers.push(worker)
@@ -102,8 +104,16 @@ function makeClient(
     maxRestarts: options.maxRestarts,
     now: () => clock.now
   })
-  return { client, workers, clock }
+  return { client: new HtmlCommentParseClient(parse), parse, workers, clock }
 }
+
+/** An instrument answer, as the worker sends it. */
+const instrumentAnswer = (id: number, outcome: unknown, raw?: Uint8Array) => ({
+  type: 'job',
+  id,
+  result: { kind: 'instrument', outcome },
+  ...(raw === undefined ? {} : { raw })
+})
 
 /** The id of the last request `worker` was sent. */
 const lastId = (worker: FakeWorker): number => worker.sent.at(-1)!.message.id
@@ -121,7 +131,7 @@ describe('CommentParseClient jobs', () => {
 
     expect(result).toMatchObject({ kind: 'list', ok: true, summary: { writable: true, threads: [] } })
     const { message, transfer } = workers[0].sent[0]
-    expect(message).toMatchObject({ type: 'job', job: { kind: 'list' } })
+    expect(message).toMatchObject({ type: 'job', fileKind: 'html', job: { kind: 'list' } })
     expect(message.bytes.buffer).not.toBe(pooled.buffer)
     expect(transfer).toEqual([message.bytes.buffer])
   })
@@ -134,7 +144,7 @@ describe('CommentParseClient jobs', () => {
     expect(await client.runJob(PAGE, { kind: 'list' })).toEqual({ kind: 'failed', failure: 'busy' })
     const [first, second, third] = workers[0].sent.map(entry => entry.message.id)
     workers[0].emit('message', { type: 'job', id: first, result: { kind: 'pin', blocks: [] } })
-    workers[0].emit('message', { type: 'result', id: second, outcome: instrumentDocument(PAGE) })
+    workers[0].emit('message', instrumentAnswer(second, instrumentDocument(PAGE)))
     workers[0].emit('message', { type: 'error', id: third })
 
     expect(await wrongKind).toEqual({ kind: 'failed', failure: 'error' })
@@ -167,7 +177,7 @@ describe('CommentParseClient', () => {
     const pooled = Buffer.from(PAGE)
     await client.instrument(pooled)
     const { message, transfer } = workers[0].sent[0]
-    expect(message.type).toBe('instrument')
+    expect(message).toMatchObject({ type: 'job', fileKind: 'html', job: { kind: 'instrument' } })
     expect(message.bytes).toEqual(new Uint8Array(PAGE))
     expect(message.bytes.buffer).not.toBe(pooled.buffer)
     expect(transfer).toEqual([message.bytes.buffer])
@@ -344,7 +354,7 @@ describe('CommentParseClient', () => {
   it('treats an answer that is not a well-formed reply as an error for that request', async () => {
     const { client, workers } = makeClient({ auto: false })
     const malformed = client.instrument(PAGE)
-    workers[0].emit('message', { type: 'result', id: 1, outcome: { kind: 'ok', tokens: 'x' } })
+    workers[0].emit('message', instrumentAnswer(1, { kind: 'ok', tokens: 'x' }))
     await expect(malformed).resolves.toEqual({ kind: 'failed', failure: 'error' })
 
     const thrown = client.instrument(PAGE)
@@ -353,11 +363,7 @@ describe('CommentParseClient', () => {
 
     // Noise without an id, or for an unknown id, changes nothing.
     workers[0].emit('message', 'noise')
-    workers[0].emit('message', {
-      type: 'result',
-      id: 99,
-      outcome: { kind: 'unavailable', reason: 'encoding' }
-    })
+    workers[0].emit('message', instrumentAnswer(99, { kind: 'unavailable', reason: 'encoding' }))
     const next = client.instrument(PAGE)
     workers[0].answer(3)
     expect((await next).kind).toBe('ok')
@@ -373,18 +379,20 @@ describe('CommentParseClient', () => {
   })
 
   it('a worker that cannot be started (missing bundle) makes comments unavailable', async () => {
-    const client = new CommentParseClient({ createWorker: () => null })
+    const client = new HtmlCommentParseClient(new CommentParseClient({ createWorker: () => null }))
     await expect(client.instrument(PAGE)).resolves.toEqual({
       kind: 'failed',
       failure: 'unavailable'
     })
     expect(client.isAvailable()).toBe(false)
 
-    const throwing = new CommentParseClient({
-      createWorker: () => {
-        throw new Error('no worker_threads')
-      }
-    })
+    const throwing = new HtmlCommentParseClient(
+      new CommentParseClient({
+        createWorker: () => {
+          throw new Error('no worker_threads')
+        }
+      })
+    )
     await expect(throwing.instrument(PAGE)).resolves.toEqual({
       kind: 'failed',
       failure: 'unavailable'
@@ -402,32 +410,33 @@ describe('CommentParseClient', () => {
   })
 
   it('dispose stops the worker, fails what waits, and refuses new work', async () => {
-    const { client, workers } = makeClient({ auto: false })
+    const { client, parse, workers } = makeClient({ auto: false })
     const waiting = client.instrument(PAGE)
-    await client.dispose()
+    await parse.dispose()
     await expect(waiting).resolves.toEqual({ kind: 'failed', failure: 'unavailable' })
     expect(workers[0].terminated).toBe(true)
     await expect(client.instrument(PAGE)).resolves.toEqual({
       kind: 'failed',
       failure: 'unavailable'
     })
-    await client.dispose()
+    await parse.dispose()
 
     const rejecting = makeClient({ auto: false })
     void rejecting.client.instrument(PAGE)
     rejecting.workers[0].terminate = () => Promise.reject(new Error('gone'))
-    await expect(rejecting.client.dispose()).resolves.toBeUndefined()
+    await expect(rejecting.parse.dispose()).resolves.toBeUndefined()
   })
 
   it('shares one client across the process', () => {
     expect(sharedCommentParseClient()).toBe(sharedCommentParseClient())
+    expect(sharedHtmlCommentParseClient()).toBe(sharedHtmlCommentParseClient())
   })
 })
 
 describe('CommentParseClient – §19 Rev 4 lent bytes and time per megabyte', () => {
   const MB = 1024 * 1024
   /** A refusal answer that hands `raw` back, as the real worker does. */
-  const refusalWith = (id: number, raw: Uint8Array) => ({ type: 'result', id, outcome: { kind: 'unavailable', reason: 'encoding' }, raw })
+  const refusalWith = (id: number, raw: Uint8Array) => instrumentAnswer(id, { kind: 'unavailable', reason: 'encoding' }, raw)
 
   it(`lends bytes of at least ${LEND_MIN_BYTES} that own their buffer, and resolves with the bytes handed back`, async () => {
     const { client, workers } = makeClient({ auto: false })

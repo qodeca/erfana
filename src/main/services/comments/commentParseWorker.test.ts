@@ -1,18 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The comment parse worker shell and its message contract
- * (docs/designs/comments/html-preview-comments.md §19 R3-12). The shell answers only
- * well-formed requests – an instrument request or a comment file job – only
- * when started in its role, transfers the result's buffers, and answers a
- * throw with `error` and no text.
+ * The comment parse worker's shared runner and its message contract
+ * (docs/designs/comments/html-preview-comments.md §19 R3-12; spec 024
+ * architecture note 001 § 8 C22). The runner answers only well-formed
+ * requests for a job a registered file kind's table names – here the HTML
+ * kind's, as the worker entry registers it – transfers the buffers the job
+ * names, and answers a throw with `error` and no text.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { encodeText } from '../../../shared/htmlComments'
 import { fixedId } from '../../../shared/comments/__fixtures__/commentTestData'
 import { buttonBlock } from '../preview/comments/__test-helpers__/commentParseBench'
 import { PAGE as WRITER_PAGE, draftFor, byId } from '../preview/comments/__test-helpers__/commentWriterHarness'
+import { htmlCommentJobTable, type InstrumentJobResult } from '../preview/comments/htmlCommentJobs'
+import { isInstrumentOutcome } from '../preview/comments/htmlCommentParseClient'
+import { commentWorkerJobs } from '../workers/comment-parse.worker'
 import { CommentDocCache, sha256HexOf } from './commentJobDocs'
+import type { WriteJobResult } from './commentWriteCore'
 import * as core from '../preview/comments/commentParseCore'
 import {
   COMMENT_PARSE_WORKER_ROLE,
@@ -26,13 +31,26 @@ import {
 import {
   answerParseRequest,
   isCommentParseWorker,
-  jobTransferablesOf,
   rawTransferablesOf,
   startCommentParseWorker,
-  type CommentParsePort
+  type CommentParsePort,
+  type CommentParseWorkerContext
 } from './commentParseWorker'
 
 const PAGE = encodeText('<!doctype html><p id="a">x</p><!-- erfana:comment v2 id=c-x\n-->')
+const JOBS = commentWorkerJobs()
+
+/** The worker's context: every registered kind's jobs, and `cache`. */
+const contextWith = (cache = new CommentDocCache()): CommentParseWorkerContext => ({ jobs: JOBS, cache })
+
+/** A request to instrument `bytes` as an HTML page. */
+const instrumentRequest = (id: number, bytes: unknown) => ({ type: 'job', id, fileKind: 'html', bytes, job: { kind: 'instrument' } })
+
+/** The outcome an instrument reply carries. */
+function outcomeOf(message: CommentParseReply): core.InstrumentOutcome {
+  if (message.type !== 'job') throw new Error('expected a job answer')
+  return (message.result as InstrumentJobResult).outcome
+}
 
 /** A port that records every reply, and apart from them every `begin` (S-M). */
 function makePort(): CommentParsePort & {
@@ -63,13 +81,13 @@ afterEach(() => {
 describe('commentParseWorker', () => {
   it('answers an instrument request with the outcome and transfers its buffers', () => {
     const port = makePort()
-    answerParseRequest(port, { type: 'instrument', id: 7, bytes: PAGE })
+    answerParseRequest(port, instrumentRequest(7, PAGE), contextWith())
 
     expect(port.replies).toHaveLength(1)
     const { message, transfer } = port.replies[0]
-    expect(message).toMatchObject({ type: 'result', id: 7, outcome: { kind: 'ok' } })
+    expect(message).toMatchObject({ type: 'job', id: 7, result: { kind: 'instrument', outcome: { kind: 'ok' } } })
     expect(isParseReply(message)).toBe(true)
-    const outcome = (message as Extract<CommentParseReply, { type: 'result' }>).outcome
+    const outcome = outcomeOf(message)
     if (outcome.kind !== 'ok') throw new Error('expected ok')
     // §19 Rev 4: the request's own bytes go back too – main may have lent them.
     expect(message.raw).toBe(PAGE)
@@ -79,9 +97,9 @@ describe('commentParseWorker', () => {
   it('transfers only the bytes it was sent back with a refusal', () => {
     const port = makePort()
     const bytes = Uint8Array.from([0xff, 0xfe])
-    answerParseRequest(port, { type: 'instrument', id: 1, bytes })
+    answerParseRequest(port, instrumentRequest(1, bytes), contextWith())
     expect(port.replies[0]).toEqual({
-      message: { type: 'result', id: 1, outcome: { kind: 'unavailable', reason: 'encoding' }, raw: bytes },
+      message: { type: 'job', id: 1, result: { kind: 'instrument', outcome: { kind: 'unavailable', reason: 'encoding' } }, raw: bytes },
       transfer: [bytes.buffer]
     })
   })
@@ -91,7 +109,7 @@ describe('commentParseWorker', () => {
       throw new Error('secret page text')
     })
     const port = makePort()
-    answerParseRequest(port, { type: 'instrument', id: 3, bytes: PAGE })
+    answerParseRequest(port, instrumentRequest(3, PAGE), contextWith())
     expect(port.replies).toEqual([{ message: { type: 'error', id: 3, raw: PAGE }, transfer: [PAGE.buffer] }])
   })
 
@@ -102,28 +120,35 @@ describe('commentParseWorker', () => {
     expect(rawTransferablesOf(own.subarray(0, 4))).toEqual([])
   })
 
-  it('ignores anything that is not a well-formed request', () => {
+  it('ignores anything that is not a well-formed request for a registered job', () => {
     const port = makePort()
     for (const noise of [
       null,
       'instrument',
-      { type: 'instrument', id: 1 },
-      { type: 'instrument', id: 1.5, bytes: PAGE },
-      { type: 'instrument', id: '1', bytes: PAGE },
-      { type: 'other', id: 1, bytes: PAGE },
-      { type: 'instrument', id: 1, bytes: [1, 2] }
+      { type: 'job', id: 1, fileKind: 'html', job: { kind: 'instrument' } },
+      instrumentRequest(1.5, PAGE),
+      instrumentRequest('1' as unknown as number, PAGE),
+      { ...instrumentRequest(1, PAGE), type: 'other' },
+      // The shape before the C22 split: no file kind, no job.
+      { type: 'instrument', id: 1, bytes: PAGE },
+      instrumentRequest(1, [1, 2]),
+      { ...instrumentRequest(1, PAGE), fileKind: undefined },
+      { ...instrumentRequest(1, PAGE), fileKind: 'markdown' },
+      { ...instrumentRequest(1, PAGE), job: { kind: '__proto__' } },
+      { ...instrumentRequest(1, PAGE), job: { kind: 'toString' } }
     ]) {
-      answerParseRequest(port, noise)
+      answerParseRequest(port, noise, contextWith())
     }
     expect(port.replies).toEqual([])
+    expect(port.begins).toEqual([])
   })
 
   it('answers a job with its result, from one document cache across requests', () => {
     const port = makePort()
     const cache = new CommentDocCache()
     const page = encodeText(WRITER_PAGE.replace('    <button', `    ${buttonBlock(1)}<button`))
-    answerParseRequest(port, { type: 'job', id: 4, bytes: page, job: { kind: 'list' } }, cache)
-    answerParseRequest(port, { type: 'job', id: 5, bytes: page, job: { kind: 'list' } }, cache)
+    answerParseRequest(port, { type: 'job', id: 4, fileKind: 'html', bytes: page, job: { kind: 'list' } }, contextWith(cache))
+    answerParseRequest(port, { type: 'job', id: 5, fileKind: 'html', bytes: page, job: { kind: 'list' } }, contextWith(cache))
 
     expect(port.replies.map(reply => reply.message)).toMatchObject([
       { type: 'job', id: 4, result: { kind: 'list', ok: true, summary: { threads: [{ threadId: fixedId('c-', 1) }] } } },
@@ -143,55 +168,59 @@ describe('commentParseWorker', () => {
       request: { op: 'add' as const, draft: draftFor(bytes, byId('buy')), view: { w: 800, h: 600, dpr: 1, x: 0, y: 0 }, text: 'Hi' },
       act: { author: { name: 'Ada', role: 'human' as const }, nowMs: Date.UTC(2026, 9, 25) }
     }
-    answerParseRequest(port, { type: 'job', id: 6, bytes, job }, new CommentDocCache())
+    answerParseRequest(port, { type: 'job', id: 6, fileKind: 'html', bytes, job }, contextWith())
 
     const { message, transfer } = port.replies[0]
-    if (message.type !== 'job' || message.result.kind !== 'write' || !message.result.ok) throw new Error('expected a write')
-    expect(transfer).toEqual([message.result.insert.buffer, bytes.buffer])
+    if (message.type !== 'job') throw new Error('expected a job answer')
+    const result = message.result as WriteJobResult
+    if (result.kind !== 'write' || !result.ok) throw new Error('expected a write')
+    expect(transfer).toEqual([result.insert.buffer, bytes.buffer])
 
     // Block bytes that are a view into a larger buffer stay put; the message copies them.
+    const jobTransferablesOf = htmlCommentJobTable.write.transferables
     const shared = new Uint8Array(16)
-    expect(jobTransferablesOf({ ...message.result, insert: shared.subarray(4, 8) })).toEqual([])
-    expect(jobTransferablesOf({ kind: 'write', ok: false, refusal: 'conflict-markers' })).toEqual([])
+    expect(jobTransferablesOf?.({ ...result, insert: shared.subarray(4, 8) })).toEqual([])
+    expect(jobTransferablesOf?.({ kind: 'write', ok: false, refusal: 'conflict-markers' })).toEqual([])
   })
 
-  it('starts listening on its port', () => {
+  it('starts listening on its port, with the jobs it is given', () => {
     const port = makePort()
-    startCommentParseWorker(port)
-    port.listener!({ type: 'instrument', id: 2, bytes: PAGE })
-    expect(port.replies[0].message).toMatchObject({ type: 'result', id: 2 })
+    startCommentParseWorker(port, JOBS)
+    port.listener!(instrumentRequest(2, PAGE))
+    expect(port.replies[0].message).toMatchObject({ type: 'job', id: 2 })
   })
 
   it('S-M names the content before any work, and answers "poisoned" for a content that stopped a worker – without parsing it', () => {
     const port = makePort()
     const instrument = vi.spyOn(core, 'instrumentDocument')
     const hash = sha256HexOf(PAGE)
-    answerParseRequest(port, { type: 'instrument', id: 3, bytes: PAGE })
+    answerParseRequest(port, instrumentRequest(3, PAGE), contextWith())
     expect(port.begins).toEqual([{ type: 'begin', id: 3, hash }])
     expect(isParseBegin(port.begins[0])).toBe(true)
     expect(instrument).toHaveBeenCalledTimes(1)
 
     const again = new Uint8Array(PAGE)
-    answerParseRequest(port, { type: 'instrument', id: 4, bytes: again, poisoned: ['0'.repeat(64), hash] })
+    answerParseRequest(port, { ...instrumentRequest(4, again), poisoned: ['0'.repeat(64), hash] }, contextWith())
     expect(port.begins.at(-1)).toEqual({ type: 'begin', id: 4, hash })
     expect(port.replies.at(-1)).toEqual({ message: { type: 'poisoned', id: 4, raw: again }, transfer: [again.buffer] })
     expect(isParseReply(port.replies.at(-1)!.message)).toBe(true)
     expect(instrument).toHaveBeenCalledTimes(1)
     // A job of the same bytes is not parsed either.
-    answerParseRequest(port, { type: 'job', id: 5, bytes: new Uint8Array(PAGE), job: { kind: 'list' }, poisoned: [hash] }, new CommentDocCache())
+    answerParseRequest(port, { type: 'job', id: 5, fileKind: 'html', bytes: new Uint8Array(PAGE), job: { kind: 'list' }, poisoned: [hash] }, contextWith())
     expect(port.replies.at(-1)!.message).toMatchObject({ type: 'poisoned', id: 5 })
   })
 
   it('S-M a poison list is a short list of content hashes, and a begin names one', () => {
-    const request = { type: 'instrument', id: 1, bytes: PAGE }
-    expect(isParseRequest({ ...request, poisoned: [] })).toBe(true)
-    expect(isParseRequest({ ...request, poisoned: ['a'.repeat(64)] })).toBe(true)
-    expect(isParseRequest({ ...request, poisoned: 'a'.repeat(64) })).toBe(false)
-    expect(isParseRequest({ ...request, poisoned: ['A'.repeat(64)] })).toBe(false)
-    expect(isParseRequest({ ...request, poisoned: Array(MAX_POISONED_HASHES + 1).fill('a'.repeat(64)) })).toBe(false)
+    const request = instrumentRequest(1, PAGE)
+    expect(isParseRequest({ ...request, poisoned: [] }, JOBS)).toBe(true)
+    expect(isParseRequest({ ...request, poisoned: ['a'.repeat(64)] }, JOBS)).toBe(true)
+    expect(isParseRequest({ ...request, poisoned: 'a'.repeat(64) }, JOBS)).toBe(false)
+    expect(isParseRequest({ ...request, poisoned: ['A'.repeat(64)] }, JOBS)).toBe(false)
+    expect(isParseRequest({ ...request, poisoned: Array(MAX_POISONED_HASHES + 1).fill('a'.repeat(64)) }, JOBS)).toBe(false)
     expect(isParseBegin({ type: 'begin', id: 1, hash: 'a'.repeat(64) })).toBe(true)
     expect(isParseBegin({ type: 'begin', id: 1, hash: 'x' })).toBe(false)
     expect(isParseBegin({ type: 'begin', id: 'one', hash: 'a'.repeat(64) })).toBe(false)
+    expect(isParseBegin(null)).toBe(false)
     // A begin is not a reply: it settles nothing.
     expect(isParseReply({ type: 'begin', id: 1, hash: 'a'.repeat(64) })).toBe(false)
   })
@@ -207,23 +236,25 @@ describe('commentParseWorker', () => {
 })
 
 describe('commentParseProtocol', () => {
-  it('isParseRequest accepts exactly the request shape', () => {
-    expect(isParseRequest({ type: 'instrument', id: 1, bytes: PAGE })).toBe(true)
-    expect(
-      isParseRequest({ type: 'instrument', id: Number.MAX_SAFE_INTEGER + 2, bytes: PAGE })
-    ).toBe(false)
-    for (const kind of ['draft', 'pin', 'list', 'write']) {
-      expect(isParseRequest({ type: 'job', id: 1, bytes: PAGE, job: { kind } })).toBe(true)
+  it('isParseRequest accepts exactly the request shape, for a job a registered kind names', () => {
+    expect(isParseRequest(instrumentRequest(1, PAGE), JOBS)).toBe(true)
+    expect(isParseRequest(instrumentRequest(Number.MAX_SAFE_INTEGER + 2, PAGE), JOBS)).toBe(false)
+    for (const kind of ['instrument', 'draft', 'pin', 'list', 'write']) {
+      expect(isParseRequest({ type: 'job', id: 1, fileKind: 'html', bytes: PAGE, job: { kind } }, JOBS)).toBe(true)
     }
-    for (const job of [undefined, null, 'list', { kind: 'other' }, {}]) {
-      expect(isParseRequest({ type: 'job', id: 1, bytes: PAGE, job })).toBe(false)
+    for (const job of [undefined, null, 'list', { kind: 'other' }, {}, { kind: 1 }]) {
+      expect(isParseRequest({ type: 'job', id: 1, fileKind: 'html', bytes: PAGE, job }, JOBS)).toBe(false)
     }
-    expect(isParseRequest({ type: 'job', id: 1, job: { kind: 'list' } })).toBe(false)
+    expect(isParseRequest({ type: 'job', id: 1, fileKind: 'html', job: { kind: 'list' } }, JOBS)).toBe(false)
+    for (const fileKind of [undefined, 1, 'markdown', '']) {
+      expect(isParseRequest({ type: 'job', id: 1, fileKind, bytes: PAGE, job: { kind: 'list' } }, JOBS)).toBe(false)
+    }
   })
 
-  it('isParseReply accepts a job answer of a known kind only', () => {
+  it('isParseReply accepts a job answer that names a job only', () => {
     expect(isParseReply({ type: 'job', id: 1, result: { kind: 'list', ok: false, refusal: 'encoding' } })).toBe(true)
-    for (const result of [undefined, null, 'list', { kind: 'other' }]) {
+    // Whether it names the job ASKED is the client's check (CommentParseWorkerAdapter.test.ts).
+    for (const result of [undefined, null, 'list', {}, { kind: 1 }]) {
       expect(isParseReply({ type: 'job', id: 1, result })).toBe(false)
     }
   })
@@ -231,44 +262,43 @@ describe('commentParseProtocol', () => {
   it('§19 Rev 4 isParseReply accepts handed-back bytes only as a Uint8Array, on every reply type', () => {
     const raw = new Uint8Array(4)
     const job = { kind: 'list', ok: false, refusal: 'encoding' }
-    const refusal = { kind: 'unavailable', reason: 'encoding' }
+    const refusal = { kind: 'instrument', outcome: { kind: 'unavailable', reason: 'encoding' } }
     expect(isParseReply({ type: 'error', id: 1, raw })).toBe(true)
     expect(isParseReply({ type: 'job', id: 1, result: job, raw })).toBe(true)
-    expect(isParseReply({ type: 'result', id: 1, outcome: refusal, raw })).toBe(true)
+    expect(isParseReply({ type: 'job', id: 1, result: refusal, raw })).toBe(true)
     for (const bad of [[1, 2], 'bytes', null, raw.buffer]) {
       expect(isParseReply({ type: 'error', id: 1, raw: bad })).toBe(false)
       expect(isParseReply({ type: 'job', id: 1, result: job, raw: bad })).toBe(false)
-      expect(isParseReply({ type: 'result', id: 1, outcome: refusal, raw: bad })).toBe(false)
+      expect(isParseReply({ type: 'job', id: 1, result: refusal, raw: bad })).toBe(false)
     }
   })
 
-  it('isParseReply checks the table is internally consistent', () => {
+  it('the HTML instrument check accepts a consistent table or a refusal with a reason only', () => {
     const ok = core.instrumentDocument(PAGE)
     if (ok.kind !== 'ok') throw new Error('expected ok')
-    expect(isParseReply({ type: 'result', id: 1, outcome: ok })).toBe(true)
+    expect(isInstrumentOutcome(ok)).toBe(true)
     expect(isParseReply({ type: 'error', id: 1 })).toBe(true)
-    expect(
-      isParseReply({ type: 'result', id: 1, outcome: { kind: 'unavailable', reason: 'encoding' } })
-    ).toBe(true)
+    expect(isInstrumentOutcome({ kind: 'unavailable', reason: 'encoding' })).toBe(true)
 
+    expect(isParseReply(null)).toBe(false)
+    expect(isParseReply({ type: 'error' })).toBe(false)
+    expect(isParseReply({ type: 'job', id: 1 })).toBe(false)
+    expect(isParseReply({ type: 'nope', id: 1 })).toBe(false)
     const broken: unknown[] = [
+      undefined,
       null,
-      { type: 'error' },
-      { type: 'result', id: 1 },
-      { type: 'result', id: 1, outcome: null },
-      { type: 'result', id: 1, outcome: { kind: 'unavailable' } },
-      { type: 'result', id: 1, outcome: { kind: 'other' } },
-      { type: 'nope', id: 1 },
-      { type: 'result', id: 1, outcome: { ...ok, tokens: ok.tokens.slice(1) } },
-      { type: 'result', id: 1, outcome: { ...ok, offsets: Array.from(ok.offsets) } },
-      { type: 'result', id: 1, outcome: { ...ok, tagCodes: new Uint32Array(0) } },
-      { type: 'result', id: 1, outcome: { ...ok, lines: new Uint32Array(0) } },
-      { type: 'result', id: 1, outcome: { ...ok, lines: Array.from(ok.lines) } },
-      { type: 'result', id: 1, outcome: { ...ok, html: 'text' } },
-      { type: 'result', id: 1, outcome: { ...ok, fileHash: 1 } },
-      { type: 'result', id: 1, outcome: { ...ok, tagNames: 'p' } },
-      { type: 'result', id: 1, outcome: { ...ok, blocks: {} } }
+      { kind: 'unavailable' },
+      { kind: 'other' },
+      { ...ok, tokens: ok.tokens.slice(1) },
+      { ...ok, offsets: Array.from(ok.offsets) },
+      { ...ok, tagCodes: new Uint32Array(0) },
+      { ...ok, lines: new Uint32Array(0) },
+      { ...ok, lines: Array.from(ok.lines) },
+      { ...ok, html: 'text' },
+      { ...ok, fileHash: 1 },
+      { ...ok, tagNames: 'p' },
+      { ...ok, blocks: {} }
     ]
-    for (const reply of broken) expect(isParseReply(reply)).toBe(false)
+    for (const outcome of broken) expect(isInstrumentOutcome(outcome)).toBe(false)
   })
 })

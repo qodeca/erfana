@@ -13,7 +13,7 @@ import { logger } from '../../LoggingService'
 import { PREVIEW_WEB_PREFERENCES } from '../previewSessionPolicy'
 import { BASE_PAGE, commentedPage } from './__test-helpers__/commentedPages'
 import { instrumentDocument } from './commentParseCore'
-import type { CommentParseResult } from '../../comments/CommentParseWorkerAdapter'
+import type { CommentParseResult } from './htmlCommentParseClient'
 import type { CommentE2eSource } from './commentE2eHook'
 import {
   createPreviewCommentServing,

@@ -21,7 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ELEMENT_TOKEN_ATTRIBUTE, indexHtml } from '../../../shared/htmlComments'
 import { commentedPage } from './comments/__test-helpers__/commentedPages'
 import { instrumentDocument } from './comments/commentParseCore'
-import type { CommentParseResult } from '../comments/CommentParseWorkerAdapter'
+import type { CommentParseResult } from './comments/htmlCommentParseClient'
 import { attach as attachHandler } from './PreviewProtocolHandler'
 import { attach as attachFilter } from './PreviewRequestFilter'
 import {

@@ -9,7 +9,7 @@
  */
 import { vi, type Mock } from 'vitest'
 import { PreviewCommentPageChannels } from '../../../../../shared/ipc/preview-comment-channels'
-import { createInProcessCommentFileJobs } from '../../../comments/commentFileJobs'
+import { createInProcessCommentFileJobs } from '../htmlCommentJobs'
 import type { PreviewCommentServing } from '../commentInstrumentation'
 import { READ_SCROLL_SCRIPT } from '../commentScripts'
 import { createPreviewCommentRegistry, type PreviewCommentEmitters } from '../commentServiceTypes'

@@ -2,18 +2,22 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Comment file jobs and the document cache they share
- * (docs/designs/comments/html-preview-comments.md §19 R3-12). The jobs themselves are
- * exercised end to end by the draft, opener, list and writer suites through
- * the in-process runner; this suite pins the dispatcher, the cache rules and
- * the splice helpers main relies on.
+ * (docs/designs/comments/html-preview-comments.md §19 R3-12; spec 024
+ * architecture note 001 § 8 C19, C22). The jobs themselves are exercised end
+ * to end by the draft, opener, list and writer suites through the in-process
+ * runner; this suite pins the job registry, the HTML table's use of the
+ * cache, the cache rules – by file kind and content hash – and the splice
+ * helpers main relies on.
  */
 import { describe, expect, it } from 'vitest'
-import { analyzeCommentDocument, encodeText } from '../../../shared/htmlComments'
+import { analyzeCommentDocument, encodeText, type CommentDocument } from '../../../shared/htmlComments'
+import { htmlKind } from '../../../shared/comments/htmlKind'
 import { PREVIEW_LIMITS } from '../../../shared/preview-limits'
 import { FIXED_NOW, VIEW } from '../../../shared/comments/__fixtures__/commentTestData'
 import { buttonBlock } from '../preview/comments/__test-helpers__/commentParseBench'
 import { byId, draftFor, PAGE } from '../preview/comments/__test-helpers__/commentWriterHarness'
-import { createInProcessCommentFileJobs, runCommentFileJob, type CommentFileJob } from './commentFileJobs'
+import { createInProcessCommentFileJobs, htmlCommentJobTable, type HtmlCommentJob } from '../preview/comments/htmlCommentJobs'
+import { CommentJobRegistry, type CommentFileJob, type CommentJobEnv, type JobResultOf } from './commentFileJobs'
 import { CommentDocCache, documentOf, freshDocumentOf, readOnlyRefusal, sha256HexOf, writableRefusal } from './commentJobDocs'
 import { storedQuoteOf } from './commentListCore'
 import { assembleSplice, isSpliceWithin } from './commentWriteCore'
@@ -21,6 +25,15 @@ import { assembleSplice, isSpliceWithin } from './commentWriteCore'
 const BYTES = encodeText(PAGE)
 const COMMENTED = encodeText(PAGE.replace('    <button', `    ${buttonBlock(1)}<button`))
 const ACT = { author: { name: 'Ada', role: 'human' as const }, nowMs: FIXED_NOW.getTime() }
+
+/** A fresh document cache's HTML slice. */
+const htmlDocs = (docs = new CommentDocCache()) => docs.forKind<CommentDocument>(htmlKind.id)
+
+/** Run `job` with the HTML kind's table, as the worker does. */
+function runCommentFileJob<J extends HtmlCommentJob>(bytes: Uint8Array, job: J, env: CommentJobEnv<CommentDocument>): JobResultOf<J> {
+  const handler = htmlCommentJobTable[job.kind] as unknown as { run(bytes: Uint8Array, job: J, env: CommentJobEnv<CommentDocument>): JobResultOf<J> }
+  return handler.run(bytes, job, env)
+}
 
 function addJob(bytes: Uint8Array): CommentFileJob {
   return { kind: 'write', request: { op: 'add', draft: draftFor(bytes, byId('buy')), view: VIEW, text: 'Hello' }, act: ACT }
@@ -48,7 +61,8 @@ describe('storedQuoteOf', () => {
 describe('CommentDocCache', () => {
   it('keeps the most recently used documents within its entry and byte budgets', () => {
     const doc = analyzeCommentDocument('<p>x</p>')
-    const cache = new CommentDocCache(10, 2)
+    const docs = new CommentDocCache(10, 2)
+    const cache = htmlDocs(docs)
     cache.set('a', doc, 4)
     cache.set('b', doc, 4)
     expect(cache.get('a')).toBe(doc) // a is now the most recent
@@ -58,24 +72,41 @@ describe('CommentDocCache', () => {
     expect(cache.get('c')).toBe(doc)
     cache.set('big', doc, 11) // over the byte budget on its own: not kept, nothing evicted
     expect(cache.get('big')).toBeUndefined()
-    expect(cache.size).toBe(2)
+    expect(docs.size).toBe(2)
     cache.set('a', doc, 9) // re-set: counted once, and the other entry makes room
-    expect(cache.size).toBe(1)
+    expect(docs.size).toBe(1)
     expect(cache.get('a')).toBe(doc)
   })
 
+  it('C19 keys by file kind and content hash: one kind never reads another kind’s document, and they share one budget', () => {
+    const html = analyzeCommentDocument('<p>x</p>')
+    const other = { notHtml: true }
+    const docs = new CommentDocCache(10, 3)
+    docs.forKind<CommentDocument>('html').set('h', html, 4)
+    expect(docs.forKind('markdown').get('h')).toBeUndefined()
+    docs.forKind<object>('markdown').set('h', other, 4)
+    expect(docs.forKind<CommentDocument>('html').get('h')).toBe(html)
+    expect(docs.forKind<object>('markdown').get('h')).toBe(other)
+    expect(docs.size).toBe(2)
+    // Over the shared byte budget: the least recently used entry goes, whatever its kind.
+    docs.forKind<object>('txt').set('h', other, 4)
+    expect(docs.forKind<CommentDocument>('html').get('h')).toBeUndefined()
+    expect(docs.size).toBe(2)
+  })
+
   it('documentOf parses once per content hash; a failed parse is not kept', () => {
-    const cache = new CommentDocCache()
+    const docs = new CommentDocCache()
+    const cache = htmlDocs(docs)
     const first = documentOf(BYTES, cache)
     const second = documentOf(new Uint8Array(BYTES), cache)
     expect(first.ok && second.ok && second.doc).toBe(first.ok && first.doc)
     expect(first.hash).toBe(sha256HexOf(BYTES))
     expect(documentOf(Uint8Array.from([0xff, 0xfe]), cache)).toMatchObject({ ok: false, refusal: 'encoding' })
-    expect(cache.size).toBe(1)
+    expect(docs.size).toBe(1)
   })
 
   it('freshDocumentOf never reads or fills the cache', () => {
-    const cache = new CommentDocCache()
+    const cache = htmlDocs()
     const cached = documentOf(BYTES, cache)
     const fresh = freshDocumentOf(BYTES)
     expect(fresh.ok && cached.ok && fresh.doc).not.toBe(cached.ok && cached.doc)
@@ -88,9 +119,9 @@ describe('CommentDocCache', () => {
   })
 })
 
-describe('runCommentFileJob', () => {
+describe('the HTML job table', () => {
   it('read-only jobs take the cached document; the write parses afresh and caches what it verified', () => {
-    const cache = new CommentDocCache()
+    const cache = htmlDocs()
     // A different document planted under this file's hash: a job that takes the cache sees it.
     cache.set(sha256HexOf(BYTES), analyzeCommentDocument(new TextDecoder().decode(COMMENTED)), BYTES.length)
 
@@ -111,7 +142,7 @@ describe('runCommentFileJob', () => {
   })
 
   it('a pin on a file that changed since it was served, or cannot be read, has no blocks', () => {
-    const cache = new CommentDocCache()
+    const cache = htmlDocs()
     const entry = { startOffset: PAGE.indexOf('<button'), tagName: 'button', fileHash: 'not-this-file' }
     expect(runCommentFileJob(BYTES, { kind: 'pin', entry, blocks: true }, { cache })).toEqual({ kind: 'pin', blocks: [] })
     const unreadable = Uint8Array.from([0xff, 0xfe])
@@ -122,7 +153,7 @@ describe('runCommentFileJob', () => {
     const damaged = PAGE.replace('    <button', '    <!-- erfana:comment v1 c-damaged {not json -->\n    <button')
     const bytes = encodeText(damaged)
     const entry = { startOffset: damaged.indexOf('<button'), tagName: 'button', fileHash: sha256HexOf(bytes) }
-    const cache = new CommentDocCache()
+    const cache = htmlDocs()
     const both = runCommentFileJob(bytes, { kind: 'pin', entry, blocks: true, pick: {} }, { cache })
     if (both.kind !== 'pin') throw new Error('expected a pin answer')
     expect(both.draft).toMatchObject({ kind: 'draft', ok: true, offset: entry.startOffset, fileHash: entry.fileHash })
@@ -134,7 +165,35 @@ describe('runCommentFileJob', () => {
   })
 
   it('a write on a file that cannot be read for comments is refused with the parse reason', () => {
-    expect(runCommentFileJob(Uint8Array.from([0xff, 0xfe]), addJob(BYTES), { cache: new CommentDocCache() })).toEqual({ kind: 'write', ok: false, refusal: 'encoding' })
+    expect(runCommentFileJob(Uint8Array.from([0xff, 0xfe]), addJob(BYTES), { cache: htmlDocs() })).toEqual({ kind: 'write', ok: false, refusal: 'encoding' })
+  })
+})
+
+describe('CommentJobRegistry', () => {
+  const table = htmlCommentJobTable
+
+  it('finds a registered kind’s jobs by name, and nothing else – inherited names included', () => {
+    const jobs = new CommentJobRegistry()
+    jobs.register('html', table)
+    expect(jobs.handlerOf('html', 'list')).toBe(table.list)
+    expect(jobs.handlerOf('html', 'instrument')).toBe(table.instrument)
+    for (const name of ['other', '__proto__', 'toString', 'constructor', 'hasOwnProperty']) {
+      expect(jobs.handlerOf('html', name)).toBeUndefined()
+    }
+    expect(jobs.handlerOf('markdown', 'list')).toBeUndefined()
+    expect(jobs.handlerOf('__proto__', 'list')).toBeUndefined()
+  })
+
+  it('takes one table per kind, never an empty one, and none once frozen', () => {
+    const jobs = new CommentJobRegistry()
+    jobs.register('html', table)
+    expect(() => jobs.register('html', table)).toThrow('already has jobs')
+    expect(() => jobs.register('txt', {})).toThrow('names no job')
+    expect(jobs.frozen).toBe(false)
+    jobs.freeze()
+    expect(jobs.frozen).toBe(true)
+    expect(() => jobs.register('markdown', table)).toThrow('frozen')
+    expect(jobs.handlerOf('markdown', 'list')).toBeUndefined()
   })
 })
 
@@ -152,6 +211,8 @@ describe('createInProcessCommentFileJobs', () => {
     // Not structured-cloneable: a function inside the job.
     const job = { kind: 'list', poison: () => undefined } as unknown as CommentFileJob
     expect(await jobs.runJob(BYTES, job)).toEqual({ kind: 'failed', failure: 'error' })
+    // A job its kind's table does not name.
+    expect(await jobs.runJob(BYTES, { kind: 'toString' } as unknown as CommentFileJob)).toEqual({ kind: 'failed', failure: 'error' })
   })
 })
 

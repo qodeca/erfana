@@ -12,6 +12,7 @@ import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { encodeText } from '../../../shared/htmlComments'
 import { CommentParseClient } from './CommentParseWorkerAdapter'
+import { HtmlCommentParseClient } from '../preview/comments/htmlCommentParseClient'
 import { COMMENT_PARSE_WORKER_ROLE } from './commentParseProtocol'
 
 const WORKER_FILE = 'comment-parse.worker.js'
@@ -61,7 +62,7 @@ beforeEach(() => {
 
 describe('CommentParseClient – the production worker', () => {
   it('starts no worker when the bundle is missing: comments are unavailable', async () => {
-    const client = new CommentParseClient()
+    const client = new HtmlCommentParseClient(new CommentParseClient())
     await expect(client.instrument(PAGE)).resolves.toEqual({
       kind: 'failed',
       failure: 'unavailable'
@@ -71,7 +72,8 @@ describe('CommentParseClient – the production worker', () => {
 
   it('starts the bundle beside the main bundle, in its role, with a heap cap', async () => {
     state.bundlePresent = true
-    const client = new CommentParseClient()
+    const parse = new CommentParseClient()
+    const client = new HtmlCommentParseClient(parse)
     // The recording worker answers `error`: the request made the round trip.
     await expect(client.instrument(PAGE)).resolves.toEqual({ kind: 'failed', failure: 'error' })
     expect(state.started).toEqual([
@@ -83,6 +85,6 @@ describe('CommentParseClient – the production worker', () => {
         }
       }
     ])
-    await client.dispose()
+    await parse.dispose()
   })
 })

@@ -8,9 +8,12 @@
  * worker shell (`commentParseWorker.ts`) and the in-process runner the suites
  * use (`commentFileJobs.ts`) share it.
  *
- * The cache is keyed by the SHA-256 of the bytes, not by path: the parse
- * depends on the bytes alone, so two files with the same bytes share one
- * entry, a changed file misses, and the worker never learns a path. It is
+ * The cache is keyed by file kind and the SHA-256 of the bytes, not by path
+ * (spec 024 architecture note 001 § 8 C19): the parse depends on the kind and
+ * the bytes alone, so two files of one kind with the same bytes share one
+ * entry, a changed file misses, the same bytes read as another kind never
+ * meet the first kind's document, and the worker never learns a path. A job
+ * sees only its own kind's slice ({@link CommentDocCache.forKind}). It is
  * bounded by entries and by the source bytes it holds – a 4 MB page holds
  * about 60 MB of tree while it is alive (spike S9), a dense 25 MB page about
  * 760 MB (§19 Rev 4), against the worker's heap ceiling (`WORKER_HEAP_MB`).
@@ -32,6 +35,7 @@ import {
   type CommentDocument,
   type FileCommentState
 } from '../../../shared/htmlComments'
+import type { CommentFileKindId } from '../../../shared/comments/fileKind'
 import type { CommentRefusal } from './commentRefusals'
 
 /** Source bytes the cache may hold: two 4 MB pages, about 120 MB of tree (S9). */
@@ -60,11 +64,22 @@ export function writableRefusal(state: FileCommentState): CommentRefusal | null 
 }
 
 interface CacheEntry {
-  readonly doc: CommentDocument
+  readonly doc: unknown
   readonly bytes: number
 }
 
-/** Parsed documents by content hash, least recently used first out. */
+/** One file kind's slice of a {@link CommentDocCache}: that kind's documents, by content hash. */
+export interface KindDocCache<D> {
+  /** The document for `hash`, now the most recently used; `undefined` on a miss. */
+  get(hash: string): D | undefined
+  /** Keep `doc`, parsed from `bytes` source bytes; one over the byte budget is not kept. */
+  set(hash: string, doc: D, bytes: number): void
+}
+
+/**
+ * Parsed documents by file kind and content hash, least recently used first
+ * out. Every kind shares the one budget: the worker has one heap.
+ */
 export class CommentDocCache {
   private readonly entries = new Map<string, CacheEntry>()
   private heldBytes = 0
@@ -74,25 +89,36 @@ export class CommentDocCache {
     private readonly maxEntries = DOC_CACHE_MAX_ENTRIES
   ) {}
 
-  /** Documents held now. */
+  /** Documents held now, of every kind. */
   get size(): number {
     return this.entries.size
   }
 
-  /** The document for `hash`, now the most recently used; `undefined` on a miss. */
-  get(hash: string): CommentDocument | undefined {
-    const entry = this.entries.get(hash)
+  /**
+   * The slice of file kind `kind`. Each kind's jobs keep one document type
+   * under its own keys, so what a slice reads back is what that kind stored.
+   */
+  forKind<D>(kind: CommentFileKindId): KindDocCache<D> {
+    // A content hash is 64 hex characters, so the key splits one way only, whatever the kind id holds.
+    const keyOf = (hash: string): string => `${kind}:${hash}`
+    return {
+      get: hash => this.get(keyOf(hash)) as D | undefined,
+      set: (hash, doc, bytes) => this.set(keyOf(hash), doc, bytes)
+    }
+  }
+
+  private get(key: string): unknown {
+    const entry = this.entries.get(key)
     if (entry === undefined) return undefined
-    this.entries.delete(hash)
-    this.entries.set(hash, entry)
+    this.entries.delete(key)
+    this.entries.set(key, entry)
     return entry.doc
   }
 
-  /** Keep `doc`, parsed from `bytes` source bytes; one over the byte budget is not kept. */
-  set(hash: string, doc: CommentDocument, bytes: number): void {
+  private set(key: string, doc: unknown, bytes: number): void {
     if (bytes > this.maxBytes) return
-    this.drop(hash)
-    this.entries.set(hash, { doc, bytes })
+    this.drop(key)
+    this.entries.set(key, { doc, bytes })
     this.heldBytes += bytes
     for (const [oldest] of this.entries) {
       if (this.heldBytes <= this.maxBytes && this.entries.size <= this.maxEntries) break
@@ -100,10 +126,10 @@ export class CommentDocCache {
     }
   }
 
-  private drop(hash: string): void {
-    const entry = this.entries.get(hash)
+  private drop(key: string): void {
+    const entry = this.entries.get(key)
     if (entry === undefined) return
-    this.entries.delete(hash)
+    this.entries.delete(key)
     this.heldBytes -= entry.bytes
   }
 }
@@ -116,7 +142,7 @@ function parsed(bytes: Uint8Array, hash: string): JobDocument {
 }
 
 /** The document for `bytes` from `cache`, parsed and kept on a miss. For read-only jobs. */
-export function documentOf(bytes: Uint8Array, cache: CommentDocCache): JobDocument {
+export function documentOf(bytes: Uint8Array, cache: KindDocCache<CommentDocument>): JobDocument {
   const hash = sha256HexOf(bytes)
   const cached = cache.get(hash)
   if (cached !== undefined) return { ok: true, hash, doc: cached }

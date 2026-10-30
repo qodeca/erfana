@@ -43,11 +43,8 @@ import { logger } from '../../LoggingService'
 import { redactedLogError } from '../../../utils/redactUserInput'
 import type { PreviewRequestClass } from '../PreviewRequestKindLedger'
 import type { InstrumentRefusal } from './commentParseCore'
-import {
-  sharedCommentParseClient,
-  type CommentParseClient,
-  type CommentParseFailure
-} from '../../comments/CommentParseWorkerAdapter'
+import type { CommentParseFailure } from '../../comments/CommentParseWorkerAdapter'
+import { sharedHtmlCommentParseClient, type HtmlCommentParseClient } from './htmlCommentParseClient'
 import { registerCommentE2eSource, type CommentE2eSource } from './commentE2eHook'
 import { ElementTokenTable, type CommentLoadScope } from './ElementTokenTable'
 
@@ -138,7 +135,7 @@ export interface PreviewCommentServing {
 export interface PreviewCommentServingDeps {
   /** The feature flag, read per request. */
   readonly isEnabled: () => boolean
-  readonly client?: Pick<CommentParseClient, 'instrument' | 'warm'>
+  readonly client?: Pick<HtmlCommentParseClient, 'instrument' | 'warm'>
   readonly now?: () => number
   readonly registerE2e?: (source: CommentE2eSource) => () => void
 }
@@ -171,7 +168,7 @@ function unavailableLog(now: () => number): DropReporter {
 export function createPreviewCommentServing(
   deps: PreviewCommentServingDeps
 ): PreviewCommentServing {
-  const client = deps.client ?? sharedCommentParseClient()
+  const client = deps.client ?? sharedHtmlCommentParseClient()
   const now = deps.now ?? (() => performance.now())
   // A settings read that throws counts as off: the safe side is today's preview.
   const isEnabled = (): boolean => {
