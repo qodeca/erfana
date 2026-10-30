@@ -274,7 +274,7 @@ interface FileCommentState {
 | Snapshot | 256 KB of raw `outerHTML` (cut on a code-point boundary, never leaving `--`) |
 | JSON depth | 6 |
 | Author name / email | 100 / 254 characters |
-| Pick signals | 5 per second per view |
+| Pick signals | 5 per second per frame in the page's preload (each new document starts again); 10 per second per view in main (spec 024 F-001, 2026-10-30 – pick, save and reload ran faster than 5 a second on a fast machine). A new document's first hello skips its frame's hello budget (the frame id survives a reload) and counts only in the view's |
 | Tokens per document | 640,000, counted as start tags before any parse; over it the page is served raw, "page too large" (§19 Rev 4; R3-13 had 100,000) |
 | File size | 25 MB (`COMMENT_FILE_MAX_BYTES`, equal to `PREVIEW.MAX_ASSET_BYTES`, the largest file the preview serves; §19 Rev 4 – was 4 MB). A file that grew past it after its load is read-only for comments with the reason "file too large" |
 | Bytes per list | 64 MB for every file of one list together, and at most 64 files (`COMMENT_LIST_MAX_BYTES`, §19 Rev 4); the files left out are counted and the drawer says so |
@@ -792,7 +792,7 @@ IDs: `HPC-U` unit, `HPC-P` property, `HPC-G` golden, `HPC-M` main, `HPC-I` IPC, 
 - SEC-03 untrusted `click`/`contextmenu`/pin events (`dispatchEvent`, `.click()`) send nothing.
 - SEC-04 page rewrites or forges `data-erfana-el` after load → unknown/stale token → no draft.
 - SEC-05 pick payloads with a path, an offset, extra keys or oversized values rejected.
-- SEC-06 1,000 picks/s → ≤ 5 accepted, one drop log line.
+- SEC-06 1,000 picks/s → ≤ 10 accepted (`MAIN_PICKS_PER_SECOND`), one drop log line.
 - SEC-07 `commentSave` from the preview webContents, a sub-frame or a forged origin refused before parsing.
 - SEC-08 reused, expired, other-window or pre-project-switch draft tokens refused.
 - SEC-09 frame `pushState`s to another path → comment still targets its navigated file, or is refused. *Rev 3 note (P5):* in real Chromium a `pushState` to another path throws `SecurityError`; after a same-document step (query, hash) a click still opens a draft on the file the load named (service e2e).

@@ -293,7 +293,7 @@ describe('commentPickHandler pins, control picks and budgets', () => {
     expect(h.out.parent).toHaveBeenCalledWith(h.child)
   })
 
-  it('SEC-06 a thousand picks in a second: at most five accepted, Esc on its own budget, one drop log line', async () => {
+  it('SEC-06 a thousand picks in a second: at most MAIN_PICKS_PER_SECOND (ten) accepted, Esc on its own budget, one drop log line', async () => {
     const h = await setup()
     const token = tokenOfTag(h.page.doc, 'button')
     for (let i = 0; i < 1_000; i++) h.handler.pick(eventFrom(h.top), menuPick(token, 'button'))
@@ -331,6 +331,29 @@ describe('commentPickHandler pins, control picks and budgets', () => {
     h.handler.hello(eventFrom(h.top), { extra: 1 })
     h.handler.anchors(eventFrom(h.child), { visible: 'all' })
     expect(h.out.hello).toHaveBeenCalledTimes(HELLOS_PER_FRAME_PER_SECOND * 2)
+  })
+
+  it('F-001 the first hello of a new document skips the frame budget, once: a page saved and reloaded faster than five a second keeps its pins', async () => {
+    const h = await setup()
+    for (let i = 0; i <= HELLOS_PER_FRAME_PER_SECOND; i++) h.handler.hello(eventFrom(h.top), {})
+    // The document's own repeats are on the frame budget: the sixth is dropped.
+    expect(h.out.hello).toHaveBeenCalledTimes(HELLOS_PER_FRAME_PER_SECOND)
+    // Six reloads in that same second: each new document's first hello lands, a second one does not.
+    for (let i = 0; i < 6; i++) {
+      h.frames.navigated(1, 'u', true)
+      h.handler.hello(eventFrom(h.top), {})
+      h.handler.hello(eventFrom(h.top), {})
+    }
+    expect(h.out.hello).toHaveBeenCalledTimes(HELLOS_PER_FRAME_PER_SECOND + 6)
+  })
+
+  it('F-001 a page that reloads itself in a loop is still held to the view-wide hello budget', async () => {
+    const h = await setup()
+    for (let i = 0; i < 200; i++) {
+      h.frames.navigated(1, 'u', true)
+      h.handler.hello(eventFrom(h.top), {})
+    }
+    expect(h.out.hello).toHaveBeenCalledTimes(HELLOS_PER_VIEW_PER_SECOND)
   })
 
   it('L5 a page that keeps making frames cannot outrun the view-wide hello and anchor budgets', async () => {

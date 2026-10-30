@@ -7642,11 +7642,21 @@
       "id": "designs-comments-html-preview-comments/13",
       "audience": "developer",
       "doc": "docs/designs/comments/html-preview-comments.md",
-      "quote": "| Pick signals | 5 per second per view |",
+      "quote": "| Pick signals | 5 per second per frame in the page's preload",
       "status": "verified",
       "evidence": "source",
       "source": "src/shared/preview-limits.ts:97",
       "match": "COMMENT_PICKS_PER_SECOND: 5"
+    },
+    {
+      "id": "designs-comments-html-preview-comments/13b",
+      "audience": "developer",
+      "doc": "docs/designs/comments/html-preview-comments.md",
+      "quote": "10 per second per view in main",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/preview/comments/commentPickHandler.ts:62",
+      "match": "export const MAIN_PICKS_PER_SECOND = 10"
     },
     {
       "id": "designs-comments-html-preview-comments/14",
@@ -24141,7 +24151,7 @@
       "quote": "| `e2e/html-preview-comments.e2e.ts:644` (E-004",
       "status": "fixed",
       "evidence": "source",
-      "source": "e2e/html-preview-comments.e2e.ts:651",
+      "source": "e2e/html-preview-comments.e2e.ts:653",
       "match": "test('E-004 the whole cycle on a CRLF + BOM file",
       "note": "said :631"
     },
@@ -48746,7 +48756,7 @@
       "quote": "per view: 64 hellos and 128 anchor reports a second",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentPickHandler.ts:68",
+      "source": "src/main/services/preview/comments/commentPickHandler.ts:79",
       "match": "ANCHORS_PER_VIEW_PER_SECOND = 128"
     },
     {
@@ -51821,7 +51831,7 @@
       "quote": "Per frame: picks 5 a second, hellos 5, anchor reports 8.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentPickHandler.ts:64",
+      "source": "src/main/services/preview/comments/commentPickHandler.ts:75",
       "match": "export const ANCHORS_PER_FRAME_PER_SECOND = 8"
     },
     {
@@ -51831,7 +51841,7 @@
       "quote": "**64 hellos and 128 anchor reports a second**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentPickHandler.ts:68",
+      "source": "src/main/services/preview/comments/commentPickHandler.ts:79",
       "match": "export const ANCHORS_PER_VIEW_PER_SECOND = 128"
     },
     {

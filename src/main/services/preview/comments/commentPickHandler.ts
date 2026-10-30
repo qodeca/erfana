@@ -12,9 +12,10 @@
  * with the panel's digest – unless:
  * - it names its sender frame, and that frame is one of this view's, live;
  * - its payload passes the strict schema (`preview-comment-schema.ts`);
- * - it fits the budget: five element and pin picks per second for the whole
+ * - it fits the budget: ten element and pin picks per second for the whole
  *   view, three `exit` and three `parent` picks each on their own (so a burst
- *   of clicks never drops Esc), five hellos and eight anchor reports per frame
+ *   of clicks never drops Esc), five hellos (a new document's first one aside)
+ *   and eight anchor reports per frame
  *   – and, because the per-frame budgets are forgotten past 256 frames (a
  *   page that keeps making frames would otherwise get fresh ones), at most
  *   {@link HELLOS_PER_VIEW_PER_SECOND} hellos and
@@ -52,13 +53,23 @@ import { realContextClick, type ContextGateGeometry } from './commentContextGate
 import type { PickerStepEvent } from './commentPickerSpeaker'
 import type { ElementTokenEntry, ElementTokenTable } from './ElementTokenTable'
 
-/** Element and pin picks the whole view admits per second (`PREVIEW_LIMITS.COMMENT_PICKS_PER_SECOND`). */
-export const MAIN_PICKS_PER_SECOND = 5
+/**
+ * Element and pin picks the whole view admits per second. Twice the page's own
+ * per-frame budget (`PREVIEW_LIMITS.COMMENT_PICKS_PER_SECOND`, counted again by
+ * each new document): pick, save and reload can run faster than five a second
+ * on a fast machine (F-001), and a pick only ever opens a window.
+ */
+export const MAIN_PICKS_PER_SECOND = 10
 /** `exit` and `parent` picks per second, each kind on its own budget. */
 export const MAIN_CONTROL_PICKS_PER_SECOND = 3
 /** Keyboard-picker `step`s per second: what the window's live region says (the preload sends at most ten). */
 export const MAIN_STEPS_PER_SECOND = 12
-/** Hellos one frame may send per second (the preload repeats at most once a second). */
+/**
+ * Hellos one frame may send per second (the preload repeats at most once a
+ * second). A new document's first hello is not counted here – the frame id
+ * survives a reload, and a page saved and reloaded five times in a second
+ * would lose its pins (F-001) – only in the view's budget.
+ */
 export const HELLOS_PER_FRAME_PER_SECOND = 5
 /** Anchor reports one frame may send per second (the preload sends at most four). */
 export const ANCHORS_PER_FRAME_PER_SECOND = 8
@@ -150,6 +161,8 @@ export function createCommentPickHandler(deps: PickHandlerDeps): CommentPickHand
   const steps = new SlidingBudget(MAIN_STEPS_PER_SECOND)
   const perFrame = new Map<string, SlidingBudget>()
   const perView = { hello: new SlidingBudget(HELLOS_PER_VIEW_PER_SECOND), anchors: new SlidingBudget(ANCHORS_PER_VIEW_PER_SECOND) }
+  /** Per frame, the document whose first hello skipped the frame's budget: one per document, never more. */
+  const documentHellos = new Map<number, number>()
 
   const drop = (reason: string): void => drops.report({ reason, level: 'warn', panelId: deps.panelId })
 
@@ -163,6 +176,19 @@ export function createCommentPickHandler(deps: PickHandlerDeps): CommentPickHand
   /** The frame's own budget first, then the view's: one frame's flood does not spend the view's. */
   function signalBudget(kind: keyof typeof perView, frame: CommentFrameLike, perSecond: number): boolean {
     return frameBudget(kind, frame, perSecond) && perView[kind].take(deps.now())
+  }
+
+  /**
+   * Whether this hello is the first of a document main saw commit (`navigated`
+   * set `needsBind`; a page cannot). It is admitted on the view's budget only.
+   */
+  function firstHelloOfDocument(frame: CommentFrameLike): boolean {
+    const record = deps.frames.get(frame.frameTreeNodeId)
+    if (record === undefined || !record.needsBind || documentHellos.get(record.ftn) === record.navigation) return false
+    documentHellos.delete(record.ftn)
+    if (documentHellos.size >= MAX_FRAME_BUDGETS) documentHellos.delete(documentHellos.keys().next().value as number)
+    documentHellos.set(record.ftn, record.navigation)
+    return true
   }
 
   function frameBudget(kind: string, frame: CommentFrameLike, perSecond: number): boolean {
@@ -265,7 +291,10 @@ export function createCommentPickHandler(deps: PickHandlerDeps): CommentPickHand
         const frame = senderOf(event)
         if (frame === undefined) return drop('no-frame')
         if (!CommentHelloSchema.safeParse(payload).success) return drop('invalid-hello')
-        if (!signalBudget('hello', frame, HELLOS_PER_FRAME_PER_SECOND)) return drop('rate-limited')
+        const admitted = firstHelloOfDocument(frame)
+          ? perView.hello.take(deps.now())
+          : signalBudget('hello', frame, HELLOS_PER_FRAME_PER_SECOND)
+        if (!admitted) return drop('rate-limited')
         deps.sinks.hello(frame)
       })
     },
