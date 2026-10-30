@@ -56,6 +56,12 @@
   padding: 0 var(--space-8) var(--space-6);
   border-block-end: var(--border-width) solid var(--color-border-default);
 }
+/* D-32, C-06: the HTML drawer's one-line note on what change detection misses. */
+.erf-comment-drawer__help {
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-base);
+  color: var(--color-text-tertiary);
+}
 
 /* "Show": a radio group drawn as three equal segments on one row (comments-v2
    C-15, the Segmented card); "Show" is the group's name, not drawn. Selected =
@@ -151,9 +157,9 @@
   padding: 0;
 }
 
-/* A row: a real button stretched behind the content (Enter / click = "Show on
-   page"), plus the active row's Open as a second Tab stop – the Welcome
-   list's shape (Rows card Exceptions). */
+/* A row: a real button stretched behind the content (Enter / click opens the
+   thread, R-10), plus the active row's Open as a second Tab stop – the Welcome
+   list's shape (Rows card Exceptions). Other rows have no Open. */
 .erf-comment-row {
   position: relative;
   display: grid;

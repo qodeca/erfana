@@ -9,7 +9,10 @@ import { symlinkSync } from 'node:fs'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fixedId, makeComment } from '../../../../shared/comments/__fixtures__/commentTestData'
+import { serializeBlock } from '../../../../shared/comments/format'
 import { ErrorCode } from '../../../../shared/errors'
+import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
 import { logger } from '../../LoggingService'
 import type { CommentPick } from '../../../../shared/ipc/preview-comment-schema'
 import { makeProject, PAGE, type TempProject } from './__test-helpers__/commentWriterHarness'
@@ -84,6 +87,19 @@ describe('buildDraft', () => {
   it('M-05 a file that cannot take comments says why, as the reason the menu names (git conflict markers)', async () => {
     const conflicted = PAGE.replace('  <main>', '<<<<<<< HEAD\na\n=======\nb\n>>>>>>> x\n  <main>')
     expect(await draftFor('index.html', conflicted, 'button')).toEqual({ ok: false, code: ErrorCode.COMMENT_FILE_CONFLICTED, reason: 'conflict-markers' })
+  })
+
+  it('024-AC-035 M-05 F-04 a page already at 500 comments gives no draft, with the "500 comments" reason; one below still does', async () => {
+    const blocks = (count: number): string =>
+      Array.from({ length: count }, (_, i) => {
+        const block = serializeBlock(makeComment({ id: fixedId('c-', i + 1) }), { indent: '', eol: '\n' })
+        if (!block.ok) throw new Error('fixture block')
+        return block.block
+      }).join('')
+    const full = PAGE.replace('  <main>', `${blocks(PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE)}  <main>`)
+    expect(await draftFor('index.html', full, 'button')).toEqual({ ok: false, code: ErrorCode.COMMENT_LIMIT, reason: 'too-many-blocks' })
+    const below = PAGE.replace('  <main>', `${blocks(PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE - 1)}  <main>`)
+    expect(await draftFor('below.html', below, 'button')).toMatchObject({ ok: true })
   })
 
   it('M-055 OD-07 a page in a dot-folder, dist/ or a gitignored file is a draft like any other (no folder refusal)', async () => {

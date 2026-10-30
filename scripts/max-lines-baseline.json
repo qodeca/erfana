@@ -24,7 +24,7 @@
     "src/renderer/src/components/Dialog/CameraDialog.tsx": 558,
     "src/renderer/src/components/Editor/DiagramViewer/ChatBubble.tsx": 672,
     "src/renderer/src/components/Editor/MarkdownEditorPanel/hooks/useScrollSync.ts": 507,
-    "src/renderer/src/components/Editor/MarkdownPreview.tsx": 1319,
+    "src/renderer/src/components/Editor/MarkdownPreview.tsx": 1317,
     "src/renderer/src/components/Editor/MonacoMarkdownEditor.tsx": 580,
     "src/renderer/src/components/Editor/markdownImageStore.ts": 632,
     "src/renderer/src/components/Panels/ImageViewerPanel/imageViewer.logic.ts": 539,

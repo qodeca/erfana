@@ -70,7 +70,7 @@ import { useCommentWords } from './commentWords'
 import { CommentWordsPicker, type WordsSpan } from './CommentWordsPicker'
 import { SELECTION_COPY } from './commentCopyWords'
 import { carriedDrafts } from './commentCarriedDrafts'
-import { WINDOW_COPY, saveBlockedReason, windowRefusal, type RefusalCopy } from './commentWindowCopy'
+import { WINDOW_COPY, saveBlockedReason, windowRefusal, wordsDroppedText, type RefusalCopy } from './commentWindowCopy'
 import { TEST_IDS } from '../../constants/testids'
 
 /** Props for {@link NewCommentView}. */
@@ -285,7 +285,7 @@ export function NewCommentView({
     if (answer.ok && answer.wordsDropped === true) {
       // Saved on the whole target: the window says so (024-FR-004), and closes on Close.
       setDropped(true)
-      alert(SELECTION_COPY.wordsDropped(words.noun(request.target.tag), file))
+      alert(wordsDroppedText(words, request.target.tag, file))
       onRefresh?.()
     } else if (answer.ok) onSaved()
     else if (answer.code === ErrorCode.COMMENT_SAVE_PENDING) alert(saveFailureCopy(answer.code, file).text)
@@ -336,7 +336,7 @@ export function NewCommentView({
       <div className="erf-comment-window__body">
         {unsavedBanner}
         {request.wordsMissing === true && (
-          <CommentBanner kind="info" testId={TEST_IDS.COMMENT_WORDS_MISSING}>{SELECTION_COPY.wordsNotInFile(file)}</CommentBanner>
+          <CommentBanner kind="info" testId={TEST_IDS.COMMENT_WORDS_MISSING}>{SELECTION_COPY.wordsNotInFile(words.noun(request.target.tag), file)}</CommentBanner>
         )}
         {generated !== null && (
           <CommentBanner kind="error" testId={TEST_IDS.COMMENT_SAVE_ERROR}>
@@ -414,7 +414,7 @@ export function NewCommentView({
         )}
         {dropped ? (
           <CommentBanner kind="success" after testId={TEST_IDS.COMMENT_WORDS_DROPPED}>
-            {SELECTION_COPY.wordsDropped(words.noun(request.target.tag), file)}
+            {wordsDroppedText(words, request.target.tag, file)}
           </CommentBanner>
         ) : pending ? (
           <CommentBanner kind="info" after testId={TEST_IDS.COMMENT_SAVE_ERROR}>

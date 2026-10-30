@@ -27,6 +27,7 @@
 import { useCallback, useState } from 'react'
 import type { CommentSaveRequest } from '../../../../shared/ipc/preview-comment-schema'
 import type { CommentListState } from '../../stores/usePreviewCommentStore'
+import type { DrawerFilter } from './commentRows'
 import { allResolved, stepPosition, type StepPosition } from './commentWindowStates'
 import type { CommentWindowRequest } from './commentWindowTypes'
 import { selectThreads, type ThreadsSelection } from './ThreadsView'
@@ -116,9 +117,10 @@ function observe(track: Track, list: CommentListState, keys: string, live: Threa
  *
  * @param request - The window's request.
  * @param list - The tab's list.
+ * @param filter - The drawer's current filter: the stepper steps within it (C-13); Open while the drawer is shut.
  * @returns {@link ThreadSession}
  */
-export function useThreadSession(request: CommentWindowRequest, list: CommentListState): ThreadSession {
+export function useThreadSession(request: CommentWindowRequest, list: CommentListState, filter: DrawerFilter = 'open'): ThreadSession {
   const opened: ShownKeys | null =
     request.kind === 'threads' ? { threadKeys: request.threadKeys, blockKeys: request.blockKeys } : null
   const [moved, setMoved] = useState<ShownKeys | null>(null)
@@ -140,7 +142,7 @@ export function useThreadSession(request: CommentWindowRequest, list: CommentLis
   const gone = fresh && empty && !removed
   const selection = removed ? current.snapshot : live
   const step = live !== null && !empty && !removed && live.damaged.length + live.newer.length === 0
-    ? stepPosition(live.file, live.threads.map(thread => thread.threadKey))
+    ? stepPosition(live.file, live.threads.map(thread => thread.threadKey), filter)
     : null
   const offered = step !== null && step.next !== null
   if (offered && !current.everStepper) {

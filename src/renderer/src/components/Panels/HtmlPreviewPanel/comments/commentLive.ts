@@ -13,6 +13,7 @@
 import type { CommentModeChanged } from '../../../../../../shared/ipc/preview-comment-schema'
 import { ANNOUNCE } from '../../../Comments/commentCopy'
 import { MD_SPOKEN_COPY } from '../../../Comments/commentCopyWords'
+import { WINDOW_COPY } from '../../../Comments/commentWindowCopy'
 
 /** Steps after the mode turns on that add the keys to use (C-10 "the first three steps"). */
 export const PICKER_HINT_STEPS = 3
@@ -35,6 +36,9 @@ export const PICKER_HINT_STEPS = 3
 export function pickerAnnouncement(event: Pick<CommentModeChanged, 'say' | 'element'>, step = PICKER_HINT_STEPS): string | undefined {
   if (event.say === 'top') return ANNOUNCE.pickerTop
   if (event.say === 'no-child') return ANNOUNCE.pickerNoChild
+  // C-10: Tab or Shift+Tab with nowhere further to go.
+  if (event.say === 'last') return WINDOW_COPY.pickerLast
+  if (event.say === 'first') return WINDOW_COPY.pickerFirst
   const element = event.say === 'showing' ? event.element : undefined
   if (element === undefined) return undefined
   if (element.added === true || element.role === undefined) return ANNOUNCE.pickerShowing(element)

@@ -71,7 +71,7 @@ export interface PickedTarget {
  */
 export type Slot =
   | {
-      /** The target's first character: the block goes right before it. */
+      /** The target's first character, or the first of the other tools' comments right before it (024-FR-023): the block goes right before it. */
       readonly offset: number
       readonly shape: 'before-target'
       /** The target line's leading blanks, repeated on the block's later lines. */

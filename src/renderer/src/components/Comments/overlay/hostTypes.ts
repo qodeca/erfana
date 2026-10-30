@@ -86,8 +86,13 @@ export interface CommentOverlayHost {
   readonly outlined: HTMLElement | null
   readonly placements: readonly ThreadPlacement[]
   readonly file: CommentFileView | null
-  /** Open the thread window on these threads (an icon). */
-  readonly openThreads: (threadKeys: readonly string[], anchor: HTMLElement | null) => void
+  /** Open the thread window on these threads, and the damaged blocks of a warning icon (an icon, S-07). */
+  readonly openThreads: (
+    threadKeys: readonly string[],
+    anchor: HTMLElement | null,
+    opener?: 'page' | 'drawer',
+    blockKeys?: readonly string[]
+  ) => void
   readonly scrollTick: number
   /** The Comment button over a selection (C-16), while it shows, and what it does. */
   readonly selectionButton: SelectionButton | null

@@ -199,7 +199,7 @@ export function createCommentPickHandler(deps: PickHandlerDeps): CommentPickHand
   /** A picker step: an element is said only as main recorded it for the frame's own load (S-L-A). */
   function stepPick(frame: CommentFrameLike, pick: CommentPick): void {
     if (pick.say !== 'showing') {
-      deps.sinks.step({ say: pick.say as 'top' | 'no-child' })
+      deps.sinks.step({ say: pick.say as 'top' | 'no-child' | 'last' | 'first' })
       return
     }
     const record = deps.frames.get(frame.frameTreeNodeId)

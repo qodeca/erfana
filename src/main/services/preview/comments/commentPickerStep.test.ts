@@ -25,6 +25,13 @@ describe('pickerStepOf', () => {
     })
   })
 
+  it('024-AC-018 C-10 (HTML) passes on either end of Tab, and the event stays valid', () => {
+    for (const say of ['last', 'first'] as const) {
+      expect(pickerStepOf({ say })).toEqual({ say })
+      expect(event(pickerStepOf({ say })).success).toBe(true)
+    }
+  })
+
   it('leaves out a parsed tag no tag name can spell, and keeps the event valid', () => {
     for (const tagName of ['a<b', '', 'x'.repeat(200), 'é']) {
       const step = pickerStepOf({ say: 'showing', entry: { tagName, line: 4 } })

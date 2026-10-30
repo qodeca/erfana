@@ -110,6 +110,7 @@ export {
   type ParsedBlock,
   type ReadOnlyReason
 } from './parse'
+export { directiveRunStart, inHtmlGeneratedRegion } from './htmlForeign'
 export {
   applySplice,
   lineLayoutAt,

@@ -47,7 +47,7 @@ export const CommentRuntimeTagSchema = CommentTagNameSchema.max(PICK_RUNTIME_TAG
 const RUNTIME_PATH = /^(?:[A-Za-z][\w.:-]*:nth-of-type\(\d{1,6}\)(?: > [A-Za-z][\w.:-]*:nth-of-type\(\d{1,6}\))*)?$/
 const quotePart = z.string().max(PREVIEW_LIMITS.COMMENT_QUOTE_MAX_CHARS)
 /** What the keyboard picker reached (§10.10 "Announce"): an element, the top of the page, or a leaf. */
-export const CommentPickerSaySchema = z.enum(['showing', 'top', 'no-child'])
+export const CommentPickerSaySchema = z.enum(['showing', 'top', 'no-child', 'last', 'first'])
 
 /** A point in CSS pixels (a pick's `screen` or `point`, a menu point). */
 export const CommentPointSchema = z.object({ x: coordinate, y: coordinate }).strict()

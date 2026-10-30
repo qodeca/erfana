@@ -27,6 +27,7 @@
  * table). Whether the rendering survives is the render check's call.
  */
 import { isBlockHeader } from '../comments/blocks'
+import { inAnyRegion } from '../comments/foreignComments'
 import type { Slot } from '../comments/fileKind'
 import { MARKDOWN_COMMENT_MAX_SLOTS } from './markdownLimits'
 import type { MdBlock, MdIndex, MdTarget } from './mdIndex'
@@ -153,5 +154,5 @@ export function markdownSlots(index: MdIndex, target: MdTarget): MdSlot[] {
 
 /** True when `target` lies inside a generated START/END region (024-FR-023). */
 export function inGeneratedRegion(index: MdIndex, target: MdTarget): boolean {
-  return index.regions.some(region => region.start < target.start && target.start < region.end)
+  return inAnyRegion(index.regions, target.start)
 }

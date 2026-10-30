@@ -98,26 +98,5 @@ export function htmlBlockClosed(value: string, type: HtmlBlockType): boolean {
   }
 }
 
-const REGION_START = /^(?:(.*)[:-])?(?:START|BEGIN)$/
-const REGION_END = /^(?:(.*)[:-])?END$/
-
-function firstWord(data: string): string {
-  return data.trim().split(/\s+/, 1)[0] ?? ''
-}
-
-/**
- * The leading name of a comment that opens a generated region – `START` or
- * `BEGIN` as its first word, or as the suffix of its first word after `:` or
- * `-` (`ALL-CONTRIBUTORS-LIST:START` → `ALL-CONTRIBUTORS-LIST`; `START` → '')
- * – or `undefined` when it opens none.
- */
-export function regionStartName(data: string): string | undefined {
-  const match = REGION_START.exec(firstWord(data))
-  return match === null ? undefined : (match[1] ?? '')
-}
-
-/** The leading name of a comment that closes a region (`END`, `…:END`, `…-END`), or `undefined`. */
-export function regionEndName(data: string): string | undefined {
-  const match = REGION_END.exec(firstWord(data))
-  return match === null ? undefined : (match[1] ?? '')
-}
+/** What a comment's first word says about generated regions: the same rule in every file kind (024-FR-023). */
+export { regionEndName, regionStartName } from '../comments/foreignComments'

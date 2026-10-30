@@ -15,7 +15,6 @@ import {
   createContext,
   useContext
 } from 'react'
-import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
 import type { PluggableList } from 'unified'
 import { PREVIEW_REHYPE_CORE, previewRemarkPlugins } from '../../../../shared/markdown/previewPipeline'
@@ -42,6 +41,7 @@ import { TEST_IDS } from '../../constants/testids'
 import { notePreviewRenderStart, notePreviewRenderCommit } from '../../utils/previewRenderTiming'
 import { useIdleDebouncedValue } from '../../hooks/useIdleDebouncedValue'
 import { rehypeCollectLinks, rehypeHeadingIds, rehypeShiftLines } from './previewRehypePlugins'
+import { ParsedMarkdown } from './markdownBodyParse'
 import { PreviewWorkContext, PreviewWorkTracker } from './previewWork'
 import { LinkTargetCache } from './linkTargetCache'
 import { MarkdownImage, MarkdownImageStoreContext, MARKDOWN_IMAGE_SETTLED_EVENT } from './MarkdownImage'
@@ -637,9 +637,7 @@ const MarkdownBody = memo(function MarkdownBody({
   const rehypePlugins = useMemo(() => buildRehypePlugins(lineOffset, linkSink), [lineOffset, linkSink])
   return (
     <RenderTimingProbe onCommit={onCommit}>
-      <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
-        {source}
-      </ReactMarkdown>
+      <ParsedMarkdown source={source} remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components} />
     </RenderTimingProbe>
   )
 })

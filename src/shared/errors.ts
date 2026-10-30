@@ -600,11 +600,11 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
 
   // HTML Preview comments, as §10.10 words them; `{file}` is the file's name, filled by the comment window
   [ErrorCode.COMMENT_TARGET_MOVED]: 'This element changed in the file since you picked it. Close and pick it again – your text will be restored.',
-  [ErrorCode.COMMENT_BLOCK_CHANGED]: 'This block changed on disk. Reopen it and try again.',
+  [ErrorCode.COMMENT_BLOCK_CHANGED]: 'This comment changed on disk. Erfana reloaded it – try again.',
   [ErrorCode.COMMENT_ENCODING_UNSUPPORTED]: 'Erfana can only add comments to UTF-8 files.',
   [ErrorCode.COMMENT_FILE_CONFLICTED]: '{file} has unresolved git conflicts. Resolve them first.',
   [ErrorCode.COMMENT_DRAFT_EXPIRED]: 'This comment window was open too long. Pick the element again – your text is kept.',
-  [ErrorCode.COMMENT_KEY_INVALID]: 'This comment is no longer open here. Reopen it and try again.',
+  [ErrorCode.COMMENT_KEY_INVALID]: 'This window is out of date – the comment changed or was removed. Close it and open the comment again.',
   [ErrorCode.COMMENT_IDENTITY_REQUIRED]: 'Enter a name to add comments.',
   [ErrorCode.COMMENT_LIMIT]: 'This would go over a comment size limit, so nothing was saved.',
   [ErrorCode.COMMENT_FILE_TOO_LARGE]: 'Erfana adds comments only to files of up to 25 MB and 640,000 elements.',

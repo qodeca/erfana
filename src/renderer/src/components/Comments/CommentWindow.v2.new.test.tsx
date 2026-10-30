@@ -5,7 +5,7 @@
  * (comments-v2 C-14, C-19, C-21, C-03; spec 024 state table W-01, W-02,
  * W-07 – W-10, 024-FR-004 words dropped).
  */
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ErrorCode } from '../../../../shared/errors'
@@ -201,7 +201,7 @@ describe('CommentWindow – v2 new comment', () => {
     await fieldFocused()
     await user.type(field(), 'On these words')
     await user.click(saveButton())
-    expect(await screen.findByTestId('comment-words-dropped')).toHaveTextContent(SELECTION_COPY.wordsDropped('paragraph', 'notes.md'))
+    expect(await screen.findByTestId('comment-words-dropped')).toHaveTextContent(SELECTION_COPY.wordsNotInFile('paragraph', 'notes.md'))
     expect(props.onRefresh).toHaveBeenCalled()
     expect(props.onWritten).not.toHaveBeenCalled()
     const close = screen.getByTestId('comment-close')
@@ -219,6 +219,20 @@ describe('CommentWindow – v2 new comment', () => {
     await fieldFocused()
     await user.type(field(), 'Fine')
     expect(saveButton()).not.toHaveAttribute('aria-disabled')
+  })
+
+  it('024-AC-018 C-19 the counter says each crossing once in its polite region: 400 characters left, then over the limit', async () => {
+    setup()
+    await fieldFocused()
+    const live = screen.getByTestId('comment-counter-live')
+    expect(live).toHaveAttribute('aria-live', 'polite')
+    expect(live).toBeEmptyDOMElement()
+    fireEvent.change(field(), { target: { value: 'a'.repeat(3_600) } })
+    expect(live).toHaveTextContent('400 characters left')
+    fireEvent.change(field(), { target: { value: 'a'.repeat(4_002) } })
+    expect(live).toHaveTextContent('Over the limit by 2')
+    fireEvent.change(field(), { target: { value: 'a'.repeat(10) } })
+    expect(live).toBeEmptyDOMElement()
   })
 
   it('C-21 an unsaved source blocks Save with its own reason', () => {

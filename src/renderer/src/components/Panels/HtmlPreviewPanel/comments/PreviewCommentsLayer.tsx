@@ -79,6 +79,8 @@ export interface PreviewCommentsLayerProps {
   readonly onCopyRaw: (text: string) => void
   /** A step in the window reached this thread (C-13): show its element on the page. */
   readonly onReveal?: (threadKey: string) => void
+  /** The panel's drawer `id`: the window's stepper steps within that drawer's filter (C-13). */
+  readonly drawerId?: string
   /** Injected clock for the window's times (tests). */
   readonly now?: () => Date
 }
@@ -175,6 +177,7 @@ export function PreviewCommentsLayer(props: PreviewCommentsLayerProps): React.JS
           onOpenInSource={props.onOpenInSource}
           onCopyRaw={props.onCopyRaw}
           onReveal={props.onReveal}
+          drawerId={props.drawerId}
         />
       )}
     </>

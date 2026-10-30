@@ -523,9 +523,9 @@ export function MarkdownEditorPanel(
     onStart: () => setIsEditorReady(false), // Reset editor ready state when loading new file
     onLoaded: (filePath, { content, generation }) => {
       openedGenerationRef.current = generation
+      comments.prefetch(filePath, getDefaultViewMode(filePath)) // 024-NFR-001: main reads comments while the preview renders
       setCurrentFile({ path: filePath, content, modified: false })
-      // Set view mode based on file type using extracted logic
-      setViewMode(getDefaultViewMode(filePath))
+      setViewMode(getDefaultViewMode(filePath)) // by file type
     },
     // Never fail silently: without this the tab read "No file open"
     onFailed: (message) =>

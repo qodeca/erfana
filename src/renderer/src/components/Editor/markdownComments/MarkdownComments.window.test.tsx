@@ -142,6 +142,39 @@ describe('Markdown Preview comments – the window and the content marks', () =>
     await waitFor(() => expect(revealed).toHaveBeenCalled())
   })
 
+  describe('C-13 (Markdown) the step keys with focus in the preview', () => {
+    const altF9 = (shift = false): void => {
+      fireEvent.keyDown(scroller(), { key: 'F9', code: 'F9', altKey: true, shiftKey: shift })
+    }
+
+    it('024-AC-019 C-13 (Markdown) Alt+F9 in the preview opens the first open comment, brings its block into view and says where it landed', async () => {
+      await ready()
+      const revealed = vi.spyOn(listItem(6), 'scrollIntoView')
+      scroller().focus()
+      altF9()
+      await screen.findByRole('dialog', { name: 'Comment on list item' })
+      expect(revealed).toHaveBeenCalled()
+      await waitFor(() => expect(screen.getByTestId(TEST_IDS.COMMENT_STEP_LIVE)).toHaveTextContent('Comment 1 of 2, on list item, line 6.'))
+    })
+
+    it('024-AC-019 C-13 (Markdown) with the window open, Alt+F9 and Alt+Shift+F9 in the preview step the window itself', async () => {
+      await ready()
+      altF9(true)
+      await screen.findByRole('dialog', { name: 'Comment on paragraph' })
+      altF9()
+      await screen.findByRole('dialog', { name: 'Comment on list item' })
+      await waitFor(() => expect(screen.getByTestId(TEST_IDS.COMMENT_WINDOW_POLITE)).toHaveTextContent('Comment 1 of 2, on list item, line 6.'))
+    })
+
+    it('024-AC-019 C-13 (Markdown) any other F9 press is left to the preview', async () => {
+      await ready()
+      fireEvent.keyDown(scroller(), { key: 'F9', code: 'F9' })
+      fireEvent.keyDown(scroller(), { key: 'F9', code: 'F9', altKey: true, ctrlKey: true })
+      await act(async () => {})
+      expect(screen.queryByRole('dialog')).toBeNull()
+    })
+  })
+
   describe('C-19 (Markdown) refusals the window can act on', () => {
     it('C-19 (Markdown) W-07 a render-check refusal offers the whole list, which opens a new comment on it', async () => {
       const user = userEvent.setup()
@@ -195,11 +228,14 @@ describe('Markdown Preview comments – the window and the content marks', () =>
     api.list.mockResolvedValue({ ok: true, file: fileView([thread('saved', 3, 'p')]), placements: [{ threadKey: 'saved', line: 3, tag: 'p' }] })
     await user.type(await screen.findByTestId('comment-new-field'), 'Which beta?')
     await user.click(screen.getByTestId('comment-save'))
+    // D-16: the Markdown window says the HTML window's sentence, with the target's kind.
+    const shown = SELECTION_COPY.wordsNotInFile('paragraph', 'notes.md')
     const dropped = SELECTION_COPY.wordsDropped('paragraph', 'notes.md')
-    await waitFor(() => expect(document.body).toHaveTextContent(dropped))
+    await waitFor(() => expect(document.body).toHaveTextContent(shown))
     await waitFor(() => expect(api.list.mock.calls.length).toBeGreaterThan(1))
     await act(async () => {})
     expect(polite()).not.toHaveTextContent(dropped)
+    expect(polite()).not.toHaveTextContent(shown)
   })
 
   describe('C-06 (Markdown) the Changed state on the page', () => {

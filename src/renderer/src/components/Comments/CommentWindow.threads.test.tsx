@@ -27,6 +27,7 @@ import {
   type FakeCommentsBridge
 } from '../Panels/HtmlPreviewPanel/comments/__test-helpers__/commentTestKit'
 import { COPY } from './commentCopy'
+import { HTML_WORDS } from './commentCopyWords'
 import { CommentWindow, type CommentWindowProps } from './CommentWindow'
 import { newCommentFrom } from './commentWindowHeading'
 import { selectThreads } from './ThreadsView'
@@ -785,7 +786,7 @@ describe('CommentWindow – threads', () => {
       const { unmount } = setup({
         list: ready([fileView({ threads: [thread(1, { notVisible: true })] })])
       })
-      expect(screen.getByTestId('comment-not-visible')).toHaveTextContent(COPY.notVisibleText)
+      expect(screen.getByTestId('comment-not-visible')).toHaveTextContent(HTML_WORDS.notVisibleText('p'))
       unmount()
       setup({ notVisible: ['t1'] })
       expect(screen.getByTestId('comment-not-visible')).toBeVisible()

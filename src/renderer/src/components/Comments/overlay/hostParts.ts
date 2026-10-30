@@ -12,7 +12,7 @@ import { hashText } from '../../../../../shared/comments/blocks'
 import type { PickedTargetRequest, ThreadPlacement } from '../../../../../shared/ipc/file-comment-schema'
 import type { CommentFileView } from '../../../../../shared/ipc/comment-common-schema'
 import type { CommentCounts } from '../../../stores/usePreviewCommentStore'
-import { MD_SPOKEN_COPY, SPOKEN_EXCERPT_MAX_CHARS } from '../commentCopyWords'
+import { MD_SPOKEN_COPY, SPOKEN_EXCERPT_MAX_CHARS, type CommentWords } from '../commentCopyWords'
 import { listCounts } from '../commentRows'
 import type { PreviewCommentAdapter } from './previewAdapter'
 
@@ -30,6 +30,11 @@ export function countsOf(file: CommentFileView | null): CommentCounts | null {
   if (file === null) return null
   const { open, resolved, damaged } = listCounts([file])
   return { open, resolved, attention: damaged }
+}
+
+/** The toolbar's counts ({@link countsOf}) and its changed count (R-14), read once from the list. */
+export function toolbarCounts(file: CommentFileView | null): { readonly counts: CommentCounts | null; readonly changed: number } {
+  return { counts: countsOf(file), changed: file === null ? 0 : listCounts([file]).changed }
 }
 
 /**
@@ -85,4 +90,15 @@ export function viewOf(el: HTMLElement | null): { w: number; h: number; dpr: num
     x: 0,
     y: Math.round(el?.scrollTop ?? 0)
   }
+}
+
+/**
+ * Why `file` takes no new comment – read-only, or full at 500 comments, where
+ * replies, edits and resolves still work (spec 024 state table F-04) – as the
+ * window, the menu and the mode tooltip word it; `null` when it takes one.
+ */
+export function noNewCommentText(file: CommentFileView | null, fileName: string, words: CommentWords): string | null {
+  if (file === null) return null
+  if (!file.writable) return words.readOnlyReasonText(file.readOnlyReason, fileName)
+  return file.addRefusal === undefined ? null : words.readOnlyReasonText(file.addRefusal, fileName)
 }

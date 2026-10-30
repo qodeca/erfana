@@ -45,6 +45,7 @@
  * and any layout work), Enter, Shift+F10 / ContextMenu, Esc.
  */
 import { reduceCommentMode } from '../../shared/comments/overlayCore/modeState'
+import { setAltHeld } from './altHold'
 import type { CommentController, PickerAction } from './controller'
 import { watchDocumentElement } from './documentWatch'
 
@@ -146,7 +147,11 @@ interface Handlers {
   readonly ready: Handler
 }
 
-function handlersOf(controller: CommentController): Handlers {
+function handlersOf(controller: CommentController, doc: Document): Handlers {
+  // C-21: the label shows the size only while Alt is held – drawn again when that changes, in comment mode.
+  const altFrom = (event: KeyboardEvent | PointerEvent): void => {
+    if (setAltHeld(doc, event.altKey) && controller.mode) controller.renderNow()
+  }
   /** Keys whose press the guard swallowed: their release is swallowed too. */
   const swallowedKeys = new Set<string>()
   return {
@@ -177,6 +182,7 @@ function handlersOf(controller: CommentController): Handlers {
     keyDown(event) {
       const key = event as KeyboardEvent
       if (!key.isTrusted) return
+      altFrom(key)
       const action = controller.mode ? pickerActionOf(key) : null
       if (action === null || !isOverlayKey(action, controller.mode)) {
         // A press the page keeps: a release left over from a swallowed one
@@ -189,11 +195,14 @@ function handlersOf(controller: CommentController): Handlers {
       controller.pickerAction(action)
     },
     keyUp(event) {
+      if (event.isTrusted) altFrom(event as KeyboardEvent)
       if (event.isTrusted && swallowedKeys.delete(keyOf(event as KeyboardEvent))) swallow(event)
     },
     move(event) {
       const pointer = event as PointerEvent
-      if (pointer.isTrusted) controller.pointerAt({ x: pointer.clientX, y: pointer.clientY })
+      if (!pointer.isTrusted) return
+      altFrom(pointer)
+      controller.pointerAt({ x: pointer.clientX, y: pointer.clientY })
     },
     out(event) {
       if (event.isTrusted && (event as PointerEvent).relatedTarget === null) controller.pointerLeft()
@@ -246,7 +255,7 @@ function registrationsOf(win: Window, doc: Document, on: Handlers): Registration
  * as long as the document).
  */
 export function attachInputGuards(win: Window, doc: Document, controller: CommentController): () => void {
-  const registrations = registrationsOf(win, doc, handlersOf(controller))
+  const registrations = registrationsOf(win, doc, handlersOf(controller, doc))
   const add = (): void => {
     // Idempotent: the same listener, type and phase is never added twice.
     for (const { target, type, listener, options } of registrations) target.addEventListener(type, listener, options)

@@ -36,7 +36,7 @@
   native page <em>shrinks</em> beside it instead of being covered (Layering card: anything over a preview lives
   outside its rectangle). <code data-token="--comments-drawer-width">320px</code> wide (<code>--comments-drawer-width</code>), at least 280px; opens
   instantly, because the native view moves in one step and an eased width would race it. Under a
-  <span data-claim="drawer-full-below-px" title="DRAWER_FULL_BELOW_PX in useDrawerSheet.ts – host width in px below which the comment drawer goes full width">640</span>px panel it takes the whole width, and “Show in preview” closes it first.
+  <span data-claim="drawer-full-below-px" title="DRAWER_FULL_BELOW_PX in useDrawerSheet.ts – host width in px below which the comment drawer goes full width">640</span>px panel it takes the whole width, and there the arrow keys only move – a reveal would close it first.
   This is the shape the proposed <a href="../../../design-system/system/patterns/drawer/index.html">Drawer</a>
   pattern generalises from this drawer.
   <br><br>
@@ -85,9 +85,12 @@
 <div class="ds-note">
   <strong>Tab</strong> reaches the close button, then the filter (one stop – <kbd>←</kbd> <kbd>→</kbd> move the
   selection), the checkbox, then the list <strong>once</strong>. In the list, <kbd>↑</kbd> <kbd>↓</kbd>
-  <kbd>Home</kbd> <kbd>End</kbd> move; <kbd>Enter</kbd> or a click is <strong>Show in preview</strong> and focus
-  stays in the list; <kbd>Tab</kbd> once more reaches that row's <strong>Open</strong>. On a not-found or damaged
-  row the Enter action is <strong>Open in source</strong> instead, because there is nothing on the page to show.
+  <kbd>Home</kbd> <kbd>End</kbd> move the active row and only reveal it – <strong>Show in preview</strong> – and
+  focus stays in the list; on a not-found, damaged or newer row there is nothing on the page to show, so they only
+  move. <kbd>Enter</kbd> or a click opens the thread, like <strong>Open</strong> (comments-v2 R-10, C-13, approved
+  2026-10-29); a not-found, damaged or newer row opens its own window. Only the active row keeps its
+  <strong>Open</strong>, and <kbd>Tab</kbd> once more reaches it. The frames below still draw Open on every row and
+  the v1 filter.
 </div>
 
 <div class="panel drawer-panel"><div class="panel__body" id="body">
@@ -106,7 +109,7 @@
     </div>
     
     <div class="erf-comment-drawer__scroll"><p class="erf-comment-drawer__file">index.html</p><ul class="erf-row-list erf-comment-list" aria-label="Open comments"><li class="erf-row erf-row--selected erf-comment-row" data-i="0">
-    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t1-l" aria-describedby="t1-x t1-m t1-t" title="Show in preview" aria-keyshortcuts="Enter" data-main=""></button>
+    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t1-l" aria-describedby="t1-x t1-m t1-t" title="Open thread" aria-keyshortcuts="Enter" data-main=""></button>
     <div class="erf-comment-row__line"><span class="erf-comment-row__label" id="t1-l" dir="ltr">button.cta</span>
       <span class="erf-comment-row__count">2 replies</span>
       <span id="t1-t"></span></div>
@@ -114,7 +117,7 @@
     <p class="erf-comment-row__meta" id="t1-m"><bdi>Marcin Obel</bdi> · Today, 14:32</p>
     <button class="erf-button erf-button--secondary erf-button--sm erf-comment-row__open" type="button" tabindex="-1" aria-label="Open comments on button.cta" data-open=""><span>Open</span></button>
   </li><li class="erf-row erf-comment-row" data-i="1">
-    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t2-l" aria-describedby="t2-x t2-m t2-t" title="Show in preview" aria-keyshortcuts="Enter" data-main=""></button>
+    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t2-l" aria-describedby="t2-x t2-m t2-t" title="Open thread" aria-keyshortcuts="Enter" data-main=""></button>
     <div class="erf-comment-row__line"><span class="erf-comment-row__label" id="t2-l" dir="ltr">p#lead</span>
       
       <span id="t2-t"></span></div>
@@ -122,7 +125,7 @@
     <p class="erf-comment-row__meta" id="t2-m"><bdi>Anna K.</bdi> · Yesterday, 09:10</p>
     <button class="erf-button erf-button--secondary erf-button--sm erf-comment-row__open" type="button" tabindex="-1" aria-label="Open comments on p#lead" data-open=""><span>Open</span></button>
   </li><li class="erf-row erf-comment-row" data-i="2">
-    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t3-l" aria-describedby="t3-x t3-m t3-t" title="Show in preview" aria-keyshortcuts="Enter" data-main=""></button>
+    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t3-l" aria-describedby="t3-x t3-m t3-t" title="Open thread" aria-keyshortcuts="Enter" data-main=""></button>
     <div class="erf-comment-row__line"><span class="erf-comment-row__label" id="t3-l" dir="ltr">section#pricing</span>
       
       <span id="t3-t"><span class="erf-comment-tag">Not visible now</span></span></div>
@@ -130,7 +133,7 @@
     <p class="erf-comment-row__meta" id="t3-m"><bdi>Anna K.</bdi> · 25 Oct, 16:05</p>
     <button class="erf-button erf-button--secondary erf-button--sm erf-comment-row__open" type="button" tabindex="-1" aria-label="Open comments on section#pricing" data-open=""><span>Open</span></button>
   </li><li class="erf-row erf-comment-row" data-i="3">
-    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t4-l" aria-describedby="t4-x t4-m t4-t" title="Show in preview" aria-keyshortcuts="Enter" data-main=""></button>
+    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t4-l" aria-describedby="t4-x t4-m t4-t" title="Open thread" aria-keyshortcuts="Enter" data-main=""></button>
     <div class="erf-comment-row__line"><span class="erf-comment-row__label" id="t4-l" dir="ltr">td.price</span>
       <span class="erf-comment-row__count">1 reply</span>
       <span id="t4-t"><span class="erf-comment-tag">In frame: pricing-table.html</span></span></div>
@@ -204,7 +207,7 @@
     </div>
     <div class="erf-comment-drawer__note"><div class="erf-banner erf-banner--info"><span class="erf-banner__icon"><svg data-icon="info" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span><div class="erf-banner__body"><p class="erf-banner__text"><span class="erf-visually-hidden">Note: </span>Comments from 2 files in this page aren't listed: one list reads at most 64 files and 64 MB. Open a frame's file in its own tab to see its comments.</p></div></div></div>
     <div class="erf-comment-drawer__scroll"><p class="erf-comment-drawer__file">index.html</p><ul class="erf-row-list erf-comment-list" aria-label="Open comments"><li class="erf-row erf-row--selected erf-comment-row" data-i="0">
-    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t1-l" aria-describedby="t1-x t1-m t1-t" title="Show in preview" aria-keyshortcuts="Enter" data-main=""></button>
+    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t1-l" aria-describedby="t1-x t1-m t1-t" title="Open thread" aria-keyshortcuts="Enter" data-main=""></button>
     <div class="erf-comment-row__line"><span class="erf-comment-row__label" id="t1-l" dir="ltr">button.cta</span>
       <span class="erf-comment-row__count">2 replies</span>
       <span id="t1-t"></span></div>
@@ -212,7 +215,7 @@
     <p class="erf-comment-row__meta" id="t1-m"><bdi>Marcin Obel</bdi> · Today, 14:32</p>
     <button class="erf-button erf-button--secondary erf-button--sm erf-comment-row__open" type="button" tabindex="-1" aria-label="Open comments on button.cta" data-open=""><span>Open</span></button>
   </li><li class="erf-row erf-comment-row" data-i="1">
-    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t2-l" aria-describedby="t2-x t2-m t2-t" title="Show in preview" aria-keyshortcuts="Enter" data-main=""></button>
+    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t2-l" aria-describedby="t2-x t2-m t2-t" title="Open thread" aria-keyshortcuts="Enter" data-main=""></button>
     <div class="erf-comment-row__line"><span class="erf-comment-row__label" id="t2-l" dir="ltr">p#lead</span>
       
       <span id="t2-t"></span></div>
@@ -220,7 +223,7 @@
     <p class="erf-comment-row__meta" id="t2-m"><bdi>Anna K.</bdi> · Yesterday, 09:10</p>
     <button class="erf-button erf-button--secondary erf-button--sm erf-comment-row__open" type="button" tabindex="-1" aria-label="Open comments on p#lead" data-open=""><span>Open</span></button>
   </li><li class="erf-row erf-comment-row" data-i="2">
-    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t3-l" aria-describedby="t3-x t3-m t3-t" title="Show in preview" aria-keyshortcuts="Enter" data-main=""></button>
+    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t3-l" aria-describedby="t3-x t3-m t3-t" title="Open thread" aria-keyshortcuts="Enter" data-main=""></button>
     <div class="erf-comment-row__line"><span class="erf-comment-row__label" id="t3-l" dir="ltr">section#pricing</span>
       
       <span id="t3-t"><span class="erf-comment-tag">Not visible now</span></span></div>
@@ -228,7 +231,7 @@
     <p class="erf-comment-row__meta" id="t3-m"><bdi>Anna K.</bdi> · 25 Oct, 16:05</p>
     <button class="erf-button erf-button--secondary erf-button--sm erf-comment-row__open" type="button" tabindex="-1" aria-label="Open comments on section#pricing" data-open=""><span>Open</span></button>
   </li><li class="erf-row erf-comment-row" data-i="3">
-    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t4-l" aria-describedby="t4-x t4-m t4-t" title="Show in preview" aria-keyshortcuts="Enter" data-main=""></button>
+    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t4-l" aria-describedby="t4-x t4-m t4-t" title="Open thread" aria-keyshortcuts="Enter" data-main=""></button>
     <div class="erf-comment-row__line"><span class="erf-comment-row__label" id="t4-l" dir="ltr">td.price</span>
       <span class="erf-comment-row__count">1 reply</span>
       <span id="t4-t"><span class="erf-comment-tag">In frame: pricing-table.html</span></span></div>
@@ -245,7 +248,7 @@
     </div>
     
     <div class="erf-comment-drawer__scroll"><p class="erf-comment-drawer__file">index.html</p><ul class="erf-row-list erf-comment-list" aria-label="Resolved comments"><li class="erf-row erf-comment-row" data-i="4">
-    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t5-l" aria-describedby="t5-x t5-m t5-t" title="Show in preview" aria-keyshortcuts="Enter" data-main=""></button>
+    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t5-l" aria-describedby="t5-x t5-m t5-t" title="Open thread" aria-keyshortcuts="Enter" data-main=""></button>
     <div class="erf-comment-row__line"><span class="erf-comment-row__label" id="t5-l" dir="ltr">div.card</span>
       <span class="erf-comment-row__count">1 reply</span>
       <span id="t5-t"><span class="erf-comment-tag">Resolved</span></span></div>
@@ -253,7 +256,7 @@
     <p class="erf-comment-row__meta" id="t5-m"><bdi>Anna K.</bdi> · 20 Oct, 10:00</p>
     <button class="erf-button erf-button--secondary erf-button--sm erf-comment-row__open" type="button" tabindex="-1" aria-label="Open comments on div.card" data-open=""><span>Open</span></button>
   </li><li class="erf-row erf-row--selected erf-comment-row" data-i="5">
-    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t6-l" aria-describedby="t6-x t6-m t6-t" title="Show in preview" aria-keyshortcuts="Enter" data-main=""></button>
+    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t6-l" aria-describedby="t6-x t6-m t6-t" title="Open thread" aria-keyshortcuts="Enter" data-main=""></button>
     <div class="erf-comment-row__line"><span class="erf-comment-row__label" id="t6-l" dir="ltr">img.logo</span>
       
       <span id="t6-t"><span class="erf-comment-tag">Resolved</span><span class="erf-comment-tag erf-comment-tag--attention"><svg data-icon="triangle-alert" width="12" height="12" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Not found</span></span></div>
@@ -261,7 +264,7 @@
     <p class="erf-comment-row__meta" id="t6-m"><bdi>Anna K.</bdi> · 19 Oct, 08:30</p>
     <button class="erf-button erf-button--secondary erf-button--sm erf-comment-row__open" type="button" tabindex="-1" aria-label="Open comments on img.logo" data-open=""><span>Open</span></button>
   </li></ul></div>
-  </aside></div></div></figure><figure class="state"><figcaption><strong>Needs attention</strong> – not found, damaged, newer format; Enter = Open in source</figcaption><div class="panel mini"><div class="panel__body"><aside class="erf-comment-drawer" id="s8" aria-labelledby="s8-title">
+  </aside></div></div></figure><figure class="state"><figcaption><strong>Needs attention</strong> – not found, damaged, newer format; Enter opens their window (R-10)</figcaption><div class="panel mini"><div class="panel__body"><aside class="erf-comment-drawer" id="s8" aria-labelledby="s8-title">
     <div class="erf-comment-drawer__head"><h2 class="erf-comment-drawer__title" id="s8-title">Comments</h2>
       <button class="erf-button erf-button--icon" type="button" aria-label="Close comments" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
     <div class="erf-comment-drawer__controls">
@@ -270,7 +273,7 @@
     </div>
     
     <div class="erf-comment-drawer__scroll"><p class="erf-comment-drawer__file">index.html</p><ul class="erf-row-list erf-comment-list" aria-label="Needs attention comments"><li class="erf-row erf-row--selected erf-comment-row" data-i="6">
-    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t7-l" aria-describedby="t7-x t7-m t7-t" title="Open in source" aria-keyshortcuts="Enter" data-main=""></button>
+    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t7-l" aria-describedby="t7-x t7-m t7-t" title="Open thread" aria-keyshortcuts="Enter" data-main=""></button>
     <div class="erf-comment-row__line"><span class="erf-comment-row__label" id="t7-l" dir="ltr">h2.old-title</span>
       
       <span id="t7-t"><span class="erf-comment-tag erf-comment-tag--attention"><svg data-icon="triangle-alert" width="12" height="12" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Not found</span></span></div>
@@ -278,7 +281,7 @@
     <p class="erf-comment-row__meta" id="t7-m"><bdi>Marcin Obel</bdi> · 18 Oct, 14:02</p>
     <button class="erf-button erf-button--secondary erf-button--sm erf-comment-row__open" type="button" tabindex="-1" aria-label="Open comments on h2.old-title" data-open=""><span>Open</span></button>
   </li><li class="erf-row erf-comment-row" data-i="7">
-    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t8-l" aria-describedby="t8-x t8-m t8-t" title="Open in source" aria-keyshortcuts="Enter" data-main=""></button>
+    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t8-l" aria-describedby="t8-x t8-m t8-t" title="Open thread" aria-keyshortcuts="Enter" data-main=""></button>
     <div class="erf-comment-row__line"><span class="erf-comment-row__label" id="t8-l" dir="ltr">index.html, line 57</span>
       
       <span id="t8-t"><span class="erf-comment-tag erf-comment-tag--attention"><svg data-icon="triangle-alert" width="12" height="12" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Damaged</span></span></div>
@@ -286,7 +289,7 @@
     <span id="t8-m"></span>
     <button class="erf-button erf-button--secondary erf-button--sm erf-comment-row__open" type="button" tabindex="-1" aria-label="Open comments on index.html, line 57" data-open=""><span>Open</span></button>
   </li><li class="erf-row erf-comment-row" data-i="8">
-    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t9-l" aria-describedby="t9-x t9-m t9-t" title="Open in source" aria-keyshortcuts="Enter" data-main=""></button>
+    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t9-l" aria-describedby="t9-x t9-m t9-t" title="Open thread" aria-keyshortcuts="Enter" data-main=""></button>
     <div class="erf-comment-row__line"><span class="erf-comment-row__label" id="t9-l" dir="ltr">index.html, line 203</span>
       
       <span id="t9-t"><span class="erf-comment-tag erf-comment-tag--attention"><svg data-icon="triangle-alert" width="12" height="12" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Newer format – read-only</span></span></div>
@@ -297,8 +300,9 @@
   </aside></div></div></figure></div>
 
 <h2>Under 640px of panel</h2>
-<div class="ds-note">The drawer takes the whole width. Show in preview closes it first, then reveals – the page is
-  never behind the list it is being shown from.</div>
+<div class="ds-note">The drawer takes the whole width. The arrow keys only move here: a reveal would close the
+  drawer first, then reveal – the page is never behind the list it is being shown from – which would end the walk
+  through the list at its first step. Enter or a click opens the thread (R-10).</div>
 <div class="panel narrow-panel"><div class="panel__body" id="narrow"><aside class="erf-comment-drawer erf-comment-drawer--full" id="n1" aria-labelledby="n1-title">
     <div class="erf-comment-drawer__head"><h2 class="erf-comment-drawer__title" id="n1-title">Comments</h2>
       <button class="erf-button erf-button--icon" type="button" aria-label="Close comments" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
@@ -308,7 +312,7 @@
     </div>
     
     <div class="erf-comment-drawer__scroll"><p class="erf-comment-drawer__file">index.html</p><ul class="erf-row-list erf-comment-list" aria-label="Open comments"><li class="erf-row erf-row--selected erf-comment-row" data-i="0">
-    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t1-l" aria-describedby="t1-x t1-m t1-t" title="Show in preview" aria-keyshortcuts="Enter" data-main=""></button>
+    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t1-l" aria-describedby="t1-x t1-m t1-t" title="Open thread" aria-keyshortcuts="Enter" data-main=""></button>
     <div class="erf-comment-row__line"><span class="erf-comment-row__label" id="t1-l" dir="ltr">button.cta</span>
       <span class="erf-comment-row__count">2 replies</span>
       <span id="t1-t"></span></div>
@@ -316,7 +320,7 @@
     <p class="erf-comment-row__meta" id="t1-m"><bdi>Marcin Obel</bdi> · Today, 14:32</p>
     <button class="erf-button erf-button--secondary erf-button--sm erf-comment-row__open" type="button" tabindex="-1" aria-label="Open comments on button.cta" data-open=""><span>Open</span></button>
   </li><li class="erf-row erf-comment-row" data-i="1">
-    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t2-l" aria-describedby="t2-x t2-m t2-t" title="Show in preview" aria-keyshortcuts="Enter" data-main=""></button>
+    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t2-l" aria-describedby="t2-x t2-m t2-t" title="Open thread" aria-keyshortcuts="Enter" data-main=""></button>
     <div class="erf-comment-row__line"><span class="erf-comment-row__label" id="t2-l" dir="ltr">p#lead</span>
       
       <span id="t2-t"></span></div>
@@ -324,7 +328,7 @@
     <p class="erf-comment-row__meta" id="t2-m"><bdi>Anna K.</bdi> · Yesterday, 09:10</p>
     <button class="erf-button erf-button--secondary erf-button--sm erf-comment-row__open" type="button" tabindex="-1" aria-label="Open comments on p#lead" data-open=""><span>Open</span></button>
   </li><li class="erf-row erf-comment-row" data-i="2">
-    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t3-l" aria-describedby="t3-x t3-m t3-t" title="Show in preview" aria-keyshortcuts="Enter" data-main=""></button>
+    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t3-l" aria-describedby="t3-x t3-m t3-t" title="Open thread" aria-keyshortcuts="Enter" data-main=""></button>
     <div class="erf-comment-row__line"><span class="erf-comment-row__label" id="t3-l" dir="ltr">section#pricing</span>
       
       <span id="t3-t"><span class="erf-comment-tag">Not visible now</span></span></div>
@@ -332,7 +336,7 @@
     <p class="erf-comment-row__meta" id="t3-m"><bdi>Anna K.</bdi> · 25 Oct, 16:05</p>
     <button class="erf-button erf-button--secondary erf-button--sm erf-comment-row__open" type="button" tabindex="-1" aria-label="Open comments on section#pricing" data-open=""><span>Open</span></button>
   </li><li class="erf-row erf-comment-row" data-i="3">
-    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t4-l" aria-describedby="t4-x t4-m t4-t" title="Show in preview" aria-keyshortcuts="Enter" data-main=""></button>
+    <button class="erf-comment-row__main" type="button" tabindex="-1" aria-labelledby="t4-l" aria-describedby="t4-x t4-m t4-t" title="Open thread" aria-keyshortcuts="Enter" data-main=""></button>
     <div class="erf-comment-row__line"><span class="erf-comment-row__label" id="t4-l" dir="ltr">td.price</span>
       <span class="erf-comment-row__count">1 reply</span>
       <span id="t4-t"><span class="erf-comment-tag">In frame: pricing-table.html</span></span></div>

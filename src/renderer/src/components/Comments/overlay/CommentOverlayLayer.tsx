@@ -13,9 +13,11 @@
  *
  * Icons sit where the shared `overlayCore/pinLayout` puts them – the same
  * step and stack rules as the HTML Preview – one per target, counting the
- * target's open threads (state table § 4). They are real buttons outside the
- * Tab order, named for what they open (D-07); the drawer is the keyboard
- * route to every thread.
+ * target's open threads, with the HTML pin's bubble, count, warning and stack
+ * looks; a not-found comment gets a dashed ghost at its own place
+ * (`iconLayout.ts`; state table § 4, S-01, S-05, S-07; C-05, C-17). They are
+ * real buttons outside the Tab order, named for what they open (D-07, R-16);
+ * the drawer is the keyboard route to every thread.
  *
  * The words of an open selection comment are marked through the Custom
  * Highlight API (`commentHighlights.ts`, C-12) while they can be found in
@@ -23,8 +25,11 @@
  * S-01, S-06). The open window's threads and the threads of a hovered icon
  * wear the active mark (C-17 "underline and icon act as one"; R-01). The
  * marks keep their thread keys under the host's `markOwner`, so the host can
- * open the thread under a click (C-17). The Comment button over a selection
- * (C-16) is drawn here too.
+ * open the thread under a click (C-17). The pointer on marked words puts
+ * their icon in its hover look, raises the words to the active mark, and
+ * gives the pane a pointer cursor and the title "Comment by {name} – click to
+ * open" (C-17 linked hover; hit-tested with `commentMarkAt`). The Comment
+ * button over a selection (C-16) is drawn here too.
  *
  * A thread whose target changed since the comment (C-06) gives its icon a
  * corner notch and "N changed" in its name, and its words a dashed bar.
@@ -35,16 +40,17 @@
  *
  * @module components/Comments/overlay/CommentOverlayLayer
  */
-import { useEffect, useId, useRef, useState } from 'react'
-import { placePin, PIN_BOX_PX, type Box } from '../../../../../shared/comments/overlayCore/pinLayout'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { ThreadPlacement } from '../../../../../shared/ipc/file-comment-schema'
 import type { CommentFileView } from '../../../../../shared/ipc/comment-common-schema'
 import { renderIcon } from '../../../utils/iconRegistry'
 import { TEST_IDS } from '../../../constants/testids'
-import { CHANGE_MARK_COPY, MD_SURFACE_COPY, SELECTION_COPY } from '../commentCopyWords'
+import { MD_SURFACE_COPY, SELECTION_COPY } from '../commentCopyWords'
 import { clearCommentDetails, copyWithoutCommentAttributes, setCommentDetails } from './commentContentAttrs'
-import { setCommentMarks, type CommentMark } from './commentHighlights'
+import { commentMarkAt, setCommentMarks, type CommentMark } from './commentHighlights'
+import { noteCommentPinsDrawn } from './commentTiming'
 import { rangeOfWords } from './domWords'
+import { iconSpots, relativeBox, type IconSpot, type PinContent } from './iconLayout'
 import type { PreviewCommentAdapter } from './previewAdapter'
 import type { SelectionButton } from './useSelectionComments'
 import './CommentOverlayLayer.css'
@@ -65,7 +71,13 @@ export interface CommentOverlayLayerProps {
   readonly scrollTick: number
   readonly polite: string
   readonly assertive: string
-  readonly onOpenThreads: (threadKeys: readonly string[], anchor: HTMLElement) => void
+  /** An icon's click: its threads, and the damaged blocks in its target's slot (S-07). */
+  readonly onOpenThreads: (
+    threadKeys: readonly string[],
+    anchor: HTMLElement | null,
+    opener?: 'page' | 'drawer',
+    blockKeys?: readonly string[]
+  ) => void
   /** The Comment button over a selection, while it shows (C-16). */
   readonly selectionButton?: SelectionButton | null
   readonly onSelectionButton?: () => void
@@ -75,60 +87,56 @@ export interface CommentOverlayLayerProps {
   readonly activeThreads?: readonly string[]
 }
 
-/** One drawn icon. */
-interface IconSpot {
-  readonly key: string
-  readonly box: Box
-  readonly element: HTMLElement
-  readonly threadKeys: readonly string[]
-  readonly name: string
-  /** At least one of its threads is Changed or Words changed (C-06). */
-  readonly changed: boolean
+/**
+ * The HTML pin's speech bubble, exactly (`PIN_PATH` and `PIN_BODY` in
+ * `preload/previewPageComments/constants.ts`, decision 33): a sealed preload
+ * entry cannot share a module with the renderer, so `iconLayout.test.ts`
+ * pins the two equal.
+ */
+export const PIN_BUBBLE_PATH = 'M2 2H22V17H7L2 22Z'
+/** The bubble's body without its tail, where a count or "!" is centred. */
+export const PIN_BUBBLE_BODY = { x: 2, y: 2, width: 20, height: 15 } as const
+
+/**
+ * An icon's glyph: the bubble with two text lines, or a count, "9+", "!" or
+ * "+3" as generated content (never a text node, so Find and a copy never
+ * meet it – the HTML pin's rule, E-022).
+ */
+function PinGlyph({ content }: { readonly content: PinContent }): React.JSX.Element {
+  const { x, y, width, height } = PIN_BUBBLE_BODY
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path className="erf-comment-host__pin-body" d={PIN_BUBBLE_PATH} />
+      {content === 'lines' ? (
+        <>
+          <rect className="erf-comment-host__pin-line" x="6" y="6" width="12" height="2" />
+          <rect className="erf-comment-host__pin-line" x="6" y="10" width="8" height="2" />
+        </>
+      ) : (
+        <foreignObject x={x} y={y} width={width} height={height}>
+          <span className="erf-comment-host__count" data-text={content} />
+        </foreignObject>
+      )}
+    </svg>
+  )
 }
 
-/** `el`'s border box, relative to `area`'s. */
-function relativeBox(el: HTMLElement, area: DOMRect): Box {
-  const box = el.getBoundingClientRect()
-  return { left: box.left - area.left, top: box.top - area.top, width: box.width, height: box.height }
+/** An icon's classes: the look its state takes (state table § 4) and the linked hover (C-17). */
+function iconClass(spot: IconSpot, hovered: boolean): string {
+  if (spot.content === null) return 'erf-comment-host__ghost'
+  return [
+    'erf-comment-host__icon',
+    spot.stack ? 'erf-comment-host__icon--stack' : '',
+    spot.changed ? 'erf-comment-host__icon--changed' : '',
+    spot.damaged ? 'erf-comment-host__icon--damaged' : '',
+    hovered ? 'erf-comment-host__icon--hover' : ''
+  ]
+    .filter(Boolean)
+    .join(' ')
 }
 
-/** Open, attached threads grouped by the element they are attached to, in document order. */
-function iconSpots(props: CommentOverlayLayerProps, area: DOMRect): IconSpot[] {
-  const { adapter, placements, file } = props
-  const openThreads = file?.threads.filter(t => t.status === 'open' && t.attached) ?? []
-  const open = new Set(openThreads.map(t => t.threadKey))
-  const changedKeys = new Set(openThreads.filter(t => t.change !== undefined).map(t => t.threadKey))
-  const byElement = new Map<HTMLElement, string[]>()
-  for (const placement of placements) {
-    if (!open.has(placement.threadKey)) continue
-    const element = adapter.attach(placement)
-    if (element === null) continue
-    const keys = byElement.get(element)
-    if (keys) keys.push(placement.threadKey)
-    else byElement.set(element, [placement.threadKey])
-  }
-  const ordered = [...byElement].sort(([a], [b]) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1))
-  const viewport = { width: area.width, height: area.height }
-  const placed: Box[] = []
-  const spots: IconSpot[] = []
-  for (const [element, threadKeys] of ordered) {
-    const box = placePin(relativeBox(element, area), placed, viewport, PIN_BOX_PX)
-    if (box === null) continue
-    placed.push(box)
-    const noun = adapter.words.noun(adapter.tagOf(element))
-    const line = adapter.lineOf(element)
-    const changed = threadKeys.filter(key => changedKeys.has(key)).length
-    spots.push({
-      key: threadKeys.join(','),
-      box,
-      element,
-      threadKeys,
-      name: changed > 0 ? CHANGE_MARK_COPY.iconName(threadKeys.length, noun, line, changed) : MD_SURFACE_COPY.iconName(threadKeys.length, noun, line),
-      changed: changed > 0
-    })
-  }
-  return spots
-}
+/** While the pointer is on marked words: the pane's pointer cursor and title (C-17). */
+const MARK_HOVER_CLASS = 'erf-comment-host-pane--mark'
 
 /** The words of open, attached selection comments, as marks in the rendered content now. */
 function commentMarks(
@@ -188,27 +196,73 @@ export function CommentOverlayLayer(props: CommentOverlayLayerProps): React.JSX.
   const owner = props.markOwner ?? ownId
   const { placements, file } = props
   const [hovered, setHovered] = useState<readonly string[]>(NO_THREADS)
+  // C-17: the thread whose marked words are under the pointer (hit-tested once a frame).
+  const [pointedMark, setPointedMark] = useState<string | null>(null)
+  const markHover = showIcons ? pointedMark : null
+  useEffect(() => {
+    if (content === null) return undefined
+    let frame = 0
+    let at: { readonly x: number; readonly y: number } | null = null
+    const onMove = (event: MouseEvent): void => {
+      at = { x: event.clientX, y: event.clientY }
+      if (frame !== 0) return
+      frame = requestAnimationFrame(() => {
+        frame = 0
+        if (at !== null) setPointedMark(commentMarkAt(owner, at.x, at.y))
+      })
+    }
+    const onLeave = (): void => {
+      cancelAnimationFrame(frame)
+      frame = 0
+      at = null
+      setPointedMark(null)
+    }
+    content.addEventListener('mousemove', onMove)
+    content.addEventListener('mouseleave', onLeave)
+    return () => {
+      cancelAnimationFrame(frame)
+      content.removeEventListener('mousemove', onMove)
+      content.removeEventListener('mouseleave', onLeave)
+    }
+  }, [content, owner])
+  // The pane, not the content, takes the cursor and the title: nothing is written into what an export reads (024-FR-024).
+  useEffect(() => {
+    if (area === null || markHover === null) return undefined
+    const author = file?.threads.find(t => t.threadKey === markHover)?.messages[0]?.by.name ?? ''
+    const title = area.getAttribute('title')
+    area.classList.add(MARK_HOVER_CLASS)
+    area.setAttribute('title', MD_SURFACE_COPY.markTitle(author))
+    return () => {
+      area.classList.remove(MARK_HOVER_CLASS)
+      if (title === null) area.removeAttribute('title')
+      else area.setAttribute('title', title)
+    }
+  }, [area, markHover, file])
   const activeThreads = props.activeThreads ?? NO_THREADS
   useEffect(() => {
-    const active = new Set([...activeThreads, ...hovered])
+    const active = new Set([...activeThreads, ...hovered, ...(markHover === null ? [] : [markHover])])
     setCommentMarks(owner, showIcons ? commentMarks(adapter, placements, file, active) : [])
-  }, [owner, showIcons, adapter, placements, file, resized, activeThreads, hovered])
+  }, [owner, showIcons, adapter, placements, file, resized, activeThreads, hovered, markHover])
   useEffect(() => () => setCommentMarks(owner, []), [owner])
 
   const areaBox = area?.getBoundingClientRect() ?? null
-  const spots = areaBox !== null && showIcons ? iconSpots(props, areaBox) : []
+  const spots = areaBox !== null && showIcons ? iconSpots(adapter, placements, file, areaBox) : []
   const outline = areaBox !== null && mode && outlined !== null && outlined.isConnected ? relativeBox(outlined, areaBox) : null
   // C-11: each icon's block points at it; taken back when the icon goes.
   const iconBase = `erf-comment-icon-${useId().replace(/[^\w-]/g, '')}`
   const iconId = (spot: IconSpot): string => `${iconBase}-${spot.key.replace(/[^\w-]/g, '_')}`
   const detailed = useRef(new Map<HTMLElement, string>())
   useEffect(() => {
-    const next = new Map(spots.map(spot => [spot.element, iconId(spot)]))
+    const next = new Map(spots.flatMap(spot => spot.elements.map(element => [element, iconId(spot)] as const)))
     for (const [element] of detailed.current) if (!next.has(element)) clearCommentDetails(element)
     for (const [element, id] of next) setCommentDetails(element, id)
     detailed.current = next
   })
   useEffect(() => () => detailed.current.forEach((_id, element) => clearCommentDetails(element)), [])
+  // 024-NFR-001: the icons are in the DOM now – the "pins visible" and "saved comment visible" marks.
+  useLayoutEffect(() => {
+    noteCommentPinsDrawn(placements, spots.flatMap(spot => spot.threadKeys))
+  })
   // 024-FR-024: a copy of the content never carries what the host wrote into it.
   useEffect(() => {
     if (content === null) return undefined
@@ -263,20 +317,18 @@ export function CommentOverlayLayer(props: CommentOverlayLayerProps): React.JSX.
           type="button"
           tabIndex={-1}
           id={iconId(spot)}
-          className={`erf-comment-host__icon${spot.changed ? ' erf-comment-host__icon--changed' : ''}`}
+          className={iconClass(spot, markHover !== null && spot.threadKeys.includes(markHover))}
           style={{ left: spot.box.left, top: spot.box.top, width: spot.box.width, height: spot.box.height }}
           aria-label={spot.name}
           title={spot.name}
-          data-testid={TEST_IDS.COMMENT_HOST_ICON}
-          onClick={() => props.onOpenThreads(spot.threadKeys, spot.element)}
+          data-testid={spot.content === null ? TEST_IDS.COMMENT_HOST_GHOST : TEST_IDS.COMMENT_HOST_ICON}
+          // A ghost has no target: the window opens beside the ghost itself (C-05).
+          onClick={event => props.onOpenThreads(spot.threadKeys, spot.elements[0] ?? event.currentTarget, 'page', spot.blockKeys)}
           // C-17: hovering an icon raises all its words to the active mark.
           onMouseEnter={() => setHovered(spot.threadKeys)}
           onMouseLeave={() => setHovered(NO_THREADS)}
         >
-          {renderIcon('message-square', { size: 16, 'aria-hidden': true })}
-          {spot.threadKeys.length > 1 && (
-            <span className="erf-comment-host__count">{spot.threadKeys.length > 9 ? '9+' : spot.threadKeys.length}</span>
-          )}
+          {spot.content !== null && <PinGlyph content={spot.content} />}
         </button>
       ))}
     </div>

@@ -14,6 +14,7 @@
  */
 import type { AnchorSelection } from '../../../../../../shared/comments/anchorSel'
 import type { CommentSaveRequest } from '../../../../../../shared/ipc/preview-comment-schema'
+import type { DrawerRow } from '../../../Comments/commentRows'
 import type { CommentWindowRequest, ElementDraft, NewCommentWords } from '../../../Comments/commentWindowTypes'
 
 /** What a menu item or a pick comments on: the selected words, or the whole element. */
@@ -57,4 +58,38 @@ export function newCommentRequest(
 export function withWords(request: CommentSaveRequest, sel: AnchorSelection | undefined): CommentSaveRequest {
   if (request.op !== 'add' || sel === undefined) return request
   return { ...request, sel: { exact: sel.exact, prefix: sel.prefix, suffix: sel.suffix } }
+}
+
+/** What a thread window needs from a drawer row – or from a step key's target (C-13). */
+export type RowTarget = Pick<DrawerRow, 'fileKey' | 'displayPath' | 'filePath' | 'frame' | 'threadKey' | 'blockKey'>
+
+/**
+ * The thread (or block) window a drawer row's Open asks for, or a step from the page (C-13).
+ *
+ * @param panelId - The panel.
+ * @param row - The row, or a step key's target in a row's shape.
+ * @param point - Where the window is anchored.
+ * @param listAfter - The list generation the window must not be older than (M2).
+ * @param opener - `'page'` for a step key pressed in the page: closing the window hands focus back to it.
+ * @returns The threads-view request.
+ */
+export function rowWindowRequest(
+  panelId: string,
+  row: RowTarget,
+  point: { readonly x: number; readonly y: number },
+  listAfter: number,
+  opener: 'page' | 'drawer' = 'drawer'
+): CommentWindowRequest {
+  return {
+    kind: 'threads',
+    panelId,
+    fileKey: row.fileKey,
+    threadKeys: row.threadKey !== undefined ? [row.threadKey] : [],
+    blockKeys: row.blockKey !== undefined ? [row.blockKey] : [],
+    point,
+    opener,
+    listAfter,
+    // The file, so a failed list read can name it (M7).
+    file: { fileKey: row.fileKey, displayPath: row.displayPath, filePath: row.filePath, frame: row.frame }
+  }
 }

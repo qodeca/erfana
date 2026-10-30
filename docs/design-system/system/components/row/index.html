@@ -402,10 +402,11 @@ switch user cannot drag at all.</p>
     <tr>
       <td>HTML-preview comments drawer</td>
       <td>Tab enters the list once – not once per row.</td>
-      <td>The same shape as the Welcome list, and it ships. The list is one Tab stop: ↑ ↓ Home End move between
-        rows, and Enter or a click is <strong>Show on page</strong> with focus staying in the list (<strong>Open in
-        source</strong> on a not-found, damaged or newer comment). Tab once more reaches the active row's
-        <strong>Open</strong>, which opens the comment window; every other row's Open stays out of the Tab order.
+      <td>The same shape as the Welcome list, and it ships – in the HTML and the Markdown preview's drawer alike.
+        The list is one Tab stop: ↑ ↓ Home End move between rows and only reveal the active row's target –
+        <strong>Show in preview</strong> in both previews (differences A-05) – with focus staying in the list.
+        Enter or a click opens the thread (R-10, C-13). Only the active row keeps its <strong>Open</strong>, the
+        second Tab stop, which also opens the comment window; every other row has none.
         The rows scroll, so they draw the inset ring. See <code>CommentDrawer.tsx</code> and
         <code>CommentDrawer.css</code>, and the <a href="../../../../designs/comments/html-comments/drawer.html">Comments
         drawer</a> card.</td>

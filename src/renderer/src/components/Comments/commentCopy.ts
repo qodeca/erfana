@@ -6,8 +6,8 @@
  *
  * WHY THE RENDERER MAPS ERROR CODES ITSELF. `src/shared/errors.ts` carries a
  * fallback sentence per code, written without the file name ("This file has
- * unresolved git conflicts"). §10.10 names the file and, in two places, words
- * the sentence differently ("This block changed on disk"). The window shows
+ * unresolved git conflicts"). §10.10 names the file and, in places, words
+ * the sentence differently. The window shows
  * the §10.10 sentence, so the mapping lives here; an unknown code – one a
  * later main adds – falls back to the generic "Couldn't save" sentence rather
  * than to nothing.
@@ -97,7 +97,10 @@ export function unavailableTooltip(reason: CommentUnavailableReason): string {
 export const REMOTE_PAGE_TOOLTIP =
   "Comments are unavailable for this page: it isn't a file in this project"
 
-/** Readable-reason for a file main marks read-only (`CommentFileView.readOnlyReason`). */
+/**
+ * Why a file takes no new comment (`CommentFileView.readOnlyReason`, `addRefusal`): menu matrix § 3's
+ * sentence, the same in the banner, the menu and the mode tooltip (C-19, F-04); never "block" (024-FR-007).
+ */
 export function readOnlyReasonText(reason: string | undefined, file: string): string {
   switch (reason) {
     case 'encoding':
@@ -105,20 +108,18 @@ export function readOnlyReasonText(reason: string | undefined, file: string): st
     case 'conflict-markers':
       return `${file} has unresolved git conflicts. Resolve them first.`
     case 'too-large':
-      // §10.10 "File limits (rev 4)"
+      // §10.10 "File limits (rev 4)": the menu's sentence, then what it means for this file
       return `${FILE_LIMIT_TEXT} ${file} is larger, so its comments are read-only.`
     case 'too-many-blocks':
-      // not in §10.10
-      return `${file} holds more comment blocks than Erfana edits, so its comments are read-only.`
+      return `${file} already has ${PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE} comments, the most Erfana adds to one file. Delete resolved threads to add more.`
     case 'unterminated-block':
-      // not in §10.10
-      return `${file} has a comment block that never ends, so Erfana won't change the file. Fix it in the source.`
+      return `A comment in ${file} has no end, so Erfana won't add comments. Fix it in the source.`
     case 'link':
       return `${file} is a link to another file, so Erfana won't write to it.`
     case 'missing':
       return `${file} no longer exists. Copy your text before closing.`
     default:
-      return `Couldn't save: ${file} is read-only. Your text is still here.`
+      return `${file} is read-only.`
   }
 }
 
@@ -234,6 +235,8 @@ export const COPY = {
   saveChanges: 'Save changes',
   close: 'Close',
   open: 'Open',
+  // R-10, C-13: what Enter or a click on a drawer row does (comments-v2/drawer.html).
+  openThread: 'Open thread',
   showInPreview: 'Show in preview', // A-05: the Markdown words, in both
   openInSource: 'Open in source',
   tryAgain: 'Try again',
@@ -257,8 +260,6 @@ export const COPY = {
   // Spec 024 state table S-07 and S-08: "comment", never "comment block" (the shared sentences).
   damagedText: "Erfana can't read this comment, so it won't change it. Fix it in the source, or delete it.",
   conflictText: 'This comment contains git conflict markers. Resolve the conflict in the source.',
-  notVisibleText:
-    "This element isn't on screen right now – it may be on another slide or tab. Its icon comes back when it does.",
   // Spec 024 state table S-09.
   newerText: 'A newer version of Erfana wrote this comment, so it is read-only here.',
   newerTag: 'Newer format – read-only',

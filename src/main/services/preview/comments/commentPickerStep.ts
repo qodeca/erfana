@@ -23,9 +23,9 @@ import type { CommentModeChanged, CommentPickerElement, CommentPickerRole } from
 import { CommentTagNameSchema } from '../../../../shared/ipc/preview-comment-page-schema'
 import type { ElementTokenEntry } from './ElementTokenTable'
 
-/** What a checked `step` pick reached: the top, a leaf, or an element of the frame's own load. */
+/** What a checked `step` pick reached: the top, a leaf, either end of Tab (C-10), or an element of the frame's own load. */
 export type PickerStepInput =
-  | { readonly say: 'top' | 'no-child' }
+  | { readonly say: 'top' | 'no-child' | 'last' | 'first' }
   | {
       readonly say: 'showing'
       readonly entry: Pick<ElementTokenEntry, 'tagName' | 'line'>

@@ -83,6 +83,12 @@ export const WINDOW_COPY = {
   writeReplyFirst: 'Write a reply first.',
   saveFileFirst: (file: string): string => `Save ${file} first.`,
   shortenFirst: 'Shorten the comment to save it.',
+  // ---- C-10 the HTML picker's Tab at either end (said in the window's polite region, as every step) ----
+  pickerLast: 'Last element at this level – Alt+Up for the parent.',
+  pickerFirst: 'First element at this level.',
+  // ---- C-19.5 the counter's crossings, said once each in the polite region ----
+  charsLeft: (left: number): string => `${left.toLocaleString('en-US')} characters left`,
+  overBy: (over: number): string => `Over the limit by ${over.toLocaleString('en-US')}`,
   moved: (noun: string): string => `This ${noun} changed in the file since you picked it. Pick it again – your text comes with you.`,
   // ---- C-18 the Markdown window's edge tab ----
   edgeTab: (noun: string, line: number, above: boolean): string => `Comment on ${noun}, line ${line} ${above ? '↑' : '↓'}`,
@@ -195,6 +201,22 @@ export function refusalCopy(code: string, reason: string | undefined, context: R
       : { text: WINDOW_COPY.renderChanged(noun, file, parent), action: 'banner', retarget: true }
   }
   return undefined
+}
+
+/**
+ * What the window says when main kept the comment but not its words (024-FR-004).
+ * HTML: "Comment saved on the whole element – …". Markdown (D-16): the check
+ * should never fail there, and when it does the window says the HTML window's
+ * sentence with the target's `{kind}`.
+ *
+ * @param words - The preview's words.
+ * @param tag - The target's tag.
+ * @param file - The file, its controls as tokens.
+ * @returns The sentence.
+ */
+export function wordsDroppedText(words: CommentWords, tag: string, file: string): string {
+  const noun = words.noun(tag)
+  return words.preview === 'markdown' ? SELECTION_COPY.wordsNotInFile(noun, file) : SELECTION_COPY.wordsDropped(noun, file)
 }
 
 /** What a new comment's Save waits for, in the order the window checks it. */

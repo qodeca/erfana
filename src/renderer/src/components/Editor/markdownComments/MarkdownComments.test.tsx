@@ -12,9 +12,13 @@
  * The selection rows M-12, M-14, M-16, M-19 and M-21 are in
  * MarkdownComments.selection.test.tsx (spec 024 commit 14).
  *
+ * The icon looks and the states drawn on the content – S-01's glyph, S-02,
+ * S-05's ghost, S-07's warning icon, the C-17 stack and linked hover – are in
+ * MarkdownComments.icons.test.tsx; the notched icon (S-03) in
+ * MarkdownComments.window.test.tsx.
+ *
  * Still pending (the comments-v2 states and window states not built yet):
- * S-02 – S-05 drawing (the ghost icon, the notched icon, "Words changed");
- * W-02 – W-05, W-07, W-08 before typing, W-10, W-11 in Markdown words; the
+ * "Words changed" drawing (S-04); W-02 – W-05, W-07, W-08 before typing, W-10, W-11 in Markdown words; the
  * non-modal window (C-18).
  */
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -396,6 +400,19 @@ describe('Markdown Preview comments', () => {
       renderPanel()
       await waitFor(() => expect(modeTool()).toHaveAttribute('aria-disabled', 'true'))
       expect(modeTool()).toHaveAttribute('title', MD_SURFACE_COPY.modeUnavailable(MARKDOWN_COPY.tooMany('notes.md')))
+    })
+
+    it('024-AC-035 F-04 M-15: a writable file at 500 comments disables the toggle and the add item with the "500 comments" sentence', async () => {
+      api.list.mockResolvedValue({ ok: true, file: fileView([], { writable: true, addRefusal: 'too-many-blocks' }), placements: [] })
+      renderPanel()
+      const sentence = MARKDOWN_COPY.tooMany('notes.md')
+      expect(sentence).toBe('notes.md already has 500 comments, the most Erfana adds to one file. Delete resolved threads to add more.')
+      await waitFor(() => expect(modeTool()).toHaveAttribute('aria-disabled', 'true'))
+      expect(modeTool()).toHaveAttribute('title', MD_SURFACE_COPY.modeUnavailable(sentence))
+      fireEvent.contextMenu(paragraph(), { clientX: 10, clientY: 10 })
+      const item = await screen.findByTestId(TEST_IDS.COMMENT_MENU_COMMENT_ON)
+      expect(item).toHaveAttribute('aria-disabled', 'true')
+      expect(within(item).getByTestId(TEST_IDS.COMMENT_MENU_REASON)).toHaveTextContent(sentence)
     })
 
     it('024-FR-022: a list refused because comments were turned off in Settings disables the toggle and lists nothing', async () => {

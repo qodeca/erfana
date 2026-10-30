@@ -123,6 +123,7 @@ export function fileView(input: ListKeys, listed: ListedFile, summary: ListSumma
     ...baseOf(input, listed),
     writable: summary.writable,
     ...(summary.readOnlyReason === undefined ? {} : { readOnlyReason: summary.readOnlyReason }),
+    ...(summary.addRefusal === undefined ? {} : { addRefusal: summary.addRefusal }),
     threads: summary.threads.map(({ threadId, ...thread }) => ({
       ...thread,
       threadKey: input.keys.keyFor(input.binding, { kind: 'thread', realPath, threadId }),

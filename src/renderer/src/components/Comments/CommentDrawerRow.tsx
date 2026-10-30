@@ -2,9 +2,11 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * One row of the comments drawer (`CommentDrawer.tsx`; decided Rows card;
- * comments-v2 C-10, C-15, R-11).
+ * comments-v2 C-10, C-13, C-15, R-10, R-11).
  *
- * A stretched main button behind the content, and Open. The main button is
+ * A stretched main button behind the content, and – on the active row only
+ * (R-10) – Open. Enter or a click on the main button opens the thread, the
+ * same as Open. The main button is
  * named by the first message's excerpt – what the comment says – and
  * described by what it is on, the "was → now" words line, the reply count,
  * who and when, the tags and what Enter does (C-10: "on Button, line 42 · 2
@@ -19,7 +21,6 @@ import { COMMENT_LIST_COPY } from './commentCopyWords'
 import { plural, visibleString } from './commentFormat'
 import { VisibleText } from './CommentParts'
 import type { DrawerRow } from './commentRows'
-import { useCommentWords } from './commentWords'
 import { TEST_IDS } from '../../constants/testids'
 
 /** Where a windowed row sits, and how it reports its height. */
@@ -43,7 +44,9 @@ export interface DrawerRowViewProps {
   /** Present only in a windowed list. */
   readonly place?: RowPlacement
   readonly time: string
+  /** Enter or a click on the row: opens the thread (R-10). */
   readonly onMain: () => void
+  /** The active row's Open. */
   readonly onOpen: () => void
 }
 
@@ -63,8 +66,8 @@ export function DrawerRowView({
   onMain,
   onOpen
 }: DrawerRowViewProps): React.JSX.Element {
-  const words = useCommentWords()
-  const mainLabel = row.main === 'source' ? COPY.openInSource : words.showInPreview
+  // R-10: every row opens its thread – a damaged, newer-format or not-found one its own window.
+  const mainLabel = COPY.openThread
   const base = `${idPrefix}-row-${row.id.replace(/[^\w-]/g, '_')}`
   const named = row.excerpt !== ''
   // `title` alone is not read once `aria-describedby` is set, so everything is in the description.
@@ -148,16 +151,18 @@ export function DrawerRowView({
           </>
         )}
       </p>
-      <button
-        type="button"
-        className="erf-comment-action erf-comment-row__open"
-        tabIndex={active ? 0 : -1}
-        aria-label={`Open comments on ${visibleString(row.label)}`}
-        data-testid={TEST_IDS.COMMENT_DRAWER_ROW_OPEN}
-        onClick={onOpen}
-      >
-        {COPY.open}
-      </button>
+      {/* R-10: only the active row keeps Open – the list's second Tab stop. */}
+      {active && (
+        <button
+          type="button"
+          className="erf-comment-action erf-comment-row__open"
+          aria-label={`Open comments on ${visibleString(row.label)}`}
+          data-testid={TEST_IDS.COMMENT_DRAWER_ROW_OPEN}
+          onClick={onOpen}
+        >
+          {COPY.open}
+        </button>
+      )}
     </li>
   )
 }

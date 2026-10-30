@@ -41,9 +41,9 @@ exports[`commentCopy strings (characterisation) > PIN-C-010 every string on Wind
     "newComment": "New comment",
     "newerTag": "Newer format – read-only",
     "newerText": "A newer version of Erfana wrote this comment, so it is read-only here.",
-    "notVisibleText": "This element isn't on screen right now – it may be on another slide or tab. Its icon comes back when it does.",
     "open": "Open",
     "openInSource": "Open in source",
+    "openThread": "Open thread",
     "pickAgain": "Pick again",
     "placeholder": "What should change here?",
     "rawCopied": "Raw text copied.",
@@ -183,18 +183,18 @@ exports[`commentCopy strings (characterisation) > PIN-C-010 every string on Wind
   "readOnlyReasonText": {
     "conflict-markers": "index.html has unresolved git conflicts. Resolve them first.",
     "encoding": "Erfana can only add comments to UTF-8 files.",
-    "from-a-later-main": "Couldn't save: index.html is read-only. Your text is still here.",
+    "from-a-later-main": "index.html is read-only.",
     "link": "index.html is a link to another file, so Erfana won't write to it.",
     "missing": "index.html no longer exists. Copy your text before closing.",
     "too-large": "Erfana adds comments only to files of up to 25 MB and 640,000 elements. index.html is larger, so its comments are read-only.",
-    "too-many-blocks": "index.html holds more comment blocks than Erfana edits, so its comments are read-only.",
-    "undefined": "Couldn't save: index.html is read-only. Your text is still here.",
-    "unterminated-block": "index.html has a comment block that never ends, so Erfana won't change the file. Fix it in the source.",
+    "too-many-blocks": "index.html already has 500 comments, the most Erfana adds to one file. Delete resolved threads to add more.",
+    "undefined": "index.html is read-only.",
+    "unterminated-block": "A comment in index.html has no end, so Erfana won't add comments. Fix it in the source.",
   },
   "saveFailureCopy": {
     "COMMENT_BLOCK_CHANGED": {
       "action": "close",
-      "text": "This block changed on disk. Reopen it and try again.",
+      "text": "This comment changed on disk. Erfana reloaded it – try again.",
     },
     "COMMENT_DRAFT_EXPIRED": {
       "action": "pick-again",
@@ -230,7 +230,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-010 every string on Wind
     },
     "COMMENT_KEY_INVALID": {
       "action": "close",
-      "text": "This comment is no longer open here. Reopen it and try again.",
+      "text": "This window is out of date – the comment changed or was removed. Close it and open the comment again.",
     },
     "COMMENT_LIMIT": {
       "action": "banner",
@@ -369,9 +369,9 @@ exports[`commentCopy strings (characterisation) > PIN-C-011 every string on macO
     "newComment": "New comment",
     "newerTag": "Newer format – read-only",
     "newerText": "A newer version of Erfana wrote this comment, so it is read-only here.",
-    "notVisibleText": "This element isn't on screen right now – it may be on another slide or tab. Its icon comes back when it does.",
     "open": "Open",
     "openInSource": "Open in source",
+    "openThread": "Open thread",
     "pickAgain": "Pick again",
     "placeholder": "What should change here?",
     "rawCopied": "Raw text copied.",
@@ -511,18 +511,18 @@ exports[`commentCopy strings (characterisation) > PIN-C-011 every string on macO
   "readOnlyReasonText": {
     "conflict-markers": "index.html has unresolved git conflicts. Resolve them first.",
     "encoding": "Erfana can only add comments to UTF-8 files.",
-    "from-a-later-main": "Couldn't save: index.html is read-only. Your text is still here.",
+    "from-a-later-main": "index.html is read-only.",
     "link": "index.html is a link to another file, so Erfana won't write to it.",
     "missing": "index.html no longer exists. Copy your text before closing.",
     "too-large": "Erfana adds comments only to files of up to 25 MB and 640,000 elements. index.html is larger, so its comments are read-only.",
-    "too-many-blocks": "index.html holds more comment blocks than Erfana edits, so its comments are read-only.",
-    "undefined": "Couldn't save: index.html is read-only. Your text is still here.",
-    "unterminated-block": "index.html has a comment block that never ends, so Erfana won't change the file. Fix it in the source.",
+    "too-many-blocks": "index.html already has 500 comments, the most Erfana adds to one file. Delete resolved threads to add more.",
+    "undefined": "index.html is read-only.",
+    "unterminated-block": "A comment in index.html has no end, so Erfana won't add comments. Fix it in the source.",
   },
   "saveFailureCopy": {
     "COMMENT_BLOCK_CHANGED": {
       "action": "close",
-      "text": "This block changed on disk. Reopen it and try again.",
+      "text": "This comment changed on disk. Erfana reloaded it – try again.",
     },
     "COMMENT_DRAFT_EXPIRED": {
       "action": "pick-again",
@@ -558,7 +558,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-011 every string on macO
     },
     "COMMENT_KEY_INVALID": {
       "action": "close",
-      "text": "This comment is no longer open here. Reopen it and try again.",
+      "text": "This window is out of date – the comment changed or was removed. Close it and open the comment again.",
     },
     "COMMENT_LIMIT": {
       "action": "banner",

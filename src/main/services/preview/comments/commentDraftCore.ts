@@ -40,7 +40,7 @@ import {
   type RuntimeAnchor
 } from '../../../../shared/htmlComments'
 import type { CommentPick } from '../../../../shared/ipc/preview-comment-schema'
-import { writableRefusal, type JobDocument } from '../../comments/commentJobDocs'
+import { addRefusal, type JobDocument } from '../../comments/commentJobDocs'
 import { positionTarget } from './commentParseCore'
 import type { CommentRefusal } from '../../comments/commentRefusals'
 import { draftWordsOf, type DraftWordsPart } from './commentWordsCore'
@@ -190,7 +190,8 @@ function targetViewOf(text: string, anchorEl: IndexedElement, anchor: CommentAnc
 export function runDraftJob(document: JobDocument, job: DraftJob): DraftJobResult {
   if (!document.ok) return { kind: 'draft', ok: false, refusal: document.refusal }
   const { doc, hash } = document
-  const blocked = writableRefusal(doc.state)
+  // F-04: a full file refuses a new comment here, so the menu disables its item with the reason.
+  const blocked = addRefusal(doc.state)
   if (blocked !== null) return { kind: 'draft', ok: false, refusal: blocked }
   // The page shows what was served; a file changed since then is re-picked after its reload.
   if (hash !== job.entry.fileHash) return MOVED

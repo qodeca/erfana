@@ -15,7 +15,7 @@
  *   instead – for display only: nothing here writes it, and every write
  *   re-reads the disk.
  * - **openDraft** mints a single-use token tied to the window, the panel and
- *   the file (C17).
+ *   the file (C17) – none for a file already at 500 comments (F-04).
  * - **save** resolves the token or the keys against the sender's panel and
  *   runs the one shared `CommentWriter`, with this family's kinds. The writer
  *   refuses while ANY window's editor holds unsaved edits for the file, asks
@@ -108,6 +108,7 @@ function refusal(reason: CommentRefusal): CommentReasonedRefusal {
 const NOT_OPEN = refusal('not-open')
 const KEY_INVALID = refusal('key-invalid')
 const COMMENTS_OFF = refusal('comments-off')
+const TOO_MANY = refusal('too-many-blocks')
 
 /** The production watch: one atomic-save-proof watcher per file. */
 const defaultWatch: FileCommentWatchFactory = (realPath, onChange) =>
@@ -182,7 +183,21 @@ export class FileCommentService {
     const panel = await this.openFor(caller, request.panelId, request.filePath)
     if (!('binding' in panel)) return panel
     if (!this.enabled(panel)) return COMMENTS_OFF
+    if (await this.isFull(panel)) return TOO_MANY
     return { ok: true, draftToken: panel.keys.mintDraft(panel.binding, { realPath: panel.realPath }) }
+  }
+
+  /**
+   * True when the file on disk already holds the most comments Erfana adds
+   * (spec 024 state table F-04): no draft is minted for a new one, while
+   * replies, edits and resolves go on. A file that cannot be read or parsed
+   * here is not refused – the save reads it again and says why.
+   */
+  private async isFull(panel: FileCommentPanel): Promise<boolean> {
+    const read = await readConfinedCommentBytes(panel.realPath)
+    if (!read.ok) return false
+    const answer = await this.jobsFor(panel.kind).runJob(read.bytes, { kind: 'list' })
+    return answer.kind !== 'failed' && answer.ok && answer.summary.addRefusal === 'too-many-blocks'
   }
 
   /** `file-comment:save`. */

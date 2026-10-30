@@ -9,13 +9,16 @@
  * Words changed > Changed > Not visible now > Open. Damaged and newer-format
  * blocks are not threads: the window shows them on their own.
  *
- * The stepper walks the open threads of the file in file order (the drawer's
- * default filter, Open), wrapping round, and skips the threads the window
- * already shows.
+ * The stepper walks the threads of the file in file order within the
+ * drawer's current filter – Open by default and while the drawer is shut,
+ * Resolved when the drawer shows resolved ones; Can't edit holds no thread,
+ * so there is nothing to step to – wrapping round, and skips the threads the
+ * window already shows.
  *
  * @module components/Comments/commentWindowStates
  */
 import type { CommentFileView, CommentThreadView } from '../../../../shared/ipc/comment-common-schema'
+import type { DrawerFilter } from './commentRows'
 
 /** A thread's state in the window (state table § 1). */
 export type ThreadState = 'open' | 'not-visible' | 'changed' | 'words' | 'not-found' | 'resolved'
@@ -46,27 +49,34 @@ export function resolveLeads(state: ThreadState): boolean {
 
 /** Where the stepper stands. */
 export interface StepPosition {
-  /** 1-based place of the shown thread among the open ones; 0 when the shown thread is not open. */
+  /** 1-based place of the shown thread among the filter's threads; 0 when the shown thread is not in it. */
   readonly at: number
   readonly of: number
-  /** The open thread before and after the shown ones, wrapping; `null` when there is none to go to. */
+  /** The filter's thread before and after the shown ones, wrapping; `null` when there is none to go to. */
   readonly previous: string | null
   readonly next: string | null
 }
 
+/** Whether a thread is in a drawer filter's list (commentRows: threads are Open or Resolved; Can't edit holds blocks). */
+export function inDrawerFilter(thread: CommentThreadView, filter: DrawerFilter): boolean {
+  if (filter === 'cantEdit') return false
+  return filter === 'resolved' ? thread.status === 'resolved' : thread.status === 'open'
+}
+
 /**
- * The stepper over a file's open threads (C-13).
+ * The stepper over a file's threads in the drawer's current filter (C-13).
  *
  * @param file - The listed file.
  * @param shown - The thread keys the window shows now, in file order.
+ * @param filter - The drawer's filter; Open while the drawer is shut.
  * @returns The position, or `null` when the window shows no thread of the file.
  */
-export function stepPosition(file: CommentFileView, shown: readonly string[]): StepPosition | null {
+export function stepPosition(file: CommentFileView, shown: readonly string[], filter: DrawerFilter = 'open'): StepPosition | null {
   const order = file.threads.map(thread => thread.threadKey)
   const showing = new Set(shown)
   const first = order.findIndex(key => showing.has(key))
   if (first < 0) return null
-  const open = file.threads.filter(thread => thread.status === 'open').map(thread => thread.threadKey)
+  const open = file.threads.filter(thread => inDrawerFilter(thread, filter)).map(thread => thread.threadKey)
   const others = open.filter(key => !showing.has(key))
   const placeOf = (key: string): number => order.indexOf(key)
   const after = others.find(key => placeOf(key) > first) ?? others[0] ?? null

@@ -5,7 +5,7 @@
  * (comments-v2 C-05, C-06, C-13, C-14, C-19, C-21, C-03, OD-05; spec 024
  * state table S-02 – S-05, S-07 – S-09, F-01, W-03 – W-05, W-11).
  */
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ErrorCode } from '../../../../shared/errors'
@@ -22,6 +22,8 @@ import { COPY } from './commentCopy'
 import { MARKDOWN_WORDS } from './commentCopyWords'
 import { CommentWindow, type CommentWindowProps } from './CommentWindow'
 import { resetCommentPendingWrites } from './commentPendingWrites'
+import { useDrawerFilterState } from './commentDrawerFilter'
+import { stepOpenWindow } from './commentStepKeys'
 import { WINDOW_COPY } from './commentWindowCopy'
 import { CommentWordsContext } from './commentWords'
 
@@ -345,6 +347,34 @@ describe('CommentWindow – v2 stepping (C-13)', () => {
     expect(props.onReveal).toHaveBeenLastCalledWith('t1')
     fireEvent.keyDown(win, { key: 'F9', code: 'F9' })
     expect(props.onReveal).toHaveBeenCalledTimes(2)
+  })
+
+  it('024-AC-019 C-13 the stepper steps within the drawer filter: Resolved walks the resolved comments', async () => {
+    const user = userEvent.setup()
+    const drawer = renderHook(() => useDrawerFilterState('drawer-1'))
+    act(() => drawer.result.current[1]('resolved'))
+    const list = ready([fileView({ threads: [thread(1, { status: 'resolved' }), thread(2), thread(3, { status: 'resolved' })] })])
+    const { props } = setup({ list, onReveal: vi.fn(), drawerId: 'drawer-1' })
+    expect(screen.getByTestId('comment-stepper')).toHaveTextContent('1 of 2')
+    await user.click(screen.getByTestId('comment-step-next'))
+    expect(props.onReveal).toHaveBeenCalledWith('t3')
+    await waitFor(() =>
+      expect(screen.getByTestId('comment-window-polite')).toHaveTextContent('Comment 2 of 2, on element, line 13.')
+    )
+    drawer.unmount()
+  })
+
+  it('024-AC-019 C-13 with the drawer shut the stepper walks the open comments (the default filter)', () => {
+    setup({ list: ready([three()]), drawerId: 'drawer-shut' })
+    expect(screen.getByTestId('comment-stepper')).toHaveTextContent('1 of 3')
+  })
+
+  it('024-AC-019 C-13 an Alt+F9 from the preview steps the open window', async () => {
+    const { props } = setup({ list: ready([three()]), onReveal: vi.fn(), drawerId: 'drawer-2' })
+    act(() => {
+      expect(stepOpenWindow('drawer-2', 'next')).toBe(true)
+    })
+    expect(props.onReveal).toHaveBeenLastCalledWith('t2')
   })
 
   it('C-13 one open comment shows no stepper', () => {

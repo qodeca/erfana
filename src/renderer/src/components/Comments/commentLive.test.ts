@@ -13,6 +13,7 @@ import {
   editDraftKey,
   replyDraftKey,
   useCommentAlert,
+  useCounterCrossing,
   useInnerStep,
   useLiveText,
   type CommentSteps
@@ -107,5 +108,37 @@ describe('commentLive', () => {
     expect(replyDraftKey('p', 'f', 't')).toBe('reply|p|f|t')
     expect(editDraftKey('p', 'f', 't', 'm')).toBe('edit|p|f|t|m')
     expect(editDraftKey('p', 'f', 't1', 'm')).not.toBe(editDraftKey('p', 'f', 't2', 'm'))
+  })
+
+  describe('useCounterCrossing (C-19.5)', () => {
+    it('024-AC-018 C-19 each counter crossing is said once: 400 characters left, then over the limit by n', () => {
+      const { result, rerender } = renderHook(({ count }) => useCounterCrossing(count), { initialProps: { count: 0 } })
+      expect(result.current).toBe('')
+      rerender({ count: 3_599 })
+      expect(result.current).toBe('')
+      rerender({ count: 3_600 })
+      expect(result.current).toBe('400 characters left')
+      rerender({ count: 3_700 })
+      expect(result.current).toBe('400 characters left')
+      rerender({ count: 4_000 })
+      expect(result.current).toBe('400 characters left')
+      rerender({ count: 4_003 })
+      expect(result.current).toBe('Over the limit by 3')
+      rerender({ count: 4_010 })
+      expect(result.current).toBe('Over the limit by 3')
+    })
+
+    it('024-AC-018 C-19 a move back down says nothing, and a jump says what is left at the crossing', () => {
+      const { result, rerender } = renderHook(({ count }) => useCounterCrossing(count), { initialProps: { count: 4_100 } })
+      // Opened over the limit (a restored draft): nothing was crossed.
+      expect(result.current).toBe('')
+      rerender({ count: 3_800 })
+      expect(result.current).toBe('')
+      rerender({ count: 100 })
+      rerender({ count: 3_750 })
+      expect(result.current).toBe('250 characters left')
+      rerender({ count: 5_234 })
+      expect(result.current).toBe('Over the limit by 1,234')
+    })
   })
 })

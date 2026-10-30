@@ -8,7 +8,7 @@
  * edit moved it – and a listed thread re-attaches to its element.
  */
 import { render } from '@testing-library/react'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { indexMarkdown } from '../../../../../shared/markdownComments/mdIndex'
 import { locateMarkdownTarget, markdownTextHash } from '../../../../../shared/markdownComments/mdLocate'
 import { ToastProvider } from '../../Toast/ToastContext'
@@ -151,6 +151,121 @@ describe('markdownAdapter', () => {
     const { adapter } = renderPreview(DOC)
     expect(adapter.attach({ threadKey: 't1', line: 9, tag: 'li' })?.textContent).toMatch(/^two\s+nested/)
     expect(adapter.attach({ threadKey: 't2', line: 99, tag: 'p' })).toBeNull()
+  })
+
+  describe('the target index (024-NFR-001)', () => {
+    /** A fresh adapter on the same content: its first read is a full scan, the answer the index must give. */
+    const scanned = (root: HTMLElement) => createMarkdownAdapter({ root: () => root, text: () => DOC })
+    const lineScans = (spy: { mock: { calls: unknown[][] } }): number => spy.mock.calls.filter(([selector]) => selector === '[data-line-start]').length
+
+    it('024-NFR-001 attaches every listed thread from one scan of the content, not one scan per thread', () => {
+      const { root, adapter } = renderPreview(DOC)
+      const spy = vi.spyOn(root, 'querySelectorAll')
+      const placements = adapter.targetsInOrder().map((el, i) => ({ threadKey: `t${i}`, line: adapter.lineOf(el), tag: adapter.tagOf(el) }))
+      for (let round = 0; round < 3; round += 1) for (const placement of placements) adapter.attach(placement)
+      expect(lineScans(spy)).toBe(1)
+      spy.mockRestore()
+    })
+
+    it('024-NFR-001 answers what a full scan answers: the first target of the line and tag in document order, and null for none', () => {
+      const { root, adapter } = renderPreview(DOC)
+      const reference = scanned(root)
+      const asked = [
+        ...reference.targetsInOrder().map(el => ({ threadKey: 'k', line: reference.lineOf(el), tag: reference.tagOf(el) })),
+        { threadKey: 'k', line: 14, tag: 'th' },
+        { threadKey: 'k', line: 99, tag: 'p' },
+        { threadKey: 'k', line: 6, tag: 'li' },
+        { threadKey: 'k', line: 1, tag: 'frontmatter' }
+      ]
+      for (const placement of asked) {
+        const expected = reference.targetsInOrder().find(el => reference.lineOf(el) === placement.line && reference.tagOf(el) === placement.tag) ?? null
+        expect(adapter.attach(placement), `${placement.tag}@${placement.line}`).toBe(expected)
+      }
+      expect(adapter.attach({ threadKey: 'k', line: 14, tag: 'th' })?.textContent).toBe('a')
+    })
+
+    it('024-NFR-001 sees a change made earlier in the same task: a removed, a re-stamped, a re-classed and an added block', () => {
+      const { root, adapter } = renderPreview(DOC)
+      expect(adapter.attach({ threadKey: 'k', line: 6, tag: 'p' })).not.toBeNull()
+
+      // No await between the change and the read: the observer has not delivered its records yet.
+      root.querySelector('p[data-line-start="6"]')!.remove()
+      expect(adapter.attach({ threadKey: 'k', line: 6, tag: 'p' })).toBeNull()
+
+      const heading = root.querySelector<HTMLElement>('h1[data-line-start="4"]')!
+      heading.setAttribute('data-line-start', '5')
+      expect(adapter.attach({ threadKey: 'k', line: 4, tag: 'h1' })).toBeNull()
+      expect(adapter.attach({ threadKey: 'k', line: 5, tag: 'h1' })).toBe(heading)
+
+      const wrapper = root.querySelector<HTMLElement>('div.table-wrapper')!
+      wrapper.classList.remove('table-wrapper')
+      expect(adapter.attach({ threadKey: 'k', line: 14, tag: 'table' })).toBeNull()
+
+      const added = document.createElement('p')
+      added.setAttribute('data-line-start', '40')
+      added.textContent = 'added'
+      root.append(added)
+      expect(adapter.attach({ threadKey: 'k', line: 40, tag: 'p' })).toBe(added)
+      expect(adapter.targetsInOrder()).toEqual(scanned(root).targetsInOrder())
+    })
+
+    it('024-NFR-001 keeps the index across the overlay\'s own writes into the content, and after the observer delivered', async () => {
+      const { root, adapter } = renderPreview(DOC)
+      const first = adapter.attach({ threadKey: 'k', line: 9, tag: 'li' })
+      const spy = vi.spyOn(root, 'querySelectorAll')
+      first!.setAttribute('aria-details', 'icon-1')
+      first!.setAttribute('tabindex', '-1')
+      await Promise.resolve()
+      expect(adapter.attach({ threadKey: 'k', line: 9, tag: 'li' })).toBe(first)
+      expect(lineScans(spy)).toBe(0)
+
+      root.querySelector('hr')!.remove()
+      await Promise.resolve()
+      expect(adapter.attach({ threadKey: 'k', line: 22, tag: 'hr' })).toBeNull()
+      expect(lineScans(spy)).toBe(1)
+      spy.mockRestore()
+    })
+
+    it('024-NFR-001 reads a new content element afresh, and nothing while there is none', () => {
+      const one = renderPreview(DOC)
+      const two = renderPreview(DOC.replace('# Plan', '# Other'))
+      let root: HTMLElement | null = one.root
+      const adapter = createMarkdownAdapter({ root: () => root, text: () => DOC })
+      expect(adapter.attach({ threadKey: 'k', line: 4, tag: 'h1' })?.textContent).toBe('Plan')
+      root = two.root
+      expect(adapter.attach({ threadKey: 'k', line: 4, tag: 'h1' })?.textContent).toBe('Other')
+      root = null
+      expect(adapter.attach({ threadKey: 'k', line: 4, tag: 'h1' })).toBeNull()
+      expect(adapter.targetsInOrder()).toEqual([])
+    })
+
+    it('024-NFR-001 hiddenNow answers from the same scan as its line query did, and reads open or closed now', () => {
+      const text = ['# Top', '', '<details><summary>More</summary>', '', 'Inside.', '', '</details>', '', 'After.', ''].join('\n')
+      const { root, adapter } = renderPreview(text)
+      const details = root.querySelector('details')!
+      const inside = root.querySelector<HTMLElement>('p[data-line-start="5"]')!
+      expect(inside.textContent).toBe('Inside.')
+      const spy = vi.spyOn(root, 'querySelectorAll')
+      const asked = [
+        { threadKey: 'k', line: 5, tag: 'p' },
+        { threadKey: 'k', line: 9, tag: 'p' },
+        { threadKey: 'k', line: 1, tag: 'h1' },
+        { threadKey: 'k', line: 5, tag: 'li' }
+      ]
+      expect(asked.map(p => adapter.hiddenNow!(p))).toEqual([true, false, false, false])
+      details.open = true
+      expect(adapter.hiddenNow!({ threadKey: 'k', line: 5, tag: 'p' })).toBe(false)
+      expect(lineScans(spy)).toBe(1)
+      spy.mockRestore()
+    })
+
+    it('024-NFR-001 hands out a copy of the order: a caller that changes it does not change the next answer', () => {
+      const { adapter } = renderPreview(DOC)
+      const order = adapter.targetsInOrder()
+      const count = order.length
+      order.splice(0, order.length)
+      expect(adapter.targetsInOrder()).toHaveLength(count)
+    })
   })
 
   it('collapses a quote as main reads one: whitespace runs, NFC, the 200-character cut', () => {

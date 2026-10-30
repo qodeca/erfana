@@ -320,6 +320,8 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-001 the page sch
             "showing",
             "top",
             "no-child",
+            "last",
+            "first",
           ],
           "type": "string",
         },
@@ -562,6 +564,8 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-001 the page sch
         "showing",
         "top",
         "no-child",
+        "last",
+        "first",
       ],
       "type": "string",
     },
@@ -1494,6 +1498,10 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
+        "addRefusal": {
+          "const": "too-many-blocks",
+          "type": "string",
+        },
         "damaged": {
           "items": {
             "additionalProperties": false,
@@ -1890,6 +1898,10 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
               "items": {
                 "additionalProperties": false,
                 "properties": {
+                  "addRefusal": {
+                    "const": "too-many-blocks",
+                    "type": "string",
+                  },
                   "damaged": {
                     "items": {
                       "additionalProperties": false,
@@ -2577,6 +2589,8 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
             "showing",
             "top",
             "no-child",
+            "last",
+            "first",
           ],
           "type": "string",
         },
@@ -2827,6 +2841,8 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
             "showing",
             "top",
             "no-child",
+            "last",
+            "first",
           ],
           "type": "string",
         },

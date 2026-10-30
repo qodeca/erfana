@@ -49,7 +49,8 @@ import type { PreviewCommentsLayerProps } from './PreviewCommentsLayer'
 import { useLiveText } from '../../../Comments/commentLive'
 import { COMMENT_LIST_COPY, HTML_WORDS } from '../../../Comments/commentCopyWords'
 import { useRemovedOutside } from '../../../Comments/commentRemovedOutside'
-import { newCommentRequest, withWords } from './previewCommentRequests'
+import { newCommentRequest, rowWindowRequest, withWords, type RowTarget } from './previewCommentRequests'
+import { usePageCommentStepKeys } from './usePageCommentStepKeys'
 import { pickerAnnouncement } from './commentLive'
 import { usePreviewDraftKeepAlive } from './usePreviewDraftKeepAlive'
 import { usePreviewModeBlock } from './usePreviewModeBlock'
@@ -349,6 +350,14 @@ export function usePreviewComments({
     [enabled, ready, menu, request, toggleMode]
   )
 
+  // A drawer row's Open, or a step key from the page (C-13): its element comes into view behind the window,
+  // out of any folded <details> (§19 Rev 4).
+  const openRow = (row: RowTarget, show: boolean, opener: 'page' | 'drawer' = 'drawer'): void => {
+    if (show && row.threadKey !== undefined) void commentGateway.reveal(panelId, row.threadKey)
+    setRequest(rowWindowRequest(panelId, row, centreOf(getArea()), listAfter(), opener))
+  }
+  usePageCommentStepKeys({ panelId, live: enabled && visible, drawerId, readList: refreshList, announce, open: ({ file, threadKey }) => openRow({ ...file, threadKey }, true, 'page') })
+
   // C-06: the count's name adds how many open comments changed, from the list main last sent.
   const changed = useMemo(() => listCounts(state.list.files).changed, [state.list.files])
   const toolbar: CommentToolbarToolsProps = {
@@ -378,27 +387,7 @@ export function usePreviewComments({
           onShowIconsChange: show => void setMode(latestRef.current.mode, show),
           onReveal: reveal,
           onOpenInSource: row => openInSource(row.filePath, row.line),
-          onOpen: row => {
-            // Its element comes into view behind the window, out of any folded <details> (§19 Rev 4).
-            if (row.main === 'reveal' && row.threadKey !== undefined) void commentGateway.reveal(panelId, row.threadKey)
-            setRequest({
-              kind: 'threads',
-              panelId,
-              fileKey: row.fileKey,
-              threadKeys: row.threadKey !== undefined ? [row.threadKey] : [],
-              blockKeys: row.blockKey !== undefined ? [row.blockKey] : [],
-              point: centreOf(getArea()),
-              opener: 'drawer',
-              listAfter: listAfter(),
-              // The file, so a failed list read can name it (M7).
-              file: {
-                fileKey: row.fileKey,
-                displayPath: row.displayPath,
-                filePath: row.filePath,
-                frame: row.frame
-              }
-            })
-          },
+          onOpen: row => openRow(row, row.main === 'reveal'),
           onRetry: () => void refreshList(),
           // OD-06: the removed-outside note, and its Copy text.
           removed: removed.removed,
@@ -459,7 +448,8 @@ export function usePreviewComments({
         closeWindow(false)
         openInSource(path, line)
       },
-      onCopyRaw: (text: string) => void textClipboard.writeText(text).then(ok => (ok ? announce(COPY.rawCopied) : alert(COPY.copyFailed)))
+      onCopyRaw: (text: string) => void textClipboard.writeText(text).then(ok => (ok ? announce(COPY.rawCopied) : alert(COPY.copyFailed))),
+      drawerId
     }),
     [
       menu,
@@ -484,7 +474,8 @@ export function usePreviewComments({
       alert,
       latestRef,
       ownDelete,
-      keepDraft
+      keepDraft,
+      drawerId
     ]
   )
 

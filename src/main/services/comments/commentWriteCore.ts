@@ -173,6 +173,7 @@ const PLAN_REFUSALS: Readonly<Record<PlanFailure, CommentRefusal>> = {
   'not-editable': 'block-changed',
   stale: 'block-changed',
   'meta-charset': 'meta-charset',
+  'generated-region': 'generated-region',
   limit: 'limit',
   invalid: 'invalid'
 }

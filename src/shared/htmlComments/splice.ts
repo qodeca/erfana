@@ -24,6 +24,12 @@
  *
  * Spike S7: own-lines placement changed rendering in 12 of 67 cases without
  * the `ws` check (CSS `white-space: pre*`, SVG `xml:space`), 0 with it.
+ *
+ * OTHER TOOLS' COMMENTS (spec 024 024-FR-023; `htmlForeign.ts`). The block
+ * goes before a directive run of other tools' comments right before the
+ * target (`<!-- prettier-ignore -->`), never between a directive and its
+ * element; with none there the slot is the start tag, as before. A target
+ * inside a generated START/END region is refused (`generated-region`).
  */
 import { CHARSET_PRESCAN_BYTES, utf8Length } from '../comments/encoding'
 import type { CommentData } from '../comments/format'
@@ -42,6 +48,7 @@ import {
   type SplicePlan,
   type SpliceVerifyResult
 } from '../comments/splice'
+import { directiveRunStart, inHtmlGeneratedRegion } from './htmlForeign'
 import type { IndexedElement } from './htmlIndex'
 import { analyzeCommentDocument, type CommentDocument } from './parse'
 
@@ -62,6 +69,7 @@ export {
   type SplicePlan,
   type VerifyFailure
 } from '../comments/splice'
+export { inHtmlGeneratedRegion } from './htmlForeign'
 
 /** Add a block before the eligible element whose start tag begins at `targetStart`. */
 export interface InsertRequest {
@@ -101,12 +109,17 @@ function pushesMetaCharset(text: string, range: readonly [number, number], inser
 export const htmlGrowthCheck: GrowthCheck = (text, range, insert) =>
   pushesMetaCharset(text, range, insert) ? 'meta-charset' : undefined
 
-/** The one slot of an eligible element: right before its start tag, on its own lines or mid-line (R3-8). */
+/**
+ * The one slot of an eligible element: right before its start tag – or before
+ * the directive run of other tools' comments in front of it (024-FR-023) – on
+ * its own lines or mid-line (R3-8).
+ */
 export function htmlSlotOf(doc: CommentDocument, el: IndexedElement, ws: string | undefined): Slot {
-  const layout = lineLayoutAt(doc.text, el.start, doc.index.bomLength)
+  const offset = directiveRunStart(doc.index, el) ?? el.start
+  const layout = lineLayoutAt(doc.text, offset, doc.index.bomLength)
   const ownLines = layout.atLineStart && !el.preformatted && ws === 'collapse'
   return {
-    offset: el.start,
+    offset,
     shape: 'before-target',
     indent: layout.indent,
     placement: ownLines ? 'own-lines' : 'mid-line'
@@ -114,7 +127,8 @@ export function htmlSlotOf(doc: CommentDocument, el: IndexedElement, ws: string 
 }
 
 /**
- * Plan a new block before an eligible element (§5.2, §5.6, R3-8).
+ * Plan a new block before an eligible element (§5.2, §5.6, R3-8), or refuse
+ * one inside a generated region (024-FR-023).
  *
  * @param note - The kind whose agent note and hints the block carries
  *   (`htmlKind`); absent: the v0.23.1 note, as the writer byte pins expect.
@@ -124,6 +138,7 @@ export function planInsert(doc: CommentDocument, request: InsertRequest, note?: 
   if (refused) return { ok: false, reason: refused }
   const el = doc.index.elementAt(request.targetStart)
   if (!el) return { ok: false, reason: 'not-eligible' }
+  if (inHtmlGeneratedRegion(doc.index, el)) return { ok: false, reason: 'generated-region' }
   return planSlotInsert(doc, htmlSlotOf(doc, el, request.ws), request.data, htmlGrowthCheck, note)
 }
 

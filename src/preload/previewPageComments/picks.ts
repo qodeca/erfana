@@ -39,7 +39,7 @@ import type { PageSel, PageWords } from './words'
  */
 export type PickKind = 'menu' | 'open' | 'icon' | 'parent' | 'exit' | 'step' | 'context'
 /** What a `step` reached: an element (with its label), the top of the page, or no child. */
-export type StepSay = 'showing' | 'top' | 'no-child'
+export type StepSay = 'showing' | 'top' | 'no-child' | 'last' | 'first'
 /** How the user picked. */
 export type PickVia = 'pointer' | 'keyboard'
 

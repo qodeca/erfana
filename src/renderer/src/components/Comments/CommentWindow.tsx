@@ -70,6 +70,8 @@ import { DialogButton, VisibleText } from './CommentParts'
 import type { Box } from './commentPlacement'
 import type { IdentityFormData } from './commentSchemas'
 import { CommentStepper, MoreActions, stepKeyOf } from './CommentStepper'
+import { useDrawerFilter } from './commentDrawerFilter'
+import { useWindowStepTarget } from './commentStepKeys'
 import { WINDOW_COPY, windowRefusal } from './commentWindowCopy'
 import { headingOf, newCommentFrom } from './commentWindowHeading'
 import { resolveLeads, stepPosition, threadStateOf } from './commentWindowStates'
@@ -126,6 +128,8 @@ export interface CommentWindowProps {
   readonly onReveal?: (threadKey: string) => void
   /** "Comment on the whole {parent}" after a render-check refusal (W-07): open the window on the parent. */
   readonly onRetarget?: (request: Extract<CommentWindowRequest, { kind: 'new' }>) => void
+  /** The panel's drawer `id`: the stepper steps within that drawer's current filter (C-13); Open when absent or shut. */
+  readonly drawerId?: string
 }
 
 /**
@@ -170,7 +174,8 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
     (identityAsked || identity === null || !identity.identityNoticeSeen || !identity.authorName)
   const view: 'identity' | 'new' | 'threads' = needsIdentity ? 'identity' : request.kind
 
-  const session = useThreadSession(request, list)
+  const stepFilter = useDrawerFilter(props.drawerId)
+  const session = useThreadSession(request, list, stepFilter)
   const selection = request.kind === 'threads' ? session.selection : null
   const waiting = request.kind === 'threads' && session.waiting
   // Before any memoized callback: the compiler takes these calls as possible changes to `selection`.
@@ -268,7 +273,7 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
     (threadKey: string) => {
       const file = selection?.file
       const target = file?.threads.find(t => t.threadKey === threadKey)
-      const at = file === undefined ? null : stepPosition(file, [threadKey])
+      const at = file === undefined ? null : stepPosition(file, [threadKey], stepFilter)
       goTo(threadKey)
       setFailure(null)
       setStepped(n => n + 1)
@@ -277,7 +282,7 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
         announce(WINDOW_COPY.stepAnnounce(at.at, at.of, words.noun(target.tag), target.line))
       }
     },
-    [selection, goTo, onReveal, announce, words]
+    [selection, goTo, onReveal, announce, words, stepFilter]
   )
   // A step lands on the new thread's title, so a screen reader starts at the top again.
   useEffect(() => {
@@ -306,6 +311,16 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
     [session.step, request.panelId, selection, run, stepTo]
   )
   const { step } = session
+  // C-13: Alt+F9 / Alt+Shift+F9 from the preview step this window too (the Markdown window is not modal).
+  const stepFromPreview = useCallback(
+    (key: 'next' | 'previous') => {
+      const target = key === 'next' ? step?.next : step?.previous
+      if (target !== null && target !== undefined) stepTo(target)
+      return true
+    },
+    [step, stepTo]
+  )
+  useWindowStepTarget(props.drawerId ?? request.panelId, request.kind === 'threads' ? shownThread?.threadKey : undefined, stepFromPreview)
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
     const key = stepKeyOf(event.nativeEvent)
     if (key === null || step === null) return

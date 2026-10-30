@@ -54,7 +54,9 @@ export interface PreviewModeBlock {
  */
 export function pageBlockReason(files: readonly CommentFileView[]): string | null {
   const page = files.find(file => !file.frame)
-  if (page === undefined || page.writable) return null
+  if (page === undefined) return null
+  // F-04: a full file stays writable for replies, but takes no new comment.
+  if (page.writable) return page.addRefusal === undefined ? null : menuReasonText(page.addRefusal, page.displayPath)
   return menuReasonText(page.readOnlyReason ?? 'read-only', page.displayPath)
 }
 

@@ -6,7 +6,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { COMMENT_PICK_CHANNEL, TOKEN_ATTRIBUTE } from './constants'
-import { byId, createHarness, dispatchTrusted, drawnText, lastStep, microtasks, mount, token, userKey, userMouse, userMove, type Harness } from './__test-helpers__/harness'
+import { byId, createHarness, dispatchTrusted, drawnText, lastStep, microtasks, mount, token, userKey, userMouse, userMove, userUp, type Harness } from './__test-helpers__/harness'
 
 const T = TOKEN_ATTRIBUTE
 const PAGE = [
@@ -49,6 +49,43 @@ const label = (): string | undefined => drawnText(h.root()?.querySelector('.erf-
 const spoken = (): string | undefined => lastStep(h, COMMENT_PICK_CHANNEL)
 const picks = (): Array<Record<string, unknown>> =>
   (h.sent(COMMENT_PICK_CHANNEL) as Array<Record<string, unknown>>).filter(p => p.kind !== 'step')
+
+describe('C-21 (HTML) the floating label', () => {
+  const part = (cls: string): Element | null | undefined => h.root()?.querySelector(cls)
+
+  it('024-AC-019 C-21 (HTML) D-05 drops the pixel size unless Alt is held', () => {
+    userMove(10, 60)
+    h.controller.renderNow()
+    expect(part('.erf-hpc-label__size')).toHaveClass('erf-hpc-hidden')
+    userKey({ key: 'Alt', code: 'AltLeft', altKey: true })
+    expect(part('.erf-hpc-label__size')).not.toHaveClass('erf-hpc-hidden')
+    expect(drawnText(part('.erf-hpc-label__size'))).toBe('800×40')
+    userUp({ key: 'Alt', code: 'AltLeft', altKey: false })
+    expect(part('.erf-hpc-label__size')).toHaveClass('erf-hpc-hidden')
+  })
+
+  it('024-AC-019 C-21 (HTML) Alt held is said by the page’s keys only: an untrusted event changes nothing', () => {
+    userMove(10, 60)
+    h.controller.renderNow()
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Alt', code: 'AltLeft', altKey: true, bubbles: true }))
+    expect(part('.erf-hpc-label__size')).toHaveClass('erf-hpc-hidden')
+  })
+
+  it('024-AC-019 C-21 (HTML) with a container above, the label sits above the outline', () => {
+    userMove(10, 60) // li#one: right above it is the main element, which holds it
+    h.controller.renderNow()
+    expect(part('.erf-hpc-label')).not.toHaveClass('erf-hpc-label--inside')
+  })
+
+  it('024-AC-019 C-21 (HTML) when other content touches the outline’s top, the label moves inside its top-left corner', () => {
+    userMove(10, 100) // li#two: li#one ends where it starts
+    h.controller.renderNow()
+    const label = part('.erf-hpc-label') as HTMLElement
+    expect(label).toHaveClass('erf-hpc-label--inside')
+    const outline = part('.erf-hpc-outline') as HTMLElement
+    expect(label.style.top).toBe(outline.style.top)
+  })
+})
 
 describe('hover label (J-001)', () => {
   it('J-001 outlines the element under the pointer and labels it with its size', () => {
@@ -159,7 +196,18 @@ describe('keyboard picker (J-010)', () => {
     expect(spoken()).toBe('showing p#last')
     userMove(10, 530)
     userKey({ key: 'Tab' })
-    expect(spoken()).toBe('showing p#last')
+    // C-10: it stays on p#last and says it is the last one (the window says "Last element at this level – …").
+    expect(spoken()).toBe('last')
+    userKey({ key: 'Tab', shiftKey: true })
+    expect(spoken()).not.toBe('last')
+  })
+
+  it('024-AC-018 C-10 (HTML) Shift+Tab on the first element stays put and says it is the first', () => {
+    userMove(10, 60) // li#one
+    for (let i = 0; i < 6; i += 1) userKey({ key: 'Tab', shiftKey: true })
+    expect(spoken()).toBe('first')
+    userKey({ key: 'Tab' })
+    expect(spoken()).toMatch(/^showing /)
   })
 
   it('J-010 Enter opens, Shift+F10 and the Menu key open the menu – keyboard picks at the element + 4 px', () => {

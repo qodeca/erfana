@@ -107,6 +107,125 @@ function isTarget(el: Element, root: Element): boolean {
   return inContainers(el, root)
 }
 
+/**
+ * Whether a closed `<details>` hides `el`: the only collapsed section the
+ * preview draws (`MarkdownPreview.tsx` keeps raw `details`; S-02, D-13). A
+ * closed section still shows its own `<summary>`.
+ */
+function collapsedIn(el: Element, root: Element): boolean {
+  for (let up = el.parentElement; up !== null && up !== root; up = up.parentElement) {
+    if (!(up instanceof HTMLDetailsElement) || up.open) continue
+    const summary = up.querySelector(':scope > summary')
+    if (summary === null || !summary.contains(el)) return true
+  }
+  return false
+}
+
+/** What one scan of the rendered content's line stamps answers. */
+interface TargetIndex {
+  /** The targets, in document order. */
+  readonly order: readonly HTMLElement[]
+  /** The first target of each line and tag ({@link lineTagKey}): what `attach` finds. */
+  readonly firstByLineTag: ReadonlyMap<string, HTMLElement>
+  /**
+   * The first stamped element of each `data-line-start` value and kind tag,
+   * target or not ({@link lineTagKey} on the raw value): what `hiddenNow`
+   * finds, as its `[data-line-start="…"]` query did.
+   */
+  readonly firstByStampKind: ReadonlyMap<string, Element>
+}
+
+/**
+ * The DOM changes that can change {@link TargetIndex}: a node added, removed
+ * or re-parented (containers, a lone image's paragraph), text (a lone image's
+ * paragraph must be empty), a line stamp or a class (the wrappers, the
+ * frontmatter, the image placeholder). The overlay's own writes into the
+ * content (`aria-details`, `tabindex` and their markers) are none of these.
+ */
+const TARGET_MUTATIONS: MutationObserverInit = {
+  childList: true,
+  subtree: true,
+  characterData: true,
+  attributes: true,
+  attributeFilter: ['data-line-start', 'class']
+}
+
+function lineTagKey(line: number | string, tag: string): string {
+  return `${line}\u0000${tag}`
+}
+
+/** Keep the first element of each key, in the order given. */
+function firstByKey<E extends Element>(elements: readonly E[], keyOf: (el: E) => string | null): Map<string, E> {
+  const first = new Map<string, E>()
+  for (const el of elements) {
+    const key = keyOf(el)
+    if (key !== null && !first.has(key)) first.set(key, el)
+  }
+  return first
+}
+
+/** One scan of `root`'s line stamps: every answer of {@link TargetIndex}. */
+function scanTargets(root: HTMLElement): TargetIndex {
+  const stamped = [...root.querySelectorAll<HTMLElement>('[data-line-start]')]
+  const order = stamped.filter(el => isTarget(el, root))
+  return {
+    order,
+    firstByLineTag: firstByKey(order, el => lineTagKey(lineOfStamp(el), tagOfTarget(el))),
+    firstByStampKind: firstByKey(stamped, el => {
+      const kind = kindTag(el)
+      return kind === null ? null : lineTagKey(el.getAttribute('data-line-start') ?? '', kind)
+    })
+  }
+}
+
+/** A target's tag as main names it; the element's own tag when it is no target kind. */
+function tagOfTarget(el: HTMLElement): string {
+  return kindTag(el) ?? el.tagName.toLowerCase()
+}
+
+/** A target's line: its stamp, or 1 when the stamp is missing or not a number. */
+function lineOfStamp(el: HTMLElement): number {
+  return Number.parseInt(el.dataset.lineStart ?? '', 10) || 1
+}
+
+/**
+ * The line stamps of the content `rootOf` names, scanned once and kept until
+ * the content changes (spec 024 024-NFR-001). The overlay attaches every
+ * listed thread on each draw, and the drawer asks each one whether a closed
+ * section hides it; a full scan per thread made one draw of a 1 MB document
+ * with 200 comments take seconds.
+ *
+ * A `MutationObserver` drops the index on the first change that can alter it,
+ * and every read first takes the observer's undelivered records, so a change
+ * made earlier in the same task (a React commit before an effect) is seen
+ * too: a read always answers what a fresh scan would. Without
+ * `MutationObserver` nothing is kept.
+ *
+ * @param rootOf - The rendered content element, when mounted
+ * @returns A reader of the current index; `null` while there is no content
+ */
+function createTargetIndex(rootOf: () => HTMLElement | null): () => TargetIndex | null {
+  let kept: { readonly root: HTMLElement; readonly index: TargetIndex } | null = null
+  let observer: MutationObserver | null = null
+  const forget = (): void => {
+    observer?.disconnect()
+    observer = null
+    kept = null
+  }
+  return () => {
+    const root = rootOf()
+    if (kept !== null && (kept.root !== root || (observer?.takeRecords().length ?? 0) > 0)) forget()
+    if (root === null) return null
+    if (kept !== null) return kept.index
+    const index = scanTargets(root)
+    if (typeof MutationObserver === 'undefined') return index
+    observer = new MutationObserver(forget)
+    observer.observe(root, TARGET_MUTATIONS)
+    kept = { root, index }
+    return index
+  }
+}
+
 /** Whitespace runs to one space, trimmed, NFC, at most the quote limit – `quoteText.ts`'s rule. */
 export function collapsedText(text: string): string {
   const collapsed = text.replace(/\s+/g, ' ').trim().normalize('NFC')
@@ -153,11 +272,12 @@ export function createMarkdownAdapter(source: MarkdownAdapterSource): PreviewCom
     return indexed.index
   }
 
-  const targetsInOrder = (): HTMLElement[] => {
-    const root = source.root()
-    if (root === null) return []
-    return [...root.querySelectorAll<HTMLElement>('[data-line-start]')].filter(el => isTarget(el, root))
-  }
+  const tagOf = tagOfTarget
+  const lineOf = lineOfStamp
+
+  const indexNow = createTargetIndex(source.root)
+  // A copy: the caller may sort or splice it, the index stays as scanned.
+  const targetsInOrder = (): HTMLElement[] => [...(indexNow()?.order ?? [])]
 
   const targetAt = (node: Node | null): HTMLElement | null => {
     const root = source.root()
@@ -169,9 +289,6 @@ export function createMarkdownAdapter(source: MarkdownAdapterSource): PreviewCom
     }
     return null
   }
-
-  const tagOf = (target: HTMLElement): string => kindTag(target) ?? target.tagName.toLowerCase()
-  const lineOf = (target: HTMLElement): number => Number.parseInt(target.dataset.lineStart ?? '', 10) || 1
 
   const parentOf = (target: HTMLElement): HTMLElement | null => {
     const root = source.root()
@@ -209,8 +326,17 @@ export function createMarkdownAdapter(source: MarkdownAdapterSource): PreviewCom
     }
   }
 
+  // The first target of the placement's line and tag, in document order (see `createTargetIndex`).
   const attach = (placement: ThreadPlacement): HTMLElement | null =>
-    targetsInOrder().find(el => lineOf(el) === placement.line && tagOf(el) === placement.tag) ?? null
+    indexNow()?.firstByLineTag.get(lineTagKey(placement.line, placement.tag)) ?? null
+
+  // S-02: main found the target in the file; the preview drew an element of its kind on its line inside a closed section.
+  const hiddenNow = (placement: ThreadPlacement): boolean => {
+    const root = source.root()
+    const drawn = indexNow()?.firstByStampKind.get(lineTagKey(String(placement.line), placement.tag))
+    // Open or closed is read now, on the found element: a toggle changes no index.
+    return root !== null && drawn !== undefined && collapsedIn(drawn, root)
+  }
 
   const refusalOf = (target: HTMLElement): 'generated-region' | null => {
     const pick = describe(target)
@@ -231,6 +357,7 @@ export function createMarkdownAdapter(source: MarkdownAdapterSource): PreviewCom
     canComment,
     describe,
     attach,
+    hiddenNow,
     root: source.root,
     refusalOf
   }

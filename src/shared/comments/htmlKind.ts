@@ -24,6 +24,7 @@ import { analyzeCommentDocument, type CommentDocument } from '../htmlComments/pa
 import {
   htmlGrowthCheck,
   htmlSlotOf,
+  inHtmlGeneratedRegion,
   spliceOriginOf,
   verifyHtmlElements,
   type SpliceOrigin
@@ -43,6 +44,7 @@ import { findAnchorTarget } from './reattach'
 import type { IndexedTarget } from './targetIndex'
 
 const NOT_FOUND: KindRefusal = { refused: 'not-found' }
+const GENERATED: KindRefusal = { refused: 'generated-region' }
 
 /**
  * `doc` as the HTML document it must be. A document another kind parsed
@@ -93,7 +95,10 @@ export const htmlKind: CommentFileKind = {
   },
 
   locate(doc, pick) {
-    return locateElement(htmlDocOf(doc), pick) ?? NOT_FOUND
+    const html = htmlDocOf(doc)
+    const el = locateElement(html, pick)
+    if (el === undefined) return NOT_FOUND
+    return inHtmlGeneratedRegion(html.index, el) ? GENERATED : el
   },
 
   slots(doc, target, pick) {

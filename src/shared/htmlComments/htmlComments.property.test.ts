@@ -266,8 +266,14 @@ function shifted(block: ParsedBlock, shift: (offset: number, isEnd: boolean) => 
   }
 }
 
-/** P-003 and P-005 for one insertion; returns the document with the block added. */
-function checkInsertion(doc: CommentDocument, plan: SplicePlan): CommentDocument {
+/**
+ * P-003 and P-005 for one insertion; returns the document with the block
+ * added. The block sits on `targetStart`: by position when it went right
+ * before it; through its stored id, path or quote when it went before other
+ * tools' comments there (024-FR-023), which the position rule does not skip
+ * (U-081).
+ */
+function checkInsertion(doc: CommentDocument, plan: SplicePlan, targetStart: number): CommentDocument {
   const newText = applySplice(doc.text, plan)
   const verified = verifyCommentSplice(doc, newText, plan)
   if (!verified.ok) throw new Error(`verifyCommentSplice: ${verified.reason}`)
@@ -285,7 +291,10 @@ function checkInsertion(doc: CommentDocument, plan: SplicePlan): CommentDocument
   expect(after[added]).toMatchObject({
     kind: 'ok',
     data: plan.data,
-    target: { state: 'attached', via: 'position', startOffset: plan.start + delta }
+    target:
+      plan.start === targetStart
+        ? { state: 'attached', via: 'position', startOffset: plan.start + delta }
+        : { state: 'attached', startOffset: shift(targetStart, false) }
   })
   expect(
     after.filter((_, i) => i !== added).map(block => shifted(block, offset => offset))
@@ -305,7 +314,7 @@ describe('document properties', () => {
             const data = makeComment({ id: NEW_BLOCK_ID, anchor: buildAnchor(doc.index, el) })
             const planned = planInsert(doc, { targetStart: el.start, data, ws })
             if (!planned.ok) throw new Error(`planInsert before <${el.tag}>: ${planned.reason}`)
-            const added = checkInsertion(doc, planned.plan)
+            const added = checkInsertion(doc, planned.plan, el.start)
             const block = added.state.blocks.find(
               b => b.kind === 'ok' && b.data.id === NEW_BLOCK_ID
             )!

@@ -124,13 +124,21 @@ describe('usePreviewComments', () => {
   let fake: FakeCommentsBridge
   let latest: PreviewComments
   const focusPage = vi.fn(async () => ({ ok: true }))
+  // Main's forwarded keys for this window (C-13: the page's Alt+F9 / Alt+Shift+F9).
+  let forwardedKey: ((payload: { panelId: string; key: string; accel: boolean }) => void) | null = null
+  const onForwardedShortcut = vi.fn((cb: typeof forwardedKey) => {
+    forwardedKey = cb
+    return () => {
+      if (forwardedKey === cb) forwardedKey = null
+    }
+  })
   const onValue = (value: PreviewComments) => {
     latest = value
   }
 
   beforeEach(() => {
     fake = installCommentsBridge()
-    ;(window as unknown as { api: Record<string, unknown> }).api.preview = { focusPage }
+    ;(window as unknown as { api: Record<string, unknown> }).api.preview = { focusPage, onForwardedShortcut }
     useGlobalSettingsStore.setState({ settings: settingsWith() })
     useOverlayOccluderStore.getState().reset()
     usePreviewCoveredStore.setState({ covered: new Set() })
@@ -320,7 +328,7 @@ describe('usePreviewComments', () => {
     act(() => fake.emitDraft(menu))
     act(() => latest.layer.onAddComment(menu))
     expect(latest.layer.request).not.toHaveProperty('wordsMissing')
-    expect(latest.layer.polite).not.toBe(SELECTION_COPY.wordsNotInFile('index.html'))
+    expect(latest.layer.polite).not.toBe(SELECTION_COPY.wordsNotInFile('element', 'index.html'))
   })
 
   it('024-AC-004 a save sends the words the window chose as sel', async () => {
@@ -533,6 +541,33 @@ describe('usePreviewComments', () => {
       await waitFor(() => expect(fake.bridge.list).toHaveBeenCalledTimes(4))
       act(() => latest.drawer?.onClose())
       expect(latest.drawer).toBeNull()
+    })
+
+    it('024-AC-019 C-13 (HTML) Alt+F9 in the page opens the first open comment, reading the list first; Alt+Shift+F9 the last', async () => {
+      fake.bridge.list.mockResolvedValue({
+        ok: true,
+        files: [fileView({ threads: [thread(1), thread(2, { status: 'resolved' }), thread(3)] })]
+      })
+      render(<Harness onValue={onValue} />)
+      expect(forwardedKey).not.toBeNull()
+      act(() => forwardedKey?.({ panelId: PANEL, key: 'comment-next', accel: false }))
+      // Opened from the page: closing the window hands focus back to the page.
+      await waitFor(() => expect(latest.layer.request).toMatchObject({ kind: 'threads', threadKeys: ['t1'], opener: 'page' }))
+      expect(fake.bridge.list).toHaveBeenCalled()
+      expect(fake.bridge.reveal).toHaveBeenCalledWith(PANEL, 't1')
+      await waitFor(() => expect(latest.layer.polite).toBe('Comment 1 of 2, on element, line 11.'))
+      act(() => latest.layer.onCloseWindow())
+      act(() => forwardedKey?.({ panelId: PANEL, key: 'comment-previous', accel: false }))
+      await waitFor(() => expect(latest.layer.request).toMatchObject({ kind: 'threads', threadKeys: ['t3'] }))
+    })
+
+    it('024-AC-019 C-13 (HTML) a step key for another panel, or another forwarded key, opens nothing', async () => {
+      fake.bridge.list.mockResolvedValue({ ok: true, files: [fileView({ threads: [thread(1)] })] })
+      render(<Harness onValue={onValue} />)
+      act(() => forwardedKey?.({ panelId: 'preview-other', key: 'comment-next', accel: false }))
+      act(() => forwardedKey?.({ panelId: PANEL, key: 'back', accel: false }))
+      await act(async () => {})
+      expect(latest.layer.request).toBeNull()
     })
 
     it('C-13 (HTML) a step in the window reveals its thread on the page', async () => {

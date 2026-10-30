@@ -27,6 +27,7 @@
 import type { Nodes as MdastNodes, Parent as MdastParent, RootContent } from 'mdast'
 import { splitFrontmatter } from '../markdown/previewPipeline'
 import type { IndexedCommentNode, IndexedTarget, TargetIndex } from '../comments/targetIndex'
+import { pairGeneratedRegions, type GeneratedRegion, type RegionNameReaders } from '../comments/foreignComments'
 import { htmlBlockClosed, htmlBlockType, isCommentOnly, regionEndName, regionStartName, scanComments } from './mdCommentScan'
 import { renderedPage, type HastRecord } from './mdHast'
 import { parseMarkdownBody, renderSignature } from './mdRender'
@@ -92,10 +93,13 @@ export interface MdComment extends IndexedCommentNode {
   readonly terminated: boolean
 }
 
-/** A generated region: from its START comment's `<!--` to its END comment's `-->`. */
-export interface MdRegion {
-  readonly start: number
-  readonly end: number
+/** A generated region: from its START comment's `<!--` to its END comment's `-->` (`foreignComments.ts`). */
+export type MdRegion = GeneratedRegion
+
+/** The region names as `mdCommentScan` exports them, read through that module so its cost test can count them. */
+const MD_REGION_NAMES: RegionNameReaders = {
+  startName: data => regionStartName(data),
+  endName: data => regionEndName(data)
 }
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] }
@@ -379,28 +383,9 @@ class IndexBuilder {
    */
   private pairRegions(container: MdBlock): void {
     const comments = container.children.filter(child => child.type === 'html').flatMap(child => child.comments)
-    const waiting = new Map<string, number[]>()
-    const ends: Array<number | undefined> = []
-    comments.forEach((comment, i) => {
-      const endName = regionEndName(comment.data)
-      if (endName !== undefined) closeRegions(waiting, endName, comment.end, ends)
-      const name = regionStartName(comment.data)
-      if (name === undefined) return
-      const starts = waiting.get(name)
-      if (starts === undefined) waiting.set(name, [i])
-      else starts.push(i)
-    })
-    comments.forEach((comment, i) => {
-      const end = ends[i]
-      if (end !== undefined) this.regions.push({ start: comment.start, end })
-    })
+    // A loop, not a spread: a file of many regions must not overflow the argument stack.
+    for (const region of pairGeneratedRegions(comments, MD_REGION_NAMES)) this.regions.push(region)
   }
-}
-
-/** An END named `name` at `end` closes every START of that name still waiting (`pairRegions`). */
-function closeRegions(waiting: Map<string, number[]>, name: string, end: number, ends: Array<number | undefined>): void {
-  for (const start of waiting.get(name) ?? []) ends[start] = end
-  waiting.delete(name)
 }
 
 /** Parse a decoded Markdown file (`bomLength` 1 when it starts with a BOM) for comments. */

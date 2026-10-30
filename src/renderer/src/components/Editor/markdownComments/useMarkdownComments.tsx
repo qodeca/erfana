@@ -26,18 +26,26 @@
  *
  * @module Editor/markdownComments/useMarkdownComments
  */
-import { useCallback, useMemo, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type RefObject } from 'react'
 import { utf8Length } from '../../../../../shared/comments/encoding'
-import { FILE_COMMENT_BUFFER_MAX_CHARS } from '../../../../../shared/ipc/file-comment-schema'
+import {
+  FILE_COMMENT_BUFFER_MAX_CHARS,
+  type FileCommentListResult,
+  type FileCommentSaveRequest,
+  type FileCommentSaveResult
+} from '../../../../../shared/ipc/file-comment-schema'
 import { isMarkdownPreviewCommentsEnabled } from '../../../../../shared/ipc/global-settings-schema'
 import { fileCommentGateway } from '../../../services/comments/fileCommentGateway'
 import { useGlobalSettingsStore } from '../../../stores/useGlobalSettingsStore'
+import { usePreviewCommentStore } from '../../../stores/usePreviewCommentStore'
 import { useProjectStore } from '../../../stores/useProjectStore'
 import { useCommentDirtyGuard } from '../../../hooks/useCommentDirtyGuard'
+import { useLatestRef } from '../../../hooks/useLatestRef'
 import { getBasename, isMarkdownFile } from '../../../utils/fileUtils'
 import { CommentToolbarTools } from '../../Comments/CommentToolbarTools'
 import { MARKDOWN_WORDS, MD_SURFACE_COPY } from '../../Comments/commentCopyWords'
 import { CommentWordsContext } from '../../Comments/commentWords'
+import { awaitSavedPin, noteCommentSaveStart } from '../../Comments/overlay/commentTiming'
 import { useCommentOverlayHost, type RendererCommentSource } from '../../Comments/overlay/useCommentOverlayHost'
 import type { MonacoEditorHandle } from '../MonacoMarkdownEditor'
 import type { ViewMode } from '../MarkdownEditorPanel/types'
@@ -69,6 +77,35 @@ export interface MarkdownComments {
   readonly band: React.ReactNode
   /** The overlay for the preview pane (EditorContentLayout draws it in the preview-only view only). */
   readonly overlay: React.ReactNode
+  /**
+   * Start reading `filePath`'s comments now, as its text arrives and before the
+   * preview renders it (024-NFR-001): the host's first list of that file takes
+   * this answer instead of asking main again. Does nothing when the file will
+   * not list in `mode` (setting off, not Markdown, not the preview-only view,
+   * panel hidden). Always present.
+   */
+  readonly prefetch: (filePath: string, mode: ViewMode) => void
+}
+
+/** A list read started before the host asked for it. */
+interface EarlyList {
+  readonly filePath: string
+  readonly answer: Promise<FileCommentListResult>
+}
+
+/** A new comment's write, between the save-start and saved-visible marks (024-NFR-001). */
+async function timedAdd(request: FileCommentSaveRequest): Promise<FileCommentSaveResult> {
+  noteCommentSaveStart()
+  const answer = await fileCommentGateway.save(request)
+  if (answer.ok && answer.threadKey !== null) awaitSavedPin(answer.threadKey)
+  return answer
+}
+
+/** The early read of `filePath`, once: the first list of the file takes it. */
+function takeEarlyList(early: MutableRefObject<EarlyList | null>, filePath: string): Promise<FileCommentListResult> | null {
+  const started = early.current
+  early.current = null
+  return started !== null && started.filePath === filePath ? started.answer : null
 }
 
 /**
@@ -98,17 +135,39 @@ export function useMarkdownComments(options: UseMarkdownCommentsOptions): Markdo
       }),
     [scroller, content]
   )
+  // 024-NFR-001: the list read started with the file's load, while the preview renders (see `prefetch`).
+  const early = useRef<EarlyList | null>(null)
   const source = useMemo<RendererCommentSource>(
     () => ({
-      list: bufferText => fileCommentGateway.list({ panelId, filePath, ...(bufferText === undefined ? {} : { bufferText }) }),
+      list: bufferText => {
+        const started = bufferText === undefined ? takeEarlyList(early, filePath) : null
+        return started ?? fileCommentGateway.list({ panelId, filePath, ...(bufferText === undefined ? {} : { bufferText }) })
+      },
       openDraft: () => fileCommentGateway.openDraft({ panelId, filePath }),
-      save: request => fileCommentGateway.save(request),
+      save: request => (request.op === 'add' ? timedAdd(request) : fileCommentGateway.save(request)),
       onChanged: callback =>
         fileCommentGateway.onChanged(payload => {
           if (payload.panelId === panelId) callback()
         })
     }),
     [panelId, filePath]
+  )
+  const visibleRef = useLatestRef(isVisible)
+  const prefetch = useCallback(
+    (path: string, mode: ViewMode) => {
+      early.current = null
+      const settings = useGlobalSettingsStore.getState().settings
+      const willList =
+        settings !== null &&
+        isMarkdownPreviewCommentsEnabled(settings) &&
+        panelId !== '' &&
+        isMarkdownFile(path) &&
+        fileCommentGateway.available() &&
+        mode === 'preview' &&
+        visibleRef.current
+      if (willList) early.current = { filePath: path, answer: fileCommentGateway.list({ panelId, filePath: path }) }
+    },
+    [panelId, visibleRef]
   )
 
   // Paused while any editor of this window holds unsaved edits (F-02), or those and a change on disk (F-03).
@@ -149,6 +208,14 @@ export function useMarkdownComments(options: UseMarkdownCommentsOptions): Markdo
     ...(paused === null || !bufferListable ? {} : { bufferText: content }),
     onOpenInSource: openInSource
   })
+  // The host's list effect ran just above, in the commit that showed this file, and took the early
+  // read if it wanted it. An early read left over now is not waited for later: it could be old.
+  useEffect(() => {
+    if (early.current?.filePath === filePath) early.current = null
+  })
+  // A closed tab's list, drawer and mode go with it: the same file opened again reads afresh and
+  // says "Reading comments…" meanwhile, instead of showing the old list (024-NFR-001).
+  useEffect(() => () => usePreviewCommentStore.getState().drop(panelId), [panelId])
 
   const goToEditor = useCallback(() => {
     // This panel's own edits: its editor view. Another tab's: that tab.
@@ -156,8 +223,9 @@ export function useMarkdownComments(options: UseMarkdownCommentsOptions): Markdo
     else guard.goToTab()
   }, [panelId, setViewMode, guard])
 
-  if (!enabled) return { tools: null, band: null, overlay: null }
+  if (!enabled) return { tools: null, band: null, overlay: null, prefetch }
   return {
+    prefetch,
     tools:
       viewMode === 'preview' ? (
         <CommentWordsContext.Provider value={MARKDOWN_WORDS}>

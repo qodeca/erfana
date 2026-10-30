@@ -34,11 +34,12 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | `parse` | same | split: the block classifier (header, damage reasons, readable compare) goes to `src/shared/comments/blocks.ts`; the parse5 comment walk goes to `htmlComments/htmlParse.ts` | S + H | Finding comment nodes depends on the HTML parser |
 | `anchor` | same | split: `resolveBlockTarget` goes to `src/shared/comments/reattach.ts`; the parse5 anchor builder stays | S + H | CSS paths come from the parse5 tree |
 | `htmlIndex`, `parseBounds`, `instrument`, `frameworkMarkers` | same | stay | H | parse5 tree, element tokens and framework roots exist only in HTML |
+| **Added since** `htmlForeign` | – | `src/shared/htmlComments/` | H | Which comments precede an element and which share a parent are read from the HTML source and the parse5 tree (024-FR-023; the region names themselves are shared, `foreignComments`) |
 | `index` (barrel) | same | stays as the HTML barrel; `src/shared/comments/index.ts` is new | S + H | Two barrels: the shared one exports the base only, so importing it never pulls in parse5 |
 | **New** `fileKind.ts`, `htmlKind.ts`, `selectionFind.ts` | – | `src/shared/comments/` | S (`htmlKind` is H) | `htmlKind` wraps the H modules above |
 | **New** `markdownComments/{mdIndex,slots,renderCheck,mdAnchor,markdownKind}.ts` | – | `src/shared/markdownComments/` | M | Markdown has no tags or ids in the source, so placement and re-attach are new (design §5, §6) |
 | **New** `src/shared/markdown/previewPipeline.ts` | inside `MarkdownPreview.tsx` | plugin list, sanitize schema, frontmatter split | M | One pipeline for the preview and main's render check |
-| **Added since** `agentNotes`, `noteLines`, `anchorSel`, `selectionWords`, `spokenExcerpt`, `cutText`, `targetIndex`, `commentableExtensions` (8) | – | `src/shared/comments/` | S | – |
+| **Added since** `agentNotes`, `noteLines`, `anchorSel`, `selectionWords`, `spokenExcerpt`, `cutText`, `targetIndex`, `commentableExtensions`, `foreignComments` (9) | – | `src/shared/comments/` | S | – |
 | **Added since** `markdownComments/{markdownLimits,mdCommentScan,mdHast,mdHints,mdLocate,mdRender,mdSlots,mdSource}.ts` (8) | – | `src/shared/markdownComments/` | M | Markdown's limits, comment tokenizer, rendered tree, target hint, locate, render check, slots and line coordinates: rules of the Markdown source, which has no tags or ids (design `markdown-format.md`; § 8 C3, C4, C7, C9, C11, C19) |
 
 ### Main process
@@ -66,6 +67,8 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | **New** `src/renderer/src/components/Editor/markdownComments/markdownAdapter.ts` | M | Maps `data-line-start` blocks to targets |
 | **Added since** `src/renderer/src/components/Comments/overlay/{useCommentOverlayHost,useHostPointerKeys,useSelectionComments,previewAdapter,pickerKeys,hostTypes,hostParts,hostMenu,hostWindow,hostDrawer,domWords,commentContentAttrs,contentGuard}.ts` (13) | S (for renderer-hosted previews) | – |
 | **Added since** `src/renderer/src/components/Editor/markdownComments/{useMarkdownComments,MarkdownCommentsOverlay,MarkdownCommentsBand}.tsx` (3) | M | The Markdown Preview's composition root, the surfaces it draws in its pane, and its paused band (D-24: only the Markdown Preview draws the editor's unsaved text) |
+| **Added since** `src/renderer/src/components/Comments/overlay/useHostStepKeys.ts` (1) | S (for renderer-hosted previews) | – |
+| **Added since** `src/renderer/src/components/Comments/overlay/{iconLayout,commentTiming}.ts` (2) | S (for renderer-hosted previews) | Icon placement with the 3-per-row cap, ghost and damaged icons (C-05, C-17, S-01..S-08); the 024-NFR-001 `performance.mark` points |
 
 ### Renderer
 
@@ -79,6 +82,8 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | **Added since** `CommentWindowShell`, `CommentStepper`, `CommentWordsPicker`, `DamagedBlockView`, `ThreadStatus`, `CommentDrawerRow`, `CommentDrawerSort`, `CommentRemovedNote`, `commentRemovedOutside`, `commentCarriedDrafts`, `commentDockPlacement`, `commentCopyWords`, `commentWindowCopy`, `commentWindowStates`, `commentWords`, `useThreadSession` (16) | `src/renderer/src/components/Comments/` | S | – |
 | **Added since** `previewCommentRequests`, `usePreviewDraftKeepAlive` (2) | stay in `HtmlPreviewPanel/comments/` | H | A page draft token and the window it opens, and its keep-alive, exist only because the HTML page picks in another process |
 | **Added since** `usePreviewModeBlock` (1) | stays in `HtmlPreviewPanel/comments/` | H | M-07: main holds the HTML comment mode, so turning it off for a read-only page goes through main's mode request; the Markdown host keeps its mode in the renderer |
+| **Added since** `commentDrawerFilter`, `commentStepKeys` (2) | `src/renderer/src/components/Comments/` | S | – |
+| **Added since** `usePageCommentStepKeys` (1) | stays in `HtmlPreviewPanel/comments/` | H | The page's Alt+F9 / Alt+Shift+F9 reach the renderer only as keys main forwards from another process (C-13) |
 
 `commentCopy` keeps one string table with a `TargetNouns` map per preview (C-03), so both previews import one module (024-AC-008).
 

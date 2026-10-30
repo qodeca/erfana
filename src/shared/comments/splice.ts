@@ -80,6 +80,8 @@ export type PlanFailure =
   | 'stale'
   /** HTML: the block would push a `<meta charset>` out of the browser's 1,024-byte prescan (§5.6). */
   | 'meta-charset'
+  /** HTML: the target lies inside a generated START/END region (024-FR-023); Markdown's kind refuses it in `locate`. */
+  | 'generated-region'
   | SerializeFailure
 
 export type PlanResult =

@@ -110,15 +110,17 @@ describe('CommentDrawer', () => {
       expect(screen.getByTestId('comment-filter-cant-edit')).toHaveAttribute('aria-checked', 'true')
     })
 
-    it('row main action is Show in preview (A-05); Open is the second Tab stop', async () => {
+    // Changed expectation under R-10 (approvals.md, 2026-10-29): was "row main action is Show in preview (A-05)",
+    // a click revealing; a click now opens the thread, and only the active row has Open.
+    it('row main action opens the thread (R-10); Open is the second Tab stop', async () => {
       const user = userEvent.setup()
       const { props } = setup()
       const [first] = rows()
       const main = within(first).getByTestId('comment-drawer-row-main')
       const open = within(first).getByTestId('comment-drawer-row-open')
-      expect(main).toHaveAttribute('title', COPY.showInPreview)
+      expect(main).toHaveAttribute('title', COPY.openThread)
       expect(main).toHaveAttribute('tabindex', '0')
-      expect(open).toHaveAttribute('tabindex', '0')
+      expect(open).not.toHaveAttribute('tabindex', '-1')
       expect(open).toHaveAccessibleName('Open comments on button.cta')
       // Only the active row is in the tab order.
       expect(within(rows()[1]).getByTestId('comment-drawer-row-main')).toHaveAttribute(
@@ -129,9 +131,10 @@ describe('CommentDrawer', () => {
       await user.tab()
       expect(open).toHaveFocus()
       await user.click(main)
-      expect(props.onReveal).toHaveBeenCalledWith(expect.objectContaining({ threadKey: 't1' }))
-      await user.click(open)
       expect(props.onOpen).toHaveBeenCalledWith(expect.objectContaining({ threadKey: 't1' }))
+      expect(props.onReveal).not.toHaveBeenCalled()
+      await user.click(open)
+      expect(props.onOpen).toHaveBeenCalledTimes(2)
     })
 
     it('moves between rows with the arrow keys, Home and End', async () => {
@@ -346,13 +349,19 @@ describe('CommentDrawer', () => {
       expect(props.onOpen).toHaveBeenCalledWith(expect.objectContaining({ threadKey: 't1' }))
     })
 
-    it('Enter on a windowed row is Show in preview, focus staying in the list', async () => {
+    // Changed expectation under R-10 (approvals.md, 2026-10-29): was "Enter on a windowed row is Show in preview,
+    // focus staying in the list"; Enter now opens the thread, and the arrow keys reveal.
+    it('Enter on a windowed row opens the thread; End reveals the last row, focus staying in the list', async () => {
       const user = userEvent.setup()
       const { props } = setup({ list: thousand() })
       mains()[0].focus()
       await user.keyboard('{Enter}')
-      expect(props.onReveal).toHaveBeenCalledWith(expect.objectContaining({ threadKey: 't0' }))
+      expect(props.onOpen).toHaveBeenCalledWith(expect.objectContaining({ threadKey: 't0' }))
+      expect(props.onReveal).not.toHaveBeenCalled()
       expect(mainAt(0)).toHaveFocus()
+      await user.keyboard('{End}')
+      await waitFor(() => expect(mainAt(999)).toHaveFocus())
+      expect(props.onReveal).toHaveBeenCalledWith(expect.objectContaining({ threadKey: 't999' }))
     })
 
     it('never pulls focus back from outside the drawer', async () => {
@@ -374,7 +383,9 @@ describe('CommentDrawer', () => {
   describe('R-020 tags and actions per row kind', () => {
     // Changed expectation under OD-04 (was "tags Element not found, Damaged and Newer format separately",
     // all three under Needs attention).
-    it('OD-04 Not found is a neutral Open row; Damaged (▲ counter) and Newer format are Can\'t edit; all open in source', async () => {
+    // Changed expectation under R-10 (approvals.md, 2026-10-29): was "… all open in source", a click calling
+    // Open in source; a click now opens the row's own window (comments-v2/drawer.html), which carries Open in source.
+    it('OD-04 Not found is a neutral Open row; Damaged (▲ counter) and Newer format are Can\'t edit; a click opens their window', async () => {
       const user = userEvent.setup()
       const { props } = setup()
       const notFound = rows()[2]
@@ -382,20 +393,139 @@ describe('CommentDrawer', () => {
       expect(notFoundTag).toHaveTextContent(DRAWER_COPY.notFound)
       expect(notFoundTag).toHaveClass('erf-comment-tag')
       expect(notFoundTag).not.toHaveClass('erf-counter--attention')
-      expect(within(notFound).getByTestId('comment-drawer-row-main')).toHaveAttribute('title', COPY.openInSource)
+      expect(within(notFound).getByTestId('comment-drawer-row-main')).toHaveAttribute('title', COPY.openThread)
       await user.click(screen.getByTestId('comment-filter-cant-edit'))
       const tags = rows().map(r => within(r).getByTestId('comment-drawer-tag'))
       expect(tags.map(tag => tag.textContent)).toEqual([DRAWER_COPY.damaged, COPY.newerTag])
       expect(tags[0]).toHaveClass('erf-counter', 'erf-counter--attention')
       expect(tags[1]).not.toHaveClass('erf-counter--attention')
       const mains = screen.getAllByTestId('comment-drawer-row-main')
-      expect(mains.every(m => m.title === COPY.openInSource)).toBe(true)
+      expect(mains.every(m => m.title === COPY.openThread)).toBe(true)
       await user.click(mains[0])
-      expect(props.onOpenInSource).toHaveBeenCalledWith(
+      expect(props.onOpen).toHaveBeenCalledWith(
         expect.objectContaining({ blockKey: 'b1', line: 41 })
       )
+      expect(props.onOpenInSource).not.toHaveBeenCalled()
       expect(props.onReveal).not.toHaveBeenCalled()
     })
+  })
+
+  // comments-v2 R-10 (C-13), approved 2026-10-29: Enter opens the thread, like a click; arrow keys only reveal;
+  // only the active row keeps its Open. Default list's Open filter: t1, t2 (not visible now), t4 (not found).
+  describe('024-AC-019 C-13 R-10 drawer keys', () => {
+    const mains = () => screen.getAllByTestId('comment-drawer-row-main')
+    const opens = () => screen.queryAllByTestId('comment-drawer-row-open')
+
+    it('024-AC-019 C-13 (HTML) R-10 Enter on a row opens the thread, like a click, and reveals nothing', async () => {
+      const user = userEvent.setup()
+      const { props } = setup()
+      mains()[0].focus()
+      await user.keyboard('{Enter}')
+      expect(props.onOpen).toHaveBeenCalledTimes(1)
+      expect(props.onOpen).toHaveBeenCalledWith(expect.objectContaining({ threadKey: 't1' }))
+      expect(props.onReveal).not.toHaveBeenCalled()
+      expect(props.onOpenInSource).not.toHaveBeenCalled()
+      // Focus stays on the row, so the window hands it back there when it closes.
+      expect(mains()[0]).toHaveFocus()
+    })
+
+    it('024-AC-019 C-13 (HTML) R-10 arrow keys, Home and End move the active row and only reveal it; a not-found row only moves', async () => {
+      const user = userEvent.setup()
+      const { props } = setup()
+      mains()[0].focus()
+      await user.keyboard('{ArrowDown}')
+      await waitFor(() => expect(mains()[1]).toHaveFocus())
+      expect(props.onReveal).toHaveBeenCalledTimes(1)
+      expect(props.onReveal).toHaveBeenLastCalledWith(expect.objectContaining({ threadKey: 't2' }))
+      // t4 is not found: nothing in the preview to reveal.
+      await user.keyboard('{ArrowDown}')
+      await waitFor(() => expect(mains()[2]).toHaveFocus())
+      expect(props.onReveal).toHaveBeenCalledTimes(1)
+      await user.keyboard('{Home}')
+      await waitFor(() => expect(mains()[0]).toHaveFocus())
+      expect(props.onReveal).toHaveBeenCalledTimes(2)
+      expect(props.onReveal).toHaveBeenLastCalledWith(expect.objectContaining({ threadKey: 't1' }))
+      // A key that does not move reveals nothing again.
+      await user.keyboard('{ArrowUp}')
+      expect(mains()[0]).toHaveFocus()
+      expect(props.onReveal).toHaveBeenCalledTimes(2)
+      await user.keyboard('{End}')
+      await waitFor(() => expect(mains()[2]).toHaveFocus())
+      expect(props.onReveal).toHaveBeenCalledTimes(2)
+      expect(props.onOpen).not.toHaveBeenCalled()
+      expect(props.onOpenInSource).not.toHaveBeenCalled()
+    })
+
+    it('024-AC-019 C-13 (HTML) R-10 only the active row keeps its Open, and Open follows the active row', async () => {
+      const user = userEvent.setup()
+      const { props } = setup()
+      expect(opens()).toHaveLength(1)
+      expect(within(rows()[0]).getByTestId('comment-drawer-row-open')).toBeVisible()
+      mains()[0].focus()
+      await user.keyboard('{ArrowDown}')
+      await waitFor(() => expect(within(rows()[1]).queryByTestId('comment-drawer-row-open')).not.toBeNull())
+      expect(opens()).toHaveLength(1)
+      // The list stays one Tab stop, and Tab once more reaches the active row's Open.
+      expect(mains().filter(main => main.tabIndex === 0)).toEqual([mains()[1]])
+      await user.tab()
+      expect(within(rows()[1]).getByTestId('comment-drawer-row-open')).toHaveFocus()
+      // A click on another row opens it and makes it the active row.
+      await user.click(mains()[2])
+      expect(props.onOpen).toHaveBeenCalledWith(expect.objectContaining({ threadKey: 't4' }))
+      expect(opens()).toHaveLength(1)
+      expect(within(rows()[2]).getByTestId('comment-drawer-row-open')).toBeVisible()
+    })
+
+    it('024-AC-019 C-13 (HTML) R-10 in a full-width drawer the arrow keys only move – a reveal there closes the sheet', async () => {
+      const user = userEvent.setup()
+      const { props } = setup({ full: true })
+      mains()[0].focus()
+      await user.keyboard('{ArrowDown}')
+      await waitFor(() => expect(mains()[1]).toHaveFocus())
+      expect(props.onReveal).not.toHaveBeenCalled()
+      await user.keyboard('{Enter}')
+      expect(props.onOpen).toHaveBeenCalledWith(expect.objectContaining({ threadKey: 't2' }))
+    })
+
+    it('024-AC-019 C-13 (Markdown) R-10 Enter opens the thread and the arrow keys only reveal, in the Markdown drawer too', async () => {
+      const user = userEvent.setup()
+      const { props, unmount } = setup({
+        list: ready([
+          fileView({
+            displayPath: 'notes.md',
+            threads: [thread(1, { tag: 'li', classes: [], line: 14 }), thread(2, { tag: 'p', classes: [], line: 20 })]
+          })
+        ])
+      })
+      unmount()
+      render(
+        <CommentWordsContext.Provider value={MARKDOWN_WORDS}>
+          <CommentDrawer {...props} pageFile="notes.md" />
+        </CommentWordsContext.Provider>
+      )
+      expect(opens()).toHaveLength(1)
+      mains()[0].focus()
+      await user.keyboard('{ArrowDown}')
+      await waitFor(() => expect(mains()[1]).toHaveFocus())
+      expect(props.onReveal).toHaveBeenCalledWith(expect.objectContaining({ threadKey: 't2' }))
+      expect(props.onOpen).not.toHaveBeenCalled()
+      expect(opens()).toHaveLength(1)
+      await user.keyboard('{Enter}')
+      expect(props.onOpen).toHaveBeenCalledWith(expect.objectContaining({ threadKey: 't2' }))
+      expect(props.onReveal).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it('024-AC-007 D-32 C-06 the HTML drawer says attribute and style changes are not detected; the Markdown drawer does not', () => {
+    const { props, unmount } = setup()
+    expect(screen.getByText(COMMENT_LIST_COPY.changeLimit)).toBeInTheDocument()
+    unmount()
+    render(
+      <CommentWordsContext.Provider value={MARKDOWN_WORDS}>
+        <CommentDrawer {...props} pageFile="notes.md" />
+      </CommentWordsContext.Provider>
+    )
+    expect(screen.queryByText(COMMENT_LIST_COPY.changeLimit)).toBeNull()
   })
 
   describe('C-15 the three-cell filter and the sort menu', () => {
@@ -517,7 +647,9 @@ describe('CommentDrawer', () => {
   })
 
   describe('C-03 (drawer) one noun system in Markdown', () => {
-    it('C-03 (drawer) Markdown rows say the kind and line, Show in preview, and no element, page or block', () => {
+    // Changed expectation under R-10 (approvals.md, 2026-10-29): was "… say the kind and line, Show in preview, …"
+    // with the row's title Show in preview; Enter or a click now opens the thread.
+    it('C-03 (drawer) Markdown rows say the kind and line, Open thread, and no element, page or block', () => {
       render(
         <CommentWordsContext.Provider value={MARKDOWN_WORDS}>
           <CommentDrawer
@@ -537,7 +669,7 @@ describe('CommentDrawer', () => {
       const drawer = screen.getAllByTestId('comment-drawer').find(el => el.id === 'drawer-md')!
       const mdRows = within(drawer).getAllByTestId('comment-drawer-row')
       expect(within(mdRows[0]).getByText('List item · line 14')).toBeVisible()
-      expect(within(mdRows[0]).getByTestId('comment-drawer-row-main')).toHaveAttribute('title', MARKDOWN_COPY.showInPreview)
+      expect(within(mdRows[0]).getByTestId('comment-drawer-row-main')).toHaveAttribute('title', COPY.openThread)
       expect(within(mdRows[1]).getByTestId('comment-drawer-tag')).toHaveTextContent(MARKDOWN_COPY.notFoundTag)
       const said = [
         drawer.textContent ?? '',
@@ -561,7 +693,8 @@ describe('CommentDrawer', () => {
       const text = description.map(id => document.getElementById(id)?.textContent ?? '')
       expect(text[0]).toBe('on button.cta')
       expect(text).toContain('1 reply')
-      expect(text.at(-1)).toBe(COPY.showInPreview)
+      // Changed expectation under R-10 (approvals.md, 2026-10-29): the action was COPY.showInPreview.
+      expect(text.at(-1)).toBe(COPY.openThread)
       // A row with no replies points at no reply count.
       const second = within(rows()[1]).getByTestId('comment-drawer-row-main')
       expect(second.getAttribute('aria-describedby')?.split(' ')).toHaveLength(4)

@@ -6,10 +6,12 @@
  * "Threads – stepper, Resolve and next, all done").
  *
  * Right of the title: Previous comment, a muted "3 of 12", Next comment –
- * icon buttons at `--btn-height-sm`. They step through the open comments of
- * the file in file order; Alt+F9 and Alt+Shift+F9 do the same while focus is
- * in the window (`isStepKey`). While the stepper shows, "Open in source" and
- * "New comment" leave the foot for the More actions (…) menu (R-06).
+ * icon buttons at `--btn-height-sm`. They step through the comments of the
+ * file in file order, within the drawer's current filter (default Open);
+ * Alt+F9 and Alt+Shift+F9 do the same while focus is in the window or the
+ * preview (`stepKeyOf`, `commentStepKeys.ts`). While the stepper shows,
+ * "Open in source" and "New comment" leave the foot for the More actions (…)
+ * menu (R-06).
  *
  * The icons are the registry's chevrons, up and down – previous and next in
  * file order – so no new icon enters the registry the design system bakes.
@@ -17,6 +19,7 @@
  * @module components/Comments/CommentStepper
  */
 import { useRef, useState } from 'react'
+import { commentStepFromDomEvent } from '../../../../shared/commentStepKey'
 import { TEST_IDS } from '../../constants/testids'
 import { renderIcon } from '../../utils/iconRegistry'
 import { ContextMenu, type ContextMenuItem } from '../ContextMenu/ContextMenu'
@@ -37,8 +40,8 @@ export interface CommentStepperProps {
  * @returns `'next'`, `'previous'`, or `null`.
  */
 export function stepKeyOf(event: Pick<KeyboardEvent, 'code' | 'altKey' | 'shiftKey' | 'ctrlKey' | 'metaKey'>): 'next' | 'previous' | null {
-  if (event.code !== 'F9' || !event.altKey || event.ctrlKey || event.metaKey) return null
-  return event.shiftKey ? 'previous' : 'next'
+  // The one rule main asks too (`shared/commentStepKey.ts`).
+  return commentStepFromDomEvent(event)
 }
 
 /**

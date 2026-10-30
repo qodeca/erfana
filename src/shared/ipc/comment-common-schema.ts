@@ -280,6 +280,13 @@ export const CommentFileViewSchema = z
     readOnlyReason: z
       .enum(['encoding', 'conflict-markers', 'too-large', 'too-many-blocks', 'unterminated-block', 'link', 'missing'])
       .optional(),
+    /**
+     * The file is writable – replies, edits and resolves still work – but no
+     * new comment can be added: it already holds `COMMENT_MAX_BLOCKS_PER_FILE`
+     * (spec 024 state table F-04, menu matrix § 2). Both previews turn comment
+     * mode and the add items off with this reason.
+     */
+    addRefusal: z.literal('too-many-blocks').optional(),
     threads: z.array(CommentThreadViewSchema).max(PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE),
     damaged: z
       .array(

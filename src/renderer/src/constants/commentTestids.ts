@@ -207,6 +207,8 @@ export const COMMENT_TEST_IDS = {
   COMMENT_HOST_OUTLINE: 'comment-host-outline',
   /** A comment icon (a real button, outside the Tab order – D-07) */
   COMMENT_HOST_ICON: 'comment-host-icon',
+  /** A not-found comment's ghost, at its place between two blocks (a real button – C-05, R-16) */
+  COMMENT_HOST_GHOST: 'comment-host-ghost',
   /** The comment-mode tab (A-03) */
   COMMENT_HOST_MODE_TAB: 'comment-host-mode-tab',
   /** The paused band over the Markdown Preview (F-02, F-03) */
@@ -303,5 +305,9 @@ export const COMMENT_TEST_IDS = {
   /** OD-05: Mark resolved (only the status line differs) */
   COMMENT_REBUILD_MARK_RESOLVED: 'comment-rebuild-mark-resolved',
   /** 024-AC-004 (g): the selected words are not in the file – the window says the comment is on the whole target */
-  COMMENT_WORDS_MISSING: 'comment-words-missing'
+  COMMENT_WORDS_MISSING: 'comment-words-missing',
+  /** C-19.5: the text field's polite region – the counter's crossings */
+  COMMENT_COUNTER_LIVE: 'comment-counter-live',
+  /** C-13: the Markdown Preview's polite region – where a step key from the preview landed */
+  COMMENT_STEP_LIVE: 'comment-step-live'
 } as const

@@ -75,7 +75,7 @@ describe('CommentWindow – the words of a new comment', () => {
 
   it('024-AC-004 (g) words not in the file as written: the window itself says the comment is on the whole element', () => {
     setup({ text: TEXT, start: 0, end: 0, cut: false }, { wordsMissing: true })
-    expect(screen.getByTestId(TEST_IDS.COMMENT_WORDS_MISSING)).toHaveTextContent(SELECTION_COPY.wordsNotInFile('index.html'))
+    expect(screen.getByTestId(TEST_IDS.COMMENT_WORDS_MISSING)).toHaveTextContent(SELECTION_COPY.wordsNotInFile('element', 'index.html'))
   })
 
   it('024-AC-005: without words from the preview there is no quote and no field – the shipped HTML window', () => {

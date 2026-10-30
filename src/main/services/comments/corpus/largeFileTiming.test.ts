@@ -214,7 +214,7 @@ function renderReport(summary: TimingSummary, history: string | undefined): stri
     '',
     '## What is timed',
     '',
-    'The parse work of the comment parse worker, on the calling thread: a cold `list` job (fresh runner, no cached parse), and a save – the `write` job of one add, main\'s `assembleSplice`, then the `list` of the new file. Before a save the app has listed the file on the same worker – the HTML draft and the Markdown list run first, untimed – so a Markdown save plans on the cached parse; the Markdown save with no list before it is recorded on its own row. IPC, the worker message copy and the preview\'s drawing are **not** in these numbers, so they are a floor of the budgets, not the 024-AC-024 measurement itself. That one is the e2e timing between `performance.mark` points in the app, which needs renderer marks that do not exist yet.',
+    'The parse work of the comment parse worker, on the calling thread: a cold `list` job (fresh runner, no cached parse), and a save – the `write` job of one add, main\'s `assembleSplice`, then the `list` of the new file. Before a save the app has listed the file on the same worker – the HTML draft and the Markdown list run first, untimed – so a Markdown save plans on the cached parse; the Markdown save with no list before it is recorded on its own row. IPC, the worker message copy and the preview\'s drawing are **not** in these numbers, so they are a floor of the budgets, not the 024-AC-024 measurement itself. That one is the e2e timing between the renderer\'s `performance.mark` points in the built app (`commentTiming.ts`), recorded by `e2e/markdown-comments.timing.e2e.ts` for Markdown and `html-preview-comments.perf.e2e.ts` for HTML.',
     '',
     '## Results',
     '',

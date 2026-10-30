@@ -43,4 +43,9 @@ describe('commentLive', () => {
     // No words (none sent, or an element with no text): the sentence without them.
     expect(pickerAnnouncement({ say: 'showing', element: { line: 7, role: 'image' } })).toBe('Image, line 7.')
   })
+
+  it('024-AC-018 C-10 (HTML) Tab at either end of the page says so: last, with the way up, and first', () => {
+    expect(pickerAnnouncement({ say: 'last' })).toBe('Last element at this level – Alt+Up for the parent.')
+    expect(pickerAnnouncement({ say: 'first' })).toBe('First element at this level.')
+  })
 })

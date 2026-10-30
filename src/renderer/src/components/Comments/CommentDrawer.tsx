@@ -8,12 +8,15 @@
  * The list of every comment in the file, and the GUARANTEED KEYBOARD ROUTE to every
  * thread: icons are not in the Tab order, and a hidden, resolved or lost comment has none.
  *
- * Keyboard (decided Rows card, plus the Welcome list's one exception):
+ * Keyboard (decided Rows card, plus the Welcome list's one exception, as
+ * changed by comments-v2 R-10 / C-13, approved 2026-10-29):
  * Tab reaches Close, then the filter (one stop – arrows move the
  * selection), the checkbox, the sort menu, then the list ONCE. In the list ↑ ↓
- * Home End move; Enter or a click is "Show in preview" with focus staying in
- * the list ("Open in source" on a not-found, damaged or newer row); Tab once
- * more reaches that row's Open.
+ * Home End move the active row and only reveal it – "Show in preview", focus
+ * staying in the list; a not-found, damaged or newer row has nothing to show,
+ * so they only move. Enter or a click opens the thread, the same as Open (a
+ * not-found, damaged or newer row opens its own window). Only the active row
+ * has Open, and Tab once more reaches it.
  *
  * comments-v2 (spec 024): the filter is three equal cells on one row – Open,
  * Resolved, Can't edit (C-15, OD-04) – with "Show" kept as the group's name
@@ -31,8 +34,9 @@
  *
  * Layout: a flow sibling of the page placeholder (CommentDrawer.css), so the
  * native page shrinks beside it rather than covering it. Under a 640px panel
- * it takes the whole width, "Show in preview" closes it first, and Esc closes it
- * (it then covers everything, like a sheet).
+ * it takes the whole width and Esc closes it (it then covers everything, like a
+ * sheet). There the arrow keys only move: the host's reveal closes the sheet
+ * first, which would end the walk through the list at its first step.
  *
  * Focus return: the `<aside>` is a `data-focus-return` region, so a comment window opened from a
  * row that has since gone hands focus back into the drawer, not `<body>` (`resolveFocusReturnTarget`).
@@ -50,6 +54,7 @@ import { DRAWER_FILTERS, drawerRows, sortRows, type DrawerFilter, type DrawerRow
 import { ActionButton, CommentBanner, VisibleText } from './CommentParts'
 import { DrawerRowView, type RowPlacement } from './CommentDrawerRow'
 import { CommentDrawerSort } from './CommentDrawerSort'
+import { useDrawerFilterState } from './commentDrawerFilter'
 import { CommentRemovedNote } from './CommentRemovedNote'
 import type { RemovedComment } from './commentRemovedOutside'
 import { useCommentWords } from './commentWords'
@@ -99,11 +104,14 @@ export interface CommentDrawerProps {
   readonly locale?: string
   readonly onClose: () => void
   readonly onShowIconsChange: (show: boolean) => void
-  /** Enter / click on a row whose element is on the page. */
+  /** An arrow key, Home or End onto a row whose target is in the preview ("Show in preview", R-10). Not called in a full-width drawer. */
   readonly onReveal: (row: DrawerRow) => void
-  /** Enter / click on a row with nothing to show. */
+  /**
+   * Open in source for a row. Since R-10 the drawer itself no longer calls it – Enter or a click
+   * opens the row's window, which carries Open in source – but the hosts still provide it.
+   */
   readonly onOpenInSource: (row: DrawerRow) => void
-  /** The row's Open: the comment window. */
+  /** Enter, a click or the active row's Open: the comment window (R-10). */
   readonly onOpen: (row: DrawerRow) => void
   readonly onRetry: () => void
   /** Open comments removed outside Erfana since the note was dismissed (OD-06); none by default. */
@@ -129,7 +137,8 @@ const NONE_REMOVED: readonly RemovedComment[] = []
  */
 export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
   const { list } = props
-  const [filter, setFilter] = useState<DrawerFilter>('open')
+  // Shared by id so the stepper and the step keys walk the drawer's current filter (C-13).
+  const [filter, setFilter] = useDrawerFilterState(props.id)
   const [order, setOrder] = useState<CommentSortOrder>('file')
   const [active, setActive] = useState(0)
   const [now] = useState(() => (props.now ?? (() => new Date()))())
@@ -229,6 +238,11 @@ export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
     chooseFilter(DRAWER_FILTERS[(at + step[event.key] + DRAWER_FILTERS.length) % DRAWER_FILTERS.length])
   }
 
+  // R-10: a move only reveals. Not in a full-width drawer, whose reveal closes it.
+  const revealOnMove = (row: DrawerRow): void => {
+    if (row.main === 'reveal' && !props.full) props.onReveal(row)
+  }
+
   const onListKeyDown = (event: React.KeyboardEvent): void => {
     const last = visible.length - 1
     const target: Record<string, number> = {
@@ -239,13 +253,15 @@ export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
     }
     if (!(event.key in target)) return
     event.preventDefault()
-    focusRow(Math.max(0, Math.min(last, target[event.key])))
+    const next = Math.max(0, Math.min(last, target[event.key]))
+    focusRow(next)
+    if (next !== current) revealOnMove(visible[next])
   }
 
-  const activate = (row: DrawerRow, index: number): void => {
+  // R-10, C-13: Enter or a click opens the thread, the same as Open.
+  const open = (row: DrawerRow, index: number): void => {
     setActive(index)
-    if (row.main === 'source') props.onOpenInSource(row)
-    else props.onReveal(row)
+    props.onOpen(row)
   }
 
   let body: React.JSX.Element
@@ -279,11 +295,8 @@ export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
         active={index === current}
         place={place}
         time={row.at ? formatCommentTime(row.at, now, props.locale) : ''}
-        onMain={() => activate(row, index)}
-        onOpen={() => {
-          setActive(index)
-          props.onOpen(row)
-        }}
+        onMain={() => open(row, index)}
+        onOpen={() => open(row, index)}
       />
     )
     body = (
@@ -387,6 +400,8 @@ export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
             }}
           />
         </div>
+        {/* D-32, C-06: HTML change detection compares text, not attributes or styles. */}
+        {words.preview === 'html' && <p className="erf-comment-drawer__help">{COMMENT_LIST_COPY.changeLimit}</p>}
       </div>
       <CommentRemovedNote
         removed={props.removed ?? NONE_REMOVED}

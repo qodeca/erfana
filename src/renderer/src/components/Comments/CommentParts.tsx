@@ -16,6 +16,7 @@
 import { useId, type ReactNode } from 'react'
 import { renderIcon } from '../../utils/iconRegistry'
 import { splitVisibleControls, counterState, COMMENT_MAX_CHARS } from './commentFormat'
+import { useCounterCrossing } from './commentLive'
 import { TEST_IDS } from '../../constants/testids'
 
 /** Props for {@link VisibleText}. */
@@ -162,6 +163,7 @@ export function CommentField({
   const id = fieldId ?? ownId
   const count = [...value].length
   const state = counterState(count)
+  const crossing = useCounterCrossing(count)
   const describedBy = [error ? `${id}-e` : null, `${id}-h`, `${id}-c`].filter(Boolean).join(' ')
   return (
     <div className="erf-comment-field">
@@ -212,6 +214,10 @@ export function CommentField({
           {`${count} / ${COMMENT_MAX_CHARS}`}
         </span>
       </div>
+      {/* C-19.5: always mounted, so each crossing is a change the screen reader hears once. */}
+      <p className="erf-comment-sr" aria-live="polite" data-testid={TEST_IDS.COMMENT_COUNTER_LIVE}>
+        {crossing}
+      </p>
       {restored && <p className="erf-comment-note">Draft restored</p>}
     </div>
   )

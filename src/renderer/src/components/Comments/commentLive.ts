@@ -20,6 +20,8 @@
  */
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useLatestRef } from '../../hooks/useLatestRef'
+import { COMMENT_MAX_CHARS, counterState, type CounterState } from './commentFormat'
+import { WINDOW_COPY } from './commentWindowCopy'
 
 /**
  * Text for an always-mounted live region, set clear-then-text.
@@ -81,6 +83,32 @@ export function useInnerStep(active: boolean, cancel: () => void): void {
     if (!active) return undefined
     return register(() => latest.current())
   }, [active, register, latest])
+}
+
+/** The counter's states, lowest first. */
+const RANK: Readonly<Record<CounterState, number>> = { ok: 0, near: 1, over: 2 }
+
+/**
+ * C-19.5: what the counter's polite region says – once per crossing. Going up
+ * into the warning band says how many characters are left ("400 characters
+ * left"), going over says by how much ("Over the limit by 3"); a move back down
+ * says nothing and empties the region. A field that opens already past a line
+ * (a restored draft) has crossed nothing.
+ *
+ * @param count - Characters in the field (code points).
+ * @returns The region's text.
+ */
+export function useCounterCrossing(count: number): string {
+  const state = counterState(count)
+  const [last, setLast] = useState<CounterState>(state)
+  const [said, setSaid] = useState('')
+  // "State from the previous render": compared and set during render, no effect.
+  if (state !== last) {
+    setLast(state)
+    const up = RANK[state] > RANK[last]
+    setSaid(!up ? '' : state === 'over' ? WINDOW_COPY.overBy(count - COMMENT_MAX_CHARS) : WINDOW_COPY.charsLeft(COMMENT_MAX_CHARS - count))
+  }
+  return said
 }
 
 /**

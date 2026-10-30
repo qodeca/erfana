@@ -241,7 +241,7 @@ export function ThreadsView(props: ThreadsViewProps): React.JSX.Element {
         )}
         {anyNotVisible && (
           <CommentBanner kind="info" testId={TEST_IDS.COMMENT_NOT_VISIBLE}>
-            {words.notVisibleText}
+            {words.notVisibleText(threads[states.indexOf('not-visible')]?.tag ?? '')}
           </CommentBanner>
         )}
         {threads.map((thread, i) => (

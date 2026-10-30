@@ -283,6 +283,7 @@ export class CommentController {
     if (action === 'next' || action === 'previous') {
       const next = stepOf(current, action === 'next', this.body(), this.pickable)
       if (next !== null) this.moveTo(next)
+      else this.steps.say(action === 'next' ? 'last' : 'first', undefined, viewOf(this.deps.win)) // C-10: either end
     } else if (action === 'up') {
       this.stepLevel(levelUp(current, this.body(), this.downPath, this.deps.isTop))
     } else if (action === 'down') {

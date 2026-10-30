@@ -141,9 +141,21 @@ describe('024-AC-038 one row per writer error code: nothing written, a code and 
 
   it('COMMENT_LIMIT – the file already holds the most blocks', async () => {
     const blocks = Array.from({ length: 500 }, (_, i) => `<!-- erfana:comment v1 id=c-${String(i).padStart(16, 'a')} -->`).join('\n')
-    await setUp({}, `${blocks}\n\n${DOC}`)
-    expect(await addAfterList(502)).toEqual(refused(ErrorCode.COMMENT_LIMIT, 'limit'))
+    // F-04: openDraft already refuses a full file, so the draft is minted at 499 and the file fills before Save.
+    const almost = blocks.slice(0, blocks.lastIndexOf('\n'))
+    await setUp({}, `${almost}\n\n${DOC}`)
+    await h.service.list(h.caller(), { panelId: PANEL, filePath: h.project.path('notes.txt') })
+    const draft = await h.service.openDraft(h.caller(), { panelId: PANEL, filePath: h.project.path('notes.txt') })
+    if (!draft.ok) throw new Error('no draft below the cap')
+    await h.project.write('notes.txt', `${blocks}\n\n${DOC}`)
+    before = await h.project.read('notes.txt')
+    const save = { panelId: PANEL, filePath: h.project.path('notes.txt'), op: 'add' as const, draftToken: draft.draftToken, target: pickOn(502), text: 'x', view: VIEW }
+    expect(await h.service.save(h.caller(), save)).toEqual(refused(ErrorCode.COMMENT_LIMIT, 'limit'))
     await unchanged()
+    // 024-AC-035 F-04: a draft asked for once the file is full is refused with the "500 comments" reason.
+    expect(await h.service.openDraft(h.caller(), { panelId: PANEL, filePath: h.project.path('notes.txt') })).toEqual(
+      refused(ErrorCode.COMMENT_LIMIT, 'too-many-blocks')
+    )
   })
 
   it('COMMENT_FILE_TOO_LARGE – over the comment file limit', async () => {

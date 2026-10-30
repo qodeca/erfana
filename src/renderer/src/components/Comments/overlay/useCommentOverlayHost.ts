@@ -43,7 +43,6 @@ import { getBasename } from '../../../utils/fileUtils'
 import { ANNOUNCE, COPY, writtenAnnouncement } from '../commentCopy'
 import { ErrorCode } from '../../../../../shared/errors'
 import { COMMENT_LIST_COPY, MARKDOWN_COPY, MD_SPOKEN_COPY, MD_SURFACE_COPY, SELECTION_COPY } from '../commentCopyWords'
-import { listCounts } from '../commentRows'
 import { useRemovedOutside } from '../commentRemovedOutside'
 import type { CommentDrawerProps } from '../CommentDrawer'
 import type { CommentToolbarToolsProps } from '../CommentToolbarTools'
@@ -53,8 +52,8 @@ import { useLiveText } from '../commentLive'
 import type { AnchorSelection } from '../../../../../shared/comments/anchorSel'
 import { commentMarkAt } from './commentHighlights'
 import { targetText } from './domWords'
-import { blockWindowRequest, rowTarget } from './hostDrawer'
-import { countsOf, draftKeyOf, pointOf, spokenTarget, threadsOn, viewOf } from './hostParts'
+import { blockWindowRequest, revealRow, useNotVisible } from './hostDrawer'
+import { draftKeyOf, noNewCommentText, pointOf, spokenTarget, threadsOn, toolbarCounts, viewOf } from './hostParts'
 import { hostMenuItems, hostMenuLabel, targetlessMenu } from './hostMenu'
 import { drawn, newRequestExtras, threadTarget, useDraftKeepAlive, type HostDock } from './hostWindow'
 import type { CommentOverlayHost, CommentOverlayHostOptions, HostMenu } from './hostTypes'
@@ -102,7 +101,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
   const removed = useRemovedOutside(state.list, words)
   const { ownDelete } = removed
   const fileName = file?.displayPath ?? getBasename(filePath)
-  const readOnly = file !== null && !file.writable ? words.readOnlyReasonText(file.readOnlyReason, fileName) : null
+  const readOnly = noNewCommentText(file, fileName, words)
   // Off and read-only win over paused: saving the editor would not make the file writable (state table § 4).
   const blocked = (off ? MARKDOWN_COPY.off : null) ?? readOnly ?? paused
   const mode = live && blocked === null && state.mode
@@ -214,7 +213,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
   )
 
   const openThreads = useCallback(
-    (threadKeys: readonly string[], anchor: HTMLElement | null, opener: 'page' | 'drawer' = 'page') => {
+    (threadKeys: readonly string[], anchor: HTMLElement | null, opener: 'page' | 'drawer' = 'page', blockKeys: readonly string[] = NO_THREADS) => {
       const listed = store.getState().panels.get(panelId)?.list
       const current = listed?.files[0]
       if (current === undefined) return
@@ -224,7 +223,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
         panelId,
         fileKey: current.fileKey,
         threadKeys,
-        blockKeys: [],
+        blockKeys,
         point: pointOf(anchor, optionsRef.current.area),
         opener,
         listAfter: listed?.generation ?? 0,
@@ -379,8 +378,8 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
   )
 
   const outlined = mode ? pointer.outlined : null
-  const counts = useMemo(() => countsOf(file), [file])
-  const changed = useMemo(() => (file === null ? 0 : listCounts([file]).changed), [file])
+  const { counts, changed } = useMemo(() => toolbarCounts(file), [file])
+  const notVisible = useNotVisible(live, adapter, placements, file, scroller)
 
   const toolbar: CommentToolbarToolsProps = {
     mode,
@@ -403,13 +402,13 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
       ? {
           id: drawerId,
           list: state.list,
-          notVisible: [],
+          notVisible,
           showIcons: state.showIcons,
           full: false,
           pageFile: fileName,
           onClose: () => setDrawerOpen(false),
           onShowIconsChange: show => store.getState().patch(panelId, { showIcons: show }),
-          onReveal: row => rowTarget(row, placements, adapter)?.scrollIntoView({ block: 'center' }),
+          onReveal: row => revealRow(row, placements, adapter, announce),
           onOpenInSource: row => options.onOpenInSource(row.line),
           onOpen: row => {
             if (row.threadKey !== undefined) openThreads([row.threadKey], null, 'drawer')
@@ -435,7 +434,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
           request,
           list: state.list,
           identity,
-          notVisible: [],
+          notVisible,
           getArea: () => {
             const box = optionsRef.current.area?.getBoundingClientRect()
             return box ? { left: box.left, top: box.top, width: box.width, height: box.height } : null

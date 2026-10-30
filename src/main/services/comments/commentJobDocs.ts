@@ -65,6 +65,19 @@ export function writableRefusal(state: FileCommentState): CommentRefusal | null 
   return state.writable ? null : readOnlyRefusal(state)
 }
 
+/**
+ * Why no NEW comment may be added to a parsed file, or `null` when one may:
+ * read-only, or already at `COMMENT_MAX_BLOCKS_PER_FILE` blocks – where
+ * replies, edits and resolves still work (spec 024 state table F-04). The
+ * planners refuse the same (`insertRefusal`); this lets the list, the HTML
+ * draft and `openDraft` say so before anything is typed.
+ */
+export function addRefusal(state: FileCommentState): CommentRefusal | null {
+  const blocked = writableRefusal(state)
+  if (blocked !== null) return blocked
+  return state.blocks.length >= PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE ? 'too-many-blocks' : null
+}
+
 interface CacheEntry {
   readonly doc: unknown
   readonly bytes: number

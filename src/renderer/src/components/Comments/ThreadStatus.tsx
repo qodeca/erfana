@@ -102,7 +102,7 @@ export function ThreadStatus({ thread, state, fileName, hidden }: ThreadStatusPr
         {was !== '' && <QuoteBox label={WINDOW_COPY.was} text={was} was />}
         {now !== undefined && <QuoteBox label={WINDOW_COPY.now} text={now} was={false} />}
       </div>
-      {hidden && <p className="erf-comment-note erf-comment-status-line">{words.notVisibleText}</p>}
+      {hidden && <p className="erf-comment-note erf-comment-status-line">{words.notVisibleText(thread.tag)}</p>}
     </div>
   )
 }

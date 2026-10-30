@@ -28,7 +28,7 @@ import type { MdIndex, MdTarget } from '../../../shared/markdownComments/mdIndex
 import { positionTargetOf } from '../../../shared/markdownComments/mdLocate'
 import { changeOf, type ListedChange } from './commentListChange'
 import { rebuildViewOf } from './commentRebuild'
-import type { JobDocument } from './commentJobDocs'
+import { addRefusal, type JobDocument } from './commentJobDocs'
 import type { CommentRefusal } from './commentRefusals'
 
 /** List one file's comments. */
@@ -66,6 +66,8 @@ export type ListedNewer = Omit<CommentFileView['newer'][number], 'blockKey'> & {
 export interface ListSummary {
   readonly writable: boolean
   readonly readOnlyReason?: CommentFileView['readOnlyReason']
+  /** Writable, but full: no new comment (`addRefusal` in `commentJobDocs.ts`). */
+  readonly addRefusal?: CommentFileView['addRefusal']
   readonly threads: ListedThread[]
   readonly damaged: ListedDamaged[]
   readonly newer: ListedNewer[]
@@ -269,6 +271,7 @@ function summaryOf(doc: KindDocument, job: ListJob | undefined): ListSummary {
   return {
     writable: doc.state.writable,
     ...(doc.state.readOnlyReason === undefined ? {} : { readOnlyReason: doc.state.readOnlyReason }),
+    ...(doc.state.writable && addRefusal(doc.state) === 'too-many-blocks' ? { addRefusal: 'too-many-blocks' as const } : {}),
     threads,
     damaged,
     newer,

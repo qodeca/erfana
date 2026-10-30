@@ -37,6 +37,7 @@ import { drawPin, showText, type PinPlacement } from './pins'
 import type { MarkPlacement } from './marks'
 import { boxOf, outlineBox, type Box, type Viewport } from './geometry'
 import { labelOf, type LabelParts, type LabelSuffix } from './label'
+import { isAltHeld } from './altHold'
 
 /** The outlined element, already clipped and snapped. */
 export interface OutlineModel {
@@ -96,6 +97,8 @@ export const MODE_TAB_TEXT = 'Comment mode · Esc to leave'
 
 /** Gap between an element and its label. */
 const LABEL_GAP_PX = 2
+/** How far a box above the outline may miss containing it and still count as its own ancestor (outline rounding). */
+const CONTAIN_SLACK_PX = 2
 
 function part(doc: Document, className: string): HTMLDivElement {
   const el = doc.createElement('div')
@@ -233,19 +236,51 @@ export class OverlayView {
     showText(this.labelTag, outline.label.tag)
     showText(this.labelRest, outline.label.rest)
     showText(this.labelSize, outline.label.size)
+    // C-21 / D-05: the pixel size only while Alt is held.
+    shown(this.labelSize, isAltHeld(this.doc))
     this.placeLabel(outline.box, viewport)
   }
 
-  /** Above the element's top-left; below it at the viewport top; inside a huge one. */
+  /**
+   * Above the element's top-left; below it at the viewport top; inside a huge
+   * one. C-21: when other content sits right above the outline – where the
+   * label would cover a neighbour's line – inside the outline's top-left
+   * corner instead, on its own solid ground (`.erf-hpc-label` is drawn on the
+   * ink colour), so it covers only the target's own first line (R-18).
+   */
   private placeLabel(box: Box, viewport: Viewport): void {
     const height = this.label.offsetHeight || this.labelHeight
     const width = this.label.offsetWidth
-    let top = box.top - height - LABEL_GAP_PX
+    const inside = this.touchesContent(box)
+    let top = inside ? Math.max(box.top, 0) : box.top - height - LABEL_GAP_PX
     if (top < 0) top = box.top + box.height + LABEL_GAP_PX
     if (top + height > viewport.height) top = Math.max(box.top, 0) + LABEL_GAP_PX
     const left = Math.max(0, Math.min(box.left, viewport.width - width))
+    this.label.classList.toggle('erf-hpc-label--inside', inside)
     this.label.style.left = `${left}px`
     this.label.style.top = `${top}px`
+  }
+
+  /**
+   * Whether the outline's top touches content: the element just above its
+   * top-left corner is not one of the target's own containers (whose box
+   * holds the outline). Text sitting directly in a container is not seen –
+   * the label then stays above, as before.
+   */
+  private touchesContent(box: Box): boolean {
+    const y = box.top - LABEL_GAP_PX - 1
+    // A document with no hit test (jsdom) has nothing to measure: the label stays above.
+    if (y < 0 || typeof this.doc.elementFromPoint !== 'function') return false
+    const above = this.doc.elementFromPoint(box.left + 1, y)
+    if (above === null) return false
+    const r = above.getBoundingClientRect()
+    const slack = CONTAIN_SLACK_PX
+    const holds =
+      r.left <= box.left + slack &&
+      r.top <= box.top + slack &&
+      r.right >= box.left + box.width - slack &&
+      r.bottom >= box.top + box.height - slack
+    return !holds
   }
 
   private renderPins(model: ViewModel): void {
