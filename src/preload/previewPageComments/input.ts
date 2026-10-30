@@ -80,6 +80,19 @@ function isPrimaryPress(event: Event): boolean {
 }
 
 /**
+ * Controls whose default a primary press works by itself – opens a select's
+ * list, focuses a field, presses a button, toggles a `<details>`, starts a
+ * player, puts a caret in editable text – none of which a comment-mode click
+ * may do (security review L-2).
+ */
+const PRESS_CONTROLS = 'select, input, textarea, button, summary, video, audio, [contenteditable]'
+
+/** Whether the press is on, or inside, one of {@link PRESS_CONTROLS}. */
+function onPressControl(event: Event): boolean {
+  return event.composedPath().some(target => target instanceof Element && target.matches(PRESS_CONTROLS))
+}
+
+/**
  * Stop an event from reaching the page. The ONLY place this preload calls
  * `preventDefault` (SEC-02): the comment-mode guard and pin clicks.
  */
@@ -144,8 +157,9 @@ function handlersOf(controller: CommentController): Handlers {
         if (event.type === 'contextmenu') controller.pageContextMenu(event as MouseEvent)
         return
       }
-      // A primary press on the page keeps its default: it may start a selection (024-FR-004).
-      if (!onOverlay && isPrimaryPress(event)) event.stopImmediatePropagation()
+      // A primary press on the page keeps its default: it may start a selection (024-FR-004) – except on a control,
+      // whose default would work it (L-2).
+      if (!onOverlay && isPrimaryPress(event) && !onPressControl(event)) event.stopImmediatePropagation()
       else swallow(event)
       if (!(event instanceof MouseEvent)) return
       if (onOverlay) controller.overlayEvent(event)

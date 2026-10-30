@@ -22,11 +22,11 @@
  *
  * @module components/Comments/CommentWindowShell
  */
-import { useCallback, useEffect, useLayoutEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { BaseDialog } from '../Dialog/BaseDialog'
 import { readZIndexToken } from '../../utils/overlayStack'
 import { TEST_IDS } from '../../constants/testids'
-import { placeDocked, type DockedPlacement } from './commentDockPlacement'
+import { inFixedFrame, placeDocked, type DockedPlacement } from './commentDockPlacement'
 import { placeCommentWindow, type Box } from './commentPlacement'
 import { WINDOW_COPY } from './commentWindowCopy'
 
@@ -80,8 +80,16 @@ function styleOf(placement: DockedPlacement | null): React.CSSProperties {
   }
 }
 
-/** Places the window: measure, then place; again on a resize and – docked – on every scroll. */
-function usePlacement(props: CommentWindowShellProps): readonly [DockedPlacement | null, () => void] {
+/**
+ * Places the window: measure, then place; again on a resize and – docked – on
+ * every scroll. The docked window is placed in viewport pixels, then moved
+ * into the box its `position: fixed` really resolves against, which `frameRef`
+ * (an inset-0 fixed probe beside it) measures (`inFixedFrame`).
+ */
+function usePlacement(
+  props: CommentWindowShellProps,
+  frameRef: React.RefObject<HTMLSpanElement | null>
+): readonly [DockedPlacement | null, () => void] {
   const { windowRef, getArea, point, dock, placeKey } = props
   const [placement, setPlacement] = useState<DockedPlacement | null>(null)
   const place = useCallback(() => {
@@ -89,13 +97,15 @@ function usePlacement(props: CommentWindowShellProps): readonly [DockedPlacement
     const area = getArea()
     if (!element || !area) return
     const size = { width: element.offsetWidth, height: element.offsetHeight }
-    if (dock === undefined) {
-      setPlacement(placeCommentWindow(point, size, area, window.innerHeight))
-      return
-    }
-    const column = boxOf(dock.column?.())
-    setPlacement(placeDocked({ anchor: boxOf(dock.anchor()), point, size, area, column, viewportHeight: window.innerHeight }))
-  }, [windowRef, getArea, point, dock])
+    const viewportHeight = window.innerHeight
+    const placed =
+      dock === undefined
+        ? placeCommentWindow(point, size, area, viewportHeight)
+        : placeDocked({ anchor: boxOf(dock.anchor()), point, size, area, column: boxOf(dock.column?.()), viewportHeight })
+    // The probe exists only for the non-modal window; the modal one is portalled and placed in viewport pixels.
+    const frame = boxOf(frameRef.current)
+    setPlacement(frame === null ? placed : inFixedFrame(placed, frame, viewportHeight))
+  }, [windowRef, getArea, point, dock, frameRef])
   useLayoutEffect(() => {
     place()
   }, [place, placeKey])
@@ -155,7 +165,8 @@ function useDockedFocus(props: CommentWindowShellProps, enabled: boolean): void 
  */
 export function CommentWindowShell(props: CommentWindowShellProps): React.JSX.Element {
   const { modal, titleId, describedBy, initialFocusRef, onDismiss, windowRef, dock, view, children } = props
-  const [placement, place] = usePlacement(props)
+  const frameRef = useRef<HTMLSpanElement>(null)
+  const [placement, place] = usePlacement(props, frameRef)
   // The dialog rung, read from the stylesheet: the Layering card forbids mirroring a z-index token into TypeScript.
   const [zIndex] = useState(() => readZIndexToken('--z-dialog'))
   useDockedFocus(props, !modal)
@@ -199,6 +210,7 @@ export function CommentWindowShell(props: CommentWindowShellProps): React.JSX.El
     const edge = placement?.kind === 'edge' ? placement : null
     return (
       <>
+        <span ref={frameRef} className="erf-comment-window-frame" aria-hidden="true" data-testid={TEST_IDS.COMMENT_WINDOW_FRAME} />
         {frame}
         {edge !== null && dock !== undefined && (
           <button

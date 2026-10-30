@@ -722,6 +722,17 @@
   outline: none;
 }
 
+/* C-18: an invisible probe with the docked window's positioning. Its box is
+   the one `position: fixed` resolves against here – dockview's `contain:
+   layout` makes that its grid, not the viewport – so the shell can move the
+   viewport-pixel placement into it (`inFixedFrame`). */
+.erf-comment-window-frame {
+  position: fixed;
+  inset: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* C-18: the edge tab a docked window folds to while its target is scrolled away. */
 .erf-comment-edge-tab {
   position: fixed;

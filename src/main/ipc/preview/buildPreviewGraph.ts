@@ -60,6 +60,7 @@ import {
 } from '../../services/preview/comments/commentServiceTypes'
 import type { CommentIdentity } from '../../services/comments/CommentWriter'
 import { createCommentUnsavedSources } from '../../services/comments/commentUnsavedSources'
+import { e2eCursor } from '../../services/preview/comments/commentE2eHook'
 import { focusHostWhileKey } from '../../services/preview/previewHostFocus'
 import { createPreviewEmitters, type PreviewEmitTarget } from './emit'
 import { createPreviewCommentEmitters } from './commentEmit'
@@ -187,7 +188,8 @@ function buildCommentShared(
     emit: createPreviewCommentEmitters({ resolveTargets }),
     identity: () => commentIdentityOf(getSettings()),
     isEnabled: () => isHtmlPreviewCommentsEnabled(getSettings()),
-    cursor: () => screen.getCursorScreenPoint()
+    // An e2e build's synthetic pointer stands in for the OS cursor `sendInputEvent` never moves (L-1).
+    cursor: () => e2eCursor() ?? screen.getCursorScreenPoint()
   }
 }
 

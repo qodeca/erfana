@@ -24,6 +24,7 @@ import { z } from 'zod'
 import { ErrorCode } from '../errors'
 import { PREVIEW_LIMITS } from '../preview-limits'
 import { TAG_MAX_CHARS } from '../comments/format'
+import { SPOKEN_EXCERPT_MAX_CODE_POINTS, isSpokenExcerpt } from '../comments/spokenExcerpt'
 import {
   COMMENT_PATH_MAX_CHARS,
   CommentFileViewSchema,
@@ -329,7 +330,8 @@ export type CommentPickerRole = z.infer<typeof CommentPickerRoleSchema>
 /**
  * Where the keyboard picker stopped, as MAIN's token table has it – the tag main parsed and the line of its start
  * tag; `added`: the element reached lies below it (a script built it). Never page text (security review S-L-A); a
- * parsed tag no tag name can spell is left out. C-10 adds its spoken kind and its open comments, both main's.
+ * parsed tag no tag name can spell is left out. C-10 adds its spoken kind and its open comments, both main's, and
+ * its opening words – from MAIN's own parse of the file served, never from the page (`commentWordsCore.ts`).
  */
 export const CommentPickerElementSchema = z
   .object({
@@ -339,7 +341,13 @@ export const CommentPickerElementSchema = z
     /** C-10: the kind main names the element by (absent for a script-built one). */
     role: CommentPickerRoleSchema.optional(),
     /** C-10: open comments on the element. */
-    comments: z.number().int().min(1).max(PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE).optional()
+    comments: z.number().int().min(1).max(PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE).optional(),
+    /** C-10: the element's first words as main parsed them – whitespace collapsed, at most 60 code points and "…". */
+    excerpt: z
+      .string()
+      .max(2 * SPOKEN_EXCERPT_MAX_CODE_POINTS + 1)
+      .refine(isSpokenExcerpt, 'C-10 an excerpt is words: at most 60 code points, and "…" when cut')
+      .optional()
   })
   .strict()
 export type CommentPickerElement = z.infer<typeof CommentPickerElementSchema>

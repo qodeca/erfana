@@ -2455,6 +2455,10 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
               "minimum": 1,
               "type": "integer",
             },
+            "excerpt": {
+              "maxLength": 121,
+              "type": "string",
+            },
             "line": {
               "maximum": 9007199254740991,
               "minimum": 1,
@@ -2539,6 +2543,7 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
     "refinements": [
       "only a picker event says",
       "a showing step names its element",
+      "C-10 an excerpt is words: at most 60 code points, and "…" when cut",
     ],
   },
   "CommentOverlayLossSchema": {
@@ -3023,6 +3028,10 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
           "minimum": 1,
           "type": "integer",
         },
+        "excerpt": {
+          "maxLength": 121,
+          "type": "string",
+        },
         "line": {
           "maximum": 9007199254740991,
           "minimum": 1,
@@ -3072,7 +3081,9 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
       ],
       "type": "object",
     },
-    "refinements": [],
+    "refinements": [
+      "C-10 an excerpt is words: at most 60 code points, and "…" when cut",
+    ],
   },
   "CommentPickerRoleSchema": {
     "jsonSchema": {

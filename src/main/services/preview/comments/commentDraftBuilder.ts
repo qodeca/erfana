@@ -147,6 +147,8 @@ export interface PinInput extends Omit<DraftInput, 'pick'> {
   readonly pick?: CommentPick
   /** Look for the damaged and newer blocks standing on the element. */
   readonly blocks: boolean
+  /** A stack pin's other pins that count blocks (C-17): found in the same job. */
+  readonly stacked?: readonly ElementTokenEntry[]
 }
 
 /** A pin click's draft and blocks. */
@@ -157,16 +159,19 @@ export interface BuiltPin {
 
 /**
  * Read the file once and, in ONE worker job, find the blocks standing on the
- * pin's element and build the draft for its "New comment" (M4). Never throws.
+ * pin's element and on a stack's other pins, and build the draft for its "New
+ * comment" (M4). Never throws.
  */
 export async function buildPin(input: PinInput): Promise<BuiltPin> {
-  if (input.pick === undefined && !input.blocks) return { draft: { ok: false }, blocks: [] }
+  const stacked = input.stacked ?? []
+  if (input.pick === undefined && !input.blocks && stacked.length === 0) return { draft: { ok: false }, blocks: [] }
   const loaded = await loadFor(input)
   if (!loaded.ok) return { draft: loaded.refused, blocks: [] }
   const found = await input.jobs.runJob(loaded.bytes, {
     kind: 'pin',
     entry: entryOf(input.entry),
     blocks: input.blocks,
+    ...(stacked.length === 0 ? {} : { stacked: stacked.map(entryOf) }),
     ...(input.pick === undefined ? {} : { pick: pickPartOf(input.pick) })
   })
   if (found.kind === 'failed') return { draft: jobFailed(found.failure, input.file.realPath), blocks: [] }

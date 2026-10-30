@@ -445,6 +445,9 @@ export async function mouseAt(
       globalX = Math.round(content.x + bounds.x + x * zoom)
       globalY = Math.round(content.y + bounds.y + y * zoom)
     }
+    // sendInputEvent never moves the OS cursor: tell main where this synthetic pointer is, so its real-cursor gate on a
+    // right-click (L-1) sees the click a reader would make. Read only behind ERFANA_E2E_TEST_HOOKS (`e2eCursor`).
+    ;(globalThis as Record<string, unknown>).__erfanaE2eCursor = { x: globalX, y: globalY }
     wc.sendInputEvent({ type: 'mouseMove', x, y, globalX, globalY })
     if (which === 'none') return true
     wc.sendInputEvent({ type: 'mouseDown', x, y, globalX, globalY, button: which, clickCount: 1 })

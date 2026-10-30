@@ -17,15 +17,42 @@
  * them only when they are a valid `anchor.sel` found exactly once in the text
  * the draft was built with.
  *
- * Pure: runs in the comment parse worker as part of the `draft` job.
+ * The keyboard picker's excerpt (comments-v2 C-10) is the same text, cut to
+ * its first 60 code points: the `excerpt` job, on the token's element in bytes
+ * that still hash to what was served – never page text, which would widen
+ * what the sealed preload sends (PIN-S-003).
+ *
+ * Pure: runs in the comment parse worker as part of the `draft` and `excerpt` jobs.
  */
 import { isAnchorSelection, type AnchorSelection } from '../../../../shared/comments/anchorSel'
 import { collapseRange, locateWords, occurrencesInContext } from '../../../../shared/comments/selectionWords'
+import { spokenExcerptOf } from '../../../../shared/comments/spokenExcerpt'
 import type { HtmlIndex, IndexedElement } from '../../../../shared/htmlComments'
 import { COMMENT_WORDS_TEXT_MAX_CHARS, type CommentDraftWords, type CommentPickSel } from '../../../../shared/ipc/preview-comment-schema'
+import type { JobDocument } from '../../comments/commentJobDocs'
+import type { DraftEntry } from './commentDraftCore'
 
 /** Characters kept on each side of the words when the target's text is too long to send whole. */
 export const WORDS_WINDOW_MARGIN_CHARS = 2_000
+
+/**
+ * Characters of an element's readable text the excerpt reads (C-10): plenty
+ * for 60 code points, while a `<body>` of a 25 MB page is never collapsed
+ * whole for one picker step.
+ */
+export const EXCERPT_SCAN_CHARS = 4_096
+
+/** The picker's excerpt of the token's element (C-10). */
+export interface ExcerptJob {
+  readonly kind: 'excerpt'
+  readonly entry: DraftEntry
+}
+
+/** The excerpt; absent when the file changed since it was served, or the element has no words. */
+export interface ExcerptJobResult {
+  readonly kind: 'excerpt'
+  readonly excerpt?: string
+}
 
 /** What a pick says about its words. */
 export interface PickWords {
@@ -96,4 +123,20 @@ export function draftWordsOf(index: HtmlIndex, el: IndexedElement, pick: PickWor
 export function verifiedSel(text: string | undefined, sel: CommentPickSel | undefined): AnchorSelection | undefined {
   if (text === undefined || sel === undefined || !isAnchorSelection(sel)) return undefined
   return occurrencesInContext(text, sel).length === 1 ? { exact: sel.exact, prefix: sel.prefix, suffix: sel.suffix } : undefined
+}
+
+/**
+ * The `excerpt` job (C-10): the first words of the element main recorded for
+ * the token, from its own parse – only in bytes that still hash to what was
+ * served, at the recorded offset, with the recorded tag.
+ */
+export function runExcerptJob(document: JobDocument, job: ExcerptJob): ExcerptJobResult {
+  const none: ExcerptJobResult = { kind: 'excerpt' }
+  if (!document.ok || document.hash !== job.entry.fileHash) return none
+  const { index } = document.doc
+  const el = index.elementAt(job.entry.startOffset)
+  if (el === undefined || el.tag !== job.entry.tagName) return none
+  const end = Math.min(el.textEnd, el.textStart + EXCERPT_SCAN_CHARS)
+  const excerpt = spokenExcerptOf(index.visibleText.slice(el.textStart, end), end < el.textEnd)
+  return excerpt === '' ? none : { kind: 'excerpt', excerpt }
 }

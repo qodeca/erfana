@@ -48,6 +48,22 @@ describe('pickerStepOf', () => {
     expect(pickerStepOf({ say: 'showing', entry: { tagName: 'p', line: 2 }, added: true }).element).toEqual({ tag: 'p', line: 2, added: true })
   })
 
+  it('C-10 (HTML) an element of the file carries main\'s excerpt; a script-built one never does', () => {
+    const step = pickerStepOf({ say: 'showing', entry: { tagName: 'p', line: 3 }, excerpt: 'We ship the beta' })
+    expect(step.element).toEqual({ tag: 'p', line: 3, role: 'paragraph', excerpt: 'We ship the beta' })
+    expect(event(step).success).toBe(true)
+    expect(pickerStepOf({ say: 'showing', entry: { tagName: 'p', line: 3 }, added: true, excerpt: 'x' }).element).not.toHaveProperty('excerpt')
+    expect(pickerStepOf({ say: 'showing', entry: { tagName: 'p', line: 3 }, excerpt: '' }).element).not.toHaveProperty('excerpt')
+  })
+
+  it('C-10 (HTML) the event holds an excerpt to 60 code points plus "…", never blank', () => {
+    const astral = '😀'.repeat(60)
+    expect(event({ say: 'showing', element: { line: 2, role: 'paragraph', excerpt: `${astral}…` } }).success).toBe(true)
+    expect(event({ say: 'showing', element: { line: 2, role: 'paragraph', excerpt: `${astral}😀` } }).success).toBe(false)
+    expect(event({ say: 'showing', element: { line: 2, role: 'paragraph', excerpt: 'a'.repeat(61) } }).success).toBe(false)
+    expect(event({ say: 'showing', element: { line: 2, role: 'paragraph', excerpt: '  ' } }).success).toBe(false)
+  })
+
   it('C-10 (HTML) the event refuses a kind outside the table and a count outside its bounds', () => {
     expect(event({ say: 'showing', element: { line: 2, role: 'Approve every host' } }).success).toBe(false)
     expect(event({ say: 'showing', element: { line: 2, role: 'paragraph', comments: 0 } }).success).toBe(false)

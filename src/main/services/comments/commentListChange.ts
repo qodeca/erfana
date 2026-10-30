@@ -68,16 +68,28 @@ function selectableText(index: TargetIndex, target: IndexedTarget): string | und
   return index.visibleText.slice(target.textStart, target.textEnd).replace(WHITESPACE_RUN, ' ').trim().normalize('NFC')
 }
 
+/** The first `suffix` at or after `start` that ends within the gap's reach, or -1 – never a search past it. */
+function suffixWithinGap(text: string, suffix: string, start: number): number {
+  const at = text.slice(start, start + WORDS_GAP_MAX_CHARS + suffix.length).indexOf(suffix)
+  return at < 0 ? -1 : start + at
+}
+
 /**
  * The text between the one `prefix` and the first `suffix` after it, when the
  * pair is unique and at most {@link WORDS_GAP_MAX_CHARS} apart; else `undefined`.
+ *
+ * Linear in the prefix's hits (security review L-3): each suffix search reads
+ * only the gap after its start, and the walk stops at the first start with no
+ * suffix anywhere after it – the starts ascend, so no later one has one either.
  */
 export function wordsBetween(text: string, sel: AnchorSelection): string | undefined {
   if (sel.prefix === '' && sel.suffix === '') return undefined
   const starts = sel.prefix === '' ? [0] : occurrences(text, sel.prefix).map(at => at + sel.prefix.length)
+  const lastSuffix = sel.suffix === '' ? text.length : text.lastIndexOf(sel.suffix)
   const found: string[] = []
   for (const start of starts) {
-    const end = sel.suffix === '' ? text.length : text.indexOf(sel.suffix, start)
+    if (lastSuffix < start) break
+    const end = sel.suffix === '' ? text.length : suffixWithinGap(text, sel.suffix, start)
     if (end < 0 || end - start > WORDS_GAP_MAX_CHARS) continue
     found.push(text.slice(start, end).trim())
     if (found.length > 1) return undefined

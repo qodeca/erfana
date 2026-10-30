@@ -47,7 +47,8 @@ import { createCommentFrameBroadcaster, type CommentFrameBroadcaster, type Comme
 import type { CommentBinding } from '../../comments/commentKeyStore'
 import { CommentDraftKeys } from './commentDraftKeys'
 import { createCommentPickHandler, type CommentPickHandler, type PageSignalEvent } from './commentPickHandler'
-import { pickerStepOf, type PickerStepInput } from './commentPickerStep'
+import { createPickerSpeaker, type PickerStepEvent } from './commentPickerSpeaker'
+import type { PickerStep } from './commentPickerStep'
 import { createCommentDraftOpener, type CommentDraftOpener, type DraftOpenerGeometry } from './commentDraftOpener'
 import { buildCommentList } from '../../comments/commentListBuilder'
 import { accentRgb } from './commentOverlayTheme'
@@ -116,6 +117,7 @@ export class PreviewCommentService implements CommentServiceApi {
   private readonly broadcaster: CommentFrameBroadcaster
   private readonly coordinator: CommentReloadCoordinator
   private readonly signals: CommentPickHandler
+  private readonly speak: (step: PickerStepEvent) => Promise<void>
   private readonly opener: CommentDraftOpener
   private readonly saveFlow: (request: CommentSaveRequest) => Promise<CommentSaveResult>
   private readonly detach: Array<() => void> = []
@@ -153,6 +155,7 @@ export class PreviewCommentService implements CommentServiceApi {
     })
     this.opener = this.buildOpener(tokens, mainFrame)
     this.saveFlow = this.buildSaveFlow()
+    this.speak = createPickerSpeaker({ realRoot: deps.realRoot, jobs: this.jobs, platform: deps.platform, say: step => this.onStep(step) })
     this.signals = createCommentPickHandler({
       panelId: deps.panelId,
       frames: this.frames,
@@ -160,11 +163,12 @@ export class PreviewCommentService implements CommentServiceApi {
       now: deps.now,
       mode: () => this.mode,
       platform: deps.platform,
+      geometry: { ...deps.geometry, cursor: deps.shared.cursor },
       sinks: {
         hello: frame => this.guard(this.onHello(frame)),
         exit: () => this.changeMode(false, 'escape'),
         parent: frame => this.onParent(frame),
-        step: step => this.onStep(step),
+        step: step => void this.speak(step),
         icon: (frame, record, key, pick) => this.guard(this.opener.icon(frame, record, key, pick)),
         element: (frame, record, entry, pick) => this.guard(this.opener.element(frame, record, entry, pick)),
         anchors: (_frame, record, anchors) => this.onAnchors(record, anchors)
@@ -451,9 +455,10 @@ export class PreviewCommentService implements CommentServiceApi {
     this.broadcaster.send(frame.parent, { focusFrame: this.frames.record(frame.frameTreeNodeId).key })
   }
 
-  /** The keyboard picker moved: the window's live region says where, in main's words (S-L-A). */
-  private onStep(step: PickerStepInput): void {
-    this.deps.shared.emit.modeChanged(this.windowId, { panelId: this.panelId, on: this.mode, reason: 'picker', ...pickerStepOf(step) })
+  /** The keyboard picker moved: the window's live region says where, in main's words (S-L-A; C-10 words read async). */
+  private onStep(step: PickerStep): void {
+    if (this.disposed || !this.mode) return
+    this.deps.shared.emit.modeChanged(this.windowId, { panelId: this.panelId, on: this.mode, reason: 'picker', ...step })
   }
 
   private onAnchors(record: FrameRecord, anchors: CommentAnchors): void {

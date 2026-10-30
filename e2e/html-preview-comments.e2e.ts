@@ -736,11 +736,12 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     // Alt+↑ is its parent, Alt+↓ back down the same path: each step is said in
     // the panel's polite region (the page holds no screen-reader text, E-022), by
     // the tag and line main parsed – never the page's ids or classes (S-L-A).
-    // C-10 (HTML): the kind from main's table, as the Markdown picker says it; the first steps add the keys.
+    // C-10 (HTML): the kind from main's table and the first words from main's own parse of the file (never the
+    // page's text), as the Markdown picker says it; the first steps add the keys.
     expect(await pressInPage(app, 'Up', ['alt'], STATIC_TARGET)).toBe(true)
-    await expect(chrome.announce()).toHaveText('Paragraph, line 24. Enter to comment, Shift+F10 for the menu.', { timeout: PREVIEW_BUDGET_MS })
+    await expect(chrome.announce()).toHaveText('Paragraph, line 24: “For one person. Every plan includes unlimited previews.”. Enter to comment, Shift+F10 for the menu.', { timeout: PREVIEW_BUDGET_MS })
     expect(await pressInPage(app, 'Down', ['alt'], STATIC_TARGET)).toBe(true)
-    await expect(chrome.announce()).toHaveText('Element, line 24. Enter to comment, Shift+F10 for the menu.', { timeout: PREVIEW_BUDGET_MS })
+    await expect(chrome.announce()).toHaveText('Element, line 24: “unlimited”. Enter to comment, Shift+F10 for the menu.', { timeout: PREVIEW_BUDGET_MS })
     // Enter opens the window on the element the picker stopped at.
     expect(await pressInPage(app, 'Enter', [], STATIC_TARGET)).toBe(true)
     await expect(win).toHaveAttribute('data-view', 'new', { timeout: PREVIEW_BUDGET_MS })
@@ -812,11 +813,12 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     // a pointer left over the page's white margin cannot set the start.
     await clickElement(app, 'starter-name', 'none', STATIC_TARGET)
     // Tab moves the picker along the level, each step said in the polite region; Enter opens the window.
-    // C-10 (HTML): the kind from main's table, as the Markdown picker says it; the first steps add the keys.
+    // C-10 (HTML): the kind from main's table and the first words from main's own parse of the file (never the
+    // page's text), as the Markdown picker says it; the first steps add the keys.
     expect(await pressInPage(app, 'Tab', [], STATIC_TARGET)).toBe(true)
-    await expect(chrome.announce()).toHaveText('Paragraph, line 24. Enter to comment, Shift+F10 for the menu.', { timeout: PREVIEW_BUDGET_MS })
+    await expect(chrome.announce()).toHaveText('Paragraph, line 24: “For one person. Every plan includes unlimited previews.”. Enter to comment, Shift+F10 for the menu.', { timeout: PREVIEW_BUDGET_MS })
     expect(await pressInPage(app, 'Tab', [], STATIC_TARGET)).toBe(true)
-    await expect(chrome.announce()).toHaveText('Button, line 25. Enter to comment, Shift+F10 for the menu.', { timeout: PREVIEW_BUDGET_MS })
+    await expect(chrome.announce()).toHaveText('Button, line 25: “Buy now”. Enter to comment, Shift+F10 for the menu.', { timeout: PREVIEW_BUDGET_MS })
     expect(await pressInPage(app, 'Enter', [], STATIC_TARGET)).toBe(true)
     const win = chrome.window()
     await expect(win).toHaveAttribute('data-view', 'new', { timeout: PREVIEW_BUDGET_MS })

@@ -78,3 +78,23 @@ export function placeDocked(input: DockInput): DockedPlacement {
   const at = anchor === null ? point : { x: anchor.left + anchor.width, y: anchor.top }
   return placeCommentWindow(at, size, area, viewportHeight)
 }
+
+/**
+ * `placement`, from viewport pixels into the box a `position: fixed` element
+ * is really placed against. The docked window renders inside its tab, and an
+ * ancestor with `contain: layout` (dockview's `.dv-dockview`), a transform or
+ * a filter makes itself that box – so viewport pixels would land shifted by
+ * the ancestor's offset, off the pane.
+ *
+ * @param placement - Where the window goes, in viewport pixels.
+ * @param frame - The fixed box's containing block, in viewport pixels (the viewport itself when nothing captures it).
+ * @param viewportHeight - `window.innerHeight`, which a sheet's `bottom` was measured from.
+ * @returns The same placement in the frame's pixels.
+ */
+export function inFixedFrame(placement: DockedPlacement, frame: Box, viewportHeight: number): DockedPlacement {
+  if (placement.kind === 'sheet') {
+    const below = viewportHeight - (frame.top + frame.height)
+    return { ...placement, left: placement.left - frame.left, bottom: placement.bottom - below }
+  }
+  return { ...placement, left: placement.left - frame.left, top: placement.top - frame.top }
+}

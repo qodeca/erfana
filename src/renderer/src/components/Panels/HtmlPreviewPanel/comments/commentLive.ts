@@ -22,10 +22,10 @@ export const PICKER_HINT_STEPS = 3
  * The page holds no live region (Find in page would count its text), so main
  * passes each step on and the window's polite region says it.
  *
- * C-10: an element of the file is named by main's kind and line and its
- * open comments – "Paragraph, line 42. 2 comments." (its first words are not
- * sent: see `commentPickerStep.ts`)
- * – the same sentence as the Markdown picker; the first
+ * C-10: an element of the file is named by main's kind, line, first words
+ * and open comments – "Paragraph, line 42: “We ship the beta…”. 2 comments."
+ * (the words come from main's own parse of the file, never from the page:
+ * `commentPickerSpeaker.ts`) – the same sentence as the Markdown picker; the first
  * {@link PICKER_HINT_STEPS} steps add the keys. A script-built element keeps
  * "Showing an element added by a script, inside …".
  *
@@ -38,6 +38,6 @@ export function pickerAnnouncement(event: Pick<CommentModeChanged, 'say' | 'elem
   const element = event.say === 'showing' ? event.element : undefined
   if (element === undefined) return undefined
   if (element.added === true || element.role === undefined) return ANNOUNCE.pickerShowing(element)
-  const sentence = MD_SPOKEN_COPY.target(element.role, element.line, '', element.comments ?? 0)
+  const sentence = MD_SPOKEN_COPY.target(element.role, element.line, element.excerpt ?? '', element.comments ?? 0)
   return step < PICKER_HINT_STEPS ? `${sentence}${MD_SPOKEN_COPY.hint}` : sentence
 }

@@ -228,9 +228,9 @@ export function isSpliceWithin(splice: ByteSplice, length: number): boolean {
 }
 
 /** The own-lines tail after a new block (§5.2): one line break, then the target's indent. */
-const OWN_LINES_TAIL = /(?:\r\n|\r|\n)[ \t]*$/
+export const OWN_LINES_TAIL = /(?:\r\n|\r|\n)[ \t]*$/
 /** A line-start slot's indent before the block (a Markdown list item 2 or later, a block in a quote): blanks only. */
-const LINE_START_INDENT = /^[ \t]+/
+export const LINE_START_INDENT = /^[ \t]+/
 
 /**
  * Main's own check of the bytes a worker answer would put in the file

@@ -124,4 +124,10 @@ describe('C-06 wordsBetween: the unique prefix…suffix pair', () => {
   it('C-06 no context at all is no pair', () => {
     expect(wordsBetween('anything', { exact: 'a', prefix: '', suffix: '' })).toBeUndefined()
   })
+  it('L-3 the bounded search finds the same pair: a suffix just inside the gap counts, one just past it does not', () => {
+    const at = { exact: 'x', prefix: '[', suffix: ']' }
+    expect(wordsBetween(`[${'y'.repeat(400)}]`, at)).toBe('y'.repeat(400))
+    expect(wordsBetween(`[${'y'.repeat(401)}]`, at)).toBeUndefined()
+    expect(wordsBetween('] then [middle] then', at)).toBe('middle')
+  })
 })

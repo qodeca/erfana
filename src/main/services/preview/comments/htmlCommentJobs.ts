@@ -5,10 +5,11 @@
  * (docs/designs/comments/html-preview-comments.md §19 R3-12; spec 024
  * architecture note 001 § 8 C22).
  *
- * Five jobs, each on bytes main read:
+ * Six jobs, each on bytes main read:
  * - `instrument` – a served page's element tokens (`commentParseCore.ts`);
  * - `draft` and `pin` – a pick, and a pin click's blocks and draft from one
  *   parse (`commentDraftCore.ts`);
+ * - `excerpt` – a keyboard-picker step's first words (C-10, `commentWordsCore.ts`);
  * - `list` and `write` – the shared list and write (`commentListCore.ts`,
  *   `commentWriteCore.ts`) on an HTML parse.
  *
@@ -28,6 +29,7 @@ import { rawTransferablesOf } from '../../comments/commentParseWorker'
 import { runWriteJob, type WriteJob } from '../../comments/commentWriteCore'
 import { runDraftJob, runPinJob, type DraftJob, type DraftJobResult, type PinJob, type PinJobResult } from './commentDraftCore'
 import { instrumentDocument, type InstrumentOutcome } from './commentParseCore'
+import { runExcerptJob, type ExcerptJob, type ExcerptJobResult } from './commentWordsCore'
 
 /** Instrument a served page. */
 export interface InstrumentJob {
@@ -41,7 +43,7 @@ export interface InstrumentJobResult {
 }
 
 /** The HTML jobs on a commented file. */
-export type HtmlFileJob = DraftJob | PinJob | ListJob | WriteJob
+export type HtmlFileJob = DraftJob | PinJob | ExcerptJob | ListJob | WriteJob
 
 /** Every HTML job. */
 export type HtmlCommentJob = InstrumentJob | HtmlFileJob
@@ -55,6 +57,7 @@ declare module '../../comments/commentFileJobs' {
     instrument: InstrumentJobResult
     draft: DraftJobResult
     pin: PinJobResult
+    excerpt: ExcerptJobResult
   }
 }
 
@@ -72,6 +75,7 @@ export const htmlCommentJobTable: CommentJobTable<HtmlCommentJob, CommentDocumen
   },
   draft: { run: (bytes, job, env) => runDraftJob(documentOf(bytes, env.cache), job) },
   pin: { run: (bytes, job, env) => runPinJob(documentOf(bytes, env.cache), job) },
+  excerpt: { run: (bytes, job, env) => runExcerptJob(documentOf(bytes, env.cache), job) },
   list: { run: (bytes, _job, env) => runListJob(documentOf(bytes, env.cache)) },
   write: {
     // The HTML kind's note and hints on every block it writes; its own reader adds the parse5 pre-checks.

@@ -342,6 +342,27 @@ describe('CommentWriter.add', () => {
     expect(await snapshot(path)).toEqual(before)
   })
 
+  it('L-4 main checks the blanks around the block against its own read: a widened indent writes nothing', async () => {
+    const path = await project.write('index.html', PAGE)
+    const before = await snapshot(path)
+    const real = createInProcessCommentFileJobs()
+    const jobs: CommentFileJobRunner = {
+      runJob: async (bytes, job) => {
+        const answer = await real.runJob(bytes, job)
+        const result: CommentJobOutcome<CommentFileJob> = answer
+        if (result.kind !== 'write' || !result.ok) return answer
+        // Still one safe comment, but its own-lines tail now indents the target by a thousand more spaces.
+        const widened = new TextEncoder().encode(`${new TextDecoder().decode(result.insert)}${' '.repeat(1_000)}`)
+        return { ...result, insert: widened } as typeof answer
+      }
+    }
+    const { writer } = makeWriter({ jobs })
+    expect(await addOn(writer, 'index.html', 'buy')).toEqual({ ok: false, code: ErrorCode.COMMENT_WRITE_FAILED, reason: 'verify-failed' })
+    expect(await snapshot(path)).toEqual(before)
+    // The real answer still writes.
+    expect(await addOn(makeWriter().writer, 'index.html', 'buy')).toMatchObject({ ok: true })
+  })
+
   it('M-013 one save is one write, and its result carries the hash of the bytes now on disk for the echo filter', async () => {
     await project.write('index.html', PAGE)
 

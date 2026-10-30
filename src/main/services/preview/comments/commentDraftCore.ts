@@ -110,6 +110,11 @@ export interface PinJob {
   readonly blocks: boolean
   /** The pick "New comment" is built from; absent: no draft (the element is not one a pick could name). */
   readonly pick?: DraftPickPart
+  /**
+   * The elements of the other pins merged into a stack pin (C-17) that count
+   * blocks: theirs come from this same parse – one read, one job (M4).
+   */
+  readonly stacked?: readonly DraftEntry[]
 }
 
 /** The pin's blocks – empty when the file changed – and the draft's parse half when one was asked for. */
@@ -221,9 +226,9 @@ function pinBlocksOf(document: JobDocument, entry: DraftEntry): PinBlock[] {
     .map(block => ({ rawHash: block.rawHash, start: block.nodeRange[0] }))
 }
 
-/** The `pin` job: the pin's blocks and the draft on its element, from one parse. */
+/** The `pin` job: the pin's blocks, a stack's other pins' blocks and the draft on its element, from one parse. */
 export function runPinJob(document: JobDocument, job: PinJob): PinJobResult {
-  const blocks = job.blocks ? pinBlocksOf(document, job.entry) : []
+  const blocks = [...(job.blocks ? pinBlocksOf(document, job.entry) : []), ...(job.stacked ?? []).flatMap(entry => pinBlocksOf(document, entry))]
   if (job.pick === undefined) return { kind: 'pin', blocks }
   return { kind: 'pin', blocks, draft: runDraftJob(document, { kind: 'draft', entry: job.entry, pick: job.pick }) }
 }

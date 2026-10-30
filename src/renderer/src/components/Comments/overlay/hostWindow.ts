@@ -19,7 +19,10 @@
  *   a refresh missed while the machine slept is made up right before the
  *   save. The window keeps the token it opened with (its typed-text key);
  *   only the save swaps it. A draft carries no target – the pick travels
- *   with the save – so a fresh one stands in for the old one exactly.
+ *   with the save – so a fresh one stands in for the old one exactly. Like
+ *   an HTML draft, it lives at most {@link DRAFT_MAX_AGE_MS} from the pick
+ *   (security review I-3): past that no fresh draft is minted, the last one
+ *   lapses, and the save says the draft expired (C-14.1).
  *
  * @module components/Comments/overlay/hostWindow
  */
@@ -34,6 +37,13 @@ import type { PreviewCommentAdapter } from './previewAdapter'
  * ten-minute `DRAFT_TTL_MS`, so one late timer never lets it lapse.
  */
 export const DRAFT_REFRESH_MS = 4 * 60 * 1000
+
+/**
+ * The longest a Markdown draft is kept alive, from the pick: a day, as main
+ * caps an HTML draft (`commentKeyStore.ts` `DRAFT_MAX_AGE_MS`, which the
+ * renderer cannot import – keep the two equal).
+ */
+export const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000
 
 /** The dock a renderer-hosted window takes (`CommentWindowProps.dock`). */
 export type HostDock = Omit<CommentDock, 'anchor' | 'label'> & { readonly anchor: (threadKey: string | null) => HTMLElement | null }
@@ -81,9 +91,10 @@ export function newRequestExtras(
   return { ...(parentTag === undefined ? {} : { parentTag }), ...(refused === undefined ? {} : { refused }) }
 }
 
-/** One open window's draft: the token it opened with, the newest one, and when that was minted. */
+/** One open window's draft: the token it opened with, when, the newest one, and when that was minted. */
 interface LiveDraft {
   readonly opened: string
+  readonly pickedAt: number
   token: string
   at: number
 }
@@ -106,6 +117,8 @@ export function useDraftKeepAlive(
   const clock = useLatestRef(now)
 
   const renew = useCallback(async (draft: LiveDraft): Promise<void> => {
+    // I-3: never past a day from the pick – the last draft then lapses and the save says so (C-14.1).
+    if (clock.current() - draft.pickedAt >= DRAFT_MAX_AGE_MS) return
     const answer = await mint.current()
     // A refused renewal keeps the current token: if it lapses, the save says so and offers Pick again (C-14.1).
     if (answer.ok && live.current === draft) {
@@ -119,7 +132,7 @@ export function useDraftKeepAlive(
       live.current = null
       return undefined
     }
-    const draft: LiveDraft = { opened, token: opened, at: clock.current() }
+    const draft: LiveDraft = { opened, pickedAt: clock.current(), token: opened, at: clock.current() }
     live.current = draft
     const timer = setInterval(() => void renew(draft), DRAFT_REFRESH_MS)
     return () => {

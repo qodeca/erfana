@@ -8,8 +8,10 @@
 import { app } from 'electron'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  COMMENT_E2E_CURSOR_KEY,
   COMMENT_E2E_HOOK_KEY,
   commentE2eHookEnabled,
+  e2eCursor,
   registerCommentE2eSource,
   type CommentE2eHook,
   type CommentE2eSource
@@ -44,6 +46,30 @@ afterEach(() => {
 })
 
 describe('commentE2eHook', () => {
+  it('L-1 the synthetic e2e cursor is read only behind the hook gate, and only as two finite numbers', () => {
+    const globals = globalThis as Record<string, unknown>
+    globals[COMMENT_E2E_CURSOR_KEY] = { x: 300, y: 200 }
+    try {
+      vi.stubEnv('ERFANA_E2E_TEST_HOOKS', '0')
+      expect(e2eCursor()).toBeUndefined()
+      vi.stubEnv('ERFANA_E2E_TEST_HOOKS', '1')
+      expect(e2eCursor()).toEqual({ x: 300, y: 200 })
+      const mutableApp = app as { isPackaged: boolean }
+      mutableApp.isPackaged = true
+      try {
+        expect(e2eCursor()).toBeUndefined()
+      } finally {
+        mutableApp.isPackaged = false
+      }
+      globals[COMMENT_E2E_CURSOR_KEY] = { x: Number.NaN, y: 1 }
+      expect(e2eCursor()).toBeUndefined()
+      globals[COMMENT_E2E_CURSOR_KEY] = 'here'
+      expect(e2eCursor()).toBeUndefined()
+    } finally {
+      delete globals[COMMENT_E2E_CURSOR_KEY]
+    }
+  })
+
   it('is gated on an unpackaged build and ERFANA_E2E_TEST_HOOKS=1', () => {
     vi.stubEnv('ERFANA_E2E_TEST_HOOKS', '1')
     expect(commentE2eHookEnabled()).toBe(true)

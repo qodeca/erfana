@@ -215,19 +215,23 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
   }
 
   /**
-   * The pin's damaged and newer blocks and a draft on its element for the
-   * window's "New comment" – built from disk as a menu's is, on the JS-built
-   * element when the pin stands on one – from one read and one worker job.
+   * The pin's damaged and newer blocks, a stack's other pins' blocks (C-17),
+   * and a draft on its element for the window's "New comment" – built from
+   * disk as a menu's is, on the JS-built element when the pin stands on one –
+   * all from ONE read and ONE worker job (M4), however many pins the stack holds.
+   * With the pin's own token gone, a stacked pin's element leads the job (blocks only, no draft).
    */
-  function pinOf(frame: CommentFrameLike, file: FrameFile, entry: ElementTokenEntry | undefined, pin: PinGroup, pick: CommentPick): Promise<BuiltPin> {
-    if (entry === undefined) return Promise.resolve({ draft: { ok: false }, blocks: [] })
-    const onPin = pinPickOf(pin, pick)
+  function pinOf(frame: CommentFrameLike, file: FrameFile, entry: ElementTokenEntry | undefined, pin: PinGroup, pick: CommentPick, stacked: readonly ElementTokenEntry[]): Promise<BuiltPin> {
+    const lead = entry ?? stacked[0]
+    if (lead === undefined) return Promise.resolve({ draft: { ok: false }, blocks: [] })
+    const onPin = entry === undefined ? undefined : pinPickOf(pin, pick)
     return buildPin({
       realRoot: deps.realRoot,
       file,
-      entry,
+      entry: lead,
       ...(onPin === undefined ? {} : { pick: onPin }),
-      blocks: pin.attention > 0,
+      blocks: entry === undefined || pin.attention > 0,
+      stacked: entry === undefined ? stacked.slice(1) : stacked,
       frame: frame.parent !== null,
       pageRealPath: deps.currentPage(),
       jobs: deps.jobs,
@@ -235,16 +239,11 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
     })
   }
 
-  /** The damaged and newer blocks of the other pins of a stack (C-17): blocks only, no draft. */
-  async function stackedBlocks(frame: CommentFrameLike, record: FrameRecord, file: FrameFile, pins: readonly PinGroup[]): Promise<BuiltPin['blocks']> {
-    const blocks: Array<BuiltPin['blocks'][number]> = []
-    for (const pin of pins) {
-      const entry = record.loadId === undefined ? undefined : deps.tokens.lookup(record.loadId, pin.token)
-      if (entry === undefined || pin.attention === 0) continue
-      const common = { realRoot: deps.realRoot, file, entry, frame: frame.parent !== null, pageRealPath: deps.currentPage() }
-      blocks.push(...(await buildPin({ ...common, blocks: true, jobs: deps.jobs, platform: deps.platform })).blocks)
-    }
-    return blocks
+  /** The token entries of a stack's other pins that count blocks (C-17); a pin on a load main no longer knows has none. */
+  function stackedEntries(record: FrameRecord, pins: readonly PinGroup[]): ElementTokenEntry[] {
+    if (record.loadId === undefined) return []
+    const loadId = record.loadId
+    return pins.flatMap(pin => (pin.attention === 0 ? [] : (deps.tokens.lookup(loadId, pin.token) ?? [])))
   }
 
   /**
@@ -260,8 +259,8 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
     const stacked = (pick.stack ?? []).flatMap(key => record.pins.get(key) ?? [])
     const entry = record.loadId === undefined ? undefined : deps.tokens.lookup(record.loadId, pin.token)
     const painted = paintAndCapture(placeOf(frame, deps.mainFrame()), pick)
-    const built = await pinOf(frame, file, entry, pin, pick)
-    const blocks = [...built.blocks, ...(await stackedBlocks(frame, record, file, stacked))]
+    const built = await pinOf(frame, file, entry, pin, pick, stackedEntries(record, stacked))
+    const { blocks } = built
     const offset = await painted
     if (!stillCurrent(record, file)) return
     deps.emit({

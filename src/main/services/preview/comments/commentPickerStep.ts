@@ -14,9 +14,10 @@
  * the token, through a fixed table, and the line of its start tag in the file
  * served – never the page's ids or classes, which would let a page put any
  * sentence it likes into the reader's screen reader, in Erfana's voice. C-10
- * adds the element's kind (a fixed table over the parsed tag) and its open
- * comments from main's own pins. Its first words are not sent: the page's
- * text would widen what the sealed preload sends (PIN-S-003).
+ * adds the element's kind (a fixed table over the parsed tag), its open
+ * comments from main's own pins, and its first words from main's own parse
+ * of the file served (`commentPickerSpeaker.ts`) – never the page's text,
+ * which would widen what the sealed preload sends (PIN-S-003).
  */
 import type { CommentModeChanged, CommentPickerElement, CommentPickerRole } from '../../../../shared/ipc/preview-comment-schema'
 import { CommentTagNameSchema } from '../../../../shared/ipc/preview-comment-page-schema'
@@ -32,6 +33,8 @@ export type PickerStepInput =
       readonly added?: true
       /** C-10: open comments on the element, from main's own pins. */
       readonly comments?: number
+      /** C-10: the element's first words, from main's own parse (`spokenExcerptOf`). */
+      readonly excerpt?: string
     }
 
 /** A picker event's step: what it reached, and for an element main's facts about it. */
@@ -74,7 +77,7 @@ export function roleOf(tagName: string): CommentPickerRole {
 /**
  * The step to pass on. A tag that no tag name can spell (parse5 keeps
  * whatever a start tag says) is left out rather than passed on. The kind,
- * line and comment count are main's; a script-built element has no kind.
+ * line, comment count and excerpt are main's; a script-built element has no kind and no excerpt.
  *
  * @param step - The checked step.
  * @returns The `say` and `element` fields of the event.
@@ -86,7 +89,9 @@ export function pickerStepOf(step: PickerStepInput): PickerStep {
     ...(CommentTagNameSchema.safeParse(tagName).success ? { tag: tagName } : {}),
     line: Math.max(1, line),
     ...(step.added ? { added: true as const } : { role: roleOf(tagName) }),
-    ...(step.comments === undefined || step.comments === 0 ? {} : { comments: step.comments })
+    ...(step.comments === undefined || step.comments === 0 ? {} : { comments: step.comments }),
+    // A script-built element's words are not in the file: it never has an excerpt.
+    ...(step.added || step.excerpt === undefined || step.excerpt === '' ? {} : { excerpt: step.excerpt })
   }
   return { say: 'showing', element }
 }

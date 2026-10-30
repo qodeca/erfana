@@ -4,7 +4,7 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FileCommentOpenDraftResult } from '../../../../../shared/ipc/file-comment-schema'
 import { MARKDOWN_WORDS } from '../commentCopyWords'
-import { DRAFT_REFRESH_MS, newRequestExtras, useDraftKeepAlive } from './hostWindow'
+import { DRAFT_MAX_AGE_MS, DRAFT_REFRESH_MS, newRequestExtras, useDraftKeepAlive } from './hostWindow'
 import type { PreviewCommentAdapter } from './previewAdapter'
 
 const OPENED = 'a'.repeat(32)
@@ -60,6 +60,21 @@ describe('C-14 (Markdown) the open window’s draft never silently expires', () 
     const { result } = keepAlive(OPENED)
     clock += DRAFT_REFRESH_MS
     await expect(result.current(OPENED)).resolves.toBe(OPENED)
+  })
+
+  it('I-3 (Markdown) a draft is kept alive for at most a day from the pick, then lapses (C-14.1)', async () => {
+    const { result } = keepAlive(OPENED)
+    // Just inside the day: a stale draft is still renewed before the save.
+    clock = DRAFT_MAX_AGE_MS - 1
+    await expect(result.current(OPENED)).resolves.toBe(token(1))
+    expect(openDraft).toHaveBeenCalledTimes(1)
+    // Past it: neither the timer nor the save mints another; the save goes with the last one, which main lets lapse.
+    clock = DRAFT_MAX_AGE_MS + DRAFT_REFRESH_MS
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DRAFT_REFRESH_MS * 3)
+    })
+    await expect(result.current(OPENED)).resolves.toBe(token(1))
+    expect(openDraft).toHaveBeenCalledTimes(1)
   })
 
   it('C-14 (Markdown) nothing is renewed once the window closed, and another token passes through', async () => {

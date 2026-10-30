@@ -190,6 +190,38 @@ describe('commentDraftOpener', () => {
     expect(s.emitted[1]).toMatchObject({ blockKeys: [] })
   })
 
+  it('M-1 a stack of pins with blocks is built from ONE read and ONE worker job, each pin\'s blocks once', async () => {
+    let html = insertBefore(commentedPage().text, '<p id="para"', damagedBlock('c-9'))
+    html = insertBefore(html, '<h1 id="title"', damagedBlock('c-8'))
+    const s = await setup(html)
+    const runJob = vi.spyOn(s.deps.jobs, 'runJob')
+    const damaged = [...s.record.pins].filter(([, pin]) => pin.attention > 0).map(([key]) => key)
+    expect(damaged).toHaveLength(2)
+    const openKey = [...s.record.pins].find(([, pin]) => pin.threadIds.length > 0 && pin.attention === 0)![0]
+    await s.opener.icon(s.top, s.record, openKey, pick({ kind: 'icon', key: openKey, stack: damaged }))
+    expect(runJob).toHaveBeenCalledTimes(1)
+    expect(runJob.mock.calls[0][1]).toMatchObject({ kind: 'pin', stacked: [expect.anything(), expect.anything()] })
+    const opened = s.emitted[0]
+    if (opened.kind !== 'icon') throw new Error('expected the icon window')
+    expect(opened.blockKeys).toHaveLength(2)
+    expect(new Set(opened.blockKeys).size).toBe(2)
+  })
+
+  it('M-1 a stack whose clicked pin has no token left still finds the stacked blocks, in one job', async () => {
+    const html = insertBefore(commentedPage().text, '<p id="para"', damagedBlock('c-9'))
+    const s = await setup(html)
+    const damagedKey = [...s.record.pins].find(([, pin]) => pin.attention > 0)![0]
+    const openKey = [...s.record.pins].find(([, pin]) => pin.attention === 0)![0]
+    const lost = new Map(s.record.pins)
+    lost.set(openKey, { ...lost.get(openKey)!, token: 'zzzzzzzzzzzz' })
+    const runJob = vi.spyOn(s.deps.jobs, 'runJob')
+    const anyRecord = createCommentDraftOpener({ ...s.deps, isCurrent: () => true })
+    await anyRecord.icon(s.top, { ...s.record, pins: lost }, openKey, pick({ kind: 'icon', key: openKey, stack: [damagedKey] }))
+    expect(runJob).toHaveBeenCalledTimes(1)
+    expect(s.emitted[0]).toMatchObject({ kind: 'icon', blockKeys: [expect.stringMatching(/^b/)] })
+    expect(s.emitted[0]).not.toHaveProperty('draftToken')
+  })
+
   it('§10.4 a pin offers "New comment": a draft on the pin\'s element, bound to this view, with its element key and target', async () => {
     const s = await setup(commentedPage().text)
     const [openKey, pin] = [...s.record.pins].find(([, group]) => group.threadIds.length > 0)!

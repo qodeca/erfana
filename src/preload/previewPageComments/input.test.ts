@@ -75,11 +75,37 @@ describe('the guards', () => {
   it('J-004 in comment mode every click-family event is stopped in capture; contextmenu and a primary press keep their default (024-FR-004: a drag selects)', () => {
     const page = pageListeners()
     h.state({ mode: true })
-    const events = GUARDED_EVENTS.map(type => userMouse(byId('cta'), type, { x: 120, y: 110 }))
+    // On text: a primary press keeps its default, so a drag can select words (on a control it does not – L-2 below).
+    const events = GUARDED_EVENTS.map(type => userMouse(byId('para'), type, { x: 120, y: 210 }))
+    const onButton = GUARDED_EVENTS.map(type => userMouse(byId('cta'), type, { x: 120, y: 110 }))
     page.remove()
     expect(page.seen).toEqual([])
     const kept = new Set(['contextmenu', 'pointerdown', 'mousedown'])
     for (const event of events) expect(event.defaultPrevented, event.type).toBe(!kept.has(event.type))
+    for (const event of onButton) expect(event.defaultPrevented, `button ${event.type}`).toBe(event.type !== 'contextmenu')
+  })
+
+  it('L-2 in comment mode a primary press on a control, or inside one, is prevented; on text elsewhere it is not', () => {
+    h.state({ mode: true })
+    const controls = document.createElement('div')
+    const inner = document.createElement('span')
+    const summary = document.createElement('summary')
+    summary.append(inner)
+    const editable = document.createElement('div')
+    editable.setAttribute('contenteditable', '')
+    const elements = ['select', 'input', 'textarea', 'button', 'video', 'audio'].map(tag => document.createElement(tag))
+    controls.append(...elements, summary, editable)
+    byId('main').append(controls)
+    for (const target of [...elements, inner, editable]) {
+      for (const type of ['pointerdown', 'mousedown']) {
+        expect(userMouse(target, type, { x: 1, y: 1, button: 0 }).defaultPrevented, `${target.tagName} ${type}`).toBe(true)
+      }
+    }
+    // Text outside any control: the press keeps its default (a drag still selects).
+    expect(userMouse(byId('em'), 'mousedown', { x: 50, y: 215, button: 0 }).defaultPrevented).toBe(false)
+    // Out of comment mode a control works as the page made it.
+    h.state({ mode: false })
+    expect(userMouse(elements[0], 'mousedown', { x: 1, y: 1, button: 0 }).defaultPrevented).toBe(false)
   })
 
   it('J-004 out of comment mode the page’s own handlers run and nothing is prevented', () => {

@@ -354,6 +354,9 @@ test.describe('Markdown Preview comments', () => {
     // The block went in before the paragraph: find it again by its text.
     const paragraph = md.content().locator('p', { hasText: 'First paragraph of the review.' })
     await expect(md.modeButton()).toHaveAttribute('aria-pressed', 'true')
+    // C-22: the paragraph is "commented" once the list says so – "Comment saved" is said on the write's answer,
+    // and the refreshed list (the icon) lands after it. A click before that is a click on an uncommented paragraph.
+    await expect(md.icons()).toHaveCount(1, { timeout: MD_COMMENT_BUDGET_MS })
     await paragraph.click()
     const win = md.window()
     await expect(win).toHaveAttribute('data-view', 'threads', { timeout: MD_COMMENT_BUDGET_MS })
@@ -376,6 +379,8 @@ test.describe('Markdown Preview comments', () => {
     await expect(md.window()).toHaveAttribute('data-view', 'new', { timeout: MD_COMMENT_BUDGET_MS })
     await md.saveNewComment(NOTE, FILE, NAME)
 
+    // C-22 / C-13: both comments are in the list (two icons) before the click opens their threads.
+    await expect(md.icons()).toHaveCount(2, { timeout: MD_COMMENT_BUDGET_MS })
     await md.content().locator('p', { hasText: 'First paragraph of the review.' }).click()
     const win = md.window()
     await expect(win).toHaveAttribute('data-view', 'threads', { timeout: MD_COMMENT_BUDGET_MS })
@@ -409,6 +414,13 @@ test.describe('Markdown Preview comments', () => {
     await expect(win).toHaveAttribute('role', 'dialog')
     await expect(win).not.toHaveAttribute('aria-modal', 'true')
     await expect(win).toHaveClass(/erf-comment-window--docked/)
+    // C-18: placed in viewport pixels inside dockview's `contain: layout` grid, the window still overlaps the
+    // preview pane – it once landed shifted right by the grid's offset, off the pane under the activity bar.
+    const [winBox, paneBox] = [await win.boundingBox(), await md.preview().boundingBox()]
+    expect(winBox).not.toBeNull()
+    expect(paneBox).not.toBeNull()
+    expect(winBox!.x).toBeLessThan(paneBox!.x + paneBox!.width)
+    expect(winBox!.x + winBox!.width).toBeGreaterThan(paneBox!.x)
     // No occluder: the preview is not covered while the window is open.
     await expect(page.locator('.dialog-overlay')).toHaveCount(0)
     const field = win.getByTestId(TEST_IDS.COMMENT_NEW_FIELD)

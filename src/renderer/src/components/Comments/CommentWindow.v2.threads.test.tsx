@@ -462,6 +462,25 @@ describe('CommentWindow – v2 docked in the Markdown Preview (C-18)', () => {
     preview.remove()
   })
 
+  it('C-18 (Markdown) inside dockview (`contain: layout`) the docked window is placed in the grid box, not the viewport', () => {
+    const leftOf = () => Number.parseFloat(screen.getByTestId('comment-window').style.left)
+    const first = setup({ list: mdList() }, true)
+    const inViewport = leftOf()
+    first.unmount()
+    // The probe is the box `position: fixed` resolves against: dockview's grid, 477px in from the viewport.
+    const real = HTMLElement.prototype.getBoundingClientRect
+    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      return this.dataset.testid === 'comment-window-frame' ? new DOMRect(477, 20, 900, 700) : real.call(this)
+    })
+    try {
+      setup({ list: mdList() }, true)
+      expect(screen.getByTestId('comment-window')).toHaveAttribute('data-placement', 'float')
+      expect(leftOf()).toBe(inViewport - 477)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
   it('C-18 (HTML) the window stays modal over the still page', () => {
     setup()
     expect(screen.getByRole('dialog')).toHaveAttribute('aria-modal', 'true')

@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest'
 import { ErrorCode } from '../../../../shared/errors'
 import { fileView, thread, threadsRequest } from '../Panels/HtmlPreviewPanel/comments/__test-helpers__/commentTestKit'
 import { HTML_WORDS, MARKDOWN_WORDS } from './commentCopyWords'
-import { MARGIN_MIN_PX, placeDocked, type DockInput } from './commentDockPlacement'
+import { MARGIN_MIN_PX, inFixedFrame, placeDocked, type DockInput } from './commentDockPlacement'
 import { stepKeyOf } from './CommentStepper'
 import { TITLE_HEADING_MAX_CHARS, WINDOW_COPY, headingQuote, refusalCopy, windowRefusal } from './commentWindowCopy'
 import { headingOf, headingText } from './commentWindowHeading'
@@ -210,5 +210,29 @@ describe('C-18 docked placement', () => {
     const placed = placeDocked({ ...base, anchor: { left: 100, top: 780, width: 400, height: 10 } })
     if (placed.kind !== 'margin') throw new Error('expected margin')
     expect(placed.top + Math.min(300, placed.maxHeight)).toBeLessThanOrEqual(800)
+  })
+})
+
+describe('C-18 docked placement inside a containing block', () => {
+  // dockview's `.dv-dockview { contain: layout }` makes its grid the box `position: fixed` resolves against.
+  const grid = { left: 477, top: 30, width: 900, height: 700 }
+
+  it('C-18 a float or margin window moves by the frame offset, so it lands where it was placed', () => {
+    const placed = { kind: 'float' as const, side: 'below' as const, left: 643, top: 145, maxWidth: 480, maxHeight: 560 }
+    expect(inFixedFrame(placed, grid, 800)).toEqual({ ...placed, left: 166, top: 115 })
+    const margin = { kind: 'margin' as const, left: 900, top: 200, maxWidth: 400, maxHeight: 560 }
+    expect(inFixedFrame(margin, grid, 800)).toMatchObject({ left: 423, top: 170 })
+  })
+
+  it('C-18 a sheet keeps its foot: bottom is measured from the frame bottom, not the viewport', () => {
+    const sheet = { kind: 'sheet' as const, left: 500, width: 300, bottom: 100, maxHeight: 400 }
+    // The frame ends 70px above the viewport foot (800 - 30 - 700).
+    expect(inFixedFrame(sheet, grid, 800)).toEqual({ ...sheet, left: 23, bottom: 30 })
+  })
+
+  it('C-18 an edge tab moves with the frame; the viewport as frame changes nothing', () => {
+    const edge = { kind: 'edge' as const, above: true, left: 1200, top: 50 }
+    expect(inFixedFrame(edge, grid, 800)).toEqual({ ...edge, left: 723, top: 20 })
+    expect(inFixedFrame(edge, { left: 0, top: 0, width: 1384, height: 800 }, 800)).toEqual(edge)
   })
 })

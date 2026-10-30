@@ -45,6 +45,8 @@ export const COMMENT_TEST_IDS = {
   // Comment window
   /** The comment window (data-view: identity / new / threads) */
   COMMENT_WINDOW: 'comment-window',
+  /** The docked window's hidden probe: the box its `position: fixed` resolves against (C-18) */
+  COMMENT_WINDOW_FRAME: 'comment-window-frame',
   /** Window title (takes focus in the threads view) */
   COMMENT_WINDOW_TITLE: 'comment-window-title',
   /** Close (x) in the window head */

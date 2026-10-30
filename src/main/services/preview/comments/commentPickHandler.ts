@@ -28,8 +28,9 @@
  *   (R3-13 L5) – a token moved onto another element is refused;
  * - for a `context` pick – the reader's right-click outside comment mode that
  *   the page did not cancel (OD-01) – comment mode is OFF (in the mode the
- *   preload sends `menu`), and the element checks above hold: it only ever
- *   opens a menu;
+ *   preload sends `menu`), the real cursor is over the view at the point the
+ *   page reports (`commentContextGate.ts`, security review L-1), and the
+ *   element checks above hold: it only ever opens a menu;
  * - for a pin pick: the key is one of the frame's pins;
  * - for a keyboard-picker step that reached an element: comment mode is on,
  *   and the token passes the element pick's frame and file checks, so the
@@ -46,7 +47,8 @@ import {
 import { logger } from '../../LoggingService'
 import { samePathKey } from '../../comments/commentUnsavedSources'
 import type { CommentFrameLike, CommentFrames, FrameRecord } from './commentFrames'
-import type { PickerStepInput } from './commentPickerStep'
+import { realContextClick, type ContextGateGeometry } from './commentContextGate'
+import type { PickerStepEvent } from './commentPickerSpeaker'
 import type { ElementTokenEntry, ElementTokenTable } from './ElementTokenTable'
 
 /** Element and pin picks the whole view admits per second (`PREVIEW_LIMITS.COMMENT_PICKS_PER_SECOND`). */
@@ -94,7 +96,7 @@ export interface PageSignalSinks {
   /** Alt+↑ out of a frame's `<body>`. */
   parent(frame: CommentFrameLike): void
   /** The keyboard picker moved, in comment mode: the window's live region says it. */
-  step(step: PickerStepInput): void
+  step(step: PickerStepEvent): void
   icon(frame: CommentFrameLike, record: FrameRecord, pinKey: string, pick: CommentPick): void
   /** `entry` absent: the element has no tokened ancestor ("Can't comment here"). */
   element(frame: CommentFrameLike, record: FrameRecord, entry: ElementTokenEntry | undefined, pick: CommentPick): void
@@ -110,6 +112,8 @@ export interface PickHandlerDeps {
   readonly mode: () => boolean
   readonly sinks: PageSignalSinks
   readonly platform?: NodeJS.Platform
+  /** Where the view and the real cursor are, for a `context` pick (L-1); absent: every `context` pick is dropped. */
+  readonly geometry?: ContextGateGeometry
 }
 
 /** The handler: one entry per page channel. Never throws. */
@@ -229,13 +233,17 @@ export function createCommentPickHandler(deps: PickHandlerDeps): CommentPickHand
     if (record === undefined || !deps.frames.isCommentable(record)) return drop('not-commentable')
     if (pick.kind === 'icon') {
       const key = pick.key as string
-      // A stack pin's click (C-17) names only pins main sent this frame, like its own.
-      if (!record.pins.has(key) || pick.stack?.some(other => !record.pins.has(other)) === true) return drop('unknown-pin')
-      deps.sinks.icon(frame, record, key, pick)
+      // A stack pin's click (C-17) names only pins main sent this frame, like its own – each once, and never itself
+      // again (security review M-1: a repeated key re-ran the pin's blocks once per copy).
+      const stack = [...new Set(pick.stack ?? [])].filter(other => other !== key)
+      if (!record.pins.has(key) || stack.some(other => !record.pins.has(other))) return drop('unknown-pin')
+      deps.sinks.icon(frame, record, key, { ...pick, stack })
       return
     }
     // A menu or open pick comes only in comment mode; a right-click outside it only out of it (OD-01).
     if (deps.mode() !== (pick.kind !== 'context')) return drop(pick.kind === 'context' ? 'mode-on' : 'mode-off')
+    // L-1: a page renderer cannot pop Erfana's menu at will – the real cursor must be at the click it reports.
+    if (pick.kind === 'context' && (deps.geometry === undefined || !realContextClick(pick, deps.geometry))) return drop('cursor-elsewhere')
     elementPick(frame, record, pick)
   }
 

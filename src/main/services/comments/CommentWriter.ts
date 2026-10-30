@@ -95,6 +95,7 @@ import {
   type WriteAct,
   type WritePlanRequest
 } from './commentWriteCore'
+import { insertBlanksFit } from './commentInsertIndent'
 
 export type { CommentFileTarget } from './commentFileAccess'
 export type { CommentDraftTarget, ThreadChange } from './commentWriteCore'
@@ -385,9 +386,9 @@ export class CommentWriter {
     if (!planned.ok) return refused(planned.refusal)
     // The bytes read: handed back when they were lent, main's own view when they were copied.
     const read = planned.raw ?? loaded.bytes
-    // Main's own checks of the worker's answer: a range inside the bytes read, and an
-    // insert that is one comment and nothing more (S-L-C).
-    if (!isSpliceWithin(planned, read.length) || !isSafeInsert(planned.insert)) return refused('verify-failed')
+    // Main's own checks of the worker's answer: a range inside the bytes read, an insert that is
+    // one comment and nothing more (S-L-C), and blanks around it that the bytes read call for (L-4).
+    if (!isSpliceWithin(planned, read.length) || !isSafeInsert(planned.insert) || !insertBlanksFit(read, planned)) return refused('verify-failed')
     // Rebuilt from the bytes read – and the strict write below re-reads the file and
     // requires these very bytes on disk: outside the block, the bytes written are the bytes read.
     const out = assembleSplice(read, planned)
