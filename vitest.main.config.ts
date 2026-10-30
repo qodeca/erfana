@@ -314,6 +314,32 @@ export default defineConfig({
         'src/main/services/comments/commentWriteCore.ts': { lines: 98, functions: 98, branches: 96, statements: 96 },
         // measured 100/100/100/100
         'src/shared/comments/identity.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Spec 024 – the Markdown comment kind (024-FR-003, 024-NFR-008), measured on the
+        // markdownComments and comments/markdown suites alone (lines/functions/branches/statements):
+        // measured 97.95/100/87.3/96.77
+        'src/shared/markdownComments/markdownKind.ts': { lines: 97, functions: 98, branches: 86, statements: 96 },
+        // measured 100/100/100/100
+        'src/shared/markdownComments/markdownLimits.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/92.15/98.43
+        'src/shared/markdownComments/mdAnchor.ts': { lines: 98, functions: 98, branches: 91, statements: 98 },
+        // measured 100/100/97.36/100
+        'src/shared/markdownComments/mdCommentScan.ts': { lines: 98, functions: 98, branches: 96, statements: 98 },
+        // measured 100/100/92.85/97.72
+        'src/shared/markdownComments/mdHast.ts': { lines: 98, functions: 98, branches: 92, statements: 97 },
+        // measured 100/92.3/91.93/98.07
+        'src/shared/markdownComments/mdHints.ts': { lines: 98, functions: 92, branches: 91, statements: 98 },
+        // measured 100/100/90.62/100
+        'src/shared/markdownComments/mdIndex.ts': { lines: 98, functions: 98, branches: 90, statements: 98 },
+        // measured 100/100/95.08/100
+        'src/shared/markdownComments/mdLocate.ts': { lines: 98, functions: 98, branches: 94, statements: 98 },
+        // measured 100/100/96.15/100
+        'src/shared/markdownComments/mdRender.ts': { lines: 98, functions: 98, branches: 96, statements: 98 },
+        // measured 98.07/100/92.64/94.93
+        'src/shared/markdownComments/mdSlots.ts': { lines: 98, functions: 98, branches: 92, statements: 94 },
+        // measured 100/100/100/100
+        'src/shared/markdownComments/mdSource.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/comments/markdown/markdownCommentJobs.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/main/services/preview/PreviewRequestKindLedger.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 93.9/100/94.73/93.9

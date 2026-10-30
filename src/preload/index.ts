@@ -24,6 +24,7 @@ import { browserBridge } from './browserBridge'
 import { screenshotBridge } from './screenshotBridge'
 import { claudeStatusBridge } from './claudeStatusBridge'
 import { previewCommentsBridge } from './previewCommentsBridge'
+import { fileCommentsBridge } from './fileCommentsBridge'
 import type { FileNode, FileStats } from '../shared/ipc/file-schema'
 
 export type { FileNode, FileStats }
@@ -146,6 +147,13 @@ const api = {
    * path to write or an author.
    */
   previewComments: previewCommentsBridge,
+
+  /**
+   * Comments in renderer-hosted previews (spec 024, see fileCommentsBridge.ts):
+   * list, open a draft, save, and the file-changed event. A panel, its file,
+   * main-minted tokens and keys – never an author.
+   */
+  fileComments: fileCommentsBridge,
 
   // Quit confirmation operations (see quitBridge.ts)
   quit: quitBridge,

@@ -35,7 +35,9 @@ import {
   type CommentDocument,
   type FileCommentState
 } from '../../../shared/htmlComments'
-import type { CommentFileKindId } from '../../../shared/comments/fileKind'
+import { decodeLossless } from '../../../shared/comments/encoding'
+import type { CommentFileKind, CommentFileKindId, KindDocument } from '../../../shared/comments/fileKind'
+import { PREVIEW_LIMITS } from '../../../shared/preview-limits'
 import type { CommentRefusal } from './commentRefusals'
 
 /** Source bytes the cache may hold: two 4 MB pages, about 120 MB of tree (S9). */
@@ -43,9 +45,9 @@ export const DOC_CACHE_MAX_BYTES = 8 * 1024 * 1024
 /** Documents the cache may hold. */
 export const DOC_CACHE_MAX_ENTRIES = 16
 
-/** A job's document: parsed, or why its bytes cannot be read for comments. */
-export type JobDocument =
-  | { readonly ok: true; readonly hash: string; readonly doc: CommentDocument }
+/** A job's document: parsed, or why its bytes cannot be read for comments. `D` is the kind's document. */
+export type JobDocument<D extends KindDocument = CommentDocument> =
+  | { readonly ok: true; readonly hash: string; readonly doc: D }
   | { readonly ok: false; readonly hash: string; readonly refusal: CommentRefusal }
 
 /** SHA-256 (hex) of `bytes` – the same digest the token table and the writer use. */
@@ -154,4 +156,36 @@ export function documentOf(bytes: Uint8Array, cache: KindDocCache<CommentDocumen
 /** A fresh parse of `bytes`, never from the cache (see the module comment). */
 export function freshDocumentOf(bytes: Uint8Array): JobDocument {
   return parsed(bytes, sha256HexOf(bytes))
+}
+
+/** The read-only document a kind's parse ends in when the file is past what it may parse. */
+function isTooLargeState(doc: KindDocument): boolean {
+  return doc.state.readOnlyReason === 'too-large'
+}
+
+/**
+ * Any file kind's document for `bytes`, parsed afresh (spec 024 architecture
+ * note 001 § 5 steps 4–5): over `COMMENT_FILE_MAX_BYTES` is `too-large` before
+ * any decode, anything but a lossless UTF-8 round trip is `encoding`, and a
+ * kind that marks the file `too-large` itself (its own bounds, NFR-008) is
+ * refused the same way. The HTML kind keeps its own reader
+ * ({@link freshDocumentOf}), which adds the parse5 token pre-checks.
+ */
+export function freshKindDocumentOf(bytes: Uint8Array, kind: CommentFileKind): JobDocument<KindDocument> {
+  const hash = sha256HexOf(bytes)
+  if (bytes.length > PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES) return { ok: false, hash, refusal: 'too-large' }
+  const decoded = decodeLossless(bytes)
+  if (!decoded.ok) return { ok: false, hash, refusal: 'encoding' }
+  const doc = kind.parse(decoded.text, decoded.hasBom ? 1 : 0)
+  return isTooLargeState(doc) ? { ok: false, hash, refusal: 'too-large' } : { ok: true, hash, doc }
+}
+
+/** {@link freshKindDocumentOf} through `cache`: the read-only jobs (the list) of a kind. */
+export function kindDocumentOf(bytes: Uint8Array, kind: CommentFileKind, cache: KindDocCache<KindDocument>): JobDocument<KindDocument> {
+  const hash = sha256HexOf(bytes)
+  const cached = cache.get(hash)
+  if (cached !== undefined) return { ok: true, hash, doc: cached }
+  const document = freshKindDocumentOf(bytes, kind)
+  if (document.ok) cache.set(hash, document.doc, bytes.length)
+  return document
 }

@@ -27,7 +27,7 @@ const hooks = vi.hoisted(() => ({
   rename: vi.fn(),
   open: vi.fn(),
   lstat: vi.fn(),
-  verifyCommentSplice: vi.fn(),
+  verifyKindSplice: vi.fn(),
   /** Runs once per temp-file creation, before the temp file is opened. */
   onTempOpen: null as null | ((count: number) => Promise<void>),
   tempOpens: 0
@@ -38,13 +38,14 @@ vi.mock('node:fs/promises', async importOriginal => {
   return { ...actual, rename: hooks.rename, open: hooks.open, lstat: hooks.lstat }
 })
 
-vi.mock('../../../shared/htmlComments', async importOriginal => {
-  const actual = await importOriginal<typeof import('../../../shared/htmlComments')>()
-  return { ...actual, verifyCommentSplice: hooks.verifyCommentSplice }
+// The write core verifies every kind through the shared `verifyKindSplice` (spec 024 § 5).
+vi.mock('../../../shared/comments/splice', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../../shared/comments/splice')>()
+  return { ...actual, verifyKindSplice: hooks.verifyKindSplice }
 })
 
 import { ErrorCode } from '../../../shared/errors'
-import * as htmlComments from '../../../shared/htmlComments'
+import type * as sharedSplice from '../../../shared/comments/splice'
 import { ATOMIC_TEMP_PREFIX } from '../../utils/atomicWrite'
 import {
   PAGE,
@@ -63,11 +64,11 @@ type FsPromises = typeof import('node:fs/promises')
 
 let project: TempProject
 let fs: FsPromises
-let realVerify: typeof htmlComments.verifyCommentSplice
+let realVerify: typeof sharedSplice.verifyKindSplice
 
 beforeEach(async () => {
   fs = await vi.importActual<FsPromises>('node:fs/promises')
-  realVerify = (await vi.importActual<typeof htmlComments>('../../../shared/htmlComments')).verifyCommentSplice
+  realVerify = (await vi.importActual<typeof sharedSplice>('../../../shared/comments/splice')).verifyKindSplice
   project = await makeProject()
   hooks.tempOpens = 0
   hooks.onTempOpen = null
@@ -81,8 +82,8 @@ beforeEach(async () => {
     }
     return fs.open(...args)
   })
-  hooks.verifyCommentSplice.mockReset()
-  hooks.verifyCommentSplice.mockImplementation(realVerify)
+  hooks.verifyKindSplice.mockReset()
+  hooks.verifyKindSplice.mockImplementation(realVerify)
   hooks.lstat.mockReset()
   hooks.lstat.mockImplementation(fs.lstat)
 })
@@ -294,7 +295,7 @@ describe('file-system failures and fail-closed verification', () => {
   it('a splice that fails its verification is never written (fail closed): COMMENT_WRITE_FAILED', async () => {
     await project.write('index.html', PAGE)
     const before = await snapshot(project.path('index.html'))
-    hooks.verifyCommentSplice.mockReturnValue({ ok: false, reason: 'elements' })
+    hooks.verifyKindSplice.mockReturnValue({ ok: false, reason: 'elements' })
 
     const result = await addOnBuy()
 

@@ -48,7 +48,8 @@ export interface CommentHostWindow {
 /** Injected collaborators for the comment handlers. */
 export interface PreviewCommentHandlerDeps {
   readonly registry: Pick<PreviewCommentRegistry, 'get'>
-  readonly unsaved: CommentUnsavedSources
+  /** The windows' unsaved files: this family reports them, the writers ask. */
+  readonly unsaved: Pick<CommentUnsavedSources, 'set' | 'has' | 'forget'>
   readonly isTrustedSender: (event: IpcMainInvokeEvent) => boolean
   /** Resolve the sender's window; defaults to `BrowserWindow.fromWebContents`. */
   readonly resolveWindow?: (event: IpcMainInvokeEvent) => CommentHostWindow | null

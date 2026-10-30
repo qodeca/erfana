@@ -25,7 +25,16 @@
  * (`commentJobDocs.ts`). The verified result is a fresh parse of the new
  * bytes, so it goes INTO the cache – the list after the write finds it.
  *
- * Only the plan and the file's {@link SpliceOrigin} outlive the planning
+ * The file kind comes with the job's environment (spec 024 architecture note
+ * 001 § 5): its parse, its own pre-write check, and its agent note and hints,
+ * which every new or rewritten block carries. An HTML `add` names a page
+ * draft (offset and anchors); a `pick` – the renderer-hosted previews' add –
+ * names a {@link PickedTarget} the kind locates, and is tried at each slot
+ * the kind offers, in order, at most {@link MAX_SLOTS_PER_SAVE}: a slot whose
+ * splice fails only the kind's own check gives way to the next, and when none
+ * passes the save is `render-changed` (C25).
+ *
+ * Only the plans and the file's {@link KindOrigin} outlive the planning
  * step, so the first parse tree can be collected before the verifying
  * re-parse: at 25 MB one tree is most of a gigabyte, and holding both would
  * double the worker's peak (§19 Rev 4).
@@ -44,11 +53,8 @@ import {
   isSafeCommentText,
   planDelete,
   planInsert,
-  planReplace,
   setStatus,
-  spliceOriginOf,
   utf8Length,
-  verifyCommentSplice,
   verifySpliceBytes,
   type CommentAnchor,
   type CommentAuthor,
@@ -59,12 +65,24 @@ import {
   type PlanFailure,
   type PlanResult,
   type RandomBytes,
-  type SpliceOrigin,
   type SplicePlan,
   type ThreadContext
 } from '../../../shared/htmlComments'
-import { freshDocumentOf, sha256HexOf, writableRefusal, type KindDocCache } from './commentJobDocs'
+import {
+  isKindRefusal,
+  type CommentFileKind,
+  type KindDocument,
+  type KindOrigin,
+  type KindRefusalReason,
+  type PickedTarget
+} from '../../../shared/comments/fileKind'
+import type { TextQuote } from '../../../shared/comments/format'
+import { insertRefusal, planReplace, planSlotInsert, verifyKindSplice, type VerifyFailure } from '../../../shared/comments/splice'
+import { freshKindDocumentOf, sha256HexOf, writableRefusal, type JobDocument, type KindDocCache } from './commentJobDocs'
 import type { CommentRefusal } from './commentRefusals'
+
+/** Slots one save tries at most, whatever its kind offers (C19). */
+export const MAX_SLOTS_PER_SAVE = 8
 
 /** What a draft recorded about its element when the pick was made (P5). */
 export interface CommentDraftTarget {
@@ -89,6 +107,14 @@ export type ThreadChange =
 /** The edit a write makes, as plain data that crosses to the worker. */
 export type WritePlanRequest =
   | { readonly op: 'add'; readonly draft: CommentDraftTarget; readonly view: CommentView; readonly text: string }
+  | {
+      readonly op: 'pick'
+      readonly pick: PickedTarget
+      /** The selected words, kept as `anchor.sel` when the kind finds them valid. */
+      readonly sel?: TextQuote
+      readonly view: CommentView
+      readonly text: string
+    }
   | { readonly op: 'thread'; readonly threadId: string; readonly rawHash: string; readonly change: ThreadChange }
   | { readonly op: 'deleteBlock'; readonly rawHash: string; readonly start?: number }
 
@@ -141,8 +167,24 @@ const PLAN_REFUSALS: Readonly<Record<PlanFailure, CommentRefusal>> = {
   invalid: 'invalid'
 }
 
+/** A kind's "no target" reasons as save refusals. */
+const KIND_REFUSALS: Readonly<Record<KindRefusalReason, CommentRefusal>> = {
+  'not-found': 'target-moved',
+  'not-eligible': 'target-moved',
+  'generated-region': 'generated-region',
+  frontmatter: 'frontmatter'
+}
+
+/** The verify failures the shared checks own; any other is the kind's own (HTML: `elements`). */
+const SHARED_VERIFY_FAILURES: ReadonlySet<VerifyFailure> = new Set<VerifyFailure>(['bytes', 'block-count', 'comment-count', 'block-data'])
+
+/**
+ * Plans in try order: one for every operation but a `pick`; one per slot for
+ * a `pick` (`slotted`), where a plan failing only the kind's check gives way
+ * to the next.
+ */
 type Planned =
-  | { readonly ok: true; readonly plan: SplicePlan; readonly threadId: string | null }
+  | { readonly ok: true; readonly plans: readonly SplicePlan[]; readonly threadId: string | null; readonly slotted?: true }
   | { readonly ok: false; readonly refusal: CommentRefusal }
 
 const refuse = (refusal: CommentRefusal): { readonly ok: false; readonly refusal: CommentRefusal } => ({ ok: false, refusal })
@@ -199,7 +241,7 @@ function contextOf(act: WriteAct, random: RandomBytes | undefined): ThreadContex
 }
 
 function fromPlan(result: PlanResult, threadId: string | null): Planned {
-  return result.ok ? { ok: true, plan: result.plan, threadId } : refuse(PLAN_REFUSALS[result.reason])
+  return result.ok ? { ok: true, plans: [result.plan], threadId } : refuse(PLAN_REFUSALS[result.reason])
 }
 
 /** The element the draft's backup anchors name in a changed file, when exactly one matches. */
@@ -208,14 +250,45 @@ function relocate(doc: CommentDocument, anchor: CommentAnchor): IndexedElement |
   return found.state === 'attached' ? doc.index.elementAt(found.startOffset) : undefined
 }
 
-function planAdd(request: Extract<WritePlanRequest, { op: 'add' }>, doc: CommentDocument, hash: string, context: () => ThreadContext): Planned {
+function planAdd(request: Extract<WritePlanRequest, { op: 'add' }>, kind: CommentFileKind, doc: KindDocument, hash: string, context: () => ThreadContext): Planned {
+  // A page draft names HTML offsets and anchors: only the HTML kind's document can take it.
+  if (!isHtmlDocument(doc)) return refuse('invalid')
   const { draft } = request
   const el = hash === draft.fileHash ? doc.index.elementAt(draft.offset) : relocate(doc, draft.anchor)
   if (!el || el.tag !== draft.anchor.tag) return refuse('target-moved')
   // The stored anchor is rebuilt from the bytes being written; only `runtime` comes from the draft
   const anchor = buildDraftAnchor(doc.index, el, draft.anchor.runtime)
   const data = createThread({ anchor, view: request.view, text: request.text, context: context() })
-  return fromPlan(planInsert(doc, { targetStart: el.start, data, ws: draft.ws }), data.id)
+  return fromPlan(planInsert(doc, { targetStart: el.start, data, ws: draft.ws }, kind), data.id)
+}
+
+/** True when `doc` is the HTML kind's document – the only one a page draft fits. */
+function isHtmlDocument(doc: KindDocument): doc is CommentDocument {
+  return 'tagSequence' in doc.index
+}
+
+/**
+ * A `pick` (the renderer-hosted previews' add): the kind finds the target,
+ * builds its anchor (with the selected words when valid) and offers its
+ * slots; one plan per slot, in the kind's order, capped.
+ */
+function planPick(request: Extract<WritePlanRequest, { op: 'pick' }>, kind: CommentFileKind, doc: KindDocument, context: () => ThreadContext): Planned {
+  const found = kind.locate(doc, request.pick)
+  if (isKindRefusal(found)) return refuse(KIND_REFUSALS[found.refused])
+  const shared = insertRefusal(doc)
+  if (shared) return refuse(PLAN_REFUSALS[shared])
+  const slots = kind.slots(doc, found, request.pick).slice(0, MAX_SLOTS_PER_SAVE)
+  if (slots.length === 0) return refuse('target-moved')
+  // One thread for every slot; only its anchor may differ by slot (a block before a whole list names the list).
+  const first = createThread({ anchor: kind.anchorOf(doc, found, request.sel, slots[0]), view: request.view, text: request.text, context: context() })
+  const plans: SplicePlan[] = []
+  for (const slot of slots) {
+    const data: CommentData = slot === slots[0] ? first : { ...first, anchor: kind.anchorOf(doc, found, request.sel, slot) }
+    const planned = planSlotInsert(doc, slot, data, kind.refuseGrowth, kind)
+    if (!planned.ok) return refuse(PLAN_REFUSALS[planned.reason])
+    plans.push(planned.plan)
+  }
+  return { ok: true, plans, threadId: first.id, slotted: true }
 }
 
 /** The thread after `change`: `null` removes the block, `undefined` means the message is gone. */
@@ -234,61 +307,74 @@ function changedData(data: CommentData, change: ThreadChange, act: WriteAct, con
   }
 }
 
-function planThreadChange(request: Extract<WritePlanRequest, { op: 'thread' }>, doc: CommentDocument, act: WriteAct, context: () => ThreadContext): Planned {
+function planThreadChange(request: Extract<WritePlanRequest, { op: 'thread' }>, kind: CommentFileKind, doc: KindDocument, act: WriteAct, context: () => ThreadContext): Planned {
   const { threadId, rawHash } = request
   const block = doc.state.blocks.find(b => b.kind === 'ok' && b.data.id === threadId)
   if (block?.kind !== 'ok' || block.rawHash !== rawHash) return refuse('block-changed')
   const next = changedData(block.data, request.change, act, context)
   if (next === undefined) return refuse('block-changed')
   if (next === null) return fromPlan(planDelete(doc, { block: { id: threadId }, rawHash }), null)
-  return fromPlan(planReplace(doc, { id: threadId, rawHash, data: next }), threadId)
+  return fromPlan(planReplace(doc, { id: threadId, rawHash, data: next }, kind.refuseGrowth, kind), threadId)
 }
 
-function planDeleteDamaged(request: Extract<WritePlanRequest, { op: 'deleteBlock' }>, doc: CommentDocument): Planned {
+function planDeleteDamaged(request: Extract<WritePlanRequest, { op: 'deleteBlock' }>, doc: KindDocument): Planned {
   const damaged = doc.state.blocks.filter(b => b.kind === 'damaged' && b.rawHash === request.rawHash)
   const block = damaged.length === 1 ? damaged[0] : damaged.find(b => b.nodeRange[0] === request.start)
   if (!block) return refuse('block-changed')
   return fromPlan(planDelete(doc, { block: { start: block.nodeRange[0] }, rawHash: request.rawHash }), null)
 }
 
-function planOf(job: WriteJob, doc: CommentDocument, hash: string, random: RandomBytes | undefined): Planned {
+function planOf(job: WriteJob, kind: CommentFileKind, doc: KindDocument, hash: string, random: RandomBytes | undefined): Planned {
   const { request, act } = job
   const context = (): ThreadContext => contextOf(act, random)
   switch (request.op) {
     case 'add':
-      return planAdd(request, doc, hash, context)
+      return planAdd(request, kind, doc, hash, context)
+    case 'pick':
+      return planPick(request, kind, doc, context)
     case 'thread':
-      return planThreadChange(request, doc, act, context)
+      return planThreadChange(request, kind, doc, act, context)
     case 'deleteBlock':
       return planDeleteDamaged(request, doc)
   }
 }
 
-/** A plan made on the bytes read, with what verifying it needs – and no parse tree. */
+/** Plans made on the bytes read, with what verifying them needs – and no parse tree. */
 type ReadyPlan =
-  | (Extract<Planned, { ok: true }> & { readonly origin: SpliceOrigin; readonly hash: string })
+  | (Extract<Planned, { ok: true }> & { readonly origin: KindOrigin; readonly hash: string })
   | { readonly ok: false; readonly refusal: CommentRefusal }
 
+/** The file kind a write runs for, and how it reads the bytes afresh. */
+export interface WriteKind {
+  readonly kind: CommentFileKind
+  /** A fresh parse of `bytes`, never from the cache; {@link freshKindDocumentOf} when absent. */
+  readonly read?: (bytes: Uint8Array) => JobDocument<KindDocument>
+}
+
 /**
- * §7.6 steps 3–6 on a fresh parse of `bytes`. Only the plan and the file's
- * {@link SpliceOrigin} are returned, so the parse tree is unreachable once
- * this returns (module comment).
+ * §7.6 steps 3–6 on a fresh parse of `bytes`. Only the plans and the file's
+ * origin are returned, so the parse tree is unreachable once this returns
+ * (module comment).
  */
-function planOnFreshParse(bytes: Uint8Array, job: WriteJob, random: RandomBytes | undefined): ReadyPlan {
-  const document = freshDocumentOf(bytes)
+function planOnFreshParse(bytes: Uint8Array, job: WriteJob, writeKind: WriteKind, random: RandomBytes | undefined): ReadyPlan {
+  const { kind } = writeKind
+  const document = writeKind.read?.(bytes) ?? freshKindDocumentOf(bytes, kind)
   if (!document.ok) return refuse(document.refusal)
   const blocked = writableRefusal(document.doc.state)
   if (blocked) return refuse(blocked)
-  const planned = planOf(job, document.doc, document.hash, random)
-  return planned.ok ? { ...planned, origin: spliceOriginOf(document.doc), hash: document.hash } : planned
+  const planned = planOf(job, kind, document.doc, document.hash, random)
+  return planned.ok ? { ...planned, origin: kind.originOf(document.doc), hash: document.hash } : planned
 }
 
-/** §7.6 steps 7–8: the splice as bytes and the new file's parse, when every check passes. */
-function spliceVerified(
-  bytes: Uint8Array,
-  origin: SpliceOrigin,
-  plan: SplicePlan
-): { readonly ok: true; readonly splice: ByteSplice; readonly out: Uint8Array; readonly doc: CommentDocument } | { readonly ok: false; readonly refusal: CommentRefusal } {
+type Spliced =
+  | { readonly ok: true; readonly splice: ByteSplice; readonly out: Uint8Array; readonly doc: KindDocument }
+  | { readonly ok: false; readonly refusal: CommentRefusal; readonly kindCheck?: true }
+
+/**
+ * §7.6 steps 7–8: the splice as bytes and the new file's parse, when every
+ * check passes. `kindCheck`: only the kind's own check failed.
+ */
+function spliceVerified(bytes: Uint8Array, kind: CommentFileKind, origin: KindOrigin, plan: SplicePlan): Spliced {
   const byteStart = utf8Length(origin.text, 0, plan.start)
   const splice: ByteSplice = { byteStart, byteEnd: byteStart + utf8Length(origin.text, plan.start, plan.end), insert: encodeText(plan.insert) }
   const out = assembleSplice(bytes, splice)
@@ -296,15 +382,39 @@ function spliceVerified(
   const text = applySplice(origin.text, plan)
   const decoded = decodeLossless(out)
   if (!verifySpliceBytes(bytes, out, origin.text, plan) || !decoded.ok || decoded.text !== text) return refuse('verify-failed')
-  const verified = verifyCommentSplice(origin, text, plan)
-  return verified.ok ? { ok: true, splice, out, doc: verified.doc } : refuse('verify-failed')
+  const verified = verifyKindSplice(origin, text, plan, {
+    parse: next => kind.parse(next, decoded.hasBom ? 1 : 0),
+    verify: (from, doc, splicePlan) => kind.verify(from, doc, splicePlan)
+  })
+  if (verified.ok) return { ok: true, splice, out, doc: verified.doc }
+  return SHARED_VERIFY_FAILURES.has(verified.reason) ? refuse('verify-failed') : { ok: false, refusal: 'verify-failed', kindCheck: true }
+}
+
+/**
+ * The first plan that passes every check. For a `pick`, a plan that fails
+ * only the kind's own check gives way to the next slot, and when every slot
+ * failed that way the save is `render-changed`; any other failure refuses.
+ */
+function firstVerified(bytes: Uint8Array, kind: CommentFileKind, ready: Extract<ReadyPlan, { ok: true }>): Spliced {
+  let last: Spliced = refuse('verify-failed')
+  for (const plan of ready.plans) {
+    last = spliceVerified(bytes, kind, ready.origin, plan)
+    if (last.ok || ready.slotted !== true || last.kindCheck !== true) return last
+  }
+  return refuse('render-changed')
+}
+
+/** What a `write` job uses: its kind (how to read and check the file), the cache it fills, a random source. */
+export interface WriteJobEnv extends WriteKind {
+  readonly cache?: KindDocCache<KindDocument>
+  readonly random?: RandomBytes
 }
 
 /** The `write` job on the bytes main read. `cache` receives the verified new file's parse. */
-export function runWriteJob(bytes: Uint8Array, job: WriteJob, env: { readonly cache?: KindDocCache<CommentDocument>; readonly random?: RandomBytes }): WriteJobResult {
-  const ready = planOnFreshParse(bytes, job, env.random)
+export function runWriteJob(bytes: Uint8Array, job: WriteJob, env: WriteJobEnv): WriteJobResult {
+  const ready = planOnFreshParse(bytes, job, env, env.random)
   if (!ready.ok) return { kind: 'write', ok: false, refusal: ready.refusal }
-  const spliced = spliceVerified(bytes, ready.origin, ready.plan)
+  const spliced = firstVerified(bytes, env.kind, ready)
   if (!spliced.ok) return { kind: 'write', ok: false, refusal: spliced.refusal }
   const outputHash = sha256HexOf(spliced.out)
   env.cache?.set(outputHash, spliced.doc, spliced.out.length)

@@ -84,6 +84,38 @@ export function isHtmlPreviewCommentsEnabled(settings: Pick<GlobalSettings, 'htm
 }
 
 /**
+ * Markdown Preview configuration (spec 024). Only its comments switch so far:
+ * `markdownPreview.comments.enabled`, "Comments in Markdown preview" in
+ * Settings, default on. Lenient, like `htmlPreview.comments`: a missing or
+ * malformed block resolves to on instead of tripping the corruption reset that
+ * would replace every other setting. Read it through
+ * {@link isMarkdownPreviewCommentsEnabled}.
+ */
+export const MarkdownPreviewSettingsSchema = z
+  .object({
+    comments: z
+      .object({ enabled: z.boolean().catch(true) })
+      .catch(() => ({ enabled: true }))
+      .optional()
+  })
+  .catch(() => ({}))
+export type MarkdownPreviewSettings = z.infer<typeof MarkdownPreviewSettingsSchema>
+
+/** Whether Markdown Preview comments are on (`markdownPreview.comments.enabled`, default on). */
+export function isMarkdownPreviewCommentsEnabled(settings: Pick<GlobalSettings, 'markdownPreview'>): boolean {
+  return settings.markdownPreview?.comments?.enabled !== false
+}
+
+/**
+ * Whether either preview's comments are on – what keeps the unsaved-files
+ * report running (024-FR-026) and the identity fields usable (024-FR-022).
+ * Reads a partial settings object (an older file, a test fixture) as on.
+ */
+export function isAnyPreviewCommentsEnabled(settings: Partial<Pick<GlobalSettings, 'htmlPreview' | 'markdownPreview'>>): boolean {
+  return settings.htmlPreview?.comments?.enabled !== false || settings.markdownPreview?.comments?.enabled !== false
+}
+
+/**
  * Terminal screen-reader mode (lens review [23]).
  *
  * - `auto` – on while the OS reports a screen reader (macOS, Windows), else off
@@ -175,6 +207,8 @@ export const GlobalSettingsSchema = z.object({
   })),
   /** HTML preview configuration (Issue #74) */
   htmlPreview: HtmlPreviewSettingsSchema.default(() => ({ enabled: true })),
+  /** Markdown Preview configuration (spec 024; lenient, absent means every default) */
+  markdownPreview: MarkdownPreviewSettingsSchema.optional(),
   /**
    * `files.exclude` (Issue #211, design D7). Lenient: a missing or malformed
    * section resolves to `{ exclude: [] }`, so it never triggers the corruption

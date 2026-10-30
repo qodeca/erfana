@@ -1,7 +1,7 @@
 {
   "limit": 500,
   "files": {
-    "src/main/index.ts": 846,
+    "src/main/index.ts": 843,
     "src/main/ipc/file-handlers.ts": 763,
     "src/main/ipc/transcription-handlers.ts": 788,
     "src/main/services/ExternalFileService.ts": 909,
@@ -42,6 +42,6 @@
     "src/renderer/src/hooks/useTerminalFileLinks.ts": 643,
     "src/renderer/src/utils/filePathLinks.logic.ts": 683,
     "src/shared/constants.ts": 706,
-    "src/shared/errors.ts": 686
+    "src/shared/errors.ts": 688
   }
 }

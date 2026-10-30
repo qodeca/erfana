@@ -171,9 +171,19 @@ export function insertRefusal(doc: SpliceDocument): PlanFailure | undefined {
   return undefined
 }
 
-/** The note area of a block about `data`: the kind's note and hints, or the v0.23.1 note alone. */
-function noteLinesOf(data: CommentData, note: BlockNote | undefined): readonly string[] {
-  return note === undefined ? AGENT_NOTE_LINES : [...note.agentNote, ...note.hints(data)]
+/**
+ * The note area of a block about `data`: the kind's note and hints, or the
+ * v0.23.1 note alone. The hints get the document the block is written into
+ * when the planner was given a kind's parse (`fileKind.ts`, `hints`).
+ */
+function noteLinesOf(data: CommentData, note: BlockNote | undefined, doc: SpliceDocument): readonly string[] {
+  if (note === undefined) return AGENT_NOTE_LINES
+  return [...note.agentNote, ...note.hints(data, isKindDocument(doc) ? doc : undefined)]
+}
+
+/** True when a planner's document is a kind's parse: it carries the kind's index. */
+function isKindDocument(doc: SpliceDocument): doc is KindDocument {
+  return 'index' in doc
 }
 
 /** The exact text a slot's shape inserts around a serialized block. */
@@ -197,7 +207,7 @@ export function planSlotInsert(
   note?: BlockNote
 ): PlanResult {
   const eol = eolAt(doc.text, slot.offset)
-  const serialized = serializeBlock(data, { indent: slot.indent, eol }, noteLinesOf(data, note))
+  const serialized = serializeBlock(data, { indent: slot.indent, eol }, noteLinesOf(data, note, doc))
   if (!serialized.ok) return fail(serialized.reason)
   const insert = insertTextOf(slot, serialized.block, eol)
   const refused = check?.(doc.text, [slot.offset, slot.offset], insert)
@@ -251,7 +261,7 @@ export function planReplace(
   if (block.kind !== 'ok') return fail('not-editable')
   if (block.rawHash !== request.rawHash) return fail('stale')
   if (request.data.id !== request.id) return fail('invalid')
-  const serialized = serializeBlock(request.data, blockLayout(doc.text, block), noteLinesOf(request.data, note))
+  const serialized = serializeBlock(request.data, blockLayout(doc.text, block), noteLinesOf(request.data, note, doc))
   if (!serialized.ok) return fail(serialized.reason)
   const refused = check?.(doc.text, block.nodeRange, serialized.block)
   if (refused) return fail(refused)
@@ -348,8 +358,11 @@ export function verifySpliceBytes(
   )
 }
 
-/** What a kind's own pre-write check can fail on (HTML: the elements changed). */
-export type KindVerifyFailure = 'elements'
+/**
+ * What a kind's own pre-write check can fail on: HTML – the elements changed;
+ * Markdown – the preview's rendering changed (spec 024 architecture note 001 § 5).
+ */
+export type KindVerifyFailure = 'elements' | 'render-changed'
 
 /** Why a spliced file failed its verification; the write must not happen. */
 export type VerifyFailure = 'bytes' | 'block-count' | 'comment-count' | KindVerifyFailure | 'block-data'

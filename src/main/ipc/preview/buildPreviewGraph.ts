@@ -169,7 +169,7 @@ function defaultZoomFactor(window: Pick<PreviewWindowLike, 'webContents'>): numb
 }
 
 /** The reviewer from the app-level settings; the writer checks and trims it (§7.9). */
-function commentIdentityOf(settings: GlobalSettings): CommentIdentity | undefined {
+export function commentIdentityOf(settings: GlobalSettings): CommentIdentity | undefined {
   const { authorName, authorEmail } = settings.comments
   if (authorName === undefined) return undefined
   return authorEmail === undefined || authorEmail === '' ? { name: authorName } : { name: authorName, email: authorEmail }

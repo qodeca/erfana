@@ -53,6 +53,11 @@ export interface PickedTarget {
   readonly id?: string
   readonly path?: string
   /**
+   * SHA-256 (hex) of the file text the preview rendered when the target was
+   * picked (C7): while it still matches, the kind may trust the line position.
+   */
+  readonly baseHash?: string
+  /**
    * HTML only: the pick's computed `white-space-collapse` of the target's
    * parent (R3-8). Own-lines placement needs `collapse`; missing → mid-line.
    */
@@ -82,8 +87,12 @@ export type Slot =
       readonly indent: string
     }
 
-/** Why a kind found no target for a pick. */
-export type KindRefusalReason = 'not-found' | 'not-eligible'
+/**
+ * Why a kind found no target for a pick: none there, one that cannot take a
+ * comment, one inside a region another tool generates between START/END
+ * comments (024-FR-023), or the file's frontmatter (Markdown M6).
+ */
+export type KindRefusalReason = 'not-found' | 'not-eligible' | 'generated-region' | 'frontmatter'
 
 /** A kind's "no target" answer. */
 export interface KindRefusal {
@@ -125,14 +134,20 @@ export interface CommentFileKind {
   /**
    * The anchor a new block about `target` stores; with `sel`, the selected
    * words as `anchor.sel` when they are a valid selection (`anchorSel.ts`).
+   * `slot`, one of {@link CommentFileKind.slots}' answers, names where the
+   * block goes when the anchor depends on it (Markdown: a later slot before
+   * a whole list names the list, with the target below it); absent: the
+   * first slot's anchor.
    */
-  anchorOf(doc: KindDocument, target: IndexedTarget, sel?: TextQuote): CommentAnchor
+  anchorOf(doc: KindDocument, target: IndexedTarget, sel?: TextQuote, slot?: Slot): CommentAnchor
   /**
    * The note-area hint lines for a block (C-01), each built by the shared
-   * encoder (`noteLines.ts`). From `@data` only (C1), so a reply or a resolve
-   * rebuilds them.
+   * encoder (`noteLines.ts`). Rebuilt from `@data` at every write (C1), so a
+   * reply or a resolve rebuilds them. `doc` is the document the block is
+   * written into, for a hint `@data` cannot hold (Markdown: the target's
+   * first source line, re-derived from the file); HTML ignores it.
    */
-  hints(data: CommentData): readonly string[]
+  hints(data: CommentData, doc?: KindDocument): readonly string[]
   /** Where an anchor's target is now, without the position rule (`reattach.ts`). */
   reattach(doc: KindDocument, anchor: CommentAnchor): TargetResolution
   /** What {@link CommentFileKind.verify} needs of the planned-on document; holds no parse tree. */

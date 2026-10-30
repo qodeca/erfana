@@ -11,7 +11,8 @@
  * sees and adds what only main knows – the file's paths and whether a thread
  * is rendered now (`commentListBuilder.ts`).
  */
-import { visibleInline, type CommentAnchor, type CommentAuthor, type CommentDocument, type ParsedBlock } from '../../../shared/htmlComments'
+import { visibleInline, type CommentAnchor, type CommentAuthor, type ParsedBlock } from '../../../shared/htmlComments'
+import type { KindDocument } from '../../../shared/comments/fileKind'
 import { PREVIEW_LIMITS } from '../../../shared/preview-limits'
 import {
   COMMENT_RAW_PREVIEW_MAX_CHARS,
@@ -25,6 +26,18 @@ import type { CommentRefusal } from './commentRefusals'
 /** List one file's comments. */
 export interface ListJob {
   readonly kind: 'list'
+  /**
+   * Also say where each attached thread's target starts (the file-comment
+   * family's placements, spec 024 § 4); the HTML Preview never asks.
+   */
+  readonly placements?: true
+}
+
+/** Where an attached thread's target is now: its 1-based first line and its tag. */
+export interface ListedPlacement {
+  readonly threadId: string
+  readonly line: number
+  readonly tag: string
 }
 
 /** A thread as listed, before main gives it a key and its "not visible now" flag. */
@@ -46,6 +59,8 @@ export interface ListSummary {
   readonly threads: ListedThread[]
   readonly damaged: ListedDamaged[]
   readonly newer: ListedNewer[]
+  /** Present only when the job asked for it. */
+  readonly placements?: ListedPlacement[]
 }
 
 /** The summary, or why the file cannot be read for comments. */
@@ -126,7 +141,19 @@ function threadOf(block: Extract<ParsedBlock, { kind: 'ok' }>, line: number): Li
   }
 }
 
-function summaryOf(doc: CommentDocument): ListSummary {
+/** Each attached thread's target line, in block order. */
+function placementsOf(doc: KindDocument, line: (offset: number) => number): ListedPlacement[] {
+  const placements: ListedPlacement[] = []
+  for (const block of doc.state.blocks) {
+    if (block.kind !== 'ok' || block.target.state !== 'attached') continue
+    const target = doc.index.elementAt(block.target.startOffset)
+    if (target === undefined) continue
+    placements.push({ threadId: block.data.id, line: line(target.start), tag: target.tag })
+  }
+  return placements
+}
+
+function summaryOf(doc: KindDocument, job: ListJob | undefined): ListSummary {
   const line = lineIndex(doc.text)
   const threads: ListedThread[] = []
   const damaged: ListedDamaged[] = []
@@ -149,13 +176,14 @@ function summaryOf(doc: CommentDocument): ListSummary {
     ...(doc.state.readOnlyReason === undefined ? {} : { readOnlyReason: doc.state.readOnlyReason }),
     threads,
     damaged,
-    newer
+    newer,
+    ...(job?.placements === true ? { placements: placementsOf(doc, line) } : {})
   }
 }
 
 /** The `list` job. */
-export function runListJob(document: JobDocument): ListJobResult {
+export function runListJob(document: JobDocument<KindDocument>, job?: ListJob): ListJobResult {
   return document.ok
-    ? { kind: 'list', ok: true, summary: summaryOf(document.doc) }
+    ? { kind: 'list', ok: true, summary: summaryOf(document.doc, job) }
     : { kind: 'list', ok: false, refusal: document.refusal }
 }

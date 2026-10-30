@@ -23,8 +23,14 @@
 import { z } from 'zod'
 import { ErrorCode } from '../errors'
 import { PREVIEW_LIMITS } from '../preview-limits'
-import { MESSAGE_ID_PATTERN, visibleInline } from '../htmlComments'
 import { TAG_MAX_CHARS } from '../comments/format'
+import {
+  COMMENT_PATH_MAX_CHARS,
+  CommentFileViewSchema,
+  CommentMessageTextSchema as MessageTextSchema,
+  commentThreadOpSchemas
+} from './comment-common-schema'
+import type { CommentSaveResult } from './comment-common-schema'
 import {
   CommentKeySchema as KeySchema,
   CommentPickerSaySchema as PickerSaySchema,
@@ -49,6 +55,15 @@ export {
 } from './preview-comment-page-schema'
 export type { CommentAnchors, CommentBox, CommentOverlayLoss, CommentPick } from './preview-comment-page-schema'
 export type { CommentPickRuntime, CommentPickView, CommentPoint } from './preview-comment-page-schema'
+// One definition with the file-comment family (spec 024 architecture note 001 § 4).
+export {
+  COMMENT_PATH_MAX_CHARS,
+  COMMENT_RAW_PREVIEW_MAX_CHARS,
+  CommentFileViewSchema,
+  CommentSaveResultSchema,
+  CommentThreadViewSchema
+} from './comment-common-schema'
+export type { CommentFileView, CommentSaveResult, CommentThreadView } from './comment-common-schema'
 
 /** A draft token: 128 random bits as lower-case hex. */
 export const COMMENT_DRAFT_TOKEN_PATTERN = /^[0-9a-f]{32}$/
@@ -56,10 +71,6 @@ export const COMMENT_DRAFT_TOKEN_PATTERN = /^[0-9a-f]{32}$/
 export const COMMENT_DRAFT_KEY_PATTERN = /^[0-9a-f]{32}$/
 /** Files one window may report as holding unsaved editor changes. */
 export const COMMENT_UNSAVED_SOURCES_MAX = 500
-/** Characters of one such path. */
-export const COMMENT_PATH_MAX_CHARS = 4_096
-/** Characters of a damaged block's raw text sent to the renderer; longer is cut and flagged. */
-export const COMMENT_RAW_PREVIEW_MAX_CHARS = 65_536
 
 // ---------------------------------------------------------------------------
 // Renderer → main
@@ -98,17 +109,6 @@ export const CommentCommandRequestSchema = z
   .strict()
 export type CommentCommandRequest = z.infer<typeof CommentCommandRequestSchema>
 
-const MessageTextSchema = z
-  .string()
-  .min(1)
-  .max(PREVIEW_LIMITS.COMMENT_MESSAGE_MAX_CHARS * 2)
-  .refine(text => text.trim() !== '', { message: 'empty' })
-  .refine(text => [...text].length <= PREVIEW_LIMITS.COMMENT_MESSAGE_MAX_CHARS, { message: 'too long' })
-const RawHashSchema = z.string().regex(/^[0-9a-f]{64}$/)
-const MessageIdSchema = z.string().regex(MESSAGE_ID_PATTERN)
-
-const threadTarget = { panelId: PanelIdSchema, fileKey: KeySchema, threadKey: KeySchema, rawHash: RawHashSchema }
-
 /** `preview:commentSave` – one operation; the author comes from main's settings, never from here. */
 export const CommentSaveRequestSchema = z.discriminatedUnion('op', [
   z
@@ -119,22 +119,7 @@ export const CommentSaveRequestSchema = z.discriminatedUnion('op', [
       text: MessageTextSchema
     })
     .strict(),
-  z.object({ ...threadTarget, op: z.literal('reply'), text: MessageTextSchema }).strict(),
-  z
-    .object({ ...threadTarget, op: z.literal('editMessage'), messageId: MessageIdSchema, text: MessageTextSchema })
-    .strict(),
-  z.object({ ...threadTarget, op: z.literal('deleteMessage'), messageId: MessageIdSchema }).strict(),
-  z.object({ ...threadTarget, op: z.literal('setStatus'), status: z.enum(['open', 'resolved']) }).strict(),
-  z.object({ ...threadTarget, op: z.literal('deleteThread') }).strict(),
-  z
-    .object({
-      panelId: PanelIdSchema,
-      op: z.literal('deleteBlock'),
-      fileKey: KeySchema,
-      blockKey: KeySchema,
-      rawHash: RawHashSchema
-    })
-    .strict()
+  ...commentThreadOpSchemas
 ])
 export type CommentSaveRequest = z.infer<typeof CommentSaveRequestSchema>
 
@@ -162,119 +147,6 @@ export type CommentSetModeResult = z.infer<typeof CommentSetModeResultSchema>
 /** `preview:commentCommand`'s and `preview:commentSetUnsavedSources`' answer. */
 export const CommentAckSchema = z.union([z.object({ ok: z.literal(true) }).strict(), RefusedSchema])
 export type CommentAck = z.infer<typeof CommentAckSchema>
-
-/** `preview:commentSave`'s answer: the thread written, `null` when the block is gone. */
-export const CommentSaveResultSchema = z.union([
-  z.object({ ok: z.literal(true), threadKey: KeySchema.nullable() }).strict(),
-  RefusedSchema
-])
-export type CommentSaveResult = z.infer<typeof CommentSaveResultSchema>
-
-const TimestampSchema = z.string().max(32)
-/** An author as the renderer shows it; the email only when the file has one. */
-const AuthorViewSchema = z.object({ name: z.string().max(400), email: z.string().max(1_000).optional() }).strict()
-
-const MessageViewSchema = z
-  .object({
-    id: MessageIdSchema,
-    by: AuthorViewSchema,
-    at: TimestampSchema,
-    text: z.string().max(PREVIEW_LIMITS.COMMENT_MESSAGE_MAX_CHARS * 2),
-    edited: TimestampSchema.optional()
-  })
-  .strict()
-
-/** One thread, read from disk (§10.4). Text and emails reach the renderer only. */
-export const CommentThreadViewSchema = z
-  .object({
-    threadKey: KeySchema,
-    rawHash: RawHashSchema,
-    status: z.enum(['open', 'resolved']),
-    resolved: z.object({ by: AuthorViewSchema, at: TimestampSchema }).strict().optional(),
-    /** 1-based line of the block in the file. */
-    line: z.number().int().min(1),
-    /** `tag#id.class` of the stored anchor (§10.2 label rules applied by the renderer). */
-    tag: z.string().max(TAG_MAX_CHARS),
-    elementId: z.string().max(200).optional(),
-    classes: z.array(z.string().max(100)).max(PREVIEW_LIMITS.COMMENT_MAX_CLASSES),
-    /** Found in the file now (else "Element not found"). */
-    attached: z.boolean(),
-    /** Found, but not rendered right now ("Not visible now", decision 30). */
-    notVisible: z.boolean(),
-    /**
-     * The element's text as the block stored it – "It was attached to:" (§10.10).
-     * One line with nothing hidden: invisible and bidi characters arrive as a
-     * visible `\uXXXX` (`visibleInline`), never raw.
-     */
-    quote: z
-      .string()
-      .min(1)
-      .max(PREVIEW_LIMITS.COMMENT_QUOTE_MAX_CHARS)
-      .refine(text => visibleInline(text) === text)
-      .optional(),
-    /** A JS-built target: its tag and path below the in-file element, and its snapshot's size. */
-    runtime: z
-      .object({
-        tag: z.string().max(TAG_MAX_CHARS),
-        path: z.string().max(PREVIEW_LIMITS.COMMENT_RUNTIME_PATH_MAX_CHARS),
-        snapshotBytes: z.number().int().min(0).optional(),
-        truncated: z.literal(true).optional()
-      })
-      .strict()
-      .optional(),
-    messages: z.array(MessageViewSchema).min(1).max(PREVIEW_LIMITS.COMMENT_MAX_REPLIES + 1)
-  })
-  .strict()
-export type CommentThreadView = z.infer<typeof CommentThreadViewSchema>
-
-const DamageReasonSchema = z.enum([
-  'no-data',
-  'bad-json',
-  'schema',
-  'limits',
-  'readable-mismatch',
-  'conflict-marker',
-  'duplicate-id',
-  'in-template',
-  'id-mismatch',
-  'unterminated'
-])
-
-/** One file's comments: the page's, or a same-project frame's (decision 15). */
-export const CommentFileViewSchema = z
-  .object({
-    fileKey: KeySchema,
-    /** Project-relative, `/`-separated – for "Saved inside {file}". */
-    displayPath: z.string().max(COMMENT_PATH_MAX_CHARS),
-    /** Absolute, in project space: the spelling the editor's tabs use (dirty guard, §7.8). */
-    filePath: z.string().max(COMMENT_PATH_MAX_CHARS),
-    /** A frame's file rather than the page's own. */
-    frame: z.boolean(),
-    writable: z.boolean(),
-    readOnlyReason: z
-      .enum(['encoding', 'conflict-markers', 'too-large', 'too-many-blocks', 'unterminated-block', 'link', 'missing'])
-      .optional(),
-    threads: z.array(CommentThreadViewSchema).max(PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE),
-    damaged: z
-      .array(
-        z
-          .object({
-            blockKey: KeySchema,
-            rawHash: RawHashSchema,
-            reason: DamageReasonSchema,
-            line: z.number().int().min(1),
-            raw: z.string().max(COMMENT_RAW_PREVIEW_MAX_CHARS),
-            rawTruncated: z.literal(true).optional()
-          })
-          .strict()
-      )
-      .max(PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE),
-    newer: z
-      .array(z.object({ blockKey: KeySchema, version: z.number().int().min(2), line: z.number().int().min(1) }).strict())
-      .max(PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE)
-  })
-  .strict()
-export type CommentFileView = z.infer<typeof CommentFileViewSchema>
 
 /** `preview:commentList`'s answer. */
 export const CommentListResultSchema = z.union([

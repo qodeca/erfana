@@ -232,6 +232,10 @@ exports[`commentCopy strings (characterisation) > PIN-C-010 every string on Wind
       "action": "banner",
       "text": "Erfana doesn't write comments to this file.",
     },
+    "COMMENT_RENDER_CHANGED": {
+      "action": "banner",
+      "text": "Erfana can't add a comment here without changing how index.html looks in the preview, so nothing was saved. Your text is still here.",
+    },
     "COMMENT_SAVE_PENDING": {
       "action": "pending",
       "text": "Still saving to index.html. Your comment appears here once it is written – no need to save again.",
@@ -546,6 +550,10 @@ exports[`commentCopy strings (characterisation) > PIN-C-011 every string on macO
     "COMMENT_PATH_REFUSED": {
       "action": "banner",
       "text": "Erfana doesn't write comments to this file.",
+    },
+    "COMMENT_RENDER_CHANGED": {
+      "action": "banner",
+      "text": "Erfana can't add a comment here without changing how index.html looks in the preview, so nothing was saved. Your text is still here.",
     },
     "COMMENT_SAVE_PENDING": {
       "action": "pending",

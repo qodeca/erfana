@@ -23,7 +23,12 @@
  * | `COMMENT_TARGET_MOVED` | the picked element is no longer in the file, or not uniquely |
  * | `COMMENT_BLOCK_CHANGED` | the block changed, turned damaged or is gone since the window read it |
  * | `COMMENT_WRITE_UNSUPPORTED_FS` | the drive cannot rename or fsync (network and FUSE mounts) |
- * | `COMMENT_WRITE_FAILED` | anything else, including a file that kept changing during the save, a held file, a splice that failed its verification (fail closed), and a parse the comment parse worker could not run (`busy`, `parse-failed`) |
+ * | `COMMENT_WRITE_FAILED` | anything else, including a file that kept changing during the save, a held file, a splice that failed its verification (fail closed), a parse the comment parse worker could not run (`busy`, `parse-failed`), a file that differed when read again after the rename (`changed-during-save`, C12), and a `file-comment:*` request from an untrusted sender or with a bad payload |
+ * | `COMMENT_RENDER_CHANGED` | no slot the file kind offered kept the file's rendering (spec 024 § 5, C25) |
+ * | `COMMENT_TARGET_MOVED` (also) | the target lies in a generated START/END region (`generated-region`, 024-FR-023) or in the frontmatter (`frontmatter`, M6) |
+ * | `COMMENT_KEY_INVALID` (also) | a `file-comment:*` request for a file not open in that panel of the sender's window (`not-open`, C17), or an unknown, used or foreign draft token or key (`key-invalid`) |
+ * | `COMMENT_DRAFT_EXPIRED` | a draft older than its time to live (`draft-expired`) |
+ * | `COMMENT_PATH_REFUSED` (also) | a `file-comment:*` draft or save while comments are off in Settings for the file's preview (`comments-off`, 024-FR-022) |
  *
  * `COMMENT_DRAFT_EXPIRED` and `COMMENT_KEY_INVALID` belong to the draft and
  * key layer (P5), which runs before a write is attempted. `COMMENT_SAVE_PENDING`
@@ -31,6 +36,7 @@
  * (`commentSaveFlow.ts`).
  */
 import { ErrorCode } from '../../../shared/errors'
+import type { CommentRefusalReason } from '../../../shared/ipc/comment-common-schema'
 
 /** The `ErrorCode`s of the HTML Preview comment family. */
 export type CommentErrorCode =
@@ -50,42 +56,14 @@ export type CommentErrorCode =
   | ErrorCode.COMMENT_PATH_REFUSED
   | ErrorCode.COMMENT_FILE_READ_ONLY
   | ErrorCode.COMMENT_WRITE_FAILED
+  | ErrorCode.COMMENT_RENDER_CHANGED
 
-/** Why a comment read or write did nothing. */
-export type CommentRefusal =
-  // Where the file is (§7.6 step 1)
-  | 'not-absolute'
-  | 'outside-project'
-  | 'excluded'
-  | 'not-html'
-  /** The real name maps to another comment file kind than the requested name (C18). */
-  | 'kind-mismatch'
-  | 'alternate-stream'
-  | 'short-name'
-  // What the file is (steps 2–5)
-  | 'missing'
-  | 'link'
-  | 'too-large'
-  | 'encoding'
-  | 'conflict-markers'
-  | 'unterminated-block'
-  | 'too-many-blocks'
-  | 'read-only'
-  | 'not-owner'
-  // The write (steps 6–9)
-  | 'unsaved-source'
-  | 'identity'
-  | 'target-moved'
-  | 'block-changed'
-  | 'limit'
-  | 'meta-charset'
-  | 'invalid'
-  | 'verify-failed'
-  | 'changed'
-  | 'unsupported-fs'
-  | 'busy'
-  | 'parse-failed'
-  | 'io'
+/**
+ * Why a comment read or write did nothing – the shared wire enum
+ * (`comment-common-schema.ts`), so the reason a save answer carries is
+ * exactly main's.
+ */
+export type CommentRefusal = CommentRefusalReason
 
 const CODES: Readonly<Record<CommentRefusal, CommentErrorCode>> = {
   'not-absolute': ErrorCode.COMMENT_PATH_REFUSED,
@@ -116,7 +94,17 @@ const CODES: Readonly<Record<CommentRefusal, CommentErrorCode>> = {
   'unsupported-fs': ErrorCode.COMMENT_WRITE_UNSUPPORTED_FS,
   busy: ErrorCode.COMMENT_WRITE_FAILED,
   'parse-failed': ErrorCode.COMMENT_WRITE_FAILED,
-  io: ErrorCode.COMMENT_WRITE_FAILED
+  io: ErrorCode.COMMENT_WRITE_FAILED,
+  'render-changed': ErrorCode.COMMENT_RENDER_CHANGED,
+  'generated-region': ErrorCode.COMMENT_TARGET_MOVED,
+  frontmatter: ErrorCode.COMMENT_TARGET_MOVED,
+  'changed-during-save': ErrorCode.COMMENT_WRITE_FAILED,
+  'untrusted-sender': ErrorCode.COMMENT_WRITE_FAILED,
+  'bad-request': ErrorCode.COMMENT_WRITE_FAILED,
+  'not-open': ErrorCode.COMMENT_KEY_INVALID,
+  'key-invalid': ErrorCode.COMMENT_KEY_INVALID,
+  'draft-expired': ErrorCode.COMMENT_DRAFT_EXPIRED,
+  'comments-off': ErrorCode.COMMENT_PATH_REFUSED
 }
 
 /** The `ErrorCode` a refusal reaches the renderer as. */

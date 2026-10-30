@@ -10,13 +10,15 @@
  * (`agentNoteProblem`). Once frozen it takes no more kinds, so nothing that
  * runs later – an IPC handler, a page – can widen what is commentable.
  *
- * {@link commentFileKinds} is the production list. It is built, filled and
+ * {@link commentFileKinds} is the production list of the HTML Preview's
+ * family; {@link fileCommentKinds} that of the renderer-hosted previews. It is built, filled and
  * frozen when this module loads, which is before any IPC handler can run;
  * the `.txt` conformance kind is never in it (C18) – the tests build their
  * own registry.
  */
 import { agentNoteProblem, type CommentFileKind, type CommentFileKindId } from '../../../shared/comments/fileKind'
 import { htmlKind } from '../../../shared/comments/htmlKind'
+import { markdownKind } from '../../../shared/markdownComments/markdownKind'
 
 /** A lower-case extension with its dot: `.html`, `.md`. */
 const EXTENSION = /^\.[a-z0-9]+$/
@@ -98,3 +100,15 @@ export function frozenCommentFileKinds(kinds: readonly CommentFileKind[]): Comme
 
 /** The production kinds: HTML. */
 export const commentFileKinds: CommentFileKindRegistry = frozenCommentFileKinds([htmlKind])
+
+/**
+ * The kinds the `file-comment:*` channel family serves – the renderer-hosted
+ * previews (spec 024 architecture note 001 § 4, § 8 C18): Markdown. A fixed
+ * set of its own: the HTML Preview's files are written only through
+ * `preview:comment*`, so HTML is not here, and a `file-comment:*` request for
+ * an `.html` file is refused by name. The `.txt` conformance kind never is.
+ * A kind added here also needs its job table in the parse worker
+ * (`comment-parse.worker.ts`) and its row in `file-comments.ts` (its Settings
+ * switch and write options) – without that row its comments stay off.
+ */
+export const fileCommentKinds: CommentFileKindRegistry = frozenCommentFileKinds([markdownKind])

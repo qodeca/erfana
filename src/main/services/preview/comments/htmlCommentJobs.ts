@@ -22,7 +22,7 @@
 import { htmlKind } from '../../../../shared/comments/htmlKind'
 import type { CommentDocument, RandomBytes } from '../../../../shared/htmlComments'
 import { createInProcessCommentJobs, type CommentFileJobRunner, type CommentJobTable } from '../../comments/commentFileJobs'
-import { documentOf } from '../../comments/commentJobDocs'
+import { documentOf, freshDocumentOf } from '../../comments/commentJobDocs'
 import { runListJob, type ListJob } from '../../comments/commentListCore'
 import { rawTransferablesOf } from '../../comments/commentParseWorker'
 import { runWriteJob, type WriteJob } from '../../comments/commentWriteCore'
@@ -74,7 +74,8 @@ export const htmlCommentJobTable: CommentJobTable<HtmlCommentJob, CommentDocumen
   pin: { run: (bytes, job, env) => runPinJob(documentOf(bytes, env.cache), job) },
   list: { run: (bytes, _job, env) => runListJob(documentOf(bytes, env.cache)) },
   write: {
-    run: (bytes, job, env) => runWriteJob(bytes, job, env),
+    // The HTML kind's note and hints on every block it writes; its own reader adds the parse5 pre-checks.
+    run: (bytes, job, env) => runWriteJob(bytes, job, { ...env, kind: htmlKind, read: freshDocumentOf }),
     // The block bytes, when they own their buffer; a view into a larger one is copied.
     transferables: result => (result.ok ? rawTransferablesOf(result.insert) : [])
   }

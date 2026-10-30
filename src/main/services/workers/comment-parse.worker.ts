@@ -19,7 +19,9 @@
  */
 import { parentPort, workerData } from 'node:worker_threads'
 import { htmlKind } from '../../../shared/comments/htmlKind'
+import { markdownKind } from '../../../shared/markdownComments/markdownKind'
 import { CommentJobRegistry } from '../comments/commentFileJobs'
+import { markdownCommentJobTable } from '../comments/markdown/markdownCommentJobs'
 import { isCommentParseWorker, startCommentParseWorker, type CommentParsePort } from '../comments/commentParseWorker'
 import { htmlCommentJobTable } from '../preview/comments/htmlCommentJobs'
 
@@ -27,7 +29,7 @@ import { htmlCommentJobTable } from '../preview/comments/htmlCommentJobs'
 export function commentWorkerJobs(): CommentJobRegistry {
   const jobs = new CommentJobRegistry()
   jobs.register(htmlKind.id, htmlCommentJobTable)
-  // A new kind registers its table here, e.g. `jobs.register(markdownKind.id, markdownCommentJobTable)`.
+  jobs.register(markdownKind.id, markdownCommentJobTable)
   jobs.freeze()
   return jobs
 }

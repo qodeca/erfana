@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * CommentWriter – the only page-driven disk write path
+ * CommentWriter – the only comment-driven disk write path, for every file kind
  * (docs/designs/comments/html-preview-comments.md §4.1 B3 → B4, §7.6, §7.7; threats
- * S10, S11, S13, S21, S23).
+ * S10, S11, S13, S21, S23; spec 024 architecture note 001 § 5, § 8 C6, C12).
+ *
+ * The file's kind comes from the registry by its name (`commentFileKinds.ts`);
+ * the parse, the plan and the kind's own check run in that kind's job table,
+ * and every block written carries that kind's agent note and hints.
  *
  * Every save, whatever the operation:
  *  1. confines the file (`commentFileAccess`, §7.6 step 1) and takes the lock
@@ -37,10 +41,15 @@
  *     bytes the worker changed could only refuse the write, never land;
  *  6. writes with `atomicWriteBytesStrict`, which refuses when the path no
  *     longer names the file read in 3 (dev/ino), the file no longer holds the
- *     bytes read, or its folder no longer resolves where it did. Then the
- *     save runs once more from 3 –
+ *     bytes read, or its folder no longer resolves where it did – and, right
+ *     before the rename, asks once more whether an editor now holds unsaved
+ *     changes for the file (C6). Then the save runs once more from 3 –
  *     the outside edit is kept and the target re-located (M-002, M-004) – and
- *     after that fails cleanly.
+ *     after that fails cleanly;
+ *  7. reads the file again after the rename and answers `changed-during-save`
+ *     when it no longer holds the bytes written (C12): the gap between the
+ *     last compare and the rename is an accepted risk, so it is reported, not
+ *     hidden.
  *
  * Results are returned, never thrown. Log lines carry the operation, the
  * refusal reason, an errno code and a digest of the path – never comment
@@ -48,21 +57,24 @@
  *
  * One instance is enough per process; the lock is process-wide either way.
  */
-import { dirname } from 'node:path'
+import { basename, dirname } from 'node:path'
 import { PREVIEW_LIMITS } from '../../../shared/preview-limits'
 import { stablePathDigest } from '../../../shared/stablePathDigest'
 import { codePointLength, type CommentAuthor, type CommentView } from '../../../shared/htmlComments'
 import { hasRefusedIdentityChar } from '../../../shared/comments/identity'
-import { htmlKind } from '../../../shared/comments/htmlKind'
-import { atomicWriteBytesStrict, errnoOf, fileIdKey } from '../../utils/atomicWriteBytesStrict'
+import type { CommentFileKind, PickedTarget } from '../../../shared/comments/fileKind'
+import type { TextQuote } from '../../../shared/comments/format'
+import { atomicWriteBytesStrict, errnoOf, fileIdKey, type StrictWriteFailure } from '../../utils/atomicWriteBytesStrict'
 import { logger } from '../LoggingService'
 import { sharedCommentParseClient } from './CommentParseWorkerAdapter'
 import {
   confineCommentFile,
   loadCommentBytes,
+  readConfinedCommentBytes,
   type CommentFileTarget,
   type ConfineResult
 } from './commentFileAccess'
+import { commentFileKinds, type CommentFileKindLookup } from './commentFileKinds'
 import type { CommentFileJob, CommentFileJobRunner } from './commentFileJobs'
 import { commentFileLock } from './commentFileLock'
 import {
@@ -100,6 +112,16 @@ export interface AddCommentRequest {
   readonly text: string
 }
 
+/** Add a new thread on a target a renderer-hosted preview picked (spec 024 § 3, `file-comment:save`). */
+export interface AddPickedCommentRequest {
+  readonly file: CommentFileTarget
+  readonly pick: PickedTarget
+  /** The selected words; the kind keeps them as `anchor.sel` only when valid. */
+  readonly sel?: TextQuote
+  readonly view: CommentView
+  readonly text: string
+}
+
 /** Change the thread `threadId`, whose block hashed to `rawHash` when the window read it. */
 export interface ThreadChangeRequest {
   readonly file: CommentFileTarget
@@ -131,6 +153,13 @@ export type CommentWriteResult =
     }
   | { readonly ok: false; readonly code: CommentErrorCode; readonly reason: CommentRefusal }
 
+/**
+ * A kind's own fields for its `write` job – what its render check needs from
+ * the app settings, such as Markdown's `breaks`. Plain values only: the job
+ * is cloned into the parse worker.
+ */
+export type KindWriteOptions = Readonly<Record<string, boolean | number | string>>
+
 /** The two log levels the writer uses. */
 export type CommentWriterLog = Pick<typeof logger, 'info' | 'warn'>
 
@@ -138,22 +167,49 @@ export type CommentWriterLog = Pick<typeof logger, 'info' | 'warn'>
 export interface CommentWriterDeps {
   /** The reviewer's identity from the app-level settings – never from the renderer. */
   readonly identity: () => CommentIdentity | undefined | Promise<CommentIdentity | undefined>
-  /** True when an editor tab holds unsaved changes for this real path (decision 13). */
+  /**
+   * True when an editor tab holds unsaved changes for this real path
+   * (decision 13). Asked before the read and again right before the rename.
+   */
   readonly hasUnsavedSource?: (realPath: string) => boolean | Promise<boolean>
+  /** The kinds a file name maps to; the production list by default. */
+  readonly kinds?: CommentFileKindLookup
   readonly now?: () => Date
   /**
-   * Where the parse, the plan and the verification run: the process-wide
-   * comment parse worker, with the HTML kind's jobs, by default. A suite
-   * passes the in-process runner (`createInProcessCommentFileJobs`), with a
-   * seeded id source.
+   * Where the parse, the plan and the verification run for a kind: the
+   * process-wide comment parse worker, with that kind's jobs, by default.
+   */
+  readonly jobsFor?: (kind: CommentFileKind) => CommentFileJobRunner
+  /**
+   * One runner for every kind – a suite's in-process runner
+   * (`createInProcessCommentFileJobs`), with a seeded id source. Wins over
+   * {@link CommentWriterDeps.jobsFor}.
    */
   readonly jobs?: CommentFileJobRunner
+  /**
+   * A kind's own write-job fields, read once per save (so a settings change
+   * applies to the next save); none by default. They never replace the
+   * job's `kind`, `request` or `act`.
+   */
+  readonly writeOptions?: (kind: CommentFileKind) => KindWriteOptions
   /** `process.platform`; a test sets `win32` on any host for the Windows path rules. */
   readonly platform?: NodeJS.Platform
   readonly log?: CommentWriterLog
 }
 
 type Attempt = Extract<CommentWriteResult, { ok: true }> | Refused
+
+/** Where one save's jobs run, and the kind's own write-job fields. */
+interface KindRunner {
+  readonly jobs: CommentFileJobRunner
+  readonly options: KindWriteOptions
+}
+
+/** A strict-write failure as a refusal: a vanished file is `missing`, a veto an unsaved editor (C6). */
+function strictWriteRefusal(reason: StrictWriteFailure): CommentRefusal {
+  if (reason === 'gone') return 'missing'
+  return reason === 'vetoed' ? 'unsaved-source' : reason
+}
 
 interface WriteJob {
   readonly op: CommentWriteOp
@@ -182,21 +238,32 @@ async function resolveAuthor(identity: CommentWriterDeps['identity']): Promise<C
   return email ? { name, email, role: 'human' } : { name, role: 'human' }
 }
 
-/** Writes comment blocks into HTML files – see the module comment for every step. */
+/** Writes comment blocks into files of every registered kind – see the module comment for every step. */
 export class CommentWriter {
   private readonly deps: CommentWriterDeps
   private readonly platform: NodeJS.Platform
   private readonly log: CommentWriterLog
   private readonly now: () => Date
-  private readonly jobs: CommentFileJobRunner
+  private readonly kinds: CommentFileKindLookup
+  private readonly runners = new Map<string, CommentFileJobRunner>()
 
   constructor(deps: CommentWriterDeps) {
     this.deps = deps
     this.platform = deps.platform ?? process.platform
     this.log = deps.log ?? logger
     this.now = deps.now ?? (() => new Date())
-    // Files are HTML until the writer takes a kind per file (architecture note 001 § 5).
-    this.jobs = deps.jobs ?? sharedCommentParseClient().runnerFor<CommentFileJob>(htmlKind.id)
+    this.kinds = deps.kinds ?? commentFileKinds
+  }
+
+  /** The runner for `kind`'s jobs: the suite's one, or the worker's for that kind (kept per kind). */
+  private jobsFor(kind: CommentFileKind): CommentFileJobRunner {
+    if (this.deps.jobs !== undefined) return this.deps.jobs
+    let runner = this.runners.get(kind.id)
+    if (runner === undefined) {
+      runner = this.deps.jobsFor?.(kind) ?? sharedCommentParseClient().runnerFor<CommentFileJob>(kind.id)
+      this.runners.set(kind.id, runner)
+    }
+    return runner
   }
 
   /** Add a new thread before the draft's element. Requires an identity. */
@@ -206,6 +273,17 @@ export class CommentWriter {
       file: request.file,
       needsAuthor: true,
       request: { op: 'add', draft: request.draft, view: request.view, text: request.text }
+    })
+  }
+
+  /** Add a new thread on a picked target, at the first slot of its kind that passes every check. Requires an identity. */
+  addPicked(request: AddPickedCommentRequest): Promise<CommentWriteResult> {
+    const { pick, sel, view, text } = request
+    return this.run({
+      op: 'add',
+      file: request.file,
+      needsAuthor: true,
+      request: { op: 'pick', pick, ...(sel === undefined ? {} : { sel }), view, text }
     })
   }
 
@@ -234,10 +312,14 @@ export class CommentWriter {
     const confined = await this.confine(job)
     if (!confined.ok) return this.refuse(job, job.file.filePath, confined)
     const { realPath } = confined
+    const kind = this.kinds.kindOfName(basename(realPath))
+    // Confinement already refused a name no kind claims; this keeps the type honest.
+    if (kind === undefined) return this.refuse(job, realPath, refused('not-html'))
     return commentFileLock.runAll([realPath, fileIdKey(confined.id)], async () => {
       let outcome: Attempt
       try {
-        outcome = await this.attemptTwice(job, realPath)
+        const options = this.deps.writeOptions?.(kind) ?? {}
+        outcome = await this.attemptTwice(job, realPath, { jobs: this.jobsFor(kind), options })
       } catch (error) {
         outcome = refused('io', errnoOf(error))
       }
@@ -248,28 +330,28 @@ export class CommentWriter {
   /** Step 1, with a throw – a path no file-system call accepts – as an I/O refusal. */
   private async confine(job: WriteJob): Promise<ConfineResult> {
     try {
-      return await confineCommentFile(job.file, { platform: this.platform })
+      return await confineCommentFile(job.file, { platform: this.platform, kinds: this.kinds })
     } catch (error) {
       return refused('io', errnoOf(error))
     }
   }
 
   /** Steps 2–6, run again once when the file changed under the write. */
-  private async attemptTwice(job: WriteJob, realPath: string): Promise<Attempt> {
+  private async attemptTwice(job: WriteJob, realPath: string, runner: KindRunner): Promise<Attempt> {
     if (await this.deps.hasUnsavedSource?.(realPath)) return refused('unsaved-source')
     const author = job.needsAuthor ? await resolveAuthor(this.deps.identity) : undefined
     if (job.needsAuthor && !author) return refused('identity')
     const act: WriteAct = { ...(author === undefined ? {} : { author }), nowMs: this.now().getTime() }
-    const first = await this.attempt(job, realPath, act)
-    return !first.ok && first.reason === 'changed' ? this.attempt(job, realPath, act) : first
+    const first = await this.attempt(job, realPath, act, runner)
+    return !first.ok && first.reason === 'changed' ? this.attempt(job, realPath, act, runner) : first
   }
 
-  private async attempt(job: WriteJob, realPath: string, act: WriteAct): Promise<Attempt> {
+  private async attempt(job: WriteJob, realPath: string, act: WriteAct, runner: KindRunner): Promise<Attempt> {
     // Confined again under the lock: the path must still resolve to the locked real path
-    const loaded = await loadCommentBytes(job.file, { platform: this.platform })
+    const loaded = await loadCommentBytes(job.file, { platform: this.platform, kinds: this.kinds })
     if (!loaded.ok) return loaded
     if (loaded.realPath !== realPath) return refused('changed')
-    const planned = await this.jobs.runJob(loaded.bytes, { kind: 'write', request: job.request, act })
+    const planned = await runner.jobs.runJob(loaded.bytes, { ...runner.options, kind: 'write', request: job.request, act })
     if (planned.kind === 'failed') return jobFailureRefusal(planned.failure)
     if (!planned.ok) return refused(planned.refusal)
     // The bytes read: handed back when they were lent, main's own view when they were copied.
@@ -286,10 +368,23 @@ export class CommentWriter {
       expectedBytes: read,
       expectedId: loaded.id,
       expectedDir: dirname(realPath),
-      maxBytes: PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES
+      maxBytes: PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES,
+      // C6: an editor that became dirty while this save planned stops it here
+      beforeRename: async () => !(await this.deps.hasUnsavedSource?.(realPath))
     })
-    if (!written.ok) return refused(written.reason === 'gone' ? 'missing' : written.reason, written.errno)
+    if (!written.ok) return refused(strictWriteRefusal(written.reason), written.errno)
+    if (!(await this.stillWritten(realPath, out))) return refused('changed-during-save')
     return { ok: true, realPath: written.path, fileHash: planned.outputHash, threadId: planned.threadId }
+  }
+
+  /** Step 7 (C12): the file holds the bytes just written when read again; a failed read counts as changed. */
+  private async stillWritten(realPath: string, out: Uint8Array): Promise<boolean> {
+    try {
+      const reread = await readConfinedCommentBytes(realPath)
+      return reread.ok && reread.bytes.equals(out)
+    } catch {
+      return false
+    }
   }
 
   private succeed(job: WriteJob, done: Extract<CommentWriteResult, { ok: true }>): CommentWriteResult {

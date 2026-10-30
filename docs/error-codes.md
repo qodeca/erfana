@@ -2,7 +2,7 @@
 
 Project-wide index of `ErrorCode` values in `src/shared/errors.ts`, grouped by category. For each code: the enum name, the user-facing message (from `ERROR_MESSAGES` map), and the primary throw site. For whisper + transcription codes, also the operator action on encounter.
 
-**Why this document exists**: Phase 4 introduced 6 new whisper codes (see [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)); the full enum has grown to 167 codes (counted on 2026-10-28, v0.23.1). A single mapping table saves every future maintainer a `grep -r ErrorCode` sweep.
+**Why this document exists**: Phase 4 introduced 6 new whisper codes (see [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)); the full enum has grown to 168 codes (counted on 2026-10-30, v0.23.1). A single mapping table saves every future maintainer a `grep -r ErrorCode` sweep.
 
 **Source of truth**: `src/shared/errors.ts`. If this doc drifts, `errors.ts` wins — file an issue.
 
@@ -250,9 +250,9 @@ Not an error: when the default-browser lookup fails, times out or returns an unu
 
 ---
 
-## HTML Preview comments (17 codes)
+## HTML Preview comments (18 codes)
 
-17 `COMMENT_*` in `src/shared/errors.ts`, added with HTML Preview comments in v0.23.0. The meanings come from `src/main/services/preview/comments/commentRefusals.ts`, which maps each finer refusal reason (logged with a path digest, never a path, a name or comment text) to one of these codes. User guide: [HTML preview § Comments](./html-preview/README.md#comments). `{file}` in the user copy is filled in with the file's name.
+18 `COMMENT_*` in `src/shared/errors.ts`, added with HTML Preview comments in v0.23.0 (`COMMENT_RENDER_CHANGED` with file comments, spec 024). The meanings come from `src/main/services/preview/comments/commentRefusals.ts`, which maps each finer refusal reason (logged with a path digest, never a path, a name or comment text) to one of these codes. User guide: [HTML preview § Comments](./html-preview/README.md#comments). `{file}` in the user copy is filled in with the file's name.
 
 | Code | User copy | Notes |
 |------|-----------|-------|
@@ -267,6 +267,7 @@ Not an error: when the default-browser lookup fails, times out or returns an unu
 | `COMMENT_UNSAVED_SOURCE` | "{file} has unsaved changes in another tab. Save them first so your edits and this comment don't overwrite each other." | An editor holds unsaved changes for the file |
 | `COMMENT_IDENTITY_REQUIRED` | "Enter a name to add comments." | No usable author name in the app settings |
 | `COMMENT_TARGET_MOVED` | "This element changed in the file since you picked it. Close and pick it again – your text will be restored." | The picked element is no longer in the file, or not uniquely |
+| `COMMENT_RENDER_CHANGED` | "Erfana can't add a comment here without changing how {file} looks in the preview, so nothing was saved. Your text is still here." | File comments (spec 024): every place the file's kind offers for the block would change the rendered page (`render-changed`). A picked element inside a generated region or the frontmatter is `COMMENT_TARGET_MOVED` (`generated-region`, `frontmatter`) |
 | `COMMENT_BLOCK_CHANGED` | "This block changed on disk. Reopen it and try again." | The block changed, turned damaged or is gone since the window read it |
 | `COMMENT_WRITE_UNSUPPORTED_FS` | "Erfana can't write to {file} on this drive." | The drive cannot rename or fsync (network and FUSE mounts) |
 | `COMMENT_WRITE_FAILED` | "Couldn't save the comment. Your text is still here – try again." | Anything else: a file that kept changing during the save, a held file, a splice that failed its verification (fail closed), or a parse the comment parse worker could not run (`busy`, `parse-failed`) |

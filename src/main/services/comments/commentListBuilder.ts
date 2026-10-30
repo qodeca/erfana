@@ -84,6 +84,9 @@ export interface ListInput {
 
 type ReadOnlyView = NonNullable<CommentFileView['readOnlyReason']>
 
+/** What naming a file's comments takes: the binding and the key store. */
+export type ListKeys = Pick<ListInput, 'binding' | 'keys'>
+
 /** Refusals that still list the file, read-only, with a reason the drawer names. */
 const LISTED_REFUSALS: Partial<Readonly<Record<CommentRefusal, ReadOnlyView>>> = {
   link: 'link',
@@ -92,7 +95,7 @@ const LISTED_REFUSALS: Partial<Readonly<Record<CommentRefusal, ReadOnlyView>>> =
   'too-large': 'too-large'
 }
 
-function baseOf(input: ListInput, { file, frame }: ListedFile) {
+function baseOf(input: ListKeys, { file, frame }: ListedFile) {
   return {
     fileKey: input.keys.keyFor(input.binding, { kind: 'file', realPath: file.realPath }),
     displayPath: file.displayPath,
@@ -108,8 +111,11 @@ interface ListedView {
   readonly threadIds: readonly string[]
 }
 
-/** The worker's summary with main's keys and paths; every "not visible now" flag still `false`. */
-function fileView(input: ListInput, listed: ListedFile, summary: ListSummary): CommentFileView {
+/**
+ * The worker's summary with main's keys and paths; every "not visible now"
+ * flag still `false`. Shared with the file-comment family (`FileCommentService`).
+ */
+export function fileView(input: ListKeys, listed: ListedFile, summary: ListSummary): CommentFileView {
   const { realPath } = listed.file
   const blockKey = (rawHash: string, start: number): string =>
     input.keys.keyFor(input.binding, { kind: 'block', realPath, rawHash, start })
@@ -128,7 +134,7 @@ function fileView(input: ListInput, listed: ListedFile, summary: ListSummary): C
 }
 
 /** A file listed with no comments, read-only for `reason`, or `undefined` when it is not listed. */
-function refusedView(input: ListInput, listed: ListedFile, refusal: CommentRefusal): CommentFileView | undefined {
+export function refusedView(input: ListKeys, listed: ListedFile, refusal: CommentRefusal): CommentFileView | undefined {
   const reason = LISTED_REFUSALS[refusal]
   if (reason === undefined) return undefined
   return { ...baseOf(input, listed), writable: false, readOnlyReason: reason, threads: [], damaged: [], newer: [] }

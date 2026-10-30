@@ -9,6 +9,7 @@ exports[`preload surface > window.api has the expected top-level groups 1`] = `
   "directoryWatch",
   "docx",
   "file",
+  "fileComments",
   "fileWatch",
   "git",
   "gitPolling",
@@ -133,6 +134,15 @@ exports[`preload surface > window.api.file and window.api.terminal expose the ex
   "onScreenReaderSupportChanged",
   "resize",
   "write",
+]
+`;
+
+exports[`preload surface > window.api.fileComments exposes the expected members 1`] = `
+[
+  "list",
+  "onChanged",
+  "openDraft",
+  "save",
 ]
 `;
 

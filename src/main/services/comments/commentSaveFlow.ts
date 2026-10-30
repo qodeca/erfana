@@ -107,7 +107,7 @@ const refused = (code: ErrorCode): Refused => ({ ok: false, code })
 const INVALID = refused(ErrorCode.COMMENT_KEY_INVALID)
 
 /** The thread change a non-add request asks for. */
-function changeOf(request: Exclude<CommentSaveRequest, { op: 'add' | 'deleteBlock' }>): ThreadChange {
+export function changeOf(request: Exclude<CommentSaveRequest, { op: 'add' | 'deleteBlock' }>): ThreadChange {
   switch (request.op) {
     case 'reply':
       return { op: 'reply', text: request.text }

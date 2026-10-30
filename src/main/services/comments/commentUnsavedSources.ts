@@ -20,8 +20,10 @@
  * lives on that share. Dropping is safe – comments never write outside the
  * project, so a dirty tab there guards nothing.
  *
- * Per window, as the design scopes it: a dirty tab in another window is not
- * seen (§7.8 "Limitation") – the disk re-hash still prevents a stale write.
+ * Kept per window. The HTML Preview asks about its own window only (§7.8
+ * "Limitation"); the file-comment family asks about EVERY window
+ * ({@link CommentUnsavedSources.hasAny}, spec 024 024-FR-026, § 8 C6), since
+ * its writes go straight to disk while any window's editor may hold the file.
  */
 import { realpath } from 'node:fs/promises'
 import { isAbsolute, normalize, resolve } from 'node:path'
@@ -56,6 +58,8 @@ export interface CommentUnsavedSources {
   set(windowId: number, paths: readonly string[]): Promise<void>
   /** Whether `windowId` holds unsaved changes for the real path `realPath`. */
   has(windowId: number, realPath: string): Promise<boolean>
+  /** Whether any window holds unsaved changes for the real path `realPath` (024-FR-026). */
+  hasAny(realPath: string): Promise<boolean>
   /** The window is gone. */
   forget(windowId: number): void
 }
@@ -99,6 +103,11 @@ export function createCommentUnsavedSources(deps: CommentUnsavedSourcesDeps): Co
       const pending = byWindow.get(windowId)
       if (pending === undefined) return false
       return (await pending).has(samePathKey(realPath, platform))
+    },
+    async hasAny(realPath) {
+      const key = samePathKey(realPath, platform)
+      const lists = await Promise.all(byWindow.values())
+      return lists.some(list => list.has(key))
     },
     forget(windowId) {
       byWindow.delete(windowId)

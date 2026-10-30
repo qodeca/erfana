@@ -246,7 +246,8 @@ describe('commentParseProtocol', () => {
       expect(isParseRequest({ type: 'job', id: 1, fileKind: 'html', bytes: PAGE, job }, JOBS)).toBe(false)
     }
     expect(isParseRequest({ type: 'job', id: 1, fileKind: 'html', job: { kind: 'list' } }, JOBS)).toBe(false)
-    for (const fileKind of [undefined, 1, 'markdown', '']) {
+    expect(isParseRequest({ type: 'job', id: 1, fileKind: 'markdown', bytes: PAGE, job: { kind: 'list' } }, JOBS)).toBe(true)
+    for (const fileKind of [undefined, 1, 'asciidoc', '']) {
       expect(isParseRequest({ type: 'job', id: 1, fileKind, bytes: PAGE, job: { kind: 'list' } }, JOBS)).toBe(false)
     }
   })

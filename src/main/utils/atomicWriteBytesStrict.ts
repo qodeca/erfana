@@ -75,6 +75,8 @@ export type StrictWriteFailure =
   | 'busy'
   /** Any other I/O error. */
   | 'io'
+  /** The caller's {@link StrictWriteOptions.beforeRename} check said no, right before the rename. */
+  | 'vetoed'
 
 /** A strict write that wrote nothing, and why. */
 export interface StrictWriteRefusal {
@@ -116,6 +118,13 @@ export interface StrictWriteOptions {
   readonly maxBytes: number
   /** `process.platform`; a test sets `win32` to run the Windows steps on any host. */
   readonly platform?: NodeJS.Platform
+  /**
+   * The caller's last check, run after the target was verified unchanged and
+   * right before the rename; `false` writes nothing (`vetoed`). A comment
+   * write asks again whether an editor now holds unsaved changes for the file
+   * (spec 024 § 8 C6). Absent: no check.
+   */
+  readonly beforeRename?: () => Promise<boolean>
 }
 
 /** Why a no-follow read returned no bytes. */
@@ -395,12 +404,15 @@ export async function atomicWriteBytesStrict(
     step = 'verify'
     const changed =
       (await verifyUnchanged(target, options)) ?? (await folderMoved(target, options.expectedDir))
-    if (changed === null) {
+    if (changed === null && options.beforeRename !== undefined && !(await options.beforeRename())) {
+      refusal = { ok: false, reason: 'vetoed' }
+    } else if (changed === null) {
       step = 'rename'
       await renameWithRetry(tempPath, target)
       return { ok: true, path: target }
+    } else {
+      refusal = changed
     }
-    refusal = changed
   } catch (error) {
     refusal = stepFailure(step, error)
   }

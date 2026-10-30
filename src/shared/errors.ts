@@ -300,6 +300,7 @@ export enum ErrorCode {
   COMMENT_FILE_READ_ONLY = 'COMMENT_FILE_READ_ONLY',
   COMMENT_WRITE_FAILED = 'COMMENT_WRITE_FAILED',
   COMMENT_SAVE_PENDING = 'COMMENT_SAVE_PENDING',
+  COMMENT_RENDER_CHANGED = 'COMMENT_RENDER_CHANGED',
 
   // Generic errors
   UNKNOWN_ERROR = 'UNKNOWN_ERROR'
@@ -615,6 +616,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.COMMENT_FILE_READ_ONLY]: "Couldn't save: {file} is read-only. Your text is still here.",
   [ErrorCode.COMMENT_WRITE_FAILED]: "Couldn't save the comment. Your text is still here – try again.",
   [ErrorCode.COMMENT_SAVE_PENDING]: 'Still saving to {file}. Your comment appears here once it is written – no need to save again.',
+  [ErrorCode.COMMENT_RENDER_CHANGED]: "Erfana can't add a comment here without changing how {file} looks in the preview, so nothing was saved. Your text is still here.",
 
   // Generic errors
   [ErrorCode.UNKNOWN_ERROR]: 'An unexpected error occurred'
