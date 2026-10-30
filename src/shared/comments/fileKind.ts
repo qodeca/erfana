@@ -17,7 +17,7 @@
  * Pure: runs in main and in the parse worker.
  */
 import type { FileCommentState } from './blocks'
-import { AGENT_NOTE_PREFIX, type CommentAnchor, type CommentData, type TextQuote } from './format'
+import { AGENT_NOTE_PREFIX, isSafeNoteLine, type CommentAnchor, type CommentData, type TextQuote } from './format'
 import type { TargetResolution } from './reattach'
 import type { GrowthCheck, KindVerifyFailure, Placement, SpliceOrigin, SplicePlan } from './splice'
 import type { IndexedTarget, TargetIndex } from './targetIndex'
@@ -122,10 +122,17 @@ export interface CommentFileKind {
    * `pick` carries what only the page knows (HTML: `ws`).
    */
   slots(doc: KindDocument, target: IndexedTarget, pick?: PickedTarget): readonly Slot[]
-  /** The anchor a new block about `target` stores. */
+  /**
+   * The anchor a new block about `target` stores; with `sel`, the selected
+   * words as `anchor.sel` when they are a valid selection (`anchorSel.ts`).
+   */
   anchorOf(doc: KindDocument, target: IndexedTarget, sel?: TextQuote): CommentAnchor
-  /** The note-area hint lines for a block (C-01); from `@data` only, so a rewrite can rebuild them. */
-  hints(data: CommentData, target: IndexedTarget): readonly string[]
+  /**
+   * The note-area hint lines for a block (C-01), each built by the shared
+   * encoder (`noteLines.ts`). From `@data` only (C1), so a reply or a resolve
+   * rebuilds them.
+   */
+  hints(data: CommentData): readonly string[]
   /** Where an anchor's target is now, without the position rule (`reattach.ts`). */
   reattach(doc: KindDocument, anchor: CommentAnchor): TargetResolution
   /** What {@link CommentFileKind.verify} needs of the planned-on document; holds no parse tree. */
@@ -140,6 +147,14 @@ export interface CommentFileKind {
   readonly refuseGrowth?: GrowthCheck
 }
 
+/**
+ * What a block's note area is made of (C1): its kind's agent note and the
+ * hint lines it builds from `@data`. A {@link CommentFileKind} is one; the
+ * planners take it so a rewrite renders the kind's note and hints
+ * (`splice.ts`).
+ */
+export type BlockNote = Pick<CommentFileKind, 'agentNote' | 'hints'>
+
 /** What an agent-note line may hold: printable ASCII, U+0020 to U+007E. */
 const PRINTABLE_ASCII = /^[\x20-\x7e]*$/
 
@@ -147,14 +162,17 @@ const PRINTABLE_ASCII = /^[\x20-\x7e]*$/
  * Why a kind's agent note may not be written into files, or `undefined` when
  * it may (C1): at least one line; the first starts `note to agents:`, which
  * is how readers find and skip the note (`blocks.ts`); every line printable
- * ASCII – no line break, control, bidi or zero-width character; and no `--`,
- * which could close or corrupt the comment.
+ * ASCII – no line break, control, bidi or zero-width character; no `--`,
+ * which could close or corrupt the comment; and no line a reader could take
+ * for the `status:` line, `@data` or a merge marker (`isSafeNoteLine`).
  */
 export function agentNoteProblem(lines: readonly string[]): string | undefined {
   if (lines.length === 0) return 'the agent note has no lines'
   if (!lines[0].startsWith(AGENT_NOTE_PREFIX)) {
     return `the agent note's first line must start with "${AGENT_NOTE_PREFIX}"`
   }
-  const at = lines.findIndex(line => !PRINTABLE_ASCII.test(line) || line.includes('--'))
-  return at < 0 ? undefined : `agent note line ${at + 1} must be printable ASCII without "--"`
+  const at = lines.findIndex(line => !PRINTABLE_ASCII.test(line) || !isSafeNoteLine(line))
+  return at < 0
+    ? undefined
+    : `agent note line ${at + 1} must be printable ASCII without "--", and not start like a status, data or marker line`
 }

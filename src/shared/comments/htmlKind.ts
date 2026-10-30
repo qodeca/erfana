@@ -14,9 +14,9 @@
  *
  * HTML picks reach the writer as page tokens (`commentDraftCore.ts`), not as
  * a {@link PickedTarget}; {@link htmlKind}'s `locate` therefore reads only the
- * pick's `path` and `id`, and its `slots` only `ws`. A selection does not
- * change the anchor until the format gains `anchor.sel` (spec 024 commit 11),
- * and HTML writes no note-area hint lines yet (C-01).
+ * pick's `path` and `id`, and its `slots` only `ws`. A valid selection is
+ * stored as `anchor.sel` and shown to agents as the words hint (C-01); its
+ * note is the HTML agent note (C-02).
  */
 import { buildAnchor } from '../htmlComments/anchor'
 import { HtmlIndex, type IndexedElement } from '../htmlComments/htmlIndex'
@@ -35,7 +35,10 @@ import type {
   KindRefusal,
   PickedTarget
 } from './fileKind'
-import { AGENT_NOTE_LINES } from './format'
+import { HTML_AGENT_NOTE_LINES } from './agentNotes'
+import { isAnchorSelection } from './anchorSel'
+import type { CommentAnchor, TextQuote } from './format'
+import { selectionHints } from './noteLines'
 import { findAnchorTarget } from './reattach'
 import type { IndexedTarget } from './targetIndex'
 
@@ -55,6 +58,16 @@ function elementOf(doc: CommentDocument, target: IndexedTarget): IndexedElement 
   return doc.index.elementAt(target.start)
 }
 
+/**
+ * `anchor` with the selected words, when they are a valid `anchor.sel`
+ * (`anchorSel.ts`); otherwise unchanged, so the comment is about the whole
+ * element. Only the three fields are kept, after every anchor field.
+ */
+function withSelection(anchor: CommentAnchor, sel: TextQuote | undefined): CommentAnchor {
+  if (!isAnchorSelection(sel)) return anchor
+  return { ...anchor, sel: { exact: sel.exact, prefix: sel.prefix, suffix: sel.suffix } }
+}
+
 function isHtmlOrigin(origin: KindOrigin): origin is SpliceOrigin {
   return 'tagSequence' in origin && Array.isArray(origin.tagSequence)
 }
@@ -68,11 +81,11 @@ function locateElement(doc: CommentDocument, pick: PickedTarget): IndexedElement
   return byId.length === 1 ? byId[0] : undefined
 }
 
-/** HTML and HTM files, as v0.23.1 shipped them. */
+/** HTML and HTM files: v0.23.1's behaviour, plus `anchor.sel`, its hint and the HTML agent note. */
 export const htmlKind: CommentFileKind = {
   id: 'html',
   extensions: ['.html', '.htm'],
-  agentNote: AGENT_NOTE_LINES,
+  agentNote: HTML_AGENT_NOTE_LINES,
 
   parse(text) {
     // The HTML index finds the BOM itself (`indexHtml`).
@@ -89,16 +102,14 @@ export const htmlKind: CommentFileKind = {
     return el === undefined ? [] : [htmlSlotOf(html, el, pick?.ws)]
   },
 
-  anchorOf(doc, target) {
+  anchorOf(doc, target, sel) {
     const html = htmlDocOf(doc)
     const el = elementOf(html, target)
     if (el === undefined) throw new Error('The HTML comment kind was given a target outside its document')
-    return buildAnchor(html.index, el)
+    return withSelection(buildAnchor(html.index, el), sel)
   },
 
-  hints() {
-    return []
-  },
+  hints: selectionHints,
 
   reattach(doc, anchor) {
     return findAnchorTarget(htmlDocOf(doc).index, anchor)

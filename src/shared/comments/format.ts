@@ -40,14 +40,15 @@ export const BLOCK_MARKER = 'erfana:comment'
 export const FORMAT_VERSION = 1
 
 /**
- * The fixed note to coding agents, written right after the header of every
+ * The v0.23.1 note to coding agents, written right after the header of every
  * block (X-001: without it, agents deleted blocks they had acted on and acted
  * on damaged ones). The first line sits at the block's indent, the others two
  * blanks deeper. ASCII only, no `--`, and no line starts with `@`, `\` or a
  * merge-marker run, so it needs no escaping. It never holds `@data` followed by
  * a blank, so a naive search for the data line cannot land on it (a fixture
  * generator did, while the note said "the @data line"). Readers skip it (parse.ts), so a
- * block reads the same with it, without it, or with other wording.
+ * block reads the same with it, without it, or with other wording. The default of
+ * {@link serializeBlock}, so the goldens and writer pins keep their bytes; kinds bring their own (`agentNotes.ts`).
  */
 export const AGENT_NOTE_LINES: readonly string[] = [
   'note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.',
@@ -143,7 +144,9 @@ const AnchorSchema = z.looseObject({
     .optional(),
   path: z.string().max(ANCHOR_PATH_MAX_CHARS),
   quote: TextQuoteSchema.optional(),
-  runtime: RuntimeAnchorSchema.optional()
+  runtime: RuntimeAnchorSchema.optional(),
+  /** Selected words (spec 024 `anchor.sel`). Never checked here: an invalid one is kept, never Damaged (`anchorSel.ts`). */
+  sel: z.unknown().optional()
 })
 
 const MAX_VIEW_PX = 1_000_000
@@ -438,11 +441,15 @@ export function renderReadable(data: CommentData, layout: BlockLayout): string {
     .join(layout.eol)
 }
 
-/** The agent note as it appears in a block with this layout. */
-export function renderAgentNote(layout: BlockLayout): string {
-  return AGENT_NOTE_LINES.map((line, i) => `${layout.indent}${i === 0 ? '' : '  '}${line}`).join(
-    layout.eol
-  )
+const NOTE_LEAD_BANNED = /^(?:status: |@|\\|<{7}|={7}|>{7}|\|{7})/
+/** Whether a line may sit in the note area (C1): nothing hidden, one line, no `--`, no start readers take for `status:`, `@data` or a marker. */
+export function isSafeNoteLine(line: string): boolean {
+  return visibleInline(line) === line && !line.includes('--') && !NOTE_LEAD_BANNED.test(line.trimStart())
+}
+
+/** The note area as it appears in a block with this layout: the note's lines, then any hint lines, two blanks deeper. */
+export function renderAgentNote(layout: BlockLayout, note: readonly string[] = AGENT_NOTE_LINES): string {
+  return note.map((line, i) => `${layout.indent}${i === 0 ? '' : '  '}${line}`).join(layout.eol)
 }
 
 /** Why a block could not be serialized. */
@@ -459,9 +466,12 @@ export type SerializeResult =
  * (`invalid`, or `limit` for a size limit) or the block would exceed
  * `COMMENT_BLOCK_MAX_BYTES` (`limit`). Every block it returns therefore parses
  * back as `ok` with equal data (property P-007).
+ * `note` is the note area – a kind's agent note, then its hint lines (default:
+ * the v0.23.1 note); it must start `note to agents:` and pass {@link isSafeNoteLine}.
  */
-export function serializeBlock(data: CommentData, layout: BlockLayout): SerializeResult {
+export function serializeBlock(data: CommentData, layout: BlockLayout, note: readonly string[] = AGENT_NOTE_LINES): SerializeResult {
   if (!INDENT.test(layout.indent) || !EOLS.has(layout.eol)) return { ok: false, reason: 'invalid' }
+  if (!note[0]?.startsWith(AGENT_NOTE_PREFIX) || !note.every(isSafeNoteLine)) return { ok: false, reason: 'invalid' }
   const parsed = CommentDataSchema.safeParse(data)
   if (!parsed.success) {
     return { ok: false, reason: parsed.error.issues.some(isLimitIssue) ? 'limit' : 'invalid' }
@@ -475,7 +485,7 @@ export function serializeBlock(data: CommentData, layout: BlockLayout): Serializ
   const { indent, eol } = layout
   const block = [
     `<!-- ${BLOCK_MARKER} v${FORMAT_VERSION} id=${data.id}`,
-    renderAgentNote(layout),
+    renderAgentNote(layout, note),
     renderReadable(data, layout),
     `${indent}@data ${escapeJsonForComment(json)}`,
     `${indent}-->`

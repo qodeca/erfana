@@ -27,7 +27,7 @@
  */
 import { CHARSET_PRESCAN_BYTES, utf8Length } from '../comments/encoding'
 import type { CommentData } from '../comments/format'
-import type { KindVerifyResult, Slot } from '../comments/fileKind'
+import type { BlockNote, KindVerifyResult, Slot } from '../comments/fileKind'
 import {
   insertRefusal,
   lineLayoutAt,
@@ -113,22 +113,30 @@ export function htmlSlotOf(doc: CommentDocument, el: IndexedElement, ws: string 
   }
 }
 
-/** Plan a new block before an eligible element (§5.2, §5.6, R3-8). */
-export function planInsert(doc: CommentDocument, request: InsertRequest): PlanResult {
+/**
+ * Plan a new block before an eligible element (§5.2, §5.6, R3-8).
+ *
+ * @param note - The kind whose agent note and hints the block carries
+ *   (`htmlKind`); absent: the v0.23.1 note, as the writer byte pins expect.
+ */
+export function planInsert(doc: CommentDocument, request: InsertRequest, note?: BlockNote): PlanResult {
   const refused = insertRefusal(doc)
   if (refused) return { ok: false, reason: refused }
   const el = doc.index.elementAt(request.targetStart)
   if (!el) return { ok: false, reason: 'not-eligible' }
-  return planSlotInsert(doc, htmlSlotOf(doc, el, request.ws), request.data, htmlGrowthCheck)
+  return planSlotInsert(doc, htmlSlotOf(doc, el, request.ws), request.data, htmlGrowthCheck, note)
 }
 
 /**
  * Plan an edit of one `ok` block (reply, edit, resolve, …). Only the comment
  * node is replaced; the line break and indent after it stay as they are, so a
  * later delete still restores the original bytes (U-053).
+ *
+ * @param note - The kind whose agent note and hints the rewritten block
+ *   carries, rebuilt from `request.data`; absent: the v0.23.1 note.
  */
-export function planReplace(doc: CommentDocument, request: ReplaceRequest): PlanResult {
-  return planSharedReplace(doc, request, htmlGrowthCheck)
+export function planReplace(doc: CommentDocument, request: ReplaceRequest, note?: BlockNote): PlanResult {
+  return planSharedReplace(doc, request, htmlGrowthCheck, note)
 }
 
 /**

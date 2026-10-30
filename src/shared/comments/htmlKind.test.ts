@@ -12,8 +12,9 @@ import { htmlGrowthCheck, planInsert, spliceOriginOf } from '../htmlComments/spl
 import { fixedId, makeComment } from './__fixtures__/commentTestData'
 import { lineDocument } from './__fixtures__/lineIndex'
 import { isKindRefusal, type PickedTarget } from './fileKind'
-import { AGENT_NOTE_LINES } from './format'
+import { HTML_AGENT_NOTE_LINES } from './agentNotes'
 import { htmlKind } from './htmlKind'
+import { wordsHint } from './noteLines'
 import { findAnchorTarget } from './reattach'
 import { applySplice, planSlotInsert } from './splice'
 
@@ -34,10 +35,10 @@ function pick(over: Partial<PickedTarget>): PickedTarget {
 }
 
 describe('htmlKind', () => {
-  it('is the shipped HTML: id, extensions and agent note', () => {
+  it('is the shipped HTML: id and extensions; its agent note is the HTML note (024-FR-008, C-02)', () => {
     expect(htmlKind.id).toBe('html')
     expect(htmlKind.extensions).toEqual(['.html', '.htm'])
-    expect(htmlKind.agentNote).toBe(AGENT_NOTE_LINES)
+    expect(htmlKind.agentNote).toBe(HTML_AGENT_NOTE_LINES)
     // C10: the meta-charset refusal is the HTML kind's own growth check.
     expect(htmlKind.refuseGrowth).toBe(htmlGrowthCheck)
   })
@@ -85,13 +86,25 @@ describe('htmlKind', () => {
     const li = byTag('li', 1)
     const anchor = htmlKind.anchorOf(doc, li)
     expect(anchor).toEqual(buildAnchor(html.index, li))
-    expect(htmlKind.hints(makeComment(), li)).toEqual([])
+    expect(htmlKind.hints(makeComment())).toEqual([])
     expect(htmlKind.reattach(doc, anchor)).toEqual(findAnchorTarget(html.index, anchor))
     const origin = htmlKind.originOf(doc)
     expect(origin).toEqual(spliceOriginOf(html))
     const plan = { op: 'replace' as const, start: 0, end: 0, insert: '' }
     expect(htmlKind.verify(origin, doc, plan)).toEqual({ ok: true })
     expect(htmlKind.verify(origin, htmlKind.parse(`${PAGE}<p>more</p>`, 0), plan)).toEqual({ ok: false, reason: 'elements' })
+  })
+
+  it('024-FR-008 stores a valid selection as anchor.sel and hints its words; drops an invalid one', () => {
+    const li = byTag('li', 1)
+    const sel = { exact: 'Two', prefix: 'One', suffix: '' }
+    const anchor = htmlKind.anchorOf(doc, li, { ...sel, extra: 1 } as typeof sel)
+    expect(anchor).toEqual({ ...buildAnchor(html.index, li), sel })
+    expect(Object.keys(anchor).at(-1)).toBe('sel')
+    expect(htmlKind.hints(makeComment({ anchor }))).toEqual([wordsHint('Two')])
+    const tooLong = { ...sel, exact: 'x'.repeat(201) }
+    expect(htmlKind.anchorOf(doc, li, tooLong)).toEqual(buildAnchor(html.index, li))
+    expect(htmlKind.hints(makeComment({ anchor: { ...anchor, sel: tooLong } }))).toEqual([])
   })
 
   it('throws on another kind\'s document, origin or target – a wiring bug, never a guess', () => {

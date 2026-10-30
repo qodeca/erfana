@@ -23,7 +23,10 @@
  * damaged (`readable-mismatch`, §3). The comparison ignores whitespace-only
  * differences (indentation, line breaks, trailing blanks), so a re-indent or a
  * CRLF checkout never damages a block, and it skips the note to agents after
- * the header, which carries no data.
+ * the header, which carries no data. A `status:` or `target:` line may also
+ * end in an extension ` (…)` this version does not render (comments-v2 C-01),
+ * so a later optional field that extends one does not damage the block here,
+ * as `sel` would have damaged it in v0.23.1 had it gone into a readable line.
  *
  * What deleting a block removes depends on the shape its kind inserts it in
  * (C2): `before-target` (HTML, exactly as shipped) or `line-start` (Markdown,
@@ -228,8 +231,22 @@ function withoutAgentNote(lines: readonly string[]): readonly string[] {
   return status < 0 ? lines.slice(1) : lines.slice(status)
 }
 
-function sameLines(a: readonly string[], b: readonly string[]): boolean {
-  return a.length === b.length && a.every((line, i) => line === b[i])
+/** Readable lines a later version may extend with ` (…)` at the end (C-01). */
+const EXTENSIBLE_LINE = /^(?:status|target): /
+
+/** True when `found` is `expected`, or `expected` with an unknown ` (…)` extension on an extensible line. */
+function sameReadableLine(found: string, expected: string): boolean {
+  if (found === expected) return true
+  return (
+    EXTENSIBLE_LINE.test(expected) &&
+    found.length > expected.length + 3 &&
+    found.startsWith(`${expected} (`) &&
+    found.endsWith(')')
+  )
+}
+
+function sameLines(found: readonly string[], expected: readonly string[]): boolean {
+  return found.length === expected.length && found.every((line, i) => sameReadableLine(line, expected[i]))
 }
 
 /** Classify the `@data` and readable parts of a terminated v1 block body. */

@@ -26,12 +26,25 @@
  * for its own reason (HTML: a `<meta charset>` pushed out of the prescan)
  * through a {@link GrowthCheck}, and adds its own pre-write check to
  * {@link verifyKindSplice} (HTML: the same elements in the same order).
+ *
+ * THE NOTE AREA (C1). An insert or a replace given a {@link BlockNote} – its
+ * file kind – writes that kind's agent note and the hint lines it builds from
+ * the new `@data`, so a reply or a resolve re-renders the hints. Without one
+ * it writes the v0.23.1 note and no hints, exactly as v0.23.1 did: the writer
+ * byte pins run that path and never change.
  */
 import { PREVIEW_LIMITS } from '../preview-limits'
 import type { FileCommentState, ParsedBlock, SpliceShape } from './blocks'
 import { encodeText, utf8Length } from './encoding'
-import { serializeBlock, type BlockLayout, type CommentData, type Eol, type SerializeFailure } from './format'
-import type { KindDocument, KindVerifyResult, Slot } from './fileKind'
+import {
+  AGENT_NOTE_LINES,
+  serializeBlock,
+  type BlockLayout,
+  type CommentData,
+  type Eol,
+  type SerializeFailure
+} from './format'
+import type { BlockNote, KindDocument, KindVerifyResult, Slot } from './fileKind'
 
 /** What a plan does to the file. */
 export type SpliceOp = 'insert' | 'replace' | 'delete'
@@ -158,6 +171,11 @@ export function insertRefusal(doc: SpliceDocument): PlanFailure | undefined {
   return undefined
 }
 
+/** The note area of a block about `data`: the kind's note and hints, or the v0.23.1 note alone. */
+function noteLinesOf(data: CommentData, note: BlockNote | undefined): readonly string[] {
+  return note === undefined ? AGENT_NOTE_LINES : [...note.agentNote, ...note.hints(data)]
+}
+
 /** The exact text a slot's shape inserts around a serialized block. */
 function insertTextOf(slot: Slot, block: string, eol: Eol): string {
   if (slot.shape === 'line-start') return slot.indent + block + eol
@@ -169,15 +187,17 @@ function insertTextOf(slot: Slot, block: string, eol: Eol): string {
  * {@link insertRefusal} and the kind's own target checks first.
  *
  * @param check - The kind's own refusal of the grown file, if it has one.
+ * @param note - The kind whose note and hints the block carries; absent: the v0.23.1 note.
  */
 export function planSlotInsert(
   doc: SpliceDocument,
   slot: Slot,
   data: CommentData,
-  check?: GrowthCheck
+  check?: GrowthCheck,
+  note?: BlockNote
 ): PlanResult {
   const eol = eolAt(doc.text, slot.offset)
-  const serialized = serializeBlock(data, { indent: slot.indent, eol })
+  const serialized = serializeBlock(data, { indent: slot.indent, eol }, noteLinesOf(data, note))
   if (!serialized.ok) return fail(serialized.reason)
   const insert = insertTextOf(slot, serialized.block, eol)
   const refused = check?.(doc.text, [slot.offset, slot.offset], insert)
@@ -216,11 +236,14 @@ function blockLayout(text: string, block: ParsedBlock): BlockLayout {
  * are, so a later delete still restores the original bytes (U-053).
  *
  * @param check - The kind's own refusal of the grown file, if it has one.
+ * @param note - The kind whose note and hints the rewritten block carries,
+ *   rebuilt from `request.data`; absent: the v0.23.1 note, no hints.
  */
 export function planReplace(
   doc: SpliceDocument,
   request: ReplaceRequest,
-  check?: GrowthCheck
+  check?: GrowthCheck,
+  note?: BlockNote
 ): PlanResult {
   if (!doc.state.writable) return fail('read-only')
   const block = findBlock(doc.state, { id: request.id })
@@ -228,7 +251,7 @@ export function planReplace(
   if (block.kind !== 'ok') return fail('not-editable')
   if (block.rawHash !== request.rawHash) return fail('stale')
   if (request.data.id !== request.id) return fail('invalid')
-  const serialized = serializeBlock(request.data, blockLayout(doc.text, block))
+  const serialized = serializeBlock(request.data, blockLayout(doc.text, block), noteLinesOf(request.data, note))
   if (!serialized.ok) return fail(serialized.reason)
   const refused = check?.(doc.text, block.nodeRange, serialized.block)
   if (refused) return fail(refused)

@@ -12,8 +12,10 @@
  * parse5 modules of `../htmlComments/`, so it is left out of this barrel and
  * importing the base never loads parse5. Import it by its path.
  */
+export * from './agentNotes'
 export * from './anchorEvidence'
 export * from './anchorLookup'
+export * from './anchorSel'
 export * from './blocks'
 export * from './conflictMarkers'
 export * from './cutText'
@@ -21,6 +23,7 @@ export * from './encoding'
 export * from './fileKind'
 export * from './format'
 export * from './identity'
+export * from './noteLines'
 export * from './quoteText'
 export * from './reattach'
 export * from './splice'
