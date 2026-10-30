@@ -214,5 +214,26 @@ export const COMMENT_TEST_IDS = {
   /** Paused band: Save {file} */
   COMMENT_HOST_PAUSED_SAVE: 'comment-host-paused-save',
   /** Paused band, changed on disk: Go to editor */
-  COMMENT_HOST_PAUSED_GO_TO_EDITOR: 'comment-host-paused-go-to-editor'
+  COMMENT_HOST_PAUSED_GO_TO_EDITOR: 'comment-host-paused-go-to-editor',
+  // Selection comments (spec 024 commit 14, 024-FR-004)
+  /** Menu item with a selection: Comment on selection (M-12, M-14, M-16, M-19, M-21) */
+  COMMENT_MENU_SELECTION: 'comment-menu-selection',
+  /** Menu item with a selection: Comment on the whole {kind} */
+  COMMENT_MENU_WHOLE: 'comment-menu-whole',
+  /** The floating Comment button over a selection (C-16) */
+  COMMENT_SELECTION_BUTTON: 'comment-selection-button',
+  /** New-comment window: the words quote (C-21) */
+  COMMENT_WORDS: 'comment-words',
+  /** New-comment window: a notice about the words (cut, crossed, tie, blank) */
+  COMMENT_WORDS_NOTICE: 'comment-words-notice',
+  /** New-comment window: Comment on the whole {kind} after a tie */
+  COMMENT_WORDS_WHOLE: 'comment-words-whole',
+  /** New-comment window: the Narrow to words disclosure (C-07) */
+  COMMENT_NARROW_TOGGLE: 'comment-narrow-toggle',
+  /** New-comment window: the read-only text field to select words in */
+  COMMENT_NARROW_FIELD: 'comment-narrow-field',
+  /** New-comment window: the result line, Comment on: “…” */
+  COMMENT_NARROW_RESULT: 'comment-narrow-result',
+  /** New-comment window: Whole {kind}, which clears the words */
+  COMMENT_NARROW_WHOLE: 'comment-narrow-whole'
 } as const

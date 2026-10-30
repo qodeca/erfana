@@ -15,8 +15,9 @@
  * written: classes in Markdown come from plugins, not the author.
  */
 import type { CommentAnchor, RuntimeAnchor, TextQuote } from '../comments/format'
-import { ANCHOR_ID_MAX_CHARS, ANCHOR_PATH_MAX_CHARS, codePointLength } from '../comments/format'
+import { ANCHOR_ID_MAX_CHARS, ANCHOR_PATH_MAX_CHARS } from '../comments/format'
 import { isAnchorSelection, SEL_CONTEXT_MAX_CHARS, type AnchorSelection } from '../comments/anchorSel'
+import { headOf, occurrences, tailOf } from '../comments/selectionWords'
 import { exactOf, prefixOf, suffixOf } from '../comments/quoteText'
 import { PREVIEW_LIMITS } from '../preview-limits'
 import { MARKDOWN_SELECTION_SEARCH_MAX_CHARS } from './markdownLimits'
@@ -77,43 +78,6 @@ const WHITESPACE_RUN = /\s+/g
 function selectableText(index: MdIndex, target: MdTarget): string | undefined {
   if (target.textEnd - target.textStart > MARKDOWN_SELECTION_SEARCH_MAX_CHARS) return undefined
   return index.visibleText.slice(target.textStart, target.textEnd).replace(WHITESPACE_RUN, ' ').trim().normalize('NFC')
-}
-
-/** Every offset `exact` starts at in `text`. */
-function occurrences(text: string, exact: string): number[] {
-  const found: number[] = []
-  for (let at = text.indexOf(exact); at !== -1; at = text.indexOf(exact, at + 1)) found.push(at)
-  return found
-}
-
-const GRAPHEMES = new Intl.Segmenter('en', { granularity: 'grapheme' })
-/** UTF-16 units read around a selection for its context: far more than 32 graphemes need. */
-const CONTEXT_WINDOW = SEL_CONTEXT_MAX_CHARS * 16
-
-/** At most `max` code points from the end of `text`, cut on a grapheme boundary. */
-function tailOf(text: string, max: number): string {
-  const window = text.slice(-CONTEXT_WINDOW)
-  const segments = [...GRAPHEMES.segment(window)]
-  let count = 0
-  let start = window.length
-  for (let i = segments.length - 1; i >= 0; i -= 1) {
-    count += codePointLength(segments[i].segment)
-    if (count > max) break
-    start = segments[i].index
-  }
-  return window.slice(start)
-}
-
-/** At most `max` code points from the start of `text`, cut on a grapheme boundary. */
-function headOf(text: string, max: number): string {
-  let count = 0
-  let end = 0
-  for (const { segment, index } of GRAPHEMES.segment(text.slice(0, CONTEXT_WINDOW))) {
-    count += codePointLength(segment)
-    if (count > max) break
-    end = index + segment.length
-  }
-  return text.slice(0, end)
 }
 
 /**

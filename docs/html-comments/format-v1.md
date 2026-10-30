@@ -1,4 +1,4 @@
-# Erfana HTML comments – format v1
+# Erfana comments – format v1 (HTML and Markdown)
 
 **Status: final for v1** (written with phase P1 of [HTML Preview comments](../designs/comments/html-preview-comments.md), finalised in P8). The format is frozen: every file Erfana writes must stay readable by every later version, so v1 only ever gains optional fields. The serializer is `src/shared/htmlComments/format.ts`; its output is pinned by golden tests, and the examples below are parsed by them.
 

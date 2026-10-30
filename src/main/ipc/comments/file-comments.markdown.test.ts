@@ -222,3 +222,30 @@ describe('024-AC-028 item 5: the file-comment family is bound to Markdown', () =
     expect(service.watchCount).toBe(0)
   })
 })
+
+describe('024-AC-005 a selection comment on a second list item (a line-start slot)', () => {
+  it('024-AC-005 is written inside the first item with its indent, keeps anchor.sel, and leaves every other byte as it was', async () => {
+    const text = ['# Review', '', '- alpha', '- beta release notes', '', 'Closing paragraph.', ''].join('\n')
+    await project.write('review.md', text)
+    await listOk('review.md')
+    const draft = await service.openDraft(caller(), { panelId: PANEL, filePath: project.path('review.md') })
+    if (!draft.ok) throw new Error(`draft refused: ${draft.code}`)
+    const saved = await service.save(caller(), {
+      panelId: PANEL,
+      filePath: project.path('review.md'),
+      op: 'add',
+      draftToken: draft.draftToken,
+      target: { lineStart: 4, lineEnd: 4, tag: 'li', ordinal: 1, quote: { exact: 'beta release notes', prefix: '', suffix: '' }, baseHash: markdownTextHash(text) },
+      sel: { exact: 'beta', prefix: '', suffix: ' release notes' },
+      text: 'Which release?',
+      view: VIEW
+    })
+    expect(saved).toMatchObject({ ok: true })
+    const after = (await project.read('review.md')).toString('utf8')
+    const start = after.indexOf('  <!-- erfana:comment v1')
+    expect(start).toBeGreaterThan(after.indexOf('- alpha'))
+    expect(after.slice(0, start)).toBe(text.slice(0, start))
+    expect(after.endsWith(text.slice(start))).toBe(true)
+    expect(after).toContain('"sel":{"exact":"beta","prefix":"","suffix":" release notes"}')
+  })
+})

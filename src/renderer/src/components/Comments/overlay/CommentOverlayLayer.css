@@ -100,3 +100,53 @@
   outline: var(--border-width-thick) solid var(--color-border-focus);
   outline-offset: calc(var(--space-1) * -1);
 }
+
+/* The Comment button over a selection (comments-v2 C-16): the Surfaces card's
+   floating edge and shadow, anchored by its end edge at the end of the
+   selection's last line, above it – or below it near the top. It takes no
+   focus, so the selection stays. */
+.erf-comment-select-btn {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: var(--btn-height-sm);
+  padding: 0 var(--space-4);
+  pointer-events: auto;
+  cursor: pointer;
+  background-color: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-md);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+.erf-comment-select-btn--above {
+  transform: translate(-100%, calc(-100% - var(--space-4)));
+}
+.erf-comment-select-btn--below {
+  transform: translate(-100%, var(--space-4));
+}
+.erf-comment-select-btn:hover {
+  background-color: var(--color-bg-hover-solid);
+}
+
+/* Commented words (024-FR-004; C-12 on the Text highlights card): the fill
+   and a continuous bar, painted by the Custom Highlight API so the content
+   is never changed (commentHighlights.ts). Below Find in paint order. */
+::highlight(erf-comment) {
+  background-color: var(--color-comment-mark);
+  text-decoration: underline var(--comment-mark-bar-width) var(--color-comment-mark-bar);
+  text-decoration-skip-ink: none;
+  text-underline-offset: var(--space-2);
+}
+
+@media (forced-colors: active) {
+  ::highlight(erf-comment) {
+    background-color: Mark;
+    color: MarkText;
+    text-decoration-color: CanvasText;
+  }
+}

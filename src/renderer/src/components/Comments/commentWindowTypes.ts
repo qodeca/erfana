@@ -30,6 +30,20 @@ export interface WindowFile {
 /** Where focus goes when the window closes (§10.4 "Focus"). */
 export type WindowOpener = 'page' | 'drawer'
 
+/**
+ * The target's text and the selected range in it, for a new comment that
+ * may be about words (spec 024 024-FR-004; comments-v2 C-07). The text is
+ * collapsed as a selection reads it (`shared/comments/selectionWords.ts`);
+ * `start === end` means no words are chosen yet.
+ */
+export interface NewCommentWords {
+  readonly text: string
+  readonly start: number
+  readonly end: number
+  /** The selection ran past the target and was cut to it (Markdown: to the block it started in). */
+  readonly cut: boolean
+}
+
 /** What the comment window is showing. */
 export type CommentWindowRequest =
   | {
@@ -42,6 +56,8 @@ export type CommentWindowRequest =
       readonly file: WindowFile
       readonly point: { readonly x: number; readonly y: number }
       readonly opener: WindowOpener
+      /** The target's text and the selected words; absent where the preview cannot offer words (HTML for now). */
+      readonly words?: NewCommentWords
     }
   | {
       readonly kind: 'threads'

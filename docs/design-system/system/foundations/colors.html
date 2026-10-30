@@ -142,7 +142,7 @@
   <strong>Nothing on this page is typed by hand.</strong> Every swatch is painted with
   <code>var(--token)</code> from the synced copy of the app's <code>design-tokens.css</code>. Every
   resolved value and every contrast ratio is <em>baked</em> into this page by <code>npm run design</code>
-  from the shipping token file, across all <span data-claim="colour-tokens" title="colour tokens declared in design-tokens.css">110</span> colour tokens the app
+  from the shipping token file, across all <span data-claim="colour-tokens" title="colour tokens declared in design-tokens.css">112</span> colour tokens the app
   declares – the page itself runs no JavaScript.
   <br><br>
   What that guarantees is narrow and worth stating exactly: <code>npm run design -- --check</code> fails in CI
@@ -463,8 +463,13 @@ message is drawn neutral (panel fill, default border, an info icon) rather than 
   <tr><td><code>--color-accent-drag-bg</code></td><td><div class="ds-swatch" style="background: var(--color-accent-drag-bg)"></div></td><td><code data-token="--color-accent-drag-bg">rgba(160, 168, 255, 0.2)</code></td><td data-contrast="--color-accent-drag-bg on --color-bg-secondary">1.47:1</td><td data-contrast="--color-accent-drag-bg on --color-bg-primary">1.44:1</td></tr>
   <tr><td><code>--color-accent-drag-bg-subtle</code></td><td><div class="ds-swatch" style="background: var(--color-accent-drag-bg-subtle)"></div></td><td><code data-token="--color-accent-drag-bg-subtle">rgba(160, 168, 255, 0.05)</code></td><td data-contrast="--color-accent-drag-bg-subtle on --color-bg-secondary">1.09:1</td><td data-contrast="--color-accent-drag-bg-subtle on --color-bg-primary">1.07:1</td></tr>
   <tr><td><code>--color-accent-drag-border</code></td><td><div class="ds-swatch" style="background: var(--color-accent-drag-border)"></div></td><td><code data-token="--color-accent-drag-border">rgba(160, 168, 255, 0.3)</code></td><td data-contrast="--color-accent-drag-border on --color-bg-secondary">1.80:1</td><td data-contrast="--color-accent-drag-border on --color-bg-primary">1.83:1</td></tr>
+  <tr><td><code>--color-comment-mark</code></td><td><div class="ds-swatch" style="background: var(--color-comment-mark)"></div></td><td><code>color-mix(in srgb, var(--color-accent-primary) 35%, transparent)</code></td><td colspan="2">The comment mark's fill over commented words (C-12); drawn on the <a href="highlights.html">Text highlights</a> card</td></tr>
+  <tr><td><code>--color-comment-mark-bar</code></td><td><div class="ds-swatch" style="background: var(--color-comment-mark-bar)"></div></td><td><code data-token="--color-comment-mark-bar">#A0A8FF</code></td><td colspan="2">The bar under a comment mark (C-12)</td></tr>
 </tbody>
 </table>
+<ul class="ds-muted">
+  <li data-not-shown="--color-comment-mark">--color-comment-mark – a <code>color-mix()</code> over <code>--color-accent-primary</code>, which the bake cannot resolve to one literal; its value is written in the row above and its look is drawn on the Text highlights card</li>
+</ul>
 
 <h3 id="c-links">Links</h3>
 <p class="ds-muted">From <code>design-tokens.css</code>: “Use these for anchor/link elements”</p>

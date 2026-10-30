@@ -13,6 +13,7 @@
  */
 import { visibleInline, type CommentAnchor, type CommentAuthor, type ParsedBlock } from '../../../shared/htmlComments'
 import type { KindDocument } from '../../../shared/comments/fileKind'
+import { anchorSelectionOf, type AnchorSelection } from '../../../shared/comments/anchorSel'
 import { PREVIEW_LIMITS } from '../../../shared/preview-limits'
 import {
   COMMENT_RAW_PREVIEW_MAX_CHARS,
@@ -33,11 +34,13 @@ export interface ListJob {
   readonly placements?: true
 }
 
-/** Where an attached thread's target is now: its 1-based first line and its tag. */
+/** Where an attached thread's target is now: its 1-based first line, its tag, and the words it is about. */
 export interface ListedPlacement {
   readonly threadId: string
   readonly line: number
   readonly tag: string
+  /** The block's valid `anchor.sel` (024-FR-004): the preview underlines these words while it finds them. */
+  readonly sel?: AnchorSelection
 }
 
 /** A thread as listed, before main gives it a key and its "not visible now" flag. */
@@ -148,7 +151,8 @@ function placementsOf(doc: KindDocument, line: (offset: number) => number): List
     if (block.kind !== 'ok' || block.target.state !== 'attached') continue
     const target = doc.index.elementAt(block.target.startOffset)
     if (target === undefined) continue
-    placements.push({ threadId: block.data.id, line: line(target.start), tag: target.tag })
+    const sel = anchorSelectionOf(block.data.anchor)
+    placements.push({ threadId: block.data.id, line: line(target.start), tag: target.tag, ...(sel === undefined ? {} : { sel }) })
   }
   return placements
 }

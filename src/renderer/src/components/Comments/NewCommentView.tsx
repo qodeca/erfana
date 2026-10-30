@@ -28,10 +28,16 @@
  *   how it ended: landed, the panel announces it and closes the window; refused,
  *   the banner turns into the refusal and Save comes back, text kept. The
  *   editor's autosave stays held until then, not just until the answer.
+ * - **Words** (spec 024 024-FR-004, C-07): when the preview sends the
+ *   target's text, `CommentWordsPicker` shows the selected words and the
+ *   Narrow to words field; the choice is derived from the range, and Save
+ *   waits while only spaces are chosen or the words cannot be found again.
  *
  * @module HtmlPreviewPanel/comments/NewCommentView
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
+import type { AnchorSelection } from '../../../../shared/comments/anchorSel'
+import { chooseWords, type WordsChoice } from '../../../../shared/comments/selectionWords'
 import type { CommentSaveResult } from '../../../../shared/ipc/preview-comment-schema'
 import { ErrorCode } from '../../../../shared/errors'
 import { commentDrafts } from '../../stores/usePreviewCommentStore'
@@ -62,6 +68,8 @@ import { useCommentAlert, useInnerStep } from './commentLive'
 import { onCommentWriteSettled, trackCommentWrite, useCommentWritePending } from './commentPendingWrites'
 import { draftKeyOf, type CommentWindowRequest } from './commentWindowTypes'
 import { useCommentWords } from './commentWords'
+import { CommentWordsPicker, type WordsSpan } from './CommentWordsPicker'
+import { SELECTION_COPY } from './commentCopyWords'
 import { TEST_IDS } from '../../constants/testids'
 
 /** Props for {@link NewCommentView}. */
@@ -69,7 +77,8 @@ export interface NewCommentViewProps {
   readonly request: Extract<CommentWindowRequest, { kind: 'new' }>
   readonly authorName: string
   readonly authorEmail: string
-  readonly onSave: (text: string) => Promise<CommentSaveResult>
+  /** Save the text; `sel` is the chosen words, absent for a comment on the whole target. */
+  readonly onSave: (text: string, sel?: AnchorSelection) => Promise<CommentSaveResult>
   readonly onSaveIdentity: (identity: IdentityFormData) => Promise<boolean>
   /** Main asked for a name after all: back to the identity step. */
   readonly onIdentityRequired: () => void
@@ -116,6 +125,10 @@ export function NewCommentView({
   const alert = useCommentAlert()
   const words = useCommentWords()
   const changeRef = useRef<HTMLButtonElement>(null)
+  const quoteId = useId()
+  const [span, setSpan] = useState<WordsSpan>(() => ({ start: request.words?.start ?? 0, end: request.words?.end ?? 0 }))
+  const [untouched, setUntouched] = useState(true)
+  const choice: WordsChoice = request.words === undefined ? { kind: 'whole' } : chooseWords({ text: request.words.text, ...span })
   const focusChange = useRef(false)
   const mounted = useRef(true)
   useEffect(
@@ -129,7 +142,8 @@ export function NewCommentView({
   // saved (by the button, Cmd+S or autosave).
   const unsaved = guard.state !== 'clean' || (refusedUnsaved && !guard.justSaved)
   const count = countCharacters(text)
-  const fieldBlocked = text.trim() === '' || counterState(count) === 'over'
+  const fieldBlocked =
+    text.trim() === '' || counterState(count) === 'over' || choice.kind === 'blank' || choice.kind === 'tie'
   // A write for this element is still being written – this window's own, or
   // one sent from a window closed meanwhile (same session draft): no second.
   const pending = useCommentWritePending(request.panelId, key) && !saving
@@ -197,6 +211,12 @@ export function NewCommentView({
       return
     }
     if (unsaved) return
+    // Words that cannot be stored: the notice above the field says why, and the window says it aloud.
+    if (choice.kind === 'blank' || choice.kind === 'tie') {
+      const noun = words.noun(request.target.tag)
+      alert(choice.kind === 'blank' ? SELECTION_COPY.blank(noun) : SELECTION_COPY.tie(noun))
+      return
+    }
     setSaving(true)
     setFailure(null)
     // Autosave held for the write, so a keystroke-triggered save of the same
@@ -208,7 +228,7 @@ export function NewCommentView({
     )
     let answer: CommentSaveResult
     try {
-      answer = await onSave(result.text)
+      answer = await onSave(result.text, choice.kind === 'words' ? choice.sel : undefined)
     } catch {
       // The gateway never rejects; a caller that does still ends the write.
       answer = { ok: false, code: ErrorCode.UNKNOWN_ERROR }
@@ -266,6 +286,21 @@ export function NewCommentView({
     <>
       <div className="erf-comment-window__body">
         {unsavedBanner}
+        {request.words !== undefined && (
+          <CommentWordsPicker
+            words={request.words}
+            span={span}
+            choice={choice}
+            untouched={untouched}
+            noun={words.noun(request.target.tag)}
+            line={request.target.line}
+            quoteId={quoteId}
+            onSpan={next => {
+              setSpan(next)
+              setUntouched(false)
+            }}
+          />
+        )}
         <CommentField
           label={COPY.fieldLabel}
           value={text}

@@ -8,10 +8,13 @@
  * M-15 (read-only and paused), M-17, M-18, M-20, M-22, M-23; F-02, F-03,
  * F-04, F-06, F-07; S-01 (icon); W-01, W-06 (refused save keeps the text).
  *
- * Pending for commit 14 (selection comments and the remaining visuals):
- * M-12, M-14, M-16, M-19, M-21; S-02 – S-05 drawing (the ghost icon, the
- * notched icon, "Words changed"); W-02 – W-05, W-07, W-08 before typing,
- * W-10, W-11 in Markdown words; the non-modal window (C-18).
+ * The selection rows M-12, M-14, M-16, M-19 and M-21 are in
+ * MarkdownComments.selection.test.tsx (spec 024 commit 14).
+ *
+ * Still pending (the comments-v2 states and window states not built yet):
+ * S-02 – S-05 drawing (the ghost icon, the notched icon, "Words changed");
+ * W-02 – W-05, W-07, W-08 before typing, W-10, W-11 in Markdown words; the
+ * non-modal window (C-18).
  */
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -273,7 +276,7 @@ describe('Markdown Preview comments', () => {
   })
 
   describe('024-AC-016: paused while an editor holds unsaved edits (F-02, F-03, M-15)', () => {
-    it('024-AC-016: the band offers Save {file}; the toggle and the menu are disabled with its sentence; the list reads the buffer', async () => {
+    it('024-AC-016 C-09: the band offers Save {file}; the toggle and the menu are disabled with its sentence; the list reads the buffer', async () => {
       const user = userEvent.setup()
       useProjectStore.setState({ dirtyPanelIds: new Set([PANEL_ID]) })
       renderPanel()
@@ -296,7 +299,7 @@ describe('Markdown Preview comments', () => {
       expect(dock.save).toHaveBeenCalledTimes(1)
     })
 
-    it('024-AC-016: a thread opened while paused is read-only with the band sentence', async () => {
+    it('024-AC-016 C-09: a thread opened while paused is read-only with the band sentence', async () => {
       const user = userEvent.setup()
       useProjectStore.setState({ dirtyPanelIds: new Set([PANEL_ID]) })
       renderPanel()
@@ -307,7 +310,7 @@ describe('Markdown Preview comments', () => {
       expect(screen.queryByTestId(TEST_IDS.COMMENT_NEW_ON_ELEMENT)).toBeNull()
     })
 
-    it('024-AC-016: changed on disk too, the band warns and Go to editor opens this panel\'s editor view (F-03)', async () => {
+    it('024-AC-016 C-09: changed on disk too, the band warns and Go to editor opens this panel\'s editor view (F-03)', async () => {
       dock.unregister()
       dock = dockWith(true)
       const user = userEvent.setup()

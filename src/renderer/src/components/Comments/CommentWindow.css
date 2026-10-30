@@ -696,3 +696,70 @@
     outline-offset: calc(var(--space-1) * -1);
   }
 }
+
+/* ---------- the words of a new comment (spec 024 024-FR-004; comments-v2 C-07, C-21) ---------- */
+
+.erf-comment-words-area {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+/* The quote: --text-base, primary ink, the accent rule, three lines unless opened (C-21). */
+.erf-comment-words {
+  padding-inline-start: var(--space-6);
+  border-inline-start: var(--border-width-thick) solid var(--color-accent-primary);
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+}
+.erf-comment-words__text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow-wrap: anywhere;
+}
+.erf-comment-words--open .erf-comment-words__text {
+  display: block;
+  -webkit-line-clamp: none;
+  line-clamp: none;
+}
+.erf-comment-disclosure {
+  align-self: flex-start;
+}
+.erf-comment-narrow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.erf-comment-narrow[hidden] {
+  display: none;
+}
+.erf-comment-narrow__label {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+/* The Form card's read-only state: the field's edge and size, the tertiary ground; focus is the one ring. */
+.erf-comment-narrow__field {
+  inline-size: 100%;
+  min-block-size: calc(var(--text-base) * var(--leading-normal) * 4 + var(--space-8));
+  padding: var(--space-4) var(--space-6);
+  background: var(--color-bg-tertiary);
+  border: var(--border-width) solid var(--color-border-input);
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  resize: vertical;
+  overflow-wrap: anywhere;
+}
+.erf-comment-narrow__field:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+.erf-comment-narrow__result {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+}

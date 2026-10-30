@@ -154,7 +154,9 @@ export const ThreadPlacementSchema = z
     /** 1-based first source line of the target. */
     line: z.number().int().min(1),
     /** The target's tag, as the kind indexes it. */
-    tag: CommentTagNameSchema
+    tag: CommentTagNameSchema,
+    /** The words the thread is about (its valid `anchor.sel`), for the underline (024-FR-004). */
+    sel: FileCommentSelSchema.optional()
   })
   .strict()
 export type ThreadPlacement = z.infer<typeof ThreadPlacementSchema>

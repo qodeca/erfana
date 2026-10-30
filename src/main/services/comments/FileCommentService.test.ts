@@ -94,6 +94,16 @@ describe('list, add, change and delete', () => {
     expect(text).toContain('"sel":{"exact":"paragraph","prefix":"Second ","suffix":" here."}')
     expect(text).toContain('comment is about the words (when commented): "paragraph"')
   })
+
+  it('024-AC-005: the list places a selection thread with its words, so the preview can mark them; a block comment has none', async () => {
+    await h.listOk('notes.txt')
+    await h.add('notes.txt', 3, 'About these words.', { sel: { exact: 'paragraph', prefix: 'Second ', suffix: ' here.' } })
+    await h.add('notes.txt', 1, 'About the intro.')
+    const listed = await h.listOk('notes.txt')
+    const bySel = listed.placements.map(p => p.sel?.exact ?? null).sort()
+    expect(bySel).toEqual(['paragraph', null].sort())
+    expect(listed.placements.find(p => p.sel !== undefined)).toMatchObject({ sel: { exact: 'paragraph', prefix: 'Second ', suffix: ' here.' } })
+  })
 })
 
 describe('024-AC-028 item 4: a draft token is single-use and tied to window, panel and file; thread ops take keys only', () => {

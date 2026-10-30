@@ -92,6 +92,19 @@ export class MarkdownCommentsPage {
     return this.page.getByTestId(TEST_IDS.COMMENT_CONTEXT_MENU)
   }
 
+  /** The floating Comment button over a selection (C-16). */
+  selectionButton(): Locator {
+    return this.overlay().getByTestId(TEST_IDS.COMMENT_SELECTION_BUTTON)
+  }
+
+  /** The texts of the ranges the comment mark paints now (CSS Custom Highlight API). */
+  async markedWords(): Promise<string[]> {
+    return this.page.evaluate(() => {
+      const highlight = CSS.highlights.get('erf-comment')
+      return highlight === undefined ? [] : [...highlight].map(range => (range as Range).toString())
+    })
+  }
+
   // ---------------------------------------------------------------------------
   // Steps
   // ---------------------------------------------------------------------------
@@ -104,6 +117,31 @@ export class MarkdownCommentsPage {
   }
 
   /** Comment mode on with the toolbar toggle. */
+  /**
+   * Select the first occurrence of `words` inside the target, as a drag
+   * would leave it, and return the selection's last line box in page pixels.
+   */
+  async selectWords(tag: string, line: number, words: string): Promise<{ x: number; y: number; right: number }> {
+    const box = await this.target(tag, line).evaluate((el, wanted) => {
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+      for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+        const at = (node as Text).data.indexOf(wanted)
+        if (at === -1) continue
+        const range = document.createRange()
+        range.setStart(node, at)
+        range.setEnd(node, at + wanted.length)
+        const selection = window.getSelection()!
+        selection.removeAllRanges()
+        selection.addRange(range)
+        const rects = range.getClientRects()
+        const last = rects[rects.length - 1]
+        return { x: last.left + last.width / 2, y: last.top + last.height / 2, right: last.right }
+      }
+      throw new Error(`"${wanted}" is not in the target`)
+    }, words)
+    return box
+  }
+
   async modeOn(): Promise<void> {
     await expect(this.modeButton()).not.toHaveAttribute('aria-disabled', 'true', { timeout: MD_COMMENT_BUDGET_MS })
     if ((await this.modeButton().getAttribute('aria-pressed')) !== 'true') await this.modeButton().click()
@@ -116,7 +154,8 @@ export class MarkdownCommentsPage {
    * type `text` and Save; wait until the window has closed and the polite
    * region says where the comment went.
    */
-  async saveNewComment(text: string, file: string, name: string): Promise<void> {
+  /** Take the one-time identity step if the window shows it, and wait for the new-comment view. */
+  async passIdentity(name: string): Promise<void> {
     const win = this.window()
     await expect(win).toHaveAttribute('data-view', /^(identity|new)$/, { timeout: MD_COMMENT_BUDGET_MS })
     if ((await win.getAttribute('data-view')) === 'identity') {
@@ -124,6 +163,11 @@ export class MarkdownCommentsPage {
       await this.page.getByTestId('comment-identity-continue').click()
     }
     await expect(win).toHaveAttribute('data-view', 'new', { timeout: MD_COMMENT_BUDGET_MS })
+  }
+
+  async saveNewComment(text: string, file: string, name: string): Promise<void> {
+    const win = this.window()
+    await this.passIdentity(name)
     await this.page.getByTestId('comment-new-field').fill(text)
     await this.page.getByTestId('comment-save').click()
     await expect(win).toHaveCount(0, { timeout: MD_COMMENT_BUDGET_MS })

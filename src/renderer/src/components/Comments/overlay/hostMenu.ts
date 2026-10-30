@@ -11,14 +11,13 @@
  * the preview's own prompt items after these; in comment mode these are the
  * whole menu (R-13).
  *
- * Selection rows (M-12, M-14, M-16, M-19, M-21) arrive with selection
- * comments (spec 024 commit 14): until then a selection outside comment mode
- * keeps the preview's shipped menu, and in comment mode a selection is not
- * looked at.
+ * With a selection (M-12, M-14, M-16, M-19, M-21) the items are "Comment on
+ * selection" and "Comment on the whole {kind}"; on the frontmatter only the
+ * first, disabled with its reason – the frontmatter is no commentable kind.
  *
  * @module components/Comments/overlay/hostMenu
  */
-import { MD_SURFACE_COPY } from '../commentCopyWords'
+import { MD_SURFACE_COPY, SELECTION_COPY } from '../commentCopyWords'
 import type { CommentWords } from '../commentCopyWords'
 import type { ContextMenuItem } from '../../ContextMenu/ContextMenu'
 import { TEST_IDS } from '../../../constants/testids'
@@ -34,10 +33,21 @@ export interface HostMenuInput {
   /** Why this target cannot take one (the frontmatter), or `null`. */
   readonly refused: string | null
   readonly words: CommentWords
+  /** Text is selected in the preview: the menu is about the selection (menu matrix "Selected: yes"). */
+  readonly selection?: boolean
+}
+
+/** What the items do. */
+export interface HostMenuActions {
+  /** Open the new-comment window on the whole target (one step, A-01). */
+  readonly open: () => void
+  /** Open it on the selected words. */
+  readonly openWords?: () => void
 }
 
 /** The menu's accessible name: the capitalised kind noun (menu matrix "Menu label"). */
-export function hostMenuLabel(input: Pick<HostMenuInput, 'tag' | 'words'>): string {
+export function hostMenuLabel(input: Pick<HostMenuInput, 'tag' | 'words' | 'selection'>): string {
+  if (input.selection === true) return SELECTION_COPY.menuLabel
   return input.tag === 'frontmatter' ? 'Frontmatter' : input.words.menuLabel(input.tag)
 }
 
@@ -45,14 +55,30 @@ export function hostMenuLabel(input: Pick<HostMenuInput, 'tag' | 'words'>): stri
  * The comment items, in order.
  *
  * @param input - {@link HostMenuInput}
- * @param open - Opens the new-comment window on the target (one step, A-01).
- * @returns One item: "Comment on {kind}" outside comment mode, "Add comment"
- *   in it, "Comment on frontmatter" on the frontmatter – disabled with its
- *   reason when it cannot be used.
+ * @param actions - {@link HostMenuActions}
+ * @returns Without a selection one item: "Comment on {kind}" outside comment
+ *   mode, "Add comment" in it, "Comment on frontmatter" on the frontmatter.
+ *   With one, "Comment on selection" then "Comment on the whole {kind}". Each
+ *   disabled with its reason when it cannot be used.
  */
-export function hostMenuItems(input: HostMenuInput, open: () => void): ContextMenuItem[] {
+export function hostMenuItems(input: HostMenuInput, actions: HostMenuActions): ContextMenuItem[] {
   const frontmatter = input.tag === 'frontmatter'
   const reason = input.refused ?? input.blocked
+  const withReason = (item: ContextMenuItem): ContextMenuItem => (reason === null ? item : { ...item, disabled: true, reason })
+  if (input.selection === true) {
+    const onWords: ContextMenuItem = {
+      label: SELECTION_COPY.commentOnSelection,
+      action: actions.openWords ?? actions.open,
+      testId: TEST_IDS.COMMENT_MENU_SELECTION
+    }
+    if (frontmatter) return [withReason(onWords)]
+    const onWhole: ContextMenuItem = {
+      label: SELECTION_COPY.commentOnWhole(input.words.noun(input.tag)),
+      action: actions.open,
+      testId: TEST_IDS.COMMENT_MENU_WHOLE
+    }
+    return [withReason(onWords), withReason(onWhole)]
+  }
   const label = input.mode
     ? MD_SURFACE_COPY.addComment
     : frontmatter
@@ -63,6 +89,5 @@ export function hostMenuItems(input: HostMenuInput, open: () => void): ContextMe
     : frontmatter
       ? TEST_IDS.COMMENT_MENU_FRONTMATTER
       : TEST_IDS.COMMENT_MENU_COMMENT_ON
-  const item: ContextMenuItem = { label, action: open, testId }
-  return [reason === null ? item : { ...item, disabled: true, reason }]
+  return [withReason({ label, action: actions.open, testId })]
 }

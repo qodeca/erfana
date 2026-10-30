@@ -355,7 +355,7 @@ describe('024-AC-038 the other error paths', () => {
 })
 
 describe('024-AC-034 (b) another window\'s unsaved edits refuse the save in main', () => {
-  it('refused with its reason, nothing written', async () => {
+  it('024-AC-034 refused with its reason, nothing written', async () => {
     await setUp()
     await h.listOk('notes.txt', { windowId: 2 })
     // Window 2 – not the saving window – holds unsaved edits for the file
@@ -364,7 +364,7 @@ describe('024-AC-034 (b) another window\'s unsaved edits refuse the save in main
     await unchanged()
   })
 
-  it('the under-lock re-check refuses when the report arrives between the plan and the rename', async () => {
+  it('024-AC-034 the under-lock re-check refuses when the report arrives between the plan and the rename', async () => {
     await setUp()
     const real = h.project.path('notes.txt')
     h.hasAny.mockImplementationOnce(async () => false).mockImplementationOnce(async () => true)

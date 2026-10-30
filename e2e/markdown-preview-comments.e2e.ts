@@ -16,6 +16,9 @@
  *   successor ("has a comment entry when the setting is on, none when off").
  * - **024-AC-016** – an unsaved edit pauses comments: the band offers Save
  *   {file}, the toggle is unavailable, and saving brings comment mode back.
+ * - **024-AC-005** (commit 14) – words selected and commented from the
+ *   right-click menu, and by a drag in comment mode and the Comment button:
+ *   `anchor.sel` is on disk and the words are marked.
  *
  * Local gate only (e2e is not a required check). Condition-based waits only.
  */
@@ -29,6 +32,7 @@ import { MonacoPage } from './pages/monaco.page'
 import { ProjectTreePage } from './pages/project-tree.page'
 import { TabBarPage } from './pages/tab-bar.page'
 import { reviewer, setGlobalSetting } from './pages/html-preview.comments-ui'
+import { TEST_IDS } from '../src/renderer/src/constants/testids'
 
 const FILE = 'review.md'
 const TEXT = [
@@ -37,7 +41,7 @@ const TEXT = [
   'First paragraph of the review.',
   '',
   '- alpha',
-  '- beta',
+  '- beta release notes',
   '',
   'Closing paragraph.',
   ''
@@ -221,5 +225,56 @@ test.describe('Markdown Preview comments', () => {
     await expect(tabs.dirtyDot(FILE)).toHaveCount(0)
     await expect(md.modeButton()).not.toHaveAttribute('aria-disabled', 'true')
     await md.modeOn()
+  })
+
+  test('024-AC-005 (a) select words, Comment on selection, save: anchor.sel is on disk and the words are marked', async ({
+    windowWithTestProject,
+    testProject
+  }) => {
+    const page = windowWithTestProject
+    const file = path.join(testProject.path, FILE)
+    const md = await openReview(page)
+
+    const at = await md.selectWords('p', 3, 'paragraph of')
+    await page.mouse.click(at.x, at.y, { button: 'right' })
+    await expect(page.getByRole('menu', { name: 'Selection' })).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await page.getByTestId(TEST_IDS.COMMENT_MENU_SELECTION).click()
+    await md.passIdentity(NAME)
+    await expect(md.window().getByTestId(TEST_IDS.COMMENT_WORDS)).toHaveText('Comment on: “paragraph of”')
+    await md.saveNewComment(NOTE, FILE, NAME)
+
+    const written = await fsp.readFile(file, 'utf-8')
+    expect(written).toContain('"sel":{"exact":"paragraph of","prefix":"First ","suffix":" the review."}')
+    await expect.poll(() => md.markedWords(), { timeout: MD_COMMENT_BUDGET_MS }).toEqual(['paragraph of'])
+  })
+
+  test('024-AC-005 (b) in comment mode a drag selects words in a list item; the Comment button saves them', async ({
+    windowWithTestProject,
+    testProject
+  }) => {
+    const page = windowWithTestProject
+    const file = path.join(testProject.path, FILE)
+    const md = await openReview(page)
+    await md.modeOn()
+
+    // A real drag across the list item's word: press at its start, release at its end.
+    const item = md.target('li', 6)
+    const box = (await item.boundingBox())!
+    const word = await md.selectWords('li', 6, 'beta')
+    await page.evaluate(() => window.getSelection()?.removeAllRanges())
+    await page.mouse.move(box.x + 2, word.y)
+    await page.mouse.down()
+    await page.mouse.move(word.right + 1, word.y, { steps: 5 })
+    await page.mouse.up()
+    // A drag is no pick: no window, and the Comment button shows over the words.
+    await expect(md.selectionButton()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await expect(md.window()).toHaveCount(0)
+    await md.selectionButton().click()
+    await md.passIdentity(NAME)
+    await expect(md.window().getByTestId(TEST_IDS.COMMENT_WORDS)).toContainText('beta')
+    await md.saveNewComment(NOTE, FILE, NAME)
+
+    const written = await fsp.readFile(file, 'utf-8')
+    expect(written).toMatch(/"sel":\{"exact":"[^"]*beta"/)
   })
 })

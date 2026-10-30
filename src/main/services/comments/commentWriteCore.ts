@@ -214,12 +214,14 @@ export function isSpliceWithin(splice: ByteSplice, length: number): boolean {
 
 /** The own-lines tail after a new block (§5.2): one line break, then the target's indent. */
 const OWN_LINES_TAIL = /(?:\r\n|\r|\n)[ \t]*$/
+/** A line-start slot's indent before the block (a Markdown list item 2 or later, a block in a quote): blanks only. */
+const LINE_START_INDENT = /^[ \t]+/
 
 /**
  * Main's own check of the bytes a worker answer would put in the file
  * (security review S-L-C): nothing (a delete), or ONE comment that cannot end
- * early or open another (`isSafeCommentText`), optionally followed by the
- * own-lines tail. The worker serialized and verified the block, but it parses
+ * early or open another (`isSafeCommentText`), optionally after a line-start
+ * slot's indent (spaces and tabs) and followed by the own-lines tail. The worker serialized and verified the block, but it parses
  * hostile pages; checked here, a worker that answered wrong still cannot make
  * main write text that leaves the comment. Strict UTF-8, BOM kept: anything
  * else is not what the serializer writes.
@@ -232,7 +234,7 @@ export function isSafeInsert(insert: Uint8Array): boolean {
   } catch {
     return false
   }
-  return isSafeCommentText(text.replace(OWN_LINES_TAIL, ''))
+  return isSafeCommentText(text.replace(OWN_LINES_TAIL, '').replace(LINE_START_INDENT, ''))
 }
 
 function contextOf(act: WriteAct, random: RandomBytes | undefined): ThreadContext {

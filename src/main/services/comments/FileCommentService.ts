@@ -323,7 +323,8 @@ export class FileCommentService {
     return (summary.placements ?? []).map(placement => ({
       threadKey: panel.keys.keyFor(panel.binding, { kind: 'thread', realPath: panel.realPath, threadId: placement.threadId }),
       line: placement.line,
-      tag: placement.tag
+      tag: placement.tag,
+      ...(placement.sel === undefined ? {} : { sel: { exact: placement.sel.exact, prefix: placement.sel.prefix, suffix: placement.sel.suffix } })
     }))
   }
 

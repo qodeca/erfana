@@ -17,16 +17,24 @@
  * Tab order, named for what they open (D-07); the drawer is the keyboard
  * route to every thread.
  *
+ * The words of an open selection comment are marked through the Custom
+ * Highlight API (`commentHighlights.ts`, C-12) while they can be found in
+ * their target; a resolved or hidden thread marks nothing (state table
+ * S-01, S-06). The Comment button over a selection (C-16) is drawn here too.
+ *
  * @module components/Comments/overlay/CommentOverlayLayer
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { placePin, PIN_BOX_PX, type Box } from '../../../../../shared/comments/overlayCore/pinLayout'
 import type { ThreadPlacement } from '../../../../../shared/ipc/file-comment-schema'
 import type { CommentFileView } from '../../../../../shared/ipc/comment-common-schema'
 import { renderIcon } from '../../../utils/iconRegistry'
 import { TEST_IDS } from '../../../constants/testids'
-import { MD_SURFACE_COPY } from '../commentCopyWords'
+import { MD_SURFACE_COPY, SELECTION_COPY } from '../commentCopyWords'
+import { setCommentMarks } from './commentHighlights'
+import { rangeOfWords } from './domWords'
 import type { PreviewCommentAdapter } from './previewAdapter'
+import type { SelectionButton } from './useSelectionComments'
 import './CommentOverlayLayer.css'
 
 /** Props for {@link CommentOverlayLayer}. */
@@ -46,6 +54,9 @@ export interface CommentOverlayLayerProps {
   readonly polite: string
   readonly assertive: string
   readonly onOpenThreads: (threadKeys: readonly string[], anchor: HTMLElement) => void
+  /** The Comment button over a selection, while it shows (C-16). */
+  readonly selectionButton?: SelectionButton | null
+  readonly onSelectionButton?: () => void
 }
 
 /** One drawn icon. */
@@ -96,6 +107,23 @@ function iconSpots(props: CommentOverlayLayerProps, area: DOMRect): IconSpot[] {
   return spots
 }
 
+/** The words of open, attached selection comments, as ranges in the rendered content now. */
+function markedRanges(
+  adapter: PreviewCommentAdapter,
+  placements: readonly ThreadPlacement[],
+  file: CommentFileView | null
+): Range[] {
+  const open = new Set(file?.threads.filter(t => t.status === 'open' && t.attached).map(t => t.threadKey) ?? [])
+  const ranges: Range[] = []
+  for (const placement of placements) {
+    if (placement.sel === undefined || !open.has(placement.threadKey)) continue
+    const element = adapter.attach(placement)
+    const range = element === null ? null : rangeOfWords(element, placement.sel)
+    if (range !== null) ranges.push(range)
+  }
+  return ranges
+}
+
 /**
  * The overlay layer.
  *
@@ -106,13 +134,32 @@ export function CommentOverlayLayer(props: CommentOverlayLayerProps): React.JSX.
   const { adapter, area, content, mode, showIcons, outlined } = props
   // The content grew or shrank (a diagram drew, an image arrived, the window
   // was resized): draw again.
-  const [, setResized] = useState(0)
+  const [resized, setResized] = useState(0)
   useEffect(() => {
     if (content === null || typeof ResizeObserver === 'undefined') return undefined
     const observer = new ResizeObserver(() => setResized(n => n + 1))
     observer.observe(content)
-    return () => observer.disconnect()
+    // The preview re-rendered its blocks (a file reload, an edit): the marks' ranges point at the old nodes.
+    let frame = 0
+    const mutations = new MutationObserver(() => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => setResized(n => n + 1))
+    })
+    mutations.observe(content, { childList: true, subtree: true, characterData: true })
+    return () => {
+      observer.disconnect()
+      mutations.disconnect()
+      cancelAnimationFrame(frame)
+    }
   }, [content])
+
+  // The marks follow the list, the icons toggle and every redraw of the content.
+  const owner = useId()
+  const { placements, file } = props
+  useEffect(() => {
+    setCommentMarks(owner, showIcons ? markedRanges(adapter, placements, file) : [])
+  }, [owner, showIcons, adapter, placements, file, resized])
+  useEffect(() => () => setCommentMarks(owner, []), [owner])
 
   const areaBox = area?.getBoundingClientRect() ?? null
   const spots = areaBox !== null && showIcons ? iconSpots(props, areaBox) : []
@@ -140,6 +187,21 @@ export function CommentOverlayLayer(props: CommentOverlayLayerProps): React.JSX.
           style={{ left: outline.left, top: outline.top, width: outline.width, height: outline.height }}
           data-testid={TEST_IDS.COMMENT_HOST_OUTLINE}
         />
+      )}
+      {props.selectionButton != null && (
+        <button
+          type="button"
+          tabIndex={-1}
+          className={`erf-comment-select-btn erf-comment-select-btn--${props.selectionButton.below ? 'below' : 'above'}`}
+          style={{ left: props.selectionButton.x, top: props.selectionButton.y }}
+          // No focus and no change to the selection (C-16).
+          onMouseDown={event => event.preventDefault()}
+          onClick={() => props.onSelectionButton?.()}
+          data-testid={TEST_IDS.COMMENT_SELECTION_BUTTON}
+        >
+          {renderIcon('message-square-plus', { size: 16, 'aria-hidden': true })}
+          <span>{SELECTION_COPY.button}</span>
+        </button>
       )}
       {spots.map(spot => (
         <button

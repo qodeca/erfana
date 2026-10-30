@@ -74,6 +74,8 @@ export function MarkdownCommentsOverlay(props: MarkdownCommentsOverlayProps): Re
           polite={host.polite}
           assertive={host.assertive}
           onOpenThreads={host.openThreads}
+          selectionButton={host.selectionButton}
+          onSelectionButton={host.onSelectionButton}
         />
       )}
       {host.drawer !== null && (
@@ -95,13 +97,14 @@ export function MarkdownCommentsOverlay(props: MarkdownCommentsOverlayProps): Re
           <PreviewContextMenu
             x={menu.x}
             y={menu.y}
-            selectedText={menu.target.textContent ?? ''}
+            selectedText={menu.selectedText ?? menu.target.textContent ?? ''}
             filePath={filePath}
             fullDocument={markdown}
             startLine={adapter.lineOf(menu.target)}
             endLine={Number.parseInt(menu.target.dataset.lineEnd ?? '', 10) || adapter.lineOf(menu.target)}
             leadingItems={menu.items}
-            hideCopy
+            // Copy selection only when the menu is about a selection (M-11 vs M-12).
+            hideCopy={menu.selectedText === undefined}
             ariaLabel={menu.label}
             onClose={host.closeMenu}
           />

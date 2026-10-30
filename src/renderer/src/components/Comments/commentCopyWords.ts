@@ -159,7 +159,7 @@ export const HTML_WORDS: CommentWords = {
 /** Markdown sentences that differ from the shared ones (C-03, menu matrix § 3, state table W-01, W-08). */
 export const MARKDOWN_COPY = {
   showInPreview: 'Show in preview',
-  drawerNone: 'No comments in this file yet. Turn on comment mode and click a paragraph.',
+  drawerNone: 'No comments in this file yet. Select text and click Comment, or turn on comment mode and click a paragraph.',
   notFoundTag: 'Not found',
   notOnScreen: "This comment's target isn't on screen right now",
   notVisibleText:
@@ -169,7 +169,7 @@ export const MARKDOWN_COPY = {
   deleteBlock: 'Delete damaged comment',
   deleteBlockAction: 'Delete damaged comment…',
   pinsOff: 'Show comment icons – off: icons hidden in this preview',
-  modeOn: 'Comment mode on. Click a paragraph, or press Tab to choose one. Esc to leave.',
+  modeOn: 'Comment mode on. Click a paragraph, select text, or press Tab to pick one. Esc to leave.',
   pickerTop: 'Top level – no parent to select.',
   pickerNoChild: 'Nothing inside to select.',
   frontmatter: "Comments can't be added to the frontmatter.",
@@ -193,7 +193,7 @@ export const MARKDOWN_COPY = {
   expired: (noun: string): string => `This comment window was open too long. Pick the ${noun} again – your text is kept.`,
   modeTooltip: (on: boolean): string => {
     const key = commentModeShortcutLabel()
-    return on ? `Comment mode (${key}) – on: click a paragraph to comment, Esc to leave` : `Comment mode (${key}) – off`
+    return on ? `Comment mode (${key}) – on: click a paragraph or select text to comment, Esc to leave` : `Comment mode (${key}) – off`
   }
 } as const
 
@@ -301,4 +301,29 @@ export const MD_SURFACE_COPY = {
   /** D-07: a comment icon's name. */
   iconName: (count: number, noun: string, line: number): string =>
     `${plural(count, 'comment', 'comments')} on ${noun}, line ${line}. Open.`
+} as const
+
+/**
+ * Selection comments, in both previews (spec 024 024-FR-004; comments-v2
+ * C-07, C-16, C-21; menu matrix M-02, M-04, M-12, M-14, M-16, M-19, M-21).
+ * `{kind}` is the preview's noun ("element" in HTML, the kind in Markdown).
+ */
+export const SELECTION_COPY = {
+  commentOnSelection: 'Comment on selection',
+  commentOnWhole: (noun: string): string => `Comment on the whole ${noun}`,
+  menuLabel: 'Selection',
+  button: 'Comment',
+  narrow: 'Narrow to words',
+  narrowLabel: (noun: string, line: number): string => `Text of ${noun}, line ${line} – select words to narrow this comment`,
+  result: (exact: string): string => `Comment on: “${exact}”`,
+  whole: (noun: string): string => `Whole ${noun}`,
+  showAll: 'Show all',
+  showLess: 'Show less',
+  cut: (max: number): string => `Only the first ${max} characters are kept.`,
+  crossed: (noun: string): string => `The selection ran past this ${noun}, so the comment is about the words in this ${noun} only.`,
+  tie: (noun: string): string =>
+    `These words appear more than once in this ${noun} with the same text around them, so Erfana could not find them again. Select more words, or comment on the whole ${noun}.`,
+  blank: (noun: string): string => `Only spaces are selected. Select some words, or comment on the whole ${noun}.`,
+  wordsDropped: (noun: string, file: string): string =>
+    `Comment saved on the whole ${noun} – the selected words are not in ${file} as written.`
 } as const

@@ -12,16 +12,16 @@
  *   attribute is the scroller's, never the exported content's.
  * - **In comment mode** the pointer outlines the target under it and a
  *   click picks it (`overlayCore/gesture`: a drag of 4 px or more, or a
- *   selection, is left alone – selection comments come with commit 14); the
- *   click never reaches a link. The picker keys move real focus between
+ *   selection, selects words instead – 024-FR-004); the click never reaches
+ *   a link. The picker keys move real focus between
  *   targets: the picked one takes `tabindex="-1"` and the Focus card's ring
  *   (C-08.3). It keeps the attribute while it is the pick – so the menu and
  *   the window hand focus back to it on close – and loses it when another
  *   target is picked or the mode ends.
- * - **The menu** opens on a right-click on a target, or from Shift+F10 / the
- *   Menu key at the picked target (in comment mode) or the first target in
- *   view (outside it). A right-click on a selection outside comment mode is
- *   left to the preview's own menu until commit 14.
+ * - **The menu** opens on a right-click on a target or a selection, or from
+ *   Shift+F10 / the Menu key: at the picked target (in comment mode), at the
+ *   selection's last line (outside it, C-08.5), else at the first target in
+ *   view. The host decides what a selection makes of it (`hostMenu.ts`).
  *
  * @module components/Comments/overlay/useHostPointerKeys
  */
@@ -51,7 +51,10 @@ export interface HostPointerKeysOptions {
   readonly onToggleMode: (byKeyboard: boolean) => void
   readonly onExit: () => void
   readonly onPick: (target: HTMLElement) => void
-  readonly onMenu: (target: HTMLElement, at: { x: number; y: number }) => void
+  /** Open the menu; `target` is the one under the pointer – the host prefers a selection's. */
+  readonly onMenu: (target: HTMLElement | null, at: { x: number; y: number }) => void
+  /** The selection's last line box, or `null` when nothing is selected (keyboard-opened menu, C-08.5). */
+  readonly selectionRect: () => DOMRect | null
   readonly onSay: (text: string) => void
   readonly onScroll: () => void
 }
@@ -116,8 +119,14 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
     return undefined
   }, [mode, live, unmark])
 
+  // C-08.2: the block holding the selection's anchor, else the first block in view.
   const focusFirst = useCallback(() => {
-    const first = firstTargetInView(adapter, latest.current.scroller?.getBoundingClientRect() ?? null)
+    const anchor = hasSelection() ? (window.getSelection()?.anchorNode ?? null) : null
+    const held = anchor !== null && latest.current.scroller?.contains(anchor) ? adapter.targetAt(anchor) : null
+    const first =
+      held !== null && adapter.canComment(held).ok
+        ? held
+        : firstTargetInView(adapter, latest.current.scroller?.getBoundingClientRect() ?? null)
     if (first !== null) focusTarget(first)
   }, [adapter, focusTarget, latest])
 
@@ -178,9 +187,8 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
       if (gesture === 'pick' && target !== null) latest.current.onPick(target)
     }
     const onContextMenu = (event: MouseEvent): void => {
-      if (!latest.current.mode && hasSelection()) return
       const target = targetOf(event)
-      if (target === null) return
+      if (target === null && !hasSelection()) return
       event.preventDefault()
       event.stopPropagation()
       latest.current.onMenu(target, { x: event.clientX, y: event.clientY })
@@ -190,7 +198,13 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
       if (step === null) return
       const { mode: on, adapter: current } = latest.current
       if (!on) {
-        if (step !== 'menu' || hasSelection()) return
+        if (step !== 'menu') return
+        const words = hasSelection() ? latest.current.selectionRect() : null
+        if (words !== null) {
+          event.preventDefault()
+          latest.current.onMenu(null, { x: words.left + MENU_KEY_OFFSET_PX, y: words.bottom })
+          return
+        }
         const first = firstTargetInView(current, scroller.getBoundingClientRect())
         if (first === null) return
         event.preventDefault()

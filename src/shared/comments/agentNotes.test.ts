@@ -9,6 +9,8 @@
  * (registered in main's `commentFileKinds.ts`) and the Markdown note, whose
  * kind is registered with the Markdown kind (spec 024 commit 12).
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { FORMAT_DOC_URL, HTML_AGENT_NOTE_LINES, MARKDOWN_AGENT_NOTE_LINES } from './agentNotes'
 import { agentNoteProblem } from './fileKind'
@@ -62,5 +64,17 @@ describe('agent notes per kind (024-AC-009)', () => {
     expect(HTML_AGENT_NOTE_LINES[0]).toBe(AGENT_NOTE_LINES[0])
     expect(AGENT_NOTE_LINES).toHaveLength(3)
     expect(agentNoteProblem(AGENT_NOTE_LINES)).toBeUndefined()
+  })
+
+  it('C-02 one note wording per file type: the Markdown note points at the Markdown after the comment (the next item in a list), never an element; the format document is titled for both file types', () => {
+    const markdown = MARKDOWN_AGENT_NOTE_LINES.join(' ')
+    expect(MARKDOWN_AGENT_NOTE_LINES[0]).toMatch(/Change the Markdown after this block \(in a list, the next item\)/)
+    expect(markdown).not.toMatch(/\belement\b/)
+    expect(HTML_AGENT_NOTE_LINES[0]).toContain('Change the element after this block')
+    expect(markdown).toContain(FORMAT_DOC_URL)
+    const doc = readFileSync(join(process.cwd(), 'docs/html-comments/format-v1.md'), 'utf8')
+    expect(doc.split(/\r?\n/, 1)[0]).toBe('# Erfana comments – format v1 (HTML and Markdown)')
+    expect(doc).toContain('## In Markdown files')
+    expect(doc).toContain('one wording per file type')
   })
 })

@@ -53,6 +53,7 @@ import type {
 } from '../../../../shared/ipc/preview-comment-schema'
 import type { CommentIdentitySettings } from '../../../../shared/ipc/global-settings-schema'
 import { ErrorCode } from '../../../../shared/errors'
+import type { AnchorSelection } from '../../../../shared/comments/anchorSel'
 import { BaseDialog } from '../Dialog/BaseDialog'
 import { readZIndexToken } from '../../utils/overlayStack'
 import type { CommentListState } from '../../stores/usePreviewCommentStore'
@@ -98,7 +99,8 @@ export interface CommentWindowProps {
   /** "New comment" in a pin's thread view: switch to a new comment on that element. */
   readonly onNewComment?: (request: Extract<CommentWindowRequest, { kind: 'new' }>) => void
   readonly onSaveIdentity: (identity: IdentityFormData) => Promise<boolean>
-  readonly onSave: (request: CommentSaveRequest) => Promise<CommentSaveResult>
+  /** Write; with a new comment, `sel` carries the chosen words (024-FR-004) – a preview that offers none ignores it. */
+  readonly onSave: (request: CommentSaveRequest, sel?: AnchorSelection) => Promise<CommentSaveResult>
   /** A write landed: announce it and refresh the list. */
   readonly onWritten: (request: CommentSaveRequest, file: string) => void
   /** Refresh the list (a refusal that means the list is stale). */
@@ -370,14 +372,11 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
             authorName={identity?.authorName ?? ''}
             authorEmail={identity?.authorEmail ?? ''}
             textareaRef={textareaRef}
-            onSave={text =>
-              props.onSave({
-                panelId: request.panelId,
-                op: 'add',
-                draftToken: request.draftToken,
-                text
-              })
-            }
+            onSave={(text, sel) => {
+              const add = { panelId: request.panelId, op: 'add' as const, draftToken: request.draftToken, text }
+              // A comment on the whole target sends the shipped one-argument call.
+              return sel === undefined ? props.onSave(add) : props.onSave(add, sel)
+            }}
             onSaveIdentity={props.onSaveIdentity}
             onIdentityRequired={() => setIdentityAsked(true)}
             onSaved={() =>

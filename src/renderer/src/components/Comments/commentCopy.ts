@@ -358,9 +358,9 @@ export const SETTINGS_COPY = {
   title: 'Comments',
   flagLabel: 'Comments in HTML preview',
   flagHint: 'Lets you add comments to elements of a previewed page.',
-  // C-04 / 024-FR-022: the Markdown switch; selection words join the hints with commit 14.
+  // C-04 / 024-FR-022: the Markdown switch. The HTML hint gains "selected text" when the HTML Preview has selection comments.
   markdownFlagLabel: 'Comments in Markdown preview',
-  markdownFlagHint: 'Lets you comment on paragraphs, list items and other parts of a Markdown file in the preview.',
+  markdownFlagHint: 'Lets you comment on paragraphs, list items and selected text.',
   nameLabel: 'Your name',
   nameHint:
     'Saved into the file next to each comment you write. Changing it affects new comments only.',

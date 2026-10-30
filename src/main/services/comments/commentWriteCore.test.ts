@@ -20,6 +20,14 @@ describe('isSafeInsert', () => {
     }
   })
 
+  it('takes a block at a line-start slot: its indent of spaces or tabs before it, the own-lines tail after it', () => {
+    const { layout, data } = GOLDEN_CASES[0]
+    const result = serializeBlock(data, layout)
+    if (!result.ok) throw new Error(result.reason)
+    expect(isSafeInsert(encodeText(`  ${result.block}\n`))).toBe(true)
+    expect(isSafeInsert(encodeText(`\t${result.block}\n\t`))).toBe(true)
+  })
+
   it.each([
     ['text after the comment', '<!-- a --><script>x()</script>'],
     ['a second comment', '<!-- a --><!-- b -->'],
@@ -31,7 +39,10 @@ describe('isSafeInsert', () => {
     ['blanks without a line break after it', '<!-- a -->  '],
     ['text after the own-lines tail', '<!-- a -->\n  <p>'],
     ['a BOM in front', '﻿<!-- a -->'],
-    ['no comment at all', '<p>hi</p>']
+    ['no comment at all', '<p>hi</p>'],
+    ['text before the indent', 'x  <!-- a -->'],
+    ['a line break before the comment', '\n<!-- a -->'],
+    ['an indent and a second comment', '  <!-- a --><!-- b -->']
   ])('refuses %s', (_name, text) => {
     expect(isSafeInsert(encodeText(text))).toBe(false)
   })

@@ -8,11 +8,12 @@
 import { describe, expect, it } from 'vitest'
 import { ADA, FIXED_NOW, makeComment, pageWith } from './__fixtures__/commentTestData'
 import { lineDocument } from './__fixtures__/lineIndex'
-import { HTML_AGENT_NOTE_LINES } from './agentNotes'
+import { HTML_AGENT_NOTE_LINES, MARKDOWN_AGENT_NOTE_LINES } from './agentNotes'
+import { analyzeCommentDocument as frozenAnalyze } from './__fixtures__/frozen-v0.23.1/parse'
 import { agentNoteProblem } from './fileKind'
 import { AGENT_NOTE_LINES, isSafeNoteLine, renderAgentNote, serializeBlock, type CommentData } from './format'
 import { htmlKind } from './htmlKind'
-import { wordsHint } from './noteLines'
+import { markdownTargetHint, wordsHint } from './noteLines'
 import { applySplice, planReplace, planSlotInsert } from './splice'
 import { addReply } from './thread'
 import { analyzeCommentDocument } from '../htmlComments/parse'
@@ -141,6 +142,26 @@ describe('planners and the note area (C1, 024-FR-010)', () => {
 
 describe('readable-line extensions (C-01)', () => {
   const block = serialized(makeComment())
+
+  it('C-01 the readable lines v0.23.1 checks are byte-for-byte as v0.23.1 writes them; the words and the Markdown target hint live in the agent-note area, and v0.23.1 reads the block ok', () => {
+    const hints = [wordsHint(SEL.exact), markdownTargetHint('list item', 'Run the load test against staging.')]
+    const withHints = serialized(WITH_SEL, [...MARKDOWN_AGENT_NOTE_LINES, ...hints])
+    const plain = serialized(makeComment(), AGENT_NOTE_LINES)
+    // Outside the note area (header, status, target, messages, @data aside) the lines are v0.23.1's.
+    const readable = (text: string): string[] => {
+      const lines = text.split('\n')
+      const status = lines.findIndex(line => line.trim().startsWith('status:'))
+      return [lines[0], ...lines.slice(status).filter(line => !line.trim().startsWith('@data'))]
+    }
+    expect(readable(withHints)).toEqual(readable(plain))
+    // The hints sit after the note's lines and before status:, two blanks deeper.
+    const lines = withHints.split('\n')
+    const status = lines.findIndex(line => line.trim().startsWith('status:'))
+    expect(lines.slice(status - hints.length, status)).toEqual(hints.map(hint => `    ${hint}`))
+    expect(lines[1]).toBe(`  ${MARKDOWN_AGENT_NOTE_LINES[0]}`)
+    // The frozen v0.23.1 parser skips the note area and reads the block, `sel` included, as ok.
+    expect(frozenAnalyze(pageWith(withHints)).state.blocks[0]).toMatchObject({ kind: 'ok' })
+  })
 
   it('a status: or target: line with an unknown " (…)" at its end still reads ok', () => {
     expect(readBack(block.replace('target: <button class="cta">', 'target: <button class="cta"> (a later field)'))[0].kind).toBe('ok')
