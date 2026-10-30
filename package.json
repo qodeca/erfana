@@ -27,6 +27,8 @@
     "test:preload": "vitest --run --config vitest.preload.config.ts --project preload",
     "test:renderer": "vitest --run --config vitest.renderer.config.ts --project renderer",
     "test:cov": "node scripts/test-cov.mjs",
+    "test:corpus": "vitest run --config vitest.corpus.config.ts --project \"corpus-*\"",
+    "test:timing": "vitest run --config vitest.corpus.config.ts --project timing",
     "check:headers": "node scripts/check-spdx-headers.mjs",
     "check:links": "node scripts/check-links.mjs",
     "check:claims": "node scripts/check-claims.mjs",
