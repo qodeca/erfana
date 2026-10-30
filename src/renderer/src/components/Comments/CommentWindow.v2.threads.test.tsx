@@ -18,7 +18,8 @@ import {
   thread,
   threadsRequest
 } from '../Panels/HtmlPreviewPanel/comments/__test-helpers__/commentTestKit'
-import { COPY } from './commentCopy'
+import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
+import { COPY, tooLongText } from './commentCopy'
 import { MARKDOWN_WORDS } from './commentCopyWords'
 import { CommentWindow, type CommentWindowProps } from './CommentWindow'
 import { resetCommentPendingWrites } from './commentPendingWrites'
@@ -383,12 +384,33 @@ describe('CommentWindow – v2 stepping (C-13)', () => {
     expect(screen.queryByTestId('comment-resolve-next')).toBeNull()
   })
 
+  it('C-13 with nothing to step to, Alt+F9 from the preview and in the window keep the window where it is', async () => {
+    const user = userEvent.setup()
+    const { props } = setup({ onReveal: vi.fn(), drawerId: 'drawer-3' })
+    await waitFor(() => expect(screen.getByTestId('comment-window-title')).toHaveFocus())
+    act(() => {
+      // Changed expectation under code review L-4 (2026-10-30): a window with
+      // nothing to step to no longer swallows the key, so the host handles it.
+      expect(stepOpenWindow('drawer-3', 'next')).toBe(false)
+    })
+    await user.keyboard('{Alt>}{F9}{/Alt}')
+    expect(props.onReveal).not.toHaveBeenCalled()
+    expect(screen.getByTestId('comment-window-title')).toHaveFocus()
+  })
+
   it('C-13 Resolve and next resolves the shown comment in one write, then steps on', async () => {
     const user = userEvent.setup()
     const { props } = setup({ list: ready([three()]), onReveal: vi.fn() })
     await user.click(screen.getByTestId('comment-resolve-next'))
     expect(props.onSave).toHaveBeenCalledWith(expect.objectContaining({ op: 'setStatus', status: 'resolved', threadKey: 't1' }))
     await waitFor(() => expect(props.onReveal).toHaveBeenCalledWith('t2'))
+  })
+
+  it('C-05 C-13 when the shown comment\'s element is gone, Resolve and next is the primary button and takes the focus', async () => {
+    setup({ list: ready([fileView({ threads: [thread(1, { attached: false }), thread(2), thread(3)] })]), onReveal: vi.fn() })
+    const next = screen.getByTestId('comment-resolve-next')
+    expect(next).toHaveClass('dialog-btn', 'dialog-btn-primary')
+    await waitFor(() => expect(next).toHaveFocus())
   })
 
   it('C-13 a refused Resolve and next stays on the comment and says why', async () => {
@@ -413,11 +435,57 @@ describe('CommentWindow – v2 stepping (C-13)', () => {
     expect(props.onSave).toHaveBeenCalledTimes(1)
   })
 
+  it('C-13 Reply and resolve with a reply past the length cap says why, keeps the text and writes nothing', async () => {
+    const { props } = setup()
+    const long = 'x'.repeat(PREVIEW_LIMITS.COMMENT_MESSAGE_MAX_CHARS + 1)
+    fireEvent.change(screen.getByTestId('comment-reply-field'), { target: { value: long } })
+    fireEvent.click(screen.getByTestId('comment-reply-resolve'))
+    expect(await screen.findByText(tooLongText(PREVIEW_LIMITS.COMMENT_MESSAGE_MAX_CHARS + 1))).toBeInTheDocument()
+    expect(props.onSave).not.toHaveBeenCalled()
+    expect(screen.getByTestId('comment-reply-field')).toHaveValue(long)
+  })
+
+  it('C-13 a refused Reply and resolve keeps the reply typed, and the thread stays open', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn(async (): Promise<CommentSaveResult> => ({ ok: false, code: ErrorCode.COMMENT_BLOCK_CHANGED }))
+    setup({ onSave })
+    await user.type(screen.getByTestId('comment-reply-field'), 'Done')
+    await user.click(screen.getByTestId('comment-reply-resolve'))
+    expect(await screen.findByTestId('comment-save-error')).toBeInTheDocument()
+    expect(onSave).toHaveBeenCalledTimes(1)
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ op: 'reply', text: 'Done', resolve: true }))
+    expect(screen.getByTestId('comment-reply-field')).toHaveValue('Done')
+    expect(screen.getByTestId('comment-reply-resolve')).toBeInTheDocument()
+  })
+
   it('C-13 the head keeps New comment and Open in source under More actions', async () => {
     const user = userEvent.setup()
     setup({ list: ready([three()]) })
     await user.click(screen.getByTestId('comment-more-actions'))
     expect(await screen.findByText(COPY.openInSource)).toBeInTheDocument()
+  })
+
+  it('C-13 More actions › Open in source opens the shown comment\'s file at its line', async () => {
+    const user = userEvent.setup()
+    const { props } = setup({ list: ready([three()]) })
+    await user.click(screen.getByTestId('comment-more-actions'))
+    await user.click(await screen.findByText(COPY.openInSource))
+    expect(props.onOpenInSource).toHaveBeenCalledExactlyOnceWith('/project/index.html', thread(1).line)
+  })
+
+  it('C-13 More actions › New comment starts a new comment on the pin\'s element', async () => {
+    const user = userEvent.setup()
+    const onNewComment = vi.fn()
+    const request = threadsRequest({
+      draftToken: 'b'.repeat(32),
+      draftKey: 'e'.repeat(32),
+      file: { fileKey: 'f1', displayPath: 'index.html', filePath: '/project/index.html', frame: false },
+      target: { tag: 'button', elementId: 'buy', classes: ['cta'], line: 12, excerpt: 'Buy now' }
+    })
+    setup({ list: ready([three()]), request, onNewComment })
+    await user.click(screen.getByTestId('comment-more-actions'))
+    await user.click(await screen.findByText(COPY.newComment))
+    expect(onNewComment).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'new', draftToken: 'b'.repeat(32) }))
   })
 
   it('W-11 once every comment is resolved the window says so and Close takes focus', async () => {
@@ -477,6 +545,23 @@ describe('CommentWindow – v2 the file changed under the window (C-14)', () => 
     expect(screen.queryByTestId('comment-resolve')).toBeNull()
     await user.click(screen.getByTestId('comment-copy-text'))
     expect(props.onCopyRaw).toHaveBeenCalledWith('Half a reply')
+  })
+
+  it('C-14 W-04 removed outside Erfana: the window offers a new comment on the same element', async () => {
+    const user = userEvent.setup()
+    const onNewComment = vi.fn()
+    // A pin's request: it carries a draft on the element, so a new comment can start there.
+    const request = threadsRequest({
+      draftToken: 'b'.repeat(32),
+      draftKey: 'e'.repeat(32),
+      file: { fileKey: 'f1', displayPath: 'index.html', filePath: '/project/index.html', frame: false },
+      target: { tag: 'button', elementId: 'buy', classes: ['cta'], line: 12, excerpt: 'Buy now' }
+    })
+    const { rerenderWith } = setup({ onNewComment, request })
+    rerenderWith({ list: ready([fileView({ threads: [] })], 2) })
+    expect(screen.getByTestId('comment-removed')).toBeInTheDocument()
+    await user.click(screen.getByTestId('comment-new-on-element'))
+    expect(onNewComment).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'new' }))
   })
 
   it('C-14 W-04 with no typed reply Copy text copies the thread', async () => {

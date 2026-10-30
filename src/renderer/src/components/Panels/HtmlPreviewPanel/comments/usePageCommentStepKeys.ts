@@ -25,7 +25,7 @@ import { usePreviewCommentStore } from '../../../../stores/usePreviewCommentStor
 import { useLatestRef } from '../../../../hooks/useLatestRef'
 import { HTML_WORDS } from '../../../Comments/commentCopyWords'
 import { drawerFilterOf } from '../../../Comments/commentDrawerFilter'
-import { takePreviewStep, type StepTarget } from '../../../Comments/commentStepKeys'
+import { takePreviewStep, useForgetPanelStepsOnClose, type StepTarget } from '../../../Comments/commentStepKeys'
 
 /** The forwarded keys of the pair, and the step each is. */
 const STEP_KEYS: Readonly<Record<string, CommentStep>> = { 'comment-next': 'next', 'comment-previous': 'previous' }
@@ -52,6 +52,7 @@ export interface PageCommentStepKeysOptions {
 export function usePageCommentStepKeys(options: PageCommentStepKeysOptions): void {
   const latest = useLatestRef(options)
   const { panelId, live } = options
+  useForgetPanelStepsOnClose(options.drawerId)
   useEffect(() => {
     if (!live) return undefined
     return previewGateway.onForwardedShortcut(payload => {

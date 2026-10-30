@@ -5257,7 +5257,7 @@
       "quote": "the comment menus keep each item's action name, disabled with its reason",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/PreviewCommentsLayer.tsx:114",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/PreviewCommentsLayer.tsx:111",
       "match": ": menuReasonText(menu.reason, menu.displayPath)",
       "note": "Spec 024 replaced the disabled \"Can't comment here\" with the item's own name and a reason line; the row moved from Open to Fixed."
     },
@@ -7553,7 +7553,7 @@
       "quote": "the \"Add comment\" menu is a `ContextMenu` inside `PreviewCommentsLayer.tsx` (no `CommentContextMenu.tsx`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/PreviewCommentsLayer.tsx:147",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/PreviewCommentsLayer.tsx:142",
       "match": "<ContextMenu",
       "note": "CommentContextMenu.tsx does not exist; the menu is rendered by PreviewCommentsLayer."
     },
@@ -20063,7 +20063,7 @@
       "quote": "const unsubscribeChanged = fileWatchGateway.onFileChanged((data) => {",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:395",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:409",
       "match": "const unsubscribeChanged = fileWatchGateway.onFileChanged((data) => {",
       "note": "Excerpt used window.api.fileWatch directly."
     },
@@ -20074,7 +20074,7 @@
       "quote": "void acquireFileWatch(slot, filePath).then(({ started, error, cause }) => {",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:388",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:402",
       "match": "void acquireFileWatch(slot, filePath).then(({ started, error, cause }) => {"
     },
     {
@@ -30559,7 +30559,7 @@
       "quote": "external file changes reload in the open tab",
       "status": "fixed",
       "evidence": "app",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:347",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:361",
       "match": "await reloadFromDisk(diskContent)",
       "test": "e2e/editor-outside-change.e2e.ts",
       "note": "Page said external changes simply 'appear in the open tab'; code auto-reloads only when the tab has no unsaved edits (useFileWatcher.ts:340-347), otherwise it shows a conflict bar. Page now states both cases."
@@ -30902,7 +30902,7 @@
       "quote": "while you have unsaved edits, choose",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:343",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:357",
       "match": "setExternalChangeDetected(true)"
     },
     {
@@ -30912,7 +30912,7 @@
       "quote": "With no local edits, Erfana reloads the disk change automatically.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:347",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:361",
       "match": "await reloadFromDisk(diskContent)"
     },
     {
@@ -32527,7 +32527,7 @@
       "quote": "Watch the editor or preview after the agent finishes.",
       "status": "verified",
       "evidence": "app",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:347",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:361",
       "match": "await reloadFromDisk(diskContent)",
       "test": "e2e/editor-outside-change.e2e.ts",
       "note": "An open file with no local edits auto-reloads when changed on disk; with local edits a conflict notice is shown instead."
@@ -34670,7 +34670,7 @@
       "quote": "If the file changes outside Erfana, a tab with no unsaved edits reloads it automatically",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:347",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:361",
       "match": "await reloadFromDisk(diskContent)",
       "test": "e2e/editor-outside-change.e2e.ts",
       "note": "Added with the fix to 24: clean tabs auto-reload."
@@ -41728,7 +41728,7 @@
       "quote": "A conflict notice appears if the file changed outside Erfana while the editor has local changes.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:341",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:355",
       "match": "if (hasLocalChangesRef.current) {"
     },
     {
@@ -46086,7 +46086,7 @@
       "quote": "1. **`isSavingRef` guard**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:186",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:187",
       "match": "const isSavingRef = useRef(false)"
     },
     {
@@ -46096,7 +46096,7 @@
       "quote": "Compares incoming file content against `pendingSavedContentsRef`, a `Set` of recently saved content strings",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:198",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:199",
       "match": "const pendingSavedContentsRef = useRef<Set<string>>(new Set())"
     },
     {
@@ -46106,7 +46106,7 @@
       "quote": "2. **Content comparison (`isEchoEvent`)**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:44",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:45",
       "match": "export function isEchoEvent("
     },
     {
@@ -46116,7 +46116,7 @@
       "quote": "3. **`hasLocalChangesRef`**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:190",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:191",
       "match": "const hasLocalChangesRef = useRef(hasLocalChanges)"
     },
     {
@@ -48746,7 +48746,7 @@
       "quote": "per view: 64 hellos and 128 anchor reports a second",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentPickHandler.ts:67",
+      "source": "src/main/services/preview/comments/commentPickHandler.ts:68",
       "match": "ANCHORS_PER_VIEW_PER_SECOND = 128"
     },
     {
@@ -48978,7 +48978,7 @@
       "quote": "The stored quote is already sent for every thread (commentListCore.ts:97-108)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/comments/commentListCore.ts:205",
+      "source": "src/main/services/comments/commentListCore.ts:213",
       "match": "...(quote === undefined ? {} : { quote })"
     },
     {
@@ -50054,7 +50054,7 @@
       "quote": "| The file holds an unresolved git conflict | Read-only until you resolve it |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/comments/blocks.ts:395",
+      "source": "src/shared/comments/blocks.ts:397",
       "match": "if (hasConflictHunk(text)) return 'conflict-markers'"
     },
     {
@@ -51821,7 +51821,7 @@
       "quote": "Per frame: picks 5 a second, hellos 5, anchor reports 8.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentPickHandler.ts:63",
+      "source": "src/main/services/preview/comments/commentPickHandler.ts:64",
       "match": "export const ANCHORS_PER_FRAME_PER_SECOND = 8"
     },
     {
@@ -51831,7 +51831,7 @@
       "quote": "**64 hellos and 128 anchor reports a second**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentPickHandler.ts:67",
+      "source": "src/main/services/preview/comments/commentPickHandler.ts:68",
       "match": "export const ANCHORS_PER_VIEW_PER_SECOND = 128"
     },
     {
@@ -54952,7 +54952,7 @@
       "quote": "<kbd>F6</kbd> moves between the window and the preview",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/CommentWindowShell.tsx:146",
+      "source": "src/renderer/src/components/Comments/CommentWindowShell.tsx:155",
       "match": "if (event.key !== 'F6'"
     },
     {

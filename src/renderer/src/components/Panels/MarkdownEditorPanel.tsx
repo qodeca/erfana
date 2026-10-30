@@ -204,17 +204,17 @@ export function MarkdownEditorPanel(
     externalChangeDetected,
     isFileDeleted,
     isReloading,
-    reloadFromDisk: handleReloadFromDisk,
+    reloadFromDisk: handleReloadFromDisk, reloadIfUnedited,
     keepLocal: handleKeepLocal,
     dismissConflict,
     clearDeletedState,
-    markSaving,
-    unmarkSaving,
+    markSaving, unmarkSaving,
     notifySaveComplete
   } = useFileWatcher({
     filePath: currentFile?.path ?? null,
     hasLocalChanges: currentFile?.modified ?? false,
-    onContentUpdate: handleContentUpdateFromWatcher
+    onContentUpdate: handleContentUpdateFromWatcher,
+    bufferNow: () => editorRef.current?.getEditor()?.getValue() // a comment save's re-read never overwrites a keystroke
   })
 
   // A save-failure reason shown for one file must not mute the same reason for
@@ -491,7 +491,7 @@ export function MarkdownEditorPanel(
   })
 
   // Markdown Preview comments (spec 024): toolbar tools, paused band, pane overlay – preview-only view.
-  const comments = useMarkdownComments({ panelId, filePath: currentFile?.path, content: currentFile?.content ?? '', viewMode, setViewMode, editorRef, isActivePanel, isVisible: isPanelVisible, onFileWritten: handleReloadFromDisk })
+  const comments = useMarkdownComments({ panelId, filePath: currentFile?.path, content: currentFile?.content ?? '', viewMode, setViewMode, editorRef, isActivePanel, isVisible: isPanelVisible, onFileWritten: reloadIfUnedited })
   // =========================================================================
   // Document Statistics
   // =========================================================================

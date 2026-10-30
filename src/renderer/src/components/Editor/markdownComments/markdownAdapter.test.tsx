@@ -274,14 +274,15 @@ describe('markdownAdapter', () => {
     expect(collapsedText('x'.repeat(250))).toHaveLength(200)
   })
 
-  it('C-19 (Markdown) W-08 a block inside a generated START/END region is refused at the pick, as main refuses it; one outside is not', () => {
+  it('024-AC-024 C-19 (Markdown) W-08 the adapter never parses the file (§ 8 C19): it describes a generated-region pick that main\'s own parse refuses, and one outside it that main finds', () => {
     const text = ['# Top', '', '<!-- START toc -->', '', 'Generated line.', '', '<!-- END toc -->', '', 'Own words.', ''].join('\n')
     const { adapter, root } = renderPreview(text)
     const generated = root.querySelector<HTMLElement>('p[data-line-start="5"]')!
     const own = root.querySelector<HTMLElement>('p[data-line-start="9"]')!
-    expect(adapter.refusalOf?.(generated)).toBe('generated-region')
+    // The refusal is main's answer to the draft (`file-comment:openDraft` with the pick), not a renderer parse.
+    expect('refusalOf' in adapter).toBe(false)
     expect(locateMarkdownTarget(indexMarkdown(text, 0), adapter.describe(generated)!)).toEqual({ refused: 'generated-region' })
-    expect(adapter.refusalOf?.(own)).toBeNull()
+    expect(locateMarkdownTarget(indexMarkdown(text, 0), adapter.describe(own)!)).not.toHaveProperty('refused')
     expect(adapter.root?.()).toBe(root)
   })
 })

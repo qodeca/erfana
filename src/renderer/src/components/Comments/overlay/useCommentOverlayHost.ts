@@ -184,7 +184,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
       const pick = adapter.describe(target)
       if (pick === null) return
       const listed = store.getState().panels.get(panelId)?.list.files[0]
-      const draft = await optionsRef.current.source.openDraft()
+      const draft = await optionsRef.current.source.openDraft(pick)
       if (!draft.ok) {
         alert(words.saveFailure(draft.code, fileName, nounTargetOf(adapter, target), draft.reason).text)
         return
@@ -207,7 +207,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
         opener,
         // The target's text, for the words and Narrow to words (C-07); a selection brings its range.
         words: chosen ?? { text: targetText(target), start: 0, end: 0, cut: false },
-        ...newRequestExtras(target, adapter)
+        ...newRequestExtras(target, adapter, draft)
       })
     },
     [blocked, adapter, store, panelId, optionsRef, alert, words, fileName, filePath]

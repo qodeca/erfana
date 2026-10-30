@@ -332,11 +332,13 @@ function beforeTargetRange(
 
 /**
  * The `line-start` removable range (spec 024 design `markdown-format.md` § 2,
- * "Reading the delete range"): when only spaces stand between the line start
- * and `<!--`, and `-->` is followed directly by a line break, the range is
- * from that line start to the end of the line break – `indent + block + eol`,
- * exactly what a `line-start` insert wrote. Otherwise (a block another tool
- * wrote mid-line, or one that ends the file) the node alone.
+ * "Reading the delete range"): when only blanks (spaces or tabs) stand
+ * between the line start and `<!--`, and `-->` is followed directly by a line
+ * break, the range is from that line start to the end of the line break –
+ * `indent + block + eol`, exactly what a `line-start` insert wrote (spaces
+ * only), and for a block indented by hand with a tab no `"\t\n"` line is left
+ * behind. Otherwise (a block another tool wrote mid-line, or one that ends
+ * the file) the node alone.
  *
  * @param start - Offset of the node's `<!--`.
  * @param end - Offset just after the node's close.
@@ -348,7 +350,7 @@ export function lineStartRange(
   end: number
 ): [number, number] {
   let lineStart = start
-  while (lineStart > bomLength && text[lineStart - 1] === ' ') lineStart -= 1
+  while (lineStart > bomLength && (text[lineStart - 1] === ' ' || text[lineStart - 1] === '\t')) lineStart -= 1
   if (!isLineStart(text, lineStart, bomLength)) return [start, end]
   const eolLength = eolLengthAt(text, end)
   return eolLength === 0 ? [start, end] : [lineStart, end + eolLength]

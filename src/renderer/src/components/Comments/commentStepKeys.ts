@@ -53,13 +53,15 @@ export function stepOpenWindow(panelKey: string, step: CommentStep): boolean {
  *
  * @param panelKey - The window's panel.
  * @param shownThread - The thread the window shows now, if any.
- * @param onStep - Take a step; return whether one was taken.
+ * @param onStep - Take a step; return whether one was taken. `undefined` while the window cannot step
+ *   (a new comment, the identity step): the press then goes on to the host, as with no window open.
  */
-export function useWindowStepTarget(panelKey: string, shownThread: string | undefined, onStep: WindowStep): void {
+export function useWindowStepTarget(panelKey: string, shownThread: string | undefined, onStep: WindowStep | undefined): void {
   useEffect(() => {
     if (shownThread !== undefined) lastShown.set(panelKey, shownThread)
   }, [panelKey, shownThread])
   useEffect(() => {
+    if (onStep === undefined) return undefined
     windows.set(panelKey, onStep)
     return () => {
       if (windows.get(panelKey) === onStep) windows.delete(panelKey)
@@ -134,6 +136,27 @@ export function takePreviewStep(host: PreviewStepHost, step: CommentStep): boole
   const at = stepPosition(target.file, [target.threadKey], host.filter)
   if (thread !== undefined && at !== null) host.announce(WINDOW_COPY.stepAnnounce(at.at, at.of, host.noun(thread), thread.line))
   return true
+}
+
+/**
+ * The panel closed: forget the thread its window showed last, so the map
+ * does not keep one entry per panel ever opened (and a panel key reused
+ * later starts from the first thread).
+ *
+ * @param panelKey - The closed panel's key (its drawer `id`).
+ */
+export function forgetPanelSteps(panelKey: string): void {
+  lastShown.delete(panelKey)
+}
+
+/**
+ * Forget `panelKey`'s step history when the calling host unmounts – a
+ * dockview panel unmounts only when it closes.
+ *
+ * @param panelKey - The host's panel key (its drawer `id`).
+ */
+export function useForgetPanelStepsOnClose(panelKey: string): void {
+  useEffect(() => () => forgetPanelSteps(panelKey), [panelKey])
 }
 
 /** Test helper: forget every window and every last shown thread. */

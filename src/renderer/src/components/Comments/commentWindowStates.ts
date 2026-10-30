@@ -85,6 +85,19 @@ export function stepPosition(file: CommentFileView, shown: readonly string[], fi
   return { at: current + 1, of: open.length, previous: before, next: after }
 }
 
+/**
+ * `file` as it is once `resolved` is resolved – what "Resolve and next"
+ * counts its step from (C-13), before the re-list brings the new file view.
+ *
+ * @param file - The listed file, still showing the thread open.
+ * @param resolved - The thread just resolved; none: `file` as it is.
+ * @returns The file with that thread's status resolved.
+ */
+export function withResolved(file: CommentFileView, resolved: string | undefined): CommentFileView {
+  if (resolved === undefined) return file
+  return { ...file, threads: file.threads.map(thread => (thread.threadKey === resolved ? { ...thread, status: 'resolved' as const } : thread)) }
+}
+
 /** True when a file has no open thread left (W-11 "All open comments are resolved"). */
 export function allResolved(file: CommentFileView): boolean {
   return file.threads.every(thread => thread.status !== 'open')

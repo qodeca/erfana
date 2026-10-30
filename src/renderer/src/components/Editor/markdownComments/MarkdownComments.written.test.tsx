@@ -8,7 +8,8 @@
  * panel heard of main's atomic write only through its file watcher, and that
  * word never came. The panel now re-reads the file as soon as the save is
  * answered – unless it holds unsaved edits of its own, which a re-read would
- * overwrite (the watcher's conflict path stays in charge of those).
+ * overwrite (the watcher's conflict path stays in charge of those). The panel
+ * checks again after its read (`useFileWatcher`'s `reloadIfUnedited`).
  */
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -90,7 +91,8 @@ describe('Markdown Preview comments – the written text reaches the preview fro
     expect(onFileWritten).not.toHaveBeenCalled()
   })
 
-  it('024-AC-024 edits made in the panel while the save ran are never overwritten by the re-read', async () => {
+  // Typing during the re-read itself is `useFileWatcher.reloadIfUnedited.test.ts`'s case.
+  it('024-AC-024 a panel that is dirty when the save answers is not asked to re-read the file', async () => {
     // The editor took a keystroke while main was writing: the watcher's conflict path decides.
     api.save.mockImplementation(async () => {
       useProjectStore.setState({ dirtyPanelIds: new Set([PANEL_ID]) })

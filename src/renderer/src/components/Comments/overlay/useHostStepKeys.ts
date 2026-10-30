@@ -24,7 +24,7 @@ import type { ThreadPlacement } from '../../../../../shared/ipc/file-comment-sch
 import type { CommentFileView } from '../../../../../shared/ipc/comment-common-schema'
 import { useLatestRef } from '../../../hooks/useLatestRef'
 import { drawerFilterOf } from '../commentDrawerFilter'
-import { takePreviewStep } from '../commentStepKeys'
+import { takePreviewStep, useForgetPanelStepsOnClose } from '../commentStepKeys'
 import type { PreviewCommentAdapter } from './previewAdapter'
 
 /** Options for {@link useHostStepKeys}. */
@@ -51,6 +51,7 @@ export interface HostStepKeysOptions {
 export function useHostStepKeys(options: HostStepKeysOptions): void {
   const latest = useLatestRef(options)
   const { live, scroller } = options
+  useForgetPanelStepsOnClose(options.drawerId)
   useEffect(() => {
     if (!live || scroller === null) return undefined
     const onKeyDown = (event: KeyboardEvent): void => {

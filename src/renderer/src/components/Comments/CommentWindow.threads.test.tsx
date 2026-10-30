@@ -305,6 +305,14 @@ describe('CommentWindow – threads', () => {
         expect(screen.getByTestId('comment-save-error')).toHaveClass('erf-comment-banner--info')
       })
 
+      it('refused after all with no code: the window says the write failed, and the text stays', async () => {
+        await replyPending('Keep me')
+        act(() => fake.emitSettled({ panelId: 'preview-index', op: 'reply', threadKey: 't1', ok: false }))
+        expect(screen.getByTestId('comment-save-error')).toHaveClass('erf-comment-banner--error')
+        expect(screen.getByTestId('comment-reply-field')).toHaveValue('Keep me')
+        expect(screen.getByTestId('comment-reply')).not.toHaveAttribute('aria-disabled')
+      })
+
       it('another thread\'s settle changes nothing here', async () => {
         await replyPending('Later')
         act(() => fake.emitSettled({ panelId: 'preview-index', op: 'reply', threadKey: 't2', ok: true }))

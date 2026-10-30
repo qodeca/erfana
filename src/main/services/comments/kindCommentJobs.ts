@@ -37,7 +37,7 @@ import { runWriteJob } from './commentWriteCore'
 /** `kind`'s `list` and `write` jobs, by name. */
 export function createKindCommentJobTable(kind: CommentFileKind): CommentJobTable<CommentFileJob, KindDocument> {
   return {
-    list: { run: (bytes, job, env) => runListJob(kindDocumentOf(bytes, kind, env.cache), job) },
+    list: { run: (bytes, job, env) => runListJob(kindDocumentOf(bytes, kind, env.cache), job, kind) },
     write: {
       run: (bytes, job, env) => runWriteJob(bytes, job, { ...env, kind, read: read => kindDocumentOf(read, kind, env.cache) }),
       // The block bytes, when they own their buffer; a view into a larger one is copied.

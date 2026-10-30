@@ -104,6 +104,19 @@ describe('CommentWindow – the words of a new comment', () => {
     expect(onSave.mock.calls[0]).toHaveLength(1)
   })
 
+  it('024-AC-004 Save on the selected words sends them as the comment\'s words, with the text around them', async () => {
+    const user = userEvent.setup()
+    const onSave = setup({ text: TEXT, start: 8, end: 16, cut: false })
+    await type(user)
+    await user.click(screen.getByTestId('comment-save'))
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
+    const [add, sel] = onSave.mock.calls[0] as unknown as [unknown, { exact: string; prefix: string; suffix: string }]
+    expect(add).toMatchObject({ op: 'add', text: 'A note' })
+    expect(sel).toMatchObject({ exact: 'the beta' })
+    expect(TEXT.slice(0, 8).endsWith(sel.prefix)).toBe(true)
+    expect(TEXT.slice(16).startsWith(sel.suffix)).toBe(true)
+  })
+
   it('024-AC-005: only spaces chosen in the field is refused – Save waits and the notice says why', async () => {
     const user = userEvent.setup()
     const onSave = setup({ text: TEXT, start: 0, end: 0, cut: false })

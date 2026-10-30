@@ -190,8 +190,13 @@ describe('Markdown Preview comments – the window and the content marks', () =>
 
     it('C-19 (Markdown) W-08 a block inside a generated region opens with the refusal and Save blocked, before anything is typed', async () => {
       const user = userEvent.setup()
+      // Main's parse decides (§ 8 C19): its answer to the draft opened with the pick carries the refusal.
+      api.openDraft.mockImplementation(async (request: { target?: { lineStart: number } }) =>
+        request.target?.lineStart === 10 ? { ok: true, draftToken: DRAFT_TOKEN, refused: 'generated-region' } : { ok: true, draftToken: DRAFT_TOKEN }
+      )
       await ready()
       const dialog = await newCommentOn(user, paragraph(10), 'New comment on paragraph')
+      expect(api.openDraft).toHaveBeenCalledWith({ panelId: PANEL_ID, filePath: FILE_PATH, target: expect.objectContaining({ lineStart: 10, tag: 'p' }) })
       expect(dialog).toHaveTextContent(MARKDOWN_WORDS.saveFailure(ErrorCode.COMMENT_TARGET_MOVED, 'notes.md', 'p', 'generated-region').text)
       await user.type(await screen.findByTestId('comment-new-field'), 'Edit the generator')
       await user.click(screen.getByTestId('comment-save'))

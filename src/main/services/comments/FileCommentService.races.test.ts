@@ -44,6 +44,16 @@ describe('L5: a list racing its cleanup records no panel and no watch', () => {
     expect(h.watches.open.size).toBe(0)
   })
 
+  it('024-AC-036 the panel is released while its list confines the path: nothing is recorded or watched', async () => {
+    const listing = h.service.list(h.caller(), { panelId: PANEL, filePath: h.project.path('notes.txt') })
+    expect(h.service.release(h.caller(), PANEL)).toBe(false)
+    expect(await listing).toEqual(NOT_OPEN)
+    expect(h.service.watchCount).toBe(0)
+    // Another panel's list in the same window is not refused, and the released id lists again later.
+    expect((await h.listOk('notes.txt', { panelId: 'other' })).ok).toBe(true)
+    expect((await h.listOk('notes.txt')).ok).toBe(true)
+  })
+
   it('another window closing does not refuse this window\'s list, and a later list of the closed window\'s id is served', async () => {
     const listing = h.service.list(h.caller(1), { panelId: PANEL, filePath: h.project.path('notes.txt') })
     h.service.forgetWindow(2)

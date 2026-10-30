@@ -15,7 +15,11 @@
  *   instead – for display only: nothing here writes it, and every write
  *   re-reads the disk.
  * - **openDraft** mints a single-use token tied to the window, the panel and
- *   the file (C17) – none for a file already at 500 comments (F-04).
+ *   the file (C17) – none for a file already at 500 comments (F-04). Sent
+ *   with the pick, it also says whether the pick sits in a generated region
+ *   (W-08), from main's own parse.
+ * - **release** forgets a closed panel of the sender's window and ends its
+ *   watch, so closed tabs do not hold the 64-watch budget.
  * - **save** resolves the token or the keys against the sender's panel and
  *   runs the one shared `CommentWriter`, with this family's kinds. The writer
  *   refuses while ANY window's editor holds unsaved edits for the file, asks
@@ -37,6 +41,7 @@ import type {
   FileCommentListResult,
   FileCommentOpenDraftResult,
   FileCommentSaveRequest,
+  PickedTargetRequest,
   ThreadPlacement
 } from '../../../shared/ipc/file-comment-schema'
 import type { CommentFileKind } from '../../../shared/comments/fileKind'
@@ -130,6 +135,8 @@ export class FileCommentService {
   private projectEpoch = 0
   /** Grows with each window's close ({@link FileCommentService.forgetWindow}), per window. */
   private readonly windowEpochs = new Map<number, number>()
+  /** Grows with each release of a panel ({@link FileCommentService.release}), per window and panel. */
+  private readonly panelEpochs = new Map<number, Map<string, number>>()
 
   constructor(private readonly deps: FileCommentServiceDeps) {
     this.panels = new FileCommentPanels(deps.keys)
@@ -178,26 +185,58 @@ export class FileCommentService {
     return { ok: true, file: fileView(panel, listed, answer.summary), placements: this.placementsOf(panel, answer.summary) }
   }
 
-  /** `file-comment:openDraft`: a single-use token for one new comment on this panel's file. */
-  async openDraft(caller: FileCommentCaller, request: { panelId: string; filePath: string }): Promise<FileCommentOpenDraftResult> {
+  /**
+   * `file-comment:openDraft`: a single-use token for one new comment on this
+   * panel's file – with `refused` when the request's pick sits in a generated
+   * region (W-08), so the window opens saying so.
+   */
+  async openDraft(
+    caller: FileCommentCaller,
+    request: { panelId: string; filePath: string; target?: PickedTargetRequest }
+  ): Promise<FileCommentOpenDraftResult> {
     const panel = await this.openFor(caller, request.panelId, request.filePath)
     if (!('binding' in panel)) return panel
     if (!this.enabled(panel)) return COMMENTS_OFF
-    if (await this.isFull(panel)) return TOO_MANY
-    return { ok: true, draftToken: panel.keys.mintDraft(panel.binding, { realPath: panel.realPath }) }
+    const check = await this.draftCheck(panel, request.target)
+    if (check.full) return TOO_MANY
+    const draftToken = panel.keys.mintDraft(panel.binding, { realPath: panel.realPath })
+    return check.refused === undefined ? { ok: true, draftToken } : { ok: true, draftToken, refused: check.refused }
   }
 
   /**
-   * True when the file on disk already holds the most comments Erfana adds
-   * (spec 024 state table F-04): no draft is minted for a new one, while
-   * replies, edits and resolves go on. A file that cannot be read or parsed
-   * here is not refused – the save reads it again and says why.
+   * `file-comment:release`: the sender's panel closed – forget it and end its
+   * watch. Only the sender's own window is searched, so no window can release
+   * another's panel; a list still confining for the panel records nothing.
+   *
+   * @returns Whether a record was dropped.
    */
-  private async isFull(panel: FileCommentPanel): Promise<boolean> {
+  release(caller: FileCommentCaller, panelId: string): boolean {
+    const epochs = this.panelEpochs.get(caller.windowId) ?? new Map<string, number>()
+    epochs.set(panelId, (epochs.get(panelId) ?? 0) + 1)
+    this.panelEpochs.set(caller.windowId, epochs)
+    const dropped = this.panels.forget(caller.windowId, panelId)
+    if (dropped === undefined) return false
+    this.releaseWatches([dropped])
+    return true
+  }
+
+  /**
+   * One parse of the file on disk for a new draft: `full` when it already
+   * holds the most comments Erfana adds (spec 024 state table F-04 – no draft
+   * is minted, while replies, edits and resolves go on), and `refused` when
+   * `target` sits in a generated region. A file that cannot be read or parsed
+   * here is neither – the save reads it again and says why.
+   */
+  private async draftCheck(
+    panel: FileCommentPanel,
+    target: PickedTargetRequest | undefined
+  ): Promise<{ readonly full: boolean; readonly refused?: 'generated-region' }> {
     const read = await readConfinedCommentBytes(panel.realPath)
-    if (!read.ok) return false
-    const answer = await this.jobsFor(panel.kind).runJob(read.bytes, { kind: 'list' })
-    return answer.kind !== 'failed' && answer.ok && answer.summary.addRefusal === 'too-many-blocks'
+    if (!read.ok) return { full: false }
+    const answer = await this.jobsFor(panel.kind).runJob(read.bytes, { kind: 'list', ...(target === undefined ? {} : { pick: target }) })
+    if (answer.kind === 'failed' || !answer.ok) return { full: false }
+    const { summary } = answer
+    return { full: summary.addRefusal === 'too-many-blocks', ...(summary.pickRefused === undefined ? {} : { refused: summary.pickRefused }) }
   }
 
   /** `file-comment:save`. */
@@ -214,12 +253,14 @@ export class FileCommentService {
   /** The window closed: forget its panels and release their watches; a list still running for it records nothing. */
   forgetWindow(windowId: number): void {
     this.windowEpochs.set(windowId, (this.windowEpochs.get(windowId) ?? 0) + 1)
-    this.release(this.panels.forgetWindow(windowId))
+    this.panelEpochs.delete(windowId)
+    this.releaseWatches(this.panels.forgetWindow(windowId))
   }
 
   /** The project changed: forget every panel and close every watch; a list still running records nothing. */
   async clear(): Promise<void> {
     this.projectEpoch += 1
+    this.panelEpochs.clear()
     this.panels.clear()
     await this.watches.closeAll()
   }
@@ -304,18 +345,21 @@ export class FileCommentService {
   ): Promise<{ readonly ok: true; readonly panel: FileCommentPanel } | CommentReasonedRefusal> {
     const projectEpoch = this.projectEpoch
     const windowEpoch = this.windowEpochs.get(caller.windowId)
+    const panelEpoch = this.panelEpochs.get(caller.windowId)?.get(panelId)
     const confined = await this.confine(caller, filePath)
     if (projectEpoch !== this.projectEpoch || windowEpoch !== this.windowEpochs.get(caller.windowId)) return NOT_OPEN
+    // The panel closed while its path was confined: recording it now would leak its record and watch.
+    if (panelEpoch !== this.panelEpochs.get(caller.windowId)?.get(panelId)) return NOT_OPEN
     if (!confined.ok) return confined
     const kind = this.deps.kinds.kindOfName(confined.realPath)
     if (kind === undefined) return refusal('not-html')
     if (!this.enabled({ kind })) {
       const dropped = this.panels.forget(caller.windowId, panelId)
-      if (dropped !== undefined) this.release([dropped])
+      if (dropped !== undefined) this.releaseWatches([dropped])
       return COMMENTS_OFF
     }
     const { panel, released } = this.panels.open(caller.windowId, panelId, { realPath: confined.realPath, requestedPath: resolve(filePath), kind })
-    this.release(released)
+    this.releaseWatches(released)
     this.watches.subscribe(panel.realPath, subscriberOf(panel))
     return { ok: true, panel }
   }
@@ -363,7 +407,7 @@ export class FileCommentService {
   }
 
   /** Panels that no longer show their file: their watch subscriptions end. */
-  private release(panels: readonly FileCommentPanel[]): void {
+  private releaseWatches(panels: readonly FileCommentPanel[]): void {
     for (const panel of panels) this.watches.unsubscribe(panel.realPath, subscriberOf(panel))
   }
 

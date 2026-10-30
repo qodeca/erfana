@@ -21,7 +21,9 @@ export const FileCommentChannels = {
   /** Mint a single-use draft token for a new comment, tied to the window, the panel and the file (C17). */
   OPEN_DRAFT: 'file-comment:openDraft',
   /** Add, reply, edit, resolve, re-open or delete. */
-  SAVE: 'file-comment:save'
+  SAVE: 'file-comment:save',
+  /** The panel closed: forget its record, keys and file watch (the sender's window only). */
+  RELEASE: 'file-comment:release'
 } as const
 
 /** Main → renderer events, sent only to the window that owns the panel. */

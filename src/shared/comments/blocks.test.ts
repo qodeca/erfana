@@ -46,11 +46,24 @@ describe('lineStartRange', () => {
     expect(lineStartRange(text, 1, ...nodeOf(text))).toEqual([1, nodeOf(text)[1] + 1])
   })
 
-  it('is the node alone mid-line, after a tab, or with no line break after it', () => {
-    for (const text of [`a ${NODE}\nb`, `\t${NODE}\nb`, `a\n${NODE}`, `a\n${NODE}b`]) {
+  it('is the node alone mid-line, or with no line break after it', () => {
+    for (const text of [`a ${NODE}\nb`, `a\t${NODE}\nb`, `a\n${NODE}`, `a\n${NODE}b`]) {
       const node = nodeOf(text)
       expect(lineStartRange(text, 0, ...node)).toEqual(node)
     }
+  })
+
+  it('024-AC-013 L-3 a block indented by hand with tabs (or tabs and spaces) goes with its whole line: no "\\t\\n" line is left', () => {
+    for (const indent of ['\t', '\t\t', ' \t', '\t  ']) {
+      const text = `- one\n${indent}${NODE}\n- two\n`
+      const [start, end] = nodeOf(text)
+      const range = lineStartRange(text, 0, start, end)
+      expect(range, JSON.stringify(indent)).toEqual([6, end + 1])
+      expect(text.slice(0, range[0]) + text.slice(range[1])).toBe('- one\n- two\n')
+    }
+    // After a BOM too, never before it.
+    const bom = `\uFEFF\t${NODE}\nb`
+    expect(lineStartRange(bom, 1, ...nodeOf(bom))).toEqual([1, nodeOf(bom)[1] + 1])
   })
 })
 

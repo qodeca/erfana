@@ -142,6 +142,7 @@ exports[`preload surface > window.api.fileComments exposes the expected members 
   "list",
   "onChanged",
   "openDraft",
+  "release",
   "save",
 ]
 `;

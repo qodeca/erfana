@@ -214,6 +214,40 @@ describe('024-AC-028 item 6: file-comment:changed goes only to the owning window
     expect([...h.watches.open.keys()]).toEqual([h.project.path('c.txt')])
   })
 
+  it('024-AC-036 a released panel is forgotten and its watch freed; another panel on the file keeps the watch', async () => {
+    await h.listOk('notes.txt', { panelId: 'a' })
+    await h.listOk('notes.txt', { panelId: 'b' })
+    expect(h.service.release(h.caller(), 'a')).toBe(true)
+    expect(h.watches.closed).toEqual([])
+    expect(await h.service.openDraft(h.caller(), { panelId: 'a', filePath: h.project.path('notes.txt') })).toEqual(NOT_OPEN)
+    expect(h.service.release(h.caller(), 'b')).toBe(true)
+    expect(h.watches.closed).toEqual([h.project.path('notes.txt')])
+    expect(h.service.watchCount).toBe(0)
+    // A change on disk now reaches no window: no panel shows the file.
+    expect(h.service.release(h.caller(), 'b')).toBe(false)
+  })
+
+  it('024-AC-028 a release names a panel of the sender\'s window only: the same panel id in another window stays', async () => {
+    await h.listOk('notes.txt', { windowId: 1, panelId: PANEL })
+    await h.listOk('notes.txt', { windowId: 2, panelId: PANEL })
+    expect(h.service.release(h.caller(2), PANEL)).toBe(true)
+    expect(h.service.watchCount).toBe(1)
+    expect(await h.service.openDraft(h.caller(1), { panelId: PANEL, filePath: h.project.path('notes.txt') })).toMatchObject({ ok: true })
+    expect(await h.service.openDraft(h.caller(2), { panelId: PANEL, filePath: h.project.path('notes.txt') })).toEqual(NOT_OPEN)
+  })
+
+  it('024-AC-036 freed by releases, the watch cap serves new files again', async () => {
+    await h.service.clear()
+    h = await fileCommentHarness({ service: { watchMax: 1 } })
+    for (const name of ['a.txt', 'b.txt']) await h.project.write(name, DOC)
+    await h.listOk('a.txt', { panelId: 'a' })
+    await h.listOk('b.txt', { panelId: 'b' })
+    expect([...h.watches.open.keys()]).toEqual([h.project.path('a.txt')])
+    h.service.release(h.caller(), 'a')
+    await h.listOk('b.txt', { panelId: 'b' })
+    expect([...h.watches.open.keys()]).toEqual([h.project.path('b.txt')])
+  })
+
   it('a project change closes every watch and forgets every panel', async () => {
     await h.listOk('notes.txt')
     await h.service.clear()

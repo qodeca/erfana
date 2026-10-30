@@ -122,9 +122,24 @@ export const FileCommentListRequestSchema = z
   .strict()
 export type FileCommentListRequest = z.infer<typeof FileCommentListRequestSchema>
 
-/** `file-comment:openDraft` – a token for one new comment on this file in this panel. */
-export const FileCommentOpenDraftRequestSchema = z.object({ panelId: PanelIdSchema, filePath: FilePathSchema }).strict()
+/**
+ * `file-comment:openDraft` – a token for one new comment on this file in this
+ * panel. `target`, when sent, is the pick the window opens on: main runs its
+ * own parse of the file against it and says whether no comment can be
+ * written there (W-08), so the renderer never parses the file itself (§ 8
+ * C19). A keep-alive renewal sends no target.
+ */
+export const FileCommentOpenDraftRequestSchema = z
+  .object({ panelId: PanelIdSchema, filePath: FilePathSchema, target: PickedTargetSchema.optional() })
+  .strict()
 export type FileCommentOpenDraftRequest = z.infer<typeof FileCommentOpenDraftRequestSchema>
+
+/**
+ * `file-comment:release` – the panel closed: main forgets its record, its keys
+ * and drafts, and its file watch. Only a panel of the sender's window.
+ */
+export const FileCommentReleaseRequestSchema = z.object({ panelId: PanelIdSchema }).strict()
+export type FileCommentReleaseRequest = z.infer<typeof FileCommentReleaseRequestSchema>
 
 /** `file-comment:save` – an `add` on a picked target, or one thread operation by keys only. */
 export const FileCommentSaveRequestSchema = z.discriminatedUnion('op', [
@@ -177,12 +192,29 @@ export const FileCommentListResultSchema = z.union([
 ])
 export type FileCommentListResult = z.infer<typeof FileCommentListResultSchema>
 
-/** `file-comment:openDraft`'s answer. */
+/**
+ * `file-comment:openDraft`'s answer. `refused: 'generated-region'` – the sent
+ * target sits inside a region another tool generates (024-FR-023): the draft
+ * is minted, the window opens with the refusal and Save blocked (W-08).
+ */
 export const FileCommentOpenDraftResultSchema = z.union([
-  z.object({ ok: z.literal(true), draftToken: z.string().regex(COMMENT_DRAFT_TOKEN_PATTERN) }).strict(),
+  z
+    .object({
+      ok: z.literal(true),
+      draftToken: z.string().regex(COMMENT_DRAFT_TOKEN_PATTERN),
+      refused: z.literal('generated-region').optional()
+    })
+    .strict(),
   CommentReasonedRefusalSchema
 ])
 export type FileCommentOpenDraftResult = z.infer<typeof FileCommentOpenDraftResultSchema>
+
+/** `file-comment:release`'s answer: `released` is false when main held no record of the panel. */
+export const FileCommentReleaseResultSchema = z.union([
+  z.object({ ok: z.literal(true), released: z.boolean() }).strict(),
+  CommentReasonedRefusalSchema
+])
+export type FileCommentReleaseResult = z.infer<typeof FileCommentReleaseResultSchema>
 
 /** `file-comment:save`'s answer: the HTML family's. */
 export { CommentSaveResultSchema as FileCommentSaveResultSchema } from './comment-common-schema'
@@ -206,5 +238,6 @@ export interface FileCommentsBridge {
   list(request: FileCommentListRequest): Promise<FileCommentListResult>
   openDraft(request: FileCommentOpenDraftRequest): Promise<FileCommentOpenDraftResult>
   save(request: FileCommentSaveRequest): Promise<FileCommentSaveResult>
+  release(request: FileCommentReleaseRequest): Promise<FileCommentReleaseResult>
   onChanged(callback: (payload: FileCommentChanged) => void): () => void
 }

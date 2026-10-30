@@ -28,6 +28,8 @@ import type {
   FileCommentListResult,
   FileCommentOpenDraftRequest,
   FileCommentOpenDraftResult,
+  FileCommentReleaseRequest,
+  FileCommentReleaseResult,
   FileCommentSaveRequest,
   FileCommentSaveResult,
   FileCommentsBridge
@@ -73,6 +75,8 @@ export const fileCommentGateway = {
     ask<FileCommentOpenDraftResult>(api => api.openDraft(request), UNAVAILABLE),
   save: (request: FileCommentSaveRequest): Promise<FileCommentSaveResult> =>
     ask<FileCommentSaveResult>(api => api.save(request), UNAVAILABLE),
+  release: (request: FileCommentReleaseRequest): Promise<FileCommentReleaseResult> =>
+    ask<FileCommentReleaseResult>(api => api.release(request), UNAVAILABLE),
   onChanged: (callback: (payload: FileCommentChanged) => void): (() => void) => {
     const api = bridge()
     if (api === undefined) return noop

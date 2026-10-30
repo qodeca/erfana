@@ -363,6 +363,42 @@ describe('CommentWriter.add', () => {
     expect(await addOn(makeWriter().writer, 'index.html', 'buy')).toMatchObject({ ok: true })
   })
 
+  it('M-015 main checks the size of the file it would write: an answer that grows it past the file limit writes nothing', async () => {
+    const path = await project.write('index.html', PAGE)
+    const before = await snapshot(path)
+    const real = createInProcessCommentFileJobs()
+    const jobs: CommentFileJobRunner = {
+      runJob: async (bytes, job) => {
+        const answer = await real.runJob(bytes, job)
+        const result: CommentJobOutcome<CommentFileJob> = answer
+        if (result.kind !== 'write' || !result.ok) return answer
+        // Still one safe comment with the real own-lines tail – only far too big for the file.
+        const tail = /(?:\r\n|\r|\n)[ \t]*$/.exec(new TextDecoder().decode(result.insert))?.[0] ?? ''
+        const huge = new TextEncoder().encode(`<!-- ${'x'.repeat(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES)} -->${tail}`)
+        return { ...result, insert: huge } as typeof answer
+      }
+    }
+    const { writer } = makeWriter({ jobs })
+    expect(await addOn(writer, 'index.html', 'buy')).toEqual({ ok: false, code: ErrorCode.COMMENT_LIMIT, reason: 'file-size' })
+    expect(await snapshot(path)).toEqual(before)
+  })
+
+  it('024-AC-004 words the file no longer holds are dropped: the comment goes on the whole element, and the result says so', async () => {
+    await project.write('index.html', PAGE)
+    const draft = draftFor(await project.read('index.html'), byId('buy'))
+    const { writer } = makeWriter()
+
+    const result = await writer.add({
+      file: project.target('index.html'),
+      draft: { ...draft, anchor: { ...draft.anchor, sel: { exact: 'Sell', prefix: '', suffix: '' } } },
+      view: VIEW,
+      text: 'Which words?'
+    })
+
+    expect(result).toMatchObject({ ok: true, wordsDropped: true })
+    expect(okBlock(await project.read('index.html'), threadIdOf(result)).data.anchor).not.toHaveProperty('sel')
+  })
+
   it('M-013 one save is one write, and its result carries the hash of the bytes now on disk for the echo filter', async () => {
     await project.write('index.html', PAGE)
 

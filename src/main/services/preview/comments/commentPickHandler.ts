@@ -131,7 +131,7 @@ function dropLog(now: () => number): DropReporter {
     emit: ({ context }) =>
       logger.warn('Preview comments: page signal dropped', {
         reason: context.reason,
-        panelId: stablePathDigest(context.panelId),
+        panelId: context.panelId === undefined ? undefined : stablePathDigest(context.panelId),
         ...(context.suppressed === undefined ? {} : { suppressed: context.suppressed })
       })
   })

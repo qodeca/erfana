@@ -161,8 +161,62 @@ describe('024-AC-003 Markdown through the file-comment service', () => {
   })
 })
 
+describe('024-AC-031 a pick inside a generated region is refused when the draft opens (W-08, § 8 C19)', () => {
+  const GENERATED = ['# Top', '', '<!-- START toc -->', '', 'Generated line.', '', '<!-- END toc -->', '', 'Own words.', ''].join('\n')
+
+  it('024-AC-031 openDraft with a pick in a START/END region mints the draft and says generated-region, from main\'s one list parse', async () => {
+    await project.write('toc.md', GENERATED)
+    await listOk('toc.md')
+    listJobs = 0
+    const draft = await service.openDraft(caller(), { panelId: PANEL, filePath: project.path('toc.md'), target: paragraphOn(GENERATED, 5) })
+    expect(draft).toEqual({ ok: true, draftToken: expect.any(String), refused: 'generated-region' })
+    expect(listJobs).toBe(1)
+  })
+
+  it('024-AC-031 a pick outside the region, or no pick (a keep-alive renewal), carries no refusal', async () => {
+    await project.write('toc.md', GENERATED)
+    await listOk('toc.md')
+    const own = await service.openDraft(caller(), { panelId: PANEL, filePath: project.path('toc.md'), target: paragraphOn(GENERATED, 9) })
+    expect(own).toEqual({ ok: true, draftToken: expect.any(String) })
+    expect(await service.openDraft(caller(), { panelId: PANEL, filePath: project.path('toc.md') })).toEqual({ ok: true, draftToken: expect.any(String) })
+  })
+
+  it('024-AC-031 the save on that pick is still refused as generated-region and writes nothing', async () => {
+    const original = Buffer.from(GENERATED)
+    await project.write('toc.md', GENERATED)
+    await listOk('toc.md')
+    const target = paragraphOn(GENERATED, 5)
+    const draft = await service.openDraft(caller(), { panelId: PANEL, filePath: project.path('toc.md'), target })
+    if (!draft.ok) throw new Error('no draft')
+    const saved = await service.save(caller(), { panelId: PANEL, filePath: project.path('toc.md'), op: 'add', draftToken: draft.draftToken, target, text: 'x', view: VIEW })
+    expect(saved).toMatchObject({ ok: false, reason: 'generated-region' })
+    expect((await project.read('toc.md')).equals(original)).toBe(true)
+  })
+})
+
+describe('024-AC-003 M-A a list item\'s later block indented past the item\'s content column takes a comment', () => {
+  it.each([
+    ['four spaces under "1. "', '1. Ship it.\n\n    Then tell the team.\n'],
+    ['a tab under "- "', '- Ship it.\n\n\tThen tell the team.\n'],
+    ['four spaces under "- "', '- Ship it.\n\n    Then tell the team.\n']
+  ])('024-AC-003 %s: the save writes the block at the item\'s column and keeps every other byte', async (_name, text) => {
+    await project.write('later.md', text)
+    await listOk('later.md')
+    expect(await addOn('later.md', 3, 'Who tells them?')).toMatchObject({ ok: true })
+    const after = (await project.read('later.md')).toString('utf8')
+    const at = after.indexOf('<!-- erfana:comment')
+    const end = after.indexOf('-->', after.lastIndexOf('erfana:comment')) + 3
+    const lineStart = after.lastIndexOf('\n', at) + 1
+    // Outside the block and its own indent and line break, the file is as it was.
+    expect(after.slice(0, lineStart) + after.slice(end + 1)).toBe(text)
+    expect(after.slice(lineStart, at)).toMatch(/^ +$/)
+    const listed = await listOk('later.md')
+    expect(listed.file.threads).toHaveLength(1)
+  })
+})
+
 describe('Markdown comments off in Settings (024-FR-022)', () => {
-  const off = { ok: false, code: ErrorCode.COMMENT_PATH_REFUSED, reason: 'comments-off' }
+  const off ={ ok: false, code: ErrorCode.COMMENT_PATH_REFUSED, reason: 'comments-off' }
 
   it('refuses a draft and every save with comments-off', async () => {
     await project.write('plan.md', PLAN)

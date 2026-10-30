@@ -28,7 +28,6 @@ import { HTML_WORDS, menuReasonText } from '../../../Comments/commentCopyWords'
 import { hostMenuItems, hostMenuLabel } from '../../../Comments/overlay/hostMenu'
 import type { ContextMenuItem } from '../../../ContextMenu/ContextMenu'
 import type { DraftScope } from './previewCommentRequests'
-import { TEST_IDS } from '../../../../constants/testids'
 import { renderIcon } from '../../../../utils/iconRegistry'
 import type {
   CommentSaveRequest,
@@ -44,8 +43,6 @@ import type { IdentityFormData } from '../../../Comments/commentSchemas'
 import { CommentWindow } from '../../../Comments/CommentWindow'
 import type { CommentWindowRequest, ElementDraft } from '../../../Comments/commentWindowTypes'
 
-/** The matrix's actions are replaced by the layer's own (see the items below). */
-const NO_ACTION = (): void => {}
 
 /** Props for {@link PreviewCommentsLayer}. */
 export interface PreviewCommentsLayerProps {
@@ -112,22 +109,20 @@ export function PreviewCommentsLayer(props: PreviewCommentsLayerProps): React.JS
         : canComment
           ? null
           : menuReasonText(menu.reason, menu.displayPath)
-  // The matrix gives labels and order, and keeps each item, disabled with its reason line, when it cannot be used.
-  // Each action is set here, where the ref is written only on click; ContextMenu never runs a disabled item.
+  // The matrix gives labels, order and each item's action, and keeps each item, disabled with its reason line,
+  // when it cannot be used. The ref is written only on click; ContextMenu never runs a disabled item.
   const items: ContextMenuItem[] =
     menu === null
       ? []
       : hostMenuItems(
           { mode: props.mode ?? true, tag: menu.target?.tag ?? '', blocked, refused: null, words: HTML_WORDS, selection },
-          { open: NO_ACTION, openWords: NO_ACTION }
+          { open: () => props.onAddComment(menu), openWords: () => props.onAddComment(menu, 'words') }
         ).map(item => ({
           ...item,
           icon: renderIcon('message-square-plus', { size: 16, 'aria-hidden': true }),
           action: () => {
-            if (blocked !== null) return
             chosen.current = true
-            if (item.testId === TEST_IDS.COMMENT_MENU_SELECTION) props.onAddComment(menu, 'words')
-            else props.onAddComment(menu)
+            item.action()
           }
         }))
   return (

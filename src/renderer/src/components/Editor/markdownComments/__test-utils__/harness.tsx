@@ -31,6 +31,7 @@ export interface FileCommentsMock {
   list: Mock
   openDraft: Mock
   save: Mock
+  release: Mock
   onChanged: Mock
   /** Fire `file-comment:changed` for the harness panel. */
   emitChanged: () => void
@@ -74,6 +75,7 @@ export function installApi(file: CommentFileView = fileView(), placements: Threa
     list: vi.fn(async () => ({ ok: true, file, placements })),
     openDraft: vi.fn(async () => ({ ok: true, draftToken: DRAFT_TOKEN })),
     save: vi.fn(async () => ({ ok: true, threadKey: 'new-thread' })),
+    release: vi.fn(async () => ({ ok: true, released: true })),
     onChanged: vi.fn((callback: (payload: unknown) => void) => {
       listeners.add(callback)
       return () => listeners.delete(callback)

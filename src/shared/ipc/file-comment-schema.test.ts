@@ -20,6 +20,9 @@ import {
   FileCommentListRequestSchema,
   FileCommentListResultSchema,
   FileCommentOpenDraftRequestSchema,
+  FileCommentOpenDraftResultSchema,
+  FileCommentReleaseRequestSchema,
+  FileCommentReleaseResultSchema,
   FileCommentSaveRequestSchema,
   PickedTargetSchema
 } from './file-comment-schema'
@@ -113,5 +116,36 @@ describe('answers', () => {
     expect(ok(FileCommentListResultSchema, { ok: true, file, placements: [{ threadKey: 't1', line: 3, tag: 'p' }] })).toBe(true)
     expect(ok(FileCommentListResultSchema, { ok: true, file, placements: [{ threadKey: 't1', line: 0, tag: 'p' }] })).toBe(false)
     expect(ok(FileCommentListResultSchema, { ok: true, file, placements: [], text: 'x' })).toBe(false)
+  })
+
+  it('024-AC-031 a draft answer may say generated-region, and nothing else, next to its token (W-08)', () => {
+    const draftToken = 'a'.repeat(32)
+    expect(ok(FileCommentOpenDraftResultSchema, { ok: true, draftToken })).toBe(true)
+    expect(ok(FileCommentOpenDraftResultSchema, { ok: true, draftToken, refused: 'generated-region' })).toBe(true)
+    expect(ok(FileCommentOpenDraftResultSchema, { ok: true, draftToken, refused: 'target-moved' })).toBe(false)
+    expect(ok(FileCommentOpenDraftResultSchema, { ok: true, draftToken, quote: 'x' })).toBe(false)
+  })
+
+  it('024-AC-028 a release answer is strict', () => {
+    expect(ok(FileCommentReleaseResultSchema, { ok: true, released: true })).toBe(true)
+    expect(ok(FileCommentReleaseResultSchema, { ok: true })).toBe(false)
+    expect(ok(FileCommentReleaseResultSchema, { ok: true, released: false, panelId: 'p' })).toBe(false)
+  })
+})
+
+describe('024-AC-028 item 4: openDraft may carry the pick; a release names a panel only', () => {
+  it('024-AC-031 openDraft takes the pick under the add\'s own target caps', () => {
+    expect(ok(FileCommentOpenDraftRequestSchema, { panelId: 'p', filePath: '/a.md', target: TARGET })).toBe(true)
+    expect(ok(FileCommentOpenDraftRequestSchema, { panelId: 'p', filePath: '/a.md', target: { ...TARGET, lineStart: FILE_COMMENT_LINE_MAX + 1 } })).toBe(false)
+    expect(ok(FileCommentOpenDraftRequestSchema, { panelId: 'p', filePath: '/a.md', target: { ...TARGET, extra: 1 } })).toBe(false)
+    expect(ok(FileCommentOpenDraftRequestSchema, { panelId: 'p', filePath: '/a.md', refused: 'generated-region' })).toBe(false)
+  })
+
+  it('024-AC-028 a release is strict: a panel id and nothing else – no path, no window', () => {
+    expect(ok(FileCommentReleaseRequestSchema, { panelId: 'p' })).toBe(true)
+    expect(ok(FileCommentReleaseRequestSchema, { panelId: '' })).toBe(false)
+    expect(ok(FileCommentReleaseRequestSchema, { panelId: 'p', filePath: '/a.md' })).toBe(false)
+    expect(ok(FileCommentReleaseRequestSchema, { panelId: 'p', windowId: 1 })).toBe(false)
+    expect(ok(FileCommentReleaseRequestSchema, {})).toBe(false)
   })
 })

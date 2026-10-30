@@ -9,7 +9,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { commentStepOf } from '../../../../shared/commentStepKey'
 import { fileView, thread } from '../Panels/HtmlPreviewPanel/comments/__test-helpers__/commentTestKit'
 import { drawerFilterOf, resetDrawerFilters, useDrawerFilter, useDrawerFilterState } from './commentDrawerFilter'
-import { resetCommentStepKeys, stepOpenWindow, stepTargetFrom, takePreviewStep, useWindowStepTarget } from './commentStepKeys'
+import {
+  forgetPanelSteps,
+  resetCommentStepKeys,
+  stepOpenWindow,
+  stepTargetFrom,
+  takePreviewStep,
+  useForgetPanelStepsOnClose,
+  useWindowStepTarget
+} from './commentStepKeys'
 import { stepPosition } from './commentWindowStates'
 
 const file = fileView({
@@ -103,5 +111,25 @@ describe('C-13 a step key from the preview', () => {
     expect(commentStepOf({ ...press, control: true })).toBeNull()
     expect(commentStepOf({ ...press, meta: true })).toBeNull()
     expect(commentStepOf({ ...press, code: 'F10' })).toBeNull()
+  })
+})
+
+describe('L-5 a closed panel\'s last shown thread is forgotten', () => {
+  it('024-AC-019 L-5 the host\'s unmount forgets the panel: the next step from a panel with that key starts at the first thread', () => {
+    const shown = renderHook(() => useWindowStepTarget('drawer-closed', 't3', undefined))
+    shown.unmount()
+    // Remembered after the window closed: the next press goes on from t3.
+    expect(stepTargetFrom('drawer-closed', [file], 'open', 'next')?.threadKey).toBe('t5')
+    const host = renderHook(() => useForgetPanelStepsOnClose('drawer-closed'))
+    host.unmount()
+    expect(stepTargetFrom('drawer-closed', [file], 'open', 'next')?.threadKey).toBe('t1')
+  })
+
+  it('024-AC-019 L-5 forgetting one panel leaves the others', () => {
+    renderHook(() => useWindowStepTarget('drawer-a', 't3', undefined))
+    renderHook(() => useWindowStepTarget('drawer-b', 't3', undefined))
+    forgetPanelSteps('drawer-a')
+    expect(stepTargetFrom('drawer-a', [file], 'open', 'next')?.threadKey).toBe('t1')
+    expect(stepTargetFrom('drawer-b', [file], 'open', 'next')?.threadKey).toBe('t5')
   })
 })

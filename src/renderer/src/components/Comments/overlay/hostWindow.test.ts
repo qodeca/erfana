@@ -114,9 +114,10 @@ describe('new-comment request extras', () => {
     expect(newRequestExtras(li, blocked)).toEqual({})
   })
 
-  it('C-19 (Markdown) W-08 a refusal the adapter already knows travels with the request', () => {
+  it('C-19 (Markdown) W-08 a refusal main\'s draft answer already carries travels with the request', () => {
     const p = document.createElement('p')
-    expect(newRequestExtras(p, adapterWith(null, { refusalOf: () => 'generated-region' }))).toEqual({ refused: 'generated-region' })
-    expect(newRequestExtras(p, adapterWith(null, { refusalOf: () => null }))).toEqual({})
+    expect(newRequestExtras(p, adapterWith(null), { refused: 'generated-region' })).toEqual({ refused: 'generated-region' })
+    expect(newRequestExtras(p, adapterWith(null), {})).toEqual({})
+    expect(newRequestExtras(p, adapterWith(null))).toEqual({})
   })
 })

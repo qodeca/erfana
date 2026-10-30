@@ -74,7 +74,7 @@ import { useDrawerFilter } from './commentDrawerFilter'
 import { useWindowStepTarget } from './commentStepKeys'
 import { WINDOW_COPY, editWordsNotice, windowRefusal } from './commentWindowCopy'
 import { headingOf, newCommentFrom } from './commentWindowHeading'
-import { resolveLeads, stepPosition, threadStateOf } from './commentWindowStates'
+import { resolveLeads, stepPosition, threadStateOf, withResolved } from './commentWindowStates'
 import type { CommentWindowRequest, NounSource } from './commentWindowTypes'
 import { CommentWindowShell, type CommentDock } from './CommentWindowShell'
 import { IdentityStep } from './IdentityStep'
@@ -274,10 +274,10 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
   const { goTo } = session
   const { onReveal } = props
   const stepTo = useCallback(
-    (threadKey: string) => {
+    (threadKey: string, resolved?: string) => {
       const file = selection?.file
       const target = file?.threads.find(t => t.threadKey === threadKey)
-      const at = file === undefined ? null : stepPosition(file, [threadKey], stepFilter)
+      const at = file === undefined ? null : stepPosition(withResolved(file, resolved), [threadKey], stepFilter)
       goTo(threadKey)
       setFailure(null)
       setStepped(n => n + 1)
@@ -309,22 +309,22 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
         status: 'resolved'
       }
       void run(save).then(ok => {
-        if (ok && next !== null) stepTo(next)
+        if (ok && next !== null) stepTo(next, thread.threadKey) // counted as resolved: the file view lists it open until the re-list
       })
     },
     [session.step, request.panelId, selection, run, stepTo]
   )
   const { step } = session
-  // C-13: Alt+F9 / Alt+Shift+F9 from the preview step this window too (the Markdown window is not modal).
+  // C-13: Alt+F9 / Alt+Shift+F9 from the preview step this window too (not modal) – only a threads view, and only when it stepped.
   const stepFromPreview = useCallback(
     (key: 'next' | 'previous') => {
-      const target = key === 'next' ? step?.next : step?.previous
-      if (target !== null && target !== undefined) stepTo(target)
-      return true
+      const target = (key === 'next' ? step?.next : step?.previous) ?? null
+      if (target !== null) stepTo(target)
+      return target !== null
     },
     [step, stepTo]
   )
-  useWindowStepTarget(props.drawerId ?? request.panelId, request.kind === 'threads' ? shownThread?.threadKey : undefined, stepFromPreview)
+  useWindowStepTarget(props.drawerId ?? request.panelId, request.kind === 'threads' ? shownThread?.threadKey : undefined, view === 'threads' ? stepFromPreview : undefined)
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
     const key = stepKeyOf(event.nativeEvent)
     if (key === null || step === null) return

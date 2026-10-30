@@ -50,7 +50,7 @@ let made: string
 let dispose: (() => void) | null = null
 let closed: Array<() => void> = []
 
-function fakeService(): { [K in 'list' | 'openDraft' | 'save' | 'forgetWindow']: ReturnType<typeof vi.fn> } {
+function fakeService(): { [K in 'list' | 'openDraft' | 'save' | 'release' | 'forgetWindow']: ReturnType<typeof vi.fn> } {
   return {
     list: vi.fn(async () => ({
       ok: true,
@@ -59,6 +59,7 @@ function fakeService(): { [K in 'list' | 'openDraft' | 'save' | 'forgetWindow']:
     })),
     openDraft: vi.fn(async () => ({ ok: true, draftToken: TOKEN })),
     save: vi.fn(async () => ({ ok: true, threadKey: 't1' })),
+    release: vi.fn(() => true),
     forgetWindow: vi.fn()
   }
 }
@@ -92,7 +93,7 @@ function register(options: RegisterOptions = {}) {
     options.snapshot === undefined ? { generation: 1, root, realRoot: root, caseSensitive: process.platform === 'linux', ownerWebContentsId: null } : options.snapshot
   const during = options.duringConfinement
   dispose = registerFileCommentHandlers({
-    service: service as unknown as Pick<FileCommentService, 'list' | 'openDraft' | 'save' | 'forgetWindow'>,
+    service: service as unknown as Pick<FileCommentService, 'list' | 'openDraft' | 'save' | 'release' | 'forgetWindow'>,
     session: { current: options.current ?? (() => snapshot) },
     isTrustedSender: () => options.trusted !== false,
     resolveWindow: () => (options.window === undefined ? window : options.window),
@@ -247,6 +248,47 @@ describe('file-comment handlers', () => {
     expect(await invoke(FileCommentChannels.OPEN_DRAFT, { panelId: PANEL, filePath: join(root, 'notes.txt') })).toEqual(
       refused(ErrorCode.COMMENT_PATH_REFUSED, 'outside-project')
     )
+  })
+
+  it('024-AC-028 024-AC-036 file-comment:release forgets a panel of the sender\'s own window, by panel id only', async () => {
+    const service = register()
+    expect(await invoke(FileCommentChannels.RELEASE, { panelId: PANEL })).toEqual({ ok: true, released: true })
+    expect(service.release).toHaveBeenCalledWith({ windowId: 7, root, realRoot: root }, PANEL)
+    service.release.mockReturnValueOnce(false)
+    expect(await invoke(FileCommentChannels.RELEASE, { panelId: 'never-listed' })).toEqual({ ok: true, released: false })
+  })
+
+  it.each([
+    ['a path', { panelId: PANEL, filePath: '/x.txt' }],
+    ['a window id', { panelId: PANEL, windowId: 3 }],
+    ['no panel', {}],
+    ['an empty panel id', { panelId: '' }]
+  ])('024-AC-028 a malformed release (%s) is refused before the service runs', async (_name, payload) => {
+    const service = register()
+    expect(await invoke(FileCommentChannels.RELEASE, payload)).toEqual(refused(ErrorCode.COMMENT_WRITE_FAILED, 'bad-request'))
+    expect(service.release).not.toHaveBeenCalled()
+  })
+
+  it('024-AC-028 a release from an untrusted sender or with no window never reaches the service', async () => {
+    let service = register({ trusted: false })
+    expect(await invoke(FileCommentChannels.RELEASE, { panelId: PANEL })).toEqual(refused(ErrorCode.COMMENT_WRITE_FAILED, 'untrusted-sender'))
+    expect(service.release).not.toHaveBeenCalled()
+    dispose?.()
+    service = register({ window: null })
+    expect(await invoke(FileCommentChannels.RELEASE, { panelId: PANEL })).toEqual(refused(ErrorCode.COMMENT_KEY_INVALID, 'not-open'))
+    expect(service.release).not.toHaveBeenCalled()
+  })
+
+  it('024-AC-031 openDraft passes the pick on and answers main\'s generated-region refusal with the token', async () => {
+    const service = register()
+    const filePath = join(root, 'notes.txt')
+    const target = { lineStart: 5, lineEnd: 5, tag: 'p', ordinal: 1 }
+    service.openDraft.mockResolvedValueOnce({ ok: true, draftToken: TOKEN, refused: 'generated-region' })
+    expect(await invoke(FileCommentChannels.OPEN_DRAFT, { panelId: PANEL, filePath, target })).toEqual({ ok: true, draftToken: TOKEN, refused: 'generated-region' })
+    expect(service.openDraft).toHaveBeenCalledWith({ windowId: 7, root, realRoot: root }, { panelId: PANEL, filePath, target })
+    // Only the one refusal main knows at the pick: anything else fails the answer's schema.
+    service.openDraft.mockResolvedValueOnce({ ok: true, draftToken: TOKEN, refused: 'target-moved' })
+    expect(await invoke(FileCommentChannels.OPEN_DRAFT, { panelId: PANEL, filePath, target })).toEqual(refused(ErrorCode.COMMENT_WRITE_FAILED, 'invalid'))
   })
 
   it('an answer that fails its schema, or a throw, is a refusal', async () => {

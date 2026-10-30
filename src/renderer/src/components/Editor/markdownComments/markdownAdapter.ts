@@ -32,19 +32,15 @@
  *   (`quoteText.ts`'s rule), and `baseHash` is `markdownTextHash` of the text
  *   the preview rendered. Main uses the line while the hash matches its own
  *   parse, else the one target with that quote (C7).
- * - **A known refusal** (W-08): main refuses a target inside a generated
- *   START/END region (024-FR-023). The preview drops those comments, so the
- *   adapter runs main's own index and locate rules (`mdIndex.ts`,
- *   `mdLocate.ts`) on the rendered text – once per text, and only when a
- *   new comment is opened – so the window opens with the refusal instead of
- *   after the reader typed. A text past the comment limits is not indexed
- *   (main makes it read-only anyway).
+ * - **No parse here** (§ 8 C19, Q3): the adapter reads the rendered DOM and
+ *   hashes the text, nothing more. Whether a pick sits in a generated
+ *   START/END region (W-08, 024-FR-023) is main's answer to the draft the
+ *   window opens with (`file-comment:openDraft` with the pick), from the
+ *   parse main already runs in its worker.
  *
  * @module Editor/markdownComments/markdownAdapter
  */
-import { markdownLimitBreach } from '../../../../../shared/markdownComments/markdownLimits'
-import { indexMarkdown, type MdIndex } from '../../../../../shared/markdownComments/mdIndex'
-import { locateMarkdownTarget, markdownTextHash } from '../../../../../shared/markdownComments/mdLocate'
+import { markdownTextHash } from '../../../../../shared/markdownComments/mdLocate'
 import { PREVIEW_LIMITS } from '../../../../../shared/preview-limits'
 import type { PickedTargetRequest, ThreadPlacement } from '../../../../../shared/ipc/file-comment-schema'
 import type { CommentTargetPlace } from '../../../../../shared/ipc/comment-common-schema'
@@ -300,15 +296,6 @@ export function createMarkdownAdapter(source: MarkdownAdapterSource): PreviewCom
     return hashed.hash
   }
 
-  // Main's index of the rendered text, for the W-08 refusal; rebuilt only when the text changes.
-  let indexed: { text: string; index: MdIndex | null } | null = null
-  const indexOf = (text: string): MdIndex | null => {
-    if (indexed?.text !== text) {
-      indexed = { text, index: markdownLimitBreach(text) === undefined ? indexMarkdown(text, text.startsWith('﻿') ? 1 : 0) : null }
-    }
-    return indexed.index
-  }
-
   const tagOf = tagOfTarget
   const lineOf = lineOfStamp
 
@@ -375,14 +362,6 @@ export function createMarkdownAdapter(source: MarkdownAdapterSource): PreviewCom
     return root !== null && drawn !== undefined && collapsedIn(drawn, root)
   }
 
-  const refusalOf = (target: HTMLElement): 'generated-region' | null => {
-    const pick = describe(target)
-    const index = pick === null ? null : indexOf(source.text())
-    if (pick === null || index === null) return null
-    const found = locateMarkdownTarget(index, pick)
-    return 'refused' in found && found.refused === 'generated-region' ? 'generated-region' : null
-  }
-
   return {
     words: MARKDOWN_WORDS,
     targetAt,
@@ -396,7 +375,6 @@ export function createMarkdownAdapter(source: MarkdownAdapterSource): PreviewCom
     describe,
     attach,
     hiddenNow,
-    root: source.root,
-    refusalOf
+    root: source.root
   }
 }

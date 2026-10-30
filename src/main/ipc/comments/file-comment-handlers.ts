@@ -15,7 +15,8 @@
  *      file, from the window that owns the project), then the comment rules
  *      of this family's kinds (`FileCommentService` → `commentFileAccess`);
  *   5. the sender's OWN window, resolved from the event – the file must be
- *      open in that window's panel (C17); thread operations name keys only.
+ *      open in that window's panel (C17); thread operations name keys only,
+ *      and a release names a panel id that is looked up in that window only.
  * The author is read from the app settings in main, never from a request.
  *
  * Answers are re-validated against their schema and never thrown: every
@@ -32,6 +33,8 @@ import {
   FileCommentListResultSchema,
   FileCommentOpenDraftRequestSchema,
   FileCommentOpenDraftResultSchema,
+  FileCommentReleaseRequestSchema,
+  FileCommentReleaseResultSchema,
   FileCommentSaveRequestSchema,
   FileCommentSaveResultSchema,
   type FileCommentChanged
@@ -57,7 +60,7 @@ export interface FileCommentHostWindow {
 
 /** Injected collaborators. */
 export interface FileCommentHandlerDeps {
-  readonly service: Pick<FileCommentService, 'list' | 'openDraft' | 'save' | 'forgetWindow'>
+  readonly service: Pick<FileCommentService, 'list' | 'openDraft' | 'save' | 'release' | 'forgetWindow'>
   /** The open project: its roots, and the window that owns it. */
   readonly session: Pick<ProjectSession, 'current'>
   /** The top-level-frame gate; {@link defaultIsTrustedSender} by default. */
@@ -100,7 +103,7 @@ export function sendFileCommentChanged(windowId: number, payload: FileCommentCha
   window.webContents.send(FileCommentEvents.CHANGED, checked.data)
 }
 
-/** Register the three `file-comment:*` channels. Returns the function that removes them. */
+/** Register the four `file-comment:*` request channels. Returns the function that removes them. */
 export function registerFileCommentHandlers(deps: FileCommentHandlerDeps): () => void {
   const { service, session } = deps
   const isTrustedSender = deps.isTrustedSender ?? defaultIsTrustedSender
@@ -205,6 +208,15 @@ export function registerFileCommentHandlers(deps: FileCommentHandlerDeps): () =>
     // Thread operations name keys only (C17): no path to confine, the key names the file.
     pathOf: request => (request.op === 'add' ? request.filePath : undefined),
     run: (caller, request) => service.save(caller, request)
+  })
+
+  register({
+    channel: FileCommentChannels.RELEASE,
+    request: FileCommentReleaseRequestSchema,
+    result: FileCommentReleaseResultSchema,
+    // A panel id only: the service looks it up in the sender's own window, so no other window's panel is reachable.
+    pathOf: () => undefined,
+    run: async (caller, request) => ({ ok: true, released: service.release(caller, request.panelId) })
   })
 
   return () => {

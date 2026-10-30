@@ -12,6 +12,7 @@ import type {
   FileCommentOpenDraftResult,
   FileCommentSaveRequest,
   FileCommentSaveResult,
+  PickedTargetRequest,
   ThreadPlacement
 } from '../../../../../shared/ipc/file-comment-schema'
 import type { CommentFileView } from '../../../../../shared/ipc/comment-common-schema'
@@ -25,7 +26,12 @@ import type { SelectionButton } from './useSelectionComments'
 /** One file's comments as the host reads and writes them (`fileCommentGateway`, bound to a panel and a file). */
 export interface RendererCommentSource {
   readonly list: (bufferText?: string) => Promise<FileCommentListResult>
-  readonly openDraft: () => Promise<FileCommentOpenDraftResult>
+  /**
+   * A new draft. With `target` – the pick a window opens on – main also says
+   * whether that pick sits in a generated region (W-08), from its own parse;
+   * a keep-alive renewal sends none.
+   */
+  readonly openDraft: (target?: PickedTargetRequest) => Promise<FileCommentOpenDraftResult>
   readonly save: (request: FileCommentSaveRequest) => Promise<FileCommentSaveResult>
   /** Called when main says the file changed on disk; returns the unsubscribe. */
   readonly onChanged: (callback: () => void) => () => void

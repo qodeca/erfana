@@ -72,6 +72,8 @@ export interface UseMarkdownCommentsOptions {
    * the file now. Main's atomic write has finished when the save answers, and
    * the file watcher's word on it can come late or never – macOS can report a
    * rename over the file as no change – leaving the preview on the old text.
+   * The panel must check again after its read that it is still unedited
+   * (`useFileWatcher`'s `reloadIfUnedited`): a keystroke during the read wins.
    */
   readonly onFileWritten?: () => void
 }
@@ -128,10 +130,16 @@ export function useMarkdownComments(options: UseMarkdownCommentsOptions): Markdo
   const shown = viewMode === 'preview' && isVisible
   const fileName = getBasename(filePath)
 
-  // The pane, from the overlay's hidden marker; the scroller is the preview beside it.
-  const [area, setArea] = useState<HTMLElement | null>(null)
-  const bindPane = useCallback((marker: HTMLElement | null) => setArea(marker?.parentElement ?? null), [])
-  const scroller = area?.querySelector<HTMLElement>(':scope > .markdown-preview') ?? null
+  // The pane, from the overlay's hidden marker; the scroller is the preview beside it, captured when the
+  // marker binds – never by a DOM query during render. The overlay mounts only in the preview-only view,
+  // in the same commit as that view's (keyed) preview, so the preview is in the pane by then.
+  const [pane, setPane] = useState<{ readonly area: HTMLElement; readonly scroller: HTMLElement | null } | null>(null)
+  const bindPane = useCallback((marker: HTMLElement | null) => {
+    const area = marker?.parentElement ?? null
+    setPane(area === null ? null : { area, scroller: area.querySelector<HTMLElement>(':scope > .markdown-preview') })
+  }, [])
+  const area = pane?.area ?? null
+  const scroller = pane?.scroller ?? null
 
   // Rebuilt for a new scroller or text: in the preview-only view the text changes only on a reload.
   const adapter = useMemo(
@@ -151,7 +159,7 @@ export function useMarkdownComments(options: UseMarkdownCommentsOptions): Markdo
         const started = bufferText === undefined ? takeEarlyList(early, filePath) : null
         return started ?? fileCommentGateway.list({ panelId, filePath, ...(bufferText === undefined ? {} : { bufferText }) })
       },
-      openDraft: () => fileCommentGateway.openDraft({ panelId, filePath }),
+      openDraft: target => fileCommentGateway.openDraft({ panelId, filePath, ...(target === undefined ? {} : { target }) }),
       save: async request => {
         const answer = await (request.op === 'add' ? timedAdd(request) : fileCommentGateway.save(request))
         // The written text reaches the preview from the save itself, not only from the watcher.
@@ -193,9 +201,11 @@ export function useMarkdownComments(options: UseMarkdownCommentsOptions): Markdo
         : MD_SURFACE_COPY.paused(fileName)
 
   // Main refuses a buffer past the Markdown file limit; the length check first spares the byte count.
+  // Counted only while the buffer is sent at all – comments on and paused – never per keystroke otherwise.
+  const sendsBuffer = enabled && paused !== null
   const bufferListable = useMemo(
-    () => content.length <= FILE_COMMENT_BUFFER_MAX_CHARS && utf8Length(content) <= FILE_COMMENT_BUFFER_MAX_CHARS,
-    [content]
+    () => sendsBuffer && content.length <= FILE_COMMENT_BUFFER_MAX_CHARS && utf8Length(content) <= FILE_COMMENT_BUFFER_MAX_CHARS,
+    [sendsBuffer, content]
   )
 
   const openInSource = useCallback(
@@ -227,8 +237,15 @@ export function useMarkdownComments(options: UseMarkdownCommentsOptions): Markdo
     if (early.current?.filePath === filePath) early.current = null
   })
   // A closed tab's list, drawer and mode go with it: the same file opened again reads afresh and
-  // says "Reading comments…" meanwhile, instead of showing the old list (024-NFR-001).
-  useEffect(() => () => usePreviewCommentStore.getState().drop(panelId), [panelId])
+  // says "Reading comments…" meanwhile, instead of showing the old list (024-NFR-001). Main forgets
+  // the panel and ends its file watch too, so closed tabs do not hold the 64-watch budget.
+  useEffect(
+    () => () => {
+      usePreviewCommentStore.getState().drop(panelId)
+      if (panelId !== '') void fileCommentGateway.release({ panelId })
+    },
+    [panelId]
+  )
 
   const goToEditor = useCallback(() => {
     // This panel's own edits: its editor view. Another tab's: that tab.

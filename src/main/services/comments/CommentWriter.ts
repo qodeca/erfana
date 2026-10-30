@@ -353,7 +353,7 @@ export class CommentWriter {
       } catch (error) {
         outcome = refused('io', errnoOf(error))
       }
-      return outcome.ok ? this.succeed(job, outcome) : this.refuse(job, realPath, outcome)
+      return outcome.ok ? this.succeed(job, kind, outcome) : this.refuse(job, realPath, outcome, kind)
     })
   }
 
@@ -418,18 +418,22 @@ export class CommentWriter {
     }
   }
 
-  private succeed(job: WriteJob, done: Extract<CommentWriteResult, { ok: true }>): CommentWriteResult {
-    this.log.info('htmlComments: comment written', {
+  // Logged under a kind-neutral prefix with the op and the file's kind; the file by digest only (C20).
+  private succeed(job: WriteJob, kind: CommentFileKind, done: Extract<CommentWriteResult, { ok: true }>): CommentWriteResult {
+    this.log.info('comments: comment written', {
       op: job.op,
+      kind: kind.id,
       file: stablePathDigest(done.realPath)
     })
     return done
   }
 
-  private refuse(job: WriteJob, path: string, refusal: Refused): CommentWriteResult {
+  /** `kind` is absent when the write was refused before the file's kind was known. */
+  private refuse(job: WriteJob, path: string, refusal: Refused, kind?: CommentFileKind): CommentWriteResult {
     const code = refusalCode(refusal.reason)
-    this.log.warn('htmlComments: comment write refused', {
+    this.log.warn('comments: comment write refused', {
       op: job.op,
+      ...(kind === undefined ? {} : { kind: kind.id }),
       code,
       reason: refusal.reason,
       ...(refusal.errno ? { errno: refusal.errno } : {}),

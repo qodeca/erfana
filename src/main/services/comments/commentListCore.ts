@@ -12,7 +12,7 @@
  * is rendered now (`commentListBuilder.ts`).
  */
 import { visibleInline, type CommentAnchor, type CommentAuthor, type ParsedBlock } from '../../../shared/htmlComments'
-import type { KindDocument } from '../../../shared/comments/fileKind'
+import { isKindRefusal, type CommentFileKind, type KindDocument, type PickedTarget } from '../../../shared/comments/fileKind'
 import { anchorSelectionOf, type AnchorSelection } from '../../../shared/comments/anchorSel'
 import { PREVIEW_LIMITS } from '../../../shared/preview-limits'
 import {
@@ -41,6 +41,12 @@ export interface ListJob {
    * family's placements, spec 024 § 4); the HTML Preview never asks.
    */
   readonly placements?: true
+  /**
+   * A new comment's pick (`file-comment:openDraft`): also say whether the
+   * file's kind refuses it as inside a generated region (W-08), from this
+   * parse – the renderer never parses the file itself (§ 8 C19).
+   */
+  readonly pick?: PickedTarget
 }
 
 /** Where an attached thread's target is now: its 1-based first line, its tag, and the words it is about. */
@@ -77,6 +83,8 @@ export interface ListSummary {
   readonly newer: ListedNewer[]
   /** Present only when the job asked for it. */
   readonly placements?: ListedPlacement[]
+  /** The job's pick sits inside a generated START/END region (024-FR-023); only when the job sent a pick. */
+  readonly pickRefused?: 'generated-region'
 }
 
 /** The summary, or why the file cannot be read for comments. */
@@ -267,7 +275,7 @@ function placementsOf(doc: KindDocument, line: (offset: number) => number): List
   return placements
 }
 
-function summaryOf(doc: KindDocument, job: ListJob | undefined): ListSummary {
+function summaryOf(doc: KindDocument, job: ListJob | undefined, kind: CommentFileKind | undefined): ListSummary {
   const line = lineIndex(doc.text)
   const threads: ListedThread[] = []
   const damaged: ListedDamaged[] = []
@@ -303,13 +311,25 @@ function summaryOf(doc: KindDocument, job: ListJob | undefined): ListSummary {
     threads,
     damaged,
     newer,
-    ...(job?.placements === true ? { placements: placementsOf(doc, line) } : {})
+    ...(job?.placements === true ? { placements: placementsOf(doc, line) } : {}),
+    ...(pickInGeneratedRegion(doc, job, kind) ? { pickRefused: 'generated-region' as const } : {})
   }
 }
 
-/** The `list` job. */
-export function runListJob(document: JobDocument<KindDocument>, job?: ListJob): ListJobResult {
+/** The job's pick is one `kind` refuses as inside a generated region; false without a pick or a kind. */
+function pickInGeneratedRegion(doc: KindDocument, job: ListJob | undefined, kind: CommentFileKind | undefined): boolean {
+  if (job?.pick === undefined || kind === undefined) return false
+  const found = kind.locate(doc, job.pick)
+  return isKindRefusal(found) && found.refused === 'generated-region'
+}
+
+/**
+ * The `list` job.
+ *
+ * @param kind - The file's kind: needed only to check a job's `pick`; the HTML table sends none.
+ */
+export function runListJob(document: JobDocument<KindDocument>, job?: ListJob, kind?: CommentFileKind): ListJobResult {
   return document.ok
-    ? { kind: 'list', ok: true, summary: summaryOf(document.doc, job) }
+    ? { kind: 'list', ok: true, summary: summaryOf(document.doc, job, kind) }
     : { kind: 'list', ok: false, refusal: document.refusal }
 }

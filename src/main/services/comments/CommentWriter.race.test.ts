@@ -285,7 +285,7 @@ describe('file-system failures and fail-closed verification', () => {
       expect(await snapshot(project.path('index.html'))).toEqual(before)
       await onlyIndex()
       expect(deps.log.warn).toHaveBeenCalledWith(
-        'htmlComments: comment write refused',
+        'comments: comment write refused',
         expect.objectContaining({ errno: code, reason: 'unsupported-fs' })
       )
       expect(JSON.stringify(deps.log.warn.mock.calls)).not.toContain('secret')

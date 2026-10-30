@@ -10,8 +10,8 @@
  *   target, or the picked target of a new comment – the text column it sits
  *   beside, and the preview scroller F6 hands focus to.
  * - **The new request's extras**: the parent that can hold a comment
- *   ("Comment on the whole {parent}", W-07) and a refusal the pick already
- *   knows (a generated START/END region, W-08).
+ *   ("Comment on the whole {parent}", W-07) and a refusal main's answer to
+ *   the draft already carries (a generated START/END region, W-08).
  * - **The draft keep-alive** (C-14.2 "drafts never silently expire"): main
  *   gives a draft ten minutes from its mint (`commentKeyStore.ts`
  *   `DRAFT_TTL_MS`). While a new-comment window is open, the host mints a
@@ -80,17 +80,19 @@ export function drawn(el: HTMLElement | null): HTMLElement | null {
  *
  * @param target - The picked target.
  * @param adapter - The preview's adapter.
- * @returns `parentTag` when a parent can hold a comment; `refused` when the pick already knows none can be written.
+ * @param draft - Main's answer to the draft opened on the pick: its parse already knows a generated region (§ 8 C19).
+ * @returns `parentTag` when a parent can hold a comment; `refused` when main already said none can be written.
  */
 export function newRequestExtras(
   target: HTMLElement,
-  adapter: PreviewCommentAdapter
+  adapter: PreviewCommentAdapter,
+  draft: { readonly refused?: 'generated-region' } = {}
 ): { readonly parentTag?: NounSource; readonly refused?: 'generated-region' } {
   const parent = adapter.parentOf(target)
   const named = parent !== null && adapter.canComment(parent).ok ? nounTargetOf(adapter, parent) : undefined
   // Its tag, or – a row holding a cell (C-03) – its tag and place, so "Comment on the whole {parent}" names it as the picker does.
   const parentTag = named?.place === undefined ? named?.tag : named
-  const refused = adapter.refusalOf?.(target) === 'generated-region' ? ('generated-region' as const) : undefined
+  const { refused } = draft
   return { ...(parentTag === undefined ? {} : { parentTag }), ...(refused === undefined ? {} : { refused }) }
 }
 

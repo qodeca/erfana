@@ -24,6 +24,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { BaseDialog } from '../Dialog/BaseDialog'
+import { useLatestRef } from '../../hooks/useLatestRef'
 import { readZIndexToken } from '../../utils/overlayStack'
 import { watchUserInput } from '../../utils/watchUserInput'
 import { TEST_IDS } from '../../constants/testids'
@@ -128,9 +129,17 @@ function usePlacement(
   return [placement, place] as const
 }
 
-/** The non-modal window's focus: first focus on open, F6 between window and preview, focus back on close. */
+/**
+ * The non-modal window's focus: first focus on open, F6 between window and
+ * preview, focus back on close. Runs once per open window: the dock is read
+ * through a ref, because the host builds a new one whenever its adapter or
+ * request changes – after every save – and re-running would send focus to
+ * the opener and back (two moves a screen reader speaks, keys lost to the
+ * preview, and the next opener an element inside the window).
+ */
 function useDockedFocus(props: CommentWindowShellProps, enabled: boolean): void {
-  const { initialFocusRef, windowRef, dock } = props
+  const { initialFocusRef, windowRef } = props
+  const dockRef = useLatestRef(props.dock)
   useEffect(() => {
     if (!enabled) return undefined
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
@@ -144,7 +153,7 @@ function useDockedFocus(props: CommentWindowShellProps, enabled: boolean): void 
     }, 0)
     const onKey = (event: KeyboardEvent): void => {
       if (event.key !== 'F6' || event.altKey || event.ctrlKey || event.metaKey) return
-      const preview = dock?.preview?.() ?? null
+      const preview = dockRef.current?.preview?.() ?? null
       const inWindow = windowRef.current?.contains(document.activeElement) === true
       if (!inWindow && (preview === null || !preview.contains(document.activeElement))) return
       event.preventDefault()
@@ -163,7 +172,7 @@ function useDockedFocus(props: CommentWindowShellProps, enabled: boolean): void 
         opener.focus()
       }
     }
-  }, [enabled, initialFocusRef, windowRef, dock])
+  }, [enabled, initialFocusRef, windowRef, dockRef])
 }
 
 /**

@@ -21,5 +21,6 @@ export const fileCommentsBridge: FileCommentsBridge = {
   list: (request) => ipcRenderer.invoke(FileCommentChannels.LIST, request),
   openDraft: (request) => ipcRenderer.invoke(FileCommentChannels.OPEN_DRAFT, request),
   save: (request) => ipcRenderer.invoke(FileCommentChannels.SAVE, request),
+  release: (request) => ipcRenderer.invoke(FileCommentChannels.RELEASE, request),
   onChanged: (callback) => subscribe(FileCommentEvents.CHANGED, callback)
 }

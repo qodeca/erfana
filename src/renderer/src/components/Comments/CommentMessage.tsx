@@ -60,6 +60,12 @@ function editedSel(field: NewCommentWords, span: WordsSpan, choice: WordsChoice)
   return field.start === field.end ? undefined : null
 }
 
+/** The stored words' range, and a key that changes whenever the stored words or their range do. */
+function storedWordsOf(field: NewCommentWords | undefined): { readonly key: string; readonly span: WordsSpan } {
+  const span = { start: field?.start ?? 0, end: field?.end ?? 0 }
+  return { key: field === undefined ? '' : `${span.start}:${span.end}:${field.text}`, span }
+}
+
 /** Props for {@link CommentMessageView}. */
 export interface CommentMessageProps {
   readonly ctx: ThreadContext
@@ -90,7 +96,13 @@ export function CommentMessageView({
   const [busy, setBusy] = useState(false)
   // C-07: the first message's words – the target's text main sent with the thread, and the range chosen in it.
   const field = first && !ctx.readOnly ? thread.words : undefined
-  const [span, setSpan] = useState<WordsSpan>(() => ({ start: field?.start ?? 0, end: field?.end ?? 0 }))
+  // The range is kept with the stored words it was chosen on: a re-list that changes them (another
+  // window's edit, a change on disk) puts the field back on the new stored words – old offsets would
+  // name other characters of the new text.
+  const stored = storedWordsOf(field)
+  const [picked, setPicked] = useState<{ readonly on: string; readonly span: WordsSpan }>(() => ({ on: stored.key, span: stored.span }))
+  const span = picked.on === stored.key ? picked.span : stored.span
+  const setSpan = (next: WordsSpan): void => setPicked({ on: stored.key, span: next })
   const choice: WordsChoice | null = field === undefined ? null : chooseWords({ text: field.text, ...span })
   const words = useCommentWords()
   const alert = useCommentAlert()
@@ -142,7 +154,9 @@ export function CommentMessageView({
       return
     }
     // Words that cannot be stored: the notice above the field says why, and the window says it aloud.
-    if (choice?.kind === 'blank' || choice?.kind === 'tie') {
+    // Only for a range the reader moved: an edit of the text alone keeps the stored words as they are.
+    const moved = span.start !== stored.span.start || span.end !== stored.span.end
+    if (moved && (choice?.kind === 'blank' || choice?.kind === 'tie')) {
       const noun = words.noun(thread)
       alert(choice.kind === 'blank' ? SELECTION_COPY.blank(noun) : SELECTION_COPY.tie(noun))
       return
@@ -319,7 +333,7 @@ export function CommentMessageView({
                 setDraft(kept !== '' ? kept : message.text)
                 setError(null)
                 // The field opens on the words stored now (R-05).
-                setSpan({ start: field?.start ?? 0, end: field?.end ?? 0 })
+                setSpan(stored.span)
                 setMode('edit')
               }
             },
