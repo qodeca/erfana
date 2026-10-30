@@ -86,8 +86,10 @@ function renderReport(info: RunInfo, md: readonly FileOutcome[], html: readonly 
   const summary: CorpusSummary = { seed: info.seed, commit: info.commit, date: new Date().toISOString().slice(0, 10), markdown: totalsOf(md), html: totalsOf(html) }
   const it = markdownItVersion(ROOT)
   return [
+    // REUSE-IgnoreStart -- the header written into the report, not this file's own
     '<!-- SPDX-License-Identifier: GPL-3.0-only -->',
     '<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->',
+    // REUSE-IgnoreEnd
     '',
     '# Corpus round trip (024-NFR-003, 024-AC-026)',
     '',

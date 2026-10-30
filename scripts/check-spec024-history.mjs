@@ -390,8 +390,10 @@ const cell = s => String(s).replace(/\|/g, '\\|').replace(/\r?\n/g, ' ')
 /** The Markdown report the unit test reads. */
 export function renderReport({ base, head, commits, rules, notes }) {
   const lines = [
+    // REUSE-IgnoreStart -- the header this script writes into the report, not this file's own
     '<!-- SPDX-License-Identifier: GPL-3.0-only -->',
     '<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->',
+    // REUSE-IgnoreEnd
     '',
     '# Spec 024 history check',
     '',
