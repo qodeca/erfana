@@ -17,7 +17,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const SPEC = 'specs/spec-t3-024-unified-comments'
+export const SPEC = 'specs/spec-t3-024-unified-comments'
 
 const range = (prefix, from, to, width) =>
   Array.from({ length: to - from + 1 }, (_, i) => `${prefix}${String(from + i).padStart(width, '0')}`)
@@ -31,15 +31,19 @@ export const REQUIRED = {
 
 const ID = String.raw`(?:024-AC-\d{3}|C-\d{2}|OD-\d{2})`
 // it / test, optionally .only/.concurrent/.each(...) – but never .skip/.todo/.fixme.
-const TITLE = new RegExp(String.raw`\b(?:it|test)(?:\.(?!skip|todo|fixme)\w+)*\(\s*(['"\x60])(${ID}(?:[ ,/]+${ID})*)\b([^'"\x60]*)\1`, 'g')
+// The rest of the title may hold the other quote characters ('Comment on "x"').
+const TITLE = new RegExp(String.raw`\b(?:it|test)(?:\.(?!skip|todo|fixme)\w+)*\(\s*(['"\x60])(${ID}(?:[ ,/]+${ID})*)\b((?:(?!\1)[^\\\n]|\\.)*)\1`, 'g')
 
-/** Test files tracked by git (unit and e2e). */
-function testFiles() {
+/** The tracer's own unit test: its sample titles (`it('C-07 …')` inside strings) are fixtures, not coverage. */
+export const SELF_TESTS = ['scripts/check-spec-trace.test.mjs']
+
+/** Test files tracked by git (unit and e2e), the tracer's own tests left out. */
+export function testFiles() {
   const out = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', 'src', 'e2e', 'scripts'], {
     cwd: ROOT,
     encoding: 'utf8'
   })
-  return out.split('\n').filter(f => /\.(test|e2e|spec)\.(m?[jt]sx?)$/.test(f))
+  return out.split('\n').filter(f => /\.(test|e2e|spec)\.(m?[jt]sx?)$/.test(f) && !SELF_TESTS.includes(f))
 }
 
 /** ID → [{ file, title }] from test titles. */
@@ -69,6 +73,18 @@ export function tableIds(text) {
     }
   }
   return ids
+}
+
+/**
+ * IDs with a filled row in recorded-checks.md § 1 "Results" only: § 2 lists
+ * the items allowed a recorded check in advance, which is not a check done.
+ */
+export function recordedIds(text) {
+  const lines = text.split(/\r?\n/)
+  const start = lines.findIndex(l => /^##\s+1\.\s+Results\b/.test(l))
+  if (start < 0) return new Set()
+  const end = lines.findIndex((l, i) => i > start && /^##\s/.test(l))
+  return tableIds(lines.slice(start + 1, end < 0 ? undefined : end).join('\n'))
 }
 
 /** Full titles that passed, from vitest (--reporter=json) or Playwright (--reporter=json) reports. */
@@ -101,7 +117,7 @@ function main(argv) {
   }
   const titles = scanTitles(testFiles())
   const passed = reports.length ? passedTitles(reports) : null
-  const recorded = tableIds(readOptional(`${SPEC}/verification/recorded-checks.md`))
+  const recorded = recordedIds(readOptional(`${SPEC}/verification/recorded-checks.md`))
   const leftOut = tableIds(readOptional(`${SPEC}/verification/left-out.md`))
 
   const rows = []

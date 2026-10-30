@@ -3,7 +3,7 @@
 /**
  * The comment window's thread states and stepping, in both previews
  * (comments-v2 C-05, C-06, C-13, C-14, C-19, C-21, C-03, OD-05; spec 024
- * state table S-02 – S-05, W-03 – W-05, W-11).
+ * state table S-02 – S-05, S-07 – S-09, F-01, W-03 – W-05, W-11).
  */
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -188,6 +188,93 @@ describe('CommentWindow – v2 thread states', () => {
     expect(reply).toHaveAttribute('aria-busy', 'true')
     expect(reply).not.toHaveAccessibleDescription(WINDOW_COPY.writeReplyFirst)
     await act(async () => answer({ ok: true, threadKey: 't1' }))
+  })
+})
+
+describe('CommentWindow – state table S-07 – S-09 and F-01', () => {
+  let portalRoot: HTMLDivElement
+  beforeEach(() => {
+    portalRoot = document.createElement('div')
+    portalRoot.id = 'portal-root'
+    document.body.appendChild(portalRoot)
+  })
+  afterEach(() => {
+    portalRoot.remove()
+    commentDrafts.reset()
+  })
+
+  const blockRequest = (key: string) => threadsRequest({ threadKeys: [], blockKeys: [key] })
+  const primaries = () => document.querySelectorAll('.dialog-btn-primary')
+
+  it('S-07 (Markdown) a damaged comment: the warning sentence, read-only raw text, Copy raw text, Open in source, Delete damaged comment…, and no main button', () => {
+    setup({ request: blockRequest('b1'), list: ready([fileView({ damaged: [damaged(1)] })]) }, true)
+    const view = screen.getByTestId('comment-damaged')
+    expect(view).toHaveTextContent("Erfana can't read this comment, so it won't change it. Fix it in the source, or delete it.")
+    expect(view.querySelector('.erf-comment-banner--warning')).not.toBeNull()
+    expect(screen.getByTestId('comment-damaged-raw')).toHaveTextContent('<!-- erfana:comment {not json -->')
+    expect(within(view).getByRole('button', { name: COPY.copyRaw })).toBeVisible()
+    expect(within(view).getByRole('button', { name: COPY.openInSource })).toBeVisible()
+    expect(screen.getByTestId('comment-delete-block')).toHaveTextContent('Delete damaged comment…')
+    // Rebuild from data… only for readable-mismatch / id-mismatch with valid @data (OD-05).
+    expect(screen.queryByTestId('comment-rebuild')).toBeNull()
+    expect(primaries()).toHaveLength(0)
+  })
+
+  it('S-07 (HTML) a damaged comment has the same parts – raw text, Copy raw text, Open in source, Delete – and no main button; none to delete in a read-only file', () => {
+    const { unmount } = setup({ request: blockRequest('b1'), list: ready([fileView({ damaged: [damaged(1)] })]) })
+    const view = screen.getByTestId('comment-damaged')
+    expect(view.querySelector('.erf-comment-banner--warning')).not.toBeNull()
+    expect(within(view).getByRole('button', { name: COPY.copyRaw })).toBeVisible()
+    expect(within(view).getByRole('button', { name: COPY.openInSource })).toBeVisible()
+    expect(screen.getByTestId('comment-delete-block')).toBeVisible()
+    expect(primaries()).toHaveLength(0)
+    unmount()
+    setup({ request: blockRequest('b1'), list: ready([fileView({ writable: false, damaged: [damaged(1)] })]) })
+    expect(screen.queryByTestId('comment-delete-block')).toBeNull()
+  })
+
+  it('S-08 (Markdown) damaged by a merge: the conflict sentence, no Rebuild, no main button; no Delete in a read-only file', () => {
+    // Even with data main could rebuild from, a conflict is fixed in the source.
+    const rebuild = { lines: [{ file: '- status: open', data: '- status: resolved' }] }
+    setup(
+      {
+        request: blockRequest('b1'),
+        list: ready([fileView({ writable: false, damaged: [damaged(1, { reason: 'conflict-marker', rebuild })] })])
+      },
+      true
+    )
+    expect(screen.getByTestId('comment-damaged')).toHaveTextContent('This comment contains git conflict markers. Resolve the conflict in the source.')
+    expect(screen.queryByTestId('comment-rebuild')).toBeNull()
+    expect(screen.queryByTestId('comment-delete-block')).toBeNull()
+    expect(primaries()).toHaveLength(0)
+  })
+
+  it('S-09 a newer-format comment is shown read-only with an info banner titled "Newer format – read-only", no actions that change it and no main button', () => {
+    for (const markdown of [false, true]) {
+      const { unmount } = setup(
+        { request: blockRequest('n1'), list: ready([fileView({ newer: [{ blockKey: 'n1', version: 2, line: 70 }] })]) },
+        markdown
+      )
+      const view = screen.getByTestId('comment-newer')
+      expect(view).toHaveAccessibleName('Newer format – read-only')
+      expect(view.querySelector('.erf-comment-banner--info')).not.toBeNull()
+      expect(view).toHaveTextContent(/^.*A newer version of Erfana wrote this comment/)
+      expect(screen.queryByTestId('comment-delete-block')).toBeNull()
+      expect(screen.queryByTestId('comment-rebuild')).toBeNull()
+      expect(screen.queryByTestId('comment-reply-field')).toBeNull()
+      expect(primaries()).toHaveLength(0)
+      unmount()
+    }
+  })
+
+  it('F-01 (HTML, Markdown) a writable file adds nothing over the comment state: no reason, no band, Reply and Resolve usable', () => {
+    for (const markdown of [false, true]) {
+      const { unmount } = setup({ list: ready([fileView({ writable: true, threads: [thread(1)] })]) }, markdown)
+      expect(screen.queryByTestId('comment-read-only')).toBeNull()
+      expect(screen.getByTestId('comment-reply-field')).toBeEnabled()
+      expect(screen.getByRole('button', { name: COPY.resolve })).not.toHaveAttribute('aria-disabled')
+      unmount()
+    }
   })
 })
 

@@ -213,6 +213,29 @@ describe('CommentsSection – R-014', () => {
     expect(IDENTITY_COPY.notice).not.toMatch(/HTML file next/)
   })
 
+  it('C-04 Settings › Comments speaks for both previews: file-based name hint and notice, a switch per preview, fields usable while either is on', () => {
+    // The exact texts of comments-v2 C-04's Design paragraph.
+    expect(SETTINGS_COPY.nameHint).toBe('Saved into the file next to each comment you write. Changing it affects new comments only.')
+    expect(SETTINGS_COPY.notice).toBe('Both are visible to anyone who can open the file – in its source and in git history once pushed.')
+    for (const [html, markdown] of [
+      [true, false],
+      [false, true]
+    ]) {
+      const { unmount } = render(<CommentsSection />)
+      act(() => useGlobalSettingsStore.setState({ settings: settingsWith({ authorName: 'Ada', identityNoticeSeen: true }, html, markdown) }))
+      const htmlFlag = screen.getByTestId('settings-toggle-html-comments')
+      const mdFlag = screen.getByTestId('settings-toggle-md-comments')
+      expect(htmlFlag).toHaveAccessibleName('Comments in HTML preview')
+      expect(mdFlag).toHaveAccessibleName('Comments in Markdown preview')
+      expect(mdFlag).toHaveAccessibleDescription('Lets you comment on paragraphs, list items and selected text.')
+      expect(name()).toHaveAccessibleDescription(SETTINGS_COPY.nameHint)
+      expect(screen.getByTestId('settings-comment-notice')).toHaveTextContent(SETTINGS_COPY.notice)
+      expect(name()).toBeEnabled()
+      expect(email()).toBeEnabled()
+      unmount()
+    }
+  })
+
   it('is inert before settings load', () => {
     useGlobalSettingsStore.setState({ settings: null })
     render(<CommentsSection />)

@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { INITIAL_PANEL_COMMENT_STATE } from '../../../../stores/usePreviewCommentStore'
 import { useOverlayOccluderStore } from '../../../../stores/useOverlayOccluderStore'
 import { menuDraft, newRequest, threadsRequest } from './__test-helpers__/commentTestKit'
-import { COPY } from '../../../Comments/commentCopy'
+import { COPY, IDENTITY_COPY } from '../../../Comments/commentCopy'
 import { MD_SURFACE_COPY, SELECTION_COPY } from '../../../Comments/commentCopyWords'
 import { PreviewCommentsLayer, type PreviewCommentsLayerProps } from './PreviewCommentsLayer'
 
@@ -117,6 +117,19 @@ describe('PreviewCommentsLayer', () => {
       expect(props.onAddComment).toHaveBeenCalledWith(draft)
     })
 
+    it('M-03 in comment mode without a selection the one item is "Add comment", on the picked element', async () => {
+      const user = userEvent.setup()
+      const draft = menuDraft()
+      const { props } = setup({ menu: draft, mode: true })
+      expect(screen.getByRole('menu', { name: COPY.menuLabel })).toBeVisible()
+      const items = screen.getAllByRole('menuitem')
+      expect(items.map(item => item.textContent)).toEqual([COPY.addComment])
+      expect(items[0]).not.toHaveAttribute('aria-disabled')
+      await user.click(items[0])
+      expect(props.onAddComment).toHaveBeenCalledWith(draft)
+      expect(props.onMenuClose).toHaveBeenCalledWith(true)
+    })
+
     it('024-AC-004 C-07 (HTML) on a selection: "Comment on selection" then "Comment on the whole element", in a menu named Selection (M-02, M-04)', async () => {
       const user = userEvent.setup()
       const draft = menuDraft({ selection: true, words: WORDS })
@@ -168,6 +181,20 @@ describe('PreviewCommentsLayer', () => {
   it('opens the comment window for a request, keyed by draft', () => {
     setup({ request: newRequest() })
     expect(screen.getByTestId('comment-window')).toBeVisible()
+  })
+
+  it('C-04 (HTML) the first comment shows the one notice for both previews; once seen in either preview it is not shown again', () => {
+    const { unmount } = setup({ request: newRequest(), identity: { authorName: 'Ada', identityNoticeSeen: false } })
+    const dialog = screen.getByRole('dialog', { name: IDENTITY_COPY.title })
+    expect(dialog).toHaveTextContent(IDENTITY_COPY.notice)
+    // The notice is about files, not pages, and names the HTML-only risk as an extra.
+    expect(IDENTITY_COPY.notice).toMatch(/^Erfana writes your name – and your email, if you add one – into the file next to each comment\./)
+    expect(IDENTITY_COPY.notice).toMatch(/In HTML files, scripts on previewed pages can read them too\./)
+    unmount()
+    // `identityNoticeSeen` is one global flag: a first comment in the Markdown Preview sets it for this preview too.
+    setup({ request: newRequest(), identity: { authorName: 'Ada', identityNoticeSeen: true } })
+    expect(screen.queryByText(IDENTITY_COPY.notice)).toBeNull()
+    expect(screen.queryByTestId('comment-identity-name')).toBeNull()
   })
 
   it('opens the threads window for a pin', () => {

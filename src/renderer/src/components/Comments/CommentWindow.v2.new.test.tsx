@@ -3,7 +3,7 @@
 /**
  * The comment window's v2 new-comment states, in both previews
  * (comments-v2 C-14, C-19, C-21, C-03; spec 024 state table W-01, W-02,
- * W-07, W-08, W-10, 024-FR-004 words dropped).
+ * W-07 – W-10, 024-FR-004 words dropped).
  */
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -241,6 +241,45 @@ describe('CommentWindow – v2 new comment', () => {
     expect(saveButton()).toHaveAttribute('aria-busy', 'true')
     expect(saveButton()).not.toHaveAccessibleDescription(WINDOW_COPY.writeCommentFirst)
     answer({ ok: true, threadKey: 't1' })
+  })
+
+  // ---- State table W-09, W-10, in both previews ----
+  const PREVIEWS = [
+    { preview: 'HTML', markdown: false, file: 'index.html' },
+    { preview: 'Markdown', markdown: true, file: 'notes.md' }
+  ] as const
+
+  for (const { preview, markdown } of PREVIEWS)
+    it(`W-09 (${preview}) between Save and the written result Save shows "Saving…" in the busy state and sends once`, async () => {
+    const user = userEvent.setup()
+    let answer: (r: CommentSaveResult) => void = () => {}
+    const onSave = vi.fn(() => new Promise<CommentSaveResult>(r => (answer = r)))
+    setup({ onSave, ...(markdown ? { request: mdRequest() } : {}) }, markdown)
+    await fieldFocused()
+    await user.type(field(), 'Half done')
+    await user.click(saveButton())
+    expect(saveButton()).toHaveTextContent('Saving…')
+    expect(saveButton()).toHaveAttribute('aria-busy', 'true')
+    await user.click(saveButton())
+    expect(onSave).toHaveBeenCalledTimes(1)
+    answer({ ok: true, threadKey: 't1' })
+  })
+
+  for (const { preview, markdown, file } of PREVIEWS)
+    it(`W-10 (${preview}) a write past its time limit says "Still saving to {file}…", offers no second Save and keeps the text`, async () => {
+    const user = userEvent.setup()
+    setup(
+      { onSave: vi.fn(async () => ({ ok: false as const, code: ErrorCode.COMMENT_SAVE_PENDING })), ...(markdown ? { request: mdRequest() } : {}) },
+      markdown
+    )
+    await fieldFocused()
+    await user.type(field(), 'Slow disk')
+    await user.click(saveButton())
+    const banner = await screen.findByTestId('comment-save-error')
+    expect(banner).toHaveTextContent(`Still saving to ${file}. Your comment appears here once it is written – no need to save again.`)
+    expect(banner).toHaveClass('erf-comment-banner--info')
+    expect(screen.queryByTestId('comment-save')).toBeNull()
+    expect(field()).toHaveValue('Slow disk')
   })
 
   // ---- C-03 (window) ----

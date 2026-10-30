@@ -216,6 +216,35 @@ describe('Markdown Preview comments', () => {
       expect(item).toHaveAccessibleDescription(MARKDOWN_COPY.frontmatter)
     })
 
+    it('M-20: in comment mode a right-click on the frontmatter offers "Add comment", disabled with its reason', async () => {
+      const user = userEvent.setup()
+      renderPanel()
+      await turnModeOn(user)
+      const frontmatter = content().querySelector<HTMLElement>('.frontmatter-wrapper, .frontmatter-error-wrapper')!
+      fireEvent.contextMenu(frontmatter, { clientX: 10, clientY: 10 })
+      const menu = await screen.findByTestId(TEST_IDS.COMMENT_CONTEXT_MENU)
+      const items = within(menu).getAllByRole('menuitem')
+      expect(items).toHaveLength(1)
+      expect(items[0]).toHaveTextContent(MD_SURFACE_COPY.addComment)
+      expect(items[0]).toHaveAttribute('aria-disabled', 'true')
+      expect(within(items[0]).getByTestId(TEST_IDS.COMMENT_MENU_REASON)).toHaveTextContent(MARKDOWN_COPY.frontmatter)
+      expect(items[0]).toHaveAccessibleDescription(MARKDOWN_COPY.frontmatter)
+      await user.click(items[0])
+      expect(screen.queryByRole('dialog')).toBeNull()
+    })
+
+    it('M-23: with "Comments in Markdown preview" off a right-click shows no comment items', async () => {
+      setSettings(undefined, false)
+      renderPanel()
+      fireEvent.contextMenu(paragraph(), { clientX: 10, clientY: 10 })
+      fireEvent.contextMenu(listItem(8), { clientX: 10, clientY: 10 })
+      expect(screen.queryByTestId(TEST_IDS.COMMENT_CONTEXT_MENU)).toBeNull()
+      for (const id of [TEST_IDS.COMMENT_MENU_COMMENT_ON, TEST_IDS.COMMENT_MENU_ADD, TEST_IDS.COMMENT_MENU_SELECTION, TEST_IDS.COMMENT_MENU_WHOLE]) {
+        expect(screen.queryByTestId(id)).toBeNull()
+      }
+      expect(screen.queryByText(/^Comment on /)).toBeNull()
+    })
+
     it('S-01: an open thread draws one icon on its list item, named in Markdown words; M-17 hides it', async () => {
       vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 600, 400))
       const user = userEvent.setup()
@@ -355,6 +384,15 @@ describe('Markdown Preview comments', () => {
       expect(screen.queryByTestId(TEST_IDS.COMMENT_DRAWER_ERROR)).toBeNull()
     })
 
+    it('F-05: comments unavailable for the file – the toggle is disabled with "Comments are unavailable for this file: {reason}" and no icon is drawn', async () => {
+      api.list.mockResolvedValue({ ok: false, code: ErrorCode.COMMENT_WRITE_FAILED, reason: 'comments-off' })
+      renderPanel()
+      await waitFor(() => expect(modeTool()).toHaveAttribute('aria-disabled', 'true'))
+      expect(MARKDOWN_COPY.off).toMatch(/^Comments are unavailable for this file: .+\.$/)
+      expect(modeTool()).toHaveAttribute('title', MD_SURFACE_COPY.modeUnavailable(MARKDOWN_COPY.off))
+      expect(screen.queryByTestId(TEST_IDS.COMMENT_HOST_ICON)).toBeNull()
+    })
+
     it('F-06 / F-07: the drawer reads, then offers Try again on a read error', async () => {
       const user = userEvent.setup()
       let answer: (value: unknown) => void = () => {}
@@ -381,6 +419,21 @@ describe('Markdown Preview comments', () => {
       expect(await screen.findByRole('dialog', { name: 'New comment on paragraph' })).toBeVisible()
       const { updateCommentIdentity } = (await import('../../../stores/useGlobalSettingsStore')).useGlobalSettingsStore.getState()
       expect(updateCommentIdentity).toHaveBeenCalledWith({ authorName: 'Grace', authorEmail: undefined, identityNoticeSeen: true })
+    })
+
+    it('C-04 (Markdown) the first comment shows the same notice as the HTML Preview – title and full text – and marks it seen for both', async () => {
+      setSettings({ authorName: 'Ada', identityNoticeSeen: false })
+      const user = userEvent.setup()
+      renderPanel()
+      fireEvent.contextMenu(listItem(8), { clientX: 10, clientY: 10 })
+      await user.click(await screen.findByTestId(TEST_IDS.COMMENT_MENU_COMMENT_ON))
+      const dialog = await screen.findByRole('dialog', { name: 'Before your first comment' })
+      // One notice: the HTML-only sentence stays in it, so a reviewer who starts in Markdown still learns it.
+      expect(dialog).toHaveTextContent(IDENTITY_COPY.notice)
+      expect(dialog).toHaveTextContent('In HTML files, scripts on previewed pages can read them too.')
+      await user.click(screen.getByTestId('comment-identity-continue'))
+      const { updateCommentIdentity } = (await import('../../../stores/useGlobalSettingsStore')).useGlobalSettingsStore.getState()
+      expect(updateCommentIdentity).toHaveBeenCalledWith(expect.objectContaining({ authorName: 'Ada', identityNoticeSeen: true }))
     })
 
     it('024-AC-023: a step already taken in the HTML Preview is not asked again', async () => {

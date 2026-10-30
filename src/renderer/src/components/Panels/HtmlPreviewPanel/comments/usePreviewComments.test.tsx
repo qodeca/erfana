@@ -163,6 +163,16 @@ describe('usePreviewComments', () => {
     expect(latest.enabled).toBe(true)
   })
 
+  it('M-09 with "Comments in HTML preview" off Erfana opens no menu and no window: the page owns its right-click', () => {
+    useGlobalSettingsStore.setState({ settings: settingsWith({ htmlPreview: { comments: { enabled: false } } } as never) })
+    render(<Harness onValue={onValue} />)
+    expect(latest.enabled).toBe(false)
+    act(() => fake.emitDraft(menuDraft()))
+    act(() => fake.emitDraft(menuDraft({ kind: 'open' })))
+    expect(latest.layer.menu).toBeNull()
+    expect(latest.layer.request).toBeNull()
+  })
+
   it('a menu draft opens the menu; Add comment turns it into a new-comment window', () => {
     render(<Harness onValue={onValue} />)
     const draft = menuDraft()
