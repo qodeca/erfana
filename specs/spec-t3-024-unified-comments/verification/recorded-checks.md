@@ -15,6 +15,7 @@ Requirement: 024-FR-017 (also used by 024-FR-018, 024-FR-019 and 024-FR-006). Ac
 
 | Date | Item | Steps | Result | Commit SHA | System | Build | Checker |
 |---|---|---|---|---|---|---|---|
+| 2026-10-29 | 024-FR-006 / 024-AC-007 – the two previews feel the same; owner acceptance with an agent | The owner gave full sign-off in advance for the hands-on acceptance test (session message: "My signoff is already provided, you have my full authorization for all the steps"); the goal says to record it with that date and not wait for it | Pass by the owner's advance sign-off. The hands-on walk of [owner-acceptance-checklist.md](owner-acceptance-checklist.md) is still the owner's to do; its outcome goes in a new row, and a failed walk stays in the table | – | – | – | Owner (sign-off recorded by Claude Code on 2026-10-30) |
 
 ## 2. Items listed in advance
 
