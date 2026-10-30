@@ -90,10 +90,17 @@ function leadFits(lead: string, line: string): boolean {
  *   removes more (or other) than one comment block.
  */
 export function insertBlanksFit(read: Uint8Array, splice: ByteSplice): boolean {
+  // Never inside a character: a UTF-8 continuation byte at either end splits one (security re-check L-C).
+  if (isContinuation(read, splice.byteStart) || isContinuation(read, splice.byteEnd)) return false
   if (splice.insert.length === 0) return removesOneBlock(read, splice)
   // An edit, reply, resolve or rebuild replaces one block's bytes and nothing else (security review M-1).
   if (splice.byteEnd > splice.byteStart && !replacesOneBlock(read, splice)) return false
   return insertFits(read, splice)
+}
+
+/** Whether `read[at]` continues a multi-byte UTF-8 character (10xxxxxx). */
+function isContinuation(read: Uint8Array, at: number): boolean {
+  return at < read.length && (read[at] & 0xc0) === 0x80
 }
 
 /** `read[byteStart, byteEnd)` as strict UTF-8, or `undefined` when it is not. */
@@ -110,10 +117,13 @@ function isOneBlock(text: string): boolean {
   return isOneCommentNode(text) && BLOCK_HEADER.test(text.slice(4))
 }
 
-/** A replace (a non-empty insert over a range): the bytes replaced are exactly one block, with no blanks around it. */
+/** A v1 header: what a replace may rewrite (a newer block is the planner's to refuse, and main's too). */
+const V1_HEADER = /^\s*erfana:comment\s+v1\b/
+
+/** A replace (a non-empty insert over a range): the bytes replaced are exactly one v1 block, with no blanks around it. */
 function replacesOneBlock(read: Uint8Array, splice: ByteSplice): boolean {
   const replaced = rangeText(read, splice)
-  return replaced !== undefined && isOneBlock(replaced)
+  return replaced !== undefined && isOneBlock(replaced) && V1_HEADER.test(replaced.slice(4))
 }
 
 /** Blanks before a removed block: its line-start indent (spaces, or a hand-written tab). */
@@ -150,6 +160,10 @@ function removesOneBlock(read: Uint8Array, splice: ByteSplice): boolean {
   // nothing but the target's indent; the blanks after the break are then exactly that indent (code review M1).
   const ownLine = lineStart === splice.byteStart || (lead === '' && /^[ \t]+$/.test(before))
   if ((lead !== '' || tail !== undefined) && !ownLine) return false
+  // Blanks before the block go only when the block also ends its line: else the text after it would lose its
+  // indent ("  <!--b-->para" in a list item) – security re-check L-B.
+  const endsLine = tail !== undefined || splice.byteEnd === read.length || read[splice.byteEnd] === LF || read[splice.byteEnd] === CR
+  if (lead !== '' && !endsLine) return false
   if (tailBlanks !== '' && tailBlanks !== before) return false
   return isOneBlock(removed.replace(REMOVED_LEAD, '').replace(REMOVED_TAIL, ''))
 }
@@ -166,6 +180,8 @@ function insertFits(read: Uint8Array, splice: ByteSplice): boolean {
     // The line-start shape: at a line start, followed by its line break and nothing more.
     return before === '' && (tail === undefined || tail === '') && leadFits(lead, lineHead(read, splice.byteStart))
   }
-  if (tail === undefined || tail === '') return true
+  // An own-lines tail – even a bare line break – only where the line so far is the target's indent (or nothing):
+  // a break in the middle of a line would split a heading or a table row (security re-check L-A).
+  if (tail === undefined) return true
   return tail === before
 }

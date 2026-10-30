@@ -65,6 +65,16 @@ describe('L5: a list racing its cleanup records no panel and no watch', () => {
     expect(opening.size).toBe(0)
   })
 
+  it('024-AC-036 two lists of one panel with a release between them are both refused; a list started after the release is served', async () => {
+    const first = h.service.list(h.caller(), { panelId: PANEL, filePath: h.project.path('notes.txt') })
+    const second = h.service.list(h.caller(), { panelId: PANEL, filePath: h.project.path('notes.txt') })
+    h.service.release(h.caller(), PANEL)
+    const third = h.service.list(h.caller(), { panelId: PANEL, filePath: h.project.path('notes.txt') })
+    expect(await first).toEqual(NOT_OPEN)
+    expect(await second).toEqual(NOT_OPEN)
+    expect((await third).ok).toBe(true)
+  })
+
   it('another window closing does not refuse this window\'s list, and a later list of the closed window\'s id is served', async () => {
     const listing = h.service.list(h.caller(1), { panelId: PANEL, filePath: h.project.path('notes.txt') })
     h.service.forgetWindow(2)

@@ -67,6 +67,12 @@ describe('L-4 a line-start indent (Markdown)', () => {
 })
 
 describe('L-4 an own-lines tail (HTML)', () => {
+  it('024-AC-038 security re-check L-A a bare line break after a block only where the line so far is blank', () => {
+    const md = '# Heading text\n'
+    expect(insertBlanksFit(...at(md, `${BLOCK}\n`, { offset: md.indexOf('text') }))).toBe(false)
+    expect(insertBlanksFit(...at(md, `${BLOCK}\n`, { offset: 0 }))).toBe(true)
+  })
+
   it('L-4 the tail gives the target back its own indent, and nothing else', () => {
     const page = '<main>\n    <p id="x">Text</p>\n</main>\n'
     const offset = page.indexOf('<p')
@@ -149,6 +155,37 @@ describe('024-AC-038 review L-2 a delete removes one comment block and nothing e
     expect(insertBlanksFit(...replacing('<!-- prettier-ignore -->\n', 0, 24))).toBe(false)
     // An add (an empty range) is not a replace.
     expect(insertBlanksFit(...replacing(md, at, at))).toBe(true)
+  })
+
+  it('024-AC-038 security re-check L-B a delete takes the blanks before a block only when the block ends its line', () => {
+    const md = `- a\n\n  ${BLOCK}para\n`
+    expect(insertBlanksFit(...removing(md, md.indexOf('  <!--'), md.indexOf('para')))).toBe(false)
+    const own = `- a\n\n  ${BLOCK}\npara\n`
+    expect(insertBlanksFit(...removing(own, own.indexOf('  <!--'), own.indexOf('para')))).toBe(true)
+    const last = `- a\n  ${BLOCK}`
+    expect(insertBlanksFit(...removing(last, last.indexOf('  <!--'), last.length))).toBe(true)
+  })
+
+  it('024-AC-038 a delete after a BOM, and an HTML own-lines delete in a CRLF file', () => {
+    const bom = `\uFEFF${BLOCK}\nPara.\n`
+    expect(insertBlanksFit(...removing(bom, 1, bom.indexOf('Para')))).toBe(true)
+    const indented = `\uFEFF  ${BLOCK}\nPara.\n`
+    expect(insertBlanksFit(...removing(indented, 1, indented.indexOf('Para')))).toBe(true)
+    const crlf = `<main>\r\n    ${BLOCK}\r\n    <p>x</p>\r\n</main>\r\n`
+    expect(insertBlanksFit(...removing(crlf, crlf.indexOf('<!--'), crlf.indexOf('<p')))).toBe(true)
+  })
+
+  it('024-AC-038 security re-check L-C never a range that starts or ends inside a character', () => {
+    const text = `é${BLOCK}\n`
+    // Byte 1 is the second byte of "é".
+    expect(insertBlanksFit(encodeText(text), { byteStart: 1, byteEnd: 1, insert: encodeText(BLOCK) })).toBe(false)
+    expect(insertBlanksFit(encodeText(text), { byteStart: 2, byteEnd: 2, insert: encodeText(BLOCK) })).toBe(true)
+  })
+
+  it('024-AC-038 a replace rewrites only a v1 block; a newer one is refused', () => {
+    const newer = '<!-- erfana:comment v2 id=c-9 -->'
+    const md = `${newer}\nPara.\n`
+    expect(insertBlanksFit(encodeText(md), { byteStart: 0, byteEnd: newer.length, insert: encodeText(BLOCK) })).toBe(false)
   })
 
   it('024-AC-038 refused: a range that a "-->" or "--!>" inside would split into two nodes', () => {
