@@ -67,4 +67,15 @@ describe('ParsedMarkdown', () => {
     expect(counter.runs()).toBe(2)
     expect(view.container.querySelector('h1')?.textContent).toBe('Other')
   })
+
+  it('024-AC-024 a saved file\'s new text always draws the new text: no parse of another text is kept, back and forth', () => {
+    const view = render(<ParsedMarkdown {...inputs} source={'- item\n'} />)
+    // The text a comment save wrote: a new block above the item, so the item moves down.
+    view.rerender(<ParsedMarkdown {...inputs} source={'<!-- c -->\n\n- item\n'} />)
+    expect(view.container.querySelectorAll('li')).toHaveLength(1)
+    // Back to the first text (a discarded render of the old text), then forward again.
+    view.rerender(<ParsedMarkdown {...inputs} source={'- item\n'} />)
+    view.rerender(<ParsedMarkdown {...inputs} source={'- other\n'} />)
+    expect(view.container.querySelector('li')?.textContent).toBe('other')
+  })
 })

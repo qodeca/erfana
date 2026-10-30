@@ -491,7 +491,7 @@ export function MarkdownEditorPanel(
   })
 
   // Markdown Preview comments (spec 024): toolbar tools, paused band, pane overlay – preview-only view.
-  const comments = useMarkdownComments({ panelId, filePath: currentFile?.path, content: currentFile?.content ?? '', viewMode, setViewMode, editorRef, isActivePanel, isVisible: isPanelVisible })
+  const comments = useMarkdownComments({ panelId, filePath: currentFile?.path, content: currentFile?.content ?? '', viewMode, setViewMode, editorRef, isActivePanel, isVisible: isPanelVisible, onFileWritten: handleReloadFromDisk })
   // =========================================================================
   // Document Statistics
   // =========================================================================

@@ -4290,7 +4290,7 @@
       "quote": "- Shortcut hints are exposed as `aria-keyshortcuts` (`⌘C` → `Meta+C`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:406",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:407",
       "match": "aria-keyshortcuts={toAriaKeyShortcuts(item.shortcut)}"
     },
     {
@@ -25054,7 +25054,7 @@
       "quote": "focus moves to the first item on open, roving tabindex",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:399",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:400",
       "match": "tabIndex={index === current ? 0 : -1}"
     },
     {
@@ -25064,7 +25064,7 @@
       "quote": "and Escape or Tab close it and return focus to the opener (#90)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:344",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:345",
       "match": "case 'Tab':"
     },
     {
@@ -25338,7 +25338,7 @@
       "quote": "Home / End, Enter / Space, typeahead",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:332",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:333",
       "match": "case 'Home':"
     },
     {
@@ -30038,7 +30038,7 @@
       "quote": "| Open and use any right-click menu | menus |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:345",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:346",
       "match": "// A menu is modal to the keyboard while open: Tab closes it rather",
       "test": "e2e/context-menu-keyboard.e2e.ts"
     },
@@ -37217,7 +37217,7 @@
       "quote": "| Move to the previous or next item; first or last item |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:333",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:334",
       "match": "next = firstItem(items)"
     },
     {
@@ -37227,7 +37227,7 @@
       "quote": "| Choose the focused item | <kbd>Enter</kbd> or <kbd>Space</kbd> | Same |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:342",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:343",
       "match": "if (current >= 0) handleItemClick(items[current])"
     },
     {
@@ -37237,7 +37237,7 @@
       "quote": "| Jump to an item by name | Type its first letters | Same |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:353",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:354",
       "match": "next = findByTypeahead(event.key)"
     },
     {
@@ -37247,7 +37247,7 @@
       "quote": "| Close the menu | <kbd>Esc</kbd> or <kbd>Tab</kbd> | Same |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:344",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:345",
       "match": "case 'Tab':"
     },
     {
@@ -38148,7 +38148,7 @@
       "quote": "then use the arrow keys and <kbd>Enter</kbd>",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:326",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:327",
       "match": "case 'ArrowDown':",
       "test": "e2e/context-menu-keyboard.e2e.ts"
     },
@@ -54952,7 +54952,7 @@
       "quote": "<kbd>F6</kbd> moves between the window and the preview",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/CommentWindowShell.tsx:138",
+      "source": "src/renderer/src/components/Comments/CommentWindowShell.tsx:146",
       "match": "if (event.key !== 'F6'"
     },
     {

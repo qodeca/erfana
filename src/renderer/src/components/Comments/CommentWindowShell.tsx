@@ -25,6 +25,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { BaseDialog } from '../Dialog/BaseDialog'
 import { readZIndexToken } from '../../utils/overlayStack'
+import { watchUserInput } from '../../utils/watchUserInput'
 import { TEST_IDS } from '../../constants/testids'
 import { inFixedFrame, placeDocked, type DockedPlacement } from './commentDockPlacement'
 import { placeCommentWindow, type Box } from './commentPlacement'
@@ -133,7 +134,14 @@ function useDockedFocus(props: CommentWindowShellProps, enabled: boolean): void 
   useEffect(() => {
     if (!enabled) return undefined
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    const timer = setTimeout(() => (initialFocusRef?.current ?? windowRef.current)?.focus(), 0)
+    const input = watchUserInput()
+    const timer = setTimeout(() => {
+      input.stop()
+      // A click or key that put focus inside the window before this tick is the reader's: keys stay there.
+      const active = document.activeElement
+      if (input.acted() && active !== windowRef.current && windowRef.current?.contains(active) === true) return
+      ;(initialFocusRef?.current ?? windowRef.current)?.focus()
+    }, 0)
     const onKey = (event: KeyboardEvent): void => {
       if (event.key !== 'F6' || event.altKey || event.ctrlKey || event.metaKey) return
       const preview = dock?.preview?.() ?? null
@@ -147,6 +155,7 @@ function useDockedFocus(props: CommentWindowShellProps, enabled: boolean): void 
     const element = windowRef.current
     return () => {
       clearTimeout(timer)
+      input.stop()
       document.removeEventListener('keydown', onKey)
       // Back where it was, unless the closing action already moved it on.
       const active = document.activeElement

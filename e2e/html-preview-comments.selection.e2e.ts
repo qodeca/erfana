@@ -25,6 +25,7 @@ import {
   CommentChrome,
   diskBytes,
   dragInPage,
+  expectPin,
   mouseAt,
   openCommentPage,
   pressInPage,
@@ -35,6 +36,7 @@ import {
   waitForBox,
   waitForViewShown
 } from './pages/html-preview.comments-ui'
+import { waitForCommentLoad } from './pages/html-preview.comments'
 import { HtmlPreviewPage, PREVIEW_BUDGET_MS } from './pages/html-preview.page'
 import { TEST_IDS } from '../src/renderer/src/constants/testids'
 
@@ -132,6 +134,11 @@ test.describe('HTML Preview comments – selected words (024-AC-004)', () => {
     await selectWords(app)
     expect(await pressInPage(app, 'Enter', [], TARGET)).toBe(true)
     await chrome.saveNewComment('Note-SEL-a1: first', PAGE, NAME)
+    // The save reloads the page with its block. Drag only once the reloaded page is the live one
+    // (its load is in, and its pin is drawn on #ship): a reload landing mid-gesture (macOS: +577 ms)
+    // dropped the words, and the right-click got the stale-element "Element" menu.
+    await waitForCommentLoad(app, PAGE, 'page', 1)
+    await expectPin(app, 'ship', true, TARGET)
     await chrome.modeButton().click()
     await expect(chrome.modeButton()).toHaveAttribute('aria-pressed', 'false', { timeout: PREVIEW_BUDGET_MS })
     const before = await diskBytes(file)

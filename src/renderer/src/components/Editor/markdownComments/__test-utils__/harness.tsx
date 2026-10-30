@@ -123,10 +123,12 @@ export interface HarnessProps {
   readonly content: string
   readonly viewMode?: ViewMode
   readonly onViewMode?: (mode: ViewMode) => void
+  /** The panel's re-read after a comment save (`MarkdownEditorPanel` passes its reload). */
+  readonly onFileWritten?: () => void
 }
 
 /** The panel, reduced: tools, band, and the pane with the preview and the overlay. */
-export function Harness({ content, viewMode = 'preview', onViewMode = () => {} }: HarnessProps): React.JSX.Element {
+export function Harness({ content, viewMode = 'preview', onViewMode = () => {}, onFileWritten }: HarnessProps): React.JSX.Element {
   const [editorRef] = useState(() => ({ current: null }))
   const comments = useMarkdownComments({
     panelId: PANEL_ID,
@@ -136,7 +138,8 @@ export function Harness({ content, viewMode = 'preview', onViewMode = () => {} }
     setViewMode: onViewMode,
     editorRef,
     isActivePanel: true,
-    isVisible: true
+    isVisible: true,
+    ...(onFileWritten === undefined ? {} : { onFileWritten })
   })
   return (
     <ToastProvider>

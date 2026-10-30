@@ -115,6 +115,21 @@ describe('CommentWindow – first focus and the save key (§19 Rev 4 owner test)
       await user.click(screen.getByTestId('comment-identity-continue'))
       expect(props.onSaveIdentity).toHaveBeenCalledWith(expect.objectContaining({ name: 'Grace Hopper' }))
     })
+
+    // A slow machine: the reader clicks into the reply field before the window's first focus
+    // lands. That focus must not pull the keys back to the title mid-word.
+    it.each([
+      { name: 'modal (HTML)', modal: true },
+      { name: 'docked (Markdown)', modal: false }
+    ])('R-003 C-13 ($name) a click into the reply field before the first focus lands keeps every key there', async ({ modal }) => {
+      // The click lands at once; each key then waits past the window's first-focus timer,
+      // as on the slow runs that kept only "Do".
+      setup({ request: threadsRequest(), list: ready([fileView({ threads: [thread(1)] })]), modal })
+      await userEvent.setup({ delay: null }).click(screen.getByTestId('comment-reply-field'))
+      await userEvent.setup({ delay: 30 }).keyboard('Done')
+      expect(screen.getByTestId('comment-reply-field')).toHaveValue('Done')
+      expect(screen.getByTestId('comment-reply-field')).toHaveFocus()
+    })
   })
 
   describe.each(PLATFORMS)('$name', ({ mac, chord, label, aria }) => {

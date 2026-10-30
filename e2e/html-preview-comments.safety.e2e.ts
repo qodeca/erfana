@@ -504,6 +504,13 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     await chrome.drawer().getByTestId('comment-drawer-row-main').first().focus()
     await page.keyboard.press('End')
     await expect(chrome.drawer().getByTestId('comment-drawer-row-main').last()).toBeFocused()
+    // Under a 640px panel the drawer is a full-width sheet over the page: there the arrows, Home
+    // and End only move, and Enter is the keyboard's reveal – it closes the sheet, shows the
+    // element and opens its thread (drawer.html "Under 640px of panel"; comments-v2 drawer.html R-10).
+    if ((await chrome.drawer().getAttribute('class'))?.split(' ').includes('erf-comment-drawer--full') === true) {
+      await page.keyboard.press('Enter')
+      await expect(chrome.window()).toHaveAttribute('data-view', 'threads', { timeout: PREVIEW_BUDGET_MS })
+    }
     await expect
       .poll(
         async () => {

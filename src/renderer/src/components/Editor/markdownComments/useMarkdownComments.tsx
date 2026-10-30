@@ -67,6 +67,13 @@ export interface UseMarkdownCommentsOptions {
   readonly isActivePanel: boolean
   /** dockview draws this panel. */
   readonly isVisible: boolean
+  /**
+   * A comment save wrote the file and this panel holds no unsaved edits: read
+   * the file now. Main's atomic write has finished when the save answers, and
+   * the file watcher's word on it can come late or never – macOS can report a
+   * rename over the file as no change – leaving the preview on the old text.
+   */
+  readonly onFileWritten?: () => void
 }
 
 /** What the panel renders; each is `null` when it does not apply. */
@@ -137,6 +144,7 @@ export function useMarkdownComments(options: UseMarkdownCommentsOptions): Markdo
   )
   // 024-NFR-001: the list read started with the file's load, while the preview renders (see `prefetch`).
   const early = useRef<EarlyList | null>(null)
+  const fileWrittenRef = useLatestRef(options.onFileWritten)
   const source = useMemo<RendererCommentSource>(
     () => ({
       list: bufferText => {
@@ -144,13 +152,18 @@ export function useMarkdownComments(options: UseMarkdownCommentsOptions): Markdo
         return started ?? fileCommentGateway.list({ panelId, filePath, ...(bufferText === undefined ? {} : { bufferText }) })
       },
       openDraft: () => fileCommentGateway.openDraft({ panelId, filePath }),
-      save: request => (request.op === 'add' ? timedAdd(request) : fileCommentGateway.save(request)),
+      save: async request => {
+        const answer = await (request.op === 'add' ? timedAdd(request) : fileCommentGateway.save(request))
+        // The written text reaches the preview from the save itself, not only from the watcher.
+        if (answer.ok && !useProjectStore.getState().dirtyPanelIds.has(panelId)) fileWrittenRef.current?.()
+        return answer
+      },
       onChanged: callback =>
         fileCommentGateway.onChanged(payload => {
           if (payload.panelId === panelId) callback()
         })
     }),
-    [panelId, filePath]
+    [panelId, filePath, fileWrittenRef]
   )
   const visibleRef = useLatestRef(isVisible)
   const prefetch = useCallback(

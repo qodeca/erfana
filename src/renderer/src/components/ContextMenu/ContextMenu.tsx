@@ -133,7 +133,7 @@ function lastItem(items: ContextMenuItem[]): number {
  */
 export function ContextMenu({ x, y, items, onClose, containerTestId, ariaLabel }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
-  // Stamped on mount by the click-outside effect below; 0 until then.
+  // Stamped on mount by the click-outside effect below, on the events' own clock; 0 until then.
   const openTimeRef = useRef<number>(0)
   // What had focus when the menu opened (the right-clicked tree row, say),
   // captured on the first render – before the menu moves focus into itself –
@@ -199,13 +199,14 @@ export function ContextMenu({ x, y, items, onClose, containerTestId, ariaLabel }
   })
 
   useEffect(() => {
-    // Record when menu was opened to ignore the opening click
-    // Only set once on mount, not on every effect re-run
-    openTimeRef.current = Date.now()
+    // Record when the menu opened, to ignore a press that began before it
+    // (the opening gesture's own). Read from a fresh event, so it is on the
+    // clock `event.timeStamp` uses. A fixed window after opening (it was 50 ms)
+    // also swallowed a real press that came quickly: the menu stayed open.
+    openTimeRef.current = new Event('context-menu-open').timeStamp
 
     const handleClickOutside = (e: MouseEvent) => {
-      // Ignore events within 50ms of menu opening (prevents closing from opening click)
-      if (Date.now() - openTimeRef.current < 50) return
+      if (e.timeStamp < openTimeRef.current) return
 
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         onCloseRef.current()

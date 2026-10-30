@@ -148,6 +148,19 @@ describe('Markdown Preview selection comments (024-AC-005)', () => {
     })
   })
 
+  it('024-AC-005 (a) M-12: a press outside the selection menu closes it, however soon after it opened', async () => {
+    await ready()
+    // The clock stands still: the press comes in the same millisecond the menu opened (a fast
+    // machine's test click – the macOS run's menu stayed open).
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now())
+    selectWords(paragraph(), 'ten customers by')
+    fireEvent.contextMenu(paragraph(), { clientX: 10, clientY: 10 })
+    await screen.findByRole('menu', { name: SELECTION_COPY.menuLabel })
+    fireEvent.pointerDown(paragraph(), { button: 0 })
+    fireEvent.mouseDown(paragraph(), { button: 0 })
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
+  })
+
   it('024-AC-005 (b) M-14: in comment mode a drag selects words in a list item instead of picking; the menu offers the comment items only', async () => {
     const user = userEvent.setup()
     await ready()
