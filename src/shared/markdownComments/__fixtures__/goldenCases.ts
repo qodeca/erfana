@@ -16,7 +16,11 @@ export interface GoldenCase {
   readonly kind: MdTargetKind
   /** Text the target's rendered text holds. */
   readonly match?: string
-  /** Which of the matches, in source order (deepest last). */
+  /**
+   * Which of the matches, in source order (deepest last). An outer list item's
+   * text holds its nested items', so a nested item is never match 0; the
+   * goldens refuse a target that holds another match.
+   */
   readonly nth?: number
   /** Selected words (`anchor.sel`). */
   readonly sel?: { readonly exact: string; readonly prefix: string; readonly suffix: string }
@@ -31,7 +35,7 @@ export const GOLDEN_CASES: readonly GoldenCase[] = [
   { name: 'g-m03-heading-setext', before: 'Intro.\n\nNext steps\n----------\n\nText.\n', kind: 'heading' },
   { name: 'g-m04-list-item-1', before: LIST, kind: 'item', match: 'Freeze' },
   { name: 'g-m05-list-item-2', before: LIST, kind: 'item', match: 'Run the load' },
-  { name: 'g-m06-nested-item-2', before: NESTED, kind: 'item', match: 'Check the links' },
+  { name: 'g-m06-nested-item-2', before: NESTED, kind: 'item', match: 'Check the links', nth: 1 },
   { name: 'g-m07-nested-item-1-first-block', before: '- Prepare\n- - Write the notes.\n  - Check the links.\n', kind: 'item', match: 'Write the notes', nth: 1 },
   { name: 'g-m08-later-block-in-item', before: '- First item.\n\n  A second paragraph in it.\n- Second item.\n', kind: 'paragraph', match: 'second paragraph' },
   { name: 'g-m09-whole-list', before: `Intro.\n\n${LIST}`, kind: 'list' },
@@ -64,5 +68,6 @@ export const GOLDEN_CASES: readonly GoldenCase[] = [
   { name: 'g-m26-skip-unclosed-fence', before: '- one\n  ```\n  open fence\n- two\n', kind: 'item', match: 'two', nth: 0 },
   { name: 'g-m27-crlf', before: '- one\r\n- two\r\n', kind: 'item', match: 'two' },
   { name: 'g-m28-bom-frontmatter', before: '\uFEFF---\ntitle: Plan\n---\nFirst paragraph.\n', kind: 'paragraph' },
-  { name: 'g-m29-cr-only-no-final-break', before: 'One.\r\rLast paragraph', kind: 'paragraph', match: 'Last' }
+  { name: 'g-m29-cr-only-no-final-break', before: 'One.\r\rLast paragraph', kind: 'paragraph', match: 'Last' },
+  { name: 'g-m30-nested-item-1', before: NESTED, kind: 'item', match: 'Write the notes', nth: 1 }
 ]

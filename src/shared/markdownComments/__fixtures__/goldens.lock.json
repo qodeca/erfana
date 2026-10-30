@@ -6,7 +6,7 @@
     "goldens/g-m03-heading-setext.md": "b3fe885ec623231429fb9b40d2e9927770f868ea4ba42b0f0701c11fcc351752",
     "goldens/g-m04-list-item-1.md": "5ab6fb4a2b47e6db04391169695c5359c1480069b3c6dfc6665a79f80cee474a",
     "goldens/g-m05-list-item-2.md": "122a348ccd4949909c98bf0f8053b1d84c7d89c9a178f5800ea60a6736a7e637",
-    "goldens/g-m06-nested-item-2.md": "7b1bf7f9e38a83fd4a2083c92c2d8616064d2356f8034b75a70cac512facc36e",
+    "goldens/g-m06-nested-item-2.md": "bd6631b1f948b5991e6e52a918d1b6e5cce2cff5d4a993223322bed6297d25bf",
     "goldens/g-m07-nested-item-1-first-block.md": "905a037679b36c15837b4b60514555076e79966bb1803f79595530e115349d28",
     "goldens/g-m08-later-block-in-item.md": "4aec15b90cd589e6bcd82603a8e586f65435732ca969f6084e8a5d8ec19819a3",
     "goldens/g-m09-whole-list.md": "d82e4340d342aee3b21255fbf02488db4db94fb3ff0a7bd23faae051058e4651",
@@ -29,6 +29,7 @@
     "goldens/g-m26-skip-unclosed-fence.md": "583bc6c73967cec0d8662b912f7d60214fb54281ee0959fb94531d7d377edfc3",
     "goldens/g-m27-crlf.md": "ae174262a7660d413a4af4dc6219094074280032a0bb352cdc2a7902d76e3213",
     "goldens/g-m28-bom-frontmatter.md": "2c3406b1377b4bb0709b3e2bb1deb5ed6d05452674607b0915ae9c6bcfbd9c39",
-    "goldens/g-m29-cr-only-no-final-break.md": "7c34acd294157bc146fff66e3a3e705a34e04eab7d11f34d340c6f31220d4c88"
+    "goldens/g-m29-cr-only-no-final-break.md": "7c34acd294157bc146fff66e3a3e705a34e04eab7d11f34d340c6f31220d4c88",
+    "goldens/g-m30-nested-item-1.md": "f6682416e4229750345f79c77ad6734ae189e57a64f404c290349ab67085c02e"
   }
 }

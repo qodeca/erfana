@@ -78,6 +78,29 @@ export function targetBy(doc: KindDocument, kind: MdTarget['kind'], text = '', n
   return found
 }
 
+/** True when `inner`'s block lies inside `outer`'s. */
+function holds(outer: MdTarget, inner: MdTarget): boolean {
+  for (let at = inner.block.parent; at; at = at.parent) if (at === outer.block) return true
+  return false
+}
+
+/**
+ * {@link targetBy} for the hashed fixtures (goldens, gate samples), refusing a
+ * target that holds another match of its kind. A list item's rendered text
+ * includes its nested items', so the first match in source order is the OUTER
+ * item – never what the preview picks, which is the innermost element under
+ * the pointer. Name the nested one with `nth` (source order, deepest last).
+ */
+export function unambiguousTargetBy(doc: KindDocument, kind: MdTarget['kind'], text = '', nth = 0): MdTarget {
+  const target = targetBy(doc, kind, text, nth)
+  const index = mdOf(doc)
+  const nested = index.elements.find(
+    t => t !== target && t.kind === kind && holds(target, t) && index.visibleText.slice(t.textStart, t.textEnd).includes(text)
+  )
+  if (nested !== undefined) throw new Error(`the ${kind} with "${text}" at ${target.path} holds ${nested.path}, which matches too: name the one meant with nth`)
+  return target
+}
+
 /** One verified write: the new text, its plan and parse. */
 export interface Written {
   readonly text: string

@@ -11,6 +11,7 @@ Fixtures for the `src/shared/markdownComments` suites ([placement rules](../../.
 | `goldens/g-m*.md` | Each case after the add, with a fixed author, clock and random source | `markdownGoldens.test.ts` with `MD_GOLDENS_WRITE=1` |
 | `goldens.lock.json` | The SHA-256 of every golden | By hand, from the hashes of the files |
 | `outside/` | `original.md` after each outside tool of 024-AC-015, with the commands in its [README](outside/README.md) | See that README |
+| `gate/` | The Claude Code gate samples of 024-FR-016, their lock and the script that runs the gate | See its [README](gate/README.md) |
 
 ## Regenerating the goldens
 

@@ -20,7 +20,7 @@ import { describe, expect, it } from 'vitest'
 import { analyzeCommentDocument as frozenAnalyze } from '../comments/__fixtures__/frozen-v0.23.1/parse'
 import { decodeLossless, encodeText } from '../comments/encoding'
 import { GOLDEN_CASES, type GoldenCase } from './__fixtures__/goldenCases'
-import { addComment, changeThread, mdOf, parseMd, pickOf, targetBy, written } from './__test-helpers__/mdHarness'
+import { addComment, changeThread, mdOf, parseMd, pickOf, unambiguousTargetBy, written } from './__test-helpers__/mdHarness'
 
 const FIXTURES = join(__dirname, '__fixtures__')
 const FOLDER = join(FIXTURES, 'goldens')
@@ -30,7 +30,7 @@ const SEED = 4242
 /** What the add of `c` writes, from a fixed seed. */
 function goldenOf(c: GoldenCase): string {
   const doc = parseMd(c.before)
-  const target = targetBy(doc, c.kind, c.match ?? '', c.nth ?? 0)
+  const target = unambiguousTargetBy(doc, c.kind, c.match ?? '', c.nth ?? 0)
   return written(addComment(c.before, pickOf(doc, target), 'Please review this.', { seed: SEED, sel: c.sel })).text
 }
 
@@ -61,6 +61,12 @@ describe('Markdown placement goldens (locked)', () => {
     expect(lock.algorithm).toBe('sha256')
     expect(actual).toEqual(lock.files)
     expect(Object.keys(actual)).toEqual(GOLDEN_CASES.map(c => `goldens/${fileOf(c)}`).sort())
+  })
+
+  it('024-AC-003 a golden never names an outer list item whose text merely holds a nested item\'s words', () => {
+    const doc = parseMd('- Prepare\n  - Write the notes.\n  - Check the links.\n- Ship\n')
+    expect(() => unambiguousTargetBy(doc, 'item', 'Check the links')).toThrow(/holds ul:nth-of-type\(1\) > li:nth-of-type\(1\) > ul:nth-of-type\(1\) > li:nth-of-type\(2\)/)
+    expect(unambiguousTargetBy(doc, 'item', 'Check the links', 1).path).toBe('ul:nth-of-type(1) > li:nth-of-type(1) > ul:nth-of-type(1) > li:nth-of-type(2)')
   })
 
   it('024-AC-003 git keeps the goldens\' bytes (-text, C8)', () => {
