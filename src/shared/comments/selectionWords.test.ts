@@ -105,3 +105,18 @@ describe('locateWords and the context helpers', () => {
     expect(occurrences('aaa', '')).toEqual([])
   })
 })
+
+describe('locateWords after the selected copy was edited', () => {
+  it('024-FR-004 the words do not jump to another copy that kept neither side of their context', () => {
+    const sel = { exact: 'colour', prefix: 'The ', suffix: ' of the sky' }
+    const before = 'The colour of the sky and the colour of the sea.'
+    expect(locateWords(before, sel)).toEqual({ start: 4, end: 10 })
+    // The selected copy was edited; the other copy has neither "The " before nor " of the sky" after.
+    expect(locateWords('The color of the sky and the colour of the sea.', sel)).toBeNull()
+  })
+
+  it('024-FR-004 the one remaining copy that kept one side is still found', () => {
+    const sel = { exact: 'colour', prefix: 'The ', suffix: ' of the sky' }
+    expect(locateWords('The colour of the sea.', sel)).toEqual({ start: 4, end: 10 })
+  })
+})

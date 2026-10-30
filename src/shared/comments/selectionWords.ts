@@ -67,6 +67,11 @@ export function occurrencesInContext(text: string, sel: AnchorSelection): number
   )
 }
 
+/** Whether the words at `at` still have their prefix before them or their suffix after them. */
+function keepsOneSide(text: string, sel: AnchorSelection, at: number): boolean {
+  return text.slice(0, at).endsWith(sel.prefix) || text.startsWith(sel.suffix, at + sel.exact.length)
+}
+
 /** A target's text and a range in it (UTF-16 offsets, `start <= end`). */
 export interface WordsRange {
   readonly text: string
@@ -157,12 +162,14 @@ export function chooseWords(range: WordsRange): WordsChoice {
 
 /**
  * Where stored words are in a target's collapsed text now: the one
- * occurrence inside their context, else the one occurrence at all; `null`
- * when they are gone or ambiguous (no underline is drawn then).
+ * occurrence inside their context, else the one occurrence that still keeps
+ * one side of it (its prefix before or its suffix after); `null` when they
+ * are gone or ambiguous (no underline is drawn then). Keeping one side stops
+ * the words jumping to another copy of them when the selected copy was edited.
  */
 export function locateWords(text: string, sel: AnchorSelection): { readonly start: number; readonly end: number } | null {
   const inContext = occurrencesInContext(text, sel)
-  const found = inContext.length > 0 ? inContext : occurrences(text, sel.exact)
+  const found = inContext.length > 0 ? inContext : occurrences(text, sel.exact).filter(at => keepsOneSide(text, sel, at))
   if (found.length !== 1) return null
   return { start: found[0], end: found[0] + sel.exact.length }
 }
