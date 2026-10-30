@@ -17,7 +17,8 @@
  *     letter case passed this check and then came back from `relative` as
  *     `../proj/…`, refused as excluded (§19 Rev 4 "case-only path
  *     differences on macOS");
- *  2. a `.html`/`.htm` name; on Windows no NTFS alternate-stream name
+ *  2. a name a registered comment file kind claims (`commentFileKinds.ts`;
+ *     today `.html`/`.htm`); on Windows no NTFS alternate-stream name
  *     (`index.html:x.html`, `index.html::$DATA`) and no 8.3 short-name
  *     segment below the root;
  *  3. no never-served segment (`node_modules`, `dist`, `out`, `coverage`,
@@ -32,7 +33,10 @@
  *     the file system's – `toLowerCase` maps the Kelvin sign U+212A to `k`, so
  *     a sibling folder `proj` + U+212A would pass for the root `projk`;
  *  5. the REAL name passes rule 2 too (a link `a.html` → `x.sh` is refused as
- *     not HTML), and the requested name is not itself a symlink (a link
+ *     not HTML) and maps to the same kind as the requested name (C18: a
+ *     link `a.html` → `b.md` is refused as `kind-mismatch`, so one kind's
+ *     rules are never applied to another kind's file), and the requested
+ *     name is not itself a symlink (a link
  *     `a.html` → `b.html` is refused as a link). Its dev/ino is returned for
  *     the write lock.
  *
@@ -62,6 +66,7 @@ import { hostPathFlavour, pathBelowRoot, type PathFlavour } from '../../utils/pa
 import { namesAlternateDataStream } from '../browserLaunch/BrowserLaunchService'
 import { hasDotSegment, hasShortNameAlias, isInExcludedDirectory } from '../preview/previewExclusion'
 import { confinePath, realPathWithin } from '../preview/previewPathResolve'
+import { commentFileKinds, type CommentFileKindLookup } from './commentFileKinds'
 import { refused, type CommentRefusal, type Refused } from './commentRefusals'
 
 /** The file a comment operation is about. */
@@ -99,10 +104,9 @@ export interface CommentFileAccessOptions {
    * file is refused as `too-large`.
    */
   readonly maxBytes?: number
+  /** The kinds a name may map to; defaults to the production list ({@link commentFileKinds}). */
+  readonly kinds?: CommentFileKindLookup
 }
-
-/** `.html` or `.htm` at the very end of the name, any case. */
-const HTML_NAME = /\.html?$/i
 
 /** Windows and macOS disks are case-insensitive by default; everything else compares exactly. */
 function isCaseSensitive(platform: NodeJS.Platform): boolean {
@@ -116,10 +120,27 @@ function fsRefusal(error: unknown): Refused {
 }
 
 /** Why a file NAME may not take comments, or `null` (rule 2). */
-function nameRefusal(filePath: string, platform: NodeJS.Platform): CommentRefusal | null {
+function nameRefusal(
+  filePath: string,
+  platform: NodeJS.Platform,
+  kinds: CommentFileKindLookup
+): CommentRefusal | null {
   if (platform === 'win32' && namesAlternateDataStream(filePath)) return 'alternate-stream'
-  if (!HTML_NAME.test(basename(filePath))) return 'not-html'
+  if (kinds.kindOfName(basename(filePath)) === undefined) return 'not-html'
   return null
+}
+
+/** Rule 5's real-name half: the real name passes rule 2 and maps to the requested name's kind (C18). */
+function realNameRefusal(
+  requestedPath: string,
+  realPath: string,
+  platform: NodeJS.Platform,
+  kinds: CommentFileKindLookup
+): CommentRefusal | null {
+  const byName = nameRefusal(realPath, platform, kinds)
+  if (byName) return byName
+  const requested = kinds.kindOfName(basename(requestedPath))
+  return kinds.kindOfName(basename(realPath)) === requested ? null : 'kind-mismatch'
 }
 
 /**
@@ -132,14 +153,18 @@ function isFullyQualified(filePath: string): boolean {
 }
 
 /** Rules 1–3: no file-system access. */
-function lexicalRefusal(target: CommentFileTarget, platform: NodeJS.Platform): CommentRefusal | null {
+function lexicalRefusal(
+  target: CommentFileTarget,
+  platform: NodeJS.Platform,
+  kinds: CommentFileKindLookup
+): CommentRefusal | null {
   const { realRoot, filePath } = target
   if (!isFullyQualified(filePath)) return 'not-absolute'
   // The host's path syntax with the platform's case rules – production passes its own platform
   const flavour: PathFlavour = { path: hostPathFlavour.path, platform }
   const rel = pathBelowRoot(resolve(filePath), realRoot, isCaseSensitive(platform), flavour)
   if (rel === undefined) return 'outside-project'
-  const byName = nameRefusal(filePath, platform)
+  const byName = nameRefusal(filePath, platform, kinds)
   if (byName) return byName
   if (hasShortNameAlias(rel, platform)) return 'short-name'
   if (hasDotSegment(rel) || isInExcludedDirectory(rel)) return 'excluded'
@@ -166,7 +191,8 @@ export async function confineCommentFile(
   options: CommentFileAccessOptions = {}
 ): Promise<ConfineResult> {
   const platform = options.platform ?? process.platform
-  const lexical = lexicalRefusal(target, platform)
+  const kinds = options.kinds ?? commentFileKinds
+  const lexical = lexicalRefusal(target, platform, kinds)
   if (lexical) return refused(lexical)
   let root: string
   try {
@@ -180,7 +206,7 @@ export async function confineCommentFile(
   }
   // Rule 4's deciding check, here and not only inside confinePath (see the module comment)
   if (realPathWithin(root, verdict.realTarget) === undefined) return refused('outside-project')
-  const byRealName = nameRefusal(verdict.realTarget, platform)
+  const byRealName = realNameRefusal(target.filePath, verdict.realTarget, platform, kinds)
   if (byRealName) return refused(byRealName)
   const requested = await requestedFileId(target.filePath)
   if (!requested.ok) return requested

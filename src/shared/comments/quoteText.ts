@@ -3,7 +3,7 @@
 /**
  * The text of a quote anchor (docs/designs/comments/html-preview-comments.md §5.3,
  * §5.9 step 4): an element's readable text, and the text on each side of it,
- * read from {@link HtmlIndex.visibleText} with whitespace runs collapsed to one
+ * read from {@link TargetIndex.visibleText} with whitespace runs collapsed to one
  * space, trimmed and NFC-normalised, so reformatting and NFD file names typed
  * on macOS do not break a match (U-088).
  *
@@ -14,7 +14,7 @@
  * early and its text is incomplete: the caller must discard it.
  */
 import { PREVIEW_LIMITS } from '../preview-limits'
-import type { HtmlIndex, IndexedElement } from '../htmlComments/htmlIndex'
+import type { IndexedTarget, TargetIndex } from './targetIndex'
 
 /** Characters of context kept on each side of a quote. */
 export const QUOTE_CONTEXT_CHARS = 32
@@ -127,7 +127,7 @@ function tailText(text: string, from: number, to: number, max: number, meter: Wo
 }
 
 /** The element's own readable text, at most `COMMENT_QUOTE_MAX_CHARS` characters. */
-export function exactOf(index: HtmlIndex, el: IndexedElement, meter = UNMETERED): string {
+export function exactOf(index: TargetIndex, el: IndexedTarget, meter = UNMETERED): string {
   return headText(
     index.visibleText,
     el.textStart,
@@ -138,13 +138,13 @@ export function exactOf(index: HtmlIndex, el: IndexedElement, meter = UNMETERED)
 }
 
 /** The readable text just before the element, at most {@link QUOTE_CONTEXT_CHARS}. */
-export function prefixOf(index: HtmlIndex, el: IndexedElement, meter = UNMETERED): string {
+export function prefixOf(index: TargetIndex, el: IndexedTarget, meter = UNMETERED): string {
   const from = Math.max(0, el.textStart - CONTEXT_WINDOW)
   return tailText(index.visibleText, from, el.textStart, QUOTE_CONTEXT_CHARS, meter)
 }
 
 /** The readable text just after the element, at most {@link QUOTE_CONTEXT_CHARS}. */
-export function suffixOf(index: HtmlIndex, el: IndexedElement, meter = UNMETERED): string {
+export function suffixOf(index: TargetIndex, el: IndexedTarget, meter = UNMETERED): string {
   const to = Math.min(index.visibleText.length, el.textEnd + CONTEXT_WINDOW)
   return headText(index.visibleText, el.textEnd, to, QUOTE_CONTEXT_CHARS, meter)
 }

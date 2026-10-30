@@ -41,7 +41,7 @@ import {
   AuthorNameSchema
 } from '../../Comments/commentSchemas'
 import { CommentBanner, CommentInput } from '../../Comments/CommentParts'
-import { useLiveText } from '../../Panels/HtmlPreviewPanel/comments/commentLive'
+import { useLiveText } from '../../Comments/commentLive'
 import '../../Comments/CommentWindow.css'
 import './CommentsSection.css'
 import { TEST_IDS } from '../../../constants/testids'

@@ -10,7 +10,7 @@
  *
  * | Code | Meaning |
  * |---|---|
- * | `COMMENT_PATH_REFUSED` | not a file comments may be written to: not absolute, outside the project, a never-served path (`node_modules`, `dist`, `out`, `coverage`, `.git`, dot-folders), not `.html`/`.htm`, an NTFS stream name, an 8.3 short name |
+ * | `COMMENT_PATH_REFUSED` | not a file comments may be written to: not absolute, outside the project, a never-served path (`node_modules`, `dist`, `out`, `coverage`, `.git`, dot-folders), not a registered comment file kind (`.html`/`.htm`), a real name of another kind than the requested one, an NTFS stream name, an 8.3 short name |
  * | `COMMENT_FILE_GONE` | the file, or a folder on its path, no longer exists |
  * | `COMMENT_WRITE_REFUSED_LINK` | the file is a symlink or has other hard links |
  * | `COMMENT_FILE_TOO_LARGE` | over `COMMENT_FILE_MAX_BYTES` (25 MB, every page the preview serves – §19 Rev 4) |
@@ -58,6 +58,8 @@ export type CommentRefusal =
   | 'outside-project'
   | 'excluded'
   | 'not-html'
+  /** The real name maps to another comment file kind than the requested name (C18). */
+  | 'kind-mismatch'
   | 'alternate-stream'
   | 'short-name'
   // What the file is (steps 2–5)
@@ -90,6 +92,7 @@ const CODES: Readonly<Record<CommentRefusal, CommentErrorCode>> = {
   'outside-project': ErrorCode.COMMENT_PATH_REFUSED,
   excluded: ErrorCode.COMMENT_PATH_REFUSED,
   'not-html': ErrorCode.COMMENT_PATH_REFUSED,
+  'kind-mismatch': ErrorCode.COMMENT_PATH_REFUSED,
   'alternate-stream': ErrorCode.COMMENT_PATH_REFUSED,
   'short-name': ErrorCode.COMMENT_PATH_REFUSED,
   missing: ErrorCode.COMMENT_FILE_GONE,

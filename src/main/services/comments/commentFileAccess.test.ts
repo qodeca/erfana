@@ -14,7 +14,9 @@ import { PREVIEW_LIMITS } from '../../../shared/preview-limits'
 import { fixedId, makeComment } from '../../../shared/comments/__fixtures__/commentTestData'
 import { fileIdOf, sha256Hex } from '../../utils/atomicWriteBytesStrict'
 import { PAGE, makeProject, snapshot, type TempProject } from '../preview/comments/__test-helpers__/commentWriterHarness'
+import { htmlKind } from '../../../shared/comments/htmlKind'
 import { confineCommentFile, loadCommentBytes } from './commentFileAccess'
+import { frozenCommentFileKinds } from './commentFileKinds'
 import { freshDocumentOf, writableRefusal } from './commentJobDocs'
 import { jobFailureRefusal, refusalCode, refused, type CommentRefusal } from './commentRefusals'
 
@@ -132,6 +134,21 @@ describe('loadCommentBytes', () => {
     }
   })
 
+  it('spec 024 C18 takes its extensions from the kind registry; the real name must map to the requested name\'s kind', async () => {
+    const notes = await project.write('notes.md', '# Notes\n')
+    const withMarkdown = frozenCommentFileKinds([
+      htmlKind,
+      { ...htmlKind, id: 'md', extensions: ['.md'], agentNote: ['note to agents: test.'] }
+    ])
+    // The production list is HTML only.
+    expect(await loadCommentBytes(project.target('notes.md'))).toEqual(refused('not-html'))
+    const loaded = await loadCommentBytes(project.target('notes.md'), { kinds: withMarkdown })
+    expect(loaded.ok && loaded.realPath).toBe(notes)
+    // A link `page.html` → `notes.md`: both names are commentable, but not as the same kind.
+    await symlink(notes, project.path('page.html'), 'file')
+    expect(await confineCommentFile(project.target('page.html'), { kinds: withMarkdown })).toEqual(refused('kind-mismatch'))
+  })
+
   it('F1 a project root that is gone is a missing file, refused before the file is looked at', async () => {
     expect(
       await confineCommentFile({ realRoot: project.path('gone'), filePath: project.path('gone', 'index.html') })
@@ -151,7 +168,7 @@ describe('writableRefusal', () => {
 
 describe('refusalCode', () => {
   const ALL: readonly CommentRefusal[] = [
-    'not-absolute', 'outside-project', 'excluded', 'not-html', 'alternate-stream', 'short-name',
+    'not-absolute', 'outside-project', 'excluded', 'not-html', 'kind-mismatch', 'alternate-stream', 'short-name',
     'missing', 'link', 'too-large', 'encoding', 'conflict-markers', 'unterminated-block',
     'too-many-blocks', 'read-only', 'not-owner', 'unsaved-source', 'identity', 'target-moved',
     'block-changed', 'limit', 'meta-charset', 'invalid', 'verify-failed', 'changed',

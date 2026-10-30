@@ -49,7 +49,7 @@
  */
 import type { AnchorLookup } from './anchorLookup'
 import type { CommentAnchor, TextQuote } from './format'
-import type { HtmlIndex, IndexedElement } from '../htmlComments/htmlIndex'
+import type { IndexedTarget, TargetIndex } from './targetIndex'
 
 /** What an element's `id` says: same as stored, another one, or nothing (none stored or none on the element). */
 type IdEvidence = 'same' | 'other' | 'none'
@@ -60,7 +60,7 @@ type IdEvidence = 'same' | 'other' | 'none'
  */
 type TextEvidence = 'same' | 'slid' | 'other' | 'unknown'
 
-function idEvidence(el: IndexedElement, anchor: CommentAnchor): IdEvidence {
+function idEvidence(el: IndexedTarget, anchor: CommentAnchor): IdEvidence {
   if (!anchor.id || !el.id) return 'none'
   return el.id === anchor.id ? 'same' : 'other'
 }
@@ -83,7 +83,7 @@ function isSlidIn(exact: string, storedSuffix: string): boolean {
  */
 function textEvidence(
   lookup: AnchorLookup,
-  el: IndexedElement,
+  el: IndexedTarget,
   quote: TextQuote | undefined
 ): TextEvidence {
   if (!quote) return 'unknown'
@@ -102,10 +102,10 @@ function textEvidence(
  * True when the element right after a block – already known to have the
  * stored tag – is corroborated as the block's element (rows 1–7 above).
  */
-export function positionCorroborated(
-  index: HtmlIndex,
+export function positionCorroborated<T extends IndexedTarget>(
+  index: TargetIndex<T>,
   lookup: AnchorLookup,
-  el: IndexedElement,
+  el: T,
   anchor: CommentAnchor
 ): boolean {
   const id = idEvidence(el, anchor)
@@ -113,7 +113,7 @@ export function positionCorroborated(
   const text = textEvidence(lookup, el, anchor.quote)
   if (text === 'same') return true
   if (text === 'slid') return false
-  if (anchor.path) return index.pathOf(el.node) === anchor.path
+  if (anchor.path) return index.pathOfTarget(el) === anchor.path
   return !anchor.id && !anchor.quote
 }
 
@@ -125,7 +125,7 @@ export function positionCorroborated(
  */
 export function pathBackupRefuses(
   lookup: AnchorLookup,
-  el: IndexedElement,
+  el: IndexedTarget,
   anchor: CommentAnchor
 ): boolean {
   const id = idEvidence(el, anchor)
@@ -138,6 +138,6 @@ export function pathBackupRefuses(
  * (row 1). Row 4 cannot apply – the quote tier only finds elements whose text
  * matches.
  */
-export function quoteBackupRefuses(el: IndexedElement, anchor: CommentAnchor): boolean {
+export function quoteBackupRefuses(el: IndexedTarget, anchor: CommentAnchor): boolean {
   return idEvidence(el, anchor) === 'other'
 }

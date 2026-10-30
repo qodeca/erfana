@@ -58,7 +58,7 @@ import { readZIndexToken } from '../../utils/overlayStack'
 import type { CommentListState } from '../../stores/usePreviewCommentStore'
 import { COPY, IDENTITY_COPY, readErrorText, saveFailureCopy, type SaveFailureCopy } from './commentCopy'
 import { visibleString } from './commentFormat'
-import { CommentStepsContext, replyDraftKey, useLiveText, type CommentSteps } from '../Panels/HtmlPreviewPanel/comments/commentLive'
+import { CommentStepsContext, replyDraftKey, useLiveText, type CommentSteps } from './commentLive'
 import {
   isCommentWritePending,
   onCommentWriteSettled,

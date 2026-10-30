@@ -81,6 +81,8 @@ export default defineConfig({
         'src/renderer/src/components/Comments/CommentMessage.tsx': { lines: 98, functions: 98, branches: 95, statements: 98 },
         // measured 100/100/100/100
         'src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentLive.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // split from the commentLive.ts above (spec 024 § 8 C22); same floor
+        'src/renderer/src/components/Comments/commentLive.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/renderer/src/components/Comments/CommentToolbarTools.tsx': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/95.83/100

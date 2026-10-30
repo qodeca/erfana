@@ -25,17 +25,12 @@
  * navigation of the same frame supersedes an older one still confining.
  */
 import { extname, join } from 'node:path'
+import type { CommentListFile } from '../../comments/commentListBuilder'
 import { confinePath, isSafeSegment, type ConfineVerdict } from '../previewPathResolve'
 import { toProjectPath } from '../previewUrl'
 
 /** The file a frame shows, as main recorded it. */
-export interface FrameFile {
-  /** The confined real path – the key of locks, token tables and the writer. */
-  readonly realPath: string
-  /** The same file in project space: the spelling the editor's tabs use. */
-  readonly projectPath: string
-  /** Project-relative, `/`-separated. */
-  readonly displayPath: string
+export interface FrameFile extends CommentListFile {
   /** `.html` or `.htm`: a document comments can be written into. */
   readonly commentable: boolean
 }

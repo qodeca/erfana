@@ -149,6 +149,17 @@ export default defineConfig({
         'src/shared/htmlComments/splice.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/shared/htmlComments/anchor.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Spec 024 commit 8 split the three above into a kind-agnostic base and
+        // the HTML entry; the split-off modules keep the same floor (measured
+        // 100/100/100/100 each on 2026-10-30, Windows, comment suites).
+        'src/shared/comments/blocks.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/splice.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/reattach.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/cutText.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // The file-kind seam and the HTML kind (spec 024 § 3; new in commit 8,
+        // measured 100/100/100/100 on 2026-10-30, Windows).
+        'src/shared/comments/fileKind.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/htmlKind.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // The re-attach tables and quote readers split out of anchor.ts
         // (measured 100/100/100/100 on 2026-10-26, Windows).
         'src/shared/comments/anchorLookup.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
@@ -181,6 +192,9 @@ export default defineConfig({
         'src/main/services/comments/CommentWriter.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/main/services/comments/commentFileAccess.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Which extensions take comments, feeding the confinement above (spec 024
+        // § 3, C18; new in commit 8, measured 100/100/100/100 on 2026-10-30).
+        'src/main/services/comments/commentFileKinds.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/main/services/comments/commentFileLock.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100

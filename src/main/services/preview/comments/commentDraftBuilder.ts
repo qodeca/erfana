@@ -34,7 +34,8 @@ import { samePathKey } from '../../comments/commentUnsavedSources'
 import type { ElementTokenEntry } from './ElementTokenTable'
 import type { FrameFile } from './frameFileMap'
 
-export { cutText, EXCERPT_MAX_CHARS, lineAt, type DraftTargetView } from './commentDraftCore'
+export { cutText } from '../../../../shared/comments/cutText'
+export { EXCERPT_MAX_CHARS, lineAt, type DraftTargetView } from './commentDraftCore'
 
 /** What a draft remembers for its Save; main-only, never sent anywhere. */
 export interface CommentDraft {

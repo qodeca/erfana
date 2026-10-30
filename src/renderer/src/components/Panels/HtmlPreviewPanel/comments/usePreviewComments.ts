@@ -46,7 +46,8 @@ import { useCommentSettleNotices } from '../../../Comments/useCommentSettleNotic
 import { useDrawerSheet } from './useDrawerSheet'
 import type { DrawerRow } from '../../../Comments/commentRows'
 import type { PreviewCommentsLayerProps } from './PreviewCommentsLayer'
-import { pickerAnnouncement, useLiveText } from './commentLive'
+import { useLiveText } from '../../../Comments/commentLive'
+import { pickerAnnouncement } from './commentLive'
 import type { PreviewKeyEventLike } from '../hooks/usePreviewGroupKeys'
 
 /** Options for {@link usePreviewComments}. */

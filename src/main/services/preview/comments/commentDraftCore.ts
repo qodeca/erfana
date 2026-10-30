@@ -25,6 +25,7 @@
  * snapshot cut and stripped (`prepareSnapshot`); a path that names an element
  * that IS in the file keeps no snapshot (M-054, `buildDraftAnchor`).
  */
+import { cutText } from '../../../../shared/comments/cutText'
 import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
 import {
   BOM_CHAR,
@@ -124,14 +125,6 @@ export function lineAt(text: string, offset: number): number {
   let line = 1
   for (let at = text.indexOf('\n'); at !== -1 && at < offset; at = text.indexOf('\n', at + 1)) line += 1
   return line
-}
-
-/** `text` cut to `max` UTF-16 units, never through a surrogate pair. */
-export function cutText(text: string, max: number): string {
-  if (text.length <= max) return text
-  const cut = text.slice(0, max)
-  const last = cut.charCodeAt(cut.length - 1)
-  return last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut
 }
 
 /** The element's start tag as it is on disk, cut for the menu. */

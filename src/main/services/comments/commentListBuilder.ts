@@ -30,7 +30,6 @@ import type { CommentFileJobRunner } from './commentFileJobs'
 import type { CommentBinding, CommentKeyStore } from './commentKeyStore'
 import type { ListSummary } from './commentListCore'
 import type { CommentRefusal } from './commentRefusals'
-import type { FrameFile } from '../preview/comments/frameFileMap'
 
 /** Files one list reads at most: the page and every frame of two pages' worth (`MAX_FRAMES_PER_PAGE` is 50). */
 export const COMMENT_LIST_MAX_FILES = 64
@@ -52,9 +51,19 @@ export interface CommentList {
   readonly unread: number
 }
 
+/** A file as a comment list names it; a preview's own file record carries at least this. */
+export interface CommentListFile {
+  /** The confined real path – the key of locks, token tables and the writer. */
+  readonly realPath: string
+  /** The same file in project space: the spelling the editor's tabs use. */
+  readonly projectPath: string
+  /** Project-relative, `/`-separated. */
+  readonly displayPath: string
+}
+
 /** One file to list: the page's, or a frame's. */
 export interface ListedFile {
-  readonly file: FrameFile
+  readonly file: CommentListFile
   readonly frame: boolean
 }
 

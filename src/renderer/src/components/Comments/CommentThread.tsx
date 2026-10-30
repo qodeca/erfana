@@ -38,7 +38,7 @@ import type {
 import { commentDrafts } from '../../stores/usePreviewCommentStore'
 import { COPY, fieldHint, saveShortcutAria, saveShortcutLabel } from './commentCopy'
 import { formatCommentTime, visibleString } from './commentFormat'
-import { replyDraftKey } from '../Panels/HtmlPreviewPanel/comments/commentLive'
+import { replyDraftKey } from './commentLive'
 import { onCommentWriteSettled, useCommentWritePending } from './commentPendingWrites'
 import { CommentMessageView } from './CommentMessage'
 import { validateCommentText } from './commentSchemas'

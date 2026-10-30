@@ -43,7 +43,7 @@ import {
   type RunCommentOp,
   type ThreadContext
 } from './CommentThread'
-import { useInnerStep } from '../Panels/HtmlPreviewPanel/comments/commentLive'
+import { useInnerStep } from './commentLive'
 import { TEST_IDS } from '../../constants/testids'
 
 type DamagedBlock = CommentFileView['damaged'][number]

@@ -18,7 +18,7 @@ import {
   type CommentFileView,
   type CommentThreadView
 } from '../../../shared/ipc/preview-comment-schema'
-import { cutText } from '../preview/comments/commentDraftCore'
+import { cutText } from '../../../shared/comments/cutText'
 import type { JobDocument } from './commentJobDocs'
 import type { CommentRefusal } from './commentRefusals'
 

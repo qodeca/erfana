@@ -28,7 +28,7 @@
  * guess from half a table. A real page stays far below it.
  */
 import type { TextQuote } from './format'
-import type { HtmlIndex, IndexedElement } from '../htmlComments/htmlIndex'
+import type { IndexedTarget, TargetIndex } from './targetIndex'
 import { exactOf, prefixOf, suffixOf, type WorkMeter } from './quoteText'
 
 /**
@@ -42,7 +42,7 @@ import { exactOf, prefixOf, suffixOf, type WorkMeter } from './quoteText'
  */
 export const QUOTE_READ_BUDGET = 40_000_000
 
-type Elements = readonly IndexedElement[]
+type Elements = readonly IndexedTarget[]
 
 /** The text just before and just after one element, as a quote stores it. */
 export interface QuoteContext {
@@ -73,21 +73,21 @@ function pairKey(first: string, second: string): string {
   return `${first.length}:${first}${second}`
 }
 
-function unique(items: Elements | undefined): IndexedElement | undefined {
+function unique(items: Elements | undefined): IndexedTarget | undefined {
   return items?.length === 1 ? items[0] : undefined
 }
 
-/** The backup-tier tables of one {@link HtmlIndex}. Get it with {@link anchorLookupOf}. */
+/** The backup-tier tables of one {@link TargetIndex}. Get it with {@link anchorLookupOf}. */
 export class AnchorLookup {
-  private tags: Map<string, IndexedElement[]> | undefined
-  private readonly ids = new Map<string, Map<string, IndexedElement[]>>()
+  private tags: Map<string, IndexedTarget[]> | undefined
+  private readonly ids = new Map<string, Map<string, IndexedTarget[]>>()
   private readonly quotes = new Map<string, QuoteTable>()
   private readonly contexts = new Map<string, ContextTable>()
   private readonly meter: WorkMeter
 
   /** @param budget - Characters all quote reads may visit; tests pass a small one. */
   constructor(
-    private readonly index: HtmlIndex,
+    private readonly index: TargetIndex,
     budget: number = QUOTE_READ_BUDGET
   ) {
     this.meter = { left: budget }
@@ -99,7 +99,7 @@ export class AnchorLookup {
   }
 
   /** Step 2: the one element with this tag and `id`, if exactly one exists. */
-  byId(tag: string, id: string): IndexedElement | undefined {
+  byId(tag: string, id: string): IndexedTarget | undefined {
     let table = this.ids.get(tag)
     if (!table) {
       table = new Map()
@@ -115,7 +115,7 @@ export class AnchorLookup {
    * exact matches when there are several, among all elements of the tag when
    * there are none. `undefined` when the quote budget ran out first.
    */
-  byQuote(tag: string, quote: TextQuote): IndexedElement | undefined {
+  byQuote(tag: string, quote: TextQuote): IndexedTarget | undefined {
     const table = this.quoteTable(tag)
     if (!table) return undefined
     const exact = table.byExact.get(quote.exact)
@@ -134,13 +134,13 @@ export class AnchorLookup {
    * check of step 1 (`anchorEvidence.ts`). `undefined` once the budget is
    * spent: a cut read is never compared.
    */
-  exactQuote(el: IndexedElement): string | undefined {
+  exactQuote(el: IndexedTarget): string | undefined {
     const exact = exactOf(this.index, el, this.meter)
     return this.budgetSpent ? undefined : exact
   }
 
   /** One element's prefix and suffix, read on the shared budget; `undefined` once it is spent. */
-  quoteContext(el: IndexedElement): QuoteContext | undefined {
+  quoteContext(el: IndexedTarget): QuoteContext | undefined {
     const prefix = prefixOf(this.index, el, this.meter)
     const suffix = suffixOf(this.index, el, this.meter)
     return this.budgetSpent ? undefined : { prefix, suffix }
@@ -158,7 +158,7 @@ export class AnchorLookup {
   private quoteTable(tag: string): QuoteTable | undefined {
     const known = this.quotes.get(tag)
     if (known || this.budgetSpent) return known
-    const byExact = new Map<string, IndexedElement[]>()
+    const byExact = new Map<string, IndexedTarget[]>()
     const exacts: string[] = []
     for (const el of this.sameTag(tag)) {
       const exact = exactOf(this.index, el, this.meter)
@@ -174,8 +174,8 @@ export class AnchorLookup {
   private contextTable(tag: string, quotes: QuoteTable): ContextTable | undefined {
     const known = this.contexts.get(tag)
     if (known || this.budgetSpent) return known
-    const byContext = new Map<string, IndexedElement[]>()
-    const byExactAndContext = new Map<string, IndexedElement[]>()
+    const byContext = new Map<string, IndexedTarget[]>()
+    const byExactAndContext = new Map<string, IndexedTarget[]>()
     const elements = this.sameTag(tag)
     for (let i = 0; i < elements.length; i += 1) {
       const el = elements[i]
@@ -192,10 +192,10 @@ export class AnchorLookup {
   }
 }
 
-const lookups = new WeakMap<HtmlIndex, AnchorLookup>()
+const lookups = new WeakMap<TargetIndex, AnchorLookup>()
 
 /** The tables of `index`, shared by every block of the parse; built lazily. */
-export function anchorLookupOf(index: HtmlIndex): AnchorLookup {
+export function anchorLookupOf(index: TargetIndex): AnchorLookup {
   let lookup = lookups.get(index)
   if (!lookup) {
     lookup = new AnchorLookup(index)

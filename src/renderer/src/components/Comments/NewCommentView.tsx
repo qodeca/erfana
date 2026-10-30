@@ -58,7 +58,7 @@ import {
   VisibleText
 } from './CommentParts'
 import { IdentityEditor } from './IdentityStep'
-import { useCommentAlert, useInnerStep } from '../Panels/HtmlPreviewPanel/comments/commentLive'
+import { useCommentAlert, useInnerStep } from './commentLive'
 import { onCommentWriteSettled, trackCommentWrite, useCommentWritePending } from './commentPendingWrites'
 import { draftKeyOf, type CommentWindowRequest } from './commentWindowTypes'
 import { TEST_IDS } from '../../constants/testids'

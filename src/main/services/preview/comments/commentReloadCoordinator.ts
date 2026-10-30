@@ -44,6 +44,7 @@ import {
   restoreScrollScript,
   type TopScroll
 } from './commentScripts'
+import type { LandedWrite } from '../../comments/commentSaveFlow'
 import { samePathKey } from '../../comments/commentUnsavedSources'
 import type { PaintContents } from './commentStillCapture'
 
@@ -55,18 +56,7 @@ export const ECHO_WINDOW_MS = 2_000
 export const FRAME_RESTORE_WINDOW_MS = 5_000
 
 /** A write that just landed. */
-export interface ArmedWrite {
-  /** The real path written. */
-  readonly realPath: string
-  /** SHA-256 of the bytes now on disk (`CommentWriteResult.fileHash`). */
-  readonly fileHash: string
-  /** The top frame's scroll before the write; absent: nothing to restore. */
-  readonly scroll?: TopScroll
-  /** The page the pick was made on: the scroll is restored only onto it. */
-  readonly page?: string
-  /** A frame's file: that frame's own scroll, for its next hello. */
-  readonly frameRestore?: { readonly realPath: string; readonly x: number; readonly y: number }
-}
+export type ArmedWrite = LandedWrite<TopScroll>
 
 /** How the last restore went (the e2e hook reads it). */
 export type RestoreOutcome = 'restored' | 'unreached' | 'dropped' | 'failed'
