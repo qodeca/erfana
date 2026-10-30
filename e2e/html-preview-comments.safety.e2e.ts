@@ -13,12 +13,12 @@
  *   where main allows it – exactly their own bytes; nothing else changes.
  * - **E-011** with the menu or the window open the native page is hidden and
  *   a fresh still frame stands in, with the selected outline painted in it.
- * - **E-012** an outside edit removes the element: "Element not found", and
+ * - **E-012** an outside edit removes the element: "Not found", and
  *   the block stays in the file (decision 21) – also when the next element
  *   has the same tag, the X-001 case (§19 Rev 4: a position match must be
  *   corroborated).
  * - **E-013** 200 comments on one page: the drawer lists them all, pins are
- *   drawn, and "Show on page" on the last row brings its element into view.
+ *   drawn, and End in the list (R-10: keys reveal) brings the last element into view.
  * - **E-027** the owner's folded-section case: a paragraph inside a
  *   `<details>` the reader opened stays open through comment mode's reload
  *   and the save's reload, with its pin drawn; folded again it is "Not
@@ -308,7 +308,8 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     await expect(rows.getByTestId('comment-drawer-tag')).toHaveText(['Damaged', 'Damaged', 'Newer format – read-only'])
 
     // The newer-format block: shown, never changeable.
-    await rows.nth(2).getByTestId('comment-drawer-row-open').click()
+    // R-10 (approvals.md, 2026-10-29): a click on a row opens its thread; only the active row has Open.
+    await rows.nth(2).getByTestId('comment-drawer-row-main').click()
     const win = chrome.window()
     await expect(win.getByTestId('comment-newer')).toHaveCount(1, { timeout: PREVIEW_BUDGET_MS })
     await expect(win.getByTestId('comment-delete-block')).toHaveCount(0)
@@ -316,7 +317,7 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     await expect(win).toHaveCount(0)
 
     // The bad-JSON block: its raw text read-only, and Delete block… removes exactly it.
-    await rows.nth(0).getByTestId('comment-drawer-row-open').click()
+    await rows.nth(0).getByTestId('comment-drawer-row-main').click()
     await expect(win.getByTestId('comment-damaged')).toHaveCount(1, { timeout: PREVIEW_BUDGET_MS })
     const raw = (await win.getByTestId('comment-damaged-raw').textContent()) ?? ''
     expect(raw).toContain('id=c-aaaaaaaaaaaaaaaa')
@@ -401,7 +402,7 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     await expect.poll(() => viewShown(app, STATIC_TARGET), { timeout: PREVIEW_BUDGET_MS }).toBe(true)
   })
 
-  test('E-012 an outside edit removes the element: "Element not found", and the block stays in the file', async ({
+  test('E-012 an outside edit removes the element: "Not found", and the block stays in the file', async ({
     windowWithTestProject,
     appWithTestProject,
     testProject
@@ -424,9 +425,9 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     // OD-04: a not-found open comment stays under Open, with its tag.
     await chrome.openDrawer()
     await chrome.filter('open').click()
-    const row = chrome.drawerRows().filter({ has: page.getByTestId('comment-drawer-tag').filter({ hasText: 'Element not found' }) })
+    const row = chrome.drawerRows().filter({ has: page.getByTestId('comment-drawer-tag').filter({ hasText: 'Not found' }) })
     await expect(row).toHaveCount(1, { timeout: PREVIEW_BUDGET_MS })
-    await row.getByTestId('comment-drawer-row-open').click()
+    await row.getByTestId('comment-drawer-row-main').click() // R-10: a row click opens its thread
     const win = chrome.window()
     await expect(win.getByTestId('comment-not-found')).toContainText('This element is no longer in', { timeout: PREVIEW_BUDGET_MS })
     await expect(win.getByTestId('comment-not-found-quote')).toHaveText('Buy now')
@@ -436,7 +437,7 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     expect(after).toContain('<span id="gone">Sold out</span>')
   })
 
-  test('E-012 the removed card has a same-tag card right after it: "Element not found", never the next card (X-001)', async ({
+  test('E-012 the removed card has a same-tag card right after it: "Not found", never the next card (X-001)', async ({
     windowWithTestProject,
     appWithTestProject,
     testProject
@@ -468,9 +469,9 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
 
     await chrome.openDrawer()
     await chrome.filter('open').click()
-    const notFound = chrome.drawerRows().filter({ has: page.getByTestId('comment-drawer-tag').filter({ hasText: 'Element not found' }) })
+    const notFound = chrome.drawerRows().filter({ has: page.getByTestId('comment-drawer-tag').filter({ hasText: 'Not found' }) })
     await expect(notFound).toHaveCount(1, { timeout: PREVIEW_BUDGET_MS })
-    await notFound.getByTestId('comment-drawer-row-open').click()
+    await notFound.getByTestId('comment-drawer-row-main').click() // R-10: a row click opens its thread
     const win = chrome.window()
     await expect(win.getByTestId('comment-not-found')).toContainText('This element is no longer in', { timeout: PREVIEW_BUDGET_MS })
     await expect(win.getByTestId('comment-not-found-quote')).toHaveText('Roasted to order We roast only what we sell that week.')
@@ -480,7 +481,7 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     expect(after).not.toContain('<h2>Roasted to order</h2>')
   })
 
-  test('E-013 200 comments: the drawer lists every one, pins are drawn, and Show on page brings the last into view', async ({
+  test('E-013 200 comments: the drawer lists every one, pins are drawn, and End in the list brings the last into view', async ({
     windowWithTestProject,
     appWithTestProject
   }) => {
@@ -499,11 +500,10 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     await chrome.openDrawer()
     await expect(chrome.filter('open')).toContainText(`Open ${MANY_COUNT}`)
     await expect(chrome.drawerRows()).toHaveCount(MANY_COUNT, { timeout: PREVIEW_BUDGET_MS })
-    // Keyboard to the last row, then Enter: "Show on page".
+    // Keyboard to the last row: End reveals it (R-10 – arrow keys, Home and End reveal; Enter opens the thread).
     await chrome.drawer().getByTestId('comment-drawer-row-main').first().focus()
     await page.keyboard.press('End')
     await expect(chrome.drawer().getByTestId('comment-drawer-row-main').last()).toBeFocused()
-    await page.keyboard.press('Enter')
     await expect
       .poll(
         async () => {

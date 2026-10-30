@@ -352,8 +352,7 @@ test.describe('HTML Preview comments – the reviewer path (P6 exit)', () => {
     await expect(mains.nth(1)).toBeFocused()
     await page.keyboard.press('Home')
     await expect(mains.nth(0)).toBeFocused()
-    // (Enter on a row – "Show on page" – is left to the unit tests: whether it
-    // keeps the drawer depends on the panel's width, under 640px it closes it.)
+    // (Enter on a row opens its thread, R-10; the unit tests cover it.)
 
     // Tab once more reaches the row's Open: the comment window, title focused.
     await page.keyboard.press('Tab')
@@ -578,7 +577,7 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     // open comment (em#when), saying where it landed; the pin goes.
     await page.getByTestId('comment-resolve-next').click()
     await expect(win.getByTestId('comment-window-polite')).toHaveText(/^Comment 1 of 2, on element, line \d+\.$/, { timeout: PREVIEW_BUDGET_MS })
-    await expect(win.getByRole('heading', { level: 2 })).toHaveText('Comment on em#when')
+    await expect(win.getByRole('heading', { level: 2 })).toHaveText('Comment on element') // A-02: the selector stays in the context line
     await expect.poll(async () => (await fsp.readFile(file, 'utf-8')).split('"status":"resolved"').length - 1, { timeout: PREVIEW_BUDGET_MS }).toBe(2)
     await page.getByTestId('comment-close').click()
     await expect(win).toHaveCount(0)
@@ -588,12 +587,13 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     await chrome.openDrawer()
     await chrome.filter('resolved').click()
     // C-10: a row is named by its first comment's words; its Open button still names the element.
-    const resolvedRow = chrome.drawerRows().filter({ has: page.getByRole('button', { name: 'Open comments on button#cta.btn', exact: true }) })
+    // R-10: only the active row keeps its Open button, so find the row by its selector label.
+    const resolvedRow = chrome.drawerRows().filter({ hasText: 'button#cta.btn' })
     await expect(resolvedRow).toHaveCount(1, { timeout: PREVIEW_BUDGET_MS })
     await expect(chrome.filter('resolved')).toContainText('Resolved 2')
 
     // Re-open from the drawer: the pin comes back and the thread is open again.
-    await resolvedRow.getByTestId('comment-drawer-row-open').click()
+    await resolvedRow.getByTestId('comment-drawer-row-main').click() // R-10: a row click opens its thread
     await expect(win).toHaveAttribute('data-view', 'threads', { timeout: PREVIEW_BUDGET_MS })
     await page.getByTestId('comment-reopen').click()
     // C-19.4: the status action is spelled "Reopen".
