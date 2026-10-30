@@ -31,8 +31,8 @@ export interface Viewport {
 
 /** The pin's box: a 24 × 24 hit target (WCAG 2.5.8) whose tail tip is at (2, 22). */
 export const PIN_BOX_PX = 24
-/** Where the tail tip sits inside the pin's box. */
-export const PIN_TIP = { x: 2, y: 22 } as const
+/** Where the tail tip sits inside the pin's box. Frozen: the core keeps no state the page's world could change. */
+export const PIN_TIP = Object.freeze({ x: 2, y: 22 } as const)
 /** The tail tip's offset outward from the element's top-right corner (§10.5). */
 export const PIN_TIP_OFFSET_PX = 4
 /**

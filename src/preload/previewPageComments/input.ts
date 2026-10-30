@@ -37,6 +37,7 @@
  * here: Tab / Shift+Tab, Alt+↑ / Alt+↓ (matched on `code`, so Option on macOS
  * and any layout work), Enter, Shift+F10 / ContextMenu, Esc.
  */
+import { reduceCommentMode } from '../../shared/comments/overlayCore/modeState'
 import type { CommentController, PickerAction } from './controller'
 import { watchDocumentElement } from './documentWatch'
 
@@ -90,6 +91,15 @@ export function pickerActionOf(event: KeyboardEvent): PickerAction | null {
   return event.key === 'Escape' ? 'exit' : null
 }
 
+/**
+ * Whether the overlay keeps a picker key from the page. Esc follows the mode
+ * machine's own word (`consumed`: only while the mode is on); every other
+ * picker key is the picker's.
+ */
+function isOverlayKey(action: PickerAction, modeOn: boolean): boolean {
+  return action !== 'exit' || reduceCommentMode({ on: modeOn }, { type: 'escape' }).consumed
+}
+
 /** One key across its press and release (the physical key; `key` where the engine gives no `code`). */
 function keyOf(event: KeyboardEvent): string {
   return event.code === '' ? event.key : event.code
@@ -137,7 +147,7 @@ function handlersOf(controller: CommentController): Handlers {
       const key = event as KeyboardEvent
       if (!key.isTrusted) return
       const action = controller.mode ? pickerActionOf(key) : null
-      if (action === null) {
+      if (action === null || !isOverlayKey(action, controller.mode)) {
         // A press the page keeps: a release left over from a swallowed one
         // (focus moved before it came) must not be swallowed now.
         swallowedKeys.delete(keyOf(key))

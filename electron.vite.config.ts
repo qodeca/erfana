@@ -36,9 +36,32 @@ const appVersion: string = JSON.parse(
  * one it imports alone (today `gesture.ts`), which Rollup inlines silently.
  * The security control is the preload contract scan; this keeps the bundle
  * honest about it.
+ *
+ * The other way round, every module the `previewPage` entry bundles must be
+ * the entry itself, its overlay folder or the overlay core: anything else
+ * reached the sealed page past the contract scan. Module ids are compared
+ * with `/` separators and lower-cased, so a drive letter's or folder's case on
+ * Windows cannot slip one past either check.
  */
-const OVERLAY_CORE_DIR = '/src/shared/comments/overlayCore/'
+const OVERLAY_CORE_DIR = '/src/shared/comments/overlayCore/'.toLowerCase()
 const OVERLAY_CORE_ENTRY = 'previewPage'
+/** The only places a module of the `previewPage` chunk may come from (ADR 0005 decision 6, ADR 0006). */
+const PREVIEW_PAGE_SOURCES = [
+  resolve('src/preload/previewPage.ts'),
+  `${resolve('src/preload/previewPageComments')}/`,
+  `${resolve('src/shared/comments/overlayCore')}/`
+].map(comparableModuleId)
+
+function comparableModuleId(id: string): string {
+  return id.replace(/\\/g, '/').toLowerCase()
+}
+
+function isPreviewPageSource(id: string): boolean {
+  const comparable = comparableModuleId(id)
+  return PREVIEW_PAGE_SOURCES.some((source) =>
+    source.endsWith('/') ? comparable.startsWith(source) : comparable === source
+  )
+}
 
 function assertSelfContainedPreloads(): Plugin {
   return {
@@ -50,12 +73,24 @@ function assertSelfContainedPreloads(): Plugin {
       const overlayCoreOutsideItsEntry = outputs
         .filter((output): output is Rollup.OutputChunk => output.type === 'chunk')
         .filter((chunk) => !(chunk.isEntry && chunk.name === OVERLAY_CORE_ENTRY))
-        .filter((chunk) => chunk.moduleIds.some((id) => id.replace(/\\/g, '/').includes(OVERLAY_CORE_DIR)))
+        .filter((chunk) => chunk.moduleIds.some((id) => comparableModuleId(id).includes(OVERLAY_CORE_DIR)))
         .map((chunk) => chunk.fileName)
       if (overlayCoreOutsideItsEntry.length > 0) {
         throw new Error(
           `Preload output ${overlayCoreOutsideItsEntry.join(', ')} bundles the shared overlay core, which only the ` +
             `${OVERLAY_CORE_ENTRY} entry may import (ADR 0006). Relaxing this check is not a fix.`
+        )
+      }
+
+      const foreignInPreviewPage = outputs
+        .filter((output): output is Rollup.OutputChunk => output.type === 'chunk')
+        .filter((chunk) => chunk.isEntry && chunk.name === OVERLAY_CORE_ENTRY)
+        .flatMap((chunk) => chunk.moduleIds.filter((id) => !isPreviewPageSource(id)))
+      if (foreignInPreviewPage.length > 0) {
+        throw new Error(
+          `The ${OVERLAY_CORE_ENTRY} preload bundles module(s) from outside src/preload/previewPage.ts, ` +
+            `src/preload/previewPageComments/ and src/shared/comments/overlayCore/: ${foreignInPreviewPage.join(', ')} ` +
+            '(ADR 0005 decision 6, ADR 0006). Relaxing this check is not a fix.'
         )
       }
 
@@ -216,6 +251,12 @@ export default defineConfig({
     // Runs on every `electron-vite build` — local, CI's Build job, the e2e
     // build step and the packaged release builds alike, so no wiring can drift.
     plugins: [assertSelfContainedPreloads()],
+    resolve: {
+      // `.ts` first: Vite's default order tries `.js` before `.ts`, so a stray
+      // `pinLayout.js` beside `pinLayout.ts` would be bundled while the contract
+      // scans read only the `.ts` (ADR 0006). The rest is Vite's default order.
+      extensions: ['.ts', '.mts', '.tsx', '.mjs', '.js', '.jsx', '.json']
+    },
     build: {
       externalizeDeps: false,
       rollupOptions: {
