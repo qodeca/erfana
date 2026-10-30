@@ -218,6 +218,16 @@ describe('024-AC-011 the frozen v0.23.1 writer keeps anchor.sel', () => {
   })
 })
 
+/** The locked Markdown placement goldens (`markdownGoldens.test.ts`), decoded. */
+function markdownGoldenTexts(): string[] {
+  const folder = join(__dirname, '..', 'markdownComments', '__fixtures__', 'goldens')
+  return readdirSync(folder).map(file => {
+    const decoded = decodeLossless(new Uint8Array(readFileSync(join(folder, file))))
+    if (!decoded.ok) throw new Error(`${file}: ${decoded.reason}`)
+    return decoded.text
+  })
+}
+
 /** Every fenced example in the format document that holds a v1 block, line breaks as LF. */
 function docExamples(markdown: string): string[] {
   const text = markdown.replace(/\r\n/g, '\n')
@@ -232,7 +242,8 @@ describe('024-AC-012 the format document', () => {
   it('024-AC-012 every example block in format-v1.md is byte-identical to a golden', () => {
     const examples = docExamples(doc)
     expect(examples.length).toBeGreaterThanOrEqual(3)
-    const goldens = [...spec024Goldens().keys()].map(goldenText)
+    // The Markdown examples of "In Markdown files" are the locked Markdown placement goldens.
+    const goldens = [...[...spec024Goldens().keys()].map(goldenText), ...markdownGoldenTexts()]
     for (const example of examples) {
       expect(goldens.includes(example), example.slice(0, 80)).toBe(true)
     }

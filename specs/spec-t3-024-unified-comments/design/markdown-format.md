@@ -2,6 +2,8 @@
 
 Approved by the owner on 2026-10-29 (pre-approval given in the session that built spec 024; recorded per the owner's instruction).
 
+**Locked on 2026-10-30**, after the Claude Code gate passed ([report](../verification/claude-code-gate.md), round 2, 11 of 11 samples). The rules now live in `docs/html-comments/format-v1.md` § "In Markdown files"; `src/shared/markdownComments/__fixtures__/markdownFormat.lock.json` holds the note hash and the goldens digest that passed, and `markdownFormatLock.test.ts` fails on any change to either.
+
 Requirements: 024-FR-003, 024-FR-012, 024-FR-023, architecture note [001](../architecture/001-shared-comment-base.md) § 8 C2, C5 and C9. These rules lock with the Claude Code gate (024-FR-016): a change after the gate means a full re-run. They move into `docs/html-comments/format-v1.md` § "In Markdown files" (024-FR-011).
 
 Sources: [markdown-preview-comments.md § 5–6](../../../docs/designs/comments/markdown-preview-comments.md) as amended by spec 024 (block quotes, owner decision 2026-10-29), [comments-v2.md C-01 to C-03](../../../docs/designs/comments/comments-v2.md), the shipped writer (`src/shared/htmlComments/splice.ts`, `format.ts`, `parse.ts`), and the CommonMark specification § 4.6 "HTML blocks" with GFM's table extension.
