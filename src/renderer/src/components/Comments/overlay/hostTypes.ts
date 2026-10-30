@@ -63,7 +63,8 @@ export interface HostMenu {
   readonly label: string
   readonly items: ContextMenuItem[]
   readonly mode: boolean
-  readonly target: HTMLElement
+  /** `null` only in comment mode, for a right-click off every target (`targetlessMenu`). */
+  readonly target: HTMLElement | null
   /** The selected text, when the menu is about a selection (the prompt items and Copy selection read it). */
   readonly selectedText?: string
 }

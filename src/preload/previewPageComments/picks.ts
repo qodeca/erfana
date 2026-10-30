@@ -280,7 +280,7 @@ export function elementPoint(element: Element): Point {
  * is not in the file – its nearest tokened ancestor's token plus a runtime
  * description. An element too deep or too oddly named to describe falls back
  * to the ancestor alone. No tokened ancestor at all (a page served raw) sends
- * no token, and main answers "Can't comment here".
+ * no token, and the menu's item is disabled with its reason (menu matrix M-08).
  */
 export function describeTarget(registry: TokenRegistry, element: Element): PickTarget {
   const tokened = registry.nearestTokened(element)

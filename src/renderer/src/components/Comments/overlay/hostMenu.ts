@@ -21,6 +21,7 @@ import { MD_SURFACE_COPY, SELECTION_COPY } from '../commentCopyWords'
 import type { CommentWords } from '../commentCopyWords'
 import type { ContextMenuItem } from '../../ContextMenu/ContextMenu'
 import { TEST_IDS } from '../../../constants/testids'
+import type { HostMenu } from './hostTypes'
 
 /** What the menu is about. */
 export interface HostMenuInput {
@@ -90,4 +91,22 @@ export function hostMenuItems(input: HostMenuInput, actions: HostMenuActions): C
       ? TEST_IDS.COMMENT_MENU_FRONTMATTER
       : TEST_IDS.COMMENT_MENU_COMMENT_ON
   return [withReason({ label, action: actions.open, testId })]
+}
+
+/** A disabled item never runs its action. */
+const NO_ACTION = (): void => {}
+
+/**
+ * The menu for a right-click in comment mode that lands on no target – a gap
+ * between blocks, the margin: "Add comment", disabled with the preview's
+ * reason. The HTML Preview answers every right-click in comment mode with its
+ * menu, and a part of the page that cannot hold a comment with this item
+ * disabled (M-03, M-08), so this host does the same rather than show nothing.
+ *
+ * @param words - The preview's words: the menu's name and the reason line.
+ * @returns The menu, less its position.
+ */
+export function targetlessMenu(words: CommentWords): Omit<HostMenu, 'x' | 'y'> {
+  const input = { mode: true, tag: '', blocked: null, refused: words.noTarget.reason, words }
+  return { label: words.noTarget.label, items: hostMenuItems(input, { open: NO_ACTION }), mode: true, target: null }
 }

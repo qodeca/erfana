@@ -458,7 +458,7 @@ Rewrite `:699` ("no file-write path" → "no write path from the page; one user-
 - Shortcut ⌥⌘M / Ctrl+Alt+M (notation per the Writing card; the shipping tooltip still spells out "Cmd+Option+M" – see §10.10). Match the **typed key** `m` with modifiers, never the physical key (AltGr+M types µ on German layouts) – except on macOS, where the physical KeyM stands in only when Option made the typed key something other than printable ASCII (§19 "One shortcut rule"). Verify Cmd+Option+M is not "Minimize All" on macOS.
   - *Rev 3 note:* the shortcut has three routes – main's forwarder (focus in the page), the panel root's `onKeyDown` (focus in the chrome) and `usePreviewGroupKeys` (focus on dockview's group element, where `group.focus()` leaves it after a tab switch; the panel renders in the overlay layer, outside that element). The third route acts only for the active tab and skips keys the root already saw; it also carries Back/Forward. Without it the toggle did nothing right after a preview tab became active (found on macOS).
 - Leave with Esc, the toggle or the shortcut. Esc order with focus in the page: open window → comment mode → existing "return to chip".
-- Mode indicators: pressed toggle; 2 px accent frame inside the page edge; top-centre tab "Comment mode – Esc to leave" (moves to the bottom when the pointer comes within 48 px). The band height never changes.
+- Mode indicators: pressed toggle; 2 px accent frame inside the page edge; top-centre tab "Comment mode · Esc to leave" (moves to the bottom when the pointer comes within 48 px). The band height never changes.
 - Cursor: system `crosshair`.
 - The mode belongs to the tab; it survives the save reload and same-tab navigation. Keyboard activation (`event.detail === 0`) moves focus into the page with the picker started.
 - The permission band card and `nav.css` narrow tiers are re-measured; below 446 px (the narrow tier) the Pins toggle leaves the row (the drawer's "Show comment icons" checkbox does the same job).
@@ -572,11 +572,11 @@ Step 1 inside the comment window on the first comment (nothing is lost, no stack
 ```
 Before your first comment
 Erfana writes your name – and your email, if you add one – into the
-HTML file next to each comment. Anyone who can open the file can read
-them: in Erfana, in the page source, and in git history once the file
-is committed and pushed. Scripts in pages previewed in this project
-can read them too. Deleting a comment later does not remove it from
-git history.
+file next to each comment. Anyone who can open the file can read
+them: in Erfana, in the file's source, and in git history once the file
+is committed and pushed. In HTML files, scripts on previewed pages can
+read them too. Deleting a comment later does not remove it from git
+history.
 Name             [__________]  Shown next to your comments.
 Email (optional) [__________]  Leave empty to keep your email out of the file.
                                          [Cancel]  [Continue]
@@ -603,32 +603,34 @@ Contrast numbers quoted in design-system cards go into `docs/design-system/claim
 
 ### 10.10 Microcopy
 
+*Spec 024 note (2026-10-30):* the Mode tab, Menu, Buttons ("Reopen"), Damaged, Identity (§10.7), Settings and Unavailable rows follow the app's strings after comments-v2 and spec 024 (differences table A-03, A-07, A-09; state table S-07, S-08; menu matrix M-01 – M-10; C-19.4). `components/Comments/commentCopy.ts` and `commentCopyWords.ts` are the code's copy; the commentCopy pin snapshot holds what ships.
+
 | Where | String |
 |---|---|
 | Toggle tooltip | "Comment mode (Ctrl+Alt+M) – off" / "Comment mode (Ctrl+Alt+M) – on: click an element to comment, Esc to leave" (macOS: Cmd+Option+M); not ready: "Comment mode – available once the page has loaded". *Shipped as written; the Writing card's macOS form is "(⌥⌘M)", which the screens draw – an open Writing card defect (`commentModeShortcutLabel`).* |
 | List button | "Comments, {n} open" · "Comments, {n} open, {k} need attention" · "Comments, {n} open, 1 needs attention" (a count of 1 takes the singular verb) · "Comments, none yet" · "Comments, none open" (nothing open, but resolved threads exist) |
 | Pins tooltip | "Show comment icons – on" / "Show comment icons – off: icons hidden on this page" |
-| Mode tab | "Comment mode – Esc to leave" |
+| Mode tab | "Comment mode · Esc to leave" |
 | Announce | "Comment mode on. Click an element, or press Tab to pick one. Esc to leave." · "Comment mode off." · "Top of page – no parent to select." · "No child elements." · "Showing {tag}, line {line}." · "Showing an element added by a script, inside {tag} on line {line}." |
-| Menu | "Add comment" · disabled "Can't comment here" |
+| Menu | label "Element" ("Selection" with words selected) · comment mode: "Add comment" · outside it: "Comment on element" · with words selected: "Comment on selection" · "Comment on the whole element" · an item that cannot be used keeps its name, disabled, with a reason line (menu matrix M-05 – M-08, M-10): "This part of the page can't hold a comment." · the read-only reasons of menu matrix § 3 · "Comments are unavailable for this file: {reason}." |
 | Window titles | "New comment" · "Comment on {label}" · "Comments on {label}" · "Damaged comment" |
 | Context line | "{label} · {file}, line {n}" · "Added by a script – saved before <{ancestor}>." · "Saved in {frame file}." |
 | Field | label "Comment", placeholder "What should change here?", hint "Plain text. Saved inside {file}.", counter "{n} / 4000" |
 | Identity line | "Commenting as {name}" · "Change" |
-| Buttons | "Cancel" · "Save" (tooltip "Save (Ctrl+Enter)"; macOS ships "Save (Cmd+Enter)", the Writing card asks for "Save (⌘Enter)") · "Saving…" · "Reply" · "Resolve" · "Re-open" · "New comment" · "Edit" · "Delete…" · "Save changes" · "Close" · "Open" · "Show on page" · "Try again" |
+| Buttons | "Cancel" · "Save" (tooltip "Save (Ctrl+Enter)"; macOS ships "Save (Cmd+Enter)", the Writing card asks for "Save (⌘Enter)") · "Saving…" · "Reply" · "Resolve" · "Reopen" · "New comment" · "Edit" · "Delete…" · "Save changes" · "Close" · "Open" · "Show on page" · "Try again" |
 | Meta | "{name} · {time}" · "· edited" · "Resolved by {name} · {time}" · "{n} replies" ("1 reply" for one) · "Draft restored" |
 | Save errors | "Write a comment first." · "Comments can be up to 4,000 characters. This one is {n}." · "Couldn't save: {file} is read-only. Your text is still here." · "This element changed in the file since you picked it. Close and pick it again – your text will be restored." · "{file} no longer exists. Copy your text before closing." · "Couldn't save the comment. Your text is still here – try again." · "Erfana can only add comments to UTF-8 files." · "{file} has unresolved git conflicts. Resolve them first." · "{file} is a link to another file, so Erfana won't write to it." |
 | Save pending (rev 3, P5) | "Still saving to {file}. Your comment appears here once it is written – no need to save again." |
 | Saved | "Comment saved to {file}." |
 | Unsaved source | "Save your edits first" / "{file} has unsaved changes in another tab. Save them first so your edits and this comment don't overwrite each other." · "Go to tab" · "Save {file}" · "Saved. You can add your comment now." · conflict variant (the tab also changed on disk; Go to tab only, no Save): "{file} has unsaved changes in another tab, and the file changed on disk too. Go to the tab and decide which version to keep, then add your comment." · the tab became clean without a save Erfana made: "The other tab has no unsaved changes now. You can add your comment." |
 | Delete | "Delete this comment? It is removed from {file}. Git history keeps earlier versions." → "Delete comment" · "Delete this thread and its {n} replies?" ("its 1 reply?" for one) → "Delete thread" |
-| Damaged | "Erfana can't read this comment block, so it won't change it. Fix it in the source, or delete it." · "This block contains git conflict markers. Resolve the conflict in the source." · "Raw text (read-only)" · "Copy raw text" · "Open in source" · "Delete block…" · "Delete this damaged block? Erfana removes exactly the text shown above from {file}." → "Delete block" · "This block changed on disk. Reopen it and try again." |
+| Damaged | "Erfana can't read this comment, so it won't change it. Fix it in the source, or delete it." · "This comment contains git conflict markers. Resolve the conflict in the source." · "Raw text (read-only)" · "Copy raw text" · "Open in source" · "Delete block…" · "Delete this damaged block? Erfana removes exactly the text shown above from {file}." → "Delete block" · "This block changed on disk. Reopen it and try again." |
 | Not found / not visible | "Erfana can't find this element any more. The comment stays in {file}, line {n}." · "It was attached to:" · "This element isn't on screen right now – it may be on another slide or tab. Its icon comes back when it does." |
 | Drawer | "Comments" · "Close comments" · "Show" · "Open {n}" · "Resolved {n}" · "Needs attention {n}" · "Show comment icons" · tags "Not visible now", "Element not found", "Damaged", "Resolved", "In frame: {file}" · "Reading comments…" · "No comments in this file yet. Turn on comment mode and click an element." · "No open comments." · "No resolved comments." · "Nothing needs attention." · "Couldn't read comments from {file}." |
 | Pin | name "{n} comment(s) on {label}. Open." · damaged "Damaged comment on {label}. Open." · tooltip "{n} comments – click to open" |
 | Identity | §10.7 · "Enter a name to continue." · "That doesn't look like an email address." |
-| Settings | "Comments" · "Your name" – "Saved into HTML files next to each comment you write. Changing it affects new comments only." · "Your email (optional)" – "Also saved into the file. Leave empty to keep it out." · notice "Both are visible to anyone who can open the file – in the page source and in git history once pushed." · "Enter a name to add comments. Existing comments keep the name they were saved with." · feature flag "Comments in HTML preview" – "Lets you add comments to elements of a previewed page." · a settings write that failed: "Couldn't save this setting. Your text is still here – try again." |
-| Unavailable | toolbar tooltip "Comments are unavailable for this page: {reason}" · reasons "file too large" (over 25 MB, §19 Rev 4), "not a UTF-8 file", "page too large – it has too many elements", "the page keeps removing Erfana's overlay", "the page replaced its own document", "comments are turned off in Settings", "couldn't prepare the page" |
+| Settings | "Comments" · "Your name" – "Saved into the file next to each comment you write. Changing it affects new comments only." · "Your email (optional)" – "Also saved into the file. Leave empty to keep it out." · notice "Both are visible to anyone who can open the file – in its source and in git history once pushed." · "Enter a name to add comments. Existing comments keep the name they were saved with." · feature flag "Comments in HTML preview" – "Lets you comment on elements and selected text in previewed pages." · a settings write that failed: "Couldn't save this setting. Your text is still here – try again." |
+| Unavailable | toolbar tooltip and disabled menu items "Comments are unavailable for this file: {reason}." · reasons "file too large" (over 25 MB, §19 Rev 4), "not a UTF-8 file", "page too large – it has too many elements", "the page keeps removing Erfana's overlay", "the page replaced its own document", "comments are turned off in Settings", "couldn't prepare the page" |
 | File gone / draft expired | "{file} no longer exists. Copy your text before closing." · "This comment window was open too long. Pick the element again – your text is kept." → "Pick again" |
 | Write refused | "Erfana can't write to {file} on this drive." |
 | File limits (rev 4) | save error: "Erfana adds comments only to files of up to 25 MB and 640,000 elements." · read-only reason: "Erfana adds comments only to files of up to 25 MB and 640,000 elements. {file} is larger, so its comments are read-only." |

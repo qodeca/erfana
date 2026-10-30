@@ -35,8 +35,6 @@ export const COMMENT_TEST_IDS = {
   COMMENT_CONTEXT_MENU: 'comment-context-menu',
   /** Element menu: Add comment */
   COMMENT_MENU_ADD: 'comment-menu-add',
-  /** Element menu: disabled Can't comment here */
-  COMMENT_MENU_DISABLED: 'comment-menu-disabled',
   /** The tab's polite live region */
   COMMENT_ANNOUNCE: 'comment-announce',
   /** The tab's assertive live region */

@@ -91,7 +91,7 @@ export function unavailableTooltip(reason: CommentUnavailableReason): string {
  * Not in §10.10: the tooltip for a page Erfana cannot comment on at all
  * because it is not a file in this project (the plan's "remote page" state).
  * No preview tab shows such a page today – a remote document only ever sits in
- * a frame, where the menu says "Can't comment here" – so this is exported for
+ * a frame, where the menu disables its item with a reason – so this is exported for
  * the toolbar card and for the day one does.
  */
 export const REMOTE_PAGE_TOOLTIP =

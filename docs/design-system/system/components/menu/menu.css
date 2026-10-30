@@ -131,7 +131,7 @@
 }
 
 /* The reason line: a second line under an item that says why – mainly why a
-   disabled item is disabled ("Can't comment here" / "Comments can't be added
+   disabled item is disabled ("Comment on frontmatter" / "Comments can't be added
    to the frontmatter."). It is PART of the item, not a stop: it sits inside the
    menuitem, the arrows move past it with the item, and typeahead matches the
    label only. The item links it with aria-describedby and takes its name from

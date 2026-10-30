@@ -86,7 +86,7 @@ export function MarkdownCommentsOverlay(props: MarkdownCommentsOverlayProps): Re
         </div>
       )}
       {menu !== null &&
-        (menu.mode ? (
+        (menu.mode || menu.target === null ? (
           <ContextMenu
             x={menu.x}
             y={menu.y}

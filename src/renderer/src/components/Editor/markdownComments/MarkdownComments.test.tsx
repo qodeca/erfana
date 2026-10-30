@@ -5,7 +5,8 @@
  * real preview, host, drawer, menu and window, with only the bridge mocked.
  *
  * State-table and menu-matrix rows covered here (024-AC-035): M-11, M-13,
- * M-15 (read-only and paused), M-17, M-18, M-20, M-22, M-23; F-02, F-03,
+ * M-15 (read-only and paused), M-17, M-18, M-20, M-22, M-23, and M-08's
+ * disabled item for a right-click off every block in comment mode; F-02, F-03,
  * F-04, F-06, F-07; S-01 (icon); W-01, W-06 (refused save keeps the text).
  *
  * The selection rows M-12, M-14, M-16, M-19 and M-21 are in
@@ -229,6 +230,26 @@ describe('Markdown Preview comments', () => {
       expect(items[0]).toHaveAttribute('aria-disabled', 'true')
       expect(within(items[0]).getByTestId(TEST_IDS.COMMENT_MENU_REASON)).toHaveTextContent(MARKDOWN_COPY.frontmatter)
       expect(items[0]).toHaveAccessibleDescription(MARKDOWN_COPY.frontmatter)
+      await user.click(items[0])
+      expect(screen.queryByRole('dialog')).toBeNull()
+    })
+
+    it('024-AC-035: M-08 (Markdown) in comment mode a right-click off every block offers "Add comment", disabled with its reason, as the HTML Preview does', async () => {
+      const user = userEvent.setup()
+      renderPanel()
+      // Outside comment mode the gap between blocks has no comment menu (the shipped preview menu needs a selection).
+      fireEvent.contextMenu(content(), { clientX: 10, clientY: 10 })
+      expect(screen.queryByTestId(TEST_IDS.COMMENT_CONTEXT_MENU)).toBeNull()
+      await turnModeOn(user)
+      const shown = fireEvent.contextMenu(content(), { clientX: 10, clientY: 10 })
+      expect(shown).toBe(false)
+      const menu = await screen.findByRole('menu', { name: 'Preview' })
+      const items = within(menu).getAllByRole('menuitem')
+      expect(items).toHaveLength(1)
+      expect(items[0]).toHaveTextContent(MD_SURFACE_COPY.addComment)
+      expect(items[0]).toHaveAttribute('aria-disabled', 'true')
+      expect(within(items[0]).getByTestId(TEST_IDS.COMMENT_MENU_REASON)).toHaveTextContent(MARKDOWN_COPY.noTarget)
+      expect(items[0]).toHaveAccessibleDescription(MARKDOWN_COPY.noTarget)
       await user.click(items[0])
       expect(screen.queryByRole('dialog')).toBeNull()
     })

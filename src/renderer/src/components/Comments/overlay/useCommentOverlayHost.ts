@@ -55,7 +55,7 @@ import { commentMarkAt } from './commentHighlights'
 import { targetText } from './domWords'
 import { blockWindowRequest, rowTarget } from './hostDrawer'
 import { countsOf, draftKeyOf, pointOf, spokenTarget, threadsOn, viewOf } from './hostParts'
-import { hostMenuItems, hostMenuLabel } from './hostMenu'
+import { hostMenuItems, hostMenuLabel, targetlessMenu } from './hostMenu'
 import { drawn, newRequestExtras, threadTarget, useDraftKeepAlive, type HostDock } from './hostWindow'
 import type { CommentOverlayHost, CommentOverlayHostOptions, HostMenu } from './hostTypes'
 import { useSelectionComments, useWordsCheck } from './useSelectionComments'
@@ -254,9 +254,12 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
     (under: HTMLElement | null, at: { x: number; y: number }) => {
       const pick = selection.read()
       const target = pick?.target ?? under
-      if (target === null) return
-      selection.hideButton()
       const on = store.getState().panels.get(panelId)?.mode === true
+      if (target === null) {
+        if (on) setMenu({ ...at, ...targetlessMenu(words) })
+        return
+      }
+      selection.hideButton()
       const can = adapter.canComment(target)
       const input = { mode: on, tag: adapter.tagOf(target), blocked, refused: can.ok ? null : can.reason, words, selection: pick !== null }
       const open = (): void => void openNew(target, 'page')

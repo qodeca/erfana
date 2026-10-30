@@ -98,7 +98,7 @@ The same function runs in main against the source text for verification (§5.4),
 |---|---|
 | Comment mode, a selection | **Add comment** (`message-square-plus`, on the words) · **Comment on whole {label}** (`square-dashed`) |
 | Comment mode, no selection | **Add comment** (unchanged) |
-| Selection that cannot be commented (refused frame, `srcdoc`, read-only file) | **Add comment** disabled, "Can't comment here", the reason on the [Menu](../../design-system/system/components/menu/index.html#reason) card's visible reason line (decided), tied by `aria-describedby` – never a tooltip (unchanged wording; see [markdown-preview-comments.md](markdown-preview-comments.md) §9.3) |
+| Selection that cannot be commented (refused frame, `srcdoc`, read-only file) | **Comment on selection** and **Comment on the whole {kind}** disabled with their names kept (spec 024 menu matrix M-06, M-08, M-16), the reason on the [Menu](../../design-system/system/components/menu/index.html#reason) card's visible reason line (decided), tied by `aria-describedby` – never a tooltip (see [markdown-preview-comments.md](markdown-preview-comments.md) §9.3) |
 
 Menu label: "Selection" when a selection exists, "Element" otherwise.
 

@@ -580,7 +580,6 @@ Constants: `TEST_IDS.COMMENT_*` (defined in `src/renderer/src/constants/commentT
 |--------|---------|------|
 | `comment-context-menu` | The element menu (right-click in comment mode) | static |
 | `comment-menu-add` | Element menu: Add comment | static |
-| `comment-menu-disabled` | Element menu: disabled Can't comment here | static |
 | `comment-announce` | The tab's polite live region | static |
 | `comment-alert` | The tab's assertive live region | static |
 

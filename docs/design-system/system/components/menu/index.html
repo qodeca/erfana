@@ -257,16 +257,16 @@ on the item, and the arrows move past both lines together. Because it is inside,
 the item names itself from the label with <code>aria-labelledby</code> and points at the reason with
 <code>aria-describedby</code> – the reason is read once, as a description, after the name and the disabled state.
 Typeahead matches the label, never the reason. Both ids must be unique in the window.</p>
-<pre class="ds-code"><code>&lt;div role=&quot;menu&quot; aria-label=&quot;Element&quot;&gt;
+<pre class="ds-code"><code>&lt;div role=&quot;menu&quot; aria-label=&quot;Frontmatter&quot;&gt;
   &lt;div role=&quot;menuitem&quot; tabindex=&quot;0&quot; aria-disabled=&quot;true&quot;
        class=&quot;erf-menu-item erf-menu-item--described&quot;
        aria-labelledby=&quot;mi-comment-label&quot; aria-describedby=&quot;mi-comment-reason&quot;&gt;
     &lt;span class=&quot;erf-menu-icon&quot; aria-hidden=&quot;true&quot;&gt;…&lt;/span&gt;
-    &lt;span class=&quot;erf-menu-label&quot; id=&quot;mi-comment-label&quot;&gt;Can't comment here&lt;/span&gt;
+    &lt;span class=&quot;erf-menu-label&quot; id=&quot;mi-comment-label&quot;&gt;Comment on frontmatter&lt;/span&gt;
     &lt;span class=&quot;erf-menu-desc&quot; id=&quot;mi-comment-reason&quot;&gt;Comments can't be added to the frontmatter.&lt;/span&gt;
   &lt;/div&gt;
 &lt;/div&gt;</code></pre>
-<p class="ds-muted">A screen reader says roughly “Can't comment here, dimmed, menu item, Comments can't be added to the
+<p class="ds-muted">A screen reader says roughly “Comment on frontmatter, dimmed, menu item, Comments can't be added to the
 frontmatter.” The reason is a visible line, not a tooltip or a <code>title</code>: a keyboard or touch user never sees a
 tooltip that only hover opens, and a reason that has to be found is not a reason.</p>
 
@@ -368,14 +368,14 @@ tooltip that only hover opens, and a reason that has to be found is not a reason
 <figure class="ds-frame">
 <div class="erf-menu" aria-hidden="true">
   <div class="erf-menu-item"><span class="erf-menu-icon">✎</span><span class="erf-menu-label">Rename…</span><span class="erf-menu-shortcut">↩</span></div>
-  <div class="erf-menu-item erf-menu-item--described" aria-disabled="true"><span class="erf-menu-icon">✚</span><span class="erf-menu-label">Can't comment here</span><span class="erf-menu-desc">Comments can't be added to the frontmatter.</span></div>
+  <div class="erf-menu-item erf-menu-item--described" aria-disabled="true"><span class="erf-menu-icon">✚</span><span class="erf-menu-label">Comment on frontmatter</span><span class="erf-menu-desc">Comments can't be added to the frontmatter.</span></div>
 </div>
 <figcaption><strong>Disabled with a reason</strong> – The label is dim; the reason stays <code>--color-text-tertiary</code>, because it is information, not the inactive control.</figcaption>
 </figure>
 <figure class="ds-frame">
 <div class="erf-menu" aria-hidden="true">
   <div class="erf-menu-item"><span class="erf-menu-icon">✎</span><span class="erf-menu-label">Rename…</span><span class="erf-menu-shortcut">↩</span></div>
-  <div class="erf-menu-item erf-menu-item--described is-focus" aria-disabled="true"><span class="erf-menu-icon">✚</span><span class="erf-menu-label">Can't comment here</span><span class="erf-menu-desc">Comments can't be added to the frontmatter.</span></div>
+  <div class="erf-menu-item erf-menu-item--described is-focus" aria-disabled="true"><span class="erf-menu-icon">✚</span><span class="erf-menu-label">Comment on frontmatter</span><span class="erf-menu-desc">Comments can't be added to the frontmatter.</span></div>
 </div>
 <figcaption><strong>Disabled with a reason + focus</strong> – Reached by the arrows like any disabled item. One ring around both lines; no fill.</figcaption>
 </figure>
@@ -439,12 +439,11 @@ on an active one – the same pair as the shortcut hint, so a disabled item's re
 <section id="defects">
 <h2>Defects this card names</h2>
 <ul class="ds-muted">
-  <li><strong>No reason line in the app.</strong> <code>ContextMenuItem</code> has no field for one
-  (<code>ContextMenu/ContextMenu.tsx:26</code>), and the item renders only icon, label and shortcut. So the comment menu's
-  disabled “Can't comment here” ships with no reason at all (<code>Panels/HtmlPreviewPanel/comments/PreviewCommentsLayer.tsx:111</code>).
-  The fix the card implies: an optional <code>description</code> on the item, rendered as <code>.erf-menu-desc</code> with
-  <code>aria-labelledby</code> and <code>aria-describedby</code> as in <a href="#reason">the markup</a>. Typeahead already
-  matches <code>item.label</code> only, so it needs no change.</li>
+  <li><strong>No reason line in the app – fixed (spec 024).</strong> <code>ContextMenuItem</code> now carries an
+  optional <code>reason</code>, drawn as the reason line with <code>aria-labelledby</code> and <code>aria-describedby</code>
+  as in <a href="#reason">the markup</a> (<code>ContextMenu/ContextMenu.tsx</code>). The comment menus no longer show a
+  disabled “Can't comment here”: each item keeps its action name, disabled with its reason (spec 024 menu matrix).
+  Typeahead matches <code>item.label</code> only.</li>
 </ul>
 </section>
 

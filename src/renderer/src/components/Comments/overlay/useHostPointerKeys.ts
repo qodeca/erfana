@@ -22,7 +22,9 @@
  *   the window hand focus back to it on close – and loses it when another
  *   target is picked or the mode ends. A picker key's release is kept from
  *   the preview with its press (Esc's keyup too, OVL-E-01).
- * - **The menu** opens on a right-click on a target or a selection, or from
+ * - **The menu** opens on a right-click on a target or a selection (in
+ *   comment mode on any right-click – off every target its item is disabled
+ *   with the reason, `targetlessMenu`), or from
  *   Shift+F10 / the Menu key: at the picked target (in comment mode), at the
  *   selection's last line (outside it, C-08.5), else at the first target in
  *   view. The host decides what a selection makes of it (`hostMenu.ts`).
@@ -250,7 +252,8 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
     }
     const onContextMenu = (event: MouseEvent): void => {
       const target = targetOf(event)
-      if (target === null && !hasSelection()) return
+      // In comment mode every right-click is the menu's, as in the HTML Preview – off every target, too (M-08).
+      if (target === null && !hasSelection() && !latest.current.mode) return
       event.preventDefault()
       event.stopPropagation()
       latest.current.onMenu(target, { x: event.clientX, y: event.clientY })
