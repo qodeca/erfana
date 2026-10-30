@@ -20,8 +20,10 @@
  */
 import { ErrorCode } from '../../../../shared/errors'
 import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
+import type { CommentSaveRequest, CommentSaveResult, CommentThreadView } from '../../../../shared/ipc/preview-comment-schema'
 import type { SaveFailureCopy } from './commentCopy'
 import { SELECTION_COPY, type CommentWords } from './commentCopyWords'
+import type { NounSource } from './commentTargetNoun'
 
 /** Megabytes of the file limit, as the C-19 size sentence prints it. */
 const FILE_LIMIT_MB = Math.round(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES / (1024 * 1024))
@@ -110,18 +112,18 @@ export const WINDOW_COPY = {
  * @param words - The preview's words.
  * @param code - Main's error code.
  * @param file - The file, its controls as tokens.
- * @param tag - The target's tag.
+ * @param tag - The target (or its tag).
  * @param reason - Main's finer reason.
- * @param parentTag - The tag of the target's commentable parent (W-07), when known.
+ * @param parentTag - The target's commentable parent (W-07), when known: its tag and place.
  * @returns The sentence, the next step, and whether it re-targets the draft.
  */
 export function windowRefusal(
   words: CommentWords,
   code: string,
   file: string,
-  tag: string | undefined,
+  tag: NounSource | undefined,
   reason?: string,
-  parentTag?: string
+  parentTag?: NounSource
 ): RefusalCopy {
   const noun = words.noun(tag ?? '')
   const parent = parentTag === undefined ? null : words.noun(parentTag)
@@ -210,11 +212,11 @@ export function refusalCopy(code: string, reason: string | undefined, context: R
  * sentence with the target's `{kind}`.
  *
  * @param words - The preview's words.
- * @param tag - The target's tag.
+ * @param tag - The target (or its tag).
  * @param file - The file, its controls as tokens.
  * @returns The sentence.
  */
-export function wordsDroppedText(words: CommentWords, tag: string, file: string): string {
+export function wordsDroppedText(words: CommentWords, tag: NounSource, file: string): string {
   const noun = words.noun(tag)
   return words.preview === 'markdown' ? SELECTION_COPY.wordsNotInFile(noun, file) : SELECTION_COPY.wordsDropped(noun, file)
 }
@@ -246,4 +248,28 @@ export function saveBlockedReason(input: SaveBlockInput): string | null {
   if (input.choice === 'blank') return SELECTION_COPY.blank(input.noun)
   if (input.choice === 'tie') return SELECTION_COPY.tie(input.noun)
   return null
+}
+
+/**
+ * C-07 (D-16): what the window says when an edit of a thread's first message
+ * asked for words main did not keep – they are not in the file as written, so
+ * the comment is about the whole target now. `null` for any other answer.
+ *
+ * @param words - The preview's words.
+ * @param save - The write sent.
+ * @param result - Main's answer.
+ * @param threads - The threads the window shows, for the target's noun.
+ * @param file - The file, its controls as tokens.
+ * @returns The note, or `null`.
+ */
+export function editWordsNotice(
+  words: CommentWords,
+  save: CommentSaveRequest,
+  result: CommentSaveResult,
+  threads: readonly CommentThreadView[],
+  file: string
+): SaveFailureCopy | null {
+  if (!result.ok || result.wordsDropped !== true || save.op !== 'editMessage') return null
+  const thread = threads.find(t => t.threadKey === save.threadKey)
+  return { text: SELECTION_COPY.wordsNotInFile(words.noun(thread ?? ''), file), action: 'notice' }
 }

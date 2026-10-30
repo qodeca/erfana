@@ -41,6 +41,7 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | **New** `src/shared/markdown/previewPipeline.ts` | inside `MarkdownPreview.tsx` | plugin list, sanitize schema, frontmatter split | M | One pipeline for the preview and main's render check |
 | **Added since** `agentNotes`, `noteLines`, `anchorSel`, `selectionWords`, `spokenExcerpt`, `cutText`, `targetIndex`, `commentableExtensions`, `foreignComments` (9) | – | `src/shared/comments/` | S | – |
 | **Added since** `markdownComments/{markdownLimits,mdCommentScan,mdHast,mdHints,mdLocate,mdRender,mdSlots,mdSource}.ts` (8) | – | `src/shared/markdownComments/` | M | Markdown's limits, comment tokenizer, rendered tree, target hint, locate, render check, slots and line coordinates: rules of the Markdown source, which has no tags or ids (design `markdown-format.md`; § 8 C3, C4, C7, C9, C11, C19) |
+| **Added since** `markdownComments/mdPlace.ts` (1) | – | `src/shared/markdownComments/` | M | A table row's, cell's and diagram's place in main's Markdown index – what the C-03 nouns "row 2", "header row", "row 2, column 3" and "diagram" are named from; HTML names every target "element" (D-04) |
 
 ### Main process
 
@@ -53,6 +54,7 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | `commentDraftCore`, `commentDraftBuilder`, `commentDraftOpener` (3) | stay | H | They turn a page token into a target ("find target"). Markdown sends line, tag and ordinal instead (§3) |
 | `commentE2eHook` (1) | stays | H | It exposes served loads |
 | **Added since** `commentInsertIndent`, `commentListChange`, `commentPathConfine`, `commentRebuild`, `fileCommentPanels`, `fileCommentWatches`, `kindCommentJobs` (7) | `src/main/services/comments/` | S | – |
+| **Added since** `commentEditWords` (1) | `src/main/services/comments/` | S | – |
 | **Added since** `commentFileKinds`, `src/main/ipc/comments/file-comments.ts` (2) | `src/main/services/comments/`, `src/main/ipc/comments/` | S – composition roots | They name every registered kind; the base itself never imports a kind (§ 8 C24) |
 | **Added since** `markdown/markdownCommentJobs` (1) | `src/main/services/comments/markdown/` | M | The Markdown kind's jobs in the parse worker (§ 8 C19, C22) |
 | **Added since** `commentContextGate`, `commentDraftKeys`, `commentWordsCore`, `commentPickerSpeaker`, `htmlCommentJobs`, `htmlCommentParseClient` (6) | stay in `src/main/services/preview/comments/` | H | They check the page's right-click, draft words and picker steps against main's parse5 parse, and run the HTML kind's jobs in the parse worker – all about a page in another process |
@@ -83,6 +85,7 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | **Added since** `previewCommentRequests`, `usePreviewDraftKeepAlive` (2) | stay in `HtmlPreviewPanel/comments/` | H | A page draft token and the window it opens, and its keep-alive, exist only because the HTML page picks in another process |
 | **Added since** `usePreviewModeBlock` (1) | stays in `HtmlPreviewPanel/comments/` | H | M-07: main holds the HTML comment mode, so turning it off for a read-only page goes through main's mode request; the Markdown host keeps its mode in the renderer |
 | **Added since** `commentDrawerFilter`, `commentStepKeys` (2) | `src/renderer/src/components/Comments/` | S | – |
+| **Added since** `commentTargetNoun` (1) | `src/renderer/src/components/Comments/` | S | – |
 | **Added since** `usePageCommentStepKeys` (1) | stays in `HtmlPreviewPanel/comments/` | H | The page's Alt+F9 / Alt+Shift+F9 reach the renderer only as keys main forwards from another process (C-13) |
 
 `commentCopy` keeps one string table with a `TargetNouns` map per preview (C-03), so both previews import one module (024-AC-008).

@@ -16,6 +16,11 @@
  * - An edit takes focus in its field and keeps its text in `commentDrafts`;
  *   Esc backs out of an edit or a confirmation first (`useInnerStep`), and
  *   leaving either returns focus to the `…` button.
+ * - **Narrow to words** (comments-v2 C-07): Edit on the FIRST message also
+ *   shows the words the comment is about and the Narrow to words field, on
+ *   the target's text main sent with the thread. Save sends `sel` only when
+ *   the range moved: the words chosen, or `null` for the whole target; main
+ *   re-checks them as it does for a new comment (024-FR-004).
  *
  * Names and emails are untrusted: drawn through `VisibleText`, and through
  * `visibleString` in attribute values (SEC-19, R-017).
@@ -23,19 +28,37 @@
  * @module HtmlPreviewPanel/comments/CommentMessage
  */
 import { useEffect, useId, useRef, useState } from 'react'
+import type { AnchorSelection } from '../../../../shared/comments/anchorSel'
+import { chooseWords, type WordsChoice } from '../../../../shared/comments/selectionWords'
 import { renderIcon } from '../../utils/iconRegistry'
 import type { CommentThreadView } from '../../../../shared/ipc/preview-comment-schema'
 import { ContextMenu } from '../ContextMenu/ContextMenu'
 import { commentDrafts } from '../../stores/usePreviewCommentStore'
 import { COPY, deleteCommentText, deleteThreadText, fieldHint } from './commentCopy'
 import { formatCommentTime, visibleString } from './commentFormat'
-import { editDraftKey, useInnerStep } from './commentLive'
+import { editDraftKey, useCommentAlert, useInnerStep } from './commentLive'
 import { validateCommentText } from './commentSchemas'
 import { CommentField, DialogButton, VisibleText } from './CommentParts'
 import type { ThreadContext } from './CommentThread'
+import { SELECTION_COPY } from './commentCopyWords'
+import { useCommentWords } from './commentWords'
+import { CommentWordsPicker, type WordsSpan } from './CommentWordsPicker'
+import type { NewCommentWords } from './commentWindowTypes'
 import { TEST_IDS } from '../../constants/testids'
 
 type Message = CommentThreadView['messages'][number]
+
+/**
+ * The `sel` an edit of the first message sends (C-07): nothing while the
+ * field's range is still the stored words' (an edit of the text alone writes
+ * what it always did), the words chosen, or `null` – the whole target – when
+ * the thread had words and the range now covers none.
+ */
+function editedSel(field: NewCommentWords, span: WordsSpan, choice: WordsChoice): AnchorSelection | null | undefined {
+  if (span.start === field.start && span.end === field.end) return undefined
+  if (choice.kind === 'words') return choice.sel
+  return field.start === field.end ? undefined : null
+}
 
 /** Props for {@link CommentMessageView}. */
 export interface CommentMessageProps {
@@ -65,6 +88,12 @@ export function CommentMessageView({
   const [draft, setDraft] = useState(message.text)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // C-07: the first message's words – the target's text main sent with the thread, and the range chosen in it.
+  const field = first && !ctx.readOnly ? thread.words : undefined
+  const [span, setSpan] = useState<WordsSpan>(() => ({ start: field?.start ?? 0, end: field?.end ?? 0 }))
+  const choice: WordsChoice | null = field === undefined ? null : chooseWords({ text: field.text, ...span })
+  const words = useCommentWords()
+  const alert = useCommentAlert()
   const menuButton = useRef<HTMLButtonElement>(null)
   const cancelRef = useRef<HTMLButtonElement>(null)
   const editRef = useRef<HTMLTextAreaElement>(null)
@@ -112,12 +141,20 @@ export function CommentMessageView({
       editRef.current?.focus()
       return
     }
+    // Words that cannot be stored: the notice above the field says why, and the window says it aloud.
+    if (choice?.kind === 'blank' || choice?.kind === 'tie') {
+      const noun = words.noun(thread)
+      alert(choice.kind === 'blank' ? SELECTION_COPY.blank(noun) : SELECTION_COPY.tie(noun))
+      return
+    }
+    const sel = field === undefined || choice === null ? undefined : editedSel(field, span, choice)
     setBusy(true)
     const ok = await ctx.run({
       ...target,
       op: 'editMessage',
       messageId: message.id,
-      text: result.text
+      text: result.text,
+      ...(sel === undefined ? {} : { sel })
     })
     setBusy(false)
     if (ok) {
@@ -186,6 +223,18 @@ export function CommentMessageView({
       </div>
       {mode === 'edit' ? (
         <>
+          {field !== undefined && choice !== null && (
+            <CommentWordsPicker
+              words={field}
+              span={span}
+              choice={choice}
+              untouched
+              noun={words.noun(thread)}
+              line={thread.line}
+              quoteId={`${id}-q`}
+              onSpan={setSpan}
+            />
+          )}
           <CommentField
             label="Edit comment"
             value={draft}
@@ -269,6 +318,8 @@ export function CommentMessageView({
                 const kept = commentDrafts.get(draftKey)
                 setDraft(kept !== '' ? kept : message.text)
                 setError(null)
+                // The field opens on the words stored now (R-05).
+                setSpan({ start: field?.start ?? 0, end: field?.end ?? 0 })
                 setMode('edit')
               }
             },

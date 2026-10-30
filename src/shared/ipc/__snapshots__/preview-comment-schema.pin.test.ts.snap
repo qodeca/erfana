@@ -1755,6 +1755,99 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
               "notVisible": {
                 "type": "boolean",
               },
+              "place": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "row",
+                        "type": "string",
+                      },
+                      "row": {
+                        "maximum": 100000,
+                        "minimum": 1,
+                        "type": "integer",
+                      },
+                    },
+                    "required": [
+                      "kind",
+                      "row",
+                    ],
+                    "type": "object",
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "header-row",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "kind",
+                    ],
+                    "type": "object",
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "column": {
+                        "maximum": 100000,
+                        "minimum": 1,
+                        "type": "integer",
+                      },
+                      "kind": {
+                        "const": "cell",
+                        "type": "string",
+                      },
+                      "row": {
+                        "maximum": 100000,
+                        "minimum": 1,
+                        "type": "integer",
+                      },
+                    },
+                    "required": [
+                      "kind",
+                      "row",
+                      "column",
+                    ],
+                    "type": "object",
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "column": {
+                        "maximum": 100000,
+                        "minimum": 1,
+                        "type": "integer",
+                      },
+                      "kind": {
+                        "const": "header-cell",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "kind",
+                      "column",
+                    ],
+                    "type": "object",
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "diagram",
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "kind",
+                    ],
+                    "type": "object",
+                  },
+                ],
+              },
               "quote": {
                 "maxLength": 200,
                 "minLength": 1,
@@ -1839,6 +1932,35 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
                 "pattern": "^[\\w-]+$",
                 "type": "string",
               },
+              "words": {
+                "additionalProperties": false,
+                "properties": {
+                  "cut": {
+                    "type": "boolean",
+                  },
+                  "end": {
+                    "maximum": 10000,
+                    "minimum": 0,
+                    "type": "integer",
+                  },
+                  "start": {
+                    "maximum": 10000,
+                    "minimum": 0,
+                    "type": "integer",
+                  },
+                  "text": {
+                    "maxLength": 10000,
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "text",
+                  "start",
+                  "end",
+                  "cut",
+                ],
+                "type": "object",
+              },
             },
             "required": [
               "threadKey",
@@ -1876,6 +1998,7 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
       "(no message)",
       "(no message)",
       "(no message)",
+      "a range inside the text",
     ],
   },
   "CommentHelloSchema": {
@@ -2155,6 +2278,99 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
                         "notVisible": {
                           "type": "boolean",
                         },
+                        "place": {
+                          "oneOf": [
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "kind": {
+                                  "const": "row",
+                                  "type": "string",
+                                },
+                                "row": {
+                                  "maximum": 100000,
+                                  "minimum": 1,
+                                  "type": "integer",
+                                },
+                              },
+                              "required": [
+                                "kind",
+                                "row",
+                              ],
+                              "type": "object",
+                            },
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "kind": {
+                                  "const": "header-row",
+                                  "type": "string",
+                                },
+                              },
+                              "required": [
+                                "kind",
+                              ],
+                              "type": "object",
+                            },
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "column": {
+                                  "maximum": 100000,
+                                  "minimum": 1,
+                                  "type": "integer",
+                                },
+                                "kind": {
+                                  "const": "cell",
+                                  "type": "string",
+                                },
+                                "row": {
+                                  "maximum": 100000,
+                                  "minimum": 1,
+                                  "type": "integer",
+                                },
+                              },
+                              "required": [
+                                "kind",
+                                "row",
+                                "column",
+                              ],
+                              "type": "object",
+                            },
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "column": {
+                                  "maximum": 100000,
+                                  "minimum": 1,
+                                  "type": "integer",
+                                },
+                                "kind": {
+                                  "const": "header-cell",
+                                  "type": "string",
+                                },
+                              },
+                              "required": [
+                                "kind",
+                                "column",
+                              ],
+                              "type": "object",
+                            },
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "kind": {
+                                  "const": "diagram",
+                                  "type": "string",
+                                },
+                              },
+                              "required": [
+                                "kind",
+                              ],
+                              "type": "object",
+                            },
+                          ],
+                        },
                         "quote": {
                           "maxLength": 200,
                           "minLength": 1,
@@ -2238,6 +2454,35 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
                           "minLength": 1,
                           "pattern": "^[\\w-]+$",
                           "type": "string",
+                        },
+                        "words": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "cut": {
+                              "type": "boolean",
+                            },
+                            "end": {
+                              "maximum": 10000,
+                              "minimum": 0,
+                              "type": "integer",
+                            },
+                            "start": {
+                              "maximum": 10000,
+                              "minimum": 0,
+                              "type": "integer",
+                            },
+                            "text": {
+                              "maxLength": 10000,
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "text",
+                            "start",
+                            "end",
+                            "cut",
+                          ],
+                          "type": "object",
                         },
                       },
                       "required": [
@@ -2496,6 +2741,7 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
       "(no message)",
       "(no message)",
       "(no message)",
+      "a range inside the text",
     ],
   },
   "CommentModeChangedSchema": {
@@ -3359,6 +3605,39 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
             "rawHash": {
               "pattern": "^[0-9a-f]{64}$",
               "type": "string",
+            },
+            "sel": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "exact": {
+                      "maxLength": 400,
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                    "prefix": {
+                      "maxLength": 64,
+                      "minLength": 0,
+                      "type": "string",
+                    },
+                    "suffix": {
+                      "maxLength": 64,
+                      "minLength": 0,
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "exact",
+                    "prefix",
+                    "suffix",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "type": "null",
+                },
+              ],
             },
             "text": {
               "maxLength": 8000,
@@ -4450,6 +4729,99 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
         "notVisible": {
           "type": "boolean",
         },
+        "place": {
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "row",
+                  "type": "string",
+                },
+                "row": {
+                  "maximum": 100000,
+                  "minimum": 1,
+                  "type": "integer",
+                },
+              },
+              "required": [
+                "kind",
+                "row",
+              ],
+              "type": "object",
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "header-row",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "kind",
+              ],
+              "type": "object",
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "column": {
+                  "maximum": 100000,
+                  "minimum": 1,
+                  "type": "integer",
+                },
+                "kind": {
+                  "const": "cell",
+                  "type": "string",
+                },
+                "row": {
+                  "maximum": 100000,
+                  "minimum": 1,
+                  "type": "integer",
+                },
+              },
+              "required": [
+                "kind",
+                "row",
+                "column",
+              ],
+              "type": "object",
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "column": {
+                  "maximum": 100000,
+                  "minimum": 1,
+                  "type": "integer",
+                },
+                "kind": {
+                  "const": "header-cell",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "kind",
+                "column",
+              ],
+              "type": "object",
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "diagram",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "kind",
+              ],
+              "type": "object",
+            },
+          ],
+        },
         "quote": {
           "maxLength": 200,
           "minLength": 1,
@@ -4534,6 +4906,35 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
           "pattern": "^[\\w-]+$",
           "type": "string",
         },
+        "words": {
+          "additionalProperties": false,
+          "properties": {
+            "cut": {
+              "type": "boolean",
+            },
+            "end": {
+              "maximum": 10000,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "start": {
+              "maximum": 10000,
+              "minimum": 0,
+              "type": "integer",
+            },
+            "text": {
+              "maxLength": 10000,
+              "type": "string",
+            },
+          },
+          "required": [
+            "text",
+            "start",
+            "end",
+            "cut",
+          ],
+          "type": "object",
+        },
       },
       "required": [
         "threadKey",
@@ -4552,6 +4953,7 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
       "(no message)",
       "(no message)",
       "(no message)",
+      "a range inside the text",
     ],
   },
   "CommentUnavailableReasonSchema": {

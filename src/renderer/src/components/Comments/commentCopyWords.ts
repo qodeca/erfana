@@ -44,40 +44,13 @@ import {
   type SaveFailureCopy
 } from './commentCopy'
 import { elementLabel, plural, type LabelSource } from './commentFormat'
+import { markdownTargetNoun as mdNoun, type NounSource, type NounTarget } from './commentTargetNoun'
 
 /** Bytes in one megabyte, for the limit sentence. */
 const MEGABYTE = 1024 * 1024
 
-const MARKDOWN_NOUNS: Readonly<Record<string, string>> = {
-  p: 'paragraph',
-  li: 'list item',
-  ul: 'list',
-  ol: 'list',
-  pre: 'code block',
-  img: 'image',
-  blockquote: 'block quote',
-  table: 'table',
-  tr: 'table row',
-  td: 'table cell',
-  th: 'table cell',
-  hr: 'divider'
-}
-
-/**
- * The Markdown kind noun of a rendered tag (C-03 kind map), lower case.
- * `pre` is "code block" whether or not it draws a diagram: the list names a
- * target by its tag only, and a diagram is a code block in the source.
- * Raw HTML the sanitizer kept is an "HTML section" – never its tag.
- *
- * @param tag - The target's tag as main indexes it (`p`, `li`, `h2`, …).
- * @returns e.g. "list item", "H2 heading".
- */
-export function markdownKindNoun(tag: string): string {
-  const lower = tag.toLowerCase()
-  const heading = /^h([1-6])$/.exec(lower)
-  if (heading !== null) return `H${heading[1]} heading`
-  return MARKDOWN_NOUNS[lower] ?? 'HTML section'
-}
+// The one Markdown noun function (C-03): every Markdown sentence below names its target through it.
+export { markdownKindNoun, markdownTargetNoun, type NounSource } from './commentTargetNoun'
 
 /** `text` with its first letter in upper case: a label or a row starts with one (C-03). */
 export function capitalise(text: string): string {
@@ -90,32 +63,32 @@ export const MARKDOWN_FILE_LIMIT_TEXT =
   `${MARKDOWN_COMMENT_MAX_LINES.toLocaleString('en-US')} lines, ${MARKDOWN_COMMENT_MAX_NESTING} levels of nesting ` +
   `and ${MARKDOWN_COMMENT_MAX_HTML_NODES.toLocaleString('en-US')} pieces of raw HTML.`
 
-/** What a target is called in one preview: its tag, and its line when the label carries one. */
-export interface WordsTarget extends LabelSource {
+/** What a target is called in one preview: its tag (and place, C-03), and its line when the label carries one. */
+export interface WordsTarget extends LabelSource, NounTarget {
   readonly line: number
 }
 
 /** The words one preview fills its comment templates with. */
 export interface CommentWords {
   readonly preview: 'html' | 'markdown'
-  /** The target word inside a sentence, lower case: "element", or the kind noun. */
-  readonly noun: (tag: string) => string
+  /** The target word inside a sentence, lower case: "element", or the Markdown noun (C-03, `commentTargetNoun.ts`). */
+  readonly noun: (target: NounSource) => string
   /** A drawer row's or the outline's label: the selector (HTML), "List item · line 14" (Markdown). */
   readonly label: (target: WordsTarget) => string
   /** The new-comment window's title. */
-  readonly newCommentTitle: (tag: string) => string
+  readonly newCommentTitle: (target: NounSource) => string
   /** A thread window's title, for `count` threads on one target. */
-  readonly threadsTitle: (target: LabelSource, count: number) => string
+  readonly threadsTitle: (target: LabelSource & NounTarget, count: number) => string
   /** The window's context line under the title. */
   readonly context: (target: WordsTarget, file: string) => string
   /** The target menu's accessible name (menu matrix "Menu label"). */
-  readonly menuLabel: (tag: string) => string
+  readonly menuLabel: (target: NounSource) => string
   readonly showInPreview: string
   readonly drawerNone: string
   readonly notFoundTag: string
   readonly notOnScreen: string
   /** S-02: the hidden target's sentence, with the target's `{kind}` and this preview's cause (D-13). */
-  readonly notVisibleText: (tag: string) => string
+  readonly notVisibleText: (target: NounSource) => string
   readonly damagedText: string
   readonly conflictText: string
   readonly deleteBlock: string
@@ -132,7 +105,7 @@ export interface CommentWords {
    * A refused save as the window shows it. `tag` names the target (the
    * Markdown sentences use its noun); `reason` is main's finer reason (C-19).
    */
-  readonly saveFailure: (code: string, file: string, tag?: string, reason?: string) => SaveFailureCopy
+  readonly saveFailure: (code: string, file: string, tag?: NounSource, reason?: string) => SaveFailureCopy
 }
 
 /** The HTML Preview's `{kind}` (024-FR-007, D-04), bare and with its article. */
@@ -203,7 +176,7 @@ export const MARKDOWN_COPY = {
   drawerNone: KIND_COPY.drawerNone(MARKDOWN_CLICK_TARGET),
   notFoundTag: DRAWER_COPY.notFound,
   notOnScreen: DRAWER_COPY.notOnScreen,
-  notVisibleText: (tag: string): string => hiddenTargetText(markdownKindNoun(tag), 'inside a collapsed section'),
+  notVisibleText: (target: NounSource): string => hiddenTargetText(mdNoun(target), 'inside a collapsed section'),
   damagedText: "Erfana can't read this comment, so it won't change it. Fix it in the source, or delete it.",
   conflictText: 'This comment contains git conflict markers. Resolve the conflict in the source.',
   deleteBlock: COPY.deleteBlock,
@@ -285,12 +258,12 @@ export function menuReasonText(reason: string | undefined, file: string): string
 /** The Markdown Preview's words (C-03 kind nouns; differences table D-03, D-04, D-13). */
 export const MARKDOWN_WORDS: CommentWords = {
   preview: 'markdown',
-  noun: markdownKindNoun,
-  label: target => `${capitalise(markdownKindNoun(target.tag))} · line ${target.line}`,
-  newCommentTitle: tag => KIND_COPY.newCommentTitle(markdownKindNoun(tag)),
-  threadsTitle: (target, count) => threadsTitle(markdownKindNoun(target.tag), count),
+  noun: mdNoun,
+  label: target => `${capitalise(mdNoun(target))} · line ${target.line}`,
+  newCommentTitle: target => KIND_COPY.newCommentTitle(mdNoun(target)),
+  threadsTitle: (target, count) => threadsTitle(mdNoun(target), count),
   context: (target, file) => `${file}, line ${target.line}`,
-  menuLabel: tag => capitalise(markdownKindNoun(tag)),
+  menuLabel: target => capitalise(mdNoun(target)),
   showInPreview: MARKDOWN_COPY.showInPreview,
   drawerNone: MARKDOWN_COPY.drawerNone,
   notFoundTag: MARKDOWN_COPY.notFoundTag,
@@ -324,13 +297,13 @@ export function markdownReadOnlyReasonText(reason: string | undefined, file: str
  *
  * @param code - Main's error code.
  * @param file - The file, as the reader knows it.
- * @param tag - The target's tag, for its noun.
+ * @param tag - The target (or its tag), for its noun.
  * @param reason - Main's finer reason, when it sent one.
  * @returns The sentence and what the window offers next.
  */
-export function markdownSaveFailureCopy(code: string, file: string, tag = 'p', reason?: string): SaveFailureCopy {
+export function markdownSaveFailureCopy(code: string, file: string, tag: NounSource = 'p', reason?: string): SaveFailureCopy {
   const shared = saveFailureCopy(code, file)
-  const noun = markdownKindNoun(tag)
+  const noun = mdNoun(tag)
   const sharedReason = sharedReasonCopy(reason)
   if (sharedReason !== undefined) return sharedReason
   if (reason === 'frontmatter') return { text: MARKDOWN_COPY.frontmatter, action: 'close' }

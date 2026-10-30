@@ -72,10 +72,10 @@ import type { IdentityFormData } from './commentSchemas'
 import { CommentStepper, MoreActions, stepKeyOf } from './CommentStepper'
 import { useDrawerFilter } from './commentDrawerFilter'
 import { useWindowStepTarget } from './commentStepKeys'
-import { WINDOW_COPY, windowRefusal } from './commentWindowCopy'
+import { WINDOW_COPY, editWordsNotice, windowRefusal } from './commentWindowCopy'
 import { headingOf, newCommentFrom } from './commentWindowHeading'
 import { resolveLeads, stepPosition, threadStateOf } from './commentWindowStates'
-import type { CommentWindowRequest } from './commentWindowTypes'
+import type { CommentWindowRequest, NounSource } from './commentWindowTypes'
 import { CommentWindowShell, type CommentDock } from './CommentWindowShell'
 import { IdentityStep } from './IdentityStep'
 import { NewCommentView } from './NewCommentView'
@@ -208,7 +208,7 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
   const { onRefresh } = props
   // Shown in banners and alerts through `visibleString`: bidi and invisible characters as tokens (S-L-B).
   const displayPath = selection?.file.displayPath ?? ''
-  const targetTag = shownThread?.tag
+  const targetTag = shownThread
   /** A write that did not land – refused, or still being written: say why and what next (C-19). */
   const refused = useCallback(
     (code: string, reason?: string, op?: CommentSaveRequest['op']) => {
@@ -243,13 +243,17 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
       write.answered(result)
       if (result.ok) {
         props.onWritten(save, file)
+        // C-07 (D-16): the edit landed without its words – the banner and the polite region say so.
+        const kept = editWordsNotice(words, save, result, selection?.threads ?? [], file)
+        if (kept !== null) setFailure(kept)
+        if (kept !== null) announce(kept.text)
         return true
       }
       noteRefused(save)
       refused(result.code, result.reason, save.op)
       return false
     },
-    [props, displayPath, refused, noteWrite, noteRefused]
+    [props, displayPath, refused, noteWrite, noteRefused, words, selection, announce]
   )
 
   // A write answered "still saving" settled: landed clears the banner (the
@@ -279,7 +283,7 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
       setStepped(n => n + 1)
       onReveal?.(threadKey)
       if (target !== undefined && at !== null) {
-        announce(WINDOW_COPY.stepAnnounce(at.at, at.of, words.noun(target.tag), target.line))
+        announce(WINDOW_COPY.stepAnnounce(at.at, at.of, words.noun(target), target.line))
       }
     },
     [selection, goTo, onReveal, announce, words, stepFilter]
@@ -333,7 +337,7 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
   // The thread whose Resolve leads takes the first focus (S-03 – S-05).
   const leads = selection?.threads.some(t => t.status === 'open' && resolveLeads(threadStateOf(t, notVisible))) === true
   const initialFocusRef = view === 'threads' ? (leads ? leadRef : titleRef) : view === 'new' ? textareaRef : undefined
-  const dock = useDock(props, request.kind === 'threads' ? (shownThread?.threadKey ?? null) : null, shownThread?.tag ?? (request.kind === 'new' ? request.target.tag : ''), shownThread?.line ?? (request.kind === 'new' ? request.target.line : 1), words.noun)
+  const dock = useDock(props, request.kind === 'threads' ? (shownThread?.threadKey ?? null) : null, shownThread ?? (request.kind === 'new' ? request.target : ''), shownThread?.line ?? (request.kind === 'new' ? request.target.line : 1), words.noun)
   const moreActions = [
     ...(newComment !== null && !props.pausedText ? [{ label: COPY.newComment, action: () => props.onNewComment?.(newComment), testId: TEST_IDS.COMMENT_NEW_ON_ELEMENT }] : []),
     { label: COPY.openInSource, action: () => props.onOpenInSource(selection?.file.filePath ?? '', shownThread?.line ?? 1), testId: TEST_IDS.COMMENT_OPEN_IN_SOURCE }
@@ -475,12 +479,12 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
 function useDock(
   props: CommentWindowProps,
   threadKey: string | null,
-  tag: string,
+  target: NounSource,
   line: number,
-  noun: (tag: string) => string
+  noun: (target: NounSource) => string
 ): CommentDock | undefined {
   const { dock } = props
-  const name = noun(tag)
+  const name = noun(target)
   return useMemo(
     () =>
       dock === undefined

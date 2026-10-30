@@ -177,7 +177,7 @@ export function NewCommentView({
   // No second Save once the draft is spent.
   const closedOff = failure?.action === 'close' || failure?.action === 'pick-again'
   // W-08: the pick already knows this part is generated – refused before anything is typed.
-  const generated = request.refused === 'generated-region' ? words.saveFailure(ErrorCode.COMMENT_TARGET_MOVED, file, request.target.tag, 'generated-region').text : null
+  const generated = request.refused === 'generated-region' ? words.saveFailure(ErrorCode.COMMENT_TARGET_MOVED, file, request.target, 'generated-region').text : null
   // C-21: what a blocked Save is waiting for, read with the button.
   const blockedReason = saveBlockedReason({
     generated,
@@ -186,7 +186,7 @@ export function NewCommentView({
     text,
     over: counterState(count) === 'over',
     choice: choice.kind,
-    noun: words.noun(request.target.tag)
+    noun: words.noun(request.target)
   })
   const fieldShowsError = fieldError !== null || counterState(count) === 'over'
   const saveBlocked = saving || pending || unsaved || fieldBlocked || closedOff || generated !== null
@@ -213,7 +213,7 @@ export function NewCommentView({
 
   /** A refused save – answered, or settled after a pending answer: say why, keep the text. */
   const refused = (code: string, reason?: string): void => {
-    const copy = windowRefusal(words, code, file, request.target.tag, reason, request.parentTag)
+    const copy = windowRefusal(words, code, file, request.target, reason, request.parentTag)
     if (copy.action === 'identity') {
       onIdentityRequired()
       return
@@ -257,7 +257,7 @@ export function NewCommentView({
     if (unsaved) return
     // Words that cannot be stored: the notice above the field says why, and the window says it aloud.
     if (choice.kind === 'blank' || choice.kind === 'tie') {
-      const noun = words.noun(request.target.tag)
+      const noun = words.noun(request.target)
       alert(choice.kind === 'blank' ? SELECTION_COPY.blank(noun) : SELECTION_COPY.tie(noun))
       return
     }
@@ -285,7 +285,7 @@ export function NewCommentView({
     if (answer.ok && answer.wordsDropped === true) {
       // Saved on the whole target: the window says so (024-FR-004), and closes on Close.
       setDropped(true)
-      alert(wordsDroppedText(words, request.target.tag, file))
+      alert(wordsDroppedText(words, request.target, file))
       onRefresh?.()
     } else if (answer.ok) onSaved()
     else if (answer.code === ErrorCode.COMMENT_SAVE_PENDING) alert(saveFailureCopy(answer.code, file).text)
@@ -336,7 +336,7 @@ export function NewCommentView({
       <div className="erf-comment-window__body">
         {unsavedBanner}
         {request.wordsMissing === true && (
-          <CommentBanner kind="info" testId={TEST_IDS.COMMENT_WORDS_MISSING}>{SELECTION_COPY.wordsNotInFile(words.noun(request.target.tag), file)}</CommentBanner>
+          <CommentBanner kind="info" testId={TEST_IDS.COMMENT_WORDS_MISSING}>{SELECTION_COPY.wordsNotInFile(words.noun(request.target), file)}</CommentBanner>
         )}
         {generated !== null && (
           <CommentBanner kind="error" testId={TEST_IDS.COMMENT_SAVE_ERROR}>
@@ -349,7 +349,7 @@ export function NewCommentView({
             span={span}
             choice={choice}
             untouched={untouched}
-            noun={words.noun(request.target.tag)}
+            noun={words.noun(request.target)}
             line={request.target.line}
             quoteId={quoteId}
             onSpan={next => {
@@ -414,7 +414,7 @@ export function NewCommentView({
         )}
         {dropped ? (
           <CommentBanner kind="success" after testId={TEST_IDS.COMMENT_WORDS_DROPPED}>
-            {wordsDroppedText(words, request.target.tag, file)}
+            {wordsDroppedText(words, request.target, file)}
           </CommentBanner>
         ) : pending ? (
           <CommentBanner kind="info" after testId={TEST_IDS.COMMENT_SAVE_ERROR}>

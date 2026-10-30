@@ -20,7 +20,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ThreadPlacement } from '../../../../../shared/ipc/file-comment-schema'
 import { useLatestRef } from '../../../hooks/useLatestRef'
-import type { NewCommentWords } from '../commentWindowTypes'
+import type { NewCommentWords, NounSource } from '../commentWindowTypes'
 import { wordsInTarget } from './domWords'
 import type { PreviewCommentAdapter } from './previewAdapter'
 
@@ -162,11 +162,12 @@ export function useSelectionComments(options: SelectionCommentsOptions): Selecti
  * main keeps `sel` only where its own parse of the file finds the words
  * once (024-FR-004), and when it did not, `onDropped` says so.
  *
- * @returns Call with the saved thread's key and its target's tag.
+ * @returns Call with the saved thread's key and its target's tag. `onDropped` gets the thread's
+ *   placement – its tag and place (C-03) – when it is on that tag, else the tag.
  */
 export function useWordsCheck(
   placements: readonly ThreadPlacement[],
-  onDropped: (tag: string) => void
+  onDropped: (target: NounSource) => void
 ): (threadKey: string, tag: string) => void {
   const pending = useRef<{ threadKey: string; tag: string } | null>(null)
   const dropped = useLatestRef(onDropped)
@@ -175,7 +176,7 @@ export function useWordsCheck(
     const placement = check === null ? undefined : placements.find(p => p.threadKey === check.threadKey)
     if (check === null || placement === undefined) return
     pending.current = null
-    if (placement.sel === undefined) dropped.current(check.tag)
+    if (placement.sel === undefined) dropped.current(placement.tag === check.tag ? placement : check.tag)
   }, [placements, dropped])
   return useCallback((threadKey: string, tag: string) => {
     pending.current = { threadKey, tag }

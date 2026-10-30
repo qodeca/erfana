@@ -11,7 +11,9 @@
  * Its rules are checked HERE, never in `CommentDataSchema`, because an invalid
  * `sel` must not make a block Damaged: the block reads `ok`, the selection is
  * ignored for underlining, and `sel` is kept as it is through every edit (the
- * anchor is loose, and thread operations never touch it). v0.23.1 reads it the
+ * anchor is loose, and thread operations never touch it – except an edit of
+ * the first message that names words, C-07, which sets, replaces or removes
+ * it by the add path's rules: `commentEditWords.ts`). v0.23.1 reads it the
  * same way – its anchor schema is loose too – so a block with `sel` stays `ok`
  * there and keeps `sel` when v0.23.1 rewrites it (024-FR-010).
  */

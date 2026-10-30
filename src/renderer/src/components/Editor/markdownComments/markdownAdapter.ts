@@ -19,6 +19,12 @@
  * - The preview wraps two blocks: a table in `div.table-wrapper` (main's
  *   `table`) and a diagram in `div.mermaid-wrapper` (main's `pre`).
  * - The frontmatter is drawn but never commentable (M-18).
+ * - **A place** (C-03) names a row, a cell or a diagram as main's index does
+ *   (`mdPlace.ts`): a body row by its number among the `tbody` rows, the
+ *   `thead` row as the header row, a cell by its row and its column among
+ *   its row's cells, and the diagram by the Mermaid render's wrapper – so the
+ *   picker, the menu and the icons say "row 2, column 3" where the window
+ *   does.
  * - **A pick** is `{ lineStart, lineEnd, tag, ordinal, quote, baseHash }`:
  *   the ordinal counts targets of the tag that start on the line (1-based,
  *   document order – main's walk order), the quote is the target's text with
@@ -41,6 +47,7 @@ import { indexMarkdown, type MdIndex } from '../../../../../shared/markdownComme
 import { locateMarkdownTarget, markdownTextHash } from '../../../../../shared/markdownComments/mdLocate'
 import { PREVIEW_LIMITS } from '../../../../../shared/preview-limits'
 import type { PickedTargetRequest, ThreadPlacement } from '../../../../../shared/ipc/file-comment-schema'
+import type { CommentTargetPlace } from '../../../../../shared/ipc/comment-common-schema'
 import { MARKDOWN_COPY, MARKDOWN_WORDS } from '../../Comments/commentCopyWords'
 import type { CanComment, PreviewCommentAdapter } from '../../Comments/overlay/previewAdapter'
 
@@ -181,6 +188,36 @@ function scanTargets(root: HTMLElement): TargetIndex {
 /** A target's tag as main names it; the element's own tag when it is no target kind. */
 function tagOfTarget(el: HTMLElement): string {
   return kindTag(el) ?? el.tagName.toLowerCase()
+}
+
+/** 1 + the index of `el` among `list`; 0 when it is not in it. */
+function positionIn(list: ArrayLike<Element>, el: Element): number {
+  return Array.prototype.indexOf.call(list, el) + 1
+}
+
+/** A row's place: the header row in `thead`, else its number among its section's rows (`mdPlace.ts`). */
+function rowPlace(row: HTMLTableRowElement): { readonly header: true } | { readonly header: false; readonly row: number } | undefined {
+  const section = row.parentElement
+  if (section instanceof HTMLTableSectionElement && section.tagName === 'THEAD') return { header: true }
+  const at = section instanceof HTMLTableSectionElement ? positionIn(section.rows, row) : 0
+  return at === 0 ? undefined : { header: false, row: at }
+}
+
+/**
+ * Where a rendered target sits when its tag does not name it (C-03), as
+ * main's index places the same block: a row, a cell, a diagram.
+ */
+function placeOfTarget(el: HTMLElement): CommentTargetPlace | undefined {
+  if (el.tagName === 'DIV' && el.classList.contains(DIAGRAM_WRAPPER)) return { kind: 'diagram' }
+  if (el instanceof HTMLTableRowElement) {
+    const row = rowPlace(el)
+    return row === undefined ? undefined : row.header ? { kind: 'header-row' } : { kind: 'row', row: row.row }
+  }
+  if (!(el instanceof HTMLTableCellElement) || !(el.parentElement instanceof HTMLTableRowElement)) return undefined
+  const row = rowPlace(el.parentElement)
+  const column = positionIn(el.parentElement.cells, el)
+  if (row === undefined || column === 0) return undefined
+  return row.header ? { kind: 'header-cell', column } : { kind: 'cell', row: row.row, column }
 }
 
 /** A target's line: its stamp, or 1 when the stamp is missing or not a number. */
@@ -353,6 +390,7 @@ export function createMarkdownAdapter(source: MarkdownAdapterSource): PreviewCom
     parentOf,
     childOf,
     tagOf,
+    placeOf: placeOfTarget,
     lineOf,
     canComment,
     describe,

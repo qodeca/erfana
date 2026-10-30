@@ -18,7 +18,8 @@
  * @module components/Comments/overlay/hostMenu
  */
 import { MD_SURFACE_COPY, SELECTION_COPY } from '../commentCopyWords'
-import type { CommentWords } from '../commentCopyWords'
+import type { CommentWords, NounSource } from '../commentCopyWords'
+import type { CommentTargetPlace } from '../../../../../shared/ipc/comment-common-schema'
 import type { ContextMenuItem } from '../../ContextMenu/ContextMenu'
 import { TEST_IDS } from '../../../constants/testids'
 import type { HostMenu } from './hostTypes'
@@ -29,6 +30,8 @@ export interface HostMenuInput {
   readonly mode: boolean
   /** The target's tag; `'frontmatter'` for the frontmatter. */
   readonly tag: string
+  /** Where the target sits when its tag does not name it (C-03): the menu names it as every other place does. */
+  readonly place?: CommentTargetPlace
   /** Why no new comment can be written now (paused, read-only), or `null`. */
   readonly blocked: string | null
   /** Why this target cannot take one (the frontmatter), or `null`. */
@@ -47,9 +50,14 @@ export interface HostMenuActions {
 }
 
 /** The menu's accessible name: the capitalised kind noun (menu matrix "Menu label"). */
-export function hostMenuLabel(input: Pick<HostMenuInput, 'tag' | 'words' | 'selection'>): string {
+export function hostMenuLabel(input: Pick<HostMenuInput, 'tag' | 'place' | 'words' | 'selection'>): string {
   if (input.selection === true) return SELECTION_COPY.menuLabel
-  return input.tag === 'frontmatter' ? 'Frontmatter' : input.words.menuLabel(input.tag)
+  return input.tag === 'frontmatter' ? 'Frontmatter' : input.words.menuLabel(nounOf(input))
+}
+
+/** The menu's target as the preview's words read it: its tag and place. */
+function nounOf(input: Pick<HostMenuInput, 'tag' | 'place'>): NounSource {
+  return input.place === undefined ? input.tag : { tag: input.tag, place: input.place }
 }
 
 /**
@@ -74,7 +82,7 @@ export function hostMenuItems(input: HostMenuInput, actions: HostMenuActions): C
     }
     if (frontmatter) return [withReason(onWords)]
     const onWhole: ContextMenuItem = {
-      label: SELECTION_COPY.commentOnWhole(input.words.noun(input.tag)),
+      label: SELECTION_COPY.commentOnWhole(input.words.noun(nounOf(input))),
       action: actions.open,
       testId: TEST_IDS.COMMENT_MENU_WHOLE
     }
@@ -84,7 +92,7 @@ export function hostMenuItems(input: HostMenuInput, actions: HostMenuActions): C
     ? MD_SURFACE_COPY.addComment
     : frontmatter
       ? MD_SURFACE_COPY.commentOnFrontmatter
-      : MD_SURFACE_COPY.commentOn(input.words.noun(input.tag))
+      : MD_SURFACE_COPY.commentOn(input.words.noun(nounOf(input)))
   const testId = input.mode
     ? TEST_IDS.COMMENT_MENU_ADD
     : frontmatter

@@ -220,7 +220,7 @@ export function ThreadsView(props: ThreadsViewProps): React.JSX.Element {
     <>
       <div className="erf-comment-window__body">
         {failure !== null && (
-          <CommentBanner kind={failure.action === 'pending' ? 'info' : 'error'} testId={TEST_IDS.COMMENT_SAVE_ERROR}>
+          <CommentBanner kind={failure.action === 'pending' || failure.action === 'notice' ? 'info' : 'error'} testId={TEST_IDS.COMMENT_SAVE_ERROR}>
             {failure.text}
           </CommentBanner>
         )}
@@ -241,7 +241,7 @@ export function ThreadsView(props: ThreadsViewProps): React.JSX.Element {
         )}
         {anyNotVisible && (
           <CommentBanner kind="info" testId={TEST_IDS.COMMENT_NOT_VISIBLE}>
-            {words.notVisibleText(threads[states.indexOf('not-visible')]?.tag ?? '')}
+            {words.notVisibleText(threads[states.indexOf('not-visible')] ?? '')}
           </CommentBanner>
         )}
         {threads.map((thread, i) => (
@@ -284,7 +284,7 @@ export function ThreadsView(props: ThreadsViewProps): React.JSX.Element {
             </DialogButton>
             {onNewComment !== undefined && (
               <DialogButton variant="secondary" onClick={onNewComment} testId={TEST_IDS.COMMENT_NEW_ON_ELEMENT}>
-                {WINDOW_COPY.newCommentOn(words.noun(threads[0]?.tag ?? ''))}
+                {WINDOW_COPY.newCommentOn(words.noun(threads[0] ?? ''))}
               </DialogButton>
             )}
             <DialogButton variant="secondary" onClick={onClose} testId={TEST_IDS.COMMENT_CLOSE}>

@@ -131,7 +131,8 @@ function threadRow(
     id: `${file.fileKey}/${thread.threadKey}`,
     filter: isResolved ? 'resolved' : 'open',
     line: thread.line,
-    label: thread.runtime ? thread.runtime.tag : words.label(thread),
+    // The HTML Preview names a script-built element by its own tag; Markdown names every target in words (C-03).
+    label: thread.runtime && words.preview === 'html' ? thread.runtime.tag : words.label(thread),
     replies: thread.messages.length - 1,
     excerpt: first?.text ?? '',
     words: change?.state === 'words' ? `“${change.was}” → “${change.now ?? ''}”` : '',

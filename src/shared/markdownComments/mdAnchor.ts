@@ -74,8 +74,12 @@ export function markdownAnchor(index: MdIndex, carrier: MdTarget, target: MdTarg
 
 const WHITESPACE_RUN = /\s+/g
 
-/** A target's rendered text as a selection reads it: whitespace collapsed, trimmed, NFC. */
-function selectableText(index: MdIndex, target: MdTarget): string | undefined {
+/**
+ * A target's rendered text as a selection reads it: whitespace collapsed,
+ * trimmed, NFC – the text {@link markdownSelection} searches, and the Narrow
+ * to words field of an edit shows (C-07). `undefined` past the search limit.
+ */
+export function selectableText(index: MdIndex, target: MdTarget): string | undefined {
   if (target.textEnd - target.textStart > MARKDOWN_SELECTION_SEARCH_MAX_CHARS) return undefined
   return index.visibleText.slice(target.textStart, target.textEnd).replace(WHITESPACE_RUN, ' ').trim().normalize('NFC')
 }

@@ -58,6 +58,7 @@ import { hostMenuItems, hostMenuLabel, targetlessMenu } from './hostMenu'
 import { drawn, newRequestExtras, threadTarget, useDraftKeepAlive, type HostDock } from './hostWindow'
 import type { CommentOverlayHost, CommentOverlayHostOptions, HostMenu } from './hostTypes'
 import { useSelectionComments, useWordsCheck } from './useSelectionComments'
+import { nounTargetOf } from './previewAdapter'
 import { useHostPointerKeys } from './useHostPointerKeys'
 
 export type { CommentOverlayHost, CommentOverlayHostOptions, HostMenu, RendererCommentSource } from './hostTypes'
@@ -185,7 +186,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
       const listed = store.getState().panels.get(panelId)?.list.files[0]
       const draft = await optionsRef.current.source.openDraft()
       if (!draft.ok) {
-        alert(words.saveFailure(draft.code, fileName, pick.tag, draft.reason).text)
+        alert(words.saveFailure(draft.code, fileName, nounTargetOf(adapter, target), draft.reason).text)
         return
       }
       picks.current.set(draft.draftToken, pick)
@@ -195,7 +196,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
         panelId,
         draftToken: draft.draftToken,
         draftKey: draftKeyOf(pick),
-        target: { tag: pick.tag, classes: [], line: pick.lineStart, excerpt: '' },
+        target: { ...nounTargetOf(adapter, target), tag: pick.tag, classes: [], line: pick.lineStart, excerpt: '' },
         file: {
           fileKey: listed?.fileKey ?? 'pending',
           displayPath: listed?.displayPath ?? fileName,
@@ -260,7 +261,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
       }
       selection.hideButton()
       const can = adapter.canComment(target)
-      const input = { mode: on, tag: adapter.tagOf(target), blocked, refused: can.ok ? null : can.reason, words, selection: pick !== null }
+      const input = { mode: on, ...nounTargetOf(adapter, target), blocked, refused: can.ok ? null : can.reason, words, selection: pick !== null }
       const open = (): void => void openNew(target, 'page')
       const openWords = pick === null ? {} : { openWords: () => void openNew(target, 'page', pick.words) }
       setMenu({
@@ -310,7 +311,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
 
   // ---- writes ----
   const liveDraft = useDraftKeepAlive(request?.kind === 'new' ? request.draftToken : null, () => optionsRef.current.source.openDraft())
-  const expectWords = useWordsCheck(placements, tag => announce(SELECTION_COPY.wordsDropped(words.noun(tag), fileName)))
+  const expectWords = useWordsCheck(placements, target => announce(SELECTION_COPY.wordsDropped(words.noun(target), fileName)))
   const save = useCallback(
     (request: CommentSaveRequest, sel?: AnchorSelection): Promise<FileCommentSaveResult> => {
       const { source: src, panelId: id, filePath: path, scroller: el } = optionsRef.current

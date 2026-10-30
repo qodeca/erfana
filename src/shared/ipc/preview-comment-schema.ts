@@ -27,6 +27,7 @@ import { TAG_MAX_CHARS } from '../comments/format'
 import { SPOKEN_EXCERPT_MAX_CODE_POINTS, isSpokenExcerpt } from '../comments/spokenExcerpt'
 import {
   COMMENT_PATH_MAX_CHARS,
+  CommentDraftWordsSchema,
   CommentFileViewSchema,
   CommentMessageTextSchema as MessageTextSchema,
   CommentRefusalReasonSchema,
@@ -69,18 +70,16 @@ export {
 } from './comment-common-schema'
 export type { CommentFileView, CommentSaveResult, CommentThreadView } from './comment-common-schema'
 
+// The words a draft or a thread carries (C-07): one definition with the file-comment family.
+export { COMMENT_WORDS_TEXT_MAX_CHARS, CommentDraftWordsSchema } from './comment-common-schema'
+export type { CommentDraftWords } from './comment-common-schema'
+
 /** A draft token: 128 random bits as lower-case hex. */
 export const COMMENT_DRAFT_TOKEN_PATTERN = /^[0-9a-f]{32}$/
 /** A draft's element key: an opaque 128-bit digest main mints from the file and the element's place in it. */
 export const COMMENT_DRAFT_KEY_PATTERN = /^[0-9a-f]{32}$/
 /** Files one window may report as holding unsaved editor changes. */
 export const COMMENT_UNSAVED_SOURCES_MAX = 500
-/**
- * Characters of a target's text a draft carries for the words of a new
- * comment (spec 024 024-FR-004, C-07 "Narrow to words"). A longer text is
- * sent as the part around the selected words, or not at all.
- */
-export const COMMENT_WORDS_TEXT_MAX_CHARS = 10_000
 
 // ---------------------------------------------------------------------------
 // Renderer → main
@@ -214,24 +213,6 @@ export const CommentDraftTargetViewSchema = z
       .optional()
   })
   .strict()
-
-/**
- * The target's text and the selected range in it, from MAIN's parse of the
- * file (spec 024 024-FR-004, C-07): what the window's words and its Narrow to
- * words field show. Collapsed as a selection reads it
- * (`shared/comments/selectionWords.ts`); `start === end`: no words chosen.
- * `cut`: the selection ran past the target and was cut to it.
- */
-export const CommentDraftWordsSchema = z
-  .object({
-    text: z.string().max(COMMENT_WORDS_TEXT_MAX_CHARS),
-    start: z.number().int().min(0).max(COMMENT_WORDS_TEXT_MAX_CHARS),
-    end: z.number().int().min(0).max(COMMENT_WORDS_TEXT_MAX_CHARS),
-    cut: z.boolean()
-  })
-  .strict()
-  .refine(words => words.start <= words.end && words.end <= words.text.length, { message: 'a range inside the text' })
-export type CommentDraftWords = z.infer<typeof CommentDraftWordsSchema>
 
 /**
  * A draft, as the renderer holds it: the single-use token, the element key the

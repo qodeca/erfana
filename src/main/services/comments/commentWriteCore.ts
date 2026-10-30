@@ -83,6 +83,7 @@ import { isAnchorSelection } from '../../../shared/comments/anchorSel'
 import { collapseRange, occurrencesInContext } from '../../../shared/comments/selectionWords'
 import { insertRefusal, planRebuild, planReplace, planSlotInsert, verifyKindSplice, type VerifyFailure } from '../../../shared/comments/splice'
 import { rebuildDataOf } from './commentRebuild'
+import { withEditedWords } from './commentEditWords'
 import { freshKindDocumentOf, sha256HexOf, writableRefusal, type JobDocument, type KindDocCache } from './commentJobDocs'
 import type { CommentRefusal } from './commentRefusals'
 
@@ -105,7 +106,8 @@ export interface CommentDraftTarget {
 export type ThreadChange =
   /** `resolve`: the reply and the resolve in one write ("Reply and resolve", C-13). */
   | { readonly op: 'reply'; readonly text: string; readonly resolve?: true }
-  | { readonly op: 'editMessage'; readonly messageId: string; readonly text: string }
+  /** `sel` (C-07, first message only): the words to store, `null` for the whole target; absent leaves them. */
+  | { readonly op: 'editMessage'; readonly messageId: string; readonly text: string; readonly sel?: TextQuote | null }
   | { readonly op: 'deleteMessage'; readonly messageId: string }
   | { readonly op: 'setStatus'; readonly status: CommentData['status'] }
   | { readonly op: 'deleteThread' }
@@ -160,7 +162,7 @@ export type WriteJobResult =
       readonly outputHash: string
       /** The thread written; `null` when the edit removed its block. */
       readonly threadId: string | null
-      /** An add asked for words the kind did not keep: the comment is on the whole target (024-FR-004). */
+      /** An add or a first-message edit asked for words the kind did not keep: the comment is on the whole target (024-FR-004). */
       readonly wordsDropped?: true
     })
   | { readonly kind: 'write'; readonly ok: false; readonly refusal: CommentRefusal }
@@ -368,10 +370,15 @@ function planThreadChange(request: Extract<WritePlanRequest, { op: 'thread' }>, 
   if (block?.kind !== 'ok' || block.rawHash !== rawHash) return refuse('block-changed')
   // A full thread is worded on its own: "Start a new comment instead" (C-19).
   if (request.change.op === 'reply' && block.data.msgs.length > PREVIEW_LIMITS.COMMENT_MAX_REPLIES) return refuse('replies')
-  const next = changedData(block.data, request.change, act, context)
+  const { change } = request
+  // C-07: only the first message's edit names the words the comment is about.
+  if (change.op === 'editMessage' && change.sel !== undefined && block.data.msgs[0]?.id !== change.messageId) return refuse('invalid')
+  const next = changedData(block.data, change, act, context)
   if (next === undefined) return refuse('block-changed')
   if (next === null) return fromPlan(planDelete(doc, { block: { id: threadId }, rawHash }), null)
-  return fromPlan(planReplace(doc, { id: threadId, rawHash, data: next }, kind.refuseGrowth, kind), threadId)
+  const words = change.op === 'editMessage' && change.sel !== undefined ? withEditedWords(doc, block, next, change.sel) : undefined
+  const planned = fromPlan(planReplace(doc, { id: threadId, rawHash, data: words?.data ?? next }, kind.refuseGrowth, kind), threadId)
+  return planned.ok && words?.dropped === true ? { ...planned, wordsDropped: true } : planned
 }
 
 function planDeleteDamaged(request: Extract<WritePlanRequest, { op: 'deleteBlock' }>, doc: KindDocument): Planned {

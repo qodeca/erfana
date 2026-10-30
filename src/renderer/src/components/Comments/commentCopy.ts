@@ -141,6 +141,8 @@ export type SaveFailureAction =
    * the write lands.
    */
   | 'pending'
+  /** Not a refusal: the write landed with a note (C-07, D-16 – an edit's words were not kept). An info banner. */
+  | 'notice'
 
 /** A refused save as the window shows it. */
 export interface SaveFailureCopy {

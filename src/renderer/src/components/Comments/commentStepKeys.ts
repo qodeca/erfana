@@ -26,6 +26,7 @@ import { useEffect } from 'react'
 import type { CommentStep } from '../../../../shared/commentStepKey'
 import type { CommentFileView } from '../../../../shared/ipc/comment-common-schema'
 import type { DrawerFilter } from './commentRows'
+import type { NounSource } from './commentTargetNoun'
 import { WINDOW_COPY } from './commentWindowCopy'
 import { inDrawerFilter, stepPosition } from './commentWindowStates'
 
@@ -113,7 +114,7 @@ export interface PreviewStepHost {
   /** Say where the step landed ("Comment 3 of 12, on paragraph, line 42."). */
   readonly announce: (text: string) => void
   /** The target word of a tag in this preview. */
-  readonly noun: (tag: string) => string
+  readonly noun: (target: NounSource) => string
 }
 
 /**
@@ -131,7 +132,7 @@ export function takePreviewStep(host: PreviewStepHost, step: CommentStep): boole
   host.open(target)
   const thread = target.file.threads.find(t => t.threadKey === target.threadKey)
   const at = stepPosition(target.file, [target.threadKey], host.filter)
-  if (thread !== undefined && at !== null) host.announce(WINDOW_COPY.stepAnnounce(at.at, at.of, host.noun(thread.tag), thread.line))
+  if (thread !== undefined && at !== null) host.announce(WINDOW_COPY.stepAnnounce(at.at, at.of, host.noun(thread), thread.line))
   return true
 }
 

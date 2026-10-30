@@ -11,6 +11,10 @@ import {
   COMMENT_DRAFT_TOKEN_PATTERN,
   type CommentDraftOpened
 } from '../../../../shared/ipc/preview-comment-schema'
+import type { CommentTargetPlace } from '../../../../shared/ipc/comment-common-schema'
+import type { NounSource } from './commentTargetNoun'
+
+export type { NounSource } from './commentTargetNoun'
 
 /** A draft event of kind `menu` or `open`. */
 export type ElementDraft = Extract<CommentDraftOpened, { kind: 'menu' | 'open' }>
@@ -18,6 +22,12 @@ export type ElementDraft = Extract<CommentDraftOpened, { kind: 'menu' | 'open' }
 export type PinDraft = Extract<CommentDraftOpened, { kind: 'icon' }>
 /** The element a new comment goes on. */
 export type DraftTarget = NonNullable<ElementDraft['target']>
+/**
+ * A new comment's target as the window names it: main's description, and –
+ * in a renderer-hosted preview – where the block sits when its tag does not
+ * name it (C-03: a table row or cell, a diagram), read from the rendered page.
+ */
+export type NewCommentTarget = DraftTarget & { readonly place?: CommentTargetPlace }
 
 /** The file a window is about, as main described it. */
 export interface WindowFile {
@@ -52,7 +62,7 @@ export type CommentWindowRequest =
       readonly draftToken: string
       /** Main's opaque key for the element: the typed text is kept under it for the session. */
       readonly draftKey: string
-      readonly target: DraftTarget
+      readonly target: NewCommentTarget
       readonly file: WindowFile
       readonly point: { readonly x: number; readonly y: number }
       readonly opener: WindowOpener
@@ -65,7 +75,7 @@ export type CommentWindowRequest =
        * one: a render-check refusal offers "Comment on the whole {parent}"
        * (C-19.3, state table W-07).
        */
-      readonly parentTag?: string
+      readonly parentTag?: NounSource
       /**
        * The pick already knows no comment can be written here – the target is
        * inside a generated START/END region (024-FR-023, W-08): the window

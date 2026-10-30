@@ -73,7 +73,7 @@ export function headingOf(
   if (request.kind === 'new') {
     const { target, file } = request
     if (words.preview !== 'html') {
-      const title = words.newCommentTitle(target.tag) + headingText(target.tag, request.words?.text)
+      const title = words.newCommentTitle(target) + headingText(target.tag, request.words?.text)
       return { title, context: words.context(target, file.displayPath), note: null }
     }
     const label = target.runtime ? target.runtime.tag : elementLabel(target)
@@ -100,7 +100,7 @@ export function headingOf(
   const lost = selection.threads.length > 0 && selection.threads.every(thread => !thread.attached && thread.status === 'open')
   if (words.preview !== 'html') {
     const title = words.threadsTitle(first, selection.threads.length) + headingText(first.tag, first.quote)
-    const context = lost ? WINDOW_COPY.notFoundContext(words.noun(first.tag), file) : words.context(first, file)
+    const context = lost ? WINDOW_COPY.notFoundContext(words.noun(first), file) : words.context(first, file)
     return { title, context, note: null }
   }
   const label = first.runtime ? first.runtime.tag : elementLabel(first)

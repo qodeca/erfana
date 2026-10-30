@@ -113,7 +113,10 @@ export function changeOf(request: Exclude<CommentSaveRequest, { op: 'add' | 'del
     case 'reply':
       return request.resolve === true ? { op: 'reply', text: request.text, resolve: true } : { op: 'reply', text: request.text }
     case 'editMessage':
-      return { op: 'editMessage', messageId: request.messageId, text: request.text }
+      // C-07: words only when the window sent them, so an edit of the text alone writes what it always did.
+      return request.sel === undefined
+        ? { op: 'editMessage', messageId: request.messageId, text: request.text }
+        : { op: 'editMessage', messageId: request.messageId, text: request.text, sel: request.sel }
     case 'deleteMessage':
       return { op: 'deleteMessage', messageId: request.messageId }
     case 'setStatus':
@@ -269,7 +272,9 @@ export function createCommentSaveFlow<D extends SaveDraft, S>(
       ref
     )
     if (!done.ok) return done
-    return { ok: true, threadKey: done.result.threadId === null ? null : threadKey }
+    const written = done.result.threadId === null ? null : threadKey
+    // C-07: an edit's words were not kept – the window says so (024-FR-004).
+    return done.result.wordsDropped === true ? { ok: true, threadKey: written, wordsDropped: true } : { ok: true, threadKey: written }
   }
 
   return request => (request.op === 'add' ? add(request) : change(request))

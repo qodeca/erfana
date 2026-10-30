@@ -51,7 +51,7 @@ import { commentMarkAt, setCommentMarks, type CommentMark } from './commentHighl
 import { noteCommentPinsDrawn } from './commentTiming'
 import { rangeOfWords } from './domWords'
 import { iconSpots, relativeBox, type IconSpot, type PinContent } from './iconLayout'
-import type { PreviewCommentAdapter } from './previewAdapter'
+import { targetNounOf, type PreviewCommentAdapter } from './previewAdapter'
 import type { SelectionButton } from './useSelectionComments'
 import './CommentOverlayLayer.css'
 
@@ -273,7 +273,7 @@ export function CommentOverlayLayer(props: CommentOverlayLayerProps): React.JSX.
   }, [content])
 
   const tab = mode
-    ? MD_SURFACE_COPY.modeTab(outlined === null ? null : { noun: adapter.words.noun(adapter.tagOf(outlined)), line: adapter.lineOf(outlined) })
+    ? MD_SURFACE_COPY.modeTab(outlined === null ? null : { noun: targetNounOf(adapter, outlined), line: adapter.lineOf(outlined) })
     : null
 
   return (

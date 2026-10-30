@@ -26,6 +26,8 @@ import type { IndexedTarget } from '../../../shared/comments/targetIndex'
 import { innerTargetOf } from '../../../shared/markdownComments/mdAnchor'
 import type { MdIndex, MdTarget } from '../../../shared/markdownComments/mdIndex'
 import { positionTargetOf } from '../../../shared/markdownComments/mdLocate'
+import { placeOf, type MdTargetPlace } from '../../../shared/markdownComments/mdPlace'
+import { attachedCarrierOf, threadWordsReader } from './commentEditWords'
 import { changeOf, type ListedChange } from './commentListChange'
 import { rebuildViewOf } from './commentRebuild'
 import { addRefusal, type JobDocument } from './commentJobDocs'
@@ -48,6 +50,8 @@ export interface ListedPlacement {
   readonly tag: string
   /** The block's valid `anchor.sel` (024-FR-004): the preview underlines these words while it finds them. */
   readonly sel?: AnchorSelection
+  /** C-03: where a Markdown target sits when its tag does not name it (a table row or cell, a diagram). */
+  readonly place?: MdTargetPlace
 }
 
 /** A thread as listed, before main gives it a key and its "not visible now" flag. */
@@ -168,11 +172,25 @@ function shownTarget(doc: KindDocument, block: OkBlock): { readonly found?: Foun
   return change === undefined ? { found } : { found, change }
 }
 
-function threadOf(doc: KindDocument, block: OkBlock, line: number): ListedThread {
+/** C-03: the place of the Markdown target a thread is about – the inner target its anchor names, else the carrier. */
+function threadPlace(doc: KindDocument, block: OkBlock, found: FoundTarget | undefined): MdTargetPlace | undefined {
+  if (found === undefined || !isMarkdownIndex(doc.index)) return undefined
+  const runtime = block.data.anchor.runtime
+  const target = runtime === undefined ? (found.el as MdTarget) : innerTargetOf(doc.index, found.el as MdTarget, runtime)
+  return target === undefined ? undefined : placeOf(target)
+}
+
+/** Reads an attached thread's words for the Narrow to words field of Edit on its first message (C-07). */
+type WordsReader = ReturnType<typeof threadWordsReader>
+
+function threadOf(doc: KindDocument, block: OkBlock, line: number, wordsOf: WordsReader): ListedThread {
   const { data } = block
   const runtime = data.anchor.runtime
   const quote = storedQuoteOf(data.anchor)
   const { found, change } = shownTarget(doc, block)
+  const carrier = attachedCarrierOf(doc, block)
+  const words = carrier === undefined ? undefined : wordsOf(carrier, data.anchor)
+  const place = threadPlace(doc, block, found)
   return {
     threadId: data.id,
     rawHash: block.rawHash,
@@ -202,7 +220,9 @@ function threadOf(doc: KindDocument, block: OkBlock, line: number): ListedThread
       text: message.text,
       ...(message.edited === undefined ? {} : { edited: message.edited })
     })),
-    ...(change === undefined ? {} : { change })
+    ...(change === undefined ? {} : { change }),
+    ...(words === undefined ? {} : { words }),
+    ...(place === undefined ? {} : { place })
   }
 }
 
@@ -235,7 +255,14 @@ function placementsOf(doc: KindDocument, line: (offset: number) => number): List
     if (carrier === undefined) continue
     const target = placedOn(doc, block, carrier)
     const sel = anchorSelectionOf(block.data.anchor)
-    placements.push({ threadId: block.data.id, line: line(target.start), tag: target.tag, ...(sel === undefined ? {} : { sel }) })
+    const place = isMarkdownIndex(doc.index) ? placeOf(target as MdTarget) : undefined
+    placements.push({
+      threadId: block.data.id,
+      line: line(target.start),
+      tag: target.tag,
+      ...(sel === undefined ? {} : { sel }),
+      ...(place === undefined ? {} : { place })
+    })
   }
   return placements
 }
@@ -245,11 +272,12 @@ function summaryOf(doc: KindDocument, job: ListJob | undefined): ListSummary {
   const threads: ListedThread[] = []
   const damaged: ListedDamaged[] = []
   const newer: ListedNewer[] = []
+  const wordsOf = threadWordsReader(doc)
   for (const block of doc.state.blocks) {
     const start = block.nodeRange[0]
     const at = line(start)
     if (block.kind === 'ok') {
-      threads.push(threadOf(doc, block, at))
+      threads.push(threadOf(doc, block, at, wordsOf))
     } else if (block.kind === 'damaged') {
       const raw = doc.text.slice(start, block.nodeRange[1])
       const cut = cutText(raw, COMMENT_RAW_PREVIEW_MAX_CHARS)

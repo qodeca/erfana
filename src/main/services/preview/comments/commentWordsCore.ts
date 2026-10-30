@@ -28,12 +28,13 @@ import { isAnchorSelection, type AnchorSelection } from '../../../../shared/comm
 import { collapseRange, locateWords, occurrencesInContext } from '../../../../shared/comments/selectionWords'
 import { spokenExcerptOf } from '../../../../shared/comments/spokenExcerpt'
 import type { HtmlIndex, IndexedElement } from '../../../../shared/htmlComments'
-import { COMMENT_WORDS_TEXT_MAX_CHARS, type CommentDraftWords, type CommentPickSel } from '../../../../shared/ipc/preview-comment-schema'
+import type { CommentDraftWords, CommentPickSel } from '../../../../shared/ipc/preview-comment-schema'
 import type { JobDocument } from '../../comments/commentJobDocs'
+import { fittedWords } from '../../comments/commentEditWords'
 import type { DraftEntry } from './commentDraftCore'
 
-/** Characters kept on each side of the words when the target's text is too long to send whole. */
-export const WORDS_WINDOW_MARGIN_CHARS = 2_000
+// The cap a thread's words share with a draft's (C-07): one definition, in the shared base.
+export { WORDS_WINDOW_MARGIN_CHARS } from '../../comments/commentEditWords'
 
 /**
  * Characters of an element's readable text the excerpt reads (C-10): plenty
@@ -75,24 +76,6 @@ export function targetTextOf(index: HtmlIndex, el: IndexedElement): string {
 }
 
 /**
- * `words` cut to at most {@link COMMENT_WORDS_TEXT_MAX_CHARS} characters
- * around its range; `undefined` when the text is longer and there is no range.
- */
-function fitted(words: CommentDraftWords): CommentDraftWords | undefined {
-  const { text, start, end } = words
-  if (text.length <= COMMENT_WORDS_TEXT_MAX_CHARS) return words
-  if (start === end || end - start > COMMENT_WORDS_TEXT_MAX_CHARS - 2 * WORDS_WINDOW_MARGIN_CHARS) return undefined
-  let from = Math.max(0, start - WORDS_WINDOW_MARGIN_CHARS)
-  let to = Math.min(text.length, end + WORDS_WINDOW_MARGIN_CHARS)
-  // Never split a word, or a surrogate pair: move each edge to the nearest space towards the words.
-  const space = text.indexOf(' ', from)
-  if (from > 0 && space !== -1 && space < start) from = space + 1
-  const back = text.lastIndexOf(' ', to)
-  if (to < text.length && back >= end) to = back
-  return { text: text.slice(from, to), start: start - from, end: end - from, cut: words.cut }
-}
-
-/**
  * The words of a draft on `el`. `runtime`: the target is an element a script
  * built, so its words cannot be in the file.
  *
@@ -111,7 +94,7 @@ export function draftWordsOf(index: HtmlIndex, el: IndexedElement, pick: PickWor
   if (text === '') return missing
   const range =
     found === null ? { start: 0, end: 0 } : { start: found.start, end: pick.long ? Math.min(text.length, found.end + 1) : found.end }
-  const words = fitted({ text, ...range, cut: found !== null && pick.crossed === true })
+  const words = fittedWords({ text, ...range, cut: found !== null && pick.crossed === true })
   return { ...(words === undefined ? {} : { words }), ...missing }
 }
 

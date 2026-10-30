@@ -18,7 +18,9 @@
  * @module components/Comments/overlay/previewAdapter
  */
 import type { PickedTargetRequest, ThreadPlacement } from '../../../../../shared/ipc/file-comment-schema'
+import type { CommentTargetPlace } from '../../../../../shared/ipc/comment-common-schema'
 import type { CommentWords } from '../commentCopyWords'
+import type { NounTarget } from '../commentTargetNoun'
 
 /** Why a target cannot take a comment, as a sentence for the menu and the toggle. */
 export type CanComment = { readonly ok: true } | { readonly ok: false; readonly reason: string }
@@ -37,6 +39,12 @@ export interface PreviewCommentAdapter {
   childOf(target: HTMLElement): HTMLElement | null
   /** The tag main indexes `target` by. */
   tagOf(target: HTMLElement): string
+  /**
+   * Where `target` sits when its tag does not name it – a table row or cell,
+   * a diagram – read from the rendered page as main's index places the same
+   * block (C-03). Absent, or `undefined`: the tag names it.
+   */
+  placeOf?(target: HTMLElement): CommentTargetPlace | undefined
   /** `target`'s first source line (1-based). */
   lineOf(target: HTMLElement): number
   /** Whether a comment can be added on `target` at all (the frontmatter cannot, M-18). */
@@ -58,4 +66,24 @@ export interface PreviewCommentAdapter {
    * none is known – main still decides at save.
    */
   refusalOf?(target: HTMLElement): 'generated-region' | null
+}
+
+/**
+ * `target` as the preview's words name it (C-03): its tag, and its place when
+ * the adapter reads one. Every place the host names a rendered target – an
+ * icon, a picker step, the mode tab, the menu, a new comment's window – reads
+ * its noun from this.
+ *
+ * @param adapter - The preview's adapter.
+ * @param target - A rendered target.
+ * @returns What `adapter.words.noun` reads.
+ */
+export function nounTargetOf(adapter: PreviewCommentAdapter, target: HTMLElement): NounTarget {
+  const place = adapter.placeOf?.(target)
+  return place === undefined ? { tag: adapter.tagOf(target) } : { tag: adapter.tagOf(target), place }
+}
+
+/** The noun `adapter`'s words name `target` by: {@link nounTargetOf} in its words. */
+export function targetNounOf(adapter: PreviewCommentAdapter, target: HTMLElement): string {
+  return adapter.words.noun(nounTargetOf(adapter, target))
 }

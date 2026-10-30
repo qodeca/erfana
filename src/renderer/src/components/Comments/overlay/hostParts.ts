@@ -14,7 +14,7 @@ import type { CommentFileView } from '../../../../../shared/ipc/comment-common-s
 import type { CommentCounts } from '../../../stores/usePreviewCommentStore'
 import { MD_SPOKEN_COPY, SPOKEN_EXCERPT_MAX_CHARS, type CommentWords } from '../commentCopyWords'
 import { listCounts } from '../commentRows'
-import type { PreviewCommentAdapter } from './previewAdapter'
+import { targetNounOf, type PreviewCommentAdapter } from './previewAdapter'
 
 /** A pick's draft key: 128 bits of the target's place, so the same target gets its text back. */
 export function draftKeyOf(pick: PickedTargetRequest): string {
@@ -66,7 +66,7 @@ export function spokenTarget(
   const text = collapsedWords(target.textContent ?? '')
   const excerpt = text.length > SPOKEN_EXCERPT_MAX_CHARS ? `${text.slice(0, SPOKEN_EXCERPT_MAX_CHARS).trimEnd()}…` : text
   const count = threadsOn(target, adapter, placements, file).length
-  return MD_SPOKEN_COPY.target(adapter.words.noun(adapter.tagOf(target)), adapter.lineOf(target), excerpt, count)
+  return MD_SPOKEN_COPY.target(targetNounOf(adapter, target), adapter.lineOf(target), excerpt, count)
 }
 
 /** Whitespace runs to one space, trimmed. */

@@ -30,7 +30,8 @@ import { useCallback, useEffect, useRef } from 'react'
 import { useLatestRef } from '../../../hooks/useLatestRef'
 import type { FileCommentOpenDraftResult, ThreadPlacement } from '../../../../../shared/ipc/file-comment-schema'
 import type { CommentDock } from '../CommentWindowShell'
-import type { PreviewCommentAdapter } from './previewAdapter'
+import type { NounSource } from '../commentTargetNoun'
+import { nounTargetOf, type PreviewCommentAdapter } from './previewAdapter'
 
 /**
  * How often an open new-comment window's draft is renewed: well inside main's
@@ -84,9 +85,11 @@ export function drawn(el: HTMLElement | null): HTMLElement | null {
 export function newRequestExtras(
   target: HTMLElement,
   adapter: PreviewCommentAdapter
-): { readonly parentTag?: string; readonly refused?: 'generated-region' } {
+): { readonly parentTag?: NounSource; readonly refused?: 'generated-region' } {
   const parent = adapter.parentOf(target)
-  const parentTag = parent !== null && adapter.canComment(parent).ok ? adapter.tagOf(parent) : undefined
+  const named = parent !== null && adapter.canComment(parent).ok ? nounTargetOf(adapter, parent) : undefined
+  // Its tag, or – a row holding a cell (C-03) – its tag and place, so "Comment on the whole {parent}" names it as the picker does.
+  const parentTag = named?.place === undefined ? named?.tag : named
   const refused = adapter.refusalOf?.(target) === 'generated-region' ? ('generated-region' as const) : undefined
   return { ...(parentTag === undefined ? {} : { parentTag }), ...(refused === undefined ? {} : { refused }) }
 }

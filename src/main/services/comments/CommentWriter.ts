@@ -158,7 +158,7 @@ export type CommentWriteResult =
       readonly fileHash: string
       /** The thread written; `null` when the operation removed its block. */
       readonly threadId: string | null
-      /** An add's selected words were not kept: the comment is on the whole target (024-FR-004). */
+      /** An add's or a first-message edit's selected words were not kept: the comment is on the whole target (024-FR-004, C-07). */
       readonly wordsDropped?: true
     }
   | { readonly ok: false; readonly code: CommentErrorCode; readonly reason: CommentRefusal }

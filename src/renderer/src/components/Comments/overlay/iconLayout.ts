@@ -34,7 +34,7 @@ import {
 import type { ThreadPlacement } from '../../../../../shared/ipc/file-comment-schema'
 import type { CommentFileView } from '../../../../../shared/ipc/comment-common-schema'
 import { CHANGE_MARK_COPY, MD_SURFACE_COPY } from '../commentCopyWords'
-import type { PreviewCommentAdapter } from './previewAdapter'
+import { targetNounOf, type PreviewCommentAdapter } from './previewAdapter'
 
 /** What an icon shows: two text lines, a count, "9+", "!" (damaged) or "+3" (a stack); `null` for the ghost. */
 export type PinContent = 'lines' | '!' | '9+' | `${number}` | `+${number}`
@@ -179,7 +179,7 @@ function spotOf(adapter: PreviewCommentAdapter, input: IconInput, box: Box): Ico
     const line = input.ghostLine ?? 1
     return { key, box, elements: [], threadKeys, blockKeys, name: MD_SURFACE_COPY.ghostName(line), content: null, changed: false, damaged: false, stack: false }
   }
-  const noun = adapter.words.noun(adapter.tagOf(element))
+  const noun = targetNounOf(adapter, element)
   const line = adapter.lineOf(element)
   const damaged = blockKeys.length > 0
   const changed = !damaged && input.changed > 0

@@ -346,7 +346,8 @@ export class FileCommentService {
       threadKey: panel.keys.keyFor(panel.binding, { kind: 'thread', realPath: panel.realPath, threadId: placement.threadId }),
       line: placement.line,
       tag: placement.tag,
-      ...(placement.sel === undefined ? {} : { sel: { exact: placement.sel.exact, prefix: placement.sel.prefix, suffix: placement.sel.suffix } })
+      ...(placement.sel === undefined ? {} : { sel: { exact: placement.sel.exact, prefix: placement.sel.prefix, suffix: placement.sel.suffix } }),
+      ...(placement.place === undefined ? {} : { place: placement.place })
     }))
   }
 

@@ -52,7 +52,7 @@ export function openThreadsOf(files: readonly CommentFileView[], words: CommentW
         threadKey: thread.threadKey,
         text: first?.text ?? '',
         author: first?.by.name ?? '',
-        label: thread.runtime ? thread.runtime.tag : words.label(thread)
+        label: thread.runtime && words.preview === 'html' ? thread.runtime.tag : words.label(thread)
       })
     }
   }

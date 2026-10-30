@@ -68,7 +68,7 @@ function QuoteBox({ label, text, was }: { readonly label: string; readonly text:
  */
 export function ThreadStatus({ thread, state, fileName, hidden }: ThreadStatusProps): React.JSX.Element | null {
   const words = useCommentWords()
-  const noun = words.noun(thread.tag)
+  const noun = words.noun(thread)
   if (state === 'not-found') {
     const quote = thread.quote
     return (
@@ -102,7 +102,7 @@ export function ThreadStatus({ thread, state, fileName, hidden }: ThreadStatusPr
         {was !== '' && <QuoteBox label={WINDOW_COPY.was} text={was} was />}
         {now !== undefined && <QuoteBox label={WINDOW_COPY.now} text={now} was={false} />}
       </div>
-      {hidden && <p className="erf-comment-note erf-comment-status-line">{words.notVisibleText(thread.tag)}</p>}
+      {hidden && <p className="erf-comment-note erf-comment-status-line">{words.notVisibleText(thread)}</p>}
     </div>
   )
 }

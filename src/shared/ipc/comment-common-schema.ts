@@ -20,11 +20,20 @@ import { z } from 'zod'
 import { ErrorCode } from '../errors'
 import { PREVIEW_LIMITS } from '../preview-limits'
 import { MESSAGE_ID_PATTERN, TAG_MAX_CHARS, visibleInline } from '../comments/format'
-import { CommentKeySchema as KeySchema } from './preview-comment-page-schema'
+import { CommentKeySchema as KeySchema, CommentPickSelSchema } from './preview-comment-page-schema'
 import { PanelIdSchema } from './preview-schema'
 
 /** Characters of one file path in a comment payload. */
 export const COMMENT_PATH_MAX_CHARS = 4_096
+/**
+ * Characters of a target's text a draft – or a thread, for Edit on its first
+ * message – carries for the words of a comment (spec 024 024-FR-004, C-07
+ * "Narrow to words"). A longer text is sent as the part around the selected
+ * words, or not at all.
+ */
+export const COMMENT_WORDS_TEXT_MAX_CHARS = 10_000
+/** Highest row or column a Markdown target's place names (C-03). */
+export const COMMENT_PLACE_INDEX_MAX = 100_000
 /** Characters of a damaged block's raw text sent to the renderer; longer is cut and flagged. */
 export const COMMENT_RAW_PREVIEW_MAX_CHARS = 65_536
 /** Characters of one line a rebuild confirmation shows (OD-05); longer is cut. */
@@ -135,6 +144,41 @@ export const CommentSaveResultSchema = z.union([
 ])
 export type CommentSaveResult = z.infer<typeof CommentSaveResultSchema>
 
+/**
+ * The target's text and the selected range in it, from MAIN's parse of the
+ * file (spec 024 024-FR-004, C-07): what the window's words and its Narrow to
+ * words field show. Collapsed as a selection reads it
+ * (`shared/comments/selectionWords.ts`); `start === end`: no words chosen.
+ * `cut`: the selection ran past the target and was cut to it.
+ */
+export const CommentDraftWordsSchema = z
+  .object({
+    text: z.string().max(COMMENT_WORDS_TEXT_MAX_CHARS),
+    start: z.number().int().min(0).max(COMMENT_WORDS_TEXT_MAX_CHARS),
+    end: z.number().int().min(0).max(COMMENT_WORDS_TEXT_MAX_CHARS),
+    cut: z.boolean()
+  })
+  .strict()
+  .refine(words => words.start <= words.end && words.end <= words.text.length, { message: 'a range inside the text' })
+export type CommentDraftWords = z.infer<typeof CommentDraftWordsSchema>
+
+const PlaceIndexSchema = z.number().int().min(1).max(COMMENT_PLACE_INDEX_MAX)
+
+/**
+ * Where a Markdown target sits when its tag alone does not name it (C-03 kind
+ * map): a table's body row (counted from 1, the header row left out), its
+ * header row, a cell by row and column, or a code block that draws a diagram.
+ * From main's index of the file; the HTML Preview never sends one (D-04).
+ */
+export const CommentTargetPlaceSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('row'), row: PlaceIndexSchema }).strict(),
+  z.object({ kind: z.literal('header-row') }).strict(),
+  z.object({ kind: z.literal('cell'), row: PlaceIndexSchema, column: PlaceIndexSchema }).strict(),
+  z.object({ kind: z.literal('header-cell'), column: PlaceIndexSchema }).strict(),
+  z.object({ kind: z.literal('diagram') }).strict()
+])
+export type CommentTargetPlace = z.infer<typeof CommentTargetPlaceSchema>
+
 const threadTarget = { panelId: PanelIdSchema, fileKey: KeySchema, threadKey: KeySchema, rawHash: CommentRawHashSchema }
 
 /**
@@ -145,8 +189,17 @@ const threadTarget = { panelId: PanelIdSchema, fileKey: KeySchema, threadKey: Ke
 export const commentThreadOpSchemas = [
   // `resolve`: "Reply and resolve" – the reply and the resolve in one write (comments-v2 C-13).
   z.object({ ...threadTarget, op: z.literal('reply'), text: CommentMessageTextSchema, resolve: z.literal(true).optional() }).strict(),
+  // C-07 `sel`, on the first message only: the words the comment is about – set or changed by the
+  // Narrow to words field, `null` for the whole target, absent to leave them as they are. Main keeps
+  // them only where its own parse finds them, as for an `add` (024-FR-004), else drops them and says so.
   z
-    .object({ ...threadTarget, op: z.literal('editMessage'), messageId: MessageIdSchema, text: CommentMessageTextSchema })
+    .object({
+      ...threadTarget,
+      op: z.literal('editMessage'),
+      messageId: MessageIdSchema,
+      text: CommentMessageTextSchema,
+      sel: CommentPickSelSchema.nullable().optional()
+    })
     .strict(),
   z.object({ ...threadTarget, op: z.literal('deleteMessage'), messageId: MessageIdSchema }).strict(),
   z.object({ ...threadTarget, op: z.literal('setStatus'), status: z.enum(['open', 'resolved']) }).strict(),
@@ -248,7 +301,16 @@ export const CommentThreadViewSchema = z
           .optional()
       })
       .strict()
-      .optional()
+      .optional(),
+    /**
+     * C-07: the target's text as main parsed it, for the Narrow to words field
+     * of Edit on the first message, with the range of the words the comment is
+     * about (none: `start === end`). Absent when the target is not found, has
+     * no text, or its text is too long to send ({@link COMMENT_WORDS_TEXT_MAX_CHARS}).
+     */
+    words: CommentDraftWordsSchema.optional(),
+    /** C-03: where a Markdown target sits (a table row or cell, a diagram); absent in HTML. */
+    place: CommentTargetPlaceSchema.optional()
   })
   .strict()
 export type CommentThreadView = z.infer<typeof CommentThreadViewSchema>

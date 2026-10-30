@@ -28,6 +28,7 @@ import {
   CommentFileViewSchema,
   CommentMessageTextSchema,
   CommentReasonedRefusalSchema,
+  CommentTargetPlaceSchema,
   commentThreadOpSchemas,
   type CommentReasonedRefusal,
   type CommentSaveResult
@@ -156,7 +157,9 @@ export const ThreadPlacementSchema = z
     /** The target's tag, as the kind indexes it. */
     tag: CommentTagNameSchema,
     /** The words the thread is about (its valid `anchor.sel`), for the underline (024-FR-004). */
-    sel: FileCommentSelSchema.optional()
+    sel: FileCommentSelSchema.optional(),
+    /** C-03: where the target sits when its tag alone does not name it (a table row or cell, a diagram). */
+    place: CommentTargetPlaceSchema.optional()
   })
   .strict()
 export type ThreadPlacement = z.infer<typeof ThreadPlacementSchema>
