@@ -77,13 +77,26 @@ const RELOAD_GUARD_MS = 20_000
  */
 const LARGEST = { runs: 3, guardMs: 300_000, openMs: 300_000 }
 const SMALL = { runs: RUNS, guardMs: RELOAD_GUARD_MS, openMs: PREVIEW_BUDGET_MS }
+/**
+ * The emulated Windows box (x64 Electron on a Windows 11 ARM VM) stalls main in
+ * native code for 2–26 s on a 4 MB reload – with comments OFF as much as on;
+ * a main-process CPU profile shows Erfana's own JS idle through it (spec 024
+ * F-002, 2026-10-30, docs/windows/known-flakes.md). F-002 asserts no time –
+ * it records – so there the guards and the first open are long enough to let
+ * every run finish; the runs and what they record are unchanged.
+ */
+const EMULATED_WINDOWS = process.platform === 'win32'
+const WIN_SMALL = { runs: RUNS, guardMs: 120_000, openMs: 120_000 }
+const WIN_LARGEST = { runs: 3, guardMs: 600_000, openMs: 600_000 }
+const small = EMULATED_WINDOWS ? WIN_SMALL : SMALL
+const largest = EMULATED_WINDOWS ? WIN_LARGEST : LARGEST
 const SIZES = [
-  { label: '0.5 MB', rel: 'comments/size-05.html', bytes: MB / 2, ...SMALL },
-  { label: '1 MB', rel: 'comments/size-1.html', bytes: MB, ...SMALL },
+  { label: '0.5 MB', rel: 'comments/size-05.html', bytes: MB / 2, ...small },
+  { label: '1 MB', rel: 'comments/size-1.html', bytes: MB, ...small },
   // Just under the comment file limit before §19 Rev 4 (4 MB): the size the R3-12 gates were set at.
-  { label: '4 MB', rel: 'comments/size-4.html', bytes: 4 * MB - 64 * 1024, ...SMALL },
+  { label: '4 MB', rel: 'comments/size-4.html', bytes: 4 * MB - 64 * 1024, ...small },
   // Just under the comment file limit (25 MB, `PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES`), so the page is still instrumented.
-  { label: '25 MB', rel: 'comments/size-25.html', bytes: 25 * MB - 64 * 1024, ...LARGEST }
+  { label: '25 MB', rel: 'comments/size-25.html', bytes: 25 * MB - 64 * 1024, ...largest }
 ] as const
 const FRAMES = 10
 const FRAME_HOST = 'comments/frames-10.html'
@@ -296,7 +309,7 @@ test.describe('HTML Preview comments – performance records (P7)', () => {
     appWithTestProject
   }, testInfo) => {
     // The 25 MB page takes a minute or more per load on the emulated Windows box (LARGEST); the others under 3 s.
-    test.setTimeout(1_800_000)
+    test.setTimeout(EMULATED_WINDOWS ? 5_400_000 : 1_800_000)
     const app = appWithTestProject
     const page = windowWithTestProject
     const preview = new HtmlPreviewPage(page, app)
@@ -346,7 +359,7 @@ test.describe('HTML Preview comments – performance records (P7)', () => {
       const frameLoads = async (): Promise<number> => (await commentLoads(app)).filter(load => load.scope === 'frame').length
       if (kind === 'instrumented') await expect.poll(frameLoads, { timeout: PREVIEW_BUDGET_MS }).toBeGreaterThanOrEqual(FRAMES)
       const runs: ReloadCost[] = []
-      for (let run = 0; run < RUNS; run += 1) runs.push(await timedReload(app, target.urlIncludes as string))
+      for (let run = 0; run < RUNS; run += 1) runs.push(await timedReload(app, target.urlIncludes as string, small.guardMs))
       if (kind === 'instrumented') await expect.poll(frameLoads, { timeout: PREVIEW_BUDGET_MS }).toBeGreaterThanOrEqual(FRAMES)
       results.push({ page: `${FRAMES} frames × 100 KB`, kind, ...summary(runs), runs })
       await preview.tabClose().click()
