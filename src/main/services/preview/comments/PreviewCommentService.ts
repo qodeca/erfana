@@ -17,9 +17,10 @@
  * - what the renderer is told (`commentPanelStatus.ts`), only ever the window
  *   that owns the view.
  *
- * Comment mode on over a page served without tokens – a file with no comments
- * yet is served raw while the mode is off – reloads the view once, keeping the
- * reader's place, so its elements can be picked.
+ * Comment mode on over a page served without tokens – one loaded before the
+ * feature was turned on (every page is instrumented while it is on, OD-01) –
+ * reloads the view once, keeping the reader's place, so its elements can be
+ * picked.
  *
  * Nothing the page sends writes, and nothing sent to the page carries a path,
  * a comment's text or an author.
@@ -37,26 +38,27 @@ import type {
 } from '../../../../shared/ipc/preview-comment-schema'
 import { logger } from '../../LoggingService'
 import type { PreviewCommentServing } from './commentInstrumentation'
-import type { CommentFileJobRunner } from './commentFileJobs'
-import { sharedCommentParseClient } from './CommentParseWorkerAdapter'
-import { CommentWriter, type CommentWriterDeps } from './CommentWriter'
+import type { HtmlFileJobRunner } from './htmlCommentJobs'
+import { sharedHtmlCommentParseClient } from './htmlCommentParseClient'
+import { CommentWriter, type CommentWriterDeps } from '../../comments/CommentWriter'
 import { registerCommentE2eSource } from './commentE2eHook'
 import { CommentFrames, type CommentFrameLike, type FrameRecord } from './commentFrames'
 import { createCommentFrameBroadcaster, type CommentFrameBroadcaster, type CommentStateExtras } from './commentFrameBroadcaster'
-import { CommentKeyStore, type CommentBinding } from './commentKeyStore'
+import type { CommentBinding } from '../../comments/commentKeyStore'
+import { CommentDraftKeys } from './commentDraftKeys'
 import { createCommentPickHandler, type CommentPickHandler, type PageSignalEvent } from './commentPickHandler'
-import { pickerStepOf, type PickerStepInput } from './commentPickerStep'
+import { createPickerSpeaker, type PickerStepEvent } from './commentPickerSpeaker'
+import type { PickerStep } from './commentPickerStep'
 import { createCommentDraftOpener, type CommentDraftOpener, type DraftOpenerGeometry } from './commentDraftOpener'
-import type { CommentDraft } from './commentDraftBuilder'
-import { buildCommentList } from './commentListBuilder'
+import { buildCommentList } from '../../comments/commentListBuilder'
 import { accentRgb } from './commentOverlayTheme'
 import { createCommentPanelStatus, type CommentPanelStatus } from './commentPanelStatus'
 import { createCommentReloadCoordinator, type CommentReloadCoordinator } from './commentReloadCoordinator'
-import { createCommentSaveFlow, type LateSettle } from './commentSaveFlow'
+import { createCommentSaveFlow, type LateSettle } from '../../comments/commentSaveFlow'
 import { attachCommentServiceEvents, type CommentEventContents, type FrameFromIds } from './commentServiceEvents'
 import { waitForPaint, type FreshStillDeps } from './commentStillCapture'
 import type { CommentE2ePanelState, CommentServiceApi, PreviewCommentShared } from './commentServiceTypes'
-import { samePathKey } from './commentUnsavedSources'
+import { samePathKey } from '../../comments/commentUnsavedSources'
 import { createFrameFileMap } from './frameFileMap'
 
 /** The slice of the view's `webContents` comments use. */
@@ -89,7 +91,7 @@ export interface PreviewCommentServiceDeps {
   /** Resolve a frame from its process and routing ids; `webFrameMain.fromId` by default. */
   readonly frameFromIds?: FrameFromIds
   /** The writer; a real `CommentWriter` by default. */
-  readonly createWriter?: (deps: CommentWriterDeps) => Pick<CommentWriter, 'add' | 'changeThread' | 'deleteDamagedBlock'>
+  readonly createWriter?: (deps: CommentWriterDeps) => Pick<CommentWriter, 'add' | 'changeThread' | 'deleteDamagedBlock'> & Partial<Pick<CommentWriter, 'rebuildDamagedBlock'>>
 }
 
 const electronFrameFromIds: FrameFromIds = (processId, routingId) =>
@@ -108,13 +110,14 @@ export class PreviewCommentService implements CommentServiceApi {
   private lastNotVisible = ''
   private disposed = false
   private readonly binding: CommentBinding
-  private readonly jobs: CommentFileJobRunner
+  private readonly jobs: HtmlFileJobRunner
   private readonly frames: CommentFrames
-  private readonly keys = new CommentKeyStore<CommentDraft>()
+  private readonly keys = new CommentDraftKeys()
   private readonly status: CommentPanelStatus
   private readonly broadcaster: CommentFrameBroadcaster
   private readonly coordinator: CommentReloadCoordinator
   private readonly signals: CommentPickHandler
+  private readonly speak: (step: PickerStepEvent) => Promise<void>
   private readonly opener: CommentDraftOpener
   private readonly saveFlow: (request: CommentSaveRequest) => Promise<CommentSaveResult>
   private readonly detach: Array<() => void> = []
@@ -123,7 +126,7 @@ export class PreviewCommentService implements CommentServiceApi {
     this.panelId = deps.panelId
     this.windowId = deps.windowId
     this.binding = { windowId: deps.windowId, panelId: deps.panelId, session: deps.session }
-    this.jobs = deps.shared.jobs ?? sharedCommentParseClient()
+    this.jobs = deps.shared.jobs ?? sharedHtmlCommentParseClient()
     const { tokens } = deps.serving
     const mainFrame = (): CommentFrameLike | undefined => deps.contents.mainFrame as CommentFrameLike | undefined
     const files = createFrameFileMap({ token: deps.token, realRoot: deps.realRoot, projectPath: deps.projectPath, platform: deps.platform })
@@ -152,6 +155,7 @@ export class PreviewCommentService implements CommentServiceApi {
     })
     this.opener = this.buildOpener(tokens, mainFrame)
     this.saveFlow = this.buildSaveFlow()
+    this.speak = createPickerSpeaker({ realRoot: deps.realRoot, jobs: this.jobs, platform: deps.platform, say: step => this.onStep(step) })
     this.signals = createCommentPickHandler({
       panelId: deps.panelId,
       frames: this.frames,
@@ -159,11 +163,12 @@ export class PreviewCommentService implements CommentServiceApi {
       now: deps.now,
       mode: () => this.mode,
       platform: deps.platform,
+      geometry: { ...deps.geometry, cursor: deps.shared.cursor },
       sinks: {
         hello: frame => this.guard(this.onHello(frame)),
         exit: () => this.changeMode(false, 'escape'),
         parent: frame => this.onParent(frame),
-        step: step => this.onStep(step),
+        step: step => void this.speak(step),
         icon: (frame, record, key, pick) => this.guard(this.opener.icon(frame, record, key, pick)),
         element: (frame, record, entry, pick) => this.guard(this.opener.element(frame, record, entry, pick)),
         anchors: (_frame, record, anchors) => this.onAnchors(record, anchors)
@@ -228,7 +233,7 @@ export class PreviewCommentService implements CommentServiceApi {
     return { ok: true, files, ...(unread > 0 ? { unread } : {}), ...(unavailable === undefined ? {} : { unavailable }) }
   }
 
-  /** "Show on page" (`preview:commentCommand`): scroll the thread's pin into view in its frame. */
+  /** "Show in preview" (`preview:commentCommand`): scroll the thread's pin into view in its frame. */
   reveal(threadKey: string): CommentAck {
     const thread = this.keys.resolve(this.binding, threadKey, 'thread')
     if (!thread.ok) return { ok: false, code: ErrorCode.COMMENT_KEY_INVALID }
@@ -246,9 +251,15 @@ export class PreviewCommentService implements CommentServiceApi {
     return { ok: false, code: ErrorCode.COMMENT_TARGET_MOVED }
   }
 
+  /** Keep an open new-comment window's draft alive (`preview:commentCommand` `keep-draft`, C-14.2). */
+  keepDraft(draftToken: string): CommentAck {
+    const touched = this.keys.touchDraft(draftToken, this.binding)
+    return touched.ok ? { ok: true } : { ok: false, code: touched.code }
+  }
+
   /** One write (`preview:commentSave`). */
   save(request: CommentSaveRequest): Promise<CommentSaveResult> {
-    return this.saveFlow(request)
+    return this.keys.withWords(request, this.saveFlow)
   }
 
   /**
@@ -444,9 +455,10 @@ export class PreviewCommentService implements CommentServiceApi {
     this.broadcaster.send(frame.parent, { focusFrame: this.frames.record(frame.frameTreeNodeId).key })
   }
 
-  /** The keyboard picker moved: the window's live region says where, in main's words (S-L-A). */
-  private onStep(step: PickerStepInput): void {
-    this.deps.shared.emit.modeChanged(this.windowId, { panelId: this.panelId, on: this.mode, reason: 'picker', ...pickerStepOf(step) })
+  /** The keyboard picker moved: the window's live region says where, in main's words (S-L-A; C-10 words read async). */
+  private onStep(step: PickerStep): void {
+    if (this.disposed || !this.mode) return
+    this.deps.shared.emit.modeChanged(this.windowId, { panelId: this.panelId, on: this.mode, reason: 'picker', ...step })
   }
 
   private onAnchors(record: FrameRecord, anchors: CommentAnchors): void {

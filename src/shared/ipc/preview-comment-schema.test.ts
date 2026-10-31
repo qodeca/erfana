@@ -257,6 +257,20 @@ describe('I-004 event and answer schemas', () => {
     expect(CommentDraftOpenedSchema.safeParse({ ...icon, ...draft, unsavedSource: true }).success).toBe(false)
   })
 
+  it('M-05 M-06 M-08 C-19 a menu with no draft names its reason as a refusal code – never text, never with a draft, never on a pin', () => {
+    const base = { panelId: PANEL, point: { x: 10, y: 20 }, displayPath: 'index.html', filePath: '/p/index.html', frame: false, fileKey: 'f1' }
+    const draft = { draftToken: DRAFT, draftKey: 'c'.repeat(32), target: { tag: 'p', classes: [], line: 2, excerpt: '<p>' } }
+    for (const reason of ['read-only', 'conflict-markers', 'unterminated-block', 'too-many-blocks', 'not-commentable']) {
+      expect(CommentDraftOpenedSchema.safeParse({ ...base, kind: 'menu', reason }).success, reason).toBe(true)
+    }
+    expect(CommentDraftOpenedSchema.safeParse({ ...base, kind: 'open', selection: true, reason: 'link' }).success).toBe(true)
+    // A code, never a sentence or a path.
+    expect(CommentDraftOpenedSchema.safeParse({ ...base, kind: 'menu', reason: 'index.html is read-only.' }).success).toBe(false)
+    expect(CommentDraftOpenedSchema.safeParse({ ...base, kind: 'menu', reason: 'x'.repeat(10_000) }).success).toBe(false)
+    expect(CommentDraftOpenedSchema.safeParse({ ...base, kind: 'menu', ...draft, reason: 'read-only' }).success).toBe(false)
+    expect(CommentDraftOpenedSchema.safeParse({ ...base, kind: 'icon', threadKeys: [KEY], blockKeys: [], reason: 'read-only' }).success).toBe(false)
+  })
+
   it('M1 a draft comes with its opaque element key and its target, all three or none', () => {
     const base = { panelId: PANEL, point: { x: 10, y: 20 }, displayPath: 'index.html', filePath: '/p/index.html', frame: false, fileKey: 'f1', kind: 'menu' }
     const target = { tag: 'div', classes: [], line: 2, excerpt: '<div>' }

@@ -32,7 +32,7 @@ import { join } from 'node:path'
 import { Worker } from 'node:worker_threads'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { serializeBlock, type CommentAnchor } from '../../../../shared/htmlComments'
-import { fixedId, makeComment } from '../../../../shared/htmlComments/__fixtures__/commentTestData'
+import { fixedId, makeComment } from '../../../../shared/comments/__fixtures__/commentTestData'
 import {
   ANCHORING_BENCH_ROLE,
   type AnchoringBenchRequest,

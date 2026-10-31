@@ -1,0 +1,335 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * HTML Preview comments – the comments drawer
+ * (docs/designs/comments/html-comments/drawer.html, status="proposed";
+ * plan docs/designs/comments/html-preview-comments.md §10.6).
+ *
+ * A FLOW SIBLING at the inline end of the page area, never absolute: the
+ * native page shrinks beside it instead of being covered, so the drawer needs
+ * no occluder and the page stays live. It opens instantly – the native view
+ * moves in one step, and an eased width would race it.
+ *
+ * Fields, buttons and the checkbox come from CommentWindow.css.
+ */
+
+.erf-comment-drawer {
+  flex: 0 0 var(--comments-drawer-width);
+  /* deviates: docs/designs/comments/html-comments/drawer.html — 280px minimum is a literal (card Exceptions, "Width") */
+  min-inline-size: 280px;
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
+  background: var(--color-bg-secondary);
+  border-inline-start: var(--border-width) solid var(--color-border-default);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+}
+
+/* Under a 640px panel: the whole width. "Show in preview" then closes it first. */
+.erf-comment-drawer--full {
+  flex-basis: 100%;
+  min-inline-size: 0;
+  border-inline-start: 0;
+}
+
+.erf-comment-drawer__head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-4) var(--space-4) var(--space-8);
+}
+.erf-comment-drawer__title {
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-emphasis);
+}
+
+.erf-comment-drawer__controls {
+  flex: 0 0 auto;
+  padding: 0 var(--space-8) var(--space-6);
+  border-block-end: var(--border-width) solid var(--color-border-default);
+}
+/* D-32, C-06: the HTML drawer's one-line note on what change detection misses. */
+.erf-comment-drawer__help {
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-base);
+  color: var(--color-text-tertiary);
+}
+
+/* "Show": a radio group drawn as three equal segments on one row (comments-v2
+   C-15, the Segmented card); "Show" is the group's name, not drawn. Selected =
+   the Rows card's signature (fill + 2px lime edge), a shape, not a colour. */
+.erf-comment-filter {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+}
+.erf-comment-filter__label-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.erf-comment-filter__option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-inline-size: 0;
+  block-size: var(--btn-height-sm);
+  padding: 0 var(--space-4);
+  background: transparent;
+  border: var(--border-width) solid var(--color-border-subtle);
+  /* Every segment has its 2px bottom edge – quiet until selected, then lime –
+     so the selected one changes colour, not height. */
+  border-block-end: var(--border-width-thick) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.erf-comment-filter__option:hover {
+  background: var(--color-bg-hover-solid);
+}
+.erf-comment-filter__option:active {
+  background: var(--color-bg-active);
+}
+.erf-comment-filter__option[aria-checked='true'] {
+  background: var(--color-bg-selected);
+  border-block-end-color: var(--color-brand-lime);
+  color: var(--color-text-emphasis);
+}
+.erf-comment-filter__option:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+.erf-comment-filter__count {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.erf-comment-drawer__check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--text-base);
+}
+
+/* Main left files out of the list (design §19 Rev 4). Above the scroll, not in
+   it: the windowed list's offset is measured once per filter, and the note
+   stays in view however far the list scrolls. */
+.erf-comment-drawer__note {
+  flex: 0 0 auto;
+  padding: var(--space-6) var(--space-8) 0;
+}
+.erf-comment-drawer__note > .erf-comment-banner {
+  margin-block-end: 0;
+}
+
+.erf-comment-drawer__scroll {
+  /* The windowed list measures its offset from here. */
+  position: relative;
+  flex: 1 1 auto;
+  min-block-size: 0;
+  overflow-y: auto;
+}
+
+.erf-comment-drawer__file {
+  margin: 0;
+  padding: var(--space-6) var(--space-8) var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  overflow-wrap: anywhere;
+}
+
+.erf-comment-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* A row: a real button stretched behind the content (Enter / click opens the
+   thread, R-10), plus the active row's Open as a second Tab stop – the Welcome
+   list's shape (Rows card Exceptions). Other rows have no Open. */
+.erf-comment-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-1) var(--space-4);
+  padding: var(--space-4) var(--space-8) var(--space-4) var(--space-6);
+  border-inline-start: var(--border-width-thick) solid transparent;
+  cursor: pointer;
+}
+.erf-comment-row:hover {
+  background: var(--color-bg-hover-solid);
+}
+.erf-comment-row--active {
+  background: var(--color-bg-selected);
+  border-inline-start-color: var(--color-brand-lime);
+}
+
+/* Beyond the first rows the browser skips layout and paint of rows off
+   screen: virtualisation without taking rows out of the DOM, so the roving
+   focus and the accessibility tree still see every row. */
+/* Above 200 rows only the rows near the viewport are mounted (CommentDrawer.tsx):
+   the list is a sizer as tall as all of them, each row placed by a transform. */
+.erf-comment-list--windowed {
+  position: relative;
+}
+.erf-comment-list--windowed > .erf-comment-row {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+}
+
+.erf-comment-row__main {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+}
+/* Inset: the list scrolls. */
+.erf-comment-row__main:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--space-1) * -1);
+}
+
+.erf-comment-row__line {
+  position: relative;
+  pointer-events: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  min-inline-size: 0;
+  grid-column: 1;
+}
+.erf-comment-row__label {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-text-bright);
+  overflow-wrap: anywhere;
+}
+.erf-comment-row__count {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+/* The first message, cut after two lines – the window shows it whole (card Exceptions, "Excerpt"). */
+.erf-comment-row__excerpt {
+  position: relative;
+  pointer-events: none;
+  grid-column: 1;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  color: var(--color-text-primary);
+}
+.erf-comment-row__meta {
+  position: relative;
+  pointer-events: none;
+  grid-column: 1;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+.erf-comment-row__open {
+  position: relative;
+  grid-column: 2;
+  grid-row: 1;
+  align-self: start;
+}
+
+.erf-comment-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  border: var(--border-width) solid var(--color-border-subtle);
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+/* A damaged row's tag is the ▲ attention counter (CommentToolbarTools.css,
+   C-15): amber never appears as tinted text beside the active row's lime edge. */
+
+/* The checkbox and the sort menu (C-15) on one row above the list. */
+.erf-comment-drawer__options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+.erf-comment-drawer__sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+
+/* "“was” → “now”" under a words-changed row's excerpt (C-06, R-11). */
+.erf-comment-row__words {
+  position: relative;
+  pointer-events: none;
+  grid-column: 1;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+/* OD-06: the removed comments, unfolded under the note – read-only. */
+.erf-comment-removed {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+}
+.erf-comment-removed__item {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-4) 0;
+  border-block-start: var(--border-width) solid var(--color-border-subtle);
+}
+.erf-comment-removed__item > .erf-comment-action {
+  justify-self: start;
+}
+
+.erf-comment-drawer__empty {
+  margin: 0;
+  padding: var(--space-12) var(--space-8);
+  color: var(--color-text-tertiary);
+  font-size: var(--text-base);
+}
+.erf-comment-drawer__status {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  align-items: flex-start;
+  padding: var(--space-12) var(--space-8);
+  color: var(--color-text-tertiary);
+}
+.erf-comment-drawer__status-line {
+  display: inline-flex;
+  gap: var(--space-3);
+  color: var(--color-text-primary);
+}
+.erf-comment-drawer__status-line > svg {
+  color: var(--color-error);
+  flex: 0 0 auto;
+}

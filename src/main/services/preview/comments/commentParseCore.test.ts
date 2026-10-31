@@ -21,7 +21,7 @@ import {
   addTo,
   fixedId,
   seededRandom
-} from '../../../../shared/htmlComments/__fixtures__/commentTestData'
+} from '../../../../shared/comments/__fixtures__/commentTestData'
 import {
   BASE_PAGE,
   commentOn,
@@ -235,6 +235,35 @@ describe('instrumentDocument – blocks resolved to tokens (§6 "On every load")
     expect(byId.get(fixedId('c-', 1))?.status).toBe('open')
   })
 
+  it('C-06 (HTML) pin: an open thread whose element text changed is marked changed; the others, and resolved ones, are not', () => {
+    const { text } = commentedPage()
+    expect(expectInstrumented(instrumentDocument(encodeText(text))).blocks.some(b => b.changed === true)).toBe(false)
+    const edited = text.replace('>Buy now</button>', '>Buy later</button>').replace('>Fresh coffee</h1>', '>Old coffee</h1>')
+    const byId = new Map(expectInstrumented(instrumentDocument(encodeText(edited))).blocks.map(b => [b.id, b]))
+    // The button's open thread is Changed; the heading's thread is resolved – history, never changed.
+    expect(byId.get(fixedId('c-', 1))?.changed).toBe(true)
+    expect(byId.get(fixedId('c-', 2))?.changed).toBeUndefined()
+    expect(byId.get(fixedId('c-', 3))?.changed).toBeUndefined()
+  })
+
+  it('C-12 an open thread carries its valid words for the page to mark; a resolved one, and one with invalid words, carry none', () => {
+    const sel = { exact: 'now', prefix: 'Buy ', suffix: '' }
+    const withSel = (data: ReturnType<typeof commentOn>, value: unknown) => ({ ...data, anchor: { ...data.anchor, sel: value } })
+    let text = BASE_PAGE
+    text = addTo(text, 'button', withSel(commentOn(text, 'button', 0, { id: fixedId('c-', 1) }), sel), { ws: 'collapse' }).text
+    text = addTo(text, 'em', withSel(commentOn(text, 'em', 0, { id: fixedId('c-', 2) }), { exact: 42 })).text
+    const resolved = {
+      id: fixedId('c-', 3),
+      status: 'resolved' as const,
+      resolved: { by: { name: 'Grace Hopper', role: 'human' as const }, at: '2026-10-26T09:12:00Z' }
+    }
+    text = addTo(text, 'h1', withSel(commentOn(text, 'h1', 0, resolved), { exact: 'Fresh', prefix: '', suffix: ' coffee' }), { ws: 'collapse' }).text
+    const byId = new Map(expectInstrumented(instrumentDocument(encodeText(text))).blocks.map(b => [b.id, b]))
+    expect(byId.get(fixedId('c-', 1))?.sel).toEqual(sel)
+    expect(byId.get(fixedId('c-', 2))).not.toHaveProperty('sel')
+    expect(byId.get(fixedId('c-', 3))).not.toHaveProperty('sel')
+  })
+
   it('an orphaned block has no target', () => {
     const block = commentOn(BASE_PAGE, 'button', 0, {
       id: fixedId('c-', 9),
@@ -259,6 +288,14 @@ describe('instrumentDocument – blocks resolved to tokens (§6 "On every load")
     expect(newer.kind).toBe('newer')
     expect(newer).not.toHaveProperty('id')
     expect(servedElement(html, tokenOf(doc, newer.target)).id).toBe('cta')
+  })
+
+  it('R3-10 a damaged block followed by other blocks points past them, at the element they all sit on', () => {
+    const run = `${damagedBlock(fixedId('c-', 5))}\n    ${newerBlock(fixedId('c-', 6))}\n    ${damagedBlock(fixedId('c-', 7))}\n    `
+    const doc = expectInstrumented(instrumentDocument(encodeText(insertBefore(BASE_PAGE, '<button', run))))
+    const html = decode(doc.html)
+    expect(doc.blocks).toHaveLength(3)
+    for (const block of doc.blocks) expect(servedElement(html, tokenOf(doc, block.target)).id).toBe('cta')
   })
 
   it('a damaged block with nothing eligible after it has no target', () => {

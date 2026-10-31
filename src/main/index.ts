@@ -544,13 +544,10 @@ app.whenReady().then(async () => {
   // built inside the composition root.
   previewHandlers = registerPreviewHandlers({
     getProjectPath: () => fileService.getProjectPath(),
-    // Main-side teardown on project switch. Until now this seam had no
-    // producer, so only the renderer's own `preview:close` tore views down
-    // (sd-074b §4.9).
-    subscribeProjectChanged: (listener) =>
-      projectService.session.onChange((prev, next) =>
-        listener(prev?.root ?? null, next?.root ?? null)
-      ),
+    // Main-side teardown on project switch (until this seam had a producer,
+    // only the renderer's own `preview:close` tore views down – sd-074b §4.9),
+    // and the project the `file-comment:*` family confines to (spec 024).
+    session: projectService.session,
     globalSettings: globalSettingsService
   })
 

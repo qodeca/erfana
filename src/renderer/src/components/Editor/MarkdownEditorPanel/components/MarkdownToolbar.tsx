@@ -63,6 +63,11 @@ export interface MarkdownToolbarProps {
   onExportPdf: () => void
   /** Callback to export the document as DOCX */
   onExportDocx: () => void
+  /**
+   * The comment tools, after Find in the preview-only view (spec 024,
+   * differences table D-28); the caller passes `null` in every other view.
+   */
+  commentTools?: React.ReactNode
 }
 
 /**
@@ -104,7 +109,8 @@ export function MarkdownToolbar({
   isExportingDocx,
   onViewModeChange,
   onExportPdf,
-  onExportDocx
+  onExportDocx,
+  commentTools = null
 }: MarkdownToolbarProps): JSX.Element {
   /**
    * Opens the search overlay with any currently selected text.
@@ -245,6 +251,7 @@ export function MarkdownToolbar({
           <Search size={16} strokeWidth={2} />
         </button>
       )}
+      {commentTools}
 
       <div className="toolbar-spacer" />
 

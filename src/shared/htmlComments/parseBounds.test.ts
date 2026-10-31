@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { PREVIEW_LIMITS } from '../preview-limits'
-import { encodeText } from './encoding'
+import { encodeText } from '../comments/encoding'
 import { indexHtml } from './htmlIndex'
 import { parseCommentFile } from './parse'
 import {

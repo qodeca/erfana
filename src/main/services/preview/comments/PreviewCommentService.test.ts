@@ -13,9 +13,9 @@ import { logger } from '../../LoggingService'
 import { BASE_PAGE, commentedPage } from './__test-helpers__/commentedPages'
 import { commentServiceFixture, SCROLL, type CommentServiceFixture } from './__test-helpers__/commentServiceFixture'
 import { FakeFrame, flush, serveLoad, tokenOfTag } from './__test-helpers__/commentServiceHarness'
-import type { CommentWriteResult } from './CommentWriter'
-import * as listBuilder from './commentListBuilder'
-import { SAVE_TIMEOUT_MS } from './commentSaveFlow'
+import type { CommentWriteResult } from '../../comments/CommentWriter'
+import * as listBuilder from '../../comments/commentListBuilder'
+import { SAVE_TIMEOUT_MS } from '../../comments/commentSaveFlow'
 import { READ_SCROLL_SCRIPT } from './commentScripts'
 
 vi.mock('../../LoggingService', () => ({
@@ -224,7 +224,17 @@ describe('PreviewCommentService', () => {
     f.emit.modeChanged.mockClear()
     await f.pick(f.top, { kind: 'step', via: 'keyboard', say: 'showing', token: tokenOfTag(load.doc, 'button'), view: VIEW })
     // BASE_PAGE's `<button id="cta" class="btn">` is on line 8: its tag and line, not its id or class.
-    expect(f.emit.modeChanged).toHaveBeenLastCalledWith(1, { panelId: 'html-preview-index', on: true, reason: 'picker', say: 'showing', element: { tag: 'button', line: 8 } })
+    // C-10: plus its kind from main's table, and its first words from main's own read of the file (said once read).
+    const modeChanged = f.emit.modeChanged
+    await vi.waitFor(() =>
+      expect(modeChanged).toHaveBeenLastCalledWith(1, {
+        panelId: 'html-preview-index',
+        on: true,
+        reason: 'picker',
+        say: 'showing',
+        element: { tag: 'button', line: 8, role: 'button', excerpt: 'Buy now' }
+      })
+    )
     await f.pick(f.top, { kind: 'step', via: 'keyboard', say: 'top', view: VIEW })
     expect(f.emit.modeChanged).toHaveBeenLastCalledWith(1, { panelId: 'html-preview-index', on: true, reason: 'picker', say: 'top' })
     expect(f.service.isModeOn()).toBe(true)

@@ -30,6 +30,8 @@ vi.mock('../../LoggingService', () => ({
 const PAGE = '/p/index.html'
 const FRAME = '/p/frame.html'
 const VIEW = { w: 800, h: 600, dpr: 1, x: 0, y: 0 }
+/** Where a real right-click on the view leaves the cursor, in screen DIPs (window content 10,20 + view 100,50 + 190,130). */
+const AT = { x: 300, y: 200 }
 
 function sinks(): { [K in keyof PageSignalSinks]: ReturnType<typeof vi.fn> } {
   return { hello: vi.fn(), exit: vi.fn(), parent: vi.fn(), step: vi.fn(), icon: vi.fn(), element: vi.fn(), anchors: vi.fn() }
@@ -54,6 +56,7 @@ async function setup() {
   if (!frames.isCommentable(frames.get(1)) || !frames.isCommentable(frames.get(2))) throw new Error('set-up: both frames bound')
   let now = 10_000
   let mode = true
+  let cursor = { ...AT }
   const out = sinks()
   const handler = createCommentPickHandler({
     panelId: 'panel',
@@ -61,7 +64,8 @@ async function setup() {
     tokens,
     now: () => now,
     mode: () => mode,
-    sinks: out as unknown as PageSignalSinks
+    sinks: out as unknown as PageSignalSinks,
+    geometry: { viewRect: () => ({ x: 100, y: 50, width: 800, height: 600 }), contentBounds: () => ({ x: 10, y: 20 }), cursor: () => cursor }
   })
   return {
     tokens,
@@ -74,7 +78,8 @@ async function setup() {
     out,
     handler,
     advance: (ms: number) => (now += ms),
-    setMode: (on: boolean) => (mode = on)
+    setMode: (on: boolean) => (mode = on),
+    moveCursor: (to: { x: number; y: number }) => (cursor = to)
   }
 }
 
@@ -119,6 +124,45 @@ describe('commentPickHandler element picks', () => {
     const pinKey = [...h.frames.get(1)!.pins.keys()][0]
     h.handler.pick(eventFrom(h.top), { kind: 'icon', key: pinKey, via: 'pointer', view: VIEW })
     expect(h.out.icon).toHaveBeenCalledTimes(1)
+  })
+
+  it('OD-01 a right-click outside comment mode (a context pick) opens the menu through the element checks; in comment mode it is dropped', async () => {
+    const h = await setup()
+    const token = tokenOfTag(h.page.doc, 'button')
+    const words = { sel: { exact: 'Buy', prefix: '', suffix: ' now' } }
+    h.setMode(false)
+    h.handler.pick(eventFrom(h.top), menuPick(token, 'button', { kind: 'context', screen: AT, ...words }))
+    expect(h.out.element).toHaveBeenCalledTimes(1)
+    expect(h.out.element.mock.calls[0][3]).toMatchObject({ kind: 'context', ...words })
+    // A forged token or tag outside the mode opens nothing either (SEC-04, R3-13 L5).
+    h.handler.pick(eventFrom(h.top), menuPick('zzzzzzzzzzzz', 'button', { kind: 'context', screen: AT }))
+    h.handler.pick(eventFrom(h.top), menuPick(token, 'p', { kind: 'context', screen: AT }))
+    expect(h.out.element).toHaveBeenCalledTimes(1)
+    h.setMode(true)
+    h.handler.pick(eventFrom(h.top), menuPick(token, 'button', { kind: 'context', screen: AT }))
+    expect(h.out.element).toHaveBeenCalledTimes(1)
+    expect(JSON.stringify(vi.mocked(logger.warn).mock.calls)).toContain('mode-on')
+  })
+
+  it('L-1 a context pick opens the menu only while the real cursor is over the view, at the point the page reports', async () => {
+    const h = await setup()
+    const token = tokenOfTag(h.page.doc, 'button')
+    h.setMode(false)
+    const context = (screen?: { x: number; y: number }) =>
+      h.handler.pick(eventFrom(h.top), menuPick(token, 'button', { kind: 'context', screen }))
+    // A page firing the pick while the reader's cursor is elsewhere on screen: dropped.
+    h.moveCursor({ x: 5, y: 5 })
+    context({ x: 5, y: 5 })
+    // The cursor on the view, but far from where the page says the click was: dropped.
+    h.moveCursor(AT)
+    context({ x: AT.x + 40, y: AT.y })
+    // No reported point at all: dropped (fail closed).
+    context()
+    expect(h.out.element).not.toHaveBeenCalled()
+    expect(JSON.stringify(vi.mocked(logger.warn).mock.calls)).toContain('cursor-elsewhere')
+    // A real click: the cursor within a few DIPs of the reported point.
+    context({ x: AT.x + 3, y: AT.y - 2 })
+    expect(h.out.element).toHaveBeenCalledTimes(1)
   })
 
   it('M-033 SEC-04 a forged, unknown or stale token opens nothing', async () => {
@@ -205,6 +249,38 @@ describe('commentPickHandler pins, control picks and budgets', () => {
     expect(h.out.icon.mock.calls[0][2]).toBe(key)
   })
 
+  it('C-17 (HTML) a stack pin is opened only when every key it names is one of the frame’s own pins', async () => {
+    const h = await setup()
+    const [key] = [...h.frames.get(1)!.pins.keys()]
+    h.handler.pick(eventFrom(h.top), { kind: 'icon', via: 'pointer', key, stack: ['p999'], view: VIEW })
+    expect(h.out.icon).not.toHaveBeenCalled()
+    h.handler.pick(eventFrom(h.top), { kind: 'icon', via: 'pointer', key, stack: [key], view: VIEW })
+    expect(h.out.icon).toHaveBeenCalledTimes(1)
+  })
+
+  it('M-1 a stack pin\'s keys reach the opener once each, without the clicked pin\'s own key', async () => {
+    const h = await setup()
+    const [key, other] = [...h.frames.get(1)!.pins.keys()]
+    expect(other).toBeDefined()
+    h.handler.pick(eventFrom(h.top), { kind: 'icon', via: 'pointer', key, stack: [key, other, other, key, other], view: VIEW })
+    expect(h.out.icon).toHaveBeenCalledTimes(1)
+    expect(h.out.icon.mock.calls[0][3].stack).toEqual([other])
+    // Only its own key, repeated: no stack at all.
+    h.handler.pick(eventFrom(h.top), { kind: 'icon', via: 'pointer', key, stack: [key, key], view: VIEW })
+    expect(h.out.icon.mock.calls[1][3].stack).toEqual([])
+  })
+
+  it('C-10 (HTML) a step counts the open comments main pinned on the element itself, never on a script-built one below it', async () => {
+    const h = await setup()
+    const [pin] = [...h.frames.get(1)!.pins.values()]
+    const step = { kind: 'step', via: 'keyboard', say: 'showing', token: pin.token, view: VIEW }
+    h.handler.pick(eventFrom(h.top), step)
+    expect(h.out.step).toHaveBeenLastCalledWith(expect.objectContaining({ say: 'showing', comments: pin.threadIds.length }))
+    expect(pin.threadIds.length).toBeGreaterThan(0)
+    h.handler.pick(eventFrom(h.top), { ...step, added: true })
+    expect(h.out.step.mock.lastCall?.[0]).not.toHaveProperty('comments')
+  })
+
   it('exit leaves the mode only while it is on; parent asks only from a child frame', async () => {
     const h = await setup()
     h.handler.pick(eventFrom(h.top), { kind: 'exit', via: 'keyboard', view: VIEW })
@@ -217,7 +293,7 @@ describe('commentPickHandler pins, control picks and budgets', () => {
     expect(h.out.parent).toHaveBeenCalledWith(h.child)
   })
 
-  it('SEC-06 a thousand picks in a second: at most five accepted, Esc on its own budget, one drop log line', async () => {
+  it('SEC-06 a thousand picks in a second: at most MAIN_PICKS_PER_SECOND (ten) accepted, Esc on its own budget, one drop log line', async () => {
     const h = await setup()
     const token = tokenOfTag(h.page.doc, 'button')
     for (let i = 0; i < 1_000; i++) h.handler.pick(eventFrom(h.top), menuPick(token, 'button'))
@@ -255,6 +331,29 @@ describe('commentPickHandler pins, control picks and budgets', () => {
     h.handler.hello(eventFrom(h.top), { extra: 1 })
     h.handler.anchors(eventFrom(h.child), { visible: 'all' })
     expect(h.out.hello).toHaveBeenCalledTimes(HELLOS_PER_FRAME_PER_SECOND * 2)
+  })
+
+  it('F-001 the first hello of a new document skips the frame budget, once: a page saved and reloaded faster than five a second keeps its pins', async () => {
+    const h = await setup()
+    for (let i = 0; i <= HELLOS_PER_FRAME_PER_SECOND; i++) h.handler.hello(eventFrom(h.top), {})
+    // The document's own repeats are on the frame budget: the sixth is dropped.
+    expect(h.out.hello).toHaveBeenCalledTimes(HELLOS_PER_FRAME_PER_SECOND)
+    // Six reloads in that same second: each new document's first hello lands, a second one does not.
+    for (let i = 0; i < 6; i++) {
+      h.frames.navigated(1, 'u', true)
+      h.handler.hello(eventFrom(h.top), {})
+      h.handler.hello(eventFrom(h.top), {})
+    }
+    expect(h.out.hello).toHaveBeenCalledTimes(HELLOS_PER_FRAME_PER_SECOND + 6)
+  })
+
+  it('F-001 a page that reloads itself in a loop is still held to the view-wide hello budget', async () => {
+    const h = await setup()
+    for (let i = 0; i < 200; i++) {
+      h.frames.navigated(1, 'u', true)
+      h.handler.hello(eventFrom(h.top), {})
+    }
+    expect(h.out.hello).toHaveBeenCalledTimes(HELLOS_PER_VIEW_PER_SECOND)
   })
 
   it('L5 a page that keeps making frames cannot outrun the view-wide hello and anchor budgets', async () => {

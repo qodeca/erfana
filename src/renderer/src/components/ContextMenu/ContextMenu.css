@@ -68,6 +68,25 @@
   flex: 1;
 }
 
+/* The reason line (Menu card #reason, decided): a second line inside the item,
+   under the label, never a stop of its own. Tertiary even on a disabled item –
+   it is information, not the inactive control. */
+.context-menu-item--described {
+  flex-wrap: wrap;
+}
+
+.context-menu-reason {
+  flex: 1 0 100%;
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-base);
+  color: var(--color-text-tertiary);
+  white-space: normal;
+}
+
+.context-menu-item--described:has(> .context-menu-icon) > .context-menu-reason {
+  padding-inline-start: calc(var(--icon-size-sm) + var(--space-4));
+}
+
 .context-menu-shortcut {
   margin-left: var(--space-8);
   font-size: var(--text-sm);

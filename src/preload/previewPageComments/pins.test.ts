@@ -5,7 +5,7 @@
  * decisions 20 and 33; J-005, J-014).
  */
 import { afterEach, describe, expect, it } from 'vitest'
-import { PIN_BODY_MIDDLE_Y, PIN_EDGE_INSET_PX, PIN_MAX_STEPS, PIN_PATH, PIN_STEP_PX } from './constants'
+import { PIN_BODY_MIDDLE_Y, PIN_EDGE_INSET_PX, PIN_PATH, PIN_ROW_CAP, PIN_STEP_PX } from './constants'
 import { overlaps } from './geometry'
 import { drawPin, pinContent, pinName, pinTooltip, placePins, type PinInput } from './pins'
 
@@ -61,7 +61,7 @@ describe('placePins (J-005)', () => {
     expect(pin.box).toEqual({ left: 800 - 24 - 4, top: 4, width: 24, height: 24 })
   })
 
-  it('moves an overlapping pin left in 22 px steps; the ancestor keeps the corner', () => {
+  it('C-17 (HTML) moves an overlapping pin left in 26 px steps (24 + 2); the ancestor keeps the corner', () => {
     document.body.innerHTML = '<section id="outer"><p id="inner"></p></section>'
     const outer = document.getElementById('outer') as HTMLElement
     const inner = document.getElementById('inner') as HTMLElement
@@ -70,7 +70,7 @@ describe('placePins (J-005)', () => {
     const pins = placePins([input(inner, box), input(outer, box)], VIEWPORT)
     expect(pins.map(p => [p.key, p.box.left])).toEqual([
       ['k-outer', 402],
-      ['k-inner', 380]
+      ['k-inner', 376]
     ])
   })
 
@@ -83,15 +83,30 @@ describe('placePins (J-005)', () => {
     expect(pins.map(p => p.box.left)).toEqual([4, 4])
   })
 
-  it(`L9 keeps the collision search bounded: at most ${PIN_MAX_STEPS} steps, against its own row only`, () => {
+  it(`L9 C-17 (HTML) a crowded spot keeps ${PIN_ROW_CAP} pins and merges the rest into one stack pin; other rows are not moved`, () => {
     const ids = Array.from({ length: 40 }, (_, i) => `p${i}`)
     const els = elements(...ids)
     const box = { left: 600, top: 200, width: 100, height: 50 }
     const pins = placePins(els.map(el => input(el, box)), VIEWPORT)
-    const lefts = pins.map(p => p.box.left)
-    // The first steps left; from the ninth on they stay put, overlapping.
-    expect(Math.min(...lefts)).toBe(702 - PIN_MAX_STEPS * PIN_STEP_PX)
-    expect(lefts.filter(left => left === 702 - PIN_MAX_STEPS * PIN_STEP_PX).length).toBe(40 - PIN_MAX_STEPS)
+    expect(pins.map(p => [p.key, p.box.left, p.content])).toEqual([
+      ['k-p0', 702, 'lines'],
+      ['k-p1', 702 - PIN_STEP_PX, 'lines'],
+      ['k-p2', 702 - 2 * PIN_STEP_PX, 'lines'],
+      ['k-p3', 702 - PIN_ROW_CAP * PIN_STEP_PX, '+37']
+    ])
+    const stack = pins[3]
+    expect(stack.members?.map(m => m.key)).toEqual(ids.slice(3).map(id => `k-${id}`))
+    expect(pinName(stack, 'p')).toBe('37 more commented elements here. Open.')
+    expect(pinTooltip(stack)).toBe('37 more commented elements – click to open')
+    const drawn = drawPin(document, undefined, stack, { label: 'p', selected: false })
+    expect(drawn.classList.contains('erf-hpc-pin--stack')).toBe(true)
+    // A damaged pin merged in makes the stack damaged; a stack shows at most +99.
+    const many = elements(...Array.from({ length: 110 }, (_, i) => `q${i}`))
+    const crowded = placePins(
+      many.map((el, i) => input(el, box, i === 50 ? { status: 'damaged' } : {})),
+      VIEWPORT
+    )
+    expect([crowded[3].content, crowded[3].status]).toEqual(['+99', 'damaged'])
     // A pin in another row is not moved by this crowd.
     const [other] = elements('other')
     const [crowd, below] = placePins([input(els[0], box), input(other, { ...box, top: 400 })], VIEWPORT)
@@ -108,7 +123,7 @@ describe('placePins (J-005)', () => {
     const [a] = elements('a')
     const box = { left: 100, top: 200, width: 50, height: 30 }
     const pins = placePins([input(a, box), input(a, box, { key: 'k-a2' })], VIEWPORT)
-    expect(pins.map(p => p.box.left)).toEqual([152, 130])
+    expect(pins.map(p => p.box.left)).toEqual([152, 126])
   })
 })
 
@@ -202,9 +217,11 @@ describe('drawPin (J-014)', () => {
     expect(el.querySelector('path')?.getAttribute('d')).toBe(PIN_PATH)
     expect(PIN_PATH).toBe('M2 2H22V17H7L2 22Z')
     expect(el.querySelectorAll('rect')).toHaveLength(2)
-    expect(el.getAttribute('role')).toBe('button')
-    expect(el.tabIndex).toBe(-1)
-    expect(el.getAttribute('aria-label')).toBe('1 comment on div#a. Open.')
+    // C-11 (HTML): visual only – no role, no tab stop, no accessible name; the name is kept as data.
+    expect(el.getAttribute('role')).toBeNull()
+    expect(el.hasAttribute('tabindex')).toBe(false)
+    expect(el.getAttribute('aria-label')).toBeNull()
+    expect(el.dataset.name).toBe('1 comment on div#a. Open.')
     expect(el.title).toBe('1 comment – click to open')
     expect(el.style.left).toBe('152px')
     expect(el.style.top).toBe('174px')
@@ -232,7 +249,7 @@ describe('drawPin (J-014)', () => {
     const damaged = drawPin(document, undefined, pinOf(0, 'damaged'), { label: 'div#a', selected: false })
     expect(damaged.querySelector('.erf-hpc-pin__count')?.getAttribute('data-text')).toBe('!')
     expect(damaged.className).toBe('erf-hpc-pin erf-hpc-pin--damaged')
-    expect(damaged.getAttribute('aria-label')).toBe('Damaged comment on div#a. Open.')
+    expect(damaged.dataset.name).toBe('Damaged comment on div#a. Open.')
     expect(damaged.title).toBe('Damaged comment – click to open')
   })
 

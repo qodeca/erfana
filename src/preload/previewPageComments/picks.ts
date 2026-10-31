@@ -21,6 +21,7 @@ import {
   PICK_BOX_MAX_PX,
   PICK_TAG_MAX_CHARS,
   PICK_TAG_PATTERN,
+  PIN_STACK_KEYS_MAX,
   RUNTIME_PATH_MAX_CHARS,
   TAG_MAX_CHARS,
   VIEW_HASH_MAX_CHARS
@@ -28,14 +29,17 @@ import {
 import { pathBelow, quoteOf, snapshotOf, whiteSpaceOf, type PickQuote } from './domPath'
 import type { Point } from './geometry'
 import type { TokenRegistry } from './tokens'
+import type { PageSel, PageWords } from './words'
 
 /**
  * What a pick asks for. `parent` = Alt+↑ out of a frame's `<body>`; `exit` =
- * Esc; `step` = the keyboard picker moved, for the window's live region.
+ * Esc; `step` = the keyboard picker moved, for the window's live region;
+ * `context` = the reader's right-click outside comment mode that the page did
+ * not cancel (OD-01).
  */
-export type PickKind = 'menu' | 'open' | 'icon' | 'parent' | 'exit' | 'step'
+export type PickKind = 'menu' | 'open' | 'icon' | 'parent' | 'exit' | 'step' | 'context'
 /** What a `step` reached: an element (with its label), the top of the page, or no child. */
-export type StepSay = 'showing' | 'top' | 'no-child'
+export type StepSay = 'showing' | 'top' | 'no-child' | 'last' | 'first'
 /** How the user picked. */
 export type PickVia = 'pointer' | 'keyboard'
 
@@ -88,6 +92,8 @@ export interface PickPayload extends PickTarget {
   readonly kind: PickKind
   readonly via: PickVia
   readonly key?: string
+  /** A stack pin's click (C-17): the keys of the other pins merged into it, in document order, capped. */
+  readonly stack?: readonly string[]
   /** A pointer pick: the trusted event's `screenX/Y` (R3-5). */
   readonly screen?: Point
   /** A keyboard pick: the element's top-left + 4 px, frame CSS pixels. */
@@ -96,7 +102,33 @@ export interface PickPayload extends PickTarget {
   readonly say?: StepSay
   /** A `showing` step: the element reached lies below the tokened one. */
   readonly added?: true
+  /** The selected words a menu, open or context pick is about (024-FR-004); main checks them against the file. */
+  readonly sel?: PageSel
+  /** The selection was longer than 200 code points. */
+  readonly long?: true
+  /** The selection ran past the target and was cut to it. */
+  readonly crossed?: true
   readonly view: PickView
+}
+
+/**
+ * What a pick says about selected words: the words, and whether they were
+ * long or cut. Nothing for a whole-element selection, or for an element main
+ * cannot look up (no token: a pick with words names its tokened element).
+ */
+export function wordsPart(words: PageWords | null, target: PickTarget): Pick<PickPayload, 'sel' | 'long' | 'crossed'> {
+  if (words?.sel === undefined || target.token === undefined) return {}
+  return {
+    sel: words.sel,
+    ...(words.long ? { long: words.long } : {}),
+    ...(words.crossed ? { crossed: words.crossed } : {})
+  }
+}
+
+/** What a pin click says about the pins merged into a stack pin (C-17): every key after the first, capped. */
+export function stackPart(members: readonly { readonly key: string }[] | undefined): Pick<PickPayload, 'stack'> {
+  if (members === undefined || members.length < 2) return {}
+  return { stack: members.slice(1, PIN_STACK_KEYS_MAX + 1).map(member => member.key) }
 }
 
 /** The element a `showing` step names: its own token, or its nearest tokened ancestor's and `added`. */
@@ -248,7 +280,7 @@ export function elementPoint(element: Element): Point {
  * is not in the file – its nearest tokened ancestor's token plus a runtime
  * description. An element too deep or too oddly named to describe falls back
  * to the ancestor alone. No tokened ancestor at all (a page served raw) sends
- * no token, and main answers "Can't comment here".
+ * no token, and the menu's item is disabled with its reason (menu matrix M-08).
  */
 export function describeTarget(registry: TokenRegistry, element: Element): PickTarget {
   const tokened = registry.nearestTokened(element)

@@ -21,6 +21,8 @@ export const previewCommentsBridge: PreviewCommentsBridge = {
   list: (panelId) => ipcRenderer.invoke(PreviewCommentChannels.LIST, { panelId }),
   reveal: (panelId, threadKey) =>
     ipcRenderer.invoke(PreviewCommentChannels.COMMAND, { panelId, command: 'reveal', threadKey }),
+  keepDraft: (panelId, draftToken) =>
+    ipcRenderer.invoke(PreviewCommentChannels.COMMAND, { panelId, command: 'keep-draft', draftToken }),
   save: (request) => ipcRenderer.invoke(PreviewCommentChannels.SAVE, request),
   setUnsavedSources: (paths) =>
     ipcRenderer.invoke(PreviewCommentChannels.SET_UNSAVED_SOURCES, { paths: [...paths] }),

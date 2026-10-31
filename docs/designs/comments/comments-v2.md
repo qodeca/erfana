@@ -479,7 +479,7 @@ Copy:
 - HTML tooltip: 'Comment mode (Ctrl+Alt+M) – on: click an element or select text to comment, Esc to leave'.
 - HTML announce: 'Comment mode on. Click an element, select text, or press Tab to pick one. Esc to leave.'
 - Markdown announce: 'Comment mode on. Click a paragraph, select text, or press Tab to pick one. Esc to leave.'
-- Empty drawer: HTML 'No comments in this file yet. Turn on comment mode, then click an element or select text.' Markdown 'No comments in this file yet. Select text and click Comment, or turn on comment mode and click a paragraph.'
+- Empty drawer (differences table A-08, one sentence for both): 'No comments in this file yet. Select text and right-click, or turn on comment mode and click {an element | a paragraph}.'
 
 Markdown right-click with no selection, outside comment mode: the menu gets 'Comment on {kind}' aimed at the nearest `[data-line-start]` block, then a separator and the prompt items. 'Copy selection' is hidden when nothing is selected.
 
@@ -783,13 +783,15 @@ Every screen also lists its cards at the end, with path and status. A **decided*
 
 ### 8.1 Owner decisions these screens raise
 
-| # | Card | Status | Question |
-|---|---|---|---|
-| D-1 | Menu | decided | Add a description line under a disabled item (C-19)? The screens draw it as a labelled proposal. |
-| D-2 | Comment tools (`html-comments/toolbar.html`), Permission band | decided | Accept the quieter toolbar and the count's new name (C-20)? |
-| D-3 | Form | decided | Add a read-only state for the Narrow to words field (C-07)? |
-| D-4 | Focus | decided | **Answered by the owner (2026-10-28):** no two-tone ring for a picked Markdown block (C-08); it shows the one ring. The two-tone ring stays only on the HTML Preview overlay. |
-| D-5 | Segmented | proposed | Keep the drawer filter cells on one row (count beside the label) rather than the card's stacked cells? |
-| D-6 | Toolbar | proposed | Adopt `--toolbar-tool-height` (28px) for the Comment button, edge tab and count? |
-| D-7 | Colours | proposed | Add `--color-info-bg` / `--color-info-border` for the info banner (C-05)? |
-| D-8 | Claims ledger | – | Done: `comment-max-chars` and `comment-warn-chars` are numeric claims, so counters read 4000 and 3600, as the app shows them. |
+Refreshed 2026-10-29 against the current cards for spec 024 (024-FR-025); the approval record is `specs/spec-t3-024-unified-comments/design/approvals.md`.
+
+| # | Card | Status | Question | Now |
+|---|---|---|---|---|
+| D-1 | Menu | decided | A description line under a disabled item (C-19) | The card already draws it (`#reason`). Approved 2026-10-29, with the item keeping its action name (024-FR-027) |
+| D-2 | Comment tools (`html-comments/toolbar.html`), Permission band | decided | The quieter toolbar and the count's new name (C-20) | Approved 2026-10-29 |
+| D-3 | Form | decided | A read-only state for the "Narrow to words" field (C-07) | The card already has a Read-only state; the field uses it as drawn there. Approved 2026-10-29 |
+| D-4 | Focus | decided | No two-tone ring on a picked Markdown block (C-08) | Answered by the owner on 2026-10-28; unchanged |
+| D-5 | Segmented | proposed | Drawer filter cells on one row | Proposed card – direction of travel; no approval needed |
+| D-6 | Toolbar | proposed | `--toolbar-tool-height` (28 px) | Proposed card – direction of travel |
+| D-7 | Colours | proposed | `--color-info-bg` / `--color-info-border` | Proposed card – direction of travel |
+| D-8 | Claims ledger | – | Numeric claims for the counter | Done |

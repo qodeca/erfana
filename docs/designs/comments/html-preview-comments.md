@@ -6,6 +6,7 @@
 > Inputs: owner interview (grill-me, depth full, 35 locked decisions), an online survey of 20+ commenting tools, and four specialist designs (architecture, UX, security, test strategy). Conflicts between those designs are resolved in §3.
 > Revision 2 (2026-10-25): folds in three plan reviews – correctness against the code, coverage of the decisions, and risk/sequencing. Their blockers are fixed in place; §18 lists what changed.
 > Revision 3 (2026-10-26): folds in the P0 spike results ([docs/spikes/html-preview-comments.md](../../spikes/html-preview-comments.md)). **§19 is authoritative where it conflicts with earlier sections.**
+> **Paths moved (spec 024, 2026-10-30):** the module paths below are as shipped in v0.23.1. Spec 024 moved the parts both previews share: the parse5-free format core from `src/shared/htmlComments/` to `src/shared/comments/`, the write path, lock, key store and parse worker from `src/main/services/preview/comments/` to `src/main/services/comments/`, and the comment window, drawer, toolbar tools and copy from `src/renderer/src/components/Panels/HtmlPreviewPanel/comments/` to `src/renderer/src/components/Comments/`. The module map is [spec 024 architecture note 001](../../../specs/spec-t3-024-unified-comments/architecture/001-shared-comment-base.md) § 1.
 
 ## 1. Summary
 
@@ -273,7 +274,7 @@ interface FileCommentState {
 | Snapshot | 256 KB of raw `outerHTML` (cut on a code-point boundary, never leaving `--`) |
 | JSON depth | 6 |
 | Author name / email | 100 / 254 characters |
-| Pick signals | 5 per second per view |
+| Pick signals | 5 per second per frame in the page's preload (each new document starts again); 10 per second per view in main (spec 024 F-001, 2026-10-30 – pick, save and reload ran faster than 5 a second on a fast machine). A new document's first hello skips its frame's hello budget (the frame id survives a reload) and counts only in the view's |
 | Tokens per document | 640,000, counted as start tags before any parse; over it the page is served raw, "page too large" (§19 Rev 4; R3-13 had 100,000) |
 | File size | 25 MB (`COMMENT_FILE_MAX_BYTES`, equal to `PREVIEW.MAX_ASSET_BYTES`, the largest file the preview serves; §19 Rev 4 – was 4 MB). A file that grew past it after its load is read-only for comments with the reason "file too large" |
 | Bytes per list | 64 MB for every file of one list together, and at most 64 files (`COMMENT_LIST_MAX_BYTES`, §19 Rev 4); the files left out are counted and the drawer says so |
@@ -340,7 +341,7 @@ Entirely in the frame: `pointermove` → `elementFromPoint` → outline + label 
 3. Open with `O_NOFOLLOW` + dev/ino match; bounded read; hash.
 4. `decodeLossless` – UTF-8 ± BOM only, byte-identical round trip; else `COMMENT_ENCODING_UNSUPPORTED`.
 5. Conflict scan – a complete hunk at line starts → `COMMENT_FILE_CONFLICTED`.
-6. Parse. **Add**: if the hash equals `draft.fileHash`, use the draft offset; else re-anchor with the draft's backup anchors, require exactly one match, else `COMMENT_TARGET_MOVED`. **Edit/delete**: find the block by id; its `rawHash` must equal what the window opened (else `COMMENT_BLOCK_CHANGED`); damaged and newer blocks refused (except "Delete block" on a terminated damaged block whose bytes still match).
+6. Parse. **Add**: if the hash equals `draft.fileHash`, use the draft offset; else re-anchor with the draft's backup anchors, require exactly one match, else `COMMENT_TARGET_MOVED`. **Edit/delete**: find the block by id; its `rawHash` must equal what the window opened (else `COMMENT_BLOCK_CHANGED`); damaged and newer blocks refused (except "Delete damaged comment" on a terminated damaged block whose bytes still match).
 7. Splice on the decoded string, encode.
 8. Verify: `new == old[0:s] + insert + old[e:]` byte for byte; re-parse – comment-node delta is exactly +1 / 0 / −1 and the block's `@data` round-trips. Else fail closed.
 9. `atomicWriteBytesStrict`: `.erfana-tmp-` temp file in the same directory → fsync → re-read and re-hash the target (must equal step 3) → `renameWithRetry` (Windows `EPERM`/`EBUSY` backoff; never fall back to an in-place write) → keep mode and on-disk spelling. `EXDEV`/`ENOTSUP` → `COMMENT_WRITE_UNSUPPORTED_FS`.
@@ -360,7 +361,7 @@ Before enabling Save: `findEditorTabsShowing(api, projectPath)` with the **proje
 `GlobalSettingsSchema.comments = { authorName?, authorEmail?, identityNoticeSeen }`, lenient `.catch` (pattern `global-settings-schema.ts:80-84`). App-level `~/.erfana/settings.json` only – never project `.erfana/` (a cloned repo must not preset identity). The identity step shows on the first comment whenever `identityNoticeSeen` is false – also when the name was already set in Settings (then the fields are pre-filled and the notice is the point). Prompt copy in §10.7. No migration is needed: the new section is lenient and absent in older settings files.
 *Rev 3 note (P5, L6):* one identity rule for every place that checks one, `src/shared/htmlComments/identity.ts`: a name or email may not carry a control, format (bidi marks, overrides, isolates, zero-width), surrogate, private-use, unassigned, line/paragraph-separator or default-ignorable code point. The writer refuses such an author; reading the settings file treats such a value as unset (lenient); a **write** through `setSetting` is checked strictly and refused with `GLOBAL_SETTINGS_VALIDATION_FAILED` and a message naming the field.
 
-### 7.10 Drawer "Show on page"
+### 7.10 Drawer "Show in preview"
 `preview:commentCommand {panelId, command: 'reveal', threadId}` → main sends `commentState {reveal: key}` to the owning frame → `scrollIntoView({block: 'center'})` + flash. Frame-in-parent scrolling is spike S3.
 
 ## 8. IPC
@@ -394,7 +395,7 @@ Before enabling Save: `findEditorTabsShowing(api, projectPath)` with the **proje
 
 *Rev 3 note (P5):* also `COMMENT_PATH_REFUSED`, `COMMENT_FILE_READ_ONLY`, `COMMENT_WRITE_FAILED` and **`COMMENT_SAVE_PENDING`**: a save that outlasts its 15 s answer limit is answered `COMMENT_SAVE_PENDING` – still being written, not failed; the draft stays held so no second write starts, and if the write lands later main reloads the view and sends `preview:commentsChanged` even with unchanged counts, so the window re-lists (wording in §10.10). Payload additions: a `ThreadView` may carry `quote` – the stored element text for "It was attached to:", at most 200 characters, one line, invisible and bidi characters as visible `\uXXXX` (`visibleInline`, refused raw by the schema); the `icon` draft event may carry `draftToken`, `draftKey` and `target` (§7.7; §19 "Draft event fields"). Every `ErrorCode` fallback sentence in `errors.ts` is §10.10's, `{file}` included, pinned by `errors.comments.test.ts`.
 
-**Drawer mapping of block kinds**: `newer` (v2+) blocks go under "Needs attention" with the tag "Newer format – read-only"; a resolved thread whose element is not found stays under "Resolved" with the "Element not found" tag. "Show on page" on a not-visible row scrolls to the in-file ancestor and says "This element isn't on screen right now"; on an orphaned or damaged row it is replaced by "Open in source" (jumps to the block's line).
+**Drawer mapping of block kinds**: `newer` (v2+) blocks go under "Needs attention" with the tag "Newer format – read-only"; a resolved thread whose element is not found stays under "Resolved" with the "Not found" tag. "Show in preview" on a not-visible row scrolls to the in-file ancestor and says "This comment's target isn't on screen right now"; on an orphaned or damaged row it is replaced by "Open in source" (jumps to the block's line).
 
 ## 9. Security
 
@@ -457,7 +458,7 @@ Rewrite `:699` ("no file-write path" → "no write path from the page; one user-
 - Shortcut ⌥⌘M / Ctrl+Alt+M (notation per the Writing card; the shipping tooltip still spells out "Cmd+Option+M" – see §10.10). Match the **typed key** `m` with modifiers, never the physical key (AltGr+M types µ on German layouts) – except on macOS, where the physical KeyM stands in only when Option made the typed key something other than printable ASCII (§19 "One shortcut rule"). Verify Cmd+Option+M is not "Minimize All" on macOS.
   - *Rev 3 note:* the shortcut has three routes – main's forwarder (focus in the page), the panel root's `onKeyDown` (focus in the chrome) and `usePreviewGroupKeys` (focus on dockview's group element, where `group.focus()` leaves it after a tab switch; the panel renders in the overlay layer, outside that element). The third route acts only for the active tab and skips keys the root already saw; it also carries Back/Forward. Without it the toggle did nothing right after a preview tab became active (found on macOS).
 - Leave with Esc, the toggle or the shortcut. Esc order with focus in the page: open window → comment mode → existing "return to chip".
-- Mode indicators: pressed toggle; 2 px accent frame inside the page edge; top-centre tab "Comment mode – Esc to leave" (moves to the bottom when the pointer comes within 48 px). The band height never changes.
+- Mode indicators: pressed toggle; 2 px accent frame inside the page edge; top-centre tab "Comment mode · Esc to leave" (moves to the bottom when the pointer comes within 48 px). The band height never changes.
 - Cursor: system `crosshair`.
 - The mode belongs to the tab; it survives the save reload and same-tab navigation. Keyboard activation (`event.detail === 0`) moves focus into the page with the picker started.
 - The permission band card and `nav.css` narrow tiers are re-measured; below 446 px (the narrow tier) the Pins toggle leaves the row (the drawer's "Show comment icons" checkbox does the same job).
@@ -467,7 +468,7 @@ Rewrite `:699` ("no file-write path" → "no write path from the page; one user-
 - Border box only, two-tone: 2 px accent ring with 1 px ink line on both sides. Selected: same ring + 12% accent fill.
 - Label `button#buy.cta.primary 120×40`, system monospace 11 px; ≤ 2 classes then `…`, ≤ 40 characters; tag in accent, rest paper, size grey; `dir="ltr"`. Suffixes ` · script`, ` · frame other.html`, ` · 2 comments`; a frame that is not commentable inside reads `iframe · refused frame` / `iframe · inline frame` (below).
 - Above the element's top-left; flips below at the viewport top; clamped sideways.
-- Alt+↑ parent (stops at `<body>`, announces "Top of page"); Alt+↓ back down the path, else first child; the level holds while the pointer stays inside that box. Instant, no tween.
+- Alt+↑ parent (stops at `<body>`, announces "Top level – no parent to select."); Alt+↓ back down the path, else first child; the level holds while the pointer stays inside that box. Instant, no tween.
 - Same-project frame: its own elements; Alt+↑ from the frame's `<body>` moves to the `<iframe>` element in the parent (spike S8). Refused, `srcdoc` and about:blank frames: the `<iframe>` element itself, label `iframe · refused frame` / `iframe · inline frame`.
 - PDF export: the overlay is hidden while printing, so pins never land in the PDF. Find in page: overlay text lives in a closed shadow root and is excluded from find counts (test R-021 / E-022). *Rev 3 note (P7):* a closed shadow root does **not** hide text from Find in page – Chromium searches it. Every word the overlay draws (the label, the mode tab, a pin's number) is CSS generated content (`::before { content: attr(data-text) }`), which Find never counts, and the page holds no live region (§10.8).
 - Tiny (< 8 px): ring pushed out 2 px. Huge: clipped to the viewport, label sticks to the visible top-left. Fixed/sticky and scrolling: `getBoundingClientRect` per animation frame, drawn in the **top layer** (Popover API), snapped to device pixels.
@@ -516,7 +517,7 @@ Resolved by Anna K. · 25 Oct     [Re-open] [v]
 - Focus: new comment → text field; thread → window title (`tabindex="-1"`); delete confirmation → Cancel; close → back to the opener (list row, or native focus to the page with the picker on the same element).
 - Saving: "Saving…" (`aria-disabled`) → write → reload → restore → pin within 1 s with one flash → announce "Comment saved to index.html."
 - `[...]` per message: Edit (in place), Delete… (inline danger confirmation, destructive button right, focus on Cancel).
-- Damaged: warning banner, raw block in a read-only monospace box, [Copy raw text] [Open in source] [Delete block…]; conflict markers get their own wording.
+- Damaged: warning banner, raw block in a read-only monospace box, [Copy raw text] [Open in source] [Delete damaged comment…]; conflict markers get their own wording.
 - Unsaved source: warning banner with [Go to tab] [Save {file}]; draft stays editable; clears itself if autosave gets there first.
 - Not found / not visible: banner, stored quote struck through, Delete and Open in source.
 
@@ -547,7 +548,7 @@ Only open threads are counted. Clicking opens the window in any mode; the click 
 
 ### 10.6 Comment drawer
 
-Flow sibling at the inline end of `.html-preview-page-area` (never absolute), 320 px (min 280), opens instantly. Under a 640 px panel it takes the full width and "Show on page" closes it first. Filter "Show": **Open (n) · Resolved (n) · Needs attention (n)** (radio group). File order; "Not visible now" is an inline tag.
+Flow sibling at the inline end of `.html-preview-page-area` (never absolute), 320 px (min 280), opens instantly. Under a 640 px panel it takes the full width and "Show in preview" closes it first. Filter "Show": **Open (n) · Resolved (n) · Needs attention (n)** (radio group). File order; "Not visible now" is an inline tag.
 
 *Rev 4 note (owner bug):* as a full-width sheet the drawer hides **its own** page only – through the panel gate `covered`, never the window's occluder – and a tab dockview has hidden is not measured, so it keeps its last real width (§19 "Rev 4 – tab switch with the drawer open").
 
@@ -562,7 +563,7 @@ Marcin Obel · Today, 14:32
 section#pricing      [Not visible now]       [Open]
 ```
 
-Rows card contract (one Tab stop, ↑ ↓ Home End); Enter or click = Show on page (focus stays in the list); the active row's **Open** is the second Tab stop. Toolbar badge = open count, plus `· !1` when something needs attention. States: loading, empty per filter, read error with "Try again". Rows virtualised above ~200 items.
+Rows card contract (one Tab stop, ↑ ↓ Home End); Enter or click = Show in preview (focus stays in the list); the active row's **Open** is the second Tab stop. Toolbar badge = open count, plus `· !1` when something needs attention. States: loading, empty per filter, read error with "Try again". Rows virtualised above ~200 items.
 
 ### 10.7 First-run identity
 
@@ -571,11 +572,11 @@ Step 1 inside the comment window on the first comment (nothing is lost, no stack
 ```
 Before your first comment
 Erfana writes your name – and your email, if you add one – into the
-HTML file next to each comment. Anyone who can open the file can read
-them: in Erfana, in the page source, and in git history once the file
-is committed and pushed. Scripts in pages previewed in this project
-can read them too. Deleting a comment later does not remove it from
-git history.
+file next to each comment. Anyone who can open the file can read
+them: in Erfana, in the file's source, and in git history once the file
+is committed and pushed. In HTML files, scripts on previewed pages can
+read them too. Deleting a comment later does not remove it from git
+history.
 Name             [__________]  Shown next to your comments.
 Email (optional) [__________]  Leave empty to keep your email out of the file.
                                          [Cancel]  [Continue]
@@ -602,32 +603,34 @@ Contrast numbers quoted in design-system cards go into `docs/design-system/claim
 
 ### 10.10 Microcopy
 
+*Spec 024 note (2026-10-30):* the Toggle tooltip, Pins tooltip, Mode tab, Announce, Menu, Window titles, Buttons ("Reopen", "Show in preview"), Damaged, Not found, Drawer, Identity (§10.7), Settings and Unavailable rows follow the app's strings after comments-v2 and spec 024 (differences table A-02, A-03 with D-34, A-05 – A-10, § 4, C-16; state table S-07, S-08; menu matrix M-01 – M-10; C-19.4). `components/Comments/commentCopy.ts` and `commentCopyWords.ts` are the code's copy; the commentCopy pin snapshot holds what ships.
+
 | Where | String |
 |---|---|
-| Toggle tooltip | "Comment mode (Ctrl+Alt+M) – off" / "Comment mode (Ctrl+Alt+M) – on: click an element to comment, Esc to leave" (macOS: Cmd+Option+M); not ready: "Comment mode – available once the page has loaded". *Shipped as written; the Writing card's macOS form is "(⌥⌘M)", which the screens draw – an open Writing card defect (`commentModeShortcutLabel`).* |
+| Toggle tooltip | "Comment mode (Ctrl+Alt+M) – off" / "Comment mode (Ctrl+Alt+M) – on: click an element or select text to comment, Esc to leave" (macOS: Cmd+Option+M); not ready: "Comment mode – available once the page has loaded". *Shipped as written; the Writing card's macOS form is "(⌥⌘M)", which the screens draw – an open Writing card defect (`commentModeShortcutLabel`).* |
 | List button | "Comments, {n} open" · "Comments, {n} open, {k} need attention" · "Comments, {n} open, 1 needs attention" (a count of 1 takes the singular verb) · "Comments, none yet" · "Comments, none open" (nothing open, but resolved threads exist) |
-| Pins tooltip | "Show comment icons – on" / "Show comment icons – off: icons hidden on this page" |
-| Mode tab | "Comment mode – Esc to leave" |
-| Announce | "Comment mode on. Click an element, or press Tab to pick one. Esc to leave." · "Comment mode off." · "Top of page – no parent to select." · "No child elements." · "Showing {tag}, line {line}." · "Showing an element added by a script, inside {tag} on line {line}." |
-| Menu | "Add comment" · disabled "Can't comment here" |
-| Window titles | "New comment" · "Comment on {label}" · "Comments on {label}" · "Damaged comment" |
+| Pins tooltip | "Show comment icons – on" / "Show comment icons – off: icons hidden in this preview" |
+| Mode tab | "Comment mode · Esc to leave" |
+| Announce | "Comment mode on. Click an element, select text, or press Tab to pick one. Esc to leave." · "Comment mode off." · "Top level – no parent to select." · "Nothing inside to select." · "Showing {tag}, line {line}." · "Showing an element added by a script, inside {tag} on line {line}." |
+| Menu | label "Element" ("Selection" with words selected) · comment mode: "Add comment" · outside it: "Comment on element" · with words selected: "Comment on selection" · "Comment on the whole element" · an item that cannot be used keeps its name, disabled, with a reason line (menu matrix M-05 – M-08, M-10): "This part of the preview can't hold a comment." · the read-only reasons of menu matrix § 3 · "Comments are unavailable for this file: {reason}." |
+| Window titles | "New comment on element" · "Comment on element" · "Comments on element" · "Damaged comment" – the selector is on the context line (A-02, D-03) |
 | Context line | "{label} · {file}, line {n}" · "Added by a script – saved before <{ancestor}>." · "Saved in {frame file}." |
 | Field | label "Comment", placeholder "What should change here?", hint "Plain text. Saved inside {file}.", counter "{n} / 4000" |
 | Identity line | "Commenting as {name}" · "Change" |
-| Buttons | "Cancel" · "Save" (tooltip "Save (Ctrl+Enter)"; macOS ships "Save (Cmd+Enter)", the Writing card asks for "Save (⌘Enter)") · "Saving…" · "Reply" · "Resolve" · "Re-open" · "New comment" · "Edit" · "Delete…" · "Save changes" · "Close" · "Open" · "Show on page" · "Try again" |
+| Buttons | "Cancel" · "Save" (tooltip "Save (Ctrl+Enter)"; macOS ships "Save (Cmd+Enter)", the Writing card asks for "Save (⌘Enter)") · "Saving…" · "Reply" · "Resolve" · "Reopen" · "New comment" · "Edit" · "Delete…" · "Save changes" · "Close" · "Open" · "Show in preview" · "Try again" |
 | Meta | "{name} · {time}" · "· edited" · "Resolved by {name} · {time}" · "{n} replies" ("1 reply" for one) · "Draft restored" |
 | Save errors | "Write a comment first." · "Comments can be up to 4,000 characters. This one is {n}." · "Couldn't save: {file} is read-only. Your text is still here." · "This element changed in the file since you picked it. Close and pick it again – your text will be restored." · "{file} no longer exists. Copy your text before closing." · "Couldn't save the comment. Your text is still here – try again." · "Erfana can only add comments to UTF-8 files." · "{file} has unresolved git conflicts. Resolve them first." · "{file} is a link to another file, so Erfana won't write to it." |
 | Save pending (rev 3, P5) | "Still saving to {file}. Your comment appears here once it is written – no need to save again." |
 | Saved | "Comment saved to {file}." |
 | Unsaved source | "Save your edits first" / "{file} has unsaved changes in another tab. Save them first so your edits and this comment don't overwrite each other." · "Go to tab" · "Save {file}" · "Saved. You can add your comment now." · conflict variant (the tab also changed on disk; Go to tab only, no Save): "{file} has unsaved changes in another tab, and the file changed on disk too. Go to the tab and decide which version to keep, then add your comment." · the tab became clean without a save Erfana made: "The other tab has no unsaved changes now. You can add your comment." |
 | Delete | "Delete this comment? It is removed from {file}. Git history keeps earlier versions." → "Delete comment" · "Delete this thread and its {n} replies?" ("its 1 reply?" for one) → "Delete thread" |
-| Damaged | "Erfana can't read this comment block, so it won't change it. Fix it in the source, or delete it." · "This block contains git conflict markers. Resolve the conflict in the source." · "Raw text (read-only)" · "Copy raw text" · "Open in source" · "Delete block…" · "Delete this damaged block? Erfana removes exactly the text shown above from {file}." → "Delete block" · "This block changed on disk. Reopen it and try again." |
-| Not found / not visible | "Erfana can't find this element any more. The comment stays in {file}, line {n}." · "It was attached to:" · "This element isn't on screen right now – it may be on another slide or tab. Its icon comes back when it does." |
-| Drawer | "Comments" · "Close comments" · "Show" · "Open {n}" · "Resolved {n}" · "Needs attention {n}" · "Show comment icons" · tags "Not visible now", "Element not found", "Damaged", "Resolved", "In frame: {file}" · "Reading comments…" · "No comments in this file yet. Turn on comment mode and click an element." · "No open comments." · "No resolved comments." · "Nothing needs attention." · "Couldn't read comments from {file}." |
+| Damaged | "Erfana can't read this comment, so it won't change it. Fix it in the source, or delete it." · "This comment contains git conflict markers. Resolve the conflict in the source." · "Raw text (read-only)" · "Copy raw text" · "Open in source" · "Delete damaged comment…" · "Delete this damaged comment? Erfana removes exactly the text shown above from {file}." → "Delete damaged comment" · "This comment changed on disk. Erfana reloaded it – try again." (spec 024 C-19.4: errors never say "reopen"; 024-FR-007: never "block") |
+| Not found / not visible | "Erfana can't find what this comment was about any more. The comment stays in {file}, line {n}." · "It was attached to:" · "This element isn't on screen right now – it may be on another slide or tab. Its icon comes back when it does." |
+| Drawer | "Comments" · "Close comments" · "Show" · "Open {n}" · "Resolved {n}" · "Needs attention {n}" · "Show comment icons" · tags "Not visible now", "Not found", "Damaged", "Resolved", "In frame: {file}" · "Reading comments…" · "No comments in this file yet. Select text and right-click, or turn on comment mode and click an element." · "This comment's target isn't on screen right now" · "No open comments." · "No resolved comments." · "Nothing needs attention." · "Couldn't read comments from {file}." |
 | Pin | name "{n} comment(s) on {label}. Open." · damaged "Damaged comment on {label}. Open." · tooltip "{n} comments – click to open" |
 | Identity | §10.7 · "Enter a name to continue." · "That doesn't look like an email address." |
-| Settings | "Comments" · "Your name" – "Saved into HTML files next to each comment you write. Changing it affects new comments only." · "Your email (optional)" – "Also saved into the file. Leave empty to keep it out." · notice "Both are visible to anyone who can open the file – in the page source and in git history once pushed." · "Enter a name to add comments. Existing comments keep the name they were saved with." · feature flag "Comments in HTML preview" – "Lets you add comments to elements of a previewed page." · a settings write that failed: "Couldn't save this setting. Your text is still here – try again." |
-| Unavailable | toolbar tooltip "Comments are unavailable for this page: {reason}" · reasons "file too large" (over 25 MB, §19 Rev 4), "not a UTF-8 file", "page too large – it has too many elements", "the page keeps removing Erfana's overlay", "the page replaced its own document", "comments are turned off in Settings", "couldn't prepare the page" |
+| Settings | "Comments" · "Your name" – "Saved into the file next to each comment you write. Changing it affects new comments only." · "Your email (optional)" – "Also saved into the file. Leave empty to keep it out." · notice "Both are visible to anyone who can open the file – in its source and in git history once pushed." · "Enter a name to add comments. Existing comments keep the name they were saved with." · feature flag "Comments in HTML preview" – "Lets you comment on elements and selected text in previewed pages." · a settings write that failed: "Couldn't save this setting. Your text is still here – try again." |
+| Unavailable | toolbar tooltip and disabled menu items "Comments are unavailable for this file: {reason}." · reasons "file too large" (over 25 MB, §19 Rev 4), "not a UTF-8 file", "page too large – it has too many elements", "the page keeps removing Erfana's overlay", "the page replaced its own document", "comments are turned off in Settings", "couldn't prepare the page" |
 | File gone / draft expired | "{file} no longer exists. Copy your text before closing." · "This comment window was open too long. Pick the element again – your text is kept." → "Pick again" |
 | Write refused | "Erfana can't write to {file} on this drive." |
 | File limits (rev 4) | save error: "Erfana adds comments only to files of up to 25 MB and 640,000 elements." · read-only reason: "Erfana adds comments only to files of up to 25 MB and 640,000 elements. {file} is larger, so its comments are read-only." |
@@ -789,7 +792,7 @@ IDs: `HPC-U` unit, `HPC-P` property, `HPC-G` golden, `HPC-M` main, `HPC-I` IPC, 
 - SEC-03 untrusted `click`/`contextmenu`/pin events (`dispatchEvent`, `.click()`) send nothing.
 - SEC-04 page rewrites or forges `data-erfana-el` after load → unknown/stale token → no draft.
 - SEC-05 pick payloads with a path, an offset, extra keys or oversized values rejected.
-- SEC-06 1,000 picks/s → ≤ 5 accepted, one drop log line.
+- SEC-06 1,000 picks/s → ≤ 10 accepted (`MAIN_PICKS_PER_SECOND`), one drop log line.
 - SEC-07 `commentSave` from the preview webContents, a sub-frame or a forged origin refused before parsing.
 - SEC-08 reused, expired, other-window or pre-project-switch draft tokens refused.
 - SEC-09 frame `pushState`s to another path → comment still targets its navigated file, or is refused. *Rev 3 note (P5):* in real Chromium a `pushState` to another path throws `SecurityError`; after a same-document step (query, hash) a click still opens a draft on the file the load named (service e2e).
@@ -825,12 +828,12 @@ IDs: `HPC-U` unit, `HPC-P` property, `HPC-G` golden, `HPC-M` main, `HPC-I` IPC, 
 **React (`comments/*.test.tsx`)**
 - R-001 menu holds only "Add comment"; arrows, Enter, Esc; disabled "Can't comment here". R-002 occluder registered on open, released on close and unmount.
 - R-003 window: Save disabled for empty/whitespace; Ctrl/Cmd+Enter saves; Esc closes and keeps the draft; "Draft restored"; busy `aria-disabled`; every error keeps the text.
-- R-004 thread order, reply, resolve/re-open, edit/delete any message, delete confirmations (comment, thread). R-005 damaged view read-only with reason, Copy raw text, Open in source, Delete block (conflict wording). R-006 not found / not visible views.
+- R-004 thread order, reply, resolve/re-open, edit/delete any message, delete confirmations (comment, thread). R-005 damaged view read-only with reason, Copy raw text, Open in source, Delete damaged comment (conflict wording). R-006 not found / not visible views.
 - R-007 unsaved-source banner with Go to tab and Save; clears when saved. R-008 identity step only when the name is unset; name required; email validated; copy matches §10.7; Cancel aborts.
-- R-009 drawer filters and counts, file order, Not visible tag, Show on page, Open as second Tab stop, empty/loading/error states, virtualisation at 1,000 rows, narrow full-width mode.
+- R-009 drawer filters and counts, file order, Not visible tag, Show in preview, Open as second Tab stop, empty/loading/error states, virtualisation at 1,000 rows, narrow full-width mode.
 - R-010 toolbar toggles (`aria-pressed`/`aria-expanded`), badge with `· !n`, disabled before load and for remote pages. R-011 no "Send to agent" control anywhere.
 - R-012 tokens test (like `HtmlPreviewPanel.tokens.test.ts`) + overlay theme mapping matches `design-tokens.css`. R-013 dialog role, focus trap, focus targets, focus return, live-region "Comment saved". R-014 Settings "Comments" section persists, saved on blur, shows the visibility notice; feature-flag switch. R-015 store ignores stale responses. R-016 time formatting (today, yesterday, this year, other year) with injected clock and locale. R-017 bidi tokens visible in rendered text; `dir="auto"`.
-- R-018 an `open` draft event opens the comment window directly with no menu (decision 19). R-019 identity step: name preset in Settings → notice still shown once (pre-filled), never again. R-020 drawer tags: "Element not found", "Damaged", "Newer format – read-only" separately; Show on page vs Open in source per row kind. R-021 unavailable state: toolbar tooltip with each reason. R-022 file gone and draft expired ("Pick again") keep the text. R-023 comment mode survives the save reload and same-tab navigation. R-024 dirty guard conflict variant offers Go to tab only.
+- R-018 an `open` draft event opens the comment window directly with no menu (decision 19). R-019 identity step: name preset in Settings → notice still shown once (pre-filled), never again. R-020 drawer tags: "Not found", "Damaged", "Newer format – read-only" separately; Show in preview vs Open in source per row kind. R-021 unavailable state: toolbar tooltip with each reason. R-022 file gone and draft expired ("Pick again") keep the text. R-023 comment mode survives the save reload and same-tab navigation. R-024 dirty guard conflict variant offers Go to tab only.
 
 **E2E (`e2e/html-preview-comments*.e2e.ts`)**
 
@@ -848,8 +851,8 @@ IDs: `HPC-U` unit, `HPC-P` property, `HPC-G` golden, `HPC-M` main, `HPC-I` IPC, 
 | E-009 | P1 | Test writes an "agent edit" while the window is open → correct placement, agent edit kept |
 | E-010 | P1 | Damaged/conflicted fixture: listed, read-only, delete only where allowed, nothing else changes |
 | E-011 | P1 | Menu or window open → fresh still frame (shows the selected outline), native view hidden |
-| E-012 | P1 | Outside edit removes the target → "Element not found"; block still in the file; also when the next element has the same tag (§19 Rev 4) |
-| E-013 | P2 | 200 comments: drawer, pins, Show on page |
+| E-012 | P1 | Outside edit removes the target → "Not found"; block still in the file; also when the next element has the same tag (§19 Rev 4) |
+| E-013 | P2 | 200 comments: drawer, pins, Show in preview |
 | E-014 | P2 | Pins toggle |
 | E-015 | P2 | Hostile page: no window opened, mtime unchanged |
 | E-016 | P2 | Keyboard-only path: shortcut → Tab picker → Enter → type → Cmd/Ctrl+Enter |
@@ -1123,7 +1126,7 @@ Owner decision (2026-10-27, "Fix: reopen and reveal"): on a real page the owner 
 |---|---|---|---|
 | Kept open | The world-996 read before a write also records the top frame's open `<details>`, each by its **place** among the page's `<details>` in document order: the first 65,536 are looked at (`PREVIEW_LIMITS.COMMENT_SECTIONS_SCANNED_MAX`), by index – a live collection's `length` would count the whole document inside the read's 400 ms – and at most 256 are kept (`COMMENT_OPEN_SECTIONS_MAX`). A comment block is a comment node, so a save moves no place. The top frame's first hello after the write's reload commits the same page gets them back, once, as `commentState.openSections`; its preload opens them, outer before inner, before it scrolls, draws or reports, so the load's first anchors report already counts the pin visible. A place the page builds later is retried each animation frame within the 1 s restore budget; any user input stops that. | §7.5 steps 3, 6; §8 `commentState` (adds `openSections?: number[]`, ≤ 256) | `commentScripts.test.ts`, `commentReloadCoordinator.test.ts`, `PreviewCommentService.test.ts`, `state.test.ts`, `contract.test.ts`, `foldedSections.test.ts`; E-027 |
 | Scope | The scroll restore's: every comment write (add, reply, edit, resolve, delete) and comment mode's reload of a page served raw – also a write whose reload serves the page raw (its last comment deleted with the mode off): a state that is not commentable carries `openSections` too, and nothing else new. Never a navigation or an ordinary file-change reload: one hand-out per write, so a later reload of the page reopens nothing – unlike the scroll restore, which an armed write applies again at a later commit of the same page (unchanged here). A frame's own sections are not kept, as its scroll is best effort; a frame write reloads the whole view, so the top frame's are. Reopen only: a section open in the file that the reader had folded comes back open, as before. | §7.5 | `commentReloadCoordinator.test.ts` |
-| Reveal unfolds | A reveal opens every closed `<details>` around the element, outermost first, before `scrollIntoView` – not one whose first `<summary>` holds it, which shows while folded. The render after it reports the element visible, so "Not visible now" goes and the pin draws. A drawer row's **Open** now reveals its thread's element too (attached threads only), behind the window, so closing the window shows it; unlike "Show on page" it keeps the drawer and announces nothing. | §7.10, §10.6 | `foldedSections.test.ts`, `usePreviewComments.test.tsx`; E-027 |
+| Reveal unfolds | A reveal opens every closed `<details>` around the element, outermost first, before `scrollIntoView` – not one whose first `<summary>` holds it, which shows while folded. The render after it reports the element visible, so "Not visible now" goes and the pin draws. A drawer row's **Open** now reveals its thread's element too (attached threads only), behind the window, so closing the window shows it; unlike "Show in preview" it keeps the drawer and announces nothing. | §7.10, §10.6 | `foldedSections.test.ts`, `usePreviewComments.test.tsx`; E-027 |
 | Accordions | Opening a section of an exclusive accordion (`<details name>`) closes its open sibling, as a summary click would, so a reveal can fold the section the reader had open beside it. Accepted. | – | – |
 | Trust | The places are numbers from main's own read in an isolated world; main and the preload both parse them, and any bad entry drops the list (the scroll stays). Only main's state starts a restore or a reveal, on the one receive channel; nothing the page sends or dispatches does. The page sees a section open (its `toggle` fires), as it would see the reader open it. | §9.1 S4, S7 | `commentScripts.test.ts`, `state.test.ts`, `foldedSections.test.ts` |
 
@@ -1145,7 +1148,7 @@ Owner report (2026-10-27, Windows; `designs/decisions/decisions.html`, the windo
 |---|---|---|---|
 | Open in source closes the window | The window closes first, then the editor opens at the line (the drawer's own Open in source is unchanged – the drawer stays). Same order and reason as "Go to tab": a dialog left open would sit over the editor, and its focus trap would pull the keyboard back out of it. Focus is not handed back to the page – the editor takes it. Nothing is asked and nothing is lost: closing a window always keeps typed text (§10.4), and reply and edit text already live in the session drafts (`replyDraftKey`, `editDraftKey`), so the reply is there when the pin is clicked again. `useCommentDirtyGuard` is not involved – it guards a save against an unsaved *source* tab, not the window's own text. | §10.4 | `usePreviewComments.test.tsx`, `CommentWindow.threads.test.tsx`; E-028 |
 | The window belongs to its tab | The design was silent. The window is a `BaseDialog` – portalled to the app window, `position: fixed` – and dockview keeps a hidden tab mounted, so the window of a tab the reader switched away from floated over the tab now shown, and its `dialog` occluder (global) froze every other preview on its still frame: the E-026 class of bug, for the window instead of the drawer. Now `usePreviewComments` takes the panel's dockview visibility (`visible`) and withholds the window from the layer while its tab is hidden: the request is **kept**, so the window comes back with its tab, text restored from the session drafts; an open inner step (an edit, a delete confirmation) does not survive the round trip, its text does. The element menu of a hidden tab is dropped (it pointed at a page no longer on screen), quietly – no native focus to a page that is not shown. | §10.4, §10.3 | `usePreviewComments.test.tsx`; E-028 |
-| One button size | Every text button in the window is the Dialog.css button (`.dialog-btn` + variant: `--space-5` / `--space-12` padding, `--text-md`, `--font-semibold`) – the Dialog framework's mandatory button, as in `PromptDialog` (Ask / Modify / Prompt). Resolve, Re-open, Open in source, Copy raw text, Delete block…, Try again, and the banner actions Go to tab, Save {file} and Pick again move from the compact `.erf-comment-action` (24 px, `--text-sm`, regular) to the secondary variant. `.erf-comment-action` stays for the drawer, which is panel chrome sized with the toolbar. The 24 px icon buttons (close, a message's …, a resolved thread's chevron) are unchanged, as in every dialog. | §10.4, §10.11 Buttons; window card | `CommentWindow.threads.test.tsx`; E-028 |
+| One button size | Every text button in the window is the Dialog.css button (`.dialog-btn` + variant: `--space-5` / `--space-12` padding, `--text-md`, `--font-semibold`) – the Dialog framework's mandatory button, as in `PromptDialog` (Ask / Modify / Prompt). Resolve, Re-open, Open in source, Copy raw text, Delete damaged comment…, Try again, and the banner actions Go to tab, Save {file} and Pick again move from the compact `.erf-comment-action` (24 px, `--text-sm`, regular) to the secondary variant. `.erf-comment-action` stays for the drawer, which is panel chrome sized with the toolbar. The 24 px icon buttons (close, a message's …, a resolved thread's chevron) are unchanged, as in every dialog. | §10.4, §10.11 Buttons; window card | `CommentWindow.threads.test.tsx`; E-028 |
 | One primary per view | Save (new comment), Continue (identity), Save changes (an edit) and the danger button of a delete confirmation, as before. Reply is primary only while the view holds exactly one open thread; with several, every Reply is secondary – a row of violet buttons ranks nothing. Accepted: while an edit is open in a single-thread view, its Save changes and the thread's Reply are both primary; the edit is an inner step that holds focus. | §10.4 | `CommentWindow.threads.test.tsx` |
 | The foot wraps as a pair | At the larger size a thread view's foot (Open in source, New comment, Close) can pass the 360 px window. New comment and Close are one group (`.erf-comment-window__foot-end`), so a narrow window wraps the pair whole, right-aligned, under Open in source, rather than stranding Close alone. | §10.4 | `CommentWindow.threads.test.tsx` |
 

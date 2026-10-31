@@ -2,7 +2,7 @@
 
 Project-wide index of `ErrorCode` values in `src/shared/errors.ts`, grouped by category. For each code: the enum name, the user-facing message (from `ERROR_MESSAGES` map), and the primary throw site. For whisper + transcription codes, also the operator action on encounter.
 
-**Why this document exists**: Phase 4 introduced 6 new whisper codes (see [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)); the full enum has grown to 167 codes (counted on 2026-10-28, v0.23.1). A single mapping table saves every future maintainer a `grep -r ErrorCode` sweep.
+**Why this document exists**: Phase 4 introduced 6 new whisper codes (see [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)); the full enum has grown to 168 codes (counted on 2026-10-30, v0.23.1). A single mapping table saves every future maintainer a `grep -r ErrorCode` sweep.
 
 **Source of truth**: `src/shared/errors.ts`. If this doc drifts, `errors.ts` wins — file an issue.
 
@@ -250,9 +250,9 @@ Not an error: when the default-browser lookup fails, times out or returns an unu
 
 ---
 
-## HTML Preview comments (17 codes)
+## HTML Preview comments (18 codes)
 
-17 `COMMENT_*` in `src/shared/errors.ts`, added with HTML Preview comments in v0.23.0. The meanings come from `src/main/services/preview/comments/commentRefusals.ts`, which maps each finer refusal reason (logged with a path digest, never a path, a name or comment text) to one of these codes. User guide: [HTML preview § Comments](./html-preview/README.md#comments). `{file}` in the user copy is filled in with the file's name.
+18 `COMMENT_*` in `src/shared/errors.ts`, added with HTML Preview comments in v0.23.0 (`COMMENT_RENDER_CHANGED` with file comments, spec 024). The meanings come from `src/main/services/preview/comments/commentRefusals.ts`, which maps each finer refusal reason (logged with a path digest, never a path, a name or comment text) to one of these codes. User guide: [HTML preview § Comments](./html-preview/README.md#comments). `{file}` in the user copy is filled in with the file's name.
 
 | Code | User copy | Notes |
 |------|-----------|-------|
@@ -267,11 +267,12 @@ Not an error: when the default-browser lookup fails, times out or returns an unu
 | `COMMENT_UNSAVED_SOURCE` | "{file} has unsaved changes in another tab. Save them first so your edits and this comment don't overwrite each other." | An editor holds unsaved changes for the file |
 | `COMMENT_IDENTITY_REQUIRED` | "Enter a name to add comments." | No usable author name in the app settings |
 | `COMMENT_TARGET_MOVED` | "This element changed in the file since you picked it. Close and pick it again – your text will be restored." | The picked element is no longer in the file, or not uniquely |
-| `COMMENT_BLOCK_CHANGED` | "This block changed on disk. Reopen it and try again." | The block changed, turned damaged or is gone since the window read it |
+| `COMMENT_RENDER_CHANGED` | "Erfana can't add a comment here without changing how {file} looks in the preview, so nothing was saved. Your text is still here." | File comments (spec 024): every place the file's kind offers for the block would change the rendered page (`render-changed`). A picked element inside a generated region or the frontmatter is `COMMENT_TARGET_MOVED` (`generated-region`, `frontmatter`) |
+| `COMMENT_BLOCK_CHANGED` | "This comment changed on disk. Erfana reloaded it – try again." | The block changed, turned damaged or is gone since the window read it |
 | `COMMENT_WRITE_UNSUPPORTED_FS` | "Erfana can't write to {file} on this drive." | The drive cannot rename or fsync (network and FUSE mounts) |
 | `COMMENT_WRITE_FAILED` | "Couldn't save the comment. Your text is still here – try again." | Anything else: a file that kept changing during the save, a held file, a splice that failed its verification (fail closed), or a parse the comment parse worker could not run (`busy`, `parse-failed`) |
 | `COMMENT_DRAFT_EXPIRED` | "This comment window was open too long. Pick the element again – your text is kept." | Draft and key layer (`commentKeyStore.ts`), before any write: a draft lives ten minutes (`DRAFT_TTL_MS`) |
-| `COMMENT_KEY_INVALID` | "This comment is no longer open here. Reopen it and try again." | Draft and key layer: an unknown key, a key of another window, panel or view, or a key of another kind – without saying which |
+| `COMMENT_KEY_INVALID` | "This window is out of date – the comment changed or was removed. Close it and open the comment again." | Draft and key layer: an unknown key, a key of another window, panel or view, or a key of another kind – without saying which |
 | `COMMENT_SAVE_PENDING` | "Still saving to {file}. Your comment appears here once it is written – no need to save again." | Not a refusal: the save outlasted its answer and is still being written (`commentSaveFlow.ts`) |
 
 ---

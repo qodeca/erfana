@@ -62,6 +62,7 @@ export const previewCommentsGateway: PreviewCommentsBridge = {
   setMode: (...args) => commentsBridge().setMode(...args),
   list: (...args) => commentsBridge().list(...args),
   reveal: (...args) => commentsBridge().reveal(...args),
+  keepDraft: (...args) => commentsBridge().keepDraft(...args),
   save: (...args) => commentsBridge().save(...args),
   setUnsavedSources: (...args) => commentsBridge().setUnsavedSources(...args),
   onDraftOpened: (...args) => commentsBridge().onDraftOpened(...args),

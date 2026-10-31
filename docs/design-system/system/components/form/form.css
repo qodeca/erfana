@@ -7,7 +7,7 @@
  * PROPOSED – not adopted. The closest thing that ships is the comment window's
  * own copy (.erf-comment-field, .erf-comment-textarea, .erf-comment-input,
  * .erf-comment-counter, .erf-comment-error in
- * src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentWindow.css),
+ * src/renderer/src/components/Comments/CommentWindow.css),
  * which this file follows value for value except where the Form controls card
  * says otherwise. Adopting this is a MOVE, not a copy: the rules land in src/,
  * and scripts/design-sync.mjs then syncs the file back here.

@@ -51,6 +51,16 @@ export const RUNTIME_PATH_MAX_CHARS = 1_024
 export const QUOTE_MAX_CHARS = 200
 /** Characters of a quote's prefix and suffix (`QUOTE_CONTEXT_CHARS` in `anchor.ts`). */
 export const QUOTE_CONTEXT_CHARS = 32
+/** Code points of a pick's selected words (`SEL_EXACT_MAX_CHARS` in `anchorSel.ts`, spec 024 024-FR-004). */
+export const SEL_EXACT_MAX_CHARS = 200
+/** Code points of the context on each side of them (`SEL_CONTEXT_MAX_CHARS` in `anchorSel.ts`). */
+export const SEL_CONTEXT_MAX_CHARS = 32
+/** Marked words one pin may carry (`PIN_WORDS_MAX` in `commentPins.ts`, C-12). */
+export const PIN_WORDS_MAX = 20
+/** Keys of the other pins a stack pin's click names (`COMMENT_PICK_STACK_MAX` in the pick schema, C-17). */
+export const PIN_STACK_KEYS_MAX = 20
+/** Characters of a target's text read for its words; a longer target is commented whole. */
+export const WORDS_TEXT_MAX_CHARS = 200_000
 /** Characters of the `#hash` sent with a pick (`PREVIEW_LIMITS.COMMENT_VIEW_HASH_MAX_CHARS`). */
 export const VIEW_HASH_MAX_CHARS = 512
 /** Characters of a tag name (`TAG_MAX_CHARS` in `format.ts` is larger; §8 caps the pick at 32). */
@@ -99,23 +109,20 @@ export const PIN_BODY = { x: 2, y: 2, width: 20, height: 15 } as const
  * (the tail hangs below it).
  */
 export const PIN_BODY_MIDDLE_Y = PIN_BODY.y + PIN_BODY.height / 2
-/** The pin's box: a 24 × 24 hit target (WCAG 2.5.8) whose tail tip is at (2, 22). */
-export const PIN_BOX_PX = 24
-/** Where the tail tip sits inside the pin's box. */
-export const PIN_TIP = { x: 2, y: 22 } as const
-/** The tail tip's offset outward from the element's top-right corner (§10.5). */
-export const PIN_TIP_OFFSET_PX = 4
 /**
- * How far a pin clamped to an edge of the frame's visible viewport stays
- * inside it (§19 Rev 4 "pins at the right edge"): the tip's own 4 px offset
- * (`--space-2`), so a pin pushed to an edge keeps clear of it – and of comment
- * mode's 2 px frame along it.
+ * The pin's box, tail tip, edge inset, stack step and step cap: the shared
+ * overlay core's (spec 024), so every preview's pins step and stack alike.
+ * Bundled into this entry like a sibling module (ADR 0006).
  */
-export const PIN_EDGE_INSET_PX = PIN_TIP_OFFSET_PX
-/** How far an overlapping pin moves left along the top edge (§10.5). */
-export const PIN_STEP_PX = 22
-/** Steps an overlapping pin may take before it stays put, overlapping (bounds the search). */
-export const PIN_MAX_STEPS = 8
+export {
+  PIN_BOX_PX,
+  PIN_EDGE_INSET_PX,
+  PIN_MAX_STEPS,
+  PIN_ROW_CAP,
+  PIN_STEP_PX,
+  PIN_TIP,
+  PIN_TIP_OFFSET_PX
+} from '../../shared/comments/overlayCore/pinLayout'
 /** An element smaller than this gets its ring pushed out (§10.2 "Tiny"). */
 export const TINY_ELEMENT_PX = 8
 /** How far a tiny element's ring is pushed out. */

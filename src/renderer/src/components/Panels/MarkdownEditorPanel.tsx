@@ -50,19 +50,11 @@ import { MarkdownToolbar, EditorErrorBoundary } from '../Editor/MarkdownEditorPa
 import { EditorContentLayout } from './EditorContentLayout'
 import { DocumentStatsBar } from './DocumentStatsBar'
 import { EditorLoadError } from './EditorLoadError'
+import { useMarkdownComments } from '../Editor/markdownComments/useMarkdownComments'
 
 // Types and pure functions
 import type { ViewMode, EditorFile } from '../Editor/MarkdownEditorPanel/types'
-import {
-  calculateStats,
-  extractFileName,
-  getDefaultViewMode,
-  settleSavedFile,
-  shouldRecreateParentDirs,
-  shouldToastSaveError,
-  trackSaveInFlight,
-  type SaveTrigger
-} from './markdownEditorPanel.logic'
+import { calculateStats, extractFileName, getDefaultViewMode, settleSavedFile, shouldRecreateParentDirs, shouldToastSaveError, trackSaveInFlight, type SaveTrigger } from './markdownEditorPanel.logic'
 import { formatSaveError, loggableError } from '../../utils/errorUtils'
 import { formatTabTitle } from '../../utils/tabTitle'
 
@@ -212,17 +204,17 @@ export function MarkdownEditorPanel(
     externalChangeDetected,
     isFileDeleted,
     isReloading,
-    reloadFromDisk: handleReloadFromDisk,
+    reloadFromDisk: handleReloadFromDisk, reloadIfUnedited,
     keepLocal: handleKeepLocal,
     dismissConflict,
     clearDeletedState,
-    markSaving,
-    unmarkSaving,
+    markSaving, unmarkSaving,
     notifySaveComplete
   } = useFileWatcher({
     filePath: currentFile?.path ?? null,
     hasLocalChanges: currentFile?.modified ?? false,
-    onContentUpdate: handleContentUpdateFromWatcher
+    onContentUpdate: handleContentUpdateFromWatcher,
+    bufferNow: () => editorRef.current?.getEditor()?.getValue() // a comment save's re-read never overwrites a keystroke
   })
 
   // A save-failure reason shown for one file must not mute the same reason for
@@ -498,6 +490,8 @@ export function MarkdownEditorPanel(
     enabled: isActivePanel
   })
 
+  // Markdown Preview comments (spec 024): toolbar tools, paused band, pane overlay – preview-only view.
+  const comments = useMarkdownComments({ panelId, filePath: currentFile?.path, content: currentFile?.content ?? '', viewMode, setViewMode, editorRef, isActivePanel, isVisible: isPanelVisible, onFileWritten: reloadIfUnedited })
   // =========================================================================
   // Document Statistics
   // =========================================================================
@@ -529,9 +523,9 @@ export function MarkdownEditorPanel(
     onStart: () => setIsEditorReady(false), // Reset editor ready state when loading new file
     onLoaded: (filePath, { content, generation }) => {
       openedGenerationRef.current = generation
+      comments.prefetch(filePath, getDefaultViewMode(filePath)) // 024-NFR-001: main reads comments while the preview renders
       setCurrentFile({ path: filePath, content, modified: false })
-      // Set view mode based on file type using extracted logic
-      setViewMode(getDefaultViewMode(filePath))
+      setViewMode(getDefaultViewMode(filePath)) // by file type
     },
     // Never fail silently: without this the tab read "No file open"
     onFailed: (message) =>
@@ -667,8 +661,10 @@ export function MarkdownEditorPanel(
               onViewModeChange={setViewMode}
               onExportPdf={handleExportPdf}
               onExportDocx={handleExportDocx}
+              commentTools={comments.tools}
             />
           </EditorErrorBoundary>
+          {comments.band}
 
           {/* File conflict notification */}
           {externalChangeDetected && (
@@ -712,6 +708,7 @@ export function MarkdownEditorPanel(
             onPreviewRendered={handlePreviewRendered}
             onSelectionChange={setSelectedText}
             isVisible={isPanelVisible}
+            previewOverlay={comments.overlay}
           />
         </EditorErrorBoundary>
       ) : loadError ? (

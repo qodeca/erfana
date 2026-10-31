@@ -285,7 +285,8 @@ test.describe('HTML Preview comments – the reviewer path (P6 exit)', () => {
       .toBeGreaterThanOrEqual(40)
     // Comment mode survived the save reload (R-023).
     await expect(page.getByTestId('preview-band-comment-mode')).toHaveAttribute('aria-pressed', 'true')
-    await expect(page.getByTestId('preview-band-comments')).toHaveAccessibleName('Comments, 1 open', {
+    // C-15: the count is a labelled text button, "1 comment".
+    await expect(page.getByTestId('preview-band-comments')).toHaveAccessibleName('1 comment', {
       timeout: PREVIEW_BUDGET_MS
     })
 
@@ -319,7 +320,7 @@ test.describe('HTML Preview comments – the reviewer path (P6 exit)', () => {
 
     // The list button names what is there, and opens the drawer from the keyboard.
     const listButton = page.getByTestId('preview-band-comments')
-    await expect(listButton).toHaveAccessibleName('Comments, 2 open', { timeout: PREVIEW_BUDGET_MS })
+    await expect(listButton).toHaveAccessibleName('2 comments', { timeout: PREVIEW_BUDGET_MS })
     await listButton.focus()
     await page.keyboard.press('Enter')
     const drawer = page.getByTestId('comment-drawer')
@@ -339,9 +340,11 @@ test.describe('HTML Preview comments – the reviewer path (P6 exit)', () => {
     await expect(openFilter).toBeFocused()
     await expect(drawer.getByTestId('comment-drawer-row')).toHaveCount(2)
 
-    // Then the checkbox, then the list ONCE: arrows and Home move in it.
+    // Then the checkbox, the sort menu (C-15, beside it in the controls), then the list ONCE: arrows and Home move in it.
     await page.keyboard.press('Tab')
     await expect(page.getByTestId('comment-drawer-show-icons')).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(page.getByTestId(TEST_IDS.COMMENT_DRAWER_SORT)).toBeFocused()
     await page.keyboard.press('Tab')
     const mains = drawer.getByTestId('comment-drawer-row-main')
     await expect(mains.nth(0)).toBeFocused()
@@ -349,8 +352,7 @@ test.describe('HTML Preview comments – the reviewer path (P6 exit)', () => {
     await expect(mains.nth(1)).toBeFocused()
     await page.keyboard.press('Home')
     await expect(mains.nth(0)).toBeFocused()
-    // (Enter on a row – "Show on page" – is left to the unit tests: whether it
-    // keeps the drawer depends on the panel's width, under 640px it closes it.)
+    // (Enter on a row opens its thread, R-10; the unit tests cover it.)
 
     // Tab once more reaches the row's Open: the comment window, title focused.
     await page.keyboard.press('Tab')
@@ -570,11 +572,15 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     await expect(win.getByTestId('comment-message-text').nth(1)).toHaveText(REPLY)
     expect(await fsp.readFile(file, 'utf-8')).toContain(REPLY)
 
-    // Resolve: the thread folds, focus moves to Re-open, and the pin goes.
-    await page.getByTestId('comment-resolve').click()
-    await expect(win.getByTestId('comment-resolved-thread')).toHaveCount(1, { timeout: PREVIEW_BUDGET_MS })
-    await expect(chrome.announce()).toHaveText('Comment resolved.', { timeout: PREVIEW_BUDGET_MS })
-    await expect(page.getByTestId('comment-reopen')).toBeFocused()
+    // Resolve. C-13: with two open comments in the file the stepper shows and Resolve is
+    // "Resolve and next": the thread is written resolved and the window steps to the other
+    // open comment (em#when), saying where it landed; the pin goes.
+    await page.getByTestId('comment-resolve-next').click()
+    // Changed expectation under code review M-B (2026-10-30): the step counts the thread just resolved
+    // as resolved, so one open comment is left – "1 of 1", not the stale "1 of 2".
+    await expect(win.getByTestId('comment-window-polite')).toHaveText(/^Comment 1 of 1, on element, line \d+\.$/, { timeout: PREVIEW_BUDGET_MS })
+    await expect(win.getByRole('heading', { level: 2 })).toHaveText('Comment on element') // A-02: the selector stays in the context line
+    await expect.poll(async () => (await fsp.readFile(file, 'utf-8')).split('"status":"resolved"').length - 1, { timeout: PREVIEW_BUDGET_MS }).toBe(2)
     await page.getByTestId('comment-close').click()
     await expect(win).toHaveCount(0)
     await expectPin(app, 'cta', false, target)
@@ -582,15 +588,18 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     // The drawer lists it under Resolved.
     await chrome.openDrawer()
     await chrome.filter('resolved').click()
-    const resolvedRow = chrome.drawerRows().filter({ has: page.getByRole('button', { name: 'button#cta.btn', exact: true }) })
+    // C-10: a row is named by its first comment's words; its Open button still names the element.
+    // R-10: only the active row keeps its Open button, so find the row by its selector label.
+    const resolvedRow = chrome.drawerRows().filter({ hasText: 'button#cta.btn' })
     await expect(resolvedRow).toHaveCount(1, { timeout: PREVIEW_BUDGET_MS })
     await expect(chrome.filter('resolved')).toContainText('Resolved 2')
 
     // Re-open from the drawer: the pin comes back and the thread is open again.
-    await resolvedRow.getByTestId('comment-drawer-row-open').click()
+    await resolvedRow.getByTestId('comment-drawer-row-main').click() // R-10: a row click opens its thread
     await expect(win).toHaveAttribute('data-view', 'threads', { timeout: PREVIEW_BUDGET_MS })
     await page.getByTestId('comment-reopen').click()
-    await expect(chrome.announce()).toHaveText('Comment re-opened.', { timeout: PREVIEW_BUDGET_MS })
+    // C-19.4: the status action is spelled "Reopen".
+    await expect(chrome.announce()).toHaveText('Comment reopened.', { timeout: PREVIEW_BUDGET_MS })
     await expect(page.getByTestId('comment-reply-field')).toBeFocused({ timeout: PREVIEW_BUDGET_MS })
     await page.getByTestId('comment-close').click()
     await expect(win).toHaveCount(0)
@@ -729,10 +738,12 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     // Alt+↑ is its parent, Alt+↓ back down the same path: each step is said in
     // the panel's polite region (the page holds no screen-reader text, E-022), by
     // the tag and line main parsed – never the page's ids or classes (S-L-A).
+    // C-10 (HTML): the kind from main's table and the first words from main's own parse of the file (never the
+    // page's text), as the Markdown picker says it; the first steps add the keys.
     expect(await pressInPage(app, 'Up', ['alt'], STATIC_TARGET)).toBe(true)
-    await expect(chrome.announce()).toHaveText('Showing p, line 24.', { timeout: PREVIEW_BUDGET_MS })
+    await expect(chrome.announce()).toHaveText('Paragraph, line 24: “For one person. Every plan includes unlimited previews.”. Enter to comment, Shift+F10 for the menu.', { timeout: PREVIEW_BUDGET_MS })
     expect(await pressInPage(app, 'Down', ['alt'], STATIC_TARGET)).toBe(true)
-    await expect(chrome.announce()).toHaveText('Showing em, line 24.', { timeout: PREVIEW_BUDGET_MS })
+    await expect(chrome.announce()).toHaveText('Element, line 24: “unlimited”. Enter to comment, Shift+F10 for the menu.', { timeout: PREVIEW_BUDGET_MS })
     // Enter opens the window on the element the picker stopped at.
     expect(await pressInPage(app, 'Enter', [], STATIC_TARGET)).toBe(true)
     await expect(win).toHaveAttribute('data-view', 'new', { timeout: PREVIEW_BUDGET_MS })
@@ -752,7 +763,7 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     await expect(win).toHaveCount(0)
   })
 
-  test('E-014 the pins toggle hides and shows the pins, from the toolbar and from the drawer', async ({
+  test('E-014 C-20 (HTML) the drawer checkbox hides and shows the pins; the toolbar has no icons toggle', async ({
     windowWithTestProject,
     appWithTestProject
   }) => {
@@ -762,20 +773,17 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     const chrome = new CommentChrome(page, preview, 'e002.html')
     const target = HtmlPreviewPage.target(REVIEW)
     await openCommentPage(preview, app, REVIEW, REVIEW_TITLE)
-    await expect(chrome.iconsButton()).toHaveAttribute('aria-pressed', 'true', { timeout: PREVIEW_BUDGET_MS })
     await expectPin(app, 'cta', true, target)
+    await expect(chrome.iconsButton()).toHaveCount(0)
 
-    await chrome.iconsButton().click()
-    await expect(chrome.iconsButton()).toHaveAttribute('aria-pressed', 'false')
-    await expectPin(app, 'cta', false, target)
-    await expectPin(app, 'when', false, target)
-
-    // The drawer's checkbox is the same switch.
     await chrome.openDrawer()
     const check = chrome.drawer().getByTestId('comment-drawer-show-icons')
-    await expect(check).not.toBeChecked()
+    await expect(check).toBeChecked()
+    await check.uncheck()
+    await expectPin(app, 'cta', false, target)
+    await expectPin(app, 'when', false, target)
     await check.check()
-    await expect(chrome.iconsButton()).toHaveAttribute('aria-pressed', 'true', { timeout: PREVIEW_BUDGET_MS })
+    await expect(check).toBeChecked({ timeout: PREVIEW_BUDGET_MS })
     await expectPin(app, 'cta', true, target)
   })
 
@@ -807,10 +815,12 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     // a pointer left over the page's white margin cannot set the start.
     await clickElement(app, 'starter-name', 'none', STATIC_TARGET)
     // Tab moves the picker along the level, each step said in the polite region; Enter opens the window.
+    // C-10 (HTML): the kind from main's table and the first words from main's own parse of the file (never the
+    // page's text), as the Markdown picker says it; the first steps add the keys.
     expect(await pressInPage(app, 'Tab', [], STATIC_TARGET)).toBe(true)
-    await expect(chrome.announce()).toHaveText('Showing p, line 24.', { timeout: PREVIEW_BUDGET_MS })
+    await expect(chrome.announce()).toHaveText('Paragraph, line 24: “For one person. Every plan includes unlimited previews.”. Enter to comment, Shift+F10 for the menu.', { timeout: PREVIEW_BUDGET_MS })
     expect(await pressInPage(app, 'Tab', [], STATIC_TARGET)).toBe(true)
-    await expect(chrome.announce()).toHaveText('Showing button, line 25.', { timeout: PREVIEW_BUDGET_MS })
+    await expect(chrome.announce()).toHaveText('Button, line 25: “Buy now”. Enter to comment, Shift+F10 for the menu.', { timeout: PREVIEW_BUDGET_MS })
     expect(await pressInPage(app, 'Enter', [], STATIC_TARGET)).toBe(true)
     const win = chrome.window()
     await expect(win).toHaveAttribute('data-view', 'new', { timeout: PREVIEW_BUDGET_MS })
@@ -1063,7 +1073,7 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     await openCommentPage(preview, app, STATIC, STATIC_TITLE)
     const reviewPanel = await openCommentPage(preview, app, REVIEW, REVIEW_TITLE)
     await expect(activeTab('e002.html')).toHaveCount(1)
-    await expect(reviewed.listButton()).toHaveAccessibleName('Comments, 2 open', { timeout: PREVIEW_BUDGET_MS })
+    await expect(reviewed.listButton()).toHaveAccessibleName('2 comments', { timeout: PREVIEW_BUDGET_MS })
 
     // The drawer open on the reviewed page, its two comments listed, and comment mode on.
     await reviewed.openDrawer()
@@ -1094,7 +1104,7 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     // Its chrome is its own: no drawer, no count, mode off …
     await expect(other.drawer()).toHaveCount(0)
     await expect(other.listButton()).toHaveAttribute('aria-expanded', 'false')
-    await expect(other.listButton()).toHaveAccessibleName('Comments, none yet')
+    await expect(other.listButton()).toHaveAccessibleName('Comments')
     await expect(other.modeButton()).toHaveAttribute('aria-pressed', 'false')
     // … and the hidden tab kept its own: drawer open, mode on.
     await expect(reviewed.listButton()).toHaveAttribute('aria-expanded', 'true')
@@ -1164,7 +1174,8 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
 
     // A reply typed, then Open in source: the window is gone and the editor shows the element's line.
     await page.getByTestId('comment-reply-field').fill(DRAFT)
-    await page.getByTestId('comment-open-in-source').click()
+    // C-13 / C-19: with the stepper shown, Open in source is under More actions.
+    await chrome.moreAction('comment-open-in-source')
     await expect(win).toHaveCount(0)
     await tabs.waitForTab('e002.html')
     await tabs.expectActive('e002.html')
@@ -1237,7 +1248,7 @@ test.describe('HTML Preview comments – the pin at the page edge (§19 Rev 4 ow
     const target = HtmlPreviewPage.target(EDGE)
 
     await openCommentPage(preview, app, EDGE, EDGE_TITLE)
-    await expect(chrome.listButton()).toHaveAccessibleName('Comments, 1 open', { timeout: PREVIEW_BUDGET_MS })
+    await expect(chrome.listButton()).toHaveAccessibleName('1 comment', { timeout: PREVIEW_BUDGET_MS })
 
     // The owner's layout: the drawer as a side panel, the page view narrower
     // beside it. With the terminal put away the panel is wide enough for one

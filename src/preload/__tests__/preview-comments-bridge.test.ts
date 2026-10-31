@@ -26,6 +26,13 @@ describeBridge('previewComments bridge', previewCommentsBridge, {
       channel: 'preview:commentCommand',
       wire: [{ panelId: 'preview-a', command: 'reveal', threadKey: 'tkey' }]
     },
+    {
+      // C-14 (HTML): the draft keep-alive rides the same sender-gated command channel.
+      method: 'keepDraft',
+      args: ['preview-a', 'a'.repeat(32)],
+      channel: 'preview:commentCommand',
+      wire: [{ panelId: 'preview-a', command: 'keep-draft', draftToken: 'a'.repeat(32) }]
+    },
     { method: 'save', args: [save], channel: 'preview:commentSave', wire: [save] },
     {
       method: 'setUnsavedSources',

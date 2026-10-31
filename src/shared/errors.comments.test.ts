@@ -22,7 +22,9 @@ const SENTENCES = new Set([...MICROCOPY.matchAll(/"([^"]+)"/g)].map(match => mat
 const NOT_IN_MICROCOPY = new Set<ErrorCode>([
   ErrorCode.COMMENT_KEY_INVALID,
   ErrorCode.COMMENT_LIMIT,
-  ErrorCode.COMMENT_PATH_REFUSED
+  ErrorCode.COMMENT_PATH_REFUSED,
+  // Spec 024 (C25): the Markdown render check; its sentence and next step come with C-19's copy table
+  ErrorCode.COMMENT_RENDER_CHANGED
 ])
 
 const COMMENT_CODES = Object.values(ErrorCode).filter(code => code.startsWith('COMMENT_'))

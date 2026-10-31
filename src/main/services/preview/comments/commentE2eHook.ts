@@ -54,6 +54,25 @@ export function commentE2eHookEnabled(): boolean {
   return !app.isPackaged && process.env.ERFANA_E2E_TEST_HOOKS === '1'
 }
 
+/**
+ * The `globalThis` key an e2e spec puts its synthetic pointer under, in screen
+ * DIPs. `webContents.sendInputEvent` never moves the OS cursor, so without it
+ * the real-cursor gate on a right-click (`commentContextGate.ts`, L-1) would
+ * drop every e2e right-click.
+ */
+export const COMMENT_E2E_CURSOR_KEY = '__erfanaE2eCursor'
+
+/**
+ * The synthetic pointer an e2e spec set, behind the hook's gate – `undefined`
+ * in every shipped build, and for anything that is not two finite numbers.
+ */
+export function e2eCursor(): { x: number; y: number } | undefined {
+  if (!commentE2eHookEnabled()) return undefined
+  const value = (globalThis as Record<string, unknown>)[COMMENT_E2E_CURSOR_KEY] as { x?: unknown; y?: unknown } | undefined
+  const { x, y } = value ?? {}
+  return typeof x === 'number' && typeof y === 'number' && Number.isFinite(x) && Number.isFinite(y) ? { x, y } : undefined
+}
+
 function install(): void {
   const panels = (): CommentE2ePanelState[] =>
     [...sources].flatMap(source => (source.panel === undefined ? [] : [source.panel()]))

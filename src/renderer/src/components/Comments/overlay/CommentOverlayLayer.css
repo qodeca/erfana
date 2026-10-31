@@ -1,0 +1,291 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * The renderer's comment overlay host (spec 024): a layer over the preview
+ * pane, outside the rendered content. It takes no pointer input itself – only
+ * its icons do – so the preview under it scrolls, selects and clicks as before.
+ *
+ * Tokens only; `border-radius: 0` (root CLAUDE.md § Design system). The
+ * outline is the Focus card's one ring (differences table D-06), drawn as a
+ * box so the content itself is never restyled.
+ */
+
+.erf-comment-host {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: var(--z-dropdown);
+}
+
+/* Comment mode: the preview reads as a picking surface. */
+.erf-comment-host--mode {
+  box-shadow: inset 0 0 0 var(--border-width-thick) var(--color-border-focus);
+}
+
+.erf-comment-host__tab {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  max-inline-size: calc(100% - var(--space-8));
+  padding: var(--space-1) var(--space-4);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background-color: var(--color-border-focus);
+  color: var(--color-bg-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  border-radius: 0;
+}
+
+.erf-comment-host__outline {
+  position: absolute;
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+  border-radius: 0;
+}
+
+/* A comment icon: the HTML pin's speech bubble (docs/designs/comments/html-comments/overlay.css,
+   comments-v2/marks.html "Icon states"; state table S-01) – accent body, ink edge, two ink text
+   lines for one comment, else the count in bold mono. A real button outside the Tab order (C-11). */
+.erf-comment-host__icon {
+  position: absolute;
+  display: block;
+  padding: 0;
+  pointer-events: auto;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  border-radius: 0;
+}
+
+.erf-comment-host__icon svg {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  overflow: visible;
+}
+
+.erf-comment-host__pin-body {
+  fill: var(--color-accent-primary);
+  stroke: var(--color-brand-black);
+  stroke-width: var(--border-width);
+  stroke-linejoin: miter;
+}
+
+.erf-comment-host__pin-line {
+  fill: var(--color-brand-black);
+}
+
+/* The count is generated content in a foreignObject over the bubble body, never a text node (E-022). */
+.erf-comment-host__count {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 100%;
+  block-size: 100%;
+  color: var(--color-brand-black);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--font-bold);
+  line-height: var(--leading-none);
+}
+
+.erf-comment-host__count::before {
+  content: attr(data-text);
+}
+
+/* Hover – on the icon, or on one of its marked words (C-17 linked hover) – recolours an open icon only. */
+.erf-comment-host__icon:not(.erf-comment-host__icon--damaged):hover .erf-comment-host__pin-body,
+.erf-comment-host__icon--hover:not(.erf-comment-host__icon--damaged) .erf-comment-host__pin-body {
+  fill: var(--color-brand-violet-hover);
+}
+
+/* Damaged (S-07, S-08): the warning fill with an ink "!". */
+.erf-comment-host__icon--damaged .erf-comment-host__pin-body {
+  fill: var(--color-warning);
+}
+
+/* The stack of a crowded row, "+3" (C-17): the elevated fill with an accent edge and count. */
+.erf-comment-host__icon--stack:not(.erf-comment-host__icon--damaged) .erf-comment-host__pin-body {
+  fill: var(--color-bg-elevated);
+  stroke: var(--color-accent-primary);
+}
+
+.erf-comment-host__icon--stack:not(.erf-comment-host__icon--damaged) .erf-comment-host__count {
+  color: var(--color-accent-primary);
+}
+
+/* Not found (C-05, R-16): a dashed ghost with no fill at the comment's place – never an icon's look. */
+.erf-comment-host__ghost {
+  position: absolute;
+  padding: 0;
+  pointer-events: auto;
+  cursor: pointer;
+  background: transparent;
+  border: var(--border-width) dashed var(--color-text-tertiary);
+  border-radius: 0;
+}
+
+.erf-comment-host__ghost:hover {
+  background-color: var(--color-bg-hover-solid);
+}
+
+.erf-comment-host__icon:focus-visible,
+.erf-comment-host__ghost:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+/* C-17: the pointer on marked words – a hand over the pane (its title names the author). */
+.erf-comment-host-pane--mark,
+.erf-comment-host-pane--mark * {
+  cursor: pointer;
+}
+
+/* The drawer docks over the right edge of the pane. */
+.erf-comment-host__drawer {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  display: flex;
+  max-inline-size: 100%;
+  z-index: var(--z-sticky);
+}
+
+/* The picked target holds real focus and wears the one ring (C-08.3). The
+   attribute goes when the pick moves or the mode ends; a pick by keyboard is
+   focused from a key press, so :focus-visible matches it; a pick by pointer
+   is focused with `focusVisible: true` (useHostPointerKeys.ts, D-06). */
+.markdown-preview-content [data-line-start][tabindex='-1']:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+/* The scroller is a tab stop while comments are live (C-08.1). */
+.markdown-preview[tabindex='0']:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--space-1) * -1);
+}
+
+/* The Comment button over a selection (comments-v2 C-16): the Surfaces card's
+   floating edge and shadow, anchored by its end edge at the end of the
+   selection's last line, above it – or below it near the top. It takes no
+   focus, so the selection stays. */
+.erf-comment-select-btn {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: var(--btn-height-sm);
+  padding: 0 var(--space-4);
+  pointer-events: auto;
+  cursor: pointer;
+  background-color: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-md);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+.erf-comment-select-btn--above {
+  transform: translate(-100%, calc(-100% - var(--space-4)));
+}
+.erf-comment-select-btn--below {
+  transform: translate(-100%, var(--space-4));
+}
+.erf-comment-select-btn:hover {
+  background-color: var(--color-bg-hover-solid);
+}
+
+/* Commented words (024-FR-004; C-12 on the Text highlights card): the fill
+   and a continuous bar, painted by the Custom Highlight API so the content
+   is never changed (commentHighlights.ts). Below Find in paint order. */
+::highlight(erf-comment),
+::highlight(erf-comment-active),
+::highlight(erf-comment-changed) {
+  background-color: var(--color-comment-mark);
+  text-decoration: underline var(--comment-mark-bar-width) var(--color-comment-mark-bar);
+  text-decoration-skip-ink: none;
+  text-underline-offset: var(--space-2);
+}
+
+/* The open thread's words: the same fill and a double bar, never a stronger
+   fill (R-01); in Markdown the words also take the emphasis ink. */
+::highlight(erf-comment-active) {
+  text-decoration-style: double;
+  color: var(--color-text-emphasis);
+}
+
+/* The words of a Changed thread (C-06): the same fill, a dashed accent bar –
+   a shape, not a colour only. */
+::highlight(erf-comment-changed) {
+  text-decoration-style: dashed;
+}
+
+/* A Changed thread's icon (C-06): a filled 4 px notch at its top-left, the
+   shape that says "changed" without colour (comments-v2.css, the HTML pin's). */
+.erf-comment-host__icon--changed::before {
+  content: '';
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  inline-size: var(--space-2);
+  block-size: var(--space-2);
+  background-color: var(--color-brand-white);
+  box-shadow: 0 0 0 var(--border-width) var(--color-brand-black);
+}
+
+/* The live selection is never the mark's look (C-12): the selection keeps its
+   own token, so "commented" and "selected" read apart. */
+.markdown-preview-content ::selection {
+  background-color: var(--color-bg-selected);
+  color: var(--color-text-emphasis);
+}
+
+@media (forced-colors: active) {
+  ::highlight(erf-comment),
+  ::highlight(erf-comment-active) {
+    background-color: Mark;
+    color: MarkText;
+    text-decoration-color: CanvasText;
+  }
+
+  ::highlight(erf-comment-changed) {
+    background-color: Mark;
+    color: MarkText;
+    text-decoration-color: CanvasText;
+  }
+
+  .erf-comment-host__icon--changed::before {
+    background-color: CanvasText;
+    box-shadow: 0 0 0 var(--border-width) Canvas;
+  }
+
+  /* The HTML pin's forced-colours mapping (overlay.css): system colours replace the theme. */
+  .erf-comment-host__icon .erf-comment-host__pin-body {
+    fill: Highlight;
+    stroke: HighlightText;
+  }
+
+  .erf-comment-host__icon .erf-comment-host__pin-line {
+    fill: HighlightText;
+  }
+
+  .erf-comment-host__icon .erf-comment-host__count {
+    color: HighlightText;
+  }
+
+  .erf-comment-host__ghost {
+    border-color: CanvasText;
+  }
+
+  .markdown-preview-content ::selection {
+    background-color: Highlight;
+    color: HighlightText;
+  }
+}

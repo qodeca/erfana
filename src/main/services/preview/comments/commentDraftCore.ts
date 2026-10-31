@@ -6,8 +6,9 @@
  * §7.3 step 3, decisions 16–17, 34, §19 R3-8, R3-11, R3-12; tests M-033,
  * M-054, M-055).
  *
- * Runs in the comment parse worker as the `draft` and `pin` jobs
- * (`commentFileJobs.ts`), so no page – up to 25 MB – parses on the main thread.
+ * Runs in the comment parse worker as the `draft` and `pin` jobs of the HTML
+ * kind's table (`htmlCommentJobs.ts`), so no page – up to 25 MB – parses on
+ * the main thread.
  * A pin click is ONE job on one read: the blocks standing on the pin's element
  * and the draft for its "New comment" come from the same parse (§19 "One pin
  * job") – a 25 MB page does not fit the worker's document cache, so two jobs
@@ -25,6 +26,7 @@
  * snapshot cut and stripped (`prepareSnapshot`); a path that names an element
  * that IS in the file keeps no snapshot (M-054, `buildDraftAnchor`).
  */
+import { cutText } from '../../../../shared/comments/cutText'
 import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
 import {
   BOM_CHAR,
@@ -38,9 +40,10 @@ import {
   type RuntimeAnchor
 } from '../../../../shared/htmlComments'
 import type { CommentPick } from '../../../../shared/ipc/preview-comment-schema'
-import { writableRefusal, type JobDocument } from './commentJobDocs'
+import { addRefusal, type JobDocument } from '../../comments/commentJobDocs'
 import { positionTarget } from './commentParseCore'
-import type { CommentRefusal } from './commentRefusals'
+import type { CommentRefusal } from '../../comments/commentRefusals'
+import { draftWordsOf, type DraftWordsPart } from './commentWordsCore'
 
 /** Characters of the start-tag excerpt the menu shows (§10.4). */
 export const EXCERPT_MAX_CHARS = 200
@@ -67,7 +70,7 @@ export interface DraftEntry {
 }
 
 /** The parts of a pick the parse needs; the rest stays on main. */
-export type DraftPickPart = Pick<CommentPick, 'runtime' | 'ws'>
+export type DraftPickPart = Pick<CommentPick, 'runtime' | 'ws' | 'sel' | 'long' | 'crossed'>
 
 /** Build a draft for a token's element. */
 export interface DraftJob {
@@ -81,7 +84,7 @@ export interface DraftJob {
  * element cannot take comments ("can't comment here").
  */
 export type DraftJobResult =
-  | {
+  | ({
       readonly kind: 'draft'
       readonly ok: true
       /** UTF-16 offset of the start tag the block goes before. */
@@ -90,7 +93,7 @@ export type DraftJobResult =
       readonly anchor: CommentAnchor
       readonly ws?: 'collapse' | 'preserve'
       readonly target: DraftTargetView
-    }
+    } & DraftWordsPart)
   | { readonly kind: 'draft'; readonly ok: false; readonly refusal?: CommentRefusal }
 
 /** A damaged or newer block by its hash and start offset – main turns it into a key. */
@@ -107,6 +110,11 @@ export interface PinJob {
   readonly blocks: boolean
   /** The pick "New comment" is built from; absent: no draft (the element is not one a pick could name). */
   readonly pick?: DraftPickPart
+  /**
+   * The elements of the other pins merged into a stack pin (C-17) that count
+   * blocks: theirs come from this same parse – one read, one job (M4).
+   */
+  readonly stacked?: readonly DraftEntry[]
 }
 
 /** The pin's blocks – empty when the file changed – and the draft's parse half when one was asked for. */
@@ -124,14 +132,6 @@ export function lineAt(text: string, offset: number): number {
   let line = 1
   for (let at = text.indexOf('\n'); at !== -1 && at < offset; at = text.indexOf('\n', at + 1)) line += 1
   return line
-}
-
-/** `text` cut to `max` UTF-16 units, never through a surrogate pair. */
-export function cutText(text: string, max: number): string {
-  if (text.length <= max) return text
-  const cut = text.slice(0, max)
-  const last = cut.charCodeAt(cut.length - 1)
-  return last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut
 }
 
 /** The element's start tag as it is on disk, cut for the menu. */
@@ -190,7 +190,8 @@ function targetViewOf(text: string, anchorEl: IndexedElement, anchor: CommentAnc
 export function runDraftJob(document: JobDocument, job: DraftJob): DraftJobResult {
   if (!document.ok) return { kind: 'draft', ok: false, refusal: document.refusal }
   const { doc, hash } = document
-  const blocked = writableRefusal(doc.state)
+  // F-04: a full file refuses a new comment here, so the menu disables its item with the reason.
+  const blocked = addRefusal(doc.state)
   if (blocked !== null) return { kind: 'draft', ok: false, refusal: blocked }
   // The page shows what was served; a file changed since then is re-picked after its reload.
   if (hash !== job.entry.fileHash) return MOVED
@@ -210,7 +211,9 @@ export function runDraftJob(document: JobDocument, job: DraftJob): DraftJobResul
     fileHash: hash,
     anchor,
     ...(ws === undefined ? {} : { ws }),
-    target: targetViewOf(doc.text, anchorEl, anchor)
+    target: targetViewOf(doc.text, anchorEl, anchor),
+    // The words: the target's own text only – none for an element a script built (024-FR-004).
+    ...draftWordsOf(doc.index, el, job.pick, job.pick.runtime !== undefined || placement.kind === 'framework')
   }
 }
 
@@ -224,9 +227,9 @@ function pinBlocksOf(document: JobDocument, entry: DraftEntry): PinBlock[] {
     .map(block => ({ rawHash: block.rawHash, start: block.nodeRange[0] }))
 }
 
-/** The `pin` job: the pin's blocks and the draft on its element, from one parse. */
+/** The `pin` job: the pin's blocks, a stack's other pins' blocks and the draft on its element, from one parse. */
 export function runPinJob(document: JobDocument, job: PinJob): PinJobResult {
-  const blocks = job.blocks ? pinBlocksOf(document, job.entry) : []
+  const blocks = [...(job.blocks ? pinBlocksOf(document, job.entry) : []), ...(job.stacked ?? []).flatMap(entry => pinBlocksOf(document, entry))]
   if (job.pick === undefined) return { kind: 'pin', blocks }
   return { kind: 'pin', blocks, draft: runDraftJob(document, { kind: 'draft', entry: job.entry, pick: job.pick }) }
 }

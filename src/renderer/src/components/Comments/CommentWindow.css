@@ -1,0 +1,928 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * HTML Preview comments – the comment window, its fields, banners, threads and
+ * the identity step (docs/designs/comments/html-comments/window.html and
+ * identity.html, status="proposed"; plan docs/designs/comments/html-preview-comments.md
+ * §10.4, §10.7).
+ *
+ * Adopted from the card's comments.css. Buttons are NOT restated: the window
+ * is a dialog, so it uses Dialog.css's `.dialog-btn` variants (the Dialog
+ * framework's mandatory rule); this file adds only the busy dim. Every text
+ * button in the window is one of them – banner, thread and foot actions alike –
+ * so one window never shows two button sizes (design §19 Rev 4 "open in source
+ * and button sizes"). `.erf-comment-action` below is the drawer's.
+ *
+ * Small text is --color-text-tertiary, never --color-text-secondary, which
+ * measures under 4.5:1 on --color-bg-elevated (the window card's claim).
+ */
+
+/* The window composes on an unchanged BaseDialog (the Dialog framework's
+   rule). Its overlay stays the layer that takes an outside click (close,
+   keeping the draft), but paints nothing – the page under it is already a
+   still image, and the rest of Erfana stays readable. CommentWindow tags the
+   overlay with `erf-comment-layer` (BaseDialog takes no overlay class, and is
+   at its line budget); a `:has()` selector would do it in CSS alone, but
+   jsdom's selector engine cannot parse one and fails every style read in the
+   unit tests. The dialog container is a full-window shell that hit-tests
+   through to that layer; the window inside it is the only thing drawn,
+   anchored next to the element. */
+.dialog-overlay.erf-comment-layer {
+  display: block;
+  padding: 0;
+  background: none;
+  backdrop-filter: none;
+  animation: none;
+}
+
+.dialog-container.erf-comment-shell {
+  position: fixed;
+  inset: 0;
+  min-width: 0;
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  overflow: visible;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  animation: none;
+  pointer-events: none;
+}
+
+.erf-comment-shell > .erf-comment-window {
+  pointer-events: auto;
+}
+
+.erf-comment-window {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  inline-size: var(--comments-window-width);
+  /* deviates: docs/designs/comments/html-comments/window.html — 320px minimum and 560px maximum height are literals (card Exceptions, "Window size") */
+  min-inline-size: min(320px, 100vw - var(--space-8));
+  max-inline-size: min(var(--comments-window-max-width), 100vw - var(--space-8));
+  /* deviates: docs/designs/comments/html-comments/window.html — see "Window size" */
+  max-block-size: min(560px, 100vh - var(--space-8));
+  background: var(--color-bg-elevated);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-dialog);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+}
+
+/* Under 400px of page width: a sheet across the page area's foot. The
+   inline position is set by the component from the page area's box. */
+.erf-comment-window--sheet {
+  min-inline-size: 0;
+  max-inline-size: none;
+  border-inline: 0;
+  border-block-end: 0;
+}
+
+.erf-comment-window__head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-6) var(--space-6) var(--space-4) var(--space-8);
+  border-block-end: var(--border-width) solid var(--color-border-default);
+}
+
+.erf-comment-window__heading {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.erf-comment-window__title {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-tight);
+  color: var(--color-text-emphasis);
+  overflow-wrap: anywhere;
+}
+
+/* tabindex="-1" for the thread view's initial focus: the ring shows only when
+   the keyboard put it there. */
+.erf-comment-window__title:focus {
+  outline: none;
+}
+.erf-comment-window__title:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+/* "{label} · {file}, line {n}" – mono, because a selector and a path are code. */
+.erf-comment-window__context {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+  overflow-wrap: anywhere;
+}
+
+.erf-comment-window__body {
+  flex: 1 1 auto;
+  min-block-size: 0;
+  overflow-y: auto;
+  padding: var(--space-8);
+}
+
+.erf-comment-window__foot {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  padding: var(--space-6) var(--space-8);
+  border-block-start: var(--border-width) solid var(--color-border-default);
+}
+
+.erf-comment-window__foot-start {
+  margin-inline-end: auto;
+}
+
+/* The foot's closing actions ("New comment", "Close") as one group: in a
+   narrow window the group wraps whole onto a second row, right-aligned, under
+   "Open in source", instead of leaving one button stranded. */
+.erf-comment-window__foot-end {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  margin-inline-start: auto;
+}
+
+/* aria-disabled, never disabled: "Saving…" keeps focus where the user pressed.
+   Busy ("Saving…", aria-busy) keeps full strength – the Buttons card's busy
+   state (C-21). Blocked (a field is empty, the source is unsaved) is the
+   card's blocked state: the label AND the fill are dimmed, never the button
+   itself, so the focus ring keeps full strength – the Permission band card's
+   rule. */
+.erf-comment-window .dialog-btn[aria-disabled='true'] {
+  cursor: default;
+  transform: none;
+}
+.erf-comment-window .dialog-btn[aria-disabled='true']:not([aria-busy='true']) {
+  cursor: not-allowed;
+}
+.erf-comment-window .dialog-btn[aria-disabled='true']:not([aria-busy='true']) > span {
+  opacity: var(--opacity-disabled);
+}
+.erf-comment-window .dialog-btn-primary[aria-disabled='true']:not([aria-busy='true']),
+.erf-comment-window .dialog-btn-primary[aria-disabled='true']:not([aria-busy='true']):hover,
+.erf-comment-window .dialog-btn-primary[aria-disabled='true']:not([aria-busy='true']):active {
+  background: color-mix(in srgb, var(--color-btn-primary-bg) calc(var(--opacity-disabled) * 100%), transparent);
+}
+
+/* ---------- icon buttons: close and the per-message actions ---------- */
+
+.erf-comment-icon-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--btn-height-sm);
+  block-size: var(--btn-height-sm);
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--border-radius);
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+}
+.erf-comment-icon-btn:hover {
+  background: var(--color-bg-hover-solid);
+  color: var(--color-text-emphasis);
+}
+/* Pressed: the design system's pressed fill (--color-bg-active). */
+.erf-comment-icon-btn:active {
+  background: var(--color-bg-active);
+}
+.erf-comment-icon-btn:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+.erf-comment-icon-btn[aria-expanded='true'] {
+  background: var(--color-bg-selected);
+  color: var(--color-text-emphasis);
+}
+
+/* A small action in the comments drawer (its "Try again"): panel chrome, sized
+   with the toolbar. Never inside the comment window – see the file header. */
+.erf-comment-action {
+  flex: 0 0 auto;
+  block-size: var(--btn-height-sm);
+  padding: 0 var(--space-6);
+  background: transparent;
+  border: var(--border-width) solid var(--color-border-input);
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.erf-comment-action:hover {
+  background: var(--color-bg-hover-solid);
+}
+.erf-comment-action:active {
+  background: var(--color-bg-active);
+}
+.erf-comment-action:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+/* "Change" next to "Commenting as …": text that acts, in the link colour. */
+.erf-comment-link {
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--color-link);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: var(--space-1);
+  cursor: pointer;
+}
+.erf-comment-link:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+/* ---------- fields ---------- */
+
+.erf-comment-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.erf-comment-field + .erf-comment-field {
+  margin-block-start: var(--space-8);
+}
+
+.erf-comment-field__label {
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+}
+/* Settings with the feature off: the label and hint dim with the field. */
+.erf-comment-field--disabled .erf-comment-field__label,
+.erf-comment-field--disabled .erf-comment-note {
+  opacity: var(--opacity-disabled);
+}
+
+.erf-comment-textarea,
+.erf-comment-input {
+  inline-size: 100%;
+  padding: var(--space-4) var(--space-6);
+  background: var(--color-bg-input);
+  border: var(--border-width) solid var(--color-border-input);
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+}
+.erf-comment-input {
+  block-size: var(--input-height-md);
+  padding-block: 0;
+}
+/* Four lines to start, grows by dragging; never sideways. */
+.erf-comment-textarea {
+  min-block-size: calc(var(--text-base) * var(--leading-normal) * 4 + var(--space-8));
+  resize: vertical;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.erf-comment-textarea--reply {
+  min-block-size: calc(var(--text-base) * var(--leading-normal) * 2 + var(--space-8));
+}
+.erf-comment-textarea::placeholder,
+.erf-comment-input::placeholder {
+  color: var(--color-text-placeholder);
+}
+.erf-comment-textarea:hover,
+.erf-comment-input:hover {
+  border-color: var(--color-border-subtle);
+}
+/* Outward, as the Form card. The window body's 16px padding holds the ring. */
+.erf-comment-textarea:focus-visible,
+.erf-comment-input:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+.erf-comment-textarea[aria-invalid='true'],
+.erf-comment-input[aria-invalid='true'] {
+  border-color: var(--color-error);
+}
+.erf-comment-input:disabled,
+.erf-comment-check:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+.erf-comment-field__foot {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-6);
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+.erf-comment-field__hint {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Always shown, tertiary. From 3,600 a warning glyph and colour; over 4,000
+   an error glyph, colour and the field error. Never colour alone. */
+.erf-comment-counter {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.erf-comment-counter--near {
+  color: var(--color-warning);
+}
+.erf-comment-counter--over {
+  color: var(--color-error);
+}
+
+/* The Form card's error: icon + text under the field, linked by aria-describedby. */
+.erf-comment-error {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-error);
+}
+
+.erf-comment-note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+
+/* "Commenting as {name} [Change]" */
+.erf-comment-identity {
+  margin: var(--space-8) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+.erf-comment-identity bdi {
+  color: var(--color-text-primary);
+}
+.erf-comment-identity-edit {
+  margin-block-start: var(--space-8);
+}
+
+/* ---------- banners inside the window: the Feedback card's shape ---------- */
+
+.erf-comment-banner {
+  display: flex;
+  gap: var(--space-6);
+  align-items: flex-start;
+  padding: var(--space-6);
+  margin-block-end: var(--space-8);
+  border: var(--border-width) solid;
+  font-size: var(--text-base);
+}
+.erf-comment-banner--after {
+  margin-block: var(--space-8) 0;
+}
+.erf-comment-banner__icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  padding-block-start: var(--space-1);
+}
+.erf-comment-banner__body {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+.erf-comment-banner__title {
+  margin: 0 0 var(--space-2);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-emphasis);
+}
+.erf-comment-banner__text {
+  margin: 0;
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+.erf-comment-banner__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-block-start: var(--space-6);
+}
+.erf-comment-banner--warning {
+  background: var(--color-warning-bg);
+  border-color: var(--color-warning-border);
+}
+.erf-comment-banner--warning .erf-comment-banner__icon {
+  color: var(--color-warning);
+}
+.erf-comment-banner--error {
+  background: var(--color-error-bg);
+  border-color: var(--color-error-border);
+}
+.erf-comment-banner--error .erf-comment-banner__icon {
+  color: var(--color-error);
+}
+.erf-comment-banner--success {
+  background: var(--color-success-bg);
+  border-color: var(--color-success-border);
+}
+.erf-comment-banner--success .erf-comment-banner__icon {
+  color: var(--color-success);
+}
+/* deviates: docs/design-system/system/components/feedback/index.html — the Feedback card has no info tone; the notice borrows the accent violet (card Exceptions, "Info banner") */
+.erf-comment-banner--info {
+  background: var(--color-brand-violet-muted);
+  border-color: var(--color-accent-primary);
+}
+.erf-comment-banner--info .erf-comment-banner__icon {
+  color: var(--color-accent-primary);
+}
+
+/* ---------- a thread ---------- */
+
+.erf-comment-thread + .erf-comment-thread,
+.erf-comment-thread + .erf-comment-resolved,
+.erf-comment-resolved + .erf-comment-thread,
+.erf-comment-resolved + .erf-comment-resolved {
+  margin-block-start: var(--space-8);
+  padding-block-start: var(--space-8);
+  border-block-start: var(--border-width) solid var(--color-border-default);
+}
+
+.erf-comment-message {
+  position: relative;
+}
+.erf-comment-message + .erf-comment-message {
+  margin-block-start: var(--space-6);
+}
+
+.erf-comment-message__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: var(--btn-height-sm);
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+.erf-comment-message__meta-text {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+.erf-comment-message__author {
+  color: var(--color-text-bright);
+  font-weight: var(--font-medium);
+}
+
+/* Plain text only: pre-wrap keeps the author's line breaks, anywhere breaks a
+   long URL, and dir="auto" on the element lets an RTL comment run RTL. */
+.erf-comment-message__text {
+  margin: var(--space-1) 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--color-text-primary);
+}
+
+/* Replies: one level, indented, with a rule on the start edge. */
+.erf-comment-replies {
+  margin: var(--space-6) 0 0;
+  padding-inline-start: var(--space-8);
+  border-inline-start: var(--border-width-thick) solid var(--color-border-default);
+}
+
+.erf-comment-thread__reply {
+  margin-block-start: var(--space-8);
+}
+.erf-comment-thread__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  margin-block-start: var(--space-4);
+}
+/* The last button, not the last child: a blocked button's hidden reason may follow it. */
+.erf-comment-thread__actions > .dialog-btn:last-of-type {
+  margin-inline-start: auto;
+}
+
+/* A resolved thread folds to one line. */
+.erf-comment-resolved {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+.erf-comment-resolved__text {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  display: inline-flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+.erf-comment-resolved__icon {
+  color: var(--color-success);
+  display: inline-flex;
+}
+.erf-comment-resolved__body {
+  flex: 1 0 100%;
+  font-size: var(--text-base);
+}
+
+/* Inline danger confirmation: never a second dialog. Destructive on the right,
+   focus on Cancel. */
+.erf-comment-confirm {
+  margin-block-start: var(--space-4);
+  padding: var(--space-6);
+  background: var(--color-error-bg);
+  border: var(--border-width) solid var(--color-error-border);
+}
+.erf-comment-confirm__text {
+  margin: 0;
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+.erf-comment-confirm__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  margin-block-start: var(--space-6);
+}
+
+/* Damaged: the raw block, read-only, in a recessed well. Focusable because it
+   scrolls – a scroller a keyboard cannot reach is one it cannot read. */
+.erf-comment-raw-label {
+  display: block;
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+.erf-comment-raw {
+  margin: 0;
+  max-block-size: calc(var(--text-sm) * var(--leading-normal) * 8 + var(--space-8));
+  overflow: auto;
+  padding: var(--space-4) var(--space-6);
+  background: var(--color-bg-primary);
+  border: var(--border-width) solid var(--color-border-default);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--color-text-primary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.erf-comment-raw:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+/* A not-found thread's stored quote: what the element said, struck through
+   because it is no longer in the file (window card, "not found"). */
+.erf-comment-quote-label {
+  display: block;
+  margin-block-start: var(--space-3);
+}
+.erf-comment-quote {
+  display: block;
+  margin: var(--space-3) 0 0;
+  padding-inline-start: var(--space-6);
+  border-inline-start: var(--border-width-thick) solid var(--color-border-subtle);
+  color: var(--color-text-tertiary);
+  text-decoration: line-through;
+  overflow-wrap: anywhere;
+}
+
+/* A bidi or zero-width control drawn as a visible token, so it cannot
+   silently reorder the line around it (threat S18). */
+.erf-comment-bidi {
+  display: inline-block;
+  padding: 0 var(--space-1);
+  border: var(--border-width) solid var(--color-warning-border);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
+  color: var(--color-warning);
+  unicode-bidi: isolate;
+  direction: ltr;
+}
+
+/* ---------- the identity step ---------- */
+
+.erf-comment-notice {
+  margin: 0 0 var(--space-8);
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+/* The Form card's checkbox: a 24 x 24 target around a 16px box. */
+.erf-comment-check {
+  appearance: none;
+  flex: 0 0 auto;
+  display: grid;
+  place-content: center;
+  inline-size: var(--btn-height-sm);
+  block-size: var(--btn-height-sm);
+  margin: 0;
+  background: var(--color-bg-input);
+  background-clip: padding-box;
+  /* Not a stroke: a transparent ring (--space-2 = 4px a side) that grows the
+     16px box to the 24px target while the fill stays 16px (padding-box clip).
+     A spacing token, because it is space, not a line weight. */
+  border: var(--space-2) solid transparent;
+  box-shadow: inset 0 0 0 var(--border-width) var(--color-border-input);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+}
+.erf-comment-check:checked {
+  /* The tick is the foreground on the violet fill (accentFill.contrast.test.ts). */
+  color: var(--color-btn-primary-text);
+  background-color: var(--color-accent-primary);
+  box-shadow: inset 0 0 0 var(--border-width) var(--color-accent-primary);
+}
+.erf-comment-check:checked::after {
+  content: '';
+  inline-size: var(--space-3);
+  block-size: var(--space-5);
+  border-inline-end: var(--border-width-thick) solid currentColor;
+  border-block-end: var(--border-width-thick) solid currentColor;
+  transform: translateY(calc(var(--border-width) * -1)) rotate(45deg);
+}
+/* Inward into the transparent border – the Focus card's recorded checkbox case. */
+.erf-comment-check:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--space-1) * -1);
+}
+
+/* Text for a screen reader only, and the always-mounted live regions. */
+.erf-comment-sr {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .erf-comment-window .dialog-btn {
+    transition: none;
+  }
+}
+
+/* A Windows contrast theme drops every fill: the selected filter, the active
+   drawer row and an open `…` menu button must keep a visible edge
+   (PreviewNavControls.css does the same for the toolbar toggles). The drawer
+   rules live here because both the window and the drawer load this file. */
+@media (forced-colors: active) {
+  .erf-comment-filter__option[aria-checked='true'] {
+    border-block-end-color: Highlight;
+  }
+  .erf-comment-row--active {
+    border-inline-start-color: Highlight;
+  }
+  .erf-comment-icon-btn[aria-expanded='true'] {
+    outline: var(--border-width) solid Highlight;
+    outline-offset: calc(var(--space-1) * -1);
+  }
+}
+
+/* ---------- comments-v2 window states (C-05, C-06, C-13, C-14, C-18, OD-05) ---------- */
+
+/* C-18: the Markdown Preview's window is docked, not modal – no shell, no
+   catcher; it sits over the preview pane at the dialog rung, placed by
+   `placeDocked` in viewport pixels. */
+.erf-comment-window--docked {
+  position: fixed;
+  z-index: var(--z-dialog);
+}
+.erf-comment-window--docked:focus {
+  outline: none;
+}
+
+/* C-18: an invisible probe with the docked window's positioning. Its box is
+   the one `position: fixed` resolves against here – dockview's `contain:
+   layout` makes that its grid, not the viewport – so the shell can move the
+   viewport-pixel placement into it (`inFixedFrame`). */
+.erf-comment-window-frame {
+  position: fixed;
+  inset: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* C-18: the edge tab a docked window folds to while its target is scrolled away. */
+.erf-comment-edge-tab {
+  position: fixed;
+  z-index: var(--z-dialog);
+  block-size: var(--btn-height-md);
+  padding: 0 var(--space-6);
+  transform: translateX(-100%);
+  background: var(--color-bg-elevated);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.erf-comment-edge-tab--below {
+  transform: translate(-100%, -100%);
+}
+.erf-comment-edge-tab:hover {
+  background: var(--color-bg-hover-solid);
+}
+.erf-comment-edge-tab:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+/* C-13: ‹ 3 of 12 › right of the title, a muted mono count between two icon buttons. */
+.erf-comment-stepper {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.erf-comment-stepper__count {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+}
+.erf-comment-icon-btn[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+.erf-comment-icon-btn[aria-disabled='true'] > svg {
+  opacity: var(--opacity-disabled);
+}
+
+/* W-11: "All open comments are resolved". */
+.erf-comment-done {
+  margin: var(--space-8) 0 0;
+  color: var(--color-text-primary);
+}
+
+/* C-05: "The comment itself is on line {n} of {file}." under the not-found banner. */
+.erf-comment-status-line {
+  margin-block: calc(var(--space-8) * -1 + var(--space-3)) var(--space-8);
+}
+
+/* C-06: Was / Now in the quote style; Was struck through and tertiary. */
+.erf-comment-status {
+  margin-block-end: var(--space-8);
+}
+.erf-comment-status .erf-comment-banner {
+  margin-block-end: var(--space-6);
+}
+.erf-comment-wasnow {
+  display: grid;
+  gap: var(--space-4);
+}
+.erf-comment-wasnow__label {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+.erf-comment-wasnow__was {
+  text-decoration: line-through;
+  color: var(--color-text-tertiary);
+}
+
+/* W-03: "New since you opened" – a rule with its words. */
+.erf-comment-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin: var(--space-6) 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+.erf-comment-divider::before,
+.erf-comment-divider::after {
+  content: '';
+  flex: 1 1 auto;
+  border-block-start: var(--border-width) solid var(--color-border-default);
+}
+
+/* OD-05: the rebuild confirmation – each differing line as the file and the data have it. */
+.erf-comment-rebuild {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border-default);
+}
+.erf-comment-rebuild__lines {
+  margin: var(--space-6) 0 0;
+}
+.erf-comment-rebuild__pair {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-2) var(--space-6);
+}
+.erf-comment-rebuild__pair + .erf-comment-rebuild__pair {
+  margin-block-start: var(--space-4);
+}
+.erf-comment-rebuild__pair dt {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+.erf-comment-rebuild__pair dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+/* ---------- the words of a new comment (spec 024 024-FR-004; comments-v2 C-07, C-21) ---------- */
+
+.erf-comment-words-area {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+/* The quote: --text-base, primary ink, the accent rule, three lines unless opened (C-21). */
+.erf-comment-words {
+  padding-inline-start: var(--space-6);
+  border-inline-start: var(--border-width-thick) solid var(--color-accent-primary);
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+}
+.erf-comment-words__text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow-wrap: anywhere;
+}
+.erf-comment-words--open .erf-comment-words__text {
+  display: block;
+  -webkit-line-clamp: none;
+  line-clamp: none;
+}
+.erf-comment-disclosure {
+  align-self: flex-start;
+}
+.erf-comment-narrow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.erf-comment-narrow[hidden] {
+  display: none;
+}
+.erf-comment-narrow__label {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+/* The Form card's read-only state: the field's edge and size, the tertiary ground; focus is the one ring. */
+.erf-comment-narrow__field {
+  inline-size: 100%;
+  min-block-size: calc(var(--text-base) * var(--leading-normal) * 4 + var(--space-8));
+  padding: var(--space-4) var(--space-6);
+  background: var(--color-bg-tertiary);
+  border: var(--border-width) solid var(--color-border-input);
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  resize: vertical;
+  overflow-wrap: anywhere;
+}
+.erf-comment-narrow__field:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+/* C-21: the quote is set in the preview's face – the Markdown Preview's serif (HTML keeps the system sans). */
+.erf-comment-words--md .erf-comment-words__text {
+  font-family: var(--font-serif);
+}
+.erf-comment-narrow__result {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+}

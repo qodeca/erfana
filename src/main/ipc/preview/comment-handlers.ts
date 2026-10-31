@@ -33,7 +33,7 @@ import {
   CommentUnsavedSourcesRequestSchema
 } from '../../../shared/ipc/preview-comment-schema'
 import type { PreviewCommentRegistry } from '../../services/preview/comments/commentServiceTypes'
-import type { CommentUnsavedSources } from '../../services/preview/comments/commentUnsavedSources'
+import type { CommentUnsavedSources } from '../../services/comments/commentUnsavedSources'
 import { logger } from '../../services/LoggingService'
 import { redactedLogError } from '../../utils/redactUserInput'
 import { registerHandle, unregisterHandle } from '../registry'
@@ -48,7 +48,8 @@ export interface CommentHostWindow {
 /** Injected collaborators for the comment handlers. */
 export interface PreviewCommentHandlerDeps {
   readonly registry: Pick<PreviewCommentRegistry, 'get'>
-  readonly unsaved: CommentUnsavedSources
+  /** The windows' unsaved files: this family reports them, the writers ask. */
+  readonly unsaved: Pick<CommentUnsavedSources, 'set' | 'has' | 'forget'>
   readonly isTrustedSender: (event: IpcMainInvokeEvent) => boolean
   /** Resolve the sender's window; defaults to `BrowserWindow.fromWebContents`. */
   readonly resolveWindow?: (event: IpcMainInvokeEvent) => CommentHostWindow | null
@@ -130,7 +131,11 @@ export function registerPreviewCommentHandlers(deps: PreviewCommentHandlerDeps):
     request: CommentCommandRequestSchema,
     result: CommentAckSchema,
     refused: KEY_INVALID,
-    run: (request, window) => registry.get(request.panelId, window.id)?.reveal(request.threadKey) ?? KEY_INVALID
+    run: (request, window) => {
+      const service = registry.get(request.panelId, window.id)
+      if (service === undefined) return KEY_INVALID
+      return request.command === 'reveal' ? service.reveal(request.threadKey) : service.keepDraft(request.draftToken)
+    }
   })
 
   register({

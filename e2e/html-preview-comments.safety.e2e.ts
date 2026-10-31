@@ -3,7 +3,7 @@
 /**
  * HTML Preview comments – file safety, hostile pages and the edges of the
  * feature, through the real UI (docs/designs/comments/html-preview-comments.md §12.2
- * E-009 – E-013, E-015, E-019, E-020, E-022, E-023, E-027; decisions 4, 8,
+ * E-009 – E-013, E-015, E-019, E-022, E-023, E-027; decisions 4, 8,
  * 12, 14, 21, 24, 28, 32; §19 R3-6, R3-8, Rev 4 "folded sections").
  *
  * - **E-009** an "agent" edits the file while the comment window is open: the
@@ -13,12 +13,12 @@
  *   where main allows it – exactly their own bytes; nothing else changes.
  * - **E-011** with the menu or the window open the native page is hidden and
  *   a fresh still frame stands in, with the selected outline painted in it.
- * - **E-012** an outside edit removes the element: "Element not found", and
+ * - **E-012** an outside edit removes the element: "Not found", and
  *   the block stays in the file (decision 21) – also when the next element
  *   has the same tag, the X-001 case (§19 Rev 4: a position match must be
  *   corroborated).
  * - **E-013** 200 comments on one page: the drawer lists them all, pins are
- *   drawn, and "Show on page" on the last row brings its element into view.
+ *   drawn, and End in the list (R-10: keys reveal) brings the last element into view.
  * - **E-027** the owner's folded-section case: a paragraph inside a
  *   `<details>` the reader opened stays open through comment mode's reload
  *   and the save's reload, with its pin drawn; folded again it is "Not
@@ -31,7 +31,8 @@
  * - **E-019** element rectangles and `innerText` are the same before and after
  *   comments on `pre`, inline, CSS `white-space: pre` and SVG text targets
  *   (`comments/raw-text/`, R3-8).
- * - **E-020** the Markdown preview has no comment entry (decision 14).
+ * - E-020 ("the Markdown preview has no comment entry") is retired by spec
+ *   024 (024-FR-020): its successor is `markdown-preview-comments.e2e.ts`.
  * - **E-022** a PDF export of a commented page carries no pin; Find in page
  *   does not count the overlay's text.
  * - **E-023** with the feature flag off: no comment UI, the page served raw,
@@ -53,8 +54,6 @@ import { test, expect } from './fixtures/index'
 import { HtmlPreviewPage, PREVIEW_BUDGET_MS } from './pages/html-preview.page'
 import { evalInFrame } from './pages/html-preview.frames'
 import { SearchBarPage } from './pages/search-bar.page'
-import { EditorPanelPage } from './pages/editor-panel.page'
-import { ProjectTreePage } from './pages/project-tree.page'
 import {
   OVERLAY_HOSTS_EXPR,
   commentLoads,
@@ -82,7 +81,7 @@ import {
   type ElementPlace
 } from './pages/html-preview.comments-ui'
 import { commentedPage, commentOn } from '../src/main/services/preview/comments/__test-helpers__/commentedPages'
-import { addTo, fixedId } from '../src/shared/htmlComments/__fixtures__/commentTestData'
+import { addTo, fixedId } from '../src/shared/comments/__fixtures__/commentTestData'
 import { manyCommentsPage } from './fixtures/html-preview-comments-pages'
 
 const CORPUS = path.join(__dirname, 'fixtures', 'html-preview-corpus', 'comments')
@@ -98,7 +97,6 @@ const RAW = 'comments/raw-text/index.html'
 const REVIEW = 'comments/review.html'
 const MANY = 'comments/many.html'
 const FRAMED = 'comments/framed.html'
-const NOTES = 'notes.md'
 
 const REVIEWED = commentedPage()
 const REVIEW_TITLE = '-HPC-P3-'
@@ -199,17 +197,7 @@ test.use({
     [REVIEW]: REVIEWED.text,
     [MANY]: MANY_TEXT,
     [CARDS]: CARDS_PAGE.text,
-    [FRAMED]: FRAMED_TEXT,
-    [NOTES]: [
-      '# Notes',
-      '',
-      'A paragraph of the notes.',
-      '',
-      '<!-- erfana:comment v1 id=c-zzzzzzzzzzzzzzzz',
-      'status: open',
-      '-->',
-      ''
-    ].join('\n')
+    [FRAMED]: FRAMED_TEXT
   }
 })
 
@@ -310,17 +298,18 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     const before = await diskBytes(file)
 
     await openCommentPage(preview, app, DAMAGED, '-HPC-DAMAGED-')
-    await expect(chrome.listButton()).toHaveAccessibleName('Comments, 0 open, 3 need attention', { timeout: PREVIEW_BUDGET_MS })
-    await expect(chrome.listButton()).toContainText('· !3')
+    // OD-04: the count is damaged blocks only; the newer-format block counts in neither.
+    await expect(chrome.listButton()).toHaveAccessibleName('Comments, 2 damaged', { timeout: PREVIEW_BUDGET_MS })
     await chrome.openDrawer()
-    await chrome.filter('attention').click()
-    await expect(chrome.filter('attention')).toContainText('Needs attention 3')
+    await chrome.filter('cantEdit').click()
+    await expect(chrome.filter('cantEdit')).toContainText("Can't edit")
     const rows = chrome.drawerRows()
     await expect(rows).toHaveCount(3, { timeout: PREVIEW_BUDGET_MS })
     await expect(rows.getByTestId('comment-drawer-tag')).toHaveText(['Damaged', 'Damaged', 'Newer format – read-only'])
 
     // The newer-format block: shown, never changeable.
-    await rows.nth(2).getByTestId('comment-drawer-row-open').click()
+    // R-10 (approvals.md, 2026-10-29): a click on a row opens its thread; only the active row has Open.
+    await rows.nth(2).getByTestId('comment-drawer-row-main').click()
     const win = chrome.window()
     await expect(win.getByTestId('comment-newer')).toHaveCount(1, { timeout: PREVIEW_BUDGET_MS })
     await expect(win.getByTestId('comment-delete-block')).toHaveCount(0)
@@ -328,7 +317,7 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     await expect(win).toHaveCount(0)
 
     // The bad-JSON block: its raw text read-only, and Delete block… removes exactly it.
-    await rows.nth(0).getByTestId('comment-drawer-row-open').click()
+    await rows.nth(0).getByTestId('comment-drawer-row-main').click()
     await expect(win.getByTestId('comment-damaged')).toHaveCount(1, { timeout: PREVIEW_BUDGET_MS })
     const raw = (await win.getByTestId('comment-damaged-raw').textContent()) ?? ''
     expect(raw).toContain('id=c-aaaaaaaaaaaaaaaa')
@@ -352,7 +341,7 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     const conflict = new CommentChrome(page, preview, 'conflict.html')
     await openCommentPage(preview, app, CONFLICT, '-HPC-CONFLICT-')
     await conflict.openDrawer()
-    await conflict.filter('attention').click()
+    await conflict.filter('cantEdit').click()
     await conflict.drawerRows().first().getByTestId('comment-drawer-row-open').click()
     await expect(win.getByTestId('comment-damaged')).toContainText('git conflict markers', { timeout: PREVIEW_BUDGET_MS })
     await expect(win.getByTestId('comment-read-only')).toBeVisible()
@@ -365,7 +354,7 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     const unterminated = new CommentChrome(page, preview, 'unterminated.html')
     await openCommentPage(preview, app, UNTERMINATED, '-HPC-UNTERMINATED-')
     await unterminated.openDrawer()
-    await unterminated.filter('attention').click()
+    await unterminated.filter('cantEdit').click()
     await unterminated.drawerRows().first().getByTestId('comment-drawer-row-open').click()
     await expect(win.getByTestId('comment-damaged')).toHaveCount(1, { timeout: PREVIEW_BUDGET_MS })
     await expect(win.getByTestId('comment-delete-block')).toHaveCount(0)
@@ -413,7 +402,7 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     await expect.poll(() => viewShown(app, STATIC_TARGET), { timeout: PREVIEW_BUDGET_MS }).toBe(true)
   })
 
-  test('E-012 an outside edit removes the element: "Element not found", and the block stays in the file', async ({
+  test('E-012 an outside edit removes the element: "Not found", and the block stays in the file', async ({
     windowWithTestProject,
     appWithTestProject,
     testProject
@@ -433,13 +422,14 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     await fsp.writeFile(file, text.replace('<button id="cta" class="btn">Buy now</button>', '<span id="gone">Sold out</span>'), 'utf-8')
     await expect.poll(() => preview.eval("String(document.getElementById('gone') !== null)", target), { timeout: PREVIEW_BUDGET_MS }).toBe('true')
 
+    // OD-04: a not-found open comment stays under Open, with its tag.
     await chrome.openDrawer()
-    await chrome.filter('attention').click()
-    const row = chrome.drawerRows().filter({ has: page.getByTestId('comment-drawer-tag').filter({ hasText: 'Element not found' }) })
+    await chrome.filter('open').click()
+    const row = chrome.drawerRows().filter({ has: page.getByTestId('comment-drawer-tag').filter({ hasText: 'Not found' }) })
     await expect(row).toHaveCount(1, { timeout: PREVIEW_BUDGET_MS })
-    await row.getByTestId('comment-drawer-row-open').click()
+    await row.getByTestId('comment-drawer-row-main').click() // R-10: a row click opens its thread
     const win = chrome.window()
-    await expect(win.getByTestId('comment-not-found')).toContainText("Erfana can't find this element any more", { timeout: PREVIEW_BUDGET_MS })
+    await expect(win.getByTestId('comment-not-found')).toContainText('This element is no longer in', { timeout: PREVIEW_BUDGET_MS })
     await expect(win.getByTestId('comment-not-found-quote')).toHaveText('Buy now')
     // Decision 21: nothing was moved or deleted.
     const after = await fsp.readFile(file, 'utf-8')
@@ -447,7 +437,7 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     expect(after).toContain('<span id="gone">Sold out</span>')
   })
 
-  test('E-012 the removed card has a same-tag card right after it: "Element not found", never the next card (X-001)', async ({
+  test('E-012 the removed card has a same-tag card right after it: "Not found", never the next card (X-001)', async ({
     windowWithTestProject,
     appWithTestProject,
     testProject
@@ -478,12 +468,12 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
       .toEqual([[onFirst, false], ...onOthers.map(id => [id, true])])
 
     await chrome.openDrawer()
-    await chrome.filter('attention').click()
-    const notFound = chrome.drawerRows().filter({ has: page.getByTestId('comment-drawer-tag').filter({ hasText: 'Element not found' }) })
+    await chrome.filter('open').click()
+    const notFound = chrome.drawerRows().filter({ has: page.getByTestId('comment-drawer-tag').filter({ hasText: 'Not found' }) })
     await expect(notFound).toHaveCount(1, { timeout: PREVIEW_BUDGET_MS })
-    await notFound.getByTestId('comment-drawer-row-open').click()
+    await notFound.getByTestId('comment-drawer-row-main').click() // R-10: a row click opens its thread
     const win = chrome.window()
-    await expect(win.getByTestId('comment-not-found')).toContainText("Erfana can't find this element any more", { timeout: PREVIEW_BUDGET_MS })
+    await expect(win.getByTestId('comment-not-found')).toContainText('This element is no longer in', { timeout: PREVIEW_BUDGET_MS })
     await expect(win.getByTestId('comment-not-found-quote')).toHaveText('Roasted to order We roast only what we sell that week.')
     // Decision 21: nothing was moved or deleted.
     const after = await fsp.readFile(file, 'utf-8')
@@ -491,7 +481,7 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     expect(after).not.toContain('<h2>Roasted to order</h2>')
   })
 
-  test('E-013 200 comments: the drawer lists every one, pins are drawn, and Show on page brings the last into view', async ({
+  test('E-013 200 comments: the drawer lists every one, pins are drawn, and End in the list brings the last into view', async ({
     windowWithTestProject,
     appWithTestProject
   }) => {
@@ -503,18 +493,24 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
 
     await openCommentPage(preview, app, MANY, '-HPC-MANY-')
     await waitForCommentLoad(app, MANY, 'page', MANY_COUNT)
-    await expect(chrome.listButton()).toHaveAccessibleName(`Comments, ${MANY_COUNT} open`, { timeout: PREVIEW_BUDGET_MS })
+    await expect(chrome.listButton()).toHaveAccessibleName(`${MANY_COUNT} comments`, { timeout: PREVIEW_BUDGET_MS })
     await expectPin(app, 'p-0', true, target)
     await expectPin(app, 'p-1', true, target)
 
     await chrome.openDrawer()
     await expect(chrome.filter('open')).toContainText(`Open ${MANY_COUNT}`)
     await expect(chrome.drawerRows()).toHaveCount(MANY_COUNT, { timeout: PREVIEW_BUDGET_MS })
-    // Keyboard to the last row, then Enter: "Show on page".
+    // Keyboard to the last row: End reveals it (R-10 – arrow keys, Home and End reveal; Enter opens the thread).
     await chrome.drawer().getByTestId('comment-drawer-row-main').first().focus()
     await page.keyboard.press('End')
     await expect(chrome.drawer().getByTestId('comment-drawer-row-main').last()).toBeFocused()
-    await page.keyboard.press('Enter')
+    // Under a 640px panel the drawer is a full-width sheet over the page: there the arrows, Home
+    // and End only move, and Enter is the keyboard's reveal – it closes the sheet, shows the
+    // element and opens its thread (drawer.html "Under 640px of panel"; comments-v2 drawer.html R-10).
+    if ((await chrome.drawer().getAttribute('class'))?.split(' ').includes('erf-comment-drawer--full') === true) {
+      await page.keyboard.press('Enter')
+      await expect(chrome.window()).toHaveAttribute('data-view', 'threads', { timeout: PREVIEW_BUDGET_MS })
+    }
     await expect
       .poll(
         async () => {
@@ -670,28 +666,15 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
       await expect(chrome.window()).toHaveAttribute('data-view', 'new', { timeout: PREVIEW_BUDGET_MS })
       await chrome.saveNewComment(`Layout-P7 ${id}`, RAW)
       await waitForCommentLoad(app, RAW, 'page', n + 1)
+      // #426: the save reloads the page. The served load lands before the new page's
+      // overlay is up in comment mode, so a click sent at once can hit a page that
+      // ignores it. Wait for main's mode, the page's hello and the overlay again.
+      await chrome.modeOn(app, panelId, target)
     }
     const text = await fsp.readFile(path.join(testProject.path, RAW), 'utf-8')
     expect(text.split('erfana:comment v1').length - 1).toBe(commented.length)
     // Rendering unchanged: the same text, and every box where it was.
     await expect.poll(() => preview.eval(LAYOUT, target), { timeout: PREVIEW_BUDGET_MS }).toBe(before)
-  })
-
-  test('E-020 the Markdown preview has no comment entry', async ({ windowWithTestProject }) => {
-    const page = windowWithTestProject
-    const tree = new ProjectTreePage(page)
-    const panel = new EditorPanelPage(page)
-    await tree.fileRow(NOTES).click()
-    await panel.waitForReady()
-    await expect(panel.previewPane()).toContainText('A paragraph of the notes.', { timeout: PREVIEW_BUDGET_MS })
-    // A v1 block in Markdown renders nothing, and no comment tool or menu exists.
-    await expect(panel.previewPane()).not.toContainText('erfana:comment')
-    await expect(page.locator('[data-testid^="preview-band-comment"]')).toHaveCount(0)
-    await expect(page.getByTestId('comment-drawer')).toHaveCount(0)
-    await panel.previewPane().getByText('A paragraph of the notes.').click({ button: 'right' })
-    await expect(page.getByTestId('comment-context-menu')).toHaveCount(0)
-    await expect(page.getByTestId('comment-menu-add')).toHaveCount(0)
-    await page.keyboard.press('Escape')
   })
 
   test('E-022 a PDF export of a commented page carries no pin', async ({

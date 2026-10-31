@@ -9,6 +9,7 @@ exports[`preload surface > window.api has the expected top-level groups 1`] = `
   "directoryWatch",
   "docx",
   "file",
+  "fileComments",
   "fileWatch",
   "git",
   "gitPolling",
@@ -136,6 +137,16 @@ exports[`preload surface > window.api.file and window.api.terminal expose the ex
 ]
 `;
 
+exports[`preload surface > window.api.fileComments exposes the expected members 1`] = `
+[
+  "list",
+  "onChanged",
+  "openDraft",
+  "release",
+  "save",
+]
+`;
+
 exports[`preload surface > window.api.fileWatch exposes the expected members 1`] = `
 [
   "getStats",
@@ -259,6 +270,7 @@ exports[`preload surface > window.api.preview exposes the expected members 1`] =
 
 exports[`preload surface > window.api.previewComments exposes the expected members 1`] = `
 [
+  "keepDraft",
   "list",
   "onAnchorStatus",
   "onCommentsChanged",

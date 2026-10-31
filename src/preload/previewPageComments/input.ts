@@ -23,7 +23,14 @@
  *
  * In comment mode a trusted click-family event is stopped
  * (`stopImmediatePropagation`) and its default prevented – except
- * `contextmenu`, whose default the native view has none of. Touches are
+ * `contextmenu`, whose default the native view has none of, and a primary
+ * press on the page, whose default starts a text selection: in comment mode a
+ * drag selects words (spec 024 024-FR-004). The click that ends it is still
+ * prevented, so a link or a button under it does nothing.
+ *
+ * Outside comment mode a trusted `contextmenu` passes to the page untouched;
+ * the controller hears of it and, only if no page listener cancelled it, asks
+ * main for Erfana's menu (OD-01). Touches are
  * stopped too (passive: the click they make is what gets cancelled), and so is
  * the release of every key whose press was a picker action. A click on a pin
  * is stopped in any mode, so a pin click never reaches the page. Wheel and
@@ -37,6 +44,8 @@
  * here: Tab / Shift+Tab, Alt+↑ / Alt+↓ (matched on `code`, so Option on macOS
  * and any layout work), Enter, Shift+F10 / ContextMenu, Esc.
  */
+import { reduceCommentMode } from '../../shared/comments/overlayCore/modeState'
+import { setAltHeld } from './altHold'
 import type { CommentController, PickerAction } from './controller'
 import { watchDocumentElement } from './documentWatch'
 
@@ -66,6 +75,24 @@ const USER_INPUT_EVENTS = ['wheel', 'pointerdown', 'keydown'] as const
 const CAPTURE: AddEventListenerOptions = Object.freeze({ capture: true })
 const PASSIVE: AddEventListenerOptions = Object.freeze({ capture: true, passive: true })
 
+/** A primary press, whose default starts a selection. */
+function isPrimaryPress(event: Event): boolean {
+  return (event.type === 'pointerdown' || event.type === 'mousedown') && (event as MouseEvent).button === 0
+}
+
+/**
+ * Controls whose default a primary press works by itself – opens a select's
+ * list, focuses a field, presses a button, toggles a `<details>`, starts a
+ * player, puts a caret in editable text – none of which a comment-mode click
+ * may do (security review L-2).
+ */
+const PRESS_CONTROLS = 'select, input, textarea, button, summary, video, audio, [contenteditable]'
+
+/** Whether the press is on, or inside, one of {@link PRESS_CONTROLS}. */
+function onPressControl(event: Event): boolean {
+  return event.composedPath().some(target => target instanceof Element && target.matches(PRESS_CONTROLS))
+}
+
 /**
  * Stop an event from reaching the page. The ONLY place this preload calls
  * `preventDefault` (SEC-02): the comment-mode guard and pin clicks.
@@ -90,6 +117,15 @@ export function pickerActionOf(event: KeyboardEvent): PickerAction | null {
   return event.key === 'Escape' ? 'exit' : null
 }
 
+/**
+ * Whether the overlay keeps a picker key from the page. Esc follows the mode
+ * machine's own word (`consumed`: only while the mode is on); every other
+ * picker key is the picker's.
+ */
+function isOverlayKey(action: PickerAction, modeOn: boolean): boolean {
+  return action !== 'exit' || reduceCommentMode({ on: modeOn }, { type: 'escape' }).consumed
+}
+
 /** One key across its press and release (the physical key; `key` where the engine gives no `code`). */
 function keyOf(event: KeyboardEvent): string {
   return event.code === '' ? event.key : event.code
@@ -111,15 +147,25 @@ interface Handlers {
   readonly ready: Handler
 }
 
-function handlersOf(controller: CommentController): Handlers {
+function handlersOf(controller: CommentController, doc: Document): Handlers {
+  // C-21: the label shows the size only while Alt is held – drawn again when that changes, in comment mode.
+  const altFrom = (event: KeyboardEvent | PointerEvent): void => {
+    if (setAltHeld(doc, event.altKey) && controller.mode) controller.renderNow()
+  }
   /** Keys whose press the guard swallowed: their release is swallowed too. */
   const swallowedKeys = new Set<string>()
   return {
     guarded(event) {
       if (!event.isTrusted) return
       const onOverlay = controller.isOverlayEvent(event)
-      if (!controller.mode && !onOverlay) return
-      swallow(event)
+      if (!controller.mode && !onOverlay) {
+        if (event.type === 'contextmenu') controller.pageContextMenu(event as MouseEvent)
+        return
+      }
+      // A primary press on the page keeps its default: it may start a selection (024-FR-004) – except on a control,
+      // whose default would work it (L-2).
+      if (!onOverlay && isPrimaryPress(event) && !onPressControl(event)) event.stopImmediatePropagation()
+      else swallow(event)
       if (!(event instanceof MouseEvent)) return
       if (onOverlay) controller.overlayEvent(event)
       else controller.pageEvent(event)
@@ -136,8 +182,9 @@ function handlersOf(controller: CommentController): Handlers {
     keyDown(event) {
       const key = event as KeyboardEvent
       if (!key.isTrusted) return
+      altFrom(key)
       const action = controller.mode ? pickerActionOf(key) : null
-      if (action === null) {
+      if (action === null || !isOverlayKey(action, controller.mode)) {
         // A press the page keeps: a release left over from a swallowed one
         // (focus moved before it came) must not be swallowed now.
         swallowedKeys.delete(keyOf(key))
@@ -148,11 +195,14 @@ function handlersOf(controller: CommentController): Handlers {
       controller.pickerAction(action)
     },
     keyUp(event) {
+      if (event.isTrusted) altFrom(event as KeyboardEvent)
       if (event.isTrusted && swallowedKeys.delete(keyOf(event as KeyboardEvent))) swallow(event)
     },
     move(event) {
       const pointer = event as PointerEvent
-      if (pointer.isTrusted) controller.pointerAt({ x: pointer.clientX, y: pointer.clientY })
+      if (!pointer.isTrusted) return
+      altFrom(pointer)
+      controller.pointerAt({ x: pointer.clientX, y: pointer.clientY })
     },
     out(event) {
       if (event.isTrusted && (event as PointerEvent).relatedTarget === null) controller.pointerLeft()
@@ -205,7 +255,7 @@ function registrationsOf(win: Window, doc: Document, on: Handlers): Registration
  * as long as the document).
  */
 export function attachInputGuards(win: Window, doc: Document, controller: CommentController): () => void {
-  const registrations = registrationsOf(win, doc, handlersOf(controller))
+  const registrations = registrationsOf(win, doc, handlersOf(controller, doc))
   const add = (): void => {
     // Idempotent: the same listener, type and phase is never added twice.
     for (const { target, type, listener, options } of registrations) target.addEventListener(type, listener, options)

@@ -48,6 +48,10 @@ interface IconPayload {
   readonly runtime?: { readonly path: string; readonly tag: string }
   readonly count: number
   readonly status: 'open' | 'damaged'
+  /** The words its open threads are about, for the page to mark (C-12): page text, never comment text. */
+  readonly words?: ReadonlyArray<{ readonly exact: string; readonly prefix: string; readonly suffix: string }>
+  /** C-06: one of its threads' targets changed – the pin is notched. A flag, no text. */
+  readonly changed?: true
 }
 
 /** What the broadcaster is built from. */
@@ -78,7 +82,9 @@ function iconsOf(record: FrameRecord): IconPayload[] {
     token: pin.token,
     ...(pin.runtime === undefined ? {} : { runtime: pin.runtime }),
     count: pin.count,
-    status: pin.status
+    status: pin.status,
+    ...(pin.words === undefined ? {} : { words: pin.words }),
+    ...(pin.changed === true ? { changed: true as const } : {})
   }))
 }
 

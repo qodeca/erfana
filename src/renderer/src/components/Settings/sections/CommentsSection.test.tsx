@@ -8,20 +8,26 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GlobalSettings } from '../../../../../shared/ipc/global-settings-schema'
 import { useGlobalSettingsStore } from '../../../stores/useGlobalSettingsStore'
-import { IDENTITY_COPY, SETTINGS_COPY } from '../../Panels/HtmlPreviewPanel/comments/commentCopy'
+import { IDENTITY_COPY, SETTINGS_COPY } from '../../Comments/commentCopy'
 import { CommentsSection } from './CommentsSection'
 
-const settingsWith = (comments: object, enabled = true): GlobalSettings =>
-  ({ comments, htmlPreview: { comments: { enabled } } }) as unknown as GlobalSettings
+const settingsWith = (comments: object, enabled = true, markdown = true): GlobalSettings =>
+  ({
+    comments,
+    htmlPreview: { comments: { enabled } },
+    markdownPreview: { comments: { enabled: markdown } }
+  }) as unknown as GlobalSettings
 
 describe('CommentsSection – R-014', () => {
   const updateCommentIdentity = vi.fn(async () => true)
   const updateHtmlPreviewCommentsEnabled = vi.fn(async () => {})
+  const updateMarkdownPreviewCommentsEnabled = vi.fn(async () => {})
   beforeEach(() => {
     useGlobalSettingsStore.setState({
       settings: settingsWith({ authorName: 'Ada', identityNoticeSeen: true }),
       updateCommentIdentity,
-      updateHtmlPreviewCommentsEnabled
+      updateHtmlPreviewCommentsEnabled,
+      updateMarkdownPreviewCommentsEnabled
     })
   })
   afterEach(() => {
@@ -158,7 +164,7 @@ describe('CommentsSection – R-014', () => {
     expect(name()).toHaveValue('Bo')
   })
 
-  it('switches the feature flag and disables the fields when off', async () => {
+  it('switches the feature flag; the fields are disabled only when both previews are off', async () => {
     const user = userEvent.setup()
     render(<CommentsSection />)
     const flag = screen.getByTestId('settings-toggle-html-comments')
@@ -168,7 +174,7 @@ describe('CommentsSection – R-014', () => {
     expect(updateHtmlPreviewCommentsEnabled).toHaveBeenCalledWith(false)
     act(() =>
       useGlobalSettingsStore.setState({
-        settings: settingsWith({ authorName: 'Ada', identityNoticeSeen: true }, false)
+        settings: settingsWith({ authorName: 'Ada', identityNoticeSeen: true }, false, false)
       })
     )
     expect(flag).not.toBeChecked()
@@ -176,6 +182,66 @@ describe('CommentsSection – R-014', () => {
     expect(email()).toBeDisabled()
     // The label and hint dim with the field (a class, not `:has()`).
     expect(name().closest('.erf-comment-field')).toHaveClass('erf-comment-field--disabled')
+  })
+
+  it('024-AC-023 with HTML comments off and Markdown comments on, the name and email fields stay usable', () => {
+    useGlobalSettingsStore.setState({ settings: settingsWith({ authorName: 'Ada', identityNoticeSeen: true }, false, true) })
+    render(<CommentsSection />)
+    expect(screen.getByTestId('settings-toggle-html-comments')).not.toBeChecked()
+    expect(screen.getByTestId('settings-toggle-md-comments')).toBeChecked()
+    expect(name()).toBeEnabled()
+    expect(email()).toBeEnabled()
+  })
+
+  it('024-AC-023 Settings describes both previews: the Markdown switch, default on, and the shared texts', async () => {
+    const user = userEvent.setup()
+    render(<CommentsSection />)
+    const flag = screen.getByTestId('settings-toggle-md-comments')
+    expect(flag).toBeChecked()
+    expect(flag).toHaveAccessibleName(SETTINGS_COPY.markdownFlagLabel)
+    expect(flag).toHaveAccessibleDescription(SETTINGS_COPY.markdownFlagHint)
+    expect(name()).toHaveAccessibleDescription(SETTINGS_COPY.nameHint)
+    expect(SETTINGS_COPY.nameHint).not.toMatch(/HTML/)
+    expect(SETTINGS_COPY.notice).not.toMatch(/\bpage\b/)
+    await user.click(flag)
+    expect(updateMarkdownPreviewCommentsEnabled).toHaveBeenCalledWith(false)
+  })
+
+  it('024-AC-023 the identity notice covers both file types', () => {
+    expect(IDENTITY_COPY.notice).toMatch(/into the file next to each comment/)
+    expect(IDENTITY_COPY.notice).toMatch(/In HTML files, scripts on previewed pages can read them too/)
+    expect(IDENTITY_COPY.notice).not.toMatch(/HTML file next/)
+  })
+
+  it('C-04 Settings › Comments speaks for both previews: file-based name hint and notice, a switch per preview, fields usable while either is on', () => {
+    // The exact texts of comments-v2 C-04's Design paragraph.
+    expect(SETTINGS_COPY.nameHint).toBe('Saved into the file next to each comment you write. Changing it affects new comments only.')
+    expect(SETTINGS_COPY.notice).toBe('Both are visible to anyone who can open the file – in its source and in git history once pushed.')
+    for (const [html, markdown] of [
+      [true, false],
+      [false, true]
+    ]) {
+      const { unmount } = render(<CommentsSection />)
+      act(() => useGlobalSettingsStore.setState({ settings: settingsWith({ authorName: 'Ada', identityNoticeSeen: true }, html, markdown) }))
+      const htmlFlag = screen.getByTestId('settings-toggle-html-comments')
+      const mdFlag = screen.getByTestId('settings-toggle-md-comments')
+      expect(htmlFlag).toHaveAccessibleName('Comments in HTML preview')
+      expect(mdFlag).toHaveAccessibleName('Comments in Markdown preview')
+      expect(mdFlag).toHaveAccessibleDescription('Lets you comment on paragraphs, list items and selected text.')
+      expect(name()).toHaveAccessibleDescription(SETTINGS_COPY.nameHint)
+      expect(screen.getByTestId('settings-comment-notice')).toHaveTextContent(SETTINGS_COPY.notice)
+      expect(name()).toBeEnabled()
+      expect(email()).toBeEnabled()
+      unmount()
+    }
+  })
+
+  it('C-04 (HTML) the HTML switch is described with comments-v2 C-04\'s exact text, naming selected text', () => {
+    render(<CommentsSection />)
+    const flag = screen.getByTestId('settings-toggle-html-comments')
+    expect(flag).toHaveAccessibleName('Comments in HTML preview')
+    expect(flag).toHaveAccessibleDescription('Lets you comment on elements and selected text in previewed pages.')
+    expect(SETTINGS_COPY.flagHint).toBe('Lets you comment on elements and selected text in previewed pages.')
   })
 
   it('is inert before settings load', () => {

@@ -12,9 +12,10 @@
  * with the panel's digest – unless:
  * - it names its sender frame, and that frame is one of this view's, live;
  * - its payload passes the strict schema (`preview-comment-schema.ts`);
- * - it fits the budget: five element and pin picks per second for the whole
+ * - it fits the budget: ten element and pin picks per second for the whole
  *   view, three `exit` and three `parent` picks each on their own (so a burst
- *   of clicks never drops Esc), five hellos and eight anchor reports per frame
+ *   of clicks never drops Esc), five hellos (a new document's first one aside)
+ *   and eight anchor reports per frame
  *   – and, because the per-frame budgets are forgotten past 256 frames (a
  *   page that keeps making frames would otherwise get fresh ones), at most
  *   {@link HELLOS_PER_VIEW_PER_SECOND} hellos and
@@ -26,6 +27,11 @@
  *   recorded it at the frame's last navigation (SEC-09), and the tag the page
  *   says the tokened element has is the tag main recorded for the token
  *   (R3-13 L5) – a token moved onto another element is refused;
+ * - for a `context` pick – the reader's right-click outside comment mode that
+ *   the page did not cancel (OD-01) – comment mode is OFF (in the mode the
+ *   preload sends `menu`), the real cursor is over the view at the point the
+ *   page reports (`commentContextGate.ts`, security review L-1), and the
+ *   element checks above hold: it only ever opens a menu;
  * - for a pin pick: the key is one of the frame's pins;
  * - for a keyboard-picker step that reached an element: comment mode is on,
  *   and the token passes the element pick's frame and file checks, so the
@@ -39,19 +45,31 @@ import {
   type CommentAnchors,
   type CommentPick
 } from '../../../../shared/ipc/preview-comment-schema'
+import { stablePathDigest } from '../../../../shared/stablePathDigest'
 import { logger } from '../../LoggingService'
-import { samePathKey } from './commentUnsavedSources'
+import { samePathKey } from '../../comments/commentUnsavedSources'
 import type { CommentFrameLike, CommentFrames, FrameRecord } from './commentFrames'
-import type { PickerStepInput } from './commentPickerStep'
+import { realContextClick, type ContextGateGeometry } from './commentContextGate'
+import type { PickerStepEvent } from './commentPickerSpeaker'
 import type { ElementTokenEntry, ElementTokenTable } from './ElementTokenTable'
 
-/** Element and pin picks the whole view admits per second (`PREVIEW_LIMITS.COMMENT_PICKS_PER_SECOND`). */
-export const MAIN_PICKS_PER_SECOND = 5
+/**
+ * Element and pin picks the whole view admits per second. Twice the page's own
+ * per-frame budget (`PREVIEW_LIMITS.COMMENT_PICKS_PER_SECOND`, counted again by
+ * each new document): pick, save and reload can run faster than five a second
+ * on a fast machine (F-001), and a pick only ever opens a window.
+ */
+export const MAIN_PICKS_PER_SECOND = 10
 /** `exit` and `parent` picks per second, each kind on its own budget. */
 export const MAIN_CONTROL_PICKS_PER_SECOND = 3
 /** Keyboard-picker `step`s per second: what the window's live region says (the preload sends at most ten). */
 export const MAIN_STEPS_PER_SECOND = 12
-/** Hellos one frame may send per second (the preload repeats at most once a second). */
+/**
+ * Hellos one frame may send per second (the preload repeats at most once a
+ * second). A new document's first hello is not counted here – the frame id
+ * survives a reload, and a page saved and reloaded five times in a second
+ * would lose its pins (F-001) – only in the view's budget.
+ */
 export const HELLOS_PER_FRAME_PER_SECOND = 5
 /** Anchor reports one frame may send per second (the preload sends at most four). */
 export const ANCHORS_PER_FRAME_PER_SECOND = 8
@@ -90,9 +108,9 @@ export interface PageSignalSinks {
   /** Alt+↑ out of a frame's `<body>`. */
   parent(frame: CommentFrameLike): void
   /** The keyboard picker moved, in comment mode: the window's live region says it. */
-  step(step: PickerStepInput): void
+  step(step: PickerStepEvent): void
   icon(frame: CommentFrameLike, record: FrameRecord, pinKey: string, pick: CommentPick): void
-  /** `entry` absent: the element has no tokened ancestor ("Can't comment here"). */
+  /** `entry` absent: the element has no tokened ancestor – its menu says it cannot hold a comment (M-08). */
   element(frame: CommentFrameLike, record: FrameRecord, entry: ElementTokenEntry | undefined, pick: CommentPick): void
   anchors(frame: CommentFrameLike, record: FrameRecord, anchors: CommentAnchors): void
 }
@@ -106,6 +124,8 @@ export interface PickHandlerDeps {
   readonly mode: () => boolean
   readonly sinks: PageSignalSinks
   readonly platform?: NodeJS.Platform
+  /** Where the view and the real cursor are, for a `context` pick (L-1); absent: every `context` pick is dropped. */
+  readonly geometry?: ContextGateGeometry
 }
 
 /** The handler: one entry per page channel. Never throws. */
@@ -122,7 +142,7 @@ function dropLog(now: () => number): DropReporter {
     emit: ({ context }) =>
       logger.warn('Preview comments: page signal dropped', {
         reason: context.reason,
-        panelId: context.panelId,
+        panelId: context.panelId === undefined ? undefined : stablePathDigest(context.panelId),
         ...(context.suppressed === undefined ? {} : { suppressed: context.suppressed })
       })
   })
@@ -141,6 +161,8 @@ export function createCommentPickHandler(deps: PickHandlerDeps): CommentPickHand
   const steps = new SlidingBudget(MAIN_STEPS_PER_SECOND)
   const perFrame = new Map<string, SlidingBudget>()
   const perView = { hello: new SlidingBudget(HELLOS_PER_VIEW_PER_SECOND), anchors: new SlidingBudget(ANCHORS_PER_VIEW_PER_SECOND) }
+  /** Per frame, the document whose first hello skipped the frame's budget: one per document, never more. */
+  const documentHellos = new Map<number, number>()
 
   const drop = (reason: string): void => drops.report({ reason, level: 'warn', panelId: deps.panelId })
 
@@ -154,6 +176,19 @@ export function createCommentPickHandler(deps: PickHandlerDeps): CommentPickHand
   /** The frame's own budget first, then the view's: one frame's flood does not spend the view's. */
   function signalBudget(kind: keyof typeof perView, frame: CommentFrameLike, perSecond: number): boolean {
     return frameBudget(kind, frame, perSecond) && perView[kind].take(deps.now())
+  }
+
+  /**
+   * Whether this hello is the first of a document main saw commit (`navigated`
+   * set `needsBind`; a page cannot). It is admitted on the view's budget only.
+   */
+  function firstHelloOfDocument(frame: CommentFrameLike): boolean {
+    const record = deps.frames.get(frame.frameTreeNodeId)
+    if (record === undefined || !record.needsBind || documentHellos.get(record.ftn) === record.navigation) return false
+    documentHellos.delete(record.ftn)
+    if (documentHellos.size >= MAX_FRAME_BUDGETS) documentHellos.delete(documentHellos.keys().next().value as number)
+    documentHellos.set(record.ftn, record.navigation)
+    return true
   }
 
   function frameBudget(kind: string, frame: CommentFrameLike, perSecond: number): boolean {
@@ -191,7 +226,7 @@ export function createCommentPickHandler(deps: PickHandlerDeps): CommentPickHand
   /** A picker step: an element is said only as main recorded it for the frame's own load (S-L-A). */
   function stepPick(frame: CommentFrameLike, pick: CommentPick): void {
     if (pick.say !== 'showing') {
-      deps.sinks.step({ say: pick.say as 'top' | 'no-child' })
+      deps.sinks.step({ say: pick.say as 'top' | 'no-child' | 'last' | 'first' })
       return
     }
     const record = deps.frames.get(frame.frameTreeNodeId)
@@ -199,7 +234,9 @@ export function createCommentPickHandler(deps: PickHandlerDeps): CommentPickHand
     // The schema puts a token on every `showing` step.
     const entry = entryOf(record, pick.token as string)
     if (typeof entry === 'string') return drop(entry)
-    deps.sinks.step({ say: 'showing', entry, ...(pick.added ? { added: true as const } : {}) })
+    // C-10: the open comments on the element itself, from main's own pins.
+    const comments = pick.added ? 0 : [...record.pins.values()].reduce((sum, pin) => sum + (pin.token === pick.token && pin.runtime === undefined ? pin.threadIds.length : 0), 0)
+    deps.sinks.step({ say: 'showing', entry, ...(pick.added ? { added: true as const } : {}), ...(comments > 0 ? { comments } : {}) })
   }
 
   function route(frame: CommentFrameLike, pick: CommentPick): void {
@@ -223,11 +260,17 @@ export function createCommentPickHandler(deps: PickHandlerDeps): CommentPickHand
     if (record === undefined || !deps.frames.isCommentable(record)) return drop('not-commentable')
     if (pick.kind === 'icon') {
       const key = pick.key as string
-      if (!record.pins.has(key)) return drop('unknown-pin')
-      deps.sinks.icon(frame, record, key, pick)
+      // A stack pin's click (C-17) names only pins main sent this frame, like its own – each once, and never itself
+      // again (security review M-1: a repeated key re-ran the pin's blocks once per copy).
+      const stack = [...new Set(pick.stack ?? [])].filter(other => other !== key)
+      if (!record.pins.has(key) || stack.some(other => !record.pins.has(other))) return drop('unknown-pin')
+      deps.sinks.icon(frame, record, key, { ...pick, stack })
       return
     }
-    if (!deps.mode()) return drop('mode-off')
+    // A menu or open pick comes only in comment mode; a right-click outside it only out of it (OD-01).
+    if (deps.mode() !== (pick.kind !== 'context')) return drop(pick.kind === 'context' ? 'mode-on' : 'mode-off')
+    // L-1: a page renderer cannot pop Erfana's menu at will – the real cursor must be at the click it reports.
+    if (pick.kind === 'context' && (deps.geometry === undefined || !realContextClick(pick, deps.geometry))) return drop('cursor-elsewhere')
     elementPick(frame, record, pick)
   }
 
@@ -248,7 +291,10 @@ export function createCommentPickHandler(deps: PickHandlerDeps): CommentPickHand
         const frame = senderOf(event)
         if (frame === undefined) return drop('no-frame')
         if (!CommentHelloSchema.safeParse(payload).success) return drop('invalid-hello')
-        if (!signalBudget('hello', frame, HELLOS_PER_FRAME_PER_SECOND)) return drop('rate-limited')
+        const admitted = firstHelloOfDocument(frame)
+          ? perView.hello.take(deps.now())
+          : signalBudget('hello', frame, HELLOS_PER_FRAME_PER_SECOND)
+        if (!admitted) return drop('rate-limited')
         deps.sinks.hello(frame)
       })
     },

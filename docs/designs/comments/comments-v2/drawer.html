@@ -86,8 +86,8 @@
 </p>
 <div class="ds-note"><strong>Static.</strong> No script: each state is drawn on its own, as a standalone drawer in a
   fixed box. Where HTML and Markdown strings differ, both are drawn. Markdown uses the C-03 nouns – a kind and a line
-  (“List item · line 14”), never a tag name, “element”, “page” or “block” – and says <strong>Show in preview</strong>
-  where HTML says <strong>Show on page</strong>.</div>
+  (“List item · line 14”), never a tag name, “element”, “page” or “block”. Both previews say
+  <strong>Show in preview</strong> (differences table A-05).</div>
 
 <!-- ============================================================ 1. at rest -->
 <h2>The drawer at rest</h2>
@@ -201,7 +201,7 @@
   <strong>Can't edit</strong> holds the comments Erfana can show but not change: damaged ones and ones in a newer
   format (OD-04). The <strong>▲ badge</strong> is a shape, not a tint, and counts <strong>damaged comments
   only</strong> – the toolbar reads “7 comments ▲1” (R-14), with the Badges card's attention counter. A newer-format comment is not damaged, so it gets a neutral
-  tag and no ▲. A click on a Can't edit row opens its read-only window; there is nothing in the preview to reveal.
+  tag and no ▲. Enter or a click on a Can't edit row opens its read-only window; there is nothing in the preview to reveal.
 </div>
 <div class="c2-grid">
 
@@ -343,12 +343,14 @@
 <!-- ============================================================ 4. rows open -->
 <h2>A click opens the thread</h2>
 <div class="ds-note">
-  <strong>Mouse and keys now differ on purpose (C-13).</strong> A <strong>mouse click</strong> anywhere on a row opens
-  the thread: reveal plus the comment window. <kbd>↑</kbd> <kbd>↓</kbd> <kbd>Home</kbd> <kbd>End</kbd> move the
-  active row and <strong>reveal only</strong> – Show on page in HTML, Show in preview in Markdown – and focus stays
-  in the list, so a keyboard user can skim targets without a window opening on each step. The active row's
-  <strong>Open</strong> stays its second Tab stop. Damaged, newer-format and not-found rows have nothing to reveal;
-  the arrow keys only move the highlight, and a click opens their window.
+  <strong>Enter and a click do the same (C-13, R-10 – approved 2026-10-29).</strong> <kbd>Enter</kbd> or a
+  <strong>mouse click</strong> anywhere on a row opens the thread: reveal plus the comment window.
+  <kbd>↑</kbd> <kbd>↓</kbd> <kbd>Home</kbd> <kbd>End</kbd> move the
+  active row and <strong>reveal only</strong> – Show in preview, in both previews – and focus stays
+  in the list, so a keyboard user can skim targets without a window opening on each step. Only the active row
+  keeps its <strong>Open</strong>, its second Tab stop; other rows have none. Damaged, newer-format and not-found
+  rows have nothing to reveal; the arrow keys only move the highlight, and Enter or a click opens their window. In
+  a full-width drawer (under 640px) the arrow keys only move, because a reveal there closes the drawer.
 </div>
 <div class="c2-grid">
   <figure><figcaption><strong>HTML · pointer over the second row</strong> – C-13. Hover is the Rows card's solid fill; the title says what a click does.</figcaption>
@@ -561,7 +563,7 @@
   pattern, frame 4); the other cells keep their counts so the way out is visible.
 </div>
 <div class="c2-grid">
-  <figure><figcaption><strong>HTML · no comments in the file</strong> – C-16.</figcaption>
+  <figure><figcaption><strong>HTML · no comments in the file</strong> – C-16, A-08.</figcaption>
     <div class="c2d-box c2d-box--short"><aside class="erf-comment-drawer" aria-labelledby="g1-t">
       <div class="erf-comment-drawer__head c2d-head"><h2 class="erf-comment-drawer__title" id="g1-t">Comments</h2>
         <button class="erf-button erf-button--icon" type="button" aria-label="Close comments" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
@@ -569,10 +571,10 @@
         <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true" tabindex="-1">Open <span class="erf-comment-filter__count">0</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">0</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">0</span></button></div>
         <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked tabindex="-1"> Show comment icons and underlines</label>
       </div>
-      <div class="erf-comment-drawer__scroll"><div class="erf-state erf-state--inline"><p class="erf-state__title">No comments in this file yet</p><p class="erf-state__hint">Turn on comment mode, then click an element or select text.</p></div></div>
+      <div class="erf-comment-drawer__scroll"><div class="erf-state erf-state--inline"><p class="erf-state__title">No comments in this file yet</p><p class="erf-state__hint">Select text and right-click, or turn on comment mode and click an element.</p></div></div>
     </aside></div></figure>
 
-  <figure><figcaption><strong>Markdown · no comments in the file</strong> – C-16.</figcaption>
+  <figure><figcaption><strong>Markdown · no comments in the file</strong> – C-16, A-08.</figcaption>
     <div class="c2d-box c2d-box--short"><aside class="erf-comment-drawer" aria-labelledby="g2-t">
       <div class="erf-comment-drawer__head c2d-head"><h2 class="erf-comment-drawer__title" id="g2-t">Comments</h2>
         <button class="erf-button erf-button--icon" type="button" aria-label="Close comments" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
@@ -580,7 +582,7 @@
         <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true" tabindex="-1">Open <span class="erf-comment-filter__count">0</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">0</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">0</span></button></div>
         <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked tabindex="-1"> Show comment icons and underlines</label>
       </div>
-      <div class="erf-comment-drawer__scroll"><div class="erf-state erf-state--inline"><p class="erf-state__title">No comments in this file yet</p><p class="erf-state__hint">Select text and click Comment, or turn on comment mode and click a paragraph.</p></div></div>
+      <div class="erf-comment-drawer__scroll"><div class="erf-state erf-state--inline"><p class="erf-state__title">No comments in this file yet</p><p class="erf-state__hint">Select text and right-click, or turn on comment mode and click a paragraph.</p></div></div>
     </aside></div></figure>
 
   <figure><figcaption><strong>empty: Open</strong> – C-15, both previews.</figcaption>

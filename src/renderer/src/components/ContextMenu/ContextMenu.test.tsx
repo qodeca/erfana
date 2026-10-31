@@ -184,6 +184,27 @@ describe('ContextMenu', () => {
     vi.useRealTimers()
   })
 
+  it('024-AC-005 a press outside right after the menu opened closes it – no blind window', () => {
+    const onClose = vi.fn()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(5_000)
+    renderMenu({ onClose })
+    // Same millisecond as the open: before, a 50 ms window swallowed it and the menu stayed.
+    fireEvent.mouseDown(document.body)
+    expect(onClose).toHaveBeenCalledOnce()
+    clock.mockRestore()
+  })
+
+  it('024-AC-005 a press that began before the menu opened (the opening gesture) does not close it', () => {
+    const onClose = vi.fn()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(5_000)
+    const early = new MouseEvent('mousedown', { bubbles: true })
+    clock.mockReturnValue(5_010)
+    renderMenu({ onClose })
+    document.body.dispatchEvent(early)
+    expect(onClose).not.toHaveBeenCalled()
+    clock.mockRestore()
+  })
+
   it('menu renders at specified position (with cursor offset)', () => {
     renderMenu({ x: 150, y: 250 })
     const menu = screen.getByRole('menu')

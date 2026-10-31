@@ -850,7 +850,7 @@ remote host</a> screen.</p>
   <br><br>
   <strong>The pressed state is a shape, not a colour</strong> (SC 1.4.1): the Rows and lists card's "selected" signature,
   a fill plus a 2px lime edge along the bottom. <strong>It is the one "on" look in the bar.</strong> It marks every
-  on/off tool – the link-mode toggle, Comment mode and Show comment icons, on <code>aria-pressed</code> – and a tool
+  on/off tool – the link-mode toggle and Comment mode, on <code>aria-pressed</code> – and a tool
   that opens a panel, the Comments list that opens the comments drawer, on <code>aria-expanded</code> for as long as
   the panel is open. An open panel is never drawn as a box, an outline or a fill of its own (owner decision,
   2026-10-28): a reader scanning the bar sees one signature for "this is on". Both states carry the edge – transparent when off, with a
@@ -994,9 +994,10 @@ remote host</a> screen.</p>
   <strong>Decided here, 2026-10-28: the Comments list wears the pressed signature while the drawer is open</strong>
   – drawn above, beside the link-mode toggle. The rest of the comment tools stays proposed.
   <br><br>
-  <strong>Proposed, not yet decided here: three comment tools after Find</strong> – Comment mode, the Comments
-  list and Show comment icons, in this card's tool and toggle shapes. They make every tier wider, so the
-  thresholds below must be re-measured before they ship; the proposed
+  <strong>Decided, 2026-10-29 (spec 024 C-15, C-20; D-2): two comment tools after Find</strong> – Comment mode and
+  the Comments list, the labelled count "7 comments ▲1", in this card's tool and toggle shapes. Show comment icons
+  left the row: it is the comments drawer's checkbox. The tools make every tier wider, so the
+  thresholds below must be re-measured before they ship; the
   <a href="../../../../designs/comments/html-comments/toolbar.html">Comment tools in the toolbar</a> card renders the row with
   them and prints what each tier then needs. This card changes when that one is promoted.
 </div>
@@ -1500,5 +1501,13 @@ is needed for it.</p>
 </section>
 
 </main>
+<section id="approvals">
+<h2>Approvals</h2>
+<p class="ds-muted">
+  2026-10-29 – the owner approved the changes comments-v2 makes to this card (spec 024, 024-FR-025), before the
+  first UI commit of spec 024. The owner gave full sign-off for every approval spec 024 requires in the Claude Code
+  session that started the build; the record is <code>specs/spec-t3-024-unified-comments/design/approvals.md</code>.
+</p>
+</section>
 </body>
 </html>

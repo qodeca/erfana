@@ -28,9 +28,9 @@ const CTRL_ALT_M = keyDown({ key: 'm', code: 'KeyM', control: true, alt: true })
 const CMD_OPT_M = keyDown({ key: 'µ', code: 'KeyM', meta: true, alt: true })
 
 describe('M-052 the comment-mode toggle', () => {
-  it('is its own frozen row, and no other key joined the forward list', () => {
+  it('is its own frozen row, and only the comment stepper pair (C-13) joined the forward list', () => {
     expect(Object.isFrozen(PREVIEW_COMMENT_TOGGLE)).toBe(true)
-    expect(PREVIEW_FORWARDED_SHORTCUTS.map(row => row.key)).toEqual(['f', 's', 'w', 'Escape', 'back', 'forward'])
+    expect(PREVIEW_FORWARDED_SHORTCUTS.map(row => row.key)).toEqual(['f', 's', 'w', 'Escape', 'back', 'forward', 'comment-next', 'comment-previous'])
   })
 
   it('M-052 matches the typed m with exactly Ctrl+Alt (Windows, Linux) or Cmd+Option (macOS)', () => {
@@ -116,5 +116,43 @@ describe('Esc in comment mode', () => {
     expect(forwarded).toEqual(['comment-mode'])
     detach()
     expect(target.removeListener).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('C-13 the comment stepper keys with focus in the page', () => {
+  const ALT_F9 = keyDown({ key: 'F9', code: 'F9', alt: true })
+  const ALT_SHIFT_F9 = keyDown({ key: 'F9', code: 'F9', alt: true, shift: true })
+
+  it('024-AC-019 C-13 Alt+F9 is the next comment and Alt+Shift+F9 the previous, on every system, while comments are on', () => {
+    for (const platform of ['darwin', 'win32', 'linux'] as const) {
+      expect(matchForwardedShortcut(ALT_F9, platform, ON)).toBe('comment-next')
+      expect(matchForwardedShortcut(ALT_SHIFT_F9, platform, ON)).toBe('comment-previous')
+      expect(matchForwardedShortcut(ALT_F9, platform, MODE_ON)).toBe('comment-next')
+    }
+  })
+
+  it('024-AC-019 C-13 off for the view, or with Ctrl, Cmd or no Alt, the press stays with the page', () => {
+    expect(matchForwardedShortcut(ALT_F9, 'win32', OFF)).toBeNull()
+    expect(matchForwardedShortcut(ALT_F9, 'win32')).toBeNull()
+    expect(matchForwardedShortcut({ ...ALT_F9, control: true }, 'win32', ON)).toBeNull()
+    expect(matchForwardedShortcut({ ...ALT_F9, meta: true }, 'darwin', ON)).toBeNull()
+    expect(matchForwardedShortcut(keyDown({ key: 'F9', code: 'F9' }), 'win32', ON)).toBeNull()
+    expect(matchForwardedShortcut(keyDown({ key: 'F8', code: 'F8', alt: true }), 'win32', ON)).toBeNull()
+    expect(matchForwardedShortcut({ ...ALT_F9, type: 'keyUp' }, 'win32', ON)).toBeNull()
+  })
+
+  it('024-AC-019 C-13 matches the physical key: an F-row that types something else still steps', () => {
+    expect(matchForwardedShortcut(keyDown({ key: 'MediaPlayPause', code: 'F9', alt: true }), 'darwin', ON)).toBe('comment-next')
+  })
+
+  it('024-AC-019 C-13 the forwarder hides the press from the page and reports the step', () => {
+    let listener: ((event: InputForwardEvent, input: ForwardableInput) => void) | undefined
+    const target = { on: vi.fn((_: 'before-input-event', l: typeof listener) => (listener = l)), removeListener: vi.fn() }
+    const forwarded: string[] = []
+    attachInputForwarding(target, key => forwarded.push(key), 'win32', ON)
+    const event = { preventDefault: vi.fn() }
+    listener!(event, ALT_SHIFT_F9)
+    expect(event.preventDefault).toHaveBeenCalledTimes(1)
+    expect(forwarded).toEqual(['comment-previous'])
   })
 })

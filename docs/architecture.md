@@ -130,9 +130,14 @@ src/
 │   │   │                        #   PreviewLinkScanWorkerAdapter + previewLinkScanWorker/Core/Protocol (link scan
 │   │   │                        #   off the main thread, v0.23.0), previewLiveComments, …
 │   │   │   └── comments/        # HTML Preview comments (v0.23.0): PreviewCommentService (per-view façade),
-│   │   │                        #   CommentWriter + commentFileLock + commentFileAccess (the one write path),
-│   │   │                        #   CommentParseWorkerAdapter + commentParseWorker + commentFileJobs (parse off main),
-│   │   │                        #   commentInstrumentation + ElementTokenTable (served copy), commentKeyStore, …
+│   │   │                        #   the HTML-only parts since spec 024: commentInstrumentation + ElementTokenTable
+│   │   │                        #   (served copy), commentPickHandler + commentContextGate (page signals),
+│   │   │                        #   commentDraftCore/Builder/Opener, commentWordsCore (selected words, excerpts), …
+│   │   ├── comments/            # Shared comment base (spec 024): CommentWriter + commentFileLock + commentFileAccess
+│   │   │                        #   + commentPathConfine (the one write path, every file kind), commentFileKinds
+│   │   │                        #   (kind registry), CommentParseWorkerAdapter + commentParseWorker + kindCommentJobs
+│   │   │                        #   (parse off main), commentKeyStore, commentUnsavedSources, FileCommentService +
+│   │   │                        #   fileCommentPanels + fileCommentWatches (renderer-hosted previews), markdown/
 │   │   ├── docx/                # DOCX conversion isolation: docxImageStrip (parse5 SSRF strip),
 │   │   │                        #   DocxConvertProcessAdapter (utilityProcess lifecycle), docx-convert.process (child)
 │   │   ├── watcher/             # ThrottledWorker (offset-deque, #173), EventCoalescer, GitEventCoalescer,
@@ -160,6 +165,8 @@ src/
 │   │   ├── terminal-screen-reader-handlers.ts  # terminal:getScreenReaderSupport + change broadcast
 │   │   ├── browser-handlers.ts  # browser:openFile – isTrustedSender before Zod (#124)
 │   │   ├── confinement/         # registerConfinedHandle, resolveConfinedPath, ConfinementError – path checks (v0.22.0)
+│   │   ├── comments/            # file-comment-handlers (file-comment:* – sender gate, strict schemas) and
+│   │   │                        #   file-comments (composition root: FileCommentService + per-kind settings), spec 024
 │   │   └── preview/             # Preview IPC split: lifecycle-, allowlist-, find-, navigation- (navigate, pageChanged,
 │   │                            #   resizeHold), focus-handlers (focusPage), buildPreviewGraph, externalLinkConsent,
 │   │                            #   isTrustedPreviewSender, emit, comment-handlers + commentEmit (HTML Preview comments)
@@ -179,8 +186,10 @@ src/
 │   ├── previewBridge.ts      # window.api.preview surface
 │   ├── previewPage.ts        # Preload for the sealed preview page (link clicks, CSP refusals; exposes nothing)
 │   ├── previewCommentsBridge.ts  # window.api.previewComments surface (HTML Preview comments)
+│   ├── fileCommentsBridge.ts # window.api.fileComments surface (Markdown Preview comments, spec 024)
 │   ├── previewPageComments/  # The comment overlay inside the sealed page and its frames: picker, pins,
-│   │                         #   closed-shadow-root overlay, token strip (22 modules, ADR 0005)
+│   │                         #   closed-shadow-root overlay, token strip (ADR 0005); imports the pure
+│   │                         #   shared/comments/overlayCore/ and nothing else outside itself (ADR 0006)
 │   ├── imageExport.ts        # Preload for the hidden image-rasterize window
 │   └── screenshotOverlay.ts  # Preload for the area-select overlay window
 ├── shared/                   # Imported by main, preload and renderer
@@ -192,14 +201,24 @@ src/
 │   ├── previewNavKeys.ts     # HTML preview Back/Forward key table (#124)
 │   ├── preview-limits.ts     # #124 preview caps and timers
 │   ├── dropReporter.ts       # Rate-capped reporter for dropped preview bounds updates (#124)
-│   ├── htmlComments/         # The erfana:comment v1 format: parse, format, splice, anchor, instrument (16 modules)
+│   ├── comments/             # Shared comment base (spec 024): the erfana:comment v1 format core (format, blocks,
+│   │                         #   thread, identity, encoding, splice, reattach, anchorSel), CommentFileKind + htmlKind,
+│   │                         #   overlayCore/ (pin layout, gesture, mode state – pure, also in the page preload)
+│   ├── htmlComments/         # The HTML kind's parse5 parts: parse, htmlIndex, anchor, parseBounds, instrument, frameworkMarkers
+│   ├── markdownComments/     # The Markdown kind: mdIndex, mdSlots, mdAnchor, mdRender (render check),
+│   │                         #   markdownLimits (checked before any parse), markdownKind
+│   ├── markdown/             # previewPipeline – one Markdown pipeline for the preview and main's render check
 │   ├── commentModeKey.ts     # The comment-mode chord (Cmd+Option+M / Ctrl+Alt+M), one rule for main and the renderer
 │   └── constants.ts, linkProtocolPolicy.ts, previewFrameBadgeText.ts, shellKind.ts, config/
 └── renderer/
     └── src/
         ├── assets/              # Vendored fonts (Cascadia Mono) and static assets
-        ├── components/          # 20 directories
+        ├── components/          # 21 directories
         │   ├── ActivityBar/     # Vertical activity bars (left/right) + activityBarConfig.ts
+        │   ├── Comments/        # Shared comment UI for both previews (spec 024): CommentWindow, CommentDrawer,
+        │   │                    #   CommentToolbarTools, IdentityStep, commentCopy + commentCopyWords, and overlay/ –
+        │   │                    #   the renderer overlay host (CommentOverlayLayer, useCommentOverlayHost,
+        │   │                    #   PreviewCommentAdapter) that the Markdown Preview plugs into (Editor/markdownComments/)
         │   ├── ContextMenu/     # Right-click menus (tree, editor, preview, terminal)
         │   ├── Dialog/          # Unified dialog system (Context + Provider + Hook) – inventory in Dialog/CLAUDE.md
         │   ├── DockLayout/      # Hybrid SplitviewReact + DockviewReact
@@ -234,7 +253,8 @@ src/
         ├── providers/           # React provider components
         ├── services/            # One gateway per window.api domain (fileGateway, terminalGateway, …), bridgePresence,
         │                        #   projectGeneration, textClipboard transport, editorSaveRegistry (#124),
-        │                        #   preview/ (PreviewLinkRouter, previewTabMove, previewDragFreeze, OverlayGuardService)
+        │                        #   preview/ (PreviewLinkRouter, previewTabMove, previewDragFreeze, OverlayGuardService),
+        │                        #   comments/fileCommentGateway (the only reader of window.api.fileComments, spec 024)
         ├── imageExport/         # harness.ts – rasterize pixel pump loaded in the hidden image-export window
         ├── stores/              # 22 Zustand stores: ActivityBar, CameraMirror, ClaudeStatus, Clipboard,
         │                        #   DiagramViewer, DocumentImport, Git, GlobalSettings, LazyFolder, OverlayOccluder,

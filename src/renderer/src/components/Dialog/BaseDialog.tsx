@@ -7,10 +7,10 @@ import { TEST_IDS } from '../../constants/testids'
 import { useOccluder } from '../../hooks/useOccluder'
 import { useOverlayStackEntry } from '../../hooks/useOverlayStackEntry'
 import { isTopmostOverlay } from '../../utils/overlayStack'
+import { watchUserInput } from '../../utils/watchUserInput'
 import './Dialog.css'
 
-// Small delay to ensure dialog is fully rendered before focusing
-// This prevents focus from being lost during the portal mounting animation
+// Focus after the portal has mounted, so focus is not lost while it settles.
 const FOCUS_DELAY_MS = 10
 
 // How long after the dialog opens a re-armed `initialFocusKey` pass may still
@@ -372,15 +372,11 @@ export function BaseDialog({
   useOccluder('dialog', isOpen)
 
   // Auto-focus: once per open, and again on every `initialFocusKey` change.
-  //
   // The focusable list is computed INSIDE the timeout so it reflects any
-  // re-render that COMMITS DURING THE DELAY — a mount-time state update, a
-  // store subscription that fires on subscribe. That is the whole of the
-  // benefit, and it is narrow: FOCUS_DELAY_MS is 10ms. It does NOT rescue a
-  // control that enables on I/O (a camera or network start resolving hundreds
-  // of ms later) — at the focus tick the DOM still shows that control
-  // disabled, exactly as it was at effect time. `initialFocusKey` is the
-  // mechanism for that case.
+  // re-render that commits during the delay; a control that enables on I/O
+  // hundreds of ms later needs `initialFocusKey`. A click or key press during
+  // the delay that left focus inside the dialog is the user's: the first pass
+  // keeps it (`watchUserInput`) instead of moving the next keys mid-word.
   useEffect(() => {
     if (!isOpen) {
       // A fresh open must resolve focus unconditionally again.
@@ -392,12 +388,17 @@ export function BaseDialog({
     // Only the FIRST pass of an open cycle stamps the clock; the re-armed
     // passes (this effect also depends on `initialFocusKey`) must measure
     // against the moment the dialog opened, not against their own arrival.
-    if (openedAt.current === null) {
-      openedAt.current = Date.now()
-    }
+    if (openedAt.current === null) openedAt.current = Date.now()
+    const input = watchUserInput()
 
     const timer = setTimeout(() => {
+      input.stop()
       const dialog = dialogRef.current
+      const moved = document.activeElement
+      if (autoFocusedElement.current === null && input.acted() && moved instanceof HTMLElement && moved !== dialog && dialog?.contains(moved) === true) {
+        autoFocusedElement.current = moved
+        return
+      }
       const preferred = initialFocusRef?.current ?? null
       // Containment is part of "focusable" here: an element outside the dialog
       // is not a legal initial-focus target for an `aria-modal` dialog, however
@@ -412,11 +413,9 @@ export function BaseDialog({
       const placed = autoFocusedElement.current
 
       // Re-armed pass (`initialFocusKey` changed). Three conditions, all
-      // necessary: the promotion must have something to promote TO, it must
-      // still be early enough in the open cycle for a focus move to read as
-      // "the dialog is still settling" rather than as a yank, and it must not
-      // take focus off a control the user tabbed to while the preferred target
-      // was still disabled.
+      // necessary: something to promote TO, early enough in the open cycle to
+      // read as "still settling" rather than a yank, and no taking focus off a
+      // control the user tabbed to while the preferred target was disabled.
       if (placed !== null) {
         if (!preferredIsFocusable) return
 
@@ -424,12 +423,10 @@ export function BaseDialog({
         if (openedAtMs === null || Date.now() - openedAtMs >= FOCUS_PROMOTION_WINDOW_MS) return
 
         // `document.body` is where Chromium leaves focus after blurring a
-        // control that just became disabled. In a `trapFocus` dialog the
-        // focusout rescue normally gets there first and re-parks focus on a
-        // live control (updating `placed`), so this arm mostly covers a
-        // `trapFocus={false}` dialog; it is kept because it costs nothing and the
-        // rescue has boundary cases (no focusable control at all) where focus
-        // really does stay on `<body>`.
+        // control that just became disabled. The focusout rescue usually
+        // re-parks it first (updating `placed`), so this arm mostly covers a
+        // `trapFocus={false}` dialog, and the rescue's boundary cases (no
+        // focusable control at all) where focus really stays on `<body>`.
         const active = document.activeElement
         if (active !== null && active !== placed && active !== document.body) return
       }
@@ -445,7 +442,10 @@ export function BaseDialog({
       autoFocusedElement.current = fallback ?? null
     }, FOCUS_DELAY_MS)
 
-    return () => clearTimeout(timer)
+    return () => {
+      clearTimeout(timer)
+      input.stop()
+    }
   }, [isOpen, initialFocusRef, initialFocusKey])
 
   // Tab-cycling trap (`trapFocus`, on by default). The list is recomputed on every

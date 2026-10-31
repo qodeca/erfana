@@ -12,8 +12,8 @@
  */
 import { render } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { GOLDEN_CASES } from '../../../../shared/htmlComments/__fixtures__/v1/cases'
-import { AGENT_NOTE_LINES, serializeBlock } from '../../../../shared/htmlComments/format'
+import { GOLDEN_CASES } from '../../../../shared/comments/__fixtures__/v1/cases'
+import { AGENT_NOTE_LINES, serializeBlock } from '../../../../shared/comments/format'
 import { useGlobalSettingsStore } from '../../stores/useGlobalSettingsStore'
 import { globalSettings } from '../../test-utils/globalSettings'
 import { ToastProvider } from '../Toast/ToastContext'

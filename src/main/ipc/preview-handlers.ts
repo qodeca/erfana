@@ -45,6 +45,8 @@ import { registerPreviewFindHandlers } from './preview/find-handlers'
 import { registerPreviewAllowlistHandlers } from './preview/allowlist-handlers'
 import { registerPreviewCommentHandlers } from './preview/comment-handlers'
 import { isTrustedPreviewSender } from './preview/isTrustedPreviewSender'
+import type { ProjectSession } from '../services/session/ProjectSession'
+import { registerFileComments } from './comments/file-comments'
 import { logger } from '../services/LoggingService'
 import { redactedLogError } from '../utils/redactUserInput'
 
@@ -68,6 +70,13 @@ export interface PreviewHandlerDeps {
   readonly subscribeProjectChanged?: (
     listener: (oldPath: string | null, newPath: string | null) => void
   ) => () => void
+  /**
+   * The project session. When given it feeds `subscribeProjectChanged` (unless
+   * that is given too) and, with a graph that has comments, registers the
+   * `file-comment:*` family (spec 024) on the same unsaved-files record as the
+   * HTML Preview's comments, so a save is refused under any window's edits.
+   */
+  readonly session?: Pick<ProjectSession, 'current' | 'onChange'>
   /** Live renderer targets for main→renderer emissions (defaulted in the graph). */
   readonly resolveEmitTargets?: () => readonly PreviewEmitTarget[]
   /** The zoom a view is sized with, read from its host window (defaulted in the graph). */
@@ -140,6 +149,11 @@ export function registerPreviewHandlers(deps: PreviewHandlerDeps): PreviewHandle
     comments === undefined
       ? () => {}
       : registerPreviewCommentHandlers({ registry: comments.registry, unsaved: comments.unsaved, isTrustedSender })
+  const session = deps.session
+  const fileComments =
+    comments === undefined || session === undefined
+      ? null
+      : registerFileComments({ session, unsaved: comments.unsaved, getSettings: () => globalSettings.getSettings() })
 
   // AC21: a global-off toggle tears down any live view immediately.
   const unsubscribeSettings = globalSettings.onSettingsChanged((event) => {
@@ -149,8 +163,14 @@ export function registerPreviewHandlers(deps: PreviewHandlerDeps): PreviewHandle
   })
 
   // §5(f): main-side belt-and-braces teardown on project switch.
+  const subscribeProjectChanged =
+    deps.subscribeProjectChanged ??
+    (session === undefined
+      ? undefined
+      : (listener: (oldPath: string | null, newPath: string | null) => void) =>
+          session.onChange((prev, next) => listener(prev?.root ?? null, next?.root ?? null)))
   const unsubscribeProject =
-    deps.subscribeProjectChanged?.((oldPath, newPath) => {
+    subscribeProjectChanged?.((oldPath, newPath) => {
       void graph.service.onProjectChanged(oldPath, newPath)
     }) ?? (() => {})
 
@@ -183,7 +203,7 @@ export function registerPreviewHandlers(deps: PreviewHandlerDeps): PreviewHandle
       unsubscribeSettings()
       unsubscribeProject()
       graph.disposeEmitters()
-      await graph.service.dispose()
+      await Promise.all([graph.service.dispose(), fileComments?.dispose()])
     }
   }
 }

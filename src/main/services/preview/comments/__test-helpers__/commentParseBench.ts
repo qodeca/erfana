@@ -5,7 +5,7 @@
  * (F-002 `commentParse.perf.test.ts`, `commentFileJobs.perf.test.ts`;
  * docs/designs/comments/html-preview-comments.md §5.8, §12.2, §19 R3-12).
  *
- * The real worker entry (`commentParseWorker.ts`) is bundled with esbuild –
+ * The real worker entry (`workers/comment-parse.worker.ts`) is bundled with esbuild –
  * the bundler Vite itself runs on – into a temporary folder and started as a
  * real `worker_threads` worker, exactly as the app starts its built bundle.
  * The test thread's event-loop utilisation (ELU) over an awaited call is its
@@ -17,9 +17,10 @@ import { join } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { Worker } from 'node:worker_threads'
 import { encodeText, serializeBlock, type CommentAnchor } from '../../../../../shared/htmlComments'
-import { BUTTON_ANCHOR, fixedId, makeComment } from '../../../../../shared/htmlComments/__fixtures__/commentTestData'
-import { CommentParseClient, WORKER_HEAP_MB } from '../CommentParseWorkerAdapter'
-import { COMMENT_PARSE_WORKER_ROLE } from '../commentParseProtocol'
+import { BUTTON_ANCHOR, fixedId, makeComment } from '../../../../../shared/comments/__fixtures__/commentTestData'
+import { CommentParseClient, WORKER_HEAP_MB } from '../../../comments/CommentParseWorkerAdapter'
+import { HtmlCommentParseClient } from '../htmlCommentParseClient'
+import { COMMENT_PARSE_WORKER_ROLE } from '../../../comments/commentParseProtocol'
 
 export const MB = 1024 * 1024
 
@@ -55,17 +56,17 @@ export function summarize(samples: readonly Sample[]): Record<string, number> {
 
 /** A real parse worker client over the bundled entry; `dispose` stops it and removes the bundle. */
 export interface BenchWorker {
-  readonly client: CommentParseClient
+  readonly client: HtmlCommentParseClient
   dispose(): Promise<void>
 }
 
-/** Bundle `commentParseWorker.ts` and start a client on it. */
+/** Bundle the worker entry (`workers/comment-parse.worker.ts`) and start a client on it. */
 export async function startBenchWorker(prefix: string): Promise<BenchWorker> {
   const outDir = mkdtempSync(join(tmpdir(), prefix))
   const workerFile = join(outDir, 'comment-parse.worker.cjs')
   const { build } = await import('esbuild')
   await build({
-    entryPoints: [join(__dirname, '..', 'commentParseWorker.ts')],
+    entryPoints: [join(__dirname, '..', '..', '..', 'workers', 'comment-parse.worker.ts')],
     bundle: true,
     platform: 'node',
     format: 'cjs',
@@ -73,7 +74,7 @@ export async function startBenchWorker(prefix: string): Promise<BenchWorker> {
     outfile: workerFile,
     logLevel: 'warning'
   })
-  const client = new CommentParseClient({
+  const parse = new CommentParseClient({
     // The app's own heap ceiling, so a 25 MB run proves it holds (§19 Rev 4).
     createWorker: () =>
       new Worker(workerFile, {
@@ -82,9 +83,9 @@ export async function startBenchWorker(prefix: string): Promise<BenchWorker> {
       })
   })
   return {
-    client,
+    client: new HtmlCommentParseClient(parse),
     async dispose() {
-      await client.dispose()
+      await parse.dispose()
       rmSync(outDir, { recursive: true, force: true })
     }
   }

@@ -27,14 +27,16 @@ import type { CommentPick } from '../../../../shared/ipc/preview-comment-schema'
 import { stablePathDigest } from '../../../../shared/stablePathDigest'
 import { logger } from '../../LoggingService'
 import type { DraftJobResult, DraftPickPart, DraftTargetView, PinBlock } from './commentDraftCore'
-import { loadCommentBytes } from './commentFileAccess'
-import type { CommentFileJobRunner } from './commentFileJobs'
-import { jobFailureRefusal, refusalCode } from './commentRefusals'
-import { samePathKey } from './commentUnsavedSources'
+import { loadCommentBytes } from '../../comments/commentFileAccess'
+import type { HtmlFileJobRunner } from './htmlCommentJobs'
+import { jobFailureRefusal, refusalCode, type CommentRefusal } from '../../comments/commentRefusals'
+import { samePathKey } from '../../comments/commentUnsavedSources'
 import type { ElementTokenEntry } from './ElementTokenTable'
+import type { DraftWordsPart } from './commentWordsCore'
 import type { FrameFile } from './frameFileMap'
 
-export { cutText, EXCERPT_MAX_CHARS, lineAt, type DraftTargetView } from './commentDraftCore'
+export { cutText } from '../../../../shared/comments/cutText'
+export { EXCERPT_MAX_CHARS, lineAt, type DraftTargetView } from './commentDraftCore'
 
 /** What a draft remembers for its Save; main-only, never sent anywhere. */
 export interface CommentDraft {
@@ -52,12 +54,26 @@ export interface CommentDraft {
   readonly view: CommentView
   /** The page's real path when the pick was made: a save restores only onto that page. */
   readonly pageRealPath?: string
+  /** The target's text the window chose its words from: a save keeps words found once in it (024-FR-004). */
+  readonly wordsText?: string
 }
 
-/** A built draft, or why there is none (`code` absent: the element cannot take comments). */
+/**
+ * A built draft, or why there is none: `reason` is the refusal the menu names
+ * (spec 024 menu matrix § 3, C-19); `code` is absent when the element cannot
+ * take comments (`not-commentable`).
+ */
 export type BuiltDraft =
-  | { readonly ok: true; readonly draft: CommentDraft; readonly target: DraftTargetView }
-  | { readonly ok: false; readonly code?: ErrorCode }
+  | ({ readonly ok: true; readonly draft: CommentDraft; readonly target: DraftTargetView } & DraftWordsPart)
+  | { readonly ok: false; readonly reason: CommentRefusal; readonly code?: ErrorCode }
+
+/** No draft: the picked part of the page cannot hold a comment (M-08). */
+export const NOT_COMMENTABLE = { ok: false, reason: 'not-commentable' } as const satisfies BuiltDraft
+
+/** No draft, refused for `reason`, with the code it reaches a save as. */
+function refusedDraft(reason: CommentRefusal): BuiltDraft {
+  return { ok: false, code: refusalCode(reason), reason }
+}
 
 /** What a draft is built from. */
 export interface DraftInput {
@@ -68,17 +84,18 @@ export interface DraftInput {
   readonly frame: boolean
   readonly pageRealPath?: string
   /** Where the parse runs: the comment parse worker in the app. */
-  readonly jobs: CommentFileJobRunner
+  readonly jobs: HtmlFileJobRunner
   readonly platform?: NodeJS.Platform
 }
-
-const MOVED = { ok: false, code: ErrorCode.COMMENT_TARGET_MOVED } as const
 
 /** The pick's runtime description and whitespace – all the parse needs of it. */
 function pickPartOf(pick: CommentPick): DraftPickPart {
   return {
     ...(pick.runtime === undefined ? {} : { runtime: pick.runtime }),
-    ...(pick.ws === undefined ? {} : { ws: pick.ws })
+    ...(pick.ws === undefined ? {} : { ws: pick.ws }),
+    ...(pick.sel === undefined ? {} : { sel: pick.sel }),
+    ...(pick.long === undefined ? {} : { long: pick.long }),
+    ...(pick.crossed === undefined ? {} : { crossed: pick.crossed })
   }
 }
 
@@ -107,9 +124,9 @@ export function draftKeyOf(draft: Pick<CommentDraft, 'realPath' | 'offset' | 'an
 /** The file's bytes, read again and confined, or why a draft cannot be built from them. */
 async function loadFor(input: Pick<DraftInput, 'realRoot' | 'file' | 'platform'>) {
   const loaded = await loadCommentBytes({ realRoot: input.realRoot, filePath: input.file.realPath }, { platform: input.platform })
-  if (!loaded.ok) return { ok: false, refused: { ok: false, code: refusalCode(loaded.reason) } } as const
+  if (!loaded.ok) return { ok: false, refused: refusedDraft(loaded.reason) } as const
   if (samePathKey(loaded.realPath, input.platform) !== samePathKey(input.file.realPath, input.platform)) {
-    return { ok: false, refused: MOVED } as const
+    return { ok: false, refused: refusedDraft('target-moved') } as const
   }
   return { ok: true, bytes: loaded.bytes } as const
 }
@@ -117,7 +134,7 @@ async function loadFor(input: Pick<DraftInput, 'realRoot' | 'file' | 'platform'>
 /** A failed job, logged by its failure and the file's digest. */
 function jobFailed(failure: Parameters<typeof jobFailureRefusal>[0], realPath: string): BuiltDraft {
   logger.warn('Preview comments: a draft could not be prepared', { failure, file: stablePathDigest(realPath) })
-  return { ok: false, code: refusalCode(jobFailureRefusal(failure).reason) }
+  return refusedDraft(jobFailureRefusal(failure).reason)
 }
 
 /** The worker's entry for a token: where it was served, as what, in which bytes. */
@@ -140,6 +157,8 @@ export interface PinInput extends Omit<DraftInput, 'pick'> {
   readonly pick?: CommentPick
   /** Look for the damaged and newer blocks standing on the element. */
   readonly blocks: boolean
+  /** A stack pin's other pins that count blocks (C-17): found in the same job. */
+  readonly stacked?: readonly ElementTokenEntry[]
 }
 
 /** A pin click's draft and blocks. */
@@ -150,26 +169,30 @@ export interface BuiltPin {
 
 /**
  * Read the file once and, in ONE worker job, find the blocks standing on the
- * pin's element and build the draft for its "New comment" (M4). Never throws.
+ * pin's element and on a stack's other pins, and build the draft for its "New
+ * comment" (M4). Never throws.
  */
 export async function buildPin(input: PinInput): Promise<BuiltPin> {
-  if (input.pick === undefined && !input.blocks) return { draft: { ok: false }, blocks: [] }
+  const stacked = input.stacked ?? []
+  if (input.pick === undefined && !input.blocks && stacked.length === 0) return { draft: NOT_COMMENTABLE, blocks: [] }
   const loaded = await loadFor(input)
   if (!loaded.ok) return { draft: loaded.refused, blocks: [] }
   const found = await input.jobs.runJob(loaded.bytes, {
     kind: 'pin',
     entry: entryOf(input.entry),
     blocks: input.blocks,
+    ...(stacked.length === 0 ? {} : { stacked: stacked.map(entryOf) }),
     ...(input.pick === undefined ? {} : { pick: pickPartOf(input.pick) })
   })
   if (found.kind === 'failed') return { draft: jobFailed(found.failure, input.file.realPath), blocks: [] }
-  const draft = input.pick === undefined || found.draft === undefined ? { ok: false as const } : draftFrom(input, input.pick, found.draft)
+  const draft = input.pick === undefined || found.draft === undefined ? NOT_COMMENTABLE : draftFrom(input, input.pick, found.draft)
   return { draft, blocks: found.blocks }
 }
 
 /** The draft from the worker's half of it. */
 function draftFrom(input: Omit<DraftInput, 'pick' | 'jobs'>, pick: CommentPick, built: DraftJobResult): BuiltDraft {
-  if (!built.ok) return built.refusal === undefined ? { ok: false } : { ok: false, code: refusalCode(built.refusal) }
+  // The worker's "no refusal" is an element that cannot take comments (`commentDraftCore.ts` NOT_HERE).
+  if (!built.ok) return built.refusal === undefined ? NOT_COMMENTABLE : refusedDraft(built.refusal)
   const { file } = input
   const draft: CommentDraft = {
     realRoot: input.realRoot,
@@ -181,7 +204,14 @@ function draftFrom(input: Omit<DraftInput, 'pick' | 'jobs'>, pick: CommentPick, 
     anchor: built.anchor,
     ...(built.ws === undefined ? {} : { ws: built.ws }),
     view: pick.view,
-    ...(input.pageRealPath === undefined ? {} : { pageRealPath: input.pageRealPath })
+    ...(input.pageRealPath === undefined ? {} : { pageRealPath: input.pageRealPath }),
+    ...(built.words === undefined ? {} : { wordsText: built.words.text })
   }
-  return { ok: true, draft, target: built.target }
+  return {
+    ok: true,
+    draft,
+    target: built.target,
+    ...(built.words === undefined ? {} : { words: built.words }),
+    ...(built.wordsMissing === undefined ? {} : { wordsMissing: built.wordsMissing })
+  }
 }

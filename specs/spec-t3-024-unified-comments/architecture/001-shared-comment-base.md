@@ -34,10 +34,14 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | `parse` | same | split: the block classifier (header, damage reasons, readable compare) goes to `src/shared/comments/blocks.ts`; the parse5 comment walk goes to `htmlComments/htmlParse.ts` | S + H | Finding comment nodes depends on the HTML parser |
 | `anchor` | same | split: `resolveBlockTarget` goes to `src/shared/comments/reattach.ts`; the parse5 anchor builder stays | S + H | CSS paths come from the parse5 tree |
 | `htmlIndex`, `parseBounds`, `instrument`, `frameworkMarkers` | same | stay | H | parse5 tree, element tokens and framework roots exist only in HTML |
-| `index` (barrel) | same | stays as the HTML barrel; `src/shared/comments/index.ts` is new | S + H | – |
+| **Added since** `htmlForeign` | – | `src/shared/htmlComments/` | H | Which comments precede an element and which share a parent are read from the HTML source and the parse5 tree (024-FR-023; the region names themselves are shared, `foreignComments`) |
+| `index` (barrel) | same | stays as the HTML barrel; `src/shared/comments/index.ts` is new | S + H | Two barrels: the shared one exports the base only, so importing it never pulls in parse5 |
 | **New** `fileKind.ts`, `htmlKind.ts`, `selectionFind.ts` | – | `src/shared/comments/` | S (`htmlKind` is H) | `htmlKind` wraps the H modules above |
 | **New** `markdownComments/{mdIndex,slots,renderCheck,mdAnchor,markdownKind}.ts` | – | `src/shared/markdownComments/` | M | Markdown has no tags or ids in the source, so placement and re-attach are new (design §5, §6) |
 | **New** `src/shared/markdown/previewPipeline.ts` | inside `MarkdownPreview.tsx` | plugin list, sanitize schema, frontmatter split | M | One pipeline for the preview and main's render check |
+| **Added since** `agentNotes`, `noteLines`, `anchorSel`, `selectionWords`, `spokenExcerpt`, `cutText`, `targetIndex`, `commentableExtensions`, `foreignComments` (9) | – | `src/shared/comments/` | S | – |
+| **Added since** `markdownComments/{markdownLimits,mdCommentScan,mdHast,mdHints,mdLocate,mdRender,mdSlots,mdSource}.ts` (8) | – | `src/shared/markdownComments/` | M | Markdown's limits, comment tokenizer, rendered tree, target hint, locate, render check, slots and line coordinates: rules of the Markdown source, which has no tags or ids (design `markdown-format.md`; § 8 C3, C4, C7, C9, C11, C19) |
+| **Added since** `markdownComments/mdPlace.ts` (1) | – | `src/shared/markdownComments/` | M | A table row's, cell's and diagram's place in main's Markdown index – what the C-03 nouns "row 2", "header row", "row 2, column 3" and "diagram" are named from; HTML names every target "element" (D-04) |
 
 ### Main process
 
@@ -49,6 +53,11 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | `commentStillCapture`, `commentReloadCoordinator`, `commentScripts`, `commentOverlayTheme` (4) | stay | H | Still images, reload and scroll restore exist only because the page runs in another process |
 | `commentDraftCore`, `commentDraftBuilder`, `commentDraftOpener` (3) | stay | H | They turn a page token into a target ("find target"). Markdown sends line, tag and ordinal instead (§3) |
 | `commentE2eHook` (1) | stays | H | It exposes served loads |
+| **Added since** `commentInsertIndent`, `commentListChange`, `commentPathConfine`, `commentRebuild`, `fileCommentPanels`, `fileCommentWatches`, `kindCommentJobs` (7) | `src/main/services/comments/` | S | – |
+| **Added since** `commentEditWords` (1) | `src/main/services/comments/` | S | – |
+| **Added since** `commentFileKinds`, `src/main/ipc/comments/file-comments.ts` (2) | `src/main/services/comments/`, `src/main/ipc/comments/` | S – composition roots | They name every registered kind; the base itself never imports a kind (§ 8 C24) |
+| **Added since** `markdown/markdownCommentJobs` (1) | `src/main/services/comments/markdown/` | M | The Markdown kind's jobs in the parse worker (§ 8 C19, C22) |
+| **Added since** `commentContextGate`, `commentDraftKeys`, `commentWordsCore`, `commentPickerSpeaker`, `htmlCommentJobs`, `htmlCommentParseClient` (6) | stay in `src/main/services/preview/comments/` | H | They check the page's right-click, draft words and picker steps against main's parse5 parse, and run the HTML kind's jobs in the parse worker – all about a page in another process |
 
 ### Overlay
 
@@ -58,6 +67,10 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | **New** `src/shared/comments/overlayCore/{pinLayout,gesture,modeState}.ts` | S | Pure rules both overlays run. No imports, no DOM |
 | **New** `src/renderer/src/components/Comments/overlay/{CommentOverlayLayer.tsx,useCommentMode.ts,targetPicker.ts,commentHighlights.ts}` | S (for renderer-hosted previews) | – |
 | **New** `src/renderer/src/components/Editor/markdownComments/markdownAdapter.ts` | M | Maps `data-line-start` blocks to targets |
+| **Added since** `src/renderer/src/components/Comments/overlay/{useCommentOverlayHost,useHostPointerKeys,useSelectionComments,previewAdapter,pickerKeys,hostTypes,hostParts,hostMenu,hostWindow,hostDrawer,domWords,commentContentAttrs,contentGuard}.ts` (13) | S (for renderer-hosted previews) | – |
+| **Added since** `src/renderer/src/components/Editor/markdownComments/{useMarkdownComments,MarkdownCommentsOverlay,MarkdownCommentsBand}.tsx` (3) | M | The Markdown Preview's composition root, the surfaces it draws in its pane, and its paused band (D-24: only the Markdown Preview draws the editor's unsaved text) |
+| **Added since** `src/renderer/src/components/Comments/overlay/useHostStepKeys.ts` (1) | S (for renderer-hosted previews) | – |
+| **Added since** `src/renderer/src/components/Comments/overlay/{iconLayout,commentTiming}.ts` (2) | S (for renderer-hosted previews) | Icon placement with the 3-per-row cap, ghost and damaged icons (C-05, C-17, S-01..S-08); the 024-NFR-001 `performance.mark` points |
 
 ### Renderer
 
@@ -68,6 +81,12 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | `usePreviewComments`, `PreviewCommentsLayer`, `commentLive` | split: shared `useComments.ts` and `CommentsHost.tsx`; the HTML parts become `HtmlPreviewPanel/comments/htmlCommentSource.ts` | S + H | Page-driven drafts, still images and main-driven mode changes exist only in HTML |
 | `useDrawerSheet` | stays | H | It hides the native view behind a full-width drawer (`usePreviewCoveredStore`) |
 | `services/preview/commentGateway.ts` and **new** `services/comments/fileCommentGateway.ts` | both implement one `CommentSource` interface | H / S | HTML is addressed per view, through page draft tokens. Text previews are addressed per file |
+| **Added since** `CommentWindowShell`, `CommentStepper`, `CommentWordsPicker`, `DamagedBlockView`, `ThreadStatus`, `CommentDrawerRow`, `CommentDrawerSort`, `CommentRemovedNote`, `commentRemovedOutside`, `commentCarriedDrafts`, `commentDockPlacement`, `commentCopyWords`, `commentWindowCopy`, `commentWindowStates`, `commentWords`, `useThreadSession` (16) | `src/renderer/src/components/Comments/` | S | – |
+| **Added since** `previewCommentRequests`, `usePreviewDraftKeepAlive` (2) | stay in `HtmlPreviewPanel/comments/` | H | A page draft token and the window it opens, and its keep-alive, exist only because the HTML page picks in another process |
+| **Added since** `usePreviewModeBlock` (1) | stays in `HtmlPreviewPanel/comments/` | H | M-07: main holds the HTML comment mode, so turning it off for a read-only page goes through main's mode request; the Markdown host keeps its mode in the renderer |
+| **Added since** `commentDrawerFilter`, `commentStepKeys` (2) | `src/renderer/src/components/Comments/` | S | – |
+| **Added since** `commentTargetNoun` (1) | `src/renderer/src/components/Comments/` | S | – |
+| **Added since** `usePageCommentStepKeys` (1) | stays in `HtmlPreviewPanel/comments/` | H | The page's Alt+F9 / Alt+Shift+F9 reach the renderer only as keys main forwards from another process (C-13) |
 
 `commentCopy` keeps one string table with a `TargetNouns` map per preview (C-03), so both previews import one module (024-AC-008).
 
@@ -279,7 +298,7 @@ Five specialist reviews (data safety, security, UX, test, agent workflow) and a 
 | C16 | Main checks `sel.exact` against its parse of the file on disk and drops it with `selRefused: 'not-in-file'` otherwise. The page gets selection offsets, never strings, so ADR 0006 amends decision 6 only. | SEC-3, SEC-7, SEC-8, ARCH-M8 |
 | C17 | `file-comment:openDraft` mints a single-use token tied to window, panel and file; `add` names it; thread ops take keys only; `filePath` must be open in a panel of the sender's window. Recorded in `docs/security.md`. | SEC-9, ARCH-M9 |
 | C18 | Named caps for every new IPC field (shared with the page schema); `bufferText` capped at the file limit and debounced; channel families bound to kinds; requested and real names map to the same kind; `txt` absent from the production registry; `file-comment:changed` only to the owning window, watchers counted, capped and freed. | SEC-10, SEC-11, SEC-12, ARCH-L2 |
-| C19 | Markdown parse, locate, slots, verify and the buffer parse run in the parse worker under its limits; slots capped per save; the "before" tree rendered once; verify compares after parse and sanitize, before presentation plugins; the plugin list is pinned by a test; main never loads YAML; size limits from the corpus; parse cache keyed by kind + hash; the pipeline packages are runtime dependencies. | SEC-13, SEC-14, SEC-15, DS-21, ARCH-M10, ARCH-L1, ARCH-L3 |
+| C19 | Markdown parse, locate, slots, verify and the buffer parse run in the parse worker under its limits; slots capped per save; the "before" tree rendered once; verify compares after parse and sanitize, before presentation plugins; the plugin list is pinned by a test; main never loads YAML; size limits from the corpus; parse cache keyed by kind + hash; the pipeline packages are runtime dependencies. *Note (2026-10-30):* the Markdown pipeline packages stay `devDependencies`, because electron-vite bundles them into the main bundle, so they ship at runtime – the intent of C19 holds. | SEC-13, SEC-14, SEC-15, DS-21, ARCH-M10, ARCH-L1, ARCH-L3 |
 | C20 | No new log line carries comment text, words, excerpts, names or e-mails. Gate and corpus runs use a made-up identity. | SEC-18, SEC-23 |
 | C21 | The `security-auditor` reviews commit 9 (`overlayCore` widening) and commit 12 (`file-comment:*`, Markdown kind) when they land, and the full PR. | SEC owner 6, ARCH-L9 |
 | C22 | `commentSaveFlow` splits into a shared timeout/late-settle core and the HTML-only view binding; the parse worker splits into a shared runner plus per-kind jobs; `cutText` moves to the base; `commentLive` is split before commit 7; `commentPendingWrites` goes through `CommentSource`. A test fails if a shared folder imports an HTML-only folder. | ARCH-H3, QA-13 |

@@ -15,7 +15,7 @@ Start with [your first ten minutes](first-ten-minutes.md). Browse [how-to guides
 
 - [Open a project](how-to/open-a-project.md), [run an agent](how-to/run-an-agent-in-the-terminal.md), and [turn a selection into a prompt](how-to/turn-a-selection-into-a-prompt.md)
 - [Edit and preview Markdown](how-to/edit-and-preview-markdown.md), [work with Mermaid diagrams](how-to/work-with-mermaid-diagrams.md), and [organise files](how-to/organise-project-files.md)
-- [Export](how-to/export-to-pdf-or-word.md), [import](how-to/import-a-document.md), [transcribe](how-to/transcribe-audio-or-video.md), [preview HTML](how-to/preview-an-html-page.md), [work with images](how-to/view-and-export-images.md), [capture an image](how-to/send-a-screenshot-or-photo-to-the-agent.md), or [work in several windows](how-to/work-in-several-windows.md)
+- [Export](how-to/export-to-pdf-or-word.md), [import](how-to/import-a-document.md), [transcribe](how-to/transcribe-audio-or-video.md), [preview HTML](how-to/preview-an-html-page.md), [comment on a preview](how-to/comment-on-a-preview.md), [work with images](how-to/view-and-export-images.md), [capture an image](how-to/send-a-screenshot-or-photo-to-the-agent.md), or [work in several windows](how-to/work-in-several-windows.md)
 
 ## Reference
 

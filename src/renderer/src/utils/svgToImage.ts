@@ -170,10 +170,13 @@ async function svgToPng(svgElement: SVGSVGElement, resolutionScale = DOCX_EXPORT
  * 4. This bypasses the issues with html-to-image and innerHTML SVGs
  *
  * @param container - The HTML element containing the content (attached to DOM)
+ * @param prepareClone - Optional: adjusts the detached copy before it is serialized
+ *   (the live content is never changed) – e.g. stripping comment attributes (spec 024 024-FR-024)
  * @returns Result object with HTML, total diagrams, and failed count
  */
 export async function convertMermaidDiagramsToImages(
-  container: Element
+  container: Element,
+  prepareClone?: (clone: Element) => void
 ): Promise<MermaidConversionResult> {
   // Validate input
   if (!container || !container.ownerDocument) {
@@ -187,8 +190,13 @@ export async function convertMermaidDiagramsToImages(
 
   // If no Mermaid diagrams, return HTML as-is
   if (mermaidContainers.length === 0) {
+    let plain = container
+    if (prepareClone !== undefined) {
+      plain = container.cloneNode(true) as Element
+      prepareClone(plain)
+    }
     return {
-      html: container.innerHTML,
+      html: plain.innerHTML,
       totalDiagrams: 0,
       failedDiagrams: 0
     }
@@ -231,6 +239,7 @@ export async function convertMermaidDiagramsToImages(
 
   // Clone the container and apply conversions
   const clone = container.cloneNode(true) as Element
+  prepareClone?.(clone)
   const clonedContainers = clone.querySelectorAll(MERMAID_SELECTOR)
 
   // Replace each mermaid container in the clone with the converted image

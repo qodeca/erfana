@@ -13,6 +13,7 @@ Preview renders GitHub-style Markdown, frontmatter, links and Mermaid diagrams b
 - [Links](#links)
 - [Images](#images)
 - [Mermaid diagrams](#mermaid-diagrams)
+- [Comments](#comments)
 
 ## Markdown and frontmatter
 
@@ -31,3 +32,18 @@ Preview renders GitHub-style Markdown, frontmatter, links and Mermaid diagrams b
 ## Mermaid diagrams
 
 **What they do:** Fenced Mermaid code renders as a diagram. Its toolbar changes direction and opens the full-screen viewer, where you can zoom, fit, reset and use the **Edit diagram** chat to ask a terminal agent to change it. **How to reach them:** Open a file containing a Mermaid block in Preview; see [the walkthrough](../how-to/work-with-mermaid-diagrams.md). Invalid syntax shows an error box with a bug-report action; see [troubleshooting](troubleshooting.md#mermaid-diagram-rendering-error).
+
+## Comments
+
+**What it does:** Leave a comment on a paragraph, list item, heading or other block, or on words you select. The comment is saved inside the `.md` file as an HTML comment right before the block, so it does not show when the file is rendered, travels with the file through git, and a coding agent reading the file sees it. A comment icon marks each commented block, and commented words are underlined. The **Comments** list shows every comment in the file, filtered by **Open**, **Resolved** or **Can't edit** and sorted by **File order**, **Changed first** or **Latest activity**. **How to reach it:** in the **Preview Only** view, select **Comment mode** in the toolbar or press <kbd>⌥⌘M</kbd> / <kbd>Ctrl+Alt+M</kbd>, then select a block; or select words and select **Comment**; or right-click a block and choose its comment item. <kbd>Esc</kbd> leaves comment mode. Step-by-step: [Comment on a preview](../how-to/comment-on-a-preview.md).
+
+The comment window stays beside the preview rather than covering it; <kbd>F6</kbd> moves between the window and the preview. Turn Markdown comments off, or change your name, in [Settings > Comments](settings.md#comments).
+
+| Limit | Behaviour |
+| --- | --- |
+| Views | Comments, icons and the comment count show only in the **Preview Only** view, never in the editor or a split view. |
+| Unsaved changes | While the editor holds unsaved changes, comments are read-only and a band above the preview says so, with a button to save the file and **Go to editor**. |
+| Frontmatter | The YAML frontmatter can't take a comment. |
+| Generated parts | A part between a tool's START and END markers can't take a comment; comment on the text before or after it. |
+| How the file looks | Erfana tries up to 4 places for a comment and refuses to save if every one would change how the file renders. Your text is kept. |
+| File size | A file over 2 MB or 100,000 lines, or one nested very deeply (for example, lists or block quotes more than 32 levels deep), can be read but takes no new comments. |

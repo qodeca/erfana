@@ -1,108 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Live-region text and inner steps of the comment window
- * (docs/designs/comments/html-preview-comments.md §10.9; round-3 H1, M6).
+ * What the page's keyboard picker says (docs/designs/comments/html-preview-comments.md
+ * §10.8, §10.10). The shared live-region and inner-step tests moved with their
+ * code to `components/Comments/commentLive.test.ts` (spec 024 § 8 C22).
  */
-import { act, renderHook } from '@testing-library/react'
-import { createElement, type ReactNode } from 'react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import {
-  CommentStepsContext,
-  editDraftKey,
-  pickerAnnouncement,
-  replyDraftKey,
-  useCommentAlert,
-  useInnerStep,
-  useLiveText,
-  type CommentSteps
-} from './commentLive'
-
-const nextFrame = (): Promise<void> => new Promise(resolve => requestAnimationFrame(() => resolve()))
+import { describe, expect, it } from 'vitest'
+import { PICKER_HINT_STEPS, pickerAnnouncement } from './commentLive'
 
 describe('commentLive', () => {
-  afterEach(() => vi.restoreAllMocks())
-
-  describe('useLiveText', () => {
-    it('clears, then sets the text a frame later – so a repeat is announced again', async () => {
-      const { result } = renderHook(() => useLiveText())
-      act(() => result.current[1]('Saved.'))
-      expect(result.current[0]).toBe('')
-      await act(nextFrame)
-      expect(result.current[0]).toBe('Saved.')
-      act(() => result.current[1]('Saved.'))
-      expect(result.current[0]).toBe('')
-      await act(nextFrame)
-      expect(result.current[0]).toBe('Saved.')
-    })
-
-    it('keeps only the newest of two quick announcements', async () => {
-      const { result } = renderHook(() => useLiveText())
-      act(() => {
-        result.current[1]('First')
-        result.current[1]('Second')
-      })
-      await act(nextFrame)
-      expect(result.current[0]).toBe('Second')
-    })
-
-    it('cancels a pending frame on unmount', () => {
-      const cancel = vi.spyOn(window, 'cancelAnimationFrame')
-      const { result, unmount } = renderHook(() => useLiveText())
-      act(() => result.current[1]('Gone'))
-      unmount()
-      expect(cancel).toHaveBeenCalled()
-    })
-  })
-
-  describe('inner steps', () => {
-    function provider(steps: CommentSteps) {
-      return function StepsProvider({ children }: { children: ReactNode }) {
-        return createElement(CommentStepsContext.Provider, { value: steps }, children)
-      }
-    }
-
-    it('registers while active, calls the newest cancel, and unregisters when done', () => {
-      const unregister = vi.fn()
-      const register = vi.fn((_cancel: () => void) => unregister)
-      const first = vi.fn()
-      const second = vi.fn()
-      const { rerender } = renderHook(
-        ({ active, cancel }) => useInnerStep(active, cancel),
-        {
-          initialProps: { active: true, cancel: first },
-          wrapper: provider({ register, alert: vi.fn() })
-        }
-      )
-      expect(register).toHaveBeenCalledTimes(1)
-      // A new cancel function needs no re-registration: the newest is called.
-      rerender({ active: true, cancel: second })
-      expect(register).toHaveBeenCalledTimes(1)
-      register.mock.calls[0][0]()
-      expect(second).toHaveBeenCalled()
-      expect(first).not.toHaveBeenCalled()
-      rerender({ active: false, cancel: second })
-      expect(unregister).toHaveBeenCalled()
-    })
-
-    it('outside a window there is nothing to register with or announce to', () => {
-      const { result } = renderHook(() => {
-        useInnerStep(true, () => {})
-        return useCommentAlert()
-      })
-      expect(() => result.current('ignored')).not.toThrow()
-    })
-
-    it('hands the window\'s alert to the parts inside it', () => {
-      const alert = vi.fn()
-      const { result } = renderHook(() => useCommentAlert(), {
-        wrapper: provider({ register: () => () => {}, alert })
-      })
-      result.current('Couldn\'t save.')
-      expect(alert).toHaveBeenCalledWith('Couldn\'t save.')
-    })
-  })
-
   it('E-022 words where the keyboard picker moved (§10.10 "Announce"), and nothing for another event', () => {
     // S-L-A: main's facts – the parsed tag and its line – never the page's ids or classes.
     expect(pickerAnnouncement({ say: 'showing', element: { tag: 'p', line: 12 } })).toBe('Showing p, line 12.')
@@ -110,15 +16,36 @@ describe('commentLive', () => {
       'Showing an element added by a script, inside ul on line 3.'
     )
     expect(pickerAnnouncement({ say: 'showing', element: { line: 5 } })).toBe('Showing an element, line 5.')
-    expect(pickerAnnouncement({ say: 'top' })).toBe('Top of page – no parent to select.')
-    expect(pickerAnnouncement({ say: 'no-child' })).toBe('No child elements.')
+    expect(pickerAnnouncement({ say: 'top' })).toBe('Top level – no parent to select.')
+    expect(pickerAnnouncement({ say: 'no-child' })).toBe('Nothing inside to select.')
     expect(pickerAnnouncement({})).toBeUndefined()
     expect(pickerAnnouncement({ say: 'showing' })).toBeUndefined()
   })
 
-  it('keys drafts per tab, file, thread and message', () => {
-    expect(replyDraftKey('p', 'f', 't')).toBe('reply|p|f|t')
-    expect(editDraftKey('p', 'f', 't', 'm')).toBe('edit|p|f|t|m')
-    expect(editDraftKey('p', 'f', 't1', 'm')).not.toBe(editDraftKey('p', 'f', 't2', 'm'))
+  it('C-10 (HTML) says the kind, the line and the open comments as the Markdown picker does, with the keys on the first steps only', () => {
+    const element = { tag: 'h2', line: 4, role: 'heading level 2' as const, comments: 2 }
+    expect(pickerAnnouncement({ say: 'showing', element }, 0)).toBe('Heading level 2, line 4. 2 comments. Enter to comment, Shift+F10 for the menu.')
+    expect(pickerAnnouncement({ say: 'showing', element }, PICKER_HINT_STEPS - 1)).toMatch(/Shift\+F10 for the menu\.$/)
+    expect(pickerAnnouncement({ say: 'showing', element })).toBe('Heading level 2, line 4. 2 comments.')
+    expect(pickerAnnouncement({ say: 'showing', element: { tag: 'p', line: 9, role: 'paragraph' } }, PICKER_HINT_STEPS)).toBe('Paragraph, line 9.')
+    // A script-built element keeps the "added by a script" sentence.
+    expect(pickerAnnouncement({ say: 'showing', element: { tag: 'ul', line: 3, added: true } }, 0)).toBe(
+      'Showing an element added by a script, inside ul on line 3.'
+    )
+  })
+
+  it('C-10 (HTML) says the first words main read from the file, in the Markdown sentence form', () => {
+    const element = { tag: 'p', line: 42, role: 'paragraph' as const, comments: 2, excerpt: 'We ship the beta on Friday…' }
+    expect(pickerAnnouncement({ say: 'showing', element })).toBe('Paragraph, line 42: “We ship the beta on Friday…”. 2 comments.')
+    expect(pickerAnnouncement({ say: 'showing', element }, 0)).toBe(
+      'Paragraph, line 42: “We ship the beta on Friday…”. 2 comments. Enter to comment, Shift+F10 for the menu.'
+    )
+    // No words (none sent, or an element with no text): the sentence without them.
+    expect(pickerAnnouncement({ say: 'showing', element: { line: 7, role: 'image' } })).toBe('Image, line 7.')
+  })
+
+  it('024-AC-018 C-10 (HTML) Tab at either end of the page says so: last, with the way up, and first', () => {
+    expect(pickerAnnouncement({ say: 'last' })).toBe('Last element at this level – Alt+Up for the parent.')
+    expect(pickerAnnouncement({ say: 'first' })).toBe('First element at this level.')
   })
 })

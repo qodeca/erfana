@@ -20,7 +20,8 @@
 import { z } from 'zod'
 import { PREVIEW_LIMITS } from '../preview-limits'
 import { ELEMENT_TOKEN_PATTERN, utf8Length } from '../htmlComments'
-import { TAG_MAX_CHARS } from '../htmlComments/format'
+import { TAG_MAX_CHARS, codePointLength } from '../comments/format'
+import { SEL_CONTEXT_MAX_CHARS, SEL_EXACT_MAX_CHARS } from '../comments/anchorSel'
 
 /** Characters in a main-minted key: pin, frame, file, thread and block keys. */
 export const COMMENT_KEY_MAX_CHARS = 40
@@ -28,6 +29,8 @@ export const COMMENT_KEY_MAX_CHARS = 40
 export const PICK_RUNTIME_TAG_MAX_CHARS = 32
 /** Keys in each list of one anchors report (§8). */
 export const COMMENT_ANCHOR_KEYS_MAX = 500
+/** Other pins' keys one stack pin's click names (spec 024 C-17; `PIN_STACK_KEYS_MAX` in the preload). */
+export const COMMENT_PICK_STACK_MAX = 20
 
 const MAX_VIEW_PX = 1_000_000
 const MAX_RECT_PX = 10_000_000
@@ -44,7 +47,7 @@ export const CommentRuntimeTagSchema = CommentTagNameSchema.max(PICK_RUNTIME_TAG
 const RUNTIME_PATH = /^(?:[A-Za-z][\w.:-]*:nth-of-type\(\d{1,6}\)(?: > [A-Za-z][\w.:-]*:nth-of-type\(\d{1,6}\))*)?$/
 const quotePart = z.string().max(PREVIEW_LIMITS.COMMENT_QUOTE_MAX_CHARS)
 /** What the keyboard picker reached (§10.10 "Announce"): an element, the top of the page, or a leaf. */
-export const CommentPickerSaySchema = z.enum(['showing', 'top', 'no-child'])
+export const CommentPickerSaySchema = z.enum(['showing', 'top', 'no-child', 'last', 'first'])
 
 /** A point in CSS pixels (a pick's `screen` or `point`, a menu point). */
 export const CommentPointSchema = z.object({ x: coordinate, y: coordinate }).strict()
@@ -86,11 +89,37 @@ export const CommentPickRuntimeSchema = z
   .strict()
 export type CommentPickRuntime = z.infer<typeof CommentPickRuntimeSchema>
 
+/** At most `max` code points (and never more than twice that in UTF-16 units). */
+const codePoints = (min: number, max: number) =>
+  z
+    .string()
+    .min(min)
+    .max(max * 2)
+    .refine(text => codePointLength(text) <= max, { message: 'too long' })
+
+/**
+ * The words selected in the page when a pick was made (spec 024 024-FR-004):
+ * `anchor.sel`'s caps, as `file-comment:*` carries them. Page text, never
+ * trusted: main looks the words up in its own parse of the file and keeps
+ * them only when they are there (`commentWordsCore.ts`).
+ */
+export const CommentPickSelSchema = z
+  .object({
+    exact: codePoints(1, SEL_EXACT_MAX_CHARS),
+    prefix: codePoints(0, SEL_CONTEXT_MAX_CHARS),
+    suffix: codePoints(0, SEL_CONTEXT_MAX_CHARS)
+  })
+  .strict()
+export type CommentPickSel = z.infer<typeof CommentPickSelSchema>
+
 /** `preview-page:commentPick` (§8, §19 R3-5, R3-8). */
 export const CommentPickSchema = z
   .object({
-    /** `step`: the keyboard picker moved – nothing is picked; the window's live region says it (§10.8). */
-    kind: z.enum(['menu', 'open', 'icon', 'parent', 'exit', 'step']),
+    /**
+     * `step`: the keyboard picker moved – nothing is picked; the window's live region says it (§10.8).
+     * `context`: the reader's right-click outside comment mode that the page did not cancel (OD-01) – a menu, never a write.
+     */
+    kind: z.enum(['menu', 'open', 'icon', 'parent', 'exit', 'step', 'context']),
     via: z.enum(['pointer', 'keyboard']),
     /** The element's token, or its nearest tokened ancestor's. */
     token: z.string().regex(ELEMENT_TOKEN_PATTERN).optional(),
@@ -98,6 +127,8 @@ export const CommentPickSchema = z
     tag: CommentTagNameSchema.optional(),
     /** A pin's key (`icon`). */
     key: CommentKeySchema.optional(),
+    /** A stack pin's click (C-17): the keys of the other pins merged into it, in document order. */
+    stack: z.array(CommentKeySchema).min(1).max(COMMENT_PICK_STACK_MAX).optional(),
     /** A pointer pick: the trusted event's `screenX/Y`. */
     screen: CommentPointSchema.optional(),
     /** A keyboard pick: the element's top-left + 4 px, frame CSS pixels. */
@@ -110,10 +141,23 @@ export const CommentPickSchema = z
     say: CommentPickerSaySchema.optional(),
     /** A `showing` step: the element reached lies below the tokened one (a script built it). */
     added: z.literal(true).optional(),
+    /** A `menu`, `open` or `context` pick made on a text selection: the words, cut to their first 200 code points. */
+    sel: CommentPickSelSchema.optional(),
+    /** The selection was longer than 200 code points and `sel.exact` is its start. */
+    long: z.literal(true).optional(),
+    /** The selection ran past the target and was cut to the element it started in (024-FR-004). */
+    crossed: z.literal(true).optional(),
     view: CommentPickViewSchema
   })
   .strict()
+  .refine(pick => pick.sel === undefined || (['menu', 'open', 'context'].includes(pick.kind) && pick.token !== undefined), {
+    message: 'only a menu, open or context pick on a tokened element carries words'
+  })
+  .refine(pick => pick.sel !== undefined || (pick.long === undefined && pick.crossed === undefined), {
+    message: 'only words are long or crossed'
+  })
   .refine(pick => pick.kind !== 'icon' || pick.key !== undefined, { message: 'a pin pick names its key' })
+  .refine(pick => pick.stack === undefined || pick.kind === 'icon', { message: 'only a pin pick names a stack' })
   .refine(pick => (pick.kind === 'step') === (pick.say !== undefined), { message: 'only a step says, and it says something' })
   .refine(pick => pick.kind !== 'step' || (pick.say === 'showing') === (pick.token !== undefined), {
     message: 'a showing step names its element by token, and only it does'

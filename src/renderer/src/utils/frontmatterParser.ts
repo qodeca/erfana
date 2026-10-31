@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import yaml from 'js-yaml'
 import { logger } from './logger'
+import { FRONTMATTER_REGEX } from '../../../shared/markdown/previewPipeline'
 
 /**
  * Represents parsed YAML frontmatter data.
@@ -33,14 +34,9 @@ export interface ExtractedFrontmatter {
 }
 
 /**
- * Regex to match YAML frontmatter at the start of a document.
- * Matches:
- * ---
- * key: value
- * ---
- * content...
+ * YAML frontmatter at the start of a document – one expression shared with
+ * main's comment render check (shared/markdown/previewPipeline.ts).
  */
-const FRONTMATTER_REGEX = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)([\s\S]*)$/
 
 /** Maximum frontmatter size in bytes (100KB) to prevent DoS via large YAML */
 const MAX_FRONTMATTER_SIZE = 100_000

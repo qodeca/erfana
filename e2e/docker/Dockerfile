@@ -18,8 +18,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # prompt), git, Python 3.12 + toolchain for node-pty, and a few fonts.
 # openbox is a minimal window manager: without one no window gets keyboard focus
 # (Monaco hides its cursor) and window resize/maximize requests are ignored.
+# xdotool parks the real X pointer in a corner (run-under-xvfb.sh).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates xvfb xauth x11-utils openbox dbus dbus-x11 \
+      ca-certificates xvfb xauth x11-utils openbox xdotool dbus dbus-x11 \
       libnss3 libatk1.0-0t64 libatk-bridge2.0-0t64 libcups2t64 libdrm2 libgbm1 \
       libgtk-3-0t64 libasound2t64 libxss1 libxtst6 libxkbcommon0 libx11-xcb1 \
       libxcomposite1 libxdamage1 libxrandr2 libxfixes3 libpango-1.0-0 libcairo2 \

@@ -9,7 +9,8 @@
  * while the top frame paints the selected outline twice over; then the fresh
  * still is captured and the renderer told – the menu's point, the file it
  * would be saved into, and a single-use draft token with its element key, or
- * no token (the menu's disabled "Can't comment here"). For a pin: the threads
+ * no token and the refusal reason (the menu's items, disabled, each with its
+ * reason line – spec 024 menu matrix M-05, M-06, M-08, C-19). For a pin: the threads
  * and blocks standing on it, as keys, and a draft token for the window's "New
  * comment" on the same element – the blocks and the draft from ONE read and
  * one worker job (M4). The draft itself – real path, offset, hash, anchor –
@@ -28,17 +29,20 @@
  */
 import { CommentPickRuntimeSchema, type CommentDraftOpened, type CommentPick } from '../../../../shared/ipc/preview-comment-schema'
 import type { PreviewBounds } from '../../../../shared/ipc/preview-types'
-import type { CommentFileJobRunner } from './commentFileJobs'
-import type { CommentBinding, CommentKeyStore } from './commentKeyStore'
+import type { HtmlFileJobRunner } from './htmlCommentJobs'
+import type { CommentBinding, CommentKeyStore } from '../../comments/commentKeyStore'
 import type { CommentFrameLike, FrameRecord } from './commentFrames'
-import { buildDraft, buildPin, draftKeyOf, type BuiltDraft, type BuiltPin, type CommentDraft } from './commentDraftBuilder'
+import { NOT_COMMENTABLE, buildDraft, buildPin, draftKeyOf, type BuiltDraft, type BuiltPin, type CommentDraft } from './commentDraftBuilder'
 import { menuPoint } from './commentMenuPoint'
 import type { PinGroup } from './commentPins'
 import { captureFreshStill, waitForPaint, type FreshStillDeps, type PickFramePlace } from './commentStillCapture'
 import type { FrameOffset } from './commentScripts'
-import { samePathKey } from './commentUnsavedSources'
+import { samePathKey } from '../../comments/commentUnsavedSources'
 import type { ElementTokenEntry, ElementTokenTable } from './ElementTokenTable'
 import type { FrameFile } from './frameFileMap'
+
+/** A draft event of kind `menu` or `open`. */
+type ElementDraftOpened = Extract<CommentDraftOpened, { kind: 'menu' | 'open' }>
 
 /** Where the menu point and the still come from. */
 export interface DraftOpenerGeometry {
@@ -64,7 +68,7 @@ export interface DraftOpenerDeps {
   readonly currentPage: () => string
   readonly emit: (payload: CommentDraftOpened) => void
   /** Where the parse runs: the comment parse worker in the app. */
-  readonly jobs: CommentFileJobRunner
+  readonly jobs: HtmlFileJobRunner
   /** False once the view is disposed or `record` is no longer its frame's: nothing is minted or sent then. */
   readonly isCurrent: (record: FrameRecord) => boolean
   readonly platform?: NodeJS.Platform
@@ -96,6 +100,20 @@ export function pinPickOf(pin: PinGroup, pick: CommentPick): CommentPick | undef
   if (pin.runtime === undefined) return base
   const runtime = CommentPickRuntimeSchema.safeParse({ path: pin.runtime.path, tag: pin.runtime.tag })
   return runtime.success ? { ...base, runtime: runtime.data } : undefined
+}
+
+/**
+ * The pin whose open threads stand on the element a comment-mode click picked
+ * (C-22): such a click opens those threads rather than a blank new comment.
+ * Only a plain click on the element itself – not a menu, not words, not a
+ * script-built element below it.
+ */
+export function openThreadsOn(record: Pick<FrameRecord, 'pins'>, pick: CommentPick): string | undefined {
+  if (pick.kind !== 'open' || pick.sel !== undefined || pick.runtime !== undefined || pick.token === undefined) return undefined
+  for (const [key, pin] of record.pins) {
+    if (pin.token === pick.token && pin.runtime === undefined && pin.threadIds.length > 0) return key
+  }
+  return undefined
 }
 
 /** Build one view's opener. */
@@ -140,12 +158,14 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
     entry: ElementTokenEntry | undefined,
     pick: CommentPick
   ): Promise<void> {
+    const commented = openThreadsOn(record, pick)
+    if (commented !== undefined) return icon(frame, record, commented, pick)
     const file = record.file!
     const place = placeOf(frame, deps.mainFrame())
     const painted = paintAndCapture(place, pick)
     const built =
       entry === undefined
-        ? ({ ok: false } as const)
+        ? NOT_COMMENTABLE
         : await buildDraft({
             realRoot: deps.realRoot,
             file,
@@ -160,10 +180,14 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
     if (!stillCurrent(record, file)) return
     deps.emit({
       panelId: deps.panelId,
-      kind: pick.kind as 'menu' | 'open',
+      // A right-click outside comment mode (OD-01) opens the same menu.
+      kind: pick.kind === 'open' ? 'open' : 'menu',
       point: pointOf(pick, offset),
       ...display(file, frame),
-      ...minted(built)
+      ...minted(built),
+      // C-19: a menu with no draft names why, so its items stay, disabled, with their reason line.
+      ...(built.ok ? {} : { reason: built.reason }),
+      ...wordsOf(built, pick)
     })
   }
 
@@ -171,6 +195,17 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
   function minted(built: BuiltDraft): Pick<CommentDraftOpened, 'draftToken' | 'draftKey' | 'target'> {
     if (!built.ok) return {}
     return { draftToken: deps.keys.mintDraft(deps.binding, built.draft), draftKey: draftKeyOf(built.draft), target: built.target }
+  }
+
+  /** A built draft's words for a menu or the window (024-FR-004); whether the pick was made on a selection. */
+  function wordsOf(built: BuiltDraft, pick: CommentPick): Pick<ElementDraftOpened, 'selection' | 'words' | 'wordsMissing'> {
+    const selection = pick.sel === undefined ? {} : { selection: true as const }
+    if (!built.ok) return selection
+    return {
+      ...selection,
+      ...(built.words === undefined ? {} : { words: built.words }),
+      ...(built.wordsMissing === undefined ? {} : { wordsMissing: built.wordsMissing })
+    }
   }
 
   /**
@@ -183,19 +218,23 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
   }
 
   /**
-   * The pin's damaged and newer blocks and a draft on its element for the
-   * window's "New comment" – built from disk as a menu's is, on the JS-built
-   * element when the pin stands on one – from one read and one worker job.
+   * The pin's damaged and newer blocks, a stack's other pins' blocks (C-17),
+   * and a draft on its element for the window's "New comment" – built from
+   * disk as a menu's is, on the JS-built element when the pin stands on one –
+   * all from ONE read and ONE worker job (M4), however many pins the stack holds.
+   * With the pin's own token gone, a stacked pin's element leads the job (blocks only, no draft).
    */
-  function pinOf(frame: CommentFrameLike, file: FrameFile, entry: ElementTokenEntry | undefined, pin: PinGroup, pick: CommentPick): Promise<BuiltPin> {
-    if (entry === undefined) return Promise.resolve({ draft: { ok: false }, blocks: [] })
-    const onPin = pinPickOf(pin, pick)
+  function pinOf(frame: CommentFrameLike, file: FrameFile, entry: ElementTokenEntry | undefined, pin: PinGroup, pick: CommentPick, stacked: readonly ElementTokenEntry[]): Promise<BuiltPin> {
+    const lead = entry ?? stacked[0]
+    if (lead === undefined) return Promise.resolve({ draft: NOT_COMMENTABLE, blocks: [] })
+    const onPin = entry === undefined ? undefined : pinPickOf(pin, pick)
     return buildPin({
       realRoot: deps.realRoot,
       file,
-      entry,
+      entry: lead,
       ...(onPin === undefined ? {} : { pick: onPin }),
-      blocks: pin.attention > 0,
+      blocks: entry === undefined || pin.attention > 0,
+      stacked: entry === undefined ? stacked.slice(1) : stacked,
       frame: frame.parent !== null,
       pageRealPath: deps.currentPage(),
       jobs: deps.jobs,
@@ -203,14 +242,28 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
     })
   }
 
+  /** The token entries of a stack's other pins that count blocks (C-17); a pin on a load main no longer knows has none. */
+  function stackedEntries(record: FrameRecord, pins: readonly PinGroup[]): ElementTokenEntry[] {
+    if (record.loadId === undefined) return []
+    const loadId = record.loadId
+    return pins.flatMap(pin => (pin.attention === 0 ? [] : (deps.tokens.lookup(loadId, pin.token) ?? [])))
+  }
+
+  /**
+   * A pin's threads and blocks, and a draft on its element for "New comment".
+   * A stack pin's click (C-17) names the other pins merged into it: their
+   * threads and blocks follow the first pin's, in document order.
+   */
   async function icon(frame: CommentFrameLike, record: FrameRecord, pinKey: string, pick: CommentPick): Promise<void> {
     const pin = record.pins.get(pinKey)
     const file = record.file
     if (pin === undefined || file === undefined) return
     const { realPath } = file
+    const stacked = (pick.stack ?? []).flatMap(key => record.pins.get(key) ?? [])
     const entry = record.loadId === undefined ? undefined : deps.tokens.lookup(record.loadId, pin.token)
     const painted = paintAndCapture(placeOf(frame, deps.mainFrame()), pick)
-    const built = await pinOf(frame, file, entry, pin, pick)
+    const built = await pinOf(frame, file, entry, pin, pick, stackedEntries(record, stacked))
+    const { blocks } = built
     const offset = await painted
     if (!stillCurrent(record, file)) return
     deps.emit({
@@ -218,8 +271,8 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
       kind: 'icon',
       point: pointOf(pick, offset),
       ...display(file, frame),
-      threadKeys: pin.threadIds.map(threadId => deps.keys.keyFor(deps.binding, { kind: 'thread', realPath, threadId })),
-      blockKeys: built.blocks.map(({ rawHash, start }) => deps.keys.keyFor(deps.binding, { kind: 'block', realPath, rawHash, start })),
+      threadKeys: [pin, ...stacked].flatMap(p => p.threadIds).map(threadId => deps.keys.keyFor(deps.binding, { kind: 'thread', realPath, threadId })),
+      blockKeys: blocks.map(({ rawHash, start }) => deps.keys.keyFor(deps.binding, { kind: 'block', realPath, rawHash, start })),
       ...minted(built.draft)
     })
   }

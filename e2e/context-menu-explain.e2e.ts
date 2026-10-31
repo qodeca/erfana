@@ -120,10 +120,17 @@ test.describe('Context Menu – Explain prompt', () => {
       const paragraph = previewPane.locator('.markdown-preview-content p').first()
       await expect(paragraph).toBeVisible({ timeout: 5000 })
 
-      // ── Step 1: Right-click WITHOUT selection – menu should NOT appear ──
-      // The preview context menu only shows when window.getSelection() is non-empty
+      // ── Step 1: Right-click WITHOUT selection – the comment item only ──
+      // Changed expectation under spec 024 C-16 (comments-v2, owner-approved
+      // 2026-10-29): with Markdown comments on, a right-click with nothing
+      // selected opens the menu with "Comment on {kind}" aimed at the block,
+      // and "Copy selection" stays hidden.
       await paragraph.click({ button: 'right' })
       const previewMenu = byTestId(window, TEST_IDS.CONTEXT_MENU_PREVIEW)
+      await expect(previewMenu).toBeVisible({ timeout: 3000 })
+      await expect(byTestId(window, TEST_IDS.COMMENT_MENU_COMMENT_ON)).toContainText('Comment on paragraph')
+      await expect(byTestId(window, TEST_IDS.CONTEXT_MENU_ITEM_COPY)).toHaveCount(0)
+      await window.keyboard.press('Escape')
       await expect(previewMenu).not.toBeVisible({ timeout: 1000 })
 
       // ── Step 2+3: Select text and open context menu (atomic) ──

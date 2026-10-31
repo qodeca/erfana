@@ -12,7 +12,11 @@
  * The page receives a pin's key, token, path, count and status – never a
  * thread id, a text or an author (§4.1 B1').
  */
+import type { AnchorSelection } from '../../../../shared/comments/anchorSel'
 import type { CommentLoadView } from './ElementTokenTable'
+
+/** Marked words one pin carries to the page: more threads on one element are still in its pin and the drawer. */
+export const PIN_WORDS_MAX = 20
 
 /** One pin, before main gives it a key. */
 export interface PinGroup {
@@ -22,18 +26,22 @@ export interface PinGroup {
   readonly runtime?: { readonly path: string; readonly tag: string }
   /** Open threads on the element, in file order. */
   readonly threadIds: readonly string[]
+  /** The words of its open threads that have them, in file order, at most {@link PIN_WORDS_MAX} (C-12). */
+  readonly words?: readonly AnchorSelection[]
   /** Damaged or newer blocks on the element. */
   readonly attention: number
   /** What the overlay draws: open threads plus blocks that need attention. */
   readonly count: number
   readonly status: 'open' | 'damaged'
+  /** One of its open threads is Changed or Words changed (C-06): the pin is notched. */
+  readonly changed?: true
 }
 
 /** A page's or a file's comment counts (§10.1 badge). */
 export interface CommentCounts {
   readonly open: number
   readonly resolved: number
-  /** Damaged and newer blocks, and open threads whose element is not in the file. */
+  /** Damaged blocks only (OD-04: the ▲ counter); newer-format blocks count in neither. */
   readonly attention: number
 }
 
@@ -45,7 +53,9 @@ interface MutableGroup {
   token: string
   runtime?: { path: string; tag: string }
   threadIds: string[]
+  words: AnchorSelection[]
   attention: number
+  changed?: true
 }
 
 /** The pins of one load, in file order of their first block. */
@@ -58,15 +68,18 @@ export function groupPins(view: Pick<CommentLoadView, 'blocks'>): PinGroup[] {
     const id = runtime === undefined ? block.token : `${block.token} ${runtime.tag} ${runtime.path}`
     let group = groups.get(id)
     if (group === undefined) {
-      group = { id, token: block.token, threadIds: [], attention: 0 }
+      group = { id, token: block.token, threadIds: [], words: [], attention: 0 }
       if (runtime !== undefined) group.runtime = { path: runtime.path, tag: runtime.tag }
       groups.set(id, group)
     }
+    if (block.kind === 'ok' && block.sel !== undefined && group.words.length < PIN_WORDS_MAX) group.words.push(block.sel)
+    if (block.kind === 'ok' && block.changed === true) group.changed = true
     if (block.kind === 'ok' && block.id !== undefined) group.threadIds.push(block.id)
     else group.attention += 1
   }
-  return [...groups.values()].map(group => ({
+  return [...groups.values()].map(({ words, ...group }) => ({
     ...group,
+    ...(words.length === 0 ? {} : { words }),
     count: group.threadIds.length + group.attention,
     status: group.attention > 0 ? 'damaged' : 'open'
   }))
@@ -78,10 +91,11 @@ export function countsOf(view: Pick<CommentLoadView, 'blocks'>): CommentCounts {
   let resolved = 0
   let attention = 0
   for (const block of view.blocks) {
-    // A resolved thread stays "Resolved" even when its element is gone (§8 drawer mapping).
-    if (block.kind !== 'ok') attention += 1
+    // OD-04: an open thread is open whether or not its element is found; a
+    // newer-format block is in neither count; only a damaged one needs attention.
+    if (block.kind === 'damaged') attention += 1
+    else if (block.kind !== 'ok') continue
     else if (block.status === 'resolved') resolved += 1
-    else if (block.token === undefined) attention += 1
     else open += 1
   }
   return { open, resolved, attention }

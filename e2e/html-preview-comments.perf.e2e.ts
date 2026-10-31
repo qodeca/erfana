@@ -20,7 +20,9 @@
  *   eventLoopUtilization`) and the longest stall (a 1 ms main-side probe)
  *   between a reload and its instrumented load(s) being registered. An upper
  *   bound of the parse's main-thread share: it also counts the load's IPC and
- *   this test's own polling. The unit-level gate on main-thread time per call
+ *   this test's own polling. The control is the same page without its block,
+ *   served raw with HTML comments turned off (OD-01 instruments every page
+ *   while they are on). The unit-level gate on main-thread time per call
  *   is `commentFileJobs.perf.test.ts` (R3-12).
  * - **F-003** right-click → the element menu shown with the still frame in
  *   place (≤ 150 ms budget, R3-6), 20 samples; and 200 pins on a page while
@@ -33,7 +35,7 @@
 
 import * as fs from 'fs'
 import * as path from 'path'
-import type { ElectronApplication, TestInfo } from '@playwright/test'
+import type { ElectronApplication, Page, TestInfo } from '@playwright/test'
 import { test, expect } from './fixtures/index'
 import { HtmlPreviewPage, PREVIEW_BUDGET_MS } from './pages/html-preview.page'
 import { commentLoads, newestLoad, waitForCommentLoad } from './pages/html-preview.comments'
@@ -75,13 +77,27 @@ const RELOAD_GUARD_MS = 20_000
  */
 const LARGEST = { runs: 3, guardMs: 300_000, openMs: 300_000 }
 const SMALL = { runs: RUNS, guardMs: RELOAD_GUARD_MS, openMs: PREVIEW_BUDGET_MS }
+/**
+ * The emulated Windows box (x64 Electron on a Windows 11 ARM VM) stalls main in
+ * native code for 2–26 s on a 4 MB reload – with comments OFF as much as on;
+ * a main-process CPU profile shows Erfana's own JS idle through it (spec 024
+ * F-002, 2026-10-30, docs/windows/known-flakes.md). F-002 asserts no time –
+ * it records – so there the guards and the first open are long enough to let
+ * every run finish – on any Windows host, as no time is asserted; the runs and
+ * what they record are unchanged.
+ */
+const WINDOWS_HOST = process.platform === 'win32'
+const WIN_SMALL = { runs: RUNS, guardMs: 120_000, openMs: 120_000 }
+const WIN_LARGEST = { runs: 3, guardMs: 600_000, openMs: 600_000 }
+const small = WINDOWS_HOST ? WIN_SMALL : SMALL
+const largest = WINDOWS_HOST ? WIN_LARGEST : LARGEST
 const SIZES = [
-  { label: '0.5 MB', rel: 'comments/size-05.html', bytes: MB / 2, ...SMALL },
-  { label: '1 MB', rel: 'comments/size-1.html', bytes: MB, ...SMALL },
+  { label: '0.5 MB', rel: 'comments/size-05.html', bytes: MB / 2, ...small },
+  { label: '1 MB', rel: 'comments/size-1.html', bytes: MB, ...small },
   // Just under the comment file limit before §19 Rev 4 (4 MB): the size the R3-12 gates were set at.
-  { label: '4 MB', rel: 'comments/size-4.html', bytes: 4 * MB - 64 * 1024, ...SMALL },
+  { label: '4 MB', rel: 'comments/size-4.html', bytes: 4 * MB - 64 * 1024, ...small },
   // Just under the comment file limit (25 MB, `PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES`), so the page is still instrumented.
-  { label: '25 MB', rel: 'comments/size-25.html', bytes: 25 * MB - 64 * 1024, ...LARGEST }
+  { label: '25 MB', rel: 'comments/size-25.html', bytes: 25 * MB - 64 * 1024, ...largest }
 ] as const
 const FRAMES = 10
 const FRAME_HOST = 'comments/frames-10.html'
@@ -188,12 +204,20 @@ async function timedReload(app: ElectronApplication, needle: string, guardMs = R
 }
 
 /**
- * Open a sized page and wait for its title. Up to 4 MB through
- * `openCommentPage`; a page with a longer `openMs` gets the same title wait
- * with that budget.
+ * Open a sized page and wait for its title. An instrumented page up to 4 MB
+ * through `openCommentPage`; a page with a longer `openMs`, or the raw
+ * control (comments off, so no comment panel), gets the same title wait with
+ * its own budget.
  */
-async function openSized(preview: HtmlPreviewPage, app: ElectronApplication, rel: string, title: string, openMs: number): Promise<void> {
-  if (openMs <= PREVIEW_BUDGET_MS) {
+async function openSized(
+  preview: HtmlPreviewPage,
+  app: ElectronApplication,
+  rel: string,
+  title: string,
+  openMs: number,
+  commented: boolean
+): Promise<void> {
+  if (commented && openMs <= PREVIEW_BUDGET_MS) {
     await openCommentPage(preview, app, rel, title)
     return
   }
@@ -206,6 +230,17 @@ async function openSized(preview: HtmlPreviewPage, app: ElectronApplication, rel
       })
       .toBe(title)
   )
+}
+
+/**
+ * Turn HTML comments on or off before a view is built. Since spec 024 OD-01
+ * every page is instrumented while comments are on – a page without a block
+ * too – so F-002's raw control is served raw only with the feature off. The
+ * view's session policy is chosen when it is built, so call this with no
+ * preview open. `afterEach` turns the feature back on.
+ */
+async function setCommentsFlag(page: Page, enabled: boolean): Promise<void> {
+  await setGlobalSetting(page, 'htmlPreview', { enabled: true, comments: { enabled } })
 }
 
 test.describe('HTML Preview comments – performance records (P7)', () => {
@@ -275,7 +310,7 @@ test.describe('HTML Preview comments – performance records (P7)', () => {
     appWithTestProject
   }, testInfo) => {
     // The 25 MB page takes a minute or more per load on the emulated Windows box (LARGEST); the others under 3 s.
-    test.setTimeout(1_800_000)
+    test.setTimeout(WINDOWS_HOST ? 5_400_000 : 1_800_000)
     const app = appWithTestProject
     const page = windowWithTestProject
     const preview = new HtmlPreviewPage(page, app)
@@ -294,7 +329,8 @@ test.describe('HTML Preview comments – performance records (P7)', () => {
         ['raw', rawOf(size.rel), `-HPC-RAW-${size.label}-`]
       ] as const) {
         const target = HtmlPreviewPage.target(rel)
-        await openSized(preview, app, rel, title, size.openMs)
+        await setCommentsFlag(page, kind === 'instrumented')
+        await openSized(preview, app, rel, title, size.openMs, kind === 'instrumented')
         if (kind === 'instrumented') await waitForCommentLoad(app, rel, 'page', 1)
         const newest = async (): Promise<string | undefined> => newestLoad(await commentLoads(app), rel, 'page')?.loadId
         const runs: ReloadCost[] = []
@@ -318,12 +354,13 @@ test.describe('HTML Preview comments – performance records (P7)', () => {
       ['raw', rawOf(FRAME_HOST), '-HPC-RAW-FRAMES10-']
     ] as const) {
       const target = HtmlPreviewPage.target(rel)
+      await setCommentsFlag(page, kind === 'instrumented')
       await preview.open(rel)
       await preview.waitForTitled(title)
       const frameLoads = async (): Promise<number> => (await commentLoads(app)).filter(load => load.scope === 'frame').length
       if (kind === 'instrumented') await expect.poll(frameLoads, { timeout: PREVIEW_BUDGET_MS }).toBeGreaterThanOrEqual(FRAMES)
       const runs: ReloadCost[] = []
-      for (let run = 0; run < RUNS; run += 1) runs.push(await timedReload(app, target.urlIncludes as string))
+      for (let run = 0; run < RUNS; run += 1) runs.push(await timedReload(app, target.urlIncludes as string, small.guardMs))
       if (kind === 'instrumented') await expect.poll(frameLoads, { timeout: PREVIEW_BUDGET_MS }).toBeGreaterThanOrEqual(FRAMES)
       results.push({ page: `${FRAMES} frames × 100 KB`, kind, ...summary(runs), runs })
       await preview.tabClose().click()

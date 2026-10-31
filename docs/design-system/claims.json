@@ -923,7 +923,7 @@
     "ext": [
       ".ts"
     ],
-    "includePath": "comments/commentFormat\\.ts$",
+    "includePath": "Comments/commentFormat\\.ts$",
     "match": "export const COMMENT_MAX_CHARS = ([0-9_]+)\\b",
     "group": 1
   },
@@ -935,7 +935,7 @@
     "ext": [
       ".ts"
     ],
-    "includePath": "comments/commentFormat\\.ts$",
+    "includePath": "Comments/commentFormat\\.ts$",
     "match": "export const COMMENT_WARN_CHARS = ([0-9_]+)\\b",
     "group": 1
   },
@@ -1019,7 +1019,7 @@
     "ext": [
       ".css"
     ],
-    "includePath": "comments/CommentDrawer\\.css$",
+    "includePath": "Comments/CommentDrawer\\.css$",
     "match": "min-inline-size:\\s*([1-9][0-9]*)px",
     "group": 1
   },

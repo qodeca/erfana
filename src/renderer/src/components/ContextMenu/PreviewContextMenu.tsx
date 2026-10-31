@@ -37,6 +37,12 @@ interface PreviewContextMenuProps {
   startLine?: number
   endLine?: number
   onClose: () => void
+  /** Items above the prompt items – the comment item of the menu matrix (spec 024 M-11, M-15, M-18). */
+  leadingItems?: ContextMenuItem[]
+  /** No "Copy selection": the menu is about a block, not a selection (M-11). */
+  hideCopy?: boolean
+  /** The menu's accessible name (the kind noun when it is about a block). */
+  ariaLabel?: string
 }
 
 
@@ -73,7 +79,10 @@ export function PreviewContextMenu({
   fullDocument,
   startLine,
   endLine,
-  onClose
+  onClose,
+  leadingItems = [],
+  hideCopy = false,
+  ariaLabel
 }: PreviewContextMenuProps) {
   // New unified dialog system
   const { showPrompt } = useDialog()
@@ -222,19 +231,25 @@ export function PreviewContextMenu({
   // Build context menu items from prompt registry
   // Filter to only show prompts for markdown-preview context-menu area
   const items: ContextMenuItem[] = [
+    ...leadingItems,
+    ...(leadingItems.length > 0 ? [{ separator: true } as ContextMenuItem] : []),
     ...getPromptsForArea('markdown-preview', 'context-menu').map((prompt) => ({
       label: prompt.label,
       icon: renderIcon(prompt.icon),
       action: () => handleAction(prompt.id),
       testId: PROMPT_TEST_ID_MAP[prompt.id]
     })),
-    { separator: true } as ContextMenuItem,
-    {
-      label: 'Copy selection',
-      icon: <Copy {...DEFAULT_ICON_PROPS} />,
-      action: handleCopySelection,
-      testId: TEST_IDS.CONTEXT_MENU_ITEM_COPY
-    }
+    ...(hideCopy
+      ? []
+      : [
+          { separator: true } as ContextMenuItem,
+          {
+            label: 'Copy selection',
+            icon: <Copy {...DEFAULT_ICON_PROPS} />,
+            action: handleCopySelection,
+            testId: TEST_IDS.CONTEXT_MENU_ITEM_COPY
+          }
+        ])
   ]
 
   return (
@@ -244,6 +259,7 @@ export function PreviewContextMenu({
       items={items}
       onClose={onClose}
       containerTestId={TEST_IDS.CONTEXT_MENU_PREVIEW}
+      ariaLabel={ariaLabel}
     />
   )
 }

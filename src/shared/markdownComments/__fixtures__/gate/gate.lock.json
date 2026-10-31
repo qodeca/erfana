@@ -1,0 +1,18 @@
+{
+  "algorithm": "sha256",
+  "samples": {
+    "samples/gate-01-paragraph.md": "b29d437f8dd5420cd9047de0eabddb2dc4d13e21674c0ccf63c28395ccac181a",
+    "samples/gate-02-heading.md": "a66c67946b9ef1b7fbf25ec45d5adb90969c6bec701276821bf1ea259f94eec5",
+    "samples/gate-03-list-item-1.md": "2f3ac06aa1abd0122643bb33d2f9b1f388484ff56604275a5414dc399a20cf4f",
+    "samples/gate-04-list-item-2.md": "6532ebb107abc054a52d569e0fa12ce16a8f3608f46b5188b9ed6ed07827efe9",
+    "samples/gate-05-nested-list-item.md": "50705d5c05b85ad4c18ae5ffaa2d01b72eef2a1c46584b49e0d39d762cb4da61",
+    "samples/gate-06-table-row.md": "8b44988f1bd0a15202af2b505b57ef2fab4ad2530247d34945608e64e0b55c65",
+    "samples/gate-07-quote-paragraph.md": "0794eac279938cea95b549a23ed323d9e6e95483f0dea6c1e010db18172ee73e",
+    "samples/gate-08-code-block.md": "32a86eb920cbeb7d46e7a0c5fc21316b514f48a5806cb3f9c9865d9e9507fdd6",
+    "samples/gate-09-resolved-comment.md": "c22593262f3fd5410fb93a06eb8282fce0d65c43e88c6ab91a82d087b1dc6f9d",
+    "samples/gate-10-selection-comment.md": "d3e3655463b482d41dc90d7dadc7a2e50c2860f19d5de094bc35e675e50e2519",
+    "samples/gate-11-run-twice.md": "93d25527c49751a09877501183550482f383c4039db8145a18219c6ab2216184"
+  },
+  "agentNote": "26e71c214300a880bed47240c6079980d3aacbe636c75d44445dafa6097fed87",
+  "prompt": "775bb55097d18fec756adaaa97cce48cfb8c41a1b879ef9fe9e2e1d7ba6dc720"
+}

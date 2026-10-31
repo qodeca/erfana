@@ -142,24 +142,45 @@ export default defineConfig({
         // measured when this entry landed (2026-10-26); never raise one above
         // what the Coverage job measures.
         // measured 100/100/100/100
-        'src/shared/htmlComments/format.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/format.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/shared/htmlComments/parse.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/shared/htmlComments/splice.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/shared/htmlComments/anchor.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Spec 024 commit 8 split the three above into a kind-agnostic base and
+        // the HTML entry; the split-off modules keep the same floor (measured
+        // 100/100/100/100 each on 2026-10-30, Windows, comment suites).
+        'src/shared/comments/blocks.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/splice.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/reattach.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/cutText.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // The file-kind seam and the HTML kind (spec 024 § 3; new in commit 8,
+        // measured 100/100/100/100 on 2026-10-30, Windows).
+        'src/shared/comments/fileKind.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/htmlKind.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Spec 024 format additions (commit 11, C1, C-01, C-02): `anchor.sel`, the
+        // agent-note-line encoder and hints, and the per-kind agent notes
+        // (measured 100/100/100/100 each on 2026-10-30, Windows, comment suites).
+        'src/shared/comments/anchorSel.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/noteLines.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/agentNotes.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Spec 024 overlayCore (ADR 0006): pure rules shared by both overlays; measured 100/100/100/100.
+        'src/shared/comments/overlayCore/pinLayout.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/overlayCore/modeState.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/overlayCore/gesture.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // The re-attach tables and quote readers split out of anchor.ts
         // (measured 100/100/100/100 on 2026-10-26, Windows).
-        'src/shared/htmlComments/anchorLookup.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
-        'src/shared/htmlComments/quoteText.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/anchorLookup.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/quoteText.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // The position-corroboration rule split out of anchor.ts (§19 Rev 4,
         // measured 100/100/100/100 on 2026-10-26, Windows).
-        'src/shared/htmlComments/anchorEvidence.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/anchorEvidence.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
-        'src/shared/htmlComments/conflictMarkers.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/conflictMarkers.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
-        'src/shared/htmlComments/encoding.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/encoding.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/shared/htmlComments/instrument.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
@@ -167,7 +188,7 @@ export default defineConfig({
         // measured 100/100/100/100
         'src/shared/htmlComments/frameworkMarkers.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
-        'src/shared/htmlComments/thread.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/thread.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // HTML Preview comments – the writer (design § 7.6, § 12.5: at least
         // 92/92/88/92). The only page-driven write into the user's files: path
         // confinement, link refusal, the re-read/re-hash compare-and-swap and the
@@ -178,13 +199,16 @@ export default defineConfig({
         // measured 100/100/98.63/99.07
         'src/main/utils/atomicWriteBytesStrict.ts': { lines: 98, functions: 98, branches: 96, statements: 97 },
         // measured 100/100/100/100
-        'src/main/services/preview/comments/CommentWriter.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/main/services/comments/CommentWriter.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
-        'src/main/services/preview/comments/commentFileAccess.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/main/services/comments/commentFileAccess.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Which extensions take comments, feeding the confinement above (spec 024
+        // § 3, C18; new in commit 8, measured 100/100/100/100 on 2026-10-30).
+        'src/main/services/comments/commentFileKinds.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
-        'src/main/services/preview/comments/commentFileLock.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/main/services/comments/commentFileLock.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
-        'src/main/services/preview/comments/commentRefusals.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/main/services/comments/commentRefusals.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // HTML Preview comments – instrumentation (design § 4.2, § 6, § 12.5: at
         // least 92/92/88/92). These modules decide which served document gets
         // element tokens and which element a token names, and the confinement
@@ -195,11 +219,21 @@ export default defineConfig({
         // measured 98.61/100/97.29/98.78
         'src/main/services/preview/comments/commentParseCore.ts': { lines: 96, functions: 98, branches: 95, statements: 96 },
         // measured 100/100/100/100
-        'src/main/services/preview/comments/commentParseProtocol.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/main/services/comments/commentParseProtocol.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
-        'src/main/services/preview/comments/commentParseWorker.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/main/services/comments/commentParseWorker.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/95.23/95.91/97.19
-        'src/main/services/preview/comments/CommentParseWorkerAdapter.ts': { lines: 98, functions: 93, branches: 93, statements: 95 },
+        'src/main/services/comments/CommentParseWorkerAdapter.ts': { lines: 98, functions: 93, branches: 93, statements: 95 },
+        // The parse worker split into a shared runner plus per-kind jobs (spec 024
+        // architecture note 001 § 8 C22): the entry that registers every kind's
+        // job table, the HTML kind's table, and its typed view of the client
+        // (2026-10-30, Windows, on the comment and preview suites).
+        // measured 100/100/100/100
+        'src/main/services/workers/comment-parse.worker.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/preview/comments/htmlCommentJobs.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/preview/comments/htmlCommentParseClient.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/94.44/100
         'src/main/services/preview/comments/ElementTokenTable.ts': { lines: 98, functions: 98, branches: 92, statements: 98 },
         // measured 100/100/93.75/100
@@ -236,9 +270,9 @@ export default defineConfig({
         // measured 100/100/97.22/100
         'src/main/services/preview/comments/commentFrames.ts': { lines: 98, functions: 98, branches: 95, statements: 98 },
         // measured 100/100/100/100
-        'src/main/services/preview/comments/commentKeyStore.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/main/services/comments/commentKeyStore.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/93.75/100
-        'src/main/services/preview/comments/commentListBuilder.ts': { lines: 98, functions: 98, branches: 91, statements: 98 },
+        'src/main/services/comments/commentListBuilder.ts': { lines: 98, functions: 98, branches: 91, statements: 98 },
         // measured 100/100/100/100
         'src/main/services/preview/comments/commentMenuPoint.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
@@ -252,7 +286,7 @@ export default defineConfig({
         // measured 100/100/91.66/98.87
         'src/main/services/preview/comments/commentReloadCoordinator.ts': { lines: 98, functions: 98, branches: 89, statements: 96 },
         // measured 100/100/95.45/100
-        'src/main/services/preview/comments/commentSaveFlow.ts': { lines: 98, functions: 98, branches: 93, statements: 98 },
+        'src/main/services/comments/commentSaveFlow.ts': { lines: 98, functions: 98, branches: 93, statements: 98 },
         // measured 100/100/100/100
         'src/main/services/preview/comments/commentScripts.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
@@ -262,24 +296,50 @@ export default defineConfig({
         // measured 100/100/95.23/96.07
         'src/main/services/preview/comments/commentStillCapture.ts': { lines: 98, functions: 98, branches: 93, statements: 94 },
         // measured 100/100/100/100
-        'src/main/services/preview/comments/commentUnsavedSources.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/main/services/comments/commentUnsavedSources.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/main/services/preview/comments/frameFileMap.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // The file jobs the parse worker runs for a pick, a pin, the list and a
         // write (§19 R3-12), and the identity rule the writer and the settings
         // share – same pinning (2026-10-26, Windows, on the comment suites alone).
         // measured 100/100/100/100
-        'src/main/services/preview/comments/commentFileJobs.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/main/services/comments/commentFileJobs.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
-        'src/main/services/preview/comments/commentJobDocs.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/main/services/comments/commentJobDocs.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/90.27/95.38
         'src/main/services/preview/comments/commentDraftCore.ts': { lines: 98, functions: 98, branches: 88, statements: 93 },
         // measured 100/100/92.85/100
-        'src/main/services/preview/comments/commentListCore.ts': { lines: 98, functions: 98, branches: 90, statements: 98 },
+        'src/main/services/comments/commentListCore.ts': { lines: 98, functions: 98, branches: 90, statements: 98 },
         // measured 100/100/98.24/98.71
-        'src/main/services/preview/comments/commentWriteCore.ts': { lines: 98, functions: 98, branches: 96, statements: 96 },
+        'src/main/services/comments/commentWriteCore.ts': { lines: 98, functions: 98, branches: 96, statements: 96 },
         // measured 100/100/100/100
-        'src/shared/htmlComments/identity.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/shared/comments/identity.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Spec 024 – the Markdown comment kind (024-FR-003, 024-NFR-008), measured on the
+        // markdownComments and comments/markdown suites alone (lines/functions/branches/statements):
+        // measured 97.95/100/87.3/96.77
+        'src/shared/markdownComments/markdownKind.ts': { lines: 97, functions: 98, branches: 86, statements: 96 },
+        // measured 100/100/100/100
+        'src/shared/markdownComments/markdownLimits.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/92.15/98.43
+        'src/shared/markdownComments/mdAnchor.ts': { lines: 98, functions: 98, branches: 91, statements: 98 },
+        // measured 100/100/97.36/100
+        'src/shared/markdownComments/mdCommentScan.ts': { lines: 98, functions: 98, branches: 96, statements: 98 },
+        // measured 100/100/92.85/97.72
+        'src/shared/markdownComments/mdHast.ts': { lines: 98, functions: 98, branches: 92, statements: 97 },
+        // measured 100/92.3/91.93/98.07
+        'src/shared/markdownComments/mdHints.ts': { lines: 98, functions: 92, branches: 91, statements: 98 },
+        // measured 100/100/90.62/100
+        'src/shared/markdownComments/mdIndex.ts': { lines: 98, functions: 98, branches: 90, statements: 98 },
+        // measured 100/100/95.08/100
+        'src/shared/markdownComments/mdLocate.ts': { lines: 98, functions: 98, branches: 94, statements: 98 },
+        // measured 100/100/96.15/100
+        'src/shared/markdownComments/mdRender.ts': { lines: 98, functions: 98, branches: 96, statements: 98 },
+        // measured 98.07/100/92.64/94.93
+        'src/shared/markdownComments/mdSlots.ts': { lines: 98, functions: 98, branches: 92, statements: 94 },
+        // measured 100/100/100/100
+        'src/shared/markdownComments/mdSource.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/comments/markdown/markdownCommentJobs.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/main/services/preview/PreviewRequestKindLedger.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 93.9/100/94.73/93.9
@@ -298,6 +358,8 @@ export default defineConfig({
         '**/__test__/**',
         '**/__test-helpers__/**',
         '**/__fixtures__/**',
+        // Spec 024 shared test suites and test-only file kinds (overlay.suite.ts, the .txt preview).
+        '**/__conformance__/**',
         'vitest.*.ts',
         'electron.vite.config.ts',
         // Type-only: declarations and interface modules compile to nothing. A

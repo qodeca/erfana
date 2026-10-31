@@ -109,17 +109,15 @@
 }
 
 /* Narrow, below what the compact row needs (446px with the comment tools).
-   The comment tools give way before Find: Show comment icons leaves first -
-   the comments drawer's checkbox does the same job - and Export to PDF with
-   it, as Cmd/Ctrl+S keeps exporting with focus in the page. Find STAYS, so it
+   Export to PDF leaves first, as Cmd/Ctrl+S keeps exporting with focus in the
+   page (Show comment icons is the drawer's checkbox now, C-20). Find STAYS, so it
    is on the row at every width the editor area can have (its minimum is
    400px; the narrow row needs 378px). `display: none`, so a hidden tool
    leaves the Tab order too. Matched by accessible names because
    PreviewToolbarTools and CommentToolbarTools own those buttons; the names are
    pinned by their tests and by the UX spec. */
 @container (width < 446px) {
-  .erf-band .erf-band__tool[aria-label='Export to PDF'],
-  .erf-band .erf-band__tool[aria-label='Show comment icons'] {
+  .erf-band .erf-band__tool[aria-label='Export to PDF'] {
     display: none;
   }
 }
@@ -141,7 +139,7 @@
 /* ---------- the comment tools (HTML Preview comments) ---------- */
 
 /*
- * Comment mode, the Comments list and Show comment icons: one group after Find
+ * Comment mode and the Comments list: one group after Find
  * (docs/designs/comments/html-comments/toolbar.html, proposed). They
  * reuse the toggle signature above, but not the link toggle's 8px gap after
  * EACH tool: one 8px gap before the group, the band's own 2px inside it.
@@ -154,21 +152,17 @@
   margin-inline-start: var(--space-4);
 }
 
-/* The Comments list: icon plus the open count, so wider than a 32px tool -
-   the count is the information (card Exceptions). Same height, colours and
-   inset ring as every band tool. */
+/* The Comments list: icon plus "7 comments" as text (C-15), so wider than a
+   32px tool - the count is the information (card Exceptions). Same height,
+   colours and inset ring as every band tool; the band's sans text. */
 .erf-band .erf-band__tool--count {
   inline-size: auto;
   min-inline-size: var(--btn-height-md);
   gap: var(--space-2);
   padding-inline: var(--space-3);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
-}
-
-.erf-band .erf-band__tool-attention {
-  color: var(--color-warning);
 }
 
 /* An open drawer reads as a pressed tool: the toggle signature, on aria-expanded. */

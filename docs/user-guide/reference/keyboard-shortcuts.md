@@ -78,6 +78,15 @@ In the find bar, <kbd>Enter</kbd> moves to the next match, <kbd>⇧Enter</kbd> /
 
 **Whole word** does nothing in a view that does not support it.
 
+In the **Preview Only** view, these keys work with [Markdown comments](markdown-preview.md#comments):
+
+| Action | macOS | Windows |
+| --- | --- | --- |
+| Turn comment mode on or off; leave it | <kbd>⌥⌘M</kbd>; <kbd>Esc</kbd> | <kbd>Ctrl+Alt+M</kbd>; <kbd>Esc</kbd> |
+| In comment mode: next or previous block; outer or inner block | <kbd>Tab</kbd>; <kbd>⇧Tab</kbd>; <kbd>⌥↑</kbd>; <kbd>⌥↓</kbd> | <kbd>Tab</kbd>; <kbd>Shift+Tab</kbd>; <kbd>Alt+↑</kbd>; <kbd>Alt+↓</kbd> |
+| In comment mode: comment on the outlined block; open its menu | <kbd>Enter</kbd>; <kbd>⇧F10</kbd> | <kbd>Enter</kbd>; <kbd>Shift+F10</kbd> |
+| Move between the comment window and the preview | <kbd>F6</kbd> | <kbd>F6</kbd> |
+
 ## Terminal
 
 | Action | macOS | Windows |
@@ -96,6 +105,8 @@ On macOS the explicit copy and paste keys and the interrupt key use the Control 
 | Find; export PDF; close tab | <kbd>⌘F</kbd>; <kbd>⌘S</kbd>; <kbd>⌘W</kbd> | <kbd>Ctrl+F</kbd>; <kbd>Ctrl+S</kbd>; <kbd>Ctrl+W</kbd> |
 | Enter page; return to toolbar | <kbd>Enter</kbd> or <kbd>Space</kbd>; <kbd>Esc</kbd> | Same |
 | Turn comment mode on or off; leave it | <kbd>⌥⌘M</kbd>; <kbd>Esc</kbd> | <kbd>Ctrl+Alt+M</kbd>; <kbd>Esc</kbd> |
+
+In a comment window of either preview, <kbd>⌥F9</kbd> / <kbd>Alt+F9</kbd> moves to the next open comment and <kbd>⌥⇧F9</kbd> / <kbd>Alt+Shift+F9</kbd> to the previous one.
 
 ## Image and diagram viewers
 

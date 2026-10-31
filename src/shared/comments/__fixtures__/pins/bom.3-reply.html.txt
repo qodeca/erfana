@@ -1,0 +1,32 @@
+﻿<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Pins</title></head>
+<body>
+<main>
+  <h1>Prices</h1>
+  <p>Plans <!-- erfana:comment v1 id=c-cccg2dzwk3k5je66
+  note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.
+    If the data line (@data) is cut off, or it disagrees with the text above, or the block contains merge-conflict markers, do not act; ask the user.
+    Spec: docs/html-comments/format-v1.md in github.com/qodeca/erfana
+  status: open
+  target: <em>
+  comment by Grace Hopper at 2026-10-25T14:03:00Z:
+    Is “start” the right verb here?
+  @data {"v":1,"id":"c\u002dcccg2dzwk3k5je66","status":"open","anchor":{"tag":"em","path":"html \u003e body \u003e main:nth\u002dof\u002dtype(1) \u003e p:nth\u002dof\u002dtype(1) \u003e em:nth\u002dof\u002dtype(1)","quote":{"exact":"start","prefix":"Plans","suffix":"at 5 €."}},"view":{"w":1280,"h":800,"dpr":2,"x":0,"y":120},"msgs":[{"id":"m\u002d77v3iikzheevazdx","by":{"name":"Grace Hopper","role":"human"},"at":"2026\u002d10\u002d25T14:03:00Z","text":"Is “start” the right verb here?"}]}
+  --><em>start</em> at 5 €.</p>
+  <!-- erfana:comment v1 id=c-bbfprq2sfulxkovr
+  note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.
+    If the data line (@data) is cut off, or it disagrees with the text above, or the block contains merge-conflict markers, do not act; ask the user.
+    Spec: docs/html-comments/format-v1.md in github.com/qodeca/erfana
+  status: open
+  target: <button class="cta">
+  comment by Ada Lovelace <ada@example.com> at 2026-10-25T14:03:00Z:
+    Make this button bigger – “Buy now” reads café-small. ✓
+  reply by Grace Hopper at 2026-10-26T09:12:00Z:
+    Agreed – and make it blue.
+  @data {"v":1,"id":"c\u002dbbfprq2sfulxkovr","status":"open","anchor":{"tag":"button","cls":["cta"],"path":"html \u003e body \u003e main:nth\u002dof\u002dtype(1) \u003e button:nth\u002dof\u002dtype(1)","quote":{"exact":"Buy now","prefix":"start at 5 €.","suffix":""}},"view":{"w":1280,"h":800,"dpr":2,"x":0,"y":120},"msgs":[{"id":"m\u002diirztzlpsjfe36xu","by":{"name":"Ada Lovelace","email":"ada@example.com","role":"human"},"at":"2026\u002d10\u002d25T14:03:00Z","text":"Make this button bigger – “Buy now” reads café\u002dsmall. ✓"},{"id":"m\u002dddhjltdeppbkdklp","by":{"name":"Grace Hopper","role":"human"},"at":"2026\u002d10\u002d26T09:12:00Z","text":"Agreed – and make it blue."}]}
+  -->
+  <button class="cta">Buy now</button>
+</main>
+</body>
+</html>

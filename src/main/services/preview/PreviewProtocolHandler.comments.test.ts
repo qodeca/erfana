@@ -21,7 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ELEMENT_TOKEN_ATTRIBUTE, indexHtml } from '../../../shared/htmlComments'
 import { commentedPage } from './comments/__test-helpers__/commentedPages'
 import { instrumentDocument } from './comments/commentParseCore'
-import type { CommentParseResult } from './comments/CommentParseWorkerAdapter'
+import type { CommentParseResult } from './comments/htmlCommentParseClient'
 import { attach as attachHandler } from './PreviewProtocolHandler'
 import { attach as attachFilter } from './PreviewRequestFilter'
 import {
@@ -226,8 +226,8 @@ describe('M-060 – what is served raw', () => {
     expect(harness.comments.tokens.size).toBe(0)
   })
 
-  it('a page without erfana:comment, comment mode off: raw', async () => {
-    expect(await (await harness.loadDocument('plain.html')).text()).not.toMatch(HAS_TOKEN)
+  it('OD-01 a page without erfana:comment is instrumented with comment mode off too (was raw)', async () => {
+    expect(await (await harness.loadDocument('plain.html')).text()).toMatch(HAS_TOKEN)
     harness.comments.setCommentMode(true)
     expect(await (await harness.loadDocument('plain.html')).text()).toMatch(HAS_TOKEN)
   })

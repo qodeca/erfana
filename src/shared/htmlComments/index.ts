@@ -32,7 +32,7 @@ export {
   lineHasMarkerPrefix,
   markerAtLineStart,
   type ConflictHunk
-} from './conflictMarkers'
+} from '../comments/conflictMarkers'
 export {
   BOM_CHAR,
   CHARSET_PRESCAN_BYTES,
@@ -42,7 +42,7 @@ export {
   utf8Length,
   type DecodeFailure,
   type DecodeResult
-} from './encoding'
+} from '../comments/encoding'
 export {
   AGENT_NOTE_LINES,
   AGENT_NOTE_PREFIX,
@@ -78,7 +78,7 @@ export {
   type SerializeFailure,
   type SerializeResult,
   type TextQuote
-} from './format'
+} from '../comments/format'
 export {
   detectFrameworkRegions,
   frameworkPlacementFor,
@@ -110,6 +110,7 @@ export {
   type ParsedBlock,
   type ReadOnlyReason
 } from './parse'
+export { directiveRunStart, inHtmlGeneratedRegion } from './htmlForeign'
 export {
   applySplice,
   lineLayoutAt,
@@ -142,4 +143,4 @@ export {
   setStatus,
   type NewThread,
   type ThreadContext
-} from './thread'
+} from '../comments/thread'

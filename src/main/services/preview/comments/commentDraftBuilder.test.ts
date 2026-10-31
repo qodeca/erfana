@@ -9,14 +9,17 @@ import { symlinkSync } from 'node:fs'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fixedId, makeComment } from '../../../../shared/comments/__fixtures__/commentTestData'
+import { serializeBlock } from '../../../../shared/comments/format'
 import { ErrorCode } from '../../../../shared/errors'
+import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
 import { logger } from '../../LoggingService'
 import type { CommentPick } from '../../../../shared/ipc/preview-comment-schema'
 import { makeProject, PAGE, type TempProject } from './__test-helpers__/commentWriterHarness'
 import { damagedBlock, insertBefore } from './__test-helpers__/commentedPages'
 import { frameFile, serveLoad, tokenOfTag } from './__test-helpers__/commentServiceHarness'
 import { buildDraft, buildPin, cutText, EXCERPT_MAX_CHARS, lineAt } from './commentDraftBuilder'
-import { createInProcessCommentFileJobs, type CommentFileJobRunner } from './commentFileJobs'
+import { createInProcessCommentFileJobs, type HtmlFileJobRunner } from './htmlCommentJobs'
 import { ElementTokenTable } from './ElementTokenTable'
 
 vi.mock('../../LoggingService', () => ({
@@ -73,25 +76,38 @@ describe('buildDraft', () => {
 
   it('M-033 the file changed since it was served, or the token\'s offset now names another element: TARGET_MOVED', async () => {
     const changed = await draftFor('index.html', PAGE, 'button', {}, path => writeFile(path, PAGE.replace('Buy now', 'Buy later')))
-    expect(changed).toEqual({ ok: false, code: ErrorCode.COMMENT_TARGET_MOVED })
+    expect(changed).toEqual({ ok: false, code: ErrorCode.COMMENT_TARGET_MOVED, reason: 'target-moved' })
   })
 
   it('M-056 the file deleted after the page loaded: FILE_GONE', async () => {
     const gone = await draftFor('index.html', PAGE, 'button', {}, path => rm(path))
-    expect(gone).toEqual({ ok: false, code: ErrorCode.COMMENT_FILE_GONE })
+    expect(gone).toEqual({ ok: false, code: ErrorCode.COMMENT_FILE_GONE, reason: 'missing' })
   })
 
-  it('a file that cannot take comments says why (git conflict markers)', async () => {
+  it('M-05 a file that cannot take comments says why, as the reason the menu names (git conflict markers)', async () => {
     const conflicted = PAGE.replace('  <main>', '<<<<<<< HEAD\na\n=======\nb\n>>>>>>> x\n  <main>')
-    expect(await draftFor('index.html', conflicted, 'button')).toEqual({ ok: false, code: ErrorCode.COMMENT_FILE_CONFLICTED })
+    expect(await draftFor('index.html', conflicted, 'button')).toEqual({ ok: false, code: ErrorCode.COMMENT_FILE_CONFLICTED, reason: 'conflict-markers' })
   })
 
-  it('M-055 a page in a dot-folder or dist/ is never a draft; a gitignored page is', async () => {
+  it('024-AC-035 M-05 F-04 a page already at 500 comments gives no draft, with the "500 comments" reason; one below still does', async () => {
+    const blocks = (count: number): string =>
+      Array.from({ length: count }, (_, i) => {
+        const block = serializeBlock(makeComment({ id: fixedId('c-', i + 1) }), { indent: '', eol: '\n' })
+        if (!block.ok) throw new Error('fixture block')
+        return block.block
+      }).join('')
+    const full = PAGE.replace('  <main>', `${blocks(PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE)}  <main>`)
+    expect(await draftFor('index.html', full, 'button')).toEqual({ ok: false, code: ErrorCode.COMMENT_LIMIT, reason: 'too-many-blocks' })
+    const below = PAGE.replace('  <main>', `${blocks(PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE - 1)}  <main>`)
+    expect(await draftFor('below.html', below, 'button')).toMatchObject({ ok: true })
+  })
+
+  it('M-055 OD-07 a page in a dot-folder, dist/ or a gitignored file is a draft like any other (no folder refusal)', async () => {
     await mkdir(project.path('.hidden'))
     await mkdir(project.path('dist'))
     await writeFile(project.path('.gitignore'), 'ignored.html\n')
-    expect(await draftFor(join('.hidden', 'page.html'), PAGE, 'button')).toEqual({ ok: false, code: ErrorCode.COMMENT_PATH_REFUSED })
-    expect(await draftFor(join('dist', 'page.html'), PAGE, 'button')).toEqual({ ok: false, code: ErrorCode.COMMENT_PATH_REFUSED })
+    expect((await draftFor(join('.hidden', 'page.html'), PAGE, 'button')).ok).toBe(true)
+    expect((await draftFor(join('dist', 'page.html'), PAGE, 'button')).ok).toBe(true)
     expect((await draftFor('ignored.html', PAGE, 'button')).ok).toBe(true)
   })
 
@@ -143,7 +159,7 @@ describe('buildDraft', () => {
       frame: false,
       jobs: { runJob: async () => ({ kind: 'failed', failure: 'timeout' }) }
     })
-    expect(built).toEqual({ ok: false, code: ErrorCode.COMMENT_WRITE_FAILED })
+    expect(built).toEqual({ ok: false, code: ErrorCode.COMMENT_WRITE_FAILED, reason: 'parse-failed' })
     const logged = JSON.stringify(vi.mocked(logger.warn).mock.calls)
     expect(logged).toContain('timeout')
     expect(logged).not.toContain('index.html')
@@ -165,14 +181,14 @@ describe('buildDraft', () => {
       frame: false,
       jobs: createInProcessCommentFileJobs()
     })
-    expect(built).toEqual({ ok: false, code: ErrorCode.COMMENT_TARGET_MOVED })
+    expect(built).toEqual({ ok: false, code: ErrorCode.COMMENT_TARGET_MOVED, reason: 'target-moved' })
   })
 
-  it('a runtime path over its cap opens no draft and names no error', async () => {
+  it('M-08 a runtime path over its cap opens no draft, names no error code, and says the part cannot hold a comment', async () => {
     const built = await draftFor('index.html', PAGE, 'p', {
       runtime: { path: Array.from({ length: 200 }, () => 'span:nth-of-type(1)').join(' > '), tag: 'span' }
     })
-    expect(built).toEqual({ ok: false })
+    expect(built).toEqual({ ok: false, reason: 'not-commentable' })
   })
 })
 
@@ -181,7 +197,7 @@ describe('buildPin (M4)', () => {
   const PINNED = insertBefore(PAGE, '<button', `${damagedBlock('d1')}\n    `)
 
   /** Serve `html`, then build the pin on the first `tag`, counting the jobs it runs. */
-  async function pinFor(html: string, tag: string, options: { pick: boolean; blocks: boolean; jobs?: CommentFileJobRunner; change?: (path: string) => Promise<void> }) {
+  async function pinFor(html: string, tag: string, options: { pick: boolean; blocks: boolean; jobs?: HtmlFileJobRunner; change?: (path: string) => Promise<void> }) {
     const path = await project.write('index.html', html)
     const tokens = new ElementTokenTable()
     const { loadId, doc } = serveLoad(tokens, html, path)
@@ -196,7 +212,7 @@ describe('buildPin (M4)', () => {
       ...(options.pick ? { pick: { kind: 'icon', via: 'pointer', token, tag, view: VIEW } as CommentPick } : {}),
       blocks: options.blocks,
       frame: false,
-      jobs: { runJob } as CommentFileJobRunner
+      jobs: { runJob } as HtmlFileJobRunner
     })
     return { built, runJob }
   }
@@ -213,22 +229,22 @@ describe('buildPin (M4)', () => {
   it('blocks only: no pick, no draft', async () => {
     const { built, runJob } = await pinFor(PINNED, 'button', { pick: false, blocks: true })
     expect(runJob.mock.calls[0][1]).not.toHaveProperty('pick')
-    expect(built).toEqual({ draft: { ok: false }, blocks: [expect.objectContaining({ start: PINNED.indexOf('<!-- erfana:comment') })] })
+    expect(built).toEqual({ draft: { ok: false, reason: 'not-commentable' }, blocks: [expect.objectContaining({ start: PINNED.indexOf('<!-- erfana:comment') })] })
   })
 
   it('neither asked for: answers at once, without reading the file', async () => {
     const { built, runJob } = await pinFor(PAGE, 'button', { pick: false, blocks: false, change: path => rm(path) })
     expect(runJob).not.toHaveBeenCalled()
-    expect(built).toEqual({ draft: { ok: false }, blocks: [] })
+    expect(built).toEqual({ draft: { ok: false, reason: 'not-commentable' }, blocks: [] })
   })
 
   it('a file gone, or a job that failed, gives no blocks and says why', async () => {
     const gone = await pinFor(PAGE, 'button', { pick: true, blocks: true, change: path => rm(path) })
     expect(gone.runJob).not.toHaveBeenCalled()
-    expect(gone.built).toEqual({ draft: { ok: false, code: ErrorCode.COMMENT_FILE_GONE }, blocks: [] })
+    expect(gone.built).toEqual({ draft: { ok: false, code: ErrorCode.COMMENT_FILE_GONE, reason: 'missing' }, blocks: [] })
 
     const failed = await pinFor(PINNED, 'button', { pick: true, blocks: true, jobs: { runJob: async () => ({ kind: 'failed', failure: 'poisoned' }) } })
-    expect(failed.built).toEqual({ draft: { ok: false, code: ErrorCode.COMMENT_WRITE_FAILED }, blocks: [] })
+    expect(failed.built).toEqual({ draft: { ok: false, code: ErrorCode.COMMENT_WRITE_FAILED, reason: 'parse-failed' }, blocks: [] })
   })
 
   it('a file changed since it was served: the draft for New comment says TARGET_MOVED', async () => {
@@ -237,7 +253,7 @@ describe('buildPin (M4)', () => {
       blocks: true,
       change: path => writeFile(path, PINNED.replace('Buy now', 'Buy later'))
     })
-    expect(built.draft).toEqual({ ok: false, code: ErrorCode.COMMENT_TARGET_MOVED })
+    expect(built.draft).toEqual({ ok: false, code: ErrorCode.COMMENT_TARGET_MOVED, reason: 'target-moved' })
   })
 })
 

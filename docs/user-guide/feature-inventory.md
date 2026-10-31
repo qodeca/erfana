@@ -101,6 +101,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | PV-04 | Links: anchors, project files inside the app, external links to the OS, unsafe links blocked | all | MarkdownPreview.tsx | [reference/markdown-preview](./reference/markdown-preview.md#links) |
 | PV-05 | Preview right-click menu: prompt templates, Copy selection | all | ContextMenu/PreviewContextMenu.tsx | [reference/menus](./reference/menus.md#editor-and-preview-context-menus) |
 | PV-06 | Project images (relative path) shown and refreshed on change; outside, absolute and `file:` images show alt text (#71) | all | Editor/MarkdownImage.tsx | [reference/markdown-preview](./reference/markdown-preview.md#images) |
+| PV-07 | Comments in the Preview Only view, saved in the `.md` file: comment mode, comments on selected words, icons and underlines, the Comments list, threads; read-only while the editor has unsaved changes | all | M/services/comments/, S/markdownComments/, R/components/Comments/, Editor/markdownComments/ | [reference/markdown-preview](./reference/markdown-preview.md#comments) |
 | MM-01 | Mermaid diagrams with a toolbar: direction buttons, View fullscreen | all | MermaidToolbar.tsx | [how-to/work-with-mermaid-diagrams](./how-to/work-with-mermaid-diagrams.md#view-a-diagram) |
 | MM-02 | Mermaid error box with "Report this error to Claude Code" | all | MermaidDiagram.tsx | [how-to/work-with-mermaid-diagrams](./how-to/work-with-mermaid-diagrams.md#view-a-diagram) |
 | MM-03 | Full-screen diagram viewer: zoom, fit, reset, directions | all | Editor/DiagramViewer/DiagramViewer.tsx | [how-to/work-with-mermaid-diagrams](./how-to/work-with-mermaid-diagrams.md#view-a-diagram) |
@@ -134,7 +135,8 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | HP-10 | Stopped preview with Reload | all | HtmlPreviewPanel/hooks/usePreviewPanelActions.ts | [reference/troubleshooting](./reference/troubleshooting.md#html-preview-stopped-or-reports-issues) |
 | HP-11 | Keyboard into and out of the page (Enter/Space, Esc); Back/Forward keys | all (keys differ) | S/previewNavKeys.ts | [reference/keyboard-shortcuts](./reference/keyboard-shortcuts.md#html-preview) |
 | HP-12 | Off-switch: **Run HTML files** setting | all | Settings/sections/HtmlPreviewSection.tsx | [reference/settings](./reference/settings.md#html-preview) |
-| HP-13 | Comments on page elements, saved in the `.html` file: comment mode, pins, the Comments drawer, threads | all | M/services/preview/comments/, HtmlPreviewPanel/comments/ | [reference/html-preview](./reference/html-preview.md#comments) |
+| HP-13 | Comments on page elements, saved in the `.html` file: comment mode, pins, the Comments drawer, threads | all | M/services/comments/, M/services/preview/comments/, R/components/Comments/, HtmlPreviewPanel/comments/ | [reference/html-preview](./reference/html-preview.md#comments) |
+| HP-14 | Comments on selected words, right-click comments outside comment mode, the drawer's filter and sort, stepping through comments, Rebuild from data | all | R/components/Comments/, M/services/preview/comments/ | [how-to/comment-on-a-preview](./how-to/comment-on-a-preview.md) |
 
 ## Terminal
 
@@ -215,6 +217,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | SET-14 | Terminal > Screen reader mode | Auto / On / Off, Auto | [reference/settings](./reference/settings.md#terminal) |
 | SET-15 | Transcription > Cancel a model download | button while downloading | [reference/settings](./reference/settings.md#transcription) |
 | SET-16 | Comments > Comments in HTML preview, Your name, Your email (optional) | checkbox, on; two text fields, empty | [reference/settings](./reference/settings.md#comments) |
+| SET-17 | Comments > Comments in Markdown preview | checkbox, on | [reference/settings](./reference/settings.md#comments) |
 
 ## Keyboard shortcuts
 
@@ -250,6 +253,8 @@ Every row goes into `reference/keyboard-shortcuts.md` with macOS and Windows col
 | KEY-26 | <kbd>⇧F10</kbd> / <kbd>Shift+F10</kbd> or <kbd>Menu</kbd>; then arrows, <kbd>Home</kbd> <kbd>End</kbd>, <kbd>Enter</kbd> or <kbd>Space</kbd>, type-ahead, <kbd>Esc</kbd> or <kbd>Tab</kbd> | Open and use any right-click menu | menus | [Shortcuts](./reference/keyboard-shortcuts.md#menus) |
 | KEY-27 | <kbd>Esc</kbd> on a focused toast | Close the message | toasts | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
 | KEY-28 | <kbd>⌥⌘M</kbd> / <kbd>Ctrl+Alt+M</kbd>; <kbd>Esc</kbd> | Turn HTML Preview comment mode on or off; leave it | HTML preview | [Shortcuts](./reference/keyboard-shortcuts.md#html-preview) |
+| KEY-29 | <kbd>⌥⌘M</kbd> / <kbd>Ctrl+Alt+M</kbd>; <kbd>Tab</kbd>, <kbd>⌥↑</kbd> <kbd>⌥↓</kbd> / <kbd>Alt+↑</kbd> <kbd>Alt+↓</kbd>, <kbd>Enter</kbd>, <kbd>F6</kbd> | Markdown comment mode, the keyboard picker, and moving between the comment window and the preview | Markdown preview | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
+| KEY-30 | <kbd>⌥F9</kbd> <kbd>⌥⇧F9</kbd> / <kbd>Alt+F9</kbd> <kbd>Alt+Shift+F9</kbd> | Next and previous open comment in a comment window | both previews | [Shortcuts](./reference/keyboard-shortcuts.md#html-preview) |
 
 ## Menus and dialogs
 

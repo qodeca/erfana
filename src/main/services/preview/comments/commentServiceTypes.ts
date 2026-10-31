@@ -20,9 +20,9 @@ import type {
   CommentSetModeResult,
   CommentsChanged
 } from '../../../../shared/ipc/preview-comment-schema'
-import type { CommentFileJobRunner } from './commentFileJobs'
-import type { CommentIdentity } from './CommentWriter'
-import type { CommentUnsavedSources } from './commentUnsavedSources'
+import type { HtmlFileJobRunner } from './htmlCommentJobs'
+import type { CommentIdentity } from '../../comments/CommentWriter'
+import type { CommentUnsavedSources } from '../../comments/commentUnsavedSources'
 
 /** Main → renderer comment events, each to the window that owns the view only. */
 export interface PreviewCommentEmitters {
@@ -60,6 +60,8 @@ export interface CommentServiceApi {
   setMode(on: boolean, showIcons: boolean): Promise<CommentSetModeResult>
   list(): Promise<CommentListResult>
   reveal(threadKey: string): CommentAck
+  /** C-14.2: keep an open new-comment window's draft alive. */
+  keepDraft(draftToken: string): CommentAck
   save(request: CommentSaveRequest): Promise<CommentSaveResult>
   e2eState(): CommentE2ePanelState
 }
@@ -103,5 +105,5 @@ export interface PreviewCommentShared {
   /** The cursor on screen (`screen.getCursorScreenPoint`), for a pick without a screen point. */
   readonly cursor?: () => { readonly x: number; readonly y: number }
   /** Where every comment parse runs; the process-wide comment parse worker by default (§19 R3-12). */
-  readonly jobs?: CommentFileJobRunner
+  readonly jobs?: HtmlFileJobRunner
 }
