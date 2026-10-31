@@ -31,7 +31,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
   - [Export](./editor/export.md) - PDF and DOCX export pipeline
   - [Mermaid Viewer](./editor/mermaid-viewer.md) - Full-screen diagram viewer with zoom and pan
 - [HTML Preview](./html-preview/README.md) - Live `.html` preview running real CSS + JS in a sealed process, with a per-project host allowlist, auto-refresh, find-in-page and PDF export (issue #74), plus same-project frames, same-tab links with Back and Forward, Open in default browser, and keyboard entry into the page (issue #124), plus comments on page elements stored in the `.html` file (v0.23.0). Threat model in [Security § HTML preview](./security.md#html-preview)
-- [HTML comments – format v1](./html-comments/format-v1.md) - Public spec, final for v1, of the `erfana:comment v1` block that HTML Preview comments store in the `.html` file: grammar, `@data` schema, escaping, placement, damaged blocks and rules for coding agents
+- [Erfana comments – format v1](./html-comments/format-v1.md) - Public spec, final for v1, of the `erfana:comment v1` block that HTML and Markdown Preview comments store in the `.html` or `.md` file: grammar, `@data` schema, escaping, placement, damaged blocks and rules for coding agents
 - [Image Viewer](./ui-components.md#image-viewer-panel) - Image preview panel with zoom, pan, and fullscreen
 - [Terminal](./terminal/README.md) - xterm.js terminal integration
   - [Bootstrap Pattern](./terminal/bootstrap-pattern.md) - Clean initialization without artifacts
@@ -134,6 +134,7 @@ Not to be confused with **[`docs/design-system/`](design-system/index.html)**, w
 - [HTML preview with CSS and JavaScript](./designs/html-preview/sd-074-html-preview.md) - Sealed-box live preview that runs a project's real CSS and JavaScript (spec 074, issue #74)
 - [Preview link navigation and multiple views](./designs/html-preview/sd-074b-preview-navigation-and-multiview.md) - In-page link navigation and independent preview tabs (spec 074; superseded in part by #124)
 - [HTML Preview comments](./designs/comments/html-preview-comments.md) - Comments on page elements, stored as `erfana:comment v1` blocks in the `.html` file (shipped in v0.23.1); sub-frame decision in [ADR 0005](./adrs/0005-sub-frame-preload-one-receive-channel.md)
+- [Comments in the HTML and Markdown previews](./designs/comments/README.md) - Index of the comment designs: the shared comment base, [Markdown Preview comments](./designs/comments/markdown-preview-comments.md), [selection comments](./designs/comments/selection-comments.md) and [comments v2](./designs/comments/comments-v2.md) (spec 024); overlay decision in [ADR 0006](./adrs/0006-overlay-core-in-the-sealed-preload.md)
 
 ### Future Features (Planned)
 - [Graph Engine](./future/graph-engine.md) – SQLite + vec + FTS5 knowledge graph (not yet implemented). The full specification lives in [`future/graph-engine/`](./future/graph-engine/), covering the data model, embeddings, hybrid search, MCP server, packaging and performance, plus a milestone-by-milestone [implementation guide](./future/graph-engine/implementation-guide/) and [wireframes](./future/graph-engine/wireframes/)
