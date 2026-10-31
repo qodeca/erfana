@@ -64,6 +64,11 @@ export interface HostPointerKeysOptions {
   readonly windowOpen: boolean
   readonly onToggleMode: (byKeyboard: boolean) => void
   readonly onExit: () => void
+  /**
+   * Esc on the preview while the non-modal window is open (C-18): close it. The Esc order is menu → window →
+   * comment mode, and a pointer pick hands focus back to the preview while the window opens.
+   */
+  readonly onWindowEscape: () => void
   /** A target was picked: by a click, or by Enter (`byKey`). */
   readonly onPick: (target: HTMLElement, byKey: boolean) => void
   /** What a keyboard pick says about `target` (C-10). */
@@ -263,6 +268,14 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
       // A press the preview keeps: a release left over from a swallowed one (focus moved before it came) is its own now.
       if (step === null || !latest.current.mode) swallowedKeys.delete(keyOf(event))
       if (step === null) return
+      // The Esc order is menu → window → comment mode. An open menu took Esc already (the overlay stack, capture
+      // phase); an open window is closed here, wherever focus is.
+      if (step === 'exit' && latest.current.windowOpen) {
+        event.preventDefault()
+        event.stopPropagation()
+        latest.current.onWindowEscape()
+        return
+      }
       const { mode: on, adapter: current } = latest.current
       if (!on) {
         if (step !== 'menu') return

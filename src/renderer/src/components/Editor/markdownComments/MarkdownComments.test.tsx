@@ -312,6 +312,19 @@ describe('Markdown Preview comments', () => {
       expect(await screen.findByRole('dialog', { name: 'New comment on list item' })).toBeVisible()
     })
 
+    it('024-AC-029 Esc order: with a window open and focus back on the preview, Esc closes the window, not comment mode', async () => {
+      const user = userEvent.setup()
+      renderPanel()
+      await user.click(modeTool())
+      await user.click(paragraph())
+      expect(await screen.findByTestId('comment-window')).toBeVisible()
+      // A pointer pick hands focus back to the preview while the window opens.
+      act(() => paragraph().focus())
+      await user.keyboard('{Escape}')
+      await waitFor(() => expect(screen.queryByTestId('comment-window')).toBeNull())
+      expect(modeTool()).toHaveAttribute('aria-pressed', 'true')
+    })
+
     it('024-AC-029: Esc leaves comment mode and returns focus to the toggle; Shift+F10 opens the menu on the picked target', async () => {
       const user = userEvent.setup()
       renderPanel()

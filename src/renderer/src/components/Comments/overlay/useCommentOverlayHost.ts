@@ -296,6 +296,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
       announce(ANNOUNCE.modeOff)
       modeButtonRef.current?.focus()
     },
+    onWindowEscape: () => setRequest(null),
     onPick: pickTarget,
     speak: target => spokenTarget(target, adapter, placements, file),
     markAt: (x, y) => commentMarkAt(markOwner, x, y),
@@ -308,7 +309,6 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
   useEffect(() => {
     focusFirst.current = pointer.focusFirst
   }, [pointer.focusFirst])
-
   // ---- writes ----
   const liveDraft = useDraftKeepAlive(request?.kind === 'new' ? request.draftToken : null, () => optionsRef.current.source.openDraft())
   const expectWords = useWordsCheck(placements, target => announce(SELECTION_COPY.wordsDropped(words.noun(target), fileName)))
