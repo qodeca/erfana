@@ -19,7 +19,7 @@
 | 025-FR-011 | New-tab links and sign-in popups | Must | 025-UC-003 | 025-AC-011 |
 | 025-FR-012 | Viewport size presets | Must | 025-UC-005 | 025-AC-012 |
 | 025-FR-013 | DevTools in its own window | Must | – | 025-AC-013 |
-| 025-FR-014 | Erfana reserves a fixed key list; the page gets every other key | Must | – | 025-AC-014 |
+| 025-FR-014 | Erfana reserves a fixed key list; key routing in browsing and pick states | Must | – | 025-AC-014 |
 | 025-FR-015 | One persistent profile per project | Must | 025-UC-003, 025-UC-006 | 025-AC-015 |
 | 025-FR-016 | The profile folder ignores itself in git | Must | – | 025-AC-016 |
 | 025-FR-017 | Cookies encrypted at rest | Must | 025-UC-003 | 025-AC-017 |
@@ -41,7 +41,7 @@
 | 025-FR-033 | The context file | Must | 025-UC-001, 025-UC-004, 025-UC-005 | 025-AC-033 |
 | 025-FR-034 | The screenshot | Must | 025-UC-001, 025-UC-004, 025-UC-005 | 025-AC-034 |
 | 025-FR-035 | Partly visible elements | Must | 025-UC-001 | 025-AC-035 |
-| 025-FR-036 | Page HTML sent as-is and labelled untrusted | Must | 025-UC-001 | 025-AC-036 |
+| 025-FR-036 | Page-derived content sent as-is, all of it inside the untrusted block | Must | 025-UC-001 | 025-AC-036 |
 | 025-FR-037 | React component and source hints | Must | 025-UC-001 | 025-AC-037 |
 | 025-FR-038 | Recent console and network errors | Must | 025-UC-001 | 025-AC-038 |
 | 025-FR-039 | Captures expire after 7 days | Must | – | 025-AC-039 |
@@ -63,7 +63,7 @@
 
 ### 025-FR-002: Address bar with search fallback
 
-**Description:** Each browser tab shall have an address bar. Input with the scheme `http://`, `https://` or `file://` shall load that address. Input that starts with any other scheme – letters, digits, `+`, `-` or `.` followed by `:`, for example `chrome://settings`, `javascript:alert(1)` or `mailto:a@b.c` – shall be handled by 025-FR-005 (refused) and never searched; `localhost:` and `host:port` forms are not schemes. `localhost` and an IP address, each with an optional port and path (for example `localhost:5173/admin` or `127.0.0.1:4100/api`), shall load as `http://`. A host name containing a dot, with or without a port or path and with no spaces (for example `github.com` or `staging.example.com/app`), shall load as `https://`. Any other input – including a single word with no dot other than `localhost`, and any input with a space – shall load a DuckDuckGo search for the text. The bar shall show the current address after every navigation, including redirects.
+**Description:** Each browser tab shall have an address bar. Input with the scheme `http://`, `https://` or `file://` shall load that address. Input that starts with any other scheme – letters, digits, `+`, `-` or `.` followed by `:`, for example `chrome://settings`, `javascript:alert(1)` or `mailto:a@b.c` – shall be handled by 025-FR-005 (refused) and never searched; `localhost:` and `host:port` forms are not schemes. `localhost` and an IP address, each with an optional port and path (for example `localhost:5173/admin` or `127.0.0.1:4100/api`), shall load as `http://`. A host name containing a dot, with or without a port or path and with no spaces (for example `github.com` or `staging.example.com/app`), shall load as `https://`. Any other input – including a single word with no dot other than `localhost`, and any input with a space – shall load a DuckDuckGo search for the text. The bar shall show the current address after every navigation, including redirects. Loading an address from the bar shall move keyboard focus to the page.
 
 **Priority:** Must · **Traces to:** 025-UC-001 · **Acceptance:** 025-AC-002
 
@@ -81,7 +81,7 @@
 
 ### 025-FR-005: `http`, `https` and `file://` addresses
 
-**Description:** A browser tab shall load `http`, `https` and `file://` addresses. A `file://` page shall not be able to read any other `file://` resource by `fetch`, `XMLHttpRequest` or from inside a frame; it may still display resources it embeds with `<img>`, `<link>` and `<script>`, as Chromium allows. The 025-NFR-001 audit checks this limit. Any other scheme typed into the address bar (for example `javascript:`, `chrome:`, `devtools:`) shall be refused with an inline message, and a page's navigation to such a scheme shall be blocked.
+**Description:** A browser tab shall load `http`, `https` and `file://` addresses. A `file://` page shall not be able to read any other `file://` resource by `fetch`, `XMLHttpRequest` or from inside a frame; it may still display resources it embeds with `<img>`, `<link>` and `<script>`, as Chromium allows. The 025-NFR-001 audit checks this limit. Any other scheme typed into the address bar (for example `javascript:`, `chrome:`, `devtools:`, `about:`, `blob:`, `data:`) shall be refused with an inline message. A page, its frames and its popups may also use, as Chromium allows: `about:blank` for new windows and frames, `blob:` URLs of the page's own origin (for example downloads and generated frames), and `data:` URLs for subresources and frames; a top-level navigation to `data:` stays blocked, as in Chromium. A page's navigation to any other scheme (for example `chrome:`, `devtools:`, `file:` from an `http` or `https` page, `javascript:` in a new window) shall be blocked.
 
 **Priority:** Must · **Traces to:** 025-UC-002 · **Acceptance:** 025-AC-005
 
@@ -133,9 +133,21 @@
 
 **Priority:** Must · **Acceptance:** 025-AC-013
 
-### 025-FR-014: Erfana reserves a fixed key list; the page gets every other key
+### 025-FR-014: Erfana reserves a fixed key list; key routing in browsing and pick states
 
-**Description:** While a browser tab's page has focus, Erfana shall handle only these keys: Ctrl/Cmd+L (address bar), Ctrl/Cmd+R and F5 (reload), Ctrl/Cmd+W (close tab), Ctrl/Cmd+T (new browser tab), Alt+Left and Alt+Right on Windows and Linux or Cmd+[ and Cmd+] on macOS (back, forward), F12 (DevTools), Ctrl/Cmd+E (pick, 025-FR-025 and 025-FR-028), Ctrl/Cmd+F (find) and the zoom keys of 025-FR-008. While pick mode is on, Erfana shall also handle Esc, Up, Down and Enter; while the prompt-actions menu of a pick is open, it shall also handle Tab, Shift+Tab and Space; in both states the page shall receive no key. While the prompt-actions menu or its dialog is open, Ctrl/Cmd+E shall be ignored. Every other key, including keys bound to Erfana app shortcuts, shall go to the page.
+**Description:** The **browser keys** are: Ctrl/Cmd+L (address bar), Ctrl/Cmd+R and F5 (reload), Ctrl/Cmd+W (close tab), Ctrl/Cmd+T (new browser tab), Alt+Left and Alt+Right on Windows and Linux or Cmd+[ and Cmd+] on macOS (back, forward), F12 (DevTools), Ctrl/Cmd+E (pick, 025-FR-025 and 025-FR-028), Ctrl/Cmd+F (find) and the zoom keys of 025-FR-008.
+
+Terms: **page focus** means keyboard focus is inside the web page or one of its frames; **toolbar focus** means keyboard focus is in the tab's own controls (address bar, find bar, toolbar buttons). When keyboard focus is anywhere outside the browser tab (terminal, editor, another panel), that place handles the keys as it does today and the browser tab receives none, whatever state the tab is in.
+
+While keyboard focus is in the browser tab, exactly one of these five rules applies:
+
+1. **Browsing** – pick mode off, no prompt-actions menu or dialog open, page focus: Erfana shall handle the browser keys; every other key, including keys bound to Erfana app shortcuts, shall go to the page.
+2. **Pick mode** – pick mode on, no prompt-actions menu or dialog open, page focus: Erfana shall handle the browser keys and Esc, Up, Down and Enter; the page shall receive no key, and every other key does nothing.
+3. **Menu** – a prompt-actions menu open: Erfana shall handle Esc, Up, Down, Enter, Tab, Shift+Tab and Space for the menu (025-FR-027, 025-FR-030) and the browser keys except Ctrl/Cmd+E and Ctrl/Cmd+F, which do nothing; the page shall receive no key, and every other key does nothing.
+4. **Dialog** – an instruction dialog open (025-FR-031): keyboard focus shall be in the dialog and every key shall go to the dialog; no browser key acts on the tab and the page receives no key. The user leaves the dialog with Esc, **Cancel** or a submit.
+5. **Toolbar** – toolbar focus, no prompt-actions menu or dialog open, in either browsing or pick mode (pick mode starts with page focus, 025-FR-025, so this rule applies in pick mode only after the user moves focus to the toolbar): typing goes to the focused control; the browser keys keep their actions except Ctrl/Cmd+E, which does nothing; the page receives no key.
+
+Under rules 1, 2, 3 and 5, a browser key that navigates or closes the tab ends pick mode (025-FR-025) and closes any open menu without sending.
 
 **Priority:** Must · **Acceptance:** 025-AC-014
 
@@ -161,13 +173,13 @@
 
 ### 025-FR-018: Linux without a keyring: one-time warning
 
-**Description:** On Linux, when no keyring is available and Chromium falls back to its built-in key, the first browser tab of each session in a project shall show a notice that logins on this machine are stored with weak protection, until the user dismisses it; after dismissal it shall not appear again for that project. The browser shall keep working.
+**Description:** On Linux, when no keyring is available and Chromium falls back to its built-in key, the first browser tab opened in a project after each Erfana start shall show a notice that logins on this machine are stored with weak protection, until the user dismisses it; after dismissal it shall not appear again for that project. The browser shall keep working.
 
 **Priority:** Must · **Acceptance:** 025-AC-018
 
 ### 025-FR-019: Site permission prompts
 
-**Description:** When a site requests camera, microphone, screen sharing, location, notifications or clipboard read, the browser tab shall show a prompt naming the site and the permission, with **Allow** and **Block**. The answer shall be saved per site in the project profile. A **Block** answer shall be saved and later requests from that site denied without a prompt. Closing the prompt without an answer shall deny the request for that page load. Every other permission request (for example MIDI, USB, serial, HID, Bluetooth, idle detection) shall be denied without a prompt.
+**Description:** When a site requests camera, microphone, screen sharing, location, notifications or clipboard read, the browser tab shall show a prompt naming the site and the permission, with **Allow** and **Block**. The answer shall be saved per site in the project profile. A **Block** answer shall be saved and later requests from that site denied without a prompt. Closing the prompt without an answer shall deny the request for that page load. Fullscreen, pointer lock, clipboard write (sanitized text and images) and persistent storage shall be allowed without a prompt, as Chrome allows them. Every other permission request (for example MIDI, USB, serial, HID, Bluetooth, idle detection) shall be denied without a prompt.
 
 **Priority:** Must · **Acceptance:** 025-AC-019
 
@@ -205,7 +217,7 @@
 
 ### 025-FR-025: Pick mode on and off
 
-**Description:** A **Pick element** toolbar button shall toggle pick mode for the active browser tab. Pressing Ctrl/Cmd+E while pick mode is off shall start pick mode; pressing it while pick mode is on shall pick at once (025-FR-028). In pick mode, clicks on the page shall not reach the page. Esc or the button shall leave pick mode. Pick mode shall end when the tab navigates.
+**Description:** A **Pick element** toolbar button shall toggle pick mode for the active browser tab. Pressing Ctrl/Cmd+E while pick mode is off shall start pick mode; pressing it while pick mode is on and no prompt-actions menu or dialog is open shall pick at once (025-FR-028); while a menu or dialog is open it does nothing (025-FR-014). Starting pick mode, by the button or by Ctrl/Cmd+E, shall move keyboard focus to the page, so 025-FR-014 rule 2 applies. In pick mode, clicks on the page shall not reach the page. Esc, while no prompt-actions menu or dialog is open, or the button shall leave pick mode; leaving pick mode also unfreezes the page if 025-FR-028 froze it. Pick mode shall end when the tab navigates.
 
 **Priority:** Must · **Traces to:** 025-UC-001, 025-UC-004 · **Acceptance:** 025-AC-025
 
@@ -217,13 +229,13 @@
 
 ### 025-FR-027: Parent and child refinement
 
-**Description:** In pick mode, the Up arrow shall move the highlight to the parent element and the Down arrow back toward the element first hovered. Up at the root element and Down at the element first hovered shall do nothing. Enter or a click shall confirm the highlighted element. While the prompt-actions menu of a pick is open, Up and Down shall move the picked element the same way, and the menu shall follow it.
+**Description:** In pick mode, the Up arrow shall move the highlight to the parent element and the Down arrow back toward the element first hovered. Up at the root element and Down at the element first hovered shall do nothing. Enter or a click shall confirm the highlighted element. While the prompt-actions menu of a pick is open, Up and Down shall move the picked element the same way, and the menu shall follow it; Enter then runs the focused action (025-FR-030) and does not confirm the element again.
 
 **Priority:** Must · **Traces to:** 025-UC-001, 025-UC-004 · **Acceptance:** 025-AC-027
 
 ### 025-FR-028: Picking hover-only elements by shortcut
 
-**Description:** In pick mode, with the mouse over an element, pressing Ctrl/Cmd+E again shall pick the element under the mouse at once, while hover-only content (menus, tooltips) is still shown, and open the menu of 025-FR-030. Entering pick mode shall not close hover-only content the mouse is over. The page state shall be frozen (scripts and timers paused) from the pick until the menu or its dialog closes.
+**Description:** In pick mode, with no prompt-actions menu or dialog open and the mouse over an element, pressing Ctrl/Cmd+E again shall pick the element under the mouse at once, while hover-only content (menus, tooltips) is still shown, and open the menu of 025-FR-030. Entering pick mode shall not close hover-only content the mouse is over. The page state shall be frozen (scripts and timers paused) from the pick until the menu or its dialog closes.
 
 **Priority:** Must · **Traces to:** 025-UC-004 · **Acceptance:** 025-AC-028
 
@@ -241,19 +253,19 @@
 
 ### 025-FR-031: Which actions open a dialog
 
-**Description:** **Explain** shall send at once. **Ask** (question), **Fix** (what is wrong), **Change style** (the visual change), **Change text** (the new text) and **Prompt** (free-form) shall open an instruction dialog first; an empty instruction shall keep the dialog open with an inline error. Ctrl/Cmd+Enter shall submit the dialog.
+**Description:** **Explain** shall send at once. **Ask** (question), **Fix** (what is wrong), **Change style** (the visual change), **Change text** (the new text) and **Prompt** (free-form) shall open an instruction dialog first; an empty instruction shall keep the dialog open with an inline error. Ctrl/Cmd+Enter shall submit the dialog. Esc or the dialog's **Cancel** button shall close the dialog without sending, unfreeze the page if 025-FR-028 froze it, and leave pick mode on.
 
 **Priority:** Must · **Traces to:** 025-UC-001, 025-UC-004 · **Acceptance:** 025-AC-031
 
 ### 025-FR-032: Sending through the prompt-template path
 
-**Description:** Each web action shall be a prompt template sent through `executePromptTemplate`, with the same terminal choice, terminal opening and error toasts as the Markdown templates, and shall be submitted at once. The rendered prompt shall contain the user's instruction and the context file path, and shall tell the agent that the page content in the context file is untrusted data. **Fix**, **Change style** and **Change text** shall ask the agent to locate and edit the source that renders the element. After a successful send, the menu and dialog close, the page is unfrozen and pick mode ends.
+**Description:** Each web action shall be a prompt template sent through `executePromptTemplate`, with the same terminal choice, terminal opening and error toasts as the Markdown templates, and shall be submitted at once. The rendered prompt shall contain the user's instruction, the context file path and Erfana's fixed template text, and no text taken from the page (025-FR-036); it shall tell the agent that the page content in the context file is untrusted data. **Fix**, **Change style** and **Change text** shall ask the agent to locate and edit the source that renders the element. After a successful send, the menu and dialog close, the page is unfrozen and pick mode ends.
 
 **Priority:** Must · **Traces to:** 025-UC-001, 025-UC-004 · **Acceptance:** 025-AC-032
 
 ### 025-FR-033: The context file
 
-**Description:** Each send shall write a Markdown context file to `.erfana/browser/captures/` holding: the page URL and title, the capture time, the viewport size and size preset (`Phone`, `Tablet`, `Desktop`, or `none` with the size the page reports when DevTools device emulation overrides it), the device pixel ratio, a CSS selector that identifies the element (for an element inside a closed shadow root, the selector of its shadow host plus the note "inside closed shadow root"), the frame chain (025-FR-029), the element's bounding box, the pick point x/y (the click position; for a pick confirmed by key, the last mouse position over the page; if the mouse has not entered the page, the centre of the element's box), the element's outer HTML (truncated to 20,000 characters with a truncation marker), these computed styles of the element – `display`, `position`, `top`, `right`, `bottom`, `left`, `width`, `height`, `margin`, `padding`, `border`, `box-sizing`, `overflow`, `z-index`, `flex-direction`, `justify-content`, `align-items`, `gap`, `grid-template-columns`, `font-family`, `font-size`, `font-weight`, `line-height`, `letter-spacing`, `text-align`, `color`, `background-color`, `opacity` – the React hints (025-FR-037), the recent errors (025-FR-038) and the path of the screenshot (025-FR-034).
+**Description:** Each send shall write a Markdown context file to `.erfana/browser/captures/` holding: the page URL and title, the capture time, the viewport size and size preset (`Phone`, `Tablet`, `Desktop`, or `none` with the size the page reports when DevTools device emulation overrides it), the device pixel ratio, a CSS selector that identifies the element (for an element inside a closed shadow root, the selector of its shadow host plus the note "inside closed shadow root"), the frame chain (025-FR-029), the element's bounding box, the pick point x/y (the click position; for a pick confirmed by key, the last mouse position over the page; if the mouse has not entered the page, the centre of the element's box), the element's outer HTML (truncated to 20,000 characters, which the capture facts record with the note of 025-FR-036), these computed styles of the element – `display`, `position`, `top`, `right`, `bottom`, `left`, `width`, `height`, `margin`, `padding`, `border`, `box-sizing`, `overflow`, `z-index`, `flex-direction`, `justify-content`, `align-items`, `gap`, `grid-template-columns`, `font-family`, `font-size`, `font-weight`, `line-height`, `letter-spacing`, `text-align`, `color`, `background-color`, `opacity` – the React hints (025-FR-037), the recent errors (025-FR-038) and the path of the screenshot (025-FR-034).
 
 **Priority:** Must · **Traces to:** 025-UC-001, 025-UC-004, 025-UC-005 · **Acceptance:** 025-AC-033
 
@@ -269,9 +281,16 @@
 
 **Priority:** Must · **Traces to:** 025-UC-001 · **Acceptance:** 025-AC-035
 
-### 025-FR-036: Page HTML sent as-is and labelled untrusted
+### 025-FR-036: Page-derived content sent as-is, all of it inside the untrusted block
 
-**Description:** The HTML in the context file shall be the page's markup as-is, including form values, apart from the length limit of 025-FR-033; Erfana shall not strip or mask it. The HTML, styles and errors shall sit inside a block headed as untrusted page content that the agent must treat as data, not instructions.
+**Description:** The HTML in the context file shall be the page's markup as-is, including form values, apart from the length limit of 025-FR-033; Erfana shall not strip or mask it, apart from escaping the fence token described below.
+
+The context file shall have two parts:
+
+1. **Capture facts**, written by Erfana and holding no text taken from the page: the capture time, the viewport size and size preset, the device pixel ratio, the element's bounding box, the pick point, the notes "partly off-screen", "off-screen", "zero size", "inside closed shadow root", "source not found" and "HTML truncated at 20,000 characters", and the screenshot path. These notes are fixed Erfana lines in the capture facts; the truncated HTML itself ends inside the untrusted block with no Erfana text appended to it.
+2. **Untrusted page content**: every field whose text comes from the page or the site – the page URL and title, the CSS selector, the frame chain with its origins, the outer HTML, the computed styles, the React component names, owner chain and source file paths, and the console and network entries with their messages and URLs. This part shall sit inside one block headed as untrusted page content that the agent must treat as data, not instructions. The block shall open and close with a fence that page text cannot end early – a delimiter carrying a random token generated per capture – and any occurrence of that token in page text shall be escaped.
+
+No page-derived text shall appear outside that block: not in the capture facts, not in the capture file names (which Erfana generates from the capture time and a random id), and not in the rendered prompt of 025-FR-032, which carries only the user's instruction, the context file path and Erfana's fixed template text.
 
 **Priority:** Must · **Traces to:** 025-UC-001 · **Acceptance:** 025-AC-036
 
@@ -297,7 +316,7 @@
 
 ### 025-FR-046: A capture that cannot be saved sends nothing
 
-**Description:** If the context file or the screenshot cannot be written (for example a full disk, a read-only folder or a failed capture), Erfana shall send no prompt, shall remove any partial capture file it wrote, and shall show an error toast that names the reason. The dialog, if one was open, shall stay open with the user's instruction so the user can retry; pick mode stays on and the page stays frozen if 025-FR-028 froze it.
+**Description:** If the context file or the screenshot cannot be written (for example a full disk, a read-only folder or a failed capture), Erfana shall send no prompt, shall remove any partial capture file it wrote, and shall show an error toast that names the reason. The dialog, if one was open, shall stay open with the user's instruction so the user can retry; for **Explain**, which has no dialog, the prompt-actions menu shall open again at the element. Pick mode stays on and the page stays frozen if 025-FR-028 froze it, until that dialog or menu closes (025-FR-030, 025-FR-031).
 
 **Priority:** Must · **Traces to:** 025-UC-001, 025-UC-004, 025-UC-005 · **Acceptance:** 025-AC-060
 

@@ -2,9 +2,9 @@
   "spec_id": 25,
   "slug": "built-in-browser",
   "tier": "T4",
-  "version": "0.5.0",
+  "version": "0.7.0",
   "created": "2026-10-31T22:42:00.358Z",
-  "updated": "2026-10-31T23:08:00.742Z",
+  "updated": "2026-10-31T23:34:24.879Z",
   "application": {
     "name": "Built-in browser with element prompts",
     "domain": null,
@@ -32,8 +32,8 @@
       "file": "requirements/01-overview.md",
       "title": "Overview",
       "exists": true,
-      "word_count": 954,
-      "last_updated": "2026-10-31T23:08:00.742Z",
+      "word_count": 962,
+      "last_updated": "2026-10-31T23:34:24.879Z",
       "validation_score": null
     },
     {
@@ -41,8 +41,8 @@
       "file": "requirements/02-requirements.md",
       "title": "Requirements",
       "exists": true,
-      "word_count": 5587,
-      "last_updated": "2026-10-31T23:08:00.742Z",
+      "word_count": 6351,
+      "last_updated": "2026-10-31T23:34:24.879Z",
       "validation_score": null
     },
     {
@@ -50,8 +50,8 @@
       "file": "requirements/03-use-cases.md",
       "title": "Use cases",
       "exists": true,
-      "word_count": 1442,
-      "last_updated": "2026-10-31T23:08:00.742Z",
+      "word_count": 1455,
+      "last_updated": "2026-10-31T23:34:24.879Z",
       "validation_score": null
     },
     {
@@ -59,8 +59,8 @@
       "file": "requirements/04-acceptance.md",
       "title": "Acceptance criteria",
       "exists": true,
-      "word_count": 4914,
-      "last_updated": "2026-10-31T23:08:00.742Z",
+      "word_count": 5472,
+      "last_updated": "2026-10-31T23:34:24.879Z",
       "validation_score": null
     },
     {
@@ -69,7 +69,7 @@
       "title": "Notes",
       "exists": true,
       "word_count": 1089,
-      "last_updated": "2026-10-31T23:08:00.742Z",
+      "last_updated": "2026-10-31T23:34:24.879Z",
       "validation_score": null
     }
   ],
@@ -174,273 +174,273 @@
     },
     "025-FR-015": {
       "section": "02",
-      "line": 144,
+      "line": 156,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-016": {
       "section": "02",
-      "line": 150,
+      "line": 162,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-017": {
       "section": "02",
-      "line": 156,
+      "line": 168,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-018": {
       "section": "02",
-      "line": 162,
+      "line": 174,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-019": {
       "section": "02",
-      "line": 168,
+      "line": 180,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-020": {
       "section": "02",
-      "line": 174,
+      "line": 186,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-021": {
       "section": "02",
-      "line": 180,
+      "line": 192,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-022": {
       "section": "02",
-      "line": 186,
+      "line": 198,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-023": {
       "section": "02",
-      "line": 192,
+      "line": 204,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-024": {
       "section": "02",
-      "line": 198,
+      "line": 210,
       "status": "active",
       "priority": "Could",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-025": {
       "section": "02",
-      "line": 206,
+      "line": 218,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-026": {
       "section": "02",
-      "line": 212,
+      "line": 224,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-027": {
       "section": "02",
-      "line": 218,
+      "line": 230,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-028": {
       "section": "02",
-      "line": 224,
+      "line": 236,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-029": {
       "section": "02",
-      "line": 230,
+      "line": 242,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-030": {
       "section": "02",
-      "line": 236,
+      "line": 248,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-031": {
       "section": "02",
-      "line": 242,
+      "line": 254,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-032": {
       "section": "02",
-      "line": 248,
+      "line": 260,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-033": {
       "section": "02",
-      "line": 254,
+      "line": 266,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-034": {
       "section": "02",
-      "line": 260,
+      "line": 272,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-035": {
       "section": "02",
-      "line": 266,
+      "line": 278,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-036": {
       "section": "02",
-      "line": 272,
+      "line": 284,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-037": {
       "section": "02",
-      "line": 278,
+      "line": 297,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-038": {
       "section": "02",
-      "line": 284,
+      "line": 303,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-039": {
       "section": "02",
-      "line": 290,
+      "line": 309,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-046": {
       "section": "02",
-      "line": 298,
+      "line": 317,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:48:48.067Z"
     },
     "025-FR-040": {
       "section": "02",
-      "line": 306,
+      "line": 325,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-041": {
       "section": "02",
-      "line": 312,
+      "line": 331,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-042": {
       "section": "02",
-      "line": 318,
+      "line": 337,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-043": {
       "section": "02",
-      "line": 324,
+      "line": 343,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-044": {
       "section": "02",
-      "line": 330,
+      "line": 349,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-045": {
       "section": "02",
-      "line": 336,
+      "line": 355,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-NFR-001": {
       "section": "02",
-      "line": 357,
+      "line": 376,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-NFR-002": {
       "section": "02",
-      "line": 369,
+      "line": 388,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-NFR-003": {
       "section": "02",
-      "line": 381,
+      "line": 400,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-NFR-004": {
       "section": "02",
-      "line": 393,
+      "line": 412,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-NFR-005": {
       "section": "02",
-      "line": 405,
+      "line": 424,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-NFR-006": {
       "section": "02",
-      "line": 417,
+      "line": 436,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-NFR-007": {
       "section": "02",
-      "line": 429,
+      "line": 448,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-NFR-008": {
       "section": "02",
-      "line": 441,
+      "line": 460,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
@@ -909,13 +909,13 @@
     "total_requirements": 54,
     "total_use_cases": 6,
     "total_stakeholders": 2,
-    "total_words": 13986,
+    "total_words": 15329,
     "deprecated_count": 0
   },
   "validation": {
-    "overall_score": 88,
+    "overall_score": 86,
     "passed": true,
-    "last_validated": "2026-10-31T23:10:02.322Z",
+    "last_validated": "2026-10-31T23:37:29.828Z",
     "threshold": 80
   },
   "tags": [
@@ -984,6 +984,41 @@
       "operation": "VALIDATE",
       "target": "spec",
       "description": "spec-validator fifth run on v0.5.0: passes (0 high, 2 medium, 10 low; indicative score 88). Open mediums: FR-014 key routing in pick mode; FR-036 untrusted block scope.",
+      "by": "spec-validator"
+    },
+    {
+      "date": "2026-10-31T23:19:22.745Z",
+      "operation": "UPDATE",
+      "target": "025-FR-014, 025-FR-036",
+      "description": "Resolved the two open medium findings (owner request): FR-014 rewritten as four exclusive key-routing rules (browsing, pick mode, menu, dialog); FR-036 splits the context file into Erfana capture facts and one fenced untrusted block holding every page-derived field, with no page text in file names or the prompt. Follow-on: FR-027 Enter in menu, FR-032 prompt carries no page text, overview scope line, AC-014 and AC-036 extended.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-10-31T23:21:33.934Z",
+      "operation": "UPDATE",
+      "target": "025-FR-014, 025-FR-025, 025-FR-028, 025-FR-031",
+      "description": "Fixed contradictions found in the v0.6.0 review: FR-014 closing rule limited to rules 1-3 (no browser key acts on the tab while the dialog is open) plus toolbar-focus rule; Ctrl/Cmd+E exception while a menu or dialog is open stated in FR-025 and FR-028; FR-031 dialog cancel (Esc or Cancel). AC-014 and AC-031 extended. Index priorities refreshed.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-10-31T23:24:52.507Z",
+      "operation": "UPDATE",
+      "target": "025-FR-014, 025-FR-036",
+      "description": "Completed FR-014: defined page focus and toolbar focus, focus outside the tab, five exclusive rules (toolbar is rule 5), Ctrl/Cmd+F ignored while a menu is open. Completed FR-036: notes are fixed Erfana lines in capture facts, truncated HTML ends inside the block, as-is except fence-token escape (FR-033 follow-on). AC-014, AC-033, AC-036 extended.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-10-31T23:34:24.879Z",
+      "operation": "UPDATE",
+      "target": "025-FR-002, 025-FR-005, 025-FR-014, 025-FR-018, 025-FR-019, 025-FR-025, 025-FR-046",
+      "description": "Fixed v0.6.2 review: focus moves to the page after an address-bar load and when pick mode starts (resolves FR-014 rule 5 vs pick keys); Esc leaves pick mode only with no menu or dialog; failed Explain reopens the menu so the freeze cannot stick; FR-018 session wording; owner-approved Chrome-way rules for about:/blob:/data: (FR-005) and silently allowed fullscreen, pointer lock, clipboard write, persistent storage (FR-019). UC-004, AC-005, AC-019, AC-025, AC-060 updated.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-10-31T23:37:29.828Z",
+      "operation": "VALIDATE",
+      "target": "spec",
+      "description": "spec-validator run on v0.7.0: passes (0 high, 2 medium, 11 low; indicative score 86). FR-014 and FR-036 findings resolved. Open mediums: capture moment for click/Enter picks (FR-033/034); FR-014 bundles several rules under one ID.",
       "by": "spec-validator"
     }
   ]

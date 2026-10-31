@@ -132,7 +132,7 @@
 **Description:** The reviewer picks an item of a dropdown menu that exists only while the mouse hovers.
 
 **Preconditions:**
-- Pick mode is off; the page has a hover menu.
+- Pick mode is off; the page has a hover menu; keyboard focus is in the page (025-FR-002 moves it there after a load).
 
 **Main flow:**
 1. The reviewer hovers the menu so it opens, and hovers the wrong item.

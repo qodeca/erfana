@@ -18,7 +18,7 @@ The first and third objectives are business aims, judged by the owner after rele
 
 ### In scope
 
-- Browser tabs in the editor area: address bar, Back, Forward, Reload, Stop, page title and site icon, find in page, zoom, size presets, DevTools; hidden tabs stay loaded; a fixed list of keys reserved for Erfana, every other key going to the page.
+- Browser tabs in the editor area: address bar, Back, Forward, Reload, Stop, page title and site icon, find in page, zoom, size presets, DevTools; hidden tabs stay loaded; a fixed list of keys reserved for Erfana, every other key going to the page while browsing and to no one while picking.
 - `http`, `https` and `file://` addresses; terminal links and the HTML Preview open pages in a browser tab.
 - One persistent browser profile per project in `<project>/.erfana/browser`, kept out of git, with cookies encrypted at rest and a notice on Linux machines without a keyring.
 - Chrome-like site behaviour: permission prompts, downloads, certificate warnings, HTTP basic-auth sign-in, new tabs and sign-in popups, clearing browsing data.
