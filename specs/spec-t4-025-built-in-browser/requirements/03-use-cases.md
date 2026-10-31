@@ -47,13 +47,14 @@
 - A2: The element sits in an iframe; steps 2–7 work the same and the context file records the frame chain (025-FR-029).
 - A3: The element is partly off-screen; the screenshot is clipped and the context file says so (025-FR-035).
 - A4: The page is a production build; the context file says "source not found" and the send proceeds (025-FR-037).
+- A5: While the **Fix** dialog is open the page navigates on its own; Erfana closes the dialog, discards the capture and shows "The page changed – pick the element again" (025-FR-053).
 
 **Error flows:**
 - E1: The reviewer submits an empty instruction; the dialog stays open with an inline error (025-FR-031).
 - E2: No terminal is open; the prompt-template path opens one, as for Markdown templates (025-FR-032).
 - E3: Writing the capture fails (disk full, permission); no prompt is sent and an error toast names the reason (025-FR-046).
 
-**Traces to:** 025-FR-001, 025-FR-002, 025-FR-025, 025-FR-026, 025-FR-027, 025-FR-029, 025-FR-030, 025-FR-031, 025-FR-032, 025-FR-033, 025-FR-034, 025-FR-035, 025-FR-036, 025-FR-037, 025-FR-038, 025-FR-046
+**Traces to:** 025-FR-001, 025-FR-002, 025-FR-025, 025-FR-026, 025-FR-027, 025-FR-029, 025-FR-030, 025-FR-031, 025-FR-032, 025-FR-033, 025-FR-034, 025-FR-035, 025-FR-036, 025-FR-037, 025-FR-038, 025-FR-046, 025-FR-053
 
 ---
 
@@ -150,7 +151,7 @@
 - E1: The reviewer presses Esc at step 3; the actions menu closes, the page resumes, pick mode is still on (025-FR-030) and nothing is sent.
 - E2: The capture cannot be written; no prompt is sent, the dialog stays open with the text and an error toast names the reason (025-FR-046).
 
-**Traces to:** 025-FR-025, 025-FR-026, 025-FR-027, 025-FR-028, 025-FR-030, 025-FR-031, 025-FR-032, 025-FR-033, 025-FR-034, 025-FR-046
+**Traces to:** 025-FR-025, 025-FR-026, 025-FR-027, 025-FR-028, 025-FR-030, 025-FR-031, 025-FR-032, 025-FR-033, 025-FR-034, 025-FR-046, 025-FR-053
 
 ---
 

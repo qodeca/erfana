@@ -19,7 +19,7 @@ Local test sites serve every page used here (including the hostile pages of 025-
 | 025-AC-011 | New-tab link and linked sign-in popup | 025-FR-011 | ⬜ |
 | 025-AC-012 | Size presets with pick and screenshot | 025-FR-012 | ⬜ |
 | 025-AC-013 | DevTools window opens and closes with the tab | 025-FR-013 | ⬜ |
-| 025-AC-014 | Key routing in browsing, pick mode, menu and dialog | 025-FR-014 | ⬜ |
+| 025-AC-014 | Browser keys act; focus outside the tab | 025-FR-014 | ⬜ |
 | 025-AC-015 | Logins persist per project | 025-FR-015 | ⬜ |
 | 025-AC-016 | Self-ignore file written first | 025-FR-016 | ⬜ |
 | 025-AC-017 | Cookie encryption fuse on | 025-FR-017 | ⬜ |
@@ -55,7 +55,7 @@ Local test sites serve every page used here (including the hostile pages of 025-
 | 025-AC-047 | Electron security release followed within 14 days | 025-NFR-002 | ⬜ |
 | 025-AC-048 | 18 of 20 first-try hits | 025-NFR-003 | ⬜ |
 | 025-AC-049 | Highlight within 50 ms | 025-NFR-004 | ⬜ |
-| 025-AC-050 | Explain send within 2 s | 025-NFR-005 | ⬜ |
+| 025-AC-050 | Pick to menu and Explain to prompt, each within 2 s | 025-NFR-005 | ⬜ |
 | 025-AC-051 | Acceptance suite on three platforms | 025-NFR-006 | ⬜ |
 | 025-AC-052 | No plain-text cookie on disk | 025-NFR-007 | ⬜ |
 | 025-AC-053 | Toolbar keyboard walk-through | 025-NFR-008 | ⬜ |
@@ -66,6 +66,13 @@ Local test sites serve every page used here (including the hostile pages of 025-
 | 025-AC-058 | Review the mobile layout | 025-UC-005 | ⬜ |
 | 025-AC-059 | Clear the project's browsing data | 025-UC-006 | ⬜ |
 | 025-AC-060 | Failed capture sends nothing | 025-FR-046 | ⬜ |
+| 025-AC-061 | Key routing while browsing | 025-FR-047 | ⬜ |
+| 025-AC-062 | Key routing in pick mode | 025-FR-048 | ⬜ |
+| 025-AC-063 | Key routing with the menu open | 025-FR-049 | ⬜ |
+| 025-AC-064 | Key routing with the dialog open | 025-FR-050 | ⬜ |
+| 025-AC-065 | Key routing with toolbar focus | 025-FR-051 | ⬜ |
+| 025-AC-066 | Leaving the tab by key ends pick mode | 025-FR-052 | ⬜ |
+| 025-AC-067 | Capture taken at pick confirmation | 025-FR-053 | ⬜ |
 
 ## Detailed test cases
 
@@ -136,10 +143,42 @@ Local test sites serve every page used here (including the hostile pages of 025-
 **Tests:** 025-FR-013
 **When** the user presses F12 in a browser tab, and separately uses the toolbar button, **then** a separate DevTools window opens for that tab. **When** the tab is closed, **then** its DevTools window closes.
 
-### 025-AC-014: Keys
+### 025-AC-014: Browser keys and focus outside the tab
 
 **Tests:** 025-FR-014
-**Given** a fixture page that logs every keydown, **when** the user presses each reserved key of 025-FR-014, **then** Erfana performs the action and the page logs nothing for it. **When** the user presses Ctrl/Cmd+S, Ctrl/Cmd+K and Ctrl/Cmd+P (and Ctrl/Cmd+Shift+N, Erfana's **New Window** shortcut), **then** the page logs each key and Erfana does nothing. **Given** pick mode is on, **when** the user presses Esc, Up, Down and Enter, **then** Erfana handles each and the page logs none of them; **when** the user presses `a`, Ctrl/Cmd+S and Ctrl/Cmd+Shift+N, **then** the page logs nothing and nothing happens; **when** the user presses Ctrl/Cmd+F, **then** the find bar opens and, with toolbar focus, typed text goes to the find bar while the page logs nothing. **Given** the prompt-actions menu is open, **when** the user presses Tab, Shift+Tab and Space, **then** Erfana handles each and the page logs none of them; **when** the user presses `a`, Ctrl/Cmd+E and Ctrl/Cmd+F, **then** nothing happens, no find bar opens and the page logs nothing. **Given** the **Fix** dialog is open, **when** the user types "abc" and presses Ctrl/Cmd+R, **then** "abc" appears in the dialog, the tab does not reload and the page logs nothing. **Given** pick mode is on with the menu open, **when** the user presses Ctrl/Cmd+W, **then** the tab closes and nothing is sent. **Given** the **Fix** dialog is open, **when** the user presses Ctrl/Cmd+W, **then** the tab stays open and the dialog stays open. **Given** focus in the address bar, **when** the user types "abc" and presses Ctrl/Cmd+E, **then** "abc" appears in the bar, pick mode does not start and the page logs nothing; **when** the user presses Ctrl/Cmd+R there, **then** the tab reloads. **Given** a browser tab in pick mode and keyboard focus in the terminal, **when** the user types `ls` and presses Ctrl/Cmd+E, **then** the terminal receives the keys as it does today, the tab stays in pick mode and the page logs nothing.
+**Given** a fixture page that logs every keydown and page focus, **when** the user presses each browser key of 025-FR-014 in turn, **then** Erfana performs its named action and the page logs nothing for it. **Given** a browser tab in pick mode and keyboard focus in the terminal, **when** the user types `ls` and presses Ctrl/Cmd+E, **then** the terminal receives the keys as it does today, the tab stays in pick mode and the page logs nothing.
+
+<!-- 025-AC-061 to 025-AC-066 sit here, out of number order, next to the key-routing test they were split from in v0.8.0; IDs are never renumbered. -->
+
+### 025-AC-061: Key routing while browsing
+
+**Tests:** 025-FR-047
+**Given** the keydown-logging fixture with page focus and pick mode off, **when** the user presses Ctrl/Cmd+S, Ctrl/Cmd+K, Ctrl/Cmd+P and Ctrl/Cmd+Shift+N (Erfana's **New Window** shortcut), **then** the page logs each key and Erfana does nothing.
+
+### 025-AC-062: Key routing in pick mode
+
+**Tests:** 025-FR-048
+**Given** pick mode on with page focus, **when** the user presses Esc, Up, Down and Enter, **then** Erfana handles each and the page logs none of them; **when** the user presses `a`, Ctrl/Cmd+S and Ctrl/Cmd+Shift+N, **then** the page logs nothing and nothing happens; **when** the user presses Ctrl/Cmd+F, **then** the find bar opens.
+
+### 025-AC-063: Key routing with the menu open
+
+**Tests:** 025-FR-049
+**Given** the prompt-actions menu is open, **when** the user presses Tab, Shift+Tab and Space, **then** Erfana handles each and the page logs none of them; **when** the user presses `a`, Ctrl/Cmd+E and Ctrl/Cmd+F, **then** nothing happens, no find bar opens and the page logs nothing. **When** the user presses Ctrl/Cmd+L, and separately clicks the address bar, **then** the menu closes with nothing sent, the page is unfrozen after a Ctrl/Cmd+E pick, and typing goes into the address bar. **When** the user clicks the page outside the open menu, **then** the menu closes, nothing is sent, the clicked element is not picked and pick mode is still on.
+
+### 025-AC-064: Key routing with the dialog open
+
+**Tests:** 025-FR-050
+**Given** the **Fix** dialog is open, **when** the user types "abc" and presses Ctrl/Cmd+R, **then** "abc" appears in the dialog, the tab does not reload and the page logs nothing; **when** the user presses Ctrl/Cmd+W, **then** the tab and the dialog stay open; **when** the user clicks the page outside the dialog, **then** nothing happens.
+
+### 025-AC-065: Key routing with toolbar focus
+
+**Tests:** 025-FR-051
+**Given** focus in the address bar, **when** the user types "abc" and presses Ctrl/Cmd+E, **then** "abc" appears in the bar, pick mode does not start and the page logs nothing; **when** the user presses Ctrl/Cmd+R there, **then** the tab reloads. **Given** the find bar is open with focus, **when** the user types "needle", **then** the text goes to the find bar and the page logs nothing; **when** the user presses Esc, **then** the find bar closes, focus returns to the page and pick mode, if on, is still on. **Given** pick mode on and focus in the address bar with edited text, **when** the user presses Esc, **then** the bar shows the current address again, focus returns to the page and pick mode is still on.
+
+### 025-AC-066: Leaving the tab by key ends pick mode
+
+**Tests:** 025-FR-052
+**Given** pick mode on with the menu open, **when** the user presses Ctrl/Cmd+W, **then** the tab closes and nothing is sent. **Given** pick mode on with no menu, after one earlier navigation, **when** the user presses the back key, **then** the tab goes back, pick mode ends, nothing is sent and no "page changed" notice appears. **Given** the **Fix** dialog open after a Ctrl/Cmd+E pick, **when** the user switches to another editor tab with the mouse, **then** on return the dialog is closed, nothing was sent or written, the page runs and pick mode is off. **Given** the prompt-actions menu open, **when** the user presses Ctrl/Cmd+T, **then** a new tab opens and, on return, the menu is closed, nothing was sent and pick mode is off.
 
 ### Profile and site data
 
@@ -198,7 +237,7 @@ Local test sites serve every page used here (including the hostile pages of 025-
 ### 025-AC-025: Pick mode
 
 **Tests:** 025-FR-025
-**When** the user presses Ctrl/Cmd+E, **then** pick mode starts and a click on a fixture button does not fire its click handler. Esc and the button each end pick mode; the button also starts it. **When** the page navigates during pick mode, **then** pick mode ends. **When** the user starts pick mode with the toolbar button and presses Up, Enter and Esc, **then** Up moves the highlight to the parent, Enter opens the prompt-actions menu, Esc closes the menu, and a second Esc leaves pick mode. **When** the user loads an address from the address bar, **then** keyboard focus is in the page and Ctrl/Cmd+E starts pick mode.
+**When** the user presses Ctrl/Cmd+E, **then** pick mode starts and a click on a fixture button does not fire its click handler. Esc and the button each end pick mode; the button also starts it. **When** the page navigates during pick mode, **then** pick mode ends. **When** the user starts pick mode with the toolbar button and, before moving the mouse onto the page, presses Up, Enter and Ctrl/Cmd+E, **then** nothing is highlighted and nothing happens. **When** the user then moves the mouse over a `<span>` inside a `<button>` and presses Up, Enter and Esc, **then** Up moves the highlight to the parent, Enter opens the prompt-actions menu, Esc closes the menu, and a second Esc leaves pick mode. **When** the user loads an address from the address bar, **then** keyboard focus is in the page and Ctrl/Cmd+E starts pick mode.
 
 ### 025-AC-026: Highlight and label
 
@@ -297,6 +336,13 @@ Local test sites serve every page used here (including the hostile pages of 025-
 **Tests:** 025-FR-044
 **Given** the user guide, **then** a browser page exists and its risk section covers prompt injection, client data going to the AI provider, full URLs in log files, `git clean -fdx` and Google sign-in.
 
+<!-- 025-AC-067 sits here, out of number order, next to the other capture tests; it was added in v0.8.0 and IDs are never renumbered. -->
+
+### 025-AC-067: Capture taken at pick confirmation
+
+**Tests:** 025-FR-053
+**Given** a fixture element whose text changes every second and which removes itself 5 s after load, **when** the user picks it by click at second 2, opens **Fix**, waits until it is removed and submits, **then** the screenshot and the HTML show the element as it was at second 2, and the context file lists only console entries logged before the pick. **When** the user picks again and presses Up in the menu, **then** the capture is replaced by one of the parent taken at that moment. **Given** the **Fix** dialog is open, **when** the fixture navigates the page by script, **then** the dialog closes, the notice "The page changed – pick the element again" appears, nothing is sent and no capture file is written.
+
 <!-- 025-AC-060 sits here, out of number order, because it was added in v0.2.0; IDs are never renumbered. -->
 
 ### 025-AC-060: Failed capture sends nothing
@@ -334,7 +380,7 @@ Local test sites serve every page used here (including the hostile pages of 025-
 ### 025-AC-050: Send latency
 
 **Tests:** 025-NFR-005
-**Given** 20 timed **Explain** sends on the React app, **then** the 95th percentile from confirm to prompt in the terminal is at most 2 s on each platform's reference machine.
+**Given** 20 timed picks followed by **Explain** on the React app, **then** on each platform's reference machine the 95th percentile from pick confirmation to the menu appearing is at most 2 s, and the 95th percentile from selecting **Explain** to the prompt appearing in the terminal is at most 2 s.
 
 ### 025-AC-051: Platforms
 
@@ -356,12 +402,13 @@ Local test sites serve every page used here (including the hostile pages of 025-
 ### 025-AC-054: Fix an element found in review
 
 **Tests:** 025-UC-001
-**Scenario:** main flow with the React app and a stub agent; then A1, A2, A3, A4 and E1–E3.
+**Scenario:** main flow with the React app and a stub agent; then A1, A2, A3, A4, A5 and E1–E3.
 - [ ] Steps 1–8 produce one capture and one submitted prompt; afterwards pick mode is off and the page runs
 - [ ] A1 Explain sends with no dialog
 - [ ] A2 iframe pick records the frame chain
 - [ ] A3 partly off-screen note present
 - [ ] A4 production build says "source not found"
+- [ ] A5 a page navigation while the dialog is open discards the capture and sends nothing
 - [ ] E1 an empty instruction keeps the dialog open with an inline error
 - [ ] E2 with no terminal open, one opens and receives the prompt
 - [ ] E3 a read-only captures folder sends nothing and shows a toast

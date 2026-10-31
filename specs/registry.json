@@ -405,9 +405,9 @@
       "description": "Built-in web browser in Erfana tabs: open any http/https/file page, one persistent encrypted profile per project in .erfana/browser (self-ignored by git), Chrome-like site behaviour (permissions, downloads, certificate warnings, basic auth, popups, DevTools, size presets), pick mode with refinement, hover-only and cross-frame picking, six web prompt actions sent through the prompt-template path with a context file (HTML as-is, styles, React hints, recent errors) and an annotated screenshot; terminal links open in a browser tab; no flag; 14-day Electron security release duty.",
       "created": "2026-10-31T22:42:00.358Z",
       "path": "spec-t4-025-built-in-browser",
-      "last_modified": "2026-10-31T23:34:24.879Z",
+      "last_modified": "2026-10-31T23:46:53.551Z",
       "sections_count": 5,
-      "requirements_count": 54,
+      "requirements_count": 61,
       "documents": {
         "technical_adrs": [],
         "solution_adrs": [],
@@ -422,7 +422,7 @@
   "metadata": {
     "schema_version": "3.0.0",
     "created": "2025-12-22T00:00:00.000Z",
-    "last_updated": "2026-10-31T23:34:24.879Z",
-    "version": 22
+    "last_updated": "2026-10-31T23:46:53.551Z",
+    "version": 25
   }
 }

@@ -1,6 +1,6 @@
 # Requirements
 
-"Ctrl/Cmd" means Cmd on macOS and Ctrl on Windows and Linux. "The profile folder" is `<project>/.erfana/browser/`. A few requirements (025-FR-005, 025-FR-011, 025-FR-014) group closely related rules of one behaviour under one ID; their acceptance criteria test each rule separately.
+"Ctrl/Cmd" means Cmd on macOS and Ctrl on Windows and Linux. "The profile folder" is `<project>/.erfana/browser/`. A few requirements (025-FR-005, 025-FR-011, 025-FR-019) group closely related rules of one behaviour under one ID; their acceptance criteria check each rule with its own Given/When/Then step. Key routing is split into one ID per state (025-FR-014, 025-FR-047 to 025-FR-052).
 
 ## Functional requirements
 
@@ -19,7 +19,7 @@
 | 025-FR-011 | New-tab links and sign-in popups | Must | 025-UC-003 | 025-AC-011 |
 | 025-FR-012 | Viewport size presets | Must | 025-UC-005 | 025-AC-012 |
 | 025-FR-013 | DevTools in its own window | Must | – | 025-AC-013 |
-| 025-FR-014 | Erfana reserves a fixed key list; key routing in browsing and pick states | Must | – | 025-AC-014 |
+| 025-FR-014 | Browser keys, focus terms and the five routing states | Must | – | 025-AC-014 |
 | 025-FR-015 | One persistent profile per project | Must | 025-UC-003, 025-UC-006 | 025-AC-015 |
 | 025-FR-016 | The profile folder ignores itself in git | Must | – | 025-AC-016 |
 | 025-FR-017 | Cookies encrypted at rest | Must | 025-UC-003 | 025-AC-017 |
@@ -52,6 +52,13 @@
 | 025-FR-044 | User guide states the known risks | Must | – | 025-AC-044 |
 | 025-FR-045 | Release note on the terminal-link change | Must | – | 025-AC-045 |
 | 025-FR-046 | A capture that cannot be saved sends nothing | Must | 025-UC-001, 025-UC-004, 025-UC-005 | 025-AC-060 |
+| 025-FR-047 | Key routing while browsing | Must | – | 025-AC-061 |
+| 025-FR-048 | Key routing in pick mode | Must | – | 025-AC-062 |
+| 025-FR-049 | Key routing with a prompt-actions menu open | Must | – | 025-AC-063 |
+| 025-FR-050 | Key routing with an instruction dialog open | Must | – | 025-AC-064 |
+| 025-FR-051 | Key routing with toolbar focus | Must | – | 025-AC-065 |
+| 025-FR-052 | Leaving the tab by key ends pick mode without sending | Must | – | 025-AC-066 |
+| 025-FR-053 | The capture is taken when the pick is confirmed | Must | 025-UC-001, 025-UC-004 | 025-AC-067 |
 
 ### Tabs and navigation
 
@@ -99,7 +106,7 @@
 
 ### 025-FR-008: Find in page and zoom
 
-**Description:** Ctrl/Cmd+F shall open a find bar for the active browser tab that highlights every match, shows the current match number and the total, and moves to the next and previous match with Enter and Shift+Enter. Ctrl/Cmd+Plus and Ctrl/Cmd+Minus shall step the tab's zoom through 25, 33, 50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300, 400 and 500%, and Ctrl/Cmd+0 shall reset it to 100%.
+**Description:** Ctrl/Cmd+F shall open a find bar for the active browser tab that highlights every match, shows the current match number and the total, and moves to the next and previous match with Enter and Shift+Enter. With no match the bar shows "0 of 0". Esc or the find bar's close button closes it and removes the highlights. Ctrl/Cmd+Plus and Ctrl/Cmd+Minus shall step the tab's zoom through 25, 33, 50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300, 400 and 500%, and Ctrl/Cmd+0 shall reset it to 100%.
 
 **Priority:** Should · **Acceptance:** 025-AC-008
 
@@ -133,23 +140,51 @@
 
 **Priority:** Must · **Acceptance:** 025-AC-013
 
-### 025-FR-014: Erfana reserves a fixed key list; key routing in browsing and pick states
+### 025-FR-014: Browser keys, focus terms and the five routing states
 
-**Description:** The **browser keys** are: Ctrl/Cmd+L (address bar), Ctrl/Cmd+R and F5 (reload), Ctrl/Cmd+W (close tab), Ctrl/Cmd+T (new browser tab), Alt+Left and Alt+Right on Windows and Linux or Cmd+[ and Cmd+] on macOS (back, forward), F12 (DevTools), Ctrl/Cmd+E (pick, 025-FR-025 and 025-FR-028), Ctrl/Cmd+F (find) and the zoom keys of 025-FR-008.
+**Description:** The **browser keys** are: Ctrl/Cmd+L (address bar), Ctrl/Cmd+R and F5 (reload), Ctrl/Cmd+W (close tab), Ctrl/Cmd+T (new browser tab), Alt+Left and Alt+Right on Windows and Linux or Cmd+[ and Cmd+] on macOS (back, forward), F12 (DevTools), Ctrl/Cmd+E (pick, 025-FR-025 and 025-FR-028), Ctrl/Cmd+F (find) and the zoom keys of 025-FR-008. Each browser key shall perform the action named here wherever a routing state lets Erfana handle it.
 
-Terms: **page focus** means keyboard focus is inside the web page or one of its frames; **toolbar focus** means keyboard focus is in the tab's own controls (address bar, find bar, toolbar buttons). When keyboard focus is anywhere outside the browser tab (terminal, editor, another panel), that place handles the keys as it does today and the browser tab receives none, whatever state the tab is in.
-
-While keyboard focus is in the browser tab, exactly one of these five rules applies:
-
-1. **Browsing** – pick mode off, no prompt-actions menu or dialog open, page focus: Erfana shall handle the browser keys; every other key, including keys bound to Erfana app shortcuts, shall go to the page.
-2. **Pick mode** – pick mode on, no prompt-actions menu or dialog open, page focus: Erfana shall handle the browser keys and Esc, Up, Down and Enter; the page shall receive no key, and every other key does nothing.
-3. **Menu** – a prompt-actions menu open: Erfana shall handle Esc, Up, Down, Enter, Tab, Shift+Tab and Space for the menu (025-FR-027, 025-FR-030) and the browser keys except Ctrl/Cmd+E and Ctrl/Cmd+F, which do nothing; the page shall receive no key, and every other key does nothing.
-4. **Dialog** – an instruction dialog open (025-FR-031): keyboard focus shall be in the dialog and every key shall go to the dialog; no browser key acts on the tab and the page receives no key. The user leaves the dialog with Esc, **Cancel** or a submit.
-5. **Toolbar** – toolbar focus, no prompt-actions menu or dialog open, in either browsing or pick mode (pick mode starts with page focus, 025-FR-025, so this rule applies in pick mode only after the user moves focus to the toolbar): typing goes to the focused control; the browser keys keep their actions except Ctrl/Cmd+E, which does nothing; the page receives no key.
-
-Under rules 1, 2, 3 and 5, a browser key that navigates or closes the tab ends pick mode (025-FR-025) and closes any open menu without sending.
+Terms: **page focus** means keyboard focus is inside the web page or one of its frames; **toolbar focus** means keyboard focus is in the tab's own controls (address bar, find bar, toolbar buttons). When keyboard focus is anywhere outside the browser tab (terminal, editor, another panel), that place handles the keys as it does today and the browser tab receives none, whatever state the tab is in. While keyboard focus is in the browser tab, exactly one of the five routing states applies: browsing (025-FR-047), pick mode (025-FR-048), menu (025-FR-049), dialog (025-FR-050) or toolbar (025-FR-051).
 
 **Priority:** Must · **Acceptance:** 025-AC-014
+
+<!-- 025-FR-047 to 025-FR-052 sit here, out of number order, because they were split out of 025-FR-014 in v0.8.0; IDs are never renumbered. -->
+
+### 025-FR-047: Key routing while browsing
+
+**Description:** With pick mode off, no prompt-actions menu or dialog open, and page focus, Erfana shall handle the browser keys, and every other key, including keys bound to Erfana app shortcuts, shall go to the page.
+
+**Priority:** Must · **Acceptance:** 025-AC-061
+
+### 025-FR-048: Key routing in pick mode
+
+**Description:** With pick mode on, no prompt-actions menu or dialog open, and page focus, Erfana shall handle the browser keys and Esc, Up, Down and Enter; the page shall receive no key, and every other key shall do nothing.
+
+**Priority:** Must · **Acceptance:** 025-AC-062
+
+### 025-FR-049: Key routing with a prompt-actions menu open
+
+**Description:** With a prompt-actions menu open, Erfana shall handle Esc, Up, Down, Enter, Tab, Shift+Tab and Space for the menu (025-FR-027, 025-FR-030) and the browser keys except Ctrl/Cmd+E and Ctrl/Cmd+F, which shall do nothing; the page shall receive no key, and every other key shall do nothing. Ctrl/Cmd+L, or a mouse click on the tab's toolbar, shall close the menu without sending, unfreeze the page if 025-FR-028 froze it, and give the toolbar focus, so 025-FR-051 applies. A mouse click on the page outside the menu shall close the menu without sending, discard its capture (025-FR-053), unfreeze the page if 025-FR-028 froze it, and keep pick mode on; it does not pick the clicked element.
+
+**Priority:** Must · **Acceptance:** 025-AC-063
+
+### 025-FR-050: Key routing with an instruction dialog open
+
+**Description:** With an instruction dialog open (025-FR-031), keyboard focus shall be in the dialog and every key shall go to the dialog; no browser key shall act on the tab and the page shall receive no key. The dialog is modal: a mouse click outside it does nothing. The user leaves the dialog with Esc, **Cancel** or a submit.
+
+**Priority:** Must · **Acceptance:** 025-AC-064
+
+### 025-FR-051: Key routing with toolbar focus
+
+**Description:** With toolbar focus and no prompt-actions menu or dialog open, in either browsing or pick mode, typing shall go to the focused control; the browser keys shall keep their actions except Ctrl/Cmd+E, which shall do nothing; the page shall receive no key. Pick mode starts with page focus (025-FR-025), so this rule applies in pick mode only after the user moves focus to the toolbar. Esc here acts on the control and never leaves pick mode: in the address bar it restores the current address and returns focus to the page; in the find bar it closes the find bar (025-FR-008) and returns focus to the page.
+
+**Priority:** Must · **Acceptance:** 025-AC-065
+
+### 025-FR-052: Leaving the tab by key ends pick mode without sending
+
+**Description:** Under 025-FR-047, 025-FR-048, 025-FR-049 and 025-FR-051, a browser key that navigates or closes the tab shall end pick mode (025-FR-025), close any open prompt-actions menu and discard its capture (025-FR-053) without sending and without a notice. The same shall happen when the browser tab is hidden: when the user switches to another editor tab (in every state, including an open dialog), or presses Ctrl/Cmd+T where 025-FR-047, 025-FR-048, 025-FR-049 or 025-FR-051 lets it act (never under 025-FR-050): any menu or dialog closes without sending, its capture is discarded, the page is unfrozen if 025-FR-028 froze it, and pick mode ends. Under 025-FR-050 no browser key acts on the tab.
+
+**Priority:** Must · **Acceptance:** 025-AC-066
 
 ### Profile and site data
 
@@ -217,13 +252,13 @@ Under rules 1, 2, 3 and 5, a browser key that navigates or closes the tab ends p
 
 ### 025-FR-025: Pick mode on and off
 
-**Description:** A **Pick element** toolbar button shall toggle pick mode for the active browser tab. Pressing Ctrl/Cmd+E while pick mode is off shall start pick mode; pressing it while pick mode is on and no prompt-actions menu or dialog is open shall pick at once (025-FR-028); while a menu or dialog is open it does nothing (025-FR-014). Starting pick mode, by the button or by Ctrl/Cmd+E, shall move keyboard focus to the page, so 025-FR-014 rule 2 applies. In pick mode, clicks on the page shall not reach the page. Esc, while no prompt-actions menu or dialog is open, or the button shall leave pick mode; leaving pick mode also unfreezes the page if 025-FR-028 froze it. Pick mode shall end when the tab navigates.
+**Description:** A **Pick element** toolbar button shall toggle pick mode for the active browser tab. Pressing Ctrl/Cmd+E while pick mode is off shall start pick mode; pressing it while pick mode is on and no prompt-actions menu or dialog is open shall pick at once (025-FR-028); while a menu or dialog is open it does nothing (025-FR-049, 025-FR-050). Starting pick mode, by the button or by Ctrl/Cmd+E, shall move keyboard focus to the page, so 025-FR-048 applies. In pick mode, clicks on the page shall not reach the page. Esc, with page focus and no prompt-actions menu or dialog open, or the button shall leave pick mode; leaving pick mode also unfreezes the page if 025-FR-028 froze it. Pick mode shall end when the tab navigates.
 
 **Priority:** Must · **Traces to:** 025-UC-001, 025-UC-004 · **Acceptance:** 025-AC-025
 
 ### 025-FR-026: Hover highlight with a label
 
-**Description:** In pick mode, the element under the mouse shall be outlined, and a label next to it shall show the element's tag, then `#id` if it has one, otherwise its first three classes in document order (this tag, id and class text cut to 40 characters), followed by its size in CSS pixels, which is never cut. The outline and label shall not change the page's layout and shall not appear in the page's DOM as seen by the page's own scripts.
+**Description:** When pick mode starts, no element is highlighted until the mouse is over the page; while none is highlighted, Up, Down, Enter and the second Ctrl/Cmd+E shall do nothing. In pick mode, the element under the mouse shall be outlined, and a label next to it shall show the element's tag, then `#id` if it has one, otherwise its first three classes in document order (this tag, id and class text cut to 40 characters), followed by its size in CSS pixels, which is never cut. The outline and label shall not change the page's layout and shall not appear in the page's DOM as seen by the page's own scripts.
 
 **Priority:** Must · **Traces to:** 025-UC-001, 025-UC-004 · **Acceptance:** 025-AC-026
 
@@ -265,7 +300,7 @@ Under rules 1, 2, 3 and 5, a browser key that navigates or closes the tab ends p
 
 ### 025-FR-033: The context file
 
-**Description:** Each send shall write a Markdown context file to `.erfana/browser/captures/` holding: the page URL and title, the capture time, the viewport size and size preset (`Phone`, `Tablet`, `Desktop`, or `none` with the size the page reports when DevTools device emulation overrides it), the device pixel ratio, a CSS selector that identifies the element (for an element inside a closed shadow root, the selector of its shadow host plus the note "inside closed shadow root"), the frame chain (025-FR-029), the element's bounding box, the pick point x/y (the click position; for a pick confirmed by key, the last mouse position over the page; if the mouse has not entered the page, the centre of the element's box), the element's outer HTML (truncated to 20,000 characters, which the capture facts record with the note of 025-FR-036), these computed styles of the element – `display`, `position`, `top`, `right`, `bottom`, `left`, `width`, `height`, `margin`, `padding`, `border`, `box-sizing`, `overflow`, `z-index`, `flex-direction`, `justify-content`, `align-items`, `gap`, `grid-template-columns`, `font-family`, `font-size`, `font-weight`, `line-height`, `letter-spacing`, `text-align`, `color`, `background-color`, `opacity` – the React hints (025-FR-037), the recent errors (025-FR-038) and the path of the screenshot (025-FR-034).
+**Description:** Each send shall write, from the capture taken when the pick was confirmed (025-FR-053), a Markdown context file to `.erfana/browser/captures/` holding: the page URL and title, the capture time, the viewport size and size preset (`Phone`, `Tablet`, `Desktop`, or `none` with the size the page reports when DevTools device emulation overrides it), the device pixel ratio, a CSS selector that identifies the element (for an element inside a closed shadow root, the selector of its shadow host plus the note "inside closed shadow root"), the frame chain (025-FR-029), the element's bounding box, the pick point x/y (the click position; for a pick confirmed by key, the last mouse position over the page; if the mouse has not entered the page, the centre of the element's box), the element's outer HTML (truncated to 20,000 characters, which the capture facts record with the note of 025-FR-036), these computed styles of the element – `display`, `position`, `top`, `right`, `bottom`, `left`, `width`, `height`, `margin`, `padding`, `border`, `box-sizing`, `overflow`, `z-index`, `flex-direction`, `justify-content`, `align-items`, `gap`, `grid-template-columns`, `font-family`, `font-size`, `font-weight`, `line-height`, `letter-spacing`, `text-align`, `color`, `background-color`, `opacity` – the React hints (025-FR-037), the recent errors (025-FR-038) and the path of the screenshot (025-FR-034).
 
 **Priority:** Must · **Traces to:** 025-UC-001, 025-UC-004, 025-UC-005 · **Acceptance:** 025-AC-033
 
@@ -302,7 +337,7 @@ No page-derived text shall appear outside that block: not in the capture facts, 
 
 ### 025-FR-038: Recent console and network errors
 
-**Description:** Each browser tab shall record its console errors and warnings and its failed network requests (network errors and HTTP status 400 or higher) since the last navigation. The context file shall include the last 20 console entries (errors and warnings together, in time order) and the last 20 failed requests, each with time, level or status, and message or URL.
+**Description:** Each browser tab shall record its console errors and warnings and its failed network requests (network errors and HTTP status 400 or higher) since the last navigation. The context file shall include the last 20 console entries (errors and warnings together, in time order) and the last 20 failed requests, each with time, level or status, and message or URL, as recorded up to the moment the pick was confirmed (025-FR-053).
 
 **Priority:** Must · **Traces to:** 025-UC-001 · **Acceptance:** 025-AC-038
 
@@ -319,6 +354,14 @@ No page-derived text shall appear outside that block: not in the capture facts, 
 **Description:** If the context file or the screenshot cannot be written (for example a full disk, a read-only folder or a failed capture), Erfana shall send no prompt, shall remove any partial capture file it wrote, and shall show an error toast that names the reason. The dialog, if one was open, shall stay open with the user's instruction so the user can retry; for **Explain**, which has no dialog, the prompt-actions menu shall open again at the element. Pick mode stays on and the page stays frozen if 025-FR-028 froze it, until that dialog or menu closes (025-FR-030, 025-FR-031).
 
 **Priority:** Must · **Traces to:** 025-UC-001, 025-UC-004, 025-UC-005 · **Acceptance:** 025-AC-060
+
+<!-- 025-FR-053 sits here, out of number order, next to the other capture requirements; IDs are never renumbered. -->
+
+### 025-FR-053: The capture is taken when the pick is confirmed
+
+**Description:** When a pick is confirmed – by a click, by Enter, or by the second Ctrl/Cmd+E press – Erfana shall at once take the whole capture: the screenshot of 025-FR-034, every field of 025-FR-033 and the recent errors of 025-FR-038, as the page is at that moment. Erfana shall keep the capture in memory while the prompt-actions menu and dialog are open and write it to disk only at send (025-FR-046). Changes to the page after confirmation – the element moving, changing or being removed, hover content closing – shall not change the capture. Up or Down in the menu (025-FR-027) picks another element and shall replace the capture with a new one taken at that moment. If the page itself navigates or reloads (by a script, a redirect, a link or a meta refresh) while the menu or dialog is open, Erfana shall close them, discard the capture without writing or sending anything, and show a notice "The page changed – pick the element again". If a browser key navigates or closes the tab (025-FR-052), Erfana shall close them and discard the capture the same way, without a notice.
+
+**Priority:** Must · **Traces to:** 025-UC-001, 025-UC-004 · **Acceptance:** 025-AC-067
 
 ### Release and documentation
 
@@ -368,7 +411,7 @@ No page-derived text shall appear outside that block: not in the capture facts, 
 | 025-NFR-002 | Security | The browser engine stays patched | Erfana release ≤ 14 days after each Electron security release |
 | 025-NFR-003 | Effectiveness | The agent edits the picked element on the first try | ≥ 18 of 20 picks |
 | 025-NFR-004 | Performance | The highlight follows the mouse | ≤ 50 ms from mouse move to outline update (95th percentile) |
-| 025-NFR-005 | Performance | Confirm to prompt in the terminal | ≤ 2 s for Explain (95th percentile) |
+| 025-NFR-005 | Performance | Pick confirmation to menu, and Explain to prompt in the terminal | Each ≤ 2 s (95th percentile) |
 | 025-NFR-006 | Portability | The browser works on every platform Erfana ships | The acceptance suite passes on macOS, Windows and Linux |
 | 025-NFR-007 | Security | Cookies are not readable as plain text from disk | 0 cookie values found in plain text in the profile folder on macOS and Windows |
 | 025-NFR-008 | Accessibility | Toolbar controls work by keyboard | 100% of toolbar controls reachable by Tab with a visible focus indicator |
@@ -425,13 +468,13 @@ No page-derived text shall appear outside that block: not in the capture facts, 
 
 **Category:** Performance
 
-**Description:** From confirming **Explain** to the prompt appearing in the terminal, including the screenshot and the context file.
+**Description:** Two intervals, each measured separately: (a) from confirming a pick (click, Enter or the second Ctrl/Cmd+E) to the prompt-actions menu appearing, which includes taking the capture of 025-FR-053; (b) from the user selecting **Explain** in the menu to the prompt appearing in the terminal, which includes writing the capture from memory to disk and the send.
 
-**Metric:** ≤ 2 s, 95th percentile.
+**Metric:** Interval (a) ≤ 2 s and interval (b) ≤ 2 s, each at the 95th percentile.
 
-**Measurement method:** 20 timed sends on the React sample app on a reference machine of each platform, as defined in 025-NFR-004.
+**Measurement method:** 20 timed picks and **Explain** sends on the React sample app on a reference machine of each platform, as defined in 025-NFR-004, with both intervals recorded for each send.
 
-**Traces to:** 025-FR-032, 025-FR-033, 025-FR-034
+**Traces to:** 025-FR-032, 025-FR-033, 025-FR-034, 025-FR-053
 
 ### 025-NFR-006: Platforms
 
@@ -485,6 +528,6 @@ Proposed canonical names; the solution design may refine them before code, and a
 | Captures folder | `.erfana/browser/captures/` | path | 025-FR-033, 025-FR-039 |
 | Self-ignore file | `.erfana/browser/.gitignore` (content `*`) | file | 025-FR-016 |
 | Prompt template ids | `browser-explain`, `browser-ask`, `browser-fix`, `browser-change-style`, `browser-change-text`, `browser-prompt` | string | 025-FR-030, 025-FR-032 |
-| Pick shortcut | Ctrl/Cmd+E (once: pick mode; again: pick at once) | key | 025-FR-014, 025-FR-025, 025-FR-028 |
+| Pick shortcut | Ctrl/Cmd+E (once: pick mode; again: pick at once) | key | 025-FR-014, 025-FR-025, 025-FR-028, 025-FR-049, 025-FR-050, 025-FR-051 |
 | Electron fuse | `EnableCookieEncryption: true` | build config | 025-FR-017 |
 | Design folder | `docs/designs/browser/` | path | 025-FR-043 |
