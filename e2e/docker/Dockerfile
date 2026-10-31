@@ -5,7 +5,7 @@
 # Built for the host's native architecture (arm64 on Apple Silicon, amd64 elsewhere).
 # Driven by scripts/e2e-linux.sh – see docs/testing/e2e-testing.md.
 # node:24-bookworm
-FROM node:24-bookworm@sha256:925de64a85319052d6971ae81ef2417da956e8a3a2c4a0fac732327970f017f5 AS node
+FROM node:25-bookworm@sha256:78839ac448c23517f8eab2e8f7943d9b4f73979eb7f8bed2c73dbf72ff869e7b AS node
 
 # ubuntu:24.04
 FROM ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac
