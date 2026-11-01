@@ -1033,6 +1033,17 @@ The `files.exclude` list, the project path filter and the Windows native directo
 
 ---
 
+### 66. Two unused leftovers in the comments code (spec 024, 2026-11)
+
+**Severity**: Low
+
+- **`COMMENT_FILTER_ATTENTION` has no user.** `src/renderer/src/constants/commentTestids.ts` still defines `COMMENT_FILTER_ATTENTION: 'comment-filter-attention'`, but no file under `src/` or `e2e/` reads it; the drawer filter it named was replaced by `COMMENT_FILTER_CANT_EDIT`. It is still counted in the 145 `COMMENT_` ids that `testids.test.ts` checks, so removing it means changing that count. Fix: delete the id and lower the count.
+- **`CommentPickerRoleSchema` keeps a value nothing produces.** The enum in `src/shared/ipc/preview-comment-schema.ts` includes `'element'`, but `roleOf` in `src/main/services/preview/comments/commentPickerStep.ts` falls back to `'section'` and never returns it. The value stays because the `PIN-C-002` snapshot (`src/shared/ipc/preview-comment-schema.pin.test.ts`) pins the schema's wire shape. Fix: drop the value and regenerate the snapshot in the same change, on purpose.
+
+**Status**: Open – left for a follow-up; neither changes behaviour.
+
+---
+
 ## Code Quality Improvements
 
 ### Documentation Token Efficiency

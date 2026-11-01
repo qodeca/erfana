@@ -96,9 +96,9 @@ Checked in the designs and found the same in both, so no row: the drawer taking 
 
 An extra difference found at owner acceptance (024-AC-007) is either fixed before merge or added to table 1 as *forced* with its reason. A row that cannot give a file-type reason is not forced; it is aligned instead.
 
-## 5. Found by the review, not yet aligned (2026-11-01)
+## 5. Found by the review (2026-11-01)
 
-The review found these differences, which the table did not list. None is forced, so each is marked with the plan step that removes it and is deleted from this table when that step lands, along with any change to table 1 or 2. Forced ones the review found are in table 1 (D-36 to D-38). Behaviour here is what the code does today, as the reviewers read it.
+The review found these differences, which the table did not list. Each row records how it ended: most read "Removed by plan step N" and are kept as the record that code comments and tests cite; a row marked "Forced in part" or "Forced for now" still differs, for the reason it gives. Forced ones the review found are in table 1 (D-36 to D-38). Behaviour here is what the code does today, as the reviewers read it.
 
 | # | Area | HTML Preview | Markdown Preview | Forced or chosen | Reason |
 |---|---|---|---|---|---|

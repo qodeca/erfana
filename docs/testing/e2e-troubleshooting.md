@@ -178,6 +178,8 @@ await window.keyboard.press('Meta+A')  // Fails on Windows/Linux
 
 ### macOS
 
+- A locked screen makes keyboard-focus tests fail with "the OS would not make Erfana the key window". That is the machine, not the code. Check with `ioreg -n Root -d1 | grep IOConsoleLocked`: a line ending in `Yes` means the screen is locked. Unlock it, or run the tests on Linux (`npm run test:e2e:linux`, see [Headless on Linux in Docker](./e2e-testing.md#headless-on-linux-in-docker)).
+- Guide tasks that use the real agent need Qwen Code at `~/.local/bin/qwen` and your setup in `~/.qwen` (`e2e/guide-tasks/guideAgent.ts`). `ERFANA_GUIDE_QWEN_BIN` overrides the binary path.
 - Use `Meta` key for keyboard shortcuts (Cmd)
 - DMG builds are signed and notarized in production (`notarize: true` in `electron-builder.yml`)
 
@@ -185,3 +187,9 @@ await window.keyboard.press('Meta+A')  // Fails on Windows/Linux
 
 - Use `Control` key for keyboard shortcuts
 - File paths use backslashes, and `getPathHash()` hashes the path string exactly as given (no normalisation), so `src\main\index.ts` and `src/main/index.ts` produce different testids – pass the same spelling the component uses
+
+### Linux Docker run
+
+- **The 25 MB page times out:** the test machine is too small. See [Sizing the Docker machine](./e2e-testing.md#sizing-the-docker-machine).
+- **A test fails in a full run and passes alone:** see [A full run is noisy](./e2e-testing.md#a-full-run-is-noisy).
+- **Docker commands reach the wrong machine after a Colima start:** restore the context with `docker context use <name>`.

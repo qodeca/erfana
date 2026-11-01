@@ -16,6 +16,7 @@ Markdown Preview, including comments on selected text. The written designs:
 | [`comments-v2.md`](comments-v2.md) | v2 – the plan of record for both previews, after the UX and UI review |
 | [`markdown-preview-comments.md`](markdown-preview-comments.md) | Markdown Preview comments |
 | [`selection-comments.md`](selection-comments.md) | Comments on selected text |
+| [`spike-outside-mode.md`](spike-outside-mode.md) | Spike report (2026-11-01): the HTML Comment button and a click on an underline outside comment mode (D-09, D-10) |
 
 ## Cards it builds on
 

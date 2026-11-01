@@ -588,6 +588,8 @@ Run `npm audit` to check. **Policy**: zero high/critical production advisories a
 
 **Current state** (audited 2026-10-28, at the `v0.23.1` tag): `npm audit --omit=dev` reports **0** production advisories, and the full tree (`npm audit`) reports 0 as well. All three v0.22.0 advisories below are cleared: the tree now resolves `electron` 44.9.3, `zod` 4.6.7 and `fast-uri` 3.1.9, each at or past its fixed release.
 
+**Update** (audited 2026-11-01): `npm audit --omit=dev` reports **1** high advisory – `follow-redirects` 1.16.0–1.16.1, GHSA-mrwp-f3q8-3g9p. The full tree (`npm audit`) reports 37 (4 high, 31 moderate, 2 low). A lockfile update is planned as its own change.
+
 **At v0.22.0** (audited 2026-10-25, at the `v0.22.0` tag): `npm audit --omit=dev` reported **3** production advisories – **2 high** and **1 moderate** – all published before the tag was pushed, so v0.22.0 shipped with them open. No accepted-exception table was recorded for v0.22.0. Each has a fixed release:
 
 | Package (shipped) | Advisory | Severity | Fixed in | Where Erfana reaches it |
