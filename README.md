@@ -43,7 +43,7 @@ Erfana hosts the agent; it has no AI of its own. [How Erfana works with agents](
 ## Features
 
 - **[Integrated terminal](docs/user-guide/reference/terminal.md)** – Claude Code or any CLI agent in an xterm.js terminal, with file links, drag-and-drop paths, and screenshot and camera capture.
-- **[Markdown editor](docs/user-guide/reference/editor.md)** – Monaco with live preview, scroll sync and [Mermaid diagrams](docs/user-guide/how-to/work-with-mermaid-diagrams.md).
+- **[Markdown editor](docs/user-guide/reference/editor.md)** – Monaco with live preview, scroll sync, [Mermaid diagrams](docs/user-guide/how-to/work-with-mermaid-diagrams.md) and [comments in the preview](docs/user-guide/how-to/comment-on-a-preview.md), saved in the `.md` file for your agent to read.
 - **[Project tree](docs/user-guide/reference/project-tree.md)** – live git status, drag-and-drop file management and full keyboard navigation.
 - **[Import](docs/user-guide/how-to/import-a-document.md) and [export](docs/user-guide/reference/export.md)** – import 50+ formats with local OCR (LiteParse); export to PDF and Word with diagrams.
 - **[HTML preview](docs/user-guide/reference/html-preview.md)** – open a `.html` file as a live page, comment on its elements (comments are saved in the file for your agent to read), with a per-host prompt before any remote request.

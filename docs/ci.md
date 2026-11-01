@@ -118,7 +118,14 @@ Notes:
 - `release.yml` looks up a green `checks.yml` run by commit SHA. A `merge_group` run for the same SHA qualifies too; it ran the same `npm audit signatures` job on the same tree, so its `package-lock-digest` is identical.
 - Direct pushes to `develop` (the leader's record pushes, the develop-first release step) are not affected: administrators are not enforced on `develop`.
 - **The setting is not in the repo.** **Require merge queue** is switched on in `develop`'s branch protection (Settings → Branches). Removing the `merge_group` trigger from `checks.yml` or `secret-scan.yml` while it is on would leave every queued PR waiting for checks that never start.
-- **No one-shot merge-and-delete.** `gh pr merge <n> --delete-branch` is the habit from a branch without a queue; here the PR is only enqueued, so delete the branch after the queue has merged it. `--admin` bypasses the queue – do not use it to land ordinary work.
+- **No one-shot merge-and-delete.** `gh pr merge <n> --delete-branch` is the habit from a branch without a queue; here the PR is only enqueued, so delete the branch only after `gh pr view <n> --json state` shows `MERGED` – deleting it earlier closes the PR (seen on #219). `--admin` bypasses the queue – do not use it to land ordinary work.
+- **If `gh pr merge` refuses** with "Auto merge is not allowed for this repository" (seen on #219), add the PR with the GraphQL mutation instead:
+
+  ```bash
+  id=$(gh pr view <n> --json id -q .id)
+  gh api graphql -f query="mutation{enqueuePullRequest(input:{pullRequestId:\"$id\"}){mergeQueueEntry{state position}}}"
+  ```
+
 - `main` is unchanged: no merge queue, the same seven required checks, `enforce_admins` on, and releases still land by direct push after `develop` is green.
 
 ## Secret scan (`secret-scan.yml`)
