@@ -59,4 +59,16 @@ describe('fileCommentGateway', () => {
     expect(fileCommentGateway.onChanged(callback)).toBe(off)
     expect(bridge.onChanged).toHaveBeenCalledWith(callback)
   })
+
+  it('W-10 onSaveSettled: no bridge is a no-op, a throwing bridge too, and a bridge is subscribed', () => {
+    expect(fileCommentGateway.onSaveSettled(() => {})).toBeTypeOf('function')
+    const off = vi.fn()
+    const callback = vi.fn()
+    const onSaveSettled = vi.fn(() => off)
+    window.api = { fileComments: { onSaveSettled } } as unknown as typeof window.api
+    expect(fileCommentGateway.onSaveSettled(callback)).toBe(off)
+    expect(onSaveSettled).toHaveBeenCalledWith(callback)
+    window.api = { fileComments: { onSaveSettled: () => { throw new Error('gone') } } } as unknown as typeof window.api
+    expect(fileCommentGateway.onSaveSettled(callback)).toBeTypeOf('function')
+  })
 })

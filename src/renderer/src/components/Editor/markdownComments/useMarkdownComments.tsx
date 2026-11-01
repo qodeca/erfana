@@ -165,6 +165,10 @@ export function useMarkdownComments(options: UseMarkdownCommentsOptions): Markdo
   // 024-NFR-001: the list read started with the file's load, while the preview renders (see `prefetch`).
   const early = useRef<EarlyList | null>(null)
   const fileWrittenRef = useLatestRef(options.onFileWritten)
+  // The written text reaches the preview from the save itself, not only from the watcher.
+  const readWritten = useCallback(() => {
+    if (!useProjectStore.getState().dirtyPanelIds.has(panelId)) fileWrittenRef.current?.()
+  }, [panelId, fileWrittenRef])
   const source = useMemo<RendererCommentSource>(
     () => ({
       list: bufferText => {
@@ -174,16 +178,16 @@ export function useMarkdownComments(options: UseMarkdownCommentsOptions): Markdo
       openDraft: target => fileCommentGateway.openDraft({ panelId, filePath, ...(target === undefined ? {} : { target }) }),
       save: async request => {
         const answer = await (request.op === 'add' ? timedAdd(request) : fileCommentGateway.save(request))
-        // The written text reaches the preview from the save itself, not only from the watcher.
-        if (answer.ok && !useProjectStore.getState().dirtyPanelIds.has(panelId)) fileWrittenRef.current?.()
+        if (answer.ok) readWritten()
         return answer
       },
+      written: readWritten,
       onChanged: callback =>
         fileCommentGateway.onChanged(payload => {
           if (payload.panelId === panelId) callback()
         })
     }),
-    [panelId, filePath, fileWrittenRef]
+    [panelId, filePath, readWritten]
   )
   const visibleRef = useLatestRef(isVisible)
   const prefetch = useCallback(

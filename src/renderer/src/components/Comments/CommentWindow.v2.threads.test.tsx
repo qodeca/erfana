@@ -120,6 +120,16 @@ describe('CommentWindow – v2 thread states', () => {
     expect(screen.getByTestId('comment-resolve')).toHaveClass('dialog-btn-primary')
   })
 
+  it('P-F10 (HTML) a part restyled or moved with the same text says so, and shows no Was or Now', () => {
+    setup({ list: ready([fileView({ threads: [thread(1, { change: { state: 'changed', was: 'Buy now' } })] })]) })
+    const status = screen.getByTestId('comment-changed')
+    expect(status).toHaveTextContent('This part was restyled or moved. Its text is the same.')
+    expect(status).not.toHaveTextContent(WINDOW_COPY.changed)
+    expect(within(status).queryByTestId('comment-was')).toBeNull()
+    expect(within(status).queryByTestId('comment-now')).toBeNull()
+    expect(screen.getByTestId('comment-resolve')).toHaveClass('dialog-btn-primary')
+  })
+
   it('C-06 words changed with nothing left says the words are gone and shows Was only', () => {
     setup({ list: ready([fileView({ threads: [thread(1, { change: { state: 'words', was: 'cheap seats' } })] })]) })
     expect(screen.getByTestId('comment-changed')).toHaveTextContent(WINDOW_COPY.wordsGone('section'))

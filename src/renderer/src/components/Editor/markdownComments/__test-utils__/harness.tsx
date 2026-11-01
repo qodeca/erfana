@@ -37,6 +37,8 @@ export interface FileCommentsMock {
   onChanged: Mock
   /** Fire `file-comment:changed` for the harness panel. */
   emitChanged: () => void
+  /** Fire `file-comment:saveSettled` for the harness panel. */
+  emitSettled: (payload: Record<string, unknown>) => void
 }
 
 /** One open thread on the block that starts on `line` with `tag`. */
@@ -73,6 +75,7 @@ export function fileView(threads: CommentThreadView[] = [], patch: Partial<Comme
 /** Install the bridges the preview and the host call; returns the comment bridge's mocks. */
 export function installApi(file: CommentFileView = fileView(), placements: ThreadPlacement[] = []): FileCommentsMock {
   const listeners = new Set<(payload: unknown) => void>()
+  const settleListeners = new Set<(payload: unknown) => void>()
   const mock = {
     list: vi.fn(async () => ({ ok: true, file, placements })),
     openDraft: vi.fn(async () => ({ ok: true, draftToken: DRAFT_TOKEN })),
@@ -81,6 +84,10 @@ export function installApi(file: CommentFileView = fileView(), placements: Threa
     onChanged: vi.fn((callback: (payload: unknown) => void) => {
       listeners.add(callback)
       return () => listeners.delete(callback)
+    }),
+    onSaveSettled: vi.fn((callback: (payload: unknown) => void) => {
+      settleListeners.add(callback)
+      return () => settleListeners.delete(callback)
     })
   }
   window.api = {
@@ -92,7 +99,8 @@ export function installApi(file: CommentFileView = fileView(), placements: Threa
   } as unknown as typeof window.api
   return {
     ...mock,
-    emitChanged: () => listeners.forEach(listener => listener({ panelId: PANEL_ID, filePath: FILE_PATH, stamp: 1 }))
+    emitChanged: () => listeners.forEach(listener => listener({ panelId: PANEL_ID, filePath: FILE_PATH, stamp: 1 })),
+    emitSettled: payload => settleListeners.forEach(listener => listener({ panelId: PANEL_ID, ...payload }))
   }
 }
 

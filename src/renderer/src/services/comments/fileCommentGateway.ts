@@ -32,6 +32,7 @@ import type {
   FileCommentReleaseResult,
   FileCommentSaveRequest,
   FileCommentSaveResult,
+  FileCommentSaveSettled,
   FileCommentsBridge
 } from '../../../../shared/ipc/file-comment-schema'
 
@@ -82,6 +83,16 @@ export const fileCommentGateway = {
     if (api === undefined) return noop
     try {
       return api.onChanged(callback)
+    } catch {
+      return noop
+    }
+  },
+  /** A save answered "still saving" ended (W-10). */
+  onSaveSettled: (callback: (payload: FileCommentSaveSettled) => void): (() => void) => {
+    const api = bridge()
+    if (api === undefined) return noop
+    try {
+      return api.onSaveSettled(callback)
     } catch {
       return noop
     }

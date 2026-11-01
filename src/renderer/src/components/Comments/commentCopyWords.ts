@@ -22,6 +22,8 @@
  * @module components/Comments/commentCopyWords
  */
 import { ErrorCode } from '../../../../shared/errors'
+import type { CommentUnavailableReason } from '../../../../shared/ipc/preview-comment-schema'
+import { MARKDOWN_COMMENT_MAX_BYTES } from '../../../../shared/markdownComments/markdownLimits'
 import {
   ANNOUNCE,
   COPY,
@@ -35,6 +37,7 @@ import {
   readOnlyReasonText,
   saveFailureCopy,
   threadsTitle,
+  unavailableTooltip,
   type SaveFailureCopy
 } from './commentCopy'
 import { elementLabel, plural, type LabelSource } from './commentFormat'
@@ -48,8 +51,13 @@ export function capitalise(text: string): string {
   return text === '' ? text : text[0].toUpperCase() + text.slice(1)
 }
 
+/** The Markdown size limit as a reader reads it: `2 MB`. */
+const MARKDOWN_SIZE_LIMIT = `${Math.round(MARKDOWN_COMMENT_MAX_BYTES / (1024 * 1024))} MB`
+/** "Too complex" stands for the line and nesting limits; only the size is a number a reader can act on (P-F14). */
+const MARKDOWN_LIMIT_WORDS = `too big or too complex for comments. The size limit is ${MARKDOWN_SIZE_LIMIT}.`
+
 /** The Markdown limit sentence (024-NFR-008; the owner's plain wording, 2026-10-31: the limits stay in `markdownLimits.ts`). */
-export const MARKDOWN_FILE_LIMIT_TEXT = 'This file is too big or too complex for comments.'
+export const MARKDOWN_FILE_LIMIT_TEXT = `This file is ${MARKDOWN_LIMIT_WORDS}`
 
 /** What a target is called in one preview: its tag (and place, C-03), and its line when the label carries one. */
 export interface WordsTarget extends LabelSource, NounTarget {
@@ -89,6 +97,8 @@ export interface CommentWords {
   readonly pinsOff: string
   readonly modeOn: string
   readonly readOnlyReasonText: (reason: string | undefined, file: string) => string
+  /** F-05: why nothing about the file can be read, as the toolbar's tooltip says it. */
+  readonly unavailableText: (reason: CommentUnavailableReason) => string
   /**
    * A refused save as the window shows it. `tag` names the target (the
    * Markdown sentences use its noun); `reason` is main's finer reason (C-19).
@@ -155,6 +165,7 @@ export const HTML_WORDS: CommentWords = {
   pinsOff: TOOL_COPY.pinsOff,
   modeOn: KIND_COPY.modeOn(HTML_CLICK_TARGET),
   readOnlyReasonText,
+  unavailableText: unavailableTooltip,
   saveFailure: (code, file, _tag, reason) => sharedReasonCopy(reason) ?? saveFailureCopy(code, file)
 }
 
@@ -268,12 +279,19 @@ export const MARKDOWN_WORDS: CommentWords = {
   pinsOff: MARKDOWN_COPY.pinsOff,
   modeOn: MARKDOWN_COPY.modeOn,
   readOnlyReasonText: markdownReadOnlyReasonText,
+  unavailableText: markdownUnavailableText,
   saveFailure: markdownSaveFailureCopy
 }
 
 /** {@link readOnlyReasonText} in Markdown words (menu matrix § 3). */
 export function markdownReadOnlyReasonText(reason: string | undefined, file: string): string {
-  return readOnlyReasonText(reason, file)
+  return reason === 'too-large' ? `${file} is ${MARKDOWN_LIMIT_WORDS}` : readOnlyReasonText(reason, file)
+}
+
+/** {@link unavailableTooltip} in Markdown words: never "page" (024-AC-008), and this preview's limit. */
+export function markdownUnavailableText(reason: CommentUnavailableReason): string {
+  if (reason === 'too-large') return `You can't comment on this file: it is too big or too complex. The size limit is ${MARKDOWN_SIZE_LIMIT}.`
+  return reason === 'prepare-failed' ? "You can't comment on this file: Erfana couldn't read it." : unavailableTooltip(reason)
 }
 
 /**
@@ -409,9 +427,16 @@ export const COMMENT_LIST_COPY = {
   sortButton: (order: CommentSortOrder): string => `Sort: ${COMMENT_LIST_COPY.sortOrder[order]}`,
   /** The toolbar count's name and tooltip: "Comments" with none, else "7 comments" (the button draws only the number, and the ▲ counter beside it). */
   count: (open: number): string => (open === 0 ? 'Comments' : plural(open, 'comment', 'comments')),
+  /** P-F22: the quiet hint beside the count, for comments with no place to show on a page. */
+  notFoundCount: (count: number): string => `${count} not found`,
   /** Its accessible name: that count first, then only the non-zero parts (R-14). */
-  countName: (open: number, changed: number, damaged: number): string =>
-    [COMMENT_LIST_COPY.count(open), changed > 0 ? `${changed} changed` : '', damaged > 0 ? `${damaged} damaged` : '']
+  countName: (open: number, changed: number, damaged: number, notFound = 0): string =>
+    [
+      COMMENT_LIST_COPY.count(open),
+      changed > 0 ? `${changed} changed` : '',
+      notFound > 0 ? COMMENT_LIST_COPY.notFoundCount(notFound) : '',
+      damaged > 0 ? `${damaged} damaged` : ''
+    ]
       .filter(part => part !== '')
       .join(', '),
   /** A row's description, after its name (C-10): what it is on. */
@@ -426,8 +451,8 @@ export const COMMENT_LIST_COPY = {
   copyText: 'Copy text',
   textCopied: 'Text copied.',
   copyTextFailed: "Couldn't copy the text.",
-  /** C-06 / D-32: the HTML drawer's help note; Markdown blocks have no attributes or styles of their own. */
-  changeLimit: "Erfana doesn't notice changes to the look of a section, only to its text."
+  /** C-06 / D-32 / P-F10: the HTML drawer's help note; Markdown blocks have no attributes or styles of their own. */
+  changeLimit: "Erfana notices when a section's text changes, or when it is restyled or moved. It doesn't notice a change made only in a style sheet."
 } as const
 
 /**

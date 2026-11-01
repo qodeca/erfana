@@ -234,7 +234,7 @@ Pin: a filled 4px corner notch top-left (shape, not colour only).
 
 Toolbar accessible name and tooltip: '7 comments, 4 changed'. The tool itself shows the icon and the number (owner decision, 2026-10-31).
 
-Limit stated in the drawer help: 'Erfana doesn't notice changes to the look of a section, only to its text.'
+Limit stated in the drawer help: 'Erfana notices when a section's text changes, or when it is restyled or moved. It doesn't notice a change made only in a style sheet.'
 
 Same rules in Markdown, where block text is compared with `anchor.quote`.
 

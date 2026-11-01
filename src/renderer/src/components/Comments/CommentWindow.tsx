@@ -64,6 +64,7 @@ import { CommentStepsContext, replyDraftKey, useLiveText, type CommentSteps } fr
 import {
   isCommentWritePending,
   onCommentWriteSettled,
+  reasonOf,
   trackCommentWrite,
   writeKeyOf
 } from './commentPendingWrites'
@@ -297,10 +298,11 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
   useEffect(() => {
     if (shownKeys === '') return undefined
     const keys = new Set(shownKeys.split('\n'))
-    return onCommentWriteSettled(({ event, request: save }) => {
+    return onCommentWriteSettled(settled => {
+      const { event, request: save } = settled
       if (save.panelId !== request.panelId || !keys.has(writeKeyOf(save))) return
       if (event.ok) setFailure(current => (current?.action === 'pending' ? null : current))
-      else refused(event.code ?? ErrorCode.COMMENT_WRITE_FAILED)
+      else refused(event.code ?? ErrorCode.COMMENT_WRITE_FAILED, reasonOf(settled))
     })
   }, [shownKeys, request.panelId, refused])
 

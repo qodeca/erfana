@@ -62,7 +62,7 @@ export function saveShortcutAria(): string {
 
 /** Why comments are unavailable for the page, as the toolbar tooltip ends. */
 export const UNAVAILABLE_REASON_TEXT: Readonly<Record<CommentUnavailableReason, string>> = {
-  'too-large': 'file too large',
+  'too-large': `the file is over the ${megabytes(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES)} limit`,
   encoding: "Erfana can't read its text format",
   'prepare-failed': "Erfana couldn't get the page ready",
   'overlay-removed': "the page keeps removing Erfana's comment tools",
@@ -107,7 +107,7 @@ export function readOnlyReasonText(reason: string | undefined, file: string): st
     case 'conflict-markers':
       return `${file} has two versions mixed together. Fix this first, or ask a developer to help.`
     case 'too-large':
-      return `${file} is too big for new comments. You can still read the existing ones.`
+      return `${file} is too big for comments. The limit is ${megabytes(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES)}.`
     case 'too-many-blocks':
       return `${file} has ${PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE} comments, which is the limit. Delete resolved comments to add more.`
     case 'unterminated-block':

@@ -140,7 +140,7 @@ describe('commentCopy', () => {
 
   it('§19 Rev 4 states the file limits the code enforces, in the drawer and in the save error alike', () => {
     expect(FILE_LIMIT_TEXT).toBe('This file is too big for comments. The limit is 25 MB.')
-    expect(readOnlyReasonText('too-large', 'a.html')).toBe('a.html is too big for new comments. You can still read the existing ones.')
+    expect(readOnlyReasonText('too-large', 'a.html')).toBe('a.html is too big for comments. The limit is 25 MB.')
     expect(ERROR_MESSAGES[ErrorCode.COMMENT_FILE_TOO_LARGE]).toBe(FILE_LIMIT_TEXT)
   })
 

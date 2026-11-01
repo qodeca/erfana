@@ -28,6 +28,7 @@ import {
   CommentFileViewSchema,
   CommentMessageTextSchema,
   CommentReasonedRefusalSchema,
+  CommentRefusalReasonSchema,
   CommentTargetPlaceSchema,
   commentThreadOpSchemas,
   type CommentReasonedRefusal,
@@ -38,7 +39,7 @@ import {
   CommentPickViewSchema,
   CommentTagNameSchema
 } from './preview-comment-page-schema'
-import { COMMENT_DRAFT_TOKEN_PATTERN } from './preview-comment-schema'
+import { COMMENT_DRAFT_TOKEN_PATTERN, CommentSaveSettledSchema } from './preview-comment-schema'
 import { PanelIdSchema } from './preview-schema'
 
 /**
@@ -235,6 +236,14 @@ export type FileCommentChanged = z.infer<typeof FileCommentChangedSchema>
 /** Any refusal of this family. */
 export type FileCommentRefusal = CommentReasonedRefusal
 
+/**
+ * `file-comment:saveSettled` (W-10): the HTML family's settle event for a save
+ * of this family, with main's finer reason (C-19) – "changed during the save"
+ * must not read as an invitation to save again.
+ */
+export const FileCommentSaveSettledSchema = CommentSaveSettledSchema.safeExtend({ reason: CommentRefusalReasonSchema.optional() })
+export type FileCommentSaveSettled = z.infer<typeof FileCommentSaveSettledSchema>
+
 /** The `window.api.fileComments` contract (`src/preload/fileCommentsBridge.ts`). */
 export interface FileCommentsBridge {
   list(request: FileCommentListRequest): Promise<FileCommentListResult>
@@ -242,4 +251,5 @@ export interface FileCommentsBridge {
   save(request: FileCommentSaveRequest): Promise<FileCommentSaveResult>
   release(request: FileCommentReleaseRequest): Promise<FileCommentReleaseResult>
   onChanged(callback: (payload: FileCommentChanged) => void): () => void
+  onSaveSettled(callback: (payload: FileCommentSaveSettled) => void): () => void
 }

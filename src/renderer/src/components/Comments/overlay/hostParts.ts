@@ -11,6 +11,7 @@
 import { hashText } from '../../../../../shared/comments/blocks'
 import type { PickedTargetRequest, ThreadPlacement } from '../../../../../shared/ipc/file-comment-schema'
 import type { CommentFileView } from '../../../../../shared/ipc/comment-common-schema'
+import type { CommentUnavailableReason } from '../../../../../shared/ipc/preview-comment-schema'
 import type { CommentCounts } from '../../../stores/usePreviewCommentStore'
 import { MD_SPOKEN_COPY, SPOKEN_EXCERPT_MAX_CHARS, type CommentWords } from '../commentCopyWords'
 import { listCounts } from '../commentRows'
@@ -90,6 +91,17 @@ export function viewOf(el: HTMLElement | null): { w: number; h: number; dpr: num
     x: 0,
     y: Math.round(el?.scrollTop ?? 0)
   }
+}
+
+/**
+ * Why nothing about this file can be read (F-05): the count goes disabled with
+ * the reason, as in the HTML Preview; `null` while something can be, or a read
+ * may yet work (F-07).
+ */
+export function unavailableOf(off: boolean, unreadable: boolean, file: CommentFileView | null): CommentUnavailableReason | null {
+  if (off) return 'disabled'
+  if (unreadable) return 'prepare-failed'
+  return file?.readOnlyReason === 'encoding' || file?.readOnlyReason === 'too-large' ? file.readOnlyReason : null
 }
 
 /**

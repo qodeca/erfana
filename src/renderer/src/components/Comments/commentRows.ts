@@ -223,6 +223,8 @@ export interface ListCounts {
   readonly resolved: number
   /** Open comments that are Changed or Words changed. */
   readonly changed: number
+  /** Open comments whose target is gone (S-05). */
+  readonly notFound: number
   /** Damaged blocks (S-07, S-08); newer-format blocks count in neither. */
   readonly damaged: number
 }
@@ -237,14 +239,16 @@ export function listCounts(files: readonly CommentFileView[]): ListCounts {
   let open = 0
   let resolved = 0
   let changed = 0
+  let notFound = 0
   let damaged = 0
   for (const file of files) {
     damaged += file.damaged.length
     for (const thread of file.threads) {
       if (thread.status === 'resolved') resolved += 1
       else open += 1
+      if (thread.status !== 'resolved' && !thread.attached) notFound += 1
       if (changeOf(thread) !== undefined) changed += 1
     }
   }
-  return { open, resolved, changed, damaged }
+  return { open, resolved, changed, notFound, damaged }
 }

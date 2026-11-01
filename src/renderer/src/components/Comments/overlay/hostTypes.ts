@@ -37,6 +37,8 @@ export interface RendererCommentSource {
   readonly save: (request: FileCommentSaveRequest) => Promise<FileCommentSaveResult>
   /** Called when main says the file changed on disk; returns the unsubscribe. */
   readonly onChanged: (callback: () => void) => () => void
+  /** A write answered "still saving" landed (W-10): as after a save answered in time, the preview needs the new text. */
+  readonly written?: () => void
 }
 
 /** Options for `useCommentOverlayHost`. */

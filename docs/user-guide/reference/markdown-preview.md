@@ -46,4 +46,4 @@ The comment window stays beside the preview rather than covering it; <kbd>F6</kb
 | Frontmatter | The YAML frontmatter can't take a comment. |
 | Generated parts | A part between a tool's START and END markers can't take a comment; comment on the text before or after it. |
 | How the file looks | Erfana tries up to 4 places for a comment and refuses to save if every one would change how the file renders. Your text is kept. |
-| File size | A file over 2 MB or 100,000 lines, or one nested very deeply (for example, lists or block quotes more than 32 levels deep), can be read but takes no new comments. |
+| File size | A file over 2 MB or 100,000 lines, or one nested very deeply (for example, lists or block quotes more than 32 levels deep), still opens in the preview, but Erfana shows no comments for it and takes no new ones. |

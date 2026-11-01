@@ -516,7 +516,7 @@ describe('CommentDrawer', () => {
     })
   })
 
-  it('024-AC-007 D-32 C-06 the HTML drawer says attribute and style changes are not detected; the Markdown drawer does not', () => {
+  it('024-AC-007 D-32 C-06 P-F10 the HTML drawer says what Changed notices; the Markdown drawer does not', () => {
     const { props, unmount } = setup()
     expect(screen.getByText(COMMENT_LIST_COPY.changeLimit)).toBeInTheDocument()
     unmount()

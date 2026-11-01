@@ -147,8 +147,8 @@ describe('drawerRows', () => {
         newer: [{ blockKey: 'n1', version: 2, line: 70 }]
       })
     ]
-    expect(listCounts(files)).toEqual({ open: 3, resolved: 1, changed: 1, damaged: 2 })
-    expect(listCounts([])).toEqual({ open: 0, resolved: 0, changed: 0, damaged: 0 })
+    expect(listCounts(files)).toEqual({ open: 3, resolved: 1, changed: 1, notFound: 1, damaged: 2 })
+    expect(listCounts([])).toEqual({ open: 0, resolved: 0, changed: 0, notFound: 0, damaged: 0 })
   })
 
   it('labels a frame file and a script-built element', () => {

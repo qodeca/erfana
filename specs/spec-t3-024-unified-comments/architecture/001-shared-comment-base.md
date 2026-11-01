@@ -78,6 +78,8 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | **Added since** `src/shared/comments/overlayCore/reveal.ts` (1) | S | Pure rule both overlays run: which folds to open for "Show in preview", the flash's length, and when the mode tab moves away. No imports, no DOM |
 | **Added since** `src/shared/comments/overlayCore/markGround.ts` (1) | S | Pure rule: which comment bar a page's ground takes. No imports, no DOM |
 | **Added since** `src/renderer/src/components/Comments/overlay/useHostReveal.ts` (1) | S (for renderer-hosted previews) | The renderer host's "Show in preview": the flash and the drawer's note |
+| **Added since** `src/renderer/src/components/Comments/overlay/useHostList.ts` (1) | S (for renderer-hosted previews) | The renderer host's comment list and what main said about the read: off, or unreadable for good (F-05) |
+| **Added since** `src/renderer/src/components/Comments/overlay/useSavingSign.ts` (1) | S (for renderer-hosted previews) | The waiting sign between a save's answer and the new icon (P-F17) |
 | **Added since** `src/renderer/src/components/Panels/HtmlPreviewPanel/comments/useRevealNote.ts` (1) | H | The HTML Preview's half: waits for the page's report, because the target opens in the page |
 | **Added since** `src/renderer/src/components/Comments/overlay/useHostPanelKeys.ts` (1) | S (for renderer-hosted previews) | – |
 | **Added since** `src/renderer/src/components/Comments/commentWindowDismiss.ts` (1) | S | – |

@@ -131,7 +131,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-010 every string on Wind
     "overlay-removed": "the page keeps removing Erfana's comment tools",
     "page-too-large": "the page is too big",
     "prepare-failed": "Erfana couldn't get the page ready",
-    "too-large": "file too large",
+    "too-large": "the file is over the 25 MB limit",
   },
   "commentModeAriaShortcut": {
     "()": "Control+Alt+M",
@@ -187,7 +187,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-010 every string on Wind
     "from-a-later-main": "index.html can't be changed, so you can't add a comment.",
     "link": "index.html is only a link to another file. Open the real file to comment.",
     "missing": "index.html no longer exists. Copy your text before closing.",
-    "too-large": "index.html is too big for new comments. You can still read the existing ones.",
+    "too-large": "index.html is too big for comments. The limit is 25 MB.",
     "too-many-blocks": "index.html has 500 comments, which is the limit. Delete resolved comments to add more.",
     "undefined": "index.html can't be changed, so you can't add a comment.",
     "unterminated-block": "One comment in index.html is broken, so Erfana can't add new ones. Fix or delete the broken comment first.",
@@ -300,7 +300,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-010 every string on Wind
     "overlay-removed": "You can't comment on this file: the page keeps removing Erfana's comment tools.",
     "page-too-large": "You can't comment on this file: the page is too big.",
     "prepare-failed": "You can't comment on this file: Erfana couldn't get the page ready.",
-    "too-large": "You can't comment on this file: file too large.",
+    "too-large": "You can't comment on this file: the file is over the 25 MB limit.",
   },
   "unreadFilesText": {
     "1": "This page has too many parts to list all comments. 1 file is missing here. Open each file in its own tab to see its comments.",
@@ -457,7 +457,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-011 every string on macO
     "overlay-removed": "the page keeps removing Erfana's comment tools",
     "page-too-large": "the page is too big",
     "prepare-failed": "Erfana couldn't get the page ready",
-    "too-large": "file too large",
+    "too-large": "the file is over the 25 MB limit",
   },
   "commentModeAriaShortcut": {
     "()": "Meta+Alt+M",
@@ -513,7 +513,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-011 every string on macO
     "from-a-later-main": "index.html can't be changed, so you can't add a comment.",
     "link": "index.html is only a link to another file. Open the real file to comment.",
     "missing": "index.html no longer exists. Copy your text before closing.",
-    "too-large": "index.html is too big for new comments. You can still read the existing ones.",
+    "too-large": "index.html is too big for comments. The limit is 25 MB.",
     "too-many-blocks": "index.html has 500 comments, which is the limit. Delete resolved comments to add more.",
     "undefined": "index.html can't be changed, so you can't add a comment.",
     "unterminated-block": "One comment in index.html is broken, so Erfana can't add new ones. Fix or delete the broken comment first.",
@@ -626,7 +626,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-011 every string on macO
     "overlay-removed": "You can't comment on this file: the page keeps removing Erfana's comment tools.",
     "page-too-large": "You can't comment on this file: the page is too big.",
     "prepare-failed": "You can't comment on this file: Erfana couldn't get the page ready.",
-    "too-large": "You can't comment on this file: file too large.",
+    "too-large": "You can't comment on this file: the file is over the 25 MB limit.",
   },
   "unreadFilesText": {
     "1": "This page has too many parts to list all comments. 1 file is missing here. Open each file in its own tab to see its comments.",

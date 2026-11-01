@@ -284,8 +284,9 @@ export const CommentThreadViewSchema = z
      * Derived, never written (comments-v2 C-06; state table S-03, S-04): the
      * target's text is not what the comment stored (`changed`), or the words
      * a selection comment is about are gone from it (`words`). `was` is the
-     * stored text, `now` the text there now – absent when no words are found.
-     * Both visible like `quote`.
+     * stored text, `now` the text there now – absent when no words are found,
+     * or for `changed` when the text is the same and only the part's `id`,
+     * classes or place differ (HTML). Both visible like `quote`.
      */
     change: z
       .object({

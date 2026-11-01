@@ -7542,7 +7542,7 @@
       "quote": "the three toolbar toggles are one `CommentToolbarTools.tsx`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/CommentToolbarTools.tsx:112",
+      "source": "src/renderer/src/components/Comments/CommentToolbarTools.tsx:121",
       "match": "export function CommentToolbarTools({",
       "note": "CommentModeToggle/CommentListToggle/ShowPinsToggle .tsx do not exist; the tools ship as one CommentToolbarTools component."
     },
@@ -32390,7 +32390,7 @@
       "quote": "Select **Comment mode** in the toolbar, or press",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/CommentToolbarTools.tsx:149",
+      "source": "src/renderer/src/components/Comments/CommentToolbarTools.tsx:160",
       "match": "aria-label={TOOL_COPY.mode}",
       "note": "Checker: the Comment mode button is rendered by the toolbar tools component."
     },
@@ -48448,7 +48448,7 @@
       "quote": "| Comment mode | Toggle, `aria-pressed`, `erf-band__tool--toggle` | `message-square-plus`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/CommentToolbarTools.tsx:161",
+      "source": "src/renderer/src/components/Comments/CommentToolbarTools.tsx:172",
       "match": "renderIcon('message-square-plus'"
     },
     {
@@ -48458,7 +48458,7 @@
       "quote": "| Comments list | Disclosure, `aria-expanded` + `aria-controls` | `messages-square` + count",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/CommentToolbarTools.tsx:180",
+      "source": "src/renderer/src/components/Comments/CommentToolbarTools.tsx:192",
       "match": "renderIcon('messages-square'"
     },
     {
@@ -48786,7 +48786,7 @@
       "quote": "A settle that never comes ends the wait after 2 minutes (`PENDING_WRITE_MAX_MS`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentPendingWrites.ts:47",
+      "source": "src/renderer/src/components/Comments/commentPendingWrites.ts:50",
       "match": "PENDING_WRITE_MAX_MS = 120_000"
     },
     {
@@ -49326,7 +49326,7 @@
       "quote": "Three near-identical bubble glyphs sit side by side (CommentToolbarTools.tsx:104-156)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/CommentToolbarTools.tsx:180",
+      "source": "src/renderer/src/components/Comments/CommentToolbarTools.tsx:192",
       "match": "renderIcon('messages-square'"
     },
     {
@@ -54762,7 +54762,7 @@
       "quote": "such as **Comment on paragraph**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:321",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:339",
       "match": "commentOn: (noun: string): string => `Comment on ${noun}`,"
     },
     {
@@ -54772,7 +54772,7 @@
       "quote": "Select **Comment** next to the selection",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:365",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:383",
       "match": "button: 'Comment',"
     },
     {
@@ -54782,7 +54782,7 @@
       "quote": "choose **Comment on selection**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:362",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:380",
       "match": "commentOnSelection: 'Comment on selection',"
     },
     {
@@ -54792,7 +54792,7 @@
       "quote": "select them in **Comment on specific words**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:366",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:384",
       "match": "narrow: 'Comment on specific words',"
     },
     {
@@ -54802,7 +54802,7 @@
       "quote": "Select **Open**, **Resolved** or **Problems**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:401",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:419",
       "match": "filterCantEdit: 'Problems',"
     },
     {
@@ -54812,7 +54812,7 @@
       "quote": "choose **File order**, **Changed first** or **Latest activity**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:408",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:426",
       "match": "sortOrder: { file: 'File order', changed: 'Changed first', latest: 'Latest activity' }"
     },
     {
@@ -54822,7 +54822,7 @@
       "quote": "clear **Show comment icons and underlines**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:406",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:424",
       "match": "showIcons: 'Show comment icons and underlines',"
     },
     {
@@ -54832,7 +54832,7 @@
       "quote": "select **Previous comment** or **Next comment**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:49",
+      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:51",
       "match": "next: 'Next comment',"
     },
     {
@@ -54852,7 +54852,7 @@
       "quote": "**Resolve and next** resolves the comment and moves on",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:53",
+      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:55",
       "match": "resolveAndNext: 'Resolve and next',"
     },
     {
@@ -54862,7 +54862,7 @@
       "quote": "**Reply and resolve** sends your reply",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:54",
+      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:56",
       "match": "replyAndResolve: 'Reply and resolve',"
     },
     {
@@ -54872,7 +54872,7 @@
       "quote": "Select **Repair comment…**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:103",
+      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:105",
       "match": "rebuildAction: 'Repair comment…',"
     },
     {
@@ -54882,7 +54882,7 @@
       "quote": "**What you see now** and **Saved copy**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:106",
+      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:108",
       "match": "dataSays: 'Saved copy',"
     },
     {
@@ -54892,7 +54892,7 @@
       "quote": "Select **Repair comment**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:107",
+      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:109",
       "match": "rebuild: 'Repair comment',"
     },
     {
@@ -54902,7 +54902,7 @@
       "quote": "choose **Mark resolved** or **Keep open** instead",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:109",
+      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:111",
       "match": "keepOpen: 'Keep open'"
     },
     {
@@ -54912,7 +54912,7 @@
       "quote": "or **Go to editor**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:334",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:352",
       "match": "goToEditor: 'Go to editor',"
     },
     {
@@ -54972,7 +54972,7 @@
       "quote": "A part between a tool's START and END markers can't take a comment",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:110",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:120",
       "match": "export const GENERATED_REGION_TEXT = 'A tool creates this part, so a comment here could be lost. Comment on the text before or after it.'"
     },
     {
@@ -54982,7 +54982,7 @@
       "quote": "lists every comment as **Open**, **Resolved** or **Problems**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:401",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:419",
       "match": "filterCantEdit: 'Problems',"
     },
     {
@@ -55012,7 +55012,7 @@
       "quote": "filtered by **Open**, **Resolved** and **Problems**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:401",
+      "source": "src/renderer/src/components/Comments/commentCopyWords.ts:419",
       "match": "filterCantEdit: 'Problems',"
     },
     {

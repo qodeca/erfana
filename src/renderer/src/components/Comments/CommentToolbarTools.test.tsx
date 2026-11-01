@@ -7,7 +7,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { CommentUnavailableReasonSchema } from '../../../../shared/ipc/preview-comment-schema'
@@ -83,6 +83,18 @@ describe('CommentToolbarTools', () => {
     })
 
     // Changed expectation: icons only, so no visible word and no number.
+    it('P-F22 D-12 comments not found show as a quiet hint with no place, and in the name', () => {
+      setup({ counts: { open: 3, resolved: 0, attention: 1 } as never, notFound: 2 })
+      expect(within(listButton()).getByText('2 not found')).toHaveClass('erf-counter')
+      expect(listButton()).toHaveAccessibleName('3 comments, 2 not found, 1 damaged')
+      expect(listButton()).toHaveAttribute('title', '3 comments, 2 not found, 1 damaged')
+    })
+
+    it('P-F22 no not-found comments, no hint', () => {
+      setup({ counts: { open: 3, resolved: 0, attention: 0 } as never, notFound: 0 })
+      expect(within(listButton()).queryByText(/not found/)).toBeNull()
+    })
+
     it('with no open comments the count is the icon alone, named "Comments"', () => {
       setup({ counts: { open: 0, resolved: 2, attention: 0 } })
       expect(listButton()).toHaveTextContent(/^$/)

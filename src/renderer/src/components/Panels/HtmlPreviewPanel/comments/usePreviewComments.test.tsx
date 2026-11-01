@@ -590,6 +590,15 @@ describe('usePreviewComments', () => {
       await waitFor(() => expect(latest.toolbar.changed).toBe(1))
     })
 
+    it('P-F22 (HTML) the toolbar counts open comments not found; a resolved one is history', async () => {
+      fake.bridge.list.mockResolvedValue({
+        ok: true,
+        files: [fileView({ threads: [thread(1, { attached: false }), thread(2), thread(3, { status: 'resolved', attached: false })] })]
+      })
+      render(<Harness onValue={onValue} />)
+      await waitFor(() => expect(latest.toolbar.notFound).toBe(1))
+    })
+
     it('OD-06 (HTML) an open comment removed outside Erfana is noted in the drawer; one Erfana deleted is not; Copy text and dismiss', async () => {
       fake.bridge.list.mockResolvedValue({ ok: true, files: [fileView({ threads: [thread(1), thread(2)] })] })
       render(<Harness onValue={onValue} />)

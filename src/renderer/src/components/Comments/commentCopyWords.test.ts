@@ -178,8 +178,9 @@ describe('commentCopyWords', () => {
       action: 'close'
     })
     expect(MARKDOWN_FILE_LIMIT_TEXT).toBe(
-      'This file is too big or too complex for comments.'
+      'This file is too big or too complex for comments. The size limit is 2 MB.'
     )
+    expect(markdownReadOnlyReasonText('too-large', FILE)).toBe(`${FILE} is too big or too complex for comments. The size limit is 2 MB.`)
     expect(markdownReadOnlyReasonText('too-many-blocks', FILE)).toBe(MARKDOWN_COPY.tooMany(FILE))
     expect(markdownReadOnlyReasonText('encoding', FILE)).toBe("Erfana can't add comments to this file because of its text format. Save the file as UTF-8, then try again.")
   })
@@ -340,7 +341,7 @@ describe('commentCopyWords', () => {
     expect(HTML_WORDS.readOnlyReasonText(undefined, FILE)).toBe(menuReasonText('read-only', FILE))
   })
 
-  it('024-AC-007 D-32 the drawer help note is the C-06 sentence', () => {
-    expect(COMMENT_LIST_COPY.changeLimit).toBe("Erfana doesn't notice changes to the look of a section, only to its text.")
+  it('024-AC-007 D-32 P-F10 the drawer help note says what Changed sees: text, restyled or moved, and not a style sheet', () => {
+    expect(COMMENT_LIST_COPY.changeLimit).toBe("Erfana notices when a section's text changes, or when it is restyled or moved. It doesn't notice a change made only in a style sheet.")
   })
 })

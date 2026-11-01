@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * HTML Preview comments – what the panel says when a write that was answered
+ * Comments, in both previews – what the panel says when a write that was answered
  * "still saving" settles (docs/designs/comments/html-preview-comments.md §8 Rev 3
  * note, §19 "Save pending settles").
  *
  * - **Landed**: the announcement a write answered in time gets ("Comment saved
  *   to {file}.", "Comment resolved.", …), and the new-comment window that sent
  *   it closes, as after a normal save. Main re-sends the counts, so the list
- *   is read again without being asked here.
+ *   is read again without being asked here; a renderer-hosted preview, which
+ *   hears of a file only from a watcher that can stay silent, passes `onSettled`.
  * - **Refused**, and no window shows that draft or thread: the refusal's
  *   §10.10 sentence from the panel's assertive region – the window that sent
  *   it may be long closed, and the text is still in the session drafts. An
@@ -20,7 +21,7 @@ import { useEffect } from 'react'
 import { ErrorCode } from '../../../../shared/errors'
 import { useLatestRef } from '../../hooks/useLatestRef'
 import { saveFailureCopy, writtenAnnouncement } from './commentCopy'
-import { onCommentWriteSettled, writeKeyOf, type SettledCommentWrite } from './commentPendingWrites'
+import { onCommentWriteSettled, reasonOf, writeKeyOf, type SettledCommentWrite } from './commentPendingWrites'
 import { draftKeyOf, type CommentWindowRequest } from './commentWindowTypes'
 
 /** Options for {@link useCommentSettleNotices}. */
@@ -34,6 +35,10 @@ export interface CommentSettleNoticeOptions {
   readonly alert: (text: string) => void
   /** Close the window, returning focus as Cancel would. */
   readonly closeWindow: () => void
+  /** A refusal in this preview's words; the shared sentence by default. */
+  readonly failureText?: (code: string, file: string, reason?: string) => string
+  /** After the notice: the file may have changed. */
+  readonly onSettled?: (ok: boolean) => void
 }
 
 /**
@@ -60,7 +65,7 @@ export function useCommentSettleNotices(options: CommentSettleNoticeOptions): vo
   useEffect(
     () =>
       onCommentWriteSettled(settled => {
-        const { panelId, request, pageName, announce, alert, closeWindow } = latest.current
+        const { panelId, request, pageName, announce, alert, closeWindow, failureText, onSettled } = latest.current
         if (settled.request.panelId !== panelId) return
         const file = settled.file || pageName
         if (settled.event.ok) {
@@ -70,11 +75,14 @@ export function useCommentSettleNotices(options: CommentSettleNoticeOptions): vo
             settled.request.op === 'add' &&
             request.draftToken === settled.request.draftToken
           if (sentByThisWindow) closeWindow()
+          onSettled?.(true)
           return
         }
         if (!windowShows(request, settled)) {
-          alert(saveFailureCopy(settled.event.code ?? ErrorCode.COMMENT_WRITE_FAILED, file).text)
+          const code = settled.event.code ?? ErrorCode.COMMENT_WRITE_FAILED
+          alert(failureText?.(code, file, reasonOf(settled)) ?? saveFailureCopy(code, file).text)
         }
+        onSettled?.(false)
       }),
     [latest]
   )

@@ -14,7 +14,8 @@
  *   ("The words this comment is about are gone").
  * - **Changed** (S-03): the target's visible text (collapsed, NFC) is not
  *   `anchor.quote.exact`; in HTML also when its `id` or classes differ, or its
- *   re-attach went through anything but position.
+ *   re-attach went through anything but position. Only then, with the text the
+ *   same, the change has no `now`: the window must not say the text changed.
  *
  * Pure: reads the parse, never changes it. Bounded: a target's text is read
  * only up to {@link CHANGE_TEXT_MAX_CHARS}, so 500 comments on one huge
@@ -166,5 +167,6 @@ export function changeOf(input: ChangeInput): ListedChange | undefined {
   const moved = via === undefined || (html && via !== 'position')
   const identity = html && ((anchor.id ?? undefined) !== (target.id ?? undefined) || !sameClasses(anchor.cls, target.classes))
   if (!textChanged && !moved && !identity) return undefined
-  return { state: 'changed', was: shown(was ?? ''), now: shown(now) }
+  // Compared whole, not as shown: a difference past the quote cap is still a changed text.
+  return now === (was ?? '') ? { state: 'changed', was: shown(was ?? '') } : { state: 'changed', was: shown(was ?? ''), now: shown(now) }
 }

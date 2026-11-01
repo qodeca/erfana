@@ -366,11 +366,12 @@ export function usePreviewComments({
     [enabled, ready, menu, request, toggleMode, latestRef, stepFromChrome]
   )
 
-  // C-06: the count's name adds how many open comments changed, from the list main last sent.
-  const changed = useMemo(() => listCounts(state.list.files).changed, [state.list.files])
+  // C-06, P-F22: how many open comments changed or are not found, from the list main last sent.
+  const { changed, notFound } = useMemo(() => listCounts(state.list.files), [state.list.files])
   const toolbar: CommentToolbarToolsProps = {
     mode: state.mode,
     changed,
+    notFound,
     drawerOpen: state.drawerOpen,
     drawerId,
     counts: state.counts,

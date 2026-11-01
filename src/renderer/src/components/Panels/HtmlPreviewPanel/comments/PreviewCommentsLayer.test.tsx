@@ -150,7 +150,7 @@ describe('PreviewCommentsLayer', () => {
       const user = userEvent.setup()
       // Even a draft main minted is not offered: nothing could be read.
       const { props, unmount } = setup({ menu: menuDraft(), mode: false, unavailable: 'too-large' })
-      expectDisabledWithReason([MD_SURFACE_COPY.commentOn('section')], "You can't comment on this file: file too large.")
+      expectDisabledWithReason([MD_SURFACE_COPY.commentOn('section')], "You can't comment on this file: the file is over the 25 MB limit.")
       await user.click(screen.getAllByRole('menuitem')[0])
       expect(props.onAddComment).not.toHaveBeenCalled()
       unmount()

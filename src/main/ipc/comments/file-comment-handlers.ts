@@ -26,7 +26,7 @@
  */
 import { BrowserWindow, type IpcMainInvokeEvent } from 'electron'
 import type { ZodType } from 'zod'
-import { FileCommentChannels, FileCommentEvents } from '../../../shared/ipc/file-comment-channels'
+import { FileCommentChannels, FileCommentEvents, type FileCommentEvent } from '../../../shared/ipc/file-comment-channels'
 import {
   FileCommentChangedSchema,
   FileCommentListRequestSchema,
@@ -37,7 +37,9 @@ import {
   FileCommentReleaseResultSchema,
   FileCommentSaveRequestSchema,
   FileCommentSaveResultSchema,
-  type FileCommentChanged
+  FileCommentSaveSettledSchema,
+  type FileCommentChanged,
+  type FileCommentSaveSettled
 } from '../../../shared/ipc/file-comment-schema'
 import type { CommentReasonedRefusal } from '../../../shared/ipc/comment-common-schema'
 import { logger } from '../../services/LoggingService'
@@ -91,16 +93,26 @@ function confinementRefusal(error: unknown): CommentReasonedRefusal {
   return refusal('outside-project')
 }
 
-/** Send `file-comment:changed` to one window, re-validated; nothing to a window that is gone. */
-export function sendFileCommentChanged(windowId: number, payload: FileCommentChanged): void {
-  const checked = FileCommentChangedSchema.safeParse(payload)
+/** Send one event to one window, re-validated; nothing to a window that is gone. */
+function sendEvent<T>(channel: FileCommentEvent, schema: ZodType<T>, windowId: number, payload: T): void {
+  const checked = schema.safeParse(payload)
   if (!checked.success) {
-    logger.warn('File comments: an event failed its schema', { channel: FileCommentEvents.CHANGED, issues: issueCodesOf(checked.error) })
+    logger.warn('File comments: an event failed its schema', { channel, issues: issueCodesOf(checked.error) })
     return
   }
   const window = BrowserWindow.fromId(windowId)
   if (window === null || window.isDestroyed()) return
-  window.webContents.send(FileCommentEvents.CHANGED, checked.data)
+  window.webContents.send(channel, checked.data)
+}
+
+/** Send `file-comment:changed` to one window. */
+export function sendFileCommentChanged(windowId: number, payload: FileCommentChanged): void {
+  sendEvent(FileCommentEvents.CHANGED, FileCommentChangedSchema, windowId, payload)
+}
+
+/** Send `file-comment:saveSettled` to one window (W-10). */
+export function sendFileCommentSaveSettled(windowId: number, payload: FileCommentSaveSettled): void {
+  sendEvent(FileCommentEvents.SAVE_SETTLED, FileCommentSaveSettledSchema, windowId, payload)
 }
 
 /** Register the four `file-comment:*` request channels. Returns the function that removes them. */

@@ -39,6 +39,8 @@ export const WINDOW_COPY = {
   notFoundContext: (label: string, file: string): string => `${label}, not found · ${file}`,
   // ---- C-06 changed (S-03, S-04) ----
   changed: 'Someone changed this text after you commented.',
+  /** P-F10: Changed with the same text (HTML only). It names no person: a build can do this as well. */
+  restyled: 'This part was restyled or moved. Its text is the same.',
   wordsGone: (_noun: string): string => 'The words this comment is about are no longer here.',
   was: 'Was',
   now: 'Now',

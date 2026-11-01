@@ -52,7 +52,7 @@ Nothing in the data changes, and Erfana never rebuilds a comment on its own.
 - **Comments are read-only in a Markdown file.** The file has unsaved changes in the editor. In the band above the preview, select the **Save** button that names your file, or **Go to editor**.
 - **Erfana did not save the comment and says it would change how the file looks.** A comment in that place would change how the Markdown file renders. Comment on the whole parent part, or on a nearby paragraph – your text is kept.
 - **The frontmatter has no comment item.** Comments can't be added to a Markdown file's frontmatter.
-- **The file is too large for comments.** A Markdown file over 2 MB, or one nested very deeply, can be read but takes no new comments. See [Markdown preview § Comments](../reference/markdown-preview.md#comments).
+- **The file is too large for comments.** A Markdown file over 2 MB, or one nested very deeply, still opens in the preview, but Erfana shows no comments for it and takes no new ones. See [Markdown preview § Comments](../reference/markdown-preview.md#comments).
 
 ## Related
 

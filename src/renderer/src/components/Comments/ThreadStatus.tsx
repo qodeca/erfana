@@ -95,6 +95,15 @@ export function ThreadStatus({ thread, state, fileName, hidden }: ThreadStatusPr
   const was = change?.was ?? thread.quote ?? ''
   const now = change?.now
   const gone = state === 'words' && now === undefined
+  // P-F10: Changed with no Now – main saw the part restyled or moved, and its text is the same.
+  if (state === 'changed' && change !== undefined && now === undefined) {
+    return (
+      <div className="erf-comment-status" data-testid={TEST_IDS.COMMENT_CHANGED}>
+        <CommentBanner kind="info">{WINDOW_COPY.restyled}</CommentBanner>
+        {hidden && <p className="erf-comment-note erf-comment-status-line">{words.notVisibleText(thread)}</p>}
+      </div>
+    )
+  }
   return (
     <div className="erf-comment-status" data-testid={TEST_IDS.COMMENT_CHANGED}>
       <CommentBanner kind="info">{gone ? WINDOW_COPY.wordsGone(noun) : WINDOW_COPY.changed}</CommentBanner>

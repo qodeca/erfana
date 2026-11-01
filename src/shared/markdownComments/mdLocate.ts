@@ -17,7 +17,9 @@
  * item n. Position alone is not enough: the target's text must still be the
  * stored quote. Without a position the quote alone may find it, when exactly
  * one target of the tag matches. A target with no text (a divider, an image's
- * paragraph) cannot be matched by text; its stored path must agree instead.
+ * paragraph) cannot be matched by text: right after its block the tag is enough
+ * (an edit above it changes its path, not its place, D-65); anywhere else its
+ * stored path must agree instead.
  */
 import { anchorLookupOf } from '../comments/anchorLookup'
 import { hashText, type BlockTargetResolver } from '../comments/blocks'
@@ -69,6 +71,12 @@ function corroborates(index: MdIndex, target: MdTarget, anchor: CommentAnchor): 
   if (target.tag !== anchor.tag) return false
   if (anchor.quote !== undefined) return exactOf(index, target) === anchor.quote.exact
   return textless(index, target) && anchor.path !== '' && target.path === anchor.path
+}
+
+/** True when `target`, on the line right after a block, is what `anchor` stored (module comment). */
+function corroboratedAtPosition(index: MdIndex, target: MdTarget, anchor: CommentAnchor): boolean {
+  if (corroborates(index, target, anchor)) return true
+  return anchor.quote === undefined && target.tag === anchor.tag && textless(index, target)
 }
 
 /** Where an anchor's target is now, without the position rule (module comment). */
@@ -145,7 +153,7 @@ export function markdownBlockResolver(index: MdIndex): BlockTargetResolver {
   }
   return (node, data) => {
     const line = lineAfter(index, node.end, skip)
-    const next = (byLine.get(line) ?? []).find(target => corroborates(index, target, data.anchor))
+    const next = (byLine.get(line) ?? []).find(target => corroboratedAtPosition(index, target, data.anchor))
     return next !== undefined
       ? { state: 'attached', startOffset: next.start, via: 'position' }
       : findMarkdownTarget(index, data.anchor)

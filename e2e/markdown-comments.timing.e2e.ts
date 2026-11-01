@@ -22,9 +22,8 @@
  * The numbers are recorded first – an `MD-TIMING {…}` line on stdout, a test
  * annotation and a JSON attachment – then gated where 024-NFR-001 says: P50
  * and P95 of pins ≤ 500 ms and of save ≤ 1,000 ms on macOS and Linux. Windows
- * records only. Markdown is over budget for now (owner decision 2026-10-30;
- * verification/known-limits.md), so the macOS/Linux gate fails until the
- * owner sets the final budget.
+ * records only, and is over budget (verification/known-limits.md). The gate
+ * passes on macOS and Linux since the runs of 2026-11-01.
  *
  * "Reading comments…" while the list loads is not checked here: the read now
  * runs while the preview renders, and the renderer is busy rendering until the

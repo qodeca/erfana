@@ -61,7 +61,7 @@ import { validateCommentText, type IdentityFormData } from './commentSchemas'
 import { CommentBanner, CommentField, DialogButton, VisibleText } from './CommentParts'
 import { IdentityEditor } from './IdentityStep'
 import { useCommentAlert, useInnerStep } from './commentLive'
-import { onCommentWriteSettled, trackCommentWrite, useCommentWritePending } from './commentPendingWrites'
+import { onCommentWriteSettled, reasonOf, trackCommentWrite, useCommentWritePending } from './commentPendingWrites'
 import { draftKeyOf, type CommentWindowRequest } from './commentWindowTypes'
 import { useCommentWords } from './commentWords'
 import { CommentWordsPicker, type WordsSpan } from './CommentWordsPicker'
@@ -237,7 +237,7 @@ export function NewCommentView({
     () =>
       onCommentWriteSettled(settled => {
         if (settled.draftKey !== key || !mounted.current) return
-        if (!settled.event.ok) refusedRef.current(settled.event.code ?? ErrorCode.COMMENT_WRITE_FAILED)
+        if (!settled.event.ok) refusedRef.current(settled.event.code ?? ErrorCode.COMMENT_WRITE_FAILED, reasonOf(settled))
         else if (settled.request.op === 'add' && settled.request.draftToken !== draftToken) setText('')
       }),
     [key, draftToken, refusedRef]

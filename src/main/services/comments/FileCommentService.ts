@@ -24,7 +24,9 @@
  *   runs the one shared `CommentWriter`, with this family's kinds. The writer
  *   refuses while ANY window's editor holds unsaved edits for the file, asks
  *   again right before the rename (C6), and reports a file that changed after
- *   the rename (C12).
+ *   the rename (C12). Past {@link SAVE_TIMEOUT_MS} the save answers
+ *   `COMMENT_SAVE_PENDING` (W-10), and `sendSettled` says how it ended once it
+ *   has; the draft stays in flight until then.
  * - **changed** goes to the windows whose panels listed the file, and to no
  *   other (`fileCommentWatches.ts`).
  *
@@ -41,6 +43,7 @@ import type {
   FileCommentListResult,
   FileCommentOpenDraftResult,
   FileCommentSaveRequest,
+  FileCommentSaveSettled,
   PickedTargetRequest,
   ThreadPlacement
 } from '../../../shared/ipc/file-comment-schema'
@@ -57,7 +60,7 @@ import type { CommentKeyStoreDeps } from './commentKeyStore'
 import { fileView, refusedView, type ListedFile } from './commentListBuilder'
 import type { ListSummary } from './commentListCore'
 import { refusalCode, type CommentRefusal } from './commentRefusals'
-import { changeOf } from './commentSaveFlow'
+import { boundedWrite, changeOf, SAVE_TIMEOUT_MS } from './commentSaveFlow'
 import type { CommentUnsavedSources } from './commentUnsavedSources'
 import { FileCommentPanels, type FileCommentPanel } from './fileCommentPanels'
 import { createFileCommentWatches, type FileCommentWatchFactory, type FileCommentWatches } from './fileCommentWatches'
@@ -81,6 +84,10 @@ export interface FileCommentServiceDeps {
   readonly identity: () => CommentIdentity | undefined
   /** Send `file-comment:changed` to one window. */
   readonly send: (windowId: number, payload: FileCommentChanged) => void
+  /** Send `file-comment:saveSettled` to one window: a save that outlasted its answer ended (W-10). */
+  readonly sendSettled?: (windowId: number, payload: FileCommentSaveSettled) => void
+  /** Longest a save waits before it answers `COMMENT_SAVE_PENDING`; {@link SAVE_TIMEOUT_MS} by default. */
+  readonly saveTimeoutMs?: number
   /** Where a kind's jobs run; the comment parse worker by default. */
   readonly jobsFor?: CommentWriterDeps['jobsFor']
   /** One runner for every kind (the suites' in-process runner). */
@@ -104,6 +111,9 @@ export interface FileCommentServiceDeps {
 
 /** A thread operation of `file-comment:save`. */
 type ThreadOp = Exclude<FileCommentSaveRequest, { op: 'add' }>
+
+/** What a late settle names a write by: the request's own key. */
+type WriteRef = Pick<FileCommentSaveSettled, 'op' | 'draftToken' | 'threadKey' | 'blockKey'>
 
 /** A refusal with its code and reason. */
 function refusal(reason: CommentRefusal): CommentReasonedRefusal {
@@ -279,7 +289,7 @@ export class FileCommentService {
       panel.keys.settleDraft(request.draftToken, false)
       return KEY_INVALID
     }
-    const result = await this.writer.addPicked({
+    const write = this.writer.addPicked({
       file: writeTargetOf(caller, panel),
       pick: request.target,
       ...(request.sel === undefined ? {} : { sel: request.sel }),
@@ -289,8 +299,12 @@ export class FileCommentService {
     // A write consumes the draft – also one whose bytes changed right after the rename
     // (`changed-during-save`): its thread landed, so a retry would add a second. Any
     // other refusal wrote nothing and leaves the draft, with the window's text, for the next try.
-    panel.keys.settleDraft(request.draftToken, result.ok || result.reason === 'changed-during-save')
-    return this.answer(panel, result)
+    // Settled when the WRITE settles, not when the answer goes: no second write while one runs.
+    void write.then(
+      result => panel.keys.settleDraft(request.draftToken, result.ok || result.reason === 'changed-during-save'),
+      () => panel.keys.settleDraft(request.draftToken, false)
+    )
+    return this.answerInTime(caller, panel, write, { op: 'add', draftToken: request.draftToken })
   }
 
   private async changeExisting(caller: FileCommentCaller, panel: FileCommentPanel, request: ThreadOp): Promise<CommentSaveResult> {
@@ -298,19 +312,40 @@ export class FileCommentService {
     if (request.op === 'deleteBlock') {
       const block = panel.keys.resolve(panel.binding, request.blockKey, 'block')
       if (!block.ok || block.value.realPath !== panel.realPath) return KEY_INVALID
-      return this.answer(panel, await this.writer.deleteDamagedBlock({ file, rawHash: request.rawHash, start: block.value.start }))
+      const write = this.writer.deleteDamagedBlock({ file, rawHash: request.rawHash, start: block.value.start })
+      return this.answerInTime(caller, panel, write, { op: request.op, blockKey: request.blockKey })
     }
     if (request.op === 'rebuildBlock') {
       // OD-05: named by its block key, as a block delete is.
       const block = panel.keys.resolve(panel.binding, request.blockKey, 'block')
       if (!block.ok || block.value.realPath !== panel.realPath) return KEY_INVALID
       const status = request.status === undefined ? {} : { status: request.status }
-      return this.answer(panel, await this.writer.rebuildDamagedBlock({ file, rawHash: request.rawHash, start: block.value.start, ...status }))
+      const write = this.writer.rebuildDamagedBlock({ file, rawHash: request.rawHash, start: block.value.start, ...status })
+      return this.answerInTime(caller, panel, write, { op: request.op, blockKey: request.blockKey })
     }
     const thread = panel.keys.resolve(panel.binding, request.threadKey, 'thread')
     if (!thread.ok || thread.value.realPath !== panel.realPath) return KEY_INVALID
-    const result = await this.writer.changeThread({ file, threadId: thread.value.threadId, rawHash: request.rawHash, change: changeOf(request) })
+    const write = this.writer.changeThread({ file, threadId: thread.value.threadId, rawHash: request.rawHash, change: changeOf(request) })
+    return this.answerInTime(caller, panel, write, { op: request.op, threadKey: request.threadKey })
+  }
+
+  /** The answer to a write within the time limit; past it `COMMENT_SAVE_PENDING`, and how it ended goes to the sender's window (W-10). */
+  private async answerInTime(caller: FileCommentCaller, panel: FileCommentPanel, write: Promise<CommentWriteResult>, ref: WriteRef): Promise<CommentSaveResult> {
+    const timeoutMs = this.deps.saveTimeoutMs ?? SAVE_TIMEOUT_MS
+    const result = await boundedWrite(write, timeoutMs, () => this.settleLate(caller.windowId, panel.binding.panelId, write, ref))
+    if (result === 'pending') return { ok: false, code: ErrorCode.COMMENT_SAVE_PENDING }
+    if (result === 'failed') return { ok: false, code: ErrorCode.COMMENT_WRITE_FAILED }
     return this.answer(panel, result)
+  }
+
+  /** A write that outlasted its answer: tell the window how it ended, whatever that was. */
+  private settleLate(windowId: number, panelId: string, write: Promise<CommentWriteResult>, ref: WriteRef): void {
+    const send = (ending: Pick<FileCommentSaveSettled, 'ok' | 'code' | 'reason'>): void =>
+      this.deps.sendSettled?.(windowId, { panelId, ...ref, ...ending })
+    void write.then(
+      result => send(result.ok ? { ok: true } : { ok: false, code: result.code, reason: result.reason }),
+      () => send({ ok: false, code: ErrorCode.COMMENT_WRITE_FAILED })
+    )
   }
 
   /** Comments are on in Settings for the panel's kind. */

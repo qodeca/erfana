@@ -29,7 +29,9 @@ export const FileCommentChannels = {
 /** Main → renderer events, sent only to the window that owns the panel. */
 export const FileCommentEvents = {
   /** A listed file changed on disk: list it again. */
-  CHANGED: 'file-comment:changed'
+  CHANGED: 'file-comment:changed',
+  /** A save answered `COMMENT_SAVE_PENDING` settled after all: written, or refused with its code (W-10). */
+  SAVE_SETTLED: 'file-comment:saveSettled'
 } as const
 
 export type FileCommentChannel = (typeof FileCommentChannels)[keyof typeof FileCommentChannels]
