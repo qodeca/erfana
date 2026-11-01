@@ -2,9 +2,11 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /** The HTML Preview's comment window, against the shared window rules. */
 import { afterEach, beforeEach, vi } from 'vitest'
-import { runWindowRulesSuite } from '../../../../../../shared/comments/__conformance__/overlay.suite'
+import { runFocusTableSuite, runWindowRulesSuite } from '../../../../../../shared/comments/__conformance__/overlay.suite'
 import type { CommentDirtyGuard } from '../../../../hooks/useCommentDirtyGuard'
+import { focusTableDriver } from '../../../Comments/__test-utils__/focusTableDriver'
 import { windowRulesDriver, type WindowRulesHost } from '../../../Comments/__test-utils__/windowRulesDriver'
+import { closeReturnsToPage } from './previewCommentRequests'
 import { PreviewCommentsLayer } from './PreviewCommentsLayer'
 
 const guard = vi.hoisted(() => ({ current: null as unknown as CommentDirtyGuard }))
@@ -24,7 +26,8 @@ const HTML_HOST: WindowRulesHost = {
       onCloseWindow={props.onClose}
       onNewComment={() => {}}
     />
-  )
+  ),
+  closeFocusesPage: closeReturnsToPage
 }
 
 let portalRoot: HTMLDivElement
@@ -36,3 +39,4 @@ beforeEach(() => {
 afterEach(() => portalRoot.remove())
 
 runWindowRulesSuite('HTML', () => windowRulesDriver(HTML_HOST, guard))
+runFocusTableSuite('HTML', () => focusTableDriver(HTML_HOST, guard))

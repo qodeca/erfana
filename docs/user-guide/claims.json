@@ -54962,7 +54962,7 @@
       "quote": "<kbd>F6</kbd> moves between the window and the preview",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/CommentWindowShell.tsx:155",
+      "source": "src/renderer/src/components/Comments/CommentWindowShell.tsx:193",
       "match": "if (event.key !== 'F6'"
     },
     {

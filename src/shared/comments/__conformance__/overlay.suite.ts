@@ -32,7 +32,7 @@
  * the host's stated reason, never silently passed.
  */
 import { afterEach, beforeEach, describe, expect, it, type TestFunction } from 'vitest'
-import type { OptionalPart, OverlayDriver, OverlayPick, OverlayTargetId, WindowRulesDriver } from './overlayDriver'
+import type { FocusClose, FocusHome, FocusOpener, FocusTableDriver, OptionalPart, OverlayDriver, OverlayPick, OverlayTargetId, WindowRulesDriver } from './overlayDriver'
 
 /** The longest name part a label shows before its size (design §10.2: at most 40 characters). */
 const LABEL_NAME_MAX_CHARS = 40
@@ -134,6 +134,17 @@ export function runOverlaySuite(
         expect(d.modeIndicatorText()).toBe(d.modeIndicatorIdle)
         d.modeOff()
         expect(d.modeIndicatorText()).toBeNull()
+      })
+
+      caseIt('OVL-M-07 leaving the mode with focus on the picked target hands focus on: it never falls out of the preview', ctx => {
+        if (d.pickByKeys === undefined || d.focusHeldInPreview === undefined) {
+          ctx.skip(notOwned('pickFocus'))
+          return
+        }
+        d.modeOn()
+        d.pickByKeys()
+        d.modeOff()
+        expect(d.focusHeldInPreview()).toBe(true)
       })
 
       caseIt('OVL-M-06 the fixture is laid out whole', () => {
@@ -412,6 +423,78 @@ export function runWindowRulesSuite(name: string, makeDriver: () => WindowRulesD
       expect(d.bannerButtons()).toEqual([])
       expect(d.bannerText()).toMatch(d.seesOtherWindows ? /in another window/ : /in another tab/)
       expect(d.replyText()).toBe('Looks right')
+    })
+
+    it(`S-03 (${name}) WIN-09 a Changed thread opens on Resolve`, async () => {
+      await d.open({ identity: 'ready', threads: ['changed'] })
+      expect(d.focused()).toBe('resolve')
+    })
+
+    it(`S-03 (${name}) WIN-10 a Changed thread with no Resolve opens on the title: read-only file`, async () => {
+      await d.open({ identity: 'ready', threads: ['changed'], readOnly: true })
+      expect(d.focused()).toBe('title')
+    })
+
+    it(`S-03 (${name}) WIN-11 a Changed thread with no Resolve opens on the title: paused by unsaved edits`, async () => {
+      await d.open({ identity: 'ready', threads: ['changed'], editor: 'dirty' })
+      expect(d.focused()).toBe('title')
+    })
+
+    it(`S-03 (${name}) WIN-12 a step lands by the same rule: onto a Changed thread, on Resolve and next`, async () => {
+      await d.open({ identity: 'ready', threads: ['open', 'changed'] })
+      await d.stepByKeys()
+      expect(d.focused()).toBe('resolve-next')
+    })
+
+    it(`S-03 (${name}) WIN-13 a step lands by the same rule: onto an open thread, on the title`, async () => {
+      await d.open({ identity: 'ready', threads: ['changed', 'open'] })
+      await d.stepByKeys()
+      expect(d.focused()).toBe('title')
+    })
+
+    it(`S-03 (${name}) WIN-14 a step lands by the same rule: onto a Changed thread on a read-only file, on the title`, async () => {
+      await d.open({ identity: 'ready', threads: ['open', 'changed'], readOnly: true })
+      await d.stepByKeys()
+      expect(d.focused()).toBe('title')
+    })
+  })
+}
+
+/** Where each opener takes focus back to, on a close that leaves it to the window. */
+const FOCUS_HOME: Readonly<Record<FocusOpener, FocusHome>> = {
+  'drawer-row': 'opener',
+  'gone-row': 'drawer',
+  toolbar: 'opener',
+  target: 'preview',
+  'gone-target': 'preview',
+  nothing: 'preview'
+}
+const FOCUS_CLOSES: readonly FocusClose[] = ['escape', 'close-button', 'saved', 'thread-gone', 'go-to-tab']
+
+/**
+ * The focus-return table: every opener against every close reason, with no
+ * mouse (plan step 3, differences D-59). Focus never falls to `<body>`.
+ *
+ * @param name - The preview, as every case title names it.
+ * @param makeDriver - A fresh driver, nothing open. Called once per test.
+ */
+export function runFocusTableSuite(name: string, makeDriver: () => FocusTableDriver): void {
+  describe(`comment window focus return – ${name}`, () => {
+    let d: FocusTableDriver
+
+    beforeEach(() => {
+      d = makeDriver()
+    })
+
+    afterEach(async () => {
+      await d.dispose()
+    })
+
+    const rows = (Object.keys(FOCUS_HOME) as FocusOpener[]).flatMap(opener => FOCUS_CLOSES.map(close => ({ opener, close })))
+    it.each(rows)(`D-59 (${name}) FOC opener $opener, closed by $close`, async ({ opener, close }) => {
+      await d.open(opener, close)
+      await d.close(close)
+      expect(d.home()).toBe(close === 'go-to-tab' ? 'editor' : FOCUS_HOME[opener])
     })
   })
 }

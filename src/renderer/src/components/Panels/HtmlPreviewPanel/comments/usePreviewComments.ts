@@ -49,7 +49,7 @@ import type { PreviewCommentsLayerProps } from './PreviewCommentsLayer'
 import { useLiveText } from '../../../Comments/commentLive'
 import { COMMENT_LIST_COPY, HTML_WORDS } from '../../../Comments/commentCopyWords'
 import { useRemovedOutside } from '../../../Comments/commentRemovedOutside'
-import { newCommentRequest, rowWindowRequest, withWords, type RowTarget } from './previewCommentRequests'
+import { closeReturnsToPage, newCommentRequest, rowWindowRequest, withWords, type RowTarget } from './previewCommentRequests'
 import { usePageCommentStepKeys } from './usePageCommentStepKeys'
 import { pickerAnnouncement } from './commentLive'
 import { usePreviewDraftKeepAlive } from './usePreviewDraftKeepAlive'
@@ -317,7 +317,7 @@ export function usePreviewComments({
   const closeWindow = useCallback(
     (returnFocus = true) => {
       setRequest(current => {
-        if (returnFocus && current?.opener === 'page') focusPageSoon(panelId)
+        if (closeReturnsToPage(current, returnFocus)) focusPageSoon(panelId)
         return null
       })
     },

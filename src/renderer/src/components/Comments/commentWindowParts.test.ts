@@ -195,6 +195,16 @@ describe('C-18 docked placement', () => {
     expect(placeDocked({ ...base, column: null }).kind).not.toMatch(/margin|edge/)
   })
 
+  it('K-2 a window holding typed text never folds: it stays in the pane, at the edge nearest its target', () => {
+    const above = placeDocked({ ...base, holdOpen: true, anchor: { left: 100, top: -90, width: 400, height: 40 } })
+    const below = placeDocked({ ...base, holdOpen: true, anchor: { left: 100, top: 5000, width: 400, height: 40 } })
+    expect(above.kind).not.toBe('edge')
+    expect(below.kind).not.toBe('edge')
+    if (above.kind === 'edge' || below.kind === 'edge' || above.kind === 'sheet' || below.kind === 'sheet') throw new Error('expected a place in the pane')
+    expect(above.top).toBeGreaterThanOrEqual(base.area.top)
+    expect(below.top + base.size.height).toBeLessThanOrEqual(base.area.top + base.area.height)
+  })
+
   it('C-18 a target scrolled out of the pane shows the edge tab on the side it went', () => {
     expect(placeDocked({ ...base, anchor: { left: 100, top: -90, width: 400, height: 40 } })).toMatchObject({
       kind: 'edge',

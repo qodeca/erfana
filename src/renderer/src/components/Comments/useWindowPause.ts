@@ -32,7 +32,7 @@ export interface WindowPause {
  * @param filePath - The shown file, project-space; `null` when the window shows none.
  * @param file - The file's name, its controls as tokens.
  * @param hostText - The host's own sentence (Markdown), else `null`.
- * @param titleRef - Takes focus when the pause ends with focus on a control that went away.
+ * @param firstFocusRef - Takes focus when the pause ends with focus on a control that went away.
  * @param leave - Close the window without handing focus back, before focus moves to the editor.
  * @param goToUnsaved - The host's way to the edits; the editor tab by default.
  * @returns {@link WindowPause}
@@ -41,7 +41,7 @@ export function useWindowPause(
   filePath: string | null,
   file: string,
   hostText: string | null,
-  titleRef: React.RefObject<HTMLElement>,
+  firstFocusRef: React.RefObject<HTMLElement | null>,
   leave: () => void,
   goToUnsaved?: () => void
 ): WindowPause {
@@ -51,9 +51,9 @@ export function useWindowPause(
   // Save {file} is gone with the banner: focus must not fall to <body>.
   const paused = useRef(false)
   useEffect(() => {
-    if (paused.current && text === null && document.activeElement === document.body) titleRef.current?.focus()
+    if (paused.current && text === null && document.activeElement === document.body) firstFocusRef.current?.focus()
     paused.current = text !== null
-  }, [text, titleRef])
+  }, [text, firstFocusRef])
   const unsaved =
     guard.state === 'clean'
       ? undefined

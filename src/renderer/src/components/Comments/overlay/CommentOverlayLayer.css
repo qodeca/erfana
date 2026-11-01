@@ -18,9 +18,12 @@
   z-index: var(--z-dropdown);
 }
 
-/* Comment mode: the preview reads as a picking surface. */
+/* Comment mode: the preview reads as a picking surface. An outline drawn
+   inward, not a box shadow: forced colours drop shadows, and the frame must
+   stay (the HTML frame is a border, D-67). */
 .erf-comment-host--mode {
-  box-shadow: inset 0 0 0 var(--border-width-thick) var(--color-border-focus);
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--border-width-thick) * -1);
 }
 
 .erf-comment-host__tab {

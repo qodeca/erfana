@@ -127,6 +127,11 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
     if (marked.current !== null) clearPickTabIndex(marked.current)
     marked.current = null
   }, [])
+  /** The pick ends. A focused target stops being focusable, which would drop focus to `<body>`: the scroller takes it first. */
+  const releasePick = useCallback(() => {
+    if (marked.current?.contains(document.activeElement) === true) latest.current.scroller?.focus({ preventScroll: true })
+    unmark()
+  }, [latest, unmark])
 
   // Keyboard steps since the mode turned on: the first ones add the keys (C-10).
   const steps = useRef(0)
@@ -162,10 +167,10 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
   // Leaving the mode or the view (or unmounting) takes the attribute off the content again.
   useEffect(() => {
     steps.current = 0
-    if (mode && live) return unmark
-    unmark()
+    if (mode && live) return releasePick
+    releasePick()
     return undefined
-  }, [mode, live, unmark])
+  }, [mode, live, releasePick])
 
   // C-08.2: the block holding the selection's anchor, else the first block in view.
   const focusFirst = useCallback(

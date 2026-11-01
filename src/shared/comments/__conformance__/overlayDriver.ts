@@ -100,7 +100,7 @@ export type OverlayLayer = 'menu' | 'window' | 'mode' | 'find'
 export type HostedLayer = Exclude<OverlayLayer, 'mode'>
 
 /** A part of the overlay a host may leave out, with the reason it gives in `notOwned`. */
-export type OptionalPart = HostedLayer | 'modeIndicator' | 'floatingLabel'
+export type OptionalPart = HostedLayer | 'modeIndicator' | 'floatingLabel' | 'pickFocus'
 
 /**
  * One host's overlay, on the fixture, ready for one test. Gestures are trusted
@@ -172,6 +172,10 @@ export interface OverlayDriver {
   middleClick(target: OverlayTargetId): void
   /** Press and release Esc with focus in the page. */
   pressEscape(): void
+  /** Move the pick by keys, so real focus sits on the target. Optional: see `notOwned.pickFocus`. */
+  pickByKeys?(): void
+  /** Focus is on something that can hold it inside the preview, never `<body>` or a target that lost its `tabindex`. */
+  focusHeldInPreview?(): boolean
 
   /** Every pick so far, oldest first. */
   picks(): readonly OverlayPick[]
@@ -209,7 +213,17 @@ export interface WindowRulesSetup {
   readonly editor?: 'clean' | 'dirty' | 'conflict'
   /** Main refuses every write as unsaved, though this window's tabs are clean. */
   readonly refusedUnsaved?: boolean
+  /** The threads of the file, in order; the first is the one shown. One open thread by default. */
+  readonly threads?: readonly WindowRulesThread[]
+  /** The file cannot be written. */
+  readonly readOnly?: boolean
 }
+
+/** One thread of the fixture: plain open, or Changed (S-03). */
+export type WindowRulesThread = 'open' | 'changed'
+
+/** What holds focus in the window. `window` is the frame itself, which draws no ring. */
+export type WindowFocus = 'title' | 'resolve' | 'resolve-next' | 'window' | 'other'
 
 /**
  * The comment window as a host mounts it, for the rules both previews share.
@@ -248,6 +262,34 @@ export interface WindowRulesDriver {
   editorSaves(): number
   /** The focused element is inside the comment window, never `<body>`. */
   focusInWindow(): boolean
+  /** What holds focus in the window now. */
+  focused(): WindowFocus
+  /** Step to the next comment with the keyboard (Alt+F9). */
+  stepByKeys(): Promise<void>
+  /** Remove everything the driver added. */
+  dispose(): void | Promise<void>
+}
+
+/** What had focus when the window opened (`gone-*`: and it left the document while the window was open). */
+export type FocusOpener = 'drawer-row' | 'gone-row' | 'target' | 'gone-target' | 'toolbar' | 'nothing'
+
+/** Why the window closed. `go-to-tab` is the one close that moves focus on by itself. */
+export type FocusClose = 'escape' | 'close-button' | 'saved' | 'thread-gone' | 'go-to-tab'
+
+/** Where focus ended up after the close. `body` is the failure this table exists to catch. */
+export type FocusHome = 'opener' | 'drawer' | 'preview' | 'editor' | 'body'
+
+/**
+ * The comment window over a stage with a toolbar, a drawer, a preview and an
+ * editor, for the focus-return table. Driven by keys only.
+ */
+export interface FocusTableDriver {
+  /** Open the window from `opener`, on what `close` needs, settled when its first focus has landed. */
+  open(opener: FocusOpener, close: FocusClose): Promise<void>
+  /** Close the window for `close`, settled when it is gone. */
+  close(close: FocusClose): Promise<void>
+  /** Where focus is now; the page taking native focus back counts as `preview`. */
+  home(): FocusHome
   /** Remove everything the driver added. */
   dispose(): void | Promise<void>
 }

@@ -25,10 +25,10 @@
  *    C-13) and what happened to the file while it was open (`useThreadSession`:
  *    updated, removed, all done – C-14, W-03, W-04, W-11).
  *
- * Focus: a new comment lands in the text field; a thread on the window title
- * (`tabindex="-1"`), so a screen reader starts at the top – or on Resolve when
- * the thread's state makes it the main action (S-03 – S-05); on close it goes
- * back to the opener.
+ * Focus: one first-focus rule (`useWindowFirstFocus`), on open and on a step –
+ * a new comment lands in the text field; a thread on Resolve when its state
+ * makes that the main action and the button is there (S-03 – S-05), else on the
+ * window title; on close it goes back to the opener.
  *
  * Esc and an outside click back out of the newest INNER step first – an
  * edit, a delete confirmation, the inline identity editor – keeping its typed
@@ -75,7 +75,7 @@ import { useDrawerFilter } from './commentDrawerFilter'
 import { useWindowStepTarget } from './commentStepKeys'
 import { WINDOW_COPY, editWordsNotice, unsavedElsewhereText, windowRefusal } from './commentWindowCopy'
 import { headingOf, newCommentFrom } from './commentWindowHeading'
-import { resolveLeads, stepPosition, threadStateOf, withResolved } from './commentWindowStates'
+import { stepPosition, withResolved } from './commentWindowStates'
 import type { CommentWindowRequest } from './commentWindowTypes'
 import { CommentWindowShell } from './CommentWindowShell'
 import { useDock, type WindowDock } from './commentWindowDock'
@@ -84,6 +84,7 @@ import { NewCommentView } from './NewCommentView'
 import { ThreadsView, ThreadsWaiting } from './ThreadsView'
 import { identityMissing, useIdentityGate } from './useIdentityGate'
 import { useThreadSession } from './useThreadSession'
+import { useWindowFirstFocus } from './useWindowFirstFocus'
 import { useWindowPause } from './useWindowPause'
 import './CommentWindow.css'
 import { TEST_IDS } from '../../constants/testids'
@@ -179,6 +180,7 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
   const { ready: identityReady, ask: askIdentity, restoreFocus: restoreGateFocus } = gate
   const needsIdentity = request.kind === 'new' ? identityAsked || identityMissing(identity) : gate.open
   const view: 'identity' | 'new' | 'threads' = needsIdentity ? 'identity' : request.kind
+  const firstFocusRef = useWindowFirstFocus(view, leadRef, titleRef, textareaRef)
 
   const stepFilter = useDrawerFilter(props.drawerId)
   const session = useThreadSession(request, list, stepFilter)
@@ -187,7 +189,7 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
   // Before any memoized callback: the compiler takes these calls as possible changes to `selection`.
   const words = useCommentWords()
   const modal = props.modal ?? words.preview === 'html'
-  const pause = useWindowPause(selection?.file.filePath ?? null, visibleString(selection?.file.displayPath ?? ''), props.pausedText ?? null, titleRef, () => props.onClose(false), props.onGoToUnsaved)
+  const pause = useWindowPause(selection?.file.filePath ?? null, visibleString(selection?.file.displayPath ?? ''), props.pausedText ?? null, firstFocusRef, () => props.onClose(false), props.onGoToUnsaved)
   const heading = headingOf(request, selection, words)
   const newComment = props.onNewComment && !session.stepped ? newCommentFrom(request, selection) : null
   const notVisible = useMemo(() => new Set(props.notVisible), [props.notVisible])
@@ -209,9 +211,9 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
   const previousView = useRef(view)
   useEffect(() => {
     if (previousView.current === 'identity' && view === 'new') textareaRef.current?.focus()
-    if (previousView.current === 'identity' && view === 'threads') restoreGateFocus(titleRef.current)
+    if (previousView.current === 'identity' && view === 'threads') restoreGateFocus(firstFocusRef.current)
     previousView.current = view
-  }, [view, restoreGateFocus])
+  }, [view, restoreGateFocus, firstFocusRef])
 
   const { onRefresh } = props
   // Shown in banners and alerts through `visibleString`: bidi and invisible characters as tokens (S-L-B).
@@ -317,10 +319,10 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
     },
     [selection, goTo, onReveal, announce, words, stepFilter]
   )
-  // A step lands on the new thread's title, so a screen reader starts at the top again.
+  // A step lands where opening on that thread would.
   useEffect(() => {
-    if (stepped > 0) titleRef.current?.focus()
-  }, [stepped])
+    if (stepped > 0) firstFocusRef.current?.focus()
+  }, [stepped, firstFocusRef])
   // W-11: Close takes focus once every comment is resolved.
   useEffect(() => {
     if (session.allDone) leadRef.current?.focus()
@@ -363,9 +365,6 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
     stepTo(target)
   }
 
-  // The thread whose Resolve leads takes the first focus (S-03 – S-05).
-  const leads = selection?.threads.some(t => t.status === 'open' && resolveLeads(threadStateOf(t, notVisible))) === true
-  const initialFocusRef = view === 'threads' ? (leads ? leadRef : titleRef) : view === 'new' ? textareaRef : undefined
   const dock = useDock(props.dock, request.kind === 'threads' ? (shownThread?.threadKey ?? null) : null, shownThread ?? (request.kind === 'new' ? request.target : ''), shownThread?.line ?? (request.kind === 'new' ? request.target.line : 1), words.noun)
   const moreActions = [
     ...(newComment !== null && pause.text === null ? [{ label: COPY.newComment, action: () => props.onNewComment?.(newComment), testId: TEST_IDS.COMMENT_NEW_ON_ELEMENT }] : []),
@@ -377,7 +376,8 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
       modal={modal}
       titleId={titleId}
       describedBy={view === 'identity' ? noticeId : undefined}
-      initialFocusRef={initialFocusRef}
+      initialFocusRef={firstFocusRef}
+      focusKey={`${view}:${waiting}`}
       onDismiss={dismiss}
       windowRef={windowRef}
       getArea={props.getArea}

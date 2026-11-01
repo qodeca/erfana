@@ -571,3 +571,76 @@ test.describe('Markdown Preview comments', () => {
     expect(mark.decoration).toMatch(/text-decoration:\s*underline/)
   })
 })
+
+test.describe('Markdown Preview comments – focus never gets lost', () => {
+  const TALL = 'tall.md'
+  const TALL_TEXT = ['# Tall', '', ...Array.from({ length: 150 }, (_, i) => `Paragraph ${i + 1} of the tall review.\n`)].join('\n')
+  test.use({ testProjectFiles: { [TALL]: TALL_TEXT } })
+
+  test.afterEach(async ({ windowWithTestProject }) => {
+    await setGlobalSetting(windowWithTestProject, 'comments', { identityNoticeSeen: false })
+  })
+
+  async function openTall(page: Parameters<typeof setGlobalSetting>[0]): Promise<MarkdownCommentsPage> {
+    const md = new MarkdownCommentsPage(page)
+    await new ProjectTreePage(page).fileRow(TALL).click()
+    await md.editor.waitForReady()
+    await expect(md.target('p', 3)).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await md.waitForComments()
+    return md
+  }
+
+  const scrollToEnd = (md: MarkdownCommentsPage): Promise<void> =>
+    md.preview().evaluate(el => {
+      el.scrollTop = el.scrollHeight
+    })
+
+  test('K-2, K-3, K-7 (Markdown) with no mouse: fold, edge tab, typed text and mode off each keep focus', async ({ windowWithTestProject }) => {
+    const page = windowWithTestProject
+    await setGlobalSetting(page, 'comments', { authorName: NAME, identityNoticeSeen: true })
+    const md = await openTall(page)
+    await md.preview().focus()
+    await page.keyboard.press(MODE_KEY)
+    await expect(md.modeButton()).toHaveAttribute('aria-pressed', 'true')
+    // The keyboard entry picks a block a frame later: Enter acts on it.
+    await expect(md.content().locator('[data-line-start]:focus')).toHaveCount(1)
+    await page.keyboard.press('Enter')
+    const win = md.window()
+    await expect(win).toHaveAttribute('data-view', 'new', { timeout: MD_COMMENT_BUDGET_MS })
+    const field = win.getByTestId(TEST_IDS.COMMENT_NEW_FIELD)
+    await expect(field).toBeFocused()
+
+    // K-2: the target scrolls away with focus in the empty window: the tab takes focus before the window hides.
+    await scrollToEnd(md)
+    const tab = page.getByTestId(TEST_IDS.COMMENT_EDGE_TAB)
+    await expect(tab).toBeFocused()
+
+    // K-3: pressed with the keyboard, it brings the window back with focus inside.
+    await page.keyboard.press('Enter')
+    await expect(tab).toHaveCount(0)
+    await expect(field).toBeFocused()
+
+    // K-2: typed text holds the window open.
+    await page.keyboard.type(NOTE)
+    await scrollToEnd(md)
+    await expect(field).toBeFocused()
+    await expect(tab).toHaveCount(0)
+    await expect(win).toBeVisible()
+
+    // K-5: closed, focus goes back to the picked block; K-7: leaving the mode from there hands it to the preview.
+    await page.keyboard.press('Escape')
+    await expect(win).toHaveCount(0, { timeout: MD_COMMENT_BUDGET_MS })
+    await page.keyboard.press(MODE_KEY)
+    await expect(md.modeButton()).toHaveAttribute('aria-pressed', 'false')
+    await expect(md.preview()).toBeFocused()
+  })
+
+  test('K-30 (Markdown) the comment-mode frame stays in forced colours', async ({ windowWithTestProject }) => {
+    const page = windowWithTestProject
+    const md = await openTall(page)
+    await md.modeOn()
+    await page.emulateMedia({ forcedColors: 'active' })
+    await expect(page.getByTestId(TEST_IDS.COMMENT_HOST_OVERLAY)).toHaveCSS('outline-style', 'solid')
+    await page.emulateMedia({ forcedColors: 'none' })
+  })
+})

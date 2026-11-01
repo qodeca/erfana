@@ -314,6 +314,17 @@ export async function createMarkdownOverlayDriver(): Promise<OverlayDriver> {
       key('keyDown', target)
       key('keyUp', target)
     },
+    pickByKeys() {
+      begin('keyboard')
+      act(() => scroller().focus())
+      fireEvent.keyDown(scroller(), { key: 'Tab', code: 'Tab' })
+      fireEvent.keyUp(document.activeElement ?? scroller(), { key: 'Tab', code: 'Tab' })
+    },
+    // jsdom keeps focus on an element that lost its `tabindex`; Chromium drops it to <body>.
+    focusHeldInPreview() {
+      const active = document.activeElement
+      return active instanceof HTMLElement && scroller().contains(active) && active.hasAttribute('tabindex')
+    },
     picks,
     pickedTarget: () => picks().filter(p => p.kind !== 'exit').at(-1)?.target ?? null,
     outlinedTarget,

@@ -87,7 +87,7 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | **Added since** `commentDrawerFilter`, `commentStepKeys` (2) | `src/renderer/src/components/Comments/` | S | – |
 | **Added since** `commentTargetNoun` (1) | `src/renderer/src/components/Comments/` | S | – |
 | **Added since** `usePageCommentStepKeys` (1) | stays in `HtmlPreviewPanel/comments/` | H | The page's Alt+F9 / Alt+Shift+F9 reach the renderer only as keys main forwards from another process (C-13) |
-| **Added since** `src/renderer/src/components/Comments/{useIdentityGate,useWindowPause,commentWindowDock}.ts`, `{CommentUnsavedActions,CommentPausedBand}.tsx` (5) | S | The name step before a thread write, the pause and its buttons, and the band: one behaviour in both previews (plan step 2); the dock is split off for the line limit |
+| **Added since** `src/renderer/src/components/Comments/{useIdentityGate,useWindowPause,useWindowFirstFocus,commentWindowDock}.ts`, `{CommentUnsavedActions,CommentPausedBand}.tsx` (6) | S | The name step before a thread write, the pause and its buttons, the band and the one first-focus rule: one behaviour in both previews (plan steps 2 and 3); the dock is split off for the line limit |
 | **Added since** `src/renderer/src/components/Panels/HtmlPreviewPanel/comments/PreviewPausedBand.tsx` (1) | H | The HTML Preview's words for the shared band: its page draws the file on disk, so the conflict sentence is the tab's |
 
 `commentCopy` keeps one string table with a `TargetNouns` map per preview (C-03), so both previews import one module (024-AC-008).

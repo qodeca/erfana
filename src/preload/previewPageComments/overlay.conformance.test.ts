@@ -175,7 +175,8 @@ function driverOn(h: Harness): OverlayDriver {
     notOwned: {
       menu: 'the element menu is main’s native menu; the page is hidden behind a still frame while it is open and gets no key',
       window: 'the comment window is renderer UI over a still frame of the page; the page gets no key while it is open',
-      find: 'Find is the renderer’s find bar; main forwards its Esc to the renderer and the page never sees it'
+      find: 'Find is the renderer’s find bar; main forwards its Esc to the renderer and the page never sees it',
+      pickFocus: 'differences table D-31: the page’s picker draws its outline in a closed shadow root and never moves the page’s focus or its tabindex, so leaving the mode has no focus to hand on'
     },
     modeOn: () => h.state({ mode: true }),
     modeOff: () => h.state({ mode: false }),

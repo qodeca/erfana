@@ -60,6 +60,18 @@ export function withWords(request: CommentSaveRequest, sel: AnchorSelection | un
   return { ...request, sel: { exact: sel.exact, prefix: sel.prefix, suffix: sel.suffix } }
 }
 
+/**
+ * Whether closing the window hands native focus to the page: the page opened
+ * it, and the close leaves focus to the window ("Go to tab" moves it itself).
+ *
+ * @param request - The window closing.
+ * @param returnFocus - `false` when the caller moves focus itself.
+ * @returns `true` when the page takes focus back.
+ */
+export function closeReturnsToPage(request: CommentWindowRequest | null, returnFocus: boolean): boolean {
+  return returnFocus && request?.opener === 'page'
+}
+
 /** What a thread window needs from a drawer row – or from a step key's target (C-13). */
 export type RowTarget = Pick<DrawerRow, 'fileKey' | 'displayPath' | 'filePath' | 'frame' | 'threadKey' | 'blockKey'>
 

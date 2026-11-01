@@ -14,7 +14,7 @@ import { expect, vi } from 'vitest'
 import { ErrorCode } from '../../../../../shared/errors'
 import type { CommentSaveRequest, CommentSaveResult } from '../../../../../shared/ipc/preview-comment-schema'
 import type { CommentIdentitySettings } from '../../../../../shared/ipc/global-settings-schema'
-import type { WindowRulesDriver, WindowRulesSetup } from '../../../../../shared/comments/__conformance__/overlayDriver'
+import type { WindowFocus, WindowRulesDriver, WindowRulesSetup } from '../../../../../shared/comments/__conformance__/overlayDriver'
 import type { CommentDirtyGuard } from '../../../hooks/useCommentDirtyGuard'
 import { commentDrafts, type CommentListState } from '../../../stores/usePreviewCommentStore'
 import { fileView, thread, threadsRequest } from '../../Panels/HtmlPreviewPanel/comments/__test-helpers__/commentTestKit'
@@ -33,12 +33,23 @@ export type WindowRulesProps = Pick<
 export interface WindowRulesHost {
   readonly host: string
   readonly seesOtherWindows: boolean
-  /** Draw the window the way the preview does; `editor` is what its host knows of the file. */
-  readonly mount: (props: WindowRulesProps, editor: 'clean' | 'dirty' | 'conflict') => ReactNode
+  /**
+   * Draw the window the way the preview does; `editor` is what its host knows
+   * of the file, `preview` what a docked window hands focus to.
+   */
+  readonly mount: (props: WindowRulesProps, editor: 'clean' | 'dirty' | 'conflict', preview?: () => HTMLElement | null) => ReactNode
+  /** The host's own close: `true` when it hands native focus to the page. Absent: focus stays in this document. */
+  readonly closeFocusesPage?: (request: WindowRulesProps['request'], returnFocus: boolean) => boolean
 }
 
 const FILE_NAME = 'index.html'
-const LIST: CommentListState = { status: 'ready', files: [fileView({ threads: [thread(1)] })], generation: 1 }
+const CHANGED = { change: { state: 'changed', was: 'Buy now', now: 'Buy today' } } as const
+
+/** The list a setup opens on. */
+function listOf(setup: WindowRulesSetup): CommentListState {
+  const threads = (setup.threads ?? ['open']).map((state, i) => thread(i + 1, state === 'changed' ? CHANGED : {}))
+  return { status: 'ready', files: [fileView({ threads, ...(setup.readOnly === true ? { writable: false } : {}) })], generation: 1 }
+}
 const IDENTITIES: Readonly<Record<WindowRulesSetup['identity'], CommentIdentitySettings | null>> = {
   none: null,
   'notice-unseen': { authorName: 'Ada', identityNoticeSeen: false },
@@ -54,7 +65,7 @@ function Stage({ host, setup, onSave }: { readonly host: WindowRulesHost; readon
   }
   const [props] = useState(() => ({
     request: threadsRequest({ listAfter: 1 }),
-    list: LIST,
+    list: listOf(setup),
     notVisible: [] as readonly string[],
     getArea: () => ({ left: 0, top: 0, width: 1000, height: 700 }),
     onClose: vi.fn(),
@@ -65,6 +76,18 @@ function Stage({ host, setup, onSave }: { readonly host: WindowRulesHost; readon
     onCopyRaw: vi.fn()
   }))
   return <>{host.mount({ ...props, identity, onSaveIdentity: saveIdentity, onSave }, setup.editor ?? 'clean')}</>
+}
+
+/** What holds focus in the window now. */
+function focusedInWindow(): WindowFocus {
+  const active = document.activeElement
+  if (active === win()) return 'window'
+  const names: ReadonlyArray<readonly [string, WindowFocus]> = [
+    [TEST_IDS.COMMENT_WINDOW_TITLE, 'title'],
+    [TEST_IDS.COMMENT_RESOLVE, 'resolve'],
+    [TEST_IDS.COMMENT_RESOLVE_NEXT, 'resolve-next']
+  ]
+  return names.find(([id]) => active?.getAttribute('data-testid') === id)?.[1] ?? 'other'
 }
 
 const win = (): HTMLElement => screen.getByTestId(TEST_IDS.COMMENT_WINDOW)
@@ -151,6 +174,11 @@ export function windowRulesDriver(host: WindowRulesHost, guard: { current: Comme
     },
     editorSaves: () => editorSaves,
     focusInWindow: () => win().contains(document.activeElement),
+    focused: focusedInWindow,
+    async stepByKeys() {
+      await user.keyboard('{Alt>}[F9]{/Alt}')
+      await settled()
+    },
     dispose() {
       cleanup()
       commentDrafts.reset()
