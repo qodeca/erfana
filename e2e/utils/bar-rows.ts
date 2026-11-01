@@ -35,10 +35,12 @@ export async function barRowsIn(still: Buffer, rgb: readonly [number, number, nu
   const rows = Array.from({ length: info.height }, (_, y) => {
     const xs = Array.from({ length: info.width }, (_unused, x) => x).filter(x => isBar(x, y))
     const runs = xs.filter((x, i) => i === 0 || xs[i - 1] !== x - 1).length
-    return { y, runs, span: xs.length === 0 ? 0 : xs[xs.length - 1] - xs[0] + 1 }
+    return { y, runs, painted: xs.length }
   })
-  const fullest = Math.max(...rows.map(row => row.span))
-  const bars = rows.filter(row => fullest >= 30 && row.span >= fullest * 0.8)
+  // Pixels in the colour, never first-to-last: subpixel-smoothed text (Linux) leaves
+  // a few stray pixels of nearly any colour, wide apart across a row of words.
+  const fullest = Math.max(...rows.map(row => row.painted))
+  const bars = rows.filter(row => fullest >= 30 && row.painted >= fullest * 0.8)
   return {
     solid: bars.filter(row => row.runs === 1).length,
     bands: bars.filter((row, i) => i === 0 || bars[i - 1].y !== row.y - 1).length,
