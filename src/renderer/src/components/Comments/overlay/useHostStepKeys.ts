@@ -42,13 +42,15 @@ export interface HostStepKeysOptions {
   readonly drawerId: string
   /** Open the window on these threads (the host's `openThreads`). */
   readonly openThreads: (threadKeys: readonly string[], anchor: HTMLElement | null) => void
+  /** The one reveal step, for the thread a step reached. */
+  readonly reveal: (threadKey: string) => void
   readonly announce: (text: string) => void
 }
 
 /** One key press in the panel: `true` when it was a step key. */
 function takeStepKey(event: HostStepKey, options: HostStepKeysOptions): boolean {
   const step = commentStepFromDomEvent(event)
-  const { live, adapter, file, placements, drawerId, openThreads, announce } = options
+  const { live, adapter, file, placements, drawerId, openThreads, announce, reveal } = options
   if (step === null || !live || event.defaultPrevented) return false
   event.preventDefault()
   takePreviewStep(
@@ -61,7 +63,7 @@ function takeStepKey(event: HostStepKey, options: HostStepKeysOptions): boolean 
       open: ({ threadKey }) => {
         const placement = placements.find(p => p.threadKey === threadKey)
         const target = placement === undefined ? null : adapter.attach(placement)
-        target?.scrollIntoView({ block: 'center' })
+        reveal(threadKey)
         openThreads([threadKey], target)
       }
     },

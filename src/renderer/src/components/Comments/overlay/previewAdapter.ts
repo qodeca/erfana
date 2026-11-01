@@ -58,6 +58,14 @@ export interface PreviewCommentAdapter {
    * collapsed section (state table S-02, D-13). Absent: the preview hides nothing.
    */
   hiddenNow?(placement: ThreadPlacement): boolean
+  /**
+   * The element a listed thread's target is drawn as, target or not: a block
+   * inside a raw section is no target of its own, yet main places a comment on
+   * it. Absent: {@link attach} answers.
+   */
+  renderedOf?(placement: ThreadPlacement): HTMLElement | null
+  /** Open every closed section hiding `target` (I-6). Absent: the preview folds nothing. */
+  openFolds?(target: HTMLElement): void
   /** The rendered text column (C-18: a docked window sits in the margin beside it); `null` when unmounted. */
   root?(): HTMLElement | null
 }

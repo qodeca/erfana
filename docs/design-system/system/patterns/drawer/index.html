@@ -374,7 +374,7 @@ reachable. Inside, each part is one tab stop – the close button, the filter gr
 <table>
   <thead><tr><th>File</th><th>Departure</th><th>Why it is still there</th></tr></thead>
   <tbody>
-    <tr><td><code>Comments/overlay/CommentOverlayLayer.css</code></td><td>The Markdown drawer is docked over the end of the preview pane (<code>position: absolute</code>), not a flow sibling, so above the full-width switch the preview does not shrink beside it.</td><td>The Markdown preview is app DOM, so nothing native has to move out of its way.</td></tr>
+    <tr><td><code>Comments/overlay/CommentOverlayLayer.css</code></td><td>The Markdown drawer is positioned at the end of the preview pane (<code>position: absolute</code>), not a flow sibling. Above the full-width switch the preview and the overlay layer give up its width, so nothing is covered.</td><td>The preview, its overlay layer and the drawer are siblings in one pane that other features also fill.</td></tr>
   </tbody>
 </table>
 </section>

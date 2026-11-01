@@ -25,6 +25,7 @@
  * keeps "Hidden on the page". Opening one section of an exclusive accordion
  * (`<details name>`) closes its open sibling, as a click on its summary would.
  */
+import { foldsHiding } from '../../shared/comments/overlayCore/reveal'
 import { RESTORE_BUDGET_MS } from './constants'
 
 const HTML_NS = 'http://www.w3.org/1999/xhtml'
@@ -60,12 +61,12 @@ function isSummary(child: Element): boolean {
  * only.
  */
 export function openAround(element: Element): number {
-  const closed: HTMLDetailsElement[] = []
-  let child: Element = element
-  for (let parent = element.parentElement; parent !== null; child = parent, parent = parent.parentElement) {
-    if (isSection(parent) && !parent.open && !isSummary(child)) closed.push(parent)
-  }
-  for (const section of closed.reverse()) section.open = true
+  const closed = foldsHiding<Element>(element, {
+    parentOf: node => node.parentElement,
+    isClosed: node => isSection(node) && !node.open,
+    showsWhileClosed: (_section, child) => isSummary(child)
+  })
+  for (const section of closed) (section as HTMLDetailsElement).open = true
   return closed.length
 }
 

@@ -64,4 +64,11 @@ describe('overlayCss', () => {
     expect(hidden.startsWith(shown)).toBe(true)
     expect(hidden.slice(shown.length)).toBe(HIDE_RULE)
   })
+
+  it('K-20 the mark takes the deep bar on a light page, in every look, and a changed mark is dashed with no fill', () => {
+    const css = overlayCss({ ...DEFAULT_THEME, accentDeep: '#123456' })
+    expect(css).toMatch(/\.erf-hpc-mark--light[^{]*\{[^}]*border-bottom-color: #123456/)
+    expect(css).toMatch(/\.erf-hpc-mark--active\.erf-hpc-mark--light \{[^}]*#123456/)
+    expect(css).toMatch(/\.erf-hpc-mark--changed:not\(\.erf-hpc-mark--active\) \{[^}]*background: transparent[^}]*dashed/)
+  })
 })

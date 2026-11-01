@@ -48479,7 +48479,7 @@
       "quote": "top-centre tab \"Comment mode · Esc to leave\" (moves to the bottom when the pointer comes within 48 px)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/constants.ts:131",
+      "source": "src/shared/comments/overlayCore/reveal.ts:15",
       "match": "MODE_TAB_AVOID_PX = 48"
     },
     {
@@ -48489,7 +48489,7 @@
       "quote": "- Cursor: system `crosshair`.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/overlayStyles.ts:123",
+      "source": "src/preload/previewPageComments/overlayStyles.ts:128",
       "match": "cursor: crosshair !important"
     },
     {
@@ -48510,7 +48510,7 @@
       "quote": "≤ 2 classes then `…`, ≤ 40 characters",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/constants.ts:133",
+      "source": "src/preload/previewPageComments/constants.ts:131",
       "match": "LABEL_MAX_CHARS = 40"
     },
     {
@@ -48531,7 +48531,7 @@
       "quote": "PDF export: the overlay is hidden while printing, so pins never land in the PDF.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/overlayStyles.ts:118",
+      "source": "src/preload/previewPageComments/overlayStyles.ts:123",
       "match": "@media print { .erf-hpc-root { display: none; } }"
     },
     {
@@ -48664,7 +48664,7 @@
       "quote": "Reduced motion: no transitions; flash = static highlight for 1.5 s",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/constants.ts:94",
+      "source": "src/shared/comments/overlayCore/reveal.ts:12",
       "match": "REVEAL_FLASH_MS = 1_500"
     },
     {
@@ -48684,7 +48684,7 @@
       "quote": "`leading` ← `--leading-snug` (the line height was a typed 1.4)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentOverlayTheme.ts:49",
+      "source": "src/main/services/preview/comments/commentOverlayTheme.ts:51",
       "match": "leading: '1.375' // --leading-snug"
     },
     {
@@ -48988,7 +48988,7 @@
       "quote": "The stored quote is already sent for every thread (commentListCore.ts:97-108)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/comments/commentListCore.ts:213",
+      "source": "src/main/services/comments/commentListCore.ts:215",
       "match": "...(quote === undefined ? {} : { quote })"
     },
     {
@@ -49111,7 +49111,7 @@
       "quote": "after a coordinate hit test (controller.ts:229-231, verified)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/controller.ts:241",
+      "source": "src/preload/previewPageComments/controller.ts:243",
       "match": "event.detail > 0"
     },
     {
@@ -49410,7 +49410,7 @@
       "quote": "The drawer draws one heading from the first row (CommentDrawer.tsx:367-370)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/CommentDrawer.tsx:420",
+      "source": "src/renderer/src/components/Comments/CommentDrawer.tsx:427",
       "match": "visible[0].displayPath"
     },
     {
@@ -50014,7 +50014,7 @@
       "quote": "unfold the sections around the comment's element so its pin shows",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/foldedSections.ts:62",
+      "source": "src/preload/previewPageComments/foldedSections.ts:63",
       "match": "export function openAround(element: Element): number {"
     },
     {
@@ -50094,7 +50094,7 @@
       "quote": "| The file is not UTF-8 | Comments are unavailable: existing ones are not listed and no new ones can be added |",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentParseCore.ts:306",
+      "source": "src/main/services/preview/comments/commentParseCore.ts:312",
       "match": "if (!decoded.ok) return { kind: 'unavailable', reason: 'encoding' }",
       "note": "Said existing comments are shown read-only. A non-UTF-8 file is instrumented as unavailable ('encoding'), parse returns no blocks, and the toolbar treats 'encoding' as unreadable (list and pins disabled), so nothing is listed."
     },
@@ -55132,7 +55132,7 @@
       "quote": "mints a fresh draft every 4 minutes",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/overlay/hostWindow.ts:40",
+      "source": "src/renderer/src/components/Comments/overlay/hostWindow.ts:41",
       "match": "export const DRAFT_REFRESH_MS = 4 * 60 * 1000"
     }
   ],

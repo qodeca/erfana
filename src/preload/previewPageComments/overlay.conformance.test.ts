@@ -18,7 +18,7 @@
  * frame, so no key reaches it. The suite skips those Esc steps for this host.
  */
 import { expect, vi } from 'vitest'
-import { COMMENT_PICK_CHANNEL, TOKEN_ATTRIBUTE } from './constants'
+import { COMMENT_PICK_CHANNEL, REVEAL_FLASH_MS, TOKEN_ATTRIBUTE } from './constants'
 import { GUARDED_EVENTS } from './input'
 import {
   createHarness,
@@ -33,6 +33,7 @@ import {
   type Harness
 } from './__test-helpers__/harness'
 import { runOverlaySuite } from '../../shared/comments/__conformance__/overlay.suite'
+import { runRevealSuite } from '../../shared/comments/__conformance__/reveal.suite'
 import { runPickerKeySuite } from '../../shared/comments/__conformance__/pickerKeys.suite'
 import { runSelectionSuite } from '../../shared/comments/__conformance__/selection.suite'
 import {
@@ -42,6 +43,8 @@ import {
   type OverlayPick,
   type OverlayTargetBox,
   type OverlayTargetId,
+  type RevealDriver,
+  type RevealTarget,
   type SelectionDriver
 } from '../../shared/comments/__conformance__/overlayDriver'
 
@@ -228,6 +231,7 @@ function driverOn(h: Harness): SelectionDriver {
       const tab = part('.erf-hpc-tab')
       return isShown(tab) ? tab.getAttribute('data-text') : null
     },
+    modeTabMovedAway: () => part('.erf-hpc-tab')?.classList.contains('erf-hpc-tab--bottom') === true,
     targets: () => [...document.querySelectorAll(`[${TARGET_ATTRIBUTE}]`)].map(el => targetOf(el) as OverlayTargetId),
     hover(point) {
       begin()
@@ -368,6 +372,54 @@ function driverOn(h: Harness): SelectionDriver {
   }
 }
 
+/** One target of each kind, each 40 px tall on its own row. */
+const REVEAL_BOXES: Readonly<Record<RevealTarget, OverlayTargetBox>> = {
+  plain: { left: 10, top: 10, width: 200, height: 40 },
+  folded: { left: 10, top: 60, width: 200, height: 40 },
+  hidden: { left: 10, top: 110, width: 200, height: 40 }
+}
+
+/** The real controller, told to reveal by main, as `commentGateway.reveal` ends. */
+async function makeRevealDriver(): Promise<RevealDriver> {
+  const h = createHarness()
+  mount(
+    `<p id="plain" ${T}="${token(1)}">Plain</p>` +
+      `<details id="fold"><summary>More</summary><p id="folded" ${T}="${token(2)}">Folded</p></details>` +
+      `<p id="hidden" ${T}="${token(3)}">Hidden</p>`
+  )
+  await microtasks()
+  h.controller.documentReady()
+  const ids = Object.keys(REVEAL_BOXES) as RevealTarget[]
+  const element = (id: string): HTMLElement => document.getElementById(id) as HTMLElement
+  for (const id of ids) h.doubles.setBox(element(id), REVEAL_BOXES[id])
+  h.doubles.setVisible(element('hidden'), false)
+  const icons = ids.map((key, i) => ({ key, token: token(i + 1), count: 1, status: 'open' }))
+  h.state({ showIcons: true, icons })
+  const fold = element('fold') as HTMLDetailsElement
+  return {
+    async show(target) {
+      vi.useFakeTimers()
+      h.state({ showIcons: true, icons, reveal: target })
+    },
+    scrolledTo: () => (h.doubles.scrolledIntoView.at(-1)?.element.id ?? null) as RevealTarget | null,
+    flashed() {
+      h.controller.renderNow()
+      const flash = h.root()?.querySelector<HTMLElement>('.erf-hpc-flash')
+      if (!isShown(flash)) return null
+      return ids.find(id => flash.style.top === `${REVEAL_BOXES[id].top}px`) ?? null
+    },
+    sectionOpen: () => fold.open,
+    async flashEnds() {
+      h.clock.now += REVEAL_FLASH_MS
+      await vi.advanceTimersByTimeAsync(REVEAL_FLASH_MS)
+    },
+    dispose() {
+      vi.useRealTimers()
+      h.dispose()
+    }
+  }
+}
+
 const makeDriver = async (): Promise<SelectionDriver> => {
   const h = createHarness()
   mount(PAGE)
@@ -380,3 +432,4 @@ const makeDriver = async (): Promise<SelectionDriver> => {
 runOverlaySuite('HTML', makeDriver)
 runPickerKeySuite('HTML', makeDriver)
 runSelectionSuite('HTML', makeDriver)
+runRevealSuite('HTML', makeRevealDriver)

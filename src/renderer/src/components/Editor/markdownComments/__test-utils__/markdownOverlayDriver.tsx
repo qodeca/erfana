@@ -301,6 +301,7 @@ export async function createMarkdownOverlayDriver(): Promise<SelectionDriver> {
     },
     isModeOn,
     modeIndicatorText: tabText,
+    modeTabMovedAway: () => byTestId(TEST_IDS.COMMENT_HOST_MODE_TAB)?.className.includes('--bottom') === true,
     targets: () => [...elements.keys()],
     hover(point) {
       begin()

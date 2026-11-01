@@ -30,6 +30,7 @@ import { useCallback, useEffect, useRef } from 'react'
 import { useLatestRef } from '../../../hooks/useLatestRef'
 import type { FileCommentOpenDraftResult, ThreadPlacement } from '../../../../../shared/ipc/file-comment-schema'
 import type { CommentDock } from '../CommentWindowShell'
+import type { CommentWindowRequest } from '../commentWindowTypes'
 import type { NounSource } from '../commentTargetNoun'
 import { nounTargetOf, type PreviewCommentAdapter } from './previewAdapter'
 
@@ -60,6 +61,30 @@ export type HostDock = Omit<CommentDock, 'anchor' | 'label'> & { readonly anchor
 export function threadTarget(threadKey: string, placements: readonly ThreadPlacement[], adapter: PreviewCommentAdapter): HTMLElement | null {
   const placement = placements.find(p => p.threadKey === threadKey)
   return placement === undefined ? null : adapter.attach(placement)
+}
+
+/**
+ * The element an open window belongs to (I-9): a new comment's pick, the thread
+ * a step moved to, or the window's first thread.
+ *
+ * @param request - The open window, or `null`.
+ * @param stepped - The thread a step moved it to, or `null`.
+ * @param picked - The picked element of a new comment's draft.
+ * @param placements - Where main placed the listed threads.
+ * @param adapter - The preview's adapter.
+ * @returns The rendered target, or `null` when there is none.
+ */
+export function windowTargetOf(
+  request: CommentWindowRequest | null,
+  stepped: string | null,
+  picked: (draftToken: string) => HTMLElement | null,
+  placements: readonly ThreadPlacement[],
+  adapter: PreviewCommentAdapter
+): HTMLElement | null {
+  if (request === null) return null
+  if (request.kind === 'new') return picked(request.draftToken)
+  const shown = stepped ?? request.threadKeys[0]
+  return shown === undefined ? null : threadTarget(shown, placements, adapter)
 }
 
 /**

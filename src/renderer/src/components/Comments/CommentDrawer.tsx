@@ -106,6 +106,8 @@ export interface CommentDrawerProps {
   readonly onShowIconsChange: (show: boolean) => void
   /** An arrow key, Home or End onto a row whose target is in the preview ("Show in preview", R-10). Not called in a full-width drawer. */
   readonly onReveal: (row: DrawerRow) => void
+  /** The last "Show in preview" could not show its target: said here, in view, not only aloud (I-6). */
+  readonly revealNote?: string | null
   /**
    * Open in file for a row. Since R-10 the drawer itself no longer calls it – Enter or a click
    * opens the row's window, which carries Open in file – but the hosts still provide it.
@@ -412,6 +414,11 @@ export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
       {list.status === 'ready' && list.unread !== undefined && (
         <div className="erf-comment-drawer__note">
           <CommentBanner kind="info" testId={TEST_IDS.COMMENT_DRAWER_UNREAD}>{unreadFilesText(list.unread)}</CommentBanner>
+        </div>
+      )}
+      {props.revealNote != null && (
+        <div className="erf-comment-drawer__note">
+          <CommentBanner kind="info" testId={TEST_IDS.COMMENT_DRAWER_REVEAL_NOTE}>{props.revealNote}</CommentBanner>
         </div>
       )}
       <div className="erf-comment-drawer__scroll" ref={scrollRef}>

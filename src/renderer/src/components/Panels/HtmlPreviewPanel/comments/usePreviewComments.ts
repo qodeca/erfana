@@ -47,6 +47,7 @@ import { newCommentOnPin } from '../../../Comments/commentWindowHeading'
 import type { CommentWindowRequest, ElementDraft } from '../../../Comments/commentWindowTypes'
 import { useCommentSettleNotices } from '../../../Comments/useCommentSettleNotices'
 import { useDrawerSheet } from './useDrawerSheet'
+import { useRevealNote } from './useRevealNote'
 import { listCounts, type DrawerRow } from '../../../Comments/commentRows'
 import type { PreviewCommentsLayerProps } from './PreviewCommentsLayer'
 import { useLiveText } from '../../../Comments/commentLive'
@@ -295,6 +296,7 @@ export function usePreviewComments({
     [containerApi]
   )
 
+  const { note: revealNote, watch: watchReveal } = useRevealNote(state.notVisible, DRAWER_COPY.notOnScreen, announce)
   const reveal = useCallback(
     (row: DrawerRow) => {
       if (row.threadKey === undefined) return
@@ -305,11 +307,9 @@ export function usePreviewComments({
         store.getState().patch(panelId, { drawerOpen: false })
         focusPageSoon(panelId)
       }
-      void commentGateway.reveal(panelId, row.threadKey)
-      if (row.tags.some(tag => tag.text === DRAWER_COPY.notVisible))
-        announce(DRAWER_COPY.notOnScreen)
+      watchReveal(row.threadKey, row.tags.some(tag => tag.text === DRAWER_COPY.notVisible), commentGateway.reveal(panelId, row.threadKey))
     },
-    [narrow, panelId, store, announce]
+    [narrow, panelId, store, watchReveal]
   )
 
   // `returnFocus: false` – "Go to tab" moves focus to the editor itself, and
@@ -395,6 +395,7 @@ export function usePreviewComments({
           onClose: () => setDrawerOpen(false),
           onShowIconsChange: show => void setMode(latestRef.current.mode, show),
           onReveal: reveal,
+          revealNote,
           onOpenInSource: row => openInSource(row.filePath, row.line),
           onOpen: row => openRow(row, row.main === 'reveal'),
           onRetry: () => void refreshList(),

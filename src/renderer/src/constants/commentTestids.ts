@@ -177,6 +177,8 @@ export const COMMENT_TEST_IDS = {
   COMMENT_DRAWER_ERROR: 'comment-drawer-error',
   /** Note: main left files out of the list (its file count or byte budget) */
   COMMENT_DRAWER_UNREAD: 'comment-drawer-unread',
+  /** The drawer's sentence when "Show in preview" could not show its target (I-6). */
+  COMMENT_DRAWER_REVEAL_NOTE: 'comment-drawer-reveal-note',
 
   // Settings
   /** Settings › Comments section */
@@ -205,6 +207,10 @@ export const COMMENT_TEST_IDS = {
   COMMENT_HOST_OVERLAY: 'comment-host-overlay',
   /** The outline around the outlined or picked target */
   COMMENT_HOST_OUTLINE: 'comment-host-outline',
+  /** The static highlight on a target "Show in preview" reached (K-22). */
+  COMMENT_HOST_FLASH: 'comment-host-flash',
+  /** The quiet outline on the target of the open window (I-9). */
+  COMMENT_HOST_WINDOW_TARGET: 'comment-host-window-target',
   /** A comment icon (a real button, outside the Tab order – D-07) */
   COMMENT_HOST_ICON: 'comment-host-icon',
   /** A not-found comment's ghost, at its place between two blocks (a real button – C-05, R-16) */

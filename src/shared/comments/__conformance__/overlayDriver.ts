@@ -155,6 +155,9 @@ export interface OverlayDriver {
   /** The comment-mode indicator's words while it is shown, else `null`. Optional: see `notOwned.modeIndicator`. */
   modeIndicatorText?(): string | null
 
+  /** The mode tab has moved away from the top edge (A-03, I-19). */
+  modeTabMovedAway(): boolean
+
   /** The targets the host laid out (the whole fixture). */
   targets(): readonly OverlayTargetId[]
 
@@ -371,6 +374,25 @@ export interface WindowRulesDriver {
   removeShown(): Promise<void>
   /** The window's actions in order: the foot's buttons, then More actions' items, opened by keys. */
   actions(): Promise<readonly string[]>
+  /** Remove everything the driver added. */
+  dispose(): void | Promise<void>
+}
+
+/** Where a comment's target is: in plain view, inside a closed section, or kept from showing any other way. */
+export type RevealTarget = 'plain' | 'folded' | 'hidden'
+
+/** "Show in preview" in one host, on a fixture holding one target of each {@link RevealTarget}. */
+export interface RevealDriver {
+  /** "Show in preview" on the comment on `target`, settled. */
+  show(target: RevealTarget): Promise<void>
+  /** The target last scrolled to, or `null`. */
+  scrolledTo(): RevealTarget | null
+  /** The target wearing the flash now, or `null`. */
+  flashed(): RevealTarget | null
+  /** The closed section around `folded` is open now. */
+  sectionOpen(): boolean
+  /** Settled once the flash's time has passed. */
+  flashEnds(): Promise<void>
   /** Remove everything the driver added. */
   dispose(): void | Promise<void>
 }

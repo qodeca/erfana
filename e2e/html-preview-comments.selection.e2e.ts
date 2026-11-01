@@ -19,6 +19,7 @@
  * disabled in CI. Condition-based waits only.
  */
 
+import * as fsp from 'fs/promises'
 import * as path from 'path'
 import { test, expect } from './fixtures/index'
 import {
@@ -28,6 +29,8 @@ import {
   expectPin,
   mouseAt,
   openCommentPage,
+  pagePng,
+  pointerOut,
   pressInPage,
   resetCommentSettings,
   reviewer,
@@ -39,6 +42,7 @@ import {
 import { waitForCommentLoad } from './pages/html-preview.comments'
 import { HtmlPreviewPage, PREVIEW_BUDGET_MS } from './pages/html-preview.page'
 import { TEST_IDS } from '../src/renderer/src/constants/testids'
+import { barRowsIn, INDIGO_RGB, type BarRows } from './utils/bar-rows'
 
 const PAGE = 'comments/selection.html'
 const TITLE = '-HPC-SEL-'
@@ -202,5 +206,42 @@ test.describe('HTML Preview comments – selected words (024-AC-004)', () => {
     expect(await mouseAt(app, { x: far, y }, 'left', TARGET), 'no preview to click').toBe(true)
     await expect(chrome.window()).toContainText('Note-SEL-far', { timeout: PREVIEW_BUDGET_MS })
     await expect(chrome.window()).not.toContainText('Note-SEL-near')
+  })
+
+  test('K-20, I-14 on a white page a mark takes the deep bar; changed words are dashed on the new words', async ({ windowWithTestProject, appWithTestProject, testProject }, testInfo) => {
+    const app = appWithTestProject
+    const page = windowWithTestProject
+    const preview = new HtmlPreviewPage(page, app)
+    const chrome = new CommentChrome(page, preview, 'selection.html')
+    const file = path.join(testProject.path, PAGE)
+    await setGlobalSetting(page, 'comments', reviewer(NAME))
+    const panelId = await openCommentPage(preview, app, PAGE, TITLE)
+    await chrome.modeOn(app, panelId, TARGET)
+    await selectWords(app)
+    expect(await pressInPage(app, 'Enter', [], TARGET)).toBe(true)
+    await expect(chrome.window()).toHaveAttribute('data-view', /^(identity|new)$/, { timeout: PREVIEW_BUDGET_MS })
+    await chrome.saveNewComment('Note-SEL-k20', PAGE, NAME)
+    await waitForCommentLoad(app, PAGE, 'page', 1)
+    await chrome.modeButton().click()
+    await expect(chrome.modeButton()).toHaveAttribute('aria-pressed', 'false')
+    await pointerOut(app, TARGET)
+
+    const line = await waitForBox(app, 'ship', TARGET)
+    const barsIn = async (name: string, rgb: typeof INDIGO_RGB): Promise<BarRows | null> => {
+      const still = await pagePng(app, line, TARGET)
+      if (still === null) return null
+      await fsp.writeFile(testInfo.outputPath(name), still)
+      return barRowsIn(still, rgb)
+    }
+    await expect.poll(async () => (await barsIn('k20-white-page.png', INDIGO_RGB))?.solid ?? 0, { timeout: PREVIEW_BUDGET_MS }).toBeGreaterThanOrEqual(1)
+
+    // The words are edited on disk: their mark moves to the new words, dashed.
+    const bytes = await fsp.readFile(file, 'utf-8')
+    const exact = /"exact":"([^"]+)"/.exec(bytes.slice(bytes.indexOf('"sel"')))?.[1] ?? ''
+    expect(exact).not.toBe('')
+    const shown = 'We ship the beta to ten customers by Friday.'
+    await fsp.writeFile(file, bytes.replace(`>${shown}<`, `>${shown.replace(exact.trim(), 'Rewritten words stand here')}<`))
+    await waitForCommentLoad(app, PAGE, 'page', 1)
+    await expect.poll(async () => (await barsIn('i14-html-now-words.png', INDIGO_RGB))?.dashes ?? 0, { timeout: PREVIEW_BUDGET_MS }).toBeGreaterThanOrEqual(3)
   })
 })

@@ -89,6 +89,7 @@ describe('countsOf and addCounts', () => {
 describe('COMMENT_OVERLAY_THEME', () => {
   const mapping: Record<keyof CommentOverlayTheme, string> = {
     accent: '--color-accent-primary',
+    accentDeep: '--color-brand-indigo',
     accentHover: '--color-brand-violet-hover',
     ink: '--color-brand-black',
     paper: '--color-brand-white',
@@ -125,6 +126,13 @@ describe('I-13 which thread a mark belongs to', () => {
   const sel = (exact: string): AnchorSelection => ({ exact, prefix: '', suffix: '' })
   const ok = (id: string, words?: AnchorSelection): CommentLoadView['blocks'][number] =>
     ({ kind: 'ok', token: 'a'.repeat(12), status: 'open', id, ...(words === undefined ? {} : { sel: words }) }) as CommentLoadView['blocks'][number]
+
+  it('K-20 each of a pin\'s words says whether its own thread changed: a neighbour on the element stays plain', () => {
+    const changed = { ...ok('t1', sel('one')), changed: true } as CommentLoadView['blocks'][number]
+    const [pin] = groupPins({ blocks: [changed, ok('t2', sel('two'))] })
+    expect(pin.words?.map(words => words.changed)).toEqual([true, undefined])
+    expect(threadsOfWords(pin, 0)).toEqual(['t1'])
+  })
 
   it('I-13 one thread per words; the same words on two threads open both', () => {
     const [pin] = groupPins({ blocks: [ok('t1', sel('one')), ok('t2', sel('two')), ok('t3', sel('one')), ok('t4')] })

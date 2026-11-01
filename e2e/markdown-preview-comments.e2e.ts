@@ -39,6 +39,7 @@ import { ProjectTreePage } from './pages/project-tree.page'
 import { TabBarPage } from './pages/tab-bar.page'
 import { reviewer, setGlobalSetting } from './pages/html-preview.comments-ui'
 import { TEST_IDS } from '../src/renderer/src/constants/testids'
+import { ACCENT_RGB, barRowsIn, type BarRows } from './utils/bar-rows'
 import { PIN_BOX_PX, placePin, type Box } from '../src/shared/comments/overlayCore/pinLayout'
 
 const FILE = 'review.md'
@@ -65,7 +66,10 @@ const REPLY = 'MdReply-13-Pz04: agreed'
 const MOD = process.platform === 'darwin' ? 'Meta' : 'Control'
 const MODE_KEY = process.platform === 'darwin' ? 'Meta+Alt+KeyM' : 'Control+Alt+KeyM'
 
-test.use({ testProjectFiles: { [FILE]: TEXT } })
+const FOLD = 'fold.md'
+const FOLD_TEXT = 'Intro paragraph.\n\nFolded paragraph.\n\nEnd paragraph.\n'
+
+test.use({ testProjectFiles: { [FILE]: TEXT, [FOLD]: FOLD_TEXT } })
 
 test.describe('Markdown Preview comments', () => {
   test.afterEach(async ({ windowWithTestProject }) => {
@@ -736,6 +740,176 @@ test.describe('Markdown Preview comments', () => {
     })
     expect(mark.inBlock, 'the marked words are not inside their paragraph').toBe(true)
     expect(mark.decoration).toMatch(/text-decoration:\s*underline/)
+  })
+
+  test('K-21 (Markdown) the solid, double and dashed bars really draw through ::highlight()', async ({ windowWithTestProject }, testInfo) => {
+    const page = windowWithTestProject
+    const md = await openReview(page)
+    const paragraph = md.target('p', 3)
+    const paint = (name: string | null): Promise<void> =>
+      paragraph.evaluate((el, highlight) => {
+        for (const old of ['erf-comment', 'erf-comment-active', 'erf-comment-changed']) CSS.highlights.delete(old)
+        if (highlight === null) return
+        const range = document.createRange()
+        range.selectNodeContents(el)
+        const mark = new Highlight(range)
+        mark.priority = -1
+        CSS.highlights.set(highlight, mark)
+      }, name)
+    const barsOf = async (name: string): Promise<BarRows> => {
+      await paint(name)
+      // Two frames: the highlight is painted on the next one.
+      await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))))
+      // The whole bar: it may hang below the paragraph's box.
+      const box = (await paragraph.boundingBox())!
+      const still = await page.screenshot({ path: testInfo.outputPath(`k21-${name}.png`), clip: { ...box, height: box.height + 10 } })
+      return barRowsIn(still, ACCENT_RGB)
+    }
+
+    // Polled: a highlight registered between frames shows on the next paint, and the still must wait for it.
+    await expect.poll(async () => (await barsOf('erf-comment')).solid, { message: 'erf-comment draws a solid bar' }).toBeGreaterThanOrEqual(1)
+    await expect.poll(async () => (await barsOf('erf-comment-active')).bands, { message: 'erf-comment-active draws two bars' }).toBe(2)
+    await expect
+      .poll(async () => barsOf('erf-comment-changed'), { message: 'erf-comment-changed draws a dashed bar, never a solid one' })
+      .toMatchObject({ solid: 0, dashes: expect.any(Number) })
+    expect((await barsOf('erf-comment-changed')).dashes).toBeGreaterThanOrEqual(3)
+  })
+})
+
+test.describe('Markdown Preview comments – reveal, marks and the drawer (plan step 10)', () => {
+  test.afterEach(async ({ windowWithTestProject }) => {
+    await setGlobalSetting(windowWithTestProject, 'comments', { identityNoticeSeen: false })
+  })
+
+  async function openFile(page: Parameters<typeof setGlobalSetting>[0], name: string): Promise<MarkdownCommentsPage> {
+    await setGlobalSetting(page, 'comments', { authorName: NAME, identityNoticeSeen: true })
+    const md = new MarkdownCommentsPage(page)
+    await new ProjectTreePage(page).fileRow(name).click()
+    await md.editor.waitForReady()
+    await md.waitForComments()
+    return md
+  }
+
+  const commentOn = async (md: MarkdownCommentsPage, text: string, file: string): Promise<void> => {
+    await md.content().locator('p', { hasText: text }).click()
+    await md.saveNewComment(NOTE, file, NAME)
+  }
+
+  const widen = (app: Parameters<Parameters<typeof test>[2]>[0]['appWithTestProject']): Promise<void> =>
+    app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1800, 800))
+
+  test('I-6, K-22, P-F07 (Markdown) Show in preview opens the folded part, scrolls and flashes', async ({ windowWithTestProject, appWithTestProject, testProject }, testInfo) => {
+    const page = windowWithTestProject
+    await widen(appWithTestProject)
+    const file = path.join(testProject.path, FOLD)
+    const md = await openFile(page, FOLD)
+    await md.modeOn()
+    await commentOn(md, 'Intro paragraph.', FOLD)
+    await commentOn(md, 'Folded paragraph.', FOLD)
+    await md.modeButton().click()
+    // An agent folds the second comment's paragraph into a section.
+    const written = await fsp.readFile(file, 'utf-8')
+    const start = written.lastIndexOf('<!-- erfana:comment v1')
+    await fsp.writeFile(
+      file,
+      `${written.slice(0, start)}<details>\n<summary>More</summary>\n\n${written.slice(start).replace(/\nEnd paragraph\.\n$/, '\n</details>\n\nEnd paragraph.\n')}`
+    )
+    const section = md.content().locator('details')
+    await expect(section).toHaveCount(1, { timeout: MD_COMMENT_BUDGET_MS })
+    await expect.poll(() => section.evaluate(el => (el as HTMLDetailsElement).open)).toBe(false)
+
+    await md.listButton().click()
+    const rows = md.drawer().getByTestId(TEST_IDS.COMMENT_DRAWER_ROW_MAIN)
+    await expect(rows).toHaveCount(2, { timeout: MD_COMMENT_BUDGET_MS })
+    await rows.first().focus()
+    await page.keyboard.press('ArrowDown')
+    await expect.poll(() => section.evaluate(el => (el as HTMLDetailsElement).open)).toBe(true)
+    await expect(section.locator('p', { hasText: 'Folded paragraph.' })).toBeInViewport()
+    const flash = page.getByTestId(TEST_IDS.COMMENT_HOST_FLASH)
+    await expect(flash).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath('i6-flash.png') })
+    await expect(flash).toHaveCount(0, { timeout: MD_COMMENT_BUDGET_MS })
+    await expect(page.getByTestId(TEST_IDS.COMMENT_DRAWER_REVEAL_NOTE)).toHaveCount(0)
+  })
+
+  test('I-9 (Markdown) the open window names its target: a selected icon and a quiet outline, gone with the window', async ({ windowWithTestProject }, testInfo) => {
+    const page = windowWithTestProject
+    const md = await openFile(page, FILE)
+    await md.modeOn()
+    await commentOn(md, 'Closing paragraph.', FILE)
+    await md.modeButton().click()
+    await expect(md.icons()).toHaveCount(1, { timeout: MD_COMMENT_BUDGET_MS })
+    await md.icons().click()
+    await expect(md.window()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await expect(md.icons()).toHaveClass(/erf-comment-host__icon--selected/)
+    const outline = page.getByTestId(TEST_IDS.COMMENT_HOST_WINDOW_TARGET)
+    await expect(outline).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath('i9-selected.png') })
+    await page.keyboard.press('Escape')
+    await expect(md.window()).toHaveCount(0)
+    await expect(outline).toHaveCount(0)
+    await expect(md.icons()).not.toHaveClass(/--selected/)
+  })
+
+  test('I-14 (Markdown) the new words of a Words changed comment wear the dashed bar', async ({ windowWithTestProject, testProject }, testInfo) => {
+    const page = windowWithTestProject
+    const file = path.join(testProject.path, FILE)
+    const md = await openFile(page, FILE)
+    const at = await md.selectWords('p', 3, 'paragraph of')
+    await page.mouse.click(at.x, at.y, { button: 'right' })
+    await page.getByTestId(TEST_IDS.COMMENT_MENU_SELECTION).click()
+    await md.saveNewComment(NOTE, FILE, NAME)
+    await expect.poll(() => md.markedWords(), { timeout: MD_COMMENT_BUDGET_MS }).toEqual(['paragraph of'])
+
+    const written = await fsp.readFile(file, 'utf-8')
+    await fsp.writeFile(file, written.replace('\nFirst paragraph of the review.', '\nFirst version here the review.'))
+    const changed = (): Promise<string[]> =>
+      page.evaluate(() => [...(CSS.highlights.get('erf-comment-changed') ?? [])].map(range => (range as Range).toString()))
+    await expect.poll(changed, { timeout: MD_COMMENT_BUDGET_MS }).toEqual(['version here'])
+    const paragraph = md.content().locator('p', { hasText: 'First version here' })
+    const box = (await paragraph.boundingBox())!
+    await expect
+      .poll(async () => (await barRowsIn(await page.screenshot({ path: testInfo.outputPath('i14-now-words.png'), clip: { ...box, height: box.height + 10 } }), ACCENT_RGB)).dashes)
+      .toBeGreaterThanOrEqual(3)
+  })
+
+  test('I-19 (Markdown) comment mode: the crosshair over the preview, and the tab moves away near the top', async ({ windowWithTestProject }, testInfo) => {
+    const page = windowWithTestProject
+    const md = await openFile(page, FILE)
+    const paragraph = md.target('p', 3)
+    await expect(paragraph).toHaveCSS('cursor', /^(auto|text)$/)
+    await md.modeOn()
+    await expect(paragraph).toHaveCSS('cursor', 'crosshair')
+    const pane = (await md.overlay().boundingBox())!
+    await page.mouse.move(pane.x + pane.width / 2, pane.y + 10)
+    await expect(md.modeTab()).toHaveClass(/--bottom/)
+    await page.screenshot({ path: testInfo.outputPath('i19-tab-bottom.png') })
+    await page.mouse.move(pane.x + pane.width / 2, pane.y + 200)
+    await expect(md.modeTab()).not.toHaveClass(/--bottom/)
+    await page.keyboard.press('Escape')
+    await expect(paragraph).not.toHaveCSS('cursor', 'crosshair')
+  })
+
+  test('I-20 (Markdown) the drawer sits beside the preview: it covers no icon, and the window stays out of it', async ({ windowWithTestProject, appWithTestProject }, testInfo) => {
+    const page = windowWithTestProject
+    await widen(appWithTestProject)
+    const md = await openFile(page, FILE)
+    await md.modeOn()
+    await commentOn(md, 'First paragraph of the review.', FILE)
+    await md.modeButton().click()
+    await expect(md.icons()).toHaveCount(1, { timeout: MD_COMMENT_BUDGET_MS })
+    const before = (await md.preview().boundingBox())!
+    await md.listButton().click()
+    await expect(md.drawer()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    const drawer = (await md.drawer().boundingBox())!
+    await expect.poll(async () => (await md.preview().boundingBox())!.width).toBeLessThanOrEqual(before.width - drawer.width + 1)
+    const icon = (await md.icons().boundingBox())!
+    expect(icon.x + icon.width, 'the icon runs under the drawer').toBeLessThanOrEqual(drawer.x)
+    await md.icons().click()
+    await expect(md.window()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    const win = (await md.window().boundingBox())!
+    expect(win.x + win.width, 'the window runs over the drawer').toBeLessThanOrEqual(drawer.x)
+    await page.screenshot({ path: testInfo.outputPath('i20-drawer-beside.png') })
   })
 })
 

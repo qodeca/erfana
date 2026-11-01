@@ -43,6 +43,29 @@
   border-radius: 0;
 }
 
+/* The pointer near the top: the tab moves out of the way of the first line (I-19, the HTML tab's rule). */
+.erf-comment-host__tab--bottom {
+  top: auto;
+  bottom: 0;
+}
+
+/* The target of the open window (I-9): a quiet line, thinner than the picked target's ring. */
+.erf-comment-host__window-target {
+  position: absolute;
+  outline: var(--border-width) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+  border-radius: 0;
+}
+
+/* Where "Show in preview" landed (K-22): static, as the HTML flash – the accent edge over a 24% fill. */
+.erf-comment-host__flash {
+  position: absolute;
+  box-sizing: border-box;
+  border: var(--border-width-thick) solid var(--color-accent-primary);
+  background-color: color-mix(in srgb, var(--color-accent-primary) 24%, transparent);
+  border-radius: 0;
+}
+
 .erf-comment-host__outline {
   position: absolute;
   outline: var(--border-width-thick) solid var(--color-border-focus);
@@ -101,9 +124,24 @@
 }
 
 /* Hover – on the icon, or on one of its marked words (C-17 linked hover) – recolours an open icon only. */
-.erf-comment-host__icon:not(.erf-comment-host__icon--damaged):hover .erf-comment-host__pin-body,
-.erf-comment-host__icon--hover:not(.erf-comment-host__icon--damaged) .erf-comment-host__pin-body {
+.erf-comment-host__icon:not(.erf-comment-host__icon--damaged, .erf-comment-host__icon--selected):hover .erf-comment-host__pin-body,
+.erf-comment-host__icon--hover:not(.erf-comment-host__icon--damaged, .erf-comment-host__icon--selected) .erf-comment-host__pin-body {
   fill: var(--color-brand-violet-hover);
+}
+
+/* The open window's icon (I-9): the bubble inverts, as the HTML pin's selected look. */
+.erf-comment-host__icon--selected .erf-comment-host__pin-body {
+  fill: var(--color-brand-black);
+  stroke: var(--color-accent-primary);
+  stroke-width: var(--border-width-thick);
+}
+
+.erf-comment-host__icon--selected .erf-comment-host__pin-line {
+  fill: var(--color-accent-primary);
+}
+
+.erf-comment-host__icon--selected .erf-comment-host__count {
+  color: var(--color-accent-primary);
 }
 
 /* Damaged (S-07, S-08): the warning fill with an ink "!". */
@@ -142,15 +180,29 @@
   outline-offset: var(--space-1);
 }
 
+/* Comment mode: the preview reads as a picking surface (I-19), as the HTML page does. */
+.erf-comment-host-pane--mode > .markdown-preview,
+.erf-comment-host-pane--mode > .markdown-preview * {
+  cursor: crosshair;
+}
+
 /* C-17: the pointer on marked words – a hand over the pane (its title names the author). */
 .erf-comment-host-pane--mark,
 .erf-comment-host-pane--mark * {
   cursor: pointer;
 }
 
-/* The drawer docks over the right edge of the pane. */
+/* The drawer docks at the right edge of the pane, and the preview and the layer stop at it (I-20): nothing it lists hides under it. */
+.preview-pane:has(> .erf-comment-host__drawer:not(.erf-comment-host__drawer--full)) > .markdown-preview {
+  inline-size: calc(100% - var(--comments-drawer-width));
+}
+
+.preview-pane:has(> .erf-comment-host__drawer:not(.erf-comment-host__drawer--full)) > .erf-comment-host {
+  inset-inline-end: var(--comments-drawer-width);
+}
+
 .erf-comment-host__drawer {
-  /* deviates: docs/design-system/system/patterns/drawer/index.html – docked over the Markdown preview pane, not a flow sibling */
+  /* deviates: docs/design-system/system/patterns/drawer/index.html – positioned in the Markdown preview pane, which reserves its width, not a flow sibling */
   position: absolute;
   inset-block: 0;
   inset-inline-end: 0;
@@ -230,10 +282,11 @@
   color: var(--color-text-emphasis);
 }
 
-/* The words of a Changed thread (C-06): the same fill, a dashed accent bar –
-   a shape, not a colour only. */
+/* The words of a Changed thread (C-06, S-04): a dashed accent bar and no fill
+   (Text highlights card) – a shape, not a colour only. */
 ::highlight(erf-comment-changed) {
   text-decoration-style: dashed;
+  background-color: transparent;
 }
 
 /* A Changed thread's icon (C-06): a filled 4 px notch at its top-left, the
@@ -265,8 +318,6 @@
   }
 
   ::highlight(erf-comment-changed) {
-    background-color: Mark;
-    color: MarkText;
     text-decoration-color: CanvasText;
   }
 
@@ -287,6 +338,23 @@
 
   .erf-comment-host__icon .erf-comment-host__count {
     color: HighlightText;
+  }
+
+  .erf-comment-host__icon--selected .erf-comment-host__pin-body {
+    fill: Canvas;
+    stroke: Highlight;
+  }
+
+  .erf-comment-host__icon--selected .erf-comment-host__pin-line {
+    fill: Highlight;
+  }
+
+  .erf-comment-host__icon--selected .erf-comment-host__count {
+    color: Highlight;
+  }
+
+  .erf-comment-host__flash {
+    border-color: Highlight;
   }
 
   .erf-comment-host__ghost {

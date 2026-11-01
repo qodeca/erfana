@@ -58,6 +58,8 @@ The build guard is not the security control; the contract scan and the pure-core
 
 **Later note (2026-11-01, I-10, I-13).** `overlayCore/selectionRules` is a new pure file, with no imports. In the page, the check that the selection is still there is a timer that asks for a redraw, not a `selectionchange` listener. A mark's click sends the existing `icon` pick, with `key` holding the pin's key plus the place of the words in that pin (`markKeyOf`, used by both sides): no field, channel or listener was added on either direction, and no thread id reaches the page. Main accepts only a place its own pin has, so a false key can only narrow what a pin of that frame opens. `previewPage.surface.pin.test.ts` and the pick schema pins pass unchanged.
 
+**Later note (2026-11-01, K-20, I-14, I-19).** `overlayCore/reveal` and `overlayCore/markGround` are new pure files, with no imports; the page's `openAround` and mode tab now use them. The page reads the computed `background-color` of a mark's ancestors, in its isolated world, to choose the bar: a read only. Main→page gains two values on the existing `commentState`: `theme.accentDeep` (a colour) and `icons[].words[].changed` (a boolean); the new words of a Words changed comment travel as `words`, which is page text. No page→main field, channel or listener was added, and no comment text, thread id or author reaches the page. `previewPage.surface.pin.test.ts` passes unchanged.
+
 ## Alternatives considered
 
 ### One overlay implementation loaded in both places

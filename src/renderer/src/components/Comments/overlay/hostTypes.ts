@@ -119,4 +119,8 @@ export interface CommentOverlayHost {
   readonly markOwner: string
   /** The threads of the open window: their words wear the active mark (R-01). */
   readonly activeThreads: readonly string[]
+  /** The target wearing "Show in preview"'s flash (K-22). */
+  readonly flash: HTMLElement | null
+  /** The element the open window belongs to (I-9). */
+  readonly windowTarget: HTMLElement | null
 }

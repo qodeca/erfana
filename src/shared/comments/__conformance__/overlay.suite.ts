@@ -33,7 +33,9 @@
  * the host's stated reason, never silently passed.
  */
 import { afterEach, beforeEach, describe, expect, it, type TestFunction } from 'vitest'
+import { OVERLAY_FIXTURE } from './overlayDriver'
 import type { ModeLeaveDriver, ModeLeavePlace, OptionalPart, OverlayDriver, OverlayPick, OverlayTargetId } from './overlayDriver'
+import { MODE_TAB_AVOID_PX } from '../overlayCore/reveal'
 
 /** The longest name part a label shows before its size (design §10.2: at most 40 characters). */
 const LABEL_NAME_MAX_CHARS = 40
@@ -373,6 +375,16 @@ export function runOverlaySuite(
         await d.open('window', 'inner')
         d.hover({ target: 'second' })
         expect(d.outlinedTarget()).toBe('inner')
+      })
+
+      caseIt('OVL-L-10 the mode tab moves away while the pointer is near the top, and comes back (I-19)', () => {
+        d.modeOn()
+        expect(d.modeTabMovedAway()).toBe(false)
+        const near = OVERLAY_FIXTURE.first.box.top + OVERLAY_FIXTURE.first.box.height / 2
+        d.hover({ target: 'first', dy: MODE_TAB_AVOID_PX - 1 - near })
+        expect(d.modeTabMovedAway()).toBe(true)
+        d.hover({ target: 'first', dy: MODE_TAB_AVOID_PX - near })
+        expect(d.modeTabMovedAway()).toBe(false)
       })
 
       caseIt(`OVL-L-04 a label's name never runs past ${LABEL_NAME_MAX_CHARS} characters, and it ends in the size`, ctx => {

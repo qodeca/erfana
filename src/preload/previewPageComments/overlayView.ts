@@ -74,6 +74,8 @@ export interface ViewModel {
   readonly pinLabel: (pin: PinPlacement) => string
   /** The element whose pin is drawn selected (the one a pick just opened). */
   readonly selected: Element | null
+  /** The pin or mark key that pick named, if any: its words alone take the active look. */
+  readonly selectedKey?: string | null
   readonly shields: readonly Box[]
   readonly indicator: { readonly visible: boolean; readonly bottom: boolean }
   readonly flash: Box | null
@@ -208,21 +210,27 @@ export class OverlayView {
     shown(this.flash, model.flash !== null)
     if (model.flash !== null) place(this.flash, model.flash)
     this.renderOutline(model.outline, viewport)
-    this.renderMarks(model.marks ?? [], model.marksClickable === true, model.hover ?? NO_HOVER)
+    this.renderMarks(model)
     this.renderPins(model)
     const button = model.button ?? null
     shown(this.button, button !== null)
     if (button !== null) place(this.button, button)
   }
 
-  private renderMarks(marks: readonly MarkPlacement[], clickable: boolean, hover: LinkedHover): void {
-    this.markLayer.classList.toggle('erf-hpc-marks--clickable', clickable)
+  private renderMarks(model: ViewModel): void {
+    const marks = model.marks ?? []
+    const hover = model.hover ?? NO_HOVER
+    const key = model.selectedKey ?? null
+    const open = (mark: MarkPlacement): boolean => mark.element === model.selected && (key === null || key === mark.key || key === mark.markKey)
+    this.markLayer.classList.toggle('erf-hpc-marks--clickable', model.marksClickable === true)
     while (this.markLayer.children.length > marks.length) this.markLayer.lastElementChild?.remove()
     while (this.markLayer.children.length < marks.length) this.markLayer.append(part(this.doc, 'erf-hpc-mark'))
     marks.forEach((mark, i) => {
       const el = this.markLayer.children[i] as HTMLElement
       place(el, mark.box)
-      el.classList.toggle('erf-hpc-mark--active', hover.marks.has(mark))
+      el.classList.toggle('erf-hpc-mark--active', hover.marks.has(mark) || open(mark))
+      el.classList.toggle('erf-hpc-mark--changed', mark.changed)
+      el.classList.toggle('erf-hpc-mark--light', mark.light)
     })
   }
 

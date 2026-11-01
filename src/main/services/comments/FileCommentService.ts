@@ -405,6 +405,7 @@ export class FileCommentService {
       line: placement.line,
       tag: placement.tag,
       ...(placement.sel === undefined ? {} : { sel: { exact: placement.sel.exact, prefix: placement.sel.prefix, suffix: placement.sel.suffix } }),
+      ...(placement.now === undefined ? {} : { now: placement.now }),
       ...(placement.place === undefined ? {} : { place: placement.place })
     }))
   }

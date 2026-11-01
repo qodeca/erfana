@@ -173,6 +173,8 @@ export const ThreadPlacementSchema = z
     tag: CommentTagNameSchema,
     /** The words the thread is about (its valid `anchor.sel`), for the underline (024-FR-004). */
     sel: FileCommentSelSchema.optional(),
+    /** The new words of a Words changed comment, as main found them (S-04, I-14): underlined instead of `sel`. */
+    now: FileCommentSelSchema.optional(),
     /** C-03: where the target sits when its tag alone does not name it (a table row or cell, a diagram). */
     place: CommentTargetPlaceSchema.optional()
   })

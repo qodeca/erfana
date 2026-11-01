@@ -75,6 +75,10 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | **Added since** `src/shared/comments/overlayCore/pointerFollow.ts` (1) | S | Pure rule both overlays run: when the pointer takes the picker over. No imports, no DOM |
 | **Added since** `src/shared/comments/overlayCore/pickerKeys.ts` (1) | S | Pure rule both overlays run: the picker's keys and its tree walk. No imports, no DOM |
 | **Added since** `src/shared/comments/overlayCore/selectionRules.ts` (1) | S | Pure rule both overlays run: where the Comment button sits, and when a right-click is about the selection. No imports, no DOM |
+| **Added since** `src/shared/comments/overlayCore/reveal.ts` (1) | S | Pure rule both overlays run: which folds to open for "Show in preview", the flash's length, and when the mode tab moves away. No imports, no DOM |
+| **Added since** `src/shared/comments/overlayCore/markGround.ts` (1) | S | Pure rule: which comment bar a page's ground takes. No imports, no DOM |
+| **Added since** `src/renderer/src/components/Comments/overlay/useHostReveal.ts` (1) | S (for renderer-hosted previews) | The renderer host's "Show in preview": the flash and the drawer's note |
+| **Added since** `src/renderer/src/components/Panels/HtmlPreviewPanel/comments/useRevealNote.ts` (1) | H | The HTML Preview's half: waits for the page's report, because the target opens in the page |
 | **Added since** `src/renderer/src/components/Comments/overlay/useHostPanelKeys.ts` (1) | S (for renderer-hosted previews) | – |
 | **Added since** `src/renderer/src/components/Comments/commentWindowDismiss.ts` (1) | S | – |
 | **Added since** `src/renderer/src/components/Comments/commentModeEscape.ts` (1) | S | – |

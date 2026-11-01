@@ -11,10 +11,11 @@
  */
 import { reduceCommentMode, type CommentModeStep } from '../../shared/comments/overlayCore/modeState'
 import { AnchorReporter } from './anchors'
-import { COMMENT_HELLO_CHANNEL, COMMENT_PICK_CHANNEL, MODE_TAB_AVOID_PX } from './constants'
+import { modeTabMovesAway } from '../../shared/comments/overlayCore/reveal'
+import { COMMENT_HELLO_CHANNEL, COMMENT_PICK_CHANNEL } from './constants'
 import { EMPTY_FRAME_MAP, iframeOfKey, mapChildFrames, shieldsOf, suffixFor, type FrameMap, type Shield } from './frames'
 import { openAround, SectionRestore } from './foldedSections'
-import { boxOf, clipToViewport, viewportOf, type Box, type Point, type Viewport } from './geometry'
+import { boxOf, clipToViewport, isRendered, viewportOf, type Box, type Point, type Viewport } from './geometry'
 import { IconResolver } from './iconResolver'
 import { labelOf, labelText } from './label'
 import { OverlayHost } from './overlayHost'
@@ -75,6 +76,7 @@ export class CommentController {
   private readonly pickHold = new PickHold(() => this.deps.doc.visibilityState === 'hidden')
   private downPath: Element[] = []
   private selected: Element | null = null
+  private selectedKey: string | null = null
   private pointer: Point | null = null
   private pins: PinPlacement[] = []
   private marks: MarkPlacement[] = []
@@ -328,7 +330,7 @@ export class CommentController {
     this.entering = false
     this.pickHold.release()
     this.downPath = []
-    this.selected = null
+    this.selected = this.selectedKey = null
   }
 
   private moveTo(element: Element): void {
@@ -380,14 +382,15 @@ export class CommentController {
 
   /** Pins and marks exist only in a commentable frame: a non-commentable state carries no icons. */
   private pickIcon(key: string, element: Element, event: MouseEvent, members?: readonly PinInput[]): void {
-    this.paintSelected(element)
+    this.paintSelected(element, key)
     this.sendPick({ kind: 'icon', via: 'pointer', key, ...stackPart(members), screen: screenOf(event), view: viewOf(this.deps.win) })
   }
 
   /** The selected outline must be painted before main captures the still (§3, R3-6). */
-  private paintSelected(element: Element): void {
+  private paintSelected(element: Element, key: string | null = null): void {
     if (this.state.mode) this.current = element
     this.selected = element
+    this.selectedKey = key
     this.renderNow()
   }
 
@@ -423,7 +426,7 @@ export class CommentController {
     if (element === undefined) return
     openAround(element)
     element.scrollIntoView({ block: 'center' })
-    this.flash.start(element)
+    if (isRendered(element)) this.flash.start(element)
     this.renderNow()
   }
 
@@ -478,10 +481,11 @@ export class CommentController {
         pins: this.pins,
         pinLabel: pin => labelText(labelOf(pin.element, boxOf(pin.element), suffixFor(pin.element, this.frameMap, this.tokens), 0)),
         selected: this.selected,
+        selectedKey: this.selectedKey,
         shields: this.shields.map(s => s.box),
         indicator: {
           visible: this.state.mode && this.deps.isTop,
-          bottom: this.pointer !== null && this.pointer.y < MODE_TAB_AVOID_PX
+          bottom: modeTabMovesAway(this.pointer?.y ?? null)
         },
         flash: flash === null ? null : clipToViewport(boxOf(flash), viewport),
         marks: this.marks,

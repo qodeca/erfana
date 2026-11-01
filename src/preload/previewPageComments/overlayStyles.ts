@@ -50,7 +50,8 @@ const FORCED_COLOURS_CSS = `@media (forced-colors: active) {
   .erf-hpc-pin--changed::before { background: CanvasText; box-shadow: 0 0 0 1px Canvas; }
   .erf-hpc-pin.erf-hpc-pin--selected .erf-hpc-pin__body { fill: Canvas; stroke: Highlight; }
   .erf-hpc-pin.erf-hpc-pin--selected .erf-hpc-pin__line, .erf-hpc-pin.erf-hpc-pin--selected .erf-hpc-pin__count { fill: Highlight; color: Highlight; }
-  .erf-hpc-mark { background: Mark; border-bottom-color: CanvasText; }
+  .erf-hpc-mark, .erf-hpc-mark.erf-hpc-mark--light { background: Mark; border-bottom-color: CanvasText; }
+  .erf-hpc-mark.erf-hpc-mark--changed:not(.erf-hpc-mark--active) { background: transparent; }
   .erf-hpc-button { background: ButtonFace; color: ButtonText; border-color: ButtonText; }
   .erf-hpc-button svg { stroke: ButtonText; }
 }`
@@ -100,11 +101,15 @@ export function overlayCss(t: OverlayTheme, hidden = false): string {
 .erf-hpc-pin--stack:not(.erf-hpc-pin--damaged) .erf-hpc-pin__body { fill: ${t.ink}; stroke: ${t.accent}; }
 .erf-hpc-pin--stack:not(.erf-hpc-pin--damaged) .erf-hpc-pin__count { color: ${t.accent}; }
 ${pinFocusCss(t)}
-/* The comment mark (spec 024 C-12): the accent at 35% under the words and a continuous accent bar along their bottom – never the selection's colour. */
+/* The comment mark (spec 024 C-12): the accent at 35% under the words and a continuous bar along their bottom – never the selection's colour. The bar is the deep violet on a light ground (K-20). */
 .erf-hpc-mark { position: fixed; pointer-events: none; background: color-mix(in srgb, ${t.accent} 35%, transparent); border-bottom: ${t.ring} solid ${t.accent}; }
 .erf-hpc-marks--clickable .erf-hpc-mark { pointer-events: auto; cursor: pointer; }
-/* Linked hover (C-17): the same fill and a double bar, never a stronger fill (R-01). A double line needs three pixels. */
+/* Linked hover and the open comment (C-17, K-20): the same fill and a double bar, never a stronger fill (R-01). A double line needs three pixels. */
 .erf-hpc-mark--active { border-bottom: calc(${t.ring} + ${t.hairline}) double ${t.accent}; }
+.erf-hpc-mark--light { border-bottom-color: ${t.accentDeep}; }
+.erf-hpc-mark--active.erf-hpc-mark--light { border-bottom-color: ${t.accentDeep}; }
+/* Changed words (C-06, S-04): a dashed bar and no fill, unless their comment is open (Text highlights card). */
+.erf-hpc-mark--changed:not(.erf-hpc-mark--active) { background: transparent; border-bottom-style: dashed; }
 /* The Comment button over a selection (C-16): the ink ground with an accent edge, because the page's ground is unknown (D-37) – square, small text. */
 .erf-hpc-button { position: fixed; pointer-events: auto; cursor: pointer; display: flex; align-items: center; gap: ${t.space2}; padding: 0 ${t.space4}; font: inherit; color: ${t.paper}; background: ${t.ink}; border: ${t.hairline} solid ${t.accent}; }
 .erf-hpc-button svg { width: calc(2 * ${t.space4}); height: calc(2 * ${t.space4}); fill: none; stroke: ${t.paper}; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }

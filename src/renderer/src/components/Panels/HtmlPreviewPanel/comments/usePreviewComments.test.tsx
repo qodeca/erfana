@@ -36,6 +36,7 @@ import {
 } from './__test-helpers__/commentTestKit'
 import { carriedDrafts } from '../../../Comments/commentCarriedDrafts'
 import { ANNOUNCE, COPY, DRAWER_COPY } from '../../../Comments/commentCopy'
+import { REVEAL_SETTLE_MS } from './useRevealNote'
 import { COMMENT_LIST_COPY, HTML_WORDS, SELECTION_COPY } from '../../../Comments/commentCopyWords'
 import { drawerRows } from '../../../Comments/commentRows'
 import { usePreviewComments, type PreviewComments } from './usePreviewComments'
@@ -714,6 +715,29 @@ describe('usePreviewComments', () => {
       act(() => latest.drawer?.onReveal(row))
       expect(fake.bridge.reveal).toHaveBeenCalledWith(PANEL, 't1')
       await waitFor(() => expect(latest.layer.polite).toBe(DRAWER_COPY.notOnScreen))
+    })
+
+    it('I-6 a target that stays hidden gets the drawer\'s visible note, and a hidden sentence is said only then', async () => {
+      render(<Harness onValue={onValue} />)
+      act(() => latest.toolbar.onToggleDrawer())
+      act(() => usePreviewCommentStore.getState().patch(PANEL, { notVisible: ['t1'] }))
+      const [row] = drawerRows([fileView({ threads: [thread(1)] })], new Set(['t1'])).open
+      act(() => latest.drawer?.onReveal(row))
+      expect(latest.drawer?.revealNote ?? null).toBeNull()
+      await waitFor(() => expect(latest.drawer?.revealNote).toBe(DRAWER_COPY.notOnScreen))
+      await waitFor(() => expect(latest.layer.polite).toBe(DRAWER_COPY.notOnScreen))
+    })
+
+    it('I-6 a target its closed section hid: the page reports it visible, and no note comes', async () => {
+      render(<Harness onValue={onValue} />)
+      act(() => latest.toolbar.onToggleDrawer())
+      act(() => usePreviewCommentStore.getState().patch(PANEL, { notVisible: ['t1'] }))
+      const [row] = drawerRows([fileView({ threads: [thread(1)] })], new Set(['t1'])).open
+      act(() => latest.drawer?.onReveal(row))
+      act(() => usePreviewCommentStore.getState().patch(PANEL, { notVisible: [] }))
+      await act(() => new Promise(done => setTimeout(done, REVEAL_SETTLE_MS + 50)))
+      expect(latest.drawer?.revealNote ?? null).toBeNull()
+      expect(latest.layer.polite).not.toBe(DRAWER_COPY.notOnScreen)
     })
 
     it('Show in preview closes a full-width drawer first', () => {

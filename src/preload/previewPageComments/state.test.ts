@@ -38,6 +38,7 @@ describe('DEFAULT_THEME', () => {
   // literals – pinned here to the tokens they mirror (lint cannot see CSS in TS).
   const mapping: Record<keyof OverlayTheme, string> = {
     accent: '--color-accent-primary',
+    accentDeep: '--color-brand-indigo',
     accentHover: '--color-brand-violet-hover',
     ink: '--color-brand-black',
     paper: '--color-brand-white',

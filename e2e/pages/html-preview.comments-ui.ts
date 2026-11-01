@@ -656,6 +656,33 @@ export async function pinCoverage(app: ElectronApplication, box: ElementBox, tar
   }, { b: box, pin: pinBoxOf(box), urlIncludes: target.urlIncludes, rgb: [...PIN_ACCENT_RGB] })
 }
 
+/**
+ * The view's pixels over `box` and a little below it, as a PNG: the page's
+ * marks are drawn in a closed shadow root, so a still is their only outside
+ * view. `null` while the view cannot be captured – the caller polls.
+ */
+export async function pagePng(app: ElectronApplication, box: ElementBox, target: PreviewTarget = {}): Promise<Buffer | null> {
+  const base64 = await app.evaluate(async ({ webContents }, { b, urlIncludes }) => {
+    const wc = webContents.getAllWebContents().find((c) => {
+      try {
+        const url = c.getURL()
+        return url.startsWith('erfana-preview://') && (urlIncludes === undefined || url.includes(urlIncludes))
+      } catch {
+        return false
+      }
+    })
+    if (!wc) return null
+    const image = await wc.capturePage().catch(() => null)
+    if (image === null || image.isEmpty()) return null
+    const zoom = b.viewportWidth > 0 ? image.getSize().width / b.viewportWidth : 1
+    return image
+      .crop({ x: Math.round(b.left * zoom), y: Math.round(b.top * zoom), width: Math.round(b.width * zoom), height: Math.round((b.height + 8) * zoom) })
+      .toPNG()
+      .toString('base64')
+  }, { b: box, urlIncludes: target.urlIncludes })
+  return base64 === null ? null : Buffer.from(base64, 'base64')
+}
+
 /** A pin is drawn when its fill covers at least this share of its body (its ink "text lines" or number take the rest). */
 export const PIN_DRAWN_COVERAGE = 0.35
 /** No pin: at most a sliver of accent (a label's 1 px border) where its body would be. */

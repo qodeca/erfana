@@ -20,6 +20,9 @@ import type { CommentLoadView } from './ElementTokenTable'
 /** Marked words one pin carries to the page: more threads on one element are still in its pin and the drawer. */
 export const PIN_WORDS_MAX = 20
 
+/** Words a pin marks; `changed`: their own thread is Changed or Words changed (K-20), so they wear the dashed bar. */
+export type PinWords = AnchorSelection & { readonly changed?: true }
+
 /** One pin, before main gives it a key. */
 export interface PinGroup {
   /** Groups blocks on the same element: `token`, plus the runtime path and tag. */
@@ -29,7 +32,7 @@ export interface PinGroup {
   /** Open conversations on the element, in file order. */
   readonly threadIds: readonly string[]
   /** The words of its open threads that have them, in file order, at most {@link PIN_WORDS_MAX} (C-12). */
-  readonly words?: readonly AnchorSelection[]
+  readonly words?: readonly PinWords[]
   /** Which thread has each of {@link words}, in step with them. Main's own: this never goes to the page. */
   readonly wordThreads?: readonly string[]
   /** Damaged or newer blocks on the element. */
@@ -57,7 +60,7 @@ interface MutableGroup {
   token: string
   runtime?: { path: string; tag: string }
   threadIds: string[]
-  words: AnchorSelection[]
+  words: PinWords[]
   wordThreads: string[]
   attention: number
   changed?: true
@@ -78,7 +81,7 @@ export function groupPins(view: Pick<CommentLoadView, 'blocks'>): PinGroup[] {
       groups.set(id, group)
     }
     if (block.kind === 'ok' && block.sel !== undefined && block.id !== undefined && group.words.length < PIN_WORDS_MAX) {
-      group.words.push(block.sel)
+      group.words.push(block.changed === true ? { ...block.sel, changed: true } : block.sel)
       group.wordThreads.push(block.id)
     }
     if (block.kind === 'ok' && block.changed === true) group.changed = true

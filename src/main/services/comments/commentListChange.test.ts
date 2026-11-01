@@ -14,7 +14,7 @@ import { markdownKind } from '../../../shared/markdownComments/markdownKind'
 import type { MdIndex } from '../../../shared/markdownComments/mdIndex'
 import { markdownTextHash } from '../../../shared/markdownComments/mdLocate'
 import { createInProcessMarkdownJobs } from './markdown/markdownCommentJobs'
-import { wordsBetween } from './commentListChange'
+import { nowWordsIn, wordsBetween } from './commentListChange'
 import type { ListSummary } from './commentListCore'
 import { assembleSplice } from './commentWriteCore'
 
@@ -107,6 +107,19 @@ describe('C-06 derived Changed and Words changed in the list job', () => {
     const summary = await list(edit(commented, 'We ship by Friday and test on staging.\n', ''))
     expect(summary.threads[0].attached).toBe(false)
     expect(summary.threads[0].change).toBeUndefined()
+  })
+})
+
+describe('I-14 the new words a preview marks', () => {
+  const sel = { exact: 'Friday', prefix: 'ship by ', suffix: ' and' }
+  it('I-14 the text between the pair, with what stands around it now', () => {
+    expect(nowWordsIn('We ship by Thursday and test.', sel)).toEqual({ exact: 'Thursday', prefix: 'We ship by ', suffix: ' and test.' })
+  })
+  it('I-14 no pair, no words to mark (S-04)', () => {
+    expect(nowWordsIn('Release whenever ready.', sel)).toBeUndefined()
+  })
+  it('I-14 words longer than a selection can be stay unmarked: the list keeps Now for the window', () => {
+    expect(nowWordsIn(`We ship by ${'x'.repeat(201)} and test.`, sel)).toBeUndefined()
   })
 })
 
