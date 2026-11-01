@@ -18,10 +18,12 @@
  *   shared `CommentWindow`, whose `add` is completed here with the adapter's
  *   description of the target (main locates it, C7);
  * - pointer and keyboard picking – `useHostPointerKeys.ts`. A pick on a
- *   target with open threads opens them, not a blank new comment (C-22);
- *   a click on commented words opens that thread (C-17); the menu's "Add
- *   comment" stays the explicit new thread. Turning the mode on with words
- *   selected only turns it on and shows the Comment button (C-16);
+ *   target with open threads opens them, not a blank new comment (C-22),
+ *   with "New comment" minting its draft on demand (I-4), unless text carried
+ *   by Pick again is waiting (I-23); a click on commented words opens that
+ *   thread (C-17); the menu's "Add comment" stays the explicit new thread.
+ *   Turning the mode on with words selected only turns it on and shows the
+ *   Comment button (C-16);
  * - the removed-outside note (OD-06, `commentRemovedOutside.ts`);
  * - the window's dock, its reveal of a stepped-to thread, the parent retarget
  *   and the draft keep-alive (C-18, C-13, W-07, C-14.2 – `hostWindow.ts`).
@@ -52,15 +54,16 @@ import { useLiveText } from '../commentLive'
 import type { AnchorSelection } from '../../../../../shared/comments/anchorSel'
 import { commentMarkAt } from './commentHighlights'
 import { targetText } from './domWords'
-import { blockWindowRequest, areaBox, revealRow, useNotVisible } from './hostDrawer'
+import { areaBox, bringRowIn, revealRow, useNotVisible } from './hostDrawer'
 import { draftKeyOf, noNewCommentText, pointOf, spokenTarget, threadsOn, toolbarCounts, viewOf } from './hostParts'
 import { hostMenuItems, hostMenuLabel, targetlessMenu } from './hostMenu'
-import { drawn, newRequestExtras, threadTarget, useDraftKeepAlive, type HostDock } from './hostWindow'
+import { drawn, newRequestExtras, targetNow, threadTarget, useDraftKeepAlive, type HostDock } from './hostWindow'
 import type { CommentOverlayHost, CommentOverlayHostOptions, HostMenu } from './hostTypes'
 import { useSelectionComments, useWordsCheck } from './useSelectionComments'
 import { nounTargetOf } from './previewAdapter'
 import { useHostCommentMode } from './useHostCommentMode'
 import { useHostPointerKeys } from './useHostPointerKeys'
+import { useHostThreads } from './useHostThreads'
 import { takeFindEscape, takeModeEscape, type ModeEscapeKey } from '../commentModeEscape'
 
 export type { CommentOverlayHost, CommentOverlayHostOptions, HostMenu, RendererCommentSource } from './hostTypes'
@@ -200,26 +203,13 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
     [blocked, adapter, store, panelId, optionsRef, alert, words, fileName, filePath]
   )
 
-  const openThreads = useCallback(
-    (threadKeys: readonly string[], anchor: HTMLElement | null, opener: 'page' | 'drawer' = 'page', blockKeys: readonly string[] = NO_THREADS) => {
-      const listed = store.getState().panels.get(panelId)?.list
-      const current = listed?.files[0]
-      if (current === undefined) return
-      setMenu(null)
-      setRequest({
-        kind: 'threads',
-        panelId,
-        fileKey: current.fileKey,
-        threadKeys,
-        blockKeys,
-        point: pointOf(anchor, optionsRef.current.area),
-        opener,
-        listAfter: listed?.generation ?? 0,
-        file: { fileKey: current.fileKey, displayPath: current.displayPath, filePath: current.filePath, frame: false }
-      })
-    },
-    [store, panelId, optionsRef]
-  )
+  const { onTarget, openThreads, openStepped, openRow } = useHostThreads({
+    panelId,
+    adapter,
+    area,
+    onRequest: next => (setMenu(null), setRequest(next)),
+    openNew: target => void openNew(target, 'page')
+  })
 
   // C-22: a pick on a target with open threads opens them; Enter on the target holding the selection opens the words.
   const pickTarget = useCallback(
@@ -411,10 +401,9 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
           onReveal: row => revealRow(row, placements, adapter, announce, narrow ? () => (setDrawerOpen(false), listButtonRef.current?.focus()) : undefined),
           onOpenInSource: row => options.onOpenInSource(row.line),
           onOpen: row => {
-            if (row.threadKey !== undefined) openThreads([row.threadKey], null, 'drawer')
-            else if (file !== null && row.blockKey !== undefined) {
-              setRequest(blockWindowRequest(file, row.blockKey, panelId, area, state.list.generation ?? 0))
-            }
+            bringRowIn(row, placements, adapter)
+            if (row.threadKey !== undefined) openRow([row.threadKey], NO_THREADS)
+            else if (row.blockKey !== undefined) openRow(NO_THREADS, [row.blockKey])
           },
           onRetry: () => void refreshList(),
           // OD-06: the removed-outside note, and its Copy text.
@@ -428,6 +417,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
         }
       : null
 
+  const newTarget = request?.kind === 'threads' && blocked === null ? targetNow(onTarget, request.threadKeys, placements, adapter) : null
   const window_: CommentWindowProps | null =
     live && request !== null
       ? {
@@ -438,6 +428,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
           getArea: () => areaBox(optionsRef.current.area),
           onClose: closeWindow,
           onNewComment: next => setRequest(next),
+          ...(newTarget === null ? {} : { onNewOnTarget: () => void openNew(newTarget, 'page') }),
           onSaveIdentity: data =>
             updateCommentIdentity({
               authorName: data.name,
@@ -487,6 +478,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
     placements,
     file,
     openThreads,
+    openStepped,
     scrollTick,
     selectionButton: request === null && menu === null ? selection.button : null,
     onSelectionButton,

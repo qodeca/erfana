@@ -15,7 +15,31 @@
 import type { AnchorSelection } from '../../../../../../shared/comments/anchorSel'
 import type { CommentSaveRequest } from '../../../../../../shared/ipc/preview-comment-schema'
 import type { DrawerRow } from '../../../Comments/commentRows'
-import type { CommentWindowRequest, ElementDraft, NewCommentWords } from '../../../Comments/commentWindowTypes'
+import { pinDraftOf, type CommentWindowRequest, type ElementDraft, type NewCommentWords, type PinDraft } from '../../../Comments/commentWindowTypes'
+
+/**
+ * The thread window a pin's event opens, with the draft main sent for "New comment".
+ *
+ * @param panelId - The panel.
+ * @param pin - Main's event: an icon click, or a pick on a commented element.
+ * @param listAfter - The list generation the window must not be older than (M2).
+ * @returns The threads-view request.
+ */
+export function pinWindowRequest(panelId: string, pin: PinDraft, listAfter: number): CommentWindowRequest {
+  return {
+    kind: 'threads',
+    panelId,
+    fileKey: pin.fileKey,
+    threadKeys: pin.threadKeys,
+    blockKeys: pin.blockKeys,
+    point: pin.point,
+    opener: 'page',
+    listAfter,
+    ...pinDraftOf(pin),
+    target: pin.target,
+    file: { fileKey: pin.fileKey, displayPath: pin.displayPath, filePath: pin.filePath, frame: pin.frame }
+  }
+}
 
 /** What a menu item or a pick comments on: the selected words, or the whole element. */
 export type DraftScope = 'words' | 'whole'

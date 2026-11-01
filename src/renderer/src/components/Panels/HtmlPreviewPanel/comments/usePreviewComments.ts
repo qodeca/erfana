@@ -41,7 +41,9 @@ import { ANNOUNCE, COPY, DRAWER_COPY, writtenAnnouncement } from '../../../Comme
 import type { Box } from '../../../Comments/commentPlacement'
 import type { CommentDrawerProps } from '../../../Comments/CommentDrawer'
 import type { CommentToolbarToolsProps } from '../../../Comments/CommentToolbarTools'
-import { pinDraftOf, type CommentWindowRequest, type ElementDraft } from '../../../Comments/commentWindowTypes'
+import { carriedDrafts } from '../../../Comments/commentCarriedDrafts'
+import { newCommentOnPin } from '../../../Comments/commentWindowHeading'
+import type { CommentWindowRequest, ElementDraft } from '../../../Comments/commentWindowTypes'
 import { useCommentSettleNotices } from '../../../Comments/useCommentSettleNotices'
 import { useDrawerSheet } from './useDrawerSheet'
 import { listCounts, type DrawerRow } from '../../../Comments/commentRows'
@@ -50,7 +52,7 @@ import { useLiveText } from '../../../Comments/commentLive'
 import { takeFindEscape, takeModeEscape } from '../../../Comments/commentModeEscape'
 import { COMMENT_LIST_COPY, HTML_WORDS } from '../../../Comments/commentCopyWords'
 import { useRemovedOutside } from '../../../Comments/commentRemovedOutside'
-import { closeReturnsToPage, newCommentRequest, rowWindowRequest, withWords, type RowTarget } from './previewCommentRequests'
+import { closeReturnsToPage, newCommentRequest, pinWindowRequest, rowWindowRequest, withWords, type RowTarget } from './previewCommentRequests'
 import { usePageCommentStepKeys } from './usePageCommentStepKeys'
 import { pickerAnnouncement } from './commentLive'
 import { usePreviewDraftKeepAlive } from './usePreviewDraftKeepAlive'
@@ -160,24 +162,10 @@ export function usePreviewComments({
       if (payload.panelId !== panelId) return
       if (payload.kind === 'icon') {
         setMenu(null)
-        setRequest({
-          kind: 'threads',
-          panelId,
-          fileKey: payload.fileKey,
-          threadKeys: payload.threadKeys,
-          blockKeys: payload.blockKeys,
-          point: payload.point,
-          opener: 'page',
-          listAfter: listAfter(),
-          ...pinDraftOf(payload),
-          target: payload.target,
-          file: {
-            fileKey: payload.fileKey,
-            displayPath: payload.displayPath,
-            filePath: payload.filePath,
-            frame: payload.frame
-          }
-        })
+        const threads = pinWindowRequest(panelId, payload, listAfter())
+        // I-23: the page's pick and its icon click reach here alike. Text carried by Pick again goes on the target.
+        const carried = carriedDrafts.pickTakesText(panelId, latestRef.current.mode) ? newCommentOnPin(threads) : null
+        setRequest(carried ?? threads)
         void refreshList()
         return
       }

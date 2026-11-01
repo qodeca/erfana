@@ -53,7 +53,7 @@ States of an open window, not of a stored comment. Same columns where they apply
 | # | State | When | Banner and text | Main button |
 |---|---|---|---|---|
 | W-01 | Moved draft | The target moved or the draft expired and main cannot find it again (C-14.1); Markdown first tries the one-quote match (D-23) | "This {kind} changed after you selected it. Select it again. Your text is safe." | **Pick again** (after Cancel) |
-| W-02 | Carried draft | The next new-comment window in the panel after Pick again | "Your text from the last comment is here." | Save |
+| W-02 | Carried draft | The next new-comment window in the panel after Pick again. While the text waits in comment mode, a pick, icon or underline on a commented target opens that window too, not the target's threads (I-23); with the mode off, the threads open and the text keeps waiting | "Your text from the last comment is here." | Save |
 | W-03 | Updated from the file | The file changed while a thread was open (C-14.4) | Info strip "Updated just now"; a "New since you opened" divider; a thread resolved elsewhere folds | As the comment's state |
 | W-04 | Removed while open | The open comment was removed outside Erfana (C-14.5) | "Someone removed this comment from {file}. Your reply is still here." – read-only | **Copy text**; also "New comment on {kind}" |
 | W-05 | Thread changed on reply | `BLOCK_CHANGED` on Reply (C-14.6) | "This conversation changed. You see the new version above. Your reply is still here, so send it again." | Reply (stays enabled) |

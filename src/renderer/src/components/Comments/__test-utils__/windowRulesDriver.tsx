@@ -7,8 +7,8 @@
  * `guard` it passes in, because the dirty state is an editor tab the fixture
  * does not have.
  */
-import { useState, type ReactNode } from 'react'
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { expect, vi } from 'vitest'
 import { ErrorCode } from '../../../../../shared/errors'
@@ -23,10 +23,12 @@ import type { CommentWindowProps } from '../CommentWindow'
 import type { IdentityFormData } from '../commentSchemas'
 import { TEST_IDS } from '../../../constants/testids'
 
+type ThreadsRequest = Extract<CommentWindowProps['request'], { kind: 'threads' }>
+
 /** What every host's window is given. */
 export type WindowRulesProps = Pick<
   CommentWindowProps,
-  'request' | 'list' | 'identity' | 'notVisible' | 'getArea' | 'onClose' | 'onSaveIdentity' | 'onSave' | 'onWritten' | 'onRefresh' | 'onPickAgain' | 'onOpenInSource' | 'onCopyRaw'
+  'request' | 'list' | 'identity' | 'notVisible' | 'getArea' | 'onClose' | 'onSaveIdentity' | 'onSave' | 'onWritten' | 'onRefresh' | 'onPickAgain' | 'onOpenInSource' | 'onCopyRaw' | 'onNewOnTarget'
 >
 
 /** One preview, for {@link windowRulesDriver}. */
@@ -38,6 +40,8 @@ export interface WindowRulesHost {
    * of the file, `preview` what a docked window hands focus to.
    */
   readonly mount: (props: WindowRulesProps, editor: 'clean' | 'dirty' | 'conflict', preview?: () => HTMLElement | null) => ReactNode
+  /** How a window opened on its target differs in this preview: what its request and its props carry for "New comment". */
+  readonly onTarget: { readonly request?: Partial<ThreadsRequest>; readonly props?: Pick<CommentWindowProps, 'onNewOnTarget'> }
   /** The host's own close: `true` when it hands native focus to the page. Absent: focus stays in this document. */
   readonly closeFocusesPage?: (request: WindowRulesProps['request'], returnFocus: boolean) => boolean
 }
@@ -48,7 +52,8 @@ const CHANGED = { change: { state: 'changed', was: 'Buy now', now: 'Buy today' }
 /** The list a setup opens on. */
 function listOf(setup: WindowRulesSetup): CommentListState {
   const threads = (setup.threads ?? ['open']).map((state, i) => thread(i + 1, state === 'changed' ? CHANGED : {}))
-  return { status: 'ready', files: [fileView({ threads, ...(setup.readOnly === true ? { writable: false } : {}) })], generation: 1 }
+  const patch = { ...(setup.readOnly === true ? { writable: false } : {}), ...(setup.full === true ? { addRefusal: 'too-many-blocks' as const } : {}) }
+  return { status: 'ready', files: [fileView({ threads, ...patch })], generation: 1 }
 }
 const IDENTITIES: Readonly<Record<WindowRulesSetup['identity'], CommentIdentitySettings | null>> = {
   none: null,
@@ -57,15 +62,19 @@ const IDENTITIES: Readonly<Record<WindowRulesSetup['identity'], CommentIdentityS
 }
 
 /** The window, holding the identity as the settings store would. */
-function Stage({ host, setup, onSave }: { readonly host: WindowRulesHost; readonly setup: WindowRulesSetup; readonly onSave: CommentWindowProps['onSave'] }): React.JSX.Element {
+function Stage({ host, setup, onSave, onStage }: { readonly host: WindowRulesHost; readonly setup: WindowRulesSetup; readonly onSave: CommentWindowProps['onSave']; readonly onStage: (removeShown: () => void) => void }): React.JSX.Element {
   const [identity, setIdentity] = useState(IDENTITIES[setup.identity])
+  const onTarget = setup.opened === 'target' ? host.onTarget : {}
+  const [list, setList] = useState(() => listOf(setup))
+  useEffect(() => {
+    onStage(() => setList(current => ({ ...current, files: current.files.map(file => ({ ...file, threads: [] })), generation: 2 })))
+  }, [onStage])
   const saveIdentity = async (data: IdentityFormData): Promise<boolean> => {
     setIdentity({ authorName: data.name, identityNoticeSeen: true })
     return true
   }
   const [props] = useState(() => ({
-    request: threadsRequest({ listAfter: 1 }),
-    list: listOf(setup),
+    request: threadsRequest({ listAfter: 1, ...onTarget.request }),
     notVisible: [] as readonly string[],
     getArea: () => ({ left: 0, top: 0, width: 1000, height: 700 }),
     onClose: vi.fn(),
@@ -75,7 +84,21 @@ function Stage({ host, setup, onSave }: { readonly host: WindowRulesHost; readon
     onOpenInSource: vi.fn(),
     onCopyRaw: vi.fn()
   }))
-  return <>{host.mount({ ...props, identity, onSaveIdentity: saveIdentity, onSave }, setup.editor ?? 'clean')}</>
+  return <>{host.mount({ ...props, ...onTarget.props, list, identity, onSaveIdentity: saveIdentity, onSave }, setup.editor ?? 'clean')}</>
+}
+
+/** The names of the window's foot buttons, then of More actions' items: opened with the keyboard, then closed. */
+async function windowActions(user: ReturnType<typeof userEvent.setup>): Promise<string[]> {
+  const foot = win().querySelector<HTMLElement>('.erf-comment-window__foot')
+  const names = foot === null ? [] : within(foot).queryAllByRole('button').map(button => button.textContent ?? '')
+  const more = screen.queryByTestId(TEST_IDS.COMMENT_MORE_ACTIONS)
+  if (more === null) return names
+  more.focus()
+  await user.keyboard('{Enter}')
+  const menu = await screen.findByRole('menu')
+  const items = within(menu).getAllByRole('menuitem').map(item => item.textContent ?? '')
+  await user.keyboard('{Escape}')
+  return [...names, ...items]
 }
 
 /** What holds focus in the window now. */
@@ -107,6 +130,10 @@ export function windowRulesDriver(host: WindowRulesHost, guard: { current: Comme
   const writes: string[] = []
   let editorSaves = 0
   const settled = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0))
+  let removeShown = (): void => {}
+  const onStage = (remove: () => void): void => {
+    removeShown = remove
+  }
   return {
     host: host.host,
     seesOtherWindows: host.seesOtherWindows,
@@ -129,7 +156,7 @@ export function windowRulesDriver(host: WindowRulesHost, guard: { current: Comme
         writes.push(save.op)
         return { ok: true, threadKey: 't1' }
       }
-      render(<Stage host={host} setup={setup} onSave={onSave} />)
+      render(<Stage host={host} setup={setup} onSave={onSave} onStage={onStage} />)
       await waitFor(() => expect(win().contains(document.activeElement)).toBe(true))
     },
     view: () => win().getAttribute('data-view') ?? '',
@@ -179,6 +206,11 @@ export function windowRulesDriver(host: WindowRulesHost, guard: { current: Comme
       await user.keyboard('{Alt>}[F9]{/Alt}')
       await settled()
     },
+    async removeShown() {
+      act(() => removeShown())
+      await settled()
+    },
+    actions: () => windowActions(user),
     dispose() {
       cleanup()
       commentDrafts.reset()

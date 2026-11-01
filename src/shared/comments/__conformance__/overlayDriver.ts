@@ -251,6 +251,10 @@ export interface WindowRulesSetup {
   readonly threads?: readonly WindowRulesThread[]
   /** The file cannot be written. */
   readonly readOnly?: boolean
+  /** The file is at its comment limit: replies and resolves work, a new comment does not (F-04). */
+  readonly full?: boolean
+  /** Where the window opened: on its target in the preview (icon, underline, pick), or anywhere else (a drawer row, a step key). */
+  readonly opened?: 'target' | 'elsewhere'
 }
 
 /** One thread of the fixture: plain open, or Changed (S-03). */
@@ -300,6 +304,10 @@ export interface WindowRulesDriver {
   focused(): WindowFocus
   /** Step to the next comment with the keyboard (Alt+F9). */
   stepByKeys(): Promise<void>
+  /** The shown thread is removed outside Erfana while the window is open (W-04). */
+  removeShown(): Promise<void>
+  /** The window's actions in order: the foot's buttons, then More actions' items, opened by keys. */
+  actions(): Promise<readonly string[]>
   /** Remove everything the driver added. */
   dispose(): void | Promise<void>
 }

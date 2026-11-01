@@ -14,35 +14,38 @@ import type { ThreadPlacement } from '../../../../../shared/ipc/file-comment-sch
 import type { CommentFileView } from '../../../../../shared/ipc/comment-common-schema'
 import { DRAWER_COPY } from '../commentCopy'
 import type { DrawerRow } from '../commentRows'
-import type { CommentWindowRequest } from '../commentWindowTypes'
+import type { CommentWindowRequest, WindowOpener } from '../commentWindowTypes'
 import { pointOf } from './hostParts'
 import type { PreviewCommentAdapter } from './previewAdapter'
 
+/** What a threads window opens on, and from where. */
+interface ThreadsWindowOn {
+  readonly threadKeys: readonly string[]
+  readonly blockKeys: readonly string[]
+  /** The pane the window is placed in, and the element it opens beside; `null`: the pane's upper middle. */
+  readonly area: HTMLElement | null
+  readonly anchor: HTMLElement | null
+  readonly opener: WindowOpener
+}
+
 /**
- * The window a block row's Open asks for: the block's raw text and its actions.
+ * The window on a file's threads, or on a damaged or newer-format block.
  *
  * @param file - The listed file.
- * @param blockKey - The damaged or newer-format block.
  * @param panelId - The panel.
- * @param area - The pane the window is placed in.
  * @param listAfter - The list generation the window must not be older than.
- * @returns The threads-view request on that block.
+ * @param on - {@link ThreadsWindowOn}
+ * @returns The threads-view request.
  */
-export function blockWindowRequest(
-  file: CommentFileView,
-  blockKey: string,
-  panelId: string,
-  area: HTMLElement | null,
-  listAfter: number
-): CommentWindowRequest {
+export function threadsWindowRequest(file: CommentFileView, panelId: string, listAfter: number, on: ThreadsWindowOn): CommentWindowRequest {
   return {
     kind: 'threads',
     panelId,
     fileKey: file.fileKey,
-    threadKeys: [],
-    blockKeys: [blockKey],
-    point: pointOf(null, area),
-    opener: 'drawer',
+    threadKeys: on.threadKeys,
+    blockKeys: on.blockKeys,
+    point: pointOf(on.anchor, on.area),
+    opener: on.opener,
     listAfter,
     file: { fileKey: file.fileKey, displayPath: file.displayPath, filePath: file.filePath, frame: false }
   }
@@ -59,6 +62,18 @@ export function blockWindowRequest(
 export function rowTarget(row: DrawerRow, placements: readonly ThreadPlacement[], adapter: PreviewCommentAdapter): HTMLElement | null {
   const placement = placements.find(p => p.threadKey === row.threadKey)
   return placement === undefined ? null : adapter.attach(placement)
+}
+
+/**
+ * Before a row's Open: its target comes into view, so the docked window opens
+ * beside it and never as an edge tab (I-2). The HTML Preview's main does the same.
+ *
+ * @param row - The drawer row.
+ * @param placements - Where main placed the listed threads.
+ * @param adapter - The preview's adapter.
+ */
+export function bringRowIn(row: DrawerRow, placements: readonly ThreadPlacement[], adapter: PreviewCommentAdapter): void {
+  if (row.main === 'reveal') rowTarget(row, placements, adapter)?.scrollIntoView({ block: 'center' })
 }
 
 /**

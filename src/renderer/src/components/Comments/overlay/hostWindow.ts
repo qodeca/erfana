@@ -76,6 +76,29 @@ export function drawn(el: HTMLElement | null): HTMLElement | null {
 }
 
 /**
+ * The target of a thread window opened on one: where it was, or – re-rendered
+ * since – where its first thread is now. `null` when it is gone, so the window
+ * offers no "New comment" that could do nothing.
+ *
+ * @param target - The target the window opened on, or `null`.
+ * @param threadKeys - The window's threads.
+ * @param placements - Where main placed the listed threads.
+ * @param adapter - The preview's adapter.
+ * @returns The rendered target.
+ */
+export function targetNow(
+  target: HTMLElement | null,
+  threadKeys: readonly string[],
+  placements: readonly ThreadPlacement[],
+  adapter: PreviewCommentAdapter
+): HTMLElement | null {
+  if (target === null) return null
+  if (target.isConnected) return target
+  const first = threadKeys[0]
+  return first === undefined ? null : threadTarget(first, placements, adapter)
+}
+
+/**
  * The extras of a new-comment request on `target` (W-07, W-08).
  *
  * @param target - The picked target.

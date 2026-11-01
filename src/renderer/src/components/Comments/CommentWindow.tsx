@@ -74,7 +74,7 @@ import { CommentStepper, MoreActions, stepKeyOf } from './CommentStepper'
 import { useDrawerFilter } from './commentDrawerFilter'
 import { useWindowStepTarget } from './commentStepKeys'
 import { WINDOW_COPY, editWordsNotice, unsavedElsewhereText, windowRefusal } from './commentWindowCopy'
-import { headingOf, newCommentFrom } from './commentWindowHeading'
+import { headingOf, newCommentAction } from './commentWindowHeading'
 import { stepPosition, withResolved } from './commentWindowStates'
 import type { CommentWindowRequest } from './commentWindowTypes'
 import { CommentWindowShell } from './CommentWindowShell'
@@ -109,6 +109,8 @@ export interface CommentWindowProps {
   readonly onClose: (returnFocus?: boolean) => void
   /** "New comment" in an icon's thread view: switch to a new comment on that target. */
   readonly onNewComment?: (request: Extract<CommentWindowRequest, { kind: 'new' }>) => void
+  /** The same for a host that mints its drafts on demand; only while the window is on its target (I-4). */
+  readonly onNewOnTarget?: () => void
   readonly onSaveIdentity: (identity: IdentityFormData) => Promise<boolean>
   /** Write; with a new comment, `sel` carries the chosen words (024-FR-004) – a preview that offers none ignores it. */
   readonly onSave: (request: CommentSaveRequest, sel?: AnchorSelection) => Promise<CommentSaveResult>
@@ -191,7 +193,7 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
   const modal = props.modal ?? words.preview === 'html'
   const pause = useWindowPause(selection?.file.filePath ?? null, visibleString(selection?.file.displayPath ?? ''), props.pausedText ?? null, firstFocusRef, () => props.onClose(false), props.onGoToUnsaved)
   const heading = headingOf(request, selection, words)
-  const newComment = props.onNewComment && !session.stepped ? newCommentFrom(request, selection) : null
+  const newComment = session.stepped || pause.text !== null ? null : newCommentAction(request, selection, props.onNewComment, props.onNewOnTarget)
   const notVisible = useMemo(() => new Set(props.notVisible), [props.notVisible])
   const shownThread = selection?.threads[0]
 
@@ -367,7 +369,7 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
 
   const dock = useDock(props.dock, request.kind === 'threads' ? (shownThread?.threadKey ?? null) : null, shownThread ?? (request.kind === 'new' ? request.target : ''), shownThread?.line ?? (request.kind === 'new' ? request.target.line : 1), words.noun)
   const moreActions = [
-    ...(newComment !== null && pause.text === null ? [{ label: COPY.newComment, action: () => props.onNewComment?.(newComment), testId: TEST_IDS.COMMENT_NEW_ON_ELEMENT }] : []),
+    ...(newComment !== null ? [{ label: COPY.newComment, action: newComment, testId: TEST_IDS.COMMENT_NEW_ON_ELEMENT }] : []),
     { label: COPY.openInSource, action: () => props.onOpenInSource(selection?.file.filePath ?? '', shownThread?.line ?? 1), testId: TEST_IDS.COMMENT_OPEN_IN_SOURCE }
   ]
 
@@ -475,7 +477,7 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
             onCopy={props.onCopyRaw}
             onOpenInSource={line => props.onOpenInSource(selection.file.filePath, line)}
             onClose={() => props.onClose()}
-            onNewComment={newComment !== null && pause.text === null ? () => props.onNewComment?.(newComment) : undefined}
+            onNewComment={newComment ?? undefined}
             pausedText={pause.text}
             unsaved={pause.unsaved}
             session={session}

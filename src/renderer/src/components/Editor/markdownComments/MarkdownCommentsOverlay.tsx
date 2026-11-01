@@ -68,7 +68,7 @@ export function MarkdownCommentsOverlay(props: MarkdownCommentsOverlayProps): Re
     file: host.file,
     placements: host.placements,
     drawerId: host.toolbar.drawerId,
-    openThreads: host.openThreads,
+    openThreads: host.openStepped,
     announce: sayStep
   })
   return (

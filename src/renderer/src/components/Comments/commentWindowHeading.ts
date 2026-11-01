@@ -29,7 +29,7 @@ export interface Heading {
  * main sent with the pin – the target is main's description of the element
  * as it is in the file now, so the context line names it exactly as a
  * right-click would. `null` when there is no such draft (a drawer row, or
- * main sent none) or the file is read-only.
+ * main sent none) or the file takes no new comment.
  *
  * @param request - The window's request.
  * @param selection - What the list holds for it.
@@ -39,12 +39,51 @@ export function newCommentFrom(
   request: CommentWindowRequest,
   selection: ReturnType<typeof selectThreads>
 ): Extract<CommentWindowRequest, { kind: 'new' }> | null {
+  return takesNewComment(selection) ? newCommentOnPin(request) : null
+}
+
+/** Whether the file takes a new comment: at its limit, replies and resolves work and a new comment does not (F-04). */
+function takesNewComment(selection: ReturnType<typeof selectThreads>): boolean {
+  return selection !== null && selection.file.writable && selection.file.addRefusal === undefined
+}
+
+/**
+ * What the window's "New comment" does, in both previews: the HTML Preview
+ * switches to the draft main sent with the pin; a host that mints drafts itself
+ * opens one on demand from the target (I-4, P-F05). Only a window opened on its
+ * target has one, so a drawer row or a step key offers none.
+ *
+ * @param request - The window's request.
+ * @param selection - What the list holds for it.
+ * @param onNewComment - Switches the window to a new-comment request.
+ * @param onNewOnTarget - Opens a new comment on the target the window opened on.
+ * @returns The action, or `null` when none is offered.
+ */
+export function newCommentAction(
+  request: CommentWindowRequest,
+  selection: ReturnType<typeof selectThreads>,
+  onNewComment?: (request: Extract<CommentWindowRequest, { kind: 'new' }>) => void,
+  onNewOnTarget?: () => void
+): (() => void) | null {
+  if (!takesNewComment(selection)) return null
+  if (onNewOnTarget !== undefined) return onNewOnTarget
+  const next = newCommentOnPin(request)
+  return next === null || onNewComment === undefined ? null : () => onNewComment(next)
+}
+
+/**
+ * The new comment a pin's draft stands for, whatever the file says: the caller
+ * knows it takes one.
+ *
+ * @param request - The window's request.
+ * @returns The request, or `null` when it carries no whole draft.
+ */
+export function newCommentOnPin(request: CommentWindowRequest): Extract<CommentWindowRequest, { kind: 'new' }> | null {
   if (request.kind !== 'threads') return null
   const { draftToken, draftKey, file, target } = request
   if (draftToken === undefined || draftKey === undefined || file === undefined || target === undefined) {
     return null
   }
-  if (selection === null || !selection.file.writable) return null
   return {
     kind: 'new',
     panelId: request.panelId,

@@ -595,7 +595,7 @@ Cards: docs/design-system/system/components/button/index.html; docs/designs/comm
 
 **Design.**
 
-When the clicked target has open threads, open the threads view with reply fields, and make 'New comment' the first footer button. Right-click → 'Add comment' stays an explicit new thread. Markdown inherits the rule.
+When the clicked target has open threads, open the threads view with reply fields, and make 'New comment' the first footer button. Right-click → 'Add comment' stays an explicit new thread. Markdown inherits the rule. While text carried by Pick again waits in comment mode, the click opens a new comment instead, so the text stays in view until it is kept (state table W-02).
 
 Several open threads on one element (**owner decision, 2026-10-28**, R-21): the window foot holds Close only – no 'Resolve and next', because it would be unclear which thread it resolves. Each thread keeps its own Resolve, and the head's ‹ › stepper still moves to the next element. With R-06, 'New comment' is the first item in the head's More actions menu while the stepper shows.
 

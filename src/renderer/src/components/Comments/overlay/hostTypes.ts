@@ -106,6 +106,8 @@ export interface CommentOverlayHost {
     opener?: 'page' | 'drawer',
     blockKeys?: readonly string[]
   ) => void
+  /** The same for a step key: the window shows the thread, and has left any target it was opened on (C-13). */
+  readonly openStepped: (threadKeys: readonly string[], anchor: HTMLElement | null) => void
   readonly scrollTick: number
   /** The Comment button over a selection (C-16), while it shows, and what it does. */
   readonly selectionButton: SelectionButton | null

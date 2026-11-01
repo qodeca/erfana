@@ -7,7 +7,7 @@
  * behaviour; the drivers are in `overlayDriver.ts`.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { FocusClose, FocusHome, FocusOpener, FocusTableDriver, WindowRulesDriver } from './overlayDriver'
+import type { FocusClose, FocusHome, FocusOpener, FocusTableDriver, WindowRulesDriver, WindowRulesSetup, WindowRulesThread } from './overlayDriver'
 
 /**
  * The comment window's rules, one behaviour in both previews (024-FR-001,
@@ -127,8 +127,44 @@ export function runWindowRulesSuite(name: string, makeDriver: () => WindowRulesD
       await d.stepByKeys()
       expect(d.focused()).toBe('title')
     })
+
+    it.each(WINDOW_ACTIONS)(`024-FR-006 (${name}) WIN-15 same actions: $state`, async ({ setup, expected, step, remove }) => {
+      await d.open({ identity: 'ready', ...setup })
+      if (step === true) await d.stepByKeys()
+      if (remove === true) await d.removeShown()
+      expect((await d.actions()).map(action => action.replace(/^New comment on .+$/, NEW_ON_KIND))).toEqual(expected)
+    })
   })
 }
+
+/** The removed-outside button, whichever kind word the preview puts in it (D-04). */
+const NEW_ON_KIND = 'New comment on {kind}'
+const OPEN = { opened: 'target' } as const
+const TWO: readonly WindowRulesThread[] = ['open', 'open']
+
+/**
+ * What the window offers in each state, one list for both previews (plan step
+ * 5, "Done when"). "New comment" needs a target in the preview, and a file that
+ * takes one; a step leaves that target.
+ */
+const WINDOW_ACTIONS: ReadonlyArray<{
+  readonly state: string
+  readonly setup: Partial<WindowRulesSetup>
+  readonly expected: readonly string[]
+  readonly step?: boolean
+  readonly remove?: boolean
+}> = [
+  { state: 'on its target', setup: OPEN, expected: ['Open in file', 'New comment', 'Close'] },
+  { state: 'on its target, more comments to step to', setup: { ...OPEN, threads: TWO }, expected: ['Close', 'Resolve and next', 'New comment', 'Open in file'] },
+  { state: 'opened elsewhere', setup: {}, expected: ['Open in file', 'Close'] },
+  { state: 'opened elsewhere, more comments to step to', setup: { threads: TWO }, expected: ['Close', 'Resolve and next', 'Open in file'] },
+  { state: 'after a step', setup: { ...OPEN, threads: TWO }, step: true, expected: ['Close', 'Resolve and next', 'Open in file'] },
+  { state: 'unsaved edits', setup: { ...OPEN, editor: 'dirty' }, expected: ['Open in file', 'Close'] },
+  { state: 'read-only file', setup: { ...OPEN, readOnly: true }, expected: ['Open in file', 'Close'] },
+  { state: 'file at its comment limit', setup: { ...OPEN, full: true }, expected: ['Open in file', 'Close'] },
+  { state: 'removed while open', setup: OPEN, remove: true, expected: ['Copy text', NEW_ON_KIND, 'Close'] },
+  { state: 'removed while open, opened elsewhere', setup: {}, remove: true, expected: ['Copy text', 'Close'] }
+]
 
 /** Where each opener takes focus back to, on a close that leaves it to the window. */
 const FOCUS_HOME: Readonly<Record<FocusOpener, FocusHome>> = {

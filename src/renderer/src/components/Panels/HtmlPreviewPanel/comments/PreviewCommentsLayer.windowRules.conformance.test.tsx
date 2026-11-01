@@ -15,6 +15,15 @@ vi.mock('../../../../hooks/useCommentDirtyGuard', () => ({ useCommentDirtyGuard:
 const HTML_HOST: WindowRulesHost = {
   host: 'HTML',
   seesOtherWindows: false,
+  // What main sends with a pin: a draft on the element, the element and the file.
+  onTarget: {
+    request: {
+      draftToken: 'b'.repeat(32),
+      draftKey: 'e'.repeat(32),
+      file: { fileKey: 'f1', displayPath: 'index.html', filePath: '/project/index.html', frame: false },
+      target: { tag: 'button', classes: [], line: 12, excerpt: 'Buy now' }
+    }
+  },
   mount: props => (
     <PreviewCommentsLayer
       {...props}

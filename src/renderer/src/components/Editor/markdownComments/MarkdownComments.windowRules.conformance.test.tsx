@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /** The Markdown Preview's docked comment window, against the shared window rules. */
-import { vi } from 'vitest'
+import { afterEach, beforeEach, vi } from 'vitest'
 import { runFocusTableSuite, runWindowRulesSuite } from '../../../../../shared/comments/__conformance__/windowRules.suite'
 import type { CommentDirtyGuard } from '../../../hooks/useCommentDirtyGuard'
 import { MARKDOWN_WORDS, MD_SURFACE_COPY } from '../../Comments/commentCopyWords'
@@ -17,6 +17,7 @@ const FILE = 'index.html'
 const MARKDOWN_HOST: WindowRulesHost = {
   host: 'Markdown',
   seesOtherWindows: true,
+  onTarget: { props: { onNewOnTarget: () => {} } },
   mount: (props, editor, preview) => (
     <CommentWordsContext.Provider value={MARKDOWN_WORDS}>
       <CommentWindow
@@ -28,6 +29,14 @@ const MARKDOWN_HOST: WindowRulesHost = {
     </CommentWordsContext.Provider>
   )
 }
+
+let portalRoot: HTMLDivElement
+beforeEach(() => {
+  portalRoot = document.createElement('div')
+  portalRoot.id = 'portal-root'
+  document.body.appendChild(portalRoot)
+})
+afterEach(() => portalRoot.remove())
 
 runWindowRulesSuite('Markdown', () => windowRulesDriver(MARKDOWN_HOST, guard))
 runFocusTableSuite('Markdown', () => focusTableDriver(MARKDOWN_HOST, guard))

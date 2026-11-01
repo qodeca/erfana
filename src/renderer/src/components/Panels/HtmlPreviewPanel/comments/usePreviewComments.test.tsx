@@ -34,6 +34,7 @@ import {
   thread,
   type FakeCommentsBridge
 } from './__test-helpers__/commentTestKit'
+import { carriedDrafts } from '../../../Comments/commentCarriedDrafts'
 import { ANNOUNCE, COPY, DRAWER_COPY } from '../../../Comments/commentCopy'
 import { COMMENT_LIST_COPY, HTML_WORDS, SELECTION_COPY } from '../../../Comments/commentCopyWords'
 import { drawerRows } from '../../../Comments/commentRows'
@@ -889,6 +890,44 @@ describe('usePreviewComments', () => {
       act(() => latest.drawer?.onOpenInSource(row))
       expect(mocks.openFileInPanel).toHaveBeenCalled()
       expect(latest.drawer).not.toBeNull()
+    })
+  })
+
+  describe('I-23 text carried by Pick again stays in view until it is kept', () => {
+    const TARGET = { tag: 'p', classes: [], line: 4, excerpt: 'Text' }
+    const onCommented = () => ({ ...pinDraft(), draftToken: 'a'.repeat(32), draftKey: 'b'.repeat(32), target: TARGET })
+
+    afterEach(() => carriedDrafts.clear(PANEL))
+
+    it('I-23 in comment mode, a pick on a commented element opens a new comment there', () => {
+      render(<Harness onValue={onValue} />)
+      act(() => fake.emitMode({ panelId: PANEL, on: true, reason: 'shortcut' }))
+      carriedDrafts.put(PANEL, 'Make it bigger')
+      act(() => fake.emitDraft(onCommented()))
+      expect(latest.layer.request).toMatchObject({ kind: 'new', draftToken: 'a'.repeat(32), draftKey: 'b'.repeat(32), target: TARGET })
+    })
+
+    it('I-23 with the mode off, it opens the thread: the text waits', () => {
+      render(<Harness onValue={onValue} />)
+      carriedDrafts.put(PANEL, 'Make it bigger')
+      act(() => fake.emitDraft(onCommented()))
+      expect(latest.layer.request).toMatchObject({ kind: 'threads' })
+      expect(carriedDrafts.peek(PANEL)).toBe('Make it bigger')
+    })
+
+    it('I-23 with no draft from main, it opens the thread: nothing can be saved there', () => {
+      render(<Harness onValue={onValue} />)
+      act(() => fake.emitMode({ panelId: PANEL, on: true, reason: 'shortcut' }))
+      carriedDrafts.put(PANEL, 'Make it bigger')
+      act(() => fake.emitDraft(pinDraft()))
+      expect(latest.layer.request).toMatchObject({ kind: 'threads' })
+    })
+
+    it('I-23 with nothing carried, a pick on a commented element opens its thread (C-22)', () => {
+      render(<Harness onValue={onValue} />)
+      act(() => fake.emitMode({ panelId: PANEL, on: true, reason: 'shortcut' }))
+      act(() => fake.emitDraft(onCommented()))
+      expect(latest.layer.request).toMatchObject({ kind: 'threads' })
     })
   })
 

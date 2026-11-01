@@ -12,6 +12,11 @@
  * kept with the session's other drafts (`commentDrafts`) and never written
  * anywhere; a later carry replaces an earlier one.
  *
+ * The text must stay in view until it is kept (I-23): while it waits in
+ * comment mode, a pick opens a new comment even on a target with comments
+ * (`pickTakesText`), in both previews. With the mode off, a target opens as
+ * usual and the text keeps waiting.
+ *
  * @module components/Comments/commentCarriedDrafts
  */
 import { commentDrafts } from '../../stores/usePreviewCommentStore'
@@ -29,6 +34,10 @@ export const carriedDrafts = {
   peek(panelId: string): string | null {
     const text = commentDrafts.get(slotOf(panelId))
     return text === '' ? null : text
+  },
+  /** A pick now owes the panel its text: comment mode is on and text is waiting (I-23). */
+  pickTakesText(panelId: string, mode: boolean): boolean {
+    return mode && this.peek(panelId) !== null
   },
   /** The text was taken (or passed over) by the next window. */
   clear(panelId: string): void {

@@ -640,6 +640,24 @@ test.describe('Markdown Preview comments – focus never gets lost', () => {
       el.scrollTop = el.scrollHeight
     })
 
+  test('I-2 (Markdown) a drawer row whose target is off screen scrolls it in, so the window shows and takes focus', async ({ windowWithTestProject }) => {
+    const page = windowWithTestProject
+    await setGlobalSetting(page, 'comments', { authorName: NAME, identityNoticeSeen: true })
+    const md = await openTall(page)
+    await md.modeOn()
+    await md.target('p', 3).click()
+    await md.saveNewComment(NOTE, TALL, NAME)
+    await expect(md.icons()).toHaveCount(1, { timeout: MD_COMMENT_BUDGET_MS })
+    await scrollToEnd(md)
+    await md.listButton().click()
+    await expect(md.drawer()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await md.drawer().getByTestId(TEST_IDS.COMMENT_DRAWER_ROW_OPEN).click()
+    const win = md.window()
+    await expect(win).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await expect(page.getByTestId(TEST_IDS.COMMENT_EDGE_TAB)).toHaveCount(0)
+    await expect(win.getByTestId('comment-window-title')).toBeFocused()
+  })
+
   test('K-2, K-3, K-7 (Markdown) with no mouse: fold, edge tab, typed text and mode off each keep focus', async ({ windowWithTestProject }) => {
     const page = windowWithTestProject
     await setGlobalSetting(page, 'comments', { authorName: NAME, identityNoticeSeen: true })
