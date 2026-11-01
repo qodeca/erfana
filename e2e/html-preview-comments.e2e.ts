@@ -798,6 +798,25 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     await expect(win).toHaveCount(0)
   })
 
+  test('E-007b I-1 Esc leaves comment mode from the toolbar after a mouse click on the toggle', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    const app = appWithTestProject
+    const page = windowWithTestProject
+    const preview = new HtmlPreviewPage(page, app)
+    const chrome = new CommentChrome(page, preview, 'index.html')
+    const panelId = await openCommentPage(preview, app, STATIC, STATIC_TITLE)
+    await chrome.modeOn(app, panelId, STATIC_TARGET)
+    await expect(chrome.modeButton()).toBeFocused()
+    await page.keyboard.press('Escape')
+    await expect(chrome.modeButton()).toHaveAttribute('aria-pressed', 'false', { timeout: PREVIEW_BUDGET_MS })
+    await expect
+      .poll(async () => (await commentPanelState(app, panelId))?.mode, { timeout: PREVIEW_BUDGET_MS })
+      .toBe(false)
+    await expect(chrome.modeButton()).toBeFocused()
+  })
+
   test('E-014 C-20 (HTML) the drawer checkbox hides and shows the pins; the toolbar has no icons toggle', async ({
     windowWithTestProject,
     appWithTestProject

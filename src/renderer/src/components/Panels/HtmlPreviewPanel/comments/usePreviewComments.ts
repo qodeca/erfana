@@ -47,6 +47,7 @@ import { useDrawerSheet } from './useDrawerSheet'
 import { listCounts, type DrawerRow } from '../../../Comments/commentRows'
 import type { PreviewCommentsLayerProps } from './PreviewCommentsLayer'
 import { useLiveText } from '../../../Comments/commentLive'
+import { takeFindEscape, takeModeEscape } from '../../../Comments/commentModeEscape'
 import { COMMENT_LIST_COPY, HTML_WORDS } from '../../../Comments/commentCopyWords'
 import { useRemovedOutside } from '../../../Comments/commentRemovedOutside'
 import { closeReturnsToPage, newCommentRequest, rowWindowRequest, withWords, type RowTarget } from './previewCommentRequests'
@@ -82,8 +83,10 @@ export interface PreviewComments {
   readonly layer: PreviewCommentsLayerProps
   /** The page's own file, as main spells it once listed: the paused band watches it. */
   readonly pageFile: string
-  /** Ctrl+Alt+M / Cmd+Option+M, focus in the chrome or on the group (native event too). */
+  /** Ctrl+Alt+M / Cmd+Option+M and Esc, focus in the chrome or on the group (native event too). */
   readonly onRootKeyDown: (event: PreviewKeyEventLike) => void
+  /** Esc in the Find bar, which stops its keys: the mode comes first (`commentModeEscape.ts`). */
+  readonly onRootKeyDownCapture: (event: React.KeyboardEvent) => void
 }
 
 /** Native focus back into the page, a frame after the overlay that held it is gone. */
@@ -344,13 +347,16 @@ export function usePreviewComments({
   const onRootKeyDown = useCallback(
     (event: PreviewKeyEventLike) => {
       if (!enabled || !ready || menu !== null || request !== null) return
+      // I-1: focus in the chrome, where the page's own Esc cannot be reached.
+      if (takeModeEscape(event, latestRef.current.mode, () => toggleMode(false))) return
       // The one rule main forwards the page's key by (`shared/commentModeKey`, M3).
       if (!matchCommentModeKey(commentModeKeyFromDomEvent(event), isMacOS())) return
       event.preventDefault()
       toggleMode(false)
     },
-    [enabled, ready, menu, request, toggleMode]
+    [enabled, ready, menu, request, toggleMode, latestRef]
   )
+  const onRootKeyDownCapture = useCallback((event: React.KeyboardEvent) => takeFindEscape(event, latestRef.current.mode, () => toggleMode(false)), [toggleMode, latestRef])
 
   // A drawer row's Open, or a step key from the page (C-13): its element comes into view behind the window,
   // out of any folded <details> (§19 Rev 4).
@@ -482,7 +488,7 @@ export function usePreviewComments({
   )
 
   const pageFile = state.list.files.find(file => !file.frame)?.filePath ?? filePath
-  return { enabled, toolbar, drawer, layer, pageFile, onRootKeyDown }
+  return { enabled, toolbar, drawer, layer, pageFile, onRootKeyDown, onRootKeyDownCapture }
 }
 
 /** The middle of a box: where a window opened from the drawer is anchored. */

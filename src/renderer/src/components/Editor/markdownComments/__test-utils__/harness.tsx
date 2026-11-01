@@ -19,7 +19,9 @@ import { DialogProvider } from '../../../Dialog'
 import { ToastProvider } from '../../../Toast/ToastContext'
 import { MarkdownPreview } from '../../MarkdownPreview'
 import type { ViewMode } from '../../MarkdownEditorPanel/types'
-import { useMarkdownComments } from '../useMarkdownComments'
+import { useMarkdownComments, type UseMarkdownCommentsOptions } from '../useMarkdownComments'
+import { SearchBar } from '../../../Search'
+import type { SearchProvider } from '../../../../providers/search'
 
 export const PANEL_ID = 'editor-notes'
 export const FILE_PATH = '/project/notes.md'
@@ -127,10 +129,26 @@ export interface HarnessProps {
   readonly onViewMode?: (mode: ViewMode) => void
   /** The panel's re-read after a comment save (`MarkdownEditorPanel` passes its reload). */
   readonly onFileWritten?: () => void
+  /** dockview draws this tab. */
+  readonly isVisible?: boolean
+  /** The panel's dockview api, for its group element. */
+  readonly panelApi?: UseMarkdownCommentsOptions['panelApi']
+  /** Mount the real Find bar, as the preview pane does (it opens from the search store). */
+  readonly withFind?: boolean
 }
 
+/** Enough provider for the Find bar to open and close: these tests never search. */
+const NO_SEARCH = {
+  id: 'harness',
+  name: 'Harness',
+  capabilities: { randomAccess: true, matchList: true, wholeWord: true },
+  search: async () => [],
+  clearHighlights: () => {},
+  onCountChange: () => () => {}
+} as unknown as SearchProvider
+
 /** The panel, reduced: tools, band, and the pane with the preview and the overlay. */
-export function Harness({ content, viewMode = 'preview', onViewMode = () => {}, onFileWritten }: HarnessProps): React.JSX.Element {
+export function Harness({ content, viewMode = 'preview', onViewMode = () => {}, onFileWritten, isVisible = true, panelApi, withFind = false }: HarnessProps): React.JSX.Element {
   const [editorRef] = useState(() => ({ current: null }))
   const comments = useMarkdownComments({
     panelId: PANEL_ID,
@@ -140,22 +158,26 @@ export function Harness({ content, viewMode = 'preview', onViewMode = () => {}, 
     setViewMode: onViewMode,
     editorRef,
     isActivePanel: true,
-    isVisible: true,
+    isVisible,
+    ...(panelApi === undefined ? {} : { panelApi }),
     ...(onFileWritten === undefined ? {} : { onFileWritten })
   })
   return (
     <ToastProvider>
       <DialogProvider>
+      <div className="markdown-editor-panel" data-testid="harness-panel" {...comments.panelKeys}>
       <div className="markdown-toolbar" role="toolbar" aria-label="Markdown formatting" data-testid="harness-toolbar">
         {comments.tools}
       </div>
       {comments.band}
       {viewMode !== 'editor' && (
         <div className="preview-pane" data-testid="harness-pane">
+          {withFind && <SearchBar provider={NO_SEARCH} />}
           <MarkdownPreview content={content} filePath={FILE_PATH} />
           {viewMode === 'preview' && comments.overlay}
         </div>
       )}
+      </div>
       </DialogProvider>
     </ToastProvider>
   )

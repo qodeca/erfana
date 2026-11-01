@@ -314,6 +314,28 @@ export async function createMarkdownOverlayDriver(): Promise<OverlayDriver> {
       key('keyDown', target)
       key('keyUp', target)
     },
+    pressEnter() {
+      begin('keyboard')
+      act(() => scroller().focus())
+      fireEvent.keyDown(scroller(), { key: 'Enter', code: 'Enter' })
+      fireEvent.keyUp(scroller(), { key: 'Enter', code: 'Enter' })
+    },
+    levelUpByKeys() {
+      begin('keyboard')
+      act(() => scroller().focus())
+      fireEvent.keyDown(scroller(), { key: 'ArrowUp', code: 'ArrowUp', altKey: true })
+      fireEvent.keyUp(document.activeElement ?? scroller(), { key: 'ArrowUp', code: 'ArrowUp', altKey: true })
+    },
+    async cancelPick() {
+      await waitFor(() => expect(commentWindow()).not.toBeNull())
+      act(() => {
+        commentWindow()?.querySelector<HTMLElement>('textarea')?.focus()
+      })
+      const active = document.activeElement ?? scroller()
+      key('keyDown', active)
+      key('keyUp', active)
+      await waitFor(() => expect(commentWindow()).toBeNull())
+    },
     pickByKeys() {
       begin('keyboard')
       act(() => scroller().focus())

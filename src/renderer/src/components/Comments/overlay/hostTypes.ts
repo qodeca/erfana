@@ -18,6 +18,7 @@ import type {
 import type { CommentFileView } from '../../../../../shared/ipc/comment-common-schema'
 import type { ContextMenuItem } from '../../ContextMenu/ContextMenu'
 import type { CommentDrawerProps } from '../CommentDrawer'
+import type { ModeEscapeKey } from '../commentModeEscape'
 import type { CommentToolbarToolsProps } from '../CommentToolbarTools'
 import type { CommentWindowProps } from '../CommentWindow'
 import type { PreviewCommentAdapter } from './previewAdapter'
@@ -45,6 +46,8 @@ export interface CommentOverlayHostOptions {
   readonly enabled: boolean
   /** The preview is shown where comments live (Markdown: preview-only view, tab visible). */
   readonly shown: boolean
+  /** The panel is in the view comments live in, tab shown or not. Leaving it leaves comment mode (024-FR-005); hiding the tab does not. */
+  readonly previewView: boolean
   /** This panel is the active one: the mode shortcut is its own (src/renderer/CLAUDE.md). */
   readonly activePanel: boolean
   readonly adapter: PreviewCommentAdapter
@@ -80,6 +83,10 @@ export interface CommentOverlayHost {
   readonly enabled: boolean
   readonly shown: boolean
   readonly mode: boolean
+  /** A key on the panel root, or on its dockview group: Esc leaves comment mode from there (`commentModeEscape.ts`). */
+  readonly onPanelKey: (event: ModeEscapeKey) => void
+  /** The same on its way down through the panel root, for the Find bar, which stops its keys. */
+  readonly onPanelKeyCapture: (event: React.KeyboardEvent) => void
   readonly showIcons: boolean
   readonly toolbar: CommentToolbarToolsProps
   readonly drawer: CommentDrawerProps | null

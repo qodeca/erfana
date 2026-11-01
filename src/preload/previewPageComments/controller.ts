@@ -20,6 +20,7 @@ import { labelOf, labelText } from './label'
 import { OverlayHost } from './overlayHost'
 import { overlayCss } from './overlayStyles'
 import { OverlayView, outlineModelOf, type OutlineModel } from './overlayView'
+import { pointerTakesOver } from '../../shared/comments/overlayCore/pointerFollow'
 import { PickHold } from './pickHold'
 import { levelDown, levelUp, pickableExcept, stepOf, type LevelMove, type PickablePredicate } from './picker'
 import { MarkResolver, type MarkPlacement } from './marks'
@@ -187,9 +188,7 @@ export class CommentController {
     this.pickHold.pointerMoved()
     if (this.state.mode) {
       const raw = this.hitElement(point)
-      if (raw !== null && !(this.levelHold && this.current?.contains(raw) === true)) {
-        if (raw !== this.current) this.select(raw, false)
-      }
+      if (raw !== null && pointerTakesOver(this.current, raw, this.levelHold)) this.select(raw, false)
     }
     this.scheduler.soon()
   }

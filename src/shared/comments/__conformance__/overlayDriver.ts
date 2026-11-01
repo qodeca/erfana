@@ -172,6 +172,12 @@ export interface OverlayDriver {
   middleClick(target: OverlayTargetId): void
   /** Press and release Esc with focus in the page. */
   pressEscape(): void
+  /** Press Enter with focus in the page. */
+  pressEnter(): void
+  /** Press Alt+Up with focus in the page: the picker climbs one level. */
+  levelUpByKeys(): void
+  /** End a pick with nothing written: the menu or window it opened is gone (HTML: both are outside the page). */
+  cancelPick(): void | Promise<void>
   /** Move the pick by keys, so real focus sits on the target. Optional: see `notOwned.pickFocus`. */
   pickByKeys?(): void
   /** Focus is on something that can hold it inside the preview, never `<body>` or a target that lost its `tabindex`. */
@@ -199,6 +205,34 @@ export interface OverlayDriver {
   /** Open a layer the host owns (`menu` and `window` on `target`), settled when it is shown. Optional: see `notOwned`. */
   open?(layer: HostedLayer, target?: OverlayTargetId): void | Promise<void>
 
+  /** Remove everything the driver added. */
+  dispose(): void | Promise<void>
+}
+
+/**
+ * Where focus sits in the panel, off the page: the mode toggle, the drawer, the
+ * Find field, or dockview's group element (where a tab switch leaves it).
+ */
+export type ModeLeavePlace = 'toggle' | 'drawer' | 'find' | 'group'
+
+/** One preview's whole panel, for leaving comment mode. Driven by keys only, after turning the mode on as a mouse does. */
+export interface ModeLeaveDriver {
+  /** Turn comment mode on with a mouse click on the toggle: focus stays there and the page has none. */
+  modeOn(): Promise<void>
+  /** Whether comment mode is on, as the toolbar shows it. */
+  isModeOn(): boolean
+  /** Put focus on `place` (opening the drawer or Find first when it is one of those). */
+  focusOn(place: ModeLeavePlace): Promise<void>
+  /** Press Esc at `place`, settled; true when the key was left unclaimed (`preventDefault` not called). */
+  pressEscape(place: ModeLeavePlace, modifiers?: GestureModifiers): Promise<boolean>
+  /** Press Esc with focus in another panel, such as the terminal. */
+  pressEscapeOutside(): Promise<void>
+  /** Whether the Find bar is open. */
+  findOpen(): boolean
+  /** Where focus is now, or `null` for anywhere else. */
+  focused(): ModeLeavePlace | null
+  /** dockview hides or shows this tab. */
+  setTabShown(shown: boolean): Promise<void>
   /** Remove everything the driver added. */
   dispose(): void | Promise<void>
 }

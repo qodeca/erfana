@@ -58,6 +58,7 @@ export function TxtCommentsPreview({ text, source }: TxtCommentsPreviewProps): R
     filePath: TXT_FILE_PATH,
     enabled: true,
     shown: true,
+    previewView: true,
     activePanel: true,
     adapter,
     source,

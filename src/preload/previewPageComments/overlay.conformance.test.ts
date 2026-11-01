@@ -240,6 +240,20 @@ function driverOn(h: Harness): OverlayDriver {
       userKey({ key: 'Escape', code: 'Escape' })
       userUp({ key: 'Escape', code: 'Escape' })
     },
+    pressEnter() {
+      begin()
+      userKey({ key: 'Enter', code: 'Enter' })
+      userUp({ key: 'Enter', code: 'Enter' })
+    },
+    levelUpByKeys() {
+      begin()
+      userKey({ key: 'ArrowUp', code: 'ArrowUp', altKey: true })
+      userUp({ key: 'ArrowUp', code: 'ArrowUp', altKey: true })
+    },
+    // Main's menu and window are not the page's: it was hidden and comes back, with the pointer away and returning.
+    cancelPick() {
+      h.controller.pointerLeft()
+    },
     picks,
     pickedTarget() {
       const last = picks().filter(p => p.kind !== 'exit').at(-1)

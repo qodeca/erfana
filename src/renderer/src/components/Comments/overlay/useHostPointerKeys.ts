@@ -39,6 +39,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { classifyGesture, type GesturePoint } from '../../../../../shared/comments/overlayCore/gesture'
+import { pointerTakesOver } from '../../../../../shared/comments/overlayCore/pointerFollow'
 import { commentModeKeyFromDomEvent, matchCommentModeKey } from '../../../../../shared/commentModeKey'
 import { useLatestRef } from '../../../hooks/useLatestRef'
 import { isMacOS } from '../../../utils/platform'
@@ -87,7 +88,7 @@ export interface HostPointerKeysOptions {
 
 /** What the host draws from pointer and keys. */
 export interface HostPointerKeys {
-  /** The target to outline: the picked one, else the one under the pointer. */
+  /** The target to outline: the pick, until the pointer moves off it with no menu or window open; else the one under the pointer. */
   readonly outlined: HTMLElement | null
   /**
    * Pick and focus the first target in view (comment mode turned on from the
@@ -120,6 +121,9 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
   const [picked, setPicked] = useState<HTMLElement | null>(null)
   const latest = useLatestRef(options)
   const pickedRef = useLatestRef(picked)
+  const hoverRef = useLatestRef(hover)
+  // The keys put the pick where it is: a level they chose holds under the pointer (`overlayCore/pointerFollow`).
+  const keyHeld = useRef(false)
 
   // The target this hook gave `tabindex="-1"`: one at a time, removed when the pick moves or the mode ends.
   const marked = useRef<HTMLElement | null>(null)
@@ -154,6 +158,7 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
   /** Give `target` real focus and the ring (C-08.3), bring it into view, and say it (C-10). */
   const focusTarget = useCallback(
     (target: HTMLElement, lead = false) => {
+      keyHeld.current = true
       paintPicked(target)
       target.scrollIntoView({ block: 'nearest' })
       const spoken = latest.current.speak(target)
@@ -232,7 +237,14 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
     const targetOf = (event: Event): HTMLElement | null => latest.current.adapter.targetAt(event.target as Node | null)
     const onScroll = (): void => latest.current.onScroll()
     const onMove = (event: MouseEvent): void => {
-      if (latest.current.mode) setHover(targetOf(event))
+      if (!latest.current.mode) return
+      const under = targetOf(event)
+      setHover(under)
+      // I-3: the outline shows what a click would hit. An open menu or window keeps its target outlined.
+      const pick = marked.current ?? pickedRef.current
+      if (pick === null || latest.current.windowOpen || !pointerTakesOver(pick, under, keyHeld.current)) return
+      releasePick()
+      setPicked(null)
     }
     const onLeave = (): void => setHover(null)
     const onDown = (event: MouseEvent): void => {
@@ -257,6 +269,7 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
       if (mark !== null) latest.current.onOpenMark(mark, target)
       else if (gesture === 'pick' && target !== null) {
         // OVL-G-01 / D-06: a pointer pick is painted as the pick before the window opens (and hands focus back to it).
+        keyHeld.current = false
         paintPicked(target)
         latest.current.onPick(target, false)
       }
@@ -301,8 +314,8 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
       event.preventDefault()
       event.stopPropagation()
       swallowedKeys.add(keyOf(event))
-      // `marked` first: it is set with the focus, and the pick's state lands a render later.
-      const at = marked.current?.isConnected === true ? marked.current : pickedRef.current
+      // `marked` first: it is set with the focus, and the pick's state lands a render later. With no pick, the outline is the hover's.
+      const at = marked.current?.isConnected === true ? marked.current : (pickedRef.current ?? hoverRef.current)
       if (step === 'exit') latest.current.onExit()
       else if (step === 'open') {
         if (at !== null) latest.current.onPick(at, true)
@@ -347,7 +360,7 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
       scroller.removeEventListener('keydown', onKeyDown)
       scroller.removeEventListener('keyup', onKeyUp)
     }
-  }, [live, scroller, adapter, latest, pickedRef, focusTarget, paintPicked])
+  }, [live, scroller, adapter, latest, pickedRef, hoverRef, focusTarget, paintPicked, releasePick])
 
   const outlined = picked !== null && picked.isConnected ? picked : hover
   return { outlined, focusFirst }

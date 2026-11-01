@@ -32,7 +32,7 @@
  * the host's stated reason, never silently passed.
  */
 import { afterEach, beforeEach, describe, expect, it, type TestFunction } from 'vitest'
-import type { FocusClose, FocusHome, FocusOpener, FocusTableDriver, OptionalPart, OverlayDriver, OverlayPick, OverlayTargetId, WindowRulesDriver } from './overlayDriver'
+import type { ModeLeaveDriver, ModeLeavePlace, OptionalPart, OverlayDriver, OverlayPick, OverlayTargetId } from './overlayDriver'
 
 /** The longest name part a label shows before its size (design §10.2: at most 40 characters). */
 const LABEL_NAME_MAX_CHARS = 40
@@ -322,6 +322,58 @@ export function runOverlaySuite(
         expect(d.outlinedTarget()).toBe('container')
       })
 
+      caseIt('OVL-L-05 after a cancelled pick the outline follows the pointer again, and a click hits what it shows', async () => {
+        d.modeOn()
+        d.click('inner')
+        await d.cancelPick()
+        d.hover({ target: 'second' })
+        expect(d.outlinedTarget()).toBe('second')
+        expect(d.outlineSelected()).toBe(false)
+        expect(d.labelText('second')).toBe(d.labels.second)
+        d.click('second')
+        expect(d.picks().at(-1)).toEqual(open('second'))
+      })
+
+      caseIt('OVL-L-06 after a cancelled pick, the pick stays outlined until the pointer really moves off it', async () => {
+        d.modeOn()
+        d.click('inner')
+        await d.cancelPick()
+        expect(d.outlinedTarget()).toBe('inner')
+        d.hover({ target: 'inner', dx: 2 })
+        expect(d.outlinedTarget()).toBe('inner')
+        expect(d.outlineSelected()).toBe(true)
+      })
+
+      caseIt('OVL-L-07 Enter after the pointer took over acts on what is outlined, not on the old pick', async () => {
+        d.modeOn()
+        d.click('inner')
+        await d.cancelPick()
+        d.hover({ target: 'second' })
+        d.pressEnter()
+        expect(d.picks().at(-1)).toEqual({ kind: 'open', via: 'keyboard', target: 'second' })
+      })
+
+      // Letting go outside the level is `overlayCore/pointerFollow`'s test: nothing in the fixture lies outside `container`.
+      caseIt('OVL-L-08 a level picked by keys holds while the pointer moves inside it', () => {
+        d.modeOn()
+        d.hover({ target: 'second' })
+        d.levelUpByKeys()
+        expect(d.outlinedTarget()).toBe('container')
+        d.hover({ target: 'second', dx: 2 })
+        expect(d.outlinedTarget()).toBe('container')
+      })
+
+      caseIt('OVL-L-09 while the window is open, the outline stays on its target', async ctx => {
+        if (d.open === undefined || d.notOwned?.window !== undefined) {
+          ctx.skip(notOwned('window'))
+          return
+        }
+        d.modeOn()
+        await d.open('window', 'inner')
+        d.hover({ target: 'second' })
+        expect(d.outlinedTarget()).toBe('inner')
+      })
+
       caseIt(`OVL-L-04 a label's name never runs past ${LABEL_NAME_MAX_CHARS} characters, and it ends in the size`, ctx => {
         if (!d.floatingLabel) {
           ctx.skip(notOwned('floatingLabel'))
@@ -339,162 +391,84 @@ export function runOverlaySuite(
   })
 }
 
+/** Who may hold focus when Esc is pressed, for {@link runModeLeaveSuite}. */
+const LEAVE_PLACES: readonly ModeLeavePlace[] = ['toggle', 'drawer', 'find', 'group']
+
 /**
- * The comment window's rules, one behaviour in both previews (024-FR-001,
- * 024-FR-015, 024-FR-022; plan step 2). Every case runs with no mouse.
+ * Leaving comment mode: the mode tab says "Esc to leave", so Esc does so from
+ * anywhere in the panel, with no mouse, in both previews (plan step 4; I-1,
+ * K-19). The Esc order stays menu → window → comment mode → Find.
  *
  * @param name - The preview, as every case title names it.
- * @param makeDriver - A fresh driver, nothing open. Called once per test.
+ * @param makeDriver - A fresh driver on a laid-out panel, comment mode off. Called once per test.
  */
-export function runWindowRulesSuite(name: string, makeDriver: () => WindowRulesDriver): void {
-  describe(`comment window rules – ${name}`, () => {
-    let d: WindowRulesDriver
+export function runModeLeaveSuite(name: string, makeDriver: () => ModeLeaveDriver | Promise<ModeLeaveDriver>): void {
+  describe(`leaving comment mode – ${name}`, () => {
+    let d: ModeLeaveDriver
 
-    beforeEach(() => {
-      d = makeDriver()
+    beforeEach(async () => {
+      d = await makeDriver()
     })
 
     afterEach(async () => {
       await d.dispose()
     })
 
-    it(`024-FR-022 (${name}) WIN-01 a first Reply asks for the name, then sends itself`, async () => {
-      await d.open({ identity: 'none' })
-      await d.replyByKeys('Looks right')
-      expect(d.view()).toBe('identity')
-      expect(d.writes()).toEqual([])
-      await d.continueByKeys('Grace Hopper')
-      expect(d.view()).toBe('threads')
-      expect(d.writes()).toEqual(['reply'])
-      expect(d.replyText()).toBe('')
-      expect(d.focusInWindow()).toBe(true)
+    it.each(LEAVE_PLACES)(`024-AC-001 (${name}) LVE-01 Esc with focus on %s leaves comment mode, in one press`, async place => {
+      await d.modeOn()
+      await d.focusOn(place)
+      await d.pressEscape(place)
+      expect(d.isModeOn()).toBe(false)
+      expect(d.findOpen()).toBe(place === 'find')
     })
 
-    it(`024-FR-022 (${name}) WIN-02 a first Resolve asks first too, then resolves`, async () => {
-      await d.open({ identity: 'none' })
-      await d.resolveByKeys()
-      expect(d.view()).toBe('identity')
-      expect(d.writes()).toEqual([])
-      await d.continueByKeys('Grace Hopper')
-      expect(d.writes()).toEqual(['setStatus'])
+    it(`024-AC-001 (${name}) LVE-02 the second Esc in Find closes Find`, async () => {
+      await d.modeOn()
+      await d.focusOn('find')
+      await d.pressEscape('find')
+      await d.pressEscape('find')
+      expect(d.findOpen()).toBe(false)
     })
 
-    it(`024-FR-022 (${name}) WIN-03 a name already in Settings still shows the notice once before a Reply`, async () => {
-      await d.open({ identity: 'notice-unseen' })
-      await d.replyByKeys('Looks right')
-      expect(d.view()).toBe('identity')
-      expect(d.writes()).toEqual([])
+    it(`024-AC-001 (${name}) LVE-03 Esc from the toggle keeps focus on the toggle`, async () => {
+      await d.modeOn()
+      await d.focusOn('toggle')
+      await d.pressEscape('toggle')
+      expect(d.focused()).toBe('toggle')
     })
 
-    it(`024-FR-022 (${name}) WIN-04 Esc at the step goes back to the thread: nothing written, the text kept`, async () => {
-      await d.open({ identity: 'none' })
-      await d.replyByKeys('Looks right')
-      await d.pressEscape()
-      expect(d.view()).toBe('threads')
-      expect(d.writes()).toEqual([])
-      expect(d.replyText()).toBe('Looks right')
-      expect(d.focusInWindow()).toBe(true)
+    it.each(LEAVE_PLACES)(`024-AC-001 (${name}) LVE-04 comment mode off: Esc on %s stays the panel's`, async place => {
+      await d.focusOn(place)
+      expect(await d.pressEscape(place)).toBe(place !== 'find')
     })
 
-    it(`024-FR-022 (${name}) WIN-05 a known reader writes straight away`, async () => {
-      await d.open({ identity: 'ready' })
-      await d.replyByKeys('Looks right')
-      expect(d.view()).toBe('threads')
-      expect(d.writes()).toEqual(['reply'])
+    it(`024-AC-001 (${name}) LVE-05 Shift+Esc is not Esc`, async () => {
+      await d.modeOn()
+      await d.focusOn('toggle')
+      await d.pressEscape('toggle', { shift: true })
+      expect(d.isModeOn()).toBe(true)
     })
 
-    it(`024-FR-015 (${name}) WIN-06 unsaved edits: no reply box, and the banner's Save works`, async () => {
-      await d.open({ identity: 'ready', editor: 'dirty' })
-      expect(d.replyText()).toBeNull()
-      expect(d.bannerButtons()).toEqual(['Go to tab', `Save ${d.fileName}`])
-      await d.saveFromBannerByKeys()
-      expect(d.editorSaves()).toBe(1)
+    it(`024-AC-001 (${name}) LVE-06 Esc outside the panel is not this panel's`, async () => {
+      await d.modeOn()
+      await d.pressEscapeOutside()
+      expect(d.isModeOn()).toBe(true)
     })
 
-    it(`024-FR-015 (${name}) WIN-07 changed on disk too: Go to tab only, never a Save that overwrites`, async () => {
-      await d.open({ identity: 'ready', editor: 'conflict' })
-      expect(d.replyText()).toBeNull()
-      expect(d.bannerButtons()).toEqual(['Go to tab'])
+    it(`024-FR-005 (${name}) LVE-07 a tab switch keeps comment mode, with no press to get it back`, async () => {
+      await d.modeOn()
+      await d.setTabShown(false)
+      await d.setTabShown(true)
+      expect(d.isModeOn()).toBe(true)
     })
 
-    it(`024-FR-015 (${name}) WIN-08 a refusal with no tab here says so in one sentence, with no buttons`, async () => {
-      await d.open({ identity: 'ready', refusedUnsaved: true })
-      await d.replyByKeys('Looks right')
-      expect(d.bannerButtons()).toEqual([])
-      expect(d.bannerText()).toMatch(d.seesOtherWindows ? /in another window/ : /in another tab/)
-      expect(d.replyText()).toBe('Looks right')
-    })
-
-    it(`S-03 (${name}) WIN-09 a Changed thread opens on Resolve`, async () => {
-      await d.open({ identity: 'ready', threads: ['changed'] })
-      expect(d.focused()).toBe('resolve')
-    })
-
-    it(`S-03 (${name}) WIN-10 a Changed thread with no Resolve opens on the title: read-only file`, async () => {
-      await d.open({ identity: 'ready', threads: ['changed'], readOnly: true })
-      expect(d.focused()).toBe('title')
-    })
-
-    it(`S-03 (${name}) WIN-11 a Changed thread with no Resolve opens on the title: paused by unsaved edits`, async () => {
-      await d.open({ identity: 'ready', threads: ['changed'], editor: 'dirty' })
-      expect(d.focused()).toBe('title')
-    })
-
-    it(`S-03 (${name}) WIN-12 a step lands by the same rule: onto a Changed thread, on Resolve and next`, async () => {
-      await d.open({ identity: 'ready', threads: ['open', 'changed'] })
-      await d.stepByKeys()
-      expect(d.focused()).toBe('resolve-next')
-    })
-
-    it(`S-03 (${name}) WIN-13 a step lands by the same rule: onto an open thread, on the title`, async () => {
-      await d.open({ identity: 'ready', threads: ['changed', 'open'] })
-      await d.stepByKeys()
-      expect(d.focused()).toBe('title')
-    })
-
-    it(`S-03 (${name}) WIN-14 a step lands by the same rule: onto a Changed thread on a read-only file, on the title`, async () => {
-      await d.open({ identity: 'ready', threads: ['open', 'changed'], readOnly: true })
-      await d.stepByKeys()
-      expect(d.focused()).toBe('title')
-    })
-  })
-}
-
-/** Where each opener takes focus back to, on a close that leaves it to the window. */
-const FOCUS_HOME: Readonly<Record<FocusOpener, FocusHome>> = {
-  'drawer-row': 'opener',
-  'gone-row': 'drawer',
-  toolbar: 'opener',
-  target: 'preview',
-  'gone-target': 'preview',
-  nothing: 'preview'
-}
-const FOCUS_CLOSES: readonly FocusClose[] = ['escape', 'close-button', 'saved', 'thread-gone', 'go-to-tab']
-
-/**
- * The focus-return table: every opener against every close reason, with no
- * mouse (plan step 3, differences D-59). Focus never falls to `<body>`.
- *
- * @param name - The preview, as every case title names it.
- * @param makeDriver - A fresh driver, nothing open. Called once per test.
- */
-export function runFocusTableSuite(name: string, makeDriver: () => FocusTableDriver): void {
-  describe(`comment window focus return – ${name}`, () => {
-    let d: FocusTableDriver
-
-    beforeEach(() => {
-      d = makeDriver()
-    })
-
-    afterEach(async () => {
-      await d.dispose()
-    })
-
-    const rows = (Object.keys(FOCUS_HOME) as FocusOpener[]).flatMap(opener => FOCUS_CLOSES.map(close => ({ opener, close })))
-    it.each(rows)(`D-59 (${name}) FOC opener $opener, closed by $close`, async ({ opener, close }) => {
-      await d.open(opener, close)
-      await d.close(close)
-      expect(d.home()).toBe(close === 'go-to-tab' ? 'editor' : FOCUS_HOME[opener])
+    it(`024-AC-001 (${name}) LVE-08 after coming back to the tab, Esc still leaves`, async () => {
+      await d.modeOn()
+      await d.setTabShown(false)
+      await d.setTabShown(true)
+      await d.focusOn('group')
+      await d.pressEscape('group')
+      expect(d.isModeOn()).toBe(false)
     })
   })
 }

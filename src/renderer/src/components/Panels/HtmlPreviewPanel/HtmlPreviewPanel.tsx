@@ -358,7 +358,7 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
   return (
     // Back/Forward keys with focus anywhere in THIS panel's chrome – a React
     // handler on the root, so another panel's keys never reach it (§3.7).
-    <div className="html-preview-panel" ref={panelRootRef} onKeyDown={onRootKeyDown}>
+    <div className="html-preview-panel" ref={panelRootRef} onKeyDown={onRootKeyDown} onKeyDownCapture={comments.onRootKeyDownCapture}>
       {/* Move announcements (part 3 §3.8, RU3-1). On the ROOT, mounted in every
           view: a move started from the failed banner mounts the band in the
           same render it lands, and a live region created with its text is not

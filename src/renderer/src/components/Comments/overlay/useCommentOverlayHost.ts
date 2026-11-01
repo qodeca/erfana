@@ -9,9 +9,9 @@
  * and a {@link RendererCommentSource}, so a later `<!-- -->` text preview
  * plugs in with its own adapter and nothing here changes. It owns:
  *
- * - **comment mode** – the shared `overlayCore/modeState` rules; the mode is
- *   per panel in `usePreviewCommentStore`, off while the host is not shown or
- *   no new comment can be written (menu matrix § 2);
+ * - **comment mode** – `useHostCommentMode.ts`: it belongs to the tab, and goes
+ *   with the preview view or when no new comment can be written; Esc leaves it
+ *   from anywhere in the panel (`onPanelKey`, `commentModeEscape.ts`);
  * - **the list** – read through the source on show, on a file change and
  *   after a write, newest answer wins (the store's generations);
  * - **the menu and the window** – the target's menu (`hostMenu.ts`) and the
@@ -34,7 +34,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { CommentSaveRequest } from '../../../../../shared/ipc/preview-comment-schema'
 import type { FileCommentSaveResult, PickedTargetRequest, ThreadPlacement } from '../../../../../shared/ipc/file-comment-schema'
-import { reduceCommentMode } from '../../../../../shared/comments/overlayCore/modeState'
 import { useGlobalSettingsStore } from '../../../stores/useGlobalSettingsStore'
 import { usePanelCommentState, usePreviewCommentStore } from '../../../stores/usePreviewCommentStore'
 import { useLatestRef } from '../../../hooks/useLatestRef'
@@ -60,7 +59,9 @@ import { drawn, newRequestExtras, threadTarget, useDraftKeepAlive, type HostDock
 import type { CommentOverlayHost, CommentOverlayHostOptions, HostMenu } from './hostTypes'
 import { useSelectionComments, useWordsCheck } from './useSelectionComments'
 import { nounTargetOf } from './previewAdapter'
+import { useHostCommentMode } from './useHostCommentMode'
 import { useHostPointerKeys } from './useHostPointerKeys'
+import { takeFindEscape, takeModeEscape, type ModeEscapeKey } from '../commentModeEscape'
 
 export type { CommentOverlayHost, CommentOverlayHostOptions, HostMenu, RendererCommentSource } from './hostTypes'
 
@@ -73,7 +74,7 @@ const NO_THREADS: readonly string[] = []
  * @returns {@link CommentOverlayHost}
  */
 export function useCommentOverlayHost(options: CommentOverlayHostOptions): CommentOverlayHost {
-  const { panelId, filePath, enabled, shown, activePanel, adapter, source, scroller, area, paused } = options
+  const { panelId, filePath, enabled, shown, previewView, activePanel, adapter, source, scroller, area, paused } = options
   const words = adapter.words
   const live = enabled && shown
   const identity = useGlobalSettingsStore(s => s.settings?.comments ?? null)
@@ -137,22 +138,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
     })
   }, [enabled, source, refreshList, optionsRef])
 
-  // ---- comment mode (overlayCore/modeState): off while hidden or blocked ----
-  const setMode = useCallback(
-    (on: boolean) => {
-      const step = reduceCommentMode({ on: store.getState().panels.get(panelId)?.mode ?? false }, { type: 'set', on })
-      if (step.changed) store.getState().patch(panelId, { mode: step.on })
-      return step.changed
-    },
-    [panelId, store]
-  )
-  useEffect(() => {
-    if (state.mode && (!live || blocked !== null)) {
-      store.getState().patch(panelId, { mode: false })
-      if (blocked !== null && live) announce(MD_SURFACE_COPY.modeUnavailable(blocked))
-    }
-  }, [state.mode, live, blocked, panelId, store, announce])
-
+  const setMode = useHostCommentMode({ panelId, inPreview: enabled && previewView, live, blocked, announce })
   const selection = useSelectionComments({ live, blocked, adapter, scroller, area })
 
   const toggleMode = useCallback(
@@ -310,6 +296,16 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
   useEffect(() => {
     focusFirst.current = pointer.focusFirst
   }, [pointer.focusFirst])
+
+  // Esc from the panel's chrome. The window comes before the mode in the Esc order, and it is open beside the toolbar.
+  const leaveByEscape = useCallback(() => {
+    if (request !== null) return setRequest(null)
+    setMode(false)
+    announce(ANNOUNCE.modeOff)
+  }, [request, setMode, announce])
+  const onPanelKey = useCallback((event: ModeEscapeKey) => void takeModeEscape(event, mode && menu === null, leaveByEscape), [mode, menu, leaveByEscape])
+  const onPanelKeyCapture = useCallback((event: React.KeyboardEvent) => takeFindEscape(event, mode && menu === null, leaveByEscape), [mode, menu, leaveByEscape])
+
   // ---- writes ----
   const liveDraft = useDraftKeepAlive(request?.kind === 'new' ? request.draftToken : null, () => optionsRef.current.source.openDraft())
   const expectWords = useWordsCheck(placements, target => announce(SELECTION_COPY.wordsDropped(words.noun(target))))
@@ -494,6 +490,8 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
     scrollTick,
     selectionButton: request === null && menu === null ? selection.button : null,
     onSelectionButton,
+    onPanelKey,
+    onPanelKeyCapture,
     markOwner,
     activeThreads: live && request?.kind === 'threads' ? request.threadKeys : NO_THREADS
   }

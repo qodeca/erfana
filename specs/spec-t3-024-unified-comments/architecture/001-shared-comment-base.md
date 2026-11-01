@@ -70,6 +70,9 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | **Added since** `src/renderer/src/components/Comments/overlay/{useCommentOverlayHost,useHostPointerKeys,useSelectionComments,previewAdapter,pickerKeys,hostTypes,hostParts,hostMenu,hostWindow,hostDrawer,domWords,commentContentAttrs,contentGuard}.ts` (13) | S (for renderer-hosted previews) | – |
 | **Added since** `src/renderer/src/components/Editor/markdownComments/{useMarkdownComments,MarkdownCommentsOverlay,MarkdownCommentsBand}.tsx` (3) | M | The Markdown Preview's composition root, the surfaces it draws in its pane, and its paused band (D-24: only the Markdown Preview draws the editor's unsaved text) |
 | **Added since** `src/renderer/src/components/Comments/overlay/useHostStepKeys.ts` (1) | S (for renderer-hosted previews) | – |
+| **Added since** `src/renderer/src/components/Comments/overlay/useHostCommentMode.ts` (1) | S (for renderer-hosted previews) | – |
+| **Added since** `src/shared/comments/overlayCore/pointerFollow.ts` (1) | S | Pure rule both overlays run: when the pointer takes the picker over. No imports, no DOM |
+| **Added since** `src/renderer/src/components/Comments/commentModeEscape.ts` (1) | S | – |
 | **Added since** `src/renderer/src/components/Comments/overlay/{iconLayout,commentTiming}.ts` (2) | S (for renderer-hosted previews) | Icon placement with the 3-per-row cap, ghost and damaged icons (C-05, C-17, S-01..S-08); the 024-NFR-001 `performance.mark` points |
 
 ### Renderer

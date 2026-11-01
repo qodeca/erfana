@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The {@link FocusTableDriver} over one preview's way of mounting the comment
- * window (`shared/comments/__conformance__/overlay.suite.ts`). The stage is the
+ * window (`shared/comments/__conformance__/windowRules.suite.ts`). The stage is the
  * smallest panel that has every opener: a toolbar, a drawer that is a
  * focus-return region, a preview with a target, and an editor. Each preview's
  * conformance test mocks `useCommentDirtyGuard` to the `guard` it passes in.

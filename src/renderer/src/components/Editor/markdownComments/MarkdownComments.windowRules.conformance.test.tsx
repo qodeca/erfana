@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /** The Markdown Preview's docked comment window, against the shared window rules. */
 import { vi } from 'vitest'
-import { runFocusTableSuite, runWindowRulesSuite } from '../../../../../shared/comments/__conformance__/overlay.suite'
+import { runFocusTableSuite, runWindowRulesSuite } from '../../../../../shared/comments/__conformance__/windowRules.suite'
 import type { CommentDirtyGuard } from '../../../hooks/useCommentDirtyGuard'
 import { MARKDOWN_WORDS, MD_SURFACE_COPY } from '../../Comments/commentCopyWords'
 import { CommentWindow } from '../../Comments/CommentWindow'

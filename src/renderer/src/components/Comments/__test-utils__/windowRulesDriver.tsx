@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The {@link WindowRulesDriver} over one preview's way of mounting the comment
- * window (`shared/comments/__conformance__/overlay.suite.ts`). Each preview's
+ * window (`shared/comments/__conformance__/windowRules.suite.ts`). Each preview's
  * conformance test hands it a `mount`, and mocks `useCommentDirtyGuard` to the
  * `guard` it passes in, because the dirty state is an editor tab the fixture
  * does not have.

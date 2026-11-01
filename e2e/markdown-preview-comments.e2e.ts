@@ -204,6 +204,51 @@ test.describe('Markdown Preview comments', () => {
     await expect(md.modeButton()).toBeFocused()
   })
 
+  test('I-1 Esc leaves comment mode from the toolbar after a mouse click on the toggle', async ({ windowWithTestProject }) => {
+    const page = windowWithTestProject
+    const md = await openReview(page)
+    await md.modeOn()
+    await expect(md.modeButton()).toBeFocused()
+    await page.keyboard.press('Escape')
+    await expect(md.modeButton()).toHaveAttribute('aria-pressed', 'false')
+    await expect(md.modeTab()).toHaveCount(0)
+    await expect(md.modeButton()).toBeFocused()
+  })
+
+  test('I-3 after a cancelled pick the outline follows the pointer: the tab names what a click would hit', async ({ windowWithTestProject }) => {
+    const page = windowWithTestProject
+    await setGlobalSetting(page, 'comments', reviewer(NAME))
+    const md = await openReview(page)
+    await md.modeOn()
+    await md.target('p', 3).click()
+    await expect(md.window()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await page.keyboard.press('Escape')
+    await expect(md.window()).toHaveCount(0)
+    await expect(md.modeTab()).toHaveText('Comment mode · Paragraph, line 3 · Esc to leave')
+    await md.target('h1', 1).hover()
+    await expect(md.modeTab()).toHaveText('Comment mode · H1 heading, line 1 · Esc to leave')
+    await md.target('h1', 1).click()
+    await expect(md.window().getByTestId('comment-window-title')).toContainText('New comment on H1 heading', { timeout: MD_COMMENT_BUDGET_MS })
+  })
+
+  test('I-8 comment mode stays through a tab switch, and Esc still leaves from where the switch left focus', async ({
+    windowWithTestProject,
+    testProject
+  }) => {
+    const page = windowWithTestProject
+    await fsp.writeFile(path.join(testProject.path, 'other.md'), '# Other\n')
+    const md = await openReview(page)
+    await md.modeOn()
+    const tabs = new TabBarPage(page)
+    await new ProjectTreePage(page).fileRow('other.md').click()
+    await tabs.expectActive('other.md')
+    await tabs.activate(FILE)
+    await expect(md.modeButton()).toHaveAttribute('aria-pressed', 'true', { timeout: MD_COMMENT_BUDGET_MS })
+    await expect(md.modeTab()).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(md.modeButton()).toHaveAttribute('aria-pressed', 'false')
+  })
+
   test('024-AC-006 comment tools show in the preview-only view only, and not at all with the setting off', async ({
     windowWithTestProject
   }) => {

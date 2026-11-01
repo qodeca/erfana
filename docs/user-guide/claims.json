@@ -24973,7 +24973,7 @@
       "quote": "and the panel matches it on its own chrome and dockview group element (`usePreviewComments`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/usePreviewComments.ts:348",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/usePreviewComments.ts:353",
       "match": "if (!matchCommentModeKey(commentModeKeyFromDomEvent(event), isMacOS())) return"
     },
     {
@@ -49111,7 +49111,7 @@
       "quote": "after a coordinate hit test (controller.ts:229-231, verified)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/controller.ts:219",
+      "source": "src/preload/previewPageComments/controller.ts:218",
       "match": "event.detail > 0"
     },
     {

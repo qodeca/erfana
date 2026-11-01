@@ -491,7 +491,7 @@ export function MarkdownEditorPanel(
   })
 
   // Markdown Preview comments (spec 024): toolbar tools, paused band, pane overlay – preview-only view.
-  const comments = useMarkdownComments({ panelId, filePath: currentFile?.path, content: currentFile?.content ?? '', viewMode, setViewMode, editorRef, isActivePanel, isVisible: isPanelVisible, onFileWritten: reloadIfUnedited })
+  const comments = useMarkdownComments({ panelId, filePath: currentFile?.path, content: currentFile?.content ?? '', viewMode, setViewMode, editorRef, isActivePanel, isVisible: isPanelVisible, panelApi: props.api, onFileWritten: reloadIfUnedited })
   // =========================================================================
   // Document Statistics
   // =========================================================================
@@ -646,7 +646,7 @@ export function MarkdownEditorPanel(
   // Render
   // =========================================================================
   return (
-    <div className="markdown-editor-panel" tabIndex={0}>
+    <div className="markdown-editor-panel" tabIndex={0} {...comments.panelKeys}>
       {currentFile && (
         <>
           <EditorErrorBoundary componentName="MarkdownToolbar" fallback={null}>
