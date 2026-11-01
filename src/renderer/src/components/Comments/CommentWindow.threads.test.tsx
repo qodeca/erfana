@@ -313,6 +313,19 @@ describe('CommentWindow – threads', () => {
         expect(screen.getByTestId('comment-reply')).not.toHaveAttribute('aria-disabled')
       })
 
+      it('C-19 refused for want of a name: the window asks for it, and Cancel goes back with the reply kept', async () => {
+        const { user } = await replyPending('Keep me')
+        act(() => fake.emitSettled({ panelId: 'preview-index', op: 'reply', threadKey: 't1', ok: false, code: ErrorCode.COMMENT_IDENTITY_REQUIRED }))
+        await user.click(await screen.findByTestId('comment-identity-cancel'))
+        expect(await screen.findByTestId('comment-reply-field')).toHaveValue('Keep me')
+      })
+
+      it('another panel\'s settle changes nothing here', async () => {
+        await replyPending('Later')
+        act(() => fake.emitSettled({ panelId: 'preview-other', op: 'reply', threadKey: 't1', ok: true }))
+        expect(screen.getByTestId('comment-save-error')).toBeInTheDocument()
+      })
+
       it('another thread\'s settle changes nothing here', async () => {
         await replyPending('Later')
         act(() => fake.emitSettled({ panelId: 'preview-index', op: 'reply', threadKey: 't2', ok: true }))

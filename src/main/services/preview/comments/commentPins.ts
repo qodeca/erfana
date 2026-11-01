@@ -102,10 +102,11 @@ export function groupPins(view: Pick<CommentLoadView, 'blocks'>): PinGroup[] {
  * None for a place the pin does not have.
  */
 export function threadsOfWords(pin: Pick<PinGroup, 'words' | 'wordThreads'>, word: number): string[] {
-  const sel = pin.words?.[word]
+  const all = pin.words ?? []
+  const sel = all[word]
   if (sel === undefined) return []
   const same = (words: AnchorSelection): boolean => words.exact === sel.exact && words.prefix === sel.prefix && words.suffix === sel.suffix
-  return (pin.words ?? []).flatMap((words, i) => (same(words) ? (pin.wordThreads?.[i] ?? []) : []))
+  return all.flatMap((words, i) => (same(words) ? (pin.wordThreads?.[i] ?? []) : []))
 }
 
 /** One load's counts. */

@@ -322,6 +322,18 @@ describe('picker edges', () => {
     }
   })
 
+  it('on a page with nothing to show the picker stands on <body>, and Tab stays there', () => {
+    document.body.innerHTML = '<script id="js">1</script>'
+    vi.spyOn(document, 'elementFromPoint').mockReturnValue(document.body)
+    // The first key lands on <body> (K-6); main has no token for it, so nothing is said yet.
+    userKey({ key: 'Tab' })
+    expect(spoken()).toBeUndefined()
+    userKey({ key: 'Tab' })
+    expect(spoken()).toBe('last')
+    userKey({ key: 'Tab', shiftKey: true })
+    expect(spoken()).toBe('first')
+  })
+
   it('picks nothing in a frame that cannot take comments, and at most 5 per second elsewhere', () => {
     h.controller.applyState({ mode: true })
     userMove(10, 60)

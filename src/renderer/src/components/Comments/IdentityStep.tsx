@@ -94,7 +94,8 @@ export function IdentityStep(props: IdentityStepProps): React.JSX.Element {
     let current = true
     void fileCommentGateway.gitName().then(answer => {
       // What the person typed meanwhile is theirs: a suggestion only fills an empty field.
-      if (current && answer.ok && answer.name !== undefined) setName(typed => (typed === '' ? (answer.name ?? '') : typed))
+      const suggested = answer.ok ? answer.name : undefined
+      if (current && suggested !== undefined) setName(typed => (typed === '' ? suggested : typed))
     })
     return () => {
       current = false

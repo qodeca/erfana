@@ -145,4 +145,14 @@ describe('I-13 which thread a mark belongs to', () => {
     const [pin] = groupPins({ blocks: [ok('t1', sel('one'))] })
     expect(threadsOfWords(pin, 1)).toEqual([])
   })
+
+  it('I-13 a pin with no words names no thread', () => {
+    const [pin] = groupPins({ blocks: [ok('t1')] })
+    expect(pin).not.toHaveProperty('words')
+    expect(threadsOfWords(pin, 0)).toEqual([])
+  })
+
+  it('I-13 words with no thread beside them name none', () => {
+    expect(threadsOfWords({ words: [sel('one')] }, 0)).toEqual([])
+  })
 })

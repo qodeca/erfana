@@ -28,13 +28,20 @@ import {
   saveShortcutLabel,
   threadsTitle,
   unavailableTooltip,
-  unreadFilesText
+  unreadFilesText,
+  writtenAnnouncement
 } from './commentCopy'
 import { HTML_WORDS } from './commentCopyWords'
 
 describe('commentCopy', () => {
   beforeEach(() => {
     platform.mac = false
+  })
+
+  it('C-13 a reply that also resolves is announced as resolved; a plain reply as saved', () => {
+    const reply = { panelId: 'p', op: 'reply', fileKey: 'f', threadKey: 't', rawHash: 'h', text: 'x' } as const
+    expect(writtenAnnouncement({ ...reply, resolve: true }, 'a.html')).toBe(ANNOUNCE.resolved)
+    expect(writtenAnnouncement(reply, 'a.html')).not.toBe(ANNOUNCE.resolved)
   })
 
   it('names the shortcuts per platform', () => {

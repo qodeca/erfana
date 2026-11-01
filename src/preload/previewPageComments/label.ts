@@ -39,7 +39,7 @@ const ELLIPSIS = '…'
 /** The quote marks and separator around the opening words: ` · “` and `”`. */
 const WORDS_FRAME_CHARS = 5
 /** Text a reader never sees as words. */
-const UNREAD_PARENTS: ReadonlySet<string> = new Set(['script', 'style', 'noscript', 'template'])
+const UNREAD_PARENTS: ReadonlySet<string | undefined> = new Set(['script', 'style', 'noscript', 'template'])
 
 /** `text` cut to `max` characters, ending in `…` when it was longer. */
 function cut(text: string, max: number): string {
@@ -84,10 +84,11 @@ function openingWords(element: Element, room: number): string {
   const walker = element.ownerDocument.createTreeWalker(element, 4 /* NodeFilter.SHOW_TEXT */)
   let words = ''
   while ([...words].length <= room) {
-    const node = walker.nextNode()
+    // SHOW_TEXT yields only text nodes, each below `element`, so each has a parent.
+    const node = walker.nextNode() as Text | null
     if (node === null) break
-    if (UNREAD_PARENTS.has(node.parentElement?.localName ?? '')) continue
-    words = `${words} ${(node.nodeValue ?? '').replace(/[\p{Cc}\p{Cf}]/gu, ' ')}`.replace(/\s+/g, ' ').trimStart()
+    if (UNREAD_PARENTS.has(node.parentElement?.localName)) continue
+    words = `${words} ${node.data.replace(/[\p{Cc}\p{Cf}]/gu, ' ')}`.replace(/\s+/g, ' ').trimStart()
   }
   return cut(words.trimEnd(), room).replace(/ …$/, ELLIPSIS)
 }

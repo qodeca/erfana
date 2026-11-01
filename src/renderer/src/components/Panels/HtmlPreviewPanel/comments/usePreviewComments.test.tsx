@@ -619,6 +619,38 @@ describe('usePreviewComments', () => {
       expect(latest.drawer?.removed).toEqual([])
     })
 
+    it('P-F21 the drawer offers to turn the mode on only while it is off', async () => {
+      render(<Harness onValue={onValue} />)
+      act(() => latest.toolbar.onToggleDrawer())
+      await waitFor(() => expect(latest.drawer?.list.status).toBe('ready'))
+      act(() => latest.drawer?.onTurnOnMode?.())
+      await waitFor(() => expect(latest.toolbar.mode).toBe(true))
+      expect(fake.bridge.setMode).toHaveBeenCalledWith({ panelId: PANEL, on: true, showIcons: expect.any(Boolean) })
+      expect(latest.drawer?.onTurnOnMode).toBeUndefined()
+    })
+
+    it('a bulk action goes out for this panel, and hears only this panel\'s settle', async () => {
+      render(<Harness onValue={onValue} />)
+      act(() => latest.toolbar.onToggleDrawer())
+      const request = { change: 'resolve', files: [] } as never
+      await act(async () => {
+        await latest.drawer?.bulk?.run(request)
+      })
+      expect(fake.bridge.bulk).toHaveBeenCalledWith({ panelId: PANEL, ...(request as object) })
+
+      let emit: (event: { panelId: string }) => void = () => {}
+      fake.bridge.onBulkSettled.mockImplementation((callback: typeof emit) => {
+        emit = callback
+        return () => {}
+      })
+      const heard = vi.fn()
+      latest.drawer?.bulk?.onSettled(heard)
+      emit({ panelId: 'preview-other' })
+      expect(heard).not.toHaveBeenCalled()
+      emit({ panelId: PANEL })
+      expect(heard).toHaveBeenCalledWith({ panelId: PANEL })
+    })
+
     it('E-005 an anchor status after the list wins over the flag the list was read with', async () => {
       fake.bridge.list.mockResolvedValue({
         ok: true,

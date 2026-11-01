@@ -68,6 +68,14 @@ describe('labelOf (J-001; P-F19, D-03, D-05)', () => {
     expect(labelText(labelOf(element('<span></span>'), BOX, suffix, comments))).toBe(expected)
   })
 
+  it('gives the opening words up when a long suffix leaves them no room', () => {
+    const file = `${'f'.repeat(30)}.html`
+    const text = labelText(labelOf(element('<p>Plans</p>'), BOX, { kind: 'frame', file }, 0))
+    expect(text).not.toContain('Plans')
+    expect(text.startsWith('Section · frame fff')).toBe(true)
+    expect([...text].length).toBeLessThanOrEqual(40)
+  })
+
   it('cuts a code longer than the label itself', () => {
     const parts = labelOf(element(`<section id="${'x'.repeat(60)}"></section>`), BOX, { kind: 'none' }, 0)
     expect([...parts.code]).toHaveLength(40)

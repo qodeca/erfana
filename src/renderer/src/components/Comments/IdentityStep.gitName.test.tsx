@@ -64,4 +64,11 @@ describe('IdentityStep – the git name', () => {
     await act(async () => {})
     expect(nameField().value).toBe('')
   })
+
+  it('P-F33 a refused read leaves the field empty too', async () => {
+    gitName.mockResolvedValue({ ok: false })
+    draw()
+    await act(async () => {})
+    expect(nameField().value).toBe('')
+  })
 })

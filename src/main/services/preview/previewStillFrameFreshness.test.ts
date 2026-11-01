@@ -169,6 +169,17 @@ describe('L-1 the view\'s real presses', () => {
     expect(pagePress).not.toHaveBeenCalled()
     freshness.dispose()
   })
+
+  it('L-1 an input with no type is no press, and leaves the picture fresh', () => {
+    const emitter = new EventEmitter()
+    const pagePress = vi.fn()
+    const markStale = vi.fn()
+    const freshness = attachStillFrameFreshness({ contents: emitter as unknown as PreviewInputEventSource, markStale, refresh: vi.fn(), now: () => 0, pagePress })
+    emitter.emit('input-event', {}, {})
+    expect(pagePress).not.toHaveBeenCalled()
+    expect(markStale).not.toHaveBeenCalled()
+    freshness.dispose()
+  })
 })
 
 describe('attachStillFrameFreshness', () => {

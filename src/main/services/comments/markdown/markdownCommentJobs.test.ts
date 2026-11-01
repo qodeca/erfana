@@ -28,6 +28,7 @@ import { MARKDOWN_COMMENT_MAX_BYTES } from '../../../../shared/markdownComments/
 import { commentWorkerJobs } from '../../workers/comment-parse.worker'
 import { CommentDocCache, type KindDocCache } from '../commentJobDocs'
 import type { ListSummary } from '../commentListCore'
+import { assembleSplices } from '../commentBulkCore'
 import { createKindCommentJobTable } from '../kindCommentJobs'
 import { assembleSplice, type ThreadChange, type WriteJobResult } from '../commentWriteCore'
 import { createInProcessMarkdownJobs, markdownCommentJobTable, type MarkdownWriteJob } from './markdownCommentJobs'
@@ -425,6 +426,28 @@ describe('024-AC-036 the Markdown work runs in the parse worker', () => {
     if (!warm.ok) throw new Error(`write refused: ${warm.refusal}`)
     expect(listed(assembleSplice(bytes, warm), cache)).toMatchObject({ kind: 'list', ok: true, summary: { threads: [{ threadId: warm.threadId }] } })
     expect(parses).toBe(2)
+  })
+
+  it('024-AC-036 a bulk write checks with the file\'s line-break setting, on or off', async () => {
+    const original = 'Line one\nline two\n\nNext.\n'
+    const bulk = async (breaks: boolean): Promise<string> => {
+      const path = tempFile(original)
+      const doc = markdownKind.parse(original, 0)
+      const added = await write(path, addJob(pickOf(doc.index as MdIndex, (doc.index as MdIndex).elements[0]), breaks), 31)
+      if (!added.ok) throw new Error(`add refused: ${added.refusal}`)
+      const { threads } = await list(path)
+      const bytes = new Uint8Array(readFileSync(path))
+      const job = { kind: 'bulkWrite' as const, request: { change: 'resolve' as const, threads: [{ threadId: added.threadId!, rawHash: threads[0].rawHash }] }, act: ACT, breaks }
+      const result = await createInProcessMarkdownJobs({ random: seededRandom(32) }).runJob(bytes, job)
+      if (result.kind !== 'bulkWrite' || !result.ok) throw new Error(`bulk failed: ${JSON.stringify(result)}`)
+      writeFileSync(path, assembleSplices(bytes, result.splices))
+      return path
+    }
+    for (const breaks of [false, true]) {
+      const path = await bulk(breaks)
+      expect((await list(path)).threads[0].status).toBe('resolved')
+      expect(frozenKinds(textOf(path))).toEqual(['ok'])
+    }
   })
 
   it('a refused write hands no buffers over; a written one hands over the block bytes it owns', () => {
