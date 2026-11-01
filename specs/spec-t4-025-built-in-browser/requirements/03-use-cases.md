@@ -13,6 +13,8 @@
 
 "Reviewer" is the primary user of the overview: a person reviewing a CLI agent's web work in Erfana.
 
+Fixed sentences quoted in the flows ("The page reloaded – …", "No agent is running in …") show on screen with a full stop; tests match them without it (02-requirements, preamble).
+
 ---
 
 ## 025-UC-001: Fix an element found in review
@@ -52,7 +54,7 @@
 
 **Error flows:**
 - E1: The reviewer submits an empty instruction; the dialog stays open with an inline error (025-FR-031).
-- E2: No terminal is open, or the target terminal runs a plain shell; Erfana types nothing and shows "No agent is running in …" with **Choose terminal**; the dialog keeps the instruction (025-FR-061).
+- E2: No terminal is open, or the target terminal runs a plain shell; Erfana types nothing and shows "No agent is running in …" with **Open terminal** (no terminal open) or **Choose terminal** (a plain shell); the dialog keeps the instruction and focus moves to the banner's button (025-FR-061).
 - E3: Writing the capture fails (disk full, permission); no prompt is sent and an error toast names the reason (025-FR-046).
 
 **Traces to:** 025-FR-001, 025-FR-002, 025-FR-025, 025-FR-026, 025-FR-027, 025-FR-029, 025-FR-030, 025-FR-031, 025-FR-032, 025-FR-033, 025-FR-034, 025-FR-035, 025-FR-036, 025-FR-037, 025-FR-038, 025-FR-046, 025-FR-053, 025-FR-054, 025-FR-060, 025-FR-061, 025-FR-063, 025-FR-065
@@ -104,7 +106,7 @@
 
 **Main flow:**
 1. The reviewer types the staging address in the address bar.
-2. The certificate warning page appears; the reviewer selects **Proceed anyway** (025-FR-021).
+2. The certificate warning page appears; after its short input guard of about 500 ms, the reviewer selects **Proceed anyway** (025-FR-021).
 3. The sign-in box appears; the reviewer enters credentials, ticks **Remember for this project** and selects **Sign in** (025-FR-022).
 4. The site's own login page opens a GitHub sign-in popup; the reviewer signs in and the popup reports back (025-FR-011).
 5. The reviewer closes Erfana and opens the project again the next day.
@@ -152,8 +154,11 @@
 **Error flows:**
 - E1: The reviewer presses Esc at step 3; the actions menu closes, the page resumes, pick mode is still on (025-FR-030) and nothing is sent.
 - E2: The capture cannot be written; no prompt is sent, the dialog stays open with the text and an error toast names the reason (025-FR-046).
+- E3: At step 2 the reviewer presses F6 instead; focus moves to the address bar, the page logs nothing and pick mode stays on, and the banner changes to its toolbar-focus text (025-FR-047, 025-FR-048, 025-FR-051).
+- E4: At step 3 the menu is open and the reviewer presses Ctrl/Cmd+L; the menu closes with nothing sent and the page resumes (025-FR-049). In the dialog at step 4, F6 moves nothing (025-FR-050); a click on another editor tab leaves the dialog as 025-FR-052 states.
+- E5: At step 4 the target terminal runs a shell; the guard banner shows, nothing is typed and focus moves to the banner button (025-FR-061).
 
-**Traces to:** 025-FR-025, 025-FR-026, 025-FR-027, 025-FR-028, 025-FR-030, 025-FR-031, 025-FR-032, 025-FR-033, 025-FR-034, 025-FR-046, 025-FR-053, 025-FR-054, 025-FR-065
+**Traces to:** 025-FR-025, 025-FR-026, 025-FR-027, 025-FR-028, 025-FR-030, 025-FR-031, 025-FR-032, 025-FR-033, 025-FR-034, 025-FR-046, 025-FR-047, 025-FR-048, 025-FR-049, 025-FR-050, 025-FR-051, 025-FR-052, 025-FR-053, 025-FR-054, 025-FR-061, 025-FR-065
 
 ---
 
@@ -169,13 +174,13 @@
 - A browser tab shows the page.
 
 **Main flow:**
-1. The reviewer selects the **Phone width (390 px)** preset (025-FR-012).
-2. The page renders 390 px wide (width only; no device emulation, 025-FR-012).
+1. The reviewer selects the **Phone width (390px)** preset (025-FR-012).
+2. The page renders 390px wide (width only; no device emulation, 025-FR-012).
 3. The reviewer picks an overflowing element and sends **Change**.
-4. The context file records the 390 px viewport and the **Phone width** preset (025-FR-033); the screenshot shows the phone-width page (025-FR-034).
+4. The context file records the 390px viewport and the **Phone width** preset (025-FR-033); the screenshot shows the phone-width page (025-FR-034).
 
 **Postconditions:**
-- The context file records the 390 px viewport and the **Phone width** preset.
+- The context file records the 390px viewport and the **Phone width** preset.
 
 **Alternative flows:**
 - A1: The reviewer uses DevTools device mode instead; the context file records preset `none` and the viewport size the page reports (025-FR-033).
@@ -204,7 +209,7 @@
 3. Open browser tabs reload; the site shows its signed-out state.
 
 **Postconditions:**
-- Cookies for this project are gone; other projects' profiles and this project's other data are unchanged (025-FR-015).
+- Cookies and the address history of this project are gone; other projects' profiles and this project's other data are unchanged (025-FR-023, 025-FR-015).
 
 **Alternative flows:**
 - A1: The reviewer selects **Cancel**; nothing changes.

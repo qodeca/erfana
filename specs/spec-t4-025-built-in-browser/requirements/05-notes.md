@@ -162,7 +162,16 @@ Owner decisions taken knowingly in the 2026-10-31 interview:
 ## Open to-dos before UI code
 
 - Review address-bar and tab-title spoofing for security; the 2026-11-01 expert panel did not cover it.
-- Write the designs in `docs/designs/browser/` and link them in this spec's registry entry (`documents.designs`); until then 025-AC-043 cannot pass (025-FR-043).
+
+## Design additions taken into the spec
+
+The design note's Additions table (`docs/designs/browser/README.md` § Additions beyond the spec) first filed three rows as routine calls. The 2026-11-01 alignment pass (v0.11.0, `.local/panel/align-025/merged.md`, not committed) found that each changes what a Must requirement does, so each is now a spec change:
+
+| Design row | What it adds | Where in the spec |
+|---|---|---|
+| A-6 | **← Actions** returns from the instruction dialog to the menu on the held capture | 025-FR-031, 025-FR-050, 025-AC-064 |
+| A-9 | The pick notes ("Move the mouse over the page to pick an element", "Top of the page", "Back at the element you started from") and the blocked pick on an empty tab and on Erfana's own pages ("Load a page to pick an element") | 025-FR-025, 025-FR-026, 025-FR-027, 025-AC-025 |
+| A-27 | An input guard of about 500 ms, with a blocked look and a fresh-press rule, on **Proceed anyway** | 025-FR-021, 025-AC-021 |
 
 ## Required decisions before implementation
 
