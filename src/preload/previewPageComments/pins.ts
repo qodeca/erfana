@@ -127,14 +127,14 @@ export function placePins(
 
 /** The pin's name (§10.10 "Pin"): kept as `data-name` since pins are visual only (C-11). */
 export function pinName(pin: PinPlacement, label: string): string {
-  if (pin.members !== undefined) return `${pin.members.length} more commented elements here. Open.`
+  if (pin.members !== undefined) return `${pin.members.length} more commented sections here. Open.`
   if (pin.status === 'damaged') return `Damaged comment on ${label}. Open.`
   return `${pin.count} ${pin.count === 1 ? 'comment' : 'comments'} on ${label}${pin.changed === true ? ', changed' : ''}. Open.`
 }
 
 /** The pin's tooltip (§10.5 "Hover"). */
 export function pinTooltip(pin: PinPlacement): string {
-  if (pin.members !== undefined) return `${pin.members.length} more commented elements – click to open`
+  if (pin.members !== undefined) return `${pin.members.length} more commented sections – click to open`
   if (pin.status === 'damaged') return 'Damaged comment – click to open'
   return `${pin.count} ${pin.count === 1 ? 'comment' : 'comments'} – click to open`
 }

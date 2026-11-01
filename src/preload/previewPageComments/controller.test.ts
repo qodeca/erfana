@@ -63,8 +63,8 @@ describe('pins (J-005)', () => {
   it('draws one pin per element, outside comment mode too', () => {
     h.state({ showIcons: true, icons: [icon('a', 2), icon('b', 3, { count: 4 })] })
     expect(pins().map(p => p.dataset.name)).toEqual([
-      '1 comment on div#s1.slide. Open.',
-      '4 comments on div#s2.slide. Open.'
+      '1 comment on Section · “One”. Open.',
+      '4 comments on Section · “Two”. Open.'
     ])
     expect(h.host()).not.toBeNull()
   })
@@ -113,7 +113,7 @@ describe('visibility reports (J-006)', () => {
     await microtasks()
     await vi.advanceTimersByTimeAsync(ANCHOR_CHECK_MIN_MS + RENDER_FALLBACK_MS)
     expect(reports().at(-1)).toEqual({ visible: ['two'], hidden: ['one'] })
-    expect(pins().map(p => p.dataset.name)).toEqual(['1 comment on div#s2.slide.active. Open.'])
+    expect(pins().map(p => p.dataset.name)).toEqual(['1 comment on Section · “Two”. Open.'])
   })
 
   it('J-006 a 0×0 element is not visible now, though checkVisibility passes it', () => {
@@ -222,7 +222,8 @@ describe('mode, reveal, restore', () => {
   it('reveals a pin’s element: scrolls it to the centre and highlights it for 1.5 s', async () => {
     vi.useFakeTimers()
     h.state({ showIcons: true, icons: [icon('two', 3)], reveal: 'two' })
-    expect(h.doubles.scrolledIntoView.at(-1)).toEqual({ element: byId('s2'), options: { block: 'center' } })
+    // K-33: instant, so a page's own smooth scrolling cannot animate it.
+    expect(h.doubles.scrolledIntoView.at(-1)).toEqual({ element: byId('s2'), options: { block: 'center', behavior: 'instant' } })
     const flash = h.root()?.querySelector('.erf-hpc-flash') as HTMLElement
     expect(flash.classList.contains('erf-hpc-hidden')).toBe(false)
     expect(flash.style.top).toBe('300px')

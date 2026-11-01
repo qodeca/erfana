@@ -85,11 +85,20 @@ describe('CommentDrawer', () => {
       ).toBeVisible()
     })
 
-    it('tags a hidden element "Hidden on the page"', () => {
+    it('tags a hidden section "Hidden right now"', () => {
       setup()
-      expect(within(rows()[1]).getByTestId('comment-drawer-tag')).toHaveTextContent(
-        DRAWER_COPY.notVisible
-      )
+      expect(within(rows()[1]).getByTestId('comment-drawer-tag')).toHaveTextContent('Hidden right now')
+    })
+
+    it('P-F19 K-17 D-03 a row reads in plain words; the code is on hover only, and is never spoken', () => {
+      setup()
+      const row = rows()[0]
+      expect(row).toHaveTextContent(/Section · line \d+/)
+      expect(row).not.toHaveTextContent('button')
+      const main = within(row).getByTestId('comment-drawer-row-main')
+      expect(main.getAttribute('title')).toMatch(/^Open conversation – \S+/)
+      expect(main).toHaveAccessibleName('Message 1')
+      expect(main).not.toHaveAccessibleDescription(/button\.cta/)
     })
 
     it('switches filters with a click and with the arrow keys', async () => {
@@ -118,10 +127,10 @@ describe('CommentDrawer', () => {
       const [first] = rows()
       const main = within(first).getByTestId('comment-drawer-row-main')
       const open = within(first).getByTestId('comment-drawer-row-open')
-      expect(main).toHaveAttribute('title', COPY.openThread)
+      expect(main).toHaveAttribute('title', `${COPY.openThread} – button.cta`)
       expect(main).toHaveAttribute('tabindex', '0')
       expect(open).not.toHaveAttribute('tabindex', '-1')
-      expect(open).toHaveAccessibleName('Open comments on button.cta')
+      expect(open).toHaveAccessibleName('Open comments on Section · line 11')
       // Only the active row is in the tab order.
       expect(within(rows()[1]).getByTestId('comment-drawer-row-main')).toHaveAttribute(
         'tabindex',
@@ -344,7 +353,7 @@ describe('CommentDrawer', () => {
       await user.keyboard('{ArrowDown}')
       await waitFor(() => expect(mainAt(1)).toHaveFocus())
       await user.tab()
-      expect(document.activeElement).toHaveAccessibleName('Open comments on button.cta')
+      expect(document.activeElement).toHaveAccessibleName(/^Open comments on Section · line \d+$/)
       await user.keyboard('{Enter}')
       expect(props.onOpen).toHaveBeenCalledWith(expect.objectContaining({ threadKey: 't1' }))
     })
@@ -393,7 +402,7 @@ describe('CommentDrawer', () => {
       expect(notFoundTag).toHaveTextContent(DRAWER_COPY.notFound)
       expect(notFoundTag).toHaveClass('erf-comment-tag')
       expect(notFoundTag).not.toHaveClass('erf-counter--attention')
-      expect(within(notFound).getByTestId('comment-drawer-row-main')).toHaveAttribute('title', COPY.openThread)
+      expect(within(notFound).getByTestId('comment-drawer-row-main').title.startsWith(COPY.openThread)).toBe(true)
       await user.click(screen.getByTestId('comment-filter-cant-edit'))
       const tags = rows().map(r => within(r).getByTestId('comment-drawer-tag'))
       expect(tags.map(tag => tag.textContent)).toEqual([DRAWER_COPY.damaged, COPY.newerTag])
@@ -691,7 +700,7 @@ describe('CommentDrawer', () => {
       expect(main).toHaveAccessibleName('Message 1')
       const description = main.getAttribute('aria-describedby')?.split(' ') ?? []
       const text = description.map(id => document.getElementById(id)?.textContent ?? '')
-      expect(text[0]).toBe('on button.cta')
+      expect(text[0]).toBe('on Section · line 11') // K-17 (was "on button.cta")
       expect(text).toContain('1 reply')
       // Changed expectation under R-10 (approvals.md, 2026-10-29): the action was COPY.showInPreview.
       expect(text.at(-1)).toBe(COPY.openThread)
@@ -747,13 +756,16 @@ describe('CommentDrawer', () => {
       expect(within(heading as HTMLElement).getByTestId('comment-control-token')).toBeVisible()
     })
 
-    it('M9 a label with a control shows a token, in the text and in Open\'s name', () => {
+    // D-03 moved the page's id from the row's text and Open's name to the hover text.
+    it('M9 a code with a control shows a token on hover, and never reaches the row or Open\'s name', () => {
       const rlo = String.fromCodePoint(0x202e)
       setup({ list: ready([fileView({ threads: [thread(1, { elementId: `buy${rlo}` })] })]) })
+      const title = within(rows()[0]).getByTestId('comment-drawer-row-main').getAttribute('title')
+      expect(title).not.toContain(rlo)
+      expect(title).toContain('\u27e8U+202E\u27e9')
       const open = within(rows()[0]).getByTestId('comment-drawer-row-open')
       expect(open.getAttribute('aria-label')).not.toContain(rlo)
-      expect(open.getAttribute('aria-label')).toContain('\u27e8U+202E\u27e9')
-      expect(within(rows()[0]).getByTestId('comment-control-token')).toBeVisible()
+      expect(rows()[0].textContent).not.toContain(rlo)
     })
   })
 })

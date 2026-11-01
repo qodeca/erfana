@@ -60,13 +60,13 @@ const PAGE =
   `<article id="a-very-long-identifier-that-overflows-the-label" class="x" ${T}="${token(5)}" ${TARGET_ATTRIBUTE}="long">Long label</article>` +
   `</section>`
 
-/** The words the v0.23.1 HTML overlay's label shows for each fixture target (design §10.2, J-001). */
+/** The words the HTML overlay's label shows for each fixture target, then the size it keeps for Alt (D-05). */
 const HTML_LABELS: Readonly<Record<OverlayTargetId, string>> = {
-  container: 'section#stage.stage 600×400',
-  first: 'div#first 260×120',
-  inner: 'button#buy.cta.primary 100×30',
-  second: 'p#second.note.lead… 260×120',
-  long: 'article#a-very-long-identifier-that-ove… 260×120'
+  container: 'Section · “First block Buy now Second…” 600×400',
+  first: 'Section · “First block Buy now” 260×120',
+  inner: 'Section · “Buy now” 100×30',
+  second: 'Section · “Second paragraph text” 260×120',
+  long: 'Section · “Long label” 260×120'
 }
 
 /** The page's own listeners: bubble phase, registered after the preload's capture guards. */
@@ -358,7 +358,7 @@ function driverOn(h: Harness): SelectionDriver {
       move(x, y)
       const label = part('.erf-hpc-label')
       if (!isShown(label)) return null
-      const [tag, rest, size] = [...label.children].map(span => span.getAttribute('data-text') ?? '')
+      const [tag, rest, , size] = [...label.children].map(span => span.getAttribute('data-text') ?? '')
       return `${tag}${rest} ${size}`
     },
     pageSaw: () => [...seen],

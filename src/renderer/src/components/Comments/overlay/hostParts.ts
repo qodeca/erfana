@@ -111,6 +111,6 @@ export function unavailableOf(off: boolean, unreadable: boolean, file: CommentFi
  */
 export function noNewCommentText(file: CommentFileView | null, fileName: string, words: CommentWords): string | null {
   if (file === null) return null
-  if (!file.writable) return words.readOnlyReasonText(file.readOnlyReason, fileName)
-  return file.addRefusal === undefined ? null : words.readOnlyReasonText(file.addRefusal, fileName)
+  if (!file.writable) return words.reasonText(file.readOnlyReason ?? 'read-only', fileName)
+  return file.addRefusal === undefined ? null : words.reasonText(file.addRefusal, fileName)
 }

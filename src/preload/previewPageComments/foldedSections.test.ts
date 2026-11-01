@@ -276,7 +276,7 @@ describe('folded sections through the controller', () => {
     expect(reports()).toEqual([{ visible: [], hidden: ['deep'] }])
 
     expect(openings(() => h.state({ showIcons: true, icons: [icon('deep', 5)], reveal: 'deep' }))).toEqual(['facts', 'deeper'])
-    expect(h.doubles.scrolledIntoView.at(-1)).toEqual({ element: byId('deep'), options: { block: 'center' } })
+    expect(h.doubles.scrolledIntoView.at(-1)).toEqual({ element: byId('deep'), options: { block: 'center', behavior: 'instant' } })
     expect(pins()).toHaveLength(1)
     await vi.advanceTimersByTimeAsync(ANCHOR_CHECK_MIN_MS + RENDER_FALLBACK_MS)
     expect(reports().at(-1)).toEqual({ visible: ['deep'], hidden: [] })

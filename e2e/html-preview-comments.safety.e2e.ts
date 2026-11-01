@@ -564,12 +564,12 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     await expectPin(app, 'folded', true, target)
 
     // Folded again – in comment mode a click on the summary is a pick, so the page folds it, as a script
-    // would: no pin, and the drawer says "Hidden on the page".
+    // would: no pin, and the drawer says "Hidden right now".
     expect(await preview.eval("(document.getElementById('facts').open = false, 'folded')", target)).toBe('folded')
     await expectPin(app, 'folded', false, target)
     await chrome.openDrawer()
     const row = chrome.drawerRows().first()
-    await expect(row.getByTestId('comment-drawer-tag')).toHaveText(['Hidden on the page'], { timeout: PREVIEW_BUDGET_MS })
+    await expect(row.getByTestId('comment-drawer-tag')).toHaveText(['Hidden right now'], { timeout: PREVIEW_BUDGET_MS })
 
     // The row's Open: its thread in the window, and behind it the section unfolds; once closed, the pin is back.
     await row.getByTestId('comment-drawer-row-open').click()

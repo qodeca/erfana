@@ -246,7 +246,7 @@ export const CommentDraftOpenedSchema = z
         ...DisplaySchema,
         /** Absent: the menu's items are disabled, each with the reason line for `reason`. */
         ...DraftSchema,
-        /** Why main minted no draft (C-19): only without one; the renderer words it (`menuReasonText`). */
+        /** Why main minted no draft (C-19): only without one; the renderer words it (`CommentWords.reasonText`). */
         reason: CommentRefusalReasonSchema.optional(),
         /** The pick was made on a text selection: the menu is the selection menu (M-02, M-04). */
         selection: z.literal(true).optional(),

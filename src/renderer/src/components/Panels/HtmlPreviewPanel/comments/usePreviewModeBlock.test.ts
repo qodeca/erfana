@@ -40,6 +40,6 @@ describe('pageBlockReason', () => {
     expect(pageBlockReason([page({ writable: false, readOnlyReason: 'conflict-markers' })])).toBe(
       'index.html has two versions mixed together. Fix this first, or ask a developer to help.'
     )
-    expect(pageBlockReason([page({ writable: false })])).toBe("index.html can't be changed, so you can't add a comment.")
+    expect(pageBlockReason([page({ writable: false })])).toBe('index.html is read-only.')
   })
 })

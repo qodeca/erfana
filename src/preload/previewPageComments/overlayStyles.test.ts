@@ -11,6 +11,12 @@ import { DEFAULT_THEME, type OverlayTheme } from './state'
 
 const HIDE_RULE = '.erf-hpc-root { display: none !important; }'
 
+describe('overlayCss leftovers', () => {
+  it('K-33 no rule for a focused icon: icons take no focus (D-07)', () => {
+    expect(overlayCss(DEFAULT_THEME, false)).not.toContain(':focus-visible')
+  })
+})
+
 describe('overlayCss', () => {
   it('draws the overlay in the theme, and hides it in print media only', () => {
     const css = overlayCss(DEFAULT_THEME)
@@ -26,7 +32,6 @@ describe('overlayCss', () => {
     expect(css).toContain('outline: 7px solid')
     expect(css).toContain('padding: 0 27px;')
     expect(css).toContain('padding: 17px 37px;')
-    expect(css).toContain('outline-offset: 17px; box-shadow: 0 0 0 27px')
     for (const typed of ['line-height: 1.4', ' 2px', ' 4px', ' 8px']) expect(css).not.toContain(typed)
   })
 

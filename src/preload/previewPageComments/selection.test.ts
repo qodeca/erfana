@@ -258,7 +258,7 @@ describe('C-12, C-17 and C-11 (HTML) marks and pins', () => {
     const icons = Array.from({ length: 5 }, (_, i) => ({ key: `p${i}`, token: token(2), count: 1, status: 'open' }))
     h.state({ mode: true, showIcons: true, icons })
     const [stack] = overlay('.erf-hpc-pin--stack')
-    expect(stack.dataset.name).toBe('2 more commented elements here. Open.')
+    expect(stack.dataset.name).toBe('2 more commented sections here. Open.')
     userMouse(h.host()!, 'click', { x: Number.parseFloat(stack.style.left) + 5, y: Number.parseFloat(stack.style.top) + 5 })
     expect(picks()).toEqual([expect.objectContaining({ kind: 'icon', key: 'p3', stack: ['p4'] })])
   })

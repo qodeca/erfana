@@ -105,7 +105,7 @@ test.describe('HTML Preview comments – script-built pages and frames (P7)', ()
     await resetCommentSettings(windowWithTestProject)
   })
 
-  test('E-005 JS deck at #3: a script-built point keeps its slide and scroll after the save; slide 1 says "Hidden on the page"; back, the pin returns', async ({
+  test('E-005 JS deck at #3: a script-built point keeps its slide and scroll after the save; slide 1 says "Hidden right now"; back, the pin returns', async ({
     windowWithTestProject,
     appWithTestProject,
     testProject
@@ -146,11 +146,11 @@ test.describe('HTML Preview comments – script-built pages and frames (P7)', ()
     await expect.poll(() => deckNumber(preview, 'Math.round(scrollY)'), { timeout: PREVIEW_BUDGET_MS }).toBe(scrolled)
     await expectPin(app, 's3-p12', true, DECK_TARGET)
 
-    // Slide 1: the point is not rendered – "Hidden on the page", not lost (decision 30).
+    // Slide 1: the point is not rendered – "Hidden right now", not lost (decision 30).
     await goToSlide(preview, 1)
     await chrome.openDrawer()
     const row = chrome.drawerRows().first()
-    await expect(row.getByTestId('comment-drawer-tag')).toHaveText(['Hidden on the page'], { timeout: PREVIEW_BUDGET_MS })
+    await expect(row.getByTestId('comment-drawer-tag')).toHaveText(['Hidden right now'], { timeout: PREVIEW_BUDGET_MS })
     // Back on slide 3 the tag goes and the pin returns.
     await goToSlide(preview, 3)
     await deckNumber(preview, "(document.getElementById('s3-p12').scrollIntoView({ block: 'center' }), scrollY)")

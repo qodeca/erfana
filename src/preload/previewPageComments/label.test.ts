@@ -4,7 +4,7 @@
  * The overlay label and the geometry it sits on
  * (docs/designs/comments/html-preview-comments.md §10.2; J-001).
  */
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { clipToViewport, contains, outlineBox, overlaps, snap, viewportOf } from './geometry'
 import { frameFileOf, labelOf, labelText } from './label'
 
@@ -19,43 +19,59 @@ afterEach(() => {
   document.body.innerHTML = ''
 })
 
-describe('labelOf (J-001)', () => {
-  it('names the tag, id and two classes, then the rounded size', () => {
+describe('labelOf (J-001; P-F19, D-03, D-05)', () => {
+  it('reads in plain words and its opening words; the code and the size are apart', () => {
     const parts = labelOf(element('<button id="buy" class="cta primary">Buy</button>'), BOX, { kind: 'none' }, 0)
-    expect(parts).toEqual({ tag: 'button', rest: '#buy.cta.primary', size: '120×40' })
-    expect(labelText(parts)).toBe('button#buy.cta.primary')
+    expect(parts).toEqual({ tag: 'Section', rest: ' · “Buy”', code: 'button#buy.cta.primary', size: '120×40' })
+    expect(labelText(parts)).toBe('Section · “Buy”')
   })
 
-  it('cuts classes after two with …', () => {
+  it('cuts classes after two with …, in the code', () => {
     const parts = labelOf(element('<div class="a b c d"></div>'), BOX, { kind: 'none' }, 0)
-    expect(parts.rest).toBe('.a.b…')
+    expect(parts.code).toBe('div.a.b…')
+    expect(parts.rest).toBe('')
+  })
+
+  it('a part with no words is just its kind word', () => {
+    expect(labelText(labelOf(element('<img src="a.png" alt="">'), BOX, { kind: 'none' }, 0))).toBe('Section')
+  })
+
+  it('reads the words a reader sees: spaces collapsed, no script or style text, no hidden characters', () => {
+    const el = element('<p><script>var a</script><style>p{}</style>  Plans\n and ‮prices  </p>')
+    expect(labelText(labelOf(el, BOX, { kind: 'none' }, 0))).toBe('Section · “Plans and prices”')
   })
 
   it('stays within 40 characters, keeping the suffix', () => {
-    const el = element(`<section id="${'x'.repeat(60)}"></section>`)
-    const parts = labelOf(el, BOX, { kind: 'script' }, 2)
-    const text = labelText(parts)
+    const el = element(`<section>${'word '.repeat(40)}</section>`)
+    const text = labelText(labelOf(el, BOX, { kind: 'script' }, 2))
     expect([...text].length).toBeLessThanOrEqual(40)
     expect(text.endsWith(' · script · 2 comments')).toBe(true)
     expect(text).toContain('…')
   })
 
+  it('stops reading a long page at the words it needs', () => {
+    const el = element(`<div>${'<p>one two three four five six seven eight nine ten</p>'.repeat(50)}</div>`)
+    const nextNode = vi.spyOn(TreeWalker.prototype, 'nextNode')
+    expect(labelText(labelOf(el, BOX, { kind: 'none' }, 0))).toMatch(/^Section · “one two.*…”$/)
+    expect(nextNode.mock.calls.length).toBeLessThan(5)
+    nextNode.mockRestore()
+  })
+
   it.each([
-    [{ kind: 'script' } as const, 0, 'span · script'],
-    [{ kind: 'frame', file: 'other.html' } as const, 0, 'span · frame other.html'],
-    [{ kind: 'refused-frame' } as const, 0, 'span · refused frame'],
-    [{ kind: 'inline-frame' } as const, 0, 'span · inline frame'],
-    [{ kind: 'none' } as const, 1, 'span · 1 comment'],
-    [{ kind: 'none' } as const, 3, 'span · 3 comments']
+    [{ kind: 'script' } as const, 0, 'Section · script'],
+    [{ kind: 'frame', file: 'other.html' } as const, 0, 'Section · frame other.html'],
+    [{ kind: 'refused-frame' } as const, 0, 'Section · refused frame'],
+    [{ kind: 'inline-frame' } as const, 0, 'Section · inline frame'],
+    [{ kind: 'none' } as const, 1, 'Section · 1 comment'],
+    [{ kind: 'none' } as const, 3, 'Section · 3 comments']
   ])('adds the suffix %j with %i comments', (suffix, comments, expected) => {
     expect(labelText(labelOf(element('<span></span>'), BOX, suffix, comments))).toBe(expected)
   })
 
-  it('cuts a tag name longer than the label itself', () => {
-    const el = document.createElement(`x-${'y'.repeat(50)}`)
-    const parts = labelOf(el, BOX, { kind: 'script' }, 0)
-    expect([...parts.tag]).toHaveLength(40)
-    expect(parts.rest).toBe('')
+  it('cuts a code longer than the label itself', () => {
+    const parts = labelOf(element(`<section id="${'x'.repeat(60)}"></section>`), BOX, { kind: 'none' }, 0)
+    expect([...parts.code]).toHaveLength(40)
+    expect(parts.code.endsWith('…')).toBe(true)
   })
 
   it('reads a frame file name from its src, and nothing from a broken one', () => {

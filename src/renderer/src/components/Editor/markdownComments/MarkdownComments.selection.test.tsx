@@ -18,7 +18,7 @@ import { SEL_EXACT_MAX_CHARS } from '../../../../../shared/comments/anchorSel'
 import { editorSaveRegistry } from '../../../services/editorSaveRegistry'
 import { useProjectStore } from '../../../stores/useProjectStore'
 import { TEST_IDS } from '../../../constants/testids'
-import { MARKDOWN_COPY, SELECTION_COPY, markdownReadOnlyReasonText } from '../../Comments/commentCopyWords'
+import { MARKDOWN_COPY, MARKDOWN_WORDS, SELECTION_COPY } from '../../Comments/commentCopyWords'
 import { COMMENT_HIGHLIGHT, COMMENT_HIGHLIGHT_PRIORITY } from '../../Comments/overlay/commentHighlights'
 import { SELECTION_BUTTON_DELAY_MS } from '../../Comments/overlay/useSelectionComments'
 import * as COPY_MODULE from '../../Comments/commentCopy'
@@ -272,7 +272,7 @@ describe('Markdown Preview selection comments (024-AC-005)', () => {
     await waitFor(() => expect(modeTool()).toHaveAttribute('aria-disabled', 'true'))
     selectWords(paragraph(), 'beta')
     fireEvent.contextMenu(paragraph(), { clientX: 10, clientY: 10 })
-    const reason = markdownReadOnlyReasonText('link', 'notes.md')
+    const reason = MARKDOWN_WORDS.reasonText('link', 'notes.md')
     for (const id of [TEST_IDS.COMMENT_MENU_SELECTION, TEST_IDS.COMMENT_MENU_WHOLE]) {
       const item = await screen.findByTestId(id)
       expect(item).toHaveAttribute('aria-disabled', 'true')

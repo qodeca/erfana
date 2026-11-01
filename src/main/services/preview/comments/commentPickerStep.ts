@@ -66,12 +66,12 @@ const ROLES: Readonly<Record<string, CommentPickerRole>> = {
   form: 'form'
 }
 
-/** The spoken kind of `tagName`: a heading with its level, a table entry, else "element". */
+/** The spoken kind of `tagName`: a heading with its level, a table entry, else "section", the HTML `{kind}` word (K-33). */
 export function roleOf(tagName: string): CommentPickerRole {
   const tag = tagName.toLowerCase()
   const heading = /^h([1-6])$/.exec(tag)
   if (heading !== null) return `heading level ${heading[1]}` as CommentPickerRole
-  return Object.hasOwn(ROLES, tag) ? ROLES[tag] : 'element'
+  return Object.hasOwn(ROLES, tag) ? ROLES[tag] : 'section'
 }
 
 /**

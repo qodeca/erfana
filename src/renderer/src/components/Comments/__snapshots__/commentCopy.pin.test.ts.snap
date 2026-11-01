@@ -6,10 +6,10 @@ exports[`commentCopy strings (characterisation) > PIN-C-010 every string on Wind
     "deleted": "Comment deleted from index.html.",
     "modeOff": "Comment mode off.",
     "pickerNoChild": "Nothing inside to select.",
-    "pickerShowing (added)": "Showing a section created by a script, inside section on line 12.",
-    "pickerShowing (added, no tag)": "Showing a section created by a script, inside a section on line 12.",
+    "pickerShowing (added)": "Showing a section created by a script, near line 12.",
+    "pickerShowing (added, no tag)": "Showing a section created by a script, near line 12.",
     "pickerShowing (no tag)": "Showing a section, line 12.",
-    "pickerShowing (tag)": "Showing section, line 12.",
+    "pickerShowing (tag)": "Showing a section, line 12.",
     "pickerTop": "Top level – no parent to select.",
     "rebuilt": "Comment repaired.",
     "reopened": "Comment reopened.",
@@ -44,7 +44,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-010 every string on Wind
     "open": "Open",
     "openInSource": "Open in file",
     "openThread": "Open conversation",
-    "pickAgain": "Pick again",
+    "pickAgain": "Select again",
     "placeholder": "What should change here?",
     "rawCopied": "Comment text copied.",
     "rawLabel": "Comment text as saved",
@@ -70,7 +70,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-010 every string on Wind
     "loading": "Reading comments…",
     "notFound": "Not found",
     "notOnScreen": "This comment's target isn't on screen right now",
-    "notVisible": "Hidden on the page",
+    "notVisible": "Hidden right now",
     "resolved": "Resolved",
     "show": "Show",
     "showIcons": "Show comment icons",
@@ -131,7 +131,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-010 every string on Wind
     "overlay-removed": "the page keeps removing Erfana's comment tools",
     "page-too-large": "the page is too big",
     "prepare-failed": "Erfana couldn't get the page ready",
-    "too-large": "the file is over the 25 MB limit",
+    "too-large": "it is too big. The limit is 25 MB",
   },
   "commentModeAriaShortcut": {
     "()": "Control+Alt+M",
@@ -151,7 +151,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-010 every string on Wind
     "2": "Delete this conversation and its 2 replies?",
   },
   "fieldHint": {
-    "index.html": "Saved inside index.html.",
+    "index.html": "Saves into index.html.",
   },
   "fillFile": {
     "none": "No placeholder.",
@@ -180,17 +180,6 @@ exports[`commentCopy strings (characterisation) > PIN-C-010 every string on Wind
   },
   "readErrorText": {
     "index.html": "Couldn't read comments from index.html.",
-  },
-  "readOnlyReasonText": {
-    "conflict-markers": "index.html has two versions mixed together. Fix this first, or ask a developer to help.",
-    "encoding": "Erfana can't add comments to this file because of its text format. Save the file as UTF-8, then try again.",
-    "from-a-later-main": "index.html can't be changed, so you can't add a comment.",
-    "link": "index.html is only a link to another file. Open the real file to comment.",
-    "missing": "index.html no longer exists. Copy your text before closing.",
-    "too-large": "index.html is too big for comments. The limit is 25 MB.",
-    "too-many-blocks": "index.html has 500 comments, which is the limit. Delete resolved comments to add more.",
-    "undefined": "index.html can't be changed, so you can't add a comment.",
-    "unterminated-block": "One comment in index.html is broken, so Erfana can't add new ones. Fix or delete the broken comment first.",
   },
   "saveFailureCopy": {
     "COMMENT_BLOCK_CHANGED": {
@@ -300,7 +289,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-010 every string on Wind
     "overlay-removed": "You can't comment on this file: the page keeps removing Erfana's comment tools.",
     "page-too-large": "You can't comment on this file: the page is too big.",
     "prepare-failed": "You can't comment on this file: Erfana couldn't get the page ready.",
-    "too-large": "You can't comment on this file: the file is over the 25 MB limit.",
+    "too-large": "You can't comment on this file: it is too big. The limit is 25 MB.",
   },
   "unreadFilesText": {
     "1": "This page has too many parts to list all comments. 1 file is missing here. Open each file in its own tab to see its comments.",
@@ -332,10 +321,10 @@ exports[`commentCopy strings (characterisation) > PIN-C-011 every string on macO
     "deleted": "Comment deleted from index.html.",
     "modeOff": "Comment mode off.",
     "pickerNoChild": "Nothing inside to select.",
-    "pickerShowing (added)": "Showing a section created by a script, inside section on line 12.",
-    "pickerShowing (added, no tag)": "Showing a section created by a script, inside a section on line 12.",
+    "pickerShowing (added)": "Showing a section created by a script, near line 12.",
+    "pickerShowing (added, no tag)": "Showing a section created by a script, near line 12.",
     "pickerShowing (no tag)": "Showing a section, line 12.",
-    "pickerShowing (tag)": "Showing section, line 12.",
+    "pickerShowing (tag)": "Showing a section, line 12.",
     "pickerTop": "Top level – no parent to select.",
     "rebuilt": "Comment repaired.",
     "reopened": "Comment reopened.",
@@ -370,7 +359,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-011 every string on macO
     "open": "Open",
     "openInSource": "Open in file",
     "openThread": "Open conversation",
-    "pickAgain": "Pick again",
+    "pickAgain": "Select again",
     "placeholder": "What should change here?",
     "rawCopied": "Comment text copied.",
     "rawLabel": "Comment text as saved",
@@ -396,7 +385,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-011 every string on macO
     "loading": "Reading comments…",
     "notFound": "Not found",
     "notOnScreen": "This comment's target isn't on screen right now",
-    "notVisible": "Hidden on the page",
+    "notVisible": "Hidden right now",
     "resolved": "Resolved",
     "show": "Show",
     "showIcons": "Show comment icons",
@@ -457,13 +446,13 @@ exports[`commentCopy strings (characterisation) > PIN-C-011 every string on macO
     "overlay-removed": "the page keeps removing Erfana's comment tools",
     "page-too-large": "the page is too big",
     "prepare-failed": "Erfana couldn't get the page ready",
-    "too-large": "the file is over the 25 MB limit",
+    "too-large": "it is too big. The limit is 25 MB",
   },
   "commentModeAriaShortcut": {
     "()": "Meta+Alt+M",
   },
   "commentModeShortcutLabel": {
-    "()": "Cmd+Option+M",
+    "()": "⌥⌘M",
   },
   "deleteBlockText": {
     "index.html": "Delete this damaged comment? Erfana removes the text above from index.html.",
@@ -477,7 +466,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-011 every string on macO
     "2": "Delete this conversation and its 2 replies?",
   },
   "fieldHint": {
-    "index.html": "Saved inside index.html.",
+    "index.html": "Saves into index.html.",
   },
   "fillFile": {
     "none": "No placeholder.",
@@ -498,25 +487,14 @@ exports[`commentCopy strings (characterisation) > PIN-C-011 every string on macO
     "two need": "Comments, 3 open, 2 need attention",
   },
   "modeTooltip": {
-    "off": "Comment mode (Cmd+Option+M) – off",
-    "on": "Comment mode is on (Cmd+Option+M). Click a section or select text. Press Esc to stop.",
+    "off": "Comment mode (⌥⌘M) – off",
+    "on": "Comment mode is on (⌥⌘M). Click a section or select text. Press Esc to stop.",
   },
   "notFoundText": {
     "line 42": "Erfana can't find the text this comment was about. The comment is still in index.html, line 42.",
   },
   "readErrorText": {
     "index.html": "Couldn't read comments from index.html.",
-  },
-  "readOnlyReasonText": {
-    "conflict-markers": "index.html has two versions mixed together. Fix this first, or ask a developer to help.",
-    "encoding": "Erfana can't add comments to this file because of its text format. Save the file as UTF-8, then try again.",
-    "from-a-later-main": "index.html can't be changed, so you can't add a comment.",
-    "link": "index.html is only a link to another file. Open the real file to comment.",
-    "missing": "index.html no longer exists. Copy your text before closing.",
-    "too-large": "index.html is too big for comments. The limit is 25 MB.",
-    "too-many-blocks": "index.html has 500 comments, which is the limit. Delete resolved comments to add more.",
-    "undefined": "index.html can't be changed, so you can't add a comment.",
-    "unterminated-block": "One comment in index.html is broken, so Erfana can't add new ones. Fix or delete the broken comment first.",
   },
   "saveFailureCopy": {
     "COMMENT_BLOCK_CHANGED": {
@@ -604,7 +582,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-011 every string on macO
     "()": "Meta+Enter",
   },
   "saveShortcutLabel": {
-    "()": "Cmd+Enter",
+    "()": "⌘Enter",
   },
   "savedAnnouncement": {
     "index.html": "Comment saved to index.html.",
@@ -626,7 +604,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-011 every string on macO
     "overlay-removed": "You can't comment on this file: the page keeps removing Erfana's comment tools.",
     "page-too-large": "You can't comment on this file: the page is too big.",
     "prepare-failed": "You can't comment on this file: Erfana couldn't get the page ready.",
-    "too-large": "You can't comment on this file: the file is over the 25 MB limit.",
+    "too-large": "You can't comment on this file: it is too big. The limit is 25 MB.",
   },
   "unreadFilesText": {
     "1": "This page has too many parts to list all comments. 1 file is missing here. Open each file in its own tab to see its comments.",

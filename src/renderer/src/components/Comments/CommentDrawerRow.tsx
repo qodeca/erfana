@@ -99,7 +99,7 @@ export function DrawerRowView({
         data-row-index={index}
         aria-labelledby={named ? `${base}-x` : `${base}-l`}
         aria-describedby={describedBy}
-        title={mainLabel}
+        title={row.code === undefined ? mainLabel : `${mainLabel} – ${visibleString(row.code)}`}
         data-row-main
         data-testid={TEST_IDS.COMMENT_DRAWER_ROW_MAIN}
         onClick={onMain}

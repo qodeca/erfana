@@ -7,46 +7,31 @@
  */
 import { describe, expect, it } from 'vitest'
 import { ErrorCode } from '../../../../shared/errors'
+import { bannedMarkdownWords } from './__test-utils__/commentWordBans'
 import { COPY, DRAWER_COPY, saveFailureCopy } from './commentCopy'
 import {
   CHANGE_MARK_COPY,
   COMMENT_LIST_COPY,
-  HTML_MENU_COPY,
   HTML_WORDS,
   MARKDOWN_COPY,
   MARKDOWN_FILE_LIMIT_TEXT,
   MARKDOWN_WORDS,
   MD_SURFACE_COPY,
+  REASON_COPY,
   SELECTION_COPY,
   capitalise,
   markdownKindNoun,
-  markdownReadOnlyReasonText,
-  markdownSaveFailureCopy,
-  menuReasonText
+  markdownSaveFailureCopy
 } from './commentCopyWords'
 import { windowRefusal } from './commentWindowCopy'
 
 /** Every tag main indexes in a Markdown file (`mdIndex.ts`), plus a raw-HTML section. */
 const TAGS = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'table', 'tr', 'th', 'td', 'blockquote', 'pre', 'hr', 'img', 'div', 'section']
 const COMMENT_CODES = Object.values(ErrorCode).filter(code => code.startsWith('COMMENT_'))
-const REASONS = [undefined, 'encoding', 'conflict-markers', 'too-large', 'too-many-blocks', 'unterminated-block', 'link', 'missing', 'generated-region', 'frontmatter', 'changed-during-save', 'comments-off']
+const REASONS = ['read-only', 'encoding', 'conflict-markers', 'too-large', 'too-many-blocks', 'unterminated-block', 'link', 'missing', 'generated-region', 'frontmatter', 'changed-during-save', 'comments-off']
 const FILE = 'notes.md'
 
-/**
- * The words no Markdown string may hold (024-AC-008): "element", "page",
- * "block" outside "code block" and "block quote", a bare tag as a word, and
- * "pin" or "pick" as nouns.
- */
-function bannedWords(text: string): string[] {
-  const found: string[] = []
-  if (/\belements?\b/i.test(text)) found.push('element')
-  if (/\bpages?\b/i.test(text)) found.push('page')
-  if (/\bblocks?\b/i.test(text.replace(/\bcode blocks?\b/gi, '').replace(/\bblock quotes?\b/gi, ''))) found.push('block')
-  const bareTag = /\b(?:p|li|ul|ol|tr|td|th|pre|hr|img|div|blockquote|h[1-6])\b/.exec(text.replace(/\bH[1-6] heading/g, ''))
-  if (bareTag !== null) found.push(`tag ${bareTag[0]}`)
-  if (/\b(?:a|the|this|your|each)\s+(?:pins?|picks?)\b/i.test(text) || /\bpins?\b/i.test(text)) found.push('pin/pick noun')
-  return found
-}
+const bannedWords = bannedMarkdownWords
 
 /** Every Markdown sentence the preview can show, with a name to fail by. */
 function markdownStrings(): Array<[string, string]> {
@@ -82,7 +67,7 @@ function markdownStrings(): Array<[string, string]> {
       }
     }
   }
-  for (const reason of REASONS) add(`readOnly ${reason ?? '-'}`, MARKDOWN_WORDS.readOnlyReasonText(reason, FILE))
+  for (const reason of REASONS) add(`readOnly ${reason}`, MARKDOWN_WORDS.reasonText(reason, FILE))
   add('deleteBlockText', MARKDOWN_WORDS.deleteBlockText(FILE))
   add('notFoundText', MARKDOWN_WORDS.notFoundText(FILE, 14))
   for (const key of ['commentOnFrontmatter', 'addComment', 'goToEditor'] as const) add(key, MD_SURFACE_COPY[key])
@@ -180,37 +165,36 @@ describe('commentCopyWords', () => {
     expect(MARKDOWN_FILE_LIMIT_TEXT).toBe(
       'This file is too big or too complex for comments. The size limit is 2 MB.'
     )
-    expect(markdownReadOnlyReasonText('too-large', FILE)).toBe(`${FILE} is too big or too complex for comments. The size limit is 2 MB.`)
-    expect(markdownReadOnlyReasonText('too-many-blocks', FILE)).toBe(MARKDOWN_COPY.tooMany(FILE))
-    expect(markdownReadOnlyReasonText('encoding', FILE)).toBe("Erfana can't add comments to this file because of its text format. Save the file as UTF-8, then try again.")
+    expect(MARKDOWN_WORDS.reasonText('too-large', FILE)).toBe(`${FILE} is too big or too complex for comments. The size limit is 2 MB.`)
+    expect(MARKDOWN_WORDS.reasonText('too-many-blocks', FILE)).toBe(MARKDOWN_COPY.tooMany(FILE))
+    expect(MARKDOWN_WORDS.reasonText('encoding', FILE)).toBe("Erfana can't add comments to this file because of its text format. Save the file as UTF-8, then try again.")
   })
 
   it('C-19 M-05 M-06 M-08 M-10 each menu reason line is menu matrix § 3\'s sentence, word for word', () => {
     const file = 'index.html'
-    const MATRIX: ReadonlyArray<[string | undefined, string]> = [
+    const MATRIX: ReadonlyArray<[string, string]> = [
       ['conflict-markers', 'index.html has two versions mixed together. Fix this first, or ask a developer to help.'],
       ['unterminated-block', "One comment in index.html is broken, so Erfana can't add new ones. Fix or delete the broken comment first."],
       ['too-many-blocks', 'index.html has 500 comments, which is the limit. Delete resolved comments to add more.'],
-      ['too-large', 'This file is too big for comments. The limit is 25 MB.'],
+      ['too-large', 'index.html is too big for comments. The limit is 25 MB.'],
       ['encoding', "Erfana can't add comments to this file because of its text format. Save the file as UTF-8, then try again."],
       ['link', "index.html is only a link to another file. Open the real file to comment."],
-      ['read-only', "index.html can't be changed, so you can't add a comment."],
-      ['not-owner', "index.html can't be changed, so you can't add a comment."],
+      ['read-only', 'index.html is read-only.'],
+      ['not-owner', 'index.html is read-only.'],
       ['outside-project', "index.html is not in this project, so you can't comment on it here."],
       // Changed expectation under 024-FR-006 § 4 (was "This part of the page can't hold a comment.").
-      ['not-commentable', "You can't add a comment here. Try a nearby section."],
-      [undefined, "You can't add a comment here. Try a nearby section."]
+      ['not-commentable', "You can't add a comment here. Try a nearby section."]
     ]
-    for (const [reason, sentence] of MATRIX) expect(menuReasonText(reason, file), String(reason)).toBe(sentence)
+    for (const [reason, sentence] of MATRIX) expect(HTML_WORDS.reasonText(reason, file), reason).toBe(sentence)
   })
 
   it('C-19 a reason the matrix has no row for still names a cause and a next step, never a bare refusal', () => {
-    expect(menuReasonText('target-moved', 'index.html')).toBe(HTML_MENU_COPY.moved('index.html'))
-    expect(menuReasonText('busy', 'index.html')).toBe(HTML_MENU_COPY.busy)
-    expect(menuReasonText('missing', 'index.html')).toBe('index.html no longer exists.')
-    for (const later of ['excluded', 'a-reason-from-a-later-main']) expect(menuReasonText(later, 'index.html')).toBe(HTML_MENU_COPY.refused)
-    for (const text of Object.values(HTML_MENU_COPY)) {
-      const sentence = typeof text === 'function' ? text('index.html') : text
+    expect(HTML_WORDS.reasonText('target-moved', 'index.html')).toBe('index.html changed after the page opened. Reload the preview, then comment.')
+    expect(MARKDOWN_WORDS.reasonText('target-moved', 'index.html')).toBe('index.html changed after the preview opened. Reload the preview, then comment.')
+    expect(HTML_WORDS.reasonText('busy', 'index.html')).toBe(REASON_COPY.busy)
+    expect(HTML_WORDS.reasonText('missing', 'index.html')).toBe('index.html no longer exists.')
+    for (const later of ['excluded', 'a-reason-from-a-later-main']) expect(HTML_WORDS.reasonText(later, 'index.html')).toBe(REASON_COPY.refused)
+    for (const sentence of Object.values(REASON_COPY)) {
       expect(sentence).toMatch(/\.$/)
       expect(sentence).not.toMatch(/comment block/)
     }
@@ -229,9 +213,9 @@ describe('commentCopyWords', () => {
 
   it('024-AC-007 A-02 titles the window "{…} on element" in the HTML Preview, the kind noun in Markdown', () => {
     const target = { tag: 'button', classes: ['cta'], line: 7 }
-    expect(HTML_WORDS.newCommentTitle('button')).toBe('New comment')
-    expect(HTML_WORDS.threadsTitle(target, 1)).toBe('Comment on this section')
-    expect(HTML_WORDS.threadsTitle(target, 3)).toBe('Comments on this section')
+    expect(HTML_WORDS.newCommentTitle('button')).toBe('New comment on section')
+    expect(HTML_WORDS.threadsTitle(target, 1)).toBe('Comment on section')
+    expect(HTML_WORDS.threadsTitle(target, 3)).toBe('Comments on section')
     expect(MARKDOWN_WORDS.newCommentTitle('li')).toBe('New comment on list item')
     expect(MARKDOWN_WORDS.threadsTitle({ tag: 'li', classes: [] }, 1)).toBe('Comment on list item')
     // The owner's plain wording, 2026-10-31: no selector in the title or the context line.
@@ -262,7 +246,6 @@ describe('commentCopyWords', () => {
       )
       expect(words.notOnScreen).toBe("This comment's target isn't on screen right now")
       expect(words.pinsOff).toBe('Comment icons are hidden')
-      expect(words.noTarget.reason).toBe("You can't add a comment here. Try a nearby section.")
     }
   })
 
@@ -317,9 +300,9 @@ describe('commentCopyWords', () => {
   it('024-AC-008 C-19.4: neither preview calls the stored item a "block" or tells the reader to "reopen" in an error', () => {
     const errors = [
       ...COMMENT_CODES.flatMap(code => [HTML_WORDS.saveFailure(code, FILE).text, MARKDOWN_WORDS.saveFailure(code, FILE).text]),
-      ...['encoding', 'conflict-markers', 'too-large', 'too-many-blocks', 'unterminated-block', 'link', 'missing', undefined].flatMap(reason => [
-        HTML_WORDS.readOnlyReasonText(reason, FILE),
-        MARKDOWN_WORDS.readOnlyReasonText(reason, FILE)
+      ...['encoding', 'conflict-markers', 'too-large', 'too-many-blocks', 'unterminated-block', 'link', 'missing', 'read-only'].flatMap(reason => [
+        HTML_WORDS.reasonText(reason, FILE),
+        MARKDOWN_WORDS.reasonText(reason, FILE)
       ])
     ]
     for (const text of errors) {
@@ -332,13 +315,11 @@ describe('commentCopyWords', () => {
 
   it('024-AC-035 F-04 C-19: the read-only banner and the menu reason are one sentence per reason, in both previews', () => {
     for (const reason of ['conflict-markers', 'too-many-blocks', 'unterminated-block', 'encoding', 'link']) {
-      expect(HTML_WORDS.readOnlyReasonText(reason, FILE), reason).toBe(menuReasonText(reason, FILE))
-      expect(MARKDOWN_WORDS.readOnlyReasonText(reason, FILE), reason).toBe(menuReasonText(reason, FILE))
+      expect(MARKDOWN_WORDS.reasonText(reason, FILE), reason).toBe(HTML_WORDS.reasonText(reason, FILE))
     }
-    expect(HTML_WORDS.readOnlyReasonText('too-many-blocks', FILE)).toBe(
+    expect(HTML_WORDS.reasonText('too-many-blocks', FILE)).toBe(
       `${FILE} has 500 comments, which is the limit. Delete resolved comments to add more.`
     )
-    expect(HTML_WORDS.readOnlyReasonText(undefined, FILE)).toBe(menuReasonText('read-only', FILE))
   })
 
   it('024-AC-007 D-32 P-F10 the drawer help note says what Changed sees: text, restyled or moved, and not a style sheet', () => {

@@ -163,7 +163,8 @@ describe('drawerRows', () => {
       ],
       new Set()
     )
-    expect(rows.open[0]).toMatchObject({ label: 'li', id: 'f2/t1' })
+    // P-F19: plain words, the tag for hover (was the label 'li').
+    expect(rows.open[0]).toMatchObject({ label: 'Section · line 11', code: 'li', id: 'f2/t1' })
     expect(tagsOf(rows.open[0])).toEqual(['From: child.html'])
   })
 

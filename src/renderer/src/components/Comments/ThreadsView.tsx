@@ -272,7 +272,7 @@ export function ThreadsView(props: ThreadsViewProps): React.JSX.Element {
             testId={TEST_IDS.COMMENT_READ_ONLY}
             actions={file.writable && props.unsaved !== undefined ? <CommentUnsavedActions file={fileName} {...props.unsaved} /> : undefined}
           >
-            {pausedText ?? words.readOnlyReasonText(file.readOnlyReason, fileName)}
+            {pausedText ?? words.reasonText(file.readOnlyReason ?? 'read-only', fileName)}
           </CommentBanner>
         )}
         {session?.updated === true && !removed && (

@@ -99,7 +99,7 @@ describe('CommentWindow – v2 thread states', () => {
     const banner = screen.getByTestId('comment-not-found')
     expect(banner).toHaveTextContent(WINDOW_COPY.notFound('paragraph', 'notes.md'))
     expect(banner).not.toHaveTextContent(/element/)
-    expect(screen.getByText('paragraph, not found · notes.md')).toBeInTheDocument()
+    expect(screen.getByText('Paragraph, not found · notes.md')).toBeInTheDocument()
     expect(screen.getByTestId('comment-resolve')).toHaveClass('dialog-btn-primary')
   })
 

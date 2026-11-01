@@ -7,8 +7,8 @@
  * `commentCopy.ts` stays the one home of every comment string; this module is
  * its per-preview half, kept beside it only because of the 500-line ratchet.
  * It imports the shared sentences from there – never the other way round – and
- * adds the slot fills: the HTML Preview's "element" and selector, the
- * Markdown Preview's kind nouns ("list item", "H2 heading").
+ * adds the slot fills: the HTML Preview's "section", the Markdown Preview's
+ * kind nouns ("list item", "H2 heading").
  *
  * A component reads its preview's table from `CommentWordsContext`
  * (`commentWords.ts`). `HTML_WORDS` is the default, and every HTML value is the
@@ -24,17 +24,16 @@
 import { ErrorCode } from '../../../../shared/errors'
 import type { CommentUnavailableReason } from '../../../../shared/ipc/preview-comment-schema'
 import { MARKDOWN_COMMENT_MAX_BYTES } from '../../../../shared/markdownComments/markdownLimits'
+import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
 import {
   ANNOUNCE,
   COPY,
   DRAWER_COPY,
-  FILE_LIMIT_TEXT,
   KIND_COPY,
   TOOL_COPY,
   deleteBlockText,
   modeTooltip,
   notFoundText,
-  readOnlyReasonText,
   saveFailureCopy,
   threadsTitle,
   unavailableTooltip,
@@ -51,6 +50,8 @@ export function capitalise(text: string): string {
   return text === '' ? text : text[0].toUpperCase() + text.slice(1)
 }
 
+/** The HTML size limit as a reader reads it: `25 MB`. */
+const HTML_SIZE_LIMIT = `${Math.round(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES / (1024 * 1024))} MB`
 /** The Markdown size limit as a reader reads it: `2 MB`. */
 const MARKDOWN_SIZE_LIMIT = `${Math.round(MARKDOWN_COMMENT_MAX_BYTES / (1024 * 1024))} MB`
 /** "Too complex" stands for the line and nesting limits; only the size is a number a reader can act on (P-F14). */
@@ -69,8 +70,10 @@ export interface CommentWords {
   readonly preview: 'html' | 'markdown'
   /** The target word inside a sentence, lower case: "element", or the Markdown noun (C-03, `commentTargetNoun.ts`). */
   readonly noun: (target: NounSource) => string
-  /** A drawer row's or the outline's label: the selector (HTML), "List item · line 14" (Markdown). */
+  /** A drawer row's label, in plain words: "Section · line 42", "List item · line 14" (D-03). */
   readonly label: (target: WordsTarget) => string
+  /** The code behind a label, for hover only (D-03): the selector in HTML; Markdown has none. */
+  readonly code: (target: LabelSource) => string | undefined
   /** The new-comment window's title. */
   readonly newCommentTitle: (target: NounSource) => string
   /** A thread window's title, for `count` threads on one target. */
@@ -96,7 +99,8 @@ export interface CommentWords {
   readonly noTarget: { readonly label: string; readonly reason: string }
   readonly pinsOff: string
   readonly modeOn: string
-  readonly readOnlyReasonText: (reason: string | undefined, file: string) => string
+  /** Why no new comment can be written, one sentence per reason wherever it shows (C-19): main's reason, or `'read-only'`. */
+  readonly reasonText: (reason: string, file: string) => string
   /** F-05: why nothing about the file can be read, as the toolbar's tooltip says it. */
   readonly unavailableText: (reason: CommentUnavailableReason) => string
   /**
@@ -124,29 +128,92 @@ function sharedReasonCopy(reason: string | undefined): SaveFailureCopy | undefin
   return reason === 'generated-region' ? { text: GENERATED_REGION_TEXT, action: 'close' } : undefined
 }
 
-/** HTML reason lines the shared sentences do not cover (menu matrix § 3, C-19). */
-export const HTML_MENU_COPY = {
-  /** M-08: `html`, `head`, template content, an element no comment can stand before; also no target (§ 4: "preview" in both). */
-  notCommentable: "You can't add a comment here. Try a nearby section.",
-  /** Not in the matrix: the file changed since the page was served, so the pick no longer names its element. */
-  moved: (file: string): string => `${file} changed after the page opened. Reload the preview, then comment.`,
-  /** Not in the matrix: the parse did not run (a full queue, a crash) – nothing about the file itself. */
+/** Reason lines that name nothing, in both previews (not in the matrix, C-19). */
+export const REASON_COPY = {
+  /** The parse did not run (a full queue, a crash) – nothing about the file itself. */
   busy: "Erfana couldn't read the file just now. Try again in a moment.",
-  /** Not in the matrix: any other refusal the menu can meet. */
+  /** Any other refusal: a reason a later main adds. */
   refused: "Erfana doesn't add comments to this file."
 } as const
 
+/** What a reason sentence takes from its preview. */
+interface ReasonWords {
+  /** What to try instead: a section, a paragraph (D-04). */
+  readonly nearby: string
+  /** What was opened when the file changed under it: the page, the preview (024-AC-008). */
+  readonly opened: string
+  /** The file limit (D-27): each preview has its own. */
+  readonly tooLarge: (file: string) => string
+}
+
+/**
+ * Why no new comment can be written – the one table of reasons (C-19, menu
+ * matrix § 3): the read-only banner, a disabled menu item's reason line and,
+ * through `MD_SURFACE_COPY.modeUnavailable`, the comment-mode toggle's.
+ *
+ * @param reason - Main's refusal code; `'read-only'` for a file main gave no reason for, `'not-commentable'` for a part with no draft. A reason a later main adds reads as {@link REASON_COPY}.refused.
+ * @param file - The file, as the reader knows it.
+ * @param words - The preview's words.
+ * @returns The reason line, ending with its full stop.
+ */
+function reasonSentence(reason: string, file: string, words: ReasonWords): string {
+  switch (reason) {
+    case 'not-commentable':
+      return `You can't add a comment here. Try a nearby ${words.nearby}.`
+    case 'encoding':
+      return "Erfana can't add comments to this file because of its text format. Save the file as UTF-8, then try again."
+    case 'conflict-markers':
+      return `${file} has two versions mixed together. Fix this first, or ask a developer to help.`
+    case 'too-large':
+      return words.tooLarge(file)
+    case 'too-many-blocks':
+      return `${file} has ${PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE} comments, which is the limit. Delete resolved comments to add more.`
+    case 'unterminated-block':
+      return `One comment in ${file} is broken, so Erfana can't add new ones. Fix or delete the broken comment first.`
+    case 'link':
+      return `${file} is only a link to another file. Open the real file to comment.`
+    case 'read-only':
+    case 'not-owner':
+      return `${file} is read-only.`
+    case 'outside-project':
+      return `${file} is not in this project, so you can't comment on it here.`
+    case 'missing':
+      return `${file} no longer exists.`
+    case 'target-moved':
+    case 'changed':
+      return `${file} changed after the ${words.opened} opened. Reload the preview, then comment.`
+    case 'busy':
+    case 'parse-failed':
+      return REASON_COPY.busy
+    default:
+      return REASON_COPY.refused
+  }
+}
+
+const HTML_REASON_WORDS: ReasonWords = {
+  nearby: HTML_NOUN,
+  opened: 'page',
+  tooLarge: file => `${file} is too big for comments. The limit is ${HTML_SIZE_LIMIT}.`
+}
+
+const MARKDOWN_REASON_WORDS: ReasonWords = {
+  nearby: 'paragraph',
+  opened: 'preview',
+  tooLarge: file => `${file} is ${MARKDOWN_LIMIT_WORDS}`
+}
+
 /**
  * The HTML Preview's words: the strings it showed before spec 024, except
- * where the differences table aligns both previews (A-02, A-05, A-06, A-08,
- * A-10, C-16, § 4) – there the shared sentence, "element" in any `{kind}` slot.
+ * where the differences table aligns both previews (A-01, A-02, A-05, A-06,
+ * A-08, A-10, C-16, § 4) – there the shared sentence, "section" in any `{kind}` slot.
  */
 export const HTML_WORDS: CommentWords = {
   preview: 'html',
   noun: () => HTML_NOUN,
-  label: target => elementLabel(target),
-  newCommentTitle: () => COPY.newComment,
-  threadsTitle: (_target, count) => threadsTitle('this section', count),
+  label: target => `${capitalise(HTML_NOUN)} · line ${target.line}`,
+  code: target => elementLabel(target),
+  newCommentTitle: () => KIND_COPY.newCommentTitle(HTML_NOUN),
+  threadsTitle: (_target, count) => threadsTitle(HTML_NOUN, count),
   context: (target, file) => `${file}, line ${target.line}`,
   menuLabel: () => COPY.menuLabel,
   showInPreview: COPY.showInPreview,
@@ -161,10 +228,10 @@ export const HTML_WORDS: CommentWords = {
   deleteBlockText,
   notFoundText,
   modeTooltip,
-  noTarget: { label: COPY.menuLabel, reason: HTML_MENU_COPY.notCommentable },
+  noTarget: { label: COPY.menuLabel, reason: reasonSentence('not-commentable', '', HTML_REASON_WORDS) },
   pinsOff: TOOL_COPY.pinsOff,
   modeOn: KIND_COPY.modeOn(HTML_CLICK_TARGET),
-  readOnlyReasonText,
+  reasonText: (reason, file) => reasonSentence(reason, file, HTML_REASON_WORDS),
   unavailableText: unavailableTooltip,
   saveFailure: (code, file, _tag, reason) => sharedReasonCopy(reason) ?? saveFailureCopy(code, file)
 }
@@ -185,80 +252,32 @@ export const MARKDOWN_COPY = {
   pickerTop: ANNOUNCE.pickerTop,
   pickerNoChild: ANNOUNCE.pickerNoChild,
   frontmatter: "You can't comment on the settings at the top of this file.",
-  /** Not in the matrix: comment mode, a right-click off every block (a gap, the margin) – HTML M-08 in Markdown words. */
-  noTarget: HTML_MENU_COPY.notCommentable,
+  /** Not in the matrix: comment mode, a right-click off every block (a gap, the margin) – HTML M-08 in Markdown words (I-26). */
+  noTarget: reasonSentence('not-commentable', '', MARKDOWN_REASON_WORDS),
   generated: GENERATED_REGION_TEXT,
   /** The shared sentence (C-19.4: errors never say "reopen"). */
   blockChanged: saveFailureCopy(ErrorCode.COMMENT_BLOCK_CHANGED, '').text,
   deleteBlockText,
   notFoundText,
-  unterminated: (file: string): string => readOnlyReasonText('unterminated-block', file),
+  unterminated: (file: string): string => reasonSentence('unterminated-block', file, MARKDOWN_REASON_WORDS),
   /** Main read the file again after the write and it differed (C12): the comment may have landed, so no retry. */
   changedDuringSave: (file: string): string =>
     `${file} changed during the save, so your comment may already be there. Check the comment list. Your text is still here.`,
   /** The list refused because Markdown comments were turned off in Settings meanwhile (024-FR-022). */
   off: "You can't comment on this file: comments are turned off in Settings.",
-  tooMany: (file: string): string => readOnlyReasonText('too-many-blocks', file),
+  tooMany: (file: string): string => reasonSentence('too-many-blocks', file, MARKDOWN_REASON_WORDS),
   moved: (noun: string): string =>
     `This ${noun} changed after you selected it. Select it again. Your text is safe.`,
   expired: (noun: string): string => `This window was open too long. Select the ${noun} again. Your text is safe.`,
   modeTooltip: (on: boolean): string => modeTooltip(on, MARKDOWN_CLICK_TARGET)
 } as const
 
-/**
- * Why no new comment can be written – a disabled menu item's reason line and,
- * through `MD_SURFACE_COPY.modeUnavailable`, the comment-mode toggle's
- * (menu matrix § 2, § 3; C-19: the menu and the window say the same sentence
- * for the same reason). `reason` is main's refusal code (the draft event's
- * `reason`, or a listed file's `readOnlyReason`); `undefined` with no draft
- * is a part of the page that cannot hold a comment.
- *
- * @param reason - Main's refusal reason; a reason a later main adds reads as {@link HTML_MENU_COPY}.refused.
- * @param file - The file, as the reader knows it.
- * @returns The reason line, ending with its full stop.
- *
- * @example
- * ```ts
- * menuReasonText('conflict-markers', 'index.html') // 'index.html has unresolved git conflicts. Resolve them first.'
- * ```
- */
-export function menuReasonText(reason: string | undefined, file: string): string {
-  switch (reason) {
-    case undefined:
-    case 'not-commentable':
-      return HTML_MENU_COPY.notCommentable
-    case 'too-large':
-      return FILE_LIMIT_TEXT
-    case 'conflict-markers':
-    case 'unterminated-block':
-    case 'too-many-blocks':
-    case 'encoding':
-    case 'link':
-      // One sentence per reason in the menu, the window and the mode tooltip (C-19, F-04).
-      return readOnlyReasonText(reason, file)
-    case 'read-only':
-    case 'not-owner':
-      return readOnlyReasonText(undefined, file)
-    case 'outside-project':
-      return `${file} is not in this project, so you can't comment on it here.`
-    case 'missing':
-      return `${file} no longer exists.`
-    case 'target-moved':
-    case 'changed':
-      return HTML_MENU_COPY.moved(file)
-    case 'busy':
-    case 'parse-failed':
-      return HTML_MENU_COPY.busy
-    default:
-      return HTML_MENU_COPY.refused
-  }
-}
-
 /** The Markdown Preview's words (C-03 kind nouns; differences table D-03, D-04, D-13). */
 export const MARKDOWN_WORDS: CommentWords = {
   preview: 'markdown',
   noun: mdNoun,
   label: target => `${capitalise(mdNoun(target))} · line ${target.line}`,
+  code: () => undefined,
   newCommentTitle: target => KIND_COPY.newCommentTitle(mdNoun(target)),
   threadsTitle: (target, count) => threadsTitle(mdNoun(target), count),
   context: (target, file) => `${file}, line ${target.line}`,
@@ -278,14 +297,9 @@ export const MARKDOWN_WORDS: CommentWords = {
   noTarget: { label: 'Preview', reason: MARKDOWN_COPY.noTarget },
   pinsOff: MARKDOWN_COPY.pinsOff,
   modeOn: MARKDOWN_COPY.modeOn,
-  readOnlyReasonText: markdownReadOnlyReasonText,
+  reasonText: (reason, file) => reasonSentence(reason, file, MARKDOWN_REASON_WORDS),
   unavailableText: markdownUnavailableText,
   saveFailure: markdownSaveFailureCopy
-}
-
-/** {@link readOnlyReasonText} in Markdown words (menu matrix § 3). */
-export function markdownReadOnlyReasonText(reason: string | undefined, file: string): string {
-  return reason === 'too-large' ? `${file} is ${MARKDOWN_LIMIT_WORDS}` : readOnlyReasonText(reason, file)
 }
 
 /** {@link unavailableTooltip} in Markdown words: never "page" (024-AC-008), and this preview's limit. */

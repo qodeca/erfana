@@ -27,15 +27,6 @@ import type { OverlayTheme } from './state'
 const HIDDEN_CSS = '.erf-hpc-root { display: none !important; }'
 
 /*
- * deviates: docs/designs/comments/html-comments/overlay.html — the pin's
- * focus ring is the passed-in accent with an ink halo, and pins are focusable
- * but outside the Tab order (card Exceptions, "Pin focus").
- */
-function pinFocusCss(t: OverlayTheme): string {
-  return `.erf-hpc-pin:focus-visible { outline: ${t.ring} solid ${t.accent}; outline-offset: ${t.space1}; box-shadow: 0 0 0 ${t.space2} ${t.ink}; }`
-}
-
-/*
  * deviates: docs/designs/comments/html-comments/overlay.html — in forced
  * colours the theme gives way to system colours, written as literals; a
  * selected pin inverts (Canvas body, Highlight stroke and content) so it still
@@ -44,7 +35,7 @@ function pinFocusCss(t: OverlayTheme): string {
 const FORCED_COLOURS_CSS = `@media (forced-colors: active) {
   .erf-hpc-outline, .erf-hpc-flash, .erf-hpc-frame { border-color: Highlight; outline-color: CanvasText; }
   .erf-hpc-label, .erf-hpc-tab { background: Highlight; color: HighlightText; border-color: HighlightText; }
-  .erf-hpc-label__tag, .erf-hpc-label__size { color: HighlightText; }
+  .erf-hpc-label__tag, .erf-hpc-label__code, .erf-hpc-label__size { color: HighlightText; }
   .erf-hpc-pin .erf-hpc-pin__body { fill: Highlight; stroke: HighlightText; }
   .erf-hpc-pin .erf-hpc-pin__line, .erf-hpc-pin .erf-hpc-pin__count { fill: HighlightText; color: HighlightText; }
   .erf-hpc-pin--changed::before { background: CanvasText; box-shadow: 0 0 0 1px Canvas; }
@@ -80,7 +71,7 @@ export function overlayCss(t: OverlayTheme, hidden = false): string {
 .erf-hpc-flash { position: fixed; pointer-events: none; border: ${t.ring} solid ${t.accent}; background: color-mix(in srgb, ${t.accent} 24%, transparent); }
 .erf-hpc-label { position: fixed; pointer-events: none; padding: 0 ${t.space2}; white-space: nowrap; direction: ltr; unicode-bidi: isolate; background: ${t.ink}; color: ${t.paper}; border: ${t.hairline} solid ${t.accent}; }
 .erf-hpc-label__tag { color: ${t.accent}; }
-.erf-hpc-label__size { color: ${t.muted}; margin-left: 1ch; }
+.erf-hpc-label__code, .erf-hpc-label__size { color: ${t.muted}; margin-left: 1ch; }
 .erf-hpc-pin { position: fixed; pointer-events: auto; cursor: pointer; display: block; }
 .erf-hpc-pin svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .erf-hpc-pin__body { fill: ${t.accent}; stroke: ${t.ink}; stroke-width: 1.5; stroke-linejoin: miter; }
@@ -100,7 +91,6 @@ export function overlayCss(t: OverlayTheme, hidden = false): string {
 /* A stack pin, "+3" (spec 024 C-17): the elevated fill with an accent edge and count, so it reads apart from a count. */
 .erf-hpc-pin--stack:not(.erf-hpc-pin--damaged) .erf-hpc-pin__body { fill: ${t.ink}; stroke: ${t.accent}; }
 .erf-hpc-pin--stack:not(.erf-hpc-pin--damaged) .erf-hpc-pin__count { color: ${t.accent}; }
-${pinFocusCss(t)}
 /* The comment mark (spec 024 C-12): the accent at 35% under the words and a continuous bar along their bottom – never the selection's colour. The bar is the deep violet on a light ground (K-20). */
 .erf-hpc-mark { position: fixed; pointer-events: none; background: color-mix(in srgb, ${t.accent} 35%, transparent); border-bottom: ${t.ring} solid ${t.accent}; }
 .erf-hpc-marks--clickable .erf-hpc-mark { pointer-events: auto; cursor: pointer; }

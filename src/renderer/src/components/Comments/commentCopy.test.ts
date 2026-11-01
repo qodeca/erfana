@@ -23,7 +23,6 @@ import {
   fillFile,
   listButtonName,
   modeTooltip,
-  readOnlyReasonText,
   saveFailureCopy,
   saveShortcutAria,
   saveShortcutLabel,
@@ -31,6 +30,7 @@ import {
   unavailableTooltip,
   unreadFilesText
 } from './commentCopy'
+import { HTML_WORDS } from './commentCopyWords'
 
 describe('commentCopy', () => {
   beforeEach(() => {
@@ -42,9 +42,9 @@ describe('commentCopy', () => {
     expect(commentModeAriaShortcut()).toBe('Control+Alt+M')
     expect(saveShortcutLabel()).toBe('Ctrl+Enter')
     platform.mac = true
-    expect(commentModeShortcutLabel()).toBe('Cmd+Option+M')
+    expect(commentModeShortcutLabel()).toBe('⌥⌘M')
     expect(commentModeAriaShortcut()).toBe('Meta+Alt+M')
-    expect(saveShortcutLabel()).toBe('Cmd+Enter')
+    expect(saveShortcutLabel()).toBe('⌘Enter')
     expect(saveShortcutAria()).toBe('Meta+Enter')
     platform.mac = false
     expect(saveShortcutAria()).toBe('Control+Enter')
@@ -133,14 +133,14 @@ describe('commentCopy', () => {
     'unterminated-block',
     'link',
     'missing',
-    undefined
+    'read-only'
   ])('states the read-only reason %s', reason => {
-    expect(readOnlyReasonText(reason, 'a.html').length).toBeGreaterThan(10)
+    expect(HTML_WORDS.reasonText(reason, 'a.html').length).toBeGreaterThan(10)
   })
 
   it('§19 Rev 4 states the file limits the code enforces, in the drawer and in the save error alike', () => {
     expect(FILE_LIMIT_TEXT).toBe('This file is too big for comments. The limit is 25 MB.')
-    expect(readOnlyReasonText('too-large', 'a.html')).toBe('a.html is too big for comments. The limit is 25 MB.')
+    expect(HTML_WORDS.reasonText('too-large', 'a.html')).toBe('a.html is too big for comments. The limit is 25 MB.')
     expect(ERROR_MESSAGES[ErrorCode.COMMENT_FILE_TOO_LARGE]).toBe(FILE_LIMIT_TEXT)
   })
 
@@ -153,8 +153,8 @@ describe('commentCopy', () => {
 
   // Changed expectation under 024-FR-006 A-02 (was the selector in the title: "Comment on button.cta").
   it('titles a thread window by count, the target word in its {kind} slot', () => {
-    expect(threadsTitle('this section', 1)).toBe('Comment on this section')
-    expect(threadsTitle('this section', 2)).toBe('Comments on this section')
+    expect(threadsTitle('section', 1)).toBe('Comment on section')
+    expect(threadsTitle('section', 2)).toBe('Comments on section')
   })
 
   it('words the delete confirmations', () => {

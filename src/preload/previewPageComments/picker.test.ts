@@ -53,15 +53,19 @@ const picks = (): Array<Record<string, unknown>> =>
 describe('C-21 (HTML) the floating label', () => {
   const part = (cls: string): Element | null | undefined => h.root()?.querySelector(cls)
 
-  it('024-AC-019 C-21 (HTML) D-05 drops the pixel size unless Alt is held', () => {
+  it('024-AC-019 C-21 (HTML) D-03 D-05 drops the code and the pixel size unless Alt is held', () => {
     userMove(10, 60)
     h.controller.renderNow()
     expect(part('.erf-hpc-label__size')).toHaveClass('erf-hpc-hidden')
+    expect(part('.erf-hpc-label__code')).toHaveClass('erf-hpc-hidden')
     userKey({ key: 'Alt', code: 'AltLeft', altKey: true })
     expect(part('.erf-hpc-label__size')).not.toHaveClass('erf-hpc-hidden')
+    expect(part('.erf-hpc-label__code')).not.toHaveClass('erf-hpc-hidden')
     expect(drawnText(part('.erf-hpc-label__size'))).toBe('800×40')
+    expect(drawnText(part('.erf-hpc-label__code'))).toBe('li#one')
     userUp({ key: 'Alt', code: 'AltLeft', altKey: false })
     expect(part('.erf-hpc-label__size')).toHaveClass('erf-hpc-hidden')
+    expect(part('.erf-hpc-label__code')).toHaveClass('erf-hpc-hidden')
   })
 
   it('024-AC-019 C-21 (HTML) Alt held is said by the page’s keys only: an untrusted event changes nothing', () => {
@@ -91,7 +95,7 @@ describe('hover label (J-001)', () => {
   it('J-001 outlines the element under the pointer and labels it with its size', () => {
     userMove(10, 60)
     h.controller.renderNow()
-    expect(label()).toBe('li#one800×40')
+    expect(label()).toBe('Section · “one”li#one800×40')
     const outline = h.root()?.querySelector('.erf-hpc-outline') as HTMLElement
     expect(outline.style.left).toBe('0px')
     expect(outline.style.top).toBe('50px')
@@ -105,12 +109,12 @@ describe('hover label (J-001)', () => {
     h.doubles.setBox(built, { left: 10, top: 305, width: 50, height: 20 })
     userMove(20, 310)
     h.controller.renderNow()
-    expect(label()).toBe('span#built · script50×20')
+    expect(label()).toBe('Section · scriptspan#built50×20')
 
     h.state({ mode: true, showIcons: true, icons: [{ key: 'k', token: token(4), count: 2, status: 'open' }] })
     userMove(10, 60)
     h.controller.renderNow()
-    expect(label()).toBe('li#one · 2 comments800×40')
+    expect(label()).toBe('Section · “one” · 2 commentsli#one800×40')
   })
 
   it('places the label above the element, below it at the viewport top, and inside a huge one', () => {
@@ -186,7 +190,7 @@ describe('keyboard picker (J-010)', () => {
     // Each move scrolls the element into view.
     expect(h.doubles.scrolledIntoView.at(-1)).toEqual({
       element: byId('list'),
-      options: { block: 'nearest', inline: 'nearest' }
+      options: { block: 'nearest', inline: 'nearest', behavior: 'instant' }
     })
   })
 
@@ -282,7 +286,7 @@ describe('picker edges', () => {
     userKey({ key: 'Tab' })
     dispatchTrusted(document, new MouseEvent('pointerout', { bubbles: true, relatedTarget: null }))
     h.controller.renderNow()
-    expect(label()).toBe('li#two800×40')
+    expect(label()).toBe('Section · “two”li#two800×40')
 
     userMove(10, 305)
     dispatchTrusted(document, new MouseEvent('pointerout', { bubbles: true, relatedTarget: null }))
@@ -295,7 +299,7 @@ describe('picker edges', () => {
     const pin = h.root()?.querySelector('.erf-hpc-pin') as HTMLElement
     userMove(Number.parseFloat(pin.style.left) + 12, Number.parseFloat(pin.style.top) + 12, h.host() as HTMLElement)
     h.controller.renderNow()
-    expect(label()).toBe('p#last · 1 comment800×40')
+    expect(label()).toBe('Section · “last” · 1 commentp#last800×40')
   })
 
   it('starts at the viewport centre when nothing is under the pointer', () => {
@@ -337,7 +341,7 @@ describe('picker edges', () => {
     userMove(10, 60)
     document.body.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 10, clientY: 305 }))
     h.controller.renderNow()
-    expect(label()).toBe('li#one800×40')
+    expect(label()).toBe('Section · “one”li#one800×40')
   })
 })
 
@@ -368,7 +372,7 @@ describe('a pick’s menu or window holds the picker on its element (macOS: the 
     pageHidden(true)
     leave()
     h.controller.renderNow()
-    expect(label()).toBe('li#one800×40')
+    expect(label()).toBe('Section · “one”li#one800×40')
     pageHidden(false)
     altUp()
     expect(spoken()).toBe('showing ul#list')
@@ -383,7 +387,7 @@ describe('a pick’s menu or window holds the picker on its element (macOS: the 
     leave()
     pageHidden(false)
     h.controller.renderNow()
-    expect(label()).toBe('li#one800×40')
+    expect(label()).toBe('Section · “one”li#one800×40')
     altUp()
     expect(spoken()).toBe('showing ul#list')
   })
@@ -406,7 +410,7 @@ describe('a pick’s menu or window holds the picker on its element (macOS: the 
     leave()
     pageHidden(false)
     h.controller.renderNow()
-    expect(label()).toBe('li#one800×40')
+    expect(label()).toBe('Section · “one”li#one800×40')
     altUp()
     expect(spoken()).toBe('showing ul#list')
   })
@@ -421,6 +425,6 @@ describe('a pick’s menu or window holds the picker on its element (macOS: the 
     userMove(12, 62)
     leave()
     h.controller.renderNow()
-    expect(label()).toBe('li#one800×40')
+    expect(label()).toBe('Section · “one”li#one800×40')
   })
 })

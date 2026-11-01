@@ -52,6 +52,8 @@ export interface DrawerRow {
   readonly frame: boolean
   readonly line: number
   readonly label: string
+  /** The code behind the label, for hover only (D-03); never spoken (K-17). */
+  readonly code?: string
   readonly replies: number
   /** The first message; `''` for a block. */
   readonly excerpt: string
@@ -131,8 +133,9 @@ function threadRow(
     id: `${file.fileKey}/${thread.threadKey}`,
     filter: isResolved ? 'resolved' : 'open',
     line: thread.line,
-    // The HTML Preview names a script-built element by its own tag; Markdown names every target in words (C-03).
-    label: thread.runtime && words.preview === 'html' ? thread.runtime.tag : words.label(thread),
+    label: words.label(thread),
+    // A script-built element's code is its own tag, not the in-file element its comment sits before.
+    code: words.code(thread.runtime ?? thread),
     replies: thread.messages.length - 1,
     excerpt: first?.text ?? '',
     words: change?.state === 'words' ? `“${change.was}” → “${change.now ?? ''}”` : '',

@@ -109,11 +109,11 @@ describe('PreviewCommentsLayer', () => {
       })
     }
 
-    it('M-05 outside comment mode on a read-only file: "Comment on this section", disabled, with the reason main named', async () => {
+    it('M-05 outside comment mode on a read-only file: "Comment on section", disabled, with the reason main named', async () => {
       const user = userEvent.setup()
       const { props } = setup({ menu: menuDraft({ ...NO_DRAFT, reason: 'conflict-markers' }), mode: false })
       expect(screen.getByRole('menu', { name: COPY.menuLabel })).toBeVisible()
-      expectDisabledWithReason([MD_SURFACE_COPY.commentOn('section')], CONFLICTS)
+      expectDisabledWithReason(['Comment on section'], CONFLICTS)
       await user.click(screen.getAllByRole('menuitem')[0])
       expect(props.onAddComment).not.toHaveBeenCalled()
     })
@@ -135,7 +135,7 @@ describe('PreviewCommentsLayer', () => {
       for (const mode of [false, true]) {
         const { unmount } = setup({ menu: menuDraft({ ...NO_DRAFT, kind: mode ? 'open' : 'menu', reason: 'not-commentable' }), mode })
         // Changed expectation under 024-FR-006 § 4 (was "This part of the page can't hold a comment.").
-        expectDisabledWithReason([mode ? COPY.addComment : MD_SURFACE_COPY.commentOn('section')], "You can't add a comment here. Try a nearby section.")
+        expectDisabledWithReason([mode ? 'Add comment' : 'Comment on section'], "You can't add a comment here. Try a nearby section.")
         unmount()
       }
       // A main that sent no reason reads the same.
@@ -150,7 +150,7 @@ describe('PreviewCommentsLayer', () => {
       const user = userEvent.setup()
       // Even a draft main minted is not offered: nothing could be read.
       const { props, unmount } = setup({ menu: menuDraft(), mode: false, unavailable: 'too-large' })
-      expectDisabledWithReason([MD_SURFACE_COPY.commentOn('section')], "You can't comment on this file: the file is over the 25 MB limit.")
+      expectDisabledWithReason([MD_SURFACE_COPY.commentOn('section')], "You can't comment on this file: it is too big. The limit is 25 MB.")
       await user.click(screen.getAllByRole('menuitem')[0])
       expect(props.onAddComment).not.toHaveBeenCalled()
       unmount()
@@ -172,14 +172,14 @@ describe('PreviewCommentsLayer', () => {
   describe('OD-01 024-AC-004 the menu matrix in the HTML Preview', () => {
     const WORDS = { text: 'We ship the beta to ten customers', start: 20, end: 33, cut: false }
 
-    it('OD-01 outside comment mode the one item is "Comment on this section" (M-01)', async () => {
+    it('OD-01 outside comment mode the one item is "Comment on section" (M-01)', async () => {
       const user = userEvent.setup()
       const draft = menuDraft()
       const { props } = setup({ menu: draft, mode: false })
       expect(screen.getByRole('menu', { name: COPY.menuLabel })).toBeVisible()
       const items = screen.getAllByRole('menuitem')
       expect(items).toHaveLength(1)
-      expect(items[0]).toHaveTextContent(MD_SURFACE_COPY.commentOn('section'))
+      expect(items[0]).toHaveTextContent(/^Comment on section$/)
       await user.click(items[0])
       expect(props.onAddComment).toHaveBeenCalledWith(draft)
     })

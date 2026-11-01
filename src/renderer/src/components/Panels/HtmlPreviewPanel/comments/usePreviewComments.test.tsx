@@ -297,7 +297,7 @@ describe('usePreviewComments', () => {
     act(() => fake.emitMode({ panelId: PANEL, on: true, reason: 'escape' }))
     await waitFor(() => expect(latest.layer.polite).toBe(HTML_WORDS.modeOn))
     act(() => fake.emitMode({ panelId: PANEL, on: false, reason: 'picker', say: 'showing', element: { tag: 'p', line: 12 } }))
-    await waitFor(() => expect(latest.layer.polite).toBe('Showing p, line 12.'))
+    await waitFor(() => expect(latest.layer.polite).toBe('Showing a section, line 12.'))
     // A picker event is not a mode change, whatever its `on` says.
     expect(latest.toolbar.mode).toBe(true)
     act(() => fake.emitMode({ panelId: PANEL, on: true, reason: 'picker', say: 'top' }))

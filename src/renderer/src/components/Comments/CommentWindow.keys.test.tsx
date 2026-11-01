@@ -68,7 +68,7 @@ const ready = (files: CommentFileView[]) => ({ status: 'ready' as const, files, 
 /** The platform's save chord, as user-event spells it. */
 const PLATFORMS = [
   { name: 'Windows / Linux', mac: false, chord: '{Control>}{Enter}{/Control}', label: 'Ctrl+Enter', aria: 'Control+Enter' },
-  { name: 'macOS', mac: true, chord: '{Meta>}{Enter}{/Meta}', label: 'Cmd+Enter', aria: 'Meta+Enter' }
+  { name: 'macOS', mac: true, chord: '{Meta>}{Enter}{/Meta}', label: '⌘Enter', aria: 'Meta+Enter' }
 ] as const
 
 describe('CommentWindow – first focus and the save key (§19 Rev 4 owner test)', () => {

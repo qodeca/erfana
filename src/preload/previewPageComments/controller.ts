@@ -337,7 +337,7 @@ export class CommentController {
     const path = this.downPath
     this.select(element, true)
     this.downPath = path
-    element.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    element.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' })
     this.renderNow()
     this.steps.say('showing', stepElementOf(this.tokens, element), viewOf(this.deps.win))
   }
@@ -425,7 +425,8 @@ export class CommentController {
     const element = this.icons.resolve(this.state.icons).find(r => r.icon.key === key)?.element
     if (element === undefined) return
     openAround(element)
-    element.scrollIntoView({ block: 'center' })
+    // K-33: instant, so a page's own `scroll-behavior: smooth` cannot animate it.
+    element.scrollIntoView({ block: 'center', behavior: 'instant' })
     if (isRendered(element)) this.flash.start(element)
     this.renderNow()
   }

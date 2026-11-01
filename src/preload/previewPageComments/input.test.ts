@@ -241,7 +241,7 @@ describe('pins and shields', () => {
     // The shield is hovered as the iframe, labelled as an inline frame.
     userMove(10, 460, h.host() as HTMLElement)
     h.controller.renderNow()
-    expect(drawnText(h.root()?.querySelector('.erf-hpc-label'))).toBe('iframe#frame · inline frame300×100')
+    expect(drawnText(h.root()?.querySelector('.erf-hpc-label'))).toBe('Section · inline frameiframe#frame300×100')
   })
 })
 

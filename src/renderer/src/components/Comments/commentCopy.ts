@@ -25,6 +25,7 @@ import type {
 } from '../../../../shared/ipc/preview-comment-schema'
 import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
 import { isMacOS } from '../../utils/platform'
+import { formatShortcut } from '../../utils/shortcutLabel'
 import { plural } from './commentFormat'
 
 /** A byte limit as the reader reads it: `25 MB`. */
@@ -40,9 +41,9 @@ function megabytes(bytes: number): string {
 export const FILE_LIMIT_TEXT =
   `This file is too big for comments. The limit is ${megabytes(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES)}.`
 
-/** The comment-mode shortcut as §10.10 prints it, per platform. */
+/** The comment-mode shortcut as the Writing card prints it: ⌥⌘M, Ctrl+Alt+M. */
 export function commentModeShortcutLabel(): string {
-  return isMacOS() ? 'Cmd+Option+M' : 'Ctrl+Alt+M'
+  return formatShortcut('M', { mod: true, alt: true })
 }
 
 /** `aria-keyshortcuts` for the comment-mode toggle. */
@@ -52,7 +53,7 @@ export function commentModeAriaShortcut(): string {
 
 /** The save shortcut as the Save button's tooltip prints it. */
 export function saveShortcutLabel(): string {
-  return isMacOS() ? 'Cmd+Enter' : 'Ctrl+Enter'
+  return formatShortcut('Enter', { mod: true })
 }
 
 /** `aria-keyshortcuts` for Save and Reply (Cmd/Ctrl+Enter in the field). */
@@ -62,7 +63,7 @@ export function saveShortcutAria(): string {
 
 /** Why comments are unavailable for the page, as the toolbar tooltip ends. */
 export const UNAVAILABLE_REASON_TEXT: Readonly<Record<CommentUnavailableReason, string>> = {
-  'too-large': `the file is over the ${megabytes(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES)} limit`,
+  'too-large': `it is too big. The limit is ${megabytes(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES)}`,
   encoding: "Erfana can't read its text format",
   'prepare-failed': "Erfana couldn't get the page ready",
   'overlay-removed': "the page keeps removing Erfana's comment tools",
@@ -96,38 +97,13 @@ export function unavailableTooltip(reason: CommentUnavailableReason): string {
 export const REMOTE_PAGE_TOOLTIP =
   "You can't comment on this page: it isn't a file in this project"
 
-/**
- * Why a file takes no new comment (`CommentFileView.readOnlyReason`, `addRefusal`): menu matrix § 3's
- * sentence, the same in the banner, the menu and the mode tooltip (C-19, F-04); never "block" (024-FR-007).
- */
-export function readOnlyReasonText(reason: string | undefined, file: string): string {
-  switch (reason) {
-    case 'encoding':
-      return "Erfana can't add comments to this file because of its text format. Save the file as UTF-8, then try again."
-    case 'conflict-markers':
-      return `${file} has two versions mixed together. Fix this first, or ask a developer to help.`
-    case 'too-large':
-      return `${file} is too big for comments. The limit is ${megabytes(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES)}.`
-    case 'too-many-blocks':
-      return `${file} has ${PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE} comments, which is the limit. Delete resolved comments to add more.`
-    case 'unterminated-block':
-      return `One comment in ${file} is broken, so Erfana can't add new ones. Fix or delete the broken comment first.`
-    case 'link':
-      return `${file} is only a link to another file. Open the real file to comment.`
-    case 'missing':
-      return `${file} no longer exists. Copy your text before closing.`
-    default:
-      return `${file} can't be changed, so you can't add a comment.`
-  }
-}
-
 /** What the window does with a refused save, besides showing its sentence. */
 export type SaveFailureAction =
   /** Error banner; Save stays. */
   | 'banner'
   /** Error banner; the only way on is Close (the draft cannot be saved any more). */
   | 'close'
-  /** Error banner with "Pick again". */
+  /** Error banner with "Select again". */
   | 'pick-again'
   /** The warning banner with Go to tab / Save {file}. */
   | 'unsaved'
@@ -240,7 +216,7 @@ export const COPY = {
   showInPreview: 'Show in preview', // A-05: the Markdown words, in both
   openInSource: 'Open in file',
   tryAgain: 'Try again',
-  pickAgain: 'Pick again',
+  pickAgain: 'Select again', // P-F30: the verb of the sentence beside it
   change: 'Change',
   edited: 'edited',
   unsavedTitle: 'Save your edits first',
@@ -271,9 +247,9 @@ export const COPY = {
   copyFailed: "Couldn't copy the comment text."
 } as const
 
-/** "Saved inside {file}." */
+/** "Saves into {file}." – shown before a save, so it says what Save will do (P-F11). */
 export function fieldHint(file: string): string {
-  return `Saved inside ${file}.`
+  return `Saves into ${file}.`
 }
 
 /** "Comments can be up to 4,000 characters. This one is {n}." */
@@ -297,8 +273,7 @@ export const KIND_COPY = {
 
 /**
  * A thread window's title (A-02, D-04; one thread "Comment on", several
- * "Comments on"). `noun` is "element" in the HTML Preview, whose selector
- * stays in the context line (D-03).
+ * "Comments on"). `noun` is the plain kind word: "section" in the HTML Preview.
  */
 export function threadsTitle(noun: string, threads: number): string {
   return threads === 1 ? `Comment on ${noun}` : `Comments on ${noun}`
@@ -388,7 +363,7 @@ export const DRAWER_COPY = {
   emptyOpen: 'No open comments.',
   emptyResolved: 'No resolved comments.',
   emptyAttention: 'Nothing needs attention.',
-  notVisible: 'Hidden on the page',
+  notVisible: 'Hidden right now', // P-F18: both previews, so no "page"
   notFound: 'Not found', // A-10: one tag in both previews
   damaged: 'Damaged',
   resolved: 'Resolved',
@@ -465,14 +440,12 @@ export const ANNOUNCE = {
   rebuilt: 'Comment repaired.',
   deleted: (file: string): string => `Comment deleted from ${file}.`,
   // keyboard picker (§10.8): spoken by the panel, never drawn in the page. The
-  // element is named by what MAIN parsed – its tag and line – never by its ids
-  // or classes, which are the page's words (security review S-L-A).
+  // element is named by the line MAIN parsed, never by its ids or classes, which
+  // are the page's words (security review S-L-A), or by a bare tag (K-33).
   pickerTop: 'Top level – no parent to select.', // A-06: the Markdown sentences, in both
   pickerNoChild: 'Nothing inside to select.',
-  pickerShowing: ({ tag, line, added }: CommentPickerElement): string =>
-    added
-      ? `Showing a section created by a script, inside ${tag ?? 'a section'} on line ${line}.`
-      : `Showing ${tag ?? 'a section'}, line ${line}.`
+  pickerShowing: ({ line, added }: CommentPickerElement): string =>
+    added ? `Showing a section created by a script, near line ${line}.` : `Showing a section, line ${line}.`
 } as const
 
 /**

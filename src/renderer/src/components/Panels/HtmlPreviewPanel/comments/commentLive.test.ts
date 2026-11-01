@@ -11,9 +11,10 @@ import { PICKER_HINT_STEPS, pickerAnnouncement } from './commentLive'
 describe('commentLive', () => {
   it('E-022 words where the keyboard picker moved (§10.10 "Announce"), and nothing for another event', () => {
     // S-L-A: main's facts – the parsed tag and its line – never the page's ids or classes.
-    expect(pickerAnnouncement({ say: 'showing', element: { tag: 'p', line: 12 } })).toBe('Showing p, line 12.')
+    // K-33: never a bare tag either (was "Showing p, line 12.").
+    expect(pickerAnnouncement({ say: 'showing', element: { tag: 'p', line: 12 } })).toBe('Showing a section, line 12.')
     expect(pickerAnnouncement({ say: 'showing', element: { tag: 'ul', line: 3, added: true } })).toBe(
-      'Showing a section created by a script, inside ul on line 3.'
+      'Showing a section created by a script, near line 3.'
     )
     expect(pickerAnnouncement({ say: 'showing', element: { line: 5 } })).toBe('Showing a section, line 5.')
     expect(pickerAnnouncement({ say: 'top' })).toBe('Top level – no parent to select.')
@@ -30,7 +31,7 @@ describe('commentLive', () => {
     expect(pickerAnnouncement({ say: 'showing', element: { tag: 'p', line: 9, role: 'paragraph' } }, PICKER_HINT_STEPS)).toBe('Paragraph, line 9.')
     // A script-built element keeps the "added by a script" sentence.
     expect(pickerAnnouncement({ say: 'showing', element: { tag: 'ul', line: 3, added: true } }, 0)).toBe(
-      'Showing a section created by a script, inside ul on line 3.'
+      'Showing a section created by a script, near line 3.'
     )
   })
 

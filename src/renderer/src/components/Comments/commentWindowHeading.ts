@@ -9,7 +9,7 @@
  * @module HtmlPreviewPanel/comments/commentWindowHeading
  */
 import { COPY, SCRIPT_BUILT_TEXT, frameFileText } from './commentCopy'
-import { HTML_WORDS, type CommentWords } from './commentCopyWords'
+import { HTML_WORDS, capitalise, type CommentWords } from './commentCopyWords'
 import { WINDOW_COPY, headingQuote } from './commentWindowCopy'
 import type { CommentWindowRequest } from './commentWindowTypes'
 import type { selectThreads } from './ThreadsView'
@@ -19,7 +19,7 @@ export interface Heading {
   readonly title: string
   readonly context: string | null
   readonly note: string | null
-  /** The HTML target's selector, for tests and tooling: the reader no longer sees it. */
+  /** The HTML target's code, for tests and tooling: the reader no longer sees it. */
   readonly target?: string
 }
 
@@ -130,7 +130,7 @@ export function headingOf(
       title: words.newCommentTitle(target.tag),
       context: `${file.displayPath}, line ${target.line}`,
       note,
-      target: words.label(target)
+      target: words.code(target)
     }
   }
   if (selection === null) return { title: 'Comments', context: null, note: null }
@@ -142,14 +142,14 @@ export function headingOf(
   }
   // C-05: a lost target says so on the context line; where the comment itself is follows the banner.
   const lost = selection.threads.length > 0 && selection.threads.every(thread => !thread.attached && thread.status === 'open')
+  const context = lost ? WINDOW_COPY.notFoundContext(capitalise(words.noun(first)), file) : words.context(first, file)
   if (words.preview !== 'html') {
     const title = words.threadsTitle(first, selection.threads.length) + headingText(first.tag, first.quote)
-    const context = lost ? WINDOW_COPY.notFoundContext(words.noun(first), file) : words.context(first, file)
     return { title, context, note: null }
   }
   return {
     title: words.threadsTitle(first, selection.threads.length),
-    context: lost ? WINDOW_COPY.notFoundContext('Section', file) : `${file}, line ${first.line}`,
+    context,
     note: selection.file.frame ? frameFileText(file) : null
   }
 }

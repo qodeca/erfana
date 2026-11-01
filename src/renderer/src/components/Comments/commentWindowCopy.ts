@@ -62,7 +62,7 @@ export const WINDOW_COPY = {
   removed: (file: string): string => `Someone removed this comment from ${file}. Your reply is still here.`,
   copyText: 'Copy text',
   textCopied: 'Text copied.',
-  newCommentOn: (noun: string): string => `New comment on this ${noun}`,
+  newCommentOn: (noun: string): string => `New comment on ${noun}`,
   blockChangedReply: (_file: string): string =>
     'This conversation changed. You see the new version above. Your reply is still here, so send it again.',
   // ---- C-19 refusals ----

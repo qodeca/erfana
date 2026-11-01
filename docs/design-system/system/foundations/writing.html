@@ -226,7 +226,7 @@ reader already knows.</p>
 <tbody>
   <tr><td>block</td><td>comment (the stored item); the kind noun (the target)</td><td>It meant both, so “Delete block…” read as “delete this paragraph”. It stays in <code>format-v1.md</code>, which is for tool authors</td></tr>
   <tr><td>pin</td><td>icon</td><td>The design name for the mark on the preview. Fine in design notes and code; the reader never sees it</td></tr>
-  <tr><td>pick, as a noun</td><td>target, or the kind noun</td><td>“Your pick” is jargon. The verb is fine on a button: “Pick again”</td></tr>
+  <tr><td>pick, as a noun</td><td>target, or the kind noun</td><td>“Your pick” is jargon. The verb is fine in a sentence, but a button says “Select again”, as its banner does</td></tr>
   <tr><td>element, in Markdown</td><td>the kind noun – paragraph, list item …</td><td>Markdown has no elements. Correct only in the HTML preview, where it is the reader's own word</td></tr>
   <tr><td>page, in Markdown</td><td>preview, or file</td><td>A Markdown preview is a rendered file, not a page: “Show in preview”, not “Show on page”</td></tr>
 </tbody>
@@ -250,8 +250,6 @@ right now” (<code>:259</code>).</p>
 marker at the site and gets a row here, naming the file.</p>
 <h3 id="open-defects">Open defects this card names</h3>
 <ul class="ds-muted">
-  <li><strong>Two macOS shortcut notations.</strong> <code>commentCopy.ts</code> types "Cmd+Option+M" and
-  "Cmd+Enter" for macOS, while <code>formatShortcut</code> renders the glyph form (⌥⌘M) everywhere else.</li>
   <li><strong>Em dashes in the permission band.</strong> Shipped strings use an em dash where this card asks for an en
   dash (shown here as ⟨em dash⟩, because no page in this folder may carry the character): the confirm sentence “but Erfana cannot limit it to that ⟨em dash⟩ the host will also be able to run code…”
   (<code>PreviewBandConfirm.tsx:169</code>–<code>170</code>); the four approval failures “Not saved ⟨em dash⟩ list full”, “Not

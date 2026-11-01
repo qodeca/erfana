@@ -85,11 +85,11 @@ describe('CommentWindow – threads', () => {
 
   describe('R-013 focus and title', () => {
     // Changed expectation under 024-FR-006 A-02 (was the selector in the title: "Comment on button.cta").
-    it('024-AC-007 A-02 titles the window "Comment on this section", the selector on its context line, and focuses the title', async () => {
+    it('024-AC-007 A-02 titles the window "Comment on section", the selector on its context line, and focuses the title', async () => {
       setup()
       const title = screen.getByTestId('comment-window-title')
-      expect(title).toHaveTextContent('Comment on this section')
-      expect(screen.getByRole('dialog', { name: 'Comment on this section' })).toBeVisible()
+      expect(title).toHaveTextContent(/^Comment on section$/)
+      expect(screen.getByRole('dialog', { name: 'Comment on section' })).toBeVisible()
       expect(screen.getByText(/^index\.html, line \d+$/)).toBeVisible()
       await waitFor(() => expect(title).toHaveFocus())
     })
@@ -99,7 +99,7 @@ describe('CommentWindow – threads', () => {
         request: threadsRequest({ threadKeys: ['t1', 't2'] }),
         list: ready([fileView({ threads: [thread(1), thread(2)] })])
       })
-      expect(screen.getByTestId('comment-window-title')).toHaveTextContent('Comments on this section')
+      expect(screen.getByTestId('comment-window-title')).toHaveTextContent(/^Comments on section$/)
     })
 
     it('shows a reading state while the list is loading', () => {
@@ -642,7 +642,7 @@ describe('CommentWindow – threads', () => {
           })
         ])
       })
-      expect(screen.getByTestId('comment-window-title')).toHaveTextContent('Comment on this section')
+      expect(screen.getByTestId('comment-window-title')).toHaveTextContent(/^Comment on section$/)
       expect(screen.getByText('child.html, line 11')).toBeVisible()
       expect(screen.getByText('Saved in child.html.')).toBeVisible()
     })

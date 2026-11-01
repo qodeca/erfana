@@ -42,7 +42,7 @@ Create each state, then check its drawer tag, icon, window banner, main button a
 | # | State | How to create it | HTML | Markdown |
 |---|---|---|---|---|
 | 3.1 | Open (S-01) | Add a comment | ☐ | ☐ |
-| 3.2 | Hidden on the page (S-02) | HTML: a hidden slide or tab; Markdown: a collapsed section | ☐ | ☐ |
+| 3.2 | Hidden right now (S-02) | HTML: a hidden slide or tab; Markdown: a collapsed section | ☐ | ☐ |
 | 3.3 | Changed (S-03) – notched icon, Was/Now, Resolve focused | Edit the commented text in the source | ☐ | ☐ |
 | 3.4 | Words changed (S-04) | Comment on selected words, then rewrite those words | ☐ | ☐ |
 | 3.5 | Not found (S-05) – info banner, Resolve focused; Markdown ghost icon | Delete the commented paragraph in the source | ☐ | ☐ |
@@ -64,7 +64,7 @@ Create each state, then check its drawer tag, icon, window banner, main button a
 | 4.4 | Stepper ‹ n of m ›, ⌥F9 / Alt+F9, "Resolve and next", "Reply and resolve" | ☐ | ☐ |
 | 4.5 | Esc order: menu, then window, then comment mode | ☐ | ☐ |
 | 4.6 | A draft survives closing the window ("Draft restored"); Markdown also across a view switch | ☐ | ☐ |
-| 4.7 | Moved target: HTML offers Pick again; Markdown saves to the moved block or offers Pick again (D-23) | ☐ | ☐ |
+| 4.7 | Moved target: HTML offers Select again; Markdown saves to the moved block or offers Select again (D-23) | ☐ | ☐ |
 
 ## 5. The file (Markdown placement)
 

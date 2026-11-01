@@ -613,7 +613,7 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     // Changed expectation under code review M-B (2026-10-30): the step counts the thread just resolved
     // as resolved, so one open comment is left – "1 of 1", not the stale "1 of 2".
     await expect(win.getByTestId('comment-window-polite')).toHaveText(/^Comment 1 of 1, on section, line \d+\.$/, { timeout: PREVIEW_BUDGET_MS })
-    await expect(win.getByRole('heading', { level: 2 })).toHaveText('Comment on this section') // A-02: the selector stays in the context line
+    await expect(win.getByRole('heading', { level: 2 })).toHaveText('Comment on section') // A-02: the plain kind word
     await expect.poll(async () => (await fsp.readFile(file, 'utf-8')).split('"status":"resolved"').length - 1, { timeout: PREVIEW_BUDGET_MS }).toBe(2)
     await page.getByTestId('comment-close').click()
     await expect(win).toHaveCount(0)
@@ -623,8 +623,8 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     await chrome.openDrawer()
     await chrome.filter('resolved').click()
     // C-10: a row is named by its first comment's words; its Open button still names the element.
-    // R-10: only the active row keeps its Open button, so find the row by its selector label.
-    const resolvedRow = chrome.drawerRows().filter({ hasText: 'button#cta.btn' })
+    // R-10: only the active row keeps its Open button, so find the row by its code, which shows on hover (D-03).
+    const resolvedRow = chrome.drawerRows().filter({ has: page.locator('[title$="button#cta.btn"]') })
     await expect(resolvedRow).toHaveCount(1, { timeout: PREVIEW_BUDGET_MS })
     await expect(chrome.filter('resolved')).toContainText('Resolved 2')
 
@@ -777,7 +777,7 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     expect(await pressInPage(app, 'Up', ['alt'], STATIC_TARGET)).toBe(true)
     await expect(chrome.announce()).toHaveText('Paragraph, line 24: “For one person. Every plan includes unlimited previews.”. Enter to comment, Shift+F10 for the menu.', { timeout: PREVIEW_BUDGET_MS })
     expect(await pressInPage(app, 'Down', ['alt'], STATIC_TARGET)).toBe(true)
-    await expect(chrome.announce()).toHaveText('Element, line 24: “unlimited”. Enter to comment, Shift+F10 for the menu.', { timeout: PREVIEW_BUDGET_MS })
+    await expect(chrome.announce()).toHaveText('Section, line 24: “unlimited”. Enter to comment, Shift+F10 for the menu.', { timeout: PREVIEW_BUDGET_MS })
     // Enter opens the window on the element the picker stopped at.
     expect(await pressInPage(app, 'Enter', [], STATIC_TARGET)).toBe(true)
     await expect(win).toHaveAttribute('data-view', 'new', { timeout: PREVIEW_BUDGET_MS })

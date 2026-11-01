@@ -24,7 +24,7 @@
  */
 import { useRef } from 'react'
 import type { AnchorSelection } from '../../../../../../shared/comments/anchorSel'
-import { HTML_WORDS, menuReasonText } from '../../../Comments/commentCopyWords'
+import { HTML_WORDS } from '../../../Comments/commentCopyWords'
 import { hostMenuItems, hostMenuLabel } from '../../../Comments/overlay/hostMenu'
 import type { ContextMenuItem } from '../../../ContextMenu/ContextMenu'
 import type { DraftScope } from './previewCommentRequests'
@@ -110,7 +110,7 @@ export function PreviewCommentsLayer(props: PreviewCommentsLayerProps): React.JS
         ? unavailableTooltip(unavailable)
         : canComment
           ? null
-          : menuReasonText(menu.reason, menu.displayPath)
+          : HTML_WORDS.reasonText(menu.reason ?? 'not-commentable', menu.displayPath)
   // The matrix gives labels, order and each item's action, and keeps each item, disabled with its reason line,
   // when it cannot be used. The ref is written only on click; ContextMenu never runs a disabled item.
   const items: ContextMenuItem[] =

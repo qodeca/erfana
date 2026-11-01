@@ -421,14 +421,14 @@ Markdown saves resolve only by line/tag/ordinal (md §7.3), so one added line ab
 
 **Design.**
 
-1. Carried draft. On TARGET_MOVED or DRAFT_EXPIRED, the window stays open with the text, and the footer becomes [Pick again] (primary) [Cancel]. 'Pick again' hides the window, turns comment mode on and stores the text in a per-panel carried-draft slot. The next new-comment window in that panel consumes it and shows 'Your text from the last comment is here.' Copy: 'This section changed after you selected it. Select it again. Your text is safe.' (Markdown: '{kind}').
+1. Carried draft. On TARGET_MOVED or DRAFT_EXPIRED, the window stays open with the text, and the footer becomes [Select again] (primary) [Cancel]. 'Select again' hides the window, turns comment mode on and stores the text in a per-panel carried-draft slot. The next new-comment window in that panel consumes it and shows 'Your text from the last comment is here.' Copy: 'This section changed after you selected it. Select it again. Your text is safe.' (Markdown: '{kind}').
 2. No silent expiry. While the window has focus or its text changes, send a rate-limited (1 per minute) keep-alive to main. At Save on an expired draft, main re-resolves the stored target and, if it is unique, mints silently. Only when that fails, show (1).
 3. Markdown re-attach. Send `{lineStart, tag, ordinal, quote, id?, path, sel?}`; main applies the §6.2 re-attach rules. One match: save and announce 'Comment saved to plan.md, line 16 (the block moved).' The open window re-resolves on every render and updates its context line live.
 4. Live refresh. Add `stamp` (hash of sorted block rawHashes per file) to the commentsChanged payload; the renderer re-reads on a stamp change while the drawer or a window is open. In an open window:
    - an info strip 'Updated just now';
    - a 'New since you opened' divider above new messages;
    - a thread resolved elsewhere folds to 'Resolved by Anna K. · just now'.
-5. Removed thread. The window stays open read-only: 'Someone removed this comment from {file}. Your reply is still here.' [Copy text] [New comment on this element]. Never close silently.
+5. Removed thread. The window stays open read-only: 'Someone removed this comment from {file}. Your reply is still here.' [Copy text] [New comment on element]. Never close silently.
 6. BLOCK_CHANGED in the thread view: 'This conversation changed. You see the new version above. Your reply is still here, so send it again.' Reply stays enabled.
 
 Cards: docs/designs/comments/html-comments/window.html (moved, expired, updated-from-file, removed states); docs/designs/comments/markdown-comments/states.html (moved block).
@@ -501,7 +501,7 @@ Underline:
 - Linked hover: hovering or focusing an underline puts its pin in the hover state; hovering a pin raises all its underlines to the active fill.
 - In a multi-thread window, each thread starts with its quote box.
 
-Pins: step = `--btn-height-sm` + `--space-1` (24px + gap), so hit areas never overlap. Beyond the cap, merge the rest of that row into a stack pin '+3', named '3 more commented elements here. Open.', which opens a threads view listing them in document order.
+Pins: step = `--btn-height-sm` + `--space-1` (24px + gap), so hit areas never overlap. Beyond the cap, merge the rest of that row into a stack pin '+3', named '3 more commented sections here. Open.', which opens a threads view listing them in document order.
 
 Cards: docs/designs/comments/html-comments/overlay.html (stack pin); docs/designs/comments/selection-comments/index.html (hover link state); docs/designs/comments/markdown-comments/states.html.
 
@@ -595,7 +595,7 @@ Cards: docs/design-system/system/components/button/index.html; docs/designs/comm
 
 **Design.**
 
-When the clicked target has open threads, open the threads view with reply fields, and make 'New comment' the first footer button. Right-click → 'Add comment' stays an explicit new thread. Markdown inherits the rule. While text carried by Pick again waits in comment mode, the click opens a new comment instead, so the text stays in view until it is kept (state table W-02).
+When the clicked target has open threads, open the threads view with reply fields, and make 'New comment' the first footer button. Right-click → 'Add comment' stays an explicit new thread. Markdown inherits the rule. While text carried by Select again waits in comment mode, the click opens a new comment instead, so the text stays in view until it is kept (state table W-02).
 
 **Owner decision (2026-11-01):** 'New comment' also shows in a thread window opened from a drawer row or a step key, and after a step inside the window, in both previews, whenever the shown thread's target can be found and the file takes a new comment. The HTML Preview had no draft there, because main sent one only with an icon or a pick, so main now builds it when the button is pressed (`preview:commentCommand` `new-on-thread`), from its own record of the load. The window for that comment opens on the thread's target and takes any carried text. It returns focus to the preview, not the drawer row (differences table D-40; WIN-15).
 
@@ -741,7 +741,7 @@ The five card designers found gaps and conflicts in §3. These resolutions are b
 | R-04 | C-03 new-comment title in Markdown | "New comment on {kind}" (for example "New comment on paragraph"); threads keep "Comment on {kind}" / "Comments on {kind}". HTML keeps "New comment". |
 | R-05 | C-07 Comment on specific words | Folded by default, also from the Comment button – the words quote already shows the selection. Expanding it shows the field with the current range selected. |
 | R-06 | C-13 stepper | **Confirmed by the owner (2026-10-28).** Hidden once nothing is left to step to ("All open comments are resolved"). "Resolve and next" and "Close" sit in the window footer, one row, primary last (Close, then Resolve and next); "Open in file" and "New comment" move into the head's "More actions" (…) menu while the stepper is shown. |
-| R-07 | C-14 button order | Primary last, as everywhere in the window: [Cancel] [Pick again]. Markdown save announcement: "Comment saved to plan.md, line 16 (the list item moved)." – never "block". |
+| R-07 | C-14 button order | Primary last, as everywhere in the window: [Cancel] [Select again]. Markdown save announcement: "Comment saved to plan.md, line 16 (the list item moved)." – never "block". |
 | R-08 | §4.1 status-only rebuild | "Mark resolved" and "Keep open" are both secondary; focus starts on Cancel. |
 | R-09 | C-15 Can't edit count vs ▲ badge | The filter cell shows a plain count ("Can't edit 2"); the ▲ badge marks damaged rows and the toolbar count, where it counts damaged comments only. Empty Can't edit: "No comments have problems." |
 | R-10 | C-13 Enter on a drawer row | Enter opens the thread, like a click; arrow keys only reveal. Only the active row keeps its Open button (the second Tab stop); other rows lose it. |

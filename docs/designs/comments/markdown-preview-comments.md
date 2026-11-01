@@ -251,7 +251,7 @@ Same component, same sizes, placement order (right of the block → left → bel
 - Context line: `{Kind} · {file}, line {n}` – `Paragraph · plan.md, line 12`. Titles use the kind noun too: "Comment on paragraph".
 - With a selection, a quote box under the context line: the selected phrase, in the serif preview font, with a left accent rule. Longer than 200 characters: cut with "…" and the note "Erfana keeps only the first 200 characters of your selection."
 - Table rows and cells: second line "Saved before the table on line {n}." (the HTML "Added by a script – saved before …" slot).
-- Hint: "Saved inside plan.md."
+- Hint: "Saves into plan.md."
 - Save refused by the render check: error under the field, text kept (§5.3 wording).
 - Banners in the window are the [Feedback](../../design-system/system/components/feedback/index.html) card's boxed `.erf-banner` (warning, info), each starting with a visually hidden severity word ("Warning: ", "Note: "), actions as `erf-button--secondary erf-button--sm`. The shipped `CommentBanner` (`CommentParts.tsx:89-110`) has no spoken severity word yet – the Feedback card's open defect, an app follow-up.
 

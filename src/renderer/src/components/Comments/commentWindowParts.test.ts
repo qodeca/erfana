@@ -164,7 +164,7 @@ describe('C-03 (window) heading text in Markdown titles', () => {
   it('C-05 the context line of a lost target says not found', () => {
     const file = fileView({ displayPath: 'notes.md', threads: [thread(1, { tag: 'p', attached: false })] })
     const selection = { file, threads: file.threads, damaged: [], newer: [] }
-    expect(headingOf(threadsRequest(), selection, MARKDOWN_WORDS).context).toBe('paragraph, not found · notes.md')
+    expect(headingOf(threadsRequest(), selection, MARKDOWN_WORDS).context).toBe('Paragraph, not found · notes.md')
   })
 })
 

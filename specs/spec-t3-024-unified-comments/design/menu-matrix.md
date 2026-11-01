@@ -6,7 +6,7 @@ Requirement: 024-FR-027 (a), with 024-FR-004, 024-FR-006, 024-FR-019 (OD-01) and
 
 *Owner decision (2026-10-31):* every comment message was rewritten for readers who are not developers, in one approved table. The HTML word "element" became "section", "thread" became "conversation", and the window no longer shows a tag or selector. The strings below are the new ones; a row dated earlier that still shows old wording is history.
 
-*Owner decision (2026-11-01):* the item uses the plain kind word, with no "this": "Comment on section" in the HTML Preview (M-01, M-05), as "Comment on {kind}" does in the Markdown Preview ("Comment on paragraph", M-11, M-15). "Add comment" stays in comment mode for now (I-24, revisited in plan step 12). Rewritten from the review: the "cannot hold a comment" reason in § 3 now matches the shipped text (I-30). Other sentences in § 3 that differ from the shipped text are settled in plan step 12 (P-F12, P-F14, P-F32; differences table D-66). The keyboard menu of § 4 for HTML with comment mode off works since plan step 7 (D-50): the page handles the key itself, and main accepts it within about 1 second of a real key press it recorded, a change to security gate L-1 the owner decided on 2026-11-01.
+*Owner decision (2026-11-01):* the item uses the plain kind word, with no "this": "Comment on section" in the HTML Preview (M-01, M-05), as "Comment on {kind}" does in the Markdown Preview ("Comment on paragraph", M-11, M-15). "Add comment" stays in comment mode (I-24: the matrix asks for both labels). Rewritten from the review: the "cannot hold a comment" reason in § 3 now matches the shipped text (I-30). § 3 is now the one reason table the code holds, `reasonSentence` in `commentCopyWords.ts`, so the banner, the menu and the toggle say one sentence per reason (plan step 12; P-F12, P-F32; the read-only row kept the matrix's words, the too-large row the shipped words that name the limit). The keyboard menu of § 4 for HTML with comment mode off works since plan step 7 (D-50): the page handles the key itself, and main accepts it within about 1 second of a real key press it recorded, a change to security gate L-1 the owner decided on 2026-11-01.
 
 ## How to read it
 
@@ -59,7 +59,8 @@ Comment mode is unavailable while no new comment can be written: the toggle is `
 | Unresolved git conflict in the file | {file} has two versions mixed together. Fix this first, or ask a developer to help. | both |
 | A comment with no end (unterminated) | One comment in {file} is broken, so Erfana can't add new ones. Fix or delete the broken comment first. | both |
 | 500 comments in the file | {file} has 500 comments, which is the limit. Delete resolved comments to add more. | both |
-| File too large | Erfana adds comments only to files of up to {limit}. | both; HTML adds "and 640,000 elements", Markdown names its line and nesting limits (024-NFR-008) |
+| File too large | {file} is too big for comments. The limit is 25 MB. | HTML |
+| File too large | {file} is too big or too complex for comments. The size limit is 2 MB. | Markdown: "too complex" stands for its line and nesting limits (024-NFR-008) |
 | Not UTF-8 | Erfana can't add comments to this file because of its text format. Save the file as UTF-8, then try again. | both |
 | A link | {file} is only a link to another file. Open the real file to comment. | both |
 | Read-only on disk | {file} is read-only. | both |
@@ -67,7 +68,8 @@ Comment mode is unavailable while no new comment can be written: the toggle is `
 | Paused – unsaved edits | {file} has unsaved changes. Save the file to change comments. | Markdown |
 | Paused – changed on disk too | {file} changed outside Erfana. Go to the editor and choose which version to keep. | Markdown |
 | Frontmatter | You can't comment on the settings at the top of this file. | Markdown |
-| Element cannot hold a comment | You can't add a comment here. Try a nearby section. | HTML |
+| Element cannot hold a comment, or a right-click on no target | You can't add a comment here. Try a nearby section. | HTML |
+| A right-click on no target (a gap, the margin) | You can't add a comment here. Try a nearby paragraph. | Markdown |
 | Inline frame (`srcdoc`) | Comments can't be added inside an inline frame. | HTML |
 | Frame from another site | Comments can't be added inside a frame from another site. | HTML |
 | Page still loading | Comments are available once the page has loaded. | HTML |

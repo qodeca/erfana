@@ -165,6 +165,7 @@ export class OverlayView {
   private readonly label: HTMLDivElement
   private readonly labelTag: HTMLSpanElement
   private readonly labelRest: HTMLSpanElement
+  private readonly labelCode: HTMLSpanElement
   private readonly labelSize: HTMLSpanElement
   private readonly pinLayer: HTMLDivElement
   private readonly markLayer: HTMLDivElement
@@ -189,9 +190,11 @@ export class OverlayView {
     this.labelTag = doc.createElement('span')
     this.labelTag.className = 'erf-hpc-label__tag'
     this.labelRest = doc.createElement('span')
+    this.labelCode = doc.createElement('span')
+    this.labelCode.className = 'erf-hpc-label__code'
     this.labelSize = doc.createElement('span')
     this.labelSize.className = 'erf-hpc-label__size'
-    this.label.append(this.labelTag, this.labelRest, this.labelSize)
+    this.label.append(this.labelTag, this.labelRest, this.labelCode, this.labelSize)
     this.pinLayer = part(doc, 'erf-hpc-pins')
     this.pinLayer.setAttribute('aria-hidden', 'true')
     this.markLayer = part(doc, 'erf-hpc-marks')
@@ -250,9 +253,12 @@ export class OverlayView {
     this.outline.classList.toggle('erf-hpc-outline--selected', outline.selected)
     showText(this.labelTag, outline.label.tag)
     showText(this.labelRest, outline.label.rest)
+    showText(this.labelCode, outline.label.code)
     showText(this.labelSize, outline.label.size)
-    // C-21 / D-05: the pixel size only while Alt is held.
-    shown(this.labelSize, isAltHeld(this.doc))
+    // C-21 / D-03 / D-05: the code and the pixel size only while Alt is held.
+    const details = isAltHeld(this.doc)
+    shown(this.labelCode, details)
+    shown(this.labelSize, details)
     this.placeLabel(outline.box, viewport)
   }
 

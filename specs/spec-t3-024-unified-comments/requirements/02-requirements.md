@@ -418,7 +418,7 @@ The pins come in two classes. **Invariants** are never updated: writer bytes, go
 
 **Category:** Accessibility
 
-**Description:** Every comment action in both previews works with the keyboard alone: picking a target, narrowing to words, writing, saving, replying, editing, deleting, reopening, resolving, stepping through, Rebuild from data, Pick again, the drawer filter and sort, the icons checkbox, opening a thread from an icon or an underline, Save {file} in the paused band, and the HTML outside-mode menu through Shift+F10. Focused items are never fully hidden by comment UI (WCAG 2.4.11), and the stepping keys work on all three systems. Screen-reader checks are out of scope (#440).
+**Description:** Every comment action in both previews works with the keyboard alone: picking a target, narrowing to words, writing, saving, replying, editing, deleting, reopening, resolving, stepping through, Rebuild from data, Select again, the drawer filter and sort, the icons checkbox, opening a thread from an icon or an underline, Save {file} in the paused band, and the HTML outside-mode menu through Shift+F10. Focused items are never fully hidden by comment UI (WCAG 2.4.11), and the stepping keys work on all three systems. Screen-reader checks are out of scope (#440).
 
 **Metric:** 100 % of the listed actions completed with no mouse event.
 

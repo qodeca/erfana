@@ -21,7 +21,7 @@ describe('removedOutside', () => {
   it('OD-06 names the open threads a new list no longer holds, never a resolved or still-listed one, never Erfana\'s own', () => {
     const before = openThreadsOf([fileView({ threads: [thread(1), thread(2), thread(3), thread(4, { status: 'resolved' })] })], HTML_WORDS)
     expect([...before.keys()]).toEqual(['t1', 't2', 't3'])
-    expect(before.get('t1')).toEqual({ threadKey: 't1', text: 'Message 1', author: 'Ada Lovelace', label: 'button.cta' })
+    expect(before.get('t1')).toEqual({ threadKey: 't1', text: 'Message 1', author: 'Ada Lovelace', label: 'Section · line 11' })
     // t2 is now resolved – still listed, so not removed; t3 Erfana deleted itself.
     const gone = removedOutside(before, new Set(['t2', 't4']), new Set(['t3']))
     expect(gone.map(r => r.threadKey)).toEqual(['t1'])
