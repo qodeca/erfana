@@ -58,7 +58,7 @@ lock_before="$(hash_text < "$ROOT/package-lock.json")"
 # --init reaps the zombie processes Electron leaves; /dev/shm is enlarged for Chromium.
 docker run --rm \
   --init \
-  --shm-size=1g \
+  --shm-size="${ERFANA_E2E_LINUX_SHM:-1g}" \
   --user "$(id -u):$(id -g)" \
   -e HOME="$CONTAINER_HOME" \
   -e ERFANA_E2E_LINUX_CONTAINER=1 \
