@@ -293,7 +293,7 @@ keyboard. The ratio under each frame is the ring against what it actually touche
 <div class="ds-note" id="two-tone">
   <strong>The two-tone ring is for a page Erfana does not own.</strong> The HTML Preview's comment overlay draws
   its ring inside a third-party page, from literal colours, with an ink line or halo beside the accent (the
-  overlay row below). That is the only place it is allowed. <strong>When the reader picks a block to comment on in
+  overlay row below), and the built-in browser's element picker draws the same ring inside the pages it shows (the picker row below; owner decision OD-2, 2026-11-01). Those are the only places it is allowed. <strong>When the reader picks a block to comment on in
   the Markdown Preview</strong> (comment mode), the picked block shows the one standard ring of this card –
   <code>var(--color-border-focus)</code> at <code>--border-width-thick</code> – because Erfana renders that DOM
   itself and its tokens apply. No Exceptions row allows the two-tone ring there. Owner decision, 2026-10-28.
@@ -349,6 +349,14 @@ keyboard. The ratio under each frame is the ring against what it actually touche
         the page's own properties. HTML Preview only – the Markdown Preview takes the standard ring
         (<a href="#two-tone">rule above</a>). See <code>overlayStyles.ts</code> and the
         <a href="../../../designs/comments/html-comments/overlay.html">Comment overlay</a> card.</td>
+    </tr>
+    <tr>
+      <td>Built-in browser element picker (outline inside the page, spec 025 – planned)</td>
+      <td>The ring is <code>var(--color-border-focus)</code> at <code>--border-width-thick</code>.</td>
+      <td>The two-tone outline – a 2px accent ring with a 1px ink line on both sides – drawn by the engine over a page Erfana
+        does not own, for the same reason as the comment overlay: tokens do not reach that page, and one colour vanishes on a
+        page in the accent colour. Owner decision OD-2 (2026-11-01). See the <a href="../patterns/picker/index.html">Element
+        picker</a> card and <a href="../../../designs/browser/picking.html">Picking</a>. No <code>src/</code> site yet.</td>
     </tr>
     <tr>
       <td>Comment pins</td>

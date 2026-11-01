@@ -1,0 +1,1372 @@
+{
+  "spec_id": 25,
+  "slug": "built-in-browser",
+  "tier": "T4",
+  "version": "0.12.0",
+  "created": "2026-10-31T22:42:00.358Z",
+  "updated": "2026-11-01T18:24:20.000Z",
+  "application": {
+    "name": "Built-in browser with element prompts",
+    "domain": null,
+    "tech_stack": [
+      "Electron",
+      "React",
+      "TypeScript",
+      "Playwright"
+    ]
+  },
+  "scope": {
+    "type": "feature",
+    "name": "Built-in browser with element prompts"
+  },
+  "components": {
+    "requirements": true,
+    "architecture": false,
+    "solution": false,
+    "design": true,
+    "ux": false
+  },
+  "sections": [
+    {
+      "id": "01",
+      "file": "requirements/01-overview.md",
+      "title": "Overview",
+      "exists": true,
+      "word_count": 1172,
+      "last_updated": "2026-11-01T18:24:20.000Z",
+      "validation_score": null
+    },
+    {
+      "id": "02",
+      "file": "requirements/02-requirements.md",
+      "title": "Requirements",
+      "exists": true,
+      "word_count": 16841,
+      "last_updated": "2026-11-01T18:24:20.000Z",
+      "validation_score": null
+    },
+    {
+      "id": "03",
+      "file": "requirements/03-use-cases.md",
+      "title": "Use cases",
+      "exists": true,
+      "word_count": 1923,
+      "last_updated": "2026-11-01T18:24:20.000Z",
+      "validation_score": null
+    },
+    {
+      "id": "04",
+      "file": "requirements/04-acceptance.md",
+      "title": "Acceptance criteria",
+      "exists": true,
+      "word_count": 14689,
+      "last_updated": "2026-11-01T18:24:20.000Z",
+      "validation_score": null
+    },
+    {
+      "id": "05",
+      "file": "requirements/05-notes.md",
+      "title": "Notes",
+      "exists": true,
+      "word_count": 2213,
+      "last_updated": "2026-11-01T18:24:20.000Z",
+      "validation_score": null
+    }
+  ],
+  "requirements_index": {
+    "025-FR-001": {
+      "section": "02",
+      "line": 77,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-002": {
+      "section": "02",
+      "line": 83,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-003": {
+      "section": "02",
+      "line": 102,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-004": {
+      "section": "02",
+      "line": 108,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-005": {
+      "section": "02",
+      "line": 114,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-006": {
+      "section": "02",
+      "line": 127,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-007": {
+      "section": "02",
+      "line": 133,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-008": {
+      "section": "02",
+      "line": 139,
+      "status": "active",
+      "priority": "Should",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-009": {
+      "section": "02",
+      "line": 145,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-010": {
+      "section": "02",
+      "line": 151,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-011": {
+      "section": "02",
+      "line": 157,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-012": {
+      "section": "02",
+      "line": 167,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-013": {
+      "section": "02",
+      "line": 173,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-014": {
+      "section": "02",
+      "line": 211,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-015": {
+      "section": "02",
+      "line": 261,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-016": {
+      "section": "02",
+      "line": 278,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-017": {
+      "section": "02",
+      "line": 284,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-018": {
+      "section": "02",
+      "line": 292,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-019": {
+      "section": "02",
+      "line": 298,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-020": {
+      "section": "02",
+      "line": 312,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-021": {
+      "section": "02",
+      "line": 318,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-022": {
+      "section": "02",
+      "line": 324,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-023": {
+      "section": "02",
+      "line": 330,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-024": {
+      "section": "02",
+      "line": 336,
+      "status": "active",
+      "priority": "Could",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-025": {
+      "section": "02",
+      "line": 344,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-026": {
+      "section": "02",
+      "line": 350,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-027": {
+      "section": "02",
+      "line": 356,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-028": {
+      "section": "02",
+      "line": 364,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-029": {
+      "section": "02",
+      "line": 372,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-030": {
+      "section": "02",
+      "line": 378,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-031": {
+      "section": "02",
+      "line": 384,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-032": {
+      "section": "02",
+      "line": 390,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-033": {
+      "section": "02",
+      "line": 402,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-034": {
+      "section": "02",
+      "line": 420,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-035": {
+      "section": "02",
+      "line": 426,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-036": {
+      "section": "02",
+      "line": 432,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-037": {
+      "section": "02",
+      "line": 447,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-038": {
+      "section": "02",
+      "line": 458,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-039": {
+      "section": "02",
+      "line": 464,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-040": {
+      "section": "02",
+      "line": 533,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-041": {
+      "section": "02",
+      "line": 539,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-042": {
+      "section": "02",
+      "line": 545,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-043": {
+      "section": "02",
+      "line": 559,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-044": {
+      "section": "02",
+      "line": 565,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-045": {
+      "section": "02",
+      "line": 575,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-046": {
+      "section": "02",
+      "line": 472,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:48:48.067Z"
+    },
+    "025-FR-047": {
+      "section": "02",
+      "line": 223,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-FR-048": {
+      "section": "02",
+      "line": 229,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-FR-049": {
+      "section": "02",
+      "line": 235,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-FR-050": {
+      "section": "02",
+      "line": 241,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-FR-051": {
+      "section": "02",
+      "line": 247,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-FR-052": {
+      "section": "02",
+      "line": 253,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-FR-053": {
+      "section": "02",
+      "line": 480,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-FR-054": {
+      "section": "02",
+      "line": 495,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-FR-056": {
+      "section": "02",
+      "line": 181,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-FR-057": {
+      "section": "02",
+      "line": 187,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-FR-058": {
+      "section": "02",
+      "line": 193,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-FR-059": {
+      "section": "02",
+      "line": 199,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-FR-060": {
+      "section": "02",
+      "line": 501,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-FR-061": {
+      "section": "02",
+      "line": 507,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-FR-063": {
+      "section": "02",
+      "line": 205,
+      "status": "active",
+      "priority": "Should",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-FR-064": {
+      "section": "02",
+      "line": 553,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-FR-065": {
+      "section": "02",
+      "line": 513,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-NFR-001": {
+      "section": "02",
+      "line": 599,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-NFR-002": {
+      "section": "02",
+      "line": 617,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-NFR-003": {
+      "section": "02",
+      "line": 629,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-NFR-004": {
+      "section": "02",
+      "line": 641,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-NFR-005": {
+      "section": "02",
+      "line": 653,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-NFR-006": {
+      "section": "02",
+      "line": 665,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-NFR-007": {
+      "section": "02",
+      "line": 677,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-NFR-008": {
+      "section": "02",
+      "line": 689,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-NFR-009": {
+      "section": "02",
+      "line": 701,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-NFR-010": {
+      "section": "02",
+      "line": 713,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-NFR-011": {
+      "section": "02",
+      "line": 725,
+      "status": "active",
+      "created": "2026-11-01T19:30:00.000Z"
+    },
+    "025-UC-001": {
+      "section": "03",
+      "line": 20,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-UC-002": {
+      "section": "03",
+      "line": 65,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-UC-003": {
+      "section": "03",
+      "line": 97,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-UC-004": {
+      "section": "03",
+      "line": 132,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-UC-005": {
+      "section": "03",
+      "line": 167,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-UC-006": {
+      "section": "03",
+      "line": 197,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-001": {
+      "section": "04",
+      "line": 115,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-002": {
+      "section": "04",
+      "line": 120,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-003": {
+      "section": "04",
+      "line": 125,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-004": {
+      "section": "04",
+      "line": 130,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-005": {
+      "section": "04",
+      "line": 135,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-006": {
+      "section": "04",
+      "line": 140,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-007": {
+      "section": "04",
+      "line": 145,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-008": {
+      "section": "04",
+      "line": 150,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-009": {
+      "section": "04",
+      "line": 155,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-010": {
+      "section": "04",
+      "line": 160,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-011": {
+      "section": "04",
+      "line": 165,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-012": {
+      "section": "04",
+      "line": 170,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-013": {
+      "section": "04",
+      "line": 175,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-014": {
+      "section": "04",
+      "line": 180,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-015": {
+      "section": "04",
+      "line": 219,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-016": {
+      "section": "04",
+      "line": 224,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-017": {
+      "section": "04",
+      "line": 229,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-018": {
+      "section": "04",
+      "line": 234,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-019": {
+      "section": "04",
+      "line": 239,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-020": {
+      "section": "04",
+      "line": 244,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-021": {
+      "section": "04",
+      "line": 249,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-022": {
+      "section": "04",
+      "line": 254,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-023": {
+      "section": "04",
+      "line": 259,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-024": {
+      "section": "04",
+      "line": 264,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-025": {
+      "section": "04",
+      "line": 271,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-026": {
+      "section": "04",
+      "line": 276,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-027": {
+      "section": "04",
+      "line": 281,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-028": {
+      "section": "04",
+      "line": 286,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-029": {
+      "section": "04",
+      "line": 291,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-030": {
+      "section": "04",
+      "line": 296,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-031": {
+      "section": "04",
+      "line": 301,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-032": {
+      "section": "04",
+      "line": 306,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-033": {
+      "section": "04",
+      "line": 311,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-034": {
+      "section": "04",
+      "line": 316,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-035": {
+      "section": "04",
+      "line": 321,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-036": {
+      "section": "04",
+      "line": 326,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-037": {
+      "section": "04",
+      "line": 331,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-038": {
+      "section": "04",
+      "line": 336,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-039": {
+      "section": "04",
+      "line": 341,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-040": {
+      "section": "04",
+      "line": 348,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-041": {
+      "section": "04",
+      "line": 353,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-042": {
+      "section": "04",
+      "line": 358,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-043": {
+      "section": "04",
+      "line": 363,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-044": {
+      "section": "04",
+      "line": 368,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-045": {
+      "section": "04",
+      "line": 387,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-046": {
+      "section": "04",
+      "line": 394,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-047": {
+      "section": "04",
+      "line": 399,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-048": {
+      "section": "04",
+      "line": 404,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-049": {
+      "section": "04",
+      "line": 409,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-050": {
+      "section": "04",
+      "line": 414,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-051": {
+      "section": "04",
+      "line": 419,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-052": {
+      "section": "04",
+      "line": 424,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-053": {
+      "section": "04",
+      "line": 429,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-054": {
+      "section": "04",
+      "line": 436,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-055": {
+      "section": "04",
+      "line": 452,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-056": {
+      "section": "04",
+      "line": 462,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-057": {
+      "section": "04",
+      "line": 475,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-058": {
+      "section": "04",
+      "line": 485,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-059": {
+      "section": "04",
+      "line": 494,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-AC-060": {
+      "section": "04",
+      "line": 382,
+      "status": "active",
+      "created": "2026-10-31T22:48:48.067Z"
+    },
+    "025-AC-061": {
+      "section": "04",
+      "line": 187,
+      "status": "active",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-AC-062": {
+      "section": "04",
+      "line": 192,
+      "status": "active",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-AC-063": {
+      "section": "04",
+      "line": 197,
+      "status": "active",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-AC-064": {
+      "section": "04",
+      "line": 202,
+      "status": "active",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-AC-065": {
+      "section": "04",
+      "line": 207,
+      "status": "active",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-AC-066": {
+      "section": "04",
+      "line": 212,
+      "status": "active",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-AC-067": {
+      "section": "04",
+      "line": 375,
+      "status": "active",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-AC-068": {
+      "section": "04",
+      "line": 504,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-069": {
+      "section": "04",
+      "line": 509,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-070": {
+      "section": "04",
+      "line": 514,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-071": {
+      "section": "04",
+      "line": 519,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-072": {
+      "section": "04",
+      "line": 524,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-073": {
+      "section": "04",
+      "line": 529,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-074": {
+      "section": "04",
+      "line": 534,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-075": {
+      "section": "04",
+      "line": 539,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-076": {
+      "section": "04",
+      "line": 544,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-077": {
+      "section": "04",
+      "line": 549,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-078": {
+      "section": "04",
+      "line": 554,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-079": {
+      "section": "04",
+      "line": 559,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-080": {
+      "section": "04",
+      "line": 564,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-081": {
+      "section": "04",
+      "line": 569,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-082": {
+      "section": "04",
+      "line": 574,
+      "status": "active",
+      "created": "2026-11-01T07:43:03.964Z"
+    },
+    "025-AC-083": {
+      "section": "04",
+      "line": 579,
+      "status": "active",
+      "created": "2026-11-01T19:30:00.000Z"
+    },
+    "025-CA-001": {
+      "section": "05",
+      "line": 14,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-CA-002": {
+      "section": "05",
+      "line": 26,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-CA-003": {
+      "section": "05",
+      "line": 38,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-CA-004": {
+      "section": "05",
+      "line": 50,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-CA-005": {
+      "section": "05",
+      "line": 62,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-CA-006": {
+      "section": "05",
+      "line": 92,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-CA-007": {
+      "section": "05",
+      "line": 93,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-CA-008": {
+      "section": "05",
+      "line": 94,
+      "status": "active",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-CA-009": {
+      "section": "05",
+      "line": 74,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    }
+  },
+  "requirement_sequences": {
+    "FR": 65,
+    "NFR": 11,
+    "UC": 6,
+    "AC": 83,
+    "CA": 9
+  },
+  "cross_references": [],
+  "id_migrations": [],
+  "statistics": {
+    "total_sections": 5,
+    "total_requirements": 74,
+    "total_use_cases": 6,
+    "total_stakeholders": 2,
+    "total_words": 36838,
+    "deprecated_count": 0,
+    "word_count_method": "whitespace-separated tokens per file (Python str.split()), markdown and table syntax included"
+  },
+  "validation": {
+    "overall_score": null,
+    "passed": null,
+    "last_validated": null,
+    "threshold": 80
+  },
+  "tags": [
+    "browser",
+    "webcontentsview",
+    "element-picker",
+    "prompt-templates",
+    "security"
+  ],
+  "related_specs": [
+    13,
+    24
+  ],
+  "change_history": [
+    {
+      "date": "2026-10-31T22:42:00.358Z",
+      "operation": "INIT",
+      "target": "manifest",
+      "description": "Spec created from the 2026-10-31 grill-me interview; owner approved tier T4 and the 45 FR / 8 NFR / 6 UC draft.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-10-31T22:48:48.067Z",
+      "operation": "UPDATE",
+      "target": "requirements",
+      "description": "Applied spec-validator findings (owner-approved): pick shortcut Ctrl/Cmd+E press-twice rule (FR-014/025/027/028/030, UC-001/004, AC-014/025/027/028/030/057); bare-domain rule FR-002; style list FR-033; Cookies and other site data FR-023; new FR-046 + AC-060 capture failure; reference machine NFR-004/005; low-severity wording, trace and checklist fixes; total_requirements counts FR+NFR.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-10-31T22:52:37.624Z",
+      "operation": "UPDATE",
+      "target": "requirements",
+      "description": "Applied second spec-validator round (owner-approved): pick point for key-confirmed picks (FR-033/034); explicit permission list, others denied silently (FR-019); error flows for UC-005 and UC-006 and failed-clear behaviour (FR-023); find bar and zoom steps (FR-008); Ctrl/Cmd+E ignored while menu open (FR-014); Linux notice rule (FR-018); closed-shadow-root selector (FR-033); FR-042 shall + technical-debt.md; NFR-007 Linux note; trace links; out-of-order notes for FR-046 and AC-060.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-10-31T22:55:22.635Z",
+      "operation": "VALIDATE",
+      "target": "spec",
+      "description": "spec-validator third run: passes (0 high, 2 medium, 15 low; indicative score 87).",
+      "by": "spec-validator"
+    },
+    {
+      "date": "2026-10-31T23:04:55.967Z",
+      "operation": "UPDATE",
+      "target": "requirements",
+      "description": "Applied third spec-validator round (owner-approved): menu keyboard operation (FR-014/030); localhost and IP with path load as http (FR-002); state after successful and failed send (FR-032/046); console/network error counts (FR-038); label cut rule (FR-026); refinement and off-screen edge cases (FR-027/035); Block saved, clear-data defaults (FR-019/023); session separation probe (NFR-001/AC-046); NFR-006 per-platform wording; UC-001/003/004 flows and traces; fault-injection method; scope bullets; CA-006..008 line numbers.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-10-31T23:06:45.196Z",
+      "operation": "VALIDATE",
+      "target": "spec",
+      "description": "spec-validator fourth run on v0.4.0: passes (0 high, 2 medium, 8 low; indicative score 88).",
+      "by": "spec-validator"
+    },
+    {
+      "date": "2026-10-31T23:08:00.742Z",
+      "operation": "UPDATE",
+      "target": "requirements",
+      "description": "Applied fourth spec-validator round (owner-approved): other schemes refused not searched (FR-002); Linux no-keyring exception for saved credentials (FR-022/AC-022); download failure path (FR-020/AC-020); tab close/reorder, no limit, 20-tab test (FR-004/AC-004); popup work-area test (AC-011); AC-060 with Fix and frozen page; preset none under DevTools emulation (FR-033, UC-005, AC-058); session separation in FR-015 and NFR-001 traces; designs to-do in notes.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-10-31T23:10:02.322Z",
+      "operation": "VALIDATE",
+      "target": "spec",
+      "description": "spec-validator fifth run on v0.5.0: passes (0 high, 2 medium, 10 low; indicative score 88). Open mediums: FR-014 key routing in pick mode; FR-036 untrusted block scope.",
+      "by": "spec-validator"
+    },
+    {
+      "date": "2026-10-31T23:19:22.745Z",
+      "operation": "UPDATE",
+      "target": "025-FR-014, 025-FR-036",
+      "description": "Resolved the two open medium findings (owner request): FR-014 rewritten as four exclusive key-routing rules (browsing, pick mode, menu, dialog); FR-036 splits the context file into Erfana capture facts and one fenced untrusted block holding every page-derived field, with no page text in file names or the prompt. Follow-on: FR-027 Enter in menu, FR-032 prompt carries no page text, overview scope line, AC-014 and AC-036 extended.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-10-31T23:21:33.934Z",
+      "operation": "UPDATE",
+      "target": "025-FR-014, 025-FR-025, 025-FR-028, 025-FR-031",
+      "description": "Fixed contradictions found in the v0.6.0 review: FR-014 closing rule limited to rules 1-3 (no browser key acts on the tab while the dialog is open) plus toolbar-focus rule; Ctrl/Cmd+E exception while a menu or dialog is open stated in FR-025 and FR-028; FR-031 dialog cancel (Esc or Cancel). AC-014 and AC-031 extended. Index priorities refreshed.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-10-31T23:24:52.507Z",
+      "operation": "UPDATE",
+      "target": "025-FR-014, 025-FR-036",
+      "description": "Completed FR-014: defined page focus and toolbar focus, focus outside the tab, five exclusive rules (toolbar is rule 5), Ctrl/Cmd+F ignored while a menu is open. Completed FR-036: notes are fixed Erfana lines in capture facts, truncated HTML ends inside the block, as-is except fence-token escape (FR-033 follow-on). AC-014, AC-033, AC-036 extended.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-10-31T23:34:24.879Z",
+      "operation": "UPDATE",
+      "target": "025-FR-002, 025-FR-005, 025-FR-014, 025-FR-018, 025-FR-019, 025-FR-025, 025-FR-046",
+      "description": "Fixed v0.6.2 review: focus moves to the page after an address-bar load and when pick mode starts (resolves FR-014 rule 5 vs pick keys); Esc leaves pick mode only with no menu or dialog; failed Explain reopens the menu so the freeze cannot stick; FR-018 session wording; owner-approved Chrome-way rules for about:/blob:/data: (FR-005) and silently allowed fullscreen, pointer lock, clipboard write, persistent storage (FR-019). UC-004, AC-005, AC-019, AC-025, AC-060 updated.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-10-31T23:37:29.828Z",
+      "operation": "VALIDATE",
+      "target": "spec",
+      "description": "spec-validator run on v0.7.0: passes (0 high, 2 medium, 11 low; indicative score 86). FR-014 and FR-036 findings resolved. Open mediums: capture moment for click/Enter picks (FR-033/034); FR-014 bundles several rules under one ID.",
+      "by": "spec-validator"
+    },
+    {
+      "date": "2026-10-31T23:40:08.648Z",
+      "operation": "ADD",
+      "target": "025-FR-047..053, 025-AC-061..067",
+      "description": "Resolved the two v0.7.0 medium findings (owner request): FR-014 split into key list and focus terms (FR-014) plus one ID per routing state (FR-047 browsing, FR-048 pick, FR-049 menu, FR-050 dialog, FR-051 toolbar) and the leave-by-key rule (FR-052), with AC-014 split into AC-014 and AC-061..066; new FR-053 capture taken at pick confirmation, kept in memory, discarded with a notice if the page changes, with AC-067 and UC-001 A5. Ctrl/Cmd+L or a toolbar click closes the menu (FR-049). Follow-on: FR-025, FR-033, FR-038, naming table, preamble.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-10-31T23:42:37.290Z",
+      "operation": "UPDATE",
+      "target": "025-NFR-005, 025-FR-052, 025-FR-053",
+      "description": "Follow-ons to v0.8.0 found by the validator: NFR-005 and AC-050 measure two intervals (pick confirmation to menu, Explain to prompt), each within the approved 2 s; page-changed notice only for page-driven navigation, silent for browser keys and tab close (FR-052, FR-053, AC-066); out-of-order comments corrected in 04-acceptance.md.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-10-31T23:46:53.551Z",
+      "operation": "UPDATE",
+      "target": "025-FR-008, 025-FR-025, 025-FR-026, 025-FR-049, 025-FR-050, 025-FR-051, 025-FR-052",
+      "description": "Closed pick-mode state gaps from the v0.8.1 review: no highlight until the mouse is over the page (keys do nothing until then); Esc with toolbar focus acts on the control and never leaves pick mode; find bar close and zero-match display; page click outside the menu closes it without picking; dialog is modal; hiding the tab (editor-tab switch, or Ctrl/Cmd+T where allowed) closes menu/dialog, discards the capture and ends pick mode. AC-008/025/063/064/065/066 extended.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-10-31T23:50:15.245Z",
+      "operation": "VALIDATE",
+      "target": "spec",
+      "description": "spec-validator run on v0.8.2: passes (0 high, 2 medium, 13 low; indicative score 86). Capture-moment and FR-014 bundling findings resolved. Open mediums: FR-050 modal wording vs FR-052 editor-tab switch; FR-053/FR-052 bundle several rules per ID.",
+      "by": "spec-validator"
+    },
+    {
+      "date": "2026-11-01T07:43:03.964Z",
+      "operation": "UPDATE",
+      "target": "spec",
+      "description": "Expert-panel revision (PR #446 panel, 2026-11-01), applied with owner approval: 72 merged findings applied, 15 declined; owner decisions D1–D15 recorded (send as is, build directly, profile and trust decisions in the project, full URLs in logs, no notice, no privacy gate, no switch, 14-day patches, submit only, one element per prompt, all terminal links, four actions Explain/Ask/Change/Prompt, 3 × 20 precision runs, no follow-up pick, keyboard-only picking out of scope). New FR-054, FR-056–FR-061, FR-063–FR-065 (FR-055 and FR-062 unused), NFR-009, NFR-010, AC-068–AC-082, CA-009. Backups *.bak-20261101-083151. Then fixed the spec-validator findings on the applied text (FR-002 rule order, FR-005 same-folder reads, NFR-010 criterion AC-082, reserved keys in FR-048/049/051, search URLs never logged, use-case traces, the dogfood row, and 11 of 13 lows; the registry count and the spoofing review stay open).",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-11-01T07:57:40.505Z",
+      "operation": "VALIDATE",
+      "target": "spec",
+      "description": "spec-validator run on v0.9.0 (fourth run after the apply fixes): passes (0 high, 2 medium, 13 low). The 2 mediums were then fixed (FR-046 send-failure example; popup key table in FR-014 with an AC-011 step), plus AC-055 A3. Open lows include the stale registry count (61 vs 73, registry outside the approved files) and the spoofing review to-do.",
+      "by": "spec-validator"
+    },
+    {
+      "date": "2026-11-01T15:08:58.000Z",
+      "operation": "UPDATE",
+      "target": "spec",
+      "description": "Design follow-ups from docs/designs/browser/README.md § Spec follow-ups, owner-approved (2026-11-01): SPEC-1, SPEC-2, SPEC-3, SPEC-5, SPEC-6, SPEC-7, A-12, A-14, A-28, A-30, OD-6, OD-7, OD-9, OD-11, OD-13, OD-14, with the owner's answers to the change-list questions (Alt aliases in FR-027/048/049; toolbar Esc limited to navigation- and pick-row buttons; popup minimum width and title; all deck banner variants in FR-065). Touched FR-011, 012, 014, 019, 022, 027, 030, 032, 034, 047–051, 053, 061, 065, the naming contracts, AC-011, 012, 019, 022, 030, 034, 054, 058, 061–065, 067, 077, 081, UC-001, UC-005; one full-stop note per file. No new IDs.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-11-01T18:24:20.000Z",
+      "operation": "UPDATE",
+      "target": "spec",
+      "description": "Design alignment pass (v0.11.0), owner-approved plan .local/panel/spec-025-alignment-improved.md and findings .local/panel/align-025/merged.md: H1, H2, H5, M1–M8, M10–M18, M21, M22, L1, L2, L4, L7, L10–L19, L21, L22, L24 applied to FR-002, 004, 011, 014, 019, 021, 022, 025, 026, 028, 031, 032, 047, 050, 051, 060, 061, 065 and AC-002, 004, 011, 019, 021, 022, 023, 025, 027, 030, 061, 063, 064, 065, 070, 077, 081 plus the test rules; owner decisions D-A (F6 with the dialog open: no 2 s note) and D-B (the dialog's target line is a menu button); queue gap 300 ms; F6 landing controls. Spec-checker fixes: F6 in the dialog is not announced (screen-reader support for pick mode is out of scope), capture file-name naming contract, banner widths tested at 1280, 400 and 360px, UC-004 traces and exception flows E3–E5, FR-015 Linux exception, UC-006 history postcondition, 500 ms guard without \"about\". Second checker pass: UC-006 postcondition, FR-047 reserved-key sentence split (Esc is not reserved), FR-038 / AC-038 console entries of either level, AC-055 and AC-057 scenario lines. No new IDs.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-11-01T18:24:20.000Z",
+      "operation": "VALIDATE",
+      "target": "spec",
+      "description": "spec-validator (T4) after the v0.11.0 alignment pass: passes – high 0, medium 2 (FR-019 / FR-014 bundle several rules under one ID; FR-056 hung-page state described both as an Erfana page and as a strip notice), low 14. Third run; the first two failed and their findings were fixed.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-11-01T18:24:20.000Z",
+      "operation": "UPDATE",
+      "target": "spec",
+      "description": "Mouse-first pick and prompt (v0.12.0), owner-approved plan .local/panel/spec-025-mouse-improved.md (findings .local/panel/mouse-025/merged.md; owner decisions P1–P4): new NFR-011 and AC-083 (pointer-complete pick and prompt); Send button (FR-031, FR-050); Parent element, Child element and the ancestor path, and the 'That element is gone – pick again' note (FR-027, FR-030); focus emulation while picking and the click route for hover-only picks (FR-025, FR-028, UC-004 A2); Pick this element picks at once from a pointer right-click (FR-057, FR-053); banners and empty-tab hint lead with the click (FR-065, FR-063); 'The page moved – click again' (FR-048); fresh pointer press (FR-030); dialog text kept across an editor-tab click (FR-052); More always shown (FR-023, FR-049); UC-001 A6; test rules (input method, one-line clauses). Touched AC-023, AC-027, 028, 030, 031, 044, 057, 062, 063, 064, 066, 070, 074, 077, 078, 081 and AC-054. New IDs: 025-NFR-011, 025-AC-083. Checker fixes: hung-page state is a strip notice (FR-056, FR-014, FR-025, FR-054); popup strip read-only top part and interactive prompt rows with F6 order (FR-011); FR-057 traces UC-001; overview origin wording.",
+      "by": "claude-code"
+    }
+  ],
+  "status": "active"
+}

@@ -365,7 +365,8 @@ h3:not(:where([class*='erf-'])) {
        <p class="ds-foreign-page__body">Text with a <span class="ds-foreign-page__link">link</span>.</p>
        <div class="ds-foreign-page__missing">Image not loaded</div>
      </div>
-   Add .ds-foreign-page--hidden for the fail-safe state, in which Erfana hides
+   Add .ds-foreign-page--dark or --accent for a page on other paper, and
+   .ds-foreign-page--hidden for the fail-safe state, in which Erfana hides
    the page rather than trust it (Permission band card). Sizes and spacing are
    tokens and stay at 13px or more; only the paint and the face are the page's. */
 /* stylelint-disable color-no-hex, declaration-property-value-allowed-list --
@@ -406,6 +407,15 @@ h3:not(:where([class*='erf-'])) {
   color: #595959;
   font-size: var(--text-base);
 }
+/* Two more papers a page can bring, shared so no card or screen declares its
+   own: a dark page, and a page painted in a colour close to Erfana's accents
+   (the case an outline or a ring has to survive). */
+.ds-foreign-page--dark { background: #0b0b0c; color: #d4d4d4; }
+.ds-foreign-page--dark .ds-foreign-page__heading { color: #fafafa; }
+.ds-foreign-page--dark .ds-foreign-page__link { color: #93c5fd; }
+.ds-foreign-page--accent { background: #a0a8ff; color: #161312; }
+.ds-foreign-page--accent .ds-foreign-page__heading { color: #161312; }
+.ds-foreign-page--accent .ds-foreign-page__link { color: #161312; }
 /* stylelint-enable color-no-hex, declaration-property-value-allowed-list */
 /* The fail-safe: the page is hidden, its space kept, nothing of it drawn. */
 .ds-foreign-page--hidden { visibility: hidden; }

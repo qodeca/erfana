@@ -7269,7 +7269,7 @@
       "quote": "`scripts/design-claims.test.mjs` checks their baked values and `@card` markers",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/design-claims.test.mjs:471",
+      "source": "scripts/design-claims.test.mjs:474",
       "match": "has every card carrying its @card marker on line 1"
     },
     {
