@@ -6,7 +6,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 # Built-in browser
 
 > Status: **proposed** – revised after design review round 1 and the owner's decisions (both 2026-11-01). The six screens, `index.html` and `browser.css` exist in this folder and are being revised from the same review. **This note is the single source** for the screens, the three new cards and the build: where a screen and this note disagree, this note wins and the screen is the defect.
-> Spec: [`specs/spec-t4-025-built-in-browser/`](../../../specs/spec-t4-025-built-in-browser/requirements/01-overview.md) v0.11.0. The surface list this note answers is 025-FR-043; 025-AC-043 checks it.
+> Spec: [`specs/spec-t4-025-built-in-browser/`](../../../specs/spec-t4-025-built-in-browser/requirements/01-overview.md) v0.12.0. The surface list this note answers is 025-FR-043; 025-AC-043 checks it.
 > Builds on: the HTML preview's bar and fail-safe ([`../html-preview/`](../html-preview/README.md), [`../html-approval/`](../html-approval/README.md)) and the element picker and menus that ship for comments ([`../comments/comments-v2.md`](../comments/comments-v2.md), the decided feature screen `../comments/html-comments/overlay.html`).
 > Plan: `.local/plans/spec-025-design-plan.md` (not committed). Review: `.local/panel/design-025-r1/` (not committed).
 
@@ -87,7 +87,7 @@ Top to bottom. Every zone is Erfana DOM except the page area. No zone animates i
 | # | Zone | Present | Height | Holds |
 | --- | --- | --- | --- | --- |
 | 1 | Editor tab | Always | `--tab-height` | Site icon (or generic globe), label (title, or the formatted origin while no title is known – never an end-truncated URL, H-01), in-use and waiting marks, close |
-| 2 | Navigation row | Always | The preview bar's height | Back, Forward, Reload/Stop, the **address bar** (badge, address, chips), Open in system browser, DevTools, More |
+| 2 | Navigation row | Always | The preview bar's height | Back, Forward, Reload/Stop, the **address bar** (badge, address, chips), Open in system browser, DevTools, **More (always shown, OD-22)** |
 | 3 | Pick row | Always (reserved) | One tool row | Pick element, **status slot** (one line), spacer, width preset, **target chooser** |
 | 4 | Find row | While find is open | One tool row | Find field, count, Previous, Next, Close |
 | 5 | Strip rows | While a site asks | One row each; sign-in and long page dialogs taller | In fixed order: refused-address error, page dialog or leave-page prompt, sign-in box, permission prompt, downloads prompt, pop-up blocked, hung-page notice, keyring notices. The 4 s full-screen and pointer-lock notice is a strip row too, with no buttons (025-FR-019). Own surface step (`--color-bg-secondary`) and a leading 2px neutral rule (Site prompts card) |
@@ -102,23 +102,23 @@ Top to bottom. Every zone is Erfana DOM except the page area. No zone animates i
 - **Width presets** narrower than the panel centre the page on `--color-bg-primary`; wider ones scroll the area sideways with an Erfana scrollbar under it.
 - **Tooltips (H-02).** Open above their trigger, except in the pick row (rule below). A tooltip never covers the address bar's rectangle and never covers the row that holds keyboard focus: if above would do either, it opens on the side away from the focused row, and if no side is free it is not shown (the control's description still carries the text). A hover tooltip closes when focus moves under it. The **editor-tab tooltip** is drawn inside the editor tab strip's band, beside the tab (end side, flipping to start), never below it: line 1 the address **through the formatter** (registrable domain emphasised, subdomains dimmed, path quiet and cut from its end – SEC-R2-5), line 2 "Title: {title}" on one line in `--color-text-tertiary` (deck: *Browser tab*). Exception row on the Tooltip card.
 - **Popups that would cross into the page area** (suggestions, target, width preset, More, right-click, Choose terminal) open only after the page area has been swapped for a still image. The page keeps running; no "Page paused" chip.
-- **While the panel is open** (Menu state, R2-H1), the navigation row, pick row and strip rows stay **live, at full strength, not dimmed and not `inert`**: a click on any of their controls closes the panel without sending and focuses that control, and Ctrl/Cmd+L closes it and focuses the address bar (025-FR-049, Must).
+- **While the panel is open** (Menu state, R2-H1), the navigation row, pick row and strip rows stay **live, at full strength, not dimmed and not `inert`**: a click on any of their controls closes the panel without sending and focuses that control, and Ctrl/Cmd+L closes it and focuses the address bar (025-FR-049, Must). **The panel also has a visible close:** a × button (*Panel – close*, "Close – nothing is sent", 24 × 24) at the header's end edge, and a click on the page outside the panel closes it the same way (frames *click outside* and *toolbar click*, prompt-actions.html). A pointer press on a panel control counts only if it began after the panel opened (025-FR-030, Z2) – the click that opened the panel cannot also press an action.
 - **While the instruction dialog is open** (Dialog state only), those rows are `inert` (025-FR-050; IX-18). Only their **icons** are dimmed (`--opacity-disabled`); the address bar and its origin text keep full strength, and a focus ring is never dimmed.
-- **Pick-row tooltips (R2-H5).** Above the pick row is the address bar and below it the page, so pick-row tooltips have their own place: **inside the pick row's band**, toward the end side, starting **after the banner's first clause** – over the later clauses, the spacer or the status slot's free part, never over "Picking – …" and never over the control that holds focus (R3-M1). When a tooltip shows because its trigger has keyboard focus, the first Esc only hides it and the next Esc does the routing action of the current state; a tooltip shown by hover alone never takes an Esc – that Esc routes and hides it in the same press, and it stays hidden until the pointer leaves and re-enters (R4-M3). They show on hover **and on keyboard focus**; while one shows, the status slot's text is hidden under it and comes back when it closes (the hidden polite region is unaffected). This is the worked example for the Tooltip card's boxed-in trigger.
-- **Click guard after layout shift (H-05).** When a row inserts or leaves while the pointer is over the page area, page clicks are ignored for about 500 ms; in pick mode the hover hit-test re-runs before a click may confirm. A strip row's own buttons follow the input guard (OD-6).
+- **Pick-row tooltips (R2-H5).** Above the pick row is the address bar and below it the page, so pick-row tooltips have their own place: **inside the pick row's band**, toward the end side, starting **after the banner's first clause** – over the later clauses, the spacer or the status slot's free part, never over "Picking – …" and never over the control that holds focus (R3-M1). When a tooltip shows because its trigger has keyboard focus, the first Esc only hides it and the next Esc does the routing action of the current state; a tooltip shown by hover alone never takes an Esc – that Esc routes and hides it in the same press, and it stays hidden until the pointer leaves and re-enters (R4-M3). They show on hover **and on keyboard focus**; while one shows, the status slot's text is hidden under it and comes back when it closes (the hidden polite region is unaffected). This is the worked example for the Tooltip card's boxed-in trigger. **Never over the send notice's actions** (mouse scope, Y11): while the send notice shows, a pick-row tooltip opens after the notice's actions, or does not show when there is no room, and the notice's 5 s timer is paused for as long as a pick-row tooltip is open – so a click on Show terminal or Open capture is never blocked by a tooltip.
+- **Click guard after layout shift (H-05).** When a row inserts or leaves while the pointer is over the page area, page clicks are ignored for about 500 ms; in pick mode the hover hit-test re-runs before a click may confirm. **A page click dropped by the guard in pick mode is answered, not silent:** the status slot shows *Note – page moved* for 2 s (mouse scope, Y10). A strip row's own buttons follow the input guard (OD-6); **the guard's blocked look wins over hover and the pointer is `not-allowed`** (mouse scope, Z6 – already how `button.css` draws `aria-disabled`; a guarded button never looks pressable under the pointer).
 - **The sheet**: under 400px of room the panel and dialog become a sheet pinned to the **bottom of the page area, over the still image**, full width, never outside the page area (M-36).
 - **A popup window** (025-FR-011, H-11, M-05): OS title bar showing "{host} – Erfana"; the **popup origin strip** (read-only address in the formatter, certificate badge, in-use chip, zoom chip); the **find row** under it when Ctrl/Cmd+F is pressed; its own strip rows; then the page. No navigation row, no pick row. The *Badge tooltip* opens inside the origin strip's band, beside the badge after the address, short form only, and does not show when it does not fit (R7-M1). Minimum content width: the strip must fit the badge word, the registrable domain and port; a smaller requested width is raised to it. Page-supplied `left`/`top` that would place the popup over the opener window's navigation, pick or strip rows are ignored and the popup opens at the OS default position.
 
 ## Screens
 
-Six files plus `index.html` and `browser.css` (layout only – no component looks, no second spinner, VS-17). Every 025-FR-043 surface is listed; each state is one static frame. Frames added in round 1 are marked †, in round 2 ‡. **This table lists only states the screens must draw**: a listed state with no frame is a screen defect to draw, not a note to trim (TR-R2-6); the screen designers own the drawing.
+Six files plus `index.html` and `browser.css` (layout only – no component looks, no second spinner, VS-17). Every 025-FR-043 surface is listed; each state is one static frame. Frames added in round 1 are marked †, in round 2 ‡, and the frames of the mouse-first revision (2026-11-01, round 9) carry ‡ as well – they are listed by name in the rows below. **This table lists only states the screens must draw**: a listed state with no frame is a screen defect to draw, not a note to trim (TR-R2-6); the screen designers own the drawing.
 
 | 025-FR-043 surface | Screen file | FR | AC | States to draw |
 | --- | --- | --- | --- | --- |
 | Entry points† | `tab-and-toolbar.html` | 025-FR-001, 010 | 025-AC-001, 010 | New browser tab button in the editor area: rest, hover, focus, tooltip with and without the shortcut; HTML preview bar with Open in browser tab |
 | Editor tab | `tab-and-toolbar.html` | 025-FR-004, 019 | 025-AC-004, 019 (in use) | Loading (formatted origin as label†); loaded; no icon; long title; long host as label (registrable domain whole)†; title that imitates an origin, beside the true address in the bar†; in use (camera, microphone, screen†); page dialog waiting†; tooltip beside the tab†; inactive, hover, selected, focus-visible; unfocused group |
 | Capture chip (app-level in-use cue)† | `tab-and-toolbar.html` | 025-FR-019 | 025-AC-019 | Camera in use in a hidden browser tab; two tabs capturing |
-| Navigation row | `tab-and-toolbar.html` | 025-FR-001, 002, 003, 013, 057 | 025-AC-001, 002, 003, 013, 053, 074 | Fresh tab; loading started by the reviewer (pending address shown); loading started by the page (committed address kept)†; loaded; two adjacent tools, one focused†; Back disabled, Forward enabled; DevTools open; full, compact, narrow (about 400px), minimal (360px) |
+| Navigation row | `tab-and-toolbar.html` | 025-FR-001, 002, 003, 013, 057 | 025-AC-001, 002, 003, 013, 053, 074 | Fresh tab; loading started by the reviewer (pending address shown); loading started by the page (committed address kept)†; loaded; two adjacent tools, one focused†; Back disabled, Forward enabled; DevTools open; full, compact, narrow (about 400px), minimal (360px) – More is on the row in every one of them (OD-22); its menu is drawn at narrow and minimal |
 | Address bar | `tab-and-toolbar.html` | 025-FR-002, 005, 021 | 025-AC-002, 005, 021 | `https`; remote `http`; loopback `http` with port; `file://`; long path (path floor)†; long host (`….domain`)†; lookalike; IDN; focused; typing; empty; IME; zoom chip focused (field without ring)†; certificate warning page up (third badge)†; userinfo link shown without its userinfo‡; `mailto:` link destination‡ |
 | Suggestions | `tab-and-toolbar.html` | 025-FR-063 | 025-AC-078 | Matches; search row only; over the still image |
 | Refused address | `tab-and-toolbar.html` | 025-FR-002, 005 | 025-AC-002, 005 | `javascript:`; Windows path; network path; Erfana's own files; field invalid and focused†; cleared on edit |
@@ -130,8 +130,8 @@ Six files plus `index.html` and `browser.css` (layout only – no component look
 | Target chooser | `tab-and-toolbar.html` | 025-FR-061 | 025-AC-077 | Agent; shell; no terminal; unknown process; long name; menu before any send; menu after a send (Open last capture enabled)† |
 | Empty-tab hint | `tab-and-toolbar.html` | 025-FR-001, 063 | 025-AC-001, 078 | First ever; history only; local servers only; both; row hover and focus |
 | Pick overlay and label | `picking.html` | 025-FR-026, 027, 029, 035 | 025-AC-026, 027, 029, 035 | No highlight yet; nothing-outlined note after ⌘E or Enter†; light page; dark page; accent page; label below at top; label outside a short element†; long classes; tiny; frame; ↑ to parent, ↑ to `body`, ↑ to `html`, end-of-range note†; ↓ back, end-of-range note†; ↑ from a frame root; partly visible; frame removed; status echo while hovering (only if ADR 0007 cannot scale the label)†; forced colours over a white image† |
-| Pick frame, banner and chip | `picking.html` | 025-FR-025, 028, 065 | 025-AC-025, 028, 065, 014, 066, 081 | Page focus (three clauses at full width†); toolbar focus (own banner)†; Out (dashed frame, no key words)†; the first click back after Out (only focuses, OD-11)†; frozen with the panel; frozen with the dialog†; banner at 400px (short ⌘E form)†; at 360px and 200% (first clause whole)†; with text-spacing overrides†; macOS and Windows; pick started by Shift+F10 → Pick this element†; Pick element tooltip on keyboard focus, inside the pick row's band‡; Out with the dialog kept (own banner)‡; return after the panel closed on leaving‡ |
-| Prompt-actions panel | `prompt-actions.html` | 025-FR-030, 027, 053, 054 | 025-AC-030, 027, 063, 067, 073 | Opened by click (Explain focused, stepper, target button, rows live at full strength, no breadcrumb)‡; opened by second ⌘E (frozen); each action focused; stepper used by click and by ↑†; stepper at an end (note)†; chip marked as changed†; placed left, right, above, below; element flush with the bottom edge, fully visible, panel above (AC-030 fixture)†; partly off-screen; off-screen after ↑; in a frame; shell target pre-warned on open†; guard hit swapped in place, focus on the banner's button‡; toolbar click closes the panel (focus on the clicked control)‡; F6 closes the panel‡; banner rewritten after choosing a terminal†; Explain sending (busy, ring kept)†; sheet at the foot of the page area† |
+| Pick frame, banner and chip | `picking.html` | 025-FR-025, 028, 065 | 025-AC-025, 028, 065, 014, 066, 081 | Hover menu opened while picking, item clicked‡; right-click and dropped-click notes (the two timed notes)‡; Page focus (three clauses at full width†); toolbar focus (own banner)†; Out (dashed frame, no key words)†; the first click back after Out (only focuses, OD-11)†; frozen with the panel; frozen with the dialog†; banner at 400px (short ⌘E form)†; at 360px and 200% (first clause whole)†; with text-spacing overrides†; macOS and Windows; pick started by Shift+F10 → Pick this element†; Pick element tooltip on keyboard focus, inside the pick row's band‡; Out with the dialog kept (own banner)‡; return after the panel closed on leaving‡ |
+| Prompt-actions panel | `prompt-actions.html` | 025-FR-030, 027, 053, 054 | 025-AC-030, 027, 063, 067, 073 | Opened by click (Explain focused, ancestor path, stepper, × close, target button, rows live at full strength)‡; closed by a click on the page outside it‡; closed by a toolbar click (the clicked control focused, pick row in its toolbar-focus banner)‡; 360px sheet with the ancestor path cut from its start and × close‡; opened by second ⌘E (frozen); each action focused; stepper used by click and by ↑†; stepper at an end (note)†; chip marked as changed†; placed left, right, above, below; element flush with the bottom edge, fully visible, panel above (AC-030 fixture)†; partly off-screen; off-screen after ↑; in a frame; shell target pre-warned on open†; guard hit swapped in place, focus on the banner's button‡; F6 closes the panel‡; banner rewritten after choosing a terminal†; Explain sending (busy, ring kept)†; sheet at the foot of the page area† |
 | Instruction dialog | `prompt-actions.html` | 025-FR-031, 050, 053, 061 | 025-AC-031, 064, 067, 077 | Ask, Change, Prompt; rows inert with icons dimmed, address bar at full strength‡; F6 with the dialog open (nothing moves, no separate note)‡; the target as a menu button, in the dialog and in the narrow sheet‡; with text; empty submitted; sending (ring kept)†; ← Actions back to the panel†; page reloaded (still-image cue in the pick row)†; focus left to the terminal and back; write failure; no agent; no terminal (Open terminal)†; Choose terminal menu; frozen dialog with chip†; rows inert behind it† |
 | Send notice | `prompt-actions.html` | 025-FR-060 | 025-AC-070 | Full width with text buttons; under 800px with icon buttons, actions kept†; paused under the pointer; after 5 s; flash; terminal revealed; displaced while focus is on an action (focus to Pick element)† |
 | Capture-failed and shell-guard messages | `prompt-actions.html` | 025-FR-046, 061 | 025-AC-060, 077 | Capture failed at confirm; write failed (dialog, Explain); no terminal; shell; page changed |
@@ -144,7 +144,7 @@ Six files plus `index.html` and `browser.css` (layout only – no component look
 | Load-error page | `page-states.html` | 025-FR-059 | 025-AC-076 | Each code group; loopback hint replacing the next step†; reached by a page-started load (focus on the heading; address bar shows the failed URL)‡; reached from the toolbar (focus on Reload)† |
 | Certificate warning page | `page-states.html` | 025-FR-021 | 025-AC-021 | Self-signed; expired; mismatch (its own caution text)†; revoked†; Proceed anyway visible at once, text-style, caution text beside it, focus on Back to safety†; Proceed anyway in its guard look just after the page appears‡; *More about this error* open‡; reached by a page-started load, address bar shows the failed host‡; no history |
 | Crashed and hung tab | `page-states.html` | 025-FR-056 | 025-AC-072 | Crashed; crashed with the panel open; hung row; after Wait; hung row recovering while focused (focus to the page)†; crashed frame |
-| Page right-click menu | `menus-and-data.html` | 025-FR-057 | 025-AC-074 | Plain; link (header with the link's host, OD-12)‡; userinfo link (header without userinfo)‡; image; selection; editable field; disabled Back/Forward; keyboard-opened (fill and inset ring)†; no menu in pick mode |
+| Page right-click menu | `menus-and-data.html` | 025-FR-057 | 025-AC-074 | Plain; link (header with the link's host, OD-12)‡; userinfo link (header without userinfo)‡; image; selection; editable field; disabled Back/Forward; keyboard-opened (fill and inset ring)†; Pick this element from a right-click – picked at once, panel open‡; no menu in pick mode |
 | Clear data and Forget | `menus-and-data.html` | 025-FR-023, 016 | 025-AC-023, 016, 059, 069 | Defaults; blocked; busy; step failed; Forget confirm; Forget on Windows; Forget failed toast†; tab refused because a path is a link (toast)†; tab refused because `.gitignore` could not be written (toast)† |
 | Keyring notices | `menus-and-data.html` | 025-FR-018 | 025-AC-018 | Notice on the first tab; restarted without dismissing – shown again†; dismissed – never again in this project†; keyring reset |
 
@@ -167,14 +167,14 @@ States per step: **Out** (focus outside the tab), **Browse** (025-FR-047), **Pic
 
 | # | Reviewer does | Erfana shows | State |
 | --- | --- | --- | --- |
-| 1 | Ctrl/Cmd+E with page focus, or Pick element | Pick element pressed; solid lime frame; *Pick banner – page focus*; crosshair. Nothing outlined until the mouse is over the page | Pick |
+| 1 | Clicks Pick element, or presses Ctrl/Cmd+E with page focus | Pick element pressed; solid lime frame; *Pick banner – page focus* ("Picking – click an element · Esc to stop · …"); crosshair. Nothing outlined until the mouse is over the page. A menu the page opens on hover stays open (focus emulation, OD-20) | Pick |
 | 1a | Ctrl/Cmd+E or Enter again with nothing outlined | Nothing is picked; *Note – nothing outlined* replaces the banner's later clauses for 4 s | Pick |
 | 2 | Moves the mouse | Two-tone outline and label follow | Pick |
 | 3 | ↑ once | Highlight moves to the parent; at an end, *Note – top of the page* or *Note – back at the start* for 2 s | Pick |
 | 4 | Clicks or presses Enter | Still image with the outline in its selected look; the panel opens beside it: element chip with the stepper, four action buttons, target button, key hint; Explain focused. The pick row shows *Pick banner – panel* | Menu |
-| 5 | ↑ ↓, or clicks the stepper | The picked element changes on the still image; the chip is marked as changed for 1 s; the panel follows | Menu |
-| 6 | Tab to Change… and Enter (fresh keydown, SPEC-7) | The dialog replaces the panel, anchored to the same outline, field focused; rows behind are inert, their icons dimmed; *Pick banner – dialog* | Dialog |
-| 7 | Types, ⌘Enter / Ctrl+Enter | Send becomes *Busy – sending*, ring kept; a second submit does nothing | Dialog |
+| 5 | Clicks a name in the ancestor path or an arrow of the stepper, or presses ↑ ↓ | The picked element changes on the still image; the chip is marked as changed for 1 s; the panel follows. If the page has removed the picked element since a click pick, the arrows show their end look and *Note – element gone* shows for 2 s | Menu |
+| 6 | Clicks Change… (or Tab to it and Enter – fresh keydown, SPEC-7) | The dialog replaces the panel, anchored to the same outline, field focused; rows behind are inert, their icons dimmed; *Pick banner – dialog* | Dialog |
+| 7 | Types, then clicks Send (shortcut ⌘Enter / Ctrl+Enter) | Send becomes *Busy – sending*, ring kept; a second submit does nothing | Dialog |
 | 8 | Send succeeds | Live page back; outline flashes 1 s; frame and banner go; *Send notice* for 5 s with both actions; terminal revealed if hidden; focus to the page | Browse |
 
 ### Pick a hover-only element (second Ctrl/Cmd+E, freeze)
@@ -186,11 +186,32 @@ States per step: **Out** (focus outside the tab), **Browse** (025-FR-047), **Pic
 | 3 | Ctrl/Cmd+E again | Picked at once; still image with the open dropdown; panel; after source hints, the page freezes and *Page paused* joins the banner | Menu |
 | 4 | Esc | Panel closes; chip goes; page resumes; frame and banner stay | Pick |
 
+### Pick a hover-only element by click (no shortcut)
+
+| # | Reviewer does | Erfana shows | State |
+|---|---|---|---|
+| 1 | Clicks Pick element | Pick mode on without moving the page; the page keeps focus emulation (DevTools "Emulate a focused page", owner decision OD-20), so a menu that closes when the page loses focus is not closed by the click | Pick |
+| 2 | Hovers the page's dropdown open | The menu opens and stays open; the outline follows the pointer onto its items (frame *Hover menu opened while picking, item clicked*) | Pick |
+| 3 | Clicks the item | Picked; still image with the open menu; panel opens | Menu |
+
+The same route is taught by *Pick tooltip – off* line 2 and by the user guide; the keyboard route (the second Ctrl/Cmd+E) above stays.
+
+### Pick from a right-click
+
+| # | Reviewer does | Erfana shows | State |
+|---|---|---|---|
+| 1 | Right-clicks an element, with a pointer | *Page right-click menu* over the still image | Browse |
+| 2 | Clicks **Pick this element** | The right-clicked element is picked **at once** (DevTools' right-click **Inspect**): the still image is the page at the moment of the right-click, the outline is in its picked look, the panel is open, pick mode is on with *Pick banner – panel* (frame *Pick this element from a right-click*) | Menu |
+| – | Shift+F10, then **Pick this element** | Unchanged: the focused element is outlined, ↑ ↓ refine, Enter confirms | Pick |
+
+A right-click on the page while pick mode is on opens no menu: *Note – right-click off* shows for 2 s.
+
 ### Refine parent and child
 
 ↑ moves to the parent (crossing a shadow root to its host, a frame root to its `<iframe>`); ↓ moves back toward the first-hovered element; the parent chain runs up through `body` to `html`, where ↑ does nothing. At either end nothing moves, the stepper's button for that direction shows its disabled look, and the end note shows (2 s in the panel header, or in the status slot before confirm). Moving the mouse resets the first-hovered element. In the panel, a refinement re-reads the element without a new screenshot and redraws the outline on the stored image. Alt+↑ and Alt+↓ act the same as ↑ and ↓ (owner decision OD-14).
 
-**Why a stepper, not an ancestor breadcrumb** (H-08): the stepper answers exactly the two keys the spec gives refinement, so the keyboard and the mouse operate one visible control; it shows the ends as a disabled state with no extra copy; it fits the 360px panel and the sheet; and it keeps page-written class names to the one element chip instead of spreading a chain of them through Erfana's trusted panel (SEC-18). A breadcrumb can show the whole path, but at 360px it truncates the very names the reviewer needs, and each crumb is more page text inside chrome.
+**The ancestor path (run lead's call, 2026-11-01; supersedes the round-1 "no breadcrumb" decision, H-08).** The panel header carries a clickable path beside the stepper, imitating Chrome DevTools' breadcrumb bar: `main › section.hero › button.cta`. Each ancestor is a button (*Path – crumb*); a click moves the pick to that element, exactly as repeated ↑ would, with the same still-image redraw and changed mark. The picked element is the **current crumb** – the existing element chip, marked `aria-current="true"` – so the chip keeps its size text and its changed mark. The path is cut **from its start**: when room is short the formatter-like component drops whole crumbs from the front behind a leading "…" (no CSS clipping of a name, no `direction` trick, as for the host in fold step 8); the current crumb always stays whole, and the stepper and × never leave. The stepper stays too: it is the keyboard's one visible twin (↑ ↓), shows the two ends as a disabled state, and works when the path is cut.
+Page text: each crumb is page-written text inside Erfana's panel (SEC-18), so a crumb follows the chip's rules – drawn as code in mono, tag plus `#id` or the first classes, long class lists cut as in *Label* – and is never a link or a heading. The path and the stepper are pointer controls (`tabindex="-1"`); the Tab order is unchanged except that × closes it.
 
 ### Choose an action, write the instruction, send
 
@@ -227,7 +248,7 @@ States per step: **Out** (focus outside the tab), **Browse** (025-FR-047), **Pic
 
 | From | Cancel by | Result | State after |
 | --- | --- | --- | --- |
-| Pick, nothing open | Esc with page focus, or Pick element | Frame, banner, crosshair go | Browse |
+| Pick, nothing open | A click on Pick element, or Esc with page focus | Frame, banner, crosshair go | Browse |
 | Pick, toolbar focus | Esc | In the address bar: restores the address; in find: closes find; **on any other button in the navigation row or the pick row, unless one of its menus is open: nothing but focus moves** (IX-20, 025-FR-051). Focus to the page; pick stays | Pick |
 | Browse, toolbar focus | Esc on any other button in the navigation row or the pick row, unless one of its menus is open (025-FR-051) | Focus to the page | Browse |
 | Any, address bar focused with *Badge tooltip* showing | Esc | First Esc only hides the tooltip and is consumed – focus and the field are unchanged; the next Esc does the field's Esc (restores the address, then returns focus to the page). The tooltip stays hidden until the field loses and regains focus (R5-M7, R6-M1). In pick mode with no room for even the short form, no tooltip shows, so the first Esc already does the field's Esc (OD-16) | Unchanged, then as the field's Esc |
@@ -235,18 +256,19 @@ States per step: **Out** (focus outside the tab), **Browse** (025-FR-047), **Pic
 | Badge tooltip shown by hover only, focus elsewhere | Esc | Does the state's routing action and hides the tooltip in the same press; it stays hidden until the pointer leaves and re-enters the badge (R7-M5) | As that action |
 | Any, a pick-row tooltip shown by hover only | Esc | Does the state's routing action and hides the tooltip in the same press; it stays hidden until the pointer leaves and re-enters its trigger (R4-M3) | As that action |
 | Panel | Esc | Panel closes; freeze lifts; pick stays | Pick |
-| Panel | Click on the page outside it | Same; the clicked element is not picked; clicks within the double-click interval of the confirming click are ignored | Pick |
-| Panel | Click on the toolbar, or Ctrl/Cmd+L | Panel closes, nothing sent, freeze lifts; focus to the clicked control or the field | Toolbar |
+| Panel | Click on its **×** (*Panel – close*, "Close – nothing is sent") | Same as Esc: nothing is sent; focus to the page | Pick |
+| Panel | Click on the page outside it | Same; the clicked element is not picked; clicks within the double-click interval of the confirming click are ignored (frame *Panel – closed by a click on the page outside it*) | Pick |
+| Panel | Click on the toolbar, or Ctrl/Cmd+L | Panel closes, nothing sent, freeze lifts; focus to the clicked control or the field (frame *Panel – closed by a click on a toolbar control*) | Toolbar |
 | Panel | Focus moves to the terminal or editor | Panel closes, capture discarded | Out |
 | Panel | F6 | Panel closes like a toolbar click, nothing sent; focus to Pick element (025-FR-049) | Toolbar |
-| Panel | Shift+F6 | Panel closes the same way, nothing sent; focus to the last control in the strip when a prompt shows there, else the last visible control of the navigation row (More only when it is shown) (025-FR-049) | Toolbar |
-| Dialog | F6 or Shift+F6 | Nothing moves (025-FR-050 keeps keys in the dialog); no separate note, no timer and no announcement – the status slot keeps showing "Esc closes the dialog" (OD-17) | Dialog |
-| Dialog | Esc or Cancel | Dialog closes; freeze lifts; pick stays | Pick |
+| Panel | Shift+F6 | Panel closes the same way, nothing sent; focus to the last control in the strip when a prompt shows there, else the last control of the navigation row – More, which is always shown (025-FR-049) | Toolbar |
+| Dialog | F6 or Shift+F6 | Nothing moves (025-FR-050 keeps keys in the dialog); no separate note, no timer and no announcement – the status slot keeps showing "Esc or Cancel closes the dialog" (OD-17) | Dialog |
+| Dialog | Esc, or a click on **Cancel** | Dialog closes; freeze lifts; pick stays | Pick |
 | Dialog | ← Actions | Back to the panel, same capture, freeze kept | Menu |
 | Dialog | Focus moves elsewhere | Dialog kept with text; frozen if it was; returns with focus | Out, then Dialog |
 | Out (pick on) | First click on the page | **Only returns focus; picks nothing** (Owner decision OD-11) | Pick |
 | Out (pick on, dialog kept) | Click in the tab | Focus returns to the dialog field; while away the pick row shows *Pick banner – Out, dialog* (CT-R2-8) | Dialog |
-| Any | Switching editor tab, or Ctrl/Cmd+T where it acts | Everything closes, nothing sent, no notice; pick ends | Out |
+| Any | Switching editor tab (a click on another tab, or a key), or Ctrl/Cmd+T where it acts | Everything closes, nothing sent, no notice; pick ends. **With the dialog open, the typed text is kept for this tab and restored on return** (mouse scope, Z7; a stray click on another tab no longer loses it) | Out |
 | Browse, Pick, Menu, Toolbar | A navigating or closing browser key | Same, then the navigation | Browse or gone |
 
 ### Leaving the tab mid-pick
@@ -282,7 +304,7 @@ Strings are not repeated here: each cell names its deck row in *italics*. Every 
 | Address bar | Never | Pending address only for reviewer-started loads (H-03) | *Refused – …* in the first strip row | See below |
 | Open in system browser | `aria-disabled` and *Busy – opening* | – | *Toast – system browser failed* | Leaves for More at fold step 3 |
 | DevTools | Never | – | – | *DevTools* / *Show DevTools* |
-| More | Shown when any tool has folded, or while the Page width group is in it; More counts in the fold order (R6-M2) | – | – | *More menu items* |
+| More | **Always shown** (owner decision OD-22): Clear browsing data… and Forget this project's browser data… live only in it, so a reviewer who prefers the pointer reaches them at every width; the fold steps and the Page width group only add to what it holds. More is on the row in every fold measurement (R6-M2) | – | – | *More menu items* |
 
 **Tiers** (container width; thresholds measured in the browser): **full**, **compact**, **narrow** (about 400px), **minimal** (360px). The tier names only say how much room there is and carry **only non-folding changes**: row padding (below 700px the rows' inline padding steps down – a non-folding tier change, R5-M1), icon-only labels (width preset below 700px, and at any width while pick mode is on or the send notice shows; Pick element, pop-up chip and in-use chip below 520px), the short ⌘E clause of the banner and the short placeholder. Nothing is moved into More by a tier name. Room is given back in **one fold order** (R3-H1), the same at every width, each step only once the previous one is exhausted – no compact-margin rule and no narrow "step 3 by itself" exception (R4-M1):
 
@@ -330,15 +352,15 @@ As round 0, strings from the deck. Suggestion rows show the address only, never 
 
 | Part | States |
 | --- | --- |
-| Pick element (toggle) | Off; on; icon-only below 520px (name and `aria-pressed` unchanged); `aria-disabled` **only on an empty tab or an Erfana page** (*Pick – blocked reason*), never while a page loads (M-17); Ctrl/Cmd+E while blocked does nothing and shows the reason in the status slot for 4 s. Tooltips *Pick tooltip – off*, *Pick tooltip – on*, drawn inside the pick row's band and shown on keyboard focus (R2-H5) |
+| Pick element (toggle) | Off; on (a click on it while on stops picking); icon-only below 520px (name and `aria-pressed` unchanged); `aria-disabled` **only on an empty tab or an Erfana page** (*Pick – blocked reason*), never while a page loads (M-17); Ctrl/Cmd+E while blocked does nothing and shows the reason in the status slot for 4 s. Tooltips *Pick tooltip – off*, *Pick tooltip – on*, drawn inside the pick row's band and shown on keyboard focus (R2-H5) |
 | Status slot | One line, `white-space: nowrap`, `--text-base`, plain text with no live role (announcements go to the tab's hidden polite region, M-45). Contents by priority below |
 | Width preset | Menu button; its label is icon-only below 700px, and at any width while pick mode is on or the send notice shows (R7-M2). Out of room it folds into More – the first pick-row control to do so: below 520px while picking, below 700px in the Out state, while the send notice shows below 800px, and while a timed note shows below 700px – and its choice then lives in More as *Page width* (§ Tiers, R5-M6); leaves the row at narrow while the panel or dialog is open |
 | Target chooser | *Target button – …*; terminal name truncates (minimum 8 characters; below 380px down to "…", full name kept in the accessible name and the target menu – § Tiers), process never; leaves the row at narrow while the panel or dialog is open, because the panel footer and the dialog's target line each carry the same menu button, so the target can still be changed before a send (TR-20, Security rules 11 and 12; OD-18) |
 
 **Status slot priority (H-09)**, highest first:
 
-1. **Pick banner** for the current routing state, whenever pick mode is on. Its **first clause** ("Picking –" plus the state's key clause) has layout priority over every optional control: it never truncates and never wraps; when room runs out, in order, the third clause drops, the second clause shortens to its narrow form, then drops; the width preset (already icon-only while pick mode is on) folds into More (Page width); the target follows its own rule. Whole clauses drop – never a second line, at any text spacing (SC 1.4.12).
-2. **Pick notes** (*Note – nothing outlined*, *Note – top of the page*, *Note – back at the start*, *Pick – blocked reason*): replace the banner's later clauses for 2–4 s; never the first clause.
+1. **Pick banner** for the current routing state, whenever pick mode is on. Its **first clause** ("Picking – click an element" in page focus; "Picking –" plus the state's own clause in the other states) has layout priority over every optional control: it never truncates and never wraps; when room runs out, in order, the third clause drops, the second clause shortens to its narrow form, then drops; the width preset (already icon-only while pick mode is on) folds into More (Page width); the target follows its own rule. Whole clauses drop – never a second line, at any text spacing (SC 1.4.12).
+2. **Pick notes** (*Note – nothing outlined*, *Note – top of the page*, *Note – back at the start*, *Note – page moved*, *Note – right-click off*, *Pick – blocked reason*): replace the banner's later clauses for 2–4 s; never the first clause.
 3. **Send notice** (5 s, after pick mode has ended at the send). The sentence truncates the terminal name first; the actions never leave (H-12).
 4. **Cue – still image**, while a dialog is over the still image with pick mode off.
 5. **Note – page changed** (until the next pointer or key action, or 8 s).
@@ -375,11 +397,11 @@ Engine-drawn over the live page; Erfana-drawn on the still image; same look (Ele
 
 | Part | States |
 | --- | --- |
-| Header | Element chip *Panel – element chip* (mono, page text drawn as code, Security rule 8) with the **stepper** beside it: *Stepper – parent*, *Stepper – child*, pointer targets of 24 × 24, `tabindex="-1"`, each showing its disabled look at its end; end note *Note – top of the page* / *Note – back at the start* for 2 s, **on the header line, after the stepper** (R2-M1); **no breadcrumb** – the stepper is the only refinement control (R2-M1); chip marked as changed for 1 s after a move (static); frame line *Panel – frame line* for a cross-origin frame; note chips *Panel – notes* in the neutral chip |
+| Header | The **ancestor path** (*Path – nav*; each ancestor a *Path – crumb* button, the picked element the current crumb, cut from its start behind "…"; see § Refine parent and child) ending in the element chip *Panel – element chip* (mono, page text drawn as code, Security rule 8), with the **stepper** beside it; the **×** (*Panel – close*) at the header's end edge: *Stepper – parent*, *Stepper – child*, pointer targets of 24 × 24, `tabindex="-1"`, each showing its disabled look at its end; end note *Note – top of the page* / *Note – back at the start* for 2 s, **on the header line, after the stepper** (R2-M1); the path and the stepper both move the pick (the round-1 "no breadcrumb" rule, R2-M1, is superseded – § Refine parent and child); chip marked as changed for 1 s after a move (static); frame line *Panel – frame line* for a cross-origin frame; note chips *Panel – notes* in the neutral chip |
 | Banner (optional, top) | *Pre-warn – shell* / *Pre-warn – no terminal* (warning) on open; *Guard – shell* / *Guard – no terminal* (error) after a guard hit; *Note – target chosen* after a choice |
 | Actions | Four buttons **in one row**, in reading order Explain, Ask…, Change…, Prompt…, in the Buttons card's secondary look with a visible edge, wrapping to a 2 × 2 grid (same order, row by row) below 320px of panel width; the screens match this exactly (R2-M1). Not menu rows (H-08). Explain focused on open. Busy: *Busy – sending*, ring kept |
 | Footer | *Target button – panel* (menu button); key hint *Panel – key hint* |
-| Keyboard | Tab and Shift+Tab: actions, then the banner's button, then the target button, then wrap (SPEC-6). ↑ ↓ refine (`aria-keyshortcuts="ArrowUp ArrowDown"` on the panel). Enter or Space act only on a **fresh keydown** that began after the panel opened; auto-repeat is ignored (SPEC-7). Esc closes |
+| Keyboard | Tab and Shift+Tab: actions, then the banner's button, then the target button, then × (*Panel – close*), then wrap (SPEC-6). ↑ ↓ refine (`aria-keyshortcuts="ArrowUp ArrowDown"` on the panel). Enter or Space act only on a **fresh keydown** that began after the panel opened; auto-repeat is ignored (SPEC-7). Esc closes |
 | Placement | Nearest edge with room, never covering the outline or the label, inside the tab; sheet at the foot of the page area under 400px of room |
 
 ### Instruction dialog
@@ -420,7 +442,7 @@ All rows: the **input guard** (OD-6) – about 500 ms after a row appears **or i
 
 ### Page right-click menu, Clear and Forget
 
-Right-click menu as round 0 with: a keyboard-opened menu draws the first item's fill and inset ring (VS-7); a link menu carries a header line with the link's formatted host (OD-12); **Pick this element** shows no shortcut hint and no `aria-keyshortcuts` – it highlights the focused element, which ⌘E does not do (M-35). From the keyboard, Shift+F10 on the page's focused element then Pick this element gives a full keyboard pick (↑ ↓, Enter), drawn on picking.html; the user guide names it. Clear and Forget as round 0, strings from the deck.
+Right-click menu as round 0 with: a keyboard-opened menu draws the first item's fill and inset ring (VS-7); a link menu carries a header line with the link's formatted host (OD-12); **Pick this element** shows no shortcut hint and no `aria-keyshortcuts` – it highlights the focused element, which ⌘E does not do (M-35). **From a pointer right-click, Pick this element picks the right-clicked element at once and opens the panel** (owner decision OD-21; DevTools' right-click **Inspect**; the still image is the page at the moment of the right-click) – drawn on menus-and-data.html. From the keyboard, Shift+F10 on the page's focused element then Pick this element gives a full keyboard pick (↑ ↓, Enter), drawn on picking.html; the user guide names it. Clear and Forget as round 0, strings from the deck.
 
 ### Where focus lands when a surface goes (H-10)
 
@@ -436,7 +458,7 @@ Focus never falls to the document.
 | A focused tool folds into More (the panel narrows) | On the tool | More. No announcement; any input guard is unchanged (R4-M4) |
 | An Erfana page replaces the live view | In the page | Reload if the reviewer started the load; else the new page's heading |
 | The live view replaces an Erfana page (Reload worked) | On Reload | The page |
-| The panel closes (Esc, outside click, send, navigation) | In the panel | The page |
+| The panel closes (Esc, ×, outside click, send, navigation) | In the panel | The page |
 | The panel closes by a toolbar click or Ctrl/Cmd+L | In the panel | That control or the field |
 | The dialog closes (Esc, Cancel, send) | In the dialog | The page |
 | ← Actions | In the dialog | The action that opened the dialog |
@@ -673,7 +695,7 @@ Shown in the first strip row as a field error, linked to the field; typed text s
 
 | Row | String | Notes |
 | --- | --- | --- |
-| Hint | Load your app, then press ⌘E / Ctrl+E to point at an element | spec-fixed (025-FR-063); CF-6 |
+| Hint | Load your app, then click **Pick element** (⌘E / Ctrl+E) to pick an element | spec-fixed (025-FR-063) as revised by the mouse-first plan (2026-11-01): leads with the click, names the button in bold, and uses "pick" – this closes CF-6. The shortcut goes through `formatShortcut` (⌘E on macOS, Ctrl+E elsewhere) |
 | First run | Type an address such as localhost:5173 in the address bar. | – |
 | Heading – recent | Recent; list name "Recent addresses" | Not drawn when empty |
 | Heading – local | Local servers seen in your terminals; list name "Local servers" | CT-22 |
@@ -685,24 +707,27 @@ Shown in the first strip row as a field error, linked to the field; typed text s
 | --- | --- | --- |
 | Group | – ; name "Pick and send" | `role="group"` |
 | Pick element | Pick element | spec-fixed; name never changes; `aria-pressed` |
-| Pick tooltip – off | Pick element (⌘E) – press ⌘E again to pick what is under the mouse; line 2 "↑ ↓ parent and child" | Names both uses (025-AC-081) and teaches refinement (IX-5) |
+| Pick tooltip – off | Pick element (⌘E) – press ⌘E again to pick what is under the mouse; line 2 "Menus stay open while picking – click to pick" | Names both uses (025-AC-081). Line 2 replaces "↑ ↓ parent and child" (IX-5): the path and the stepper now teach refinement in the panel, and the line tells a pointer-only reviewer that a hover menu survives the click on Pick element (OD-20) |
 | Pick tooltip – on | Line 1 "Stop picking"; line 2 "⌘E starts picking, then picks what is under the mouse" (Windows and Linux: "Ctrl+E …") | Names both uses of the key, as when off (025-AC-081). Esc is not named: from the button, Esc only returns to the page (CT-3) |
 | Pick – blocked reason | Load a page to pick an element | Tooltip, description and status note |
-| Pick banner – page focus | Picking – Esc to stop · ⌘E picks what is under the mouse · ↑ ↓ parent and child | spec-fixed (025-FR-065), all three clauses; the third drops first. Narrow form of the second clause: "⌘E again: pick under the mouse" |
-| Pick banner – toolbar focus | Picking – Esc returns to the page | spec-fixed (025-FR-065; SPEC-2, F-9) |
-| Pick banner – panel | Picking – Esc closes the panel | spec-fixed (025-FR-065); no ⌘E clause, ⌘E does nothing here (AX-12) |
-| Pick banner – dialog | Picking – Esc closes the dialog | spec-fixed (025-FR-065) |
+| Pick banner – page focus | Picking – click an element · Esc to stop · ⌘E picks under the mouse · ↑ ↓ parent and child | spec-fixed (025-FR-065) as revised by the mouse-first plan: leads with the click. First clause "Picking – click an element" is protected; of the spec's clauses the shortcut clause drops first, then "Esc to stop". The design's optional clauses (hover echo, "↑ ↓ parent and child") keep their earlier drop order and leave before either. Narrow form of the shortcut clause: "⌘E again: pick under the mouse" |
+| Pick banner – toolbar focus | Picking – Esc returns to the page | spec-fixed (025-FR-065; SPEC-2, F-9); unchanged |
+| Pick banner – panel | Picking – Esc or click outside closes the panel | spec-fixed (025-FR-065) as revised; no ⌘E clause, ⌘E does nothing here (AX-12) |
+| Pick banner – dialog | Picking – Esc or Cancel closes the dialog | spec-fixed (025-FR-065) as revised |
 | Pick banner – Out | Picking – click the page to continue | spec-fixed (025-FR-065); no key (H-07); the click only focuses (OD-11) |
 | Pick banner – Out, panel | Picking – the panel closed when you left; pick again | spec-fixed (025-FR-065); on return after focus left with the panel open (R2-M13) |
 | Pick banner – Out, dialog | Picking – click to return to the dialog | spec-fixed (025-FR-065); while away with the dialog kept (CT-R2-8) |
 | Chip – still image | Still image | Static chip after the panel or dialog banner while the page area shows a still image and the page is not paused; *Page paused* takes its place when frozen. Desc. "Erfana is showing a picture of the page" (R2-M2) |
 | Page paused | Page paused | spec-fixed chip |
-| Cue – still image | Over a still image of the page – Esc closes the dialog | Pick off, dialog open (M-03) |
+| Cue – still image | Over a still image of the page – Esc or Cancel closes the dialog | Pick off, dialog open (M-03); follows *Pick banner – dialog* |
 | Label | {tag} {size} | spec-fixed content (025-FR-026) |
 | Note – nothing outlined | Move the mouse over the page to pick an element | 4 s (M-24) |
 | Note – top of the page | Top of the page | 2 s, in the panel header or status slot (IX-6) |
 | Note – back at the start | Back at the element you started from | 2 s |
 | Note – frame removed | That frame is gone. Pick another element. | Announcement; the outline simply goes |
+| Note – page moved | The page moved – click again | 2 s, status slot; shown when the click guard dropped a page click in pick mode (025-FR-047, 025-FR-048; mouse scope, Y10). No full stop: a one-line status clause (voice rule 10) |
+| Note – element gone | That element is gone – pick again | 2 s, in the panel header after the stepper (like *Note – top of the page*); after a click pick, when the page has removed the picked element and the reviewer refines; the arrows show their end look (025-FR-027; Y6) |
+| Note – right-click off | Right-click is off while picking – click Pick element to stop | 2 s, status slot, replaces the later clauses; a right-click on the page in pick mode (025-FR-048; Z4) |
 
 ### Prompt-actions panel
 
@@ -712,6 +737,10 @@ Shown in the first strip row as a field error, linked to the field; typed text s
 | Panel – element chip | {tag} · {size} | – | Mono, page text |
 | Stepper – parent | – (▲ icon) | Name "Parent element"; tooltip "Parent element (↑)" | Disabled look at the top |
 | Stepper – child | – (▼ icon) | Name "Child element"; tooltip "Child element (↓)" | Disabled look at the start |
+| Path – nav | – | Name "Element path" | `nav` around an ordered list (ancestors from the outermost to the picked element); the whole path is pointer-only (`tabindex="-1"`) |
+| Path – crumb | {tag}{#id or .classes} of an ancestor | The visible text is the name; Desc. "Moves the pick here" | Ghost button, mono, `--text-sm`, 24px high; a click moves the pick there. Separators "›" and the leading "…" are drawn, not typed into the name (`aria-hidden`) |
+| Path – current | The element chip ({tag} · {size}) | `aria-current="true"` | The picked element; marked as changed for 1 s after a move |
+| Panel – close | × (icon) | Name "Close – nothing is sent" | 24 × 24, last in the Tab order after the target button; closes the panel without sending, like Esc (owner scope: mouse only) |
 | Panel – frame line | {frame host}, inside {top host} | – | Cross-origin frame only (H-04) |
 | Panel – notes | Partly off-screen · Off-screen · Zero size | – | Neutral chips |
 | Explain | Explain | Desc. "Sends now – asks the agent to explain this element" | spec-fixed; no ellipsis |
@@ -719,7 +748,7 @@ Shown in the first strip row as a field error, linked to the field; typed text s
 | Change | Change… | Name "Change"; Desc. "Ask the agent to change the code behind this element" | spec-fixed (025-FR-030; SPEC-6) |
 | Prompt | Prompt… | Name "Prompt"; Desc. "Write your own prompt about this element" | spec-fixed (025-FR-030; SPEC-6) |
 | Busy – sending | Sending… | – | The pressed control |
-| Panel – key hint | ↑ ↓ parent and child · Tab next action · Esc closes the panel | – | Narrow: "↑ ↓ parent and child · Esc closes the panel" |
+| Panel – key hint | ↑ ↓ parent and child · Tab next action · Esc closes the panel | – | Narrow: "↑ ↓ parent and child · Esc closes the panel". The click routes (path, arrows, ×, outside) are visible controls and need no hint line |
 | Announce – refined | Picked {tag}, {size spoken}. | – | Polite, on each refinement |
 
 ### Instruction dialog
@@ -979,14 +1008,14 @@ Every open decision was answered on 2026-11-01 (§ Decisions), so the deck carri
 
 ## Accessibility
 
-Screen-reader support is out of Erfana's scope (#440); roles, names and announcements are what the cards require, not gates. Keyboard-only use is in scope; picking without a mouse is out of scope, but the Shift+F10 → Pick this element route exists and is drawn (M-35).
+Screen-reader support is out of Erfana's scope (#440); roles, names and announcements are what the cards require, not gates. Keyboard-only use is in scope; picking without a mouse is out of scope, but the Shift+F10 → Pick this element route exists and is drawn (M-35). **Mouse-only use is in scope for picking an element and sending a prompt** (owner scope, 2026-11-01): every step – start and stop pick mode, pick, hover-only pick, refine, choose an action, write and send, change the target, close without sending, answer a guard banner, use the send notice's actions – has a pointer path; only typing the instruction needs keys. Key-only paths outside that workflow (pointer lock, full-screen exit, find, zoom, Enter in the address bar) stay as they are (OD-19).
 
 ### Focus order
 
 | Surface | Order |
 | --- | --- |
-| Browser tab | Navigation row (Back, Forward, Reload/Stop, address bar, field chips, Open in system browser, DevTools, More – shown only when a tool has folded or while the Page width group is in it) → pick row (Pick element, status-slot actions when present, width preset, target) → find row → strip rows in their order → an Erfana page's content → out of the browser tab (025-FR-047). The page is not a Tab stop: Tab from the last control leaves the browser tab. The live page is reached by loading, Esc in the field, Esc on any other button in the navigation row or the pick row, a click, or F6; left with Ctrl/Cmd+L |
-| Prompt-actions panel | Explain → Ask… → Change… → Prompt… → banner button (when present) → target button → wrap. Explain focused on open. The stepper is pointer-only; ↑ ↓ are its keys (SPEC-6) |
+| Browser tab | Navigation row (Back, Forward, Reload/Stop, address bar, field chips, Open in system browser, DevTools, More – always shown, OD-22) → pick row (Pick element, status-slot actions when present, width preset, target) → find row → strip rows in their order → an Erfana page's content → out of the browser tab (025-FR-047). The page is not a Tab stop: Tab from the last control leaves the browser tab. The live page is reached by loading, Esc in the field, Esc on any other button in the navigation row or the pick row, a click, or F6; left with Ctrl/Cmd+L |
+| Prompt-actions panel | Explain → Ask… → Change… → Prompt… → banner button (when present) → target button → × → wrap. Explain focused on open. The ancestor path and the stepper are pointer-only; ↑ ↓ are their keys (SPEC-6) |
 | F6 and Shift+F6 | Forward and back through navigation row → pick row → strip rows → find row (only while open) → the page → around (025-FR-047). **From the page**: F6 lands on the address bar; Shift+F6 lands on the last control in the strip when a prompt shows there, else on the last control of the pick row. With the panel open they close it first (025-FR-049; § Flows › Cancel at each point) |
 | Instruction dialog | ← Actions → banner button (if any) → field → target button ("Sends to") → Cancel → Send → wrap. Initial focus: the field |
 | Strip row | Its controls in reading order; a page dialog's overflowing quote box after the header |
@@ -1011,6 +1040,8 @@ Names and descriptions are deck rows; this table gives structure only.
 | Find field | `searchbox`; count in the hidden region | *Find – …* |
 | Prompt-actions panel | `dialog`, `aria-modal="false"`, `aria-keyshortcuts="ArrowUp ArrowDown"`; **other zones stay live and are not `inert`** – a toolbar click or Ctrl/Cmd+L closes the panel (025-FR-049, R2-H1) | *Panel* |
 | Stepper | `button`, `tabindex="-1"`, `aria-disabled` at an end | *Stepper – …* |
+| Element path | `nav` named "Element path" around an `ol`; crumbs are `button`, `tabindex="-1"`; the picked crumb has `aria-current="true"` | *Path – …* |
+| Panel close | `button`, last Tab stop in the panel | *Panel – close* |
 | Actions | `button` | *Explain*, *Ask*, *Change*, *Prompt* |
 | Instruction dialog | `dialog`, `aria-modal="false"`; other zones `inert`, icons dimmed, origin text and focus rings never dimmed | *Dialog – title* |
 | Strip prompt row | `group`; `alertdialog` for page dialogs and leave-page, described by the quote | The row's deck strings |
@@ -1057,6 +1088,13 @@ One row per UI element or behaviour the spec does not require (M-23, OD-15). **R
 | A-28 | Esc on any other button in the navigation row or the pick row, unless one of its menus is open, returns focus to the page | One way back to the page from the toolbar buttons | Spec change (025-FR-051; TR-R2-7) |
 | A-29 | Last-resort start cut of the host (fold step 8), done by the formatter slicing the string and writing "…" (never CSS `direction`, R5-M3), also for the tab label; `circle-alert` badge glyph and badge tooltip | The end of a domain and the port are what a spoof hides; a lock glyph reads as safe | Routine call (run lead, R4-H1, R4-M5) |
 | A-30 | Target name: minimum 8 characters, below 380px down to "…" (full name in the accessible name and target menu; process never cut) | Keeps the process and More whole at 360px | Spec change (025-FR-061; R5-M8) |
+| A-31 | Ancestor path in the panel and sheet header (DevTools' breadcrumb): each ancestor a button that moves the pick, the picked element the current crumb, cut from its start behind "…" | The stepper moves one step at a time; a pointer user otherwise cannot jump to a distant ancestor | Spec change (025-FR-027, 025-FR-030; mouse-first plan, run lead's call) |
+| A-32 | **×** close button on the panel and sheet ("Close – nothing is sent"), and a click outside the panel as an explicit pointer exit; the panel's pointer press counts only if it began after the panel opened | Esc was the only visible-by-name way out; the hint named only keys | Spec change (025-FR-030, 025-FR-049; mouse-first plan) |
+| A-33 | A pointer right-click **Pick this element** picks at once and opens the panel; Shift+F10 keeps outline-then-Enter | Chosen from a menu with a pointer, a second confirmation had no pointer route (OD-21) | Spec change (025-FR-057, 025-AC-074) |
+| A-34 | More always shown | Clear browsing data… and Forget… had no pointer route at full width (OD-22) | Spec change (025-FR-023) |
+| A-35 | Focus emulation while pick mode is on, so a hover menu survives the click on Pick element (OD-20) | A menu that closes on blur could not be picked by pointer alone | Spec change (025-FR-025, 025-FR-028) |
+| A-36 | Pick notes *Note – page moved* (a click the guard dropped), *Note – right-click off* and *Note – element gone*; the send notice's actions are never covered by a pick-row tooltip, and its timer pauses while one is open | Silent no-ops read as broken clicks; a tooltip could block the notice's buttons | Spec change (025-FR-027, 025-FR-047, 025-FR-048, 025-FR-060) |
+| A-37 | The dialog's typed text is kept for a tab and restored on return when the reviewer clicks another editor tab | A stray tab click lost the text | Spec change (025-FR-052) |
 
 ## Decisions
 
@@ -1087,8 +1125,13 @@ The owner answered every open decision on 2026-11-01 (11:38, and OD-16 later the
 | SPEC-6 | 025-FR-030 Tab cycle, ellipsis on labels, no-terminal guard form | Banner button and target button after the four actions, then wrap; "Ask…", "Change…", "Prompt…"; *Guard – no terminal* as in the deck | 2026-11-01 |
 | SPEC-7 | Panel acts on Enter or Space only on a fresh keydown | Yes | 2026-11-01 |
 | OD-16 | At 360px in pick mode the pick row has about 18px between "Picking – Esc to stop" and the target, and the shortest short form of the badge tooltip needs about 84px with its padding. What happens? | **Owner decision OD-16 (2026-11-01): hide the tooltip when there is no room.** The full text stays in the accessible description and the badge icon (shape plus colour) remains. Not chosen: (a) shrink the terminal name to "…" while the tooltip shows; (b) allow the tooltip beside the field below 380px | 2026-11-01 |
-| OD-17 | F6 with the instruction dialog open (alignment review, D-A) | **Drop the 2 s note.** F6 does nothing; the status slot keeps "Esc closes the dialog". No re-announcement either: screen-reader support for pick mode is out of scope (spec 025 § Out of scope, #440), as the spec checker found on 2026-11-01 | 2026-11-01 |
+| OD-17 | F6 with the instruction dialog open (alignment review, D-A) | **Drop the 2 s note.** F6 does nothing; the status slot keeps "Esc closes the dialog" (since the mouse-first revision: "Esc or Cancel closes the dialog"). No re-announcement either: screen-reader support for pick mode is out of scope (spec 025 § Out of scope, #440), as the spec checker found on 2026-11-01 | 2026-11-01 |
 | OD-18 | The dialog's target line at narrow widths, where the toolbar's target has left the row (alignment review, D-B) | **The target line becomes a menu button, as in the panel footer**, so the target can be changed before a send at every width | 2026-11-01 |
+| Scope (mouse only) | What "mouse only" means for this design | **"Mouse only" does not mean there is no keyboard.** Selecting elements and triggering prompts must be fully doable with the mouse, so a user who prefers clicking never needs a key; typing the instruction text is fine. Key-only paths outside that workflow (pointer lock, full-screen exit, find, zoom, Enter in the address bar) stay as they are | 2026-11-01 |
+| OD-19 | P1 – pointer lock needs only Esc to release (mouse-only review, finding X3) | **Out of scope** – the keyboard is there; Esc stays the exit | 2026-11-01 |
+| OD-20 | P2 – menus that close when the page loses focus cannot be picked by pointer (finding X6) | **Keep the page focused while picking** (DevTools "Emulate a focused page"; CDP `Emulation.setFocusEmulationEnabled`), so a hover menu stays open through the click on Pick element | 2026-11-01 |
+| OD-21 | P3 – right-click **Pick this element** has no pointer confirmation (finding Y7) | **It picks the right-clicked element at once and opens the panel** (DevTools right-click **Inspect**); Shift+F10 keeps outline-then-Enter | 2026-11-01 |
+| OD-22 | P4 – More is hidden at full width and takes Clear browsing data… and Forget… with it (finding Y4) | **More is always shown** | 2026-11-01 |
 
 ## Spec follow-ups
 
@@ -1115,6 +1158,22 @@ These answers changed spec 025's text. **Every row below is applied in spec v0.1
 | A-6 | 025-FR-050 and 025-FR-031: ← Actions leaves the dialog back to the menu on the held capture, freeze kept – *applied in v0.11.0* |
 | A-9 | 025-FR-025 and 025-FR-028: Pick element and Ctrl/Cmd+E blocked on an empty tab and on Erfana pages, with the 4 s reason note; the pick notes of 025-AC-025 and 025-AC-027 – *applied in v0.11.0* |
 | A-27 | 025-FR-021: the Proceed anyway input guard (about 500 ms, blocked look, fresh press only) – *applied in v0.11.0* |
+
+### Mouse-first revision – spec follow-ups (2026-11-01)
+
+The design above was revised for pointer-complete pick and prompt. These rows are **applied in spec v0.12.0** (025-NFR-011, 025-AC-083 and the FR and AC changes listed in the plan `.local/panel/spec-025-mouse-improved.md`); design-only copy (the × button's name, the Pick tooltip's second line, the right-click note) stays in this note.
+
+| Item | Spec change |
+| --- | --- |
+| Scope | New NFR "pointer-complete pick and prompt" with its walk-through acceptance; "Pick and prompt by mouse alone" in the overview's In scope |
+| A-31 | 025-FR-027, 025-FR-030, 025-AC-027, 025-AC-030: name **Parent element** / **Child element** and the clickable ancestor path |
+| A-32 | 025-FR-030, 025-FR-049: the × close (name "Close – nothing is sent"); a pointer press counts only if it began after the panel opened |
+| A-33, OD-21 | 025-FR-057, 025-AC-074: pointer right-click **Pick this element** picks at once |
+| A-34, OD-22 | 025-FR-023: More always shown; Clear browsing data… and Forget… live there |
+| A-35, OD-20 | 025-FR-025, 025-FR-028, 025-AC-028: focus emulation while pick mode is on; UC-004 A2 |
+| A-36 | 025-FR-027 (*Note – element gone*), 025-FR-047 / 025-FR-048 (*Note – page moved*, *Note – right-click off*), 025-FR-060 (tooltips and the notice's timer) |
+| A-37 | 025-FR-052: the dialog's text kept per tab |
+| Copy | 025-FR-065 and 025-AC-078, 025-AC-081 (banners), 025-FR-063 (empty-tab hint): the strings in the deck; 025-FR-031, 025-FR-050, 025-AC-031 name **Send** |
 
 ## Developer handoff
 
@@ -1155,6 +1214,23 @@ Round 2 – 2026-11-01, same six reviewers: 16 of 18 round-1 highs fixed, 2 part
 Round 3 – 2026-11-01, confirm round: round-2 highs R2-H1, H3, H4, H5 fixed; R2-H2 remainder open (fold order) and 5 mediums – fixed in this revision.
 
 Owner approval – 2026-11-01: the owner approved the six screens as a group (025-FR-043). Cards and screens keep their `proposed` status; nothing is marked decided by this approval.
+
+### Revision notes (round 9 – mouse-first)
+
+Round 9 – 2026-11-01: pick and prompt made fully doable by pointer (owner scope and decisions OD-19 to OD-22). Source: `.local/panel/mouse-025/merged.md` (uncommitted). Reference: Chrome DevTools' element picker.
+
+| Change | Findings |
+| --- | --- |
+| More always shown (`browser.css`, focus order, tiers, captions); fold steps still move tools into More | P4 / OD-22, Y4 |
+| Panel and sheet: × close, ancestor path beside the stepper; frames *click outside*, *toolbar click*, 360px sheet; the round-1 "no breadcrumb" rule superseded | Y8, DevTools |
+| Banners lead with the click: page focus, panel ("Esc or click outside"), dialog ("Esc or Cancel"), empty-tab hint | Y9 |
+| *Pick tooltip – off* line 2 teaches that menus stay open; frame *Hover menu opened while picking, item clicked* | Y5, P2 / OD-20 |
+| Frame *Pick this element from a right-click – picked at once, panel open* | Y7, P3 / OD-21 |
+| Notes *Page moved*, *Element gone*, *Right-click off* (the first and third drawn, the second described) | Y10, Y6, Z4 |
+| Pick-row tooltips never cover the send notice's actions; timer paused while one is open | Y11 |
+| Guard blocked look wins over hover, `cursor: not-allowed` – already `button.css`'s `aria-disabled` rule; recorded, no new CSS | Z6 |
+| Dialog text kept when another editor tab is clicked | Z7 |
+| Not applied (outside the pick-and-prompt workflow, owner scope): pointer lock, full-screen exit, find, zoom, Go row, mouse side buttons, sideways scroll | X3 / OD-19, Y1, Y2, Y3, X2, Z3, Z5 |
 
 ### Revision notes (round 8)
 

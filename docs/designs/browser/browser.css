@@ -41,11 +41,13 @@
  * into More – never a further icon-only step, R7-M2); Pick element, the
  * pop-up chip and the in-use chip below 520px (by tier only – never a fold
  * step, R6-M4).
- * More shows when any tool has folded into it, or while the Page width group
- * is in it – the width preset leaves the pick row in pick mode below 520px,
- * in Out and while a timed note shows below 700px, and while the send notice
- * shows below 800px (rules in sections 4 and 5, R6-M2). More counts in the fold
- * order: the component measures the row with More on it.
+ * More is ALWAYS shown (owner decision OD-22, P4): at full width it holds
+ * Clear browsing data…, Forget this project's browser data…, Open last capture
+ * and the zoom row; the fold steps and the Page width group only add to what
+ * it holds (the width preset leaves the pick row in pick mode below 520px, in
+ * Out and while a timed note shows below 700px, and while the send notice
+ * shows below 800px – sections 4 and 5, R6-M2). More is on the row in every
+ * measurement of the fold order: the component measures with More present.
  * Literal px because a custom property cannot be used in a container
  * condition.
  *
@@ -412,19 +414,18 @@
    measures and sets them. Folded tools keep their shortcuts and sit in More in
    toolbar order. If the focused tool folds, focus moves to More (no
    announcement). More never shrinks and is never clipped.
-   MORE ITSELF counts in this order (R6-M2): it is shown from step 3, or
-   earlier while the pick row's width preset has folded into it (the Page
-   width group – one rule set, in section 4, keyed on the pick row's state);
-   the steps above are measured with More's width already on the row, so at
-   400px in pick mode steps 1 and 2 run where step 1 alone would do without
-   it. */
+   MORE ITSELF is always on the row (OD-22, P4; it counts in this order since
+   R6-M2): it holds the data commands from full width on, and the folded tools
+   and the pick row's width preset (the Page width group) as they fold; every
+   step above is measured with More's width already on the row. */
 .erf-brw-nav:is(.erf-brw-nav--fold, .erf-brw-nav--tight1, .erf-brw-nav--snug, .erf-brw-nav--tight2) :is(.erf-brw-collapsible, .erf-brw-zoomchip) { display: none; }
 .erf-brw-nav:is(.erf-brw-nav--tight1, .erf-brw-nav--snug, .erf-brw-nav--tight2) .erf-brw-t1 { display: none; }
 .erf-brw-nav:is(.erf-brw-nav--snug, .erf-brw-nav--tight2) .erf-origin { margin-inline: var(--space-2); }
 .erf-brw-nav--tight2 .erf-brw-t2 { display: none; }
-.erf-brw-nav:is(.erf-brw-nav--fold, .erf-brw-nav--tight1, .erf-brw-nav--snug, .erf-brw-nav--tight2) .erf-brw-anchor.erf-brw-more { display: inline-flex; }
-/* More: hidden while everything fits. Two classes, so it beats .erf-brw-anchor's display. */
-.erf-brw-anchor.erf-brw-more { display: none; }
+/* More: always on the row (OD-22) – at full width too, because Clear browsing
+   data… and Forget… live only there. Two classes, so it beats
+   .erf-brw-anchor's display. */
+.erf-brw-anchor.erf-brw-more { display: inline-flex; }
 /* More never shrinks, clips or leaves (R2-H2): it is the only route to what
    has folded (fold order above). */
 .erf-brw-more,
@@ -767,8 +768,7 @@
 .erf-brw-pick:is(.erf-brw-pk-fold1, .erf-brw-pk-fold2) > .erf-brw-pk-wa { display: none; }
 .erf-brw-pick.erf-brw-pk-fold2 .erf-brw-status { margin-inline-start: var(--space-2); }
 .erf-brw-pick.erf-brw-pk-fold2 .erf-brw-status + .erf-brw-spacer { flex-basis: 0; min-inline-size: 0; }
-/* The folded preset needs a home: More shows in the navigation row, drawn whole. */
-.erf-brw-nav:has(+ :is(.erf-brw-pk-fold1, .erf-brw-pk-fold2)) .erf-brw-anchor.erf-brw-more { display: inline-flex; }
+/* The folded preset's home is More (always on the row, OD-22). */
 .erf-brw-pk-fill > .erf-brw-pk-ta > .erf-brw-target { max-inline-size: 100%; }
 .erf-brw-pk-fill .erf-brw-status {
   gap: var(--space-4);
@@ -803,13 +803,16 @@
 @container erf-brw-status (width < 700px) { .erf-brw-pk-c--ud { display: none; } }
 @container erf-brw-status (width < 540px) { .erf-brw-pk-c--echo { display: none; } }
 @container erf-brw-status (width < 380px) { .erf-brw-pk-c--key { display: none; } }
+/* The click-first banner (owner scope: mouse only): "Picking – click an element" is the
+   protected first clause; "Esc to stop" is the next to last to leave, the
+   shortcut clause before it (README § Status slot priority). */
+@container erf-brw-status (width < 300px) { .erf-brw-pk-c--esc { display: none; } }
 
 /* Optional controls give way to the first clause: the width preset label goes icon-only below 700px, and at any width while pick mode is on or the send notice shows; out of room, it folds into More (Page width) (R7-M2). */
 .erf-brw-pk-on .erf-brw-width__label { display: none; }
 @container erf-brw (width < 520px) {
   :is(.erf-brw-pk-on, .erf-brw-pa-noticing) > .erf-brw-pk-wa { display: none; }
-  /* The preset's Page width group is in More now, so More shows (R6-M2). */
-  .erf-brw-nav:has(+ :is(.erf-brw-pk-on, .erf-brw-pa-noticing)) .erf-brw-anchor.erf-brw-more { display: inline-flex; }
+  /* The preset's Page width group is in More now (R6-M2); More is always shown. */
   /* Panel or dialog open: the target leaves the row – the panel footer and the
      dialog's target button show it and change it without losing the pick. */
   .erf-brw-pk-modal > .erf-brw-pk-ta { display: none; }
@@ -819,10 +822,8 @@
    below the full tier, so it is never cut (H-07, H-09). */
 @container erf-brw (width < 700px) {
   .erf-brw-pk-away > .erf-brw-pk-wa { display: none; }
-  .erf-brw-nav:has(+ .erf-brw-pk-away) .erf-brw-anchor.erf-brw-more { display: inline-flex; }
   /* A timed note (end of range, nothing outlined) outranks the preset too. */
   .erf-brw-pk-fill:has(.erf-brw-pk-c--note) > .erf-brw-pk-wa { display: none; }
-  .erf-brw-nav:has(+ .erf-brw-pk-fill .erf-brw-pk-c--note) .erf-brw-anchor.erf-brw-more { display: inline-flex; }
 }
 
 /* Panel open (Menu state): the rows stay live and at full strength – a click
@@ -1127,6 +1128,47 @@
 .erf-brw-pa-frameline { margin: 0; color: var(--color-text-tertiary); font-size: var(--text-sm); }
 .erf-brw-pa-frameline .erf-brw-mono { color: var(--color-text-primary); }
 
+/* ---------- panel and sheet header: ancestor path and × close (run lead's call, owner scope: mouse only) ----------
+   The path imitates Chrome DevTools' breadcrumb bar: each ancestor is a button
+   (a click moves the pick there), the picked element is the current crumb
+   (aria-current, here the element chip) and the row is cut from its START behind
+   a leading "…" when short of room. The component drops whole crumbs – no CSS
+   clipping of a name – and the current crumb always stays. The × close sits
+   after the stepper, 24 × 24, and closes the panel without sending. */
+.erf-brw-pa-nav { display: flex; flex: 1 1 auto; min-inline-size: 0; }
+.erf-brw-pa-path {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-1);
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+.erf-brw-pa-path > li { display: flex; flex: 0 0 auto; align-items: center; gap: var(--space-1); }
+.erf-brw-pa-path > li:last-child { flex: 0 1 auto; min-inline-size: 0; }
+.erf-brw-pa-path__more,
+.erf-brw-pa-path__sep { color: var(--color-text-tertiary); }
+.erf-brw-pa-crumb { padding-inline: var(--space-3); font-family: var(--font-mono); font-weight: var(--font-normal); }
+.erf-brw-pa-path .erf-button:focus-visible,
+.erf-brw-pa-path .erf-button[class~='is-focus'] { outline-offset: calc(var(--space-1) * -1); }
+.erf-brw-pa-path .erf-brw-pa-el { min-inline-size: 0; max-inline-size: 100%; }
+.erf-brw-pa-path .erf-brw-pa-el > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* × is the LAST child of the panel, so Tab reaches it after the target button;
+   it is drawn at the header's end edge, and the header reserves its room. */
+.erf-brw-pa-panel > .erf-brw-pa-close {
+  position: absolute;
+  inset-block-start: var(--space-3);
+  inset-inline-end: var(--space-3);
+}
+.erf-brw-pa-panel .erf-brw-pa-refine { padding-inline-end: calc(var(--btn-height-sm) + var(--space-3)); }
+/* The path is the header's one growing item: the stepper keeps its size. */
+.erf-brw-pa-refine > .erf-brw-pa-step { flex: 0 0 auto; }
+
 /* ---------- the four actions: a row of buttons, not menu rows (H-08) ----------
    Nothing about the look promises ↓ moves to the next action. Explain first. */
 /* Four buttons in one row; wrapping 2 × 2 only when the panel is under 320px
@@ -1227,7 +1269,6 @@
 .erf-brw-pa-noticing .erf-brw-width__label { display: none; }
 @container erf-brw (width < 800px) {
   .erf-brw-pa-noticing > .erf-brw-pk-wa { display: none; }
-  .erf-brw-nav:has(+ .erf-brw-pa-noticing) .erf-brw-anchor.erf-brw-more { display: inline-flex; }
   .erf-brw-pa-nact__label { display: none; }
   .erf-brw-pa-nact { inline-size: var(--input-height-sm); padding: 0; justify-content: center; }
 }
