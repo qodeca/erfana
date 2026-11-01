@@ -4,7 +4,7 @@
   "tier": "T4",
   "version": "0.12.0",
   "created": "2026-10-31T22:42:00.358Z",
-  "updated": "2026-11-01T20:30:00.000Z",
+  "updated": "2026-11-01T18:24:20.000Z",
   "application": {
     "name": "Built-in browser with element prompts",
     "domain": null,
@@ -33,7 +33,7 @@
       "title": "Overview",
       "exists": true,
       "word_count": 1172,
-      "last_updated": "2026-11-01T20:30:00.000Z",
+      "last_updated": "2026-11-01T18:24:20.000Z",
       "validation_score": null
     },
     {
@@ -41,8 +41,8 @@
       "file": "requirements/02-requirements.md",
       "title": "Requirements",
       "exists": true,
-      "word_count": 16831,
-      "last_updated": "2026-11-01T20:30:00.000Z",
+      "word_count": 16841,
+      "last_updated": "2026-11-01T18:24:20.000Z",
       "validation_score": null
     },
     {
@@ -50,8 +50,8 @@
       "file": "requirements/03-use-cases.md",
       "title": "Use cases",
       "exists": true,
-      "word_count": 1925,
-      "last_updated": "2026-11-01T20:00:00.000Z",
+      "word_count": 1923,
+      "last_updated": "2026-11-01T18:24:20.000Z",
       "validation_score": null
     },
     {
@@ -59,8 +59,8 @@
       "file": "requirements/04-acceptance.md",
       "title": "Acceptance criteria",
       "exists": true,
-      "word_count": 14691,
-      "last_updated": "2026-11-01T20:00:00.000Z",
+      "word_count": 14689,
+      "last_updated": "2026-11-01T18:24:20.000Z",
       "validation_score": null
     },
     {
@@ -68,8 +68,8 @@
       "file": "requirements/05-notes.md",
       "title": "Notes",
       "exists": true,
-      "word_count": 2214,
-      "last_updated": "2026-11-01T17:40:00.000Z",
+      "word_count": 2213,
+      "last_updated": "2026-11-01T18:24:20.000Z",
       "validation_score": null
     }
   ],
@@ -1184,13 +1184,14 @@
     "total_requirements": 74,
     "total_use_cases": 6,
     "total_stakeholders": 2,
-    "total_words": 36833,
-    "deprecated_count": 0
+    "total_words": 36838,
+    "deprecated_count": 0,
+    "word_count_method": "whitespace-separated tokens per file (Python str.split()), markdown and table syntax included"
   },
   "validation": {
     "overall_score": null,
-    "passed": true,
-    "last_validated": "2026-11-01T20:45:00.000Z",
+    "passed": null,
+    "last_validated": null,
     "threshold": 80
   },
   "tags": [
@@ -1346,32 +1347,26 @@
       "by": "claude-code"
     },
     {
-      "date": "2026-11-01T18:30:00.000Z",
+      "date": "2026-11-01T18:24:20.000Z",
       "operation": "UPDATE",
       "target": "spec",
       "description": "Design alignment pass (v0.11.0), owner-approved plan .local/panel/spec-025-alignment-improved.md and findings .local/panel/align-025/merged.md: H1, H2, H5, M1–M8, M10–M18, M21, M22, L1, L2, L4, L7, L10–L19, L21, L22, L24 applied to FR-002, 004, 011, 014, 019, 021, 022, 025, 026, 028, 031, 032, 047, 050, 051, 060, 061, 065 and AC-002, 004, 011, 019, 021, 022, 023, 025, 027, 030, 061, 063, 064, 065, 070, 077, 081 plus the test rules; owner decisions D-A (F6 with the dialog open: no 2 s note) and D-B (the dialog's target line is a menu button); queue gap 300 ms; F6 landing controls. Spec-checker fixes: F6 in the dialog is not announced (screen-reader support for pick mode is out of scope), capture file-name naming contract, banner widths tested at 1280, 400 and 360px, UC-004 traces and exception flows E3–E5, FR-015 Linux exception, UC-006 history postcondition, 500 ms guard without \"about\". Second checker pass: UC-006 postcondition, FR-047 reserved-key sentence split (Esc is not reserved), FR-038 / AC-038 console entries of either level, AC-055 and AC-057 scenario lines. No new IDs.",
       "by": "claude-code"
     },
     {
-      "date": "2026-11-01T18:45:00.000Z",
+      "date": "2026-11-01T18:24:20.000Z",
       "operation": "VALIDATE",
       "target": "spec",
       "description": "spec-validator (T4) after the v0.11.0 alignment pass: passes – high 0, medium 2 (FR-019 / FR-014 bundle several rules under one ID; FR-056 hung-page state described both as an Erfana page and as a strip notice), low 14. Third run; the first two failed and their findings were fixed.",
       "by": "claude-code"
     },
     {
-      "date": "2026-11-01T19:30:00.000Z",
+      "date": "2026-11-01T18:24:20.000Z",
       "operation": "UPDATE",
       "target": "spec",
       "description": "Mouse-first pick and prompt (v0.12.0), owner-approved plan .local/panel/spec-025-mouse-improved.md (findings .local/panel/mouse-025/merged.md; owner decisions P1–P4): new NFR-011 and AC-083 (pointer-complete pick and prompt); Send button (FR-031, FR-050); Parent element, Child element and the ancestor path, and the 'That element is gone – pick again' note (FR-027, FR-030); focus emulation while picking and the click route for hover-only picks (FR-025, FR-028, UC-004 A2); Pick this element picks at once from a pointer right-click (FR-057, FR-053); banners and empty-tab hint lead with the click (FR-065, FR-063); 'The page moved – click again' (FR-048); fresh pointer press (FR-030); dialog text kept across an editor-tab click (FR-052); More always shown (FR-023, FR-049); UC-001 A6; test rules (input method, one-line clauses). Touched AC-023, AC-027, 028, 030, 031, 044, 057, 062, 063, 064, 066, 070, 074, 077, 078, 081 and AC-054. New IDs: 025-NFR-011, 025-AC-083. Checker fixes: hung-page state is a strip notice (FR-056, FR-014, FR-025, FR-054); popup strip read-only top part and interactive prompt rows with F6 order (FR-011); FR-057 traces UC-001; overview origin wording.",
       "by": "claude-code"
-    },
-    {
-      "date": "2026-11-01T20:45:00.000Z",
-      "operation": "VALIDATE",
-      "target": "spec",
-      "description": "spec-validator (T4) on v0.12.0: passes – high 0, medium 2 (FR-057 keyboard-opened right-click pick vs the overview's out-of-scope keyboard-only picking; FR-019 groups several rules under one ID), low 15. Second run; the first found the hung-page contradiction and the popup strip wording, both fixed.",
-      "by": "claude-code"
     }
-  ]
+  ],
+  "status": "active"
 }

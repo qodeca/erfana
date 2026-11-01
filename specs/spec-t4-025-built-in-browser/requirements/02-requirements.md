@@ -35,7 +35,7 @@
 | 025-FR-025 | Pick mode on and off | Must | 025-UC-001, 025-UC-004 | 025-AC-025 |
 | 025-FR-026 | Hover highlight with a label | Must | 025-UC-001, 025-UC-004 | 025-AC-026 |
 | 025-FR-027 | Parent and child refinement | Must | 025-UC-001, 025-UC-004 | 025-AC-027 |
-| 025-FR-028 | Picking hover-only elements by shortcut | Must | 025-UC-004 | 025-AC-028 |
+| 025-FR-028 | Picking hover-only elements, by click or shortcut | Must | 025-UC-004 | 025-AC-028 |
 | 025-FR-029 | Picking in every frame | Must | 025-UC-001 | 025-AC-029 |
 | 025-FR-030 | Confirming a pick opens the web prompt-actions menu | Must | 025-UC-001, 025-UC-004 | 025-AC-030 |
 | 025-FR-031 | Which actions open a dialog | Must | 025-UC-001, 025-UC-004 | 025-AC-031 |
@@ -260,7 +260,7 @@ Terms: **page focus** means keyboard focus is inside the web page or one of its 
 
 ### 025-FR-015: One persistent profile per project
 
-**Description:** Each project shall have its own browser profile. Cookies, local storage, cache, site permissions, certificate exceptions and saved basic-auth credentials shall persist across Erfana restarts (except on Linux with the `basic_text` backend, where 025-FR-022 keeps them for the session only) and stay separate between projects, and the browser session shall be separate from Erfana's own session and from the HTML Preview's session. Profile data shall live in `.erfana/browser/profile/` and captures in `.erfana/browser/captures/`.
+**Description:** Each project shall have its own browser profile. Cookies, local storage, cache, site permissions, certificate exceptions and saved basic-auth credentials shall persist across Erfana restarts (except on Linux with the `basic_text` backend, where 025-FR-022 keeps saved credentials in memory for the session only) and stay separate between projects, and the browser session shall be separate from Erfana's own session and from the HTML Preview's session. Profile data shall live in `.erfana/browser/profile/` and captures in `.erfana/browser/captures/`.
 
 Erfana shall:
 
@@ -361,7 +361,7 @@ Every other permission request, and every device request through the HID, serial
 
 **Priority:** Must · **Traces to:** 025-UC-001, 025-UC-004 · **Acceptance:** 025-AC-027
 
-### 025-FR-028: Picking hover-only elements by shortcut
+### 025-FR-028: Picking hover-only elements, by click or shortcut
 
 **Description:** In pick mode, with page focus, no prompt-actions menu or dialog open and the mouse over an element, pressing Ctrl/Cmd+E again shall pick the element under the mouse at once, while hover-only content (menus, tooltips) is still shown, and open the menu of 025-FR-030; with toolbar focus Ctrl/Cmd+E does nothing (025-FR-051). The same content can be picked with the mouse alone: the user clicks **Pick element**, hovers the content open and clicks the item. Starting pick mode shall not close hover-only content the mouse is over, whether by Ctrl/Cmd+E or by the **Pick element** button, because the page keeps focus emulation while pick mode is on (025-FR-025). In pick mode the click confirms the element under the mouse and, as every click pick, does not freeze the page. The user guide shall name both routes, the click and the shortcut.
 
@@ -524,7 +524,7 @@ If a browser key navigates or closes the tab (025-FR-052), or the tab or project
 | Outside the browser tab, after the menu closed because focus left (025-FR-014) | "Picking – the panel closed when you left; pick again" |
 | Outside the browser tab, with an instruction dialog kept open | "Picking – click to return to the dialog" |
 
-The page-focus banner leads with the click, the route every user has. Its third clause, the shortcut, is optional and is the first to drop when space is short, then the second clause ("Esc to stop"); the first clause never drops. These steps have no fixed breakpoints: each happens when the part no longer fits, in the order of the design's status-slot priority and fold order (`docs/designs/browser/README.md` § States › Tiers). The acceptance tests check fixed widths of the browser tab: at 1280px all three clauses show; at 400px the first two clauses show and the shortcut clause does not; at 360px the first clause shows whole and no text is clipped or wrapped. While the page is frozen (025-FR-028), the banner shall add the chip "Page paused". The **Pick element** button's tooltip shall name both uses of Ctrl/Cmd+E. Every way pick mode ends – Esc or the button with no menu or dialog open, a send, a navigation, hiding the tab (025-FR-052), closing the tab or the window, a crash – shall remove the frame, the banner and any freeze. Esc or **Cancel** in a menu or dialog removes only the freeze and the "Page paused" chip; pick mode, the frame and the banner stay.
+The page-focus banner leads with the click, the route every user has. Its third clause, the shortcut, is optional and is the first to drop when space is short, then the second clause ("Esc to stop"); the first clause never drops. These steps have no fixed breakpoints: each happens when the part no longer fits, in the order of the design's status-slot priority and fold order (`docs/designs/browser/README.md` § States › Tiers). The acceptance tests check fixed widths of the browser tab: at 1280px all three clauses show; at 400px the first two clauses show and the shortcut clause does not; at 360px the first clause shows whole and no text is clipped or wrapped. While the page is frozen (025-FR-028), the banner shall add the chip "Page paused". The **Pick element** button's tooltip shall name both uses of Ctrl/Cmd+E. Every way pick mode ends – Esc or the button with no menu or dialog open, a send, a navigation, hiding the tab (025-FR-052), closing the tab or the window, a crash – shall remove the frame, the banner and any freeze. Esc in the menu, or Esc or **Cancel** in the dialog, removes only the freeze and the "Page paused" chip; pick mode, the frame and the banner stay.
 
 **Priority:** Must · **Traces to:** 025-UC-001, 025-UC-004 · **Acceptance:** 025-AC-081
 

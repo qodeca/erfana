@@ -107,7 +107,7 @@ Fixed sentences quoted in the flows ("The page reloaded – …", "No agent is r
 
 **Main flow:**
 1. The reviewer types the staging address in the address bar.
-2. The certificate warning page appears; after its short input guard of about 500 ms, the reviewer selects **Proceed anyway** (025-FR-021).
+2. The certificate warning page appears; after its input guard of 500 ms, the reviewer selects **Proceed anyway** (025-FR-021).
 3. The sign-in box appears; the reviewer enters credentials, ticks **Remember for this project** and selects **Sign in** (025-FR-022).
 4. The site's own login page opens a GitHub sign-in popup; the reviewer signs in and the popup reports back (025-FR-011).
 5. The reviewer closes Erfana and opens the project again the next day.
