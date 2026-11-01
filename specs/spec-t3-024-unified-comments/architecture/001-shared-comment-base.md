@@ -74,6 +74,7 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | **Added since** `src/renderer/src/components/Comments/overlay/useHostThreads.ts` (1) | S (for renderer-hosted previews) | – |
 | **Added since** `src/shared/comments/overlayCore/pointerFollow.ts` (1) | S | Pure rule both overlays run: when the pointer takes the picker over. No imports, no DOM |
 | **Added since** `src/shared/comments/overlayCore/pickerKeys.ts` (1) | S | Pure rule both overlays run: the picker's keys and its tree walk. No imports, no DOM |
+| **Added since** `src/shared/comments/overlayCore/selectionRules.ts` (1) | S | Pure rule both overlays run: where the Comment button sits, and when a right-click is about the selection. No imports, no DOM |
 | **Added since** `src/renderer/src/components/Comments/overlay/useHostPanelKeys.ts` (1) | S (for renderer-hosted previews) | – |
 | **Added since** `src/renderer/src/components/Comments/commentWindowDismiss.ts` (1) | S | – |
 | **Added since** `src/renderer/src/components/Comments/commentModeEscape.ts` (1) | S | – |

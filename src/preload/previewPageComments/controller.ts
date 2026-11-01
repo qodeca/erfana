@@ -25,11 +25,11 @@ import { PickHold } from './pickHold'
 import { movePicker, type PickerMove, type PickerStep, type PickerTree } from '../../shared/comments/overlayCore/pickerKeys'
 import { focusedElement, pageTree, pickableExcept, pickerStart, type PickablePredicate } from './picker'
 import { MarkResolver, type MarkPlacement } from './marks'
-import { elementOfHit, hitAt, type OverlayHit } from './overlayHits'
+import { elementOfHit, hitAt, linkedHover, NO_HOVER, routeOverlayEvent, type OverlayHit } from './overlayHits'
 import { HelloRepeater, RevealFlash } from './revealFlash'
 import { describeTarget, elementPoint, PickBudgets, screenOf, stackPart, StepSender, stepElementOf, viewOf, wordsPart, type PickKind, type PickPayload } from './picks'
 import { PageMenu } from './pageMenu'
-import { SelectionButton, selectionEnd } from './selectionButton'
+import { onSelection, SelectionButton, selectionEnd, selectionInView } from './selectionButton'
 import { readSelection, type PageWords } from './words'
 import { placePins, type PinInput, type PinPlacement } from './pins'
 import { CursorSheet, PageWatch, RenderScheduler, ScrollRestore } from './scheduling'
@@ -106,11 +106,11 @@ export class CommentController {
     this.tree = pageTree(() => this.body(), this.pickable)
     this.icons = new IconResolver(this.tokens, () => this.watch.version)
     this.markResolver = new MarkResolver(() => this.watch.version)
-    this.button = new SelectionButton(deps.win)
+    this.button = new SelectionButton(deps.win, now, () => this.scheduler.soon())
     this.flash = new RevealFlash(now, () => this.scheduler.soon())
     this.hellos = new HelloRepeater(now, deps.send)
     const open = (): boolean => !this.state.mode && this.state.commentable
-    this.menu = new PageMenu({ win: deps.win, tokens: this.tokens, now, open, words: () => this.selectionWords(), wordsPoint: () => selectionEnd(deps.win), keyTarget: () => this.menuKeyTarget(), send: payload => this.sendPick(payload) })
+    this.menu = new PageMenu({ win: deps.win, tokens: this.tokens, now, open, words: () => this.selectionWords(), wordsAt: point => this.wordsAt(point), wordsPoint: () => selectionEnd(deps.win), keyTarget: () => this.menuKeyTarget(), send: payload => this.sendPick(payload) })
   }
 
   /** Comment mode is on for this frame. */
@@ -215,27 +215,16 @@ export class CommentController {
   overlayEvent(event: MouseEvent): void {
     const hit = this.overlayHit({ x: event.clientX, y: event.clientY })
     if (hit === null) return
-    const primaryClick = event.type === 'click' && event.button === 0 && event.detail > 0
-    if (hit.kind === 'pin' || hit.kind === 'mark') {
-      // A mark acts as its pin; a stack pin names every pin merged into it (C-17).
-      const { key, element } = hit.kind === 'pin' ? hit.pin : hit.mark
-      if (primaryClick) this.pickIcon(key, element, event, hit.kind === 'pin' ? hit.pin.members : undefined)
-      return
-    }
-    // The Comment button opens the window on its words (C-16).
-    if (hit.kind === 'button') {
-      if (primaryClick) this.pickElement('open', hit.words.target, event, hit.words)
-      return
-    }
-    // A shield exists only in comment mode (`shieldsOf`).
-    if (primaryClick) this.pickElement('open', hit.iframe, event)
-    if (event.type === 'contextmenu') this.pickElement('menu', hit.iframe, event)
+    routeOverlayEvent(hit, event, {
+      icon: (key, element, click, members) => this.pickIcon(key, element, click, members),
+      element: (kind, element, click, words) => this.pickElement(kind, element, click, words)
+    })
   }
 
   /**
    * A trusted press, click or context menu on the page, in comment mode. A
    * drag selects words and shows the Comment button; a click picks (024-FR-004,
-   * overlayCore `gesture`). With words selected, the menu is about them.
+   * overlayCore `gesture`). The menu is about the words only with the pointer on them (I-22).
    */
   pageEvent(event: MouseEvent): void {
     const target = event.target instanceof Element ? event.target : null
@@ -246,7 +235,7 @@ export class CommentController {
     if (event.type === 'contextmenu') {
       // Shift+F10 / the Menu key also fire a contextmenu: the key already picked.
       if (this.deps.now() - this.keyboardMenuAt < 1_000) return
-      const words = this.selectionWords()
+      const words = this.wordsAt(at)
       this.pickElement('menu', words?.target ?? element, event, words)
     }
     if (event.type === 'click' && event.button === 0 && event.detail > 0) {
@@ -295,6 +284,7 @@ export class CommentController {
     this.sections.cancel()
     this.cursor.set(false)
     this.flash.dispose()
+    this.button.dispose()
     this.host.dispose()
   }
 
@@ -363,7 +353,7 @@ export class CommentController {
   /** Enter and the menu act on what is outlined (K-11): the Comment button's words only when they are its words. */
   private pickOutlined(kind: 'open' | 'menu', element: Element): void {
     if (kind === 'menu') this.keyboardMenuAt = this.deps.now()
-    const shown = this.button.current
+    const shown = this.button.wordsInView(viewportOf(this.deps.win))
     const words = shown?.target === element ? shown : null
     this.pickElement(kind, element, undefined, words, words === null ? null : this.button.menuPoint())
   }
@@ -381,6 +371,11 @@ export class CommentController {
   /** The page's selected words, if any (never in the overlay). */
   private selectionWords(): PageWords | null {
     return readSelection(this.deps.win, node => this.host.isHost(node))
+  }
+
+  /** The page's selected words, when the pointer at `point` is on them. */
+  private wordsAt(point: Point): PageWords | null {
+    return onSelection(this.deps.win, point) ? this.selectionWords() : null
   }
 
   /** Pins and marks exist only in a commentable frame: a non-commentable state carries no icons. */
@@ -414,8 +409,8 @@ export class CommentController {
       this.button.hide()
       return
     }
-    // Turned on with words selected: the mode only comes on, around them, with the Comment button (C-16).
-    const words = this.selectionWords()
+    // Turned on with words selected in view: the mode only comes on, around them, with the Comment button (C-16).
+    const words = selectionInView(this.deps.win, viewportOf(this.deps.win)) ? this.selectionWords() : null
     if (words !== null) {
       this.current = words.target
       this.button.show(words)
@@ -468,6 +463,7 @@ export class CommentController {
     this.shields = this.state.mode ? shieldsOf(doc, this.frameMap, viewport) : []
     this.watch.observeSizes(pinned.map(r => r.element as Element))
     const flash = this.flash.current()
+    const hover = this.state.mode && this.pointer !== null ? linkedHover(this.overlayHit(this.pointer), this.marks) : NO_HOVER
     const needed = this.state.mode || this.pins.length > 0 || this.marks.length > 0 || flash !== null
     if (!needed && this.view === null) return
     const root = this.host.ensure()
@@ -490,6 +486,7 @@ export class CommentController {
         flash: flash === null ? null : clipToViewport(boxOf(flash), viewport),
         marks: this.marks,
         marksClickable: this.state.mode,
+        hover,
         button: this.buttonBox
       },
       viewport

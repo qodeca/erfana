@@ -457,6 +457,20 @@ describe('commentPickHandler pins, control picks and budgets', () => {
     expect(h.out.icon.mock.calls[0][2]).toBe(key)
   })
 
+  it('I-13 a mark names a place its pin has: the opener hears the pin and the place; anything else is dropped', async () => {
+    const h = await setup()
+    const record = h.frames.get(h.top.frameTreeNodeId)!
+    const [key, pin] = [...record.pins][0]
+    record.pins.set(key, { ...pin, words: [{ exact: 'x', prefix: '', suffix: '' }], wordThreads: pin.threadIds.slice(0, 1) })
+    h.handler.pick(eventFrom(h.top), { kind: 'icon', via: 'pointer', key: `${key}-w0`, view: VIEW })
+    expect(h.out.icon).toHaveBeenCalledTimes(1)
+    expect(h.out.icon.mock.calls[0].slice(2, 3)).toEqual([key])
+    expect(h.out.icon.mock.calls[0][4]).toBe(0)
+    h.handler.pick(eventFrom(h.top), { kind: 'icon', via: 'pointer', key: `${key}-w1`, view: VIEW })
+    h.handler.pick(eventFrom(h.top), { kind: 'icon', via: 'pointer', key: 'p999-w0', view: VIEW })
+    expect(h.out.icon).toHaveBeenCalledTimes(1)
+  })
+
   it('C-17 (HTML) a stack pin is opened only when every key it names is one of the frame’s own pins', async () => {
     const h = await setup()
     const [key] = [...h.frames.get(1)!.pins.keys()]

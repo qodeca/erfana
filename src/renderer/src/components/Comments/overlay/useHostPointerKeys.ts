@@ -83,12 +83,16 @@ export interface HostPointerKeysOptions {
   /** Open one thread from its marked words; `at` is the target the click was in. */
   readonly onOpenMark: (threadKey: string, at: HTMLElement | null) => void
   /**
-   * Open the menu; `target` is the one under the pointer or outlined. The host prefers a selection's,
-   * except on a key (`byKey`) in comment mode, which acts on what is outlined (K-11).
+   * Open the menu; `target` is the one under the pointer or outlined. The host takes a selection's when the
+   * pointer is on it (I-22), or on a key (`byKey`), except in comment mode, which acts on what is outlined (K-11).
    */
   readonly onMenu: (target: HTMLElement | null, at: { x: number; y: number }, byKey?: boolean) => void
   /** The selection's last line box, or `null` when nothing is selected (keyboard-opened menu, C-08.5). */
   readonly selectionRect: () => DOMRect | null
+  /** The target holding a selection in view, or `null`: the keyboard's mode entry starts there (C-08.2, I-12). */
+  readonly selectionTarget: () => HTMLElement | null
+  /** Whether a viewport point is on the selection: only there is a right-click about the words (I-22). */
+  readonly onSelectionAt: (x: number, y: number) => boolean
   readonly onSay: (text: string) => void
   /** A key moved the pick: the Comment button's words are behind it. */
   readonly onKeyMove: () => void
@@ -189,13 +193,12 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
     return undefined
   }, [mode, live, releasePick])
 
-  // C-08.2: the block holding the selection's anchor, else the first block in view.
+  // C-08.2: the block holding a selection in view, else the first block in view.
   const focusFirst = useCallback(
     (lead = false) => {
       // Asked a frame after the mode turned on: a pick, a menu or a window that came first keeps the focus.
       if (pickedRef.current?.isConnected === true || latest.current.windowOpen) return
-      const anchor = hasSelection() ? (window.getSelection()?.anchorNode ?? null) : null
-      const held = anchor !== null && latest.current.scroller?.contains(anchor) ? adapter.targetAt(anchor) : null
+      const held = latest.current.selectionTarget()
       const first =
         held !== null && adapter.canComment(held).ok
           ? held
@@ -291,7 +294,7 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
     const onContextMenu = (event: MouseEvent): void => {
       const target = targetOf(event)
       // In comment mode every right-click is the menu's, as in the HTML Preview – off every target, too (M-08).
-      if (target === null && !hasSelection() && !latest.current.mode) return
+      if (target === null && !latest.current.onSelectionAt(event.clientX, event.clientY) && !latest.current.mode) return
       event.preventDefault()
       event.stopPropagation()
       latest.current.onMenu(target, { x: event.clientX, y: event.clientY })
@@ -315,7 +318,7 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
         const words = hasSelection() ? latest.current.selectionRect() : null
         if (words !== null) {
           event.preventDefault()
-          latest.current.onMenu(null, { x: words.left + MENU_KEY_OFFSET_PX, y: words.bottom })
+          latest.current.onMenu(null, { x: words.left + MENU_KEY_OFFSET_PX, y: words.bottom }, true)
           return
         }
         const first = firstTargetInView(current, scroller.getBoundingClientRect())

@@ -35,7 +35,7 @@ import type { CommentBinding, CommentKeyStore } from '../../comments/commentKeyS
 import type { CommentFrameLike, FrameRecord } from './commentFrames'
 import { NOT_COMMENTABLE, buildDraft, buildPin, draftKeyOf, type BuiltDraft, type BuiltPin, type CommentDraft } from './commentDraftBuilder'
 import { menuPoint } from './commentMenuPoint'
-import type { PinGroup } from './commentPins'
+import { threadsOfWords, type PinGroup } from './commentPins'
 import { captureFreshStill, waitForPaint, type FreshStillDeps, type PickFramePlace } from './commentStillCapture'
 import type { FrameOffset } from './commentScripts'
 import { samePathKey } from '../../comments/commentUnsavedSources'
@@ -78,7 +78,7 @@ export interface DraftOpenerDeps {
 /** Opens drafts and pin threads for one view. */
 export interface CommentDraftOpener {
   element(frame: CommentFrameLike, record: FrameRecord, entry: ElementTokenEntry | undefined, pick: CommentPick): Promise<void>
-  icon(frame: CommentFrameLike, record: FrameRecord, pinKey: string, pick: CommentPick): Promise<void>
+  icon(frame: CommentFrameLike, record: FrameRecord, pinKey: string, pick: CommentPick, word?: number): Promise<void>
   /** A new comment on the element a listed thread stands on (C-22): the window is up, so nothing is painted or captured. */
   onThread(frame: CommentFrameLike, record: FrameRecord, entry: ElementTokenEntry, runtime: PinGroup['runtime'], view: CommentPickView): Promise<CommentAck>
 }
@@ -256,9 +256,11 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
   /**
    * A pin's threads and blocks, and a draft on its element for "New comment".
    * A stack pin's click (C-17) names the other pins merged into it: their
-   * threads and blocks follow the first pin's, in document order.
+   * threads and blocks follow the first pin's, in document order. A mark's
+   * click (I-13) names the place of its words in the pin: only the thread on
+   * them opens, as an underline's does in the Markdown Preview.
    */
-  async function icon(frame: CommentFrameLike, record: FrameRecord, pinKey: string, pick: CommentPick): Promise<void> {
+  async function icon(frame: CommentFrameLike, record: FrameRecord, pinKey: string, pick: CommentPick, word?: number): Promise<void> {
     const pin = record.pins.get(pinKey)
     const file = record.file
     if (pin === undefined || file === undefined) return
@@ -267,7 +269,9 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
     const entry = record.loadId === undefined ? undefined : deps.tokens.lookup(record.loadId, pin.token)
     const painted = paintAndCapture(placeOf(frame, deps.mainFrame()), pick)
     const built = await pinOf(frame, file, entry, pin, pick, stackedEntries(record, stacked))
-    const { blocks } = built
+    const marked = word === undefined ? [] : threadsOfWords(pin, word)
+    const threadIds = marked.length > 0 ? marked : [pin, ...stacked].flatMap(p => p.threadIds)
+    const blocks = marked.length > 0 ? [] : built.blocks
     const offset = await painted
     const point = pointOf(pick, offset)
     if (!stillCurrent(record, file) || point === null) return
@@ -276,7 +280,7 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
       kind: 'icon',
       point,
       ...display(file, frame),
-      threadKeys: [pin, ...stacked].flatMap(p => p.threadIds).map(threadId => deps.keys.keyFor(deps.binding, { kind: 'thread', realPath, threadId })),
+      threadKeys: threadIds.map(threadId => deps.keys.keyFor(deps.binding, { kind: 'thread', realPath, threadId })),
       blockKeys: blocks.map(({ rawHash, start }) => deps.keys.keyFor(deps.binding, { kind: 'block', realPath, rawHash, start })),
       ...minted(built.draft)
     })

@@ -463,10 +463,10 @@ Cards: docs/design-system/system/components/badge/index.html#counter (the attent
 **Design.**
 
 Comment button (called the 'chip' in earlier drafts – the Badges card's chip is a static label, so this is a button):
-- About 150ms after a pointer-up that leaves a non-collapsed selection inside a commentable target, draw a Comment button at the proposed `--toolbar-tool-height` (28px, Toolbar card) `--space-4` above the end of the selection's last line, flipped below near the viewport top.
+- About 150ms after a pointer-up that leaves a non-collapsed selection inside a commentable target, draw a Comment button 28px high (`--btn-height-sm` plus two `--space-1`, as the HTML overlay computes it) `--space-4` above the end of the selection's last line in view, flipped below within 48px of the view's top. The same rule in both previews (`overlayCore/selectionRules`, plan step 9).
 - Content: `message-square-plus` 16px plus 'Comment'.
-- Look: `--color-bg-elevated` with the Surfaces card's floating edge and shadow (`--color-border-subtle` plus `--shadow-md`, `foundations/surfaces.html#floating`), radius 0, `--text-sm`.
-- Takes no focus and does not alter the selection. Hides on Esc, scroll or collapse.
+- Look: `--color-bg-elevated` with the Surfaces card's floating edge and shadow (`--color-border-subtle` plus `--shadow-md`, `foundations/surfaces.html#floating`), radius 0, `--text-sm`. The HTML overlay keeps its ink ground with an accent edge, because the page's ground colour is unknown (differences table D-37).
+- Takes no focus and does not alter the selection. It follows the selection on a scroll, goes while the selection is out of view and comes back with it. Esc or a collapsed selection ends it, including a script clearing the selection (owner decision, 2026-11-01, I-10).
 - Click → new-comment window on the words.
 - Markdown: shown inside and outside comment mode. HTML: only in comment mode (the page owns its mouse outside it; see OD-01), drawn in the overlay shadow root with the label as generated content so Find ignores it.
 - This resolves INT-03 (labelled button) vs BEN-04 (24px icon only): the label wins for learnability.
@@ -497,7 +497,7 @@ Cards: docs/designs/comments/selection-comments/index.html (Comment button frame
 
 Underline:
 - Markdown: a plain click inside an underlined range (no drag, not on a link) opens the window with only that thread expanded and its phrase in the active fill; other threads on the block are folded below. Hit-test with `caretRangeFromPoint` against cached Ranges. Hover shows a pointer, the active fill and the title 'Comment by {name} – click to open'.
-- HTML: in comment mode, underline boxes take clicks like pins. Outside the mode the page keeps its clicks.
+- HTML: in comment mode, underline boxes take clicks and open that one thread, as in Markdown (I-13). The pick names the mark by its pin's key and the words' place in the pin, and main finds the thread, because no thread id reaches the page. Hover shows the pointer and the active look; the title is left out, because an author's name does not reach the page (differences table D-53). Outside the mode the page keeps its clicks.
 - Linked hover: hovering or focusing an underline puts its pin in the hover state; hovering a pin raises all its underlines to the active fill.
 - In a multi-thread window, each thread starts with its quote box.
 

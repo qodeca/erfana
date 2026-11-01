@@ -153,4 +153,54 @@ test.describe('HTML Preview comments – selected words (024-AC-004)', () => {
     const text = expectWordsBlock(before, await diskBytes(file))
     expect(text).toContain('Note-SEL-a2')
   })
+
+  test('I-22 a right-click away from selected words is about what is under the pointer', async ({ windowWithTestProject, appWithTestProject }) => {
+    const app = appWithTestProject
+    const page = windowWithTestProject
+    const preview = new HtmlPreviewPage(page, app)
+    const chrome = new CommentChrome(page, preview, 'selection.html')
+    await setGlobalSetting(page, 'comments', reviewer(NAME))
+
+    const panelId = await openCommentPage(preview, app, PAGE, TITLE)
+    await chrome.modeOn(app, panelId, TARGET)
+    await selectWords(app)
+    const other = await waitForBox(app, 'other', TARGET)
+    const away = { x: Math.round(other.left + 40), y: Math.round(other.top + other.height / 2) }
+    expect(await mouseAt(app, away, 'right', TARGET), 'no preview to right-click').toBe(true)
+    await expect(chrome.menu()).toBeVisible({ timeout: PREVIEW_BUDGET_MS })
+    await expect(chrome.menu()).toHaveAttribute('aria-label', 'Section')
+  })
+
+  test('I-13 in comment mode a click on an underline opens that one thread', async ({ windowWithTestProject, appWithTestProject }) => {
+    const app = appWithTestProject
+    const page = windowWithTestProject
+    const preview = new HtmlPreviewPage(page, app)
+    const chrome = new CommentChrome(page, preview, 'selection.html')
+    await setGlobalSetting(page, 'comments', reviewer(NAME))
+
+    const panelId = await openCommentPage(preview, app, PAGE, TITLE)
+    await chrome.modeOn(app, panelId, TARGET)
+    await waitForViewShown(app, TARGET)
+    const box = await waitForBox(app, 'ship', TARGET)
+    const y = Math.round(box.top + box.height / 2)
+    const near = Math.round(box.left + 40)
+    const far = Math.round(box.left + 320)
+
+    /** Comment on the words across `from` to `to` in the one line; `count` comments stand once it is saved. */
+    const comment = async (from: number, to: number, note: string, count: number): Promise<void> => {
+      await waitForViewShown(app, TARGET)
+      expect(await dragInPage(app, { x: from, y }, { x: to, y }, TARGET), 'no preview to drag in').toBe(true)
+      expect(await pressInPage(app, 'Enter', [], TARGET)).toBe(true)
+      await expect(chrome.window()).toHaveAttribute('data-view', /^(identity|new)$/, { timeout: PREVIEW_BUDGET_MS })
+      await chrome.saveNewComment(note, PAGE, NAME)
+      await waitForCommentLoad(app, PAGE, 'page', count)
+      await expectPin(app, 'ship', true, TARGET)
+    }
+    await comment(near - 30, near + 30, 'Note-SEL-near', 1)
+    await comment(far - 60, far + 60, 'Note-SEL-far', 2)
+
+    expect(await mouseAt(app, { x: far, y }, 'left', TARGET), 'no preview to click').toBe(true)
+    await expect(chrome.window()).toContainText('Note-SEL-far', { timeout: PREVIEW_BUDGET_MS })
+    await expect(chrome.window()).not.toContainText('Note-SEL-near')
+  })
 })

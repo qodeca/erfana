@@ -142,7 +142,12 @@ export class MarkdownCommentsPage {
    * would leave it, and return the selection's last line box in page pixels.
    */
   async selectWords(tag: string, line: number, words: string): Promise<{ x: number; y: number; right: number }> {
-    const box = await this.target(tag, line).evaluate((el, wanted) => {
+    return this.selectWordsIn(this.target(tag, line), words)
+  }
+
+  /** {@link selectWords} on any block, for one the tag and line do not name alone (two cells on a line). */
+  async selectWordsIn(block: Locator, words: string): Promise<{ x: number; y: number; right: number }> {
+    const box = await block.evaluate((el, wanted) => {
       const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
       for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
         const at = (node as Text).data.indexOf(wanted)

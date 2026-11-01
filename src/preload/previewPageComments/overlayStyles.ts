@@ -86,7 +86,8 @@ export function overlayCss(t: OverlayTheme, hidden = false): string {
 .erf-hpc-pin__line { fill: ${t.ink}; }
 .erf-hpc-pin__count { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; color: ${t.ink}; font-family: ${t.font}; font-size: ${t.size}; font-weight: 700; }
 @media (forced-colors: none) {
-  .erf-hpc-pin:not(.erf-hpc-pin--selected):not(.erf-hpc-pin--damaged):hover .erf-hpc-pin__body { fill: ${t.accentHover}; }
+  .erf-hpc-pin:not(.erf-hpc-pin--selected):not(.erf-hpc-pin--damaged):hover .erf-hpc-pin__body,
+  .erf-hpc-pin--hover:not(.erf-hpc-pin--selected):not(.erf-hpc-pin--damaged) .erf-hpc-pin__body { fill: ${t.accentHover}; }
 }
 .erf-hpc-pin--selected .erf-hpc-pin__body { fill: ${t.ink}; stroke: ${t.accent}; stroke-width: 2; }
 .erf-hpc-pin--selected .erf-hpc-pin__line { fill: ${t.accent}; }
@@ -102,9 +103,11 @@ ${pinFocusCss(t)}
 /* The comment mark (spec 024 C-12): the accent at 35% under the words and a continuous accent bar along their bottom – never the selection's colour. */
 .erf-hpc-mark { position: fixed; pointer-events: none; background: color-mix(in srgb, ${t.accent} 35%, transparent); border-bottom: ${t.ring} solid ${t.accent}; }
 .erf-hpc-marks--clickable .erf-hpc-mark { pointer-events: auto; cursor: pointer; }
-/* The Comment button over a selection (C-16): the floating surface – ink fill, hairline edge – square, small text. */
+/* Linked hover (C-17): the same fill and a double bar, never a stronger fill (R-01). A double line needs three pixels. */
+.erf-hpc-mark--active { border-bottom: calc(${t.ring} + ${t.hairline}) double ${t.accent}; }
+/* The Comment button over a selection (C-16): the ink ground with an accent edge, because the page's ground is unknown (D-37) – square, small text. */
 .erf-hpc-button { position: fixed; pointer-events: auto; cursor: pointer; display: flex; align-items: center; gap: ${t.space2}; padding: 0 ${t.space4}; font: inherit; color: ${t.paper}; background: ${t.ink}; border: ${t.hairline} solid ${t.accent}; }
-.erf-hpc-button svg { width: ${t.size}; height: ${t.size}; fill: none; stroke: ${t.paper}; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.erf-hpc-button svg { width: calc(2 * ${t.space4}); height: calc(2 * ${t.space4}); fill: none; stroke: ${t.paper}; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .erf-hpc-shield { position: fixed; pointer-events: auto; background: transparent; cursor: crosshair; }
 .erf-hpc-frame { position: fixed; inset: 0; pointer-events: none; border: ${t.ring} solid ${t.accent}; }
 .erf-hpc-tab { position: fixed; top: 0; left: 50%; transform: translateX(-50%); pointer-events: none; padding: ${t.space1} ${t.space4}; white-space: nowrap; background: ${t.accent}; color: ${t.ink}; }

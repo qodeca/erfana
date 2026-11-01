@@ -51,6 +51,7 @@ import { stablePathDigest } from '../../../../shared/stablePathDigest'
 import { logger } from '../../LoggingService'
 import { samePathKey } from '../../comments/commentUnsavedSources'
 import type { CommentFrameLike, CommentFrames, FrameRecord } from './commentFrames'
+import { parseMarkKey } from '../../../../shared/comments/overlayCore/selectionRules'
 import { realContextClick, type ContextGateGeometry, type ContextKeyGate } from './commentContextGate'
 import type { PickerStepEvent } from './commentPickerSpeaker'
 import type { ElementTokenEntry, ElementTokenTable } from './ElementTokenTable'
@@ -111,7 +112,7 @@ export interface PageSignalSinks {
   parent(frame: CommentFrameLike): void
   /** The keyboard picker moved, in comment mode: the window's live region says it. */
   step(step: PickerStepEvent): void
-  icon(frame: CommentFrameLike, record: FrameRecord, pinKey: string, pick: CommentPick): void
+  icon(frame: CommentFrameLike, record: FrameRecord, pinKey: string, pick: CommentPick, word?: number): void
   /** `entry` absent: the element has no tokened ancestor – its menu says it cannot hold a comment (M-08). */
   element(frame: CommentFrameLike, record: FrameRecord, entry: ElementTokenEntry | undefined, pick: CommentPick): void
   anchors(frame: CommentFrameLike, record: FrameRecord, anchors: CommentAnchors): void
@@ -277,12 +278,15 @@ export function createCommentPickHandler(deps: PickHandlerDeps): CommentPickHand
     if (record === undefined || !deps.frames.isCommentable(record)) return drop('not-commentable')
     if (pick.kind === 'icon') {
       if (!spentInput(pick)) return
-      const key = pick.key as string
+      // A comment mark's click names its pin and the place of its words there (I-13).
+      const mark = record.pins.has(pick.key as string) ? null : parseMarkKey(pick.key as string)
+      const key = mark?.pin ?? (pick.key as string)
       // A stack pin's click (C-17) names only pins main sent this frame, like its own – each once, and never itself
       // again (security review M-1: a repeated key re-ran the pin's blocks once per copy).
       const stack = [...new Set(pick.stack ?? [])].filter(other => other !== key)
       if (!record.pins.has(key) || stack.some(other => !record.pins.has(other))) return drop('unknown-pin')
-      deps.sinks.icon(frame, record, key, { ...pick, stack })
+      if (mark !== null && record.pins.get(key)?.words?.[mark.word] === undefined) return drop('unknown-pin')
+      deps.sinks.icon(frame, record, key, { ...pick, stack }, mark?.word)
       return
     }
     // A menu or open pick comes only in comment mode; a right-click outside it only out of it (OD-01).

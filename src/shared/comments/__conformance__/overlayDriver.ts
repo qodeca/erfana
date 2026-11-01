@@ -225,6 +225,32 @@ export interface OverlayDriver {
   dispose(): void | Promise<void>
 }
 
+/** The Comment button as drawn: where it is, and whether it went below the line. */
+export interface DrawnCommentButton {
+  readonly top: number
+  readonly below: boolean
+}
+
+/** {@link OverlayDriver} plus what `selection.suite.ts` needs: a selection drawn on a line the suite chooses. */
+export interface SelectionDriver extends OverlayDriver {
+  /** Words selected in `target`, drawn on one line at `line`, as a finished selection leaves them. */
+  selectWords(target: OverlayTargetId, line: OverlayTargetBox): void
+  /** The same by a mouse: press, words selected, release, and the `click` that ends it. */
+  dragSelect(target: OverlayTargetId, line: OverlayTargetBox): void
+  /** Settled once the button's wait after a mouse selection has passed. */
+  waitForButton(): Promise<void>
+  /** The selection's line is now at `line`, and the preview says it scrolled. */
+  scrollSelection(line: OverlayTargetBox): void
+  /** A page script clears the selection, with no input; settled well past any wait the host keeps. */
+  clearSelectionByScript(): Promise<void>
+  /** The Comment button, while it is drawn. Reading it forces no redraw. */
+  commentButton(): DrawnCommentButton | null
+  /** Whether the last keyboard pick carried selected words. */
+  lastPickHadWords(): Promise<boolean>
+  /** Whether the menu the last right-click asked for is about the selected words. */
+  menuAboutWords(): Promise<boolean>
+}
+
 /**
  * Where focus sits in the panel, off the page: the mode toggle, the drawer, the
  * Find field, or dockview's group element (where a tab switch leaves it).

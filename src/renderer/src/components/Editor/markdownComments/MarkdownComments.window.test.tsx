@@ -69,6 +69,8 @@ describe('Markdown Preview comments – the window and the content marks', () =>
     Element.prototype.scrollIntoView ??= vi.fn()
     Range.prototype.getBoundingClientRect ??= () => new DOMRect()
     Range.prototype.getClientRects ??= () => [] as unknown as DOMRectList
+    // The selection is drawn over the whole preview: a right-click counts only on its lines (I-22).
+    vi.spyOn(Range.prototype, 'getClientRects').mockReturnValue([new DOMRect(-1, -1, 10_000, 10_000)] as unknown as DOMRectList)
     resetStores()
     api = installApi(fileView([thread('t1', 6, 'li'), thread('w1', 3, 'p')]), [ON_ITEM, WORDS])
     setSettings()

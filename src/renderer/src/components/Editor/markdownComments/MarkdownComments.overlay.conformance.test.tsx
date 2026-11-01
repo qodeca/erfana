@@ -20,6 +20,7 @@
 import { vi } from 'vitest'
 import { runOverlaySuite } from '../../../../../shared/comments/__conformance__/overlay.suite'
 import { runPickerKeySuite } from '../../../../../shared/comments/__conformance__/pickerKeys.suite'
+import { runSelectionSuite } from '../../../../../shared/comments/__conformance__/selection.suite'
 import { createMarkdownOverlayDriver } from './__test-utils__/markdownOverlayDriver'
 
 vi.mock('../../Comments/overlay/useHostPointerKeys', async importOriginal => {
@@ -30,3 +31,4 @@ vi.mock('../../Comments/overlay/useHostPointerKeys', async importOriginal => {
 
 runOverlaySuite('Markdown', createMarkdownOverlayDriver)
 runPickerKeySuite('Markdown', createMarkdownOverlayDriver)
+runSelectionSuite('Markdown', createMarkdownOverlayDriver)

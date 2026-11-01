@@ -32,8 +32,10 @@ export interface PageMenuDeps {
   readonly now: () => number
   /** The menu is Erfana's to ask for: comment mode is off, and the frame can hold comments. */
   readonly open: () => boolean
-  /** The page's selected words, if any. */
+  /** The page's selected words, if any: what a keyboard menu is about. */
   readonly words: () => PageWords | null
+  /** The selected words the pointer at this point is on, if any: only those are what a right-click is about (I-22). */
+  readonly wordsAt: (point: Point) => PageWords | null
   /** The selection's last line, for a keyboard menu on the words. */
   readonly wordsPoint: () => Point | null
   /** What a keyboard menu with no words is about (menu matrix § 4). */
@@ -73,7 +75,8 @@ export class PageMenu {
       this.echo = event
       return
     }
-    const payload = contextPayload(deps.tokens, event.target, event, deps.words(), deps.win)
+    const words = deps.wordsAt({ x: event.clientX, y: event.clientY })
+    const payload = contextPayload(deps.tokens, event.target, event, words, deps.win)
     setTimeout(() => {
       if (!event.defaultPrevented) deps.send(payload)
     }, 0)

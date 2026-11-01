@@ -10,6 +10,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { COMMENT_PICK_CHANNEL, TOKEN_ATTRIBUTE } from './constants'
 import { COMMENT_BUTTON_TEXT } from './overlayView'
+import { SELECTION_BUTTON_DELAY_MS } from '../../shared/comments/overlayCore/selectionRules'
 import { byId, createHarness, drawnText, microtasks, mount, token, userKey, userMouse, type Harness } from './__test-helpers__/harness'
 
 const T = TOKEN_ATTRIBUTE
@@ -111,10 +112,12 @@ describe('024-AC-004 (b) comment mode: a drag selects, a click picks (C-16)', ()
     selectWords()
     userMouse(byId('ship'), 'click', { x: 264, y: 110 })
     expect(picks()).toEqual([])
+    h.clock.now += SELECTION_BUTTON_DELAY_MS
     h.controller.renderNow()
     const [button] = overlay('.erf-hpc-button')
     expect(button.classList.contains('erf-hpc-hidden')).toBe(false)
     expect(button.localName).toBe('button')
+    expect(button.style.height).toBe('28px')
     expect(button.tabIndex).toBe(-1)
     expect(drawnText(button)).toBe(COMMENT_BUTTON_TEXT)
     // Above the end of the selection's last line, inside the viewport.
@@ -203,14 +206,52 @@ describe('C-12, C-17 and C-11 (HTML) marks and pins', () => {
     expect(overlay('.erf-hpc-mark')).toHaveLength(0)
   })
 
-  it('C-17 (HTML) in comment mode a click on a mark opens its threads like the pin; outside it the page keeps the click', () => {
+  it('C-17 (HTML) in comment mode a click on a mark opens its thread; outside it the page keeps the click', () => {
     h.state({ mode: true, showIcons: true, icons: [withWords] })
     userMouse(h.host()!, 'click', { x: LINE.left + 10, y: LINE.top + 10 })
-    expect(picks()).toEqual([expect.objectContaining({ kind: 'icon', key: 'p1' })])
+    expect(picks()).toEqual([expect.objectContaining({ kind: 'icon', key: 'p1-w0' })])
     expect(overlay('.erf-hpc-marks--clickable')).toHaveLength(1)
     h.state({ mode: false, showIcons: true, icons: [withWords] })
     expect(overlay('.erf-hpc-marks--clickable')).toHaveLength(0)
     expect(h.controller.overlayHit({ x: LINE.left + 10, y: LINE.top + 10 })).toBeNull()
+  })
+
+  it('I-13 (HTML) a click on a mark names the place of its words, so main opens that one thread', () => {
+    const second = { exact: 'by Friday', prefix: 'ten customers ', suffix: '.' }
+    h.state({ mode: true, showIcons: true, icons: [{ ...withWords, count: 2, words: [WORDS, second] }] })
+    userMouse(h.host()!, 'click', { x: LINE.left + 10, y: LINE.top + 10 })
+    expect(picks()).toEqual([expect.objectContaining({ kind: 'icon', key: 'p1-w0' })])
+    expect(picks()[0]).not.toHaveProperty('sel')
+  })
+
+  it('I-13 (HTML) in comment mode the pointer on a mark raises the words and puts the pin in its hover look; off it, neither', () => {
+    h.state({ mode: true, showIcons: true, icons: [withWords] })
+    h.controller.pointerAt({ x: LINE.left + 10, y: LINE.top + 10 })
+    h.controller.renderNow()
+    expect(overlay('.erf-hpc-mark--active')).toHaveLength(1)
+    expect(overlay('.erf-hpc-pin--hover')).toHaveLength(1)
+    h.controller.pointerAt({ x: 700, y: 500 })
+    h.controller.renderNow()
+    expect(overlay('.erf-hpc-mark--active')).toHaveLength(0)
+    expect(overlay('.erf-hpc-pin--hover')).toHaveLength(0)
+  })
+
+  it('I-13 (HTML) in comment mode the pointer on a pin raises all its words', () => {
+    const second = { exact: 'by Friday', prefix: 'ten customers ', suffix: '.' }
+    h.state({ mode: true, showIcons: true, icons: [{ ...withWords, count: 2, words: [WORDS, second] }] })
+    const [pin] = overlay('.erf-hpc-pin')
+    h.controller.pointerAt({ x: Number.parseFloat(pin.style.left) + 2, y: Number.parseFloat(pin.style.top) + 2 })
+    h.controller.renderNow()
+    expect(overlay('.erf-hpc-mark--active')).toHaveLength(overlay('.erf-hpc-mark').length)
+    expect(overlay('.erf-hpc-mark').length).toBeGreaterThan(0)
+  })
+
+  it('I-13 (HTML) outside comment mode nothing raises: the page keeps its pointer', () => {
+    h.state({ showIcons: true, icons: [withWords] })
+    h.controller.pointerAt({ x: LINE.left + 10, y: LINE.top + 10 })
+    h.controller.renderNow()
+    expect(overlay('.erf-hpc-mark--active')).toHaveLength(0)
+    expect(overlay('.erf-hpc-pin--hover')).toHaveLength(0)
   })
 
   it('C-17 (HTML) a click on a stack pin in comment mode names every pin merged into it', () => {

@@ -35,6 +35,7 @@
  */
 import { drawPin, showText, type PinPlacement } from './pins'
 import type { MarkPlacement } from './marks'
+import { NO_HOVER, type LinkedHover } from './overlayHits'
 import { boxOf, outlineBox, type Box, type Viewport } from './geometry'
 import { labelOf, type LabelParts, type LabelSuffix } from './label'
 import { isAltHeld } from './altHold'
@@ -80,6 +81,8 @@ export interface ViewModel {
   readonly marks?: readonly MarkPlacement[]
   /** Marks take clicks (comment mode, C-17). */
   readonly marksClickable?: boolean
+  /** What the pointer lights across pins and marks (C-17). */
+  readonly hover?: LinkedHover
   /** The Comment button over a selection (C-16), while it shows. */
   readonly button?: Box | null
 }
@@ -205,18 +208,22 @@ export class OverlayView {
     shown(this.flash, model.flash !== null)
     if (model.flash !== null) place(this.flash, model.flash)
     this.renderOutline(model.outline, viewport)
-    this.renderMarks(model.marks ?? [], model.marksClickable === true)
+    this.renderMarks(model.marks ?? [], model.marksClickable === true, model.hover ?? NO_HOVER)
     this.renderPins(model)
     const button = model.button ?? null
     shown(this.button, button !== null)
     if (button !== null) place(this.button, button)
   }
 
-  private renderMarks(marks: readonly MarkPlacement[], clickable: boolean): void {
+  private renderMarks(marks: readonly MarkPlacement[], clickable: boolean, hover: LinkedHover): void {
     this.markLayer.classList.toggle('erf-hpc-marks--clickable', clickable)
     while (this.markLayer.children.length > marks.length) this.markLayer.lastElementChild?.remove()
     while (this.markLayer.children.length < marks.length) this.markLayer.append(part(this.doc, 'erf-hpc-mark'))
-    marks.forEach((mark, i) => place(this.markLayer.children[i] as HTMLElement, mark.box))
+    marks.forEach((mark, i) => {
+      const el = this.markLayer.children[i] as HTMLElement
+      place(el, mark.box)
+      el.classList.toggle('erf-hpc-mark--active', hover.marks.has(mark))
+    })
   }
 
   private renderShields(boxes: readonly Box[]): void {
@@ -290,7 +297,8 @@ export class OverlayView {
       const existing = this.pinElements.get(pin.key)
       const el = drawPin(this.doc, existing, pin, {
         label: model.pinLabel(pin),
-        selected: pin.element === model.selected
+        selected: pin.element === model.selected,
+        hovered: pin.key === model.hover?.pin || pin.members?.some(member => member.key === model.hover?.pin) === true
       })
       if (existing === undefined) {
         this.pinElements.set(pin.key, el)

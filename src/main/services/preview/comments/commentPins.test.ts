@@ -8,7 +8,8 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { accentRgb, COMMENT_OVERLAY_THEME, type CommentOverlayTheme } from './commentOverlayTheme'
-import { addCounts, countsOf, groupPins, NO_COUNTS } from './commentPins'
+import { addCounts, countsOf, groupPins, NO_COUNTS, threadsOfWords } from './commentPins'
+import type { AnchorSelection } from '../../../../shared/comments/anchorSel'
 import type { CommentLoadView } from './ElementTokenTable'
 
 type Block = CommentLoadView['blocks'][number]
@@ -117,5 +118,23 @@ describe('COMMENT_OVERLAY_THEME', () => {
   it('accentRgb reads the accent as three channels', () => {
     expect(accentRgb()).toEqual([0xa0, 0xa8, 0xff])
     expect(accentRgb({ ...COMMENT_OVERLAY_THEME, accent: '#010203' })).toEqual([1, 2, 3])
+  })
+})
+
+describe('I-13 which thread a mark belongs to', () => {
+  const sel = (exact: string): AnchorSelection => ({ exact, prefix: '', suffix: '' })
+  const ok = (id: string, words?: AnchorSelection): CommentLoadView['blocks'][number] =>
+    ({ kind: 'ok', token: 'a'.repeat(12), status: 'open', id, ...(words === undefined ? {} : { sel: words }) }) as CommentLoadView['blocks'][number]
+
+  it('I-13 one thread per words; the same words on two threads open both', () => {
+    const [pin] = groupPins({ blocks: [ok('t1', sel('one')), ok('t2', sel('two')), ok('t3', sel('one')), ok('t4')] })
+    expect(threadsOfWords(pin, 1)).toEqual(['t2'])
+    expect(threadsOfWords(pin, 0)).toEqual(['t1', 't3'])
+    expect(threadsOfWords(pin, 2)).toEqual(['t1', 't3'])
+  })
+
+  it('I-13 a place the pin does not have names no thread', () => {
+    const [pin] = groupPins({ blocks: [ok('t1', sel('one'))] })
+    expect(threadsOfWords(pin, 1)).toEqual([])
   })
 })

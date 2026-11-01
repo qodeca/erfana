@@ -177,7 +177,7 @@ export function drawPin(
   doc: Document,
   existing: HTMLElement | undefined,
   pin: PinPlacement,
-  options: { readonly label: string; readonly selected: boolean }
+  options: { readonly label: string; readonly selected: boolean; readonly hovered?: boolean }
 ): HTMLElement {
   const el = existing ?? doc.createElement('div')
   if (el.dataset.content !== pin.content) {
@@ -189,7 +189,8 @@ export function drawPin(
     pin.members === undefined ? '' : 'erf-hpc-pin--stack',
     pin.members === undefined && pin.changed === true ? 'erf-hpc-pin--changed' : '',
     pin.status === 'damaged' ? 'erf-hpc-pin--damaged' : '',
-    options.selected ? 'erf-hpc-pin--selected' : ''
+    options.selected ? 'erf-hpc-pin--selected' : '',
+    options.hovered === true ? 'erf-hpc-pin--hover' : ''
   ]
     .filter(Boolean)
     .join(' ')

@@ -4,42 +4,46 @@
  * Selection comments in a renderer-hosted preview (spec 024 024-FR-004;
  * comments-v2 C-16; menu matrix M-12, M-14, M-16, M-19, M-21).
  *
- * - **Reading the selection** ({@link readSelection}): the target is the one
- *   the selection starts in, and a selection that runs past it is cut to it
- *   (Markdown: "cut to the block where it started", with a notice in the
- *   window). A selection that starts in a target that cannot take a comment
- *   (the frontmatter) carries that reason. Only spaces are no selection.
- * - **The Comment button** appears about 150 ms after a pointer-up that
- *   leaves words selected in a target that can take a comment, above the
- *   end of the selection's last line (below it near the top). It takes no
- *   focus and leaves the selection alone; Esc, a scroll or a collapsed
- *   selection hide it. Shown inside and outside comment mode (C-16).
+ * - **Reading the selection** ({@link readSelection}): the target is the
+ *   smallest one holding the whole selection – a list for two of its items, a
+ *   table for two of its rows (I-16, D-17). When no target holds it all, the
+ *   selection is cut to the target it starts in (Markdown: "cut to the block
+ *   where it started", with a notice in the window). A selection that starts
+ *   in a target that cannot take a comment (the frontmatter) carries that
+ *   reason. Only spaces are no selection.
+ * - **The Comment button** follows the overlay core's one rule
+ *   (`overlayCore/selectionRules`): about 150 ms after a pointer-up that
+ *   leaves words selected in a target that can take a comment, above the end
+ *   of the selection's last line in view (below it near the top). It takes no
+ *   focus and leaves the selection alone. It follows a scroll, leaves while
+ *   the selection is out of view and comes back with it; Esc or a collapsed
+ *   selection end it. Shown inside and outside comment mode (C-16).
  *
  * @module components/Comments/overlay/useSelectionComments
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ThreadPlacement } from '../../../../../shared/ipc/file-comment-schema'
+import { SELECTION_BUTTON_DELAY_MS, buttonGoesBelow, lastLineInView } from '../../../../../shared/comments/overlayCore/selectionRules'
 import { useLatestRef } from '../../../hooks/useLatestRef'
 import type { NewCommentWords, NounSource } from '../commentWindowTypes'
 import { wordsInTarget } from './domWords'
 import type { PreviewCommentAdapter } from './previewAdapter'
 
-/** The wait after the pointer-up before the Comment button shows (C-16 "about 150 ms"). */
-export const SELECTION_BUTTON_DELAY_MS = 150
-/** Below this distance from the area's top, the button goes under the selection (C-16 "flipped below"). */
-const FLIP_BELOW_PX = 48
+export { SELECTION_BUTTON_DELAY_MS }
 
 /** The selection, as a comment would be about it. */
 export interface SelectionPick {
-  /** The target the selection starts in. */
+  /** The smallest target holding the whole selection, else the one it starts in. */
   readonly target: HTMLElement
   /** Why that target cannot take a comment (the frontmatter), or `null`. */
   readonly refused: string | null
   readonly words: NewCommentWords
   /** The selected text as the page has it (the prompt items read it). */
   readonly text: string
-  /** The selection's last line box, for the button and a keyboard-opened menu. */
+  /** The selection's last line box, for a keyboard-opened menu. */
   readonly rect: DOMRect | null
+  /** Every line box: the button sits on the last in view, and a right-click counts only on one of them. */
+  readonly lines: readonly DOMRect[]
 }
 
 /** Where the Comment button sits, relative to the overlay's area. */
@@ -60,12 +64,23 @@ export function readSelection(adapter: PreviewCommentAdapter, scroller: HTMLElem
   if (text.trim() === '') return null
   const range = selection.getRangeAt(0)
   if (!scroller.contains(range.startContainer)) return null
-  const target = adapter.targetAt(range.startContainer)
+  const started = adapter.targetAt(range.startContainer)
+  const holder = adapter.targetAt(range.commonAncestorContainer)
+  const target = holder !== null && adapter.canComment(holder).ok ? holder : started
   if (target === null) return null
   const can = adapter.canComment(target)
-  const rects = typeof range.getClientRects === 'function' ? range.getClientRects() : null
-  const rect = rects !== null && rects.length > 0 ? rects[rects.length - 1] : null
-  return { target, refused: can.ok ? null : can.reason, words: wordsInTarget(target, range), text, rect }
+  const lines = typeof range.getClientRects === 'function' ? [...range.getClientRects()] : []
+  return { target, refused: can.ok ? null : can.reason, words: wordsInTarget(target, range), text, rect: lines.at(-1) ?? null, lines }
+}
+
+/** The selection, when it shows in `area`: words out of view are ignored (C-16, I-12). */
+function inView(pick: SelectionPick | null, area: HTMLElement | null): SelectionPick | null {
+  return pick !== null && lastLineOf(pick, area) !== null ? pick : null
+}
+
+/** The last line of `pick` that shows in `area`, the line the button sits on. */
+function lastLineOf(pick: SelectionPick, area: HTMLElement | null): DOMRect | null {
+  return area === null ? null : lastLineInView(pick.lines, area.getBoundingClientRect())
 }
 
 /** Options for {@link useSelectionComments}. */
@@ -82,8 +97,10 @@ export interface SelectionCommentsOptions {
 export interface SelectionComments {
   /** The Comment button, while it shows. */
   readonly button: SelectionButton | null
-  /** The current selection (menu, keyboard, button click). */
+  /** The current selection (menu, button click). */
   readonly read: () => SelectionPick | null
+  /** The current selection, when it shows: what a key may act on (C-16, I-12). */
+  readonly readInView: () => SelectionPick | null
   readonly hideButton: () => void
   /**
    * Draw the Comment button over the current selection now (C-16: turning
@@ -104,24 +121,36 @@ export function useSelectionComments(options: SelectionCommentsOptions): Selecti
   const latest = useLatestRef(options)
   const [button, setButton] = useState<SelectionButton | null>(null)
 
-  const read = useCallback(() => readSelection(latest.current.adapter, latest.current.scroller), [latest])
-  const hideButton = useCallback(() => setButton(null), [])
+  // The button is up, or out of view and coming back with its selection: a scroll moves it.
+  const armed = useRef(false)
 
-  // The button over the selection's last line, when the selection can take a comment (and, asked for, is in view).
-  const place = useCallback((inViewOnly = false): boolean => {
-    const pick = readSelection(latest.current.adapter, latest.current.scroller)
-    const area = latest.current.area?.getBoundingClientRect()
-    const outOfView =
-      inViewOnly && pick?.rect != null && area !== undefined && (pick.rect.bottom <= area.top || pick.rect.top >= area.bottom)
-    if (pick === null || pick.refused !== null || latest.current.blocked !== null || pick.rect === null || area === undefined || outOfView) {
+  const read = useCallback(() => readSelection(latest.current.adapter, latest.current.scroller), [latest])
+  const readInView = useCallback(() => inView(read(), latest.current.area), [read, latest])
+  const hideButton = useCallback(() => {
+    armed.current = false
+    setButton(null)
+  }, [])
+
+  // The button over the selection's last line in view, when the selection can take a comment; `false` when it cannot show now.
+  const place = useCallback((): boolean => {
+    const pick = read()
+    const area = latest.current.area
+    if (pick === null || pick.refused !== null || latest.current.blocked !== null || area === null) {
+      hideButton()
+      return false
+    }
+    const line = lastLineOf(pick, area)
+    if (line === null) {
       setButton(null)
       return false
     }
-    const top = pick.rect.top - area.top
-    const below = top < FLIP_BELOW_PX
-    setButton({ x: Math.max(0, pick.rect.right - area.left), y: below ? pick.rect.bottom - area.top : top, below })
+    const box = area.getBoundingClientRect()
+    const top = line.top - box.top
+    const below = buttonGoesBelow(line.top, box.top)
+    armed.current = true
+    setButton({ x: Math.max(0, line.right - box.left), y: below ? line.bottom - box.top : top, below })
     return true
-  }, [latest])
+  }, [latest, read, hideButton])
 
   useEffect(() => {
     if (!live || scroller === null) return undefined
@@ -131,30 +160,31 @@ export function useSelectionComments(options: SelectionCommentsOptions): Selecti
       clearTimeout(timer)
       timer = setTimeout(place, SELECTION_BUTTON_DELAY_MS)
     }
-    const hide = (): void => setButton(null)
+    const onScroll = (): void => {
+      if (armed.current) place()
+    }
     const onSelectionChange = (): void => {
       const selection = window.getSelection()
-      if (selection === null || selection.isCollapsed) hide()
+      if (selection === null || selection.isCollapsed) hideButton()
     }
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') hide()
+      if (event.key === 'Escape') hideButton()
     }
     // Capture: in comment mode the content guard keeps a release from the preview's content (`contentGuard.ts`).
     scroller.addEventListener('mouseup', onUp, true)
-    scroller.addEventListener('scroll', hide, { passive: true })
+    scroller.addEventListener('scroll', onScroll, { passive: true })
     scroller.addEventListener('keydown', onKey)
     document.addEventListener('selectionchange', onSelectionChange)
     return () => {
       clearTimeout(timer)
       scroller.removeEventListener('mouseup', onUp, true)
-      scroller.removeEventListener('scroll', hide)
+      scroller.removeEventListener('scroll', onScroll)
       scroller.removeEventListener('keydown', onKey)
       document.removeEventListener('selectionchange', onSelectionChange)
     }
-  }, [live, scroller, place])
+  }, [live, scroller, place, hideButton])
 
-  const showButton = useCallback(() => place(true), [place])
-  return { button: live ? button : null, read, hideButton, showButton }
+  return { button: live ? button : null, read, readInView, hideButton, showButton: place }
 }
 
 /**

@@ -98,6 +98,8 @@ describe('Markdown Preview comments – comments-v2', () => {
     Element.prototype.scrollIntoView ??= vi.fn()
     Range.prototype.getBoundingClientRect ??= () => new DOMRect()
     Range.prototype.getClientRects ??= () => [] as unknown as DOMRectList
+    // The selection is drawn over the whole preview: a right-click counts only on its lines (I-22).
+    vi.spyOn(Range.prototype, 'getClientRects').mockReturnValue([new DOMRect(-1, -1, 10_000, 10_000)] as unknown as DOMRectList)
     resetStores()
     api = installApi(fileView([thread('t1', 9, 'li'), thread('w1', 6, 'p')]), [ON_ITEM, WORDS])
     setSettings()
@@ -344,7 +346,7 @@ describe('Markdown Preview comments – comments-v2', () => {
       selectWords(paragraph(), 'beta')
       fireEvent.mouseUp(paragraph(), { button: 0 })
       expect(await screen.findByTestId(TEST_IDS.COMMENT_SELECTION_BUTTON, {}, { timeout: SELECTION_BUTTON_DELAY_MS * 10 })).toBeVisible()
-      fireEvent.contextMenu(paragraph(), { clientX: 10, clientY: 10 })
+      fireEvent.contextMenu(paragraph(), { clientX: 110, clientY: 205 })
       const menu = await screen.findByRole('menu', { name: SELECTION_COPY.menuLabel })
       const items = within(menu).getAllByRole('menuitem').map(el => el.querySelector('.context-menu-label')?.textContent ?? el.textContent)
       expect(items.slice(0, 2)).toEqual([SELECTION_COPY.commentOnSelection, SELECTION_COPY.commentOnWhole('paragraph')])

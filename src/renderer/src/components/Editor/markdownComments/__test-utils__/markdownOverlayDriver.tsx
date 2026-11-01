@@ -32,9 +32,10 @@ import {
   fixtureTargetAt,
   type GestureModifiers,
   type GesturePoint,
-  type OverlayDriver,
   type OverlayLayer,
-  type OverlayTargetId
+  type OverlayTargetBox,
+  type OverlayTargetId,
+  type SelectionDriver
 } from '../../../../../../shared/comments/__conformance__/overlayDriver'
 import { Harness, fileView, installApi, resetStores, setSettings } from './harness'
 import { pickRecorder } from './pickRecorder'
@@ -88,6 +89,11 @@ const PAGE_EVENTS = [
   'keyup'
 ] as const
 
+/** The start of `second`'s text: what `selectIn` selects there. */
+const SELECTED_WORDS = 'Second'
+/** Longer than the button's wait, in real time. */
+const BUTTON_WAIT_MS = 400
+
 const byTestId = (id: string): HTMLElement | null => document.querySelector<HTMLElement>(`[data-testid="${id}"]`)
 
 /** A pointer event where jsdom has them, else the mouse event it stands for. */
@@ -119,7 +125,7 @@ function commonAncestor(a: Element, b: Element): Element {
  *
  * @returns The driver; `dispose` unmounts it and puts back what it replaced.
  */
-export async function createMarkdownOverlayDriver(): Promise<OverlayDriver> {
+export async function createMarkdownOverlayDriver(): Promise<SelectionDriver> {
   const portal = document.createElement('div')
   portal.id = 'portal-root'
   document.body.appendChild(portal)
@@ -130,12 +136,19 @@ export async function createMarkdownOverlayDriver(): Promise<OverlayDriver> {
   // jsdom has no layout: scrolling does nothing and a range has an empty box.
   const scrollIntoView = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollIntoView')
   const rangeBox = Object.getOwnPropertyDescriptor(Range.prototype, 'getBoundingClientRect')
+  const rangeRects = Object.getOwnPropertyDescriptor(Range.prototype, 'getClientRects')
   Element.prototype.scrollIntoView = vi.fn()
   Range.prototype.getBoundingClientRect = () => new DOMRect()
+  /** Every range is drawn on the one line `box` (the suite's `LINE`s). */
+  const drawRangesAt = (box: OverlayTargetBox): void => {
+    const rect = new DOMRect(box.left, box.top, box.width, box.height)
+    Range.prototype.getClientRects = () => [rect] as unknown as DOMRectList
+  }
   const restoreLayout = (): void => {
     for (const [proto, name, original] of [
       [Element.prototype, 'scrollIntoView', scrollIntoView],
-      [Range.prototype, 'getBoundingClientRect', rangeBox]
+      [Range.prototype, 'getBoundingClientRect', rangeBox],
+      [Range.prototype, 'getClientRects', rangeRects]
     ] as const) {
       if (original === undefined) Reflect.deleteProperty(proto, name)
       else Object.defineProperty(proto, name, original)
@@ -216,7 +229,7 @@ export async function createMarkdownOverlayDriver(): Promise<OverlayDriver> {
       if (detail === 2) mouse(el, 'dblclick', { x, y, button: 0, detail })
     }
   }
-  const picks: OverlayDriver['picks'] = () =>
+  const picks: SelectionDriver['picks'] = () =>
     pickRecorder.picks.map(p => ({ kind: p.kind, via: p.via, target: targetOf(p.element) }))
   const outlinedTarget = (): OverlayTargetId | null => {
     const outline = byTestId(TEST_IDS.COMMENT_HOST_OUTLINE)
@@ -245,6 +258,19 @@ export async function createMarkdownOverlayDriver(): Promise<OverlayDriver> {
     release(el, x, y, 2)
     mouse(el, 'contextmenu', { x, y, button: 2 })
     mouse(el, 'auxclick', { x, y, button: 2, detail: 1 })
+  }
+  const selectionButton = (): HTMLElement | null => byTestId(TEST_IDS.COMMENT_SELECTION_BUTTON)
+  /** The first words of `target`'s own text selected. */
+  const selectIn = (target: OverlayTargetId): void => {
+    const text = [...(elements.get(target)?.childNodes ?? [])].find(node => node.nodeType === Node.TEXT_NODE)
+    if (text === undefined) throw new Error(`no text in ${target}`)
+    const range = document.createRange()
+    range.setStart(text, 0)
+    range.setEnd(text, Math.min(SELECTED_WORDS.length, text.textContent?.length ?? 0))
+    act(() => {
+      window.getSelection()?.removeAllRanges()
+      window.getSelection()?.addRange(range)
+    })
   }
   const key = (type: 'keyDown' | 'keyUp', target: Element): void => {
     fireEvent[type](target, { key: 'Escape', code: 'Escape' })
@@ -300,15 +326,46 @@ export async function createMarkdownOverlayDriver(): Promise<OverlayDriver> {
       mouse(commonAncestor(start.el, end.el), 'click', { x: end.x, y: end.y, button: 0, detail: 1 })
     },
     selectText(target) {
-      const text = [...(elements.get(target)?.childNodes ?? [])].find(node => node.nodeType === Node.TEXT_NODE)
-      if (text === undefined) throw new Error(`no text in ${target}`)
-      const range = document.createRange()
-      range.setStart(text, 0)
-      range.setEnd(text, Math.min(6, text.textContent?.length ?? 0))
-      act(() => {
-        window.getSelection()?.removeAllRanges()
-        window.getSelection()?.addRange(range)
-      })
+      drawRangesAt(OVERLAY_FIXTURE[target].box)
+      selectIn(target)
+    },
+    selectWords(target, line) {
+      drawRangesAt(line)
+      selectIn(target)
+    },
+    dragSelect(target, line) {
+      begin()
+      const { x, y, el } = at({ target })
+      press(el, x - 10, y, 0, { detail: 1 })
+      drawRangesAt(line)
+      selectIn(target)
+      release(el, x + 10, y, 0, { detail: 1 })
+      mouse(el, 'click', { x: x + 10, y, button: 0, detail: 1 })
+    },
+    async waitForButton() {
+      await waitFor(() => expect(selectionButton()).not.toBeNull(), { timeout: BUTTON_WAIT_MS * 3 })
+    },
+    scrollSelection(line) {
+      drawRangesAt(line)
+      fireEvent.scroll(scroller())
+    },
+    async clearSelectionByScript() {
+      act(() => window.getSelection()?.removeAllRanges())
+      // jsdom fires `selectionchange` a task later.
+      await act(() => new Promise(resolve => setTimeout(resolve, BUTTON_WAIT_MS)))
+    },
+    commentButton() {
+      const button = selectionButton()
+      if (button === null) return null
+      return { top: Number.parseFloat(button.style.top), below: button.className.includes('--below') }
+    },
+    async lastPickHadWords() {
+      await waitFor(() => expect(commentWindow()).not.toBeNull())
+      return commentWindow()?.textContent?.includes(SELECTED_WORDS) === true
+    },
+    async menuAboutWords() {
+      await waitFor(() => expect(menu()).not.toBeNull())
+      return byTestId(TEST_IDS.COMMENT_MENU_SELECTION) !== null
     },
     selectedText: () => window.getSelection()?.toString() ?? '',
     rightClick,

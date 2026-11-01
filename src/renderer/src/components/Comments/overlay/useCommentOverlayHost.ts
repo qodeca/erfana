@@ -52,6 +52,7 @@ import type { CommentWindowProps } from '../CommentWindow'
 import type { CommentWindowRequest, NewCommentWords } from '../commentWindowTypes'
 import { useLiveText } from '../commentLive'
 import type { AnchorSelection } from '../../../../../shared/comments/anchorSel'
+import { pointerOnLines } from '../../../../../shared/comments/overlayCore/selectionRules'
 import { commentMarkAt } from './commentHighlights'
 import { targetText } from './domWords'
 import { areaBox, bringRowIn, revealRow, useNotVisible } from './hostDrawer'
@@ -214,7 +215,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
   // C-22: a pick on a target with open threads opens them; Enter on the target holding the selection opens the words.
   const pickTarget = useCallback(
     (target: HTMLElement, byKey: boolean) => {
-      const words = byKey ? selection.read() : null
+      const words = byKey ? selection.readInView() : null
       if (words !== null && words.target === target && words.refused === null) {
         void openNew(target, 'page', words.words)
         return
@@ -226,13 +227,14 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
     [selection, adapter, placements, file, openThreads, openNew]
   )
 
-  // With words selected the menu is about them (M-12, M-14, M-16, M-19, M-21); the target is where they start.
+  // The pointer decides the subject (I-22): on selected words the menu is about them (M-12, M-14, M-16, M-19, M-21). A key has
+  // no pointer: it takes the selection, except in comment mode, where it acts on what is outlined (K-11).
   const openMenu = useCallback(
     (under: HTMLElement | null, at: { x: number; y: number }, byKey = false) => {
       const on = store.getState().panels.get(panelId)?.mode === true
       const read = selection.read()
-      // K-11: in comment mode a key acts on what is outlined; selected words elsewhere are not it.
-      const pick = byKey && on && read?.target !== under ? null : read
+      const subject = byKey ? !on || read?.target === under : read !== null && pointerOnLines(read.lines, at)
+      const pick = subject ? read : null
       const target = pick?.target ?? under
       if (target === null) {
         if (on) setMenu({ ...at, ...targetlessMenu(words) })
@@ -284,6 +286,8 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
     onOpenMark: (threadKey, at) => openThreads([threadKey], at),
     onMenu: openMenu,
     selectionRect: () => selection.read()?.rect ?? null,
+    selectionTarget: () => selection.readInView()?.target ?? null,
+    onSelectionAt: (x, y) => pointerOnLines(selection.read()?.lines ?? [], { x, y }),
     onSay: announce,
     onKeyMove: selection.hideButton,
     onScroll: () => setScrollTick(n => n + 1)

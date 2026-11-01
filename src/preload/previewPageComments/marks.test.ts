@@ -98,7 +98,7 @@ describe('C-16 and C-17 (HTML) overlay hits', () => {
     const frame = document.getElementById('f') as HTMLIFrameElement
     const box = { left: 0, top: 0, width: 50, height: 50 }
     const pin = { key: 'k', count: 1, status: 'open' as const, element: p, content: 'lines' as const, box }
-    const mark = { key: 'k', element: p, box }
+    const mark = { key: 'k', element: p, markKey: 'k-w0', box }
     const boxes = { button: { words: { target: p }, box }, pins: [pin], marks: [mark], shields: [{ frame, box }] }
     const at = { x: 5, y: 5 }
     expect(hitAt(boxes, at)?.kind).toBe('button')

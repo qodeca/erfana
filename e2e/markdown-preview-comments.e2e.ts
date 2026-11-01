@@ -51,6 +51,11 @@ const TEXT = [
   '- beta release notes',
   '',
   'Closing paragraph.',
+  '',
+  '| Name | Team |',
+  '| --- | --- |',
+  '| Ada | Core |',
+  '| Lin | Docs |',
   ''
 ].join('\n')
 
@@ -388,6 +393,94 @@ test.describe('Markdown Preview comments', () => {
 
     const written = await fsp.readFile(file, 'utf-8')
     expect(written).toMatch(/"sel":\{"exact":"[^"]*beta"/)
+  })
+
+  /** A drag from `from`'s text in one target to `to`'s in another, as a person makes it. */
+  async function dragBetween(page: Parameters<typeof setGlobalSetting>[0], from: { x: number; y: number }, to: { x: number; y: number }): Promise<void> {
+    await page.evaluate(() => window.getSelection()?.removeAllRanges())
+    await page.mouse.move(from.x, from.y)
+    await page.mouse.down()
+    await page.mouse.move(to.x, to.y, { steps: 8 })
+    await page.mouse.up()
+  }
+
+  test('I-16 a drag across two list items saves on the list, with the words; main keeps them', async ({ windowWithTestProject, testProject }) => {
+    const page = windowWithTestProject
+    const file = path.join(testProject.path, FILE)
+    const md = await openReview(page)
+
+    const from = await md.selectWords('li', 5, 'alpha')
+    const to = await md.selectWords('li', 6, 'release')
+    await dragBetween(page, from, to)
+    await expect(md.selectionButton()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await md.selectionButton().click()
+    await md.passIdentity(NAME)
+    await expect(md.window()).toContainText('New comment on list')
+    await expect(md.window()).not.toContainText('list item where')
+    await md.saveNewComment(NOTE, FILE, NAME)
+
+    const written = await fsp.readFile(file, 'utf-8')
+    expect(written).toMatch(/"sel":\{"exact":"[^"]*a beta r[^"]*"/)
+  })
+
+  test('I-16 a drag across two table cells in a row saves on the row, with the words', async ({ windowWithTestProject, testProject }) => {
+    const page = windowWithTestProject
+    const file = path.join(testProject.path, FILE)
+    const md = await openReview(page)
+
+    const from = await md.selectWordsIn(md.content().locator('td', { hasText: 'Ada' }), 'Ada')
+    const to = await md.selectWordsIn(md.content().locator('td', { hasText: 'Core' }), 'Core')
+    await dragBetween(page, from, to)
+    await expect(md.selectionButton()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await md.selectionButton().click()
+    await md.passIdentity(NAME)
+    await md.saveNewComment(NOTE, FILE, NAME)
+
+    const written = await fsp.readFile(file, 'utf-8')
+    expect(written).toContain('"sel":')
+    expect(written).toMatch(/"exact":"[^"]*da[^"]*Co/)
+  })
+
+  test('I-10 I-11 the Comment button is 28 px, and follows the selection on a scroll', async ({ windowWithTestProject }) => {
+    const page = windowWithTestProject
+    const md = await openReview(page)
+    await md.target('p', 3).evaluate(el => {
+      // Room to scroll, in the rendered content only: nothing here reaches the file.
+      el.closest<HTMLElement>('.markdown-preview-content')!.style.paddingBottom = '3000px'
+    })
+
+    const line = md.content().locator('p', { hasText: 'Closing paragraph.' })
+    const from = await md.selectWordsIn(line, 'Closing')
+    const to = await md.selectWordsIn(line, 'paragraph')
+    await dragBetween(page, from, to)
+    await expect(md.selectionButton()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    const before = (await md.selectionButton().boundingBox())!
+    expect(before.height).toBe(28)
+    await md.preview().evaluate(el => el.scrollBy(0, 30))
+    await expect.poll(async () => (await md.selectionButton().boundingBox())?.y).toBeLessThan(before.y)
+    await page.evaluate(() => window.getSelection()?.removeAllRanges())
+    await expect(md.selectionButton()).toHaveCount(0)
+  })
+
+  test('I-22 a right-click away from a selection is about what is under the pointer; on a bare word the menu matches what the system selected', async ({ windowWithTestProject }) => {
+    const page = windowWithTestProject
+    const md = await openReview(page)
+    const closing = (await md.content().locator('p', { hasText: 'Closing paragraph.' }).boundingBox())!
+    const y = closing.y + closing.height / 2
+
+    await md.selectWords('p', 3, 'paragraph of')
+    await page.mouse.click(closing.x + closing.width - 4, y, { button: 'right' })
+    await expect(page.getByRole('menu', { name: 'Paragraph' })).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await page.keyboard.press('Escape')
+
+    await page.evaluate(() => window.getSelection()?.removeAllRanges())
+    await page.mouse.click(closing.x + 20, y, { button: 'right' })
+    await expect(page.getByRole('menu').first()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    // macOS may select the word under a right-click. Blink does so only in a focused, active window, so `focused` says what this run proves.
+    const { word, focused } = await page.evaluate(() => ({ word: window.getSelection()?.toString().trim() ?? '', focused: document.hasFocus() }))
+    test.info().annotations.push({ type: 'I-22', description: `${process.platform}: window focused ${focused}, right-click selected "${word}"` })
+    await expect(page.getByRole('menu').first()).toHaveAttribute('aria-label', word === '' ? 'Paragraph' : 'Selection')
+    await page.keyboard.press('Escape')
   })
 
   /** Comment on a target in comment mode and leave the mode on. */

@@ -218,6 +218,19 @@ describe('commentDraftOpener', () => {
     expect(s.emitted[1]).toMatchObject({ kind: 'icon', threadKeys: [expect.stringMatching(/^t/)], blockKeys: [] })
   })
 
+  it('I-13 (HTML) a mark opens the one thread on its words, with no blocks; a place the pin does not have opens the pin', async () => {
+    const html = insertBefore(commentedPage().text, '<p id="para"', damagedBlock('c-9'))
+    const s = await setup(html)
+    const [key, pin] = [...s.record.pins].find(([, p]) => p.threadIds.length > 0)!
+    const sel = { exact: 'marked', prefix: '', suffix: '' }
+    const other = pin.threadIds[0]
+    s.record.pins.set(key, { ...pin, threadIds: [...pin.threadIds, 't-other'], words: [sel], wordThreads: [other], attention: 1 })
+    await s.opener.icon(s.top, s.record, key, pick({ kind: 'icon', key }), 0)
+    expect(s.emitted[0]).toMatchObject({ kind: 'icon', threadKeys: [expect.stringMatching(/^t/)], blockKeys: [] })
+    await s.opener.icon(s.top, s.record, key, pick({ kind: 'icon', key }), 5)
+    expect((s.emitted[1] as { threadKeys: string[] }).threadKeys).toHaveLength(pin.threadIds.length + 1)
+  })
+
   it('C-17 (HTML) a stack pin opens the threads and blocks of every pin merged into it, in document order; unknown keys add nothing', async () => {
     const html = insertBefore(commentedPage().text, '<p id="para"', damagedBlock('c-9'))
     const s = await setup(html)

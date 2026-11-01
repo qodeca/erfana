@@ -13,7 +13,8 @@
  * (`src/renderer/src/components/Editor/markdownComments/MarkdownComments.overlay.conformance.test.tsx`).
  * Every case title starts `024-AC-001 ({preview})`. It covers what jsdom can
  * show: comment mode on and off, the gesture table, the Esc order and the
- * label. Pin placement and the underline run in Playwright, per preview.
+ * label. Pin placement and the underline run in Playwright, per preview. The
+ * Comment button and the menu's subject are `selection.suite.ts`, beside this.
  *
  * Where the differences table makes the hosts differ on purpose, the driver
  * says so and the case checks that host's behaviour instead: the floating

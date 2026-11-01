@@ -17,6 +17,7 @@
  * either the menu or the window is open the page sits hidden behind a still
  * frame, so no key reaches it. The suite skips those Esc steps for this host.
  */
+import { expect, vi } from 'vitest'
 import { COMMENT_PICK_CHANNEL, TOKEN_ATTRIBUTE } from './constants'
 import { GUARDED_EVENTS } from './input'
 import {
@@ -33,13 +34,15 @@ import {
 } from './__test-helpers__/harness'
 import { runOverlaySuite } from '../../shared/comments/__conformance__/overlay.suite'
 import { runPickerKeySuite } from '../../shared/comments/__conformance__/pickerKeys.suite'
+import { runSelectionSuite } from '../../shared/comments/__conformance__/selection.suite'
 import {
   OVERLAY_FIXTURE,
   type GestureModifiers,
   type GesturePoint,
-  type OverlayDriver,
   type OverlayPick,
-  type OverlayTargetId
+  type OverlayTargetBox,
+  type OverlayTargetId,
+  type SelectionDriver
 } from '../../shared/comments/__conformance__/overlayDriver'
 
 const T = TOKEN_ATTRIBUTE
@@ -91,6 +94,16 @@ const isShown = (el: Element | null | undefined): el is HTMLElement =>
 
 const realRects = Range.prototype.getClientRects
 
+/** Every range is drawn on the one line `box`: jsdom has no layout. */
+function drawRangesAt(box: OverlayTargetBox): void {
+  const rect = new DOMRect(box.left, box.top, box.width, box.height)
+  Range.prototype.getClientRects = () => [rect] as unknown as DOMRectList
+}
+
+/** Longer than the button's wait and its redraw, in real time: the overlay's own timers run. */
+const BUTTON_WAIT_MS = 400
+const realTime = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
+
 /** The page sends which end; the window words it (`commentLive.ts`, pinned by its own test). */
 const END_SENTENCES: Readonly<Record<string, string>> = {
   top: 'Top level – no parent to select.',
@@ -100,7 +113,7 @@ const END_SENTENCES: Readonly<Record<string, string>> = {
 }
 
 /** The driver over a harness whose page holds the fixture. */
-function driverOn(h: Harness): OverlayDriver {
+function driverOn(h: Harness): SelectionDriver {
   h.state({ mode: false }) // Main's first state of the load: the mode is off, and can come on from here.
   for (const target of Object.keys(OVERLAY_FIXTURE) as OverlayTargetId[]) {
     h.doubles.setBox(elementOf(target), OVERLAY_FIXTURE[target].box)
@@ -152,6 +165,17 @@ function driverOn(h: Harness): OverlayDriver {
       userMouse(el, 'click', { x, y, button: 0, detail, ...modifiers(m) })
       if (detail === 2) userMouse(el, 'dblclick', { x, y, button: 0, detail })
     }
+  }
+  /** The first words of `target`'s own text selected. */
+  const selectIn = (target: OverlayTargetId): void => {
+    const text = [...elementOf(target).childNodes].find(node => node.nodeType === Node.TEXT_NODE)
+    if (text === undefined) throw new Error(`no text in ${target}`)
+    const range = document.createRange()
+    range.setStart(text, 0)
+    range.setEnd(text, Math.min(6, text.textContent?.length ?? 0))
+    const selection = window.getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
   }
   const picks = (): OverlayPick[] =>
     (h.sent(COMMENT_PICK_CHANNEL) as Array<{ kind: string; via: 'pointer' | 'keyboard'; token?: string }>)
@@ -226,16 +250,50 @@ function driverOn(h: Harness): OverlayDriver {
       release(end.el, end.x, end.y, 0, { detail: 1 })
       userMouse(commonAncestor(start.el, end.el), 'click', { x: end.x, y: end.y, button: 0, detail: 1 })
     },
+    selectWords(target, line) {
+      selectIn(target)
+      drawRangesAt(line)
+    },
+    dragSelect(target, line) {
+      begin()
+      const { x, y, el } = at({ target })
+      press(el, x - 10, y, 0, { detail: 1 })
+      selectIn(target)
+      drawRangesAt(line)
+      release(el, x + 10, y, 0, { detail: 1 })
+      userMouse(el, 'click', { x: x + 10, y, button: 0, detail: 1 })
+      h.controller.renderNow()
+    },
+    async waitForButton() {
+      h.clock.now += BUTTON_WAIT_MS
+      await realTime(BUTTON_WAIT_MS)
+    },
+    scrollSelection(line) {
+      drawRangesAt(line)
+      h.controller.renderNow()
+    },
+    async clearSelectionByScript() {
+      window.getSelection()?.removeAllRanges()
+      h.clock.now += BUTTON_WAIT_MS
+      await realTime(BUTTON_WAIT_MS)
+    },
+    commentButton() {
+      const button = h.root()?.querySelector<HTMLElement>('.erf-hpc-button')
+      if (!isShown(button)) return null
+      const top = Number.parseFloat(button.style.top)
+      const line = [...Range.prototype.getClientRects.call(document.createRange())].at(-1)
+      return { top, below: line !== undefined && top >= line.bottom }
+    },
+    lastPickHadWords: () => Promise.resolve((h.sent(COMMENT_PICK_CHANNEL) as Array<{ kind: string; sel?: unknown }>).filter(p => p.kind !== 'step').at(-1)?.sel !== undefined),
+    async menuAboutWords() {
+      const asked = (): { sel?: unknown } | undefined =>
+        (h.sent(COMMENT_PICK_CHANNEL) as Array<{ kind: string; sel?: unknown }>).filter(p => p.kind === 'menu' || p.kind === 'context').at(-1)
+      await vi.waitFor(() => expect(asked()).toBeDefined())
+      return asked()?.sel !== undefined
+    },
     selectText(target) {
-      Range.prototype.getClientRects = () => [] as unknown as DOMRectList // jsdom has no layout
-      const text = [...elementOf(target).childNodes].find(node => node.nodeType === Node.TEXT_NODE)
-      if (text === undefined) throw new Error(`no text in ${target}`)
-      const range = document.createRange()
-      range.setStart(text, 0)
-      range.setEnd(text, Math.min(6, text.textContent?.length ?? 0))
-      const selection = window.getSelection()
-      selection?.removeAllRanges()
-      selection?.addRange(range)
+      drawRangesAt(OVERLAY_FIXTURE[target].box)
+      selectIn(target)
     },
     selectedText: () => window.getSelection()?.toString() ?? '',
     rightClick(target) {
@@ -310,7 +368,7 @@ function driverOn(h: Harness): OverlayDriver {
   }
 }
 
-const makeDriver = async (): Promise<OverlayDriver> => {
+const makeDriver = async (): Promise<SelectionDriver> => {
   const h = createHarness()
   mount(PAGE)
   // The token window is open while the page parses: let the registry see the fixture, then close it.
@@ -321,3 +379,4 @@ const makeDriver = async (): Promise<OverlayDriver> => {
 
 runOverlaySuite('HTML', makeDriver)
 runPickerKeySuite('HTML', makeDriver)
+runSelectionSuite('HTML', makeDriver)

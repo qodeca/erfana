@@ -7655,7 +7655,7 @@
       "quote": "10 per second per view in main",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentPickHandler.ts:64",
+      "source": "src/main/services/preview/comments/commentPickHandler.ts:65",
       "match": "export const MAIN_PICKS_PER_SECOND = 10"
     },
     {
@@ -48489,7 +48489,7 @@
       "quote": "- Cursor: system `crosshair`.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/overlayStyles.ts:120",
+      "source": "src/preload/previewPageComments/overlayStyles.ts:123",
       "match": "cursor: crosshair !important"
     },
     {
@@ -48531,7 +48531,7 @@
       "quote": "PDF export: the overlay is hidden while printing, so pins never land in the PDF.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/overlayStyles.ts:115",
+      "source": "src/preload/previewPageComments/overlayStyles.ts:118",
       "match": "@media print { .erf-hpc-root { display: none; } }"
     },
     {
@@ -48756,7 +48756,7 @@
       "quote": "per view: 64 hellos and 128 anchor reports a second",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentPickHandler.ts:81",
+      "source": "src/main/services/preview/comments/commentPickHandler.ts:82",
       "match": "ANCHORS_PER_VIEW_PER_SECOND = 128"
     },
     {
@@ -49111,7 +49111,7 @@
       "quote": "after a coordinate hit test (controller.ts:229-231, verified)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/controller.ts:218",
+      "source": "src/preload/previewPageComments/controller.ts:241",
       "match": "event.detail > 0"
     },
     {
@@ -51831,7 +51831,7 @@
       "quote": "Per frame: picks 5 a second, hellos 5, anchor reports 8.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentPickHandler.ts:77",
+      "source": "src/main/services/preview/comments/commentPickHandler.ts:78",
       "match": "export const ANCHORS_PER_FRAME_PER_SECOND = 8"
     },
     {
@@ -51841,7 +51841,7 @@
       "quote": "**64 hellos and 128 anchor reports a second**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentPickHandler.ts:81",
+      "source": "src/main/services/preview/comments/commentPickHandler.ts:82",
       "match": "export const ANCHORS_PER_VIEW_PER_SECOND = 128"
     },
     {
@@ -53537,7 +53537,7 @@
       "quote": "The parent draws a transparent click-shield over every non-commentable",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/overlayHits.ts:24",
+      "source": "src/preload/previewPageComments/overlayHits.ts:43",
       "match": "| { readonly kind: 'shield'; readonly iframe: FrameElement }"
     },
     {

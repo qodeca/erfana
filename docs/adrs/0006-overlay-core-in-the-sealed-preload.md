@@ -56,6 +56,8 @@ The build guard is not the security control; the contract scan and the pure-core
 
 **Later note (2026-11-01, K-1).** The keyboard's menu outside comment mode added a use of `overlayCore/pickerKeys` in main (`previewInputForward.ts`), so the page and main agree on which press is the menu key; main importing the core is not an allow-list change. In the page it added logic only: the existing `keydown` listener, and the existing `preview-page:commentPick` fields with `kind: 'context'` and `via: 'keyboard'`. No channel, listener or field was added, and `previewPage.surface.pin.test.ts` passes unchanged.
 
+**Later note (2026-11-01, I-10, I-13).** `overlayCore/selectionRules` is a new pure file, with no imports. In the page, the check that the selection is still there is a timer that asks for a redraw, not a `selectionchange` listener. A mark's click sends the existing `icon` pick, with `key` holding the pin's key plus the place of the words in that pin (`markKeyOf`, used by both sides): no field, channel or listener was added on either direction, and no thread id reaches the page. Main accepts only a place its own pin has, so a false key can only narrow what a pin of that frame opens. `previewPage.surface.pin.test.ts` and the pick schema pins pass unchanged.
+
 ## Alternatives considered
 
 ### One overlay implementation loaded in both places
