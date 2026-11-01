@@ -9,7 +9,7 @@ Erfana gains a built-in web browser that opens in tabs next to the HTML and Mark
 | Objective | Success metric | Target |
 |-----------|---------------|--------|
 | Review an agent's web work without leaving Erfana | Review steps that need an outside browser for the Qodeca team's web projects | None for pages that do not need Google sign-in |
-| Point the agent at the right element | First-try hits on a fixed 20-pick set (025-NFR-003) | 18 of 20 or more |
+| Point the agent at the right element | First-try hits over 3 runs of a fixed 20-pick set (025-NFR-003) | 54 of 60 or more |
 | Replace the screenshot-and-describe routine | Steps from "I see a wrong element" to "prompt submitted" | Pick, choose action, (type), submit – no screenshot tool, no paste |
 
 The first and third objectives are business aims, judged by the owner after release; they sit outside the acceptance suite. The second is measured by 025-AC-048.
@@ -18,14 +18,15 @@ The first and third objectives are business aims, judged by the owner after rele
 
 ### In scope
 
-- Browser tabs in the editor area: address bar, Back, Forward, Reload, Stop, page title and site icon, find in page, zoom, size presets, DevTools; hidden tabs stay loaded; a fixed list of keys reserved for Erfana, every other key going to the page while browsing and to no one while picking.
-- `http`, `https` and `file://` addresses; terminal links and the HTML Preview open pages in a browser tab.
+- Browser tabs in the editor area: address bar, Back, Forward, Reload, Stop, page title and site icon, find in page, zoom, width presets, DevTools; hidden tabs stay loaded; a fixed list of keys reserved for Erfana, every other key going to the page while browsing and to no one while picking.
+- `http`, `https` and `file://` addresses, with local files confined to their folder (this may change how Erfana's own window loads, if ADR 0012 moves it to a custom protocol); terminal links and the HTML Preview open pages in a browser tab.
 - One persistent browser profile per project in `<project>/.erfana/browser`, kept out of git, with cookies encrypted at rest and a notice on Linux machines without a keyring.
-- Chrome-like site behaviour: permission prompts, downloads, certificate warnings, HTTP basic-auth sign-in, new tabs and sign-in popups, clearing browsing data.
+- Chrome-like site behaviour: permission prompts, downloads, certificate warnings, HTTP sign-in, new tabs, sign-in popups with a visible origin, a popup blocker, clearing browsing data.
+- Page right-click menu and **Open in system browser**; page dialogs and leave-page prompts; load-error and crashed-tab pages; per-project address history and local addresses seen in the project's terminal output, shown on an empty tab (Should).
 - Pick mode: hover highlight with a label, parent and child refinement, hover-only elements, every frame.
-- Six web prompt actions (Explain, Ask, Fix, Change style, Change text, Prompt) sent through the existing prompt-template path.
-- A capture per send: a context file (page facts, HTML, styles, React hints, recent console and network errors) and one annotated screenshot, deleted automatically after 7 days.
-- Release work: no feature flag, a separate Dependabot rule for Electron, a security audit gate, full URLs in log files as a recorded exception, owner-approved designs before UI code, user-guide risk notes, a release note on the terminal-link change.
+- Four web prompt actions (Explain, Ask, Change, Prompt) sent through the existing prompt-template path to a target terminal that runs an agent, with a notice after each send.
+- A capture per send: a context file (page facts, HTML, styles, React hints, recent console and network errors) and one annotated screenshot plus an element crop, deleted automatically after 7 days.
+- Release work: no feature flag, a separate Dependabot rule for Electron, a hostile-page test suite and a security audit gate, full URLs in log files as a recorded exception, owner-approved designs before UI code, user-guide risk notes, a release note on the terminal-link change.
 
 ### Out of scope
 
@@ -36,18 +37,21 @@ The first and third objectives are business aims, judged by the owner after rele
 - One prompt that carries several picked elements.
 - Restoring browser tabs when a project reopens; unloading hidden tabs to save memory.
 - A feature flag or a hidden off-switch.
-- Stripping form values or other client data from captures.
+- Stripping form values or other client data from captures (reconfirmed by the owner on 2026-11-01).
+- Picking by keyboard alone (without a mouse).
+- Following up on the last picked element after a reload (a follow-up candidate, 05-notes).
 - Screen-reader support for pick mode (screen-reader support left Erfana in #440).
 
 ## Success criteria
 
 | Criterion | Metric | Target |
 |-----------|--------|--------|
-| Pick precision | First-try hits, 20 picks over 3 sample apps, Claude Code (025-NFR-003) | ≥ 18 of 20 |
-| Isolation holds | High or critical findings in the release security audit (025-NFR-001) | 0 |
+| Pick precision | First-try hits, 3 runs of the same 20 pre-registered picks over the sample apps, Claude Code (025-NFR-003) | ≥ 54 of 60 |
+| Isolation holds | Hostile-page tests on every pull request, and high or critical findings in the release security audit (025-NFR-001) | All pass; 0 |
 | Engine stays patched | Days from an Electron security release to an Erfana release (025-NFR-002) | ≤ 14 |
 | Works everywhere Erfana ships | Platforms that pass the acceptance suite (025-NFR-006) | macOS, Windows, Linux |
 | Logins survive a restart | Signed-in session still valid after Erfana restarts (025-AC-015) | Yes, on all three platforms |
+| Team use | Two-week dogfood log by the Qodeca team, with no telemetry: picks per day, menus closed without sending, dialogs cancelled, action used, re-sends on the same element within 10 minutes; summarised in `docs/testing/browser-dogfood.md` | Owner-judged after the first release (not a release gate) |
 
 ## Target users
 

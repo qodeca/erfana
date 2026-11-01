@@ -2,9 +2,9 @@
   "spec_id": 25,
   "slug": "built-in-browser",
   "tier": "T4",
-  "version": "0.8.2",
+  "version": "0.9.0",
   "created": "2026-10-31T22:42:00.358Z",
-  "updated": "2026-10-31T23:46:53.551Z",
+  "updated": "2026-11-01T07:57:40.336Z",
   "application": {
     "name": "Built-in browser with element prompts",
     "domain": null,
@@ -32,8 +32,8 @@
       "file": "requirements/01-overview.md",
       "title": "Overview",
       "exists": true,
-      "word_count": 962,
-      "last_updated": "2026-10-31T23:46:53.551Z",
+      "word_count": 1140,
+      "last_updated": "2026-11-01T07:47:37.032Z",
       "validation_score": null
     },
     {
@@ -41,8 +41,8 @@
       "file": "requirements/02-requirements.md",
       "title": "Requirements",
       "exists": true,
-      "word_count": 7194,
-      "last_updated": "2026-10-31T23:46:53.551Z",
+      "word_count": 13356,
+      "last_updated": "2026-11-01T07:57:40.336Z",
       "validation_score": null
     },
     {
@@ -50,8 +50,8 @@
       "file": "requirements/03-use-cases.md",
       "title": "Use cases",
       "exists": true,
-      "word_count": 1489,
-      "last_updated": "2026-10-31T23:46:53.551Z",
+      "word_count": 1588,
+      "last_updated": "2026-11-01T07:47:37.032Z",
       "validation_score": null
     },
     {
@@ -59,8 +59,8 @@
       "file": "requirements/04-acceptance.md",
       "title": "Acceptance criteria",
       "exists": true,
-      "word_count": 6152,
-      "last_updated": "2026-10-31T23:46:53.551Z",
+      "word_count": 10707,
+      "last_updated": "2026-11-01T07:57:40.336Z",
       "validation_score": null
     },
     {
@@ -68,945 +68,1117 @@
       "file": "requirements/05-notes.md",
       "title": "Notes",
       "exists": true,
-      "word_count": 1089,
-      "last_updated": "2026-10-31T23:46:53.551Z",
+      "word_count": 2072,
+      "last_updated": "2026-11-01T07:43:03.964Z",
       "validation_score": null
     }
   ],
   "requirements_index": {
     "025-FR-001": {
       "section": "02",
-      "line": 65,
+      "line": 75,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-002": {
       "section": "02",
-      "line": 71,
+      "line": 81,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-003": {
       "section": "02",
-      "line": 77,
+      "line": 100,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-004": {
       "section": "02",
-      "line": 83,
+      "line": 106,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-005": {
       "section": "02",
-      "line": 89,
+      "line": 112,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-006": {
       "section": "02",
-      "line": 95,
+      "line": 125,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-007": {
       "section": "02",
-      "line": 101,
+      "line": 131,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-008": {
       "section": "02",
-      "line": 107,
+      "line": 137,
       "status": "active",
       "priority": "Should",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-009": {
       "section": "02",
-      "line": 113,
+      "line": 143,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-010": {
       "section": "02",
-      "line": 119,
+      "line": 149,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-011": {
       "section": "02",
-      "line": 125,
+      "line": 155,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-012": {
       "section": "02",
-      "line": 131,
+      "line": 165,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-013": {
       "section": "02",
-      "line": 137,
+      "line": 171,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-014": {
       "section": "02",
-      "line": 143,
-      "status": "active",
-      "priority": "Must",
-      "created": "2026-10-31T22:42:00.358Z"
-    },
-    "025-FR-047": {
-      "section": "02",
-      "line": 153,
-      "status": "active",
-      "priority": "Must",
-      "created": "2026-10-31T23:40:08.648Z"
-    },
-    "025-FR-048": {
-      "section": "02",
-      "line": 159,
-      "status": "active",
-      "priority": "Must",
-      "created": "2026-10-31T23:40:08.648Z"
-    },
-    "025-FR-049": {
-      "section": "02",
-      "line": 165,
-      "status": "active",
-      "priority": "Must",
-      "created": "2026-10-31T23:40:08.648Z"
-    },
-    "025-FR-050": {
-      "section": "02",
-      "line": 171,
-      "status": "active",
-      "priority": "Must",
-      "created": "2026-10-31T23:40:08.648Z"
-    },
-    "025-FR-051": {
-      "section": "02",
-      "line": 177,
-      "status": "active",
-      "priority": "Must",
-      "created": "2026-10-31T23:40:08.648Z"
-    },
-    "025-FR-052": {
-      "section": "02",
-      "line": 183,
-      "status": "active",
-      "priority": "Must",
-      "created": "2026-10-31T23:40:08.648Z"
-    },
-    "025-FR-015": {
-      "section": "02",
-      "line": 191,
-      "status": "active",
-      "priority": "Must",
-      "created": "2026-10-31T22:42:00.358Z"
-    },
-    "025-FR-016": {
-      "section": "02",
-      "line": 197,
-      "status": "active",
-      "priority": "Must",
-      "created": "2026-10-31T22:42:00.358Z"
-    },
-    "025-FR-017": {
-      "section": "02",
-      "line": 203,
-      "status": "active",
-      "priority": "Must",
-      "created": "2026-10-31T22:42:00.358Z"
-    },
-    "025-FR-018": {
-      "section": "02",
       "line": 209,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
-    "025-FR-019": {
-      "section": "02",
-      "line": 215,
-      "status": "active",
-      "priority": "Must",
-      "created": "2026-10-31T22:42:00.358Z"
-    },
-    "025-FR-020": {
-      "section": "02",
-      "line": 221,
-      "status": "active",
-      "priority": "Must",
-      "created": "2026-10-31T22:42:00.358Z"
-    },
-    "025-FR-021": {
-      "section": "02",
-      "line": 227,
-      "status": "active",
-      "priority": "Must",
-      "created": "2026-10-31T22:42:00.358Z"
-    },
-    "025-FR-022": {
-      "section": "02",
-      "line": 233,
-      "status": "active",
-      "priority": "Must",
-      "created": "2026-10-31T22:42:00.358Z"
-    },
-    "025-FR-023": {
-      "section": "02",
-      "line": 239,
-      "status": "active",
-      "priority": "Must",
-      "created": "2026-10-31T22:42:00.358Z"
-    },
-    "025-FR-024": {
-      "section": "02",
-      "line": 245,
-      "status": "active",
-      "priority": "Could",
-      "created": "2026-10-31T22:42:00.358Z"
-    },
-    "025-FR-025": {
-      "section": "02",
-      "line": 253,
-      "status": "active",
-      "priority": "Must",
-      "created": "2026-10-31T22:42:00.358Z"
-    },
-    "025-FR-026": {
+    "025-FR-015": {
       "section": "02",
       "line": 259,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
+    "025-FR-016": {
+      "section": "02",
+      "line": 276,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-017": {
+      "section": "02",
+      "line": 282,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-018": {
+      "section": "02",
+      "line": 290,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-019": {
+      "section": "02",
+      "line": 296,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-020": {
+      "section": "02",
+      "line": 308,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-021": {
+      "section": "02",
+      "line": 314,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-022": {
+      "section": "02",
+      "line": 320,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-023": {
+      "section": "02",
+      "line": 326,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-024": {
+      "section": "02",
+      "line": 332,
+      "status": "active",
+      "priority": "Could",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-025": {
+      "section": "02",
+      "line": 340,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-FR-026": {
+      "section": "02",
+      "line": 346,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:42:00.358Z"
+    },
     "025-FR-027": {
       "section": "02",
-      "line": 265,
+      "line": 352,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-028": {
       "section": "02",
-      "line": 271,
+      "line": 358,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-029": {
       "section": "02",
-      "line": 277,
+      "line": 366,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-030": {
       "section": "02",
-      "line": 283,
+      "line": 372,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-031": {
       "section": "02",
-      "line": 289,
+      "line": 378,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-032": {
       "section": "02",
-      "line": 295,
+      "line": 384,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-033": {
       "section": "02",
-      "line": 301,
+      "line": 396,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-034": {
       "section": "02",
-      "line": 307,
+      "line": 414,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-035": {
       "section": "02",
-      "line": 313,
+      "line": 420,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-036": {
       "section": "02",
-      "line": 319,
+      "line": 426,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-037": {
       "section": "02",
-      "line": 332,
+      "line": 441,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-038": {
       "section": "02",
-      "line": 338,
+      "line": 452,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-039": {
       "section": "02",
-      "line": 344,
+      "line": 458,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
-    "025-FR-046": {
-      "section": "02",
-      "line": 352,
-      "status": "active",
-      "priority": "Must",
-      "created": "2026-10-31T22:48:48.067Z"
-    },
-    "025-FR-053": {
-      "section": "02",
-      "line": 360,
-      "status": "active",
-      "priority": "Must",
-      "created": "2026-10-31T23:40:08.648Z"
-    },
     "025-FR-040": {
       "section": "02",
-      "line": 368,
+      "line": 515,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-041": {
       "section": "02",
-      "line": 374,
+      "line": 521,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-042": {
       "section": "02",
-      "line": 380,
+      "line": 527,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-043": {
       "section": "02",
-      "line": 386,
+      "line": 541,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-044": {
       "section": "02",
-      "line": 392,
+      "line": 547,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-045": {
       "section": "02",
-      "line": 398,
+      "line": 557,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
+    "025-FR-046": {
+      "section": "02",
+      "line": 466,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T22:48:48.067Z"
+    },
+    "025-FR-047": {
+      "section": "02",
+      "line": 221,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-FR-048": {
+      "section": "02",
+      "line": 227,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-FR-049": {
+      "section": "02",
+      "line": 233,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-FR-050": {
+      "section": "02",
+      "line": 239,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-FR-051": {
+      "section": "02",
+      "line": 245,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-FR-052": {
+      "section": "02",
+      "line": 251,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-FR-053": {
+      "section": "02",
+      "line": 474,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-FR-054": {
+      "section": "02",
+      "line": 489,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-FR-056": {
+      "section": "02",
+      "line": 179,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-FR-057": {
+      "section": "02",
+      "line": 185,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-FR-058": {
+      "section": "02",
+      "line": 191,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-FR-059": {
+      "section": "02",
+      "line": 197,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-FR-060": {
+      "section": "02",
+      "line": 495,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-FR-061": {
+      "section": "02",
+      "line": 501,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-FR-063": {
+      "section": "02",
+      "line": 203,
+      "status": "active",
+      "priority": "Should",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-FR-064": {
+      "section": "02",
+      "line": 535,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-FR-065": {
+      "section": "02",
+      "line": 507,
+      "status": "active",
+      "priority": "Must",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
     "025-NFR-001": {
       "section": "02",
-      "line": 419,
+      "line": 580,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-NFR-002": {
       "section": "02",
-      "line": 431,
+      "line": 598,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-NFR-003": {
       "section": "02",
-      "line": 443,
+      "line": 610,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-NFR-004": {
       "section": "02",
-      "line": 455,
+      "line": 622,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-NFR-005": {
       "section": "02",
-      "line": 467,
+      "line": 634,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-NFR-006": {
       "section": "02",
-      "line": 479,
+      "line": 646,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-NFR-007": {
       "section": "02",
-      "line": 491,
+      "line": 658,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-NFR-008": {
       "section": "02",
-      "line": 503,
+      "line": 670,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-NFR-009": {
+      "section": "02",
+      "line": 682,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-NFR-010": {
+      "section": "02",
+      "line": 694,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
     },
     "025-UC-001": {
       "section": "03",
       "line": 18,
       "status": "active",
-      "priority": "High",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-UC-002": {
       "section": "03",
-      "line": 61,
+      "line": 62,
       "status": "active",
-      "priority": "High",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-UC-003": {
       "section": "03",
-      "line": 92,
+      "line": 94,
       "status": "active",
-      "priority": "High",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-UC-004": {
       "section": "03",
-      "line": 127,
+      "line": 129,
       "status": "active",
-      "priority": "Medium",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-UC-005": {
       "section": "03",
-      "line": 158,
+      "line": 160,
       "status": "active",
-      "priority": "Medium",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-UC-006": {
       "section": "03",
-      "line": 188,
+      "line": 190,
       "status": "active",
-      "priority": "Low",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-001": {
       "section": "04",
-      "line": 81,
+      "line": 114,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-002": {
       "section": "04",
-      "line": 86,
+      "line": 119,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-003": {
       "section": "04",
-      "line": 91,
+      "line": 124,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-004": {
       "section": "04",
-      "line": 96,
+      "line": 129,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-005": {
       "section": "04",
-      "line": 101,
+      "line": 134,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-006": {
       "section": "04",
-      "line": 106,
+      "line": 139,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-007": {
       "section": "04",
-      "line": 111,
+      "line": 144,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-008": {
       "section": "04",
-      "line": 116,
+      "line": 149,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-009": {
       "section": "04",
-      "line": 121,
+      "line": 154,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-010": {
       "section": "04",
-      "line": 126,
+      "line": 159,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-011": {
       "section": "04",
-      "line": 131,
+      "line": 164,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-012": {
       "section": "04",
-      "line": 136,
+      "line": 169,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-013": {
       "section": "04",
-      "line": 141,
+      "line": 174,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-014": {
       "section": "04",
-      "line": 146,
+      "line": 179,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
-    "025-AC-061": {
-      "section": "04",
-      "line": 153,
-      "status": "active",
-      "created": "2026-10-31T23:40:08.648Z"
-    },
-    "025-AC-062": {
-      "section": "04",
-      "line": 158,
-      "status": "active",
-      "created": "2026-10-31T23:40:08.648Z"
-    },
-    "025-AC-063": {
-      "section": "04",
-      "line": 163,
-      "status": "active",
-      "created": "2026-10-31T23:40:08.648Z"
-    },
-    "025-AC-064": {
-      "section": "04",
-      "line": 168,
-      "status": "active",
-      "created": "2026-10-31T23:40:08.648Z"
-    },
-    "025-AC-065": {
-      "section": "04",
-      "line": 173,
-      "status": "active",
-      "created": "2026-10-31T23:40:08.648Z"
-    },
-    "025-AC-066": {
-      "section": "04",
-      "line": 178,
-      "status": "active",
-      "created": "2026-10-31T23:40:08.648Z"
-    },
     "025-AC-015": {
       "section": "04",
-      "line": 185,
+      "line": 218,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-016": {
       "section": "04",
-      "line": 190,
+      "line": 223,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-017": {
       "section": "04",
-      "line": 195,
+      "line": 228,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-018": {
       "section": "04",
-      "line": 200,
+      "line": 233,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-019": {
       "section": "04",
-      "line": 205,
+      "line": 238,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-020": {
       "section": "04",
-      "line": 210,
+      "line": 243,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-021": {
       "section": "04",
-      "line": 215,
+      "line": 248,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-022": {
       "section": "04",
-      "line": 220,
+      "line": 253,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-023": {
       "section": "04",
-      "line": 225,
+      "line": 258,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-024": {
       "section": "04",
-      "line": 230,
+      "line": 263,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-025": {
       "section": "04",
-      "line": 237,
+      "line": 270,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-026": {
       "section": "04",
-      "line": 242,
+      "line": 275,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-027": {
       "section": "04",
-      "line": 247,
+      "line": 280,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-028": {
       "section": "04",
-      "line": 252,
+      "line": 285,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-029": {
       "section": "04",
-      "line": 257,
+      "line": 290,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-030": {
       "section": "04",
-      "line": 262,
+      "line": 295,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-031": {
       "section": "04",
-      "line": 267,
+      "line": 300,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-032": {
       "section": "04",
-      "line": 272,
+      "line": 305,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-033": {
       "section": "04",
-      "line": 277,
+      "line": 310,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-034": {
       "section": "04",
-      "line": 282,
+      "line": 315,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-035": {
       "section": "04",
-      "line": 287,
+      "line": 320,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-036": {
       "section": "04",
-      "line": 292,
+      "line": 325,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-037": {
       "section": "04",
-      "line": 297,
+      "line": 330,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-038": {
       "section": "04",
-      "line": 302,
+      "line": 335,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-039": {
       "section": "04",
-      "line": 307,
+      "line": 340,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-040": {
       "section": "04",
-      "line": 314,
+      "line": 347,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-041": {
       "section": "04",
-      "line": 319,
+      "line": 352,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-042": {
       "section": "04",
-      "line": 324,
+      "line": 357,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-043": {
       "section": "04",
-      "line": 329,
+      "line": 362,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-044": {
       "section": "04",
-      "line": 334,
+      "line": 367,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
-    "025-AC-067": {
-      "section": "04",
-      "line": 341,
-      "status": "active",
-      "created": "2026-10-31T23:40:08.648Z"
-    },
-    "025-AC-060": {
-      "section": "04",
-      "line": 348,
-      "status": "active",
-      "created": "2026-10-31T22:48:48.067Z"
-    },
     "025-AC-045": {
       "section": "04",
-      "line": 353,
+      "line": 386,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-046": {
       "section": "04",
-      "line": 360,
+      "line": 393,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-047": {
       "section": "04",
-      "line": 365,
+      "line": 398,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-048": {
       "section": "04",
-      "line": 370,
+      "line": 403,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-049": {
       "section": "04",
-      "line": 375,
+      "line": 408,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-050": {
       "section": "04",
-      "line": 380,
+      "line": 413,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-051": {
       "section": "04",
-      "line": 385,
+      "line": 418,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-052": {
       "section": "04",
-      "line": 390,
+      "line": 423,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-053": {
       "section": "04",
-      "line": 395,
+      "line": 428,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-054": {
       "section": "04",
-      "line": 402,
+      "line": 435,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-055": {
       "section": "04",
-      "line": 416,
+      "line": 450,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-056": {
       "section": "04",
-      "line": 424,
+      "line": 460,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-057": {
       "section": "04",
-      "line": 437,
+      "line": 473,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-058": {
       "section": "04",
-      "line": 446,
+      "line": 482,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-AC-059": {
       "section": "04",
-      "line": 455,
+      "line": 491,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
+    "025-AC-060": {
+      "section": "04",
+      "line": 381,
+      "status": "active",
+      "created": "2026-10-31T22:48:48.067Z"
+    },
+    "025-AC-061": {
+      "section": "04",
+      "line": 186,
+      "status": "active",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-AC-062": {
+      "section": "04",
+      "line": 191,
+      "status": "active",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-AC-063": {
+      "section": "04",
+      "line": 196,
+      "status": "active",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-AC-064": {
+      "section": "04",
+      "line": 201,
+      "status": "active",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-AC-065": {
+      "section": "04",
+      "line": 206,
+      "status": "active",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-AC-066": {
+      "section": "04",
+      "line": 211,
+      "status": "active",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-AC-067": {
+      "section": "04",
+      "line": 374,
+      "status": "active",
+      "created": "2026-10-31T23:40:08.648Z"
+    },
+    "025-AC-068": {
+      "section": "04",
+      "line": 501,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-069": {
+      "section": "04",
+      "line": 506,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-070": {
+      "section": "04",
+      "line": 511,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-071": {
+      "section": "04",
+      "line": 516,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-072": {
+      "section": "04",
+      "line": 521,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-073": {
+      "section": "04",
+      "line": 526,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-074": {
+      "section": "04",
+      "line": 531,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-075": {
+      "section": "04",
+      "line": 536,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-076": {
+      "section": "04",
+      "line": 541,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-077": {
+      "section": "04",
+      "line": 546,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-078": {
+      "section": "04",
+      "line": 551,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-079": {
+      "section": "04",
+      "line": 556,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-080": {
+      "section": "04",
+      "line": 561,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-081": {
+      "section": "04",
+      "line": 566,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
+    },
+    "025-AC-082": {
+      "section": "04",
+      "line": 571,
+      "status": "active",
+      "created": "2026-11-01T07:43:03.964Z"
+    },
     "025-CA-001": {
       "section": "05",
-      "line": 13,
+      "line": 14,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-CA-002": {
       "section": "05",
-      "line": 25,
+      "line": 26,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-CA-003": {
       "section": "05",
-      "line": 37,
+      "line": 38,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-CA-004": {
       "section": "05",
-      "line": 49,
+      "line": 50,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-CA-005": {
       "section": "05",
-      "line": 61,
+      "line": 62,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-CA-006": {
       "section": "05",
-      "line": 79,
+      "line": 92,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-CA-007": {
       "section": "05",
-      "line": 80,
+      "line": 93,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-CA-008": {
       "section": "05",
-      "line": 81,
+      "line": 94,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
+    },
+    "025-CA-009": {
+      "section": "05",
+      "line": 74,
+      "status": "active",
+      "created": "2026-11-01T07:38:39.581Z"
     }
   },
   "requirement_sequences": {
-    "FR": 53,
-    "NFR": 8,
+    "FR": 65,
+    "NFR": 10,
     "UC": 6,
-    "AC": 67,
-    "CA": 8
+    "AC": 82,
+    "CA": 9
   },
   "cross_references": [],
   "id_migrations": [],
   "statistics": {
     "total_sections": 5,
-    "total_requirements": 61,
+    "total_requirements": 73,
     "total_use_cases": 6,
     "total_stakeholders": 2,
-    "total_words": 16886,
+    "total_words": 28863,
     "deprecated_count": 0
   },
   "validation": {
-    "overall_score": 86,
+    "overall_score": null,
     "passed": true,
-    "last_validated": "2026-10-31T23:50:15.245Z",
+    "last_validated": "2026-11-01T07:57:40.505Z",
     "threshold": 80
   },
   "tags": [
@@ -1138,6 +1310,20 @@
       "operation": "VALIDATE",
       "target": "spec",
       "description": "spec-validator run on v0.8.2: passes (0 high, 2 medium, 13 low; indicative score 86). Capture-moment and FR-014 bundling findings resolved. Open mediums: FR-050 modal wording vs FR-052 editor-tab switch; FR-053/FR-052 bundle several rules per ID.",
+      "by": "spec-validator"
+    },
+    {
+      "date": "2026-11-01T07:43:03.964Z",
+      "operation": "UPDATE",
+      "target": "spec",
+      "description": "Expert-panel revision (PR #446 panel, 2026-11-01), applied with owner approval: 72 merged findings applied, 15 declined; owner decisions D1–D15 recorded (send as is, build directly, profile and trust decisions in the project, full URLs in logs, no notice, no privacy gate, no switch, 14-day patches, submit only, one element per prompt, all terminal links, four actions Explain/Ask/Change/Prompt, 3 × 20 precision runs, no follow-up pick, keyboard-only picking out of scope). New FR-054, FR-056–FR-061, FR-063–FR-065 (FR-055 and FR-062 unused), NFR-009, NFR-010, AC-068–AC-082, CA-009. Backups *.bak-20261101-083151. Then fixed the spec-validator findings on the applied text (FR-002 rule order, FR-005 same-folder reads, NFR-010 criterion AC-082, reserved keys in FR-048/049/051, search URLs never logged, use-case traces, the dogfood row, and 11 of 13 lows; the registry count and the spoofing review stay open).",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-11-01T07:57:40.505Z",
+      "operation": "VALIDATE",
+      "target": "spec",
+      "description": "spec-validator run on v0.9.0 (fourth run after the apply fixes): passes (0 high, 2 medium, 13 low). The 2 mediums were then fixed (FR-046 send-failure example; popup key table in FR-014 with an AC-011 step), plus AC-055 A3. Open lows include the stale registry count (61 vs 73, registry outside the approved files) and the spoofing review to-do.",
       "by": "spec-validator"
     }
   ]

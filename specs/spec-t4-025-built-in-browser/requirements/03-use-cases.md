@@ -25,13 +25,13 @@
 
 **Preconditions:**
 - A project is open and a CLI agent (Claude Code) runs in Erfana's terminal.
-- The reviewer opened a browser tab (025-FR-001) and loaded the page from the address bar (025-FR-002).
+- The reviewer opened a browser tab (025-FR-001), which showed recent addresses and the pick hint (025-FR-063), and loaded the page from the address bar (025-FR-002).
 
 **Main flow:**
-1. The reviewer presses Ctrl/Cmd+E; pick mode starts (025-FR-025).
+1. The reviewer presses Ctrl/Cmd+E; pick mode starts and the pick banner shows (025-FR-025, 025-FR-065).
 2. The reviewer moves the mouse; the element under it is outlined with a label (025-FR-026).
 3. The reviewer presses Up once to select the parent button instead of its text (025-FR-027) and presses Enter.
-4. The prompt-actions menu opens (025-FR-030); the reviewer selects **Fix**.
+4. The prompt-actions menu opens (025-FR-030); the reviewer selects **Change**.
 5. The instruction dialog opens (025-FR-031); the reviewer types "the label is cut off on the right" and presses Ctrl/Cmd+Enter.
 6. Erfana writes the screenshot and the context file (025-FR-033, 025-FR-034, 025-FR-036, 025-FR-037, 025-FR-038).
 7. Erfana sends the rendered prompt to the terminal and submits it (025-FR-032).
@@ -41,20 +41,21 @@
 - The capture files exist in `.erfana/browser/captures/`.
 - The menu and dialog are closed, the page runs and pick mode is off (025-FR-032).
 - The prompt was submitted to the agent once.
+- A notice names the terminal that received the prompt (025-FR-060).
 
 **Alternative flows:**
 - A1: At step 4 the reviewer selects **Explain**; no dialog opens and step 6 follows at once.
 - A2: The element sits in an iframe; steps 2–7 work the same and the context file records the frame chain (025-FR-029).
 - A3: The element is partly off-screen; the screenshot is clipped and the context file says so (025-FR-035).
 - A4: The page is a production build; the context file says "source not found" and the send proceeds (025-FR-037).
-- A5: While the **Fix** dialog is open the page navigates on its own; Erfana closes the dialog, discards the capture and shows "The page changed – pick the element again" (025-FR-053).
+- A5: While the **Change** dialog is open the page reloads on its own; the dialog stays open with the instruction and the note "The page reloaded – the capture shows the page as you picked it", and **Send** uses the capture taken at the pick (025-FR-053).
 
 **Error flows:**
 - E1: The reviewer submits an empty instruction; the dialog stays open with an inline error (025-FR-031).
-- E2: No terminal is open; the prompt-template path opens one, as for Markdown templates (025-FR-032).
+- E2: No terminal is open, or the target terminal runs a plain shell; Erfana types nothing and shows "No agent is running in …" with **Choose terminal**; the dialog keeps the instruction (025-FR-061).
 - E3: Writing the capture fails (disk full, permission); no prompt is sent and an error toast names the reason (025-FR-046).
 
-**Traces to:** 025-FR-001, 025-FR-002, 025-FR-025, 025-FR-026, 025-FR-027, 025-FR-029, 025-FR-030, 025-FR-031, 025-FR-032, 025-FR-033, 025-FR-034, 025-FR-035, 025-FR-036, 025-FR-037, 025-FR-038, 025-FR-046, 025-FR-053
+**Traces to:** 025-FR-001, 025-FR-002, 025-FR-025, 025-FR-026, 025-FR-027, 025-FR-029, 025-FR-030, 025-FR-031, 025-FR-032, 025-FR-033, 025-FR-034, 025-FR-035, 025-FR-036, 025-FR-037, 025-FR-038, 025-FR-046, 025-FR-053, 025-FR-054, 025-FR-060, 025-FR-061, 025-FR-063, 025-FR-065
 
 ---
 
@@ -81,11 +82,12 @@
 **Alternative flows:**
 - A1: The reviewer Ctrl/Cmd-clicks the link; the address opens in the OS default browser and no tab opens.
 - A2: The link is a GitHub URL; a plain click still opens a browser tab.
+- A3: The reviewer right-clicks a link on the page and selects **Open link in system browser** (025-FR-057).
 
 **Error flows:**
-- E1: The dev server is not running yet; the tab shows Chromium's connection error page and Reload works once the server is up.
+- E1: The dev server is not running yet; the tab shows Erfana's load-error page (025-FR-059) and **Reload** works once the server is up.
 
-**Traces to:** 025-FR-003, 025-FR-004, 025-FR-005, 025-FR-009
+**Traces to:** 025-FR-003, 025-FR-004, 025-FR-005, 025-FR-009, 025-FR-057, 025-FR-059
 
 ---
 
@@ -137,9 +139,9 @@
 
 **Main flow:**
 1. The reviewer hovers the menu so it opens, and hovers the wrong item.
-2. The reviewer presses Ctrl/Cmd+E; pick mode starts and the menu stays open (025-FR-025).
+2. The reviewer presses Ctrl/Cmd+E; pick mode starts, the pick banner shows and the menu stays open (025-FR-025, 025-FR-065).
 3. The reviewer presses Ctrl/Cmd+E again; Erfana freezes the page, picks the item under the mouse and opens the prompt-actions menu (025-FR-028).
-4. The reviewer selects **Change text**, types the new label and submits.
+4. The reviewer selects **Change**, types the new label and submits.
 
 **Postconditions:**
 - The screenshot shows the open menu with the item outlined; the page resumes after the dialog closes.
@@ -151,7 +153,7 @@
 - E1: The reviewer presses Esc at step 3; the actions menu closes, the page resumes, pick mode is still on (025-FR-030) and nothing is sent.
 - E2: The capture cannot be written; no prompt is sent, the dialog stays open with the text and an error toast names the reason (025-FR-046).
 
-**Traces to:** 025-FR-025, 025-FR-026, 025-FR-027, 025-FR-028, 025-FR-030, 025-FR-031, 025-FR-032, 025-FR-033, 025-FR-034, 025-FR-046, 025-FR-053
+**Traces to:** 025-FR-025, 025-FR-026, 025-FR-027, 025-FR-028, 025-FR-030, 025-FR-031, 025-FR-032, 025-FR-033, 025-FR-034, 025-FR-046, 025-FR-053, 025-FR-054, 025-FR-065
 
 ---
 
@@ -167,13 +169,13 @@
 - A browser tab shows the page.
 
 **Main flow:**
-1. The reviewer selects the **Phone** size preset (025-FR-012).
-2. The page renders 390 px wide.
-3. The reviewer picks an overflowing element and sends **Change style**.
-4. The context file records the 390 px viewport and the **Phone** preset (025-FR-033); the screenshot shows the phone-width page (025-FR-034).
+1. The reviewer selects the **Phone width (390 px)** preset (025-FR-012).
+2. The page renders 390 px wide (width only; no device emulation, 025-FR-012).
+3. The reviewer picks an overflowing element and sends **Change**.
+4. The context file records the 390 px viewport and the **Phone width** preset (025-FR-033); the screenshot shows the phone-width page (025-FR-034).
 
 **Postconditions:**
-- The context file records the 390 px viewport and the **Phone** preset.
+- The context file records the 390 px viewport and the **Phone width** preset.
 
 **Alternative flows:**
 - A1: The reviewer uses DevTools device mode instead; the context file records preset `none` and the viewport size the page reports (025-FR-033).
