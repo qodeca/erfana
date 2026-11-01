@@ -51,13 +51,14 @@ Fixed sentences quoted in the flows ("The page reloaded – …", "No agent is r
 - A3: The element is partly off-screen; the screenshot is clipped and the context file says so (025-FR-035).
 - A4: The page is a production build; the context file says "source not found" and the send proceeds (025-FR-037).
 - A5: While the **Change** dialog is open the page reloads on its own; the dialog stays open with the instruction and the note "The page reloaded – the capture shows the page as you picked it", and **Send** uses the capture taken at the pick (025-FR-053).
+- A6: The reviewer works with the mouse alone: clicks **Pick element** (step 1), moves the mouse (step 2), clicks the element (step 3), and in the menu clicks **Parent element** or a name in the ancestor path instead of pressing Up; clicks **Change** (step 4); types the instruction – the only key use – and clicks **Send** (step 5). Steps 6–8 follow, and the send notice's **Show terminal** and **Open capture** are clicks too (025-FR-027, 025-FR-031, 025-FR-060, 025-NFR-011). A right-click on the element with **Pick this element** replaces steps 1–3 and opens the menu at once (025-FR-057).
 
 **Error flows:**
 - E1: The reviewer submits an empty instruction; the dialog stays open with an inline error (025-FR-031).
 - E2: No terminal is open, or the target terminal runs a plain shell; Erfana types nothing and shows "No agent is running in …" with **Open terminal** (no terminal open) or **Choose terminal** (a plain shell); the dialog keeps the instruction and focus moves to the banner's button (025-FR-061).
 - E3: Writing the capture fails (disk full, permission); no prompt is sent and an error toast names the reason (025-FR-046).
 
-**Traces to:** 025-FR-001, 025-FR-002, 025-FR-025, 025-FR-026, 025-FR-027, 025-FR-029, 025-FR-030, 025-FR-031, 025-FR-032, 025-FR-033, 025-FR-034, 025-FR-035, 025-FR-036, 025-FR-037, 025-FR-038, 025-FR-046, 025-FR-053, 025-FR-054, 025-FR-060, 025-FR-061, 025-FR-063, 025-FR-065
+**Traces to:** 025-FR-001, 025-FR-002, 025-FR-025, 025-FR-026, 025-FR-027, 025-FR-029, 025-FR-030, 025-FR-031, 025-FR-032, 025-FR-033, 025-FR-034, 025-FR-035, 025-FR-036, 025-FR-037, 025-FR-038, 025-FR-046, 025-FR-053, 025-FR-054, 025-FR-057, 025-FR-060, 025-FR-061, 025-FR-063, 025-FR-065, 025-NFR-011
 
 ---
 
@@ -150,6 +151,7 @@ Fixed sentences quoted in the flows ("The page reloaded – …", "No agent is r
 
 **Alternative flows:**
 - A1: The reviewer presses Up before choosing an action to select the whole menu (025-FR-027).
+- A2: The reviewer works with the mouse alone: clicks **Pick element**, hovers the menu open and clicks the wrong item; the menu stays open while picking, because the page keeps focus emulation, and the click picks the item (025-FR-025, 025-FR-028). **Parent element** then selects the whole menu, as A1 does, and **Change**, typing and **Send** follow as in the main flow (025-NFR-011).
 
 **Error flows:**
 - E1: The reviewer presses Esc at step 3; the actions menu closes, the page resumes, pick mode is still on (025-FR-030) and nothing is sent.
@@ -158,7 +160,7 @@ Fixed sentences quoted in the flows ("The page reloaded – …", "No agent is r
 - E4: At step 3 the menu is open and the reviewer presses Ctrl/Cmd+L; the menu closes with nothing sent and the page resumes (025-FR-049). In the dialog at step 4, F6 moves nothing (025-FR-050); a click on another editor tab leaves the dialog as 025-FR-052 states.
 - E5: At step 4 the target terminal runs a shell; the guard banner shows, nothing is typed and focus moves to the banner button (025-FR-061).
 
-**Traces to:** 025-FR-025, 025-FR-026, 025-FR-027, 025-FR-028, 025-FR-030, 025-FR-031, 025-FR-032, 025-FR-033, 025-FR-034, 025-FR-046, 025-FR-047, 025-FR-048, 025-FR-049, 025-FR-050, 025-FR-051, 025-FR-052, 025-FR-053, 025-FR-054, 025-FR-061, 025-FR-065
+**Traces to:** 025-FR-025, 025-FR-026, 025-FR-027, 025-FR-028, 025-FR-030, 025-FR-031, 025-FR-032, 025-FR-033, 025-FR-034, 025-FR-046, 025-FR-047, 025-FR-048, 025-FR-049, 025-FR-050, 025-FR-051, 025-FR-052, 025-FR-053, 025-FR-054, 025-FR-061, 025-FR-065, 025-NFR-011
 
 ---
 

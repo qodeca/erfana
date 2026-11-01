@@ -24,6 +24,7 @@ The first and third objectives are business aims, judged by the owner after rele
 - Chrome-like site behaviour: permission prompts, downloads, certificate warnings, HTTP sign-in, new tabs, sign-in popups with a visible origin, a popup blocker, clearing browsing data.
 - Page right-click menu and **Open in system browser**; page dialogs and leave-page prompts; load-error and crashed-tab pages; per-project address history and local addresses seen in the project's terminal output, shown on an empty tab (Should).
 - Pick mode: hover highlight with a label, parent and child refinement, hover-only elements, every frame.
+- Pick and prompt by mouse alone: every step from starting pick mode to the send notice works with the pointer, except typing the instruction text (025-NFR-011).
 - Four web prompt actions (Explain, Ask, Change, Prompt) sent through the existing prompt-template path to a target terminal that runs an agent, with a notice after each send.
 - A capture per send: a context file (page facts, HTML, styles, React hints, recent console and network errors) and one annotated screenshot plus an element crop, deleted automatically after 7 days.
 - Release work: no feature flag, a separate Dependabot rule for Electron, a hostile-page test suite and a security audit gate, full URLs in log files as a recorded exception, owner-approved designs before UI code, user-guide risk notes, a release note on the terminal-link change.
@@ -64,7 +65,7 @@ When the two differ, the Qodeca team's workflow decides.
 
 ## Context
 
-- **Origin.** The plan was settled in a grill-me interview on 2026-10-31; every owner decision in this spec comes from that interview.
+- **Origin.** The plan was settled in a grill-me interview on 2026-10-31; the founding owner decisions come from that interview; later ones are dated where they appear.
 - **Today's routine.** The team takes a screenshot in Chrome, pastes it into the terminal and describes the element in words. It is slow, and the agent often edits the wrong element.
 - **Prior art.** Cursor drops a chip for the picked element into its chat box; VS Code's experimental integrated browser attaches HTML, CSS and a screenshot through **Add Element to Chat**. Both separate human picking from agent-driven browser tools, and Cursor cannot pick inside iframes. Erfana has no chat box, so it reuses its prompt templates, which type into the terminal and submit.
 - **What exists.** The HTML Preview already runs pages in a sandboxed `WebContentsView` and has an element picker for comments (spec 024); `capturePage` takes view screenshots; `executePromptTemplate` (`src/renderer/src/utils/panelUtils.ts`) sends prompt templates to the terminal; terminal links open through `createTerminalLinkHandler` (`src/renderer/src/components/Panels/TerminalPanel/terminalPanel.logic.ts`).
