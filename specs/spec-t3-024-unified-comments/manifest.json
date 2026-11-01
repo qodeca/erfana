@@ -149,6 +149,10 @@
       "section": "02-requirements",
       "status": "active"
     },
+    "024-FR-028": {
+      "section": "02-requirements",
+      "status": "active"
+    },
     "024-NFR-001": {
       "section": "02-requirements",
       "status": "active"
@@ -330,6 +334,10 @@
       "status": "active"
     },
     "024-AC-038": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "024-AC-039": {
       "section": "03-acceptance",
       "status": "active"
     }
@@ -529,6 +537,13 @@
       "from": "024-FR-027",
       "to": [
         "024-AC-035"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "024-FR-028",
+      "to": [
+        "024-AC-039"
       ],
       "type": "traces"
     },

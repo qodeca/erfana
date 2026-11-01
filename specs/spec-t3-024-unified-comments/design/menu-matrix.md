@@ -6,6 +6,8 @@ Requirement: 024-FR-027 (a), with 024-FR-004, 024-FR-006, 024-FR-019 (OD-01) and
 
 *Owner decision (2026-10-31):* every comment message was rewritten for readers who are not developers, in one approved table. The HTML word "element" became "section", "thread" became "conversation", and the window no longer shows a tag or selector. The strings below are the new ones; a row dated earlier that still shows old wording is history.
 
+*Owner decision (2026-11-01):* the item uses the plain kind word, with no "this": "Comment on section" in the HTML Preview (M-01, M-05), as "Comment on {kind}" does in the Markdown Preview ("Comment on paragraph", M-11, M-15). "Add comment" stays in comment mode for now (I-24, revisited in plan step 12). Rewritten from the review: the "cannot hold a comment" reason in § 3 now matches the shipped text (I-30). Other sentences in § 3 that differ from the shipped text are settled in plan step 12 (P-F12, P-F14, P-F32; differences table D-66). The keyboard menu of § 4 for HTML with comment mode off does not work yet; plan step 7 settles it (D-50).
+
 ## How to read it
 
 - **Axes.** Preview (HTML, Markdown) × comment mode (off, on) × text selected (no, yes) × file state. File state is one of: **writable**; **read-only** (any reason a new comment cannot be written – see § 3); for Markdown also **paused** (unsaved editor edits, 024-FR-015) and **frontmatter** (the pointer, the focused block or any part of the selection is in the frontmatter).
@@ -18,11 +20,11 @@ Requirement: 024-FR-027 (a), with 024-FR-004, 024-FR-006, 024-FR-019 (OD-01) and
 
 | # | Preview | Mode | Selected | File | Items, in order |
 |---|---|---|---|---|---|
-| M-01 | HTML | off | no | writable | 1. **Comment on this section** – opens the new-comment window on the target in one step (A-01) |
+| M-01 | HTML | off | no | writable | 1. **Comment on section** – opens the new-comment window on the target in one step (A-01) |
 | M-02 | HTML | off | yes | writable | 1. **Comment on selection** · 2. **Comment on the whole section** |
 | M-03 | HTML | on | no | writable | 1. **Add comment** – on the picked element |
 | M-04 | HTML | on | yes | writable | 1. **Comment on selection** · 2. **Comment on the whole section** |
-| M-05 | HTML | off | no | read-only | 1. **Comment on this section** – disabled, reason |
+| M-05 | HTML | off | no | read-only | 1. **Comment on section** – disabled, reason |
 | M-06 | HTML | off | yes | read-only | 1. **Comment on selection** – disabled, reason · 2. **Comment on the whole section** – disabled, reason |
 | M-07 | HTML | on | any | read-only | Not reachable: comment mode is unavailable while no new comment can be written (§ 2) |
 | M-08 | HTML | off or on | any | target cannot hold a comment (`html`, `head`, inside template content, an inline or refused frame) | The row's items for a writable file, each disabled with its reason |
@@ -65,7 +67,7 @@ Comment mode is unavailable while no new comment can be written: the toggle is `
 | Paused – unsaved edits | {file} has unsaved changes. Save the file to change comments. | Markdown |
 | Paused – changed on disk too | {file} changed outside Erfana. Go to the editor and choose which version to keep. | Markdown |
 | Frontmatter | You can't comment on the settings at the top of this file. | Markdown |
-| Element cannot hold a comment | This part of the page can't hold a comment. | HTML |
+| Element cannot hold a comment | You can't add a comment here. Try a nearby section. | HTML |
 | Inline frame (`srcdoc`) | Comments can't be added inside an inline frame. | HTML |
 | Frame from another site | Comments can't be added inside a frame from another site. | HTML |
 | Page still loading | Comments are available once the page has loaded. | HTML |
