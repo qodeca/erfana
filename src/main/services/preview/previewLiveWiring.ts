@@ -268,12 +268,20 @@ export function wirePreviewLiveView(owner: PreviewLiveWiringOwner): PreviewLiveP
         token,
         realRoot,
         windowId: params.window.id,
-        // Read at every click: a move changes the page on screen (issue #124).
+        // Read at every click: a move changes the page on screen (issue #124),
+        // and only the view itself knows its `?query`.
         get currentUrl(): string {
-          return urlFor(page.currentPage())
+          return wc.getURL() || urlFor(page.currentPage())
         }
       },
       {
+        loadSameFile: (url) => {
+          late.comments?.reloadStarting()
+          void page.startPageLoad(page.currentPage(), 'reload', () => {
+            // A failed load reports itself through `did-fail-load`.
+            wc.loadURL(url).catch(() => undefined)
+          })
+        },
         // In project space, so a link and a tree click mint one tab for one
         // file (part 3 §3.4); the disposition rides along (part 3 §3.2).
         requestOpenFile: (sourcePanelId, realTarget, anchor, windowId, disposition) =>

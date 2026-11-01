@@ -16,8 +16,8 @@
  * - An edit takes focus in its field and keeps its text in `commentDrafts`;
  *   Esc backs out of an edit or a confirmation first (`useInnerStep`), and
  *   leaving either returns focus to the `…` button.
- * - **Narrow to words** (comments-v2 C-07): Edit on the FIRST message also
- *   shows the words the comment is about and the Narrow to words field, on
+ * - **Comment on specific words** (comments-v2 C-07): Edit on the FIRST message also
+ *   shows the words the comment is about and the Comment on specific words field, on
  *   the target's text main sent with the thread. Save sends `sel` only when
  *   the range moved: the words chosen, or `null` for the whole target; main
  *   re-checks them as it does for a new comment (024-FR-004).

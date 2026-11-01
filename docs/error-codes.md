@@ -258,21 +258,21 @@ Not an error: when the default-browser lookup fails, times out or returns an unu
 |------|-----------|-------|
 | `COMMENT_PATH_REFUSED` | "Erfana doesn't write comments to this file." | Not a file comments may be written to: not absolute, outside the project, a never-served path (`node_modules`, `dist`, `out`, `coverage`, `.git`, dot-folders), not `.html` / `.htm`, an NTFS stream name or an 8.3 short name |
 | `COMMENT_FILE_GONE` | "{file} no longer exists. Copy your text before closing." | The file, or a folder on its path, no longer exists |
-| `COMMENT_WRITE_REFUSED_LINK` | "{file} is a link to another file, so Erfana won't write to it." | The file is a symlink or has other hard links |
-| `COMMENT_FILE_TOO_LARGE` | "Erfana adds comments only to files of up to 25 MB and 640,000 elements." | Over `COMMENT_FILE_MAX_BYTES` (25 MB) |
-| `COMMENT_ENCODING_UNSUPPORTED` | "Erfana can only add comments to UTF-8 files." | Not UTF-8 (with or without a BOM) with a byte-identical round trip |
-| `COMMENT_FILE_CONFLICTED` | "{file} has unresolved git conflicts. Resolve them first." | A complete git conflict hunk in the file |
-| `COMMENT_FILE_READ_ONLY` | "Couldn't save: {file} is read-only. Your text is still here." | Read-only on disk, another user's file, an unwritable folder, or an unterminated comment block (read-only for comments) |
+| `COMMENT_WRITE_REFUSED_LINK` | "{file} is only a link to another file. Open the real file to comment." | The file is a symlink or has other hard links |
+| `COMMENT_FILE_TOO_LARGE` | "This file is too big for comments. The limit is 25 MB." | Over `COMMENT_FILE_MAX_BYTES` (25 MB) |
+| `COMMENT_ENCODING_UNSUPPORTED` | "Erfana can't add comments to this file because of its text format. Save the file as UTF-8, then try again." | Not UTF-8 (with or without a BOM) with a byte-identical round trip |
+| `COMMENT_FILE_CONFLICTED` | "{file} has two versions mixed together. Fix this first, or ask a developer to help." | A complete git conflict hunk in the file |
+| `COMMENT_FILE_READ_ONLY` | "Couldn't save because {file} can't be changed. Your text is still here." | Read-only on disk, another user's file, an unwritable folder, or an unterminated comment block (read-only for comments) |
 | `COMMENT_LIMIT` | "This would go over a comment size limit, so nothing was saved." | The write would break a limit (message, replies, block bytes, blocks per file, file size) or push a `<meta charset>` out of the prescan |
-| `COMMENT_UNSAVED_SOURCE` | "{file} has unsaved changes in another tab. Save them first so your edits and this comment don't overwrite each other." | An editor holds unsaved changes for the file |
+| `COMMENT_UNSAVED_SOURCE` | "{file} has unsaved changes in another tab. Save them first, so that you don't lose any work." | An editor holds unsaved changes for the file |
 | `COMMENT_IDENTITY_REQUIRED` | "Enter a name to add comments." | No usable author name in the app settings |
-| `COMMENT_TARGET_MOVED` | "This element changed in the file since you picked it. Close and pick it again – your text will be restored." | The picked element is no longer in the file, or not uniquely |
-| `COMMENT_RENDER_CHANGED` | "Erfana can't add a comment here without changing how {file} looks in the preview, so nothing was saved. Your text is still here." | File comments (spec 024): every place the file's kind offers for the block would change the rendered page (`render-changed`). A picked element inside a generated region or the frontmatter is `COMMENT_TARGET_MOVED` (`generated-region`, `frontmatter`) |
-| `COMMENT_BLOCK_CHANGED` | "This comment changed on disk. Erfana reloaded it – try again." | The block changed, turned damaged or is gone since the window read it |
-| `COMMENT_WRITE_UNSUPPORTED_FS` | "Erfana can't write to {file} on this drive." | The drive cannot rename or fsync (network and FUSE mounts) |
+| `COMMENT_TARGET_MOVED` | "This section changed after you selected it. Close this window and select it again. Your text is safe." | The picked element is no longer in the file, or not uniquely |
+| `COMMENT_RENDER_CHANGED` | "A comment here would change how {file} looks, so nothing was saved. Your text is still here." | File comments (spec 024): every place the file's kind offers for the block would change the rendered page (`render-changed`). A picked element inside a generated region or the frontmatter is `COMMENT_TARGET_MOVED` (`generated-region`, `frontmatter`) |
+| `COMMENT_BLOCK_CHANGED` | "Someone changed this comment outside Erfana. Erfana loaded the new version. Try again." | The block changed, turned damaged or is gone since the window read it |
+| `COMMENT_WRITE_UNSUPPORTED_FS` | "Erfana can't save to the drive that holds {file}." | The drive cannot rename or fsync (network and FUSE mounts) |
 | `COMMENT_WRITE_FAILED` | "Couldn't save the comment. Your text is still here – try again." | Anything else: a file that kept changing during the save, a held file, a splice that failed its verification (fail closed), or a parse the comment parse worker could not run (`busy`, `parse-failed`) |
-| `COMMENT_DRAFT_EXPIRED` | "This comment window was open too long. Pick the element again – your text is kept." | Draft and key layer (`commentKeyStore.ts`), before any write: a draft lives ten minutes (`DRAFT_TTL_MS`) |
-| `COMMENT_KEY_INVALID` | "This window is out of date – the comment changed or was removed. Close it and open the comment again." | Draft and key layer: an unknown key, a key of another window, panel or view, or a key of another kind – without saying which |
+| `COMMENT_DRAFT_EXPIRED` | "This window was open too long. Select the section again. Your text is safe." | Draft and key layer (`commentKeyStore.ts`), before any write: a draft lives ten minutes (`DRAFT_TTL_MS`) |
+| `COMMENT_KEY_INVALID` | "This comment changed or was removed. Close this window and open the comment again." | Draft and key layer: an unknown key, a key of another window, panel or view, or a key of another kind – without saying which |
 | `COMMENT_SAVE_PENDING` | "Still saving to {file}. Your comment appears here once it is written – no need to save again." | Not a refusal: the save outlasted its answer and is still being written (`commentSaveFlow.ts`) |
 
 ---

@@ -188,7 +188,7 @@ function threadPlace(doc: KindDocument, block: OkBlock, found: FoundTarget | und
   return target === undefined ? undefined : placeOf(target)
 }
 
-/** Reads an attached thread's words for the Narrow to words field of Edit on its first message (C-07). */
+/** Reads an attached thread's words for the Comment on specific words field of Edit on its first message (C-07). */
 type WordsReader = ReturnType<typeof threadWordsReader>
 
 function threadOf(doc: KindDocument, block: OkBlock, line: number, wordsOf: WordsReader): ListedThread {

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The words of a new comment in the shared window (spec 024 024-FR-004;
- * comments-v2 C-07 "Narrow to words", C-21 clamped quote): the quote, the
+ * comments-v2 C-07 "Comment on specific words", C-21 clamped quote): the quote, the
  * notices, the field and what Save sends. Split from CommentWindow.test.tsx
  * because the dirty-guard mock hoists to module scope.
  */
@@ -73,9 +73,9 @@ describe('CommentWindow – the words of a new comment', () => {
     resetCommentPendingWrites()
   })
 
-  it('024-AC-004 (g) words not in the file as written: the window itself says the comment is on the whole element', () => {
+  it('024-AC-004 (g) words not in the file as written: the window itself says the comment is on the whole section', () => {
     setup({ text: TEXT, start: 0, end: 0, cut: false }, { wordsMissing: true })
-    expect(screen.getByTestId(TEST_IDS.COMMENT_WORDS_MISSING)).toHaveTextContent(SELECTION_COPY.wordsNotInFile('element', 'index.html'))
+    expect(screen.getByTestId(TEST_IDS.COMMENT_WORDS_MISSING)).toHaveTextContent(SELECTION_COPY.wordsNotInFile('section'))
   })
 
   it('024-AC-005: without words from the preview there is no quote and no field – the shipped HTML window', () => {
@@ -84,12 +84,12 @@ describe('CommentWindow – the words of a new comment', () => {
     expect(screen.queryByTestId(TEST_IDS.COMMENT_WORDS)).toBeNull()
   })
 
-  it('024-AC-005: a target with no text (an image, a divider) offers no Narrow to words', () => {
+  it('024-AC-005: a target with no text (an image, a divider) offers no Comment on specific words', () => {
     setup({ text: '', start: 0, end: 0, cut: false })
     expect(screen.queryByTestId(TEST_IDS.COMMENT_NARROW_TOGGLE)).toBeNull()
   })
 
-  it('024-AC-005: Narrow to words opens with the mouse selection selected, and Whole {kind} clears it to a comment on the whole target', async () => {
+  it('024-AC-005: Comment on specific words opens with the mouse selection selected, and Whole {kind} clears it to a comment on the whole target', async () => {
     const user = userEvent.setup()
     const onSave = setup({ text: TEXT, start: 8, end: 16, cut: false })
     expect(screen.getByTestId(TEST_IDS.COMMENT_WORDS)).toHaveTextContent(SELECTION_COPY.result('the beta'))
@@ -126,7 +126,7 @@ describe('CommentWindow – the words of a new comment', () => {
       field.setSelectionRange(2, 3)
       fireEvent.select(field)
     })
-    expect(screen.getByText(SELECTION_COPY.blank('element'))).toBeVisible()
+    expect(screen.getByText(SELECTION_COPY.blank('section'))).toBeVisible()
     await type(user)
     await user.click(screen.getByTestId('comment-save'))
     expect(screen.getByTestId('comment-save')).toHaveAttribute('aria-disabled', 'true')
@@ -139,7 +139,7 @@ describe('CommentWindow – the words of a new comment', () => {
     const text = `${half} ${half}`
     const at = text.indexOf(' the ') + 1
     const onSave = setup({ text, start: at, end: at + 3, cut: false })
-    expect(screen.getByText(SELECTION_COPY.tie('element'), { exact: false })).toBeVisible()
+    expect(screen.getByText(SELECTION_COPY.tie('section'), { exact: false })).toBeVisible()
     await type(user)
     await user.click(screen.getByTestId('comment-save'))
     expect(onSave).not.toHaveBeenCalled()

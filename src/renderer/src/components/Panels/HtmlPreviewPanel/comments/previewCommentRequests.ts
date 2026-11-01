@@ -7,8 +7,8 @@
  * A draft from main carries the target's text as main parsed it, and – when
  * the pick was made on a selection that main found in the file – the words'
  * range in it. "Comment on selection" opens the window on that range; "Comment
- * on the whole element", "Add comment" and "Comment on element" open it with
- * no words chosen, the Narrow to words field starting from the whole text.
+ * on the whole element", "Add comment" and "Comment on this section" open it with
+ * no words chosen, the Comment on specific words field starting from the whole text.
  *
  * @module HtmlPreviewPanel/comments/previewCommentRequests
  */

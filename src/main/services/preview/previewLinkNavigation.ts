@@ -77,6 +77,8 @@ export interface PreviewLinkNavigationDeps {
     windowId: number,
     disposition: PreviewLinkDisposition
   ) => void
+  /** Load the file on screen in its own view, at a vetted URL with another `?query`. */
+  readonly loadSameFile: (url: string) => void
   /** Hand a vetted URL to the OS browser. */
   readonly openExternal: (url: string) => Promise<void>
   /** Record a failure entry for this panel's badge. */
@@ -198,6 +200,11 @@ export async function routeLinkActivation(
   switch (intent.kind) {
     case 'same-document':
       // Chromium already scrolled the page; nothing to do.
+      return
+
+    case 'same-file-query':
+      // The policy kept the host and the path, so this reaches no other file.
+      deps.loadSameFile(intent.url)
       return
 
     case 'blocked':

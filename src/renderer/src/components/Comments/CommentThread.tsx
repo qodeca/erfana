@@ -284,7 +284,7 @@ export function CommentThread({ ctx, thread, resolveLeads, resolveRef }: Comment
   return (
     <section
       className="erf-comment-thread"
-      aria-label={`Thread started by ${visibleString(first.by.name)}`}
+      aria-label={`Conversation started by ${visibleString(first.by.name)}`}
       data-testid={TEST_IDS.COMMENT_THREAD}
     >
       <CommentMessageView ctx={ctx} thread={thread} message={first} first />
@@ -373,7 +373,7 @@ export function ResolvedThread({ ctx, thread }: CommentThreadProps): React.JSX.E
         className="erf-comment-icon-btn"
         aria-expanded={open}
         aria-controls={bodyId}
-        aria-label="Show the resolved thread"
+        aria-label="Show the resolved conversation"
         onClick={() => setOpen(!open)}
       >
         {open
@@ -382,7 +382,7 @@ export function ResolvedThread({ ctx, thread }: CommentThreadProps): React.JSX.E
       </button>
       <div className="erf-comment-resolved__body" id={bodyId} hidden={!open}>
         {open && (
-          <section className="erf-comment-thread" aria-label="Resolved thread">
+          <section className="erf-comment-thread" aria-label="Resolved conversation">
             {thread.messages.map((message, index) => (
               <CommentMessageView
                 key={message.id}

@@ -6,14 +6,14 @@
  * table S-07, S-08; comments-v2 OD-05 § 4.1).
  *
  * Read-only and never overwritten without a user action (024-FR-014): why,
- * the raw text in a read-only well, Copy raw text, Open in source, and Delete
+ * the raw text in a read-only well, Copy comment text, Open in file, and Delete
  * damaged comment… where main allows it (a terminated block in a writable
  * file). Conflict markers get their own wording and no Rebuild (S-08).
  *
- * **Rebuild from data…** (OD-05) is offered only when main says the block's
+ * **Repair comment…** (OD-05) is offered only when main says the block's
  * `@data` is valid and only its readable lines or header id disagree with it
  * (`readable-mismatch`, `id-mismatch`). It opens an inline confirmation
- * listing each differing line – "The file says" / "The data says". When only
+ * listing each differing line – "What you see now" / "Saved copy". When only
  * the `status:` line differs there are two choices instead: Mark resolved
  * (writes the status the line claims) and Keep open (re-renders the line from
  * `@data`); both are secondary and focus starts on Cancel (R-08). `@data`

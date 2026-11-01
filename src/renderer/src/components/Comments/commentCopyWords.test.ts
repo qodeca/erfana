@@ -75,7 +75,7 @@ function markdownStrings(): Array<[string, string]> {
     add(`iconName ${tag}`, MD_SURFACE_COPY.iconName(3, markdownKindNoun(tag), 14))
     add(`changedIconName ${tag}`, CHANGE_MARK_COPY.iconName(3, markdownKindNoun(tag), 14, 1))
     add(`notVisibleText ${tag}`, MARKDOWN_WORDS.notVisibleText(tag))
-    add(`wordsNotInFile ${tag}`, SELECTION_COPY.wordsNotInFile(markdownKindNoun(tag), FILE))
+    add(`wordsNotInFile ${tag}`, SELECTION_COPY.wordsNotInFile(markdownKindNoun(tag)))
     for (const code of [...COMMENT_CODES, 'SOMETHING_NEW']) {
       for (const reason of REASONS) {
         add(`saveFailure ${code} ${tag} ${reason ?? '-'}`, MARKDOWN_WORDS.saveFailure(code, FILE, tag, reason).text)
@@ -158,10 +158,10 @@ describe('commentCopyWords', () => {
 
   it('024-AC-008: a refused save names the kind and keeps the window action main implies', () => {
     expect(markdownSaveFailureCopy(ErrorCode.COMMENT_TARGET_MOVED, FILE, 'li')).toEqual({
-      text: 'This list item changed in the file since you picked it. Pick it again – your text comes with you.',
+      text: 'This list item changed after you selected it. Select it again. Your text is safe.',
       action: 'pick-again'
     })
-    expect(markdownSaveFailureCopy(ErrorCode.COMMENT_DRAFT_EXPIRED, FILE, 'pre').text).toContain('Pick the code block again')
+    expect(markdownSaveFailureCopy(ErrorCode.COMMENT_DRAFT_EXPIRED, FILE, 'pre').text).toContain('Select the code block again')
     expect(markdownSaveFailureCopy(ErrorCode.COMMENT_TARGET_MOVED, FILE, 'p', 'generated-region')).toEqual({
       text: MARKDOWN_COPY.generated,
       action: 'close'
@@ -178,27 +178,27 @@ describe('commentCopyWords', () => {
       action: 'close'
     })
     expect(MARKDOWN_FILE_LIMIT_TEXT).toBe(
-      'Erfana adds comments only to files of up to 2 MB, 100,000 lines, 32 levels of nesting and 5,000 pieces of raw HTML.'
+      'This file is too big or too complex for comments.'
     )
     expect(markdownReadOnlyReasonText('too-many-blocks', FILE)).toBe(MARKDOWN_COPY.tooMany(FILE))
-    expect(markdownReadOnlyReasonText('encoding', FILE)).toBe('Erfana can only add comments to UTF-8 files.')
+    expect(markdownReadOnlyReasonText('encoding', FILE)).toBe("Erfana can't add comments to this file because of its text format. Save the file as UTF-8, then try again.")
   })
 
   it('C-19 M-05 M-06 M-08 M-10 each menu reason line is menu matrix § 3\'s sentence, word for word', () => {
     const file = 'index.html'
     const MATRIX: ReadonlyArray<[string | undefined, string]> = [
-      ['conflict-markers', 'index.html has unresolved git conflicts. Resolve them first.'],
-      ['unterminated-block', "A comment in index.html has no end, so Erfana won't add comments. Fix it in the source."],
-      ['too-many-blocks', 'index.html already has 500 comments, the most Erfana adds to one file. Delete resolved threads to add more.'],
-      ['too-large', 'Erfana adds comments only to files of up to 25 MB and 640,000 elements.'],
-      ['encoding', 'Erfana can only add comments to UTF-8 files.'],
-      ['link', "index.html is a link to another file, so Erfana won't write to it."],
-      ['read-only', 'index.html is read-only.'],
-      ['not-owner', 'index.html is read-only.'],
-      ['outside-project', "index.html is outside this project, so Erfana won't write to it."],
+      ['conflict-markers', 'index.html has two versions mixed together. Fix this first, or ask a developer to help.'],
+      ['unterminated-block', "One comment in index.html is broken, so Erfana can't add new ones. Fix or delete the broken comment first."],
+      ['too-many-blocks', 'index.html has 500 comments, which is the limit. Delete resolved comments to add more.'],
+      ['too-large', 'This file is too big for comments. The limit is 25 MB.'],
+      ['encoding', "Erfana can't add comments to this file because of its text format. Save the file as UTF-8, then try again."],
+      ['link', "index.html is only a link to another file. Open the real file to comment."],
+      ['read-only', "index.html can't be changed, so you can't add a comment."],
+      ['not-owner', "index.html can't be changed, so you can't add a comment."],
+      ['outside-project', "index.html is not in this project, so you can't comment on it here."],
       // Changed expectation under 024-FR-006 § 4 (was "This part of the page can't hold a comment.").
-      ['not-commentable', "This part of the preview can't hold a comment."],
-      [undefined, "This part of the preview can't hold a comment."]
+      ['not-commentable', "You can't add a comment here. Try a nearby section."],
+      [undefined, "You can't add a comment here. Try a nearby section."]
     ]
     for (const [reason, sentence] of MATRIX) expect(menuReasonText(reason, file), String(reason)).toBe(sentence)
   })
@@ -219,29 +219,27 @@ describe('commentCopyWords', () => {
   // with "New comment", "Show on page" and the old empty drawer): the aligned rows read the shared template.
   it('keeps the HTML words the HTML Preview showed, apart from the rows the differences table aligns', () => {
     const target = { tag: 'div', classes: ['note'], line: 7 }
-    expect(HTML_WORDS.noun('p')).toBe('element')
+    expect(HTML_WORDS.noun('p')).toBe('section')
     expect(HTML_WORDS.menuLabel('p')).toBe(COPY.menuLabel)
     expect(HTML_WORDS.notFoundTag).toBe(DRAWER_COPY.notFound)
-    expect(HTML_WORDS.context(target, 'index.html')).toBe(`${HTML_WORDS.label(target)} · index.html, line 7`)
+    expect(HTML_WORDS.context(target, 'index.html')).toBe('index.html, line 7')
     for (const code of COMMENT_CODES) expect(HTML_WORDS.saveFailure(code, 'index.html')).toEqual(saveFailureCopy(code, 'index.html'))
   })
 
   it('024-AC-007 A-02 titles the window "{…} on element" in the HTML Preview, the kind noun in Markdown', () => {
     const target = { tag: 'button', classes: ['cta'], line: 7 }
-    expect(HTML_WORDS.newCommentTitle('button')).toBe('New comment on element')
-    expect(HTML_WORDS.threadsTitle(target, 1)).toBe('Comment on element')
-    expect(HTML_WORDS.threadsTitle(target, 3)).toBe('Comments on element')
+    expect(HTML_WORDS.newCommentTitle('button')).toBe('New comment')
+    expect(HTML_WORDS.threadsTitle(target, 1)).toBe('Comment on this section')
+    expect(HTML_WORDS.threadsTitle(target, 3)).toBe('Comments on this section')
     expect(MARKDOWN_WORDS.newCommentTitle('li')).toBe('New comment on list item')
     expect(MARKDOWN_WORDS.threadsTitle({ tag: 'li', classes: [] }, 1)).toBe('Comment on list item')
-    // D-03: the selector is not a title word; it stays in the context line.
+    // The owner's plain wording, 2026-10-31: no selector in the title or the context line.
     expect(HTML_WORDS.newCommentTitle('button')).not.toContain('button')
-    expect(HTML_WORDS.context(target, 'index.html')).toBe('button.cta · index.html, line 7')
+    expect(HTML_WORDS.context(target, 'index.html')).toBe('index.html, line 7')
   })
 
   it('024-AC-007 D-04 every aligned sentence is one template; only the {kind} word differs', () => {
-    const swap = (text: string): string => text.replace(/\ban element\b/g, 'a paragraph').replace(/\belement\b/g, 'paragraph')
-    expect(swap(HTML_WORDS.newCommentTitle('div'))).toBe(MARKDOWN_WORDS.newCommentTitle('p'))
-    expect(swap(HTML_WORDS.threadsTitle({ tag: 'div', classes: [] }, 2))).toBe(MARKDOWN_WORDS.threadsTitle({ tag: 'p', classes: [] }, 2))
+    const swap = (text: string): string => text.replace(/\ba section\b/g, 'a paragraph').replace(/\bsections\b/g, 'paragraphs')
     expect(swap(HTML_WORDS.drawerNone)).toBe(MARKDOWN_WORDS.drawerNone)
     expect(swap(HTML_WORDS.modeOn)).toBe(MARKDOWN_WORDS.modeOn)
     expect(swap(HTML_WORDS.modeTooltip(true))).toBe(MARKDOWN_WORDS.modeTooltip(true))
@@ -252,18 +250,18 @@ describe('commentCopyWords', () => {
 
   it('024-AC-007 § 4: not found, delete damaged, not on screen, icons off and no target read the same in both previews', () => {
     expect(HTML_WORDS.notFoundText('a.html', 4)).toBe(
-      "Erfana can't find what this comment was about any more. The comment stays in a.html, line 4."
+      "Erfana can't find the text this comment was about. The comment is still in a.html, line 4."
     )
     expect(MARKDOWN_WORDS.notFoundText('a.html', 4)).toBe(HTML_WORDS.notFoundText('a.html', 4))
     for (const words of [HTML_WORDS, MARKDOWN_WORDS]) {
       expect(words.deleteBlock).toBe('Delete damaged comment')
       expect(words.deleteBlockAction).toBe('Delete damaged comment…')
       expect(words.deleteBlockText('a.html')).toBe(
-        'Delete this damaged comment? Erfana removes exactly the text shown above from a.html.'
+        'Delete this damaged comment? Erfana removes the text above from a.html.'
       )
       expect(words.notOnScreen).toBe("This comment's target isn't on screen right now")
-      expect(words.pinsOff).toBe('Show comment icons – off: icons hidden in this preview')
-      expect(words.noTarget.reason).toBe("This part of the preview can't hold a comment.")
+      expect(words.pinsOff).toBe('Comment icons are hidden')
+      expect(words.noTarget.reason).toBe("You can't add a comment here. Try a nearby section.")
     }
   })
 
@@ -271,14 +269,14 @@ describe('commentCopyWords', () => {
     expect(HTML_WORDS.showInPreview).toBe('Show in preview')
     expect(HTML_WORDS.notFoundTag).toBe('Not found')
     expect(HTML_WORDS.drawerNone).toBe(
-      'No comments in this file yet. Select text and right-click, or turn on comment mode and click an element.'
+      'No comments yet. Select some text and right-click, or turn on comment mode and click a section.'
     )
     expect(MARKDOWN_WORDS.drawerNone).toBe(
-      'No comments in this file yet. Select text and right-click, or turn on comment mode and click a paragraph.'
+      'No comments yet. Select some text and right-click, or turn on comment mode and click a paragraph.'
     )
-    expect(HTML_WORDS.modeOn).toBe('Comment mode on. Click an element, select text, or press Tab to pick one. Esc to leave.')
+    expect(HTML_WORDS.modeOn).toBe('Comment mode is on. Click a section or select text to comment. Press Tab to move between sections. Press Esc to stop.')
     expect(HTML_WORDS.modeTooltip(true)).toMatch(
-      /^Comment mode \([^)]+\) – on: click an element or select text to comment, Esc to leave$/
+      /^Comment mode is on \([^)]+\)\. Click a section or select text\. Press Esc to stop\.$/
     )
     expect(MARKDOWN_COPY.pickerTop).toBe('Top level – no parent to select.')
     expect(MARKDOWN_COPY.pickerNoChild).toBe('Nothing inside to select.')
@@ -286,7 +284,7 @@ describe('commentCopyWords', () => {
 
   it('024-AC-007 S-02 D-13 the hidden-target banner is one {kind} template; only the cause differs by preview', () => {
     expect(HTML_WORDS.notVisibleText('p')).toBe(
-      'This element is hidden right now – it may be on another slide or tab. Its icon comes back when it shows.'
+      'This section is hidden right now – it may be on another slide or tab. Its icon comes back when it shows.'
     )
     expect(MARKDOWN_WORDS.notVisibleText('li')).toBe(
       'This list item is hidden right now – it may be inside a collapsed section. Its icon comes back when it shows.'
@@ -300,16 +298,16 @@ describe('commentCopyWords', () => {
   })
 
   it('024-AC-007 D-16 the words-not-in-file sentence is one {kind} template', () => {
-    expect(SELECTION_COPY.wordsNotInFile('element', 'index.html')).toBe(
-      'The selected words are not in index.html as written, so this comment is about the whole element.'
+    expect(SELECTION_COPY.wordsNotInFile('section')).toBe(
+      "Erfana can't attach this comment to the words you selected. The comment goes on the whole section."
     )
-    expect(SELECTION_COPY.wordsNotInFile('list item', FILE)).toBe(
-      'The selected words are not in notes.md as written, so this comment is about the whole list item.'
+    expect(SELECTION_COPY.wordsNotInFile('list item')).toBe(
+      "Erfana can't attach this comment to the words you selected. The comment goes on the whole list item."
     )
   })
 
   it('024-AC-031 a save refused inside a generated region says the generated sentence in the HTML Preview too, and closes', () => {
-    const generated = 'This part is generated by a tool. Comment on the text before or after it.'
+    const generated = 'A tool creates this part, so a comment here could be lost. Comment on the text before or after it.'
     expect(HTML_WORDS.saveFailure(ErrorCode.COMMENT_TARGET_MOVED, 'index.html', 'li', 'generated-region')).toEqual({ text: generated, action: 'close' })
     expect(windowRefusal(HTML_WORDS, ErrorCode.COMMENT_TARGET_MOVED, 'index.html', 'li', 'generated-region')).toEqual({ text: generated, action: 'close' })
     expect(MARKDOWN_COPY.generated).toBe(generated)
@@ -327,8 +325,8 @@ describe('commentCopyWords', () => {
       expect(text, text).not.toMatch(/\breopen/i)
       expect(text.replace(/code block|block quote/gi, ''), text).not.toMatch(/\bblocks?\b/i)
     }
-    expect(HTML_WORDS.saveFailure(ErrorCode.COMMENT_BLOCK_CHANGED, FILE).text).toBe('This comment changed on disk. Erfana reloaded it – try again.')
-    expect(MARKDOWN_WORDS.saveFailure(ErrorCode.COMMENT_BLOCK_CHANGED, FILE).text).toBe('This comment changed on disk. Erfana reloaded it – try again.')
+    expect(HTML_WORDS.saveFailure(ErrorCode.COMMENT_BLOCK_CHANGED, FILE).text).toBe('Someone changed this comment outside Erfana. Erfana loaded the new version. Try again.')
+    expect(MARKDOWN_WORDS.saveFailure(ErrorCode.COMMENT_BLOCK_CHANGED, FILE).text).toBe('Someone changed this comment outside Erfana. Erfana loaded the new version. Try again.')
   })
 
   it('024-AC-035 F-04 C-19: the read-only banner and the menu reason are one sentence per reason, in both previews', () => {
@@ -337,12 +335,12 @@ describe('commentCopyWords', () => {
       expect(MARKDOWN_WORDS.readOnlyReasonText(reason, FILE), reason).toBe(menuReasonText(reason, FILE))
     }
     expect(HTML_WORDS.readOnlyReasonText('too-many-blocks', FILE)).toBe(
-      `${FILE} already has 500 comments, the most Erfana adds to one file. Delete resolved threads to add more.`
+      `${FILE} has 500 comments, which is the limit. Delete resolved comments to add more.`
     )
     expect(HTML_WORDS.readOnlyReasonText(undefined, FILE)).toBe(menuReasonText('read-only', FILE))
   })
 
   it('024-AC-007 D-32 the drawer help note is the C-06 sentence', () => {
-    expect(COMMENT_LIST_COPY.changeLimit).toBe('Changes to attributes or styles only are not detected.')
+    expect(COMMENT_LIST_COPY.changeLimit).toBe("Erfana doesn't notice changes to the look of a section, only to its text.")
   })
 })

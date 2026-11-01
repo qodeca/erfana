@@ -48,32 +48,11 @@
   }
 }
 
-/* Full and compact tiers: the words, "7 comments". */
+/* Icons only, at every width: the icon, and the number when there are comments. */
 .erf-comment-count {
   gap: var(--space-2);
 }
 
-.erf-comment-count__text {
-  font-family: var(--font-sans);
-  white-space: nowrap;
-}
-
-.erf-comment-count__icon,
-.erf-comment-count__number {
-  display: none;
-}
-
-/* The narrow tier (the band's container under 446px): the icon and the number. */
-@container (width < 446px) {
-  .erf-comment-count__icon {
-    display: inline-flex;
-  }
-
-  .erf-comment-count__number {
-    display: inline;
-  }
-
-  .erf-comment-count__text {
-    display: none;
-  }
+.erf-comment-count__icon {
+  display: inline-flex;
 }

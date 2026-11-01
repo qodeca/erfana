@@ -4,7 +4,7 @@
  * What the drawer's rows open in a renderer-hosted preview
  * (`useCommentOverlayHost.ts`): the window on a damaged or newer-format
  * block, where a row's thread is in the preview now, and which threads are
- * "Not visible now" (S-02, D-13). Kept apart from the host only because of
+ * "Hidden on the page" (S-02, D-13). Kept apart from the host only because of
  * the 500-line ratchet.
  *
  * @module components/Comments/overlay/hostDrawer
@@ -70,11 +70,19 @@ export function revealRow(
   row: DrawerRow,
   placements: readonly ThreadPlacement[],
   adapter: PreviewCommentAdapter,
-  say: (text: string) => void
+  say: (text: string) => void,
+  beforeScroll?: () => void
 ): void {
+  beforeScroll?.()
   const target = rowTarget(row, placements, adapter)
   if (target !== null) target.scrollIntoView({ block: 'center' })
   else if (row.tags.some(tag => tag.text === DRAWER_COPY.notVisible)) say(adapter.words.notOnScreen)
+}
+
+/** The preview area's box on screen, for the comment window's placement. */
+export function areaBox(area: HTMLElement | null | undefined): { left: number; top: number; width: number; height: number } | null {
+  const box = area?.getBoundingClientRect()
+  return box ? { left: box.left, top: box.top, width: box.width, height: box.height } : null
 }
 
 const NOT_VISIBLE_NONE: readonly string[] = []
@@ -82,7 +90,7 @@ const NOT_VISIBLE_NONE: readonly string[] = []
 /**
  * The open, found threads whose target the preview renders but hides right
  * now – a collapsed section (state table S-02; differences table D-13). They
- * feed the drawer's "Not visible now" tag and the window's sentence, as main's
+ * feed the drawer's "Hidden on the page" tag and the window's sentence, as main's
  * report does for the HTML Preview. Read again when a section opens or closes
  * (`toggle`, which does not bubble, is caught on its way down) and whenever
  * the list changes.

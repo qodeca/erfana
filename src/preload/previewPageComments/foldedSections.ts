@@ -6,7 +6,7 @@
  * "folded sections").
  *
  * A closed `<details>` renders only its summary, so a comment on anything else
- * inside it has no pin and is "Not visible now". Two things open it:
+ * inside it has no pin and is "Hidden on the page". Two things open it:
  *
  * - {@link openAround}: a reveal ("Show in preview", or a drawer row's Open) of
  *   such an element opens every closed `<details>` around it, outermost first,
@@ -22,7 +22,7 @@
  * Both run only on main's state, the one receive channel: nothing the page
  * sends or dispatches starts either. Only `<details>`: an element hidden any
  * other way (`display: none`, `hidden`, an inactive slide) stays hidden and
- * keeps "Not visible now". Opening one section of an exclusive accordion
+ * keeps "Hidden on the page". Opening one section of an exclusive accordion
  * (`<details name>`) closes its open sibling, as a click on its summary would.
  */
 import { RESTORE_BUDGET_MS } from './constants'

@@ -40,7 +40,7 @@ export type OpenThreads = ReadonlyMap<string, RemovedComment>
  *
  * @param files - Main's list.
  * @param words - The preview's words, for the target label.
- * @returns Open threads by thread key.
+ * @returns Open conversations by thread key.
  */
 export function openThreadsOf(files: readonly CommentFileView[], words: CommentWords): OpenThreads {
   const open = new Map<string, RemovedComment>()

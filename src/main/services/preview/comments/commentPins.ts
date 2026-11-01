@@ -24,7 +24,7 @@ export interface PinGroup {
   readonly id: string
   readonly token: string
   readonly runtime?: { readonly path: string; readonly tag: string }
-  /** Open threads on the element, in file order. */
+  /** Open conversations on the element, in file order. */
   readonly threadIds: readonly string[]
   /** The words of its open threads that have them, in file order, at most {@link PIN_WORDS_MAX} (C-12). */
   readonly words?: readonly AnchorSelection[]

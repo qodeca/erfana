@@ -16,9 +16,9 @@
  *   Not found, Changed and Words changed say so above it (`ThreadStatus`), and
  *   Resolve leads there – primary and focused (S-03 – S-05).
  * - **Damaged** blocks are read-only and never overwritten (decision 12,
- *   `DamagedBlockView`, with Rebuild from data… – OD-05); **newer format**
+ *   `DamagedBlockView`, with Repair comment… – OD-05); **newer format**
  *   blocks are shown, never changed.
- * - **Not visible now** (decision 30) is a banner, the thread still usable.
+ * - **Hidden on the page** (decision 30) is a banner, the thread still usable.
  * - A **read-only file** or **paused** comments state their reason up front
  *   and offer no writes.
  * - **Updated from the file** (W-03): an info strip, and a "New since you
@@ -27,7 +27,7 @@
  *   with Copy text and New comment on this {kind}.
  * - **Stepper foot** (C-13, R-06): with the stepper and one open thread the
  *   foot is Close, then Resolve and next; with several open threads Close
- *   only, each thread keeping its own Resolve (R-21). Open in source and New
+ *   only, each thread keeping its own Resolve (R-21). Open in file and New
  *   comment are then in the head's More actions (the window draws the head).
  * - **All done** (W-11): "All open comments are resolved", Close focused.
  *

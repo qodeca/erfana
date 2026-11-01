@@ -151,7 +151,7 @@
 
 /* The foot's closing actions ("New comment", "Close") as one group: in a
    narrow window the group wraps whole onto a second row, right-aligned, under
-   "Open in source", instead of leaving one button stranded. */
+   "Open in file", instead of leaving one button stranded. */
 .erf-comment-window__foot-end {
   display: flex;
   flex-wrap: wrap;

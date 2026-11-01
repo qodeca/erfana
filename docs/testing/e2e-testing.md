@@ -81,7 +81,7 @@ What `scripts/e2e-linux.sh` does:
 
 1. Builds the image from `e2e/docker/Dockerfile` for the host's native architecture (arm64 on Apple Silicon, amd64 elsewhere): Node 24, the Electron runtime libraries, xvfb plus the openbox window manager, real `bash` and `zsh`, `git`, Python 3.12 and a C++ toolchain for node-pty.
 2. Mounts the repo read-write at `/work`, running as your own user id (HOME is `/tmp/home`). `node_modules`, `out/` and the npm download cache live in **named Docker volumes** (`erfana-e2e-node-modules-<hash>`, `erfana-e2e-out-<hash>`, `erfana-e2e-npm-cache-<hash>`), so the macOS copies on the host are never touched. The image tag carries the same hash.
-3. Runs `npm ci` (never `npm install`), runs `npx electron-vite build`, then `xvfb-run -a … npx playwright test <args>` (`e2e/docker/run-suite.sh`). The script compares the hash of `package-lock.json` before and after and fails if it changed; the suite's own exit code wins when both fail.
+3. Runs `npm ci` (never `npm install`), runs `npx electron-vite build` with a 4 GB Node memory limit, as the CI builds do, then `xvfb-run -a … npx playwright test <args>` (`e2e/docker/run-suite.sh`). The script compares the hash of `package-lock.json` before and after and fails if it changed; the suite's own exit code wins when both fail.
 4. Writes the HTML report and the test results straight to `.local/e2e-linux/` (git-ignored, emptied at the start of every run); the repo-root `playwright-report/` and `test-results/` are not used.
 
 The first run takes a few minutes longer (image build, `npm ci`, native rebuild); later runs reuse the volumes. A full run takes about 8 minutes on an Apple Silicon Mac.

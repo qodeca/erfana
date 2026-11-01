@@ -6,7 +6,7 @@
  *
  * - The files the drawer lists: the page's, then each same-project frame's,
  *   each once.
- * - The threads whose element is not rendered right now ("Not visible now"),
+ * - The threads whose element is not rendered right now ("Hidden on the page"),
  *   as main-minted keys.
  * - The tab's counts, added over the files on screen, and why comments are
  *   unavailable for it – the feature flag, the page's overlay going, or

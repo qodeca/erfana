@@ -140,7 +140,7 @@ export interface DeleteDamagedBlockRequest {
   readonly start?: number
 }
 
-/** Rebuild a hand-damaged block from its own valid `@data` (OD-05, "Rebuild from data…"). */
+/** Rebuild a hand-damaged block from its own valid `@data` (OD-05, "Repair comment…"). */
 export interface RebuildDamagedBlockRequest extends DeleteDamagedBlockRequest {
   /** "Mark resolved": write the status the readable line claims; absent or `'open'` re-renders the lines only. */
   readonly status?: 'open' | 'resolved'

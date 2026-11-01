@@ -316,19 +316,19 @@ describe('usePreviewComments', () => {
     expect(latest.layer.request).toMatchObject({ kind: 'new', words: { ...words, start: 0, end: 0 } })
   })
 
-  it('024-AC-004 (g) words main could not find in the file: the window opens on the whole element and says so', async () => {
+  it('024-AC-004 (g) words main could not find in the file: the window opens on the whole section and says so', async () => {
     render(<Harness onValue={onValue} />)
     act(() => fake.emitDraft(menuDraft({ kind: 'open', selection: true, wordsMissing: true })))
     // The window says so itself (owner rule, 024-FR-004): the request carries it, the panel announces nothing.
     expect(latest.layer.request).toMatchObject({ kind: 'new', wordsMissing: true })
     expect(latest.layer.request).not.toHaveProperty('words')
-    // "Comment on the whole element" from a menu on such words asks for no notice.
+    // "Comment on the whole section" from a menu on such words asks for no notice.
     const menu = menuDraft({ selection: true, wordsMissing: true })
     act(() => latest.layer.onCloseWindow())
     act(() => fake.emitDraft(menu))
     act(() => latest.layer.onAddComment(menu))
     expect(latest.layer.request).not.toHaveProperty('wordsMissing')
-    expect(latest.layer.polite).not.toBe(SELECTION_COPY.wordsNotInFile('element', 'index.html'))
+    expect(latest.layer.polite).not.toBe(SELECTION_COPY.wordsNotInFile('section'))
   })
 
   it('024-AC-004 a save sends the words the window chose as sel', async () => {
@@ -458,7 +458,7 @@ describe('usePreviewComments', () => {
 
   describe('menu matrix § 2 and § 3 – a file that cannot take a new comment (HTML)', () => {
     const CONFLICTED = fileView({ writable: false, readOnlyReason: 'conflict-markers' })
-    const MODE_BLOCKED = 'Comment mode is unavailable: index.html has unresolved git conflicts. Resolve them first.'
+    const MODE_BLOCKED = 'Comment mode is unavailable: index.html has two versions mixed together. Fix this first, or ask a developer to help.'
 
     it('M-07 the page\'s file is read-only: the toggle is unavailable with its reason, and asking for the mode only says why', async () => {
       fake.bridge.list.mockResolvedValue({ ok: true, files: [CONFLICTED] })
@@ -507,7 +507,7 @@ describe('usePreviewComments', () => {
       render(<Harness onValue={onValue} />)
       await waitFor(() =>
         expect(latest.toolbar.modeUnavailableText).toBe(
-          "Comment mode is unavailable: A comment in index.html has no end, so Erfana won't add comments. Fix it in the source."
+          "Comment mode is unavailable: One comment in index.html is broken, so Erfana can't add new ones. Fix or delete the broken comment first."
         )
       )
     })
@@ -555,7 +555,7 @@ describe('usePreviewComments', () => {
       await waitFor(() => expect(latest.layer.request).toMatchObject({ kind: 'threads', threadKeys: ['t1'], opener: 'page' }))
       expect(fake.bridge.list).toHaveBeenCalled()
       expect(fake.bridge.reveal).toHaveBeenCalledWith(PANEL, 't1')
-      await waitFor(() => expect(latest.layer.polite).toBe('Comment 1 of 2, on element, line 11.'))
+      await waitFor(() => expect(latest.layer.polite).toBe('Comment 1 of 2, on section, line 11.'))
       act(() => latest.layer.onCloseWindow())
       act(() => forwardedKey?.({ panelId: PANEL, key: 'comment-previous', accel: false }))
       await waitFor(() => expect(latest.layer.request).toMatchObject({ kind: 'threads', threadKeys: ['t3'] }))
@@ -866,7 +866,7 @@ describe('usePreviewComments', () => {
   })
 
   describe('§19 Rev 4 owner test: open in source', () => {
-    it('Open in source closes the window, opens the editor at the line, and leaves focus to it', async () => {
+    it('Open in file closes the window, opens the editor at the line, and leaves focus to it', async () => {
       render(<Harness onValue={onValue} />)
       act(() => fake.emitDraft(pinDraft()))
       expect(latest.layer.request).not.toBeNull()
@@ -882,7 +882,7 @@ describe('usePreviewComments', () => {
       expect(focusPage).not.toHaveBeenCalled()
     })
 
-    it("the drawer's Open in source leaves the drawer open", () => {
+    it("the drawer's Open in file leaves the drawer open", () => {
       render(<Harness onValue={onValue} />)
       act(() => latest.toolbar.onToggleDrawer())
       const [row] = drawerRows([fileView({ damaged: [damaged(1)] })], new Set()).cantEdit
@@ -967,7 +967,7 @@ describe('usePreviewComments', () => {
     await waitFor(() => expect(latest.layer.polite).toBe(COPY.rawCopied))
     mocks.writeText.mockResolvedValueOnce(false)
     act(() => latest.layer.onCopyRaw('raw'))
-    await waitFor(() => expect(latest.layer.assertive).toBe("Couldn't copy the raw text."))
+    await waitFor(() => expect(latest.layer.assertive).toBe("Couldn't copy the comment text."))
   })
 
   it('saves through the gateway and measures the page area', async () => {

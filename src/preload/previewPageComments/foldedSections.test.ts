@@ -242,7 +242,7 @@ describe('folded sections through the controller', () => {
     h.dispose()
   })
 
-  it('a comment inside a folded section is "Not visible now" and has no pin', () => {
+  it('a comment inside a folded section is "Hidden on the page" and has no pin', () => {
     h.state({ showIcons: true, icons: [icon('shallow', 6)] })
     expect(reports()).toEqual([{ visible: [], hidden: ['shallow'] }])
     expect(pins()).toHaveLength(0)
@@ -283,7 +283,7 @@ describe('folded sections through the controller', () => {
     expect(isOpen('elsewhere')).toBe(false)
   })
 
-  it('a reveal outside any section opens nothing, and one hidden another way stays "Not visible now"', async () => {
+  it('a reveal outside any section opens nothing, and one hidden another way stays "Hidden on the page"', async () => {
     vi.useFakeTimers()
     h.doubles.setVisible(byId('plain'), false)
     expect(openings(() => h.state({ showIcons: true, icons: [icon('plain', 7)], reveal: 'plain' }))).toEqual([])

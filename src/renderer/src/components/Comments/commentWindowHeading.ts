@@ -8,9 +8,8 @@
  *
  * @module HtmlPreviewPanel/comments/commentWindowHeading
  */
-import { COPY, frameFileText, scriptBuiltText } from './commentCopy'
+import { COPY, SCRIPT_BUILT_TEXT, frameFileText } from './commentCopy'
 import { HTML_WORDS, type CommentWords } from './commentCopyWords'
-import { ancestorTag, elementLabel } from './commentFormat'
 import { WINDOW_COPY, headingQuote } from './commentWindowCopy'
 import type { CommentWindowRequest } from './commentWindowTypes'
 import type { selectThreads } from './ThreadsView'
@@ -20,6 +19,8 @@ export interface Heading {
   readonly title: string
   readonly context: string | null
   readonly note: string | null
+  /** The HTML target's selector, for tests and tooling: the reader no longer sees it. */
+  readonly target?: string
 }
 
 /**
@@ -76,17 +77,17 @@ export function headingOf(
       const title = words.newCommentTitle(target) + headingText(target.tag, request.words?.text)
       return { title, context: words.context(target, file.displayPath), note: null }
     }
-    const label = target.runtime ? target.runtime.tag : elementLabel(target)
     const note = target.runtime
-      ? scriptBuiltText(ancestorTag(target))
+      ? SCRIPT_BUILT_TEXT
       : file.frame
         ? frameFileText(file.displayPath)
         : null
-    // A-02: "New comment on element"; the selector stays in the context line (D-03).
+    // The owner's plain wording, 2026-10-31: no tag or selector in the window.
     return {
       title: words.newCommentTitle(target.tag),
-      context: `${label} · ${file.displayPath}, line ${target.line}`,
-      note
+      context: `${file.displayPath}, line ${target.line}`,
+      note,
+      target: words.label(target)
     }
   }
   if (selection === null) return { title: 'Comments', context: null, note: null }
@@ -103,10 +104,9 @@ export function headingOf(
     const context = lost ? WINDOW_COPY.notFoundContext(words.noun(first), file) : words.context(first, file)
     return { title, context, note: null }
   }
-  const label = first.runtime ? first.runtime.tag : elementLabel(first)
   return {
     title: words.threadsTitle(first, selection.threads.length),
-    context: lost ? WINDOW_COPY.notFoundContext(label, file) : `${label} · ${file}, line ${first.line}`,
+    context: lost ? WINDOW_COPY.notFoundContext('Section', file) : `${file}, line ${first.line}`,
     note: selection.file.frame ? frameFileText(file) : null
   }
 }

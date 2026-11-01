@@ -265,7 +265,7 @@ describe('I-004 event and answer schemas', () => {
     }
     expect(CommentDraftOpenedSchema.safeParse({ ...base, kind: 'open', selection: true, reason: 'link' }).success).toBe(true)
     // A code, never a sentence or a path.
-    expect(CommentDraftOpenedSchema.safeParse({ ...base, kind: 'menu', reason: 'index.html is read-only.' }).success).toBe(false)
+    expect(CommentDraftOpenedSchema.safeParse({ ...base, kind: 'menu', reason: "index.html can't be changed, so you can't add a comment." }).success).toBe(false)
     expect(CommentDraftOpenedSchema.safeParse({ ...base, kind: 'menu', reason: 'x'.repeat(10_000) }).success).toBe(false)
     expect(CommentDraftOpenedSchema.safeParse({ ...base, kind: 'menu', ...draft, reason: 'read-only' }).success).toBe(false)
     expect(CommentDraftOpenedSchema.safeParse({ ...base, kind: 'icon', threadKeys: [KEY], blockKeys: [], reason: 'read-only' }).success).toBe(false)

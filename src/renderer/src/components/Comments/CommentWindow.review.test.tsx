@@ -10,7 +10,7 @@
  * - **M-C** an edit of the text alone is never blocked by the stored words:
  *   the blank/tie check is for a range the reader moved.
  * - **M-D** a re-list that changes the stored words during an open edit puts
- *   the Narrow to words range back on the new words: the old offsets would
+ *   the Comment on specific words range back on the new words: the old offsets would
  *   name other characters of the new text.
  * - **L-4** Alt+F9 from the preview is taken by the window only when it
  *   stepped, and only in the threads view; otherwise it goes on to the host.

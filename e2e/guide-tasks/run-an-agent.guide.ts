@@ -3,18 +3,16 @@
 /**
  * Guide task: docs/user-guide/how-to/run-an-agent-in-the-terminal.md
  *
- * Follows the page step by step with the REAL Claude Code CLI: start it in the
- * integrated terminal, ask it for one small edit, then review that edit in the
- * editor or preview, as the page promises.
- *
- * Login: ERFANA_GUIDE_CLAUDE_TOKEN_FILE names a token file. The token is read
- * inside the terminal's shell only – this spec never reads, prints or logs it.
+ * Follows the page step by step with a REAL CLI agent (`guideAgent.ts`): start
+ * it in the integrated terminal, ask it for one small edit, then review that
+ * edit in the editor or preview, as the page promises.
  */
 
 import * as fs from 'fs'
 import * as path from 'path'
 import { test, expect } from '../fixtures'
 import { TerminalPage } from '../pages/terminal.page'
+import { askAgent, guideAgent } from './guideAgent'
 
 const FILE_NAME = 'notes.md'
 const BEFORE_LINE = 'Status: draft'
@@ -28,44 +26,22 @@ test.use({
 })
 
 test.describe('Guide: run an agent in the terminal', () => {
-  test('Claude Code edits a file and the edit shows in the app', async ({
+  test('the agent edits a file and the edit shows in the app', async ({
     windowWithTestProject: window,
     testProject,
     homeDir
   }) => {
     test.setTimeout(8 * 60_000)
 
-    const tokenFile = process.env.ERFANA_GUIDE_CLAUDE_TOKEN_FILE
-    if (!tokenFile || !fs.existsSync(tokenFile)) {
-      throw new Error(
-        'ERFANA_GUIDE_CLAUDE_TOKEN_FILE must name an existing Claude Code token file – ' +
-          'this guide task needs the real agent and has no stand-in.'
-      )
-    }
-
+    const agent = guideAgent()
     const terminal = new TerminalPage(window)
     const filePath = path.join(testProject.path, FILE_NAME)
     const editedText = window.getByText(AFTER_LINE).first()
     const terminalRegion = window.getByRole('region', { name: 'Terminal' })
     const terminalInput = terminalRegion.getByRole('textbox', { name: 'Terminal input' })
 
-    await test.step('Harness setup: a Claude Code install that already trusts the project', async () => {
-      const projectPaths = Array.from(
-        new Set([testProject.path, fs.realpathSync(testProject.path)])
-      )
-      const projects = Object.fromEntries(
-        projectPaths.map((p) => [p, { hasTrustDialogAccepted: true, hasCompletedProjectOnboarding: true }])
-      )
-      fs.writeFileSync(
-        path.join(homeDir, '.claude.json'),
-        JSON.stringify({ theme: 'dark', hasCompletedOnboarding: true, projects }, null, 2)
-      )
-      const settingsDir = path.join(testProject.path, '.claude')
-      fs.mkdirSync(settingsDir, { recursive: true })
-      fs.writeFileSync(
-        path.join(settingsDir, 'settings.json'),
-        JSON.stringify({ permissions: { defaultMode: 'acceptEdits' } }, null, 2)
-      )
+    await test.step('Harness setup: an agent install that already trusts the project', async () => {
+      agent.prepare(homeDir, testProject.path)
     })
 
     await test.step('Before you start: "open a project" (and open the file to watch)', async () => {
@@ -89,22 +65,21 @@ test.describe('Guide: run an agent in the terminal', () => {
     })
 
     await test.step('Start 2: "Select the terminal and type the command for your CLI agent."', async () => {
-      await terminal.sendCommand(
-        'CLAUDE_CODE_OAUTH_TOKEN="$(cat "$ERFANA_GUIDE_CLAUDE_TOKEN_FILE")" claude'
-      )
-      // Claude Code's start screen names the product.
+      await terminal.sendCommand(agent.command)
       await expect
         .poll(async () => (await terminal.readScreen()).lines.join('\n'), {
-          message: 'Claude Code should start in the terminal',
+          message: `${agent.name} should start in the terminal`,
           timeout: 90_000
         })
-        .toMatch(/Claude Code/)
+        .toMatch(agent.ready)
     })
 
     await test.step('Start 3: "Tell the agent which file to inspect or change."', async () => {
-      await terminal.sendCommand(
+      await askAgent(
+        terminal,
         `In ${FILE_NAME}, replace the line "${BEFORE_LINE}" with "${AFTER_LINE}". ` +
-          'Change nothing else and do not create other files.'
+          'Change nothing else and do not create other files.',
+        FILE_NAME
       )
       await expect
         .poll(() => fs.readFileSync(filePath, 'utf-8'), {
@@ -140,7 +115,7 @@ test.describe('Guide: run an agent in the terminal', () => {
       await expect(terminalInput).toBeAttached()
     })
 
-    await test.step('Cleanup: leave Claude Code', async () => {
+    await test.step('Cleanup: leave the agent', async () => {
       await terminal.interrupt()
       await terminal.interrupt()
     })

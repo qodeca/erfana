@@ -7,7 +7,7 @@
  *
  * Three filters (OD-04):
  *
- * - **Open** – every open thread, found or not: "Not visible now" (S-02),
+ * - **Open** – every open thread, found or not: "Hidden on the page" (S-02),
  *   "Changed" and "Words changed" (S-03, S-04) and "Not found" (S-05) are
  *   neutral tags, never a filter. Enter on a not-found row is "Open in
  *   source": there is nothing in the preview to show.
@@ -46,7 +46,7 @@ export interface DrawerRow {
   readonly filter: DrawerFilter
   readonly fileKey: string
   readonly displayPath: string
-  /** Absolute, project space – "Open in source". */
+  /** Absolute, project space – "Open in file". */
   readonly filePath: string
   /** The file is a frame's, not the page's own. */
   readonly frame: boolean

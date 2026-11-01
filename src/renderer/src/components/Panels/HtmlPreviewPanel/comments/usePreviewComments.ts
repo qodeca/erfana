@@ -67,7 +67,7 @@ export interface UsePreviewCommentsOptions {
   readonly pageAreaRef: React.RefObject<HTMLElement | null>
   /** The panel root: its width decides the drawer's full-width mode. */
   readonly panelRootRef: React.RefObject<HTMLElement | null>
-  /** The editor area, for "Open in source". */
+  /** The editor area, for "Open in file". */
   readonly containerApi: DockviewApi | undefined
   /** dockview shows this tab (default `true`). A hidden tab stays mounted: its window must not float over another (§19 Rev 4). */
   readonly visible?: boolean
@@ -194,7 +194,7 @@ export function usePreviewComments({
     const offAnchors = commentGateway.onAnchorStatus(payload => {
       if (payload.panelId !== panelId) return
       // Newer than the flags a list keeps from its read: a list read while the
-      // element was hidden must not keep "Not visible now" once it shows (E-005).
+      // element was hidden must not keep "Hidden on the page" once it shows (E-005).
       const hidden = new Set(payload.notVisible)
       const list = store.getState().panels.get(panelId)?.list
       const files = list?.files.map(file => ({

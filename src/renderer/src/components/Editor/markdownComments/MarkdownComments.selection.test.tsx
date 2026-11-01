@@ -203,7 +203,7 @@ describe('Markdown Preview selection comments (024-AC-005)', () => {
     expect([...(saved.sel as { exact: string }).exact].length).toBeLessThanOrEqual(SEL_EXACT_MAX_CHARS)
   })
 
-  it('024-AC-005 (e): with the keyboard only, Narrow to words chooses words in the field and saves them', async () => {
+  it('024-AC-005 (e): with the keyboard only, Comment on specific words chooses words in the field and saves them', async () => {
     const user = userEvent.setup()
     await ready()
     await user.click(modeTool())
@@ -310,7 +310,7 @@ describe('Markdown Preview selection comments (024-AC-005)', () => {
     await user.click(await screen.findByTestId(TEST_IDS.COMMENT_MENU_SELECTION))
     api.list.mockResolvedValue({ ok: true, file: fileView([thread('saved', 6, 'p')]), placements: [{ threadKey: 'saved', line: 6, tag: 'p' }] })
     await saveTyped(user, 'Which beta?')
-    await waitFor(() => expect(polite()).toHaveTextContent(SELECTION_COPY.wordsDropped('paragraph', 'notes.md')))
+    await waitFor(() => expect(polite()).toHaveTextContent(SELECTION_COPY.wordsDropped('paragraph')))
   })
 
   it('024-AC-005: the words of an open selection comment are marked while they are found; a resolved one is not', async () => {

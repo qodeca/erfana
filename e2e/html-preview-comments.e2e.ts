@@ -44,7 +44,7 @@
  * element, as a tab switch leaves it – `usePreviewGroupKeys`), E-021 (Settings changes the author of new comments
  * only), E-024 (`git diff` after add, edit and delete on a line-start
  * target), E-026 (a tab switch away from an open drawer leaves the other
- * preview live, with its own drawer and count) and E-028 (Open in source
+ * preview live, with its own drawer and count) and E-028 (Open in file
  * closes the window and shows the line; one button size; the window stays
  * with its tab – §19 Rev 4 "open in source and button sizes"). E-029 (with
  * the drawer open beside the page, a full-width element's pin is drawn and
@@ -263,7 +263,8 @@ test.describe('HTML Preview comments – the reviewer path (P6 exit)', () => {
 
     // Then the comment itself, about the element that was picked.
     await expect(commentWindow).toHaveAttribute('data-view', 'new', { timeout: PREVIEW_BUDGET_MS })
-    await expect(commentWindow).toContainText(`p#target · ${PAGE}, line 11`)
+    await expect(commentWindow).toContainText(`${PAGE}, line 11`)
+    await expect(commentWindow.locator(`[data-target="p#target"]`)).toHaveCount(1)
     const field = page.getByTestId('comment-new-field')
     await expect(field).toBeFocused()
     await field.fill(NOTE)
@@ -529,7 +530,8 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     // Decision 19: the window, straight away; the element menu never opened.
     await expect(chrome.window()).toHaveAttribute('data-view', 'new', { timeout: PREVIEW_BUDGET_MS })
     await expect(chrome.menu()).toHaveCount(0)
-    await expect(chrome.window()).toContainText(`p#team-copy · ${STATIC}, line `)
+    await expect(chrome.window()).toContainText(`${STATIC}, line `)
+    await expect(chrome.window().locator(`[data-target="p#team-copy"]`)).toHaveCount(1)
     await chrome.saveNewComment(NOTE_A, STATIC)
     await expectPin(app, 'team-copy', true, STATIC_TARGET)
 
@@ -578,8 +580,8 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     await page.getByTestId('comment-resolve-next').click()
     // Changed expectation under code review M-B (2026-10-30): the step counts the thread just resolved
     // as resolved, so one open comment is left – "1 of 1", not the stale "1 of 2".
-    await expect(win.getByTestId('comment-window-polite')).toHaveText(/^Comment 1 of 1, on element, line \d+\.$/, { timeout: PREVIEW_BUDGET_MS })
-    await expect(win.getByRole('heading', { level: 2 })).toHaveText('Comment on element') // A-02: the selector stays in the context line
+    await expect(win.getByTestId('comment-window-polite')).toHaveText(/^Comment 1 of 1, on section, line \d+\.$/, { timeout: PREVIEW_BUDGET_MS })
+    await expect(win.getByRole('heading', { level: 2 })).toHaveText('Comment on this section') // A-02: the selector stays in the context line
     await expect.poll(async () => (await fsp.readFile(file, 'utf-8')).split('"status":"resolved"').length - 1, { timeout: PREVIEW_BUDGET_MS }).toBe(2)
     await page.getByTestId('comment-close').click()
     await expect(win).toHaveCount(0)
@@ -704,7 +706,7 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
 
     // Delete the thread (first message, with a reply): the original bytes.
     await chrome.messageAction(0, 'Delete…')
-    await expect(page.getByTestId('comment-delete-confirm')).toHaveText('Delete thread')
+    await expect(page.getByTestId('comment-delete-confirm')).toHaveText('Delete conversation')
     await page.getByTestId('comment-delete-confirm').click()
     await expect(win).toHaveCount(0, { timeout: PREVIEW_BUDGET_MS })
     await expect.poll(async () => (await diskBytes(file)).equals(original), { timeout: PREVIEW_BUDGET_MS }).toBe(true)
@@ -726,7 +728,7 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     // A click on the page's own button: Erfana's window, never the page's handler.
     await clickElement(app, 'buy', 'left', STATIC_TARGET)
     await expect(win).toHaveAttribute('data-view', 'new', { timeout: PREVIEW_BUDGET_MS })
-    await expect(win).toContainText('button#buy.cta')
+    await expect(win.locator('[data-target="button#buy.cta"]')).toHaveCount(1)
     expect(await preview.eval('String(window.__clicks ?? 0)', STATIC_TARGET)).toBe('0')
     await page.keyboard.press('Escape')
     await expect(win).toHaveCount(0)
@@ -747,7 +749,8 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     // Enter opens the window on the element the picker stopped at.
     expect(await pressInPage(app, 'Enter', [], STATIC_TARGET)).toBe(true)
     await expect(win).toHaveAttribute('data-view', 'new', { timeout: PREVIEW_BUDGET_MS })
-    await expect(win).toContainText(`em#unlimited · ${STATIC}, line `)
+    await expect(win).toContainText(`${STATIC}, line `)
+    await expect(win.locator(`[data-target="em#unlimited"]`)).toHaveCount(1)
     await page.keyboard.press('Escape')
     await expect(win).toHaveCount(0)
     // Still no click reached the page.
@@ -824,7 +827,8 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     expect(await pressInPage(app, 'Enter', [], STATIC_TARGET)).toBe(true)
     const win = chrome.window()
     await expect(win).toHaveAttribute('data-view', 'new', { timeout: PREVIEW_BUDGET_MS })
-    await expect(win).toContainText(`button#buy.cta · ${STATIC}, line `)
+    await expect(win).toContainText(`${STATIC}, line `)
+    await expect(win.locator(`[data-target="button#buy.cta"]`)).toHaveCount(1)
     const field = page.getByTestId('comment-new-field')
     await expect(field).toBeFocused()
     await page.keyboard.type(TYPED)
@@ -976,9 +980,18 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     await expect.poll(async () => (await fsp.readFile(file, 'utf-8')).includes(FIRST), { timeout: PREVIEW_BUDGET_MS }).toBe(true)
 
     await setNameInSettings(SECOND)
-    await clickElement(app, 'vat', 'left', STATIC_TARGET)
-    // No identity step this time: the notice was seen.
-    await expect(chrome.window()).toHaveAttribute('data-view', 'new', { timeout: PREVIEW_BUDGET_MS })
+    // No identity step this time: the notice was seen. A press that lands before
+    // the page's reload from the first save gets the "changed since the page
+    // loaded" menu, not the window, so close that menu and press again.
+    await expect(async () => {
+      await clickElement(app, 'vat', 'left', STATIC_TARGET)
+      try {
+        await expect(chrome.window()).toHaveAttribute('data-view', 'new', { timeout: 3_000 })
+      } catch (error) {
+        await page.keyboard.press('Escape')
+        throw error
+      }
+    }).toPass({ timeout: PREVIEW_BUDGET_MS })
     await expect(page.getByTestId('comment-identity-line')).toContainText(SECOND)
     await chrome.saveNewComment('Second-P7-Settings', STATIC)
 
@@ -1143,7 +1156,7 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
       .poll(() => preview.eval('String(window.__clicks ?? 0)', STATIC_TARGET), { timeout: PREVIEW_BUDGET_MS })
       .toBe('2')
   })
-  test('E-028 Open in source closes the comment window and shows the line; the window keeps one button size and never follows to another tab', async ({
+  test('E-028 Open in file closes the comment window and shows the line; the window keeps one button size and never follows to another tab', async ({
     windowWithTestProject,
     appWithTestProject
   }) => {
@@ -1172,9 +1185,9 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
       await expect(textButtons.nth(i)).not.toHaveClass(/\berf-comment-action\b/)
     }
 
-    // A reply typed, then Open in source: the window is gone and the editor shows the element's line.
+    // A reply typed, then Open in file: the window is gone and the editor shows the element's line.
     await page.getByTestId('comment-reply-field').fill(DRAFT)
-    // C-13 / C-19: with the stepper shown, Open in source is under More actions.
+    // C-13 / C-19: with the stepper shown, Open in file is under More actions.
     await chrome.moreAction('comment-open-in-source')
     await expect(win).toHaveCount(0)
     await tabs.waitForTab('e002.html')

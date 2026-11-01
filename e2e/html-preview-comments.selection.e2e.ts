@@ -64,7 +64,7 @@ const PAGE_TEXT = [
 
 test.use({ testProjectFiles: { [PAGE]: PAGE_TEXT } })
 
-/** A drag across the first half of `#ship`'s line: words, not the whole element. */
+/** A drag across the first half of `#ship`'s line: words, not the whole section. */
 async function selectWords(app: Parameters<typeof waitForBox>[0]): Promise<{ x: number; y: number }> {
   await waitForViewShown(app, TARGET)
   const box = await waitForBox(app, 'ship', TARGET)

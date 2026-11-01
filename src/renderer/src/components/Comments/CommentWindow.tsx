@@ -244,7 +244,7 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
       if (result.ok) {
         props.onWritten(save, file)
         // C-07 (D-16): the edit landed without its words – the banner and the polite region say so.
-        const kept = editWordsNotice(words, save, result, selection?.threads ?? [], file)
+        const kept = editWordsNotice(words, save, result, selection?.threads ?? [])
         if (kept !== null) setFailure(kept)
         if (kept !== null) announce(kept.text)
         return true
@@ -372,7 +372,7 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
               {view === 'identity' ? IDENTITY_COPY.title : <VisibleText text={heading.title} />}
             </h2>
             {heading.context !== null && (
-              <p className="erf-comment-window__context">
+              <p className="erf-comment-window__context" data-target={heading.target}>
                 {/* The label and the path come from the page: tokens, not controls (M9). */}
                 <bdi dir="ltr">
                   <VisibleText text={heading.context} />

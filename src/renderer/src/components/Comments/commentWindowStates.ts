@@ -6,7 +6,7 @@
  * comments-v2 C-05, C-06, C-13, R-06, R-21). Pure: no React, no bridge.
  *
  * One state per thread, the first that applies: Resolved > Not found >
- * Words changed > Changed > Not visible now > Open. Damaged and newer-format
+ * Words changed > Changed > Hidden on the page > Open. Damaged and newer-format
  * blocks are not threads: the window shows them on their own.
  *
  * The stepper walks the threads of the file in file order within the

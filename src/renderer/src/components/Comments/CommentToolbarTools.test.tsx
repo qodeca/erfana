@@ -44,7 +44,7 @@ describe('CommentToolbarTools', () => {
       expect(props.onToggleMode).toHaveBeenCalledWith(false)
       rerender(<CommentToolbarTools {...props} mode />)
       expect(modeButton()).toHaveAttribute('aria-pressed', 'true')
-      expect(modeButton().title).toContain('– on')
+      expect(modeButton().title).toContain('Comment mode is on')
     })
 
     it('tells a keyboard activation apart from a click', () => {
@@ -53,13 +53,13 @@ describe('CommentToolbarTools', () => {
       expect(props.onToggleMode).toHaveBeenCalledWith(true)
     })
 
-    // Changed expectation under C-20 (was "Comments, 3 open" – the count's name now starts with its visible text).
-    it('C-20 the count is a labelled disclosure: "3 comments", with no title that repeats it', async () => {
+    // Changed expectation: preview toolbars are icons only, so the name is also the tooltip.
+    it('the count is a disclosure named "3 comments", drawn as the icon and the number', async () => {
       const user = userEvent.setup()
       const { props, rerender } = setup({ counts: { open: 3, resolved: 1, attention: 0 } })
       expect(listButton()).toHaveAccessibleName('3 comments')
-      expect(listButton().querySelector('.erf-comment-count__text')).toHaveTextContent('3 comments')
-      expect(listButton()).not.toHaveAttribute('title')
+      expect(listButton()).toHaveTextContent(/^3$/)
+      expect(listButton()).toHaveAttribute('title', '3 comments')
       expect(listButton()).toHaveAttribute('aria-expanded', 'false')
       expect(listButton()).not.toHaveAttribute('aria-controls')
       await user.click(listButton())
@@ -82,20 +82,20 @@ describe('CommentToolbarTools', () => {
       expect(listButton().querySelector('.erf-counter--attention')).toBeNull()
     })
 
-    // Changed expectation under C-20 (was "Comments, none open" with an empty button).
-    it('C-20 with no open comments the count reads "Comments", no number', () => {
+    // Changed expectation: icons only, so no visible word and no number.
+    it('with no open comments the count is the icon alone, named "Comments"', () => {
       setup({ counts: { open: 0, resolved: 2, attention: 0 } })
-      expect(listButton()).toHaveTextContent('Comments')
+      expect(listButton()).toHaveTextContent(/^$/)
       expect(listButton()).toHaveAccessibleName('Comments')
       expect(listButton().querySelector('.erf-comment-count__number')).toBeNull()
     })
 
-    it('C-20 the narrow tier has the icon and the number ready, hidden until the container is narrow', () => {
+    it('shows the icon and the number at every width, with no width rule to hide them', () => {
       setup({ counts: { open: 7, resolved: 0, attention: 0 } })
       expect(listButton().querySelector('.erf-comment-count__icon svg')).not.toBeNull()
       expect(listButton().querySelector('.erf-comment-count__number')).toHaveTextContent('7')
       const css = readFileSync(resolve(__dirname, 'CommentToolbarTools.css'), 'utf8')
-      expect(css).toMatch(/@container \(width < 446px\) \{[\s\S]*erf-comment-count__text \{\s*display: none;/)
+      expect(css).not.toMatch(/@container/)
     })
 
     it('C-20 the icons toggle is gone from the row at every tier: two tools only', () => {

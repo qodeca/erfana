@@ -96,7 +96,6 @@ const CALLS: Record<string, () => Record<string, string | copy.SaveFailureCopy>>
   deleteThreadText: () => ({ '0': copy.deleteThreadText(0), '1': copy.deleteThreadText(1), '2': copy.deleteThreadText(2) }),
   deleteBlockText: () => ({ [FILE]: copy.deleteBlockText(FILE) }),
   notFoundText: () => ({ 'line 42': copy.notFoundText(FILE, 42) }),
-  scriptBuiltText: () => ({ '<section>': copy.scriptBuiltText('<section>') }),
   frameFileText: () => ({ 'frame.html': copy.frameFileText('frame.html') }),
   readErrorText: () => ({ [FILE]: copy.readErrorText(FILE) }),
   unreadFilesText: () => ({ '1': copy.unreadFilesText(1), '3': copy.unreadFilesText(3) }),

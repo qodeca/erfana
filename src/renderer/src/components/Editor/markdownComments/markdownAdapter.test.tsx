@@ -132,7 +132,7 @@ describe('markdownAdapter', () => {
     const frontmatter = root.querySelector<HTMLElement>('.frontmatter-wrapper, .frontmatter-error-wrapper')!
     const target = adapter.targetAt(frontmatter.querySelector('td') ?? frontmatter)!
     expect(adapter.tagOf(target)).toBe('frontmatter')
-    expect(adapter.canComment(target)).toEqual({ ok: false, reason: "Comments can't be added to the frontmatter." })
+    expect(adapter.canComment(target)).toEqual({ ok: false, reason: "You can't comment on the settings at the top of this file." })
     expect(adapter.describe(target)).toBeNull()
   })
 

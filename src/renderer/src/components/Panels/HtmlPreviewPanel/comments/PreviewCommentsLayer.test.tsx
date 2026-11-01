@@ -94,7 +94,7 @@ describe('PreviewCommentsLayer', () => {
 
   describe('C-19 024-FR-027 a disabled item keeps its action name and shows its reason line (HTML)', () => {
     const NO_DRAFT = { draftToken: undefined, draftKey: undefined, target: undefined }
-    const CONFLICTS = 'index.html has unresolved git conflicts. Resolve them first.'
+    const CONFLICTS = 'index.html has two versions mixed together. Fix this first, or ask a developer to help.'
     const WORDS = { selection: true as const }
 
     /** Every item: its label, disabled, named from its label and described by its visible reason line. */
@@ -109,11 +109,11 @@ describe('PreviewCommentsLayer', () => {
       })
     }
 
-    it('M-05 outside comment mode on a read-only file: "Comment on element", disabled, with the reason main named', async () => {
+    it('M-05 outside comment mode on a read-only file: "Comment on this section", disabled, with the reason main named', async () => {
       const user = userEvent.setup()
       const { props } = setup({ menu: menuDraft({ ...NO_DRAFT, reason: 'conflict-markers' }), mode: false })
       expect(screen.getByRole('menu', { name: COPY.menuLabel })).toBeVisible()
-      expectDisabledWithReason([MD_SURFACE_COPY.commentOn('element')], CONFLICTS)
+      expectDisabledWithReason([MD_SURFACE_COPY.commentOn('section')], CONFLICTS)
       await user.click(screen.getAllByRole('menuitem')[0])
       expect(props.onAddComment).not.toHaveBeenCalled()
     })
@@ -122,8 +122,8 @@ describe('PreviewCommentsLayer', () => {
       const user = userEvent.setup()
       const { props } = setup({ menu: menuDraft({ ...NO_DRAFT, ...WORDS, reason: 'unterminated-block' }), mode: false })
       expect(screen.getByRole('menu', { name: SELECTION_COPY.menuLabel })).toBeVisible()
-      const reason = "A comment in index.html has no end, so Erfana won't add comments. Fix it in the source."
-      expectDisabledWithReason([SELECTION_COPY.commentOnSelection, SELECTION_COPY.commentOnWhole('element')], reason)
+      const reason = "One comment in index.html is broken, so Erfana can't add new ones. Fix or delete the broken comment first."
+      expectDisabledWithReason([SELECTION_COPY.commentOnSelection, SELECTION_COPY.commentOnWhole('section')], reason)
       // Two items, two reason lines – never one shared element.
       const [first, second] = screen.getAllByRole('menuitem')
       expect(first.getAttribute('aria-describedby')).not.toBe(second.getAttribute('aria-describedby'))
@@ -135,29 +135,29 @@ describe('PreviewCommentsLayer', () => {
       for (const mode of [false, true]) {
         const { unmount } = setup({ menu: menuDraft({ ...NO_DRAFT, kind: mode ? 'open' : 'menu', reason: 'not-commentable' }), mode })
         // Changed expectation under 024-FR-006 § 4 (was "This part of the page can't hold a comment.").
-        expectDisabledWithReason([mode ? COPY.addComment : MD_SURFACE_COPY.commentOn('element')], "This part of the preview can't hold a comment.")
+        expectDisabledWithReason([mode ? COPY.addComment : MD_SURFACE_COPY.commentOn('section')], "You can't add a comment here. Try a nearby section.")
         unmount()
       }
       // A main that sent no reason reads the same.
       setup({ menu: menuDraft({ ...NO_DRAFT, ...WORDS }), mode: true })
       expectDisabledWithReason(
-        [SELECTION_COPY.commentOnSelection, SELECTION_COPY.commentOnWhole('element')],
-        "This part of the preview can't hold a comment."
+        [SELECTION_COPY.commentOnSelection, SELECTION_COPY.commentOnWhole('section')],
+        "You can't add a comment here. Try a nearby section."
       )
     })
 
-    it('M-10 comments unavailable for this file: the row\'s items, each disabled with "Comments are unavailable for this file: {reason}."', async () => {
+    it('M-10 comments unavailable for this file: the row\'s items, each disabled with "You can\'t comment on this file: {reason}."', async () => {
       const user = userEvent.setup()
       // Even a draft main minted is not offered: nothing could be read.
       const { props, unmount } = setup({ menu: menuDraft(), mode: false, unavailable: 'too-large' })
-      expectDisabledWithReason([MD_SURFACE_COPY.commentOn('element')], 'Comments are unavailable for this file: file too large.')
+      expectDisabledWithReason([MD_SURFACE_COPY.commentOn('section')], "You can't comment on this file: file too large.")
       await user.click(screen.getAllByRole('menuitem')[0])
       expect(props.onAddComment).not.toHaveBeenCalled()
       unmount()
       setup({ menu: menuDraft({ ...NO_DRAFT, ...WORDS, reason: 'encoding' }), mode: false, unavailable: 'overlay-removed' })
       expectDisabledWithReason(
-        [SELECTION_COPY.commentOnSelection, SELECTION_COPY.commentOnWhole('element')],
-        "Comments are unavailable for this file: the page keeps removing Erfana's overlay."
+        [SELECTION_COPY.commentOnSelection, SELECTION_COPY.commentOnWhole('section')],
+        "You can't comment on this file: the page keeps removing Erfana's comment tools."
       )
     })
 
@@ -172,14 +172,14 @@ describe('PreviewCommentsLayer', () => {
   describe('OD-01 024-AC-004 the menu matrix in the HTML Preview', () => {
     const WORDS = { text: 'We ship the beta to ten customers', start: 20, end: 33, cut: false }
 
-    it('OD-01 outside comment mode the one item is "Comment on element" (M-01)', async () => {
+    it('OD-01 outside comment mode the one item is "Comment on this section" (M-01)', async () => {
       const user = userEvent.setup()
       const draft = menuDraft()
       const { props } = setup({ menu: draft, mode: false })
       expect(screen.getByRole('menu', { name: COPY.menuLabel })).toBeVisible()
       const items = screen.getAllByRole('menuitem')
       expect(items).toHaveLength(1)
-      expect(items[0]).toHaveTextContent(MD_SURFACE_COPY.commentOn('element'))
+      expect(items[0]).toHaveTextContent(MD_SURFACE_COPY.commentOn('section'))
       await user.click(items[0])
       expect(props.onAddComment).toHaveBeenCalledWith(draft)
     })
@@ -197,7 +197,7 @@ describe('PreviewCommentsLayer', () => {
       expect(props.onMenuClose).toHaveBeenCalledWith(true)
     })
 
-    it('024-AC-004 C-07 (HTML) on a selection: "Comment on selection" then "Comment on the whole element", in a menu named Selection (M-02, M-04)', async () => {
+    it('024-AC-004 C-07 (HTML) on a selection: "Comment on selection" then "Comment on the whole section", in a menu named Selection (M-02, M-04)', async () => {
       const user = userEvent.setup()
       const draft = menuDraft({ selection: true, words: WORDS })
       for (const mode of [false, true]) {
@@ -206,14 +206,14 @@ describe('PreviewCommentsLayer', () => {
         const items = screen.getAllByRole('menuitem')
         expect(items.map(item => item.textContent)).toEqual([
           SELECTION_COPY.commentOnSelection,
-          SELECTION_COPY.commentOnWhole('element')
+          SELECTION_COPY.commentOnWhole('section')
         ])
         await user.click(items[0])
         expect(props.onAddComment).toHaveBeenCalledWith(draft, 'words')
         unmount()
       }
       const { props } = setup({ menu: draft, mode: false })
-      await user.click(screen.getByRole('menuitem', { name: SELECTION_COPY.commentOnWhole('element') }))
+      await user.click(screen.getByRole('menuitem', { name: SELECTION_COPY.commentOnWhole('section') }))
       expect(props.onAddComment).toHaveBeenCalledWith(draft)
     })
   })
@@ -239,7 +239,7 @@ describe('PreviewCommentsLayer', () => {
   })
 
   it('R-013 carries the polite and assertive live regions', () => {
-    setup({ polite: 'Comment saved to index.html.', assertive: "Couldn't copy the raw text." })
+    setup({ polite: 'Comment saved to index.html.', assertive: "Couldn't copy the comment text." })
     expect(screen.getByTestId('comment-announce')).toHaveTextContent('Comment saved to index.html.')
     expect(screen.getByTestId('comment-announce')).toHaveAttribute('aria-live', 'polite')
     expect(screen.getByTestId('comment-alert')).toHaveAttribute('aria-live', 'assertive')
@@ -255,8 +255,8 @@ describe('PreviewCommentsLayer', () => {
     const dialog = screen.getByRole('dialog', { name: IDENTITY_COPY.title })
     expect(dialog).toHaveTextContent(IDENTITY_COPY.notice)
     // The notice is about files, not pages, and names the HTML-only risk as an extra.
-    expect(IDENTITY_COPY.notice).toMatch(/^Erfana writes your name – and your email, if you add one – into the file next to each comment\./)
-    expect(IDENTITY_COPY.notice).toMatch(/In HTML files, scripts on previewed pages can read them too\./)
+    expect(IDENTITY_COPY.notice).toMatch(/^Erfana saves your name in the file next to each comment\./)
+    expect(IDENTITY_COPY.notice).toMatch(/Scripts on HTML pages can read them too\./)
     unmount()
     // `identityNoticeSeen` is one global flag: a first comment in the Markdown Preview sets it for this preview too.
     setup({ request: newRequest(), identity: { authorName: 'Ada', identityNoticeSeen: true } })

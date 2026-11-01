@@ -10,8 +10,8 @@
  * swaps the native page for a still while it is open – with the comment items
  * of the menu matrix (spec 024 `design/menu-matrix.md`, shared with the
  * Markdown Preview through `hostMenu.ts`): "Add comment" in comment mode
- * (M-03), "Comment on element" outside it (M-01, OD-01), and on a selection
- * "Comment on selection" then "Comment on the whole element" (M-02, M-04).
+ * (M-03), "Comment on this section" outside it (M-01, OD-01), and on a selection
+ * "Comment on selection" then "Comment on the whole section" (M-02, M-04).
  * When main minted no draft, or comments are unavailable for the page, the
  * same items stay – disabled, each with its reason line (M-05, M-06, M-08,
  * M-10; C-19). The window is {@link CommentWindow}.
@@ -47,7 +47,7 @@ import type { CommentWindowRequest, ElementDraft } from '../../../Comments/comme
 /** Props for {@link PreviewCommentsLayer}. */
 export interface PreviewCommentsLayerProps {
   readonly menu: ElementDraft | null
-  /** Comment mode is on: the menu without a selection says "Add comment", else "Comment on element" (default on). */
+  /** Comment mode is on: the menu without a selection says "Add comment", else "Comment on this section" (default on). */
   readonly mode?: boolean
   /** Why comments are unavailable for the page (M-10): every item is disabled with that sentence. */
   readonly unavailable?: CommentUnavailableReason | null

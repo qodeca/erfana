@@ -196,7 +196,7 @@ describe('keyboard picker (J-010)', () => {
     expect(spoken()).toBe('showing p#last')
     userMove(10, 530)
     userKey({ key: 'Tab' })
-    // C-10: it stays on p#last and says it is the last one (the window says "Last element at this level – …").
+    // C-10: it stays on p#last and says it is the last one (the window says "Last section at this level – …").
     expect(spoken()).toBe('last')
     userKey({ key: 'Tab', shiftKey: true })
     expect(spoken()).not.toBe('last')

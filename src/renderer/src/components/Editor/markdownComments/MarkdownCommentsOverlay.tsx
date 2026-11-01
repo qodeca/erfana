@@ -98,7 +98,7 @@ export function MarkdownCommentsOverlay(props: MarkdownCommentsOverlayProps): Re
         />
       )}
       {host.drawer !== null && (
-        <div className="erf-comment-host__drawer">
+        <div className={`erf-comment-host__drawer${host.drawer.full ? ' erf-comment-host__drawer--full' : ''}`}>
           <CommentDrawer {...host.drawer} />
         </div>
       )}

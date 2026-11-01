@@ -188,7 +188,7 @@ export class CommentChrome {
     return this.drawer().getByTestId('comment-drawer-row')
   }
 
-  /** A drawer filter (OD-04: Open, Resolved, Can't edit). */
+  /** A drawer filter (OD-04: Open, Resolved, Problems). */
   filter(key: 'open' | 'resolved' | 'cantEdit'): Locator {
     return this.drawer().getByTestId(`comment-filter-${key === 'cantEdit' ? 'cant-edit' : key}`)
   }

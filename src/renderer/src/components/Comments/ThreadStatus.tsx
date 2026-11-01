@@ -13,7 +13,7 @@
  *   then a Was box (the stored text, struck through) and a Now box (the text
  *   there now, first 200 characters) in the C-21 quote style – the preview's
  *   serif in Markdown. Words with no prefix…suffix pair left: Was only, and
- *   "The words this comment is about are gone from this {kind}." When the
+ *   "The words this comment is about are no longer here." When the
  *   target is also hidden, the hidden sentence follows the boxes (§ 4 rule 8).
  *
  * Every text here comes from the file: React text nodes through

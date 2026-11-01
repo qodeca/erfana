@@ -73,7 +73,7 @@ export interface ListInput {
   readonly keys: Pick<CommentKeyStore<unknown>, 'keyFor'>
   readonly realRoot: string
   readonly files: readonly ListedFile[]
-  /** Whether a thread's element is not rendered right now ("Not visible now"). */
+  /** Whether a thread's element is not rendered right now ("Hidden on the page"). */
   readonly notVisible: (realPath: string, threadId: string) => boolean
   /** Where the parse runs: the comment parse worker in the app. */
   readonly jobs: CommentFileJobRunner

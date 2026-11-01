@@ -55,8 +55,8 @@ describe('024-AC-008 C-03 the Markdown noun of a target', () => {
     expect(nounTagOf({ tag: 'ul', runtime: { tag: 'li' } })).toBe('li')
   })
 
-  it('024-AC-008 C-03 the HTML Preview keeps "element" whatever the place (D-04)', () => {
-    expect(HTML_WORDS.noun({ tag: 'tr', place: ROW_2 })).toBe('element')
+  it('024-AC-008 C-03 the HTML Preview keeps "section" whatever the place (D-04)', () => {
+    expect(HTML_WORDS.noun({ tag: 'tr', place: ROW_2 })).toBe('section')
   })
 })
 

@@ -80,7 +80,6 @@ function ensureProject(): void {
   if (fs.existsSync(marker)) return
   fs.rmSync(PROJECT, { recursive: true, force: true })
   fs.mkdirSync(PROJECT, { recursive: true })
-  // A root file: openProject waits for a file node, and folders start collapsed
   fs.writeFileSync(path.join(PROJECT, 'README.md'), '# Bench project\n')
   for (let d = 0; d < FOLDERS; d++) {
     const dir = path.join(PROJECT, `folder-${String(d).padStart(3, '0')}`)
@@ -150,7 +149,7 @@ test.describe('Watcher structural refresh benchmark', () => {
         })
         window = await app.firstWindow()
         await waitForAppReady(window)
-        await openProject(window, PROJECT)
+        await openProject(window, PROJECT, { anyRow: true })
         await new Promise((resolve) => setTimeout(resolve, WATCHER_WARMUP_MS))
         await instrument(app)
 

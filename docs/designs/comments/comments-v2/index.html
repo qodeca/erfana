@@ -117,7 +117,7 @@
     <tr><td>C-04</td><td>P0</td><td>One identity notice and Settings text for both previews</td><td><a href="./window.html">window.html</a></td></tr>
     <tr><td>C-05</td><td>P0</td><td>Every open-thread state keeps Reply and Resolve; not found reads as possible success</td><td><a href="./window.html">window.html</a>; Not found tag on <a href="./drawer.html">drawer.html</a>; ghost icon on <a href="./marks.html">marks.html</a></td></tr>
     <tr><td>C-06</td><td>P0</td><td>Derived "Changed since comment" and "Words changed" with a Was/Now box</td><td><a href="./window.html">window.html</a>; Changed tag and sort on <a href="./drawer.html">drawer.html</a>; notch and dashed mark on <a href="./marks.html">marks.html</a></td></tr>
-    <tr><td>C-07</td><td>P0</td><td>Keyboard route to selection comments: the "Narrow to words" field</td><td><a href="./window.html">window.html</a> (collapsed and expanded); journey step 2 here</td></tr>
+    <tr><td>C-07</td><td>P0</td><td>Keyboard route to selection comments: the "Comment on specific words" field</td><td><a href="./window.html">window.html</a> (collapsed and expanded); journey step 2 here</td></tr>
     <tr><td>C-08</td><td>P0</td><td>Markdown keyboard focus model for comment mode</td><td><a href="./menus-toolbar.html">menus-toolbar.html</a></td></tr>
     <tr><td>C-09</td><td>P0</td><td>"Comments paused" while the Markdown buffer differs from disk</td><td><a href="./menus-toolbar.html">menus-toolbar.html</a> (bands)</td></tr>
     <tr><td>C-10</td><td>P0</td><td>Spoken target model: picker steps, window description, accessible names</td><td><a href="./menus-toolbar.html">menus-toolbar.html</a>, <a href="./drawer.html">drawer.html</a>, <a href="./window.html">window.html</a>; announcements in this journey</td></tr>
@@ -130,7 +130,7 @@
     <tr><td>C-17</td><td>P1</td><td>Mark and icon act as one; icons never overlap</td><td><a href="./marks.html">marks.html</a>; journey step 4</td></tr>
     <tr><td>C-18</td><td>P1</td><td>Non-modal window in Markdown, in the right margin when there is room</td><td><a href="./menus-toolbar.html">menus-toolbar.html</a> (margin, edge tab); journey steps 2 and 4</td></tr>
     <tr><td>C-19</td><td>P1</td><td>Every refusal names its reason and a next step</td><td>Refusals on <a href="./window.html">window.html</a>; disabled menu item with a reason line on <a href="./menus-toolbar.html">menus-toolbar.html</a></td></tr>
-    <tr><td>C-20</td><td>P1</td><td>Quieter toolbar: icons toggle moves to the drawer, list becomes a labelled count</td><td><a href="./menus-toolbar.html">menus-toolbar.html</a>; checkbox on <a href="./drawer.html">drawer.html</a></td></tr>
+    <tr><td>C-20</td><td>P1</td><td>Quieter toolbar: icons toggle moves to the drawer, list becomes the icon and the count</td><td><a href="./menus-toolbar.html">menus-toolbar.html</a>; checkbox on <a href="./drawer.html">drawer.html</a></td></tr>
     <tr><td>C-21</td><td>P1</td><td>Window hierarchy: blocked Save looks blocked, quote clamped, labels stop covering text</td><td><a href="./window.html">window.html</a>; HTML label on <a href="./marks.html">marks.html</a>; comment-mode tab on <a href="./menus-toolbar.html">menus-toolbar.html</a>; quote in journey steps 2 and 4</td></tr>
     <tr><td>C-22</td><td>P1</td><td>Clicking a commented target in comment mode opens its threads</td><td><a href="./window.html">window.html</a></td></tr>
     <tr><td>C-23</td><td>P1</td><td>Screen-reader acceptance gate</td><td>Nothing to draw – a test document, <code>docs/testing/comments-screen-reader.md</code></td></tr>
@@ -145,7 +145,7 @@
 
 <!-- ======================================================= journey -->
 <h2>The journey, in both previews</h2>
-<div class="ds-note">Select words → <strong>Comment</strong> button → window with the words and "Narrow to words" →
+<div class="ds-note">Select words → <strong>Comment</strong> button → window with the words and "Comment on specific words" →
   save → comment mark and icon → click the mark → step with ‹ › and <strong>Resolve and next</strong> → "All open
   comments are resolved". The HTML window stays modal over a still image of the page; the Markdown window is
   non-modal and sits in the right margin when there is room (C-18).</div>
@@ -186,9 +186,9 @@
 <!-- 2. window -->
 <section class="c2i-step" aria-labelledby="s2">
   <p class="step__no">2 · write</p>
-  <h3 class="step__title" id="s2">The window quotes the words; "Narrow to words" waits, folded</h3>
+  <h3 class="step__title" id="s2">The window quotes the words; "Comment on specific words" waits, folded</h3>
   <p class="step__text">The quote is quieter than the comment: body size, primary text, three lines then "Show all"
-    (C-21) – system sans in HTML, the preview's serif in Markdown. Under it, the <strong>Narrow to words</strong>
+    (C-21) – system sans in HTML, the preview's serif in Markdown. Under it, the <strong>Comment on specific words</strong>
     disclosure (C-07) opens a read-only copy of the target's text, the keyboard route to the same result.
     <strong>HTML:</strong> modal, over a still image of the page. <strong>Markdown:</strong> no modal, no catcher;
     with at least 376 px free right of the text column, the window sits in that margin, top-aligned with its
@@ -206,11 +206,11 @@
             <h2 class="erf-comment-window__title" id="w2h-t" tabindex="-1">New comment</h2>
             <p class="erf-comment-window__context"><bdi dir="ltr">p.lede</bdi> · index.html, line 12</p>
             <span class="erf-comment-words"><span class="erf-comment-words__text">ship by Friday</span></span>
-            <div class="c2i-narrow"><button class="erf-button erf-button--text erf-button--sm " type="button" aria-expanded="false" tabindex="-1"><svg data-icon="chevron-right" width="14" height="14" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg><span>Narrow to words</span></button></div>
+            <div class="c2i-narrow"><button class="erf-button erf-button--text erf-button--sm " type="button" aria-expanded="false" tabindex="-1"><svg data-icon="chevron-right" width="14" height="14" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg><span>Comment on specific words</span></button></div>
           </div><button class="erf-button erf-button--icon" type="button" aria-label="Close" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
           <div class="erf-comment-window__body"><div class="erf-comment-field"><label class="erf-comment-field__label" for="f2h">Comment</label>
             <textarea class="erf-comment-textarea" id="f2h" placeholder="What should change here?" tabindex="-1">Friday is a holiday in two markets. Say Thursday.</textarea>
-            <div class="erf-comment-field__foot"><p class="erf-comment-field__hint">Plain text. Saved inside index.html.</p><span class="erf-comment-counter">49 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span></div></div>
+            <div class="erf-comment-field__foot"><p class="erf-comment-field__hint">Saved inside index.html.</p><span class="erf-comment-counter">49 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span></div></div>
             <p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-button erf-button--text erf-button--sm" type="button" tabindex="-1"><span>Change</span></button></p></div>
           <div class="erf-comment-window__foot"><button class="erf-button erf-button--secondary" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-button erf-button--primary" type="button" tabindex="-1"><span>Save</span></button></div>
         </div>
@@ -229,11 +229,11 @@
             <h2 class="erf-comment-window__title" id="w2m-t" tabindex="-1">New comment on paragraph</h2>
             <p class="erf-comment-window__context">plan.md, line 7</p>
             <span class="erf-comment-words erf-comment-words--md"><span class="erf-comment-words__text">ship by Friday</span></span>
-            <div class="c2i-narrow"><button class="erf-button erf-button--text erf-button--sm " type="button" aria-expanded="false" tabindex="-1"><svg data-icon="chevron-right" width="14" height="14" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg><span>Narrow to words</span></button></div>
+            <div class="c2i-narrow"><button class="erf-button erf-button--text erf-button--sm " type="button" aria-expanded="false" tabindex="-1"><svg data-icon="chevron-right" width="14" height="14" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg><span>Comment on specific words</span></button></div>
           </div><button class="erf-button erf-button--icon" type="button" aria-label="Close" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
           <div class="erf-comment-window__body"><div class="erf-comment-field"><label class="erf-comment-field__label" for="f2m">Comment</label>
             <textarea class="erf-comment-textarea" id="f2m" placeholder="What should change here?" tabindex="-1">Friday is a holiday in two of our markets. Thursday?</textarea>
-            <div class="erf-comment-field__foot"><p class="erf-comment-field__hint">Plain text. Saved inside plan.md.</p><span class="erf-comment-counter">52 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span></div></div>
+            <div class="erf-comment-field__foot"><p class="erf-comment-field__hint">Saved inside plan.md.</p><span class="erf-comment-counter">52 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span></div></div>
             <p class="erf-comment-identity">Commenting as <bdi>Anna K.</bdi> <button class="erf-button erf-button--text erf-button--sm" type="button" tabindex="-1"><span>Change</span></button></p></div>
           <div class="erf-comment-window__foot"><button class="erf-button erf-button--secondary" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-button erf-button--primary" type="button" tabindex="-1"><span>Save</span></button></div>
         </div>
@@ -280,7 +280,7 @@
     <strong>‹ 3 of 12 ›</strong>: two Buttons-card icon buttons (<code data-token="--btn-height-sm">24px</code>) around a
     muted count, stepping through threads in file order within the drawer's filter, also on ⌥F9 / Alt+F9 (next) and
     ⇧⌥F9 / Alt+Shift+F9 (previous). While the stepper shows, the footer is one row – <strong>Close</strong>, then
-    <strong>Resolve and next</strong> last – and Open in source and New comment move into the head's <strong>More actions</strong>
+    <strong>Resolve and next</strong> last – and Open in file and New comment move into the head's <strong>More actions</strong>
     menu (R-06, confirmed by the owner on 2026-10-28; the Dialog pattern's one footer row, primary last). Reply is blocked until there is text: the Buttons
     card's blocked look, <code>aria-disabled</code> with a reason (C-21).</p>
   <div class="c2-grid">
@@ -451,7 +451,7 @@
     <tr><td>Selection colour on the HTML page</td><td>Chromium paints the page's own selection.</td><td>System colours <code>Highlight</code> / <code>HighlightText</code> stand in for it, as on the selection card.</td></tr>
     <tr><td>Markdown icon button</td><td>Shipping CSS will style the real <code>&lt;button&gt;</code> (C-11).</td><td>A local reset strips the browser's button padding, border and background so the shared icon look shows.</td></tr>
     <tr><td>Selected icon lines</td><td><code>overlay.css</code> recolours lines through <code>color</code>.</td><td>The static SVG rects take <code>fill</code>, so a card rule sets it to the accent (as on the Markdown states card).</td></tr>
-    <tr><td>More actions menu in step 4</td><td>R-06 moves Open in source and New comment into a menu while the stepper shows.</td><td>Drawn closed here; window.html draws it open. The Dialog pattern keeps the footer to one row with the primary last and does not put a menu in its footer-start, so the menu button sits in the head beside Close.</td></tr>
+    <tr><td>More actions menu in step 4</td><td>R-06 moves Open in file and New comment into a menu while the stepper shows.</td><td>Drawn closed here; window.html draws it open. The Dialog pattern keeps the footer to one row with the primary last and does not put a menu in its footer-start, so the menu button sits in the head beside Close.</td></tr>
     <tr><td>Toolbars</td><td>Both previews have a toolbar above the page.</td><td>Left out of the journey frames; they are drawn on menus-toolbar.html.</td></tr>
   </tbody>
 </table>

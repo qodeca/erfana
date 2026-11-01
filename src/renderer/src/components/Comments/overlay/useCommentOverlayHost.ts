@@ -45,6 +45,7 @@ import { ErrorCode } from '../../../../../shared/errors'
 import { COMMENT_LIST_COPY, MARKDOWN_COPY, MD_SPOKEN_COPY, MD_SURFACE_COPY, SELECTION_COPY } from '../commentCopyWords'
 import { useRemovedOutside } from '../commentRemovedOutside'
 import type { CommentDrawerProps } from '../CommentDrawer'
+import { useNarrowElement } from '../useNarrowPanel'
 import type { CommentToolbarToolsProps } from '../CommentToolbarTools'
 import type { CommentWindowProps } from '../CommentWindow'
 import type { CommentWindowRequest, NewCommentWords } from '../commentWindowTypes'
@@ -52,7 +53,7 @@ import { useLiveText } from '../commentLive'
 import type { AnchorSelection } from '../../../../../shared/comments/anchorSel'
 import { commentMarkAt } from './commentHighlights'
 import { targetText } from './domWords'
-import { blockWindowRequest, revealRow, useNotVisible } from './hostDrawer'
+import { blockWindowRequest, areaBox, revealRow, useNotVisible } from './hostDrawer'
 import { draftKeyOf, noNewCommentText, pointOf, spokenTarget, threadsOn, toolbarCounts, viewOf } from './hostParts'
 import { hostMenuItems, hostMenuLabel, targetlessMenu } from './hostMenu'
 import { drawn, newRequestExtras, threadTarget, useDraftKeepAlive, type HostDock } from './hostWindow'
@@ -205,7 +206,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
         },
         point: pointOf(target, optionsRef.current.area),
         opener,
-        // The target's text, for the words and Narrow to words (C-07); a selection brings its range.
+        // The target's text, for the words and Comment on specific words (C-07); a selection brings its range.
         words: chosen ?? { text: targetText(target), start: 0, end: 0, cut: false },
         ...newRequestExtras(target, adapter, draft)
       })
@@ -311,7 +312,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
   }, [pointer.focusFirst])
   // ---- writes ----
   const liveDraft = useDraftKeepAlive(request?.kind === 'new' ? request.draftToken : null, () => optionsRef.current.source.openDraft())
-  const expectWords = useWordsCheck(placements, target => announce(SELECTION_COPY.wordsDropped(words.noun(target), fileName)))
+  const expectWords = useWordsCheck(placements, target => announce(SELECTION_COPY.wordsDropped(words.noun(target))))
   const save = useCallback(
     (request: CommentSaveRequest, sel?: AnchorSelection): Promise<FileCommentSaveResult> => {
       const { source: src, panelId: id, filePath: path, scroller: el } = optionsRef.current
@@ -381,6 +382,8 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
   const outlined = mode ? pointer.outlined : null
   const { counts, changed } = useMemo(() => toolbarCounts(file), [file])
   const notVisible = useNotVisible(live, adapter, placements, file, scroller)
+  // Under 640px the drawer covers the preview: "Show in preview" closes it first, and keeps focus off <body>.
+  const narrow = useNarrowElement(area, state.drawerOpen)
 
   const toolbar: CommentToolbarToolsProps = {
     mode,
@@ -405,11 +408,11 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
           list: state.list,
           notVisible,
           showIcons: state.showIcons,
-          full: false,
+          full: narrow,
           pageFile: fileName,
           onClose: () => setDrawerOpen(false),
           onShowIconsChange: show => store.getState().patch(panelId, { showIcons: show }),
-          onReveal: row => revealRow(row, placements, adapter, announce),
+          onReveal: row => revealRow(row, placements, adapter, announce, narrow ? () => (setDrawerOpen(false), listButtonRef.current?.focus()) : undefined),
           onOpenInSource: row => options.onOpenInSource(row.line),
           onOpen: row => {
             if (row.threadKey !== undefined) openThreads([row.threadKey], null, 'drawer')
@@ -436,10 +439,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
           list: state.list,
           identity,
           notVisible,
-          getArea: () => {
-            const box = optionsRef.current.area?.getBoundingClientRect()
-            return box ? { left: box.left, top: box.top, width: box.width, height: box.height } : null
-          },
+          getArea: () => areaBox(optionsRef.current.area),
           onClose: closeWindow,
           onNewComment: next => setRequest(next),
           onSaveIdentity: data =>

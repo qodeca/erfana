@@ -208,15 +208,15 @@ describe('CommentsSection – R-014', () => {
   })
 
   it('024-AC-023 the identity notice covers both file types', () => {
-    expect(IDENTITY_COPY.notice).toMatch(/into the file next to each comment/)
-    expect(IDENTITY_COPY.notice).toMatch(/In HTML files, scripts on previewed pages can read them too/)
+    expect(IDENTITY_COPY.notice).toMatch(/in the file next to each comment/)
+    expect(IDENTITY_COPY.notice).toMatch(/Scripts on HTML pages can read them too/)
     expect(IDENTITY_COPY.notice).not.toMatch(/HTML file next/)
   })
 
   it('C-04 Settings › Comments speaks for both previews: file-based name hint and notice, a switch per preview, fields usable while either is on', () => {
     // The exact texts of comments-v2 C-04's Design paragraph.
     expect(SETTINGS_COPY.nameHint).toBe('Saved into the file next to each comment you write. Changing it affects new comments only.')
-    expect(SETTINGS_COPY.notice).toBe('Both are visible to anyone who can open the file – in its source and in git history once pushed.')
+    expect(SETTINGS_COPY.notice).toBe('Anyone who can open the file can read these. If the file goes into git, they stay in its history.')
     for (const [html, markdown] of [
       [true, false],
       [false, true]
@@ -240,8 +240,8 @@ describe('CommentsSection – R-014', () => {
     render(<CommentsSection />)
     const flag = screen.getByTestId('settings-toggle-html-comments')
     expect(flag).toHaveAccessibleName('Comments in HTML preview')
-    expect(flag).toHaveAccessibleDescription('Lets you comment on elements and selected text in previewed pages.')
-    expect(SETTINGS_COPY.flagHint).toBe('Lets you comment on elements and selected text in previewed pages.')
+    expect(flag).toHaveAccessibleDescription('Lets you comment on sections and selected text in previewed pages.')
+    expect(SETTINGS_COPY.flagHint).toBe('Lets you comment on sections and selected text in previewed pages.')
   })
 
   it('is inert before settings load', () => {

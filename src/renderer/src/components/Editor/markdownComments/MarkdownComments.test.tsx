@@ -211,7 +211,7 @@ describe('Markdown Preview comments', () => {
       expect(within(menu).getAllByRole('menuitem').map(el => el.textContent)).toEqual(['Add comment'])
     })
 
-    it('M-18: the frontmatter offers "Comment on frontmatter", disabled with its reason', async () => {
+    it('M-18: the frontmatter offers "Comment on file settings", disabled with its reason', async () => {
       renderPanel()
       const frontmatter = content().querySelector<HTMLElement>('.frontmatter-wrapper, .frontmatter-error-wrapper')!
       fireEvent.contextMenu(frontmatter, { clientX: 10, clientY: 10 })
@@ -419,7 +419,7 @@ describe('Markdown Preview comments', () => {
       api.list.mockResolvedValue({ ok: true, file: fileView([], { writable: true, addRefusal: 'too-many-blocks' }), placements: [] })
       renderPanel()
       const sentence = MARKDOWN_COPY.tooMany('notes.md')
-      expect(sentence).toBe('notes.md already has 500 comments, the most Erfana adds to one file. Delete resolved threads to add more.')
+      expect(sentence).toBe('notes.md has 500 comments, which is the limit. Delete resolved comments to add more.')
       await waitFor(() => expect(modeTool()).toHaveAttribute('aria-disabled', 'true'))
       expect(modeTool()).toHaveAttribute('title', MD_SURFACE_COPY.modeUnavailable(sentence))
       fireEvent.contextMenu(paragraph(), { clientX: 10, clientY: 10 })
@@ -435,11 +435,11 @@ describe('Markdown Preview comments', () => {
       expect(screen.queryByTestId(TEST_IDS.COMMENT_DRAWER_ERROR)).toBeNull()
     })
 
-    it('F-05: comments unavailable for the file – the toggle is disabled with "Comments are unavailable for this file: {reason}" and no icon is drawn', async () => {
+    it('F-05: comments unavailable for the file – the toggle is disabled with "You can\'t comment on this file: {reason}" and no icon is drawn', async () => {
       api.list.mockResolvedValue({ ok: false, code: ErrorCode.COMMENT_WRITE_FAILED, reason: 'comments-off' })
       renderPanel()
       await waitFor(() => expect(modeTool()).toHaveAttribute('aria-disabled', 'true'))
-      expect(MARKDOWN_COPY.off).toMatch(/^Comments are unavailable for this file: .+\.$/)
+      expect(MARKDOWN_COPY.off).toMatch(/^You can't comment on this file: .+\.$/)
       expect(modeTool()).toHaveAttribute('title', MD_SURFACE_COPY.modeUnavailable(MARKDOWN_COPY.off))
       expect(screen.queryByTestId(TEST_IDS.COMMENT_HOST_ICON)).toBeNull()
     })
@@ -481,7 +481,7 @@ describe('Markdown Preview comments', () => {
       const dialog = await screen.findByRole('dialog', { name: 'Before your first comment' })
       // One notice: the HTML-only sentence stays in it, so a reviewer who starts in Markdown still learns it.
       expect(dialog).toHaveTextContent(IDENTITY_COPY.notice)
-      expect(dialog).toHaveTextContent('In HTML files, scripts on previewed pages can read them too.')
+      expect(dialog).toHaveTextContent('Scripts on HTML pages can read them too.')
       await user.click(screen.getByTestId('comment-identity-continue'))
       const { updateCommentIdentity } = (await import('../../../stores/useGlobalSettingsStore')).useGlobalSettingsStore.getState()
       expect(updateCommentIdentity).toHaveBeenCalledWith(expect.objectContaining({ authorName: 'Ada', identityNoticeSeen: true }))

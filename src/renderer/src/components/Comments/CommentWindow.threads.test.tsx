@@ -85,12 +85,12 @@ describe('CommentWindow – threads', () => {
 
   describe('R-013 focus and title', () => {
     // Changed expectation under 024-FR-006 A-02 (was the selector in the title: "Comment on button.cta").
-    it('024-AC-007 A-02 titles the window "Comment on element", the selector on its context line, and focuses the title', async () => {
+    it('024-AC-007 A-02 titles the window "Comment on this section", the selector on its context line, and focuses the title', async () => {
       setup()
       const title = screen.getByTestId('comment-window-title')
-      expect(title).toHaveTextContent('Comment on element')
-      expect(screen.getByRole('dialog', { name: 'Comment on element' })).toBeVisible()
-      expect(screen.getByText(/^button\.cta · index\.html, line \d+$/)).toBeVisible()
+      expect(title).toHaveTextContent('Comment on this section')
+      expect(screen.getByRole('dialog', { name: 'Comment on this section' })).toBeVisible()
+      expect(screen.getByText(/^index\.html, line \d+$/)).toBeVisible()
       await waitFor(() => expect(title).toHaveFocus())
     })
 
@@ -99,7 +99,7 @@ describe('CommentWindow – threads', () => {
         request: threadsRequest({ threadKeys: ['t1', 't2'] }),
         list: ready([fileView({ threads: [thread(1), thread(2)] })])
       })
-      expect(screen.getByTestId('comment-window-title')).toHaveTextContent('Comments on element')
+      expect(screen.getByTestId('comment-window-title')).toHaveTextContent('Comments on this section')
     })
 
     it('shows a reading state while the list is loading', () => {
@@ -330,7 +330,7 @@ describe('CommentWindow – threads', () => {
       await user.type(screen.getByTestId('comment-reply-field'), 'Hmm')
       await user.keyboard('{Control>}{Enter}{/Control}')
       expect(await screen.findByTestId('comment-save-error')).toHaveTextContent(
-        'index.html is read-only'
+        "Couldn't save because index.html can't be changed"
       )
       expect(screen.getByTestId('comment-reply-field')).toHaveValue('Hmm')
       expect(props.onWritten).not.toHaveBeenCalled()
@@ -362,7 +362,7 @@ describe('CommentWindow – threads', () => {
       )
       // Folded until expanded.
       expect(screen.queryByTestId('comment-message-text')).toBeNull()
-      await user.click(screen.getByRole('button', { name: 'Show the resolved thread' }))
+      await user.click(screen.getByRole('button', { name: 'Show the resolved conversation' }))
       expect(screen.getByTestId('comment-message-text')).toHaveTextContent('Message 1')
       await user.click(screen.getByTestId('comment-reopen'))
       expect(props.onSave).toHaveBeenLastCalledWith({ ...target, op: 'setStatus', status: 'open' })
@@ -405,7 +405,7 @@ describe('CommentWindow – threads', () => {
       await user.click(screen.getByRole('menuitem', { name: COPY.delete }))
       expect(
         screen.getByText(
-          'Delete this comment? It is removed from index.html. Git history keeps earlier versions.'
+          'Delete this comment from index.html? If the file is in git, old versions still keep it.'
         )
       ).toBeVisible()
       expect(screen.getByTestId('comment-delete-cancel')).toHaveFocus()
@@ -422,7 +422,7 @@ describe('CommentWindow – threads', () => {
       })
       await user.click(screen.getAllByTestId('comment-message-actions')[0])
       await user.click(screen.getByRole('menuitem', { name: COPY.delete }))
-      expect(screen.getByText('Delete this thread and its 2 replies?')).toBeVisible()
+      expect(screen.getByText('Delete this conversation and its 2 replies?')).toBeVisible()
       await user.click(screen.getByRole('button', { name: COPY.deleteThread }))
       expect(props.onSave).toHaveBeenCalledWith({ ...target, op: 'deleteThread' })
     })
@@ -461,7 +461,7 @@ describe('CommentWindow – threads', () => {
       await user.click(screen.getByRole('menuitem', { name: COPY.delete }))
       await user.click(screen.getByTestId('comment-delete-confirm'))
       expect(await screen.findByTestId('comment-save-error')).toHaveTextContent(
-        'unresolved git conflicts'
+        'two versions mixed together'
       )
       expect(screen.queryByTestId('comment-delete-confirm')).toBeNull()
     })
@@ -497,7 +497,7 @@ describe('CommentWindow – threads', () => {
       expect(screen.queryByText('kim@c.io', { selector: 'bdi' })).toBeNull()
     })
 
-    it('Open in source opens the file at the thread line; Close closes', async () => {
+    it('Open in file opens the file at the thread line; Close closes', async () => {
       const user = userEvent.setup()
       const { props } = setup()
       await user.click(screen.getByTestId('comment-open-in-source'))
@@ -513,7 +513,7 @@ describe('CommentWindow – threads', () => {
         ])
       })
       expect(screen.getByTestId('comment-read-only')).toHaveTextContent(
-        'Erfana can only add comments to UTF-8 files.'
+        "Erfana can't add comments to this file because of its text format. Save the file as UTF-8, then try again."
       )
       expect(screen.queryByTestId('comment-reply-field')).toBeNull()
       expect(screen.queryByTestId('comment-message-actions')).toBeNull()
@@ -523,7 +523,7 @@ describe('CommentWindow – threads', () => {
   describe('R-005 damaged block view', () => {
     const damagedRequest = threadsRequest({ threadKeys: [], blockKeys: ['b1'] })
 
-    it('is read-only with its reason, raw text, Copy raw text, Open in source and Delete block', async () => {
+    it('is read-only with its reason, raw text, Copy comment text, Open in file and Delete block', async () => {
       const user = userEvent.setup()
       const { props } = setup({
         request: damagedRequest,
@@ -547,7 +547,7 @@ describe('CommentWindow – threads', () => {
 
       await user.click(screen.getByTestId('comment-delete-block'))
       expect(
-        screen.getByText(/Erfana removes exactly the text shown above from index.html/)
+        screen.getByText(/Erfana removes the text above from index.html/)
       ).toBeVisible()
       await user.click(screen.getByTestId('comment-delete-block-confirm'))
       expect(props.onSave).toHaveBeenCalledWith({
@@ -642,8 +642,8 @@ describe('CommentWindow – threads', () => {
           })
         ])
       })
-      expect(screen.getByTestId('comment-window-title')).toHaveTextContent('Comment on element')
-      expect(screen.getByText('li · child.html, line 11')).toBeVisible()
+      expect(screen.getByTestId('comment-window-title')).toHaveTextContent('Comment on this section')
+      expect(screen.getByText('child.html, line 11')).toBeVisible()
       expect(screen.getByText('Saved in child.html.')).toBeVisible()
     })
 
@@ -784,7 +784,7 @@ describe('CommentWindow – threads', () => {
     it('C-05 (HTML) says the element is gone as a possible success and keeps the thread usable', () => {
       setup({ list: ready([fileView({ threads: [thread(1, { attached: false })] })]) })
       expect(screen.getByTestId('comment-not-found')).toHaveTextContent(
-        'This element is no longer in index.html – it may have been removed or rewritten as asked. Check, then resolve.'
+        'This section is no longer in index.html. Someone may have changed it as you asked. Check it, then resolve the comment.'
       )
       expect(screen.getByTestId('comment-comment-line')).toHaveTextContent('The comment itself is on line 11 of index.html.')
       expect(screen.getByTestId('comment-reply-field')).toBeVisible()
@@ -858,7 +858,7 @@ describe('CommentWindow – threads', () => {
       await titleFocused()
       await user.type(screen.getByTestId('comment-reply-field'), 'Hmm')
       await user.click(screen.getByTestId('comment-reply'))
-      await waitFor(() => expect(region).toHaveTextContent('index.html is read-only'))
+      await waitFor(() => expect(region).toHaveTextContent("Couldn't save because index.html can't be changed"))
     })
 
     it('M4 an edit takes focus in its field; Esc backs out to the … button, keeping the text', async () => {
@@ -1112,7 +1112,7 @@ describe('CommentWindow – threads', () => {
         ])
       })
       const buttons = textButtons()
-      // Resolve, Reply, Re-open, Open in source, Close – one size, no compact action among them.
+      // Resolve, Reply, Re-open, Open in file, Close – one size, no compact action among them.
       expect(buttons.map(b => b.textContent)).toEqual(
         expect.arrayContaining([COPY.resolve, COPY.reply, COPY.reopen, COPY.openInSource, COPY.close])
       )
@@ -1146,7 +1146,7 @@ describe('CommentWindow – threads', () => {
       expect(screen.getByTestId('comment-window-retry')).toHaveClass('dialog-btn', 'dialog-btn-secondary')
     })
 
-    it('the foot keeps Open in source leading and the closing actions in one group that wraps whole', () => {
+    it('the foot keeps Open in file leading and the closing actions in one group that wraps whole', () => {
       setup()
       expect(screen.getByTestId('comment-open-in-source').parentElement).toHaveClass(
         'erf-comment-window__foot-start'
@@ -1155,14 +1155,14 @@ describe('CommentWindow – threads', () => {
       expect(screen.getByTestId('comment-close').parentElement).toHaveClass('erf-comment-window__foot-end')
     })
 
-    it('a reply typed before Open in source is still there when the window opens again', async () => {
+    it('a reply typed before Open in file is still there when the window opens again', async () => {
       const user = userEvent.setup()
       const first = setup()
       await titleFocused()
       await user.type(screen.getByTestId('comment-reply-field'), 'Half a thought')
       await user.click(screen.getByTestId('comment-open-in-source'))
       expect(first.props.onOpenInSource).toHaveBeenCalledWith('/project/index.html', 11)
-      // The panel closes the window for Open in source (usePreviewComments): nothing is asked, nothing lost.
+      // The panel closes the window for Open in file (usePreviewComments): nothing is asked, nothing lost.
       first.unmount()
       setup()
       expect(screen.getByTestId('comment-reply-field')).toHaveValue('Half a thought')

@@ -255,7 +255,7 @@ describe('Markdown Preview comments – icons and states on the content', () => 
   })
 
   describe('S-02 (Markdown) not visible now', () => {
-    it('S-02 (Markdown) a comment inside a collapsed section is "Not visible now" in the drawer until the section opens', async () => {
+    it('S-02 (Markdown) a comment inside a collapsed section is "Hidden on the page" in the drawer until the section opens', async () => {
       boxesByLine()
       list(fileView([thread('a', 3, 'p'), thread('hid', 14, 'p')]), placementsFor(['a', 3, 'p'], ['hid', 14, 'p']))
       await ready()

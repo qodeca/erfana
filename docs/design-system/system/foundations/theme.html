@@ -127,8 +127,9 @@ nothing when it was empty.</p>
 </div>
 
 <h3 id="highlight">Proposed: one selection colour</h3>
-<p class="ds-muted">The app sets no <code>::selection</code> rule, so selected text takes the operating system's accent
-– blue on one Mac, pink on another, something else on Windows – and the terminal draws its own. Proposed: a single
+<p class="ds-muted">The app sets no app-wide <code>::selection</code> rule, so selected text takes the operating system's accent
+– blue on one Mac, pink on another, something else on Windows – and the terminal draws its own. Only the Markdown
+preview sets one, so that a selection reads apart from a comment mark. Proposed: a single
 rule in <code>utilities.css</code>, <code>::selection { background: var(--color-bg-selected); color:
 var(--color-text-emphasis); }</code>, the same violet wash that marks a selected row. The selectable samples above
 use it.</p>
@@ -147,8 +148,9 @@ use it.</p>
 marker at the site and gets a row here, naming the file.</p>
 <h3 id="defects">Defects this card names</h3>
 <ul class="ds-muted">
-  <li><strong>No app-wide selection colour.</strong> No renderer stylesheet declares <code>::selection</code>; selection
-  follows the OS accent, and the terminal uses its own hex (the README's "Terminal palette literals" row).</li>
+  <li><strong>No app-wide selection colour.</strong> Only <code>.markdown-preview-content</code> declares
+  <code>::selection</code> (<code>CommentOverlayLayer.css</code>); elsewhere selection follows the OS accent, and the
+  terminal uses its own hex (the README's "Terminal palette literals" row).</li>
   <li><strong>The selection-policy comment undercounts.</strong> The header comment in <code>utilities.css</code> names
   two CSS-module surfaces that declare <code>user-select: text</code> in place; <code>ImageViewerPanel.module.css</code>
   declares it on four. The card names the file, not a count.</li>

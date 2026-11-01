@@ -66,6 +66,8 @@ export type LinkIntent =
   | { kind: 'external'; url: string }
   /** Do nothing: a fragment jump inside the current document. */
   | { kind: 'same-document' }
+  /** This same file with another `?query`: load it in this view. `url` keeps its host and path. */
+  | { kind: 'same-file-query'; url: string }
   /** Refuse and record a failure entry. */
   | { kind: 'blocked'; reason: LinkBlockReason }
 
@@ -152,8 +154,11 @@ function decideInProject(url: URL, currentUrl: string, token: string): LinkInten
   // sent both down the in-project path, which re-opened the document already on
   // screen and, through `openFileInPanel`, pulled focus off the page on every
   // click.
-  if (sameDocument(url, currentUrl)) {
-    return { kind: 'same-document' }
+  const current = sameFile(url, currentUrl)
+  if (current !== null) {
+    return current.search === url.search
+      ? { kind: 'same-document' }
+      : { kind: 'same-file-query', url: url.href }
   }
 
   // Strip the leading slash; the remainder is a project-relative path whose
@@ -170,13 +175,13 @@ function decideInProject(url: URL, currentUrl: string, token: string): LinkInten
   return { kind: 'in-project', relPath, anchor }
 }
 
-/** Whether two preview URLs address the same document, ignoring the fragment. */
-function sameDocument(url: URL, currentUrl: string): boolean {
+/** The current URL when `url` addresses the same file, else `null`. Query and fragment are the caller's. */
+function sameFile(url: URL, currentUrl: string): URL | null {
   try {
     const current = new URL(currentUrl)
-    return current.hostname === url.hostname && current.pathname === url.pathname
+    return current.hostname === url.hostname && current.pathname === url.pathname ? current : null
   } catch {
-    return false
+    return null
   }
 }
 

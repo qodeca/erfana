@@ -641,7 +641,7 @@ Constants: `TEST_IDS.COMMENT_*` (defined in `src/renderer/src/constants/commentT
 | `comment-resolve` | Resolve a thread | static |
 | `comment-reopen` | Re-open a resolved thread | static |
 | `comment-new-on-element` | New comment on the pin's element | static |
-| `comment-open-in-source` | Open in source (window foot) | static |
+| `comment-open-in-source` | Open in file (window foot) | static |
 | `comment-read-only` | Read-only file banner | static |
 | `comment-not-visible` | Not-visible-now banner | static |
 | `comment-not-found` | Element-not-found banner | static |
@@ -665,7 +665,7 @@ Constants: `TEST_IDS.COMMENT_*` (defined in `src/renderer/src/constants/commentT
 | `comment-drawer-show-icons` | Show comment icons checkbox | static |
 | `comment-drawer-list` | The row list | static |
 | `comment-drawer-row` | A row | static |
-| `comment-drawer-row-main` | A row's main action (Show on page / Open in source) | static |
+| `comment-drawer-row-main` | A row's main action (Show on page / Open in file) | static |
 | `comment-drawer-row-open` | A row's Open (the comment window) | static |
 | `comment-drawer-tag` | A tag on a row | static |
 | `comment-drawer-error` | List read error with Try again | static |

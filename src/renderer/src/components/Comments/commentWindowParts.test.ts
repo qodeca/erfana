@@ -95,7 +95,7 @@ describe('C-19 refusal table', () => {
     expect(refusalCopy(ErrorCode.COMMENT_LIMIT, 'file-size', context)?.text).toContain('larger than 25 MB')
     expect(refusalCopy(ErrorCode.COMMENT_LIMIT, 'meta-charset', context)?.action).toBe('banner')
     expect(refusalCopy(ErrorCode.COMMENT_PATH_REFUSED, 'outside-project', context)).toEqual({
-      text: 'notes.md is outside this project, so Erfana won\'t write to it.',
+      text: 'notes.md is not in this project, so you can\'t comment on it here.',
       action: 'close'
     })
     expect(refusalCopy(ErrorCode.COMMENT_PATH_REFUSED, 'kind-mismatch', context)?.text).toBe(WINDOW_COPY.notCommentable)
@@ -110,7 +110,7 @@ describe('C-19 refusal table', () => {
 
   it('C-14 a moved target offers Pick again with the text kept', () => {
     expect(refusalCopy(ErrorCode.COMMENT_TARGET_MOVED, undefined, context)).toEqual({
-      text: 'This paragraph changed in the file since you picked it. Pick it again – your text comes with you.',
+      text: 'This paragraph changed after you selected it. Select it again. Your text is safe.',
       action: 'pick-again'
     })
   })

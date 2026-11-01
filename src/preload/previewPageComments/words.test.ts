@@ -45,7 +45,7 @@ describe('024-AC-004 (preload) which element a selection is about', () => {
     expect(words?.crossed).toBeUndefined()
   })
 
-  it('024-AC-004 (i) the whole element\'s text: the element, with no words', () => {
+  it('024-AC-004 (i) the whole section\'s text: the element, with no words', () => {
     html('<main><p id="p">  Whole   paragraph </p></main>')
     select(text('p'), 0, text('p'), text('p').length)
     const words = readSelection(window, notOverlay)

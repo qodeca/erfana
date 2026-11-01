@@ -12,7 +12,7 @@ Leave a comment on part of an HTML page or a Markdown document, then ask an agen
 ## Comment on a part of the document
 
 1. Select **Comment mode** in the preview toolbar, or press <kbd>⌥⌘M</kbd> / <kbd>Ctrl+Alt+M</kbd>.
-2. Select the part you want to comment on: a paragraph, list item or heading in Markdown, any element in an HTML page. You can also press <kbd>Tab</kbd> to move the outline and <kbd>Enter</kbd> to choose.
+2. Select the part you want to comment on: a paragraph, list item or heading in Markdown, any section of an HTML page. You can also press <kbd>Tab</kbd> to move the outline and <kbd>Enter</kbd> to choose.
 3. The first time, enter your name in **Before your first comment** and select **Continue**.
 4. Type the comment and select **Save**. A comment icon marks the part you commented on.
 
@@ -24,12 +24,12 @@ Outside comment mode, right-click the part and choose the comment item, such as 
 2. Select **Comment** next to the selection, or right-click it and choose **Comment on selection**. In the HTML preview the **Comment** button shows in comment mode; outside it, use the right-click menu.
 3. Type the comment and select **Save**. The words are underlined in the preview.
 
-To comment on fewer words, select them in **Narrow to words** in the comment window. To comment on the whole part instead, choose **Comment on the whole paragraph** (the item names the part). If the selected words are not in the file as written – for example, a script on the page added them – Erfana saves the comment on the whole part and says so.
+To comment on fewer words, select them in **Comment on specific words** in the comment window. To comment on the whole part instead, choose **Comment on the whole paragraph** (the item names the part). If the selected words are not in the file as written – for example, a script on the page added them – Erfana saves the comment on the whole part and says so.
 
 ## Find and sort comments
 
 1. Select the comment count in the preview toolbar, such as **7 comments**, to open the **Comments** list.
-2. Select **Open**, **Resolved** or **Can't edit** to choose which comments to show. **Can't edit** lists comments Erfana cannot read or change, such as ones edited by hand.
+2. Select **Open**, **Resolved** or **Problems** to choose which comments to show. **Problems** lists comments Erfana cannot read or change, such as ones edited by hand.
 3. Select the sort button, such as **Sort: File order**, and choose **File order**, **Changed first** or **Latest activity**.
 4. To hide the icons and underlines in the preview, clear **Show comment icons and underlines**.
 
@@ -41,9 +41,9 @@ In an open comment, select **Previous comment** or **Next comment** next to the 
 
 When someone edits a comment's readable lines by hand but leaves its data line intact, Erfana can rebuild those lines from the data.
 
-1. In the **Comments** list, select **Can't edit** and open the comment.
-2. Select **Rebuild from data…**. Erfana shows each differing line as **The file says** and **The data says**.
-3. Select **Rebuild comment**. When only the status line differs, choose **Mark resolved** or **Keep open** instead.
+1. In the **Comments** list, select **Problems** and open the comment.
+2. Select **Repair comment…**. Erfana shows each differing line as **What you see now** and **Saved copy**.
+3. Select **Repair comment**. When only the status line differs, choose **Mark resolved** or **Keep open** instead.
 
 Nothing in the data changes, and Erfana never rebuilds a comment on its own.
 

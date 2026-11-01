@@ -41,7 +41,7 @@ describe('C-13 the stepper within the drawer filter', () => {
     expect(stepPosition(file, ['t3'], 'resolved')).toEqual({ at: 0, of: 2, previous: 't2', next: 't4' })
   })
 
-  it("024-AC-019 C-13 Can't edit holds no thread, so there is nothing to step to", () => {
+  it("024-AC-019 C-13 Problems holds no thread, so there is nothing to step to", () => {
     expect(stepPosition(file, ['t1'], 'cantEdit')).toEqual({ at: 0, of: 0, previous: null, next: null })
   })
 })

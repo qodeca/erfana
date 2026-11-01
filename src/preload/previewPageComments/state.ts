@@ -78,7 +78,7 @@ export interface IconState {
   readonly key: string
   readonly token: string
   readonly runtime?: IconRuntime
-  /** Open threads on the element; a damaged block counts as one. */
+  /** Open conversations on the element; a damaged block counts as one. */
   readonly count: number
   readonly status: 'open' | 'damaged'
   /** The words its open threads are about (spec 024 C-12): page text, which the overlay marks. */

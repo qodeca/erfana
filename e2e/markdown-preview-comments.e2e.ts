@@ -226,7 +226,7 @@ test.describe('Markdown Preview comments', () => {
       await md.editor.setViewMode('preview')
       await expect(band).toBeVisible({ timeout: 1000 })
       await expect(band).toHaveAttribute('data-state', 'paused')
-      await expect(band).toContainText(`${FILE} has unsaved changes – comments are read-only until you save.`)
+      await expect(band).toContainText(`${FILE} has unsaved changes. Save the file to change comments.`)
       await expect(md.modeButton()).toHaveAttribute('aria-disabled', 'true')
       await expect(md.modeButton()).toHaveAttribute('title', /^Comment mode is unavailable: /)
       await band.getByTestId('comment-host-paused-save').click({ timeout: 1000 })
@@ -297,18 +297,18 @@ test.describe('Markdown Preview comments', () => {
     await md.saveNewComment(NOTE, FILE, NAME)
   }
 
-  test('C-20 (Markdown) a quieter toolbar: Comment mode and a labelled count; icons and underlines are the drawer checkbox', async ({
+  test('C-20 (Markdown) a quieter toolbar: Comment mode and an icon count; icons and underlines are the drawer checkbox', async ({
     windowWithTestProject
   }) => {
     const page = windowWithTestProject
     const md = await openReview(page)
-    // No "Show comment icons" tool in the row; with no comments the count reads "Comments".
+    // No "Show comment icons" tool in the row; with no comments the count is named "Comments".
     await expect(md.editor.toolbar().getByTestId(TEST_IDS.COMMENT_TOOL_ICONS)).toHaveCount(0)
     await expect(md.listButton()).toHaveAccessibleName('Comments')
     await commentOn(md, 'li', 5)
     await expect(md.listButton()).toHaveAccessibleName('1 comment', { timeout: MD_COMMENT_BUDGET_MS })
-    await expect(md.listButton()).toContainText('1 comment')
-    await expect(md.listButton()).not.toHaveAttribute('title')
+    await expect(md.listButton()).toHaveText('1')
+    await expect(md.listButton()).toHaveAttribute('title', '1 comment')
 
     await md.listButton().click()
     await expect(md.listButton()).toHaveAttribute('aria-expanded', 'true')
@@ -318,6 +318,28 @@ test.describe('Markdown Preview comments', () => {
     await expect(md.icons()).toHaveCount(0)
     await md.iconsCheckbox().check()
     await expect(md.icons()).toHaveCount(1)
+  })
+
+  test('the drawer fills a narrow preview, as in the HTML preview, and goes back beside the page when it is wide', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    const page = windowWithTestProject
+    const md = await openReview(page)
+    const setWidth = (width: number): Promise<void> =>
+      appWithTestProject.evaluate(({ BrowserWindow }, w) => BrowserWindow.getAllWindows()[0].setSize(w, 800), width)
+    const widthOf = async (selector: string): Promise<number> => (await page.locator(selector).first().boundingBox())?.width ?? 0
+    await setWidth(1800)
+    await md.listButton().click()
+    await expect(md.drawer()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await expect(md.drawer()).not.toHaveClass(/erf-comment-drawer--full/)
+
+    await setWidth(900)
+    await expect(md.drawer()).toHaveClass(/erf-comment-drawer--full/)
+    await expect.poll(async () => Math.round(await widthOf('.markdown-preview') - (await md.drawer().boundingBox())!.width)).toBe(0)
+
+    await setWidth(1800)
+    await expect(md.drawer()).not.toHaveClass(/erf-comment-drawer--full/)
   })
 
   test('C-15 (Markdown) the drawer filter is three cells on one row, and the sort menu orders the rows', async ({
@@ -331,7 +353,7 @@ test.describe('Markdown Preview comments', () => {
 
     await expect(md.filter('open')).toHaveText('Open 1')
     await expect(md.filter('resolved')).toHaveText('Resolved 0')
-    await expect(md.filter('cantEdit')).toHaveText("Can't edit 0")
+    await expect(md.filter('cantEdit')).toHaveText("Problems 0")
     // One row, equal widths: every cell shares the first cell's top and width (within a pixel).
     const boxes = await Promise.all((['open', 'resolved', 'cantEdit'] as const).map(which => md.filter(which).boundingBox()))
     for (const box of boxes) {

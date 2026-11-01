@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The words of an EXISTING comment: what Edit on its first message offers in
- * the Narrow to words field, and the check of the words it sends back (spec
+ * the Comment on specific words field, and the check of the words it sends back (spec
  * 024 024-FR-004; comments-v2 C-07 "add a field … to Edit on a thread's first
  * message").
  *
@@ -116,7 +116,7 @@ export function editedSelection(doc: KindDocument, carrier: IndexedTarget, ancho
 }
 
 /**
- * A reader of the Narrow to words field's text for listed comments: each
+ * A reader of the Comment on specific words field's text for listed comments: each
  * target's text is collapsed once per list, however many comments it holds.
  *
  * @param doc - The listed file.

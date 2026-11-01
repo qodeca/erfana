@@ -52,12 +52,12 @@ describe('commentCopy', () => {
 
   describe('R-021 M-10 unavailable sentence with each reason – "for this file" (menu matrix § 3)', () => {
     it.each(CommentUnavailableReasonSchema.options)('has wording for %s', reason => {
-      expect(unavailableTooltip(reason)).toBe(`Comments are unavailable for this file: ${UNAVAILABLE_REASON_TEXT[reason]}.`)
+      expect(unavailableTooltip(reason)).toBe(`You can't comment on this file: ${UNAVAILABLE_REASON_TEXT[reason]}.`)
     })
 
     it('falls back to the prepare-failed wording for an unknown reason', () => {
       expect(unavailableTooltip('???' as never)).toBe(
-        `Comments are unavailable for this file: ${UNAVAILABLE_REASON_TEXT['prepare-failed']}.`
+        `You can't comment on this file: ${UNAVAILABLE_REASON_TEXT['prepare-failed']}.`
       )
     })
   })
@@ -94,7 +94,7 @@ describe('commentCopy', () => {
         'a.html no longer exists. Copy your text before closing.'
       )
       expect(saveFailureCopy(ErrorCode.COMMENT_DRAFT_EXPIRED, 'a.html').text).toContain(
-        'your text is kept'
+        'Your text is safe'
       )
     })
 
@@ -139,27 +139,27 @@ describe('commentCopy', () => {
   })
 
   it('§19 Rev 4 states the file limits the code enforces, in the drawer and in the save error alike', () => {
-    expect(FILE_LIMIT_TEXT).toBe('Erfana adds comments only to files of up to 25 MB and 640,000 elements.')
-    expect(readOnlyReasonText('too-large', 'a.html')).toBe(`${FILE_LIMIT_TEXT} a.html is larger, so its comments are read-only.`)
+    expect(FILE_LIMIT_TEXT).toBe('This file is too big for comments. The limit is 25 MB.')
+    expect(readOnlyReasonText('too-large', 'a.html')).toBe('a.html is too big for new comments. You can still read the existing ones.')
     expect(ERROR_MESSAGES[ErrorCode.COMMENT_FILE_TOO_LARGE]).toBe(FILE_LIMIT_TEXT)
   })
 
   it('§19 Rev 4 says how many files a list left out, with a real singular', () => {
     expect(unreadFilesText(1)).toBe(
-      "Comments from 1 file in this page aren't listed: one list reads at most 64 files and 64 MB. Open a frame's file in its own tab to see its comments."
+      'This page has too many parts to list all comments. 1 file is missing here. Open each file in its own tab to see its comments.'
     )
-    expect(unreadFilesText(3)).toContain('Comments from 3 files in this page')
+    expect(unreadFilesText(3)).toContain('3 files are missing here')
   })
 
   // Changed expectation under 024-FR-006 A-02 (was the selector in the title: "Comment on button.cta").
   it('titles a thread window by count, the target word in its {kind} slot', () => {
-    expect(threadsTitle('element', 1)).toBe('Comment on element')
-    expect(threadsTitle('element', 2)).toBe('Comments on element')
+    expect(threadsTitle('this section', 1)).toBe('Comment on this section')
+    expect(threadsTitle('this section', 2)).toBe('Comments on this section')
   })
 
   it('words the delete confirmations', () => {
-    expect(deleteThreadText(1)).toBe('Delete this thread and its 1 reply?')
-    expect(deleteThreadText(4)).toBe('Delete this thread and its 4 replies?')
+    expect(deleteThreadText(1)).toBe('Delete this conversation and its 1 reply?')
+    expect(deleteThreadText(4)).toBe('Delete this conversation and its 4 replies?')
     expect(deleteBlockText('a.html')).toContain('from a.html')
     expect(ANNOUNCE.deleted('a.html')).toBe('Comment deleted from a.html.')
   })
@@ -175,7 +175,7 @@ describe('commentCopy', () => {
   // Changed expectation under C-16 (was "– on: click an element to comment, Esc to leave").
   it('describes the mode in its tooltip', () => {
     expect(modeTooltip(false)).toBe('Comment mode (Ctrl+Alt+M) – off')
-    expect(modeTooltip(true)).toBe('Comment mode (Ctrl+Alt+M) – on: click an element or select text to comment, Esc to leave')
+    expect(modeTooltip(true)).toBe('Comment mode is on (Ctrl+Alt+M). Click a section or select text. Press Esc to stop.')
   })
 
   it('024-AC-007 A-05 A-06 A-10: the drawer action, the picker ends and the not-found tag read the Markdown words', () => {

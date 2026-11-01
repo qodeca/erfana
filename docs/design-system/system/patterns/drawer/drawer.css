@@ -6,7 +6,7 @@
  * PROPOSED – not adopted. The first shipping instance is the comment drawer:
  *   src/renderer/src/components/Comments/CommentDrawer.css
  *   (.erf-comment-drawer, __head, __title, __controls, __note, __scroll)
- *   src/renderer/src/components/Panels/HtmlPreviewPanel/comments/useDrawerSheet.ts
+ *   src/renderer/src/components/Comments/useNarrowPanel.ts
  *   (the 640px full-width switch, measured in script because the page is a
  *   native view that must also be hidden)
  * Adopting is a MOVE: those rules become this file, and scripts/design-sync.mjs

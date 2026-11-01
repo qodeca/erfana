@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * "Rebuild from data…" through the writer (comments-v2 OD-05): a block whose
+ * "Repair comment…" through the writer (comments-v2 OD-05): a block whose
  * readable lines were edited by hand is re-rendered from its own valid
  * `@data`, on disk, under the same confinement, lock and checks as every other
  * save. "Mark resolved" writes who resolved it, so it needs an identity; "Keep

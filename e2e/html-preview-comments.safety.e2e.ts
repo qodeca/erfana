@@ -302,10 +302,10 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     await expect(chrome.listButton()).toHaveAccessibleName('Comments, 2 damaged', { timeout: PREVIEW_BUDGET_MS })
     await chrome.openDrawer()
     await chrome.filter('cantEdit').click()
-    await expect(chrome.filter('cantEdit')).toContainText("Can't edit")
+    await expect(chrome.filter('cantEdit')).toContainText("Problems")
     const rows = chrome.drawerRows()
     await expect(rows).toHaveCount(3, { timeout: PREVIEW_BUDGET_MS })
-    await expect(rows.getByTestId('comment-drawer-tag')).toHaveText(['Damaged', 'Damaged', 'Newer format – read-only'])
+    await expect(rows.getByTestId('comment-drawer-tag')).toHaveText(['Damaged', 'Damaged', 'Needs a newer Erfana'])
 
     // The newer-format block: shown, never changeable.
     // R-10 (approvals.md, 2026-10-29): a click on a row opens its thread; only the active row has Open.
@@ -343,7 +343,7 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     await conflict.openDrawer()
     await conflict.filter('cantEdit').click()
     await conflict.drawerRows().first().getByTestId('comment-drawer-row-open').click()
-    await expect(win.getByTestId('comment-damaged')).toContainText('git conflict markers', { timeout: PREVIEW_BUDGET_MS })
+    await expect(win.getByTestId('comment-damaged')).toContainText('two versions mixed together', { timeout: PREVIEW_BUDGET_MS })
     await expect(win.getByTestId('comment-read-only')).toBeVisible()
     await expect(win.getByTestId('comment-delete-block')).toHaveCount(0)
     await page.getByTestId('comment-close').click()
@@ -429,7 +429,7 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     await expect(row).toHaveCount(1, { timeout: PREVIEW_BUDGET_MS })
     await row.getByTestId('comment-drawer-row-main').click() // R-10: a row click opens its thread
     const win = chrome.window()
-    await expect(win.getByTestId('comment-not-found')).toContainText('This element is no longer in', { timeout: PREVIEW_BUDGET_MS })
+    await expect(win.getByTestId('comment-not-found')).toContainText('This section is no longer in', { timeout: PREVIEW_BUDGET_MS })
     await expect(win.getByTestId('comment-not-found-quote')).toHaveText('Buy now')
     // Decision 21: nothing was moved or deleted.
     const after = await fsp.readFile(file, 'utf-8')
@@ -473,7 +473,7 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     await expect(notFound).toHaveCount(1, { timeout: PREVIEW_BUDGET_MS })
     await notFound.getByTestId('comment-drawer-row-main').click() // R-10: a row click opens its thread
     const win = chrome.window()
-    await expect(win.getByTestId('comment-not-found')).toContainText('This element is no longer in', { timeout: PREVIEW_BUDGET_MS })
+    await expect(win.getByTestId('comment-not-found')).toContainText('This section is no longer in', { timeout: PREVIEW_BUDGET_MS })
     await expect(win.getByTestId('comment-not-found-quote')).toHaveText('Roasted to order We roast only what we sell that week.')
     // Decision 21: nothing was moved or deleted.
     const after = await fsp.readFile(file, 'utf-8')
@@ -564,12 +564,12 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     await expectPin(app, 'folded', true, target)
 
     // Folded again – in comment mode a click on the summary is a pick, so the page folds it, as a script
-    // would: no pin, and the drawer says "Not visible now".
+    // would: no pin, and the drawer says "Hidden on the page".
     expect(await preview.eval("(document.getElementById('facts').open = false, 'folded')", target)).toBe('folded')
     await expectPin(app, 'folded', false, target)
     await chrome.openDrawer()
     const row = chrome.drawerRows().first()
-    await expect(row.getByTestId('comment-drawer-tag')).toHaveText(['Not visible now'], { timeout: PREVIEW_BUDGET_MS })
+    await expect(row.getByTestId('comment-drawer-tag')).toHaveText(['Hidden on the page'], { timeout: PREVIEW_BUDGET_MS })
 
     // The row's Open: its thread in the window, and behind it the section unfolds; once closed, the pin is back.
     await row.getByTestId('comment-drawer-row-open').click()

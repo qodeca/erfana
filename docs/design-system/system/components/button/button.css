@@ -133,8 +133,7 @@
 /* Toggle: aria-pressed carries the state. Pressed (ON) is a fill AND a lime
    bottom edge – the permission band's toggle signature – never colour alone
    (1.4.1). A radio in a toolbar's one-of-many group (role="radio",
-   aria-checked) is FILLED only, with no lime foot, so a view-mode group read
-   beside on/off toggles says "one of these" rather than "on". The Toolbar
+   aria-checked) wears the same look (owner decision, 2026-10-31). The Toolbar
    card's view-mode group is the case.
    Resting text is tertiary: secondary measures under 4.5:1 on a panel, and a
    toggle usually carries a word, not only a glyph. */
@@ -144,7 +143,7 @@
   background: var(--color-bg-selected);
   color: var(--color-text-bright);
 }
-.erf-button--toggle[aria-pressed='true'] { border-block-end-color: var(--color-brand-lime); }
+.erf-button--toggle:is([aria-pressed='true'], [aria-checked='true']) { border-block-end-color: var(--color-brand-lime); }
 
 /* Text: an action that reads as a link but does something (Retry, Show more).
    A real navigation is an <a>, not this. */
@@ -228,7 +227,6 @@
   background: color-mix(in srgb, var(--color-bg-selected) var(--erf-button-dim), transparent);
   border-block-end-color: color-mix(in srgb, var(--color-brand-lime) var(--erf-button-dim), transparent);
 }
-.erf-button--toggle[aria-checked='true']:is(:disabled, [aria-disabled='true']) { border-block-end-color: transparent; }
 .erf-button--primary:is(:disabled, [aria-disabled='true']):not([aria-busy='true']),
 .erf-button--primary:is(:disabled, [aria-disabled='true']):not([aria-busy='true']):is(:hover, [class~='is-hover'], :active, [class~='is-active']) {
   background: color-mix(in srgb, var(--color-btn-primary-bg) var(--erf-button-dim), transparent);
@@ -281,7 +279,6 @@
 @media (forced-colors: active) {
   .erf-button { border-color: ButtonText; }
   .erf-button--text { border-color: transparent; }
-  .erf-button--toggle[aria-pressed='true'] { border-block-end-color: Highlight; }
-  .erf-button--toggle[aria-checked='true'] { border-color: Highlight; }
+  .erf-button--toggle:is([aria-pressed='true'], [aria-checked='true']) { border-block-end-color: Highlight; }
   .erf-button:is(:disabled, [aria-disabled='true']) { border-color: GrayText; color: GrayText; }
 }

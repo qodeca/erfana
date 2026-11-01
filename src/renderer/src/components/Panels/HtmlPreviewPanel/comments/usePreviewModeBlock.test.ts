@@ -21,7 +21,7 @@ const page = (over: Partial<CommentFileView>): CommentFileView => ({
   ...over
 })
 
-const FULL = 'index.html already has 500 comments, the most Erfana adds to one file. Delete resolved threads to add more.'
+const FULL = 'index.html has 500 comments, which is the limit. Delete resolved comments to add more.'
 
 describe('pageBlockReason', () => {
   it('024-AC-035 M-07 F-04 a writable page at 500 comments blocks comment mode with the "500 comments" sentence', () => {
@@ -38,8 +38,8 @@ describe('pageBlockReason', () => {
 
   it('024-AC-035 M-07 a read-only page blocks with its reason; the same sentence the menu shows', () => {
     expect(pageBlockReason([page({ writable: false, readOnlyReason: 'conflict-markers' })])).toBe(
-      'index.html has unresolved git conflicts. Resolve them first.'
+      'index.html has two versions mixed together. Fix this first, or ask a developer to help.'
     )
-    expect(pageBlockReason([page({ writable: false })])).toBe('index.html is read-only.')
+    expect(pageBlockReason([page({ writable: false })])).toBe("index.html can't be changed, so you can't add a comment.")
   })
 })

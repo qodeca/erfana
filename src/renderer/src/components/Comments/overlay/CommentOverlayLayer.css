@@ -147,12 +147,18 @@
 
 /* The drawer docks over the right edge of the pane. */
 .erf-comment-host__drawer {
+  /* deviates: docs/design-system/system/patterns/drawer/index.html – docked over the Markdown preview pane, not a flow sibling */
   position: absolute;
   inset-block: 0;
   inset-inline-end: 0;
   display: flex;
   max-inline-size: 100%;
   z-index: var(--z-sticky);
+}
+
+/* The drawer's full-width mode: the whole preview, as in the HTML preview. */
+.erf-comment-host__drawer--full {
+  inset-inline-start: 0;
 }
 
 /* The picked target holds real focus and wears the one ring (C-08.3). The

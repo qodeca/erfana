@@ -76,7 +76,7 @@ describe('CommentDrawer', () => {
       setup()
       expect(screen.getByTestId('comment-filter-open')).toHaveTextContent('Open 3')
       expect(screen.getByTestId('comment-filter-resolved')).toHaveTextContent('Resolved 1')
-      expect(screen.getByTestId('comment-filter-cant-edit')).toHaveTextContent("Can't edit 2")
+      expect(screen.getByTestId('comment-filter-cant-edit')).toHaveTextContent("Problems 2")
       expect(screen.getByTestId('comment-filter-open')).toHaveAttribute('aria-checked', 'true')
       expect(rows()).toHaveLength(3)
       expect(within(rows()[0]).getByText('1 reply')).toBeVisible()
@@ -85,7 +85,7 @@ describe('CommentDrawer', () => {
       ).toBeVisible()
     })
 
-    it('tags a hidden element "Not visible now"', () => {
+    it('tags a hidden element "Hidden on the page"', () => {
       setup()
       expect(within(rows()[1]).getByTestId('comment-drawer-tag')).toHaveTextContent(
         DRAWER_COPY.notVisible
@@ -99,7 +99,7 @@ describe('CommentDrawer', () => {
       expect(rows()).toHaveLength(1)
       expect(screen.getByTestId('comment-filter-resolved')).toHaveFocus()
       await user.keyboard('{ArrowRight}')
-      // OD-04: the third cell is Can't edit (was Needs attention with 3 rows).
+      // OD-04: the third cell is Problems (was Needs attention with 3 rows).
       expect(screen.getByTestId('comment-filter-cant-edit')).toHaveAttribute('aria-checked', 'true')
       expect(rows()).toHaveLength(2)
       await user.keyboard('{ArrowRight}')
@@ -384,7 +384,7 @@ describe('CommentDrawer', () => {
     // Changed expectation under OD-04 (was "tags Element not found, Damaged and Newer format separately",
     // all three under Needs attention).
     // Changed expectation under R-10 (approvals.md, 2026-10-29): was "… all open in source", a click calling
-    // Open in source; a click now opens the row's own window (comments-v2/drawer.html), which carries Open in source.
+    // Open in file; a click now opens the row's own window (comments-v2/drawer.html), which carries Open in file.
     it('OD-04 Not found is a neutral Open row; Damaged (▲ counter) and Newer format are Can\'t edit; a click opens their window', async () => {
       const user = userEvent.setup()
       const { props } = setup()
@@ -544,7 +544,7 @@ describe('CommentDrawer', () => {
       expect(within(group).getAllByRole('radio')).toHaveLength(3)
       expect(group).not.toHaveTextContent(/^Show/)
       expect(screen.queryByText(DRAWER_COPY.show, { selector: 'span' })).toBeNull()
-      expect(within(group).getByRole('radio', { name: "Can't edit 2" })).toBeVisible()
+      expect(within(group).getByRole('radio', { name: "Problems 2" })).toBeVisible()
       const css = readFileSync(resolve(__dirname, 'CommentDrawer.css'), 'utf8')
       expect(css).toMatch(/\.erf-comment-filter \{[^}]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/)
     })
@@ -649,7 +649,7 @@ describe('CommentDrawer', () => {
   describe('C-03 (drawer) one noun system in Markdown', () => {
     // Changed expectation under R-10 (approvals.md, 2026-10-29): was "… say the kind and line, Show in preview, …"
     // with the row's title Show in preview; Enter or a click now opens the thread.
-    it('C-03 (drawer) Markdown rows say the kind and line, Open thread, and no element, page or block', () => {
+    it('C-03 (drawer) Markdown rows say the kind and line, Open conversation, and no element, page or block', () => {
       render(
         <CommentWordsContext.Provider value={MARKDOWN_WORDS}>
           <CommentDrawer

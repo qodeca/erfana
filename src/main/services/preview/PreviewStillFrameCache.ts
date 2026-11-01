@@ -38,8 +38,7 @@
  *     version of it, that is gone – a same-tab move's old page (RS2-8).
  *   - `capturePage` past `CAPTURE_TIMEOUT_MS` ⇒ NO frame, previous kept
  *   - `capturePage` throws      ⇒ NO frame (swallowed, never rethrown)
- *   - downscale to `MAX_FRAME_EDGE_PX` longest edge via `NativeImage.resize`
- *   - `toDataURL` over `MAX_FRAME_DATAURL_CHARS` ⇒ NO frame
+ *   - the picture fits no budget of `previewStillFrameEncode.ts` ⇒ NO frame
  *
  * Two facts ride with a stored frame (issue #124, part 1 §1.5): the view's CSS
  * size at capture (`cssWidth`, `cssHeight`), which the renderer draws the still
@@ -55,6 +54,12 @@ import { logger } from '../LoggingService'
 import { TimeoutError, withTimeout } from '../../utils/withTimeout'
 import type { PreviewBounds, PreviewStillFrame } from '../../../shared/ipc/preview-types'
 import { StillFrameOrder, type PreviewInvalidateOptions } from './previewStillFrameOrder'
+import {
+  MAX_SHARP_FRAME_DATAURL_CHARS,
+  MAX_SHARP_FRAME_EDGE_PX,
+  encodeStillFrame,
+  type StillFrameBudget
+} from './previewStillFrameEncode'
 
 /**
  * An error as a log line carries it: its name, plus `code` when it has one.
@@ -98,6 +103,10 @@ export interface PreviewStillFrameCacheDeps {
   maxEdgePx?: number
   /** Data-URL char cap; over budget ⇒ no frame (defaults to the constant). */
   maxDataUrlChars?: number
+  /** The first longest-edge cap tried (defaults to the constant). */
+  maxSharpEdgePx?: number
+  /** The first data-URL cap tried; over it the frame falls back to the two caps above. */
+  maxSharpDataUrlChars?: number
 }
 
 export interface IPreviewStillFrameCache {
@@ -199,13 +208,20 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
   /** Capture starts and load marks in one order (E-011). */
   private readonly order = new StillFrameOrder()
   private readonly now: () => number
-  private readonly maxEdgePx: number
-  private readonly maxDataUrlChars: number
+  private readonly budgets: readonly StillFrameBudget[]
 
   constructor(deps: PreviewStillFrameCacheDeps = {}) {
     this.now = deps.now ?? Date.now
-    this.maxEdgePx = deps.maxEdgePx ?? PREVIEW.MAX_FRAME_EDGE_PX
-    this.maxDataUrlChars = deps.maxDataUrlChars ?? PREVIEW.MAX_FRAME_DATAURL_CHARS
+    this.budgets = [
+      {
+        edgePx: deps.maxSharpEdgePx ?? MAX_SHARP_FRAME_EDGE_PX,
+        dataUrlChars: deps.maxSharpDataUrlChars ?? MAX_SHARP_FRAME_DATAURL_CHARS
+      },
+      {
+        edgePx: deps.maxEdgePx ?? PREVIEW.MAX_FRAME_EDGE_PX,
+        dataUrlChars: deps.maxDataUrlChars ?? PREVIEW.MAX_FRAME_DATAURL_CHARS
+      }
+    ]
   }
 
   async captureIfStale(
@@ -368,25 +384,20 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
     return this.store(panelId, image, { cssSize: opts.cssSize, stale: false, order: run.order })
   }
 
-  /** Downscale, encode and keep `image` as `panelId`'s frame; `false` when it is over budget. */
+  /** Encode and keep `image` as `panelId`'s frame; `false` when it fits no budget. */
   private store(
     panelId: string,
     image: PreviewNativeImage,
     { cssSize, stale, order }: { cssSize?: { width: number; height: number }; stale: boolean; order: number }
   ): boolean {
-    const downscaled = this.downscale(image)
-    const dataUrl = downscaled.toDataURL()
-    // Over the data-URL budget ⇒ NO frame (never a partial/blank one).
-    if (dataUrl.length > this.maxDataUrlChars) {
+    const encoded = encodeStillFrame(image, this.budgets)
+    if (encoded === null) {
       return false
     }
-    const { width, height } = downscaled.getSize()
     // The #124 fields are added only when there is something to say, so a frame
     // without them is exactly the frame it always was.
     this.frames.set(panelId, {
-      dataUrl,
-      width,
-      height,
+      ...encoded,
       capturedAt: this.now(),
       ...(cssSize !== undefined ? { cssWidth: cssSize.width, cssHeight: cssSize.height } : {}),
       ...(stale ? { stale: true } : {})
@@ -468,25 +479,6 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
       PREVIEW.CAPTURE_TIMEOUT_MS,
       'Preview still-frame capture'
     )
-  }
-
-  /**
-   * Downscale so the longest edge is at most `maxEdgePx`, preserving aspect
-   * ratio. Images already within budget are returned untouched.
-   */
-  private downscale(image: PreviewNativeImage): PreviewNativeImage {
-    const { width, height } = image.getSize()
-    const longestEdge = Math.max(width, height)
-    if (longestEdge <= this.maxEdgePx || longestEdge === 0) {
-      return image
-    }
-
-    const scale = this.maxEdgePx / longestEdge
-    return image.resize({
-      width: Math.max(1, Math.round(width * scale)),
-      height: Math.max(1, Math.round(height * scale)),
-      quality: 'good'
-    })
   }
 }
 

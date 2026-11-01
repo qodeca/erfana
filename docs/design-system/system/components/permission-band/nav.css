@@ -129,7 +129,7 @@
    shortcut, and it is the natural way out of a panel too small to use.
    Comment mode and the list stay - the feature's front door and the keyboard
    route to every thread (the list has no shortcut, Find does). The minimal
-   row itself needs 344px; below that it scrolls sideways. */
+   row itself needs 351px; below that it scrolls sideways. */
 @container (width < 378px) {
   .erf-band .erf-band__tool[aria-label='Find'] {
     display: none;
@@ -152,7 +152,7 @@
   margin-inline-start: var(--space-4);
 }
 
-/* The Comments list: icon plus "7 comments" as text (C-15), so wider than a
+/* The Comments list: the icon and the open count (C-15), so wider than a
    32px tool - the count is the information (card Exceptions). Same height,
    colours and inset ring as every band tool; the band's sans text. */
 .erf-band .erf-band__tool--count {

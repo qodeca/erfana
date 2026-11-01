@@ -62,8 +62,8 @@ describe('drawerRows', () => {
     expect(rows.cantEdit.map(r => r.tags[0].attention)).toEqual([true, false])
   })
 
-  // Changed expectation under OD-04 (was "R-020 offers Show on page … Open in source otherwise" over Needs attention).
-  it('OD-04 offers Show in preview for an attached thread and Open in source otherwise', () => {
+  // Changed expectation under OD-04 (was "R-020 offers Show on page … Open in file otherwise" over Needs attention).
+  it('OD-04 offers Show in preview for an attached thread and Open in file otherwise', () => {
     const rows = drawerRows(
       [
         fileView({
@@ -95,7 +95,7 @@ describe('drawerRows', () => {
     expect(rows.resolved.map(tagsOf)).toEqual([[DRAWER_COPY.resolved, DRAWER_COPY.notFound]])
   })
 
-  it('C-15 one state tag per thread by precedence: Words changed over Changed over Not visible now', () => {
+  it('C-15 one state tag per thread by precedence: Words changed over Changed over Hidden on the page', () => {
     const rows = drawerRows(
       [
         fileView({
@@ -164,7 +164,7 @@ describe('drawerRows', () => {
       new Set()
     )
     expect(rows.open[0]).toMatchObject({ label: 'li', id: 'f2/t1' })
-    expect(tagsOf(rows.open[0])).toEqual(['In frame: child.html'])
+    expect(tagsOf(rows.open[0])).toEqual(['From: child.html'])
   })
 
   it('handles 1,000 threads in one pass', () => {

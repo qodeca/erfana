@@ -188,7 +188,8 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
   if (shownMode !== (mode && live)) {
     setShownMode(mode && live)
     setHover(null)
-    setPicked(null)
+    // Only on the way out: the first pick can land before the render that turns the mode on.
+    if (!(mode && live)) setPicked(null)
   }
 
   // ---- the mode shortcut: the active panel's only ----
@@ -295,7 +296,8 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
       event.preventDefault()
       event.stopPropagation()
       swallowedKeys.add(keyOf(event))
-      const at = pickedRef.current
+      // `marked` first: it is set with the focus, and the pick's state lands a render later.
+      const at = marked.current?.isConnected === true ? marked.current : pickedRef.current
       if (step === 'exit') latest.current.onExit()
       else if (step === 'open') {
         if (at !== null) latest.current.onPick(at, true)

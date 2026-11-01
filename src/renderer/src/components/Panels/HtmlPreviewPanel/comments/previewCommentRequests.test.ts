@@ -11,7 +11,7 @@ import { newCommentRequest, withWords, wordsOf } from './previewCommentRequests'
 const WORDS = { text: 'We ship the beta to ten customers', start: 20, end: 33, cut: true }
 
 describe('024-AC-004 (renderer) the window a draft opens', () => {
-  it('024-AC-004 C-07 (HTML) "Comment on selection" opens on the words main found; the whole element on none, from the whole text', () => {
+  it('024-AC-004 C-07 (HTML) "Comment on selection" opens on the words main found; the whole section on none, from the whole text', () => {
     const draft = menuDraft({ selection: true, words: WORDS })
     expect(newCommentRequest('preview-index', draft, 'words')?.words).toEqual(WORDS)
     expect(newCommentRequest('preview-index', draft, 'whole')?.words).toEqual({ ...WORDS, start: 0, end: 0, cut: false })

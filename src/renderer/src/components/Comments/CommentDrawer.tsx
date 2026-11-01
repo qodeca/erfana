@@ -107,8 +107,8 @@ export interface CommentDrawerProps {
   /** An arrow key, Home or End onto a row whose target is in the preview ("Show in preview", R-10). Not called in a full-width drawer. */
   readonly onReveal: (row: DrawerRow) => void
   /**
-   * Open in source for a row. Since R-10 the drawer itself no longer calls it – Enter or a click
-   * opens the row's window, which carries Open in source – but the hosts still provide it.
+   * Open in file for a row. Since R-10 the drawer itself no longer calls it – Enter or a click
+   * opens the row's window, which carries Open in file – but the hosts still provide it.
    */
   readonly onOpenInSource: (row: DrawerRow) => void
   /** Enter, a click or the active row's Open: the comment window (R-10). */

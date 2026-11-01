@@ -182,7 +182,7 @@ Behaviour:
 1. Listen for `click` and `auxclick` on `document`.
 2. Ignore when `!event.isTrusted` (so `a.click()` cannot drive it) or the button is neither primary nor middle.
 3. Find the nearest `<a href>` / `<area href>` through `event.composedPath()`.
-4. Let same-document fragment links proceed natively.
+4. Let same-document fragment links proceed natively. A link with another `?query` is a new load, so it is reported; main loads it in this view.
 5. Read `target` from the anchor, falling back to an explicit `document.querySelector('base[target]')` re-read per click – there is no IDL surface for a document base target, and a page can mutate `<base>` at runtime.
 6. `preventDefault()`, defer to a microtask, **re-check `defaultPrevented`**, then `ipcRenderer.send(channel, { href: anchor.href, target, modifiers, download })`.
 7. No `contextBridge` call anywhere in the file.

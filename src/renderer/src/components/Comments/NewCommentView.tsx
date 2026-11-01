@@ -30,7 +30,7 @@
  *   editor's autosave stays held until then, not just until the answer.
  * - **Words** (spec 024 024-FR-004, C-07): when the preview sends the
  *   target's text, `CommentWordsPicker` shows the selected words and the
- *   Narrow to words field; the choice is derived from the range, and Save
+ *   Comment on specific words field; the choice is derived from the range, and Save
  *   waits while only spaces are chosen or the words cannot be found again.
  *
  * @module HtmlPreviewPanel/comments/NewCommentView
@@ -56,12 +56,7 @@ import {
 } from './commentCopy'
 import { counterState, countCharacters, visibleString } from './commentFormat'
 import { validateCommentText, type IdentityFormData } from './commentSchemas'
-import {
-  CommentBanner,
-  CommentField,
-  DialogButton,
-  VisibleText
-} from './CommentParts'
+import { CommentBanner, CommentField, DialogButton, VisibleText } from './CommentParts'
 import { IdentityEditor } from './IdentityStep'
 import { useCommentAlert, useInnerStep } from './commentLive'
 import { onCommentWriteSettled, trackCommentWrite, useCommentWritePending } from './commentPendingWrites'
@@ -147,12 +142,14 @@ export function NewCommentView({
   const choice: WordsChoice = request.words === undefined ? { kind: 'whole' } : chooseWords({ text: request.words.text, ...span })
   const focusChange = useRef(false)
   const mounted = useRef(true)
-  useEffect(
-    () => () => {
+  // Set on the way in too: StrictMode runs this effect twice, and a ref left
+  // false by that first cleanup strands the window on "Saving…".
+  useEffect(() => {
+    mounted.current = true
+    return () => {
       mounted.current = false
-    },
-    []
-  )
+    }
+  }, [])
   // The next new-comment window spends the slot (C-14.1): the carried text is this window's now,
   // kept under its own key – or, when it has text of its own, the slot is simply dropped.
   const { panelId } = request
@@ -285,7 +282,7 @@ export function NewCommentView({
     if (answer.ok && answer.wordsDropped === true) {
       // Saved on the whole target: the window says so (024-FR-004), and closes on Close.
       setDropped(true)
-      alert(wordsDroppedText(words, request.target, file))
+      alert(wordsDroppedText(words, request.target))
       onRefresh?.()
     } else if (answer.ok) onSaved()
     else if (answer.code === ErrorCode.COMMENT_SAVE_PENDING) alert(saveFailureCopy(answer.code, file).text)
@@ -336,7 +333,7 @@ export function NewCommentView({
       <div className="erf-comment-window__body">
         {unsavedBanner}
         {request.wordsMissing === true && (
-          <CommentBanner kind="info" testId={TEST_IDS.COMMENT_WORDS_MISSING}>{SELECTION_COPY.wordsNotInFile(words.noun(request.target), file)}</CommentBanner>
+          <CommentBanner kind="info" testId={TEST_IDS.COMMENT_WORDS_MISSING}>{(request.target.runtime ? SELECTION_COPY.wordsFromScript : SELECTION_COPY.wordsNotInFile)(words.noun(request.target))}</CommentBanner>
         )}
         {generated !== null && (
           <CommentBanner kind="error" testId={TEST_IDS.COMMENT_SAVE_ERROR}>
@@ -414,7 +411,7 @@ export function NewCommentView({
         )}
         {dropped ? (
           <CommentBanner kind="success" after testId={TEST_IDS.COMMENT_WORDS_DROPPED}>
-            {wordsDroppedText(words, request.target, file)}
+            {wordsDroppedText(words, request.target)}
           </CommentBanner>
         ) : pending ? (
           <CommentBanner kind="info" after testId={TEST_IDS.COMMENT_SAVE_ERROR}>

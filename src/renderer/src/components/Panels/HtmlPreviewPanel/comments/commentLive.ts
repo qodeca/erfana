@@ -28,7 +28,7 @@ export const PICKER_HINT_STEPS = 3
  * (the words come from main's own parse of the file, never from the page:
  * `commentPickerSpeaker.ts`) – the same sentence as the Markdown picker; the first
  * {@link PICKER_HINT_STEPS} steps add the keys. A script-built element keeps
- * "Showing an element added by a script, inside …".
+ * "Showing a section created by a script, inside …".
  *
  * @param step - Steps said since the mode turned on (0 for the first).
  * @returns The sentence, or `undefined` for an event that is not a picker step.

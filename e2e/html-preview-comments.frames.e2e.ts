@@ -105,7 +105,7 @@ test.describe('HTML Preview comments – script-built pages and frames (P7)', ()
     await resetCommentSettings(windowWithTestProject)
   })
 
-  test('E-005 JS deck at #3: a script-built point keeps its slide and scroll after the save; slide 1 says "Not visible now"; back, the pin returns', async ({
+  test('E-005 JS deck at #3: a script-built point keeps its slide and scroll after the save; slide 1 says "Hidden on the page"; back, the pin returns', async ({
     windowWithTestProject,
     appWithTestProject,
     testProject
@@ -129,7 +129,7 @@ test.describe('HTML Preview comments – script-built pages and frames (P7)', ()
     await clickElement(app, 's3-p12', 'left', DECK_TARGET)
     await expect(chrome.window()).toHaveAttribute('data-view', 'new', { timeout: PREVIEW_BUDGET_MS })
     // Built by the script: anchored to the nearest element in the file (§10.10).
-    await expect(chrome.window()).toContainText('Added by a script – saved before <main')
+    await expect(chrome.window()).toContainText('This part is created by a script, so the comment is saved near it in the file.')
     await chrome.saveNewComment('Deck-P7: make this point the headline', DECK)
 
     // The block went before the deck's in-file <main>, the one tokened ancestor.
@@ -146,11 +146,11 @@ test.describe('HTML Preview comments – script-built pages and frames (P7)', ()
     await expect.poll(() => deckNumber(preview, 'Math.round(scrollY)'), { timeout: PREVIEW_BUDGET_MS }).toBe(scrolled)
     await expectPin(app, 's3-p12', true, DECK_TARGET)
 
-    // Slide 1: the point is not rendered – "Not visible now", not lost (decision 30).
+    // Slide 1: the point is not rendered – "Hidden on the page", not lost (decision 30).
     await goToSlide(preview, 1)
     await chrome.openDrawer()
     const row = chrome.drawerRows().first()
-    await expect(row.getByTestId('comment-drawer-tag')).toHaveText(['Not visible now'], { timeout: PREVIEW_BUDGET_MS })
+    await expect(row.getByTestId('comment-drawer-tag')).toHaveText(['Hidden on the page'], { timeout: PREVIEW_BUDGET_MS })
     // Back on slide 3 the tag goes and the pin returns.
     await goToSlide(preview, 3)
     await deckNumber(preview, "(document.getElementById('s3-p12').scrollIntoView({ block: 'center' }), scrollY)")
@@ -182,7 +182,8 @@ test.describe('HTML Preview comments – script-built pages and frames (P7)', ()
     await expect(chrome.menu()).toBeVisible({ timeout: PREVIEW_BUDGET_MS })
     await page.getByTestId('comment-menu-add').click()
     await expect(chrome.window()).toHaveAttribute('data-view', 'new', { timeout: PREVIEW_BUDGET_MS })
-    await expect(chrome.window()).toContainText(`p#child-note · ${CHILD}, line `)
+    await expect(chrome.window()).toContainText(`${CHILD}, line `)
+    await expect(chrome.window().locator(`[data-target="p#child-note"]`)).toHaveCount(1)
     await expect(chrome.window()).toContainText(`Saved in ${CHILD}.`)
     await chrome.saveNewComment('Frame-P7: shorter', CHILD)
 
@@ -215,7 +216,8 @@ test.describe('HTML Preview comments – script-built pages and frames (P7)', ()
     await waitForOverlay(preview, app, HOST_TARGET, '/iframe-host/grandchild.html')
     await clickElement(app, 'grand-note', 'left', IN_GRAND)
     await expect(chrome.window()).toHaveAttribute('data-view', 'new', { timeout: PREVIEW_BUDGET_MS })
-    await expect(chrome.window()).toContainText(`p#grand-note · ${GRAND}, line `)
+    await expect(chrome.window()).toContainText(`${GRAND}, line `)
+    await expect(chrome.window().locator(`[data-target="p#grand-note"]`)).toHaveCount(1)
     await chrome.saveNewComment('Nested-P7: fine as is', GRAND)
 
     expect(singleBlockInsert(before.grand, await diskBytes(grandFile)), 'the innermost file did not gain one block').not.toBeNull()
@@ -273,7 +275,8 @@ test.describe('HTML Preview comments – script-built pages and frames (P7)', ()
     for (const id of ['inline', 'blank', 'remote']) {
       await clickElement(app, id, 'left', HOST_TARGET)
       await expect(chrome.window()).toHaveAttribute('data-view', 'new', { timeout: PREVIEW_BUDGET_MS })
-      await expect(chrome.window()).toContainText(`iframe#${id} · ${HOST}, line `)
+      await expect(chrome.window()).toContainText(`${HOST}, line `)
+      await expect(chrome.window().locator(`[data-target="iframe#${id}"]`)).toHaveCount(1)
       await chrome.window().getByTestId('comment-cancel').click()
       await expect(chrome.window()).toHaveCount(0)
     }

@@ -284,7 +284,7 @@ export interface RebuildRequest {
 }
 
 /**
- * Plan the rebuild of one damaged block (OD-05, "Rebuild from data…"): its
+ * Plan the rebuild of one damaged block (OD-05, "Repair comment…"): its
  * comment node is replaced by the block serialized from `data` in the
  * block's own layout – as an edit of an `ok` block is – so only the comment
  * node changes. Only a damaged block whose bytes still match is rebuilt; the

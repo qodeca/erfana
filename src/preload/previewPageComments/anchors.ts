@@ -8,7 +8,7 @@
  * element is rendered right now. A report goes to main only when the split
  * changed, at most once per {@link ANCHOR_CHECK_MIN_MS} (a trailing report
  * carries the latest split), and each list is capped at
- * {@link ANCHOR_KEYS_MAX} keys. Main turns "hidden" into "Not visible now";
+ * {@link ANCHOR_KEYS_MAX} keys. Main turns "hidden" into "Hidden on the page";
  * a key whose element is not in the file at all is main's call (orphaned).
  *
  * When the overlay gave up (the page kept removing it, or rewrote itself with

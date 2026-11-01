@@ -352,7 +352,7 @@ describe('Markdown Preview comments – comments-v2', () => {
       window.getSelection()?.removeAllRanges()
       fireEvent.click(modeTool(), { detail: 1 })
       await waitFor(() => expect(polite()).toHaveTextContent(MARKDOWN_COPY.modeOn))
-      expect(modeTool().title).toContain('click a paragraph or select text')
+      expect(modeTool().title).toContain('Click a paragraph or select text')
       // The empty drawer teaches both gestures too.
       api.list.mockResolvedValue({ ok: true, file: fileView([]), placements: [] })
       await user.click(screen.getByTestId(TEST_IDS.COMMENT_TOOL_LIST))
@@ -360,8 +360,8 @@ describe('Markdown Preview comments – comments-v2', () => {
     })
   })
 
-  describe('C-07 (Markdown) Narrow to words by keyboard', () => {
-    it('C-07 (Markdown) the keyboard route is complete: pick, Enter, Narrow to words, select, Save with the words', async () => {
+  describe('C-07 (Markdown) Comment on specific words by keyboard', () => {
+    it('C-07 (Markdown) the keyboard route is complete: pick, Enter, Comment on specific words, select, Save with the words', async () => {
       const user = userEvent.setup()
       api = installApi(fileView([]), [])
       render(<Harness content={DOC} />)
@@ -390,14 +390,15 @@ describe('Markdown Preview comments – comments-v2', () => {
   })
 
   describe('C-15 / C-20 the Markdown toolbar and OD-06 in the host', () => {
-    it('C-20 (Markdown) the toolbar has Comment mode and the labelled count only; the drawer has the icons checkbox', async () => {
+    it('C-20 (Markdown) the toolbar has Comment mode and the count only, icons and a number; the drawer has the icons checkbox', async () => {
       const user = userEvent.setup()
       await ready()
       const toolbar = screen.getByTestId('harness-toolbar')
       expect(within(toolbar).getAllByRole('button')).toHaveLength(2)
       expect(screen.queryByTestId(TEST_IDS.COMMENT_TOOL_ICONS)).toBeNull()
       const count = screen.getByTestId(TEST_IDS.COMMENT_TOOL_LIST)
-      expect(count).toHaveTextContent('2 comments')
+      expect(count).toHaveTextContent(/^2$/)
+      expect(count).toHaveAccessibleName('2 comments')
       await user.click(count)
       expect(count).toHaveAttribute('aria-expanded', 'true')
       expect(screen.getByRole('checkbox', { name: COMMENT_LIST_COPY.showIcons })).toBeChecked()
@@ -417,7 +418,7 @@ describe('Markdown Preview comments – comments-v2', () => {
       await waitFor(() => expect(count).toHaveAccessibleName('1 comment, 1 damaged'))
       expect(count.querySelector('.erf-counter--attention')).toHaveTextContent('1')
       await user.click(count)
-      expect(await screen.findByTestId(TEST_IDS.COMMENT_FILTER_CANT_EDIT)).toHaveTextContent("Can't edit 1")
+      expect(await screen.findByTestId(TEST_IDS.COMMENT_FILTER_CANT_EDIT)).toHaveTextContent("Problems 1")
     })
 
     it('OD-06 (Markdown) open comments removed outside Erfana are noted in the drawer, session only', async () => {

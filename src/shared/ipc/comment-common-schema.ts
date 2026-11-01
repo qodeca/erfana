@@ -28,7 +28,7 @@ export const COMMENT_PATH_MAX_CHARS = 4_096
 /**
  * Characters of a target's text a draft – or a thread, for Edit on its first
  * message – carries for the words of a comment (spec 024 024-FR-004, C-07
- * "Narrow to words"). A longer text is sent as the part around the selected
+ * "Comment on specific words"). A longer text is sent as the part around the selected
  * words, or not at all.
  */
 export const COMMENT_WORDS_TEXT_MAX_CHARS = 10_000
@@ -190,7 +190,7 @@ export const commentThreadOpSchemas = [
   // `resolve`: "Reply and resolve" – the reply and the resolve in one write (comments-v2 C-13).
   z.object({ ...threadTarget, op: z.literal('reply'), text: CommentMessageTextSchema, resolve: z.literal(true).optional() }).strict(),
   // C-07 `sel`, on the first message only: the words the comment is about – set or changed by the
-  // Narrow to words field, `null` for the whole target, absent to leave them as they are. Main keeps
+  // Comment on specific words field, `null` for the whole target, absent to leave them as they are. Main keeps
   // them only where its own parse finds them, as for an `add` (024-FR-004), else drops them and says so.
   z
     .object({
@@ -213,7 +213,7 @@ export const commentThreadOpSchemas = [
       rawHash: CommentRawHashSchema
     })
     .strict(),
-  // OD-05 "Rebuild from data…": re-render a hand-damaged block's readable lines from its valid
+  // OD-05 "Repair comment…": re-render a hand-damaged block's readable lines from its valid
   // `@data`; `status: 'resolved'` is "Mark resolved" (the status its line claims), `'open'` "Keep open".
   z
     .object({
@@ -256,7 +256,7 @@ export const CommentThreadViewSchema = z
     classes: z.array(z.string().max(100)).max(PREVIEW_LIMITS.COMMENT_MAX_CLASSES),
     /** Found in the file now (else "Not found"). */
     attached: z.boolean(),
-    /** Found, but not rendered right now ("Not visible now", decision 30). */
+    /** Found, but not rendered right now ("Hidden on the page", decision 30). */
     notVisible: z.boolean(),
     /**
      * The element's text as the block stored it – "It was attached to:" (§10.10).
@@ -303,7 +303,7 @@ export const CommentThreadViewSchema = z
       .strict()
       .optional(),
     /**
-     * C-07: the target's text as main parsed it, for the Narrow to words field
+     * C-07: the target's text as main parsed it, for the Comment on specific words field
      * of Edit on the first message, with the range of the words the comment is
      * about (none: `start === end`). Absent when the target is not found, has
      * no text, or its text is too long to send ({@link COMMENT_WORDS_TEXT_MAX_CHARS}).

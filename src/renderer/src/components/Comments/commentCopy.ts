@@ -38,8 +38,7 @@ function megabytes(bytes: number): string {
  * `COMMENT_FILE_TOO_LARGE`'s fallback sentence in `errors.ts`.
  */
 export const FILE_LIMIT_TEXT =
-  `Erfana adds comments only to files of up to ${megabytes(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES)} ` +
-  `and ${PREVIEW_LIMITS.COMMENT_MAX_TOKENS_PER_DOCUMENT.toLocaleString('en-US')} elements.`
+  `This file is too big for comments. The limit is ${megabytes(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES)}.`
 
 /** The comment-mode shortcut as §10.10 prints it, per platform. */
 export function commentModeShortcutLabel(): string {
@@ -64,13 +63,13 @@ export function saveShortcutAria(): string {
 /** Why comments are unavailable for the page, as the toolbar tooltip ends. */
 export const UNAVAILABLE_REASON_TEXT: Readonly<Record<CommentUnavailableReason, string>> = {
   'too-large': 'file too large',
-  encoding: 'not a UTF-8 file',
-  'prepare-failed': "couldn't prepare the page",
-  'overlay-removed': "the page keeps removing Erfana's overlay",
+  encoding: "Erfana can't read its text format",
+  'prepare-failed': "Erfana couldn't get the page ready",
+  'overlay-removed': "the page keeps removing Erfana's comment tools",
   // not in §10.10 (§19 R3-13): over the element cap.
-  'page-too-large': 'page too large – it has too many elements',
+  'page-too-large': 'the page is too big',
   // not in §10.10: `document.open()` erased the overlay's listeners.
-  'document-replaced': 'the page replaced its own document',
+  'document-replaced': 'the page replaced itself while it was open',
   // not in §10.10: the feature flag was turned off while the tab was open.
   disabled: 'comments are turned off in Settings'
 }
@@ -81,10 +80,10 @@ export const UNAVAILABLE_REASON_TEXT: Readonly<Record<CommentUnavailableReason, 
  * reason line of each disabled menu item – one sentence for both (C-19).
  *
  * @param reason - Main's reason.
- * @returns `Comments are unavailable for this file: {reason}.`
+ * @returns `You can't comment on this file: {reason}.`
  */
 export function unavailableTooltip(reason: CommentUnavailableReason): string {
-  return `Comments are unavailable for this file: ${UNAVAILABLE_REASON_TEXT[reason] ?? UNAVAILABLE_REASON_TEXT['prepare-failed']}.`
+  return `You can't comment on this file: ${UNAVAILABLE_REASON_TEXT[reason] ?? UNAVAILABLE_REASON_TEXT['prepare-failed']}.`
 }
 
 /**
@@ -95,7 +94,7 @@ export function unavailableTooltip(reason: CommentUnavailableReason): string {
  * the toolbar card and for the day one does.
  */
 export const REMOTE_PAGE_TOOLTIP =
-  "Comments are unavailable for this page: it isn't a file in this project"
+  "You can't comment on this page: it isn't a file in this project"
 
 /**
  * Why a file takes no new comment (`CommentFileView.readOnlyReason`, `addRefusal`): menu matrix § 3's
@@ -104,22 +103,21 @@ export const REMOTE_PAGE_TOOLTIP =
 export function readOnlyReasonText(reason: string | undefined, file: string): string {
   switch (reason) {
     case 'encoding':
-      return 'Erfana can only add comments to UTF-8 files.'
+      return "Erfana can't add comments to this file because of its text format. Save the file as UTF-8, then try again."
     case 'conflict-markers':
-      return `${file} has unresolved git conflicts. Resolve them first.`
+      return `${file} has two versions mixed together. Fix this first, or ask a developer to help.`
     case 'too-large':
-      // §10.10 "File limits (rev 4)": the menu's sentence, then what it means for this file
-      return `${FILE_LIMIT_TEXT} ${file} is larger, so its comments are read-only.`
+      return `${file} is too big for new comments. You can still read the existing ones.`
     case 'too-many-blocks':
-      return `${file} already has ${PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE} comments, the most Erfana adds to one file. Delete resolved threads to add more.`
+      return `${file} has ${PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE} comments, which is the limit. Delete resolved comments to add more.`
     case 'unterminated-block':
-      return `A comment in ${file} has no end, so Erfana won't add comments. Fix it in the source.`
+      return `One comment in ${file} is broken, so Erfana can't add new ones. Fix or delete the broken comment first.`
     case 'link':
-      return `${file} is a link to another file, so Erfana won't write to it.`
+      return `${file} is only a link to another file. Open the real file to comment.`
     case 'missing':
       return `${file} no longer exists. Copy your text before closing.`
     default:
-      return `${file} is read-only.`
+      return `${file} can't be changed, so you can't add a comment.`
   }
 }
 
@@ -214,7 +212,7 @@ export function unsavedSourceText(file: string): string {
  * overwrite the outside edit – so the sentence sends the reader to the tab.
  */
 export function unsavedConflictText(file: string): string {
-  return `${file} has unsaved changes in another tab, and the file changed on disk too. Go to the tab and decide which version to keep, then add your comment.`
+  return `${file} has unsaved changes in another tab, and the file also changed outside Erfana. Go to the tab, choose which version to keep, then add your comment.`
 }
 
 /** §10.10 field and window strings. */
@@ -238,9 +236,9 @@ export const COPY = {
   close: 'Close',
   open: 'Open',
   // R-10, C-13: what Enter or a click on a drawer row does (comments-v2/drawer.html).
-  openThread: 'Open thread',
+  openThread: 'Open conversation',
   showInPreview: 'Show in preview', // A-05: the Markdown words, in both
-  openInSource: 'Open in source',
+  openInSource: 'Open in file',
   tryAgain: 'Try again',
   pickAgain: 'Pick again',
   change: 'Change',
@@ -252,30 +250,30 @@ export const COPY = {
   // were discarded, or saved some other way we cannot tell apart).
   unsavedGone: 'The other tab has no unsaved changes now. You can add your comment.',
   addComment: 'Add comment',
-  menuLabel: 'Element',
+  menuLabel: 'Section',
   deleteComment: 'Delete comment',
-  deleteThread: 'Delete thread',
+  deleteThread: 'Delete conversation',
   deleteBlock: 'Delete damaged comment', // 024-FR-006 § 4: the Markdown words, in both
   deleteBlockAction: 'Delete damaged comment…',
-  copyRaw: 'Copy raw text',
-  rawLabel: 'Raw text (read-only)',
+  copyRaw: 'Copy comment text',
+  rawLabel: 'Comment text as saved',
   // Spec 024 state table S-07 and S-08: "comment", never "comment block" (the shared sentences).
-  damagedText: "Erfana can't read this comment, so it won't change it. Fix it in the source, or delete it.",
-  conflictText: 'This comment contains git conflict markers. Resolve the conflict in the source.',
+  damagedText: "This comment is damaged, so Erfana can't read it. You can delete it, or fix it in the file.",
+  conflictText: 'This comment has two versions mixed together. Fix this in the file, or ask a developer to help.',
   // Spec 024 state table S-09.
-  newerText: 'A newer version of Erfana wrote this comment, so it is read-only here.',
-  newerTag: 'Newer format – read-only',
+  newerText: 'A newer version of Erfana wrote this comment. Update Erfana to change it.',
+  newerTag: 'Needs a newer Erfana',
   attachedTo: 'It was attached to:',
-  rawCopied: 'Raw text copied.',
+  rawCopied: 'Comment text copied.',
   // not in §10.10: the read-error sentence when no file name is known yet.
   thisFile: 'this file',
   // not in §10.10: the clipboard refused the raw text.
-  copyFailed: "Couldn't copy the raw text."
+  copyFailed: "Couldn't copy the comment text."
 } as const
 
-/** "Plain text. Saved inside {file}." */
+/** "Saved inside {file}." */
 export function fieldHint(file: string): string {
-  return `Plain text. Saved inside ${file}.`
+  return `Saved inside ${file}.`
 }
 
 /** "Comments can be up to 4,000 characters. This one is {n}." */
@@ -292,9 +290,9 @@ export function savedAnnouncement(file: string): string {
 export const KIND_COPY = {
   newCommentTitle: (noun: string): string => `New comment on ${noun}`,
   drawerNone: (clickTarget: string): string =>
-    `No comments in this file yet. Select text and right-click, or turn on comment mode and click ${clickTarget}.`,
+    `No comments yet. Select some text and right-click, or turn on comment mode and click ${clickTarget}.`,
   modeOn: (clickTarget: string): string =>
-    `Comment mode on. Click ${clickTarget}, select text, or press Tab to pick one. Esc to leave.`
+    `Comment mode is on. Click ${clickTarget} or select text to comment. Press Tab to move between ${clickTarget.replace(/^an? /, '')}s. Press Esc to stop.`
 } as const
 
 /**
@@ -306,30 +304,28 @@ export function threadsTitle(noun: string, threads: number): string {
   return threads === 1 ? `Comment on ${noun}` : `Comments on ${noun}`
 }
 
-/** "Delete this comment? It is removed from {file}. Git history keeps earlier versions." */
+/** "Delete this comment from {file}? If the file is in git, old versions still keep it." */
 export function deleteCommentText(file: string): string {
-  return `Delete this comment? It is removed from ${file}. Git history keeps earlier versions.`
+  return `Delete this comment from ${file}? If the file is in git, old versions still keep it.`
 }
 
-/** "Delete this thread and its {n} replies?" with a real singular. */
+/** "Delete this conversation and its {n} replies?" with a real singular. */
 export function deleteThreadText(replies: number): string {
-  return `Delete this thread and its ${plural(replies, 'reply', 'replies')}?`
+  return `Delete this conversation and its ${plural(replies, 'reply', 'replies')}?`
 }
 
-/** "Delete this damaged comment? Erfana removes exactly the text shown above from {file}." (both previews) */
+/** "Delete this damaged comment? Erfana removes the text above from {file}." (both previews) */
 export function deleteBlockText(file: string): string {
-  return `Delete this damaged comment? Erfana removes exactly the text shown above from ${file}.`
+  return `Delete this damaged comment? Erfana removes the text above from ${file}.`
 }
 
 /** Both previews; it names no target word, so no `{kind}` slot (differences table § 4). */
 export function notFoundText(file: string, line: number): string {
-  return `Erfana can't find what this comment was about any more. The comment stays in ${file}, line ${line}.`
+  return `Erfana can't find the text this comment was about. The comment is still in ${file}, line ${line}.`
 }
 
-/** "Added by a script – saved before <{ancestor}>." */
-export function scriptBuiltText(ancestor: string): string {
-  return `Added by a script – saved before ${ancestor}.`
-}
+/** The note on a part a script creates: its comment is saved near it in the file. */
+export const SCRIPT_BUILT_TEXT = 'This part is created by a script, so the comment is saved near it in the file.'
 
 /** "Saved in {frame file}." */
 export function frameFileText(file: string): string {
@@ -341,10 +337,9 @@ export const IDENTITY_COPY = {
   title: 'Before your first comment',
   // C-04: one notice for both previews, shown once before the first comment in either.
   notice:
-    'Erfana writes your name – and your email, if you add one – into the file next to each comment. ' +
-    "Anyone who can open the file can read them: in Erfana, in the file's source, and in git history once the file is " +
-    'committed and pushed. In HTML files, scripts on previewed pages can read them too. Deleting a comment later does ' +
-    'not remove it from git history.',
+    'Erfana saves your name in the file next to each comment. It also saves your email if you add one. ' +
+    'Anyone who can open the file can read them. Scripts on HTML pages can read them too. If the file goes into git, ' +
+    'a tool that keeps old versions, your name stays there even after you delete the comment.',
   nameLabel: 'Name',
   nameHint: 'Shown next to your comments.',
   emailLabel: 'Email (optional)',
@@ -354,9 +349,9 @@ export const IDENTITY_COPY = {
   emailInvalid: "That doesn't look like an email address.",
   // not in §10.10 (SEC-18)
   nameControl:
-    "Names can't contain invisible or direction-changing characters – they could make it read as someone else's.",
+    'Your name has hidden characters. Please type it again.',
   // not in §10.10 (SEC-18)
-  emailControl: "Emails can't contain invisible or direction-changing characters.",
+  emailControl: 'Your email has hidden characters. Please type it again.',
   // not in §10.10: the settings schema reads a longer value as unset.
   nameTooLong: 'Names can be up to 100 characters.',
   emailTooLong: 'Emails can be up to 254 characters.',
@@ -368,7 +363,7 @@ export const SETTINGS_COPY = {
   title: 'Comments',
   flagLabel: 'Comments in HTML preview',
   // C-04 / 024-FR-022: both switches name selected text, which both previews comment on.
-  flagHint: 'Lets you comment on elements and selected text in previewed pages.',
+  flagHint: 'Lets you comment on sections and selected text in previewed pages.',
   markdownFlagLabel: 'Comments in Markdown preview',
   markdownFlagHint: 'Lets you comment on paragraphs, list items and selected text.',
   nameLabel: 'Your name',
@@ -377,7 +372,7 @@ export const SETTINGS_COPY = {
   emailLabel: 'Your email (optional)',
   emailHint: 'Also saved into the file. Leave empty to keep it out.',
   notice:
-    'Both are visible to anyone who can open the file – in its source and in git history once pushed.',
+    'Anyone who can open the file can read these. If the file goes into git, they stay in its history.',
   nameEmpty: 'Enter a name to add comments. Existing comments keep the name they were saved with.',
   // not in §10.10: the settings write failed.
   saveFailed: "Couldn't save this setting. Your text is still here – try again."
@@ -393,7 +388,7 @@ export const DRAWER_COPY = {
   emptyOpen: 'No open comments.',
   emptyResolved: 'No resolved comments.',
   emptyAttention: 'Nothing needs attention.',
-  notVisible: 'Not visible now',
+  notVisible: 'Hidden on the page',
   notFound: 'Not found', // A-10: one tag in both previews
   damaged: 'Damaged',
   resolved: 'Resolved',
@@ -410,18 +405,18 @@ export function readErrorText(file: string): string {
  * files or its byte budget – so the drawer says the list is not complete.
  *
  * @param count - Files main did not read.
- * @returns e.g. "Comments from 2 files in this page aren't listed: …".
+ * @returns e.g. "This page has too many parts to list all comments. 2 files are missing here. …".
  */
 export function unreadFilesText(count: number): string {
   return (
-    `Comments from ${plural(count, 'file', 'files')} in this page aren't listed: one list reads at most ` +
-    `64 files and ${megabytes(PREVIEW_LIMITS.COMMENT_LIST_MAX_BYTES)}. Open a frame's file in its own tab to see its comments.`
+    `This page has too many parts to list all comments. ${plural(count, 'file', 'files')} ${count === 1 ? 'is' : 'are'} missing here. ` +
+    'Open each file in its own tab to see its comments.'
   )
 }
 
-/** "In frame: {file}" */
+/** "From: {file}" */
 export function inFrameTag(file: string): string {
-  return `In frame: ${file}`
+  return `From: ${file}`
 }
 
 /** The toolbar tools' accessible names and tooltips (§10.1, §10.10). */
@@ -430,14 +425,14 @@ export const TOOL_COPY = {
   modeNotReady: 'Comment mode – available once the page has loaded',
   pins: 'Show comment icons',
   pinsOn: 'Show comment icons – on',
-  pinsOff: 'Show comment icons – off: icons hidden in this preview'
+  pinsOff: 'Comment icons are hidden'
 } as const
 
 /** The comment-mode toggle's tooltip in its two ordinary states (C-16, D-04): `clickTarget` is the `{kind}` with its article. */
-export function modeTooltip(on: boolean, clickTarget = 'an element'): string {
+export function modeTooltip(on: boolean, clickTarget = 'a section'): string {
   const key = commentModeShortcutLabel()
   return on
-    ? `Comment mode (${key}) – on: click ${clickTarget} or select text to comment, Esc to leave`
+    ? `Comment mode is on (${key}). Click ${clickTarget} or select text. Press Esc to stop.`
     : `Comment mode (${key}) – off`
 }
 
@@ -467,7 +462,7 @@ export const ANNOUNCE = {
   resolved: 'Comment resolved.',
   reopened: 'Comment reopened.',
   // OD-05: a damaged comment rebuilt from its data line.
-  rebuilt: 'Comment rebuilt.',
+  rebuilt: 'Comment repaired.',
   deleted: (file: string): string => `Comment deleted from ${file}.`,
   // keyboard picker (§10.8): spoken by the panel, never drawn in the page. The
   // element is named by what MAIN parsed – its tag and line – never by its ids
@@ -476,8 +471,8 @@ export const ANNOUNCE = {
   pickerNoChild: 'Nothing inside to select.',
   pickerShowing: ({ tag, line, added }: CommentPickerElement): string =>
     added
-      ? `Showing an element added by a script, inside ${tag ?? 'an element'} on line ${line}.`
-      : `Showing ${tag ?? 'an element'}, line ${line}.`
+      ? `Showing a section created by a script, inside ${tag ?? 'a section'} on line ${line}.`
+      : `Showing ${tag ?? 'a section'}, line ${line}.`
 } as const
 
 /**

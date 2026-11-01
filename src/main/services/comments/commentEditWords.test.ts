@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The words of an existing Markdown comment and the place of its target
- * (comments-v2 C-07 "Narrow to words" on Edit of the first message, C-03 kind
+ * (comments-v2 C-07 "Comment on specific words" on Edit of the first message, C-03 kind
  * nouns; spec 024 024-FR-004). Runs the real Markdown kind, list and write
  * core in process: add a comment, list it, edit it with and without words.
  */
@@ -75,7 +75,7 @@ async function edit(text: string, extra: Partial<Extract<ThreadChange, { op: 'ed
 const paragraph = (target: MdTarget): boolean => target.tag === 'p'
 const SHIP = 'We ship the beta to ten customers by Friday.'
 
-describe('024-AC-005 C-07 a listed Markdown thread carries the Narrow to words text', () => {
+describe('024-AC-005 C-07 a listed Markdown thread carries the Comment on specific words text', () => {
   it('024-AC-005 C-07 the target\'s rendered text, with no range for a comment on the whole paragraph', async () => {
     const [thread] = (await list(await added(DOC, paragraph))).threads
     expect(thread.words).toEqual({ text: SHIP, start: 0, end: 0, cut: false })

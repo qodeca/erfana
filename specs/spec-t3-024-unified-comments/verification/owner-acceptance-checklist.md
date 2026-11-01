@@ -25,12 +25,12 @@ Right-click, then repeat with ⇧F10 / Shift+F10 for every row you can reach by 
 
 | # | Check | HTML | Markdown |
 |---|---|---|---|
-| 2.1 | Mode off, nothing selected: one step to the window – "Comment on element" / "Comment on {kind}" (M-01, M-11) | ☐ | ☐ |
+| 2.1 | Mode off, nothing selected: one step to the window – "Comment on this section" / "Comment on {kind}" (M-01, M-11) | ☐ | ☐ |
 | 2.2 | Mode off, words selected: "Comment on selection", "Comment on the whole {kind}" (M-02, M-12) | ☐ | ☐ |
 | 2.3 | Mode on, nothing selected: "Add comment" (M-03, M-13) | ☐ | ☐ |
 | 2.4 | Mode on, words selected: "Comment on selection", "Comment on the whole {kind}", no prompt items (M-04, M-14) | ☐ | ☐ |
 | 2.5 | Read-only file (for example a file with a git conflict): the items keep their names, are disabled and show a visible reason; comment mode is unavailable with the reason (M-05 to M-07, M-15 to M-17) | ☐ | ☐ |
-| 2.6 | Markdown frontmatter, with and without a selection: disabled items with "Comments can't be added to the frontmatter." (M-18 to M-21) | – | ☐ |
+| 2.6 | Markdown frontmatter, with and without a selection: disabled items with "You can't comment on the settings at the top of this file." (M-18 to M-21) | – | ☐ |
 | 2.7 | Markdown with unsaved editor edits: the paused band, disabled items with the band's sentence (M-15, M-16) | – | ☐ |
 | 2.8 | HTML outside comment mode by keyboard: ⇧F10 / Shift+F10 in the page opens Erfana's menu (§ 4 of the matrix) | ☐ | – |
 | 2.9 | Markdown editor and split views: no comment items, tools, icons, underlines or count (M-22) | – | ☐ |
@@ -42,7 +42,7 @@ Create each state, then check its drawer tag, icon, window banner, main button a
 | # | State | How to create it | HTML | Markdown |
 |---|---|---|---|---|
 | 3.1 | Open (S-01) | Add a comment | ☐ | ☐ |
-| 3.2 | Not visible now (S-02) | HTML: a hidden slide or tab; Markdown: a collapsed section | ☐ | ☐ |
+| 3.2 | Hidden on the page (S-02) | HTML: a hidden slide or tab; Markdown: a collapsed section | ☐ | ☐ |
 | 3.3 | Changed (S-03) – notched icon, Was/Now, Resolve focused | Edit the commented text in the source | ☐ | ☐ |
 | 3.4 | Words changed (S-04) | Comment on selected words, then rewrite those words | ☐ | ☐ |
 | 3.5 | Not found (S-05) – info banner, Resolve focused; Markdown ghost icon | Delete the commented paragraph in the source | ☐ | ☐ |
@@ -59,7 +59,7 @@ Create each state, then check its drawer tag, icon, window banner, main button a
 | # | Check | HTML | Markdown |
 |---|---|---|---|
 | 4.1 | Keyboard only: pick a target with Tab and Alt+Up/Down, Enter, write, ⌘Enter / Ctrl+Enter to save | ☐ | ☐ |
-| 4.2 | "Narrow to words" field selects words by keyboard and saves them | ☐ | ☐ |
+| 4.2 | "Comment on specific words" field selects words by keyboard and saves them | ☐ | ☐ |
 | 4.3 | Clicking a commented target in comment mode opens its threads, not a blank comment (C-22) | ☐ | ☐ |
 | 4.4 | Stepper ‹ n of m ›, ⌥F9 / Alt+F9, "Resolve and next", "Reply and resolve" | ☐ | ☐ |
 | 4.5 | Esc order: menu, then window, then comment mode | ☐ | ☐ |

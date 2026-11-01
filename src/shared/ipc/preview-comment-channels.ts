@@ -61,7 +61,7 @@ export const PreviewCommentEvents = {
   DRAFT_OPENED: 'preview:commentDraftOpened',
   /** The tab's comment counts, or its availability, changed. */
   COMMENTS_CHANGED: 'preview:commentsChanged',
-  /** Which threads' elements are not rendered right now ("Not visible now"). */
+  /** Which threads' elements are not rendered right now ("Hidden on the page"). */
   ANCHOR_STATUS: 'preview:commentAnchorStatus',
   /** Main turned comment mode on or off: Esc in the page (its exit pick), or the shortcut. */
   MODE_CHANGED: 'preview:commentModeChanged',

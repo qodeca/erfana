@@ -115,7 +115,7 @@ describe('024-AC-004 (main) the draft carries the words from main\'s own parse',
   it('024-AC-004 (h) words that appear twice with the same context are found by their context, else left to the window as a tie', async () => {
     const built = await draftFor(PAGE, 'p', { sel: sel('the plan', 'Read ', ' and the') }, 1)
     expect(built.words).toMatchObject({ start: 5, end: 13 })
-    // With no context to tell them apart, the page's words are not placed: the window offers the whole element.
+    // With no context to tell them apart, the page's words are not placed: the window offers the whole section.
     const tie = await draftFor(PAGE, 'p', { sel: sel('the plan') }, 1)
     expect(tie.wordsMissing).toBe(true)
   })
@@ -133,7 +133,7 @@ describe('024-AC-004 (main) the draft carries the words from main\'s own parse',
     expect(words.text.length).toBeLessThanOrEqual(2 * WORDS_WINDOW_MARGIN_CHARS + 'needle here'.length)
     expect(words.text.slice(words.start, words.end)).toBe('needle here')
     expect(words.text.startsWith('lorem') || words.text.startsWith('ipsum')).toBe(true)
-    // No words and too much text: the window gets none, and Narrow to words is not offered.
+    // No words and too much text: the window gets none, and Comment on specific words is not offered.
     expect((await draftFor(html, 'p')).words).toBeUndefined()
   })
 })
@@ -181,7 +181,7 @@ describe('024-AC-004 (main) a save keeps words only when they are found once', (
     // A later claim, outside that save, is the draft as main built it.
     expect(keys.claimDraft(token, binding)).toMatchObject({ ok: true, value: { anchor: { tag: 'p' } } })
     keys.settleDraft(token, false)
-    // Words not in the text: saved on the whole element (024-FR-004).
+    // Words not in the text: saved on the whole section (024-FR-004).
     await keys.withWords({ panelId: 'p', op: 'add', draftToken: token, text: 'Hi', sel: sel('nowhere') }, save)
     expect(claimed?.anchor.sel).toBeUndefined()
   })
