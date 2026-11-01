@@ -58,6 +58,8 @@ function setup(patch: Partial<CommentWindowProps> = {}, markdown = false) {
 
 /** Press the button with the keyboard. */
 async function press(user: ReturnType<typeof userEvent.setup>, testId: string): Promise<void> {
+  // The dialog places its first focus on a short timer: on a slow machine it would take focus back before Enter.
+  await waitFor(() => expect(screen.getByTestId('comment-window')).toContainElement(document.activeElement as HTMLElement))
   act(() => screen.getByTestId(testId).focus())
   await user.keyboard('{Enter}')
 }
