@@ -317,7 +317,7 @@ Add `spokenTarget(role, line, excerpt?, count?)` built from main-supplied facts 
 Picker announcements:
 - 'Paragraph, line 42: “We ship the beta to ten customers…”. 2 comments.' The first three steps add ' Enter to comment, Shift+F10 for the menu.'
 - Script-built element: 'Element added by a script, inside Section on line 12.'
-- At level ends: 'Last section at this level – Alt+Up for the parent.' / 'First section at this level.'
+- At level ends: 'Last {kind} at this level – Alt+Up for the parent.' / 'First {kind} at this level.' (one template in both previews; {kind} is "section" in HTML, the kind noun in Markdown, D-04)
 - On keyboard entry, one combined sentence, sent after main confirms the page holds focus: 'Comment mode on. Paragraph, line 12: “…”.'
 
 Window: the context line, script note and selection quote get ids passed to BaseDialog `ariaDescribedBy` for the new and threads views. The textarea's aria-describedby lists the target first.

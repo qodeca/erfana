@@ -385,7 +385,6 @@ describe('CommentWindow – v2 stepping (C-13)', () => {
   })
 
   it('C-13 with nothing to step to, Alt+F9 from the preview and in the window keep the window where it is', async () => {
-    const user = userEvent.setup()
     const { props } = setup({ onReveal: vi.fn(), drawerId: 'drawer-3' })
     await waitFor(() => expect(screen.getByTestId('comment-window-title')).toHaveFocus())
     act(() => {
@@ -393,9 +392,11 @@ describe('CommentWindow – v2 stepping (C-13)', () => {
       // nothing to step to no longer swallows the key, so the host handles it.
       expect(stepOpenWindow('drawer-3', 'next')).toBe(false)
     })
-    await user.keyboard('{Alt>}{F9}{/Alt}')
+    fireEvent.keyDown(screen.getByTestId('comment-window-title'), { key: 'F9', code: 'F9', altKey: true })
     expect(props.onReveal).not.toHaveBeenCalled()
     expect(screen.getByTestId('comment-window-title')).toHaveFocus()
+    // K-26: a key with nothing to do says so.
+    await waitFor(() => expect(screen.getByTestId('comment-window-polite')).toHaveTextContent('No comments to go to.'))
   })
 
   it('C-13 Resolve and next resolves the shown comment in one write, then steps on', async () => {

@@ -8,8 +8,9 @@
  * It runs the real preview, the real `useMarkdownComments` and the real
  * renderer overlay host through the panel harness (`harness.tsx`), with only
  * the comment bridge mocked. The fixture is a block quote: the quote is
- * `container`; its one list item, which holds a nested item (`inner`), is
- * `first`; two paragraphs are `second` and `long`. jsdom has no layout, so
+ * `container`; a nested quote is `first`, and its paragraph is `inner`; two
+ * paragraphs are `second` and `long`, so the levels are the HTML page's (a list
+ * would add its own `ul` target between them). jsdom has no layout, so
  * each fixture block gets its fixture box and a gesture is delivered to the
  * innermost fixture block under its point (`fixtureTargetAt`).
  *
@@ -38,25 +39,34 @@ import {
 import { Harness, fileView, installApi, resetStores, setSettings } from './harness'
 import { pickRecorder } from './pickRecorder'
 
-/** The fixture as Markdown: a quote holding a list item (with a nested item) and two paragraphs. */
-export const OVERLAY_DOC = ['> - First block', '>   - Buy now', '>', '> Second paragraph text', '>', '> Long label', ''].join('\n')
+/** The fixture as Markdown: a quote holding a nested quote (with its paragraph) and two paragraphs. */
+export const OVERLAY_DOC = ['> > Buy now', '>', '> Second paragraph text', '>', '> Long label', ''].join('\n')
 
 /** Where each fixture target is in the rendered preview. */
 const SELECTORS: Readonly<Record<OverlayTargetId, string>> = {
-  container: 'blockquote[data-line-start="1"]',
-  first: 'blockquote > ul > li[data-line-start="1"]',
-  inner: 'li > ul > li[data-line-start="2"]',
-  second: 'blockquote > p[data-line-start="4"]',
-  long: 'blockquote > p[data-line-start="6"]'
+  container: ':scope > blockquote',
+  first: ':scope > blockquote > blockquote',
+  inner: ':scope > blockquote > blockquote > p',
+  second: ':scope > blockquote > p[data-line-start="3"]',
+  long: ':scope > blockquote > p[data-line-start="5"]'
 }
 
 /** What the mode tab says while each target is outlined (A-03, Markdown words). */
 const MARKDOWN_LABELS: Readonly<Record<OverlayTargetId, string>> = {
   container: 'Comment mode · Block quote, line 1 · Esc to leave',
-  first: 'Comment mode · List item, line 1 · Esc to leave',
-  inner: 'Comment mode · List item, line 2 · Esc to leave',
-  second: 'Comment mode · Paragraph, line 4 · Esc to leave',
-  long: 'Comment mode · Paragraph, line 6 · Esc to leave'
+  first: 'Comment mode · Block quote, line 1 · Esc to leave',
+  inner: 'Comment mode · Paragraph, line 1 · Esc to leave',
+  second: 'Comment mode · Paragraph, line 3 · Esc to leave',
+  long: 'Comment mode · Paragraph, line 5 · Esc to leave'
+}
+
+/** The kind word of each target (D-04). */
+const MARKDOWN_KINDS: Readonly<Record<OverlayTargetId, string>> = {
+  container: 'block quote',
+  first: 'block quote',
+  inner: 'paragraph',
+  second: 'paragraph',
+  long: 'paragraph'
 }
 
 /** The pane's (and every other element's) box: the fixture fits inside it, at the viewport's origin. */
@@ -136,7 +146,7 @@ export async function createMarkdownOverlayDriver(): Promise<OverlayDriver> {
   const elements = new Map<OverlayTargetId, HTMLElement>()
   await waitFor(() => {
     for (const target of Object.keys(SELECTORS) as OverlayTargetId[]) {
-      const el = document.querySelector<HTMLElement>(`.markdown-preview-content ${SELECTORS[target]}`)
+      const el = document.querySelector('.markdown-preview-content')?.querySelector<HTMLElement>(SELECTORS[target]) ?? null
       if (el === null) throw new Error(`no fixture target ${target}`)
       elements.set(target, el)
     }
@@ -246,16 +256,22 @@ export async function createMarkdownOverlayDriver(): Promise<OverlayDriver> {
     labels: MARKDOWN_LABELS,
     modeIndicatorIdle: 'Comment mode · Esc to leave',
     rightClickOutsideMode: 'menu',
+    kinds: MARKDOWN_KINDS,
     notOwned: {
       floatingLabel:
         'differences table D-05: the Markdown Preview draws no label at the outline – every block has its own box, and the comment-mode tab names the outlined block (its words are checked by OVL-L-01)',
       find: 'Find in the preview-only view is the editor panel’s find bar, outside the preview host this harness mounts'
     },
+    // `detail` 1: a mouse click. A keyboard press has none, and would start the picker a frame later.
     modeOn() {
-      if (!isModeOn()) fireEvent.click(modeTool())
+      if (!isModeOn()) fireEvent.click(modeTool(), { detail: 1 })
     },
     modeOff() {
-      if (isModeOn()) fireEvent.click(modeTool())
+      if (isModeOn()) fireEvent.click(modeTool(), { detail: 1 })
+    },
+    async modeOnByKeys() {
+      fireEvent.click(modeTool(), { detail: 0 })
+      await waitFor(() => expect(pickRecorder.said.length).toBeGreaterThan(0))
     },
     isModeOn,
     modeIndicatorText: tabText,
@@ -325,6 +341,17 @@ export async function createMarkdownOverlayDriver(): Promise<OverlayDriver> {
       act(() => scroller().focus())
       fireEvent.keyDown(scroller(), { key: 'ArrowUp', code: 'ArrowUp', altKey: true })
       fireEvent.keyUp(document.activeElement ?? scroller(), { key: 'ArrowUp', code: 'ArrowUp', altKey: true })
+    },
+    pressKey({ key: name, code, shift, alt, ctrl, meta }) {
+      begin('keyboard')
+      if (!scroller().contains(document.activeElement)) act(() => scroller().focus())
+      const init = { key: name, code, shiftKey: shift === true, altKey: alt === true, ctrlKey: ctrl === true, metaKey: meta === true }
+      fireEvent.keyDown(document.activeElement ?? scroller(), init)
+      fireEvent.keyUp(document.activeElement ?? scroller(), init)
+    },
+    saidAtEnd() {
+      const last = pickRecorder.said.at(-1) ?? ''
+      return /at this level|Top level|Nothing inside/.test(last) ? last : null
     },
     async cancelPick() {
       await waitFor(() => expect(commentWindow()).not.toBeNull())

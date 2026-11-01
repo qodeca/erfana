@@ -12,8 +12,8 @@
  */
 import type { CommentModeChanged } from '../../../../../../shared/ipc/preview-comment-schema'
 import { ANNOUNCE } from '../../../Comments/commentCopy'
-import { MD_SPOKEN_COPY } from '../../../Comments/commentCopyWords'
-import { WINDOW_COPY } from '../../../Comments/commentWindowCopy'
+import { HTML_WORDS, MD_SPOKEN_COPY } from '../../../Comments/commentCopyWords'
+import { pickerEndSentence } from '../../../Comments/overlay/pickerKeys'
 
 /** Steps after the mode turns on that add the keys to use (C-10 "the first three steps"). */
 export const PICKER_HINT_STEPS = 3
@@ -34,11 +34,7 @@ export const PICKER_HINT_STEPS = 3
  * @returns The sentence, or `undefined` for an event that is not a picker step.
  */
 export function pickerAnnouncement(event: Pick<CommentModeChanged, 'say' | 'element'>, step = PICKER_HINT_STEPS): string | undefined {
-  if (event.say === 'top') return ANNOUNCE.pickerTop
-  if (event.say === 'no-child') return ANNOUNCE.pickerNoChild
-  // C-10: Tab or Shift+Tab with nowhere further to go.
-  if (event.say === 'last') return WINDOW_COPY.pickerLast
-  if (event.say === 'first') return WINDOW_COPY.pickerFirst
+  if (event.say !== undefined && event.say !== 'showing') return pickerEndSentence(event.say, HTML_WORDS.noun({ tag: '' }))
   const element = event.say === 'showing' ? event.element : undefined
   if (element === undefined) return undefined
   if (element.added === true || element.role === undefined) return ANNOUNCE.pickerShowing(element)

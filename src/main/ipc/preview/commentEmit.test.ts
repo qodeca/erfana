@@ -135,6 +135,13 @@ describe('createPreviewCommentEmitters', () => {
       expect(own.focusHost).toHaveBeenCalledTimes(2)
     })
 
+    it('K-8 Esc in the page left comment mode: focus comes back BEFORE the renderer hears, for the toggle to take it', () => {
+      const own = focusable(1)
+      const emit = createPreviewCommentEmitters({ resolveTargets: () => [own.value] })
+      emit.modeChanged(1, { panelId: PANEL, on: false, reason: 'escape' })
+      expect(own.trail).toEqual(['focus', PreviewCommentEvents.MODE_CHANGED])
+    })
+
     it('moves no focus for the other events, nor for a draft that fails its schema', () => {
       const own = focusable(1)
       const emit = createPreviewCommentEmitters({ resolveTargets: () => [own.value] })

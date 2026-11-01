@@ -254,7 +254,7 @@ Every row goes into `reference/keyboard-shortcuts.md` with macOS and Windows col
 | KEY-27 | <kbd>Esc</kbd> on a focused toast | Close the message | toasts | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
 | KEY-28 | <kbd>⌥⌘M</kbd> / <kbd>Ctrl+Alt+M</kbd>; <kbd>Esc</kbd> | Turn HTML Preview comment mode on or off; leave it | HTML preview | [Shortcuts](./reference/keyboard-shortcuts.md#html-preview) |
 | KEY-29 | <kbd>⌥⌘M</kbd> / <kbd>Ctrl+Alt+M</kbd>; <kbd>Tab</kbd>, <kbd>⌥↑</kbd> <kbd>⌥↓</kbd> / <kbd>Alt+↑</kbd> <kbd>Alt+↓</kbd>, <kbd>Enter</kbd>, <kbd>F6</kbd> | Markdown comment mode, the keyboard picker, and moving between the comment window and the preview | Markdown preview | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
-| KEY-30 | <kbd>⌥F9</kbd> <kbd>⌥⇧F9</kbd> / <kbd>Alt+F9</kbd> <kbd>Alt+Shift+F9</kbd> | Next and previous open comment in a comment window | both previews | [Shortcuts](./reference/keyboard-shortcuts.md#html-preview) |
+| KEY-30 | <kbd>⌥F9</kbd> <kbd>⌥⇧F9</kbd> / <kbd>Alt+F9</kbd> <kbd>Alt+Shift+F9</kbd> | Next and previous open comment, from anywhere in the panel | both previews | [Shortcuts](./reference/keyboard-shortcuts.md#html-preview) |
 
 ## Menus and dialogs
 

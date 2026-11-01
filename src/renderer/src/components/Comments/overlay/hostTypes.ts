@@ -19,6 +19,7 @@ import type { CommentFileView } from '../../../../../shared/ipc/comment-common-s
 import type { ContextMenuItem } from '../../ContextMenu/ContextMenu'
 import type { CommentDrawerProps } from '../CommentDrawer'
 import type { ModeEscapeKey } from '../commentModeEscape'
+import type { HostStepKey } from './useHostStepKeys'
 import type { CommentToolbarToolsProps } from '../CommentToolbarTools'
 import type { CommentWindowProps } from '../CommentWindow'
 import type { PreviewCommentAdapter } from './previewAdapter'
@@ -84,7 +85,7 @@ export interface CommentOverlayHost {
   readonly shown: boolean
   readonly mode: boolean
   /** A key on the panel root, or on its dockview group: Esc leaves comment mode from there (`commentModeEscape.ts`). */
-  readonly onPanelKey: (event: ModeEscapeKey) => void
+  readonly onPanelKey: (event: ModeEscapeKey & HostStepKey) => void
   /** The same on its way down through the panel root, for the Find bar, which stops its keys. */
   readonly onPanelKeyCapture: (event: React.KeyboardEvent) => void
   readonly showIcons: boolean
@@ -95,6 +96,8 @@ export interface CommentOverlayHost {
   readonly window: CommentWindowProps | null
   readonly polite: string
   readonly assertive: string
+  /** C-13: where a step key landed, or that it had nowhere to go. */
+  readonly stepSaid: string
   /** The target under the pointer or picked by key in comment mode. */
   readonly outlined: HTMLElement | null
   readonly placements: readonly ThreadPlacement[]

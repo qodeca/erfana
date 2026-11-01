@@ -144,6 +144,29 @@ describe('024-AC-004 (b) comment mode: a drag selects, a click picks (C-16)', ()
     expect(picks().at(-1)).toMatchObject({ kind: 'open', via: 'keyboard', sel: WORDS })
   })
 
+  it('K-11 a keyboard menu on the words opens at the selection’s last line (menu matrix § 4)', () => {
+    h.state({ mode: true })
+    userMouse(byId('ship'), 'mousedown', { x: 160, y: 110 })
+    selectWords()
+    userMouse(byId('ship'), 'click', { x: 264, y: 110 })
+    h.clock.now += 1_000
+    userKey({ key: 'F10', code: 'F10', shiftKey: true })
+    expect(picks().at(-1)).toMatchObject({ kind: 'menu', via: 'keyboard', sel: WORDS, point: { x: LINE.left, y: LINE.top + LINE.height } })
+  })
+
+  it('K-11 a keyboard move takes the Comment button away: Enter is about the outline, not words left behind', () => {
+    h.state({ mode: true })
+    userMouse(byId('ship'), 'mousedown', { x: 160, y: 110 })
+    selectWords()
+    userMouse(byId('ship'), 'click', { x: 264, y: 110 })
+    userKey({ key: 'Tab', code: 'Tab' })
+    h.controller.renderNow()
+    expect(overlay('.erf-hpc-button')[0]?.classList.contains('erf-hpc-hidden') ?? true).toBe(true)
+    h.clock.now += 1_000
+    userKey({ key: 'Enter', code: 'Enter' })
+    expect(picks().at(-1)).not.toHaveProperty('sel')
+  })
+
   it('024-AC-004 (a) a right-click on selected words in comment mode is the selection menu', () => {
     h.state({ mode: true })
     selectWords()

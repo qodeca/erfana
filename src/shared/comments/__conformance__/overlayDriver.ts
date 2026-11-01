@@ -93,6 +93,12 @@ export interface OverlayPick {
   readonly target: OverlayTargetId | null
 }
 
+/** A key press as `KeyboardEvent` names it; the driver presses and releases it with focus in the page. */
+export interface PickerKeyPress extends GestureModifiers {
+  readonly key: string
+  readonly code: string
+}
+
 /** A layer Esc can close, top first: the element menu, the comment window, comment mode, Find. */
 export type OverlayLayer = 'menu' | 'window' | 'mode' | 'find'
 
@@ -133,6 +139,8 @@ export interface OverlayDriver {
    * Markdown Preview's own menu, comment items first, and the page never sees it.
    */
   readonly rightClickOutsideMode: 'page' | 'menu'
+  /** The word each target's end sentence uses (D-04: "section" in HTML, the kind noun in Markdown). */
+  readonly kinds: Readonly<Record<OverlayTargetId, string>>
   /** Why each part the host does not own is not here; read by the suite when it skips. */
   readonly notOwned?: Readonly<Partial<Record<OptionalPart, string>>>
 
@@ -140,6 +148,8 @@ export interface OverlayDriver {
   modeOn(): void
   /** Turn comment mode off, the way the host's toolbar or shortcut does. */
   modeOff(): void
+  /** Turn comment mode on from the keyboard, with no mouse: settled once the picker has started. */
+  modeOnByKeys(): void | Promise<void>
   /** Whether comment mode is on, as the overlay itself sees it. */
   isModeOn(): boolean
   /** The comment-mode indicator's words while it is shown, else `null`. Optional: see `notOwned.modeIndicator`. */
@@ -176,6 +186,10 @@ export interface OverlayDriver {
   pressEnter(): void
   /** Press Alt+Up with focus in the page: the picker climbs one level. */
   levelUpByKeys(): void
+  /** Press and release one key with focus in the page. */
+  pressKey(press: PickerKeyPress): void
+  /** The last sentence the picker said at a level end, else `null`. */
+  saidAtEnd(): string | null
   /** End a pick with nothing written: the menu or window it opened is gone (HTML: both are outside the page). */
   cancelPick(): void | Promise<void>
   /** Move the pick by keys, so real focus sits on the target. Optional: see `notOwned.pickFocus`. */
@@ -235,6 +249,27 @@ export interface ModeLeaveDriver {
   setTabShown(shown: boolean): Promise<void>
   /** Remove everything the driver added. */
   dispose(): void | Promise<void>
+}
+
+/**
+ * {@link ModeLeaveDriver} plus the panel's other keys: the step keys, the mode
+ * shortcut and Esc from the preview itself, with no mouse.
+ */
+export interface PanelKeyDriver extends ModeLeaveDriver {
+  /** The file has one open comment (call before anything else). */
+  withComment(): Promise<void>
+  /** Press Alt+F9 at `place`, settled. */
+  pressStep(place: ModeLeavePlace): Promise<void>
+  /** Press the mode shortcut at `place`, settled. */
+  pressModeKey(place: ModeLeavePlace): Promise<void>
+  /** Esc with keyboard focus in the preview, in comment mode, settled. */
+  pressEscapeInPreview(): Promise<void>
+  /** The keyboard reached the preview and the picker can act there. */
+  keysInPreview(): boolean
+  /** A comment window is open. */
+  windowOpen(): boolean
+  /** The last sentence the panel said politely; it lands a frame after the key. */
+  said(): string
 }
 
 /** Who the reader is to the comment window: nobody yet, a name in Settings with the notice unseen, or all set. */

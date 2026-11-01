@@ -106,7 +106,7 @@ On macOS the explicit copy and paste keys and the interrupt key use the Control 
 | Enter page; return to toolbar | <kbd>Enter</kbd> or <kbd>Space</kbd>; <kbd>Esc</kbd> | Same |
 | Turn comment mode on or off; leave it | <kbd>⌥⌘M</kbd>; <kbd>Esc</kbd> | <kbd>Ctrl+Alt+M</kbd>; <kbd>Esc</kbd> |
 
-In a comment window of either preview, <kbd>⌥F9</kbd> / <kbd>Alt+F9</kbd> moves to the next open comment and <kbd>⌥⇧F9</kbd> / <kbd>Alt+Shift+F9</kbd> to the previous one.
+With focus anywhere in the panel of either preview, <kbd>⌥F9</kbd> / <kbd>Alt+F9</kbd> moves to the next open comment and <kbd>⌥⇧F9</kbd> / <kbd>Alt+Shift+F9</kbd> to the previous one.
 
 ## Image and diagram viewers
 

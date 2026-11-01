@@ -13,7 +13,8 @@ import {
   PICKS_PER_SECOND,
   TOKEN_ATTRIBUTE
 } from './constants'
-import { GUARDED_EVENTS, TOGGLE_EVENTS, TOUCH_EVENTS, pickerActionOf } from './input'
+import { pickerStepOf } from '../../shared/comments/overlayCore/pickerKeys'
+import { GUARDED_EVENTS, TOGGLE_EVENTS, TOUCH_EVENTS, attachInputGuards } from './input'
 import {
   byId,
   createHarness,
@@ -288,7 +289,7 @@ describe('keys', () => {
     h.dispose()
     const onWindow =
       GUARDED_EVENTS.length + TOUCH_EVENTS.length + TOGGLE_EVENTS.length +
-      3 /* user input */ + 4 /* keydown, keyup, pointermove, DOMContentLoaded */
+      3 /* user input */ + 5 /* keydown, keyup, pointermove, focus, DOMContentLoaded */
     expect(removed).toHaveBeenCalledTimes(onWindow)
     expect(removedDoc.mock.calls.map(([type]) => type)).toEqual(['pointerout', 'visibilitychange'])
     removed.mockRestore()
@@ -339,8 +340,8 @@ describe('keys', () => {
   it.each([
     [{ key: 'Tab' }, 'next'],
     [{ key: 'Tab', shiftKey: true }, 'previous'],
-    [{ key: 'ArrowUp', code: 'ArrowUp', altKey: true }, 'up'],
-    [{ key: 'ArrowDown', code: 'ArrowDown', altKey: true }, 'down'],
+    [{ key: 'ArrowUp', code: 'ArrowUp', altKey: true }, 'parent'],
+    [{ key: 'ArrowDown', code: 'ArrowDown', altKey: true }, 'child'],
     [{ key: 'Enter' }, 'open'],
     [{ key: 'F10', shiftKey: true }, 'menu'],
     [{ key: 'ContextMenu' }, 'menu'],
@@ -353,7 +354,68 @@ describe('keys', () => {
     [{ key: 'µ', code: 'KeyM', altKey: true }, null],
     [{ key: 'F10' }, null]
   ])('maps %j to %s', (init, action) => {
-    expect(pickerActionOf(new KeyboardEvent('keydown', init))).toBe(action)
+    expect(pickerStepOf(new KeyboardEvent('keydown', init))).toBe(action)
+  })
+})
+
+describe('the window taking focus starts the picker (K-6)', () => {
+  /** The guard as the page's real `focus` would reach it: jsdom fires no trusted event at the window. */
+  const focusGuard = (): ((event: Event) => void) => {
+    const add = vi.spyOn(window, 'addEventListener')
+    const detach = attachInputGuards(window, document, h.controller)
+    const listener = add.mock.calls.find(([type]) => type === 'focus')?.[1] as (event: Event) => void
+    detach()
+    add.mockRestore()
+    return listener
+  }
+  const start = (): ReturnType<typeof vi.spyOn> => vi.spyOn(h.controller, 'startPicker')
+
+  it('K-6 a trusted focus on the window starts it', () => {
+    const started = start()
+    focusGuard()({ isTrusted: true, target: window } as unknown as Event)
+    expect(started).toHaveBeenCalledOnce()
+  })
+
+  it('K-6 focus on an element passing the window, or a page’s own event, does not', () => {
+    const started = start()
+    const guard = focusGuard()
+    guard({ isTrusted: true, target: document.body } as unknown as Event)
+    guard({ isTrusted: false, target: window } as unknown as Event)
+    expect(started).not.toHaveBeenCalled()
+  })
+
+  it('K-6 the picker starts only in comment mode, in the top frame, and once', () => {
+    userMove(5, 5)
+    h.controller.startPicker()
+    expect(h.sent(COMMENT_PICK_CHANNEL)).toEqual([])
+    h.state({ mode: false })
+    h.state({ mode: true })
+    h.controller.startPicker()
+    h.controller.startPicker()
+    expect((h.sent(COMMENT_PICK_CHANNEL) as Array<{ kind: string }>).filter(p => p.kind === 'step')).toHaveLength(1)
+  })
+
+  it('K-6 with only the page’s bare margin at the centre, it starts on the first element, which can be said', () => {
+    const margin = vi.spyOn(document, 'elementFromPoint').mockReturnValue(document.body)
+    h.state({ mode: false })
+    h.state({ mode: true })
+    h.controller.startPicker()
+    margin.mockRestore()
+    expect((h.sent(COMMENT_PICK_CHANNEL) as Array<{ kind: string; say?: string }>).filter(p => p.kind === 'step').map(p => p.say)).toEqual(['showing'])
+  })
+
+  it('K-6 a page loaded with the mode on stays quiet when focus comes back: it would talk over "Comment saved"', () => {
+    h.state({ mode: true })
+    h.controller.startPicker()
+    expect((h.sent(COMMENT_PICK_CHANNEL) as Array<{ kind: string }>).filter(p => p.kind === 'step')).toEqual([])
+  })
+
+  it('K-6 the mode coming on with focus already in the page starts it, with no focus event', () => {
+    const focused = vi.spyOn(document, 'hasFocus').mockReturnValue(true)
+    h.state({ mode: false })
+    h.state({ mode: true })
+    focused.mockRestore()
+    expect((h.sent(COMMENT_PICK_CHANNEL) as Array<{ kind: string }>).filter(p => p.kind === 'step')).toHaveLength(1)
   })
 })
 

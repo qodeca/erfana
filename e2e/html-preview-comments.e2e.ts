@@ -932,6 +932,33 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
       .toBe(true)
   })
 
+  test('K-6, K-8 no mouse: the shortcut from the toolbar takes the keyboard into the page and starts the picker; Esc comes back to the toggle', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    const app = appWithTestProject
+    const page = windowWithTestProject
+    const preview = new HtmlPreviewPage(page, app)
+    const chrome = new CommentChrome(page, preview, 'e001.html')
+    const target = HtmlPreviewPage.target(PAGE)
+    await openCommentPage(preview, app, PAGE, TITLE)
+    await expect(chrome.modeButton()).not.toHaveAttribute('aria-disabled', 'true', { timeout: PREVIEW_BUDGET_MS })
+    await bringAppToFront(app)
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.webContents.focus())
+    await chrome.modeButton().focus()
+
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+Alt+m' : 'Control+Alt+m')
+    await expect(chrome.modeButton()).toHaveAttribute('aria-pressed', 'true', { timeout: PREVIEW_BUDGET_MS })
+    await expect.poll(async () => (await focusState(app, target))?.preview, { timeout: PREVIEW_BUDGET_MS }).toBe(true)
+    // No new page signal: the page sees the focus arrive, starts, and says where through its usual step.
+    await expect(chrome.announce()).toContainText('Comment mode on.', { timeout: PREVIEW_BUDGET_MS })
+
+    expect(await pressInPage(app, 'Escape', [], target)).toBe(true)
+    await expect(chrome.modeButton()).toHaveAttribute('aria-pressed', 'false', { timeout: PREVIEW_BUDGET_MS })
+    await expect.poll(async () => (await focusState(app, target))?.host, { timeout: PREVIEW_BUDGET_MS }).toBe(true)
+    await expect(chrome.modeButton()).toBeFocused()
+  })
+
   test('E-016c a pick made with the page holding the keyboard opens the window with the keyboard in its field; Ctrl/Cmd+Enter saves', async ({
     windowWithTestProject,
     appWithTestProject,

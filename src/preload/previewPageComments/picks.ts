@@ -16,6 +16,7 @@
  * would not run this one (§9.1 S7).
  */
 import {
+  CONTROL_PICKS_PER_SECOND,
   PICKS_PER_SECOND,
   STEPS_PER_SECOND,
   PICK_BOX_MAX_PX,
@@ -309,4 +310,32 @@ export function describeTarget(registry: TokenRegistry, element: Element): PickT
       ...(truncated ? { truncated: true as const } : {})
     }
   }
+}
+
+/** Element and pin picks share one budget; Esc and Alt+↑-out-of-a-frame each have their own. */
+export class PickBudgets {
+  private readonly pick: PickLimiter
+  private readonly exit: PickLimiter
+  private readonly parent: PickLimiter
+
+  constructor(now: () => number, private readonly post: (payload: PickPayload) => void) {
+    this.pick = new PickLimiter(now)
+    this.exit = new PickLimiter(now, CONTROL_PICKS_PER_SECOND)
+    this.parent = new PickLimiter(now, CONTROL_PICKS_PER_SECOND)
+  }
+
+  /** Send `payload` within its budget. `true` when an element or pin pick went out. */
+  send(payload: PickPayload): boolean {
+    const { kind } = payload
+    const limiter = kind === 'exit' ? this.exit : kind === 'parent' ? this.parent : this.pick
+    if (!limiter.tryTake()) return false
+    this.post(payload)
+    return limiter === this.pick
+  }
+}
+
+/** A right-click's `context` pick: on the selected words, or on `element`. */
+export function contextPayload(tokens: TokenRegistry, element: Element, event: MouseEvent, words: PageWords | null, win: Window): PickPayload {
+  const target = describeTarget(tokens, words?.target ?? element)
+  return { kind: 'context', via: 'pointer', ...target, ...wordsPart(words, target), screen: screenOf(event), view: viewOf(win) }
 }

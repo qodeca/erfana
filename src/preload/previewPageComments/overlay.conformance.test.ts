@@ -21,6 +21,7 @@ import { COMMENT_PICK_CHANNEL, TOKEN_ATTRIBUTE } from './constants'
 import { GUARDED_EVENTS } from './input'
 import {
   createHarness,
+  lastStep,
   microtasks,
   mount,
   token,
@@ -31,6 +32,7 @@ import {
   type Harness
 } from './__test-helpers__/harness'
 import { runOverlaySuite } from '../../shared/comments/__conformance__/overlay.suite'
+import { runPickerKeySuite } from '../../shared/comments/__conformance__/pickerKeys.suite'
 import {
   OVERLAY_FIXTURE,
   type GestureModifiers,
@@ -87,8 +89,19 @@ const commonAncestor = (a: Element, b: Element): Element => {
 const isShown = (el: Element | null | undefined): el is HTMLElement =>
   el !== null && el !== undefined && !el.classList.contains('erf-hpc-hidden')
 
+const realRects = Range.prototype.getClientRects
+
+/** The page sends which end; the window words it (`commentLive.ts`, pinned by its own test). */
+const END_SENTENCES: Readonly<Record<string, string>> = {
+  top: 'Top level – no parent to select.',
+  'no-child': 'Nothing inside to select.',
+  last: 'Last section at this level – Alt+Up for the parent.',
+  first: 'First section at this level.'
+}
+
 /** The driver over a harness whose page holds the fixture. */
 function driverOn(h: Harness): OverlayDriver {
+  h.state({ mode: false }) // Main's first state of the load: the mode is off, and can come on from here.
   for (const target of Object.keys(OVERLAY_FIXTURE) as OverlayTargetId[]) {
     h.doubles.setBox(elementOf(target), OVERLAY_FIXTURE[target].box)
   }
@@ -172,6 +185,7 @@ function driverOn(h: Harness): OverlayDriver {
     // A-03: the decided tab, the same words as the Markdown Preview's before a target is outlined.
     modeIndicatorIdle: 'Comment mode · Esc to leave',
     rightClickOutsideMode: 'page',
+    kinds: { container: 'section', first: 'section', inner: 'section', second: 'section', long: 'section' },
     notOwned: {
       menu: 'the element menu is main’s native menu; the page is hidden behind a still frame while it is open and gets no key',
       window: 'the comment window is renderer UI over a still frame of the page; the page gets no key while it is open',
@@ -180,6 +194,11 @@ function driverOn(h: Harness): OverlayDriver {
     },
     modeOn: () => h.state({ mode: true }),
     modeOff: () => h.state({ mode: false }),
+    // Main says the mode is on, then gives the page native focus (`preview:focusPage`).
+    modeOnByKeys() {
+      h.state({ mode: true })
+      h.controller.startPicker()
+    },
     isModeOn: () => h.controller.mode,
     modeIndicatorText() {
       const tab = part('.erf-hpc-tab')
@@ -208,6 +227,7 @@ function driverOn(h: Harness): OverlayDriver {
       userMouse(commonAncestor(start.el, end.el), 'click', { x: end.x, y: end.y, button: 0, detail: 1 })
     },
     selectText(target) {
+      Range.prototype.getClientRects = () => [] as unknown as DOMRectList // jsdom has no layout
       const text = [...elementOf(target).childNodes].find(node => node.nodeType === Node.TEXT_NODE)
       if (text === undefined) throw new Error(`no text in ${target}`)
       const range = document.createRange()
@@ -250,6 +270,15 @@ function driverOn(h: Harness): OverlayDriver {
       userKey({ key: 'ArrowUp', code: 'ArrowUp', altKey: true })
       userUp({ key: 'ArrowUp', code: 'ArrowUp', altKey: true })
     },
+    pressKey({ key, code, shift, alt, ctrl, meta }) {
+      begin()
+      const init = { key, code, shiftKey: shift === true, altKey: alt === true, ctrlKey: ctrl === true, metaKey: meta === true }
+      userKey(init)
+      userUp(init)
+    },
+    saidAtEnd() {
+      return END_SENTENCES[lastStep(h, COMMENT_PICK_CHANNEL) ?? ''] ?? null
+    },
     // Main's menu and window are not the page's: it was hidden and comes back, with the pointer away and returning.
     cancelPick() {
       h.controller.pointerLeft()
@@ -274,16 +303,20 @@ function driverOn(h: Harness): OverlayDriver {
     dispose() {
       for (const type of PAGE_EVENTS) document.removeEventListener(type, record)
       window.getSelection()?.removeAllRanges()
+      Range.prototype.getClientRects = realRects
       h.dispose()
     }
   }
 }
 
-runOverlaySuite('HTML', async () => {
+const makeDriver = async (): Promise<OverlayDriver> => {
   const h = createHarness()
   mount(PAGE)
   // The token window is open while the page parses: let the registry see the fixture, then close it.
   await microtasks()
   h.controller.documentReady()
   return driverOn(h)
-})
+}
+
+runOverlaySuite('HTML', makeDriver)
+runPickerKeySuite('HTML', makeDriver)

@@ -441,9 +441,8 @@ export const MD_SPOKEN_COPY = {
     `${capitalise(noun)}, line ${line}${excerpt === '' ? '' : `: “${excerpt}”`}.${comments > 0 ? ` ${plural(comments, 'comment', 'comments')}.` : ''}`,
   /** Added to the first steps after the mode turns on. */
   hint: ' Enter to comment, Shift+F10 for the menu.',
-  /** Tab at either end of the preview. */
-  last: 'End of the preview – Shift+Tab goes back.',
-  first: 'Start of the preview.',
+  /** A picker key in a preview with no target at all. */
+  noTargets: 'Nothing here to comment on.',
   /** C-16: turning the mode on with words selected only turns the mode on. */
   modeOnSelected: 'Comment mode on. Text is selected – press Enter or click Comment to comment on it.',
   /** C-10: the keyboard entry, in one sentence. */

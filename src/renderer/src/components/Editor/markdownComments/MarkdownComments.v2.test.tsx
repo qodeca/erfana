@@ -155,7 +155,7 @@ describe('Markdown Preview comments – comments-v2', () => {
       await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
       await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
       await waitFor(() => expect(content().querySelector('h1')).toHaveFocus())
-      for (let i = 0; i < 4; i += 1) await user.keyboard('{Tab}')
+      await user.keyboard('{Tab}{Tab}{Alt>}{ArrowDown}{/Alt}{Tab}')
       expect(listItem(9)).toHaveFocus()
       await user.keyboard('{Enter}')
       expect(await screen.findByRole('dialog', { name: 'Comment on list item' })).toBeVisible()
@@ -233,24 +233,24 @@ describe('Markdown Preview comments – comments-v2', () => {
           MD_SPOKEN_COPY.target('paragraph', 6, 'We ship the beta to ten customers by Friday.', 1) + MD_SPOKEN_COPY.hint
         )
       )
-      // The list, then its first item: past the third step the keys are no longer added.
-      await user.keyboard('{Tab}{Tab}{Tab}')
+      // The list, into it, then its second item: past the third step the keys are no longer added.
+      await user.keyboard('{Tab}{Alt>}{ArrowDown}{/Alt}{Tab}')
       expect(listItem(9)).toHaveFocus()
       await waitFor(() => expect(polite().textContent).toBe(MD_SPOKEN_COPY.target('list item', 9, 'two', 1)))
       expect(polite().textContent).toBe('List item, line 9: “two”. 1 comment.')
     })
 
-    it('C-10 (Markdown) Tab past either end of the preview says so', async () => {
+    it('C-10 (Markdown) Tab past either end of a level says so, with the one template and its kind word', async () => {
       const user = userEvent.setup()
       await ready()
       await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
       await waitFor(() => expect(content().querySelector('h1')).toHaveFocus())
       await user.keyboard('{Shift>}{Tab}{/Shift}')
-      await waitFor(() => expect(polite()).toHaveTextContent(MD_SPOKEN_COPY.first))
-      for (let i = 0; i < 5; i += 1) await user.keyboard('{Tab}')
+      await waitFor(() => expect(polite()).toHaveTextContent('First H1 heading at this level.'))
+      for (let i = 0; i < 3; i += 1) await user.keyboard('{Tab}')
       await waitFor(() => expect(polite()).toHaveTextContent('Paragraph, line 11: “Second paragraph here.”.'))
       await user.keyboard('{Tab}')
-      await waitFor(() => expect(polite()).toHaveTextContent(MD_SPOKEN_COPY.last))
+      await waitFor(() => expect(polite()).toHaveTextContent('Last paragraph at this level – Alt+Up for the parent.'))
     })
   })
 

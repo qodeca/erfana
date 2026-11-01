@@ -31,7 +31,7 @@ export interface PreviewCommentAdapter {
   readonly words: CommentWords
   /** The target that holds `node` (pointer, focus), climbing to the nearest one; `null` outside every target. */
   targetAt(node: Node | null): HTMLElement | null
-  /** Every target in document order: the keyboard picker's Tab order (C-08). */
+  /** Every target in document order: the keyboard picker reads its levels from this (C-08, A-15). */
   targetsInOrder(): HTMLElement[]
   /** The target that holds `target`, or `null` at the top level. */
   parentOf(target: HTMLElement): HTMLElement | null

@@ -590,7 +590,7 @@ Form card errors (`aria-invalid`, `aria-describedby`, icon + text). Settings get
 
 ### 10.8 Accessibility
 
-- Keyboard-only path: shortcut or toggle → picker starts on the hovered element, else the element at the viewport centre → Tab and ⇧Tab / Shift+Tab next/previous at the same level (then the parent's next sibling), ⌥↑ ⌥↓ / Alt+↑ Alt+↓ level, each move scrolls into view → Enter opens the window, ⇧F10 / Shift+F10 the menu. Arrow keys keep scrolling.
+- Keyboard-only path: shortcut or toggle → picker starts on the hovered element, else the element at the viewport centre → Tab and ⇧Tab / Shift+Tab next/previous at the same level, stopping at either end (differences table A-15), ⌥↑ ⌥↓ / Alt+↑ Alt+↓ level, each move scrolls into view → Enter opens the window, ⇧F10 / Shift+F10 the menu. Arrow keys keep scrolling.
 - Always-mounted polite live region in the shadow root ("button, Buy now, 2 comments."); mode and save results also go to `.erf-band__announce`; an assertive region for errors. Verify with NVDA, VoiceOver and Orca. *Rev 3 note (P7):* the page holds **no** live region – Find in page counts its text (E-022). The keyboard picker sends each move to main as a `step` pick (what it reached, as an element token – §19 "Picker words"), main passes it on as `commentModeChanged` with reason `picker`, and the comment chrome's polite region (`useLiveText`) says the §10.10 "Announce" sentence. Mode on and off are said there too.
 - The drawer is the guaranteed keyboard route to every thread.
 - Reduced motion: no transitions; flash = static highlight for 1.5 s; instant scrolling; nothing loops.

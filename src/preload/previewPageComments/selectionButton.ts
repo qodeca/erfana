@@ -59,6 +59,14 @@ export class SelectionButton {
     return gesture === 'select'
   }
 
+  /** Where a keyboard menu on the words opens: at the selection's last line (menu matrix § 4), or `null` with no box. */
+  menuPoint(): Point | null {
+    const selection = this.win.getSelection()
+    if (this.words === null || selection === null || selection.rangeCount === 0) return null
+    const last = rectsOf(selection.getRangeAt(0)).at(-1)
+    return last === undefined ? null : { x: Math.round(last.left), y: Math.round(last.bottom) }
+  }
+
   /**
    * The button's box now, `height` tall, `gap` from the selection; `null` –
    * and the words dropped – once the selection is gone or its target left the

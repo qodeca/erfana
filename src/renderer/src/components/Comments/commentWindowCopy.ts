@@ -87,9 +87,11 @@ export const WINDOW_COPY = {
   // ---- 024-FR-015 unsaved edits main knows of and this window does not ----
   unsavedElsewhere: (file: string): string => `${file} has unsaved changes in another window – save it there, then try again.`,
   shortenFirst: 'Shorten the comment to save it.',
-  // ---- C-10 the HTML picker's Tab at either end (said in the window's polite region, as every step) ----
-  pickerLast: 'Last section at this level – Alt+Up for the parent.',
-  pickerFirst: 'First section at this level.',
+  // ---- C-10 the picker's Tab at either end of a level, one template in both previews (D-04) ----
+  pickerLast: (kind: string): string => `Last ${kind} at this level – Alt+Up for the parent.`,
+  pickerFirst: (kind: string): string => `First ${kind} at this level.`,
+  // ---- K-26 a step key with nothing to step to ----
+  noStepTarget: 'No comments to go to.',
   // ---- C-19.5 the counter's crossings, said once each in the polite region ----
   charsLeft: (left: number): string => `${left.toLocaleString('en-US')} characters left`,
   overBy: (over: number): string => `Over the limit by ${over.toLocaleString('en-US')}`,

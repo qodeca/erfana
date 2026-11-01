@@ -64,7 +64,7 @@ import { nounTargetOf } from './previewAdapter'
 import { useHostCommentMode } from './useHostCommentMode'
 import { useHostPointerKeys } from './useHostPointerKeys'
 import { useHostThreads } from './useHostThreads'
-import { takeFindEscape, takeModeEscape, type ModeEscapeKey } from '../commentModeEscape'
+import { useHostPanelKeys } from './useHostPanelKeys'
 
 export type { CommentOverlayHost, CommentOverlayHostOptions, HostMenu, RendererCommentSource } from './hostTypes'
 
@@ -228,10 +228,12 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
 
   // With words selected the menu is about them (M-12, M-14, M-16, M-19, M-21); the target is where they start.
   const openMenu = useCallback(
-    (under: HTMLElement | null, at: { x: number; y: number }) => {
-      const pick = selection.read()
-      const target = pick?.target ?? under
+    (under: HTMLElement | null, at: { x: number; y: number }, byKey = false) => {
       const on = store.getState().panels.get(panelId)?.mode === true
+      const read = selection.read()
+      // K-11: in comment mode a key acts on what is outlined; selected words elsewhere are not it.
+      const pick = byKey && on && read?.target !== under ? null : read
+      const target = pick?.target ?? under
       if (target === null) {
         if (on) setMenu({ ...at, ...targetlessMenu(words) })
         return
@@ -259,6 +261,8 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
     if (pick !== null && pick.refused === null) void openNew(pick.target, 'page', pick.words)
   }, [selection, openNew])
 
+  const panelKeys = useHostPanelKeys({ live, adapter, file, placements, drawerId, openThreads: openStepped, mode, windowOpen: request !== null, menuOpen: menu !== null, leaveMode: () => (setMode(false), announce(ANNOUNCE.modeOff)), closeWindow: () => setRequest(null) })
+
   const pointer = useHostPointerKeys({
     live,
     mode,
@@ -273,7 +277,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
       announce(ANNOUNCE.modeOff)
       modeButtonRef.current?.focus()
     },
-    onWindowEscape: () => setRequest(null),
+    onWindowEscape: panelKeys.dismissWindow,
     onPick: pickTarget,
     speak: target => spokenTarget(target, adapter, placements, file),
     markAt: (x, y) => commentMarkAt(markOwner, x, y),
@@ -281,20 +285,12 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
     onMenu: openMenu,
     selectionRect: () => selection.read()?.rect ?? null,
     onSay: announce,
+    onKeyMove: selection.hideButton,
     onScroll: () => setScrollTick(n => n + 1)
   })
   useEffect(() => {
     focusFirst.current = pointer.focusFirst
   }, [pointer.focusFirst])
-
-  // Esc from the panel's chrome. The window comes before the mode in the Esc order, and it is open beside the toolbar.
-  const leaveByEscape = useCallback(() => {
-    if (request !== null) return setRequest(null)
-    setMode(false)
-    announce(ANNOUNCE.modeOff)
-  }, [request, setMode, announce])
-  const onPanelKey = useCallback((event: ModeEscapeKey) => void takeModeEscape(event, mode && menu === null, leaveByEscape), [mode, menu, leaveByEscape])
-  const onPanelKeyCapture = useCallback((event: React.KeyboardEvent) => takeFindEscape(event, mode && menu === null, leaveByEscape), [mode, menu, leaveByEscape])
 
   // ---- writes ----
   const liveDraft = useDraftKeepAlive(request?.kind === 'new' ? request.draftToken : null, () => optionsRef.current.source.openDraft())
@@ -474,6 +470,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
     window: window_,
     polite,
     assertive,
+    stepSaid: panelKeys.stepSaid,
     outlined,
     placements,
     file,
@@ -482,8 +479,8 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
     scrollTick,
     selectionButton: request === null && menu === null ? selection.button : null,
     onSelectionButton,
-    onPanelKey,
-    onPanelKeyCapture,
+    onPanelKey: panelKeys.onPanelKey,
+    onPanelKeyCapture: panelKeys.onPanelKeyCapture,
     markOwner,
     activeThreads: live && request?.kind === 'threads' ? request.threadKeys : NO_THREADS
   }

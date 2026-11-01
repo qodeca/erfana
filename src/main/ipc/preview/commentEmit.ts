@@ -16,7 +16,9 @@
  * the pick that opened the menu or window was a click or key inside the page,
  * which still holds focus, and the renderer's DOM focus alone cannot take it
  * back – the reader's typing and Cmd/Ctrl+Enter would land in the page (§19
- * "Rev 4 – owner test: comment window focus and save key").
+ * "Rev 4 – owner test: comment window focus and save key"). `modeChanged` does
+ * the same when Esc in the page left comment mode (K-8): the renderer then puts
+ * focus on the toggle, which takes the keyboard only in a focused contents.
  */
 import type { ZodType } from 'zod'
 import { PreviewCommentEvents } from '../../../shared/ipc/preview-comment-channels'
@@ -80,7 +82,7 @@ export function createPreviewCommentEmitters(deps: PreviewCommentEmitterDeps): P
     anchorStatus: (windowId, payload) =>
       send(PreviewCommentEvents.ANCHOR_STATUS, CommentAnchorStatusSchema, windowId, payload),
     modeChanged: (windowId, payload) =>
-      send(PreviewCommentEvents.MODE_CHANGED, CommentModeChangedSchema, windowId, payload),
+      send(PreviewCommentEvents.MODE_CHANGED, CommentModeChangedSchema, windowId, payload, payload.reason === 'escape'),
     saveSettled: (windowId, payload) =>
       send(PreviewCommentEvents.SAVE_SETTLED, CommentSaveSettledSchema, windowId, payload)
   }

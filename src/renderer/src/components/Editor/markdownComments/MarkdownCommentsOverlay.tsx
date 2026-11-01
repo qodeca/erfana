@@ -18,8 +18,6 @@ import { CommentDrawer } from '../../Comments/CommentDrawer'
 import { MARKDOWN_WORDS } from '../../Comments/commentCopyWords'
 import { CommentWindow } from '../../Comments/CommentWindow'
 import { CommentWordsContext } from '../../Comments/commentWords'
-import { useLiveText } from '../../Comments/commentLive'
-import { useHostStepKeys } from '../../Comments/overlay/useHostStepKeys'
 import { CommentOverlayLayer } from '../../Comments/overlay/CommentOverlayLayer'
 import type { PreviewCommentAdapter } from '../../Comments/overlay/previewAdapter'
 import type { CommentOverlayHost } from '../../Comments/overlay/useCommentOverlayHost'
@@ -59,23 +57,11 @@ export function MarkdownCommentsOverlay(props: MarkdownCommentsOverlayProps): Re
   const { host, adapter, scroller, area, filePath, content: markdown, bindPane } = props
   const menu = host.menu
   const content = scroller?.querySelector<HTMLElement>('.markdown-preview-content') ?? null
-  // C-13: Alt+F9 / Alt+Shift+F9 with focus in the preview; where a step landed is said here.
-  const [stepSaid, sayStep] = useLiveText()
-  useHostStepKeys({
-    live: host.shown,
-    scroller,
-    adapter,
-    file: host.file,
-    placements: host.placements,
-    drawerId: host.toolbar.drawerId,
-    openThreads: host.openStepped,
-    announce: sayStep
-  })
   return (
     <CommentWordsContext.Provider value={MARKDOWN_WORDS}>
       <span hidden ref={bindPane} />
       <p className="erf-comment-sr" aria-live="polite" data-testid={TEST_IDS.COMMENT_STEP_LIVE}>
-        {stepSaid}
+        {host.stepSaid}
       </p>
       {host.shown && (
         <CommentOverlayLayer

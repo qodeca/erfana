@@ -204,6 +204,35 @@ test.describe('Markdown Preview comments', () => {
     await expect(md.modeButton()).toBeFocused()
   })
 
+  test('A-15, K-12 keyboard only: Tab stays at its level and says so; Alt+Down goes back the way Alt+Up came', async ({ windowWithTestProject }) => {
+    const page = windowWithTestProject
+    const md = await openReview(page)
+    await page.keyboard.press(MODE_KEY)
+    await expect(md.target('h1', 1)).toBeFocused({ timeout: MD_COMMENT_BUDGET_MS })
+    await page.keyboard.press('Tab')
+    await page.keyboard.press('Tab')
+    await expect(md.target('ul', 5)).toBeFocused()
+    await page.keyboard.press('Alt+ArrowDown')
+    await page.keyboard.press('Tab')
+    await expect(md.target('li', 6)).toBeFocused()
+    await page.keyboard.press('Alt+ArrowUp')
+    await expect(md.target('ul', 5)).toBeFocused()
+    await page.keyboard.press('Alt+ArrowDown')
+    await expect(md.target('li', 6)).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(md.target('li', 6)).toBeFocused()
+    await expect(md.announce()).toHaveText('Last list item at this level – Alt+Up for the parent.')
+  })
+
+  test('I-25, K-26 Alt+F9 from the toolbar: with no comment it says so, in the panel, with no mouse', async ({ windowWithTestProject }) => {
+    const page = windowWithTestProject
+    const md = await openReview(page)
+    await md.modeButton().focus()
+    await page.keyboard.press('Alt+F9')
+    await expect(page.getByTestId('comment-step-live')).toHaveText('No comments to go to.')
+    await expect(md.modeButton()).toBeFocused()
+  })
+
   test('I-1 Esc leaves comment mode from the toolbar after a mouse click on the toggle', async ({ windowWithTestProject }) => {
     const page = windowWithTestProject
     const md = await openReview(page)

@@ -127,6 +127,18 @@ describe('Markdown Preview selection comments (024-AC-005)', () => {
     return api.save.mock.calls[0][0] as Record<string, unknown>
   }
 
+  it('K-11 in comment mode a key acts on what is outlined: after moving off the words, the menu is the outlined target’s', async () => {
+    const user = userEvent.setup()
+    await ready()
+    selectWords(paragraph(), 'ten customers by')
+    await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
+    await waitFor(() => expect(paragraph()).toHaveFocus())
+    await user.keyboard('{Tab}{Shift>}{F10}{/Shift}')
+    const menu = await screen.findByTestId(TEST_IDS.COMMENT_CONTEXT_MENU)
+    expect(menu).not.toHaveAccessibleName(SELECTION_COPY.menuLabel)
+    expect(screen.queryByTestId(TEST_IDS.COMMENT_MENU_SELECTION)).toBeNull()
+  })
+
   it('024-AC-005 (a) M-12: three words, right-click, Comment on selection saves them as anchor.sel on the paragraph', async () => {
     const user = userEvent.setup()
     await ready()

@@ -103,6 +103,14 @@ describe('C-13 a step key from the preview', () => {
     expect(takePreviewStep({ ...host, filter: 'cantEdit' }, 'next')).toBe(false)
   })
 
+  it('K-26 a step with nothing to go to says so', () => {
+    const announce = vi.fn()
+    const open = vi.fn()
+    expect(takePreviewStep({ panelKey: 'empty', files: () => [], filter: 'open', open, announce, noun: () => 'paragraph' }, 'next')).toBe(false)
+    expect(open).not.toHaveBeenCalled()
+    expect(announce).toHaveBeenCalledWith('No comments to go to.')
+  })
+
   it('024-AC-019 C-13 the key rule is the same pair on every system: Alt+F9 next, Alt+Shift+F9 previous', () => {
     const press = { code: 'F9', alt: true, shift: false, control: false, meta: false }
     expect(commentStepOf(press)).toBe('next')

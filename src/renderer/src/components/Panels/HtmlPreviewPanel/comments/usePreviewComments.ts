@@ -35,6 +35,7 @@ import {
 import { useLatestRef } from '../../../../hooks/useLatestRef'
 import { isMacOS } from '../../../../utils/platform'
 import { commentModeKeyFromDomEvent, matchCommentModeKey } from '../../../../../../shared/commentModeKey'
+import { commentStepFromDomEvent } from '../../../../../../shared/commentStepKey'
 import { openFileInPanel } from '../../../../utils/openFileInPanel'
 import { getBasename } from '../../../../utils/fileUtils'
 import { ANNOUNCE, COPY, DRAWER_COPY, writtenAnnouncement } from '../../../Comments/commentCopy'
@@ -50,7 +51,7 @@ import { listCounts, type DrawerRow } from '../../../Comments/commentRows'
 import type { PreviewCommentsLayerProps } from './PreviewCommentsLayer'
 import { useLiveText } from '../../../Comments/commentLive'
 import { takeFindEscape, takeModeEscape } from '../../../Comments/commentModeEscape'
-import { COMMENT_LIST_COPY, HTML_WORDS } from '../../../Comments/commentCopyWords'
+import { COMMENT_LIST_COPY, HTML_WORDS, MD_SPOKEN_COPY } from '../../../Comments/commentCopyWords'
 import { useRemovedOutside } from '../../../Comments/commentRemovedOutside'
 import { closeReturnsToPage, newCommentRequest, pinWindowRequest, rowWindowRequest, withWords, type RowTarget } from './previewCommentRequests'
 import { usePageCommentStepKeys } from './usePageCommentStepKeys'
@@ -138,7 +139,9 @@ export function usePreviewComments({
   const [polite, announce] = useLiveText()
   const [assertive, alert] = useLiveText()
   const listButtonRef = useRef<HTMLButtonElement>(null)
+  const modeButtonRef = useRef<HTMLButtonElement>(null)
   const pickerSteps = useRef(0) // C-10: picker steps said since the mode last changed (the first ones add the keys).
+  const keyEntry = useRef(false) // C-10: the keyboard entry says the mode and the start in one sentence.
   // OD-06: open comments that a list no longer holds, and Erfana did not delete.
   const removed = useRemovedOutside(state.list, HTML_WORDS)
   const keepDraft = usePreviewDraftKeepAlive(panelId, request?.kind === 'new' ? request.draftToken : null)
@@ -205,12 +208,16 @@ export function usePreviewComments({
       if (payload.reason === 'picker') {
         const say = pickerAnnouncement(payload, pickerSteps.current)
         if (payload.say === 'showing') pickerSteps.current += 1
-        if (say !== undefined) announce(say)
+        if (say !== undefined) announce(keyEntry.current ? MD_SPOKEN_COPY.modeOnAt(say) : say)
+        keyEntry.current = false
         return
       }
       pickerSteps.current = 0
+      keyEntry.current = payload.on && payload.reason === 'shortcut'
       store.getState().patch(panelId, { mode: payload.on })
       announce(payload.on ? HTML_WORDS.modeOn : ANNOUNCE.modeOff)
+      // K-8: main handed native focus back with this event (`commentEmit.ts`).
+      if (payload.reason === 'escape') modeButtonRef.current?.focus()
     })
     return () => {
       offDraft()
@@ -264,6 +271,7 @@ export function usePreviewComments({
       void setMode(on, latestRef.current.showIcons).then(now => {
         announce(now ? HTML_WORDS.modeOn : ANNOUNCE.modeOff)
         // Keyboard activation moves focus into the page with the picker started (§10.1).
+        keyEntry.current = now && byKeyboard
         if (now && byKeyboard) void previewGateway.focusPage(panelId).catch(() => {})
       })
     },
@@ -332,18 +340,6 @@ export function usePreviewComments({
     return box ? { left: box.left, top: box.top, width: box.width, height: box.height } : null
   }, [pageAreaRef])
 
-  const onRootKeyDown = useCallback(
-    (event: PreviewKeyEventLike) => {
-      if (!enabled || !ready || menu !== null || request !== null) return
-      // I-1: focus in the chrome, where the page's own Esc cannot be reached.
-      if (takeModeEscape(event, latestRef.current.mode, () => toggleMode(false))) return
-      // The one rule main forwards the page's key by (`shared/commentModeKey`, M3).
-      if (!matchCommentModeKey(commentModeKeyFromDomEvent(event), isMacOS())) return
-      event.preventDefault()
-      toggleMode(false)
-    },
-    [enabled, ready, menu, request, toggleMode, latestRef]
-  )
   const onRootKeyDownCapture = useCallback((event: React.KeyboardEvent) => takeFindEscape(event, latestRef.current.mode, () => toggleMode(false)), [toggleMode, latestRef])
 
   // A drawer row's Open, or a step key from the page (C-13): its element comes into view behind the window,
@@ -352,7 +348,22 @@ export function usePreviewComments({
     if (show && row.threadKey !== undefined) void commentGateway.reveal(panelId, row.threadKey)
     setRequest(rowWindowRequest(panelId, row, centreOf(getArea()), listAfter(), opener))
   }
-  usePageCommentStepKeys({ panelId, live: enabled && visible, drawerId, readList: refreshList, announce, open: ({ file, threadKey }) => openRow({ ...file, threadKey }, true, 'page') })
+  const stepFromChrome = usePageCommentStepKeys({ panelId, live: enabled && visible, drawerId, readList: refreshList, announce, open: ({ file, threadKey }, chrome) => openRow({ ...file, threadKey }, true, chrome ? 'drawer' : 'page') })
+  const onRootKeyDown = useCallback(
+    (event: PreviewKeyEventLike) => {
+      if (!enabled || !ready || menu !== null || request !== null) return
+      const step = commentStepFromDomEvent(event)
+      if (step !== null) return event.preventDefault(), stepFromChrome(step)
+      // I-1: focus in the chrome, where the page's own Esc cannot be reached.
+      if (takeModeEscape(event, latestRef.current.mode, () => toggleMode(false))) return
+      // The one rule main forwards the page's key by (`shared/commentModeKey`, M3).
+      if (!matchCommentModeKey(commentModeKeyFromDomEvent(event), isMacOS())) return
+      event.preventDefault()
+      // I-17: as from the page or the toggle by keyboard, the shortcut takes the keyboard into the page.
+      toggleMode(true)
+    },
+    [enabled, ready, menu, request, toggleMode, latestRef, stepFromChrome]
+  )
 
   // C-06: the count's name adds how many open comments changed, from the list main last sent.
   const changed = useMemo(() => listCounts(state.list.files).changed, [state.list.files])
@@ -367,6 +378,7 @@ export function usePreviewComments({
     modeUnavailableText: modeBlocked, // M-07
     onToggleMode: toggleMode,
     onToggleDrawer: () => setDrawerOpen(!latestRef.current.drawerOpen),
+    modeRef: modeButtonRef,
     listRef: listButtonRef
   }
 

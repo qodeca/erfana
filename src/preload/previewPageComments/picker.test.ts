@@ -172,34 +172,33 @@ describe('Alt+↑ / Alt+↓ (J-002)', () => {
 
 describe('keyboard picker (J-010)', () => {
   it('J-010 starts on the hovered element, else at the viewport centre, and Tab walks the level', () => {
-    // No pointer yet: the element at the centre of the 1024 × 768 test viewport.
+    // No pointer yet: the element at the centre of the 1024 × 768 test viewport. The first key lands on it (K-6).
     vi.spyOn(document, 'elementFromPoint').mockImplementationOnce(() => byId('title'))
+    userKey({ key: 'Tab' })
+    expect(spoken()).toBe('showing h1#title')
     userKey({ key: 'Tab' })
     expect(spoken()).toBe('showing ul#list')
     userKey({ key: 'Tab' })
     // <script> is skipped.
     expect(spoken()).toBe('showing p#last')
-    userKey({ key: 'Tab' })
-    expect(spoken()).toBe('showing footer#foot')
     userKey({ key: 'Tab', shiftKey: true })
-    expect(spoken()).toBe('showing main#main')
+    expect(spoken()).toBe('showing ul#list')
     // Each move scrolls the element into view.
     expect(h.doubles.scrolledIntoView.at(-1)).toEqual({
-      element: byId('main'),
+      element: byId('list'),
       options: { block: 'nearest', inline: 'nearest' }
     })
   })
 
-  it('J-010 Tab at the end of a level climbs to the parent’s next sibling, and stops at the last one', () => {
+  it('A-15 Tab at the end of a level stays and says so: it never climbs to the parent’s next sibling', () => {
     userMove(10, 100) // li#two, the last item
     userKey({ key: 'Tab' })
-    expect(spoken()).toBe('showing p#last')
-    userMove(10, 530)
-    userKey({ key: 'Tab' })
-    // C-10: it stays on p#last and says it is the last one (the window says "Last section at this level – …").
+    // C-10: the window says "Last section at this level – …".
     expect(spoken()).toBe('last')
     userKey({ key: 'Tab', shiftKey: true })
-    expect(spoken()).not.toBe('last')
+    expect(spoken()).toBe('showing li#one')
+    userKey({ key: 'Tab', shiftKey: true })
+    expect(spoken()).toBe('first')
   })
 
   it('024-AC-018 C-10 (HTML) Shift+Tab on the first element stays put and says it is the first', () => {
@@ -261,6 +260,7 @@ describe('picker edges', () => {
   it('Alt+↓ with no remembered path goes to the first child that can be shown', () => {
     vi.spyOn(document, 'elementFromPoint').mockImplementationOnce(() => byId('title'))
     userKey({ key: 'Tab' })
+    userKey({ key: 'Tab' })
     expect(spoken()).toBe('showing ul#list')
     userKey({ key: 'ArrowDown', code: 'ArrowDown', altKey: true })
     expect(spoken()).toBe('showing li#one')
@@ -303,7 +303,7 @@ describe('picker edges', () => {
     at.mockReturnValueOnce(null).mockReturnValueOnce(null).mockReturnValueOnce(byId('title'))
     userMove(10, 60)
     userKey({ key: 'Tab' })
-    expect(spoken()).toBe('showing ul#list')
+    expect(spoken()).toBe('showing h1#title')
   })
 
   it('works in a document without a <body>', () => {

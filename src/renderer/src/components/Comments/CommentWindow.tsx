@@ -73,6 +73,7 @@ import type { IdentityFormData } from './commentSchemas'
 import { CommentStepper, MoreActions, stepKeyOf } from './CommentStepper'
 import { useDrawerFilter } from './commentDrawerFilter'
 import { useWindowStepTarget } from './commentStepKeys'
+import { useWindowDismiss } from './commentWindowDismiss'
 import { WINDOW_COPY, editWordsNotice, unsavedElsewhereText, windowRefusal } from './commentWindowCopy'
 import { headingOf, newCommentAction } from './commentWindowHeading'
 import { stepPosition, withResolved } from './commentWindowStates'
@@ -203,6 +204,7 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
     if (top) top()
     else onClose()
   }, [onClose])
+  useWindowDismiss(props.drawerId ?? request.panelId, dismiss)
   // Gone before it was shown, or deleted from here: nothing left to show (M2).
   const { gone } = session
   useEffect(() => {
@@ -360,11 +362,11 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
   useWindowStepTarget(props.drawerId ?? request.panelId, request.kind === 'threads' ? shownThread?.threadKey : undefined, view === 'threads' ? stepFromPreview : undefined)
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
     const key = stepKeyOf(event.nativeEvent)
-    if (key === null || step === null || view !== 'threads') return
-    const target = key === 'next' ? step.next : step.previous
-    if (target === null) return
+    if (key === null) return
     event.preventDefault()
-    stepTo(target)
+    const target = view === 'threads' ? ((key === 'next' ? step?.next : step?.previous) ?? null) : null
+    if (target === null) announce(WINDOW_COPY.noStepTarget) // K-26
+    else stepTo(target)
   }
 
   const dock = useDock(props.dock, request.kind === 'threads' ? (shownThread?.threadKey ?? null) : null, shownThread ?? (request.kind === 'new' ? request.target : ''), shownThread?.line ?? (request.kind === 'new' ? request.target.line : 1), words.noun)

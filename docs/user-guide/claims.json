@@ -6048,7 +6048,7 @@
       "quote": "`preventDefault` only in the comment-mode guard (`swallow` in `input.ts`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/input.ts:100",
+      "source": "src/preload/previewPageComments/input.ts:102",
       "match": "function swallow(event: Event): void {"
     },
     {
@@ -7470,7 +7470,7 @@
       "quote": "Blocked in comment mode (`input.ts` cancels `mousedown` and `dragstart`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/input.ts:56",
+      "source": "src/preload/previewPageComments/input.ts:58",
       "match": "'mousedown',"
     },
     {
@@ -24973,7 +24973,7 @@
       "quote": "and the panel matches it on its own chrome and dockview group element (`usePreviewComments`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/usePreviewComments.ts:341",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/usePreviewComments.ts:360",
       "match": "if (!matchCommentModeKey(commentModeKeyFromDomEvent(event), isMacOS())) return"
     },
     {
@@ -24983,7 +24983,7 @@
       "quote": "**Esc** leaves comment mode.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/input.ts:117",
+      "source": "src/shared/comments/overlayCore/pickerKeys.ts:52",
       "match": "return event.key === 'Escape' ? 'exit' : null"
     },
     {
@@ -25328,8 +25328,8 @@
       "quote": "The keys inside comment mode (Tab, Alt+Up / Down Arrow, Enter, Shift+F10)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/input.ts:110",
-      "match": "if (event.code === 'ArrowUp') return 'up'"
+      "source": "src/shared/comments/overlayCore/pickerKeys.ts:45",
+      "match": "if (physical === 'ArrowUp') return 'parent'"
     },
     {
       "id": "keyboard-shortcuts/65",
@@ -37095,7 +37095,7 @@
       "quote": "<kbd>Ctrl+Alt+M</kbd>; <kbd>Esc</kbd> |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/input.ts:117",
+      "source": "src/shared/comments/overlayCore/pickerKeys.ts:52",
       "match": "return event.key === 'Escape' ? 'exit' : null"
     },
     {
@@ -48551,7 +48551,7 @@
       "quote": "Shift+F10 / Menu key on the picked element (at its top-left + 4 px)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/input.ts:114",
+      "source": "src/shared/comments/overlayCore/pickerKeys.ts:49",
       "match": "event.key === 'ContextMenu'"
     },
     {
@@ -49111,7 +49111,7 @@
       "quote": "after a coordinate hit test (controller.ts:229-231, verified)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/controller.ts:218",
+      "source": "src/preload/previewPageComments/controller.ts:213",
       "match": "event.detail > 0"
     },
     {
@@ -49974,7 +49974,7 @@
       "quote": "Tab and Shift+Tab move the outline to the next or previous element",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/input.ts:113",
+      "source": "src/shared/comments/overlayCore/pickerKeys.ts:48",
       "match": "if (event.key === 'Tab') return event.shiftKey ? 'previous' : 'next'"
     },
     {
@@ -49984,7 +49984,7 @@
       "quote": "Shift+F10 or the Menu key opens the menu",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/input.ts:114",
+      "source": "src/shared/comments/overlayCore/pickerKeys.ts:49",
       "match": "if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) return 'menu'"
     },
     {
@@ -53517,7 +53517,7 @@
       "quote": "the input guards stop `beforetoggle` and `toggle` on the host",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/input.ts:70",
+      "source": "src/preload/previewPageComments/input.ts:72",
       "match": "export const TOGGLE_EVENTS = ['beforetoggle', 'toggle'] as const"
     },
     {
@@ -54872,7 +54872,7 @@
       "quote": "Select **Repair comment…**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:101",
+      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:103",
       "match": "rebuildAction: 'Repair comment…',"
     },
     {
@@ -54882,7 +54882,7 @@
       "quote": "**What you see now** and **Saved copy**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:104",
+      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:106",
       "match": "dataSays: 'Saved copy',"
     },
     {
@@ -54892,7 +54892,7 @@
       "quote": "Select **Repair comment**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:105",
+      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:107",
       "match": "rebuild: 'Repair comment',"
     },
     {
@@ -54902,7 +54902,7 @@
       "quote": "choose **Mark resolved** or **Keep open** instead",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:107",
+      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:109",
       "match": "keepOpen: 'Keep open'"
     },
     {
