@@ -1,0 +1,1562 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * Built-in browser (spec 025) – the screens' shared styles.
+ *
+ * PROPOSED – not adopted. Design note: docs/designs/browser/README.md.
+ * Loaded AFTER the system CSS each screen links (tokens.css, ds.css, then
+ * tabs.css, button.css, badge.css, form.css, menu.css, tooltip.css,
+ * feedback.css, row.css, host.css, states.css, dialog.css as needed) and the
+ * three proposed cards this design adds:
+ *   system/components/origin-field/origin-field.css   the address field
+ *   system/patterns/picker/picker.css                  outline, label, pick frame
+ *   system/patterns/site-prompts/site-prompts.css      strip rows
+ * Buttons, chips, menus, fields, banners and rows come from those files and are
+ * never restyled here. This file keeps only what is browser-specific: the tab's
+ * anatomy (rows, page area, frame gutter, width presets) and per-screen layout.
+ *
+ * NAMING
+ *   erf-brw-*   a part of the browser tab as the app would draw it (app scale:
+ *               11px text is allowed, because a frame draws the app to scale)
+ *   brw-*       documentation chrome on the screens: gallery, frames, captions,
+ *               tags (never below --text-base, 13px)
+ * Wave 2 adds its rules in ITS OWN marked section below, with a screen prefix
+ * after erf-brw- when a part is screen-only (erf-brw-pa-* prompt-actions,
+ * erf-brw-pk-* picking, erf-brw-sp-* site-prompts, erf-brw-ps-* page-states,
+ * erf-brw-md-* menus-and-data), and edits no other section.
+ *
+ * TIERS. The tab is a size container (erf-brw). The tiers are container
+ * queries on the tab's own width and change only things that never fold a
+ * tool off the row – what leaves the navigation row, and in which order, is
+ * the FOLD ORDER in section 2, set by the component from what it measures:
+ *   full      700px and wider
+ *   compact   below 700px – tighter row padding
+ *   narrow    below 520px – the banner's second clause takes its short form,
+ *             "⌘E again: pick under the mouse"
+ *   minimal   below 380px – the placeholder shortens; on the pick row the
+ *             terminal name may truncate past 8 characters (process kept);
+ *             360px is the narrowest width drawn (200% zoom)
+ * Icon-only labels, names kept: the width preset below 700px, and at any
+ * width while pick mode is on or the send notice shows (out of room it folds
+ * into More – never a further icon-only step, R7-M2); Pick element, the
+ * pop-up chip and the in-use chip below 520px (by tier only – never a fold
+ * step, R6-M4).
+ * More shows when any tool has folded into it, or while the Page width group
+ * is in it – the width preset leaves the pick row in pick mode below 520px,
+ * in Out and while a timed note shows below 700px, and while the send notice
+ * shows below 800px (rules in sections 4 and 5, R6-M2). More counts in the fold
+ * order: the component measures the row with More on it.
+ * Literal px because a custom property cannot be used in a container
+ * condition.
+ *
+ * Positions inside a drawing are custom properties (--ds-top …), never literal
+ * spacing (docs/designs/README.md).
+ */
+
+/* =====================================================================
+   1. Shared frame and gallery layout (documentation chrome)
+   ===================================================================== */
+
+/* The screens are galleries, wider than a card's reading column. */
+.brw-page > main { max-inline-size: none; }
+.brw-page .ds-lede,
+.brw-page .ds-note,
+.brw-page .ds-muted { max-inline-size: 110ch; }
+
+.brw-section { margin-block: var(--space-24) var(--space-8); }
+
+/* Frames side by side when two fit, one per row otherwise. */
+.brw-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 620px), 1fr));
+  gap: var(--space-12);
+  align-items: start;
+  margin: 0 0 var(--space-16);
+}
+.brw-gallery--wide { grid-template-columns: minmax(0, 1fr); }
+
+/* One state per frame. The drawing is inert and aria-hidden; the caption names
+   the surface, the state, the spec ids and any assumption. */
+.brw-frame {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-inline-size: 0;
+}
+.brw-frame > figcaption { margin-block-start: 0; }
+.brw-frame > figcaption p { margin: var(--space-3) 0 0; max-inline-size: 72ch; }
+
+/* The drawing area: lets a drawing wider than the column scroll instead of
+   pushing the grid. */
+.brw-stage { max-inline-size: 100%; overflow-x: auto; }
+
+.brw-ids {
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--ds-text-small);
+}
+.brw-tag {
+  display: inline-block;
+  padding: 0 var(--space-3);
+  border: var(--border-width) solid var(--color-border-subtle);
+  color: var(--color-text-bright);
+  font-size: var(--ds-text-small);
+  white-space: nowrap;
+}
+.brw-tag--assume { border-color: var(--color-warning-border); background: var(--color-warning-bg); }
+.brw-tag--platform { border-color: var(--color-border-focus); }
+
+/* A sheet of small drawings for per-control states (rest, hover, focus):
+   one cell per state, labelled underneath. */
+.brw-sheet {
+  display: grid;
+  grid-template-columns: max-content repeat(3, max-content);
+  /* As wide as its columns, so the edge wraps every cell and the stage
+     scrolls at 200% instead of clipping the last column (SC 1.4.10). */
+  inline-size: max-content;
+  gap: var(--space-6) var(--space-12);
+  align-items: center;
+  padding: var(--space-8);
+  background: var(--color-bg-primary);
+  border: var(--border-width) solid var(--color-border-subtle);
+}
+.brw-sheet__head,
+.brw-sheet__name {
+  color: var(--color-text-tertiary);
+  font-size: var(--ds-text-small);
+}
+.brw-sheet__head { color: var(--color-text-bright); }
+
+/* The gallery index (index.html). */
+.brw-screens { display: grid; gap: var(--space-6); max-inline-size: 110ch; margin: 0 0 var(--space-16); padding: 0; list-style: none; }
+.brw-screens li {
+  display: grid;
+  grid-template-columns: minmax(0, 18ch) minmax(0, 1fr);
+  gap: var(--space-8);
+  padding: var(--space-6) var(--space-8);
+  border: var(--border-width) solid var(--color-border-default);
+  background: var(--color-bg-tertiary);
+  font-size: var(--ds-text-body);
+}
+
+/* =====================================================================
+   2. Browser tab anatomy (app scale)
+   ===================================================================== */
+
+/* ---------- the tab: a size container, top to bottom ---------- */
+
+.erf-brw {
+  --erf-brw-width: 720px;
+  --erf-brw-gutter: calc(var(--space-1) + var(--border-width-thick)); /* 4px: --space-1 gap, then the 2px edge */
+  --erf-brw-spin: 0.8s; /* proposed --duration-spin, as button.css names it */
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  inline-size: var(--erf-brw-width);
+  overflow: hidden;
+  background: var(--color-bg-primary);
+  border: var(--border-width) solid var(--color-border-subtle);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  container: erf-brw / inline-size;
+}
+.erf-brw--w320 { --erf-brw-width: 320px; }
+.erf-brw--w360 { --erf-brw-width: 360px; }
+.erf-brw--w380 { --erf-brw-width: 380px; }
+.erf-brw--w400 { --erf-brw-width: 400px; }
+.erf-brw--w480 { --erf-brw-width: 480px; }
+.erf-brw--w512 { --erf-brw-width: 512px; }
+.erf-brw--w520 { --erf-brw-width: 520px; }
+.erf-brw--w560 { --erf-brw-width: 560px; }
+.erf-brw--w640 { --erf-brw-width: 640px; }
+.erf-brw--w700 { --erf-brw-width: 700px; }
+.erf-brw--w720 { --erf-brw-width: 720px; }
+.erf-brw--w880 { --erf-brw-width: 880px; }
+
+/* Hosts, addresses, paths and processes in running text (Typography card). */
+.erf-brw-mono { font-family: var(--font-mono); }
+
+/* ---------- 1 editor tab (tabs.css) ---------- */
+
+/* The editor tab's tooltip opens BESIDE the tab, inside the strip's own band
+   (H-02): it never covers the origin field or a row that could hold focus, and
+   the page-supplied title in it can never sit over the true address. If
+   keyboard focus is on a later tab in the same strip, the hover tooltip is not
+   shown. */
+.erf-brw-tabstrip { position: relative; }
+.erf-brw-tabstrip .erf-tab { flex: 0 1 220px; }
+
+/* A tab labelled by its address (no title yet, or none): the origin display,
+   never end truncation (H-01). The component drops whole subdomain labels from
+   the front to fit the tab; the registrable domain, a non-https scheme and a
+   non-default port never leave, so the tab grows rather than cut them. */
+.erf-brw-tabstrip .erf-tab:has(.erf-brw-tab__origin) { flex: 0 0 auto; }
+.erf-brw-tab__origin {
+  display: flex;
+  min-inline-size: min-content;
+  font-family: var(--font-mono);
+  direction: ltr;
+  unicode-bidi: isolate;
+  white-space: nowrap;
+}
+.erf-brw-tab__origin > * { flex: 0 0 auto; }
+/* Fold step 8 in the tab: at the tab's ceiling the formatter slices the host
+   from its start and writes the leading "…" (an __elide span) – never its end,
+   never CSS direction, so digits and punctuation keep their order (R4-H1,
+   R5-M3). The tab only keeps its 220px ceiling so the tail stays readable. */
+/* The cut tab keeps its full 220px ceiling – the other tabs shrink first – so
+   the end of the domain and its TLD stay readable. */
+.erf-brw-tabstrip .erf-tab:has(.erf-brw-tab__origin .erf-origin__elide) { flex: 0 0 220px; }
+
+
+/* The New browser tab button at the strip's end (025-FR-001): an icon tool,
+   ringed inset because the strip clips its overflow (Tabs card). */
+.erf-brw-newtab { align-self: center; margin-inline: var(--space-2); }
+.erf-brw-tabstrip .erf-brw-newtab.erf-button--icon {
+  inline-size: var(--input-height-sm);
+  block-size: var(--input-height-sm);
+}
+
+/* The loading spinner in the tab's icon slot. A tab is not a button, so it
+   cannot take button.css's aria-busy ring; it draws the same ring (currentColor
+   edge, open top) with button.css's own erf-button-spin keyframes, at the icon
+   slot's size, still under reduced motion (Motion card). Recorded in
+   tab-and-toolbar.html #exceptions until a shared spinner primitive exists. */
+.erf-brw-spin {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  inline-size: var(--icon-size-sm);
+  block-size: var(--icon-size-sm);
+  border: var(--border-width-thick) solid currentColor;
+  border-block-start-color: transparent;
+  border-radius: var(--border-radius-circle);
+  color: var(--color-text-secondary);
+  animation: erf-button-spin var(--erf-brw-spin) linear infinite;
+}
+
+/* Camera, microphone or screen in use: icons after the title, part of the
+   tab's name in words (copy deck). */
+.erf-brw-tab__inuse {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: var(--space-1);
+  color: var(--color-text-emphasis);
+}
+.erf-brw-tab__inuse svg { inline-size: var(--icon-size-xs); block-size: var(--icon-size-xs); }
+
+/* A tooltip pinned at a point in the drawing (forced open): the anchor is a
+   zero-size point placed by custom properties. */
+.erf-brw-tip {
+  position: absolute;
+  inset-block-start: var(--ds-top, 0);
+  inset-inline-start: var(--ds-left, 0);
+  z-index: var(--z-tooltip);
+}
+/* Beside the second tab: anchored at the tab's end (two 220px tabs), the
+   tooltip's top at the strip's top, at most the strip's height – two one-line
+   lines: the true address in mono, then the title labelled "Title:" in
+   tertiary, cut at its end. Exception to the Tooltip card (placement and
+   one-line lines), recorded in tab-and-toolbar.html #exceptions. */
+.erf-brw-tip--tab { --ds-top: 0; --ds-left: calc(var(--space-24) * 9 + var(--space-4)); }
+.erf-brw-tip--tab > .erf-tooltip {
+  inset-block: 0 auto;
+  inset-inline-start: var(--space-2);
+  max-block-size: var(--tab-height);
+  max-inline-size: 64ch;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.erf-brw-tip--tab > .erf-tooltip::before { display: none; }
+.erf-brw-tip--tab .erf-tooltip__line { overflow: hidden; text-overflow: ellipsis; }
+.erf-brw-tip__addr { font-family: var(--font-mono); }
+.erf-brw-tip__title { color: var(--color-text-tertiary); }
+/* The Badge tooltip (deck description, R4-M5, R5-M7, R6-M1). Position, the
+   whole rule: it stays inside the pick row's band. It never covers the editor
+   tab strip, the live page, the origin field, More, the banner's first clause
+   ("Picking – …") or the target button. Out of pick mode it starts under the
+   badge; in pick mode it starts after the first clause; it always ends before
+   the target. At most two lines: when the full description does not fit, it
+   shows the deck's short form ("Badge tooltip – short"); the full text stays
+   the badge's accessible description. NO ROOM: when even the short form does
+   not fit in the band (pick mode at the narrowest widths, OD-16) it does not
+   show; the accessible description carries the state. POP-UP WINDOW (no pick
+   row, R7-M1): it opens inside the pop-up origin strip's band, beside the
+   badge after the address, short form only; when it does not fit, it does not
+   show. Shown on hover, and while the address bar has keyboard focus and the
+   badge is icon-only. ESC with keyboard focus: the first press hides it and is
+   consumed – focus and the field are unchanged; the next Esc does the field's
+   Esc; it stays hidden until the field loses and regains focus. ESC on hover
+   with focus elsewhere (R7-M5): the press does that state's routing action and
+   hides the tooltip in the same press; it stays hidden until the pointer
+   leaves the badge and re-enters. Box (R7-M4): like the pick-row tooltip –
+   capped at the pick row's full height, --space-1 block padding,
+   --leading-tight – so two lines still fit under raised text spacing
+   (SC 1.4.12). Drawn as a pinned point in the pick row (--ds-left, --ds-w);
+   the component measures both. */
+.erf-brw-tip--badge { --ds-top: 0; }
+.erf-brw-tip--badge > .erf-tooltip {
+  inset-block: 0 auto;
+  inset-inline-start: 0;
+  inline-size: max-content;
+  max-inline-size: var(--ds-w, 32ch);
+  max-block-size: calc(var(--input-height-sm) + var(--space-3) * 2);
+  padding-block: var(--space-1);
+  overflow: hidden;
+  line-height: var(--leading-tight);
+}
+/* Raised text spacing (SC 1.4.12 drawing): line height 1.5 on the tooltip too.
+   Headroom is about 1px: two lines at 1.5 take about 39px against the 40px
+   cap (2 × 11px × 1.5 + 2 × --space-1 + 2 × 1px border). Do not add
+   __line gaps, more padding or a thicker border without rechecking
+   SC 1.4.12 at 360px (round 8 note). */
+.erf-brw-pk-spacing .erf-brw-tip--badge > .erf-tooltip { line-height: var(--leading-normal); }
+.erf-brw-tip--badge > .erf-tooltip::before { display: none; }
+.erf-brw-tip__addr { display: flex; }
+.erf-brw-tip__addr > * { flex: 0 0 auto; }
+.erf-brw-tip__addr > .erf-origin__path { flex: 0 1 auto; inline-size: auto; max-inline-size: none; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* Pick-row tooltips (R2-H5): drawn inside the pick row's own band, toward the
+   end side of the toggle – over the status slot and spacer, never over the
+   navigation row, the page, or the toggle that holds focus. Shown on hover
+   and on keyboard focus. Two one-line lines (Pick tooltip – off). */
+.erf-brw-tip--pick { --ds-top: 0; --ds-left: calc(var(--space-24) * 2 + var(--space-16)); } /* clear of the toggle's focus ring */
+.erf-brw-tip--pick > .erf-tooltip {
+  inset-block: var(--space-1) auto;
+  inset-inline-start: 0;
+  max-block-size: calc(var(--input-height-sm) + var(--space-3) * 2 - var(--space-2));
+  max-inline-size: none;
+  white-space: nowrap;
+}
+.erf-brw-tip--pick > .erf-tooltip::before { display: none; }
+/* In pick mode the banner's first clause is in the slot: the tooltip opens
+   after it, never over "Picking – …" – drawn with picking.html's
+   .erf-brw-pk-tip--after-toolbar offset (R3-M1, R4-M2). Esc (R4-M3): the
+   two-step Esc applies only when the tooltip shows because its trigger has
+   keyboard focus – the first Esc hides it, the next routes. A hover tooltip
+   with focus elsewhere hides in the same press that does the routing action. */
+
+/* A group inside a menu (More's "Page width" group while picking, R5-M6,
+   R6-M3): role="group" named by its heading (aria-labelledby). The heading is
+   not an item: tertiary, at the menu's label inset. */
+.erf-brw-menugroup { display: block; }
+.erf-brw-menuhead {
+  padding: var(--space-2) var(--space-6) 0 calc(var(--space-6) + var(--icon-size-sm) + var(--space-4));
+  color: var(--color-text-tertiary);
+  font-size: var(--text-sm);
+}
+
+/* The capture chip (addition A-15): at the end of the editor tab strip while a
+   browser tab in the window uses a camera, microphone or screen – including a
+   tab that is not showing. Activating it shows that tab. One chip per
+   capturing tab. */
+.erf-brw-capchips { display: flex; flex: none; align-items: center; gap: var(--space-2); margin-inline: auto var(--space-3); }
+.erf-brw-capchips .erf-chip svg { inline-size: var(--icon-size-xs); block-size: var(--icon-size-xs); }
+
+/* ---------- rows above the page: navigation, pick, find ---------- */
+
+/* The HTML preview bar's height (Permission band, decided): a tool at the
+   proposed --toolbar-tool-height (--input-height-sm until it lands) in
+   --space-3 / --space-6 padding, a 1px neutral rule under it. Rows never wrap
+   and never change height; they degrade by tier instead. */
+.erf-brw-row {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  align-items: center;
+  /* --space-2 between tools: an outward ring reaches 4px (2px offset plus
+     2px width), so it lands in the gap and never on the next tool (M-37). */
+  gap: var(--space-2);
+  min-block-size: calc(var(--input-height-sm) + var(--space-3) * 2);
+  padding: var(--space-3) var(--space-6);
+  background: var(--color-bg-primary);
+  border-block-end: var(--border-width) solid var(--color-border-default);
+}
+.erf-brw-row .erf-button { block-size: var(--input-height-sm); }
+.erf-brw-row .erf-button--icon { inline-size: var(--input-height-sm); }
+.erf-brw-row .erf-button--ghost { padding-inline: var(--space-4); font-weight: var(--font-normal); }
+
+/* A group of tools (role="group", not role="toolbar" – note F-7), --space-2
+   apart for the same reason as the row. */
+.erf-brw-group {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+.erf-brw-spacer { flex: 1 1 auto; min-inline-size: var(--space-4); }
+/* After the status slot the spacer only keeps the gap: the slot takes the free
+   space first, so a banner or notice is never squeezed by empty space. */
+.erf-brw-status + .erf-brw-spacer { flex: 0 0 var(--space-4); }
+
+/* Navigation row: the origin field takes what is left, between the groups. */
+.erf-brw-nav .erf-origin { margin-inline: var(--space-4); }
+/* THE FOLD ORDER (R3-H1). Whatever the tier, room is given back in one order,
+   each step only once the one before is exhausted, so the registrable domain,
+   a non-https scheme and a non-default port are never cut (Security rule 2):
+     1  the path (component drops it whole under 2 characters)
+     2  whole subdomain labels, from the front ("….")
+     3  the zoom chip, Open in system browser and DevTools into More  --fold
+     4  Forward and Reload into More                                  --tight1
+     5  the field's margins shrink to --space-2                       --snug
+     6  the badge word to its icon, "Not secure" kept as its name     .erf-origin--badge-icon
+     7  Back into More, last                                          --tight2
+     8  the formatter slices the host from its START and writes a
+        leading "…", keeping the end of the registrable domain, the
+        TLD and the port; the field is never clipped at its end       (markup, no class)
+   One order at every width: no tier folds a tool or shrinks a margin by
+   itself (R4-M1). Each modifier implies the steps before it; the component
+   measures and sets them. Folded tools keep their shortcuts and sit in More in
+   toolbar order. If the focused tool folds, focus moves to More (no
+   announcement). More never shrinks and is never clipped.
+   MORE ITSELF counts in this order (R6-M2): it is shown from step 3, or
+   earlier while the pick row's width preset has folded into it (the Page
+   width group – one rule set, in section 4, keyed on the pick row's state);
+   the steps above are measured with More's width already on the row, so at
+   400px in pick mode steps 1 and 2 run where step 1 alone would do without
+   it. */
+.erf-brw-nav:is(.erf-brw-nav--fold, .erf-brw-nav--tight1, .erf-brw-nav--snug, .erf-brw-nav--tight2) :is(.erf-brw-collapsible, .erf-brw-zoomchip) { display: none; }
+.erf-brw-nav:is(.erf-brw-nav--tight1, .erf-brw-nav--snug, .erf-brw-nav--tight2) .erf-brw-t1 { display: none; }
+.erf-brw-nav:is(.erf-brw-nav--snug, .erf-brw-nav--tight2) .erf-origin { margin-inline: var(--space-2); }
+.erf-brw-nav--tight2 .erf-brw-t2 { display: none; }
+.erf-brw-nav:is(.erf-brw-nav--fold, .erf-brw-nav--tight1, .erf-brw-nav--snug, .erf-brw-nav--tight2) .erf-brw-anchor.erf-brw-more { display: inline-flex; }
+/* More: hidden while everything fits. Two classes, so it beats .erf-brw-anchor's display. */
+.erf-brw-anchor.erf-brw-more { display: none; }
+/* More never shrinks, clips or leaves (R2-H2): it is the only route to what
+   has folded (fold order above). */
+.erf-brw-more,
+.erf-brw-more > .erf-button { flex: none; }
+
+/* Pick row: toggle, status slot, spacer, width preset, target. The toggle's
+   icon starts --space-3 in, so its centre lines up with Back's icon centre
+   above it (one inline start for every row, VS-25). */
+.erf-brw-pickbtn { gap: var(--space-3); padding-inline-start: var(--space-3); }
+.erf-brw-pickbtn svg { inline-size: var(--icon-size-sm); block-size: var(--icon-size-sm); }
+
+/* The status slot: the row's free space, ONE line at any text spacing
+   (SC 1.4.12, H-09). Text is --text-base, nowrap, never wrapped or clamped.
+   Each part is one flex item the height of a tool; the slot is one tool high
+   and wraps its parts, so a part that does not fit beside the ones before it
+   drops to a second line that is clipped – it leaves WHOLE, never cut
+   mid-word. The first part (__lead: "Picking – Esc to stop", or a whole
+   notice) always sits on line 1; the optional controls give way to it
+   (picking.html § status slot and the Element picker card's #room). */
+.erf-brw-status {
+  display: flex;
+  flex: 1 1 0; /* takes the free space, and yields it before any control does */
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: flex-start;
+  min-inline-size: 0;
+  block-size: var(--input-height-sm);
+  margin-inline-start: var(--space-4);
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  white-space: nowrap;
+  /* A size container, so a screen can drop optional parts by the slot's own
+     width (picking.html), not only by the tab's tier. */
+  container: erf-brw-status / inline-size;
+}
+.erf-brw-status > * {
+  display: inline-block; /* inline text: spaces between a host and its sentence stay */
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  min-block-size: var(--input-height-sm);
+  padding-block: calc((var(--input-height-sm) - 1lh) / 2); /* centred in a tool-high line */
+  white-space: nowrap;
+}
+/* __more: the banner's second clause. The separator is drawn here, with
+   equal space either side (VS-21) – the markup carries the words only, never
+   a literal "· ". __more--short is its narrow-tier form (IX-19): "⌘E again:
+   pick under mouse" keeps the hover-pick hint below 520px. */
+.erf-brw-status__more::before {
+  content: '·';
+  margin-inline: var(--space-4);
+  color: var(--color-text-tertiary);
+}
+.erf-brw-status__more--short { display: none; }
+
+/* A link's destination while the pointer or focus is on it (owner
+   decision OD-12): the origin display in the status slot – Erfana chrome outside the
+   page, so a page cannot fake it. The path is the part that is cut. */
+.erf-brw-status__url {
+  min-inline-size: 0;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+.erf-brw-status > .erf-brw-status__url { display: inline-flex; flex: 0 1 auto; align-items: center; }
+.erf-brw-status__url > :not(.erf-origin__path) { flex: 0 0 auto; }
+.erf-brw-status__url > .erf-origin__path { flex: 0 1 auto; inline-size: auto; max-inline-size: none; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; }
+
+.erf-brw-status { min-inline-size: var(--erf-brw-lead, 0); }
+/* The component measures the first clause and sets --erf-brw-lead to its
+   width (the slot is a size container, so CSS cannot read it). The slot then
+   never gets narrower than the first clause: the target's terminal name
+   truncates instead, keeping at least 8 characters (TR-R2-7) – below 380px it
+   may go under 8, down to "…" (README § Tiers, A-30). */
+.erf-brw-target { flex-shrink: 1; }
+.erf-brw-pick .erf-brw-anchor:has(.erf-brw-target) { flex: 0 1 auto; min-inline-size: 0; }
+.erf-brw-pick .erf-brw-target { max-inline-size: 100%; }
+
+/* Width preset and target: ghost menu buttons (button.css). */
+.erf-brw-width svg:not(.erf-button__caret) { inline-size: var(--icon-size-sm); block-size: var(--icon-size-sm); }
+.erf-brw-target { min-inline-size: 0; max-inline-size: 40ch; }
+.erf-brw-target__arrow { color: var(--color-text-tertiary); }
+/* The terminal name truncates first, keeping at least 8 characters – below
+   380px it may go under 8, down to "…" (README § Tiers, A-30); the process is
+   never cut (copy deck, {terminal name} and {process}). */
+.erf-brw-target__name {
+  flex: 0 1 auto;
+  min-inline-size: 8ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.erf-brw-target__proc { flex: 0 0 auto; font-family: var(--font-mono); color: var(--color-text-bright); }
+.erf-brw-target__warn { color: var(--color-warning); }
+.erf-brw-target .erf-brw-target__warn { inline-size: var(--icon-size-sm); block-size: var(--icon-size-sm); }
+
+/* Find row: field, count, Previous, Next, Close. The full-tier padding at
+   every tier, so the field's outward ring never reaches the tab's edge (VS-25). */
+.erf-brw-row.erf-brw-find { padding-inline: var(--space-6); }
+.erf-brw-find .erf-input {
+  flex: 0 1 32ch;
+  block-size: var(--input-height-sm);
+  min-inline-size: 12ch;
+}
+.erf-brw-find__count {
+  flex: 0 0 auto;
+  min-inline-size: 7ch;
+  margin-inline: var(--space-4);
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Strip rows (site-prompts.css, feedback.css band form) stack in the fixed
+   order under the rows above; nothing here restyles them. */
+.erf-brw-strip { flex: 0 0 auto; }
+
+/* Menus and popups opened from a control: placed under their trigger. They
+   cross into the page area only over the still image (Layering card). */
+.erf-brw-anchor { position: relative; display: inline-flex; min-inline-size: 0; }
+.erf-brw-menu {
+  position: absolute;
+  inset-block-start: calc(100% + var(--space-2));
+  inset-inline-end: 0;
+  z-index: var(--z-dropdown);
+  inline-size: max-content;
+  max-inline-size: 44ch;
+}
+.erf-brw-menu--start { inset-inline-start: 0; inset-inline-end: auto; }
+.erf-brw-menu .erf-menu-label { white-space: nowrap; }
+.erf-brw-menu .erf-menu-item--checked .erf-menu-icon { color: var(--color-text-emphasis); }
+
+/* ---------- 6 page area and its frame ---------- */
+
+/* The gutter is outside the page's rectangle, so the ring and the pick frame
+   never resize the page (390 means 390). */
+.erf-brw-area {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-block-size: var(--erf-brw-area-height, 180px);
+  padding: var(--erf-brw-gutter);
+  overflow: hidden;
+  background: var(--color-bg-primary);
+}
+.erf-brw-area--short { --erf-brw-area-height: 96px; }
+.erf-brw-area--tall { --erf-brw-area-height: 300px; }
+.erf-brw-area--xtall { --erf-brw-area-height: 400px; }
+
+/* The page's rectangle: the native view, a still image of it, or an Erfana page. */
+.erf-brw-view {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-inline-size: 0;
+}
+.erf-brw-view > .ds-foreign-page { flex: 1 1 auto; }
+
+/* Browse: the Focus card's ring, 2px, offset 2px – drawn in the gutter. */
+.erf-brw-view--focus {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+/* Pick: .erf-picker-frame (picker.css) on the same element. */
+
+/* Width presets narrower than the panel: the page is centred, the frame hugs
+   it, --color-bg-primary either side. */
+.erf-brw-area--centred { justify-content: center; }
+.erf-brw-view--phone { flex: 0 0 390px; inline-size: 390px; }
+.erf-brw-view--tablet { flex: 0 0 768px; inline-size: 768px; }
+
+/* Wider than the panel: the area scrolls sideways, with an Erfana scrollbar
+   under the page (drawn, since the frame is a picture). */
+.erf-brw-area--scrolls { padding-block-end: calc(var(--erf-brw-gutter) + var(--scrollbar-width)); }
+.erf-brw-hbar {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
+  block-size: var(--scrollbar-width);
+  background: var(--scrollbar-track);
+}
+.erf-brw-hbar::after {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  inline-size: var(--ds-thumb, 90%);
+  background: var(--scrollbar-thumb);
+}
+
+/* ---------- Erfana pages in the page area: the empty tab ---------- */
+
+.erf-brw-home {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-12) var(--space-16);
+  overflow: hidden;
+  background: var(--color-bg-primary);
+}
+.erf-brw-home__hint {
+  margin: 0;
+  color: var(--color-text-bright);
+  font-size: var(--text-md);
+}
+.erf-brw-home__first {
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-base);
+}
+.erf-brw-home__first code { font-size: var(--text-base); color: var(--color-text-primary); }
+.erf-brw-home__section { max-inline-size: 72ch; }
+.erf-brw-home__heading {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-tertiary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+}
+.erf-brw-home .erf-row { font-family: var(--font-mono); }
+.erf-brw-home .erf-row__name { display: flex; min-inline-size: 0; }
+.erf-brw-home .erf-origin__display { flex: 0 1 auto; padding: 0; }
+.erf-brw-home__from { flex: 0 0 auto; color: var(--color-text-tertiary); font-family: var(--font-sans); }
+
+/* ---------- user settings ---------- */
+
+@container erf-brw (width < 700px) {
+  .erf-brw-row { padding-inline: var(--space-3); }
+  .erf-brw-width__label { display: none; }
+}
+@container erf-brw (width < 520px) {
+  /* No navigation-row tool folds here by itself: the fold order (step 3 and
+     on) is set by the component from what it measures (R4-M1). */
+  .erf-brw-pickbtn__label,
+  .erf-brw-chiplabel,
+  .erf-brw-status__more:not(.erf-brw-status__more--short) { display: none; }
+  .erf-brw-status__more--short { display: inline-flex; }
+  .erf-brw-pickbtn { inline-size: var(--input-height-sm); padding: 0; }
+  .erf-brw-home { padding: var(--space-8); }
+}
+@container erf-brw (width < 380px) {
+  .erf-brw-ph-long { display: none; }
+  /* The pick row at the minimal tier: nothing passes the tab's edge. The
+     width preset has folded (picking.html, pick mode); the status slot's
+     leading gap and the spacer after it close up, so the banner's first clause
+     and the target at its 8-character minimum plus its process both fit. */
+  .erf-brw-pick .erf-brw-status { margin-inline-start: var(--space-2); }
+  .erf-brw-pick .erf-brw-status + .erf-brw-spacer { flex-basis: 0; min-inline-size: 0; }
+  /* The pick row never overflows the tab here, and the process is never cut.
+     Room is given back in this order: the width preset folds into More while
+     picking (picking.html), then the leading gap and the spacer close up, then
+     – at this tier only – the terminal name may truncate below its usual
+     8-character minimum, down to "…" alone. The name stays whole in the
+     button's accessible name and in the target menu. */
+  .erf-brw-pick .erf-brw-target__name { min-inline-size: 0; }
+  .erf-brw-pick { min-inline-size: 0; }
+}
+@container erf-brw (width >= 380px) {
+  .erf-brw-ph-short { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .erf-brw-spin { animation: none; }
+}
+
+/* Every state keeps an edge: the page ring turns Highlight (the pick frame's
+   dashed Highlight is picker.css). The pressed Pick element takes the full
+   Highlight treatment – fill, edge and label – so on and off differ by more
+   than one edge's colour (M-33; proposed for the Buttons card). */
+@media (forced-colors: active) {
+  .erf-brw-view--focus { outline-color: Highlight; }
+  .erf-brw-pickbtn[aria-pressed='true'] {
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+}
+
+/* =====================================================================
+   3. tab-and-toolbar.html (wave 1)
+   ===================================================================== */
+
+/* A stage that leaves room under a drawing for a menu that opens past its
+   bottom edge (no menu here does – they open over the still image inside). */
+.brw-tt-pair { display: flex; flex-wrap: wrap; gap: var(--space-8); align-items: flex-start; }
+
+/* The New browser tab tooltip, under the button after one 220px tab. It opens
+   over the editor's own content (no browser rows under a Markdown tab). */
+.erf-brw-tip--newtab { --ds-top: var(--tab-height); --ds-left: calc(var(--space-24) * 4 + var(--space-14)); }
+
+/* The suggestion list sits under the field, over the page area. */
+.erf-brw-nav .erf-origin .erf-origin-list { inline-size: auto; }
+
+/* An IDN shown in Unicode, and a punycode label, need no extra rule: both are
+   .erf-origin__domain text. */
+
+/* =====================================================================
+   4. picking.html (wave 2) – pick overlay and label, pick-mode frame,
+      banner and "Page paused" chip
+   ===================================================================== */
+
+/* A page area of fixed height, so a tall element is clipped where the page's
+   viewport ends (partly visible) and a panel placed in it stays put. */
+.erf-brw-area.erf-brw-pk-fix { block-size: var(--erf-brw-area-height, 180px); }
+.erf-brw-pk-fix > .erf-brw-view { min-block-size: 0; }
+.erf-brw-pk-fix .ds-foreign-page { min-block-size: 0; }
+.erf-brw-pk-h480 { --erf-brw-area-height: 480px; }
+.erf-brw-pk-h560 { --erf-brw-area-height: 560px; }
+.erf-brw-pk-w1100 { --erf-brw-width: 1100px; }
+
+/* ---------- the pick row's status slot in these screens (H-09, M-01) ----------
+   One line at any text spacing: every part is nowrap and leaves WHOLE, never
+   wraps or clamps. The first clause is --text-base and has layout priority over
+   every optional control: the width preset label goes icon-only below 700px,
+   and at any width while pick mode is on or the send notice shows; out of
+   room, it folds into More (Page width). The target name truncates, keeping at
+   least 8 characters (README § Tiers, A-30; below 380px down to "…"). Then the optional
+   clauses leave in this order: "↑ ↓ parent and child", the hover echo, the ⌘E
+   clause. Rule recorded on the Element picker card (#room). The visible slot is
+   plain text with no live role; announcements go to a separate hidden polite
+   region (M-45). */
+.erf-brw-pk-fill > .erf-brw-spacer { flex-grow: 0; }
+/* The slot is a size container, so it has no content size of its own: a floor
+   in em – the first clause – keeps "Picking – Esc to stop" whole; at 380px
+   and wider the target keeps at least 8 characters of its name (README
+   § Tiers, A-30), below that it may go down to "…". */
+.erf-brw-pk-fill > .erf-brw-status { min-inline-size: 10em; }
+/* Text-spacing overrides widen the clause, so the drawing's floor grows too. */
+.erf-brw-pk-spacing .erf-brw-pk-fill > .erf-brw-status { min-inline-size: 13em; }
+.erf-brw-pk-fill > .erf-brw-pk-ta { flex-shrink: 1; min-inline-size: 0; }
+/* The pick row's own fold steps, set by the component when the row is short of
+   room at any width (no tier rule): 1 – the width preset folds into More's
+   "Page width" item; 2 – the gap before the status text and the spacer after it
+   close up. Only after both may the terminal name go under 8 characters, and
+   only below 380px (README § Tiers, A-30). */
+.erf-brw-pick:is(.erf-brw-pk-fold1, .erf-brw-pk-fold2) > .erf-brw-pk-wa { display: none; }
+.erf-brw-pick.erf-brw-pk-fold2 .erf-brw-status { margin-inline-start: var(--space-2); }
+.erf-brw-pick.erf-brw-pk-fold2 .erf-brw-status + .erf-brw-spacer { flex-basis: 0; min-inline-size: 0; }
+/* The folded preset needs a home: More shows in the navigation row, drawn whole. */
+.erf-brw-nav:has(+ :is(.erf-brw-pk-fold1, .erf-brw-pk-fold2)) .erf-brw-anchor.erf-brw-more { display: inline-flex; }
+.erf-brw-pk-fill > .erf-brw-pk-ta > .erf-brw-target { max-inline-size: 100%; }
+.erf-brw-pk-fill .erf-brw-status {
+  gap: var(--space-4);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  white-space: nowrap;
+}
+.erf-brw-pk-fill .erf-brw-status > * {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-2);
+  overflow: visible;
+  white-space: nowrap;
+  -webkit-line-clamp: none;
+}
+/* The clause separator is drawn by section 2 (__more::before, VS-21); the
+   slot's gap already gives the space before it. */
+.erf-brw-pk-fill .erf-brw-status__more::before { margin-inline: 0 var(--space-4); }
+.erf-brw-pk-fill .erf-brw-status svg { inline-size: var(--icon-size-xs); block-size: var(--icon-size-xs); }
+/* Out: the first clause names no key and is quieter (H-07). */
+.erf-brw-pk-away .erf-brw-status__lead { color: var(--color-text-tertiary); }
+/* The hover echo: what the outline is on, in the label's anatomy, so it grows
+   with Erfana's zoom even if the engine-drawn label cannot (M-34). */
+.erf-brw-pk-echo { font-family: var(--font-mono); font-size: var(--text-sm); }
+.erf-brw-pk-echo__tag { color: var(--color-accent-primary); }
+.erf-brw-pk-c--note { color: var(--color-text-bright); }
+/* Chips after the clause: "Still image" (an Erfana surface is over the still
+   image – the chrome-side cue a page cannot draw, M-03) and "Page paused". */
+.erf-brw-pk-chip { flex: 0 0 auto; }
+
+@container erf-brw-status (width < 700px) { .erf-brw-pk-c--ud { display: none; } }
+@container erf-brw-status (width < 540px) { .erf-brw-pk-c--echo { display: none; } }
+@container erf-brw-status (width < 380px) { .erf-brw-pk-c--key { display: none; } }
+
+/* Optional controls give way to the first clause: the width preset label goes icon-only below 700px, and at any width while pick mode is on or the send notice shows; out of room, it folds into More (Page width) (R7-M2). */
+.erf-brw-pk-on .erf-brw-width__label { display: none; }
+@container erf-brw (width < 520px) {
+  :is(.erf-brw-pk-on, .erf-brw-pa-noticing) > .erf-brw-pk-wa { display: none; }
+  /* The preset's Page width group is in More now, so More shows (R6-M2). */
+  .erf-brw-nav:has(+ :is(.erf-brw-pk-on, .erf-brw-pa-noticing)) .erf-brw-anchor.erf-brw-more { display: inline-flex; }
+  /* Panel or dialog open: the target leaves the row – the panel footer and the
+     dialog's target button show it and change it without losing the pick. */
+  .erf-brw-pk-modal > .erf-brw-pk-ta { display: none; }
+  .erf-brw-pk-modal .erf-brw-pk-still__label { display: none; }
+}
+/* Out: the longer "click the page to continue" clause outranks the preset
+   below the full tier, so it is never cut (H-07, H-09). */
+@container erf-brw (width < 700px) {
+  .erf-brw-pk-away > .erf-brw-pk-wa { display: none; }
+  .erf-brw-nav:has(+ .erf-brw-pk-away) .erf-brw-anchor.erf-brw-more { display: inline-flex; }
+  /* A timed note (end of range, nothing outlined) outranks the preset too. */
+  .erf-brw-pk-fill:has(.erf-brw-pk-c--note) > .erf-brw-pk-wa { display: none; }
+  .erf-brw-nav:has(+ .erf-brw-pk-fill .erf-brw-pk-c--note) .erf-brw-anchor.erf-brw-more { display: inline-flex; }
+}
+
+/* Panel open (Menu state): the rows stay live and at full strength – a click
+   on the toolbar, or Ctrl/Cmd+L, closes the panel without sending and focuses
+   that control (025-FR-049, R2-H1). Dialog open only: the rows are inert
+   (M-46, aria-modal false) and their buttons' ICONS are dimmed, as the
+   Permission band card dims an icon, never a button – so no focus ring and no
+   label loses contrast, and the origin field stays at full strength (its
+   "quiet, never hidden" rule). The status slot carries the cue. */
+.erf-brw-pk-behind :is(.erf-brw-nav, .erf-brw-pick) .erf-button svg { opacity: var(--opacity-disabled); }
+
+/* Page layout helpers for placing an element where a frame needs it. */
+.brw-pk-cta { display: block; margin-block-start: var(--space-12); }
+.brw-pk-cta--end { text-align: end; }
+.brw-pk-post { display: flex; flex-direction: column; gap: var(--space-6); min-block-size: 520px; padding: var(--space-24) var(--space-8); }
+.brw-pk-overtop { margin-block-start: calc(var(--space-24) * -2); }
+.brw-pk-spacer { display: block; block-size: 150px; }
+.brw-pk-spacer--l { block-size: 236px; }
+.brw-pk-spacer--m { block-size: 202px; }
+/* Caption tag for a drawing that rests on an owner's answer (neutral: settled, not open). */
+.brw-tag.brw-pk-owner { border-color: var(--color-border-default); }
+.ds-foreign-page.brw-pk-edge { padding-inline-end: 0; }
+.ds-foreign-page.brw-pk-flush { padding-block-start: 0; }
+.ds-foreign-page.brw-pk-foot { padding-block-end: 0; }
+/* Refinement frames: the page box itself is the html element, so its padding
+   moves to an inner wrapper and the outline can wrap the whole page. */
+.ds-foreign-page.brw-pk-bare { block-size: 100%; padding: 0; }
+.brw-pk-bare > .erf-brw-pk-anchor--block { block-size: 100%; }
+.brw-pk-pad { display: block; padding: var(--space-10); }
+
+/* The overlay drawn around an element on the page (picker card's anchor), so
+   no coordinate is typed: the element, then its outline and label. */
+.erf-brw-pk-anchor { position: relative; display: inline-block; }
+.erf-brw-pk-anchor--block { display: block; }
+.erf-brw-pk-anchor > .erf-picker-outline,
+.erf-brw-pk-anchor > .erf-picker-flash { inset: calc(var(--border-width) * -1); }
+.erf-brw-pk-anchor > .erf-picker-outline.erf-brw-pk-tiny { inset: calc(var(--border-width-thick) * -2); }
+.erf-brw-pk-anchor > .erf-picker-label {
+  inset-block-end: calc(100% + var(--border-width-thick));
+  inset-inline-start: calc(var(--border-width) * -1);
+  max-inline-size: none;
+}
+.erf-brw-pk-anchor > .erf-picker-label.erf-brw-pk-below {
+  inset-block-end: auto;
+  inset-block-start: calc(100% + var(--border-width-thick));
+}
+.erf-brw-pk-anchor > .erf-picker-label.erf-brw-pk-end {
+  inset-inline-start: auto;
+  inset-inline-end: calc(var(--border-width) * -1);
+}
+.erf-brw-pk-anchor > .erf-picker-label.erf-brw-pk-inside {
+  inset-block-end: auto;
+  inset-block-start: var(--border-width-thick);
+  inset-inline-start: var(--border-width-thick);
+}
+
+/* The pointer, where a frame needs it: the crosshair over the page in pick
+   mode. Drawn at a point (custom properties). */
+.erf-brw-pk-cursor {
+  position: absolute;
+  inset-block-start: var(--ds-top, 0);
+  inset-inline-start: var(--ds-left, 0);
+  inline-size: var(--icon-size-md);
+  block-size: var(--icon-size-md);
+  color: var(--color-brand-black);
+  pointer-events: none;
+}
+.erf-brw-pk-cursor--light { color: var(--color-brand-white); }
+
+/* The Pick element tooltip, forced open above the toggle (Tooltip card:
+   above, never --below in the browser). */
+.erf-brw-pk-tipanchor { position: relative; display: inline-flex; }
+/* Pick-row tooltips sit INSIDE the pick row's own band, beside the toggle,
+   over the status slot – never over the navigation row or the address bar,
+   never over the focused control, so they show on keyboard focus too (H-02,
+   R2-H5). Two one-line lines fit the band's height. */
+.erf-brw-pk-tipanchor > .erf-tooltip {
+  inset-block: calc(var(--space-3) * -1) auto;
+  inset-inline-start: calc(100% + var(--space-4));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-block-size: calc(var(--input-height-sm) + var(--space-3) * 2);
+  max-block-size: calc(var(--input-height-sm) + var(--space-3) * 2);
+  max-inline-size: none;
+  padding-block: var(--space-1);
+  line-height: var(--leading-tight);
+  white-space: nowrap;
+}
+.erf-brw-pk-tipanchor > .erf-tooltip::before { display: none; }
+/* With pick mode on the banner's first clause is protected (R3-M1): the
+   tooltip starts AFTER it, over the later clauses. A drawing places it past the
+   clause it follows; the component measures the clause. While a tooltip shows
+   because its trigger has keyboard focus, the first Esc only hides it and the
+   next Esc routes. A hover tooltip with focus elsewhere (the page, say) does
+   not take an Esc: Esc does the routing action and hides the tooltip in the
+   same press, and it stays hidden until the pointer leaves and re-enters
+   (R4-M3). */
+.erf-brw-pk-tip--after-stop > .erf-tooltip { inset-inline-start: calc(100% + var(--space-8) + var(--text-base) * 10); }
+.erf-brw-pk-tip--after-toolbar > .erf-tooltip { inset-inline-start: calc(100% + var(--space-8) + var(--text-base) * 16.5); }
+
+/* A window drawn around the tab when a frame needs the rest of Erfana: the
+   terminal beside it (focus outside the tab, revealed terminal, toasts placed
+   clear of the live page). */
+.erf-brw-pk-win { display: flex; align-items: stretch; inline-size: max-content; }
+.erf-brw-pk-term {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  inline-size: calc(var(--space-24) * 7);
+  background: var(--color-bg-secondary);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-inline-start: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+}
+.erf-brw-pk-term__lines {
+  flex: 1 1 auto;
+  margin: 0;
+  padding: var(--space-6) var(--space-8);
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  white-space: pre-wrap;
+}
+.erf-brw-pk-term__dim { color: var(--color-text-tertiary); }
+.erf-brw-pk-term__prompt { color: var(--color-accent-secondary); }
+/* The toast stack, placed clear of the live page (toastPlacement): over the
+   terminal, at its foot. */
+.erf-brw-pk-toasts {
+  position: absolute;
+  inset-block-end: var(--space-8);
+  inset-inline: var(--space-6);
+}
+.erf-brw-pk-toasts .erf-toast { min-inline-size: 0; max-inline-size: none; }
+
+/* Text-spacing overrides (SC 1.4.12) applied to a frame, to prove the status
+   slot stays on one line. */
+.erf-brw-pk-spacing * {
+  letter-spacing: 0.12em;
+  word-spacing: 0.16em;
+}
+.erf-brw-pk-spacing .erf-brw-status { line-height: var(--leading-normal); }
+
+/* stylelint-disable color-no-hex, declaration-property-value-allowed-list --
+   This is NOT Erfana: the third-party pages the picker is judged on – a page in
+   the accent colour, a hover menu, an embedded frame from another site, small
+   and long elements – in the page's own paint and face. Sizes and spacing stay
+   tokens. prompt-actions.html draws on the same pages. */
+.brw-pk-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-8); }
+.brw-pk-btn--ink { background: #161312; color: #fafafa; }
+.brw-pk-hero {
+  display: block;
+  padding: var(--space-8) var(--space-10);
+  background: #f3efe6;
+  border-inline-start: var(--space-2) solid #d9a441;
+}
+.brw-pk-hero--tall { block-size: 260px; }
+.brw-pk-dot { display: inline-block; inline-size: 6px; block-size: 6px; background: #c0392b; vertical-align: middle; }
+/* A hover menu the page opened under its "Plots" link. */
+.brw-pk-menu {
+  display: block;
+  inline-size: max-content;
+  margin-block-start: var(--space-1);
+  padding: var(--space-2) 0;
+  background: #ffffff;
+  border: 1px solid #d0d7de;
+  box-shadow: 0 6px 18px #0000001f;
+  font-family: system-ui, sans-serif;
+  font-size: var(--text-base);
+}
+.brw-pk-menu__item { display: block; padding: var(--space-3) var(--space-10); color: #1f2328; }
+.brw-pk-menu__item--hover { background: #eef2ff; }
+.brw-pk-navlink { position: relative; }
+.brw-pk-navlink--open { color: #1f2328; text-decoration: underline; }
+.brw-pk-menuwrap { position: absolute; inset-block-start: 100%; inset-inline-start: 0; }
+/* An embedded frame from another site, in its own paint. */
+.brw-pk-iframe {
+  display: block;
+  max-inline-size: 320px;
+  padding: var(--space-6) var(--space-8);
+  background: #eaf4ec;
+  border: 1px solid #9fbfa6;
+  color: #23412b;
+  font-family: system-ui, sans-serif;
+  font-size: var(--text-base);
+}
+.brw-pk-iframe__title { display: block; margin: 0 0 var(--space-4); font-weight: 600; }
+.brw-pk-iframe__btn {
+  display: inline-block;
+  padding: var(--space-2) var(--space-6);
+  background: #23412b;
+  color: #ffffff;
+  font-weight: 600;
+}
+.brw-pk-gone {
+  display: block;
+  max-inline-size: 320px;
+  padding: var(--space-6) var(--space-8);
+  color: #57606a;
+  font-family: system-ui, sans-serif;
+  font-size: var(--text-base);
+}
+/* A page header whose last button touches the page's right edge. */
+.brw-pk-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 var(--space-8);
+  padding-block-end: var(--space-4);
+  border-block-end: 1px solid #d0d7de;
+  color: #1f2328;
+  font-family: system-ui, sans-serif;
+  font-size: var(--text-base);
+}
+.brw-pk-topbar__end { display: inline-flex; }
+/* A short tag right under a heading, and a white image (unforced pixels). */
+.ds-foreign-page__heading.brw-pk-tight { margin-block-end: 0; }
+.brw-pk-tag {
+  display: inline-block;
+  padding: 0 var(--space-4);
+  background: #ddf4ff;
+  color: #0a3069;
+  font-family: system-ui, sans-serif;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+.brw-pk-img { display: block; inline-size: 260px; block-size: 64px; background: #ffffff; border: 1px solid #d0d7de; }
+/* stylelint-enable color-no-hex, declaration-property-value-allowed-list */
+/* The page root for the refinement frames: html's own inset round body. */
+.brw-pk-root { display: block; box-sizing: border-box; block-size: 100%; padding: var(--space-4); }
+.brw-pk-bare > .erf-brw-pk-anchor--block > .brw-pk-root { block-size: 100%; }
+
+/* A frame drawn in the system colours forced colours use (a static frame
+   cannot switch the media query on): the page is Canvas, the image keeps its
+   own pixels, and the picker parts take picker.css's forced rules. Checked
+   against a real forced-colours render of the same CSS. */
+.ds-foreign-page.brw-pk-forced { background: Canvas; color: CanvasText; }
+.ds-foreign-page.brw-pk-forced :is(.ds-foreign-page__heading, .brw-page__bar, .brw-page__bar *) { color: CanvasText; border-color: CanvasText; }
+.brw-pk-forced .erf-picker-outline { border-color: Highlight; outline-color: Canvas; box-shadow: none; background: none; }
+.brw-pk-forced .erf-picker-outline::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: var(--border-width) solid CanvasText;
+  pointer-events: none;
+}
+.brw-pk-forced .erf-picker-label { background: Highlight; border-color: HighlightText; color: HighlightText; }
+.brw-pk-forced :is(.erf-picker-label__tag, .erf-picker-label__size) { color: HighlightText; }
+.erf-brw-view.brw-pk-forced { outline-color: Highlight; outline-style: dashed; }
+
+/* =====================================================================
+   5. prompt-actions.html (wave 2) – prompt-actions panel, instruction
+      dialog, send notice, capture-failed and shell-guard messages
+   ===================================================================== */
+
+/* Both surfaces are anchored dialogs (dialog.css) over the still image, with
+   the picker card's lime top edge (.erf-picker-owned). Modal inside the tab
+   only: aria-modal="false" plus the tab's other zones inert (M-46). The
+   component places them; a frame places them at a point. */
+.erf-brw-pa-at {
+  inset-block-start: var(--ds-top, auto);
+  inset-block-end: var(--ds-bottom, auto);
+  inset-inline-start: var(--ds-left, auto);
+  inset-inline-end: var(--ds-right, auto);
+}
+/* Narrow room: the sheet sits INSIDE the page's rectangle, over the still
+   image, pinned to its foot – the frame stays visible round it (M-36; rule on
+   the Element picker card, #room). */
+.erf-brw-area > .erf-dialog--sheet.erf-picker-owned {
+  inset-inline: var(--erf-brw-gutter);
+  inset-block-end: var(--erf-brw-gutter);
+}
+
+/* ---------- panel header: element chip and stepper (H-08, R2-M1) ----------
+   One control: the element chip (page text as code, SEC-18) with the parent
+   and child steppers beside it. The steppers answer the pointer; ↑ ↓ do the
+   same from anywhere in the panel, so they are not Tab stops. At an end the
+   stepper for that direction is aria-disabled and the end note shows in the
+   header for 2 s. After a move the chip is marked as changed for 1 s (a static
+   accent edge, no motion). */
+.erf-dialog--anchored .erf-brw-pa-head {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-3);
+}
+.erf-brw-pa-refine { display: flex; align-items: center; gap: var(--space-2); }
+.erf-brw-pa-refine > .erf-brw-pa-el { margin-inline-end: auto; }
+.erf-brw-pa-el--changed { border-color: var(--color-accent-primary); }
+.erf-brw-pa-step svg { inline-size: var(--icon-size-sm); block-size: var(--icon-size-sm); }
+.erf-brw-pa-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  margin: 0;
+}
+.erf-brw-pa-endnote { color: var(--color-text-bright); font-size: var(--text-base); }
+.erf-brw-pa-frameline { margin: 0; color: var(--color-text-tertiary); font-size: var(--text-sm); }
+.erf-brw-pa-frameline .erf-brw-mono { color: var(--color-text-primary); }
+
+/* ---------- the four actions: a row of buttons, not menu rows (H-08) ----------
+   Nothing about the look promises ↓ moves to the next action. Explain first. */
+/* Four buttons in one row; wrapping 2 × 2 only when the panel is under 320px
+   (the note's Prompt-actions panel table). */
+.erf-brw-pa-panel { container: erf-brw-pa / inline-size; }
+.erf-dialog--anchored .erf-brw-pa-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-8) var(--space-6);
+  overflow: visible;
+}
+.erf-brw-pa-act { flex: 1 1 0; min-inline-size: 0; padding-inline: var(--space-4); }
+@container erf-brw-pa (width < 320px) {
+  .erf-brw-pa-act { flex-basis: 40%; }
+}
+
+/* A boxed banner inside the panel or dialog (feedback.css). */
+.erf-brw-pa-banner { margin: 0 var(--space-8) var(--space-4); }
+.erf-dialog__body > .erf-brw-pa-banner { margin: 0 0 var(--space-6); }
+.erf-brw-pa-banner .erf-banner__text { margin: 0; }
+.erf-brw-pa-banner .erf-banner__icon svg { inline-size: var(--icon-size-sm); block-size: var(--icon-size-sm); }
+.erf-brw-pa-banner .erf-banner__actions { position: relative; }
+
+/* ---------- footer: the target as a menu button (M-27), then the key hint ---------- */
+.erf-dialog--anchored .erf-brw-pa-foot {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding-block-start: var(--space-4);
+  border-block-start: var(--border-width) solid var(--color-border-default);
+}
+/* One target line in the panel and the dialog: same size, same colours (VS-19). */
+.erf-brw-pa-target {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+  white-space: nowrap;
+}
+.erf-brw-pa-anchor { position: relative; display: inline-flex; min-inline-size: 0; }
+.erf-brw-pa-tbtn { gap: var(--space-2); min-inline-size: 0; padding-inline: var(--space-3); font-weight: var(--font-normal); }
+.erf-brw-pa-target__arrow { color: var(--color-text-tertiary); }
+.erf-brw-pa-target__name { min-inline-size: 8ch; overflow: hidden; text-overflow: ellipsis; }
+.erf-brw-pa-target__proc { flex: 0 0 auto; color: var(--color-text-bright); font-family: var(--font-mono); }
+.erf-brw-pa-target__warn { flex: 0 0 auto; inline-size: var(--icon-size-sm); block-size: var(--icon-size-sm); color: var(--color-warning); }
+.erf-brw-pa-hint { margin: 0; color: var(--color-text-tertiary); font-size: var(--text-sm); }
+.erf-brw-pa-sendsto { color: var(--color-text-tertiary); }
+
+/* ---------- instruction dialog ---------- */
+.erf-brw-pa-dlg .erf-dialog__header { flex-wrap: wrap; gap: var(--space-3) var(--space-6); }
+.erf-brw-pa-back { gap: var(--space-2); margin-inline-start: calc(var(--space-4) * -1); }
+.erf-brw-pa-dlg .erf-field { margin-block-end: var(--space-4); }
+.erf-brw-pa-dlg .erf-textarea { resize: none; }
+.erf-brw-pa-el { font-family: var(--font-mono); }
+.erf-brw-pa-el__tag { color: var(--color-accent-primary); }
+
+/* The Choose terminal menu, under its button inside the panel or dialog. A
+   keyboard-opened menu draws the Menu card's inset ring on its active item. */
+.erf-brw-pa-menu {
+  position: absolute;
+  inset-block-start: calc(100% + var(--space-2));
+  inset-inline-start: 0;
+  z-index: var(--z-dropdown);
+  inline-size: max-content;
+}
+.erf-brw-pa-banner .erf-brw-pa-menu { inset-inline-start: auto; inset-inline-end: 0; }
+.erf-brw-pa-menu .erf-menu-label { white-space: nowrap; }
+.erf-brw-pa-menu .erf-menu-icon { color: var(--color-text-emphasis); }
+.erf-brw-pa-menu .is-focus-ring {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--space-1) * -1);
+}
+
+/* ---------- send notice (H-12) ----------
+   The glyph is neutral – lime means pick mode and selection, never "done"
+   (M-42). The sentence is --text-base with a clear gap before the actions
+   (VS-18). The actions stay at every width: below 800px they become icon
+   buttons that keep their full names (accessible name and tooltip); below
+   800px the width preset leaves for More (Page width); the target keeps at
+   least 8 characters of its name (below 380px down to "…"). */
+.erf-brw-pa-ok { flex: 0 0 auto; inline-size: var(--icon-size-sm); block-size: var(--icon-size-sm); color: var(--color-text-primary); }
+.erf-brw-pk-fill .erf-brw-pa-notice > .erf-brw-status__lead { display: block; flex: 0 1 auto; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; }
+.erf-brw-pa-nacts { display: inline-flex; flex: 0 0 auto; gap: var(--space-2); margin-inline-start: var(--space-4); }
+.erf-brw-pa-nact { gap: var(--space-2); }
+.erf-brw-pa-nact svg { inline-size: var(--icon-size-sm); block-size: var(--icon-size-sm); }
+.erf-brw-pa-nact.is-hover { background: var(--color-bg-hover); color: var(--color-text-bright); }
+
+/* The notice never wraps: the sentence truncates, the actions stay. The width
+   preset gives way below 800px; the target keeps at least 8 characters of its
+   name, below 380px down to "…" (README § Tiers, A-30). */
+.erf-brw-pa-noticing .erf-brw-status { flex-wrap: nowrap; }
+.erf-brw-pa-noticing .erf-brw-width__label { display: none; }
+@container erf-brw (width < 800px) {
+  .erf-brw-pa-noticing > .erf-brw-pk-wa { display: none; }
+  .erf-brw-nav:has(+ .erf-brw-pa-noticing) .erf-brw-anchor.erf-brw-more { display: inline-flex; }
+  .erf-brw-pa-nact__label { display: none; }
+  .erf-brw-pa-nact { inline-size: var(--input-height-sm); padding: 0; justify-content: center; }
+}
+
+/* =====================================================================
+   6. site-prompts.html (wave 2) – permission prompt, fullscreen notice,
+      popup origin strip, downloads, sign-in box, page dialogs
+   ===================================================================== */
+
+/* A window drawing: the browser tab beside a neighbouring panel (a terminal
+   stand-in), so a toast is drawn where toastPlacement puts it – clear of the
+   live view, never under it. Reused by menus-and-data.html for its toasts. */
+.erf-brw-sp-window {
+  display: flex;
+  align-items: stretch;
+  inline-size: max-content;
+  border: var(--border-width) solid var(--color-border-subtle);
+}
+.erf-brw-sp-window > .erf-brw { border: 0; }
+.erf-brw-sp-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  inline-size: 340px; /* mockup: a terminal panel beside the browser tab */
+  padding: var(--space-6);
+  background: var(--color-bg-secondary);
+  border-inline-start: var(--border-width) solid var(--color-border-default);
+}
+.erf-brw-sp-side__head { color: var(--color-text-primary); font-size: var(--text-sm); font-weight: var(--font-semibold); }
+.erf-brw-sp-side__term {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+.erf-brw-sp-side .erf-toast { min-inline-size: 0; }
+
+/* An editor tab whose label is an address (no title yet): the origin display
+   from the one origin formatter (H-01) – no https://, whole subdomain labels
+   dropped from the front by the component, never cut from the end. */
+.erf-brw-tab__origin { font-family: var(--font-mono); }
+
+/* The screen source chooser (copy deck): two toggles, then a grid of sources.
+   Drawn inside a strip form row – the note gives no place (see the caption). */
+.erf-brw-sp-tabs { display: flex; gap: var(--space-2); margin-block-start: var(--space-4); }
+.erf-brw-sp-sources {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20ch), 1fr));
+  gap: var(--space-4);
+  margin-block-start: var(--space-4);
+}
+.erf-brw-sp-source {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border-default);
+}
+.erf-brw-sp-source__thumb { block-size: var(--space-24); background: var(--color-bg-tertiary); }
+.erf-brw-sp-source__name { color: var(--color-text-primary); font-size: var(--text-sm); }
+
+/* A pop-up window (025-FR-011): the OS title bar as a plain stand-in (the OS
+   draws it; Erfana only sets "{host} – Erfana"), then the read-only popup
+   origin strip in a row of the navigation row's height. */
+.erf-brw-sp-titlebar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: var(--space-14);
+  padding-inline: calc(var(--space-24) + var(--space-6));
+  background: var(--color-bg-secondary);
+  border-block-end: var(--border-width) solid var(--color-border-default);
+}
+.erf-brw-sp-titlebar__lights {
+  position: absolute;
+  inset-inline-start: var(--space-6);
+  display: flex;
+  gap: var(--space-3);
+}
+.erf-brw-sp-titlebar__lights span {
+  inline-size: var(--space-6);
+  block-size: var(--space-6);
+  border-radius: var(--border-radius-circle);
+  background: var(--color-border-subtle);
+}
+.erf-brw-sp-titlebar__text {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The popup origin strip's read-only field is ALWAYS as wide as its text,
+   hover or not (VS-R8-1): nothing in the strip changes size when a tooltip
+   shows. The room after the field belongs to the strip. When the text is
+   wider than the strip the field shrinks to the strip and the path loses its
+   end first (the formatter has already dropped whole subdomain labels from the
+   front); the registrable domain never shrinks. */
+.erf-brw-sp-popstrip .erf-origin { flex: 0 1 auto; min-inline-size: 0; }
+.erf-brw-sp-popstrip .erf-origin__display { min-inline-size: 0; } /* the host parts stay flex: none, so only the path gives way */
+.erf-brw-sp-popstrip .erf-origin__path { flex: 0 1 auto; inline-size: auto; }
+/* Badge tooltip in a pop-up window (R7-M1): no pick row, so it sits inside
+   the strip's band after the field – short form only, one line. "No room" is
+   measured from the end of the field's box to the strip's end; when the short
+   form does not fit there, the component does not show it. */
+.erf-brw-sp-poptip { display: flex; flex: 1 1 auto; align-items: center; min-inline-size: 0; margin-inline-start: var(--space-2); }
+.erf-brw-sp-poptip > .erf-tooltip {
+  position: static;
+  max-inline-size: 100%;
+  padding-block: var(--space-1);
+  line-height: var(--leading-tight);
+  white-space: nowrap;
+}
+.erf-brw-sp-poptip > .erf-tooltip::before { display: none; }
+
+/* =====================================================================
+   7. page-states.html (wave 2) – load-error page, certificate warning
+      page, crashed and hung tab
+   ===================================================================== */
+
+/* An Erfana page in the page area (States card, error: load and error: panel).
+   It owns the whole rectangle, so the frame stays plain (note § Page area). */
+.erf-brw-ps-page {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--color-bg-primary);
+}
+.erf-brw-ps-page .erf-state { padding: var(--space-12) var(--space-8); }
+/* The title is the page's h1, one step up from a panel state's title. */
+.erf-brw-ps-title {
+  max-inline-size: 48ch;
+  color: var(--color-text-emphasis);
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-tight);
+  overflow-wrap: anywhere;
+}
+.erf-brw-ps-title .erf-brw-mono,
+.erf-brw-ps-title .erf-brw-ps-host { font-size: var(--text-md); }
+/* Focus lands on the heading when the view it replaced held focus and the
+   load was not started from the toolbar (H-10). .is-focus is a doc hook. */
+.erf-brw-ps-title:is(:focus-visible, [class~='is-focus']) {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+/* A host Erfana writes in a title or sentence: mono, subdomain labels quiet
+   and wrapping at their dots, the registrable domain never broken (H-01). */
+.erf-brw-ps-host { font-family: var(--font-mono); overflow-wrap: normal; }
+.erf-brw-ps-host__quiet { color: var(--color-text-tertiary); }
+.erf-brw-ps-host__domain { white-space: nowrap; }
+.erf-brw-ps-text .erf-brw-mono,
+.erf-brw-ps-title .erf-brw-mono { white-space: nowrap; }
+.erf-brw-ps-text { max-inline-size: 52ch; margin: 0; color: var(--color-text-primary); }
+.erf-brw-ps-strong { font-weight: var(--font-semibold); }
+
+/* The localhost hint: only for a loopback host, set apart so the general
+   sentence still reads first. */
+.erf-brw-ps-local {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+  max-inline-size: 52ch;
+  margin: 0;
+  padding: var(--space-4) var(--space-6);
+  background: var(--color-bg-secondary);
+  border-inline-start: var(--border-width-thick) solid var(--color-border-subtle);
+  color: var(--color-text-primary);
+  text-align: start;
+}
+.erf-brw-ps-local svg { flex: 0 0 auto; margin-block-start: var(--space-1); color: var(--color-text-tertiary); }
+
+/* Address and code: mono, quiet, whole – the address wraps anywhere. */
+.erf-brw-ps-address,
+.erf-brw-ps-code {
+  max-inline-size: 60ch;
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+/* The certificate interstitial: the one place red leads – a rule across the
+   top of the page, so it never reads as an ordinary load error. */
+.erf-brw-ps-cert { border-block-start: var(--border-width-thick) solid var(--color-error); }
+.erf-brw-ps-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  align-items: center;
+  inline-size: 100%;
+}
+.erf-brw-ps-details > summary {
+  min-block-size: var(--btn-height-sm);
+  padding-inline: var(--space-4);
+  color: var(--color-link);
+  cursor: pointer;
+}
+.erf-brw-ps-details > summary:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+.erf-brw-ps-details[open] > summary { color: var(--color-text-primary); }
+.erf-brw-ps-cert .erf-state__actions { flex-direction: column; align-items: center; }
+/* Proceed anyway, shown at once (owner decision OD-5) as the quieter
+   text-style button, with what it saves beside it as plain text. */
+.erf-brw-ps-proceed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: center;
+  max-inline-size: 52ch;
+}
+.erf-brw-ps-why { margin: 0; color: var(--color-text-tertiary); font-size: var(--text-sm); }
+
+/* =====================================================================
+   8. menus-and-data.html (wave 2) – page right-click menu, clear-data
+      dialog and Forget, Linux keyring notice
+   ===================================================================== */
+
+/* The page menu, placed at the pointer inside the page area (over the still
+   image). Positions are custom properties on the element. */
+.erf-brw-md-menu { position: absolute; z-index: var(--z-context-menu); }
+.erf-brw-md-pointer {
+  position: absolute;
+  z-index: var(--z-context-menu);
+  color: var(--color-brand-black);
+}
+.erf-brw-md-pointer svg { fill: currentColor; stroke: var(--color-brand-white); }
+
+/* Keyboard-opened menu: the first item shows the decided Menu card's
+   :focus-visible look (fill plus the 2px inset ring). .is-focus is a doc hook
+   mirroring :focus-visible, which a static frame cannot trigger. */
+.erf-brw-md-menu .erf-menu-item.is-focus {
+  background-color: var(--color-bg-hover-solid);
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--space-1) * -1);
+}
+
+/* The dialog scrim, contained by the drawing (fixed in the app). */
+.erf-brw-md-scrim { position: absolute; padding: var(--space-8); }
+.erf-brw-md-area { --erf-brw-area-height: 520px; }
+.erf-brw-md-kinds { display: flex; flex-direction: column; gap: var(--space-6); }
+.erf-brw-md-reason {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  margin: var(--space-8) 0 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-base);
+}
+
+/* An editor stand-in where the closed browser tabs were. */
+.erf-brw-md-editor {
+  flex: 1 1 auto;
+  min-block-size: var(--space-24);
+  padding: var(--space-12);
+  color: var(--color-text-tertiary);
+}
+
+/* Link-menu header (owner decision OD-12): the link's host through the one
+   origin formatter, not an item – arrows skip it. */
+.erf-brw-md-linkhead {
+  max-inline-size: 32ch;
+  padding: var(--space-2) var(--space-4);
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+.erf-brw-md-linkhead__sub { color: var(--color-text-tertiary); }
+.erf-brw-md-linkhead__domain { color: var(--color-text-emphasis); white-space: nowrap; }
+
+/* The keyring band keeps the strip's row padding. */
+.erf-brw-md-band { padding-inline: var(--space-6); }
+
+/* =====================================================================
+   9. Third-party content (exempt)
+   ===================================================================== */
+
+/* stylelint-disable color-no-hex, declaration-property-value-allowed-list --
+   This is NOT Erfana. A site's favicon and a dark third-party page are content
+   the native view paints in its own colours and face; drawing them with
+   Erfana's tokens would hide the boundary these frames exist to show. The light
+   page is ds.css's .ds-foreign-page; these add the variants the browser needs.
+   Sizes and spacing stay tokens. */
+
+/* A site's own icon in the editor tab. */
+.brw-favicon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--icon-size-sm);
+  block-size: var(--icon-size-sm);
+  background: #2563eb;
+  color: #ffffff;
+  font-family: Georgia, serif;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* A page's own header bar and button, for pages with a recognisable layout. */
+.brw-page__bar {
+  display: flex;
+  gap: var(--space-8);
+  margin: 0 0 var(--space-8);
+  padding-block-end: var(--space-4);
+  border-block-end: var(--border-width) solid #d0d7de;
+  color: #57606a;
+  font-family: system-ui, sans-serif;
+  font-size: var(--text-base);
+}
+.brw-page__bar strong { color: #1f2328; }
+.brw-page__btn {
+  display: inline-block;
+  padding: var(--space-3) var(--space-8);
+  background: #1f883d;
+  color: #ffffff;
+  font-family: system-ui, sans-serif;
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+/* stylelint-enable color-no-hex, declaration-property-value-allowed-list */

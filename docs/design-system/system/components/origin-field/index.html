@@ -1,0 +1,188 @@
+<!-- @card group="Components" name="Origin field" subtitle="A one-line field that says where you are – badge, host emphasis, what is cut first and what never is" status="proposed" reviewed="never" answers="Show the current address; Show a host in a one-line field; Add an address field with suggestions" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Origin field – Erfana design system</title>
+<link rel="stylesheet" href="../../../tokens.css">
+<link rel="stylesheet" href="../../../ds.css">
+<link rel="stylesheet" href="../badge/badge.css">
+<link rel="stylesheet" href="origin-field.css">
+<style>
+  /* Documentation chrome: a slice of the row the field lives in, on the row's own surface. */
+  .of-row { /* mockup: app scale */ display: flex; align-items: center; padding: var(--space-3) var(--space-6);
+            background: var(--color-bg-primary); border: var(--border-width) solid var(--color-border-default); }
+  .of-row--with-list { padding-block-end: calc(var(--space-24) * 3); }
+  .of-w560 { inline-size: 560px; max-inline-size: 100%; }
+  .of-w320 { inline-size: 320px; }
+  .of-anatomy { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-3) var(--space-8); margin-block-start: var(--space-6); }
+  .of-anatomy dt { font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-text-bright); }
+  .of-anatomy dd { margin: 0; font-size: var(--ds-text-body); }
+</style>
+</head>
+<body>
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../../index.html#components">Components</a> <span aria-hidden="true">/</span> <span aria-current="page">Origin field</span></nav>
+<main>
+<h1>Origin field</h1>
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</p>
+<p class="ds-lede" id="decision">
+  A field that says where you are is <code>.erf-origin</code> in <a href="origin-field.css">origin-field.css</a>: a
+  Form-card field at <code>--input-height-sm</code> whose text is the <strong>origin display</strong> – the
+  registrable domain brightest (<code>--color-text-emphasis</code>), subdomain labels, scheme, port and path quiet in
+  tertiary – with a <strong>state badge</strong> fused to its start and action chips at its end. When it
+  does not fit, the <strong>path</strong> loses its end first, then <strong>whole subdomain labels</strong> leave from
+  the front; tools leave the row before the <strong>registrable domain</strong> could be cut, and only as the last resort it loses its <em>start</em>, never its end. It never shows a page title or any
+  text the page supplied.
+</p>
+
+<div class="ds-note">
+  <strong>Why a card, when Rows and lists already decides hosts.</strong> The Rows card answers a host that does not fit
+  with “wrap, never cut” – right for a list row, impossible in a one-line field. The Form card decides fields, not what
+  an address looks like. The browser (spec 025) needs both at once: a field that must stay one line and an origin that
+  must stay honest. This card takes every origin rule the Rows card decided – scheme only when not <code>https</code>,
+  port only when not default, both dimmed; punycode for a label that mixes scripts; the full origin in real text for
+  assistive technology – and adds the three a one-line field needs: emphasis, elision order, and what may never sit in it.
+</div>
+
+<h2 id="anatomy">Anatomy</h2>
+<div class="of-row of-w560" aria-hidden="true">
+  <div class="erf-origin"><span class="erf-origin__badge erf-origin__badge--warning"><svg data-icon="circle-alert" width="12" height="12" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg><span>Not secure</span></span><span class="erf-origin__display"><span class="erf-origin__scheme">http://</span><span class="erf-origin__sub">intranet.</span><span class="erf-origin__domain">example.net</span><span class="erf-origin__port">:8080</span><span class="erf-origin__path">/reports/october</span></span><span class="erf-origin__chips"><span class="erf-chip erf-chip--action">125%</span></span></div>
+</div>
+<dl class="of-anatomy">
+  <dt>__badge</dt><dd>The state in a word plus an icon: “Not secure” (<code>circle-alert</code> in <code>--color-warning</code> on <code>http</code> to a remote host – round, never a lock, so the icon-only form cannot read as “safe” and differs in shape from the triangle; error triangle after a certificate failure), “File”. None for <code>https</code> or a loopback or private <code>http</code> address. The segment has a hover tooltip with the deck description, so the icon-only form can be read back. Never shrinks; the word stays until every optional tool has left the row, then <code>.erf-origin--badge-icon</code> keeps only the icon (exception below).</dd>
+  <dt>__scheme</dt><dd>Drawn only when not <code>https</code>, tertiary.</dd>
+  <dt>__sub</dt><dd>Subdomain labels, tertiary, so the domain is the one bright run. The first thing to leave after the path – whole labels, from the front, replaced by <code>__elide</code>.</dd>
+  <dt>__elide</dt><dd>“….” – the ellipsis and the dot that separated the dropped labels, tertiary, so the cut never reads as part of the domain.</dd>
+  <dt>__domain</dt><dd>The registrable domain, emphasis. Never shrinks while anything else can give way; as the last resort (exception below) the formatter slices off its <em>start</em> and writes a leading “…”, keeping its end, TLD and port – never its end. The component knows where it starts from the public-suffix list (browser note OD-1); CSS cannot.</dd>
+  <dt>__port</dt><dd>Drawn only when not the scheme’s default, tertiary.</dd>
+  <dt>__path</dt><dd>Path, query and fragment, tertiary. The only part CSS cuts, from its end, with a floor of 2 characters: below that the component drops it whole – never a one-letter sliver.</dd>
+  <dt>__chips</dt><dd>Action chips (Badges card): zoom, pop-up blocked, in use. Zoom leaves the field before the badge or the domain do; the in-use chip never leaves – it pins to its icon. A focused chip has the one ring, inset; the field draws its own ring only while the text has focus.</dd>
+  <dt>__input</dt><dd>The real <code>&lt;input&gt;</code> while typing (frames draw it as <code>__typed</code> spans to show a caret and a selection).</dd>
+</dl>
+
+<h2 id="states">Every state</h2>
+<div class="ds-frames">
+  <figure class="ds-frame"><div class="of-row" aria-hidden="true"><div class="erf-origin"><span class="erf-origin__display"><span class="erf-origin__sub">staging.</span><span class="erf-origin__domain">harbour-garden.org</span><span class="erf-origin__path">/events</span></span></div></div>
+    <figcaption><strong>Resting, https</strong> – no badge; host alone, path quiet.</figcaption></figure>
+  <figure class="ds-frame"><div class="of-row" aria-hidden="true"><div class="erf-origin"><span class="erf-origin__badge erf-origin__badge--warning"><svg data-icon="circle-alert" width="12" height="12" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg><span>Not secure</span></span><span class="erf-origin__display"><span class="erf-origin__scheme">http://</span><span class="erf-origin__domain">example.net</span></span></div></div>
+    <figcaption><strong>Remote http</strong> – “Not secure”, scheme drawn.</figcaption></figure>
+  <figure class="ds-frame"><div class="of-row" aria-hidden="true"><div class="erf-origin"><span class="erf-origin__display"><span class="erf-origin__scheme">http://</span><span class="erf-origin__domain">localhost</span><span class="erf-origin__port">:5173</span></span></div></div>
+    <figcaption><strong>Loopback http</strong> – a secure context for development: no badge; scheme and port dimmed.</figcaption></figure>
+  <figure class="ds-frame"><div class="of-row" aria-hidden="true"><div class="erf-origin"><span class="erf-origin__badge"><svg data-icon="file" width="12" height="12" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg><span>File</span></span><span class="erf-origin__display"><span class="erf-origin__path">site/</span><span class="erf-origin__file">index.html</span></span></div></div>
+    <figcaption><strong>Local file</strong> – path from the project (or <code>~/</code>); folders elide from the front, the file name never.</figcaption></figure>
+  <figure class="ds-frame"><div class="of-row" aria-hidden="true"><div class="erf-origin"><span class="erf-origin__badge erf-origin__badge--error"><svg data-icon="triangle-alert" width="12" height="12" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><span>Not secure</span></span><span class="erf-origin__display"><span class="erf-origin__sub">staging.</span><span class="erf-origin__domain">harbour-garden.org</span></span></div></div>
+    <figcaption><strong>Certificate not trusted</strong> – error triangle; the badge’s description says which failure.</figcaption></figure>
+  <figure class="ds-frame"><div class="of-row" aria-hidden="true"><div class="erf-origin"><span class="erf-origin__display"><span class="erf-origin__sub">docs.</span><span class="erf-origin__domain">harbour-garden.org</span><span class="erf-origin__path">/guides/volunteering/saturday-work-mornings/what-to-bring?ref=newsletter</span></span></div></div>
+    <figcaption><strong>Long path</strong> – the path loses its end; the host is whole.</figcaption></figure>
+  <figure class="ds-frame"><div class="of-row" aria-hidden="true"><div class="erf-origin"><span class="erf-origin__display"><span class="erf-origin__elide">….</span><span class="erf-origin__sub">staging.</span><span class="erf-origin__domain">harbour-garden.co.uk</span></span></div></div>
+    <figcaption><strong>Long host</strong> – <code>eu-west-2.preview.cdn.staging.harbour-garden.co.uk</code>: whole labels leave from the front; <code>co.uk</code> is one suffix, so the domain is <code>harbour-garden.co.uk</code>.</figcaption></figure>
+  <figure class="ds-frame"><div class="of-row" aria-hidden="true"><div class="erf-origin"><span class="erf-origin__display"><span class="erf-origin__sub">login.paypal.com.</span><span class="erf-origin__domain">secure-check.net</span></span></div></div>
+    <figcaption><strong>Host built to mislead</strong> – the brightest text is the site really serving the page.</figcaption></figure>
+  <figure class="ds-frame"><div class="of-row" aria-hidden="true"><div class="erf-origin"><span class="erf-origin__display"><span class="erf-origin__domain">xn--pple-43d.com</span></span></div></div>
+    <figcaption><strong>Mixed scripts</strong> – a label mixing scripts is drawn as punycode (Rows card); a single-script IDN shows in Unicode.</figcaption></figure>
+  <figure class="ds-frame"><div class="of-row" aria-hidden="true"><div class="erf-origin is-focus"><span class="erf-origin__typed"><span class="erf-origin__sel">https://staging.harbour-garden.org/events</span></span></div></div>
+    <figcaption><strong>Focused</strong> – the full URL as typed text, all selected; the ring outward (Form card).</figcaption></figure>
+  <figure class="ds-frame"><div class="of-row" aria-hidden="true"><div class="erf-origin is-focus"><span class="erf-origin__typed"><span class="erf-origin__caret"></span><span class="erf-origin__placeholder">Search DuckDuckGo or type an address</span></span></div></div>
+    <figcaption><strong>Empty</strong> – a placeholder that names where a search goes, in sans.</figcaption></figure>
+  <figure class="ds-frame"><div class="of-row" aria-hidden="true"><div class="erf-origin is-focus" aria-invalid="true"><span class="erf-origin__erricon"><svg data-icon="circle-alert" width="12" height="12" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg></span><span class="erf-origin__typed">javascript:alert(1)<span class="erf-origin__caret"></span></span></div></div>
+    <figcaption><strong>Invalid</strong> – red edge and the error icon; the message sits outside the field, linked by <code class="ds-nowrap">aria-describedby</code>.</figcaption></figure>
+  <figure class="ds-frame"><div class="of-row" aria-hidden="true"><div class="erf-origin erf-origin--readonly"><span class="erf-origin__badge erf-origin__badge--warning"><svg data-icon="circle-alert" width="12" height="12" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg><span>Not secure</span></span><span class="erf-origin__display"><span class="erf-origin__scheme">http://</span><span class="erf-origin__domain">example.net</span><span class="erf-origin__path">/popup</span></span></div></div>
+    <figcaption><strong>Read-only</strong> – the popup origin strip: same display, no hover response, still focusable so the address can be copied.</figcaption></figure>
+  <figure class="ds-frame"><div class="of-row of-w320" aria-hidden="true"><div class="erf-origin erf-origin--badge-icon"><span class="erf-origin__badge erf-origin__badge--warning"><svg data-icon="circle-alert" width="12" height="12" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg><span>Not secure</span></span><span class="erf-origin__display"><span class="erf-origin__scheme">http://</span><span class="erf-origin__elide">….</span><span class="erf-origin__domain">example.net</span><span class="erf-origin__port">:8080</span></span></div></div>
+    <figcaption><strong>At its narrowest</strong> – <code>http://intranet.example.net:8080/reports</code> once every optional tool has left: the path and the subdomain have left; the scheme, the registrable domain and the port stay; the badge is its icon (<code>.erf-origin--badge-icon</code>), its word kept as the accessible name.</figcaption></figure>
+
+  <figure class="ds-frame"><div class="of-row" aria-hidden="true"><div class="erf-origin is-hover"><span class="erf-origin__display"><span class="erf-origin__sub">staging.</span><span class="erf-origin__domain">harbour-garden.org</span><span class="erf-origin__path">/events</span></span></div></div>
+    <figcaption><strong>Hover</strong> – the edge brightens (Form card); a text cursor.</figcaption></figure>
+  <figure class="ds-frame"><div class="of-row" aria-hidden="true"><div class="erf-origin is-focus"><span class="erf-origin__typed">harbour <span class="erf-origin__ime">ガーデン</span><span class="erf-origin__caret"></span></span></div></div>
+    <figcaption><strong>IME composing</strong> – the platform underline under the composition; Esc and Enter go to it first.</figcaption></figure>
+  <figure class="ds-frame"><div class="of-row of-w320" aria-hidden="true"><div class="erf-origin"><span class="erf-origin__badge erf-origin__badge--warning"><svg data-icon="circle-alert" width="12" height="12" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg><span>Not secure</span></span><span class="erf-origin__display"><span class="erf-origin__scheme">http://</span><span class="erf-origin__domain">example.net</span></span></div></div>
+    <figcaption><strong>Badge word kept</strong> – the same host at 320px of field: the word stays while the host fits beside it; tools leave the row first.</figcaption></figure>
+  <figure class="ds-frame"><div class="of-row" aria-hidden="true"><div class="erf-origin"><span class="erf-origin__display"><span class="erf-origin__domain">harbour-garden.org</span><span class="erf-origin__path">/programme</span></span><span class="erf-origin__chips"><button class="erf-chip erf-chip--action" type="button" tabindex="-1"><svg data-icon="app-window" width="12" height="12" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 4v4"/><path d="M2 8h20"/><path d="M6 4v4"/></svg></button><button class="erf-chip erf-chip--action" type="button" tabindex="-1"><svg data-icon="video" width="12" height="12" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg></button><button class="erf-chip erf-chip--action" type="button" tabindex="-1">125%</button></span></div></div>
+    <figcaption><strong>Chips</strong> – pop-up blocked, in use, zoom: action chips at the end, after the path; drawn in their narrow form, where the pop-up and in-use chips are icon-only (names kept).</figcaption></figure>
+  <figure class="ds-frame"><div class="of-row" aria-hidden="true"><div class="erf-origin"><span class="erf-origin__display"><span class="erf-origin__domain">harbour-garden.org</span><span class="erf-origin__path">/programme</span></span><span class="erf-origin__chips"><button class="erf-chip erf-chip--action is-focus" type="button" tabindex="-1">125%</button></span></div></div>
+    <figcaption><strong>Chip focused</strong> – one ring: the chip’s, inset, inside the field’s edge. The field shows no ring, because its ring belongs to the text (Focus card, “one ring”).</figcaption></figure>
+  <figure class="ds-frame"><div class="of-row" aria-hidden="true"><div class="erf-origin"><span class="erf-origin__display"><span class="erf-origin__sub">staging.</span><span class="erf-origin__domain">harbour-garden.org</span><span class="erf-origin__path">/events</span></span></div></div>
+    <figcaption><strong>Loading, started by the user</strong> – typed, Reload, Back or Forward, a history row, a terminal link: the display shows the <em>pending</em> address at once.</figcaption></figure>
+  <figure class="ds-frame"><div class="of-row" aria-hidden="true"><div class="erf-origin"><span class="erf-origin__display"><span class="erf-origin__sub">staging.</span><span class="erf-origin__domain">harbour-garden.org</span><span class="erf-origin__path">/events/open-day</span></span></div></div>
+    <figcaption><strong>Loading, started by the page</strong> – a script, a link, a form or a redirect heading to <code>harbour-garden-login.example</code>: the display keeps the <em>committed</em> address until the new page commits. A page can never put an address here that it has not reached.</figcaption></figure>
+</div>
+
+<div class="ds-frames">
+  <figure class="ds-frame"><div class="of-row of-w320" aria-hidden="true"><div class="erf-origin erf-origin--badge-icon"><span class="erf-origin__badge erf-origin__badge--warning"><svg data-icon="circle-alert" width="12" height="12" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg><span>Not secure</span></span><span class="erf-origin__display"><span class="erf-origin__scheme">http://</span><span class="erf-origin__elide">…</span><span class="erf-origin__domain">ty-garden-trust.org</span><span class="erf-origin__port">:8080</span></span></div></div>
+    <figcaption><strong>Last resort – cut from the start</strong> – <code>harbour-street-community-garden-trust.org</code> does not fit even alone: the formatter slices it and writes the leading “…”; the end of the domain, the TLD and the port stay.</figcaption></figure>
+  <figure class="ds-frame"><div class="of-row of-w320" aria-hidden="true"><div class="erf-origin erf-origin--badge-icon"><span class="erf-origin__badge erf-origin__badge--warning"><svg data-icon="circle-alert" width="12" height="12" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg><span>Not secure</span></span><span class="erf-origin__display"><span class="erf-origin__scheme">http://</span><span class="erf-origin__elide">…</span><span class="erf-origin__domain">ommunity-garden.org</span><span class="erf-origin__port">:8080</span></span></div></div>
+    <figcaption><strong>Last resort – a domain that starts with digits</strong> – <code>2024-harbour-street-community-garden.org</code>: cut by slicing the string, never by CSS <code>direction</code>, so no character moves – <code>2024-</code> is simply gone from the front, and <code>163.com</code> could never read <code>com.163</code>.</figcaption></figure>
+</div>
+
+<h2 id="suggestions">The suggestion list</h2>
+<div class="ds-frames">
+  <figure class="ds-frame"><div class="of-row of-row--with-list" aria-hidden="true"><div class="erf-origin is-focus" aria-expanded="true"><span class="erf-origin__typed">harbour<span class="erf-origin__caret"></span></span>
+    <ul class="erf-origin-list"><li class="erf-origin-option erf-origin-option--active"><svg data-icon="history" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg><span class="erf-origin__display"><span class="erf-origin__domain">harbour-garden.org</span><span class="erf-origin__path">/programme</span></span></li><li class="erf-origin-option"><svg data-icon="history" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg><span class="erf-origin__display"><span class="erf-origin__sub">staging.</span><span class="erf-origin__domain">harbour-garden.org</span></span></li><li class="erf-origin-option erf-origin-option--search"><svg data-icon="search" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg><span>Search DuckDuckGo for “<span class="erf-origin-option__query">harbour</span>”</span></li></ul></div></div>
+    <figcaption><strong>Open, one row active</strong> – a <code>listbox</code> under the field; focus stays in the field (<code class="ds-nowrap">aria-activedescendant</code>), so the active row draws the ring itself, inset. Rows show addresses with the origin display, never stored titles. The last row says where a search would go.</figcaption></figure>
+</div>
+
+<h2 id="pending">Which address it shows while loading</h2>
+<p class="ds-muted" style="max-inline-size: 72ch">The pending address only for a load the <strong>user</strong> started (typed, Reload, Back or Forward, a history row, a terminal link). For a load the <strong>page</strong> started (script, link click, form, redirect) the committed address stays until the new page commits – otherwise a page could show an address it never reaches (browser Security rule 1). The editor tab’s label and description follow the same rule: for a page-started load they keep the committed page’s title, or its host, until commit. No class: the component chooses which URL to hand the display. Both cases are drawn above.</p>
+
+<h2 id="userinfo">User names in a URL, and links that are not web addresses</h2>
+<p class="ds-muted" style="max-inline-size: 72ch">A user name and password written into a URL (<code>https://accounts.harbour-garden.org@evil.example/</code> – everything before the <code>@</code>) are <strong>stripped on every display</strong>: the field at rest, the editor tab and its tooltip, the link destination, the link menu’s header, history rows. Only the focused, editable field shows them, unemphasised. A link that is not <code>http</code>, <code>https</code> or <code>file</code> shows the scheme word and a plain description (<code>.erf-origin__other</code>), never a host in bright text.</p>
+<div class="ds-frames">
+  <figure class="ds-frame"><div class="of-row" aria-hidden="true"><div class="erf-origin"><span class="erf-origin__display"><span class="erf-origin__domain">evil.example</span><span class="erf-origin__path">/</span></span></div></div>
+    <figcaption><strong>Userinfo stripped</strong> – <code>https://accounts.harbour-garden.org@evil.example/</code> displays as <code>evil.example</code>.</figcaption></figure>
+  <figure class="ds-frame"><div class="of-row" aria-hidden="true"><div class="erf-origin"><span class="erf-origin__display"><span class="erf-origin__scheme">mailto:</span><span class="erf-origin__other">&nbsp;link – opens your email app</span></span></div></div>
+    <figcaption><strong>Not a web address</strong> – the scheme word and what it does; another scheme reads “{scheme}: link – opens another app”.</figcaption></figure>
+</div>
+
+<h2 id="never">What never goes in the field</h2>
+<div class="ds-note">
+  <strong>A page title, or any text the page supplied.</strong> The display is filled from the engine’s committed URL
+  only. A title appears in the editor tab and its tooltip (Tabs card), where the tooltip leads with the true address.
+  No lock, no tick and no badge ever sits beside a title. <strong>A colour for “safe”.</strong> <code>https</code> gets
+  no badge rather than a green one: the absence of a warning is the normal case, and a reassuring colour is the thing a
+  page would imitate.
+</div>
+
+<h2 id="contrast">Contrast</h2>
+<table>
+  <thead><tr><th>Part</th><th>Pair</th><th>Ratio</th></tr></thead>
+  <tbody>
+    <tr><td>Registrable domain</td><td><code>--color-text-emphasis</code> on <code>--color-bg-input</code></td><td data-contrast="--color-text-emphasis on --color-bg-input" data-min="4.5" data-result="pass">13.72:1 · pass</td></tr>
+        <tr><td>Subdomains, scheme, port, path, “….”</td><td><code>--color-text-tertiary</code> on <code>--color-bg-input</code></td><td data-contrast="--color-text-tertiary on --color-bg-input" data-min="4.5" data-result="pass">6.33:1 · pass</td></tr>
+    <tr><td>Placeholder</td><td><code>--color-text-placeholder</code> on <code>--color-bg-input</code></td><td data-contrast="--color-text-placeholder on --color-bg-input" data-min="4.5" data-result="pass">4.52:1 · pass</td></tr>
+    <tr><td>Badge word</td><td><code>--color-text-primary</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-text-primary on --color-bg-tertiary" data-min="4.5" data-result="pass">9.53:1 · pass</td></tr>
+    <tr><td>Warning icon</td><td><code>--color-warning</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-warning on --color-bg-tertiary" data-min="3" data-result="pass">6.63:1 · pass</td></tr>
+    <tr><td>Error icon</td><td><code>--color-error</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-error on --color-bg-tertiary" data-min="3" data-result="pass">6.23:1 · pass</td></tr>
+    <tr><td>Field edge</td><td><code>--color-border-input</code> on <code>--color-bg-primary</code></td><td data-contrast="--color-border-input on --color-bg-primary" data-min="3" data-result="pass">4.18:1 · pass</td></tr>
+    <tr><td>Domain against the rest of the host</td><td><code>--color-text-emphasis</code> on <code>--color-text-tertiary</code></td><td data-contrast="--color-text-emphasis on --color-text-tertiary">2.16:1</td></tr>
+  </tbody>
+</table>
+<p class="ds-muted">The last row is a step, not a pass mark: the domain is the one bright run against dimmed subdomains, and the elision rule – not the colour – is what keeps it whole.</p>
+
+<h2 id="keyboard">The keyboard contract</h2>
+<table class="ds-keys"><thead><tr><th>Key</th><th>Result</th><th>Focus ends on</th></tr></thead><tbody>
+  <tr><td><kbd>⌘L</kbd> / <kbd>Ctrl+L</kbd>, or a click</td><td>The full URL as text, all selected</td><td>The field</td></tr>
+  <tr><td><kbd>↓</kbd> <kbd>↑</kbd></td><td>Move the active suggestion; the field keeps focus</td><td>The field</td></tr>
+  <tr><td><kbd>Enter</kbd></td><td>Loads the active row, or the typed text</td><td>The page, when it loads</td></tr>
+  <tr><td><kbd>Esc</kbd> once</td><td>Closes the list, keeps the typed text</td><td>The field</td></tr>
+  <tr><td><kbd>Esc</kbd> twice</td><td>Restores the current address</td><td>The page</td></tr>
+  <tr><td>IME composition</td><td><kbd>Esc</kbd> and <kbd>Enter</kbd> go to the composition first</td><td>The field</td></tr>
+</tbody></table>
+<p class="ds-muted">No app test holds this yet: the first user is the spec 025 browser (025-AC-002, 025-AC-078). In the app the input is the <code>combobox</code>, named “Address and search”; description: the badge text, then the error when refused. The drawings above are pictures and carry no role.</p>
+
+<section id="exceptions">
+<h2>Exceptions</h2>
+<table>
+  <thead><tr><th>Where</th><th>The card</th><th>The exception, and why</th></tr></thead>
+  <tbody>
+    <tr><td>Host cut from its start (last resort)</td><td>Nothing is ever cut inside the registrable domain.</td><td>When the scheme, the registrable domain and the port still do not fit with every tool gone (browser fold step 8), the field may shrink below its host and the formatter slices the domain from its <strong>start</strong> and writes a leading “…” (no CSS <code>direction</code>, which would reorder a digit-led domain), keeping the end of the domain, the TLD and the port. The field is never clipped at its end, so a long lookalike cannot read as the trusted name it begins with. The editor tab’s address label follows the same rule. Drawn in <code>docs/designs/browser/tab-and-toolbar.html</code> (“Long host – step 8”).</td></tr>
+    <tr><td>Badge once every optional tool has left</td><td>The badge never shrinks.</td><td>At any tier, once every optional tool has left the row (browser fold steps 1–5: path, subdomain labels, zoom chip with Open and DevTools, Forward and Reload, field margins), the word may go and the icon stays (<code>.erf-origin--badge-icon</code>); the word stays as the accessible name. Only Back folds after it. The alternative is cutting the registrable domain. Drawn in <code>docs/designs/browser/tab-and-toolbar.html</code> § The longest host at every tier.</td></tr>
+  </tbody>
+</table>
+</section>
+</main>
+</body>
+</html>

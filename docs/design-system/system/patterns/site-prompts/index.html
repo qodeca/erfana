@@ -1,0 +1,165 @@
+<!-- @card group="Patterns" name="Site prompts" subtitle="A page asks in a strip row above the page, named by its origin – one row per kind, in a fixed order, never taking focus behind your back" status="proposed" reviewed="never" answers="Ask for a site permission; Show a page's own dialog; Ask for a sign-in from a page" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Site prompts – Erfana design system</title>
+<link rel="stylesheet" href="../../../tokens.css">
+<link rel="stylesheet" href="../../../ds.css">
+<link rel="stylesheet" href="../../components/button/button.css">
+<link rel="stylesheet" href="../../components/form/form.css">
+<link rel="stylesheet" href="../../components/feedback/feedback.css">
+<link rel="stylesheet" href="../../components/row/host.css">
+<link rel="stylesheet" href="site-prompts.css">
+<style>
+  /* Documentation chrome: the strip, then the top of the page it sits above. */
+  .sp-tab { /* mockup: app scale */ inline-size: 640px; max-inline-size: 100%; border: var(--border-width) solid var(--color-border-subtle); background: var(--color-bg-primary); }
+  .sp-tab--narrow { inline-size: 400px; }
+  .sp-page { min-block-size: var(--space-24); padding: calc(var(--space-1) + var(--border-width-thick)); }
+  .sp-page > .ds-foreign-page { padding: var(--space-6) var(--space-10); }
+  .sp-order { margin: 0; padding-inline-start: var(--space-12); font-size: var(--ds-text-body); }
+</style>
+</head>
+<body>
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../../index.html#patterns">Patterns</a> <span aria-hidden="true">/</span> <span aria-current="page">Site prompts</span></nav>
+<main>
+<h1>Site prompts</h1>
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</p>
+<p class="ds-lede" id="decision">
+  Every request a page makes of the reader – a permission, a sign-in, a page’s own <code>alert</code>,
+  <code>confirm</code> or <code>prompt</code>, a blocked pop-up, several downloads – is a <strong>strip row above the
+  page</strong> (<code>.erf-site-prompt</code> in <a href="site-prompts.css">site-prompts.css</a>) that starts with the
+  <strong>requesting origin</strong>, drawn by Erfana from the engine, never from page text. One row per kind, in a
+  <strong>fixed order</strong>; more of a kind queue behind it as “+N waiting”. A row never takes focus on arrival unless
+  the reader just navigated or the page is halted. Page-supplied words sit in a box under “{host} says”, plain, clamped
+  and never bold.
+</p>
+
+<div class="ds-note">
+  <strong>Why no existing card covers it.</strong> The <a href="../../components/permission-band/index.html">Permission band</a>
+  (decided) settles one kind of request – the HTML preview’s blocked remote hosts – in one bar, and it is the rule this
+  card keeps: Erfana chrome is a flow sibling <em>above</em> the page, never an overlay. The
+  <a href="../../components/feedback/index.html">Feedback</a> band form is one row, at most two actions, no fields. Neither
+  covers a sign-in form, a page <code>prompt()</code>, queueing, the order across kinds, or text a page wrote. Its first
+  user is the built-in browser (spec 025, 025-FR-019, 020, 022, 058).
+</div>
+
+<h2 id="rows">Rows</h2>
+<div class="ds-frames">
+  <figure class="ds-frame"><div class="sp-tab" aria-hidden="true" inert>
+    <div class="erf-site-prompts"><div class="erf-site-prompt" role="group" aria-label="harbour-garden.org wants to use your camera"><span class="erf-site-prompt__icon"><svg data-icon="video" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg></span><div class="erf-site-prompt__body"><span class="erf-site-prompt__origin"><span class="erf-site-prompt__domain">harbour-garden.org</span></span> <span class="erf-site-prompt__request">wants to use your camera</span></div><div class="erf-site-prompt__actions"><button class="erf-button erf-button--secondary erf-button--sm" type="button" tabindex="-1"><span>Block</span></button><button class="erf-button erf-button--secondary erf-button--sm" type="button" tabindex="-1"><span>Allow once</span></button><button class="erf-button erf-button--secondary erf-button--sm" type="button" tabindex="-1"><span>Allow</span></button><button class="erf-button erf-button--icon" type="button" tabindex="-1" aria-label="Dismiss"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div></div></div>
+    <div class="sp-page"><div class="ds-foreign-page"><p class="ds-foreign-page__body">Join the video call</p></div></div></div>
+    <figcaption><strong>Permission</strong> – origin, then the permission in Erfana’s words. Three secondary answers, no filled primary, so none is nudged. Close denies for this load.</figcaption></figure>
+
+  <figure class="ds-frame"><div class="sp-tab" aria-hidden="true" inert>
+    <div class="erf-site-prompts"><div class="erf-site-prompt" role="group"><span class="erf-site-prompt__icon"><svg data-icon="map-pin" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></span><div class="erf-site-prompt__body"><span class="erf-site-prompt__origin"><span class="erf-site-prompt__sub">maps.</span><span class="erf-site-prompt__domain">example.net</span></span>, inside <span class="erf-site-prompt__origin"><span class="erf-site-prompt__domain">harbour-garden.org</span></span>, <span class="erf-site-prompt__request">wants to know your location</span></div><div class="erf-site-prompt__actions"><button class="erf-button erf-button--secondary erf-button--sm" type="button" tabindex="-1"><span>Block</span></button><button class="erf-button erf-button--secondary erf-button--sm" type="button" tabindex="-1"><span>Allow</span></button><span class="erf-site-prompt__queue">+1 waiting</span><button class="erf-button erf-button--icon" type="button" tabindex="-1" aria-label="Dismiss"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div></div></div>
+    <div class="sp-page"><div class="ds-foreign-page"><p class="ds-foreign-page__body">Find the garden</p></div></div></div>
+    <figcaption><strong>From a frame, one more waiting</strong> – both origins in the one frame grammar below, asker first; a second request of the same kind queues behind (“+1 waiting”, name “1 more request waiting”). When it moves up, its answers are guarded (see Input guard).</figcaption></figure>
+
+  <figure class="ds-frame"><div class="sp-tab sp-tab--narrow" aria-hidden="true" inert>
+    <div class="erf-site-prompts"><div class="erf-site-prompt" role="group"><span class="erf-site-prompt__icon"><svg data-icon="bell" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg></span><div class="erf-site-prompt__body"><span class="erf-site-prompt__origin"><span class="erf-host"><span class="erf-site-prompt__sub">eu-west-2.<wbr>preview.<wbr>build-4812.<wbr>cdn.<wbr>staging.<wbr></span><span class="erf-site-prompt__domain">harbour-garden.co.uk</span></span></span> <span class="erf-site-prompt__request">wants to show notifications</span></div><div class="erf-site-prompt__actions"><button class="erf-button erf-button--secondary erf-button--sm" type="button" tabindex="-1"><span>Block</span></button><button class="erf-button erf-button--secondary erf-button--sm" type="button" tabindex="-1"><span>Allow</span></button><button class="erf-button erf-button--icon" type="button" tabindex="-1" aria-label="Dismiss"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div></div></div>
+    <div class="sp-page"><div class="ds-foreign-page"><p class="ds-foreign-page__body">Preview build</p></div></div></div>
+    <figcaption><strong>Long origin at 400px</strong> – the origin wraps at dots (Rows card), never cut; the buttons wrap under the text when they no longer fit beside it.</figcaption></figure>
+
+  <figure class="ds-frame"><div class="sp-tab" aria-hidden="true" inert>
+    <div class="erf-site-prompts"><div class="erf-site-prompt erf-site-prompt--dialog" role="alertdialog" aria-label="harbour-garden.org says"><div class="erf-site-prompt__body"><span class="erf-site-prompt__origin"><span class="erf-site-prompt__domain">harbour-garden.org</span></span> <span class="erf-site-prompt__request">says</span><span class="erf-site-prompt__label">Message from the page</span><div class="erf-site-prompt__quote" role="region" aria-label="Message from the page">Erfana security check: your session expired.
+Click Confirm and type your Erfana password below to keep your agent running.
+This message was written by the page – and the box says so.
+Line four of the page’s text.
+Line five of the page’s text.
+Line six – the box scrolls after this.
+Line seven, reachable by scrolling.</div></div><div class="erf-site-prompt__actions"><button class="erf-button erf-button--secondary erf-button--sm" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-button erf-button--secondary erf-button--sm" type="button" tabindex="-1"><span>Confirm</span></button></div></div></div>
+    <div class="sp-page"><div class="ds-foreign-page"><p class="ds-foreign-page__body">Account</p></div></div></div>
+    <figcaption><strong>A page’s own <code>confirm</code></strong> – a fixed look no other row shares (<code>--dialog</code>): the header is Erfana’s (“{host} says”), then the label “Message from the page” over a dashed box holding the page’s words – plain text, never bold or linked, clamped to six lines; when it overflows it becomes a Tab stop with the inset ring and is the dialog’s description. The answers always sit under the box. A <code>prompt()</code> field is labelled “Answer to the page”, with the hint “Passwords for this site belong only in the sign-in box.” A page that names Erfana is visibly quoting.</figcaption></figure>
+
+  <figure class="ds-frame"><div class="sp-tab" aria-hidden="true" inert>
+    <div class="erf-site-prompts"><div class="erf-site-prompt erf-site-prompt--form" role="group" aria-label="Sign in to staging.harbour-garden.org"><span class="erf-site-prompt__icon"><svg data-icon="key-round" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg></span><div class="erf-site-prompt__body"><span class="erf-site-prompt__request">Sign in to</span> <span class="erf-site-prompt__origin"><span class="erf-site-prompt__sub">staging.</span><span class="erf-site-prompt__domain">harbour-garden.org</span></span>
+      <div class="erf-site-prompt__fields"><div class="erf-field"><label class="erf-field__label">Username</label><input class="erf-input is-focus" type="text" tabindex="-1" autocomplete="username"></div><div class="erf-field"><label class="erf-field__label">Password</label><input class="erf-input" type="password" tabindex="-1" autocomplete="current-password"></div></div>
+      <div class="erf-check"><input class="erf-checkbox" type="checkbox" tabindex="-1"><div class="erf-check__body"><span class="erf-check__label">Remember for this project</span><p class="erf-check__desc">Saved encrypted in this project’s browser data</p></div></div></div>
+      <div class="erf-site-prompt__actions"><button class="erf-button erf-button--secondary erf-button--sm" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-button erf-button--secondary erf-button--sm" type="button" tabindex="-1"><span>Sign in</span></button></div></div></div>
+    <div class="sp-page"><div class="ds-foreign-page"><p class="ds-foreign-page__body">Staging</p></div></div></div>
+    <figcaption><strong>A form row: sign-in</strong> – taller, fields in reading order (Form card). No server-supplied realm text. Focused here because it answers a navigation the reader started.</figcaption></figure>
+  <figure class="ds-frame"><div class="sp-tab" aria-hidden="true" inert>
+    <div class="erf-site-prompts"><div class="erf-site-prompt erf-site-prompt--form" role="group" aria-label="Sign in to http://intranet.example.net"><span class="erf-site-prompt__icon"><svg data-icon="key-round" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg></span><div class="erf-site-prompt__body"><span class="erf-site-prompt__request">Sign in to</span> <span class="erf-site-prompt__origin"><span class="erf-site-prompt__scheme">http://</span><span class="erf-site-prompt__sub">intranet.</span><span class="erf-site-prompt__domain">example.net</span></span><div class="erf-banner erf-banner--warning"><span class="erf-banner__icon"><svg data-icon="triangle-alert" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span><div class="erf-banner__body"><p class="erf-banner__text"><span class="erf-visually-hidden">Warning: </span>This connection isn’t encrypted – others on the network could read your password.</p></div></div><div class="erf-site-prompt__fields"><div class="erf-field"><label class="erf-field__label">Username</label><input class="erf-input" type="text" tabindex="-1" value="marta"></div><div class="erf-field"><label class="erf-field__label">Password</label><input class="erf-input is-focus" type="password" tabindex="-1" value="gardenpass"></div></div><div class="erf-check"><input class="erf-checkbox" type="checkbox" tabindex="-1" disabled><div class="erf-check__body"><span class="erf-check__label">Remember for this project</span><p class="erf-check__desc">No keyring – cannot store passwords safely</p></div></div></div><div class="erf-site-prompt__actions"><button class="erf-button erf-button--secondary erf-button--sm" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-button erf-button--secondary erf-button--sm" type="button" tabindex="-1"><span>Sign in</span></button></div></div>
+    <div class="erf-site-prompt" role="alertdialog" aria-label="Leave this page?"><span class="erf-site-prompt__icon"><svg data-icon="log-out" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></svg></span><div class="erf-site-prompt__body"><span class="erf-site-prompt__title">Leave this page?</span> <span class="erf-site-prompt__request">Changes may not be saved</span></div><div class="erf-site-prompt__actions"><button class="erf-button erf-button--secondary erf-button--sm is-focus" type="button" tabindex="-1"><span>Stay</span></button><button class="erf-button erf-button--secondary erf-button--sm" type="button" tabindex="-1"><span>Leave</span></button></div></div>
+    <div class="erf-site-prompt" role="group" aria-label="photos.harbour-garden.org wants to download several files"><span class="erf-site-prompt__icon"><svg data-icon="download" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg></span><div class="erf-site-prompt__body"><span class="erf-site-prompt__line"><span class="erf-site-prompt__origin"><span class="erf-site-prompt__sub">photos.</span><span class="erf-site-prompt__domain">harbour-garden.org</span></span></span><span class="erf-site-prompt__request">This site wants to download several files</span></div><div class="erf-site-prompt__actions"><button class="erf-button erf-button--secondary erf-button--sm" type="button" tabindex="-1"><span>Block</span></button><button class="erf-button erf-button--secondary erf-button--sm" type="button" tabindex="-1"><span>Allow</span></button><button class="erf-button erf-button--icon" type="button" tabindex="-1" aria-label="Dismiss"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div></div></div>
+    <div class="sp-page"><div class="ds-foreign-page"><p class="ds-foreign-page__body">Intranet</p></div></div></div>
+    <figcaption><strong>Stacked parts, a title, an origin line</strong> – added with the browser screens. A boxed banner (Feedback card) carries the sign-in box’s warning or error line, with its hidden severity word; a disabled checkbox shows its reason as its description. <code>__scheme</code> draws a non-https scheme quietly; <code>__title</code> is a question in Erfana’s words; <code>__line</code> puts the origin on its own line above a fixed sentence that names none.</figcaption></figure>
+</div>
+
+<h2 id="order">One row per kind, in a fixed order</h2>
+<p class="ds-muted">Top to bottom, whatever order they arrived in. A new row appears in one step and pushes the page down once; nothing animates its height (Motion card).</p>
+<ol class="sp-order">
+  <li>Field error (Feedback band, owned by the address field)</li>
+  <li>Page dialog, or the leave-page prompt</li>
+  <li>Sign-in box</li>
+  <li>Permission prompt</li>
+  <li>Downloads prompt</li>
+  <li>Pop-up blocked</li>
+  <li>Hung-page notice</li>
+  <li>Keyring notice</li>
+</ol>
+
+<h2 id="provenance">One grammar for a request from a frame</h2>
+<p class="ds-muted">Every row that a frame’s request produces names the asker first, then the page that holds it, both from the engine: “<code>{frame host}</code>, inside <code>{top host}</code>, …”. One phrase, one meaning, in every kind – the permission row, the sign-in box, a page dialog. “A frame from …” and “inside a frame from …” are not used: they read both ways, and in the password prompt the wrong reading helps a phisher.</p>
+<table>
+  <thead><tr><th>Kind</th><th>From the top page</th><th>From a frame</th></tr></thead>
+  <tbody>
+    <tr><td>Permission</td><td>harbour-garden.org wants to know your location</td><td>maps.example.net, inside harbour-garden.org, wants to know your location</td></tr>
+    <tr><td>Sign-in box</td><td>Sign in to staging.harbour-garden.org</td><td>reports.example.net, inside harbour-garden.org, asks you to sign in</td></tr>
+    <tr><td>Page dialog</td><td>harbour-garden.org says</td><td>ads.example.com, inside harbour-garden.org, says</td></tr>
+  </tbody>
+</table>
+<p class="ds-muted">The registrable domain in an origin line never breaks – not at a hyphen, not anywhere (<code>white-space: nowrap</code> on <code>__domain</code>); subdomain labels are quieter (<code>__sub</code>, <code>--color-text-tertiary</code>) and wrap at their dots. The sign-in wording replaces spec 025’s “inside a frame from” fragment, approved by the owner as SPEC-3 (2026-11-01).</p>
+
+<h2 id="guard">Input guard</h2>
+<p class="ds-muted">Owner decision OD-6 (2026-11-01). For about half a second after a row appears <em>or its content changes</em> – including a queue advance, when the next request takes the same row and the same button positions – its answers ignore presses that began before the change, pointer and keyboard alike. Meanwhile they show the Buttons card’s blocked look (<code>aria-disabled</code>, no animation), so a slow or switch user sees why nothing happened. Between one request and the next of a kind, the row clears for a short beat (about 300 ms). The no-focus rule alone does not stop a timed click; the guard does. Rows also push the page down once, so for the same half second clicks on the page are ignored after a row is inserted or removed under the pointer.</p>
+
+<h2 id="surface">A surface of its own</h2>
+<p class="ds-muted">Strip rows sit on <code>--color-bg-secondary</code>, one step off the <code>--color-bg-primary</code> of Erfana’s navigation and pick rows, so the site’s voice is told apart from Erfana’s own chrome without reading (<span data-contrast="--color-bg-secondary on --color-bg-primary">1.34:1</span> as a surface step; every text pair is measured on the new surface below).</p>
+
+<h2 id="focus">Focus on arrival</h2>
+<table>
+  <thead><tr><th>Row</th><th>Takes focus when it arrives</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>Permission, pop-up blocked, downloads, hung page, keyring</td><td>Never; announced politely</td><td>A page can time a request under the reader’s Enter or click</td></tr>
+    <tr><td>Sign-in box</td><td>Only after a navigation the reader started from the toolbar</td><td>Otherwise a page could steal typing into a password field</td></tr>
+    <tr><td>Page dialog</td><td>Only when its tab is the active tab and keyboard focus is already in that page; otherwise it waits in the strip, is announced, and marks the editor tab</td><td>It halts the page’s script – but a background tab can call <code>prompt()</code> while the reader types in a terminal, and focus must never cross panels to catch those keys</td></tr>
+    <tr><td>Leave-page prompt</td><td>Yes, on Stay – the safe answer</td><td>Enter must not discard the reader’s work</td></tr>
+  </tbody>
+</table>
+<p class="ds-muted"><strong>Where focus goes when a row goes.</strong> A row that leaves while one of its controls has focus – answered, withdrawn by the page, or a hung page that recovers – hands focus to the next strip row <em>as a whole</em> – the row group, <code>tabindex="-1"</code>, inset ring, its name announced – or to one of its non-granting controls (Block, Dismiss), never to a grant. Focus that arrives by restoration re-arms that row’s input guard, so an Enter meant for the row that left grants nothing. With no row left, focus goes to the page, or to the heading of an Erfana page that replaced it. Never to the document.</p>
+
+<h2 id="contrast">Contrast</h2>
+<table>
+  <thead><tr><th>Part</th><th>Pair</th><th>Ratio</th></tr></thead>
+  <tbody>
+    <tr><td>Registrable domain</td><td><code>--color-text-emphasis</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-text-emphasis on --color-bg-secondary" data-min="4.5" data-result="pass">13.72:1 · pass</td></tr>
+    <tr><td>Request text</td><td><code>--color-text-primary</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-text-primary on --color-bg-secondary" data-min="4.5" data-result="pass">8.54:1 · pass</td></tr>
+    <tr><td>Page’s words in the box</td><td><code>--color-text-primary</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-text-primary on --color-bg-tertiary" data-min="4.5" data-result="pass">9.53:1 · pass</td></tr>
+    <tr><td>Queue count, subdomain, description, labels</td><td><code>--color-text-tertiary</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-text-tertiary on --color-bg-secondary" data-min="4.5" data-result="pass">6.33:1 · pass</td></tr>
+    <tr><td>Row rule</td><td><code>--color-border-default</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-border-default on --color-bg-secondary">1.24:1</td></tr>
+  </tbody>
+</table>
+
+<h2 id="keyboard">The keyboard contract</h2>
+<table class="ds-keys"><thead><tr><th>Key</th><th>Result</th><th>Focus ends on</th></tr></thead><tbody>
+  <tr><td><kbd>Tab</kbd></td><td>Reaches the strip rows after the toolbar rows, in their fixed order; inside a row, its controls start to end</td><td>The next control</td></tr>
+  <tr><td><kbd>Enter</kbd> / <kbd>Space</kbd> on an answer</td><td>Answers; the row goes, or the next request of its kind takes its place</td><td>The next row as a group (never a grant), else the page</td></tr>
+  <tr><td>A row goes while it holds focus</td><td>Answered, withdrawn or recovered</td><td>The next row as a group, guard re-armed; else the page or the Erfana page’s heading</td></tr>
+  <tr><td><kbd>Esc</kbd> in a page dialog</td><td>Cancel (Close on an <code>alert</code>)</td><td>The page</td></tr>
+  <tr><td><kbd>Esc</kbd> in the sign-in box</td><td>Cancel</td><td>The page</td></tr>
+</tbody></table>
+<p class="ds-muted">No app test holds this yet: first user spec 025 (025-AC-011, 019, 020, 022, 075). The input guard (owner decision OD-6) has a look – the blocked answers – described under Input guard and drawn on the browser’s site-prompts screen.</p>
+
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None recorded.</p>
+</section>
+</main>
+</body>
+</html>

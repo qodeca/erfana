@@ -1,0 +1,361 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * The origin field – a one-line field that says where you are: the state
+ * badge, the origin display, the chips at its end, and the suggestion list
+ * under it.
+ *
+ * PROPOSED – not adopted. First user: the built-in browser's address field
+ * (docs/designs/browser/, spec 025), and the read-only popup origin strip.
+ * Nothing ships it yet. Builds on two decided cards and never restyles them:
+ *   - Form controls: the field's fill, edge, hover, outward focus ring, the
+ *     invalid edge, the read-only rule;
+ *   - Rows and lists: what an origin shows (scheme only when not https, port
+ *     only when not default, both dimmed; punycode for mixed scripts; the full
+ *     origin in real text for assistive technology).
+ * What it adds, because a one-line field cannot wrap the way a row does:
+ *   - host emphasis: the registrable domain in --color-text-emphasis, the rest
+ *     of the host in --color-text-primary, scheme, port and path in
+ *     --color-text-tertiary;
+ *   - elision order: the path from its end first, then WHOLE subdomain labels
+ *     from the front, and never inside the registrable domain. CSS cannot know
+ *     where the registrable domain starts – the component does, from the
+ *     public-suffix list (browser note OD-1) – so the component drops whole
+ *     labels and writes the "…" itself; this file only guarantees that the
+ *     domain, scheme and port never shrink and the path is the one part that
+ *     ellipsizes.
+ *
+ * .is-hover and .is-focus are documentation-only hooks; they never ship in
+ * src/. Classes are prefixed erf-.
+ */
+
+/* ---------- the field ---------- */
+
+/* A Form-card field at --input-height-sm, laid out as a row of parts. The text
+   is mono (Typography card: hosts, paths and selectors), the badge and the
+   placeholder are sans because they are words, not an address. */
+.erf-origin {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: stretch;
+  /* Never narrower than the badge, the host and the chips: when the row runs
+     out of room, tools leave the row first – the field does not cut the host. */
+  min-inline-size: min-content;
+  block-size: var(--input-height-sm);
+  margin: 0;
+  background: var(--color-bg-input);
+  border: var(--border-width) solid var(--color-border-input);
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  line-height: var(--leading-none);
+  cursor: text;
+}
+
+/* While the field holds the full URL as text, the text scrolls inside it: the
+   field gives up its min-content floor so a long URL never pushes tools off. */
+.erf-origin:has(.erf-origin__typed, .erf-origin__input) { min-inline-size: 0; }
+
+/* Form card: hover brightens the edge; read-only and invalid fields do not answer. */
+.erf-origin:is(:hover, [class~='is-hover']):not(.erf-origin--readonly, [aria-invalid='true']) {
+  border-color: var(--color-gray-500);
+}
+
+/* Form card: the one ring, outward, --space-1 off the edge – drawn only while
+   the TEXT has focus. A chip inside the field is its own control: when it has
+   focus the field shows no ring, so there is only ever one ring and it names
+   the control Enter acts on (Focus card, "one ring"). */
+.erf-origin:is(:has(.erf-origin__input:focus-visible), [class~='is-focus']) {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+.erf-origin[aria-invalid='true'] { border-color: var(--color-error); }
+
+/* Invalid also shows the error icon at the field's start, so the state is not
+   the red edge alone (Form card error contract); the message is the first
+   strip row, linked by aria-describedby. */
+.erf-origin__erricon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  padding-inline-start: var(--space-4);
+  color: var(--color-error);
+}
+.erf-origin__erricon svg { inline-size: var(--icon-size-xs); block-size: var(--icon-size-xs); }
+.erf-origin__erricon + .erf-origin__typed { padding-inline-start: var(--space-3); }
+
+/* Read-only (the popup origin strip): resting edge, a text cursor, still
+   focusable so the address can be selected and copied. */
+.erf-origin--readonly { cursor: text; }
+
+/* ---------- the state badge: a segment fused to the field's start ---------- */
+
+/* A word and an icon in its own square segment, divided from the address by
+   the field's own edge colour. It never shrinks and its word stays down to the
+   point where every optional tool has left the row (browser: the fold order
+   in docs/designs/browser/browser.css – path, subdomain labels, zoom chip,
+   Open and DevTools, Forward and Reload, field margins, then the word). The word carries the state;
+   the icon colour only repeats it (SC 1.4.1). */
+.erf-origin__badge {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+  border-inline-end: var(--border-width) solid var(--color-border-input);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+.erf-origin__badge svg {
+  flex: 0 0 auto;
+  inline-size: var(--icon-size-xs);
+  block-size: var(--icon-size-xs);
+  color: var(--color-text-tertiary);
+}
+.erf-origin__badge--warning svg { color: var(--color-warning); }
+
+/* At any tier, once every optional tool has left the row, the badge collapses
+   to its icon; the word stays as its accessible name (visually hidden) and the
+   domain keeps the space. The host adds the modifier when it measures that
+   step. Recorded as an exception to "never shrinks" in #exceptions. */
+.erf-origin--badge-icon .erf-origin__badge > span {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.erf-origin__badge--error svg { color: var(--color-error); }
+/* The segment carries a hover tooltip with the badge's description (the host
+   wraps it in a tooltip anchor), so the icon-only form can be read back. */
+.erf-origin__badgetip { display: inline-flex; flex: 0 0 auto; }
+
+/* ---------- the origin display (at rest) ---------- */
+
+/* Left to right whatever the page or the host contains; the host never
+   reorders against the field around it (Rows card, host.css). */
+.erf-origin__display {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  /* The host is this element's minimum width: no overflow clip here, so the
+     registrable domain can never be cut by the field's own edge. Only the
+     path below clips. */
+  min-inline-size: min-content;
+  padding: 0 var(--space-4);
+  direction: ltr;
+  unicode-bidi: isolate;
+  white-space: nowrap;
+}
+
+/* Every part is its own element, so each can refuse or accept shrinking. */
+.erf-origin__scheme,
+.erf-origin__sub,
+.erf-origin__domain,
+.erf-origin__port,
+.erf-origin__elide { flex: 0 0 auto; }
+
+/* Quiet, never hidden: a part of a security decision may be de-emphasised,
+   not made hard to read (Rows card). */
+.erf-origin__scheme,
+.erf-origin__port,
+.erf-origin__path,
+.erf-origin__elide { color: var(--color-text-tertiary); }
+
+/* Subdomain labels are dimmed with the scheme and port, so the registrable
+   domain is the one bright run (emphasis against tertiary, not a 1.6:1 step
+   against primary). */
+.erf-origin__sub { color: var(--color-text-tertiary); }
+
+/* The registrable domain: the brightest text in the field. It does not shrink
+   while anything else can give way – tools leave the row first (the host's
+   fold order). Only when the scheme, the registrable domain and the port still
+   do not fit with every tool gone does the formatter cut it, from its START
+   (below). */
+.erf-origin__domain { color: var(--color-text-emphasis); }
+
+/* The last resort (fold step 8, R4-H1; exception in #exceptions): when the
+   scheme, the registrable domain and the port still do not fit, the FORMATTER
+   slices the domain string from its start and writes a leading "…" as an
+   __elide span, keeping the domain's end – the TLD and the label before it –
+   and the port. No CSS does this: direction: rtl would reorder a digit-led
+   domain (163.com read as com.163, R5-M3). The field is never clipped at its
+   end, so a long lookalike can never read as the trusted name it starts with.
+   No class: the markup carries the cut. */
+
+/* The path is the only part CSS may cut, and it loses its END. Zero basis, so
+   it grows into the room left after the host, up to its own length, and adds
+   nothing to the field's minimum (so it never pushes a tool off the row). The
+   component drops it whole when under 2ch would show – never a one-letter
+   sliver after the domain (it measures, as it does for subdomain labels). */
+.erf-origin__path {
+  flex: 1 1 0;
+  inline-size: 0;
+  max-inline-size: max-content;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A file:// address shows a project-relative or ~/ path: the folder part is
+   dimmed, the file name is primary, and the component elides folders from the
+   front at a boundary, never the file name or its own folder. */
+.erf-origin__file { flex: 0 0 auto; color: var(--color-text-primary); }
+
+/* While a load the USER started is in flight (typed address, Reload, Back or
+   Forward, a history row, a terminal link), the display shows the pending
+   address. A load the PAGE started (script, link, form, redirect) keeps the
+   committed address until the new page commits – a page cannot put an address
+   in the field that it has not reached (browser Security rule 1). No class:
+   the component chooses which URL to hand the display. */
+
+/* What the display never shows (rule 2 of the browser note): user name and
+   password written into a URL ("userinfo") are stripped on every display –
+   field at rest, tab, tooltip, link destination, link menu header, history
+   rows; the focused, editable field shows them unemphasised. A link that is
+   not http, https or file shows the scheme word and a plain description
+   (.erf-origin__other), never a host in bright text. */
+.erf-origin__other { flex: 0 0 auto; color: var(--color-text-primary); font-family: var(--font-sans); }
+
+/* ---------- typing: the full URL as text ---------- */
+
+/* Static frames draw the typed text as spans so a selection and a caret can be
+   shown; the app uses a real <input class="erf-origin__input"> styled the same.
+   The input draws no ring of its own: the field draws it (above). */
+.erf-origin__input {
+  margin: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+}
+.erf-origin__typed,
+.erf-origin__input {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  min-inline-size: 0;
+  padding: 0 var(--space-4);
+  overflow: hidden;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+.erf-origin__sel {
+  background: var(--color-bg-selected);
+  color: var(--color-text-emphasis);
+}
+.erf-origin__caret {
+  align-self: stretch;
+  margin-block: var(--space-3);
+  border-inline-start: var(--border-width) solid var(--color-text-emphasis);
+}
+/* IME composition: the platform's underline under the composing text. */
+.erf-origin__ime {
+  text-decoration: underline;
+  text-decoration-thickness: var(--border-width);
+  text-underline-offset: var(--space-2);
+}
+.erf-origin__placeholder {
+  overflow: hidden;
+  color: var(--color-text-placeholder);
+  font-family: var(--font-sans);
+  text-overflow: ellipsis;
+}
+
+/* ---------- chips at the end of the field ---------- */
+
+/* Action chips from badge.css (.erf-chip .erf-chip--action), 24px tall inside
+   the 26px of room. They leave before the badge or the registrable domain do. */
+.erf-origin__chips {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding-inline-end: var(--space-1);
+}
+.erf-origin__chips .erf-chip { white-space: nowrap; }
+/* A chip's ring is the inset form (Focus card): the outward ring of a 24px
+   chip would run into the 28px field's own edge. */
+.erf-origin__chips .erf-chip:is(:focus-visible, [class~='is-focus']) {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--border-width-thick) * -1);
+}
+.erf-origin__chips .erf-chip svg {
+  inline-size: var(--icon-size-xs);
+  block-size: var(--icon-size-xs);
+}
+
+/* ---------- the suggestion list ---------- */
+
+/* A listbox under the field (combobox with aria-activedescendant: focus stays
+   in the field). A floating surface (Surfaces card): subtle edge and shadow.
+   Rows show the address only, with the origin display – never a stored title. */
+.erf-origin-list {
+  position: absolute;
+  /* Clear of the field's outward ring (2px offset + 2px ring), so the two never touch. */
+  inset-block-start: calc(100% + var(--space-3) + var(--border-width-thick));
+  inset-inline: calc(var(--border-width) * -1);
+  z-index: var(--z-dropdown);
+  margin: 0;
+  padding: var(--space-2) 0;
+  list-style: none;
+  background: var(--color-bg-tertiary);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-md);
+  cursor: default;
+}
+
+.erf-origin-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-block-size: var(--space-14);
+  padding: var(--space-3) var(--space-6);
+  overflow: hidden;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+.erf-origin-option svg {
+  flex: 0 0 auto;
+  inline-size: var(--icon-size-sm);
+  block-size: var(--icon-size-sm);
+  color: var(--color-text-tertiary);
+}
+.erf-origin-option .erf-origin__display { padding: 0; }
+
+/* Hover and the keyboard's active row look the same (Menu card); the active
+   row draws the ring itself, inset, because focus stays in the field. */
+.erf-origin-option:hover,
+.erf-origin-option--active { background: var(--color-bg-hover-solid); }
+.erf-origin-option--active {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--border-width-thick) * -1);
+}
+
+/* The search row: words, so sans; the query in mono inside curly quotes. */
+.erf-origin-option--search { font-family: var(--font-sans); }
+.erf-origin-option--search .erf-origin-option__query {
+  overflow: hidden;
+  font-family: var(--font-mono);
+  color: var(--color-text-emphasis);
+  text-overflow: ellipsis;
+}
+
+/* ---------- user settings ---------- */
+
+/* A contrast theme drops fills: the badge keeps its divider and the active
+   suggestion keeps its ring (Forced colours card). */
+@media (forced-colors: active) {
+  .erf-origin__badge { border-inline-end-color: CanvasText; }
+  .erf-origin__sel { background: Highlight; color: HighlightText; }
+  .erf-origin-option--active { outline-color: Highlight; }
+  .erf-origin__chips .erf-chip:is(:focus-visible, [class~='is-focus']) { outline-color: Highlight; }
+}

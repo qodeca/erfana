@@ -472,6 +472,8 @@ site and gets a row here, naming the file.</p>
   <thead><tr><th>File</th><th>Departure</th><th>Why it is still there</th></tr></thead>
   <tbody>
     <tr><td><code>Editor/MarkdownEditorPanel/components/MarkdownToolbar.css</code> (lines 72 and 102)</td><td>The formatting tools (<code>.toolbar-btn</code>) and the view-mode buttons (<code>.view-mode-btn</code>) are 32 × 28: the width is <code>--btn-height-md</code>, the height a <code>28px</code> literal – off the button scale.</td><td>It is the height the Toolbar card proposes for every tool (<a href="../toolbar/index.html#tool-height"><code>--toolbar-tool-height</code></a>). Not yet marked at the site: the marker, or the token, lands with the next change to that file.</td></tr>
+    <tr><td><code>docs/designs/browser/tab-and-toolbar.html</code> (proposed screen, spec 025)</td><td>The editor tab’s loading spinner draws this card’s busy ring with its <code>erf-button-spin</code> keyframes outside a button.</td><td>A tab is not a button and cannot take <code>aria-busy</code>; pending a shared spinner primitive.</td></tr>
+    <tr><td><code>docs/designs/browser/tab-and-toolbar.html</code> (proposed screen, spec 025)</td><td>In forced colours the pressed Pick element takes the full <code>Highlight</code> treatment – fill, edge, <code>HighlightText</code> label.</td><td>Proposed for this card: on and off must differ by more than one edge’s colour (browser M-33).</td></tr>
     <tr><td>This card</td><td>The “What ships today” block is mirrored by hand; no drift check holds it to <code>Dialog.css</code>. It is pending with the adoption.</td><td>Drift check pending</td></tr>
   </tbody>
 </table>

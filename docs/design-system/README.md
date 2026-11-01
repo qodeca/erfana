@@ -42,8 +42,8 @@ defects on its first run: a warning strip that was permanently visible because `
 | Path | What it is |
 |---|---|
 | `system/foundations/` | Colours, typography, spacing, surfaces and elevation, focus and keyboard, motion, layering, theme (dark only, text selection), terminal and code colours, forced colours, text highlights (`highlights.html`), writing, brand (`brand.html`) |
-| `system/components/` | Badges, buttons, feedback, form controls, icons, menu, permission band, rows and lists, segmented control (`segmented/`), splitter, status bar (`status-bar/`), tabs, toolbar, tooltip – one folder each, with its `index.html` card and its component CSS |
-| `system/patterns/` | Recurring flows built from components: the dialog, the drawer (`drawer/`), and the empty, loading and error states – one folder each, like a component |
+| `system/components/` | Badges, buttons, feedback, form controls, icons, menu, origin field (`origin-field/`), permission band, rows and lists, segmented control (`segmented/`), splitter, status bar (`status-bar/`), tabs, toolbar, tooltip – one folder each, with its `index.html` card and its component CSS |
+| `system/patterns/` | Recurring flows built from components: the dialog, the drawer (`drawer/`), the element picker (`picker/`), site prompts (`site-prompts/`), and the empty, loading and error states – one folder each, like a component |
 | `ds.css`, `fonts.css` | Hand-written page chrome for the documentation itself |
 | `claims.json` | The claims ledger: every count or ratio a card quotes, with the code that derives it |
 | `tokens.css`, `fonts/`, `index.html`, `deviations.html` | **Generated** by `scripts/design-sync.mjs` – never edit |
@@ -295,9 +295,10 @@ card should probably absorb.
 ### Component CSS: proposed or adopted
 
 **Proposed** – authored here, no home in `src/` yet: under `system/components/`, `badge/badge.css`,
-`button/button.css`, `feedback/feedback.css`, `form/form.css`, `menu/menu.css`, `row/row.css`, `segmented/segmented.css`,
-`splitter/splitter.css`, `status-bar/status-bar.css`, `tabs/tabs.css`, `toolbar/toolbar.css` and `tooltip/tooltip.css`; under
-`system/patterns/`, `dialog/dialog.css`, `drawer/drawer.css` and `states/states.css`. Each also sits in
+`button/button.css`, `feedback/feedback.css`, `form/form.css`, `menu/menu.css`, `origin-field/origin-field.css`, `row/row.css`,
+`segmented/segmented.css`, `splitter/splitter.css`, `status-bar/status-bar.css`, `tabs/tabs.css`, `toolbar/toolbar.css` and
+`tooltip/tooltip.css`; under `system/patterns/`, `dialog/dialog.css`, `drawer/drawer.css`, `picker/picker.css`,
+`site-prompts/site-prompts.css` and `states/states.css`. Each also sits in
 `PROPOSED_NOT_YET_ADOPTED` in `scripts/design-claims.test.mjs`, which fails on a stylesheet that is neither listed
 there nor synced. (`row.css` and `tabs.css` are *consolidations* when adopted: the app already ships their
 rules several times over, under several class names. Their headers carry the list.)
