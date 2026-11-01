@@ -390,8 +390,15 @@ records it as an <a href="../button/index.html#exceptions">exception</a>); this 
 
 <section id="exceptions">
 <h2>Exceptions</h2>
-<p class="ds-muted">None recorded. A shipping toolbar that departs from this card carries a
-<code>deviates:</code> marker at the site and gets a row here, naming the file.</p>
+<p class="ds-muted">A shipping toolbar that departs from this card carries a
+<code>deviates:</code> marker at the site and gets a row here, naming the file. Proposed screens that depart are listed too, so the card does not drift from them.</p>
+<table>
+  <thead><tr><th>File</th><th>Departure</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td><code>docs/designs/browser/tab-and-toolbar.html</code> (proposed screen, spec 025)</td><td>The browser tab’s navigation, pick and find rows use <code>--color-bg-primary</code> and 28px tools in <code>--space-3</code> padding, not this card’s surface and height, and its tools sit <code>--space-2</code> (4px) apart so an outward focus ring lands in the gap, never on the next tool (M-37).</td><td>They copy the HTML preview bar (Permission band, decided), so Erfana’s two web-page surfaces look alike. Proposed here: a <code>--toolbar-tool-height</code> token instead of the screen’s local height override.</td></tr>
+  </tbody>
+</table>
+
 </section>
 </main>
 </body>

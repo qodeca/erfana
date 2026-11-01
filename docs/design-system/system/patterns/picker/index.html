@@ -1,0 +1,188 @@
+<!-- @card group="Patterns" name="Element picker" subtitle="Pointing at one element on a page Erfana does not own – outline, label, picked look, flash and mode frame" status="proposed" reviewed="never" answers="Highlight an element on a third-party page; Label a picked element; Show that pick mode is on" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Element picker – Erfana design system</title>
+<link rel="stylesheet" href="../../../tokens.css">
+<link rel="stylesheet" href="../../../ds.css">
+<link rel="stylesheet" href="picker.css">
+<style>
+  /* Documentation chrome. A page area: the gutter, then the page. */
+  .pk-area { padding: calc(var(--space-1) + var(--border-width-thick)); background: var(--color-bg-primary); }
+  .pk-page { position: relative; overflow: hidden; min-block-size: 150px; }
+  .pk-page--short { min-block-size: 96px; max-block-size: 96px; }
+  .pk-focus { outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: var(--space-1); }
+  /* An element on the page with the overlay drawn around it, so no coordinate is typed. */
+  .pk-anchor { position: relative; display: inline-block; margin-block-start: var(--space-6); }
+  .pk-anchor > .erf-picker-outline,
+  .pk-anchor > .erf-picker-flash { inset: calc(var(--border-width) * -1); }
+  .pk-anchor > .erf-picker-outline.pk-tiny { inset: calc(var(--border-width-thick) * -2); }
+  .pk-anchor > .erf-picker-label { inset-block-end: calc(100% + var(--border-width-thick)); inset-inline-start: calc(var(--border-width) * -1); max-inline-size: none; }
+  .pk-anchor > .erf-picker-label.pk-below { inset-block-end: auto; inset-block-start: calc(100% + var(--border-width-thick)); }
+  .pk-anchor > .erf-picker-label.pk-inside { inset-block-end: auto; inset-block-start: var(--border-width-thick); inset-inline-start: var(--border-width-thick); }
+  .pk-block { display: block; }
+  /* A stand-in for a pick-owned surface: the floating surface's look, placed beside the outline. */
+  .pk-owned-stage { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-8); }
+  .pk-owned-stage > .ds-foreign-page__heading { flex: 1 0 100%; }
+  .pk-owned { /* mockup: app scale */ padding: var(--space-6) var(--space-8); background: var(--color-bg-elevated);
+              border-inline: var(--border-width) solid var(--color-border-subtle);
+              border-block-end: var(--border-width) solid var(--color-border-subtle); box-shadow: var(--shadow-md);
+              color: var(--color-text-primary); font-family: var(--font-sans); font-size: var(--text-base); }
+  /* Forced colours, drawn: a static frame cannot switch the media query, so these
+     classes paint what picker.css's forced-colors block asks for. */
+  .pk-forced .erf-picker-outline { border-color: Highlight; outline-color: Canvas; box-shadow: none; background: none; }
+  .pk-forced .erf-picker-outline::after { content: ''; position: absolute; inset: 0; border: var(--border-width) solid CanvasText; }
+  .pk-forced .erf-picker-outline--selected { border-style: double; border-width: calc(var(--border-width-thick) * 2); }
+  .pk-forced .pk-page { background: Canvas; color: CanvasText; }
+  .pk-forced .erf-picker-frame--away { outline-style: dotted; }
+  .pk-forced .erf-picker-label { background: Highlight; border-color: HighlightText; color: HighlightText; }
+  .pk-forced .erf-picker-label__tag, .pk-forced .erf-picker-label__size { color: HighlightText; }
+  .pk-forced .erf-picker-frame { outline-color: Highlight; outline-style: dashed; }
+
+  /* stylelint-disable color-no-hex, declaration-property-value-allowed-list --
+     This is NOT Erfana: page elements and a dark and an accent-coloured third-party
+     page, in the page's own paint, so the outline is judged on real page colours.
+     The light page is ds.css's .ds-foreign-page. Sizes and spacing stay tokens. */
+  .pk-btn { display: inline-block; padding: var(--space-4) var(--space-8); background: #d9a441; color: #161312;
+            font-family: Georgia, serif; font-size: var(--text-md); line-height: 1.2; }
+  .pk-btn--ink { background: #161312; color: #fafafa; }
+  .pk-nav { display: flex; gap: var(--space-8); padding: var(--space-3) var(--space-6); background: #3d6b47; color: #fafafa;
+            font-family: Georgia, serif; font-size: var(--text-md); }
+  .pk-dot { display: inline-block; inline-size: 6px; block-size: 6px; background: #c0392b; }
+  .pk-img { display: block; inline-size: 260px; block-size: 64px; margin-block-start: var(--space-6); background: #ffffff; border: 1px solid #d0d7de; }
+  .pk-card { display: block; block-size: 120px; padding: var(--space-6); background: #f3efe6; border-inline-start: var(--space-2) solid #d9a441; }
+  /* stylelint-enable color-no-hex, declaration-property-value-allowed-list */
+</style>
+</head>
+<body>
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../../index.html#patterns">Patterns</a> <span aria-hidden="true">/</span> <span aria-current="page">Element picker</span></nav>
+<main>
+<h1>Element picker</h1>
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</p>
+<p class="ds-lede" id="decision">
+  Pointing at one element on a page Erfana does not own looks the same wherever it happens: a <strong>two-tone
+  outline</strong> on the element’s border box (a 2px accent ring with a 1px ink line on both sides), a
+  <strong>label</strong> on ink naming <code>tag#id.classes</code> then the size, a light fill for the element that was
+  <strong>picked</strong>, a <strong>static flash</strong> after a send, and a <strong>mode frame</strong> that says the
+  keys belong to the picker. The parts are in <a href="picker.css">picker.css</a>; where they go is the component’s job.
+</p>
+
+<div class="ds-note">
+  <strong>Why a pattern card now.</strong> These rules live today in one decided feature screen, the HTML preview’s
+  <a href="../../../../designs/comments/html-comments/overlay.html">comment overlay</a>, and a Focus card exception. The
+  built-in browser (spec 025) is a second feature that picks elements; without a shared card the two copies drift. This
+  card lifts the overlay’s outline and label with two stated differences – the flash adds the 1px ink line so it
+  survives on white, and the gap before the size is <code>--space-4</code> (a token) where the overlay uses
+  <code>1ch</code> – and adds what the browser needs: the selected look on a still image, the flash, and a
+  frame drawn <em>outside</em> the page. <strong>Owner decision:</strong> the <a href="../../foundations/focus.html#two-tone">Focus card</a>
+  allows the two-tone ring only for the comment overlay; the owner approved widening it to the browser (browser note,
+  owner decision OD-2, 2026-11-01), and the Focus card's Exceptions now record it.
+</div>
+
+<h2 id="outline">Outline and label on any page colour</h2>
+<div class="ds-frames">
+  <figure class="ds-frame"><div class="pk-area" aria-hidden="true"><div class="pk-page ds-foreign-page"><p class="ds-foreign-page__heading">Open day 2026</p><span class="pk-anchor"><span class="pk-btn">Show opening hours</span><span class="erf-picker-outline"></span><span class="erf-picker-label"><span class="erf-picker-label__tag">button</span>.cta<span class="erf-picker-label__size">176 × 32</span></span></span></div></div>
+    <figcaption><strong>Light page</strong> – on white the ink lines carry the edge; the label sits above the element’s top-left.</figcaption></figure>
+  <figure class="ds-frame"><div class="pk-area" aria-hidden="true"><div class="pk-page ds-foreign-page ds-foreign-page--dark"><p class="ds-foreign-page__heading">Release notes</p><span class="pk-anchor"><span class="pk-btn pk-btn--ink">Download</span><span class="erf-picker-outline"></span><span class="erf-picker-label"><span class="erf-picker-label__tag">a</span>#get.button<span class="erf-picker-label__size">104 × 32</span></span></span></div></div>
+    <figcaption><strong>Dark page</strong> – on black the accent ring carries it; the ink line disappears into the page.</figcaption></figure>
+  <figure class="ds-frame"><div class="pk-area" aria-hidden="true"><div class="pk-page ds-foreign-page ds-foreign-page--accent"><p class="ds-foreign-page__heading">Members</p><span class="pk-anchor"><span class="pk-btn pk-btn--ink">Join</span><span class="erf-picker-outline"></span><span class="erf-picker-label"><span class="erf-picker-label__tag">button</span>.join<span class="erf-picker-label__size">64 × 32</span></span></span></div></div>
+    <figcaption><strong>A page in the accent colour</strong> – the ring vanishes into the page; the two ink lines still draw the box. This is why one colour is never enough.</figcaption></figure>
+  <figure class="ds-frame"><div class="pk-area" aria-hidden="true"><div class="pk-page ds-foreign-page"><span class="pk-anchor pk-block"><span class="pk-nav"><span>Home</span><span>Programme</span><span>Partners</span></span><span class="erf-picker-outline"></span><span class="erf-picker-label pk-below"><span class="erf-picker-label__tag">nav</span>.site-nav<span class="erf-picker-label__size">480 × 34</span></span></span></div></div>
+    <figcaption><strong>Flipped below</strong> – the element touches the page top, so the label moves under it.</figcaption></figure>
+  <figure class="ds-frame"><div class="pk-area" aria-hidden="true"><div class="pk-page ds-foreign-page"><span class="pk-nav"><span>Home</span><span>Programme</span></span><span class="pk-anchor pk-block"><span class="pk-card">Garden tours – every hour from 11:00</span><span class="erf-picker-outline"></span><span class="erf-picker-label pk-inside"><span class="erf-picker-label__tag">article</span>.tour<span class="erf-picker-label__size">480 × 120</span></span></span></div></div>
+    <figcaption><strong>Inside the outline</strong> – the element’s top touches other content, so the label moves inside its top-left rather than covering the neighbour.</figcaption></figure>
+  <figure class="ds-frame"><div class="pk-area" aria-hidden="true"><div class="pk-page ds-foreign-page"><p class="ds-foreign-page__heading">Pricing</p><span class="pk-anchor"><span class="pk-btn">Compare</span><span class="erf-picker-outline"></span><span class="erf-picker-label"><span class="erf-picker-label__tag">button</span>.btn.btn-primary.btn-lg-respons…<span class="erf-picker-label__size">96 × 32</span></span></span></div></div>
+    <figcaption><strong>Long class list</strong> – cut at 40 characters at a whole character with “…”; the size is never cut. The label is never wider than the area.</figcaption></figure>
+  <figure class="ds-frame"><div class="pk-area" aria-hidden="true"><div class="pk-page ds-foreign-page"><p class="ds-foreign-page__heading">Status</p><p class="ds-foreign-page__body">Server <span class="pk-anchor"><span class="pk-dot"></span><span class="erf-picker-outline pk-tiny"></span><span class="erf-picker-label"><span class="erf-picker-label__tag">span</span>.dot<span class="erf-picker-label__size">6 × 6</span></span></span> down</p></div></div>
+    <figcaption><strong>Tiny element</strong> – under 8px, the ring is pushed out 2px so the element stays visible inside it.</figcaption></figure>
+  <figure class="ds-frame"><div class="pk-area" aria-hidden="true"><div class="pk-page pk-page--short ds-foreign-page"><p class="ds-foreign-page__heading">Programme</p><span class="pk-anchor pk-block"><span class="pk-card">Seed swap – bring some, take some</span><span class="erf-picker-outline"></span><span class="erf-picker-label pk-inside"><span class="erf-picker-label__tag">article</span>.swap<span class="erf-picker-label__size">480 × 120</span></span></span></div></div>
+    <figcaption><strong>Partly visible</strong> – the outline is clipped where the page’s viewport ends; the label sticks to the visible top-left.</figcaption></figure>
+</div>
+
+<h2 id="states">Picked, sent, and the mode frame</h2>
+<div class="ds-frames">
+  <figure class="ds-frame"><div class="pk-area" aria-hidden="true"><div class="pk-page ds-foreign-page erf-picker-frame"><p class="ds-foreign-page__heading">Open day 2026</p><span class="pk-anchor"><span class="pk-btn">Show opening hours</span><span class="erf-picker-outline erf-picker-outline--selected"></span><span class="erf-picker-label"><span class="erf-picker-label__tag">button</span>.cta<span class="erf-picker-label__size">176 × 32</span></span></span></div></div>
+    <figcaption><strong>Picked, on the still image</strong> – the same outline plus a light accent fill, so picked differs from hovered by a fill, not only colour. Drawn by Erfana over the still image, never inside the page.</figcaption></figure>
+  <figure class="ds-frame"><div class="pk-area" aria-hidden="true"><div class="pk-page ds-foreign-page pk-focus"><p class="ds-foreign-page__heading">Open day 2026</p><span class="pk-anchor"><span class="pk-btn">Show opening hours</span><span class="erf-picker-flash"></span></span></div></div>
+    <figcaption><strong>Flash after a send</strong> – a static box for 1 s on the live page; no movement, so reduced motion needs no variant.</figcaption></figure>
+  <figure class="ds-frame"><div class="pk-area" aria-hidden="true"><div class="pk-page ds-foreign-page pk-focus"><p class="ds-foreign-page__heading">Open day 2026</p><p class="ds-foreign-page__body">Keys go to the page.</p></div></div>
+    <figcaption><strong>Page focused, not picking</strong> – the Focus card’s violet ring, in the gutter outside the page.</figcaption></figure>
+  <figure class="ds-frame"><div class="pk-area" aria-hidden="true"><div class="pk-page ds-foreign-page erf-picker-frame"><p class="ds-foreign-page__heading">Open day 2026</p><p class="ds-foreign-page__body">Keys go to the picker.</p></div></div>
+    <figcaption><strong>Pick mode – the browser’s frame</strong> – <code>.erf-picker-frame</code>: a lime edge in the same gutter and at the same offset, so the page never resizes when the state changes.</figcaption></figure>
+  <figure class="ds-frame"><div class="pk-area pk-forced" aria-hidden="true"><div class="pk-page erf-picker-frame"><span class="pk-anchor pk-block"><span class="pk-img"></span><span class="erf-picker-outline"></span><span class="erf-picker-label"><span class="erf-picker-label__tag">img</span>.hero<span class="erf-picker-label__size">260 × 64</span></span></span></div></div>
+    <figcaption><strong>Forced colours, hovered, over an unforced white image</strong> – three real lines: a Canvas outline, the 2px Highlight border and a CanvasText line inside, so a light and a dark line surround the element whatever the pixels under it. The pick frame turns <strong>dashed</strong> Highlight.</figcaption></figure>
+  <figure class="ds-frame"><div class="pk-area pk-forced" aria-hidden="true"><div class="pk-page erf-picker-frame"><span class="pk-anchor pk-block"><span class="pk-img"></span><span class="erf-picker-outline erf-picker-outline--selected"></span><span class="erf-picker-label"><span class="erf-picker-label__tag">img</span>.hero<span class="erf-picker-label__size">260 × 64</span></span></span></div></div>
+    <figcaption><strong>Forced colours, picked</strong> – the fill is gone in forced colours, so “picked” is a shape: a double Highlight border.</figcaption></figure>
+  <figure class="ds-frame"><div class="pk-area" aria-hidden="true"><div class="pk-page ds-foreign-page erf-picker-frame erf-picker-frame--away"><p class="ds-foreign-page__heading">Open day 2026</p><p class="ds-foreign-page__body">Keys go to the terminal; pick mode is still on.</p></div></div>
+    <figcaption><strong>Pick mode on, focus elsewhere</strong> – <code>.erf-picker-frame--away</code>: the same lime edge, dashed (dotted in forced colours). The first click on the page after a return only returns focus (owner decision OD-11).</figcaption></figure>
+</div>
+
+<h2 id="owned">A surface that answers the pick</h2>
+<p class="ds-muted">Proposed with the browser’s prompt-actions screen. A floating Erfana surface over the still image that answers the reviewer’s own pick – the prompt-actions panel, the instruction dialog – carries <code>.erf-picker-owned</code>: a 2px lime top edge, the pick frame’s colour, so the surface reads as part of pick mode and leaves with it. Its edge on the page is still the floating surface’s own border and shadow; lime does not clear 3:1 on a white page (see Contrast), so the lime is identity, never the boundary. It is not a security signal – a page can paint lime; what the reviewer trusts is the place: over the still image, never inside the page.</p>
+<div class="ds-frames">
+  <figure class="ds-frame"><div class="pk-area" aria-hidden="true"><div class="pk-page ds-foreign-page erf-picker-frame pk-owned-stage"><p class="ds-foreign-page__heading">Open day 2026</p><span class="pk-anchor"><span class="pk-btn">Show opening hours</span><span class="erf-picker-outline erf-picker-outline--selected"></span></span><span class="pk-owned erf-picker-owned">Explain · Ask… · Change… · Prompt…</span></div></div>
+    <figcaption><strong>Over a white page</strong> – the lime edge marks the surface as pick mode’s; the subtle border and the shadow carry its outline. The real panel is drawn on the browser’s <a href="../../../../designs/browser/prompt-actions.html">prompt-actions screen</a>.</figcaption></figure>
+</div>
+
+<div class="ds-note">
+  <strong>Two hosts, two frames – recorded, not reconciled.</strong> The HTML preview’s comment mode draws a violet
+  frame <em>inside</em> the page edge with a “Comment mode” tab (decided overlay screen). The browser draws the lime frame
+  <em>outside</em> the page, because its violet already means “the page has keyboard focus” and its banner lives in the
+  reserved pick row. Bringing comment mode onto the lime frame is a later decision for the owner; this card does not
+  change the decided screen.
+</div>
+
+<h2 id="contrast">Contrast</h2>
+<table>
+  <thead><tr><th>Part</th><th>Pair</th><th>Ratio</th></tr></thead>
+  <tbody>
+    <tr><td>Accent ring on a white page</td><td><code>--color-accent-primary</code> on <code>--color-brand-white</code></td><td data-contrast="--color-accent-primary on --color-brand-white" data-min="3" data-result="fail">2.09:1 · fail</td></tr>
+    <tr><td>Ink line on a white page</td><td><code>--color-brand-black</code> on <code>--color-brand-white</code></td><td data-contrast="--color-brand-black on --color-brand-white" data-min="3" data-result="pass">17.62:1 · pass</td></tr>
+    <tr><td>Accent ring on a black page</td><td><code>--color-accent-primary</code> on <code>--color-brand-black</code></td><td data-contrast="--color-accent-primary on --color-brand-black" data-min="3" data-result="pass">8.39:1 · pass</td></tr>
+    <tr><td>Label tag</td><td><code>--color-accent-primary</code> on <code>--color-brand-black</code></td><td data-contrast="--color-accent-primary on --color-brand-black" data-min="4.5" data-result="pass">8.39:1 · pass</td></tr>
+    <tr><td>Label id and classes</td><td><code>--color-brand-white</code> on <code>--color-brand-black</code></td><td data-contrast="--color-brand-white on --color-brand-black" data-min="4.5" data-result="pass">17.62:1 · pass</td></tr>
+    <tr><td>Label size</td><td><code>--color-text-primary</code> on <code>--color-brand-black</code></td><td data-contrast="--color-text-primary on --color-brand-black" data-min="4.5" data-result="pass">11.51:1 · pass</td></tr>
+    <tr><td>Pick frame</td><td><code>--color-accent-secondary</code> on <code>--color-bg-primary</code></td><td data-contrast="--color-accent-secondary on --color-bg-primary" data-min="3" data-result="pass">13.94:1 · pass</td></tr>
+    <tr><td>Pick-owned top edge on a white page</td><td><code>--color-accent-secondary</code> on <code>--color-brand-white</code></td><td data-contrast="--color-accent-secondary on --color-brand-white" data-min="3" data-result="fail">1.26:1 · fail</td></tr>
+    <tr><td>Page-focus ring</td><td><code>--color-border-focus</code> on <code>--color-bg-primary</code></td><td data-contrast="--color-border-focus on --color-bg-primary" data-min="3" data-result="pass">8.39:1 · pass</td></tr>
+  </tbody>
+</table>
+<p class="ds-muted">The first row fails on purpose: it is why the outline is two-tone. One of the first three rows always passes on any page. The pick-owned edge row fails too, and that is why it is never the surface’s boundary.</p>
+
+<h2 id="room">The mode banner and the answering surfaces in narrow room</h2>
+<p class="ds-muted">Proposed with the browser’s picking and prompt-actions screens (review round 1: H-09, M-01, M-03, M-36), so a screen does not decide them.</p>
+<ul>
+  <li><strong>The banner is one line at any text spacing.</strong> Every part is nowrap and leaves whole – it never wraps or clamps. The first clause has priority over every optional control beside it: in pick mode the width preset goes icon-only, below the narrow tier it leaves the row, and the target name truncates but keeps at least 8 characters at 380px and wider (browser design rule, README § Tiers, A-30); below 380px it may go down to “…” – the full name stays in the accessible name and the target menu, and the process is never cut. Optional clauses leave in this order: “↑ ↓ parent and child”, the hover echo of the label, the ⌘E clause.</li>
+  <li><strong>One true clause per key-routing state.</strong> Pick: “Picking – Esc to stop”. Toolbar focus: “Picking – Esc returns to the page”. Panel open: “Picking – Esc closes the panel”. Dialog open: “Picking – Esc closes the dialog”. Focus elsewhere: “Picking – click the page to continue”, or “Picking – click to return to the dialog” while a dialog waits – no key is named while the keys go to another panel. The Pick element tooltip, while on, reads “Stop picking”.</li>
+  <li><strong>Pick-row tooltips stay inside the pick row’s band</strong>, beside the toggle, over the status slot – never over the navigation row or the address bar, never over the focused control – so they show on keyboard focus too.</li>
+  <li><strong>A chrome-side cue while an answering surface is over the still image:</strong> the panel or dialog variant of the banner in the status slot with a “Still image” chip (“Page paused” in its place when frozen), or, once pick mode has ended with a dialog still open, “Over a still image of the page – Esc closes the dialog”. A page cannot draw it, so a panel without it is a fake.</li>
+  <li><strong>Behind the panel the rows stay live</strong> at full strength – a toolbar click, Ctrl/Cmd+L or F6 closes the panel without sending (025-FR-049). Behind the dialog only, the rows are inert and their buttons’ icons are dimmed; the origin field and focus rings are never dimmed.</li>
+  <li><strong>What lime means here, and only this:</strong> pick mode (the frame, solid or dashed, and the pressed toggle’s foot), the selected editor tab’s underline, and the pick-owned edge of a surface that answers the pick. It never means “done” – the send notice’s check is neutral – and no refinement control carries it.</li>
+  <li><strong>Under 400px of room the panel and the dialog are a sheet</strong> (Dialog card’s <code>--sheet</code>) inside the page’s rectangle, over the still image, pinned to its foot, with the pick-owned top edge; the frame stays visible round it. While one is open at the narrow tier the target leaves the pick row – the surface shows the target and changes it without losing the pick.</li>
+</ul>
+
+<h2 id="keyboard">The keyboard contract</h2>
+<p class="ds-muted">The two hosts differ today; the difference is shown, not hidden. Owner decision OD-14: the browser accepts <kbd>Alt+↑</kbd> / <kbd>Alt+↓</kbd> as aliases of <kbd>↑</kbd> / <kbd>↓</kbd>, so one refinement chord works in both pickers. The comment picker’s banner reads “Comment mode · Esc to leave” on its own in-page tab; the browser’s lives in the reserved pick row. The same owner decision makes it one banner pattern shared by both hosts – one true clause per routing state – with the browser’s lime outer frame kept.</p>
+<table class="ds-keys"><thead><tr><th>Key</th><th>Browser (spec 025, proposed)</th><th>Comment mode (shipped)</th></tr></thead><tbody>
+  <tr><td><kbd>⌘E</kbd> / <kbd>Ctrl+E</kbd></td><td>Pick mode on: the frame, the banner, the crosshair. Nothing outlined until the mouse is over the page. Focus stays on the page</td><td>Not used – comment mode starts from the preview toolbar</td></tr>
+  <tr><td><kbd>⌘E</kbd> / <kbd>Ctrl+E</kbd> again, or <kbd>Enter</kbd></td><td>Picks what is outlined, at once. With nothing outlined: nothing is picked and the status slot says “Move the mouse over the page to choose an element” for about 4 s</td><td><kbd>Enter</kbd> picks the outlined element</td></tr>
+  <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Parent – across a shadow root to its host, a frame root to its <code>&lt;iframe&gt;</code> – and back toward the first-hovered element. At <code>html</code> or at the first-hovered element nothing changes and the status slot shows “Top of the page” / “Back at the element you started from” for about 2 s</td><td>Not bound</td></tr>
+  <tr><td><kbd>Alt+↑</kbd> / <kbd>Alt+↓</kbd></td><td>Same as <kbd>↑</kbd> / <kbd>↓</kbd> (aliases, owner decision OD-14)</td><td>Parent and child</td></tr>
+  <tr><td><kbd>Tab</kbd> / <kbd>Shift+Tab</kbd></td><td>Nothing in pick mode with page focus (025-FR-048)</td><td>Walk to the next and previous element</td></tr>
+  <tr><td>A click</td><td>Picks the element under the pointer – except the first click after focus returns from another panel, which only returns focus (owner decision OD-11)</td><td>Picks the element under the pointer</td></tr>
+  <tr><td><kbd>Esc</kbd></td><td>Pick mode off with page focus; from any toolbar control, focus returns to the page and pick mode stays</td><td>Leaves comment mode</td></tr>
+</tbody></table>
+<p class="ds-muted">No app test holds the browser’s picker yet (spec 025: 025-AC-025 to 025-AC-029, 025-AC-081). The comment overlay’s behaviour is held by the tests its decided screen names.</p>
+
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None recorded. The overlay inside a third-party page is drawn from resolved literals, never <code>var()</code>; the comment overlay records that on its own screen, and the browser’s engine overlay will record its own when built (browser note, ADR 0007).</p>
+</section>
+</main>
+</body>
+</html>

@@ -364,8 +364,15 @@ covers the badge, git or key styles yet.</p>
 
 <section id="exceptions">
 <h2>Exceptions</h2>
-<p class="ds-muted">None recorded. A shipping component that departs from this card carries a
-<code>deviates:</code> marker at the site and gets a row here, naming the file.</p>
+<p class="ds-muted">A shipping component that departs from this card carries a
+<code>deviates:</code> marker at the site and gets a row here, naming the file. Proposed screens that depart are listed too.</p>
+<table>
+  <thead><tr><th>File</th><th>Departure</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td><code>docs/designs/browser/tab-and-toolbar.html</code> (proposed screen, spec 025)</td><td>An action chip inside the origin field rings inset (the Focus card’s inset form), not outward.</td><td>The outward ring of a 24px chip would run into the 28px field’s edge, and the field draws no second ring (browser M-32).</td></tr>
+  </tbody>
+</table>
+
 </section>
 
 </main>

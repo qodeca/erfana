@@ -521,8 +521,14 @@ A token for each lands with the first component that implements them.</p>
 
 <section id="exceptions">
 <h2>Exceptions</h2>
-<p class="ds-muted">None recorded. A shipping component that departs from this card carries a
+<p class="ds-muted">A shipping component that departs from this card carries a
 <code>deviates:</code> marker at the site and gets a row here, naming the file.</p>
+<table class="ds-tokens">
+  <thead><tr><th>File</th><th>Departure</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td><code>docs/designs/browser/page-states.html</code> (design, spec 025)</td><td>Load-error, certificate and crashed pages use the Buttons card’s <code>.erf-button</code> instead of <code>.erf-state__action</code>; the title is an <code>h1</code> at <code>--text-lg</code> in <code>--color-text-emphasis</code>; a boxed localhost hint; the certificate page adds a 2px <code>--color-error</code> top rule</td><td>The page owns the whole browser page area, Reload needs the Buttons card’s busy spinner, and the certificate page must not look like an ordinary load error</td></tr>
+  </tbody>
+</table>
 </section>
 
 </main>
