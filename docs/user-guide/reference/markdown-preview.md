@@ -42,8 +42,9 @@ The comment window stays beside the preview rather than covering it; <kbd>F6</kb
 | Limit | Behaviour |
 | --- | --- |
 | Views | Comments, icons and the comment count show only in the **Preview Only** view, never in the editor or a split view. |
-| Unsaved changes | While the editor holds unsaved changes, comments are read-only and a band above the preview says so, with a button to save the file and **Go to editor**. |
-| Frontmatter | The YAML frontmatter can't take a comment. |
+| Unsaved changes | While the editor holds unsaved changes, comments are read-only and a band above the preview says so. Its button is **Save** and your file's name, or **Go to editor** when the file also changed on disk. |
+| Frontmatter | The YAML frontmatter can't take a comment. Right-clicking it shows **Comment on file settings** turned off, with the reason. |
 | Generated parts | A part between a tool's START and END markers can't take a comment; comment on the text before or after it. |
 | How the file looks | Erfana tries up to 4 places for a comment and refuses to save if every one would change how the file renders. Your text is kept. |
+| Site builders | A tool that reads `.md` files as strict MDX can refuse the file, because comments are saved as HTML comments. See [If something goes wrong](../how-to/comment-on-a-preview.md#if-something-goes-wrong). |
 | File size | A file over 2 MB or 100,000 lines, or one nested very deeply (for example, lists or block quotes more than 32 levels deep), still opens in the preview, but Erfana shows no comments for it and takes no new ones. |

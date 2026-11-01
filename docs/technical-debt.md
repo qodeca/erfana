@@ -818,7 +818,7 @@ One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns 
 
 **Severity**: Low
 
-**Impact**: `src/main/services/preview/previewLiveVisibility.ts` (334 lines when filed, 342 on 2026-10-29) and `previewLiveWiring.ts` (371 then, 442 now) are reached only through the `PreviewLiveView` / `PreviewViewService` tests and e2e. `previewLiveVisibility.ts` owns the synchronous-hide invariant that keeps an untrusted page from covering Erfana's own permission prompt.
+**Impact**: `src/main/services/preview/previewLiveVisibility.ts` (334 lines when filed, 342 on 2026-10-29) and `previewLiveWiring.ts` (371 then, 445 now) are reached only through the `PreviewLiveView` / `PreviewViewService` tests and e2e. `previewLiveVisibility.ts` owns the synchronous-hide invariant that keeps an untrusted page from covering Erfana's own permission prompt.
 
 **Recommended Solution**: a direct test file for each, behind a per-file coverage floor.
 

@@ -147,7 +147,7 @@ test.describe('Claims: developer docs (dev-1)', () => {
   test('file sizes stated in docs/technical-debt.md', () => {
     expect(lineCount('scripts/fuses.js')).toBe(2370)
     expect(lineCount('src/main/services/preview/previewLiveVisibility.ts')).toBe(342)
-    expect(lineCount('src/main/services/preview/previewLiveWiring.ts')).toBe(442)
+    expect(lineCount('src/main/services/preview/previewLiveWiring.ts')).toBe(445)
   })
 
   test('GitHub-side CI state stated in docs/ci.md', async () => {

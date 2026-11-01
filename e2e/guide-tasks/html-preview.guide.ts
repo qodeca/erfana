@@ -168,7 +168,7 @@ test('Guide: preview an HTML page', async ({
     await waitForOverlay(new HtmlPreviewPage(window, app), app, INDEX)
   })
 
-  await test.step('Comment 2. Select an element. The first time, enter your name in Before your first comment and select Continue.', async () => {
+  await test.step('Comment 2. Select a section. The first time, enter your name in Before your first comment and select Continue.', async () => {
     await clickElement(app, 'intro', 'left', INDEX)
     const prompt = window.getByRole('dialog', { name: 'Before your first comment' })
     await expect(prompt).toBeVisible({ timeout: BUDGET })
@@ -176,7 +176,7 @@ test('Guide: preview an HTML page', async ({
     await prompt.getByRole('button', { name: 'Continue', exact: true }).click()
   })
 
-  await test.step('Comment 3. Type the comment and select Save. It is saved inside the .html file, and a pin marks the element.', async () => {
+  await test.step('Comment 3. Type the comment and select Save. It is saved inside the .html file, and a comment icon marks the section.', async () => {
     const commentText = 'Please add the start time.'
     const saveButton = window.getByRole('button', { name: 'Save', exact: true })
     const commentWindow = window.getByRole('dialog').filter({ has: saveButton })

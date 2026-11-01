@@ -24,11 +24,11 @@ Open an HTML file to run its page in Erfana. Approve a remote host only when you
 > [!NOTE]
 > Approved remote hosts are saved in the project's `.erfana/settings.json`. You cannot remove them in the app.
 
-## Comment on an element
+## Comment on a section
 
 1. Select **Comment mode** in the toolbar, or press <kbd>⌥⌘M</kbd> / <kbd>Ctrl+Alt+M</kbd>.
-2. Select an element, or right-click it and choose **Add comment**. The first time, enter your name in **Before your first comment** and select **Continue**.
-3. Type the comment and select **Save**. It is saved inside the `.html` file, and a pin marks the element.
+2. Select a section, or right-click it and choose **Add comment**. The first time, enter your name in **Before your first comment** and select **Continue**.
+3. Type the comment and select **Save**. It is saved inside the `.html` file, and a comment icon marks the section.
 
 To comment on selected words, find and sort comments, or step through them, see [Comment on a preview](comment-on-a-preview.md). See also [HTML preview reference § Comments](../reference/html-preview.md#comments).
 
