@@ -21,7 +21,7 @@
 import { ErrorCode } from '../../../../shared/errors'
 import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
 import type { CommentSaveRequest, CommentSaveResult, CommentThreadView } from '../../../../shared/ipc/preview-comment-schema'
-import type { SaveFailureCopy } from './commentCopy'
+import { unsavedSourceText, type SaveFailureCopy } from './commentCopy'
 import { SELECTION_COPY, type CommentWords } from './commentCopyWords'
 import type { NounSource } from './commentTargetNoun'
 
@@ -84,6 +84,8 @@ export const WINDOW_COPY = {
   writeCommentFirst: 'Write a comment first.',
   writeReplyFirst: 'Write a reply first.',
   saveFileFirst: (file: string): string => `Save ${file} first.`,
+  // ---- 024-FR-015 unsaved edits main knows of and this window does not ----
+  unsavedElsewhere: (file: string): string => `${file} has unsaved changes in another window – save it there, then try again.`,
   shortenFirst: 'Shorten the comment to save it.',
   // ---- C-10 the HTML picker's Tab at either end (said in the window's polite region, as every step) ----
   pickerLast: 'Last section at this level – Alt+Up for the parent.',
@@ -218,6 +220,19 @@ export function refusalCopy(code: string, reason: string | undefined, context: R
 export function wordsDroppedText(words: CommentWords, tag: NounSource): string {
   const noun = words.noun(tag)
   return words.preview === 'markdown' ? SELECTION_COPY.wordsNotInFile(noun) : SELECTION_COPY.wordsDropped(noun)
+}
+
+/**
+ * Main refused for unsaved edits and no tab in this window holds them. Markdown
+ * asks about every window, so they are elsewhere. HTML asks about this window
+ * only, so a tab here just changed: the usual sentence.
+ *
+ * @param words - The preview's words.
+ * @param file - The file, its controls as tokens.
+ * @returns The sentence.
+ */
+export function unsavedElsewhereText(words: CommentWords, file: string): string {
+  return words.preview === 'markdown' ? WINDOW_COPY.unsavedElsewhere(file) : unsavedSourceText(file)
 }
 
 /** What a new comment's Save waits for, in the order the window checks it. */

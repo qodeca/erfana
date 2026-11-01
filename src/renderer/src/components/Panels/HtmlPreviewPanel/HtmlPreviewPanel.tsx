@@ -64,6 +64,7 @@ import { previewPlaceholderLabel, selectFallback, selectPanelView } from './html
 import './HtmlPreviewPanel.css'
 import { previewGateway } from '../../../services/previewGateway'
 import { usePreviewComments } from './comments/usePreviewComments'
+import { PreviewPausedBand } from './comments/PreviewPausedBand'
 import { CommentToolbarTools } from '../../Comments/CommentToolbarTools'
 import { CommentDrawer } from '../../Comments/CommentDrawer'
 import { PreviewCommentsLayer } from './comments/PreviewCommentsLayer'
@@ -420,6 +421,7 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
               </>
             }
           />
+          {comments.enabled && <PreviewPausedBand filePath={comments.pageFile} />}
           {/* Everything below the strip. This wrapper is the find bar's
               positioning context, so the bar's offset measures from BELOW the
               strip — it used to be positioned against the panel root, which put

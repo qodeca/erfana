@@ -198,3 +198,56 @@ export interface OverlayDriver {
   /** Remove everything the driver added. */
   dispose(): void | Promise<void>
 }
+
+/** Who the reader is to the comment window: nobody yet, a name in Settings with the notice unseen, or all set. */
+export type WindowRulesIdentity = 'none' | 'notice-unseen' | 'ready'
+
+/** What one test opens: a thread on a writable file (a teammate's). */
+export interface WindowRulesSetup {
+  readonly identity: WindowRulesIdentity
+  /** An editor in this window holds the file (`dirty`), and the file also changed on disk (`conflict`). */
+  readonly editor?: 'clean' | 'dirty' | 'conflict'
+  /** Main refuses every write as unsaved, though this window's tabs are clean. */
+  readonly refusedUnsaved?: boolean
+}
+
+/**
+ * The comment window as a host mounts it, for the rules both previews share.
+ * Driven by keys only: a person with no mouse can do everything here.
+ */
+export interface WindowRulesDriver {
+  /** The host's name, for messages. */
+  readonly host: string
+  /** Whether main refuses a write for another window's unsaved edits (HTML asks about its own window only: D-61). */
+  readonly seesOtherWindows: boolean
+  /** The file's name as the banner's Save button says it. */
+  readonly fileName: string
+  /** Open the window on one open thread, settled when its first focus has landed. */
+  open(setup: WindowRulesSetup): Promise<void>
+  /** The view the window shows now. */
+  view(): string
+  /** Type into the reply field and send with the Save shortcut. */
+  replyByKeys(text: string): Promise<void>
+  /** Press Resolve with the keyboard. */
+  resolveByKeys(): Promise<void>
+  /** Answer the identity step with the keyboard: the name, then Continue. */
+  continueByKeys(name: string): Promise<void>
+  /** Press Esc. */
+  pressEscape(): Promise<void>
+  /** The writes that reached main, by operation. */
+  writes(): readonly string[]
+  /** What the reply field holds, `null` when no reply box is shown. */
+  replyText(): string | null
+  /** The names of the buttons in the window's unsaved or refusal banner. */
+  bannerButtons(): readonly string[]
+  /** The banner's words. */
+  bannerText(): string
+  /** Press the banner's button that saves the file, with the keyboard. */
+  saveFromBannerByKeys(): Promise<void>
+  /** Editor saved calls so far. */
+  editorSaves(): number
+  /** The focused element is inside the comment window, never `<body>`. */
+  focusInWindow(): boolean
+  /** Remove everything the driver added. */
+  dispose(): void | Promise<void>
+}

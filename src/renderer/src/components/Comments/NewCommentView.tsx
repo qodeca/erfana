@@ -18,7 +18,9 @@
  *   comment now." on its own when OUR Save wrote the tab (a neutral line when
  *   the tab became clean some other way, e.g. its changes were discarded).
  *   Go to tab closes the window first (the text stays in the drafts) so the
- *   modal is not left over the editor.
+ *   modal is not left over the editor. Main refusing with no such tab in this
+ *   window gets one sentence and no buttons, and Save stays, to try again
+ *   once that other window has saved (P-F02).
  * - Every refusal, and the unsaved banner clearing, is also spoken from the
  *   window's assertive region (`useCommentAlert`).
  * - Busy is `aria-disabled` "Saving…": focus stays where the user pressed.
@@ -65,7 +67,8 @@ import { useCommentWords } from './commentWords'
 import { CommentWordsPicker, type WordsSpan } from './CommentWordsPicker'
 import { SELECTION_COPY } from './commentCopyWords'
 import { carriedDrafts } from './commentCarriedDrafts'
-import { WINDOW_COPY, saveBlockedReason, windowRefusal, wordsDroppedText, type RefusalCopy } from './commentWindowCopy'
+import { WINDOW_COPY, saveBlockedReason, unsavedElsewhereText, windowRefusal, wordsDroppedText, type RefusalCopy } from './commentWindowCopy'
+import { CommentUnsavedActions } from './CommentUnsavedActions'
 import { TEST_IDS } from '../../constants/testids'
 
 /** Props for {@link NewCommentView}. */
@@ -162,9 +165,10 @@ export function NewCommentView({
     if (dropped) doneRef.current?.focus()
   }, [dropped])
 
-  // Main refused for unsaved changes: blocked until the guard sees the tab
-  // saved (by the button, Cmd+S or autosave).
-  const unsaved = guard.state !== 'clean' || (refusedUnsaved && !guard.justSaved)
+  // Blocked until the guard sees the tab saved (by the button, Cmd+S or autosave).
+  const unsaved = guard.state !== 'clean'
+  // Main refused and no tab here holds the file: nothing here can clear it, so Save stays to try again.
+  const elsewhere = refusedUnsaved && !unsaved && !guard.justSaved
   const count = countCharacters(text)
   const fieldBlocked =
     text.trim() === '' || counterState(count) === 'over' || choice.kind === 'blank' || choice.kind === 'tie'
@@ -217,7 +221,7 @@ export function NewCommentView({
     }
     if (copy.action === 'unsaved') {
       setRefusedUnsaved(true)
-      alert(unsavedSourceText(file))
+      alert(unsavedElsewhereText(words, file))
       return
     }
     setFailure(copy)
@@ -260,6 +264,7 @@ export function NewCommentView({
     }
     setSaving(true)
     setFailure(null)
+    setRefusedUnsaved(false)
     // Autosave held for the write, so a keystroke-triggered save of the same
     // file cannot land between main's re-read and its rename (§7.8) – until
     // the write settles, which for a pending answer is after the answer.
@@ -295,32 +300,24 @@ export function NewCommentView({
       title={COPY.unsavedTitle}
       testId={TEST_IDS.COMMENT_UNSAVED_BANNER}
       actions={
-        <>
-          <DialogButton
-            variant="secondary"
-            testId={TEST_IDS.COMMENT_UNSAVED_GO_TO_TAB}
-            onClick={() => {
-              // Close first (the text is in the drafts): a modal left open
-              // would sit over the editor and trap focus away from it.
-              onLeave()
-              guard.goToTab()
-            }}
-          >
-            {COPY.goToTab}
-          </DialogButton>
-          {guard.state !== 'conflict' && (
-            <DialogButton
-              variant="secondary"
-              onClick={() => void guard.save()}
-              testId={TEST_IDS.COMMENT_UNSAVED_SAVE}
-            >
-              {`Save ${file}`}
-            </DialogButton>
-          )}
-        </>
+        <CommentUnsavedActions
+          file={file}
+          conflict={guard.state === 'conflict'}
+          onGoToTab={() => {
+            // Close first (the text is in the drafts): a modal left open
+            // would sit over the editor and trap focus away from it.
+            onLeave()
+            guard.goToTab()
+          }}
+          onSave={() => void guard.save()}
+        />
       }
     >
       {guard.state === 'conflict' ? unsavedConflictText(file) : unsavedSourceText(file)}
+    </CommentBanner>
+  ) : elsewhere ? (
+    <CommentBanner kind="warning" testId={TEST_IDS.COMMENT_UNSAVED_BANNER}>
+      {unsavedElsewhereText(words, file)}
     </CommentBanner>
   ) : clearedText !== null ? (
     <CommentBanner kind="success" testId={TEST_IDS.COMMENT_UNSAVED_CLEARED}>

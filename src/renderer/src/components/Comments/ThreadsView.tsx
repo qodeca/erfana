@@ -20,7 +20,9 @@
  *   blocks are shown, never changed.
  * - **Hidden on the page** (decision 30) is a banner, the thread still usable.
  * - A **read-only file** or **paused** comments state their reason up front
- *   and offer no writes.
+ *   and offer no writes. Unsaved edits add the banner's Save {file} and Go to
+ *   tab, in both previews (024-FR-015): the reply box comes back with its
+ *   typed text once the file is saved.
  * - **Updated from the file** (W-03): an info strip, and a "New since you
  *   opened" divider above messages that arrived meanwhile.
  * - **Removed while open** (W-04): the last thread shown stays, read-only,
@@ -39,11 +41,12 @@ import type {
   CommentThreadView
 } from '../../../../shared/ipc/preview-comment-schema'
 import { commentDrafts } from '../../stores/usePreviewCommentStore'
-import { COPY, type SaveFailureCopy } from './commentCopy'
+import { COPY, readErrorText, type SaveFailureCopy } from './commentCopy'
 import { useCommentWords } from './commentWords'
 import { visibleString } from './commentFormat'
 import { replyDraftKey } from './commentLive'
-import { CommentBanner, DialogButton } from './CommentParts'
+import { CommentBanner, DialogButton, VisibleText } from './CommentParts'
+import { CommentUnsavedActions } from './CommentUnsavedActions'
 import {
   CommentThread,
   ResolvedThread,
@@ -109,6 +112,13 @@ export interface ThreadsSessionView {
   readonly seen: ReadonlyMap<string, ReadonlySet<string>>
 }
 
+/** The ways on from unsaved edits an editor in this window holds. */
+export interface ThreadsUnsaved {
+  readonly conflict: boolean
+  readonly onSave: () => void
+  readonly onGoToTab: () => void
+}
+
 /** Props for {@link ThreadsView}. */
 export interface ThreadsViewProps {
   readonly selection: ThreadsSelection
@@ -125,16 +135,43 @@ export interface ThreadsViewProps {
   /** An icon's draft is there: "New comment" adds a thread on the same target. */
   readonly onNewComment?: () => void
   /**
-   * Comments are paused (Markdown, unsaved editor edits – 024-FR-015, F-02):
-   * every write is off, as for a read-only file, and this sentence says why.
+   * Comments are paused (unsaved editor edits – 024-FR-015, F-02): every
+   * write is off, as for a read-only file, and this sentence says why.
    */
   readonly pausedText?: string | null
+  /** The ways on from those edits, when an editor in this window holds them. */
+  readonly unsaved?: ThreadsUnsaved
   /** The window's session; absent – the shipped single view. */
   readonly session?: ThreadsSessionView
   /** "Resolve and next" (C-13): the window resolves the thread and steps on. */
   readonly onResolveAndNext?: (thread: CommentThreadView) => void
   /** Takes the control the window focuses first: the leading Resolve, or Close when all is done. */
   readonly leadRef?: React.Ref<HTMLButtonElement>
+}
+
+/** The window before its comments are there: reading, or a failed read with the way on (M7: never an endless "Reading"). */
+export function ThreadsWaiting({ failedFile, onRetry }: { readonly failedFile: string | null; readonly onRetry: () => void }): React.JSX.Element {
+  if (failedFile === null) {
+    return (
+      <div className="erf-comment-window__body">
+        <p className="erf-comment-note" role="status">
+          Reading comments…
+        </p>
+      </div>
+    )
+  }
+  return (
+    <div className="erf-comment-window__body">
+      <p className="erf-comment-note" data-testid={TEST_IDS.COMMENT_WINDOW_READ_ERROR}>
+        <VisibleText text={readErrorText(failedFile)} />
+      </p>
+      <div className="erf-comment-thread__actions">
+        <DialogButton variant="secondary" onClick={onRetry} testId={TEST_IDS.COMMENT_WINDOW_RETRY}>
+          {COPY.tryAgain}
+        </DialogButton>
+      </div>
+    </div>
+  )
 }
 
 /** The newer-format block: shown, never changed (S-09). */
@@ -230,7 +267,11 @@ export function ThreadsView(props: ThreadsViewProps): React.JSX.Element {
           </CommentBanner>
         )}
         {!removed && (!file.writable || pausedText !== null) && (
-          <CommentBanner kind="info" testId={TEST_IDS.COMMENT_READ_ONLY}>
+          <CommentBanner
+            kind={file.writable && props.unsaved?.conflict === true ? 'warning' : 'info'}
+            testId={TEST_IDS.COMMENT_READ_ONLY}
+            actions={file.writable && props.unsaved !== undefined ? <CommentUnsavedActions file={fileName} {...props.unsaved} /> : undefined}
+          >
             {pausedText ?? words.readOnlyReasonText(file.readOnlyReason, fileName)}
           </CommentBanner>
         )}
@@ -265,7 +306,7 @@ export function ThreadsView(props: ThreadsViewProps): React.JSX.Element {
           </div>
         ))}
         {damaged.map(block => (
-          <DamagedBlockView key={block.blockKey} block={block} file={file} panelId={panelId} run={run} onCopy={onCopy} onOpenInSource={onOpenInSource} />
+          <DamagedBlockView key={block.blockKey} block={block} file={pausedText === null ? file : { ...file, writable: false }} panelId={panelId} run={run} onCopy={onCopy} onOpenInSource={onOpenInSource} />
         ))}
         {newer.map(block => (
           <NewerBlockView key={block.blockKey} block={block} onOpenInSource={onOpenInSource} />

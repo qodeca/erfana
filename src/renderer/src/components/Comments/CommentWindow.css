@@ -127,6 +127,15 @@
   overflow-wrap: anywhere;
 }
 
+/* A thread view stays mounted under the identity step: no box of its own while shown. */
+.erf-comment-window__threads {
+  display: contents;
+}
+
+.erf-comment-window__threads[hidden] {
+  display: none;
+}
+
 .erf-comment-window__body {
   flex: 1 1 auto;
   min-block-size: 0;

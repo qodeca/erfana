@@ -205,7 +205,10 @@ The pre-save check shall prove this before the file is written. The shared check
 **Priority:** Must
 
 **Acceptance Criteria:**
-- [ ] With unsaved edits – in this panel, another panel or another window – the comment actions are disabled and the band offers Save {file}; after Save {file}, the comment saves.
+- [ ] With unsaved edits – in this panel or another panel of this window – the comment actions are disabled and the band offers Save {file}; after Save {file}, the comment saves.
+- [ ] With unsaved edits in another window, a write is refused in main (024-FR-026) and the comment window says so in one sentence, with no button that cannot work. Save stays, to try again.
+
+*Lowered 2026-11-01 (open decision 7, assumed by the plan; the owner confirms at the checklist walk):* this window cannot see another window's tabs, so the up-front pause covers this window only. The feed across windows is not built. The HTML Preview shows the same band and pauses Reply and Resolve in the same way (open decision 9, D-24).
 
 ### 024-FR-016: Claude Code gate
 

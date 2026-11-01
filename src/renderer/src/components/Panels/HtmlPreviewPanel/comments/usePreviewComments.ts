@@ -80,6 +80,8 @@ export interface PreviewComments {
   /** The drawer's props while it is open, else `null`. */
   readonly drawer: CommentDrawerProps | null
   readonly layer: PreviewCommentsLayerProps
+  /** The page's own file, as main spells it once listed: the paused band watches it. */
+  readonly pageFile: string
   /** Ctrl+Alt+M / Cmd+Option+M, focus in the chrome or on the group (native event too). */
   readonly onRootKeyDown: (event: PreviewKeyEventLike) => void
 }
@@ -479,7 +481,8 @@ export function usePreviewComments({
     ]
   )
 
-  return { enabled, toolbar, drawer, layer, onRootKeyDown }
+  const pageFile = state.list.files.find(file => !file.frame)?.filePath ?? filePath
+  return { enabled, toolbar, drawer, layer, pageFile, onRootKeyDown }
 }
 
 /** The middle of a box: where a window opened from the drawer is anchored. */

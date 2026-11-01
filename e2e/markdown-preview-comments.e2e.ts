@@ -134,6 +134,33 @@ test.describe('Markdown Preview comments', () => {
     await expect(md.icons()).toHaveCount(0, { timeout: MD_COMMENT_BUDGET_MS })
   })
 
+  test('P-F01 a first Reply on a teammate\'s file asks for the name, then sends itself', async ({
+    windowWithTestProject,
+    testProject
+  }) => {
+    const page = windowWithTestProject
+    const file = path.join(testProject.path, FILE)
+    const md = await openReview(page)
+    await md.modeOn()
+    await md.target('p', 3).click()
+    await expect(md.window()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await md.saveNewComment(NOTE, FILE, NAME)
+    await expect(md.icons()).toHaveCount(1, { timeout: MD_COMMENT_BUDGET_MS })
+    // Now as someone who received the file: the notice was never shown to them.
+    await setGlobalSetting(page, 'comments', { identityNoticeSeen: false })
+    await md.modeButton().click()
+    await md.icons().first().click()
+    const win = md.window()
+    await expect(win).toHaveAttribute('data-view', 'threads', { timeout: MD_COMMENT_BUDGET_MS })
+    await page.getByTestId('comment-reply-field').fill(REPLY)
+    await page.getByTestId('comment-reply').click()
+    await expect(win).toHaveAttribute('data-view', 'identity')
+    await page.getByTestId('comment-identity-name').fill(NAME)
+    await page.getByTestId('comment-identity-continue').click()
+    await expect(win.getByTestId('comment-message')).toHaveCount(2, { timeout: MD_COMMENT_BUDGET_MS })
+    expect(await fsp.readFile(file, 'utf-8')).toContain(REPLY)
+  })
+
   test('024-AC-029 keyboard only: the shortcut, Tab and Alt+Down to a list item, Enter, save, Esc', async ({
     windowWithTestProject,
     testProject

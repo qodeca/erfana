@@ -5226,7 +5226,7 @@
       "quote": "(`CommentWindow.css:441`, a recorded exception)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/CommentWindow.css:452",
+      "source": "src/renderer/src/components/Comments/CommentWindow.css:461",
       "match": ".erf-comment-banner--info {"
     },
     {
@@ -5268,7 +5268,7 @@
       "quote": "reacts on read-only fields (`CommentWindow.css:300`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/CommentWindow.css:311",
+      "source": "src/renderer/src/components/Comments/CommentWindow.css:320",
       "match": ".erf-comment-textarea:hover,"
     },
     {
@@ -8599,7 +8599,7 @@
       "quote": "The placeholder's `img` role pre-paint (`HtmlPreviewPanel.tsx:454-463`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/HtmlPreviewPanel.tsx:454",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/HtmlPreviewPanel.tsx:456",
       "match": "role={isViewHidden ? 'img'"
     },
     {
@@ -17932,7 +17932,7 @@
       "quote": "the comment buttons (**Comment mode**, **Comments** and **Show comment icons**, when comments are on",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/HtmlPreviewPanel.tsx:419",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/HtmlPreviewPanel.tsx:420",
       "match": "{comments.enabled && <CommentToolbarTools {...comments.toolbar} />}",
       "note": "The left-to-right toolbar list left out the three comment tools."
     },
@@ -24151,7 +24151,7 @@
       "quote": "| `e2e/html-preview-comments.e2e.ts:644` (E-004",
       "status": "fixed",
       "evidence": "source",
-      "source": "e2e/html-preview-comments.e2e.ts:655",
+      "source": "e2e/html-preview-comments.e2e.ts:687",
       "match": "test('E-004 the whole cycle on a CRLF + BOM file",
       "note": "said :631"
     },
@@ -24973,7 +24973,7 @@
       "quote": "and the panel matches it on its own chrome and dockview group element (`usePreviewComments`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/usePreviewComments.ts:346",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/usePreviewComments.ts:348",
       "match": "if (!matchCommentModeKey(commentModeKeyFromDomEvent(event), isMacOS())) return"
     },
     {
@@ -25258,7 +25258,7 @@
       "quote": "so an inactive tab's placeholder – dockview keeps it mounted – is never in the tab order",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/HtmlPreviewPanel.tsx:458",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/HtmlPreviewPanel.tsx:460",
       "match": "tabIndex={pageEntry.enabled ? 0 : -1}"
     },
     {
@@ -25298,7 +25298,7 @@
       "quote": "the panel root's `onKeyDown` is not a `window` listener",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/HtmlPreviewPanel.tsx:360",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/HtmlPreviewPanel.tsx:361",
       "match": "onKeyDown={onRootKeyDown}"
     },
     {
@@ -39637,8 +39637,8 @@
       "quote": "Leave it empty and Erfana asks for a name the next time you comment.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/CommentWindow.tsx:174",
-      "match": "!identity.authorName)",
+      "source": "src/renderer/src/components/Comments/useIdentityGate.ts:25",
+      "match": "!identity.authorName",
       "note": "Repointed evidence to the comment window, which shows the identity step when no name is saved."
     },
     {
@@ -48866,7 +48866,7 @@
       "quote": "New comment and Close are one group (`.erf-comment-window__foot-end`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/ThreadsView.tsx:281",
+      "source": "src/renderer/src/components/Comments/ThreadsView.tsx:359",
       "match": "erf-comment-window__foot-end"
     },
     {
@@ -52559,7 +52559,7 @@
       "quote": "`HtmlPreviewPanel.tsx` 477",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/HtmlPreviewPanel.tsx:477",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/HtmlPreviewPanel.tsx:479",
       "match": "}",
       "note": "Added a 2026-10-29 re-measure: was 433 in the table, now 477 (last line)"
     },
@@ -54872,7 +54872,7 @@
       "quote": "Select **Repair comment…**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:99",
+      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:101",
       "match": "rebuildAction: 'Repair comment…',"
     },
     {
@@ -54882,7 +54882,7 @@
       "quote": "**What you see now** and **Saved copy**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:102",
+      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:104",
       "match": "dataSays: 'Saved copy',"
     },
     {
@@ -54892,7 +54892,7 @@
       "quote": "Select **Repair comment**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:103",
+      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:105",
       "match": "rebuild: 'Repair comment',"
     },
     {
@@ -54902,7 +54902,7 @@
       "quote": "choose **Mark resolved** or **Keep open** instead",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:105",
+      "source": "src/renderer/src/components/Comments/commentWindowCopy.ts:107",
       "match": "keepOpen: 'Keep open'"
     },
     {

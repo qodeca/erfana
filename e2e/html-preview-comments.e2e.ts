@@ -461,6 +461,8 @@ test.describe('HTML Preview comments – the reviewer path (P6 exit)', () => {
     // Save is blocked behind the banner; "Save e001.html" writes the source tab.
     await dirtyWindow(async () => {
       await expect(banner).toContainText('Save your edits first')
+      // Decision 9: the same band as the Markdown Preview, above the page.
+      await expect(page.getByTestId('comment-host-paused')).toHaveAttribute('data-state', 'paused')
       await page.getByTestId('comment-new-field').fill(NOTE)
       await expect(page.getByTestId('comment-save')).toHaveAttribute('aria-disabled', 'true')
       await page.getByTestId('comment-unsaved-save').click({ timeout: 1000 })
@@ -472,6 +474,7 @@ test.describe('HTML Preview comments – the reviewer path (P6 exit)', () => {
       'Saved. You can add your comment now.'
     )
     await expect(tabs.dirtyDot('e001.html')).toHaveCount(0)
+    await expect(page.getByTestId('comment-host-paused')).toHaveCount(0)
     expect(await fsp.readFile(file, 'utf-8')).toContain(marker)
     await page.getByTestId('comment-cancel').click()
     await expect(commentWindow).toHaveCount(0)
@@ -539,6 +542,35 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     expect(text).toContain(NOTE_A)
     expect(text).toContain(NAME_A)
     expect(tail.startsWith('<p id="team-copy">')).toBe(true)
+  })
+
+  test('E-002b P-F01 a first Reply on a teammate\'s file asks for the name, then sends itself', async ({
+    windowWithTestProject,
+    appWithTestProject,
+    testProject
+  }) => {
+    const app = appWithTestProject
+    const page = windowWithTestProject
+    const preview = new HtmlPreviewPage(page, app)
+    const chrome = new CommentChrome(page, preview, 'e002.html')
+    const target = HtmlPreviewPage.target(REVIEW)
+    const file = path.join(testProject.path, REVIEW)
+    const REPLY = 'Reply-PF01-Hk20: first words in this file'
+    await setGlobalSetting(page, 'comments', { identityNoticeSeen: false })
+
+    await openCommentPage(preview, app, REVIEW, REVIEW_TITLE)
+    await expectPin(app, 'cta', true, target)
+    await clickPin(app, 'cta', target)
+    const win = chrome.window()
+    await expect(win).toHaveAttribute('data-view', 'threads', { timeout: PREVIEW_BUDGET_MS })
+    await page.getByTestId('comment-reply-field').fill(REPLY)
+    await page.getByTestId('comment-reply').click()
+    await expect(win).toHaveAttribute('data-view', 'identity')
+    await page.getByTestId('comment-identity-name').fill(NAME_A)
+    await page.getByTestId('comment-identity-continue').click()
+    await expect(win.getByTestId('comment-message')).toHaveCount(2, { timeout: PREVIEW_BUDGET_MS })
+    expect(await fsp.readFile(file, 'utf-8')).toContain(REPLY)
+    await expect(page.getByTestId('comment-reply-field')).toHaveValue('')
   })
 
   test('E-002 a pin opens its thread outside comment mode; reply, resolve (pin hidden, drawer "Resolved"), re-open', async ({

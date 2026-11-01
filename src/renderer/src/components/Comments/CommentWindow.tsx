@@ -15,9 +15,10 @@
  * Its three views, in the one window (no stacked dialog, nothing lost):
  *
  * 1. **Before your first comment** – the identity step, shown on the first
- *    comment while the one-time privacy notice is unseen (also when the name
- *    is already set in Settings, then pre-filled – R-019), or when main says
- *    a name is needed.
+ *    comment or the first Reply, Resolve, Re-open or Mark resolved while the
+ *    one-time privacy notice is unseen (also when the name is already set in
+ *    Settings, then pre-filled – R-019), or when main says a name is needed.
+ *    A thread write waits on it and then goes by itself (`useIdentityGate`).
  * 2. **New comment** – {@link NewCommentView}.
  * 3. **Comment(s) on {label}** / **Damaged comment** – {@link ThreadsView},
  *    with the stepper (‹ 3 of 12 ›, Alt+F9 / Alt+Shift+F9, Resolve and next –
@@ -56,7 +57,7 @@ import type { CommentIdentitySettings } from '../../../../shared/ipc/global-sett
 import { ErrorCode } from '../../../../shared/errors'
 import type { AnchorSelection } from '../../../../shared/comments/anchorSel'
 import type { CommentListState } from '../../stores/usePreviewCommentStore'
-import { COPY, IDENTITY_COPY, readErrorText, type SaveFailureCopy } from './commentCopy'
+import { COPY, IDENTITY_COPY, type SaveFailureCopy } from './commentCopy'
 import { useCommentWords } from './commentWords'
 import { visibleString } from './commentFormat'
 import { CommentStepsContext, replyDraftKey, useLiveText, type CommentSteps } from './commentLive'
@@ -66,21 +67,24 @@ import {
   trackCommentWrite,
   writeKeyOf
 } from './commentPendingWrites'
-import { DialogButton, VisibleText } from './CommentParts'
+import { VisibleText } from './CommentParts'
 import type { Box } from './commentPlacement'
 import type { IdentityFormData } from './commentSchemas'
 import { CommentStepper, MoreActions, stepKeyOf } from './CommentStepper'
 import { useDrawerFilter } from './commentDrawerFilter'
 import { useWindowStepTarget } from './commentStepKeys'
-import { WINDOW_COPY, editWordsNotice, windowRefusal } from './commentWindowCopy'
+import { WINDOW_COPY, editWordsNotice, unsavedElsewhereText, windowRefusal } from './commentWindowCopy'
 import { headingOf, newCommentFrom } from './commentWindowHeading'
 import { resolveLeads, stepPosition, threadStateOf, withResolved } from './commentWindowStates'
-import type { CommentWindowRequest, NounSource } from './commentWindowTypes'
-import { CommentWindowShell, type CommentDock } from './CommentWindowShell'
+import type { CommentWindowRequest } from './commentWindowTypes'
+import { CommentWindowShell } from './CommentWindowShell'
+import { useDock, type WindowDock } from './commentWindowDock'
 import { IdentityStep } from './IdentityStep'
 import { NewCommentView } from './NewCommentView'
-import { ThreadsView } from './ThreadsView'
+import { ThreadsView, ThreadsWaiting } from './ThreadsView'
+import { identityMissing, useIdentityGate } from './useIdentityGate'
 import { useThreadSession } from './useThreadSession'
+import { useWindowPause } from './useWindowPause'
 import './CommentWindow.css'
 import { TEST_IDS } from '../../constants/testids'
 
@@ -115,15 +119,17 @@ export interface CommentWindowProps {
   readonly onPickAgain: () => void
   readonly onOpenInSource: (filePath: string, line: number) => void
   readonly onCopyRaw: (text: string) => void
-  /** Comments are paused (Markdown, 024-FR-015): writes are off and this says why. */
+  /** The host's own words for a pause (Markdown, 024-FR-015): writes are off and this says why. */
   readonly pausedText?: string | null
+  /** The way to unsaved edits when "Go to tab" is not it (Markdown: this panel's own editor view). */
+  readonly onGoToUnsaved?: () => void
   /**
    * Modal over a still page (the HTML Preview), or docked and non-modal (the
    * Markdown Preview, C-18). Defaults by the preview's words.
    */
   readonly modal?: boolean
   /** What a docked window follows and hands F6 to (C-18); `anchor` takes the thread shown, `null` for a new comment. */
-  readonly dock?: Omit<CommentDock, 'anchor' | 'label'> & { readonly anchor: (threadKey: string | null) => HTMLElement | null }
+  readonly dock?: WindowDock
   /** A step reached this thread (C-13): show its target. */
   readonly onReveal?: (threadKey: string) => void
   /** "Comment on the whole {parent}" after a render-check refusal (W-07): open the window on the parent. */
@@ -169,9 +175,9 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
   const stepsValue = useMemo<CommentSteps>(() => ({ register, alert }), [register, alert])
   const [now] = useState(() => (props.now ?? (() => new Date()))())
 
-  const needsIdentity =
-    request.kind === 'new' &&
-    (identityAsked || identity === null || !identity.identityNoticeSeen || !identity.authorName)
+  const gate = useIdentityGate(identity, register)
+  const { ready: identityReady, ask: askIdentity, restoreFocus: restoreGateFocus } = gate
+  const needsIdentity = request.kind === 'new' ? identityAsked || identityMissing(identity) : gate.open
   const view: 'identity' | 'new' | 'threads' = needsIdentity ? 'identity' : request.kind
 
   const stepFilter = useDrawerFilter(props.drawerId)
@@ -181,6 +187,7 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
   // Before any memoized callback: the compiler takes these calls as possible changes to `selection`.
   const words = useCommentWords()
   const modal = props.modal ?? words.preview === 'html'
+  const pause = useWindowPause(selection?.file.filePath ?? null, visibleString(selection?.file.displayPath ?? ''), props.pausedText ?? null, titleRef, () => props.onClose(false), props.onGoToUnsaved)
   const heading = headingOf(request, selection, words)
   const newComment = props.onNewComment && !session.stepped ? newCommentFrom(request, selection) : null
   const notVisible = useMemo(() => new Set(props.notVisible), [props.notVisible])
@@ -202,13 +209,15 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
   const previousView = useRef(view)
   useEffect(() => {
     if (previousView.current === 'identity' && view === 'new') textareaRef.current?.focus()
+    if (previousView.current === 'identity' && view === 'threads') restoreGateFocus(titleRef.current)
     previousView.current = view
-  }, [view])
+  }, [view, restoreGateFocus])
 
   const { onRefresh } = props
   // Shown in banners and alerts through `visibleString`: bidi and invisible characters as tokens (S-L-B).
   const displayPath = selection?.file.displayPath ?? ''
   const targetTag = shownThread
+  const pauseText = pause.text
   /** A write that did not land – refused, or still being written: say why and what next (C-19). */
   const refused = useCallback(
     (code: string, reason?: string, op?: CommentSaveRequest['op']) => {
@@ -218,17 +227,24 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
         code === ErrorCode.COMMENT_BLOCK_CHANGED && op === 'reply'
           ? { text: WINDOW_COPY.blockChangedReply(file), action: 'banner' }
           : windowRefusal(words, code, file, targetTag, reason)
-      setFailure(copy)
-      alert(copy.text)
+      if (copy.action === 'identity') {
+        void askIdentity()
+        return
+      }
+      // A tab here: the pause already says it, with its buttons. No tab here: one sentence, no dead buttons (P-F02).
+      if (copy.action === 'unsaved' && pauseText !== null) return
+      const shown = copy.action === 'unsaved' ? { text: unsavedElsewhereText(words, file), action: 'banner' as const } : copy
+      setFailure(shown)
+      alert(shown.text)
       // The list is stale: read it again so the next try uses fresh hashes.
       if (code === ErrorCode.COMMENT_BLOCK_CHANGED || code === ErrorCode.COMMENT_KEY_INVALID) onRefresh()
     },
-    [displayPath, alert, onRefresh, words, targetTag]
+    [displayPath, alert, onRefresh, words, targetTag, askIdentity, pauseText]
   )
 
   const { noteWrite, noteRefused } = session
-  const run = useCallback(
-    async (save: CommentSaveRequest): Promise<boolean> => {
+  const attempt = useCallback(
+    async (save: CommentSaveRequest): Promise<boolean | 'identity'> => {
       // Still being written: a second write on the thread would only collide with it.
       if (isCommentWritePending(save.panelId, writeKeyOf(save), true)) {
         refused(ErrorCode.COMMENT_SAVE_PENDING)
@@ -250,10 +266,23 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
         return true
       }
       noteRefused(save)
+      if (result.code === ErrorCode.COMMENT_IDENTITY_REQUIRED) return 'identity'
       refused(result.code, result.reason, save.op)
       return false
     },
     [props, displayPath, refused, noteWrite, noteRefused, words, selection, announce]
+  )
+  const run = useCallback(
+    async (save: CommentSaveRequest): Promise<boolean> => {
+      if (!(await identityReady(save))) return false
+      for (;;) {
+        const outcome = await attempt(save)
+        if (outcome !== 'identity') return outcome
+        // Main still wants a name (it was changed elsewhere): ask, then send it again.
+        if (!(await askIdentity())) return false
+      }
+    },
+    [attempt, identityReady, askIdentity]
   )
 
   // A write answered "still saving" settled: landed clears the banner (the
@@ -327,7 +356,7 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
   useWindowStepTarget(props.drawerId ?? request.panelId, request.kind === 'threads' ? shownThread?.threadKey : undefined, view === 'threads' ? stepFromPreview : undefined)
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
     const key = stepKeyOf(event.nativeEvent)
-    if (key === null || step === null) return
+    if (key === null || step === null || view !== 'threads') return
     const target = key === 'next' ? step.next : step.previous
     if (target === null) return
     event.preventDefault()
@@ -337,9 +366,9 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
   // The thread whose Resolve leads takes the first focus (S-03 – S-05).
   const leads = selection?.threads.some(t => t.status === 'open' && resolveLeads(threadStateOf(t, notVisible))) === true
   const initialFocusRef = view === 'threads' ? (leads ? leadRef : titleRef) : view === 'new' ? textareaRef : undefined
-  const dock = useDock(props, request.kind === 'threads' ? (shownThread?.threadKey ?? null) : null, shownThread ?? (request.kind === 'new' ? request.target : ''), shownThread?.line ?? (request.kind === 'new' ? request.target.line : 1), words.noun)
+  const dock = useDock(props.dock, request.kind === 'threads' ? (shownThread?.threadKey ?? null) : null, shownThread ?? (request.kind === 'new' ? request.target : ''), shownThread?.line ?? (request.kind === 'new' ? request.target.line : 1), words.noun)
   const moreActions = [
-    ...(newComment !== null && !props.pausedText ? [{ label: COPY.newComment, action: () => props.onNewComment?.(newComment), testId: TEST_IDS.COMMENT_NEW_ON_ELEMENT }] : []),
+    ...(newComment !== null && pause.text === null ? [{ label: COPY.newComment, action: () => props.onNewComment?.(newComment), testId: TEST_IDS.COMMENT_NEW_ON_ELEMENT }] : []),
     { label: COPY.openInSource, action: () => props.onOpenInSource(selection?.file.filePath ?? '', shownThread?.line ?? 1), testId: TEST_IDS.COMMENT_OPEN_IN_SOURCE }
   ]
 
@@ -400,10 +429,11 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
             noticeId={noticeId}
             initialName={identity?.authorName ?? ''}
             initialEmail={identity?.authorEmail ?? ''}
-            onCancel={() => props.onClose()}
+            onCancel={() => (gate.open ? gate.cancel() : props.onClose())}
             onSubmit={async data => {
               const ok = await props.onSaveIdentity(data)
               if (ok) setIdentityAsked(false)
+              if (ok) gate.answered()
               return ok
             }}
           />
@@ -431,7 +461,9 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
             onRefresh={props.onRefresh}
           />
         )}
-        {view === 'threads' && selection !== null && !waiting && (
+        {request.kind === 'threads' && selection !== null && !waiting && (
+          // Kept mounted under the identity step: the write that waits on it still owns its text and focus.
+          <div className="erf-comment-window__threads" hidden={view === 'identity'}>
           <ThreadsView
             selection={selection}
             panelId={request.panelId}
@@ -443,58 +475,19 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
             onCopy={props.onCopyRaw}
             onOpenInSource={line => props.onOpenInSource(selection.file.filePath, line)}
             onClose={() => props.onClose()}
-            onNewComment={newComment !== null && !props.pausedText ? () => props.onNewComment?.(newComment) : undefined}
-            pausedText={props.pausedText ?? null}
+            onNewComment={newComment !== null && pause.text === null ? () => props.onNewComment?.(newComment) : undefined}
+            pausedText={pause.text}
+            unsaved={pause.unsaved}
             session={session}
             onResolveAndNext={resolveAndNext}
             leadRef={leadRef}
           />
-        )}
-        {view === 'threads' && waiting && list.status === 'error' && (
-          <div className="erf-comment-window__body">
-            {/* M7: a list that failed is said, with the way on – never an endless "Reading". */}
-            <p className="erf-comment-note" data-testid={TEST_IDS.COMMENT_WINDOW_READ_ERROR}>
-              <VisibleText text={readErrorText(request.file?.displayPath ?? COPY.thisFile)} />
-            </p>
-            <div className="erf-comment-thread__actions">
-              <DialogButton variant="secondary" onClick={props.onRefresh} testId={TEST_IDS.COMMENT_WINDOW_RETRY}>
-                {COPY.tryAgain}
-              </DialogButton>
-            </div>
           </div>
         )}
-        {view === 'threads' && waiting && list.status !== 'error' && (
-          <div className="erf-comment-window__body">
-            <p className="erf-comment-note" role="status">
-              Reading comments…
-            </p>
-          </div>
+        {view === 'threads' && waiting && (
+          <ThreadsWaiting failedFile={list.status === 'error' ? (request.file?.displayPath ?? COPY.thisFile) : null} onRetry={props.onRefresh} />
         )}
       </CommentStepsContext.Provider>
     </CommentWindowShell>
-  )
-}
-
-/** The docked window's dock for the thread shown now (C-18), memoized so placement does not re-run every render. */
-function useDock(
-  props: CommentWindowProps,
-  threadKey: string | null,
-  target: NounSource,
-  line: number,
-  noun: (target: NounSource) => string
-): CommentDock | undefined {
-  const { dock } = props
-  const name = noun(target)
-  return useMemo(
-    () =>
-      dock === undefined
-        ? undefined
-        : {
-            anchor: () => dock.anchor(threadKey),
-            ...(dock.column === undefined ? {} : { column: dock.column }),
-            ...(dock.preview === undefined ? {} : { preview: dock.preview }),
-            label: { noun: name, line }
-          },
-    [dock, threadKey, name, line]
   )
 }

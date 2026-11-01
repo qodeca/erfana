@@ -32,7 +32,7 @@
  * the host's stated reason, never silently passed.
  */
 import { afterEach, beforeEach, describe, expect, it, type TestFunction } from 'vitest'
-import type { OptionalPart, OverlayDriver, OverlayPick, OverlayTargetId } from './overlayDriver'
+import type { OptionalPart, OverlayDriver, OverlayPick, OverlayTargetId, WindowRulesDriver } from './overlayDriver'
 
 /** The longest name part a label shows before its size (design §10.2: at most 40 characters). */
 const LABEL_NAME_MAX_CHARS = 40
@@ -324,6 +324,94 @@ export function runOverlaySuite(
           expect(label.slice(cut + 1), target).toMatch(/^\d+×\d+$/)
         }
       })
+    })
+  })
+}
+
+/**
+ * The comment window's rules, one behaviour in both previews (024-FR-001,
+ * 024-FR-015, 024-FR-022; plan step 2). Every case runs with no mouse.
+ *
+ * @param name - The preview, as every case title names it.
+ * @param makeDriver - A fresh driver, nothing open. Called once per test.
+ */
+export function runWindowRulesSuite(name: string, makeDriver: () => WindowRulesDriver): void {
+  describe(`comment window rules – ${name}`, () => {
+    let d: WindowRulesDriver
+
+    beforeEach(() => {
+      d = makeDriver()
+    })
+
+    afterEach(async () => {
+      await d.dispose()
+    })
+
+    it(`024-FR-022 (${name}) WIN-01 a first Reply asks for the name, then sends itself`, async () => {
+      await d.open({ identity: 'none' })
+      await d.replyByKeys('Looks right')
+      expect(d.view()).toBe('identity')
+      expect(d.writes()).toEqual([])
+      await d.continueByKeys('Grace Hopper')
+      expect(d.view()).toBe('threads')
+      expect(d.writes()).toEqual(['reply'])
+      expect(d.replyText()).toBe('')
+      expect(d.focusInWindow()).toBe(true)
+    })
+
+    it(`024-FR-022 (${name}) WIN-02 a first Resolve asks first too, then resolves`, async () => {
+      await d.open({ identity: 'none' })
+      await d.resolveByKeys()
+      expect(d.view()).toBe('identity')
+      expect(d.writes()).toEqual([])
+      await d.continueByKeys('Grace Hopper')
+      expect(d.writes()).toEqual(['setStatus'])
+    })
+
+    it(`024-FR-022 (${name}) WIN-03 a name already in Settings still shows the notice once before a Reply`, async () => {
+      await d.open({ identity: 'notice-unseen' })
+      await d.replyByKeys('Looks right')
+      expect(d.view()).toBe('identity')
+      expect(d.writes()).toEqual([])
+    })
+
+    it(`024-FR-022 (${name}) WIN-04 Esc at the step goes back to the thread: nothing written, the text kept`, async () => {
+      await d.open({ identity: 'none' })
+      await d.replyByKeys('Looks right')
+      await d.pressEscape()
+      expect(d.view()).toBe('threads')
+      expect(d.writes()).toEqual([])
+      expect(d.replyText()).toBe('Looks right')
+      expect(d.focusInWindow()).toBe(true)
+    })
+
+    it(`024-FR-022 (${name}) WIN-05 a known reader writes straight away`, async () => {
+      await d.open({ identity: 'ready' })
+      await d.replyByKeys('Looks right')
+      expect(d.view()).toBe('threads')
+      expect(d.writes()).toEqual(['reply'])
+    })
+
+    it(`024-FR-015 (${name}) WIN-06 unsaved edits: no reply box, and the banner's Save works`, async () => {
+      await d.open({ identity: 'ready', editor: 'dirty' })
+      expect(d.replyText()).toBeNull()
+      expect(d.bannerButtons()).toEqual(['Go to tab', `Save ${d.fileName}`])
+      await d.saveFromBannerByKeys()
+      expect(d.editorSaves()).toBe(1)
+    })
+
+    it(`024-FR-015 (${name}) WIN-07 changed on disk too: Go to tab only, never a Save that overwrites`, async () => {
+      await d.open({ identity: 'ready', editor: 'conflict' })
+      expect(d.replyText()).toBeNull()
+      expect(d.bannerButtons()).toEqual(['Go to tab'])
+    })
+
+    it(`024-FR-015 (${name}) WIN-08 a refusal with no tab here says so in one sentence, with no buttons`, async () => {
+      await d.open({ identity: 'ready', refusedUnsaved: true })
+      await d.replyByKeys('Looks right')
+      expect(d.bannerButtons()).toEqual([])
+      expect(d.bannerText()).toMatch(d.seesOtherWindows ? /in another window/ : /in another tab/)
+      expect(d.replyText()).toBe('Looks right')
     })
   })
 }

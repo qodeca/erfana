@@ -273,7 +273,7 @@ export function useMarkdownComments(options: UseMarkdownCommentsOptions): Markdo
       ) : null,
     overlay: (
       <MarkdownCommentsOverlay
-        host={host}
+        host={host.window === null ? host : { ...host, window: { ...host.window, onGoToUnsaved: goToEditor } }}
         adapter={adapter}
         filePath={filePath}
         content={content}

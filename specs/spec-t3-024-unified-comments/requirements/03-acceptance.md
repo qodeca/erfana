@@ -230,11 +230,11 @@
 
 **Tests:** 024-FR-015
 
-**Given:** A Markdown file with an unsaved edit (a) in the editor of this panel, (b) in another panel, (c) in another window; and (d) a file saved by an outside tool while paused; then switched to the preview-only view.
+**Given:** A Markdown file with an unsaved edit (a) in the editor of this panel, (b) in another panel, (c) in another window (lowered 2026-11-01, see 024-FR-015); and (d) a file saved by an outside tool while paused; then switched to the preview-only view.
 
 **When:** The user tries to comment, reply and resolve; tests wait on the paused state's test id, never on time.
 
-**Then:** The band shows Save {file}, Reply, Resolve, New comment and comment mode are disabled and the count stays clickable; in (d) the conflict variant offers Go to editor; after Save {file} a comment saves normally.
+**Then:** In (a), (b) and (d) the band shows Save {file}, Reply, Resolve, New comment and comment mode are disabled and the count stays clickable; in (d) the conflict variant offers Go to editor; after Save {file} a comment saves normally. In (c) no band shows; a write is refused, and the window says so in one sentence with no dead buttons.
 
 ---
 
