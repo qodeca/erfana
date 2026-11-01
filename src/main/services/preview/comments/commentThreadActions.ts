@@ -57,7 +57,12 @@ export function createThreadActions(deps: ThreadActionDeps): ThreadActions {
     }
   }
 
-  /** The top frame's view now, in the isolated world; the page cannot answer for it. */
+  /**
+   * The top frame's view now, read by main's own script in the isolated world.
+   * The page's script cannot change what the script does, but it sets the
+   * values read – its scroll, size and hash – so they are only a note on the
+   * comment, and a bad answer is checked and replaced.
+   */
   async function readView(): Promise<CommentPickView> {
     try {
       const raw = await withTimeout(deps.contents.executeJavaScriptInIsolatedWorld(COMMENT_WORLD_ID, [{ code: READ_VIEW_SCRIPT }]), COMMENT_SCRIPT_TIMEOUT_MS, 'Preview comments: view read')

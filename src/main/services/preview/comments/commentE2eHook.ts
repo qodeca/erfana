@@ -20,7 +20,29 @@
  */
 import { app } from 'electron'
 import type { CommentLoadView } from './ElementTokenTable'
+import type { CommentFrames } from './commentFrames'
+import type { CommentReloadCoordinator } from './commentReloadCoordinator'
 import type { CommentE2ePanelState } from './commentServiceTypes'
+
+/** One view's state for the hook, from the service's own parts: counts and outcomes only. */
+export function commentE2ePanelState(
+  panel: Pick<CommentE2ePanelState, 'panelId' | 'windowId' | 'mode' | 'showIcons' | 'hidden'>,
+  stats: ReturnType<CommentReloadCoordinator['stats']>,
+  frames: Pick<CommentFrames, 'all' | 'isCommentable'>,
+  held: { readonly drafts: number; readonly keys: number }
+): CommentE2ePanelState {
+  const records = frames.all()
+  return {
+    ...panel,
+    reloads: stats.reloads,
+    echoes: stats.echoes,
+    ...(stats.lastRestore === undefined ? {} : { lastRestore: stats.lastRestore }),
+    drafts: held.drafts,
+    keys: held.keys,
+    frames: records.length,
+    commentableFrames: records.filter(record => frames.isCommentable(record)).length
+  }
+}
 
 /**
  * What one preview view contributes to the hook: its served loads

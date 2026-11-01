@@ -22,6 +22,8 @@ The preview-page preload may import **exactly one folder outside its own entry: 
 - `pinLayout.ts` – the pin constants and `placePin` (plus the `clipToViewport` and `overlaps` it runs on). The preload's `pins.ts`, `geometry.ts` and `constants.ts` now use these instead of their own copies.
 - `modeState.ts` – `reduceCommentMode`, the comment-mode state machine (`set` from the window; Esc while on leaves the mode, tells the window and keeps the key from the page; Esc while off is the page's). The preload's controller follows its steps.
 - `gesture.ts` – `classifyGesture`, the select-or-pick rule. Not wired into the preload yet: v0.23.1 picks on a drag, and the selection commit of spec 024 turns the rule on in both previews at once.
+- `pickerKeys.ts` – `pickerStepOf`, the keyboard picker's one key rule, and `movePicker`, its walk over a tree the host hands in. Main reads `pickerStepOf` too, to record the key the page acts on.
+- `pointerFollow.ts` – `pointerTakesOver`, whether a pointer move hands the picker to what is under it.
 
 This amends **ADR 0005 decision 6 only**, and only its import allow-list.
 

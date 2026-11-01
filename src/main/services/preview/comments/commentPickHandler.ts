@@ -20,6 +20,8 @@
  *   page that keeps making frames would otherwise get fresh ones), at most
  *   {@link HELLOS_PER_VIEW_PER_SECOND} hellos and
  *   {@link ANCHORS_PER_VIEW_PER_SECOND} anchor reports for the whole view;
+ * - for an element or pin pick: comments are on, and main saw the real input
+ *   behind it, spent once (`commentContextGate.ts`, security review L-1);
  * - for an element pick: comment mode is on (the page's preload asks for a
  *   menu only then, so one without it is not from the preload), the frame is
  *   commentable, the token is in the load
@@ -29,11 +31,9 @@
  *   (R3-13 L5) – a token moved onto another element is refused;
  * - for a `context` pick – the reader's right-click, Shift+F10 or Menu key
  *   outside comment mode that the page did not cancel (OD-01, K-1) – comment
- *   mode is OFF (in the mode the preload sends `menu`), main has its own
- *   evidence of the gesture (`commentContextGate.ts`, security review L-1: the
- *   real cursor at the reported point for a pointer pick, a real key press in
- *   the last second for a keyboard one), and the element checks above hold: it
- *   only ever opens a menu;
+ *   mode is OFF (in the mode the preload sends `menu`), a pointer pick has the
+ *   real cursor at the reported point as well, and the element checks above
+ *   hold: it only ever opens a menu;
  * - for a pin pick: the key is one of the frame's pins;
  * - for a keyboard-picker step that reached an element: comment mode is on,
  *   and the token passes the element pick's frame and file checks, so the
@@ -124,12 +124,16 @@ export interface PickHandlerDeps {
   readonly tokens: ElementTokenTable
   readonly now: () => number
   readonly mode: () => boolean
+  /** Comments are on for the view. */
+  readonly enabled: () => boolean
   readonly sinks: PageSignalSinks
   readonly platform?: NodeJS.Platform
   /** Where the view and the real cursor are, for a `context` pick (L-1); absent: every `context` pick is dropped. */
   readonly geometry?: ContextGateGeometry
-  /** Main's record of the menu key, for a keyboard `context` pick (L-1); absent: every such pick is dropped. */
+  /** Main's record of the picker's keys, for a keyboard pick (L-1); absent: every such pick is dropped. */
   readonly menuKey?: Pick<ContextKeyGate, 'take'>
+  /** Main's record of a press on the view, for a pointer pick (L-1); absent: every such pick is dropped. */
+  readonly pagePress?: Pick<ContextKeyGate, 'take'>
 }
 
 /** The handler: one entry per page channel. Never throws. */
@@ -243,6 +247,14 @@ export function createCommentPickHandler(deps: PickHandlerDeps): CommentPickHand
     deps.sinks.step({ say: 'showing', entry, ...(pick.added ? { added: true as const } : {}), ...(comments > 0 ? { comments } : {}) })
   }
 
+  /** L-1: spend the real input behind `pick`, or drop it – a page renderer cannot open anything at will. */
+  function spentInput(pick: CommentPick): boolean {
+    const gate = pick.via === 'keyboard' ? deps.menuKey : deps.pagePress
+    if (gate?.take(deps.now()) === true) return true
+    drop(pick.via === 'keyboard' ? 'no-menu-key' : 'no-press')
+    return false
+  }
+
   function route(frame: CommentFrameLike, pick: CommentPick): void {
     if (pick.kind === 'step') {
       if (!steps.take(deps.now())) return drop('rate-limited')
@@ -260,9 +272,11 @@ export function createCommentPickHandler(deps: PickHandlerDeps): CommentPickHand
       return
     }
     if (!picks.take(deps.now())) return drop('rate-limited')
+    if (!deps.enabled()) return drop('comments-off')
     const record = deps.frames.get(frame.frameTreeNodeId)
     if (record === undefined || !deps.frames.isCommentable(record)) return drop('not-commentable')
     if (pick.kind === 'icon') {
+      if (!spentInput(pick)) return
       const key = pick.key as string
       // A stack pin's click (C-17) names only pins main sent this frame, like its own – each once, and never itself
       // again (security review M-1: a repeated key re-ran the pin's blocks once per copy).
@@ -273,9 +287,8 @@ export function createCommentPickHandler(deps: PickHandlerDeps): CommentPickHand
     }
     // A menu or open pick comes only in comment mode; a right-click outside it only out of it (OD-01).
     if (deps.mode() !== (pick.kind !== 'context')) return drop(pick.kind === 'context' ? 'mode-on' : 'mode-off')
-    // L-1: a page renderer cannot pop Erfana's menu at will – main must have seen the gesture itself.
-    if (pick.kind === 'context' && pick.via === 'keyboard' && deps.menuKey?.take(deps.now()) !== true) return drop('no-menu-key')
     if (pick.kind === 'context' && pick.via === 'pointer' && (deps.geometry === undefined || !realContextClick(pick, deps.geometry))) return drop('cursor-elsewhere')
+    if (!spentInput(pick)) return
     elementPick(frame, record, pick)
   }
 

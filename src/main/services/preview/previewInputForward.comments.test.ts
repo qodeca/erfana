@@ -202,6 +202,46 @@ describe('K-1 main records the menu key', () => {
     expect(pressed).not.toHaveBeenCalled()
   })
 
+  describe('L-1 in comment mode the picker keys are recorded instead', () => {
+    const ENTER = keyDown({ key: 'Enter', code: 'Enter' })
+    const inMode = (state: Partial<CommentKeyState> = {}) => {
+      const pickKeyPressed = vi.fn()
+      return { ...attached({ modeOn: () => true, pickKeyPressed, ...state }), pickKeyPressed }
+    }
+
+    it.each([
+      ['Enter', ENTER],
+      ['Shift+F10', SHIFT_F10],
+      ['the Menu key', MENU_KEY]
+    ])('L-1 %s is recorded, and stays with the page', (_name, input) => {
+      const { press, pickKeyPressed, forwarded } = inMode()
+      const preventDefault = press(input)
+      expect(pickKeyPressed).toHaveBeenCalledTimes(1)
+      expect(preventDefault).not.toHaveBeenCalled()
+      expect(forwarded).toEqual([])
+    })
+
+    it.each([
+      ['a held Enter', { ...ENTER, isAutoRepeat: true }],
+      ['a release', { ...ENTER, type: 'keyUp' }],
+      ['Tab, which only moves', keyDown({ key: 'Tab', code: 'Tab' })],
+      ['a letter', keyDown({ key: 'a', code: 'KeyA' })]
+    ])('L-1 %s buys no pick', (_name, input) => {
+      const { press, pickKeyPressed } = inMode()
+      press(input)
+      expect(pickKeyPressed).not.toHaveBeenCalled()
+    })
+
+    it('L-1 Enter buys nothing outside comment mode or with comments off', () => {
+      const outside = inMode({ modeOn: () => false })
+      outside.press(ENTER)
+      expect(outside.pickKeyPressed).not.toHaveBeenCalled()
+      const off = inMode({ enabled: () => false })
+      off.press(ENTER)
+      expect(off.pickKeyPressed).not.toHaveBeenCalled()
+    })
+  })
+
   it('L-1 it is recorded only while the page could ask: comments on, comment mode off', () => {
     const off = attached({ enabled: () => false })
     off.press(SHIFT_F10)

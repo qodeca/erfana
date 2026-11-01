@@ -143,6 +143,34 @@ describe('marksStillFrameStale', () => {
   })
 })
 
+describe('L-1 the view\'s real presses', () => {
+  const watched = () => {
+    const page = makePage()
+    const pagePress = vi.fn()
+    const freshness = attachStillFrameFreshness({ contents: page.source, markStale: vi.fn(), refresh: vi.fn(), now: () => 0, pagePress })
+    return { page, pagePress, freshness }
+  }
+
+  it.each([
+    ['mouseDown', 'down'],
+    ['touchStart', 'down'],
+    ['mouseUp', 'up'],
+    ['touchEnd', 'up']
+  ])('L-1 %s is reported as %s', (type, phase) => {
+    const { page, pagePress, freshness } = watched()
+    page.input(type)
+    expect(pagePress).toHaveBeenCalledExactlyOnceWith(phase)
+    freshness.dispose()
+  })
+
+  it.each(['mouseMove', 'mouseEnter', 'mouseWheel', 'keyDown', 'contextMenu', 'constructor'])('L-1 %s is no press', type => {
+    const { page, pagePress, freshness } = watched()
+    page.input(type)
+    expect(pagePress).not.toHaveBeenCalled()
+    freshness.dispose()
+  })
+})
+
 describe('attachStillFrameFreshness', () => {
   it.each(['mouseWheel', 'keyDown', 'mouseDown', 'touchStart'])(
     '%s marks the frame stale, and a pause refreshes it',

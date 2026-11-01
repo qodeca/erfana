@@ -7755,7 +7755,7 @@
       "quote": "Adds only the toggle shortcut (typed key `m` + Ctrl+Alt / Cmd+Option; AltGr not captured)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/previewInputForward.ts:92",
+      "source": "src/main/services/preview/previewInputForward.ts:93",
       "match": "Ctrl+Alt+M, Cmd+Option+M on macOS"
     },
     {
@@ -9410,7 +9410,7 @@
       "quote": "which `previewStillFrameFreshness.ts` counts as stale-making input",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/previewStillFrameFreshness.ts:62",
+      "source": "src/main/services/preview/previewStillFrameFreshness.ts:63",
       "match": "  'mouseDown',"
     },
     {
@@ -24851,7 +24851,7 @@
       "quote": "`PREVIEW_FORWARDED_SHORTCUTS` in `src/main/services/preview/previewInputForward.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/previewInputForward.ts:63",
+      "source": "src/main/services/preview/previewInputForward.ts:64",
       "match": "export const PREVIEW_FORWARDED_SHORTCUTS = Object.freeze(["
     },
     {
@@ -24932,7 +24932,7 @@
       "quote": "**Zoom is not forwarded.**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/previewInputForward.ts:67",
+      "source": "src/main/services/preview/previewInputForward.ts:68",
       "match": "// NO zoom keys. Cmd/Ctrl +/-/0 reach a focused preview through the View menu"
     },
     {
@@ -25278,7 +25278,7 @@
       "quote": "come from one table for both processes, `src/shared/previewNavKeys.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/previewInputForward.ts:179",
+      "source": "src/main/services/preview/previewInputForward.ts:182",
       "match": "const navAction = matchPreviewNavKey(input, platform)"
     },
     {
@@ -25318,7 +25318,7 @@
       "quote": "main matches it in the page's `before-input-event` (`previewInputForward.ts`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/previewInputForward.ts:202",
+      "source": "src/main/services/preview/previewInputForward.ts:205",
       "match": "return matchCommentModeKey(input, platform === 'darwin')"
     },
     {
@@ -34936,7 +34936,7 @@
       "quote": "press <kbd>⌘S</kbd> / <kbd>Ctrl+S</kbd> while the HTML preview is active",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/previewInputForward.ts:65",
+      "source": "src/main/services/preview/previewInputForward.ts:66",
       "match": "{ key: 's', accel: true }",
       "note": "Cmd/Ctrl+S is one of the accelerators forwarded out of the focused preview page to the host."
     },
@@ -49192,7 +49192,7 @@
       "quote": "publishChanged fires only when counts change (PreviewCommentService.ts:481-488)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/PreviewCommentService.ts:489",
+      "source": "src/main/services/preview/comments/PreviewCommentService.ts:494",
       "match": "if (text === this.lastChanged && !force) return"
     },
     {
@@ -51700,7 +51700,7 @@
       "quote": "Enumerated keyboard forwarding – `f` / `s` / `w` / `Escape`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/previewInputForward.ts:78",
+      "source": "src/main/services/preview/previewInputForward.ts:79",
       "match": "{ key: 'Escape', accel: false },"
     },
     {
@@ -55032,7 +55032,7 @@
       "quote": "within 4 DIP of the reported point",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentContextGate.ts:33",
+      "source": "src/main/services/preview/comments/commentContextGate.ts:40",
       "match": "export const CONTEXT_CURSOR_SLACK_DIP = 4"
     },
     {

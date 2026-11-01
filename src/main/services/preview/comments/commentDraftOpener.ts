@@ -123,7 +123,7 @@ export function openThreadsOn(record: Pick<FrameRecord, 'pins'>, pick: CommentPi
 export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpener {
   const { geometry } = deps
 
-  function pointOf(pick: CommentPick, offset: FrameOffset | null): { x: number; y: number } {
+  function pointOf(pick: CommentPick, offset: FrameOffset | null): { x: number; y: number } | null {
     return menuPoint({
       pick,
       frameOffset: offset,
@@ -180,12 +180,13 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
             platform: deps.platform
           })
     const offset = await painted
-    if (!stillCurrent(record, file)) return
+    const point = pointOf(pick, offset)
+    if (!stillCurrent(record, file) || point === null) return
     deps.emit({
       panelId: deps.panelId,
       // A right-click outside comment mode (OD-01) opens the same menu.
       kind: pick.kind === 'open' ? 'open' : 'menu',
-      point: pointOf(pick, offset),
+      point,
       ...display(file, frame),
       ...minted(built),
       // C-19: a menu with no draft names why, so its items stay, disabled, with their reason line.
@@ -268,11 +269,12 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
     const built = await pinOf(frame, file, entry, pin, pick, stackedEntries(record, stacked))
     const { blocks } = built
     const offset = await painted
-    if (!stillCurrent(record, file)) return
+    const point = pointOf(pick, offset)
+    if (!stillCurrent(record, file) || point === null) return
     deps.emit({
       panelId: deps.panelId,
       kind: 'icon',
-      point: pointOf(pick, offset),
+      point,
       ...display(file, frame),
       threadKeys: [pin, ...stacked].flatMap(p => p.threadIds).map(threadId => deps.keys.keyFor(deps.binding, { kind: 'thread', realPath, threadId })),
       blockKeys: blocks.map(({ rawHash, start }) => deps.keys.keyFor(deps.binding, { kind: 'block', realPath, rawHash, start })),
@@ -290,7 +292,8 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
     const built = await buildDraft({ realRoot: deps.realRoot, file, entry, pick, frame: frame.parent !== null, pageRealPath: deps.currentPage(), jobs: deps.jobs, platform: deps.platform })
     if (!built.ok) return { ok: false, code: built.code ?? ErrorCode.COMMENT_TARGET_MOVED }
     if (!stillCurrent(record, file)) return { ok: false, code: ErrorCode.COMMENT_TARGET_MOVED }
-    deps.emit({ panelId: deps.panelId, kind: 'open', point: pointOf(pick, null), ...display(file, frame), ...minted(built), ...wordsOf(built, pick) })
+    // Not the page's pick: a view hidden behind the window has an empty rectangle, and this one still opens.
+    deps.emit({ panelId: deps.panelId, kind: 'open', point: pointOf(pick, null) ?? point, ...display(file, frame), ...minted(built), ...wordsOf(built, pick) })
     return { ok: true }
   }
 

@@ -326,7 +326,8 @@ export function wirePreviewLiveView(owner: PreviewLiveWiringOwner): PreviewLiveP
         comments: {
           enabled: () => late.comments?.acceptsToggle() ?? false,
           modeOn: () => late.comments?.isModeOn() ?? false,
-          menuKeyPressed: () => late.comments?.menuKeyPressed()
+          menuKeyPressed: () => late.comments?.menuKeyPressed(),
+          pickKeyPressed: () => late.comments?.menuKeyPressed()
         }
       },
       {
@@ -418,7 +419,8 @@ export function wirePreviewLiveView(owner: PreviewLiveWiringOwner): PreviewLiveP
     contents: wc,
     markStale: () => deps.stillFrameCache.markStale?.(panelId),
     refresh: () => visibility.captureWhileVisible(),
-    now: () => deps.now()
+    now: () => deps.now(),
+    pagePress: (phase) => late.comments?.pagePressed(phase)
   })
   // Last: it never throws (a failure leaves the view without comments).
   const comments = createPreviewLiveComments(params, { page, pipeline, bounds, visibility })

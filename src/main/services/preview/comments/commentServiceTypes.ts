@@ -8,6 +8,7 @@
  * every live view; a view's service registers itself under its panel and
  * window, and leaves when the view goes.
  */
+import { ErrorCode } from '../../../../shared/errors'
 import type {
   CommentAck,
   CommentAnchorStatus,
@@ -23,6 +24,9 @@ import type {
 import type { HtmlFileJobRunner } from './htmlCommentJobs'
 import type { CommentIdentity } from '../../comments/CommentWriter'
 import type { CommentUnsavedSources } from '../../comments/commentUnsavedSources'
+
+/** What a window hears once comments are off: its keys and drafts are no longer good here. */
+export const COMMENTS_OFF = { ok: false, code: ErrorCode.COMMENT_KEY_INVALID } as const
 
 /** Main → renderer comment events, each to the window that owns the view only. */
 export interface PreviewCommentEmitters {

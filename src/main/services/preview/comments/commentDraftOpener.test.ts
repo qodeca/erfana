@@ -86,6 +86,22 @@ function tokensOfTag(doc: InstrumentedDocument, tag: string): string[] {
 const DRAFT_KEY = /^[0-9a-f]{32}$/
 
 describe('commentDraftOpener', () => {
+  it.each([
+    ['no view rectangle', null],
+    ['an empty one', { x: 0, y: 0, width: 0, height: 0 }]
+  ])('C a keyboard pick with %s opens nothing and mints nothing; the window\'s own New comment still opens', async (_name, rect) => {
+    const s = await setup(commentedPage().text)
+    const opener = createCommentDraftOpener({ ...s.deps, geometry: { ...s.deps.geometry, viewRect: () => rect } })
+    const token = tokenOfTag(s.load.doc, 'p')
+    const entry = s.tokens.lookup(s.record.loadId!, token)!
+    await opener.element(s.top, s.record, entry, pick({ via: 'keyboard', token, tag: 'p', point: { x: 1, y: 2 } }))
+    expect(s.emitted).toHaveLength(0)
+    expect(s.keys.size.drafts).toBe(0)
+    // A hidden view has an empty rectangle while the window stands over it, and this command is not the page's.
+    expect(await opener.onThread(s.top, s.record, entry, undefined, VIEW)).toEqual({ ok: true })
+    expect(s.emitted).toHaveLength(1)
+  })
+
   it('opens a draft with its token, its element key and the file\'s keys – and no unsaved flag (L3)', async () => {
     const s = await setup(commentedPage().text)
     const token = tokenOfTag(s.load.doc, 'p')

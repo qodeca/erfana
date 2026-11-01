@@ -145,10 +145,17 @@ export async function commentServiceFixture(pageHtml: string, overrides: Partial
     await flush()
     await settle()
   }
-  const pick = async (frame: FakeFrame, payload: unknown): Promise<void> => {
+  /** A pick with nothing behind it: what a compromised renderer can send at any moment. */
+  const forgedPick = async (frame: FakeFrame, payload: unknown): Promise<void> => {
     view.ipc.get(PreviewCommentPageChannels.PICK)?.(eventFrom(frame), payload)
     for (let i = 0; i < 6; i++) await flush()
     await settle()
+  }
+  /** A pick the reader really made: main saw the press and the key first. */
+  const pick = async (frame: FakeFrame, payload: unknown): Promise<void> => {
+    service.pagePressed('down')
+    service.menuKeyPressed()
+    await forgedPick(frame, payload)
   }
   const anchors = (frame: FakeFrame, payload: unknown): void => {
     view.ipc.get(PreviewCommentPageChannels.ANCHORS)?.(eventFrom(frame), payload)
@@ -176,6 +183,7 @@ export async function commentServiceFixture(pageHtml: string, overrides: Partial
     navigate,
     hello,
     pick,
+    forgedPick,
     anchors,
     loadPage,
     setEnabled: (on: boolean) => (enabled = on),

@@ -13,7 +13,9 @@
  *   `(view.x + (offset + point) × page zoom) / host zoom`.
  *
  * Either is clamped to the panel, so a forged or stale value only misplaces
- * the menu inside the preview it belongs to.
+ * the menu inside the preview it belongs to. A keyboard pick with no view
+ * rectangle, or an empty one, has no panel to clamp to and no place on screen:
+ * it has no point, and the opener drops it.
  */
 import type { PreviewBounds } from '../../../../shared/ipc/preview-types'
 import type { CommentPick, CommentPoint } from '../../../../shared/ipc/preview-comment-schema'
@@ -44,10 +46,12 @@ function clamp(value: number, low: number, high: number): number {
   return Math.min(Math.max(value, low), Math.max(low, high))
 }
 
-/** The menu's point in host-window CSS pixels, clamped to the panel. */
-export function menuPoint(input: MenuPointInput): CommentPoint {
+/** The menu's point in host-window CSS pixels, clamped to the panel; `null` for a keyboard pick with no panel on screen. */
+export function menuPoint(input: MenuPointInput): CommentPoint | null {
   const hostZoom = positive(input.hostZoom)
   const pageZoom = positive(input.pageZoom)
+  const rect = input.viewRect
+  const onScreen = rect !== null && rect.width > 0 && rect.height > 0
   let x: number
   let y: number
   if (input.pick.via === 'pointer') {
@@ -56,14 +60,13 @@ export function menuPoint(input: MenuPointInput): CommentPoint {
     x = (screen.x - input.contentBounds.x) / hostZoom
     y = (screen.y - input.contentBounds.y) / hostZoom
   } else {
+    if (!onScreen) return null
     const point = input.pick.point ?? { x: 0, y: 0 }
     const offset = input.frameOffset ?? { x: 0, y: 0 }
-    const rect = input.viewRect ?? { x: 0, y: 0, width: 0, height: 0 }
     x = (rect.x + (offset.x + point.x) * pageZoom) / hostZoom
     y = (rect.y + (offset.y + point.y) * pageZoom) / hostZoom
   }
-  const rect = input.viewRect
-  if (rect !== null && rect.width > 0 && rect.height > 0) {
+  if (onScreen) {
     x = clamp(x, rect.x / hostZoom, (rect.x + rect.width) / hostZoom - 1)
     y = clamp(y, rect.y / hostZoom, (rect.y + rect.height) / hostZoom - 1)
   }

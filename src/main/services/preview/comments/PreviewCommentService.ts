@@ -32,7 +32,7 @@ import type { PreviewCommentServing } from './commentInstrumentation'
 import type { HtmlFileJobRunner } from './htmlCommentJobs'
 import { sharedHtmlCommentParseClient } from './htmlCommentParseClient'
 import { CommentWriter, type CommentWriterDeps } from '../../comments/CommentWriter'
-import { registerCommentE2eSource } from './commentE2eHook'
+import { commentE2ePanelState, registerCommentE2eSource } from './commentE2eHook'
 import { ContextKeyGate } from './commentContextGate'
 import { CommentFrames, type CommentFrameLike, type FrameRecord } from './commentFrames'
 import { createCommentFrameBroadcaster, type CommentFrameBroadcaster, type CommentStateExtras } from './commentFrameBroadcaster'
@@ -50,7 +50,7 @@ import { createCommentSaveFlow, type LateSettle } from '../../comments/commentSa
 import { createThreadActions, type ThreadActions } from './commentThreadActions'
 import { attachCommentServiceEvents, type CommentEventContents, type FrameFromIds } from './commentServiceEvents'
 import { waitForPaint, type FreshStillDeps } from './commentStillCapture'
-import type { CommentE2ePanelState, CommentServiceApi, PreviewCommentShared } from './commentServiceTypes'
+import { COMMENTS_OFF, type CommentE2ePanelState, type CommentServiceApi, type PreviewCommentShared } from './commentServiceTypes'
 import { createFrameFileMap } from './frameFileMap'
 
 /** The slice of the view's `webContents` comments use. */
@@ -106,6 +106,7 @@ export class PreviewCommentService implements CommentServiceApi {
   private readonly frames: CommentFrames
   private readonly keys = new CommentDraftKeys()
   private readonly menuKey = new ContextKeyGate()
+  private readonly pagePress = new ContextKeyGate()
   private readonly status: CommentPanelStatus
   private readonly broadcaster: CommentFrameBroadcaster
   private readonly coordinator: CommentReloadCoordinator
@@ -157,9 +158,11 @@ export class PreviewCommentService implements CommentServiceApi {
       tokens,
       now: deps.now,
       mode: () => this.mode,
+      enabled: () => this.enabled(),
       platform: deps.platform,
       geometry: { ...deps.geometry, cursor: deps.shared.cursor },
       menuKey: this.menuKey,
+      pagePress: this.pagePress,
       sinks: {
         hello: frame => this.guard(this.onHello(frame)),
         exit: () => this.changeMode(false, 'escape'),
@@ -179,6 +182,7 @@ export class PreviewCommentService implements CommentServiceApi {
           anchors: (event, payload) => this.signals.anchors(event as PageSignalEvent, payload),
           navigated: (frame, url, isMainFrame) => {
             this.frames.navigated(frame.frameTreeNodeId, url, isMainFrame)
+            if (isMainFrame) this.forgetInput()
             this.broadcaster.broadcastSoon()
           },
           frameCreated: () => this.broadcaster.broadcastSoon()
@@ -208,9 +212,16 @@ export class PreviewCommentService implements CommentServiceApi {
     return this.enabled()
   }
 
-  /** A real Shift+F10 or Menu key reached the page outside comment mode: a keyboard menu may follow (L-1). */
+  /** A real Shift+F10 or Menu key, or Enter in comment mode, reached the page: one keyboard pick may follow (L-1). */
   menuKeyPressed(): void {
     this.menuKey.press(this.deps.now())
+  }
+
+  /** A real press or release reached the page: one pointer pick may follow (L-1). Nothing is kept with comments off. */
+  pagePressed(phase: 'down' | 'up'): void {
+    if (!this.enabled()) return
+    if (phase === 'down') this.pagePress.press(this.deps.now())
+    else this.pagePress.release(this.deps.now())
   }
 
   /** The comment-mode shortcut reached the page (Ctrl+Alt+M / Cmd+Option+M). */
@@ -236,23 +247,24 @@ export class PreviewCommentService implements CommentServiceApi {
 
   /** "Show in preview" (`preview:commentCommand`): scroll the thread's pin into view in its frame. */
   reveal(threadKey: string): CommentAck {
-    return this.threads.reveal(threadKey)
+    return this.enabled() ? this.threads.reveal(threadKey) : COMMENTS_OFF
   }
 
   /** "New comment" in a window with no pin's draft (`preview:commentCommand`, C-22). */
   newOnThread(threadKey: string): Promise<CommentAck> {
-    return this.threads.newComment(threadKey)
+    return this.enabled() ? this.threads.newComment(threadKey) : Promise.resolve(COMMENTS_OFF)
   }
 
   /** Keep an open new-comment window's draft alive (`preview:commentCommand` `keep-draft`, C-14.2). */
   keepDraft(draftToken: string): CommentAck {
+    if (!this.enabled()) return COMMENTS_OFF
     const touched = this.keys.touchDraft(draftToken, this.binding)
     return touched.ok ? { ok: true } : { ok: false, code: touched.code }
   }
 
   /** One write (`preview:commentSave`). */
   save(request: CommentSaveRequest): Promise<CommentSaveResult> {
-    return this.keys.withWords(request, this.saveFlow)
+    return this.enabled() ? this.keys.withWords(request, this.saveFlow) : Promise.resolve(COMMENTS_OFF)
   }
 
   /**
@@ -298,22 +310,8 @@ export class PreviewCommentService implements CommentServiceApi {
   }
 
   e2eState(): CommentE2ePanelState {
-    const stats = this.coordinator.stats()
-    const records = this.frames.all()
-    return {
-      panelId: this.panelId,
-      windowId: this.windowId,
-      mode: this.mode,
-      showIcons: this.showIcons,
-      hidden: this.hidden,
-      reloads: stats.reloads,
-      echoes: stats.echoes,
-      ...(stats.lastRestore === undefined ? {} : { lastRestore: stats.lastRestore }),
-      drafts: this.keys.size.drafts,
-      keys: this.keys.size.keys,
-      frames: records.length,
-      commentableFrames: records.filter(record => this.frames.isCommentable(record)).length
-    }
+    const { panelId, windowId, mode, showIcons, hidden } = this
+    return commentE2ePanelState({ panelId, windowId, mode, showIcons, hidden }, this.coordinator.stats(), this.frames, this.keys.size)
   }
 
   /** The view is going: every listener, draft, key and record with it. */
@@ -394,8 +392,15 @@ export class PreviewCommentService implements CommentServiceApi {
     }
   }
 
+  /** A press made on the old page or in the old mode buys nothing in the new one. */
+  private forgetInput(): void {
+    this.menuKey.clear()
+    this.pagePress.clear()
+  }
+
   private applyMode(on: boolean): void {
     const turnedOn = on && !this.mode
+    if (on !== this.mode) this.forgetInput()
     this.mode = on
     this.deps.serving.setCommentMode(on)
     this.broadcaster.broadcast()
