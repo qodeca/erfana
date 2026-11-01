@@ -15,8 +15,9 @@
  *   so a page cannot raise the button by bait; a press on a page control
  *   earns nothing either.
  * - **A click on an underline** opens its thread by the ordinary `icon` pick,
- *   only when it was a plain click on plain text and the page let it pass: not
- *   cancelled, and nothing in the page changed during the click's own turn.
+ *   only when it was a plain click on plain text, on the marked element itself
+ *   (a page part drawn over the mark keeps its click), and the page let it pass:
+ *   not cancelled, and nothing in the page changed during the click's own turn.
  *   Then it waits {@link UNDERLINE_CLICK_WAIT_MS} for a second press, which is
  *   a double-click selecting a word. A page handler that changes nothing at
  *   once cannot be told from no handler, so both act: a stated limit (D-09).
@@ -45,8 +46,8 @@ export interface OutsideModeDeps {
   readonly tokens: TokenRegistry
   /** The page's selected words, if any. */
   readonly words: () => PageWords | null
-  /** The comment mark drawn at a point. */
-  readonly markAt: (point: Point) => MarkPlacement | null
+  /** The comment mark drawn at a point whose element is on an event's `path`. */
+  readonly markAt: (point: Point, path: readonly EventTarget[]) => MarkPlacement | null
   /** Counts the page's changes. */
   readonly pageVersion: () => number
   /** The click is the reader's: open the mark's thread. */
@@ -108,15 +109,17 @@ export class OutsideMode {
     if (event.button !== 0 || event.detail !== 1 || down === null || this.onControl || hasModifier(event) || !deps.open()) return
     const at = pointOf(event)
     if (selectsOutsideMode({ down, up: at, clicks: event.detail })) return
-    const mark = deps.markAt(at)
-    if (mark === null || onPageControl(event.composedPath(), deps.win)) return
+    // Empty once the dispatch ends, so the wait below keeps its own copy.
+    const path = event.composedPath()
+    const mark = deps.markAt(at, path)
+    if (mark === null || onPageControl(path, deps.win)) return
     const version = deps.pageVersion()
     this.wait = setTimeout(() => {
       this.wait = null
       if (event.defaultPrevented || deps.pageVersion() !== version) return
       this.wait = setTimeout(() => {
         this.wait = null
-        if (this.stillPlain(mark, at)) deps.openMark(mark, event)
+        if (this.stillPlain(mark, at, path)) deps.openMark(mark, event)
       }, UNDERLINE_CLICK_WAIT_MS)
     }, 0)
   }
@@ -128,10 +131,10 @@ export class OutsideMode {
   }
 
   /** After the wait: still outside the mode, no words selected, the same mark under the click. */
-  private stillPlain(mark: MarkPlacement, at: Point): boolean {
+  private stillPlain(mark: MarkPlacement, at: Point, path: readonly EventTarget[]): boolean {
     const selection = this.deps.win.getSelection()
     const noWords = selection === null || selection.isCollapsed
-    return noWords && this.deps.open() && this.deps.markAt(at)?.markKey === mark.markKey
+    return noWords && this.deps.open() && this.deps.markAt(at, path)?.markKey === mark.markKey
   }
 
   private cancelWait(): void {

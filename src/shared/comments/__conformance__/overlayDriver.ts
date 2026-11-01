@@ -321,6 +321,8 @@ export interface WindowRulesSetup {
   readonly full?: boolean
   /** Where the window opened: on its target in the preview (icon, underline, pick), or anywhere else (a drawer row, a step key). */
   readonly opened?: 'target' | 'elsewhere'
+  /** The window came from a click in the page with comment mode off: one more key must not write (S-03 – S-05). */
+  readonly outsideMode?: boolean
 }
 
 /** One thread of the fixture: plain open, Changed (S-03), or Not found (S-05). */

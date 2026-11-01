@@ -6,6 +6,12 @@
  * Comment button is never drawn over it. A drawn control with neither a role
  * nor a pointer cursor cannot be seen from here: a stated limit
  * (docs/designs/comments/spike-outside-mode.md § Risks).
+ *
+ * The controls inside a shadow tree are hidden from these selectors, so a custom
+ * element and a shadow host each count as a control whole. That also answers
+ * what `PageWatch` cannot see: a mutation observer stops at a shadow root, so a
+ * click there that changes only that tree would pass for no reaction. A plain
+ * element with a closed shadow root shows no sign of one here: a stated limit.
  */
 import type { Box } from './geometry'
 
@@ -33,6 +39,17 @@ const COVERED_CONTROLS = `${PAGE_CONTROLS}, iframe, embed, object`
 /** How far apart the button's box is sampled: less than the smallest control a pointer can hit. */
 const SAMPLE_STEP_PX = 8
 
+/** Whether `element` holds a part this frame's selectors cannot see into. */
+function hidesItsParts(element: Element): boolean {
+  return element.localName.includes('-') || element.shadowRoot !== null
+}
+
+/** Whether `element`, or an element around it in its tree, {@link hidesItsParts}. */
+function insideHiddenParts(element: Element): boolean {
+  for (let at: Element | null = element; at !== null; at = at.parentElement) if (hidesItsParts(at)) return true
+  return false
+}
+
 /** Whether `element` shows a pointer cursor, the mark of a clickable part with no role. */
 function hasPointerCursor(element: Element, win: Window): boolean {
   return win.getComputedStyle(element).cursor === 'pointer'
@@ -47,7 +64,7 @@ function hasPointerCursor(element: Element, win: Window): boolean {
  */
 export function onPageControl(path: readonly EventTarget[], win: Window): boolean {
   const elements = path.filter((target): target is Element => target instanceof Element)
-  if (elements.some(element => element.matches(PAGE_CONTROLS))) return true
+  if (elements.some(element => element.matches(PAGE_CONTROLS) || hidesItsParts(element))) return true
   return elements.length > 0 && hasPointerCursor(elements[0], win)
 }
 
@@ -74,6 +91,6 @@ export function coversPageControl(doc: Document, win: Window, box: Box, isOverla
   if (typeof doc.elementsFromPoint !== 'function') return false
   return samplesOf(box).some(({ x, y }) => {
     const under = doc.elementsFromPoint(x, y).find(element => !isOverlay(element))
-    return under !== undefined && (under.closest(COVERED_CONTROLS) !== null || hasPointerCursor(under, win))
+    return under !== undefined && (under.closest(COVERED_CONTROLS) !== null || insideHiddenParts(under) || hasPointerCursor(under, win))
   })
 }

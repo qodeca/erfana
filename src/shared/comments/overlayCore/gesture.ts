@@ -9,9 +9,9 @@
  * Shared overlay core – pure, no imports, no globals, no DOM (see
  * `pinLayout.ts` and docs/adrs/0006-overlay-core-in-the-sealed-preload.md).
  *
- * Not wired yet: in v0.23.1 a drag in comment mode picks, and the preload
- * keeps that until spec 024's selection commit turns this rule on in both
- * previews at once.
+ * Wired in both previews: {@link classifyGesture} in comment mode (the preload's
+ * `selectionButton.ts`, the Markdown host), {@link selectsOutsideMode} in the
+ * HTML Preview outside it (`outsideMode.ts`).
  */
 
 /** Pointer travel, in CSS pixels, from which a press-and-release is a drag that selects. */

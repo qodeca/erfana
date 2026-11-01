@@ -182,6 +182,38 @@ describe('Markdown Preview comments – comments-v2', () => {
       expect(await screen.findByRole('dialog', { name: 'Comment on paragraph' })).toBeVisible()
     })
 
+    describe('S-03 (Markdown) a Changed comment opened from its words', () => {
+      const changed = { state: 'changed' as const, was: 'ten customers', now: 'nine customers' }
+
+      beforeEach(() => {
+        api.list.mockResolvedValue({ ok: true, file: fileView([thread('t1', 9, 'li'), thread('w1', 6, 'p', { change: changed })]), placements: [ON_ITEM, WORDS] })
+      })
+
+      async function readyChanged(): Promise<void> {
+        render(<Harness content={DOC} />)
+        await waitFor(() => expect(screen.getByTestId(TEST_IDS.COMMENT_TOOL_LIST)).toHaveAccessibleName(/^2 comments/))
+      }
+
+      it('S-03 (Markdown) outside comment mode it opens on the title, never on Resolve', async () => {
+        await readyChanged()
+        caretAt(paragraph(), paragraph().textContent!.indexOf('customers'))
+        plainClick(paragraph())
+        const dialog = await screen.findByRole('dialog', { name: 'Comment on paragraph' })
+        await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true))
+        expect(screen.getByTestId(TEST_IDS.COMMENT_WINDOW_TITLE)).toHaveFocus()
+      })
+
+      it('S-03 (Markdown) in comment mode Resolve and next leads, as the state table says', async () => {
+        const user = userEvent.setup()
+        await readyChanged()
+        await user.click(modeTool())
+        caretAt(paragraph(), paragraph().textContent!.indexOf('customers'))
+        plainClick(paragraph())
+        await screen.findByRole('dialog', { name: 'Comment on paragraph' })
+        await waitFor(() => expect(screen.getByTestId(TEST_IDS.COMMENT_RESOLVE_NEXT)).toHaveFocus())
+      })
+    })
+
     it('C-17 (Markdown) a click beside the words, or a drag over them, opens nothing', async () => {
       await ready()
       caretAt(paragraph(), 2)

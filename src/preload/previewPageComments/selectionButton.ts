@@ -14,6 +14,10 @@
  * on every render, so the button follows a scroll, leaves with the selection
  * and comes back with it. It never changes the selection.
  *
+ * Outside comment mode the words are taken as the release starts, before the
+ * page's own `mouseup` turn, and dropped if the selection differs by the time
+ * the button would show: a page cannot swap in words the reader never selected.
+ *
  * A page script can clear the selection with no input and no page change, and
  * `selectionchange` is a listener this sealed preload does not add (ADR 0006,
  * PIN-S): while the words are held, a timer asks for a redraw.
@@ -53,6 +57,12 @@ export function selectionInView(win: Window, viewport: Viewport): boolean {
   return lastLineInView(linesOf(win), viewOf(viewport)) !== null
 }
 
+/** Whether `now` is the selection `held` was taken from: the same words, in the same place. */
+function sameWords(held: PageWords, now: PageWords | null): boolean {
+  const [was, is] = [held.sel, now?.sel]
+  return now !== null && now.target === held.target && was?.exact === is?.exact && was?.prefix === is?.prefix && was?.suffix === is?.suffix
+}
+
 /** The selection's Comment button. */
 export class SelectionButton {
   private words: PageWords | null = null
@@ -62,6 +72,8 @@ export class SelectionButton {
   private dueAt = Number.NEGATIVE_INFINITY
   private timer: ReturnType<typeof setTimeout> | null = null
   private reading: ReturnType<typeof setTimeout> | null = null
+  /** Reads the selection again when the button would first show; `null`: nothing left to check. */
+  private recheck: (() => PageWords | null) | null = null
 
   /**
    * @param win - The frame's window.
@@ -82,34 +94,40 @@ export class SelectionButton {
   /** Show the button for `words` at once (nothing: hide it). */
   show(words: PageWords | null): void {
     this.words = words
+    this.recheck = null
     this.dueAt = Number.NEGATIVE_INFINITY
   }
 
   hide(): void {
     this.words = null
+    this.recheck = null
   }
 
   /** The primary button went down on the page at `at`: a new gesture starts, and the button goes. */
   press(at: Point): void {
     this.downAt = at
-    this.words = null
+    this.hide()
     if (this.reading !== null) clearTimeout(this.reading)
     this.reading = null
   }
 
   /**
-   * A real selecting gesture ended outside comment mode (`outsideMode.ts`).
-   * The words are read a task later, so the page has had its turn at the
-   * release; the button's wait runs from now.
+   * A real selecting gesture ended outside comment mode (`outsideMode.ts`), and
+   * the page has not had its turn at the release yet. The words are taken now
+   * and held only if a task later, the page's turn over, they are still the
+   * selection; {@link box} asks once more. The button's wait runs from now.
    *
    * @param read - The words main could keep, if any.
    */
   selected(read: () => PageWords | null): void {
+    const held = read()
+    if (held === null) return
     const dueAt = this.now() + SELECTION_BUTTON_DELAY_MS
     this.reading = setTimeout(() => {
       this.reading = null
-      this.words = read()
-      if (this.words === null) return
+      if (!sameWords(held, read())) return
+      this.words = held
+      this.recheck = read
       this.dueAt = dueAt
       this.watch()
     }, 0)
@@ -160,6 +178,7 @@ export class SelectionButton {
     this.watch()
     const last = lastLineInView(rectsOf(selection.getRangeAt(0)), viewOf(viewport))
     if (last === null || this.now() < this.dueAt) return null
+    if (this.recheck !== null && !this.stillHeld(this.recheck)) return null
     const width = COMMENT_BUTTON_WIDTH_PX
     const left = Math.max(0, Math.min(last.right - width, viewport.width - width))
     if (clear !== undefined) {
@@ -175,6 +194,14 @@ export class SelectionButton {
     if (this.timer !== null) clearTimeout(this.timer)
     if (this.reading !== null) clearTimeout(this.reading)
     this.timer = this.reading = null
+  }
+
+  /** The check before the first show: the words stay, or they go. */
+  private stillHeld(read: () => PageWords | null): boolean {
+    this.recheck = null
+    if (this.words !== null && sameWords(this.words, read())) return true
+    this.words = null
+    return false
   }
 
   /** One redraw after the wait; `box` asks again for as long as the words are held. */

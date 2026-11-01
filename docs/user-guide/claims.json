@@ -7645,7 +7645,7 @@
       "quote": "10 per second per view in main",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentPickHandler.ts:68",
+      "source": "src/main/services/preview/comments/commentPickHandler.ts:70",
       "match": "export const MAIN_PICKS_PER_SECOND = 10"
     },
     {
@@ -48746,7 +48746,7 @@
       "quote": "per view: 64 hellos and 128 anchor reports a second",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentPickHandler.ts:85",
+      "source": "src/main/services/preview/comments/commentPickHandler.ts:87",
       "match": "ANCHORS_PER_VIEW_PER_SECOND = 128"
     },
     {
@@ -48856,7 +48856,7 @@
       "quote": "New comment and Close are one group (`.erf-comment-window__foot-end`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/ThreadsView.tsx:360",
+      "source": "src/renderer/src/components/Comments/ThreadsView.tsx:361",
       "match": "erf-comment-window__foot-end"
     },
     {
@@ -51821,7 +51821,7 @@
       "quote": "Per frame: picks 5 a second, hellos 5, anchor reports 8.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentPickHandler.ts:81",
+      "source": "src/main/services/preview/comments/commentPickHandler.ts:83",
       "match": "export const ANCHORS_PER_FRAME_PER_SECOND = 8"
     },
     {
@@ -51831,7 +51831,7 @@
       "quote": "**64 hellos and 128 anchor reports a second**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentPickHandler.ts:85",
+      "source": "src/main/services/preview/comments/commentPickHandler.ts:87",
       "match": "export const ANCHORS_PER_VIEW_PER_SECOND = 128"
     },
     {
@@ -53487,7 +53487,7 @@
       "quote": "comment mode's crosshair cursor is a constructable sheet in `document.adoptedStyleSheets`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/scheduling.ts:183",
+      "source": "src/preload/previewPageComments/scheduling.ts:184",
       "match": "doc.adoptedStyleSheets = [...doc.adoptedStyleSheets, sheet]"
     },
     {

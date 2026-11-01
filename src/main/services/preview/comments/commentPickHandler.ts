@@ -26,7 +26,9 @@
  *   menu only then, so one without it is not from the preload) – or, for an
  *   `open` pick, it is the Comment button over selected words outside the mode
  *   (D-10): a pointer pick with a token and words, with the real cursor at the
- *   reported point as well as the real press – and the frame is
+ *   reported point as well as the real press; the page's `sel` only says which
+ *   words, so the opener opens nothing when they are not in the file on disk
+ *   (`commentWordsCore.ts`) – and the frame is
  *   commentable, the token is in the load
  *   bound to THAT frame (SEC-26), the load is of the frame's own file as main
  *   recorded it at the frame's last navigation (SEC-09), and the tag the page
@@ -116,8 +118,11 @@ export interface PageSignalSinks {
   /** The keyboard picker moved, in comment mode: the window's live region says it. */
   step(step: PickerStepEvent): void
   icon(frame: CommentFrameLike, record: FrameRecord, pinKey: string, pick: CommentPick, word?: number): void
-  /** `entry` absent: the element has no tokened ancestor – its menu says it cannot hold a comment (M-08). */
-  element(frame: CommentFrameLike, record: FrameRecord, entry: ElementTokenEntry | undefined, pick: CommentPick): void
+  /**
+   * `entry` absent: the element has no tokened ancestor – its menu says it cannot hold a comment (M-08).
+   * `wordsRequired`: the Comment button outside the mode (D-10) – words not in the file open nothing.
+   */
+  element(frame: CommentFrameLike, record: FrameRecord, entry: ElementTokenEntry | undefined, pick: CommentPick, wordsRequired?: boolean): void
   anchors(frame: CommentFrameLike, record: FrameRecord, anchors: CommentAnchors): void
 }
 
@@ -224,7 +229,7 @@ export function createCommentPickHandler(deps: PickHandlerDeps): CommentPickHand
     return entry
   }
 
-  function elementPick(frame: CommentFrameLike, record: FrameRecord, pick: CommentPick): void {
+  function elementPick(frame: CommentFrameLike, record: FrameRecord, pick: CommentPick, wordsRequired: boolean): void {
     if (pick.token === undefined) {
       deps.sinks.element(frame, record, undefined, pick)
       return
@@ -232,7 +237,7 @@ export function createCommentPickHandler(deps: PickHandlerDeps): CommentPickHand
     const entry = entryOf(record, pick.token)
     if (typeof entry === 'string') return drop(entry)
     if (!sameTag(pick.tag, entry.tagName)) return drop('tag-mismatch')
-    deps.sinks.element(frame, record, entry, pick)
+    deps.sinks.element(frame, record, entry, pick, wordsRequired)
   }
 
   /** A picker step: an element is said only as main recorded it for the frame's own load (S-L-A). */
@@ -299,7 +304,7 @@ export function createCommentPickHandler(deps: PickHandlerDeps): CommentPickHand
     const needsCursor = buttonPick || (pick.kind === 'context' && pick.via === 'pointer')
     if (needsCursor && (deps.geometry === undefined || !realContextClick(pick, deps.geometry))) return drop('cursor-elsewhere')
     if (!spentInput(pick)) return
-    elementPick(frame, record, pick)
+    elementPick(frame, record, pick, buttonPick)
   }
 
   /** Run `body`, dropping instead of throwing: a listener throw is an uncaught main-process error. */

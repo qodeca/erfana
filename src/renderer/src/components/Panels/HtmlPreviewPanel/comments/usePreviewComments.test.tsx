@@ -196,6 +196,24 @@ describe('usePreviewComments', () => {
     })
   })
 
+  describe('S-03 a window opened from the page: which route it came by', () => {
+    const iconDraft = { panelId: PANEL, kind: 'icon', point: { x: 1, y: 2 }, displayPath: 'index.html', filePath: 'index.html', frame: false, fileKey: 'f1', threadKeys: ['t1'], blockKeys: [] }
+
+    it('outside comment mode: the window is marked, so no write button takes first focus', () => {
+      render(<Harness onValue={onValue} />)
+      act(() => fake.emitDraft(iconDraft as never))
+      expect(latest.layer.request).toMatchObject({ kind: 'threads', outsideMode: true })
+    })
+
+    it('in comment mode: the ordinary first-focus rule holds', () => {
+      render(<Harness onValue={onValue} />)
+      act(() => latest.toolbar.onToggleMode(true))
+      act(() => fake.emitDraft(iconDraft as never))
+      expect(latest.layer.request).toMatchObject({ kind: 'threads' })
+      expect(latest.layer.request).not.toHaveProperty('outsideMode')
+    })
+  })
+
   it('ignores another panel’s events', () => {
     render(<Harness onValue={onValue} />)
     act(() => fake.emitDraft(menuDraft({ panelId: 'preview-other' })))

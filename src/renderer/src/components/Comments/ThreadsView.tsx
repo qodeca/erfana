@@ -14,7 +14,8 @@
  * - Threads in file order; resolved ones folded.
  * - **Every open thread keeps Reply and Resolve** (C-05), whatever its state.
  *   Not found, Changed and Words changed say so above it (`ThreadStatus`), and
- *   Resolve leads there – primary and focused (S-03 – S-05).
+ *   Resolve leads there – primary, and focused unless the page opened the
+ *   window outside comment mode (S-03 – S-05, `useWindowFirstFocus`).
  * - **Damaged** blocks are read-only and never overwritten (decision 12,
  *   `DamagedBlockView`, with Repair comment… – OD-05); **newer format**
  *   blocks are shown, never changed.

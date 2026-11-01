@@ -174,7 +174,7 @@ export class PreviewCommentService implements CommentServiceApi {
         parent: frame => this.onParent(frame),
         step: step => void this.speak(step),
         icon: (frame, record, key, pick, word) => this.guard(this.opener.icon(frame, record, key, pick, word)),
-        element: (frame, record, entry, pick) => this.guard(this.opener.element(frame, record, entry, pick)),
+        element: (frame, record, entry, pick, wordsRequired) => this.guard(this.opener.element(frame, record, entry, pick, wordsRequired)),
         anchors: (_frame, record, anchors) => this.onAnchors(record, anchors)
       }
     })

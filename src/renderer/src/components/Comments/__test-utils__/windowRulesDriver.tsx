@@ -80,7 +80,7 @@ function Stage({ host, setup, onSave, onStage, onCopy }: { readonly host: Window
     return true
   }
   const [props] = useState(() => ({
-    request: threadsRequest({ listAfter: 1, ...onTarget.request }),
+    request: threadsRequest({ listAfter: 1, ...onTarget.request, ...(setup.outsideMode === true ? { outsideMode: true as const } : {}) }),
     notVisible: [] as readonly string[],
     getArea: () => ({ left: 0, top: 0, width: 1000, height: 700 }),
     onClose: vi.fn(),

@@ -21,13 +21,13 @@ The preview-page preload may import **exactly one folder outside its own entry: 
 
 - `pinLayout.ts` – the pin constants and `placePin` (plus the `clipToViewport` and `overlaps` it runs on). The preload's `pins.ts`, `geometry.ts` and `constants.ts` now use these instead of their own copies.
 - `modeState.ts` – `reduceCommentMode`, the comment-mode state machine (`set` from the window; Esc while on leaves the mode, tells the window and keeps the key from the page; Esc while off is the page's). The preload's controller follows its steps.
-- `gesture.ts` – `classifyGesture`, the select-or-pick rule. Not wired into the preload yet: v0.23.1 picks on a drag, and the selection commit of spec 024 turns the rule on in both previews at once.
+- `gesture.ts` – `classifyGesture`, the select-or-pick rule, used in comment mode by both previews, and `selectsOutsideMode`, the stricter rule the HTML Preview uses outside it.
 - `pickerKeys.ts` – `pickerStepOf`, the keyboard picker's one key rule, and `movePicker`, its walk over a tree the host hands in. Main reads `pickerStepOf` too, to record the key the page acts on.
 - `pointerFollow.ts` – `pointerTakesOver`, whether a pointer move hands the picker to what is under it.
 
 This amends **ADR 0005 decision 6 only**, and only its import allow-list.
 
-ADR 0005 **decision 2 is untouched**: the one receive channel still carries no comment text, author names or emails. Spec 024's selection comments add selection offsets to `commentState` – character offsets within the target's text, numbers only, never strings (§ 8 C16); main checks the selected words against its own parse of the file on disk. The overlay core handles no comment text, names or e-mails either: its inputs are numbers and booleans – element boxes, the viewport, pointer positions and the mode flag.
+ADR 0005 **decision 2 is untouched**: the one receive channel still carries no comment text, author names or emails. Spec 024's selection comments add the marked words to `commentState`: `icons[].words` holds each comment's `exact`, `prefix` and `suffix`, strings quoted from the file, because the page must find them to underline them. That replaces the character offsets, numbers only, that § 8 C16 planned; those words are page text, not what anyone wrote in a comment. Main checks the selected words a pick sends against its own parse of the file on disk. The overlay core handles no comment text, names or e-mails either: its inputs are numbers and booleans – element boxes, the viewport, pointer positions and the mode flag.
 
 Those inputs come from the page: a hostile page controls the element boxes and the viewport size the core is handed. What it can do with them is bounded – `placePin` takes at most `PIN_MAX_STEPS` (8) steps per pin, and the preload draws at most 500 pins per state (`MAX_ICONS`) – so the worst a page can buy is wrongly placed pins, at a fixed cost.
 
@@ -61,6 +61,8 @@ The build guard is not the security control; the contract scan and the pure-core
 **Later note (2026-11-01, K-20, I-14, I-19).** `overlayCore/reveal` and `overlayCore/markGround` are new pure files, with no imports; the page's `openAround` and mode tab now use them. The page reads the computed `background-color` of a mark's ancestors, in its isolated world, to choose the bar: a read only. Main→page gains two values on the existing `commentState`: `theme.accentDeep` (a colour) and `icons[].words[].changed` (a boolean); the new words of a Words changed comment travel as `words`, which is page text. No page→main field, channel or listener was added, and no comment text, thread id or author reaches the page. `previewPage.surface.pin.test.ts` passes unchanged.
 
 **Later note (2026-11-01, D-09, D-10).** The HTML Comment button and underline clicks outside comment mode added rules to `overlayCore/gesture` and `overlayCore/selectionRules`, and pure functions only. The preload reads events its guards already receive: no channel, message field, listener or `preventDefault` was added, and the PIN-S snapshot did not change. The page observer now also watches `characterData`, an option on an existing observer, so a page's reaction that only rewrites text counts as a reaction.
+
+**Later note (2026-11-01, security audit of D-09, D-10).** In the page, logic only: reads of `composedPath()`, `localName` and `shadowRoot`, and a second read of the selection. No channel, field, listener or `preventDefault` was added. The opening words of an element's label (`label.ts`, D-03) stay inside the overlay: set as text and never sent to main, so they widen nothing here.
 
 ## Alternatives considered
 

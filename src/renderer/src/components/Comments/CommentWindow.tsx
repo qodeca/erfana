@@ -27,8 +27,8 @@
  *
  * Focus: one first-focus rule (`useWindowFirstFocus`), on open and on a step –
  * a new comment lands in the text field; a thread on Resolve when its state
- * makes that the main action and the button is there (S-03 – S-05), else on the
- * window title; on close it goes back to the opener.
+ * makes that the main action and the button is there (S-03 – S-05) and the page
+ * did not open it outside comment mode, else on the window title; on close it goes back to the opener.
  *
  * Esc and an outside click back out of the newest INNER step first – an
  * edit, a delete confirmation, the inline identity editor – keeping its typed
@@ -184,7 +184,7 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
   const { ready: identityReady, ask: askIdentity, restoreFocus: restoreGateFocus } = gate
   const needsIdentity = request.kind === 'new' ? identityAsked || identityMissing(identity) : gate.open
   const view: 'identity' | 'new' | 'threads' = needsIdentity ? 'identity' : request.kind
-  const firstFocusRef = useWindowFirstFocus(view, leadRef, titleRef, textareaRef)
+  const firstFocusRef = useWindowFirstFocus(view, leadRef, titleRef, textareaRef, request.kind === 'threads' && request.outsideMode === true)
 
   const stepFilter = useDrawerFilter(props.drawerId)
   const session = useThreadSession(request, list, stepFilter)

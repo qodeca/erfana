@@ -25,6 +25,8 @@ interface ThreadsWindowOn {
   readonly area: HTMLElement | null
   readonly anchor: HTMLElement | null
   readonly opener: WindowOpener
+  /** A click in the preview opened it with comment mode off. */
+  readonly outsideMode?: boolean
 }
 
 /**
@@ -46,6 +48,7 @@ export function threadsWindowRequest(file: CommentFileView, panelId: string, lis
     point: pointOf(on.anchor, on.area),
     opener: on.opener,
     listAfter,
+    ...(on.outsideMode === true ? { outsideMode: true as const } : {}),
     file: { fileKey: file.fileKey, displayPath: file.displayPath, filePath: file.filePath, frame: false }
   }
 }

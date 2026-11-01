@@ -25,7 +25,9 @@
  * that commits another document while the draft is built would otherwise get
  * a menu labelled with the new file over a draft that writes into the old
  * one; such a pick opens nothing. Nothing is minted or sent once the view is
- * gone or the frame's record left it (`isCurrent`).
+ * gone or the frame's record left it (`isCurrent`). The Comment button outside
+ * comment mode (D-10) opens nothing for words main could not find on disk: they
+ * are the page's claim, and that route has no comment mode to vouch for the pick.
  */
 import { ErrorCode } from '../../../../shared/errors'
 import { CommentPickRuntimeSchema, type CommentAck, type CommentDraftOpened, type CommentPick, type CommentPickView } from '../../../../shared/ipc/preview-comment-schema'
@@ -77,7 +79,7 @@ export interface DraftOpenerDeps {
 
 /** Opens drafts and pin threads for one view. */
 export interface CommentDraftOpener {
-  element(frame: CommentFrameLike, record: FrameRecord, entry: ElementTokenEntry | undefined, pick: CommentPick): Promise<void>
+  element(frame: CommentFrameLike, record: FrameRecord, entry: ElementTokenEntry | undefined, pick: CommentPick, wordsRequired?: boolean): Promise<void>
   icon(frame: CommentFrameLike, record: FrameRecord, pinKey: string, pick: CommentPick, word?: number): Promise<void>
   /** A new comment on the element a listed thread stands on (C-22): the window is up, so nothing is painted or captured. */
   onThread(frame: CommentFrameLike, record: FrameRecord, entry: ElementTokenEntry, runtime: PinGroup['runtime'], view: CommentPickView): Promise<CommentAck>
@@ -159,7 +161,8 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
     frame: CommentFrameLike,
     record: FrameRecord,
     entry: ElementTokenEntry | undefined,
-    pick: CommentPick
+    pick: CommentPick,
+    wordsRequired = false
   ): Promise<void> {
     const commented = openThreadsOn(record, pick)
     if (commented !== undefined) return icon(frame, record, commented, pick)
@@ -182,6 +185,7 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
     const offset = await painted
     const point = pointOf(pick, offset)
     if (!stillCurrent(record, file) || point === null) return
+    if (wordsRequired && built.ok && built.wordsMissing === true) return
     deps.emit({
       panelId: deps.panelId,
       // A right-click outside comment mode (OD-01) opens the same menu.

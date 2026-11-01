@@ -24,9 +24,10 @@ import { pinDraftOf, type CommentWindowRequest, type ElementDraft, type NewComme
  * @param panelId - The panel.
  * @param pin - Main's event: an icon click, or a pick on a commented element.
  * @param listAfter - The list generation the window must not be older than (M2).
+ * @param mode - Comment mode is on: off, the click opens on the title (state table, first-focus exception).
  * @returns The threads-view request.
  */
-export function pinWindowRequest(panelId: string, pin: PinDraft, listAfter: number): CommentWindowRequest {
+export function pinWindowRequest(panelId: string, pin: PinDraft, listAfter: number, mode: boolean): CommentWindowRequest {
   return {
     kind: 'threads',
     panelId,
@@ -36,6 +37,7 @@ export function pinWindowRequest(panelId: string, pin: PinDraft, listAfter: numb
     point: pin.point,
     opener: 'page',
     listAfter,
+    ...(mode ? {} : { outsideMode: true as const }),
     ...pinDraftOf(pin),
     target: pin.target,
     file: { fileKey: pin.fileKey, displayPath: pin.displayPath, filePath: pin.filePath, frame: pin.frame }

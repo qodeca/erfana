@@ -108,6 +108,12 @@ export type CommentWindowRequest =
       readonly file?: WindowFile
       /** The element the pin's draft is on, as main described it (with `draftToken`). */
       readonly target?: DraftTarget
+      /**
+       * A click in the page opened it with comment mode off: the reader meant to
+       * read, so it opens on its title and never on a write button (state table,
+       * first-focus exception).
+       */
+      readonly outsideMode?: true
     }
 
 /**

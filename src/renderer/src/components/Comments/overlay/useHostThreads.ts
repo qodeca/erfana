@@ -58,12 +58,12 @@ export function useHostThreads(options: HostThreadsOptions): HostThreads {
   const store = usePreviewCommentStore
 
   const show = useCallback(
-    (threadKeys: readonly string[], anchor: HTMLElement | null, opener: 'page' | 'drawer', blockKeys: readonly string[], target: HTMLElement | null) => {
+    (threadKeys: readonly string[], anchor: HTMLElement | null, opener: 'page' | 'drawer', blockKeys: readonly string[], target: HTMLElement | null, outsideMode = false) => {
       const listed = store.getState().panels.get(panelId)?.list
       const file = listed?.files[0]
       if (file === undefined) return
       setOnTarget(target)
-      latest.current.onRequest(threadsWindowRequest(file, panelId, listed?.generation ?? 0, { threadKeys, blockKeys, anchor, area: latest.current.area, opener }))
+      latest.current.onRequest(threadsWindowRequest(file, panelId, listed?.generation ?? 0, { threadKeys, blockKeys, anchor, area: latest.current.area, opener, outsideMode }))
     },
     [store, panelId, latest]
   )
@@ -74,7 +74,7 @@ export function useHostThreads(options: HostThreadsOptions): HostThreads {
       const target = opener === 'page' && anchor !== null && adapter.targetAt(anchor) === anchor && adapter.canComment(anchor).ok ? anchor : null
       const mode = store.getState().panels.get(panelId)?.mode === true
       if (target !== null && carriedDrafts.pickTakesText(panelId, mode)) latest.current.openNew(target)
-      else show(threadKeys, anchor, opener, blockKeys, target)
+      else show(threadKeys, anchor, opener, blockKeys, target, opener === 'page' && !mode)
     },
     [adapter, store, panelId, latest, show]
   )

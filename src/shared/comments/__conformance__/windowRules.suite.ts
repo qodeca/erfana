@@ -100,6 +100,17 @@ export function runWindowRulesSuite(name: string, makeDriver: () => WindowRulesD
       expect(d.focused()).toBe('resolve')
     })
 
+    it.each(['changed', 'not-found'] as const)(`S-03 (${name}) WIN-09a opened from the page outside comment mode, a %s thread opens on the title`, async state => {
+      await d.open({ identity: 'ready', threads: [state], outsideMode: true })
+      expect(d.focused()).toBe('title')
+    })
+
+    it(`S-03 (${name}) WIN-09b opened from the page outside comment mode, a step stays off the write button too`, async () => {
+      await d.open({ identity: 'ready', threads: ['open', 'changed'], outsideMode: true })
+      await d.stepByKeys()
+      expect(d.focused()).toBe('title')
+    })
+
     it(`S-03 (${name}) WIN-10 a Changed thread with no Resolve opens on the title: read-only file`, async () => {
       await d.open({ identity: 'ready', threads: ['changed'], readOnly: true })
       expect(d.focused()).toBe('title')

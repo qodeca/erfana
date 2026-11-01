@@ -181,6 +181,25 @@ describe('commentDraftOpener', () => {
     expect(s.keys.size.drafts).toBe(0)
   })
 
+  describe('D-10 the Comment button outside comment mode needs its words on disk', () => {
+    const open = (token: string, exact: string) => pick({ kind: 'open', via: 'pointer', token, tag: 'p', screen: { x: 1, y: 2 }, sel: { exact, prefix: '', suffix: '' } })
+
+    it('hostile: words a script put on the page open nothing, and no draft is minted', async () => {
+      const s = await setup(commentedPage().text)
+      const token = tokenOfTag(s.load.doc, 'p')
+      await s.opener.element(s.top, s.record, s.tokens.lookup(s.record.loadId!, token), open(token, 'words the file never held'), true)
+      expect(s.emitted).toEqual([])
+      expect(s.keys.size.drafts).toBe(0)
+    })
+
+    it('in comment mode the same words still open the window, which says they are missing', async () => {
+      const s = await setup(commentedPage().text)
+      const token = tokenOfTag(s.load.doc, 'p')
+      await s.opener.element(s.top, s.record, s.tokens.lookup(s.record.loadId!, token), open(token, 'words the file never held'))
+      expect(s.emitted[0]).toMatchObject({ kind: 'open', wordsMissing: true, draftToken: expect.any(String) })
+    })
+  })
+
   describe('a read-only file: the menu names the same refusal a save would meet (C-19)', () => {
     // A complete hunk, its markers at the start of their lines.
     const CONFLICT = '\n<<<<<<< HEAD\na\n=======\nb\n>>>>>>> x\n'

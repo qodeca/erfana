@@ -197,6 +197,15 @@ describe('commentPickHandler element picks', () => {
       h.handler.pick(eventFrom(h.top), open(tokenOfTag(h.page.doc, 'button')))
       expect(h.out.element).toHaveBeenCalledTimes(1)
       expect(h.out.element.mock.calls[0][3]).toMatchObject({ kind: 'open', via: 'pointer', ...SEL })
+      // Words main cannot find on disk open nothing here: the opener is told.
+      expect(h.out.element.mock.calls[0][4]).toBe(true)
+    })
+
+    it('D-10 in comment mode words main cannot find still open the window, which says so', async () => {
+      const h = await setup()
+      h.setMode(true)
+      h.handler.pick(eventFrom(h.top), open(tokenOfTag(h.page.doc, 'button')))
+      expect(h.out.element.mock.calls[0][4]).toBe(false)
     })
 
     it('D-10 dropped with no real press: the renderer alone opens nothing', async () => {

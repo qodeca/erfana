@@ -168,7 +168,7 @@ export function usePreviewComments({
       if (payload.panelId !== panelId) return
       if (payload.kind === 'icon') {
         setMenu(null)
-        const threads = pinWindowRequest(panelId, payload, listAfter())
+        const threads = pinWindowRequest(panelId, payload, listAfter(), latestRef.current.mode)
         // I-23: the page's pick and its icon click reach here alike. Text carried by Pick again goes on the target.
         const carried = carriedDrafts.pickTakesText(panelId, latestRef.current.mode) ? newCommentOnPin(threads) : null
         setRequest(carried ?? threads)

@@ -114,7 +114,7 @@ export class CommentController {
     this.hellos = new HelloRepeater(now, deps.send)
     const open = (): boolean => !this.state.mode && this.state.commentable
     this.menu = new PageMenu({ win: deps.win, tokens: this.tokens, now, open, words: () => this.selectionWords(), wordsAt: point => this.wordsAt(point), wordsPoint: () => selectionEnd(deps.win), keyTarget: () => this.menuKeyTarget(), send: payload => this.sendPick(payload) })
-    this.outside = new OutsideMode({ win: deps.win, doc, open, isOverlay: element => this.host.isHost(element), button: this.button, tokens: this.tokens, words: () => this.selectionWords(), markAt: point => this.marks.find(mark => contains(mark.box, point)) ?? null, pageVersion: () => this.watch.version, openMark: (mark, event) => this.pickIcon(mark.markKey, mark.element, event), redraw: () => this.scheduler.soon() })
+    this.outside = new OutsideMode({ win: deps.win, doc, open, isOverlay: element => this.host.isHost(element), button: this.button, tokens: this.tokens, words: () => this.selectionWords(), markAt: (point, path) => this.marks.find(mark => contains(mark.box, point) && path.includes(mark.element)) ?? null, pageVersion: () => this.watch.version, openMark: (mark, event) => this.pickIcon(mark.markKey, mark.element, event), redraw: () => this.scheduler.soon() })
   }
 
   /** Comment mode is on for this frame. */

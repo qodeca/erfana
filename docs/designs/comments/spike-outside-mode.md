@@ -70,6 +70,7 @@ Unit checks with the trial in place:
 | The 320 ms wait makes the click feel slower, and a reader with a slower double-click can still open the thread | Low | Accept, or tune in step 9 |
 | A rare missed open when a live page changes inside the click's own turn | Low | Did not happen in the clock test |
 | A drawn page control the check cannot see, such as a plain `div` with no pointer cursor | Low | The button can still cover it |
+| Controls inside a shadow tree cannot be seen, and a plain element with a closed shadow root shows no sign of one | Low | Custom elements and open shadow hosts count as controls whole, so a page built from them gets no underline clicks or button there; comment mode and right-click remain |
 | A word wrapped alone in its own element gives no `sel` | Low | No button; the right-click route remains |
 
 ## Not tested

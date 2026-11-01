@@ -8,7 +8,8 @@
   free spot; the right-click menu still works there.
 - **Click underlined words in the HTML preview to open their comment, outside comment mode too.** It
   works on plain text. A page that uses the click itself keeps it, so links, buttons and clickable text
-  still do what the page says.
+  still do what the page says. Comment on a page built from custom elements with comment mode or
+  the right-click menu.
 - **New comment from an open comment, in both previews.** The comment window offers a new comment on
   the same part, and an empty **Comments** list has a **Turn on comment mode** button.
 

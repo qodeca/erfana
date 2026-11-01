@@ -9,6 +9,10 @@
  * on the title when there is none: a Changed thread on a read-only or paused
  * file has no Resolve. Opening, a step and the end of a pause all ask here.
  *
+ * The exception: a window a click in the page opened outside comment mode stays
+ * on the title. One click and one Space must never write the reader's name, so
+ * the view's lead is not asked for the whole life of that window.
+ *
  * The answer is read when focus moves, from what is really on screen, so the
  * rule cannot disagree with what the view drew. The ref object is stable: a
  * window that swapped refs re-ran its focus pass whenever a list changed what
@@ -28,22 +32,26 @@ type WindowView = 'identity' | 'new' | 'threads'
  * @param leadRef - Holds the view's leading control, when it drew one.
  * @param titleRef - The window title, which always can take focus.
  * @param fieldRef - A new comment's text field.
+ * @param outsideMode - The page opened this thread window with comment mode off.
  * @returns A ref whose `current` is the target at the moment it is read.
  */
 export function useWindowFirstFocus(
   view: WindowView,
   leadRef: React.RefObject<HTMLElement | null>,
   titleRef: React.RefObject<HTMLElement | null>,
-  fieldRef: React.RefObject<HTMLElement | null>
+  fieldRef: React.RefObject<HTMLElement | null>,
+  outsideMode: boolean
 ): React.RefObject<HTMLElement | null> {
   const viewRef = useLatestRef(view)
+  const outsideRef = useLatestRef(outsideMode)
   return useMemo(
     () => ({
       get current(): HTMLElement | null {
-        const preferred = viewRef.current === 'new' ? fieldRef.current : viewRef.current === 'threads' ? leadRef.current : null
+        const lead = outsideRef.current ? null : leadRef.current
+        const preferred = viewRef.current === 'new' ? fieldRef.current : viewRef.current === 'threads' ? lead : null
         return preferred ?? titleRef.current
       }
     }),
-    [viewRef, leadRef, titleRef, fieldRef]
+    [viewRef, outsideRef, leadRef, titleRef, fieldRef]
   )
 }

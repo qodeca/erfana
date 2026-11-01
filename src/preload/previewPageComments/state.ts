@@ -76,7 +76,7 @@ export interface IconRuntime {
   readonly tag: string
 }
 
-/** One pin: the element is found by `token` (and `runtime`); text never arrives. */
+/** One pin: the element is found by `token` (and `runtime`); comment text never arrives, only the words it quotes (`words`). */
 export interface IconState {
   readonly key: string
   readonly token: string
