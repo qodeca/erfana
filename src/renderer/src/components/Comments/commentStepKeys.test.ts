@@ -41,7 +41,7 @@ describe('C-13 the stepper within the drawer filter', () => {
     expect(stepPosition(file, ['t3'], 'resolved')).toEqual({ at: 0, of: 2, previous: 't2', next: 't4' })
   })
 
-  it("024-AC-019 C-13 Can't edit holds no thread, so there is nothing to step to", () => {
+  it("024-AC-019 C-13 Problems holds no thread, so there is nothing to step to", () => {
     expect(stepPosition(file, ['t1'], 'cantEdit')).toEqual({ at: 0, of: 0, previous: null, next: null })
   })
 })
@@ -101,6 +101,14 @@ describe('C-13 a step key from the preview', () => {
     expect(open).toHaveBeenCalledWith(expect.objectContaining({ threadKey: 't5' }))
     expect(announce).toHaveBeenCalledWith('Comment 3 of 3, on paragraph, line 15.')
     expect(takePreviewStep({ ...host, filter: 'cantEdit' }, 'next')).toBe(false)
+  })
+
+  it('K-26 a step with nothing to go to says so', () => {
+    const announce = vi.fn()
+    const open = vi.fn()
+    expect(takePreviewStep({ panelKey: 'empty', files: () => [], filter: 'open', open, announce, noun: () => 'paragraph' }, 'next')).toBe(false)
+    expect(open).not.toHaveBeenCalled()
+    expect(announce).toHaveBeenCalledWith('No comments to go to.')
   })
 
   it('024-AC-019 C-13 the key rule is the same pair on every system: Alt+F9 next, Alt+Shift+F9 previous', () => {

@@ -2,12 +2,12 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The words part of a new comment (spec 024 024-FR-004; comments-v2 C-07,
- * C-21; docs/designs/comments/comments-v2/window.html "Narrow to words").
+ * C-21; docs/designs/comments/comments-v2/window.html "Comment on specific words").
  *
  * - **The quote** – "Comment on: “…”" – is clamped to three lines with a
  *   Show all text button (C-21). The 200-character notice sits outside it
  *   and is always visible while the words were cut (024-FR-004).
- * - **Narrow to words** is a disclosure, folded by default (R-05). Open, it
+ * - **Comment on specific words** is a disclosure, folded by default (R-05). Open, it
  *   is a read-only field holding the target's text; selecting in it with
  *   Shift+arrow (by character) or Ctrl+Shift+arrow / Option+Shift+arrow (by
  *   word) chooses the words – the guaranteed keyboard route (C-07). A polite
@@ -57,7 +57,7 @@ export interface CommentWordsPickerProps {
 }
 
 /**
- * The quote, the notices and the Narrow to words field.
+ * The quote, the notices and the Comment on specific words field.
  *
  * @param props - {@link CommentWordsPickerProps}
  */

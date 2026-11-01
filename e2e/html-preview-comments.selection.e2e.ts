@@ -19,6 +19,7 @@
  * disabled in CI. Condition-based waits only.
  */
 
+import * as fsp from 'fs/promises'
 import * as path from 'path'
 import { test, expect } from './fixtures/index'
 import {
@@ -28,17 +29,21 @@ import {
   expectPin,
   mouseAt,
   openCommentPage,
+  pagePng,
+  pointerOut,
   pressInPage,
   resetCommentSettings,
   reviewer,
   setGlobalSetting,
   singleBlockInsert,
   waitForBox,
+  waitForOverlay,
   waitForViewShown
 } from './pages/html-preview.comments-ui'
 import { waitForCommentLoad } from './pages/html-preview.comments'
 import { HtmlPreviewPage, PREVIEW_BUDGET_MS } from './pages/html-preview.page'
 import { TEST_IDS } from '../src/renderer/src/constants/testids'
+import { barRowsIn, INDIGO_RGB, type BarRows } from './utils/bar-rows'
 
 const PAGE = 'comments/selection.html'
 const TITLE = '-HPC-SEL-'
@@ -64,7 +69,7 @@ const PAGE_TEXT = [
 
 test.use({ testProjectFiles: { [PAGE]: PAGE_TEXT } })
 
-/** A drag across the first half of `#ship`'s line: words, not the whole element. */
+/** A drag across the first half of `#ship`'s line: words, not the whole section. */
 async function selectWords(app: Parameters<typeof waitForBox>[0]): Promise<{ x: number; y: number }> {
   await waitForViewShown(app, TARGET)
   const box = await waitForBox(app, 'ship', TARGET)
@@ -152,5 +157,147 @@ test.describe('HTML Preview comments – selected words (024-AC-004)', () => {
 
     const text = expectWordsBlock(before, await diskBytes(file))
     expect(text).toContain('Note-SEL-a2')
+  })
+
+  test('D-10 outside comment mode a real drag shows the Comment button; its click opens the window; only Save writes sel', async ({
+    windowWithTestProject,
+    appWithTestProject,
+    testProject
+  }) => {
+    const app = appWithTestProject
+    const page = windowWithTestProject
+    const preview = new HtmlPreviewPage(page, app)
+    const chrome = new CommentChrome(page, preview, 'selection.html')
+    const file = path.join(testProject.path, PAGE)
+    await setGlobalSetting(page, 'comments', reviewer(NAME))
+    const before = await diskBytes(file)
+
+    await openCommentPage(preview, app, PAGE, TITLE)
+    await waitForViewShown(app, TARGET)
+    // The second line: the first sits within 48 px of the view's top, where the button goes below.
+    const box = await waitForBox(app, 'other', TARGET)
+    const y = Math.round(box.top + box.height / 2)
+    const to = { x: Math.round(box.left + box.width * 0.45), y }
+    expect(await dragInPage(app, { x: Math.round(box.left + 2), y }, to, TARGET), 'no preview to drag in').toBe(true)
+    // This page has no comments: the overlay's host comes up with the button.
+    await waitForOverlay(preview, app, TARGET)
+    await expect(chrome.window()).toHaveCount(0)
+    expect(await mouseAt(app, { x: to.x - 40, y: Math.round(box.top - 18) }, 'left', TARGET), 'no preview to click').toBe(true)
+    await expect(chrome.window()).toHaveAttribute('data-view', /^(identity|new)$/, { timeout: PREVIEW_BUDGET_MS })
+    expect(await diskBytes(file), 'nothing is written before Save').toEqual(before)
+    await chrome.saveNewComment('Note-SEL-d10: outside the mode', PAGE, NAME)
+
+    const text = expectWordsBlock(before, await diskBytes(file))
+    expect(text).toContain('Note-SEL-d10')
+  })
+
+  test('D-09 outside comment mode a plain click on an underline opens its thread', async ({ windowWithTestProject, appWithTestProject }) => {
+    const app = appWithTestProject
+    const page = windowWithTestProject
+    const preview = new HtmlPreviewPage(page, app)
+    const chrome = new CommentChrome(page, preview, 'selection.html')
+    await setGlobalSetting(page, 'comments', reviewer(NAME))
+
+    const panelId = await openCommentPage(preview, app, PAGE, TITLE)
+    await chrome.modeOn(app, panelId, TARGET)
+    const at = await selectWords(app)
+    expect(await pressInPage(app, 'Enter', [], TARGET)).toBe(true)
+    await expect(chrome.window()).toHaveAttribute('data-view', /^(identity|new)$/, { timeout: PREVIEW_BUDGET_MS })
+    await chrome.saveNewComment('Note-SEL-d09', PAGE, NAME)
+    await waitForCommentLoad(app, PAGE, 'page', 1)
+    await expectPin(app, 'ship', true, TARGET)
+    await chrome.modeButton().click()
+    await expect(chrome.modeButton()).toHaveAttribute('aria-pressed', 'false', { timeout: PREVIEW_BUDGET_MS })
+
+    await waitForViewShown(app, TARGET)
+    expect(await mouseAt(app, at, 'left', TARGET), 'no preview to click').toBe(true)
+    await expect(chrome.window()).toContainText('Note-SEL-d09', { timeout: PREVIEW_BUDGET_MS })
+  })
+
+  test('I-22 a right-click away from selected words is about what is under the pointer', async ({ windowWithTestProject, appWithTestProject }) => {
+    const app = appWithTestProject
+    const page = windowWithTestProject
+    const preview = new HtmlPreviewPage(page, app)
+    const chrome = new CommentChrome(page, preview, 'selection.html')
+    await setGlobalSetting(page, 'comments', reviewer(NAME))
+
+    const panelId = await openCommentPage(preview, app, PAGE, TITLE)
+    await chrome.modeOn(app, panelId, TARGET)
+    await selectWords(app)
+    const other = await waitForBox(app, 'other', TARGET)
+    const away = { x: Math.round(other.left + 40), y: Math.round(other.top + other.height / 2) }
+    expect(await mouseAt(app, away, 'right', TARGET), 'no preview to right-click').toBe(true)
+    await expect(chrome.menu()).toBeVisible({ timeout: PREVIEW_BUDGET_MS })
+    await expect(chrome.menu()).toHaveAttribute('aria-label', 'Section')
+  })
+
+  test('I-13 in comment mode a click on an underline opens that one thread', async ({ windowWithTestProject, appWithTestProject }) => {
+    const app = appWithTestProject
+    const page = windowWithTestProject
+    const preview = new HtmlPreviewPage(page, app)
+    const chrome = new CommentChrome(page, preview, 'selection.html')
+    await setGlobalSetting(page, 'comments', reviewer(NAME))
+
+    const panelId = await openCommentPage(preview, app, PAGE, TITLE)
+    await chrome.modeOn(app, panelId, TARGET)
+    await waitForViewShown(app, TARGET)
+    const box = await waitForBox(app, 'ship', TARGET)
+    const y = Math.round(box.top + box.height / 2)
+    const near = Math.round(box.left + 40)
+    const far = Math.round(box.left + 320)
+
+    /** Comment on the words across `from` to `to` in the one line; `count` comments stand once it is saved. */
+    const comment = async (from: number, to: number, note: string, count: number): Promise<void> => {
+      await waitForViewShown(app, TARGET)
+      expect(await dragInPage(app, { x: from, y }, { x: to, y }, TARGET), 'no preview to drag in').toBe(true)
+      expect(await pressInPage(app, 'Enter', [], TARGET)).toBe(true)
+      await expect(chrome.window()).toHaveAttribute('data-view', /^(identity|new)$/, { timeout: PREVIEW_BUDGET_MS })
+      await chrome.saveNewComment(note, PAGE, NAME)
+      await waitForCommentLoad(app, PAGE, 'page', count)
+      await expectPin(app, 'ship', true, TARGET)
+    }
+    await comment(near - 30, near + 30, 'Note-SEL-near', 1)
+    await comment(far - 60, far + 60, 'Note-SEL-far', 2)
+
+    expect(await mouseAt(app, { x: far, y }, 'left', TARGET), 'no preview to click').toBe(true)
+    await expect(chrome.window()).toContainText('Note-SEL-far', { timeout: PREVIEW_BUDGET_MS })
+    await expect(chrome.window()).not.toContainText('Note-SEL-near')
+  })
+
+  test('K-20, I-14 on a white page a mark takes the deep bar; changed words are dashed on the new words', async ({ windowWithTestProject, appWithTestProject, testProject }, testInfo) => {
+    const app = appWithTestProject
+    const page = windowWithTestProject
+    const preview = new HtmlPreviewPage(page, app)
+    const chrome = new CommentChrome(page, preview, 'selection.html')
+    const file = path.join(testProject.path, PAGE)
+    await setGlobalSetting(page, 'comments', reviewer(NAME))
+    const panelId = await openCommentPage(preview, app, PAGE, TITLE)
+    await chrome.modeOn(app, panelId, TARGET)
+    await selectWords(app)
+    expect(await pressInPage(app, 'Enter', [], TARGET)).toBe(true)
+    await expect(chrome.window()).toHaveAttribute('data-view', /^(identity|new)$/, { timeout: PREVIEW_BUDGET_MS })
+    await chrome.saveNewComment('Note-SEL-k20', PAGE, NAME)
+    await waitForCommentLoad(app, PAGE, 'page', 1)
+    await chrome.modeButton().click()
+    await expect(chrome.modeButton()).toHaveAttribute('aria-pressed', 'false')
+    await pointerOut(app, TARGET)
+
+    const line = await waitForBox(app, 'ship', TARGET)
+    const barsIn = async (name: string, rgb: typeof INDIGO_RGB): Promise<BarRows | null> => {
+      const still = await pagePng(app, line, TARGET)
+      if (still === null) return null
+      await fsp.writeFile(testInfo.outputPath(name), still)
+      return barRowsIn(still, rgb)
+    }
+    await expect.poll(async () => (await barsIn('k20-white-page.png', INDIGO_RGB))?.solid ?? 0, { timeout: PREVIEW_BUDGET_MS }).toBeGreaterThanOrEqual(1)
+
+    // The words are edited on disk: their mark moves to the new words, dashed.
+    const bytes = await fsp.readFile(file, 'utf-8')
+    const exact = /"exact":"([^"]+)"/.exec(bytes.slice(bytes.indexOf('"sel"')))?.[1] ?? ''
+    expect(exact).not.toBe('')
+    const shown = 'We ship the beta to ten customers by Friday.'
+    await fsp.writeFile(file, bytes.replace(`>${shown}<`, `>${shown.replace(exact.trim(), 'Rewritten words stand here')}<`))
+    await waitForCommentLoad(app, PAGE, 'page', 1)
+    await expect.poll(async () => (await barsIn('i14-html-now-words.png', INDIGO_RGB))?.dashes ?? 0, { timeout: PREVIEW_BUDGET_MS }).toBeGreaterThanOrEqual(3)
   })
 })

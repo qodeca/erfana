@@ -21,6 +21,7 @@ import { markdownKind, markdownKindWith } from '../../../../shared/markdownComme
 import type { RandomBytes } from '../../../../shared/comments/format'
 import type { KindDocument } from '../../../../shared/comments/fileKind'
 import { createInProcessCommentJobs, type CommentFileJobRunner, type CommentJobTable } from '../commentFileJobs'
+import type { BulkWriteJob } from '../commentBulkCore'
 import type { ListJob } from '../commentListCore'
 import { createKindCommentJobTable } from '../kindCommentJobs'
 import type { WriteJob } from '../commentWriteCore'
@@ -31,22 +32,28 @@ export interface MarkdownWriteJob extends WriteJob {
   readonly breaks?: boolean
 }
 
+/** A bulk write to a Markdown file, rendered with the user's line-break setting. */
+export interface MarkdownBulkWriteJob extends BulkWriteJob {
+  readonly breaks?: boolean
+}
+
 /** The Markdown jobs. */
-export type MarkdownCommentJob = ListJob | MarkdownWriteJob
+export type MarkdownCommentJob = ListJob | MarkdownWriteJob | MarkdownBulkWriteJob
 
 const SHARED = createKindCommentJobTable(markdownKind)
 /** The kinds by line-break setting: built once, never per job. */
 const BY_BREAKS = { off: markdownKind, on: markdownKindWith({ breaks: true }) }
-const WRITE_ON = createKindCommentJobTable(BY_BREAKS.on).write
+const ON = createKindCommentJobTable(BY_BREAKS.on)
 
 /** The Markdown kind's jobs, by name. */
 export const markdownCommentJobTable: CommentJobTable<MarkdownCommentJob, KindDocument> = {
   list: SHARED.list,
   write: {
-    run: (bytes, job, env) => (job.breaks === true ? WRITE_ON : SHARED.write).run(bytes, job, env),
+    run: (bytes, job, env) => (job.breaks === true ? ON.write : SHARED.write).run(bytes, job, env),
     // Both write tables come from `createKindCommentJobTable`, so they transfer alike.
     transferables: SHARED.write.transferables
-  }
+  },
+  bulkWrite: { run: (bytes, job, env) => (job.breaks === true ? ON.bulkWrite : SHARED.bulkWrite).run(bytes, job, env) }
 }
 
 /**

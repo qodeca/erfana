@@ -242,7 +242,7 @@ describe('folded sections through the controller', () => {
     h.dispose()
   })
 
-  it('a comment inside a folded section is "Not visible now" and has no pin', () => {
+  it('a comment inside a folded section is "Hidden on the page" and has no pin', () => {
     h.state({ showIcons: true, icons: [icon('shallow', 6)] })
     expect(reports()).toEqual([{ visible: [], hidden: ['shallow'] }])
     expect(pins()).toHaveLength(0)
@@ -276,14 +276,14 @@ describe('folded sections through the controller', () => {
     expect(reports()).toEqual([{ visible: [], hidden: ['deep'] }])
 
     expect(openings(() => h.state({ showIcons: true, icons: [icon('deep', 5)], reveal: 'deep' }))).toEqual(['facts', 'deeper'])
-    expect(h.doubles.scrolledIntoView.at(-1)).toEqual({ element: byId('deep'), options: { block: 'center' } })
+    expect(h.doubles.scrolledIntoView.at(-1)).toEqual({ element: byId('deep'), options: { block: 'center', behavior: 'instant' } })
     expect(pins()).toHaveLength(1)
     await vi.advanceTimersByTimeAsync(ANCHOR_CHECK_MIN_MS + RENDER_FALLBACK_MS)
     expect(reports().at(-1)).toEqual({ visible: ['deep'], hidden: [] })
     expect(isOpen('elsewhere')).toBe(false)
   })
 
-  it('a reveal outside any section opens nothing, and one hidden another way stays "Not visible now"', async () => {
+  it('a reveal outside any section opens nothing, and one hidden another way stays "Hidden on the page"', async () => {
     vi.useFakeTimers()
     h.doubles.setVisible(byId('plain'), false)
     expect(openings(() => h.state({ showIcons: true, icons: [icon('plain', 7)], reveal: 'plain' }))).toEqual([])

@@ -14,11 +14,12 @@
  *
  * This hook, for THIS panel only, opens the window on the next (previous)
  * thread in the drawer's current filter (`commentStepKeys.ts`). The list is
- * read first when the tab has not read it yet.
+ * read first when the tab has not read it yet. The panel's chrome – toolbar and
+ * drawer – hands its own presses to the function it returns (I-25).
  *
  * @module HtmlPreviewPanel/comments/usePageCommentStepKeys
  */
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import type { CommentStep } from '../../../../../../shared/commentStepKey'
 import { previewGateway } from '../../../../services/previewGateway'
 import { usePreviewCommentStore } from '../../../../stores/usePreviewCommentStore'
@@ -39,32 +40,39 @@ export interface PageCommentStepKeysOptions {
   readonly drawerId: string
   /** Read the list (when the tab has not read it yet). */
   readonly readList: () => Promise<void>
-  /** Open the thread's window. */
-  readonly open: (target: StepTarget) => void
+  /** Open the thread's window; `chrome` when the press came from the panel's chrome, not the page. */
+  readonly open: (target: StepTarget, chrome: boolean) => void
   readonly announce: (text: string) => void
+}
+
+/** One step, the list read first when the tab has not read it yet. `latest`: the read is awaited. */
+function takeStep(panelId: string, latest: { readonly current: PageCommentStepKeysOptions }, step: CommentStep, chrome: boolean): void {
+  const files = () => usePreviewCommentStore.getState().panels.get(panelId)?.list.files ?? []
+  const go = (): void => {
+    const { drawerId, open, announce } = latest.current
+    takePreviewStep({ panelKey: drawerId, files, filter: drawerFilterOf(drawerId), open: target => open(target, chrome), announce, noun: HTML_WORDS.noun }, step)
+  }
+  if (usePreviewCommentStore.getState().panels.get(panelId)?.list.status === 'ready') go()
+  else void latest.current.readList().then(go)
 }
 
 /**
  * Route the page's forwarded step keys to this panel's comments.
  *
  * @param options - {@link PageCommentStepKeysOptions}
+ * @returns Takes a step pressed in the panel's chrome.
  */
-export function usePageCommentStepKeys(options: PageCommentStepKeysOptions): void {
+export function usePageCommentStepKeys(options: PageCommentStepKeysOptions): (step: CommentStep) => void {
   const latest = useLatestRef(options)
   const { panelId, live } = options
   useForgetPanelStepsOnClose(options.drawerId)
+  const take = useCallback((step: CommentStep, chrome: boolean) => takeStep(panelId, latest, step, chrome), [panelId, latest])
   useEffect(() => {
     if (!live) return undefined
     return previewGateway.onForwardedShortcut(payload => {
       const step = STEP_KEYS[payload.key]
-      if (payload.panelId !== panelId || step === undefined) return
-      const files = () => usePreviewCommentStore.getState().panels.get(panelId)?.list.files ?? []
-      const take = (): void => {
-        const { drawerId, open, announce } = latest.current
-        takePreviewStep({ panelKey: drawerId, files, filter: drawerFilterOf(drawerId), open, announce, noun: HTML_WORDS.noun }, step)
-      }
-      if (usePreviewCommentStore.getState().panels.get(panelId)?.list.status === 'ready') take()
-      else void latest.current.readList().then(take)
+      if (payload.panelId === panelId && step !== undefined) take(step, false)
     })
-  }, [live, panelId, latest])
+  }, [live, panelId, take])
+  return useCallback((step: CommentStep) => take(step, true), [take])
 }

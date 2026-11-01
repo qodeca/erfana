@@ -383,7 +383,7 @@ describe('CommentWriter.add', () => {
     expect(await snapshot(path)).toEqual(before)
   })
 
-  it('024-AC-004 words the file no longer holds are dropped: the comment goes on the whole element, and the result says so', async () => {
+  it('024-AC-004 words the file no longer holds are dropped: the comment goes on the whole section, and the result says so', async () => {
     await project.write('index.html', PAGE)
     const draft = draftFor(await project.read('index.html'), byId('buy'))
     const { writer } = makeWriter()

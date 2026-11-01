@@ -9,7 +9,7 @@
  * key (`code`), so a layout or an F-key row that types something else still
  * steps; Ctrl and Cmd are never held.
  *
- * Asked by the comment window and the Markdown Preview's scroller in the
+ * Asked by the comment window and both previews' panels in the
  * renderer, and by main in the HTML page's `before-input-event`
  * (`previewInputForward.ts`), so the three never disagree about which press
  * is a step.

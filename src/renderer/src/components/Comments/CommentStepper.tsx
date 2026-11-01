@@ -10,7 +10,7 @@
  * file in file order, within the drawer's current filter (default Open);
  * Alt+F9 and Alt+Shift+F9 do the same while focus is in the window or the
  * preview (`stepKeyOf`, `commentStepKeys.ts`). While the stepper shows,
- * "Open in source" and "New comment" leave the foot for the More actions (…)
+ * "Open in file" and "New comment" leave the foot for the More actions (…)
  * menu (R-06).
  *
  * The icons are the registry's chevrons, up and down – previous and next in
@@ -94,7 +94,7 @@ export interface MoreActionsProps {
 }
 
 /**
- * The head's More actions (…) menu: New comment first, then Open in source (R-06, C-22).
+ * The head's More actions (…) menu: New comment first, then Open in file (R-06, C-22).
  *
  * @param props - {@link MoreActionsProps}
  * @returns The menu button, and the menu while open.

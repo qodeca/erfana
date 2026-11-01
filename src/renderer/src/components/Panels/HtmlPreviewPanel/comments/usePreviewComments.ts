@@ -25,6 +25,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { DockviewApi } from 'dockview'
 import type { CommentSaveRequest } from '../../../../../../shared/ipc/preview-comment-schema'
 import { commentGateway } from '../../../../services/preview/commentGateway'
+import { useSaveCommentIdentity } from '../../../Comments/useIdentityGate'
 import { previewGateway } from '../../../../services/previewGateway'
 import { textClipboard } from '../../../../services/textClipboard'
 import { useGlobalSettingsStore } from '../../../../stores/useGlobalSettingsStore'
@@ -35,21 +36,27 @@ import {
 import { useLatestRef } from '../../../../hooks/useLatestRef'
 import { isMacOS } from '../../../../utils/platform'
 import { commentModeKeyFromDomEvent, matchCommentModeKey } from '../../../../../../shared/commentModeKey'
+import { commentStepFromDomEvent } from '../../../../../../shared/commentStepKey'
 import { openFileInPanel } from '../../../../utils/openFileInPanel'
 import { getBasename } from '../../../../utils/fileUtils'
 import { ANNOUNCE, COPY, DRAWER_COPY, writtenAnnouncement } from '../../../Comments/commentCopy'
 import type { Box } from '../../../Comments/commentPlacement'
 import type { CommentDrawerProps } from '../../../Comments/CommentDrawer'
 import type { CommentToolbarToolsProps } from '../../../Comments/CommentToolbarTools'
-import { pinDraftOf, type CommentWindowRequest, type ElementDraft } from '../../../Comments/commentWindowTypes'
+import { carriedDrafts } from '../../../Comments/commentCarriedDrafts'
+import { newCommentOnPin } from '../../../Comments/commentWindowHeading'
+import type { CommentWindowRequest, ElementDraft } from '../../../Comments/commentWindowTypes'
 import { useCommentSettleNotices } from '../../../Comments/useCommentSettleNotices'
 import { useDrawerSheet } from './useDrawerSheet'
+import { useRevealNote } from './useRevealNote'
 import { listCounts, type DrawerRow } from '../../../Comments/commentRows'
 import type { PreviewCommentsLayerProps } from './PreviewCommentsLayer'
 import { useLiveText } from '../../../Comments/commentLive'
-import { COMMENT_LIST_COPY, HTML_WORDS } from '../../../Comments/commentCopyWords'
+import { takeFindEscape, takeModeEscape } from '../../../Comments/commentModeEscape'
+import { COMMENT_LIST_COPY, HTML_WORDS, MD_SPOKEN_COPY } from '../../../Comments/commentCopyWords'
 import { useRemovedOutside } from '../../../Comments/commentRemovedOutside'
-import { newCommentRequest, rowWindowRequest, withWords, type RowTarget } from './previewCommentRequests'
+import { centreOf, closeReturnsToPage, newCommentRequest, pinWindowRequest, rowWindowRequest, withWords, type RowTarget } from './previewCommentRequests'
+import { newOnThreadAction } from './previewNewOnThread'
 import { usePageCommentStepKeys } from './usePageCommentStepKeys'
 import { pickerAnnouncement } from './commentLive'
 import { usePreviewDraftKeepAlive } from './usePreviewDraftKeepAlive'
@@ -67,7 +74,7 @@ export interface UsePreviewCommentsOptions {
   readonly pageAreaRef: React.RefObject<HTMLElement | null>
   /** The panel root: its width decides the drawer's full-width mode. */
   readonly panelRootRef: React.RefObject<HTMLElement | null>
-  /** The editor area, for "Open in source". */
+  /** The editor area, for "Open in file". */
   readonly containerApi: DockviewApi | undefined
   /** dockview shows this tab (default `true`). A hidden tab stays mounted: its window must not float over another (§19 Rev 4). */
   readonly visible?: boolean
@@ -80,8 +87,12 @@ export interface PreviewComments {
   /** The drawer's props while it is open, else `null`. */
   readonly drawer: CommentDrawerProps | null
   readonly layer: PreviewCommentsLayerProps
-  /** Ctrl+Alt+M / Cmd+Option+M, focus in the chrome or on the group (native event too). */
+  /** The page's own file, as main spells it once listed: the paused band watches it. */
+  readonly pageFile: string
+  /** Ctrl+Alt+M / Cmd+Option+M and Esc, focus in the chrome or on the group (native event too). */
   readonly onRootKeyDown: (event: PreviewKeyEventLike) => void
+  /** Esc in the Find bar, which stops its keys: the mode comes first (`commentModeEscape.ts`). */
+  readonly onRootKeyDownCapture: (event: React.KeyboardEvent) => void
 }
 
 /** Native focus back into the page, a frame after the overlay that held it is gone. */
@@ -115,7 +126,7 @@ export function usePreviewComments({
   visible = true
 }: UsePreviewCommentsOptions): PreviewComments {
   const settings = useGlobalSettingsStore(s => s.settings)
-  const updateCommentIdentity = useGlobalSettingsStore(s => s.updateCommentIdentity)
+  const saveCommentIdentity = useSaveCommentIdentity()
   // Read defensively: a partial settings object may lack `htmlPreview`.
   const enabled =
     settings !== null &&
@@ -131,7 +142,9 @@ export function usePreviewComments({
   const [polite, announce] = useLiveText()
   const [assertive, alert] = useLiveText()
   const listButtonRef = useRef<HTMLButtonElement>(null)
+  const modeButtonRef = useRef<HTMLButtonElement>(null)
   const pickerSteps = useRef(0) // C-10: picker steps said since the mode last changed (the first ones add the keys).
+  const keyEntry = useRef(false) // C-10: the keyboard entry says the mode and the start in one sentence.
   // OD-06: open comments that a list no longer holds, and Erfana did not delete.
   const removed = useRemovedOutside(state.list, HTML_WORDS)
   const keepDraft = usePreviewDraftKeepAlive(panelId, request?.kind === 'new' ? request.draftToken : null)
@@ -155,24 +168,10 @@ export function usePreviewComments({
       if (payload.panelId !== panelId) return
       if (payload.kind === 'icon') {
         setMenu(null)
-        setRequest({
-          kind: 'threads',
-          panelId,
-          fileKey: payload.fileKey,
-          threadKeys: payload.threadKeys,
-          blockKeys: payload.blockKeys,
-          point: payload.point,
-          opener: 'page',
-          listAfter: listAfter(),
-          ...pinDraftOf(payload),
-          target: payload.target,
-          file: {
-            fileKey: payload.fileKey,
-            displayPath: payload.displayPath,
-            filePath: payload.filePath,
-            frame: payload.frame
-          }
-        })
+        const threads = pinWindowRequest(panelId, payload, listAfter(), latestRef.current.mode)
+        // I-23: the page's pick and its icon click reach here alike. Text carried by Pick again goes on the target.
+        const carried = carriedDrafts.pickTakesText(panelId, latestRef.current.mode) ? newCommentOnPin(threads) : null
+        setRequest(carried ?? threads)
         void refreshList()
         return
       }
@@ -194,7 +193,7 @@ export function usePreviewComments({
     const offAnchors = commentGateway.onAnchorStatus(payload => {
       if (payload.panelId !== panelId) return
       // Newer than the flags a list keeps from its read: a list read while the
-      // element was hidden must not keep "Not visible now" once it shows (E-005).
+      // element was hidden must not keep "Hidden on the page" once it shows (E-005).
       const hidden = new Set(payload.notVisible)
       const list = store.getState().panels.get(panelId)?.list
       const files = list?.files.map(file => ({
@@ -212,12 +211,16 @@ export function usePreviewComments({
       if (payload.reason === 'picker') {
         const say = pickerAnnouncement(payload, pickerSteps.current)
         if (payload.say === 'showing') pickerSteps.current += 1
-        if (say !== undefined) announce(say)
+        if (say !== undefined) announce(keyEntry.current ? MD_SPOKEN_COPY.modeOnAt(say) : say)
+        keyEntry.current = false
         return
       }
       pickerSteps.current = 0
+      keyEntry.current = payload.on && payload.reason === 'shortcut'
       store.getState().patch(panelId, { mode: payload.on })
       announce(payload.on ? HTML_WORDS.modeOn : ANNOUNCE.modeOff)
+      // K-8: main handed native focus back with this event (`commentEmit.ts`).
+      if (payload.reason === 'escape') modeButtonRef.current?.focus()
     })
     return () => {
       offDraft()
@@ -271,6 +274,7 @@ export function usePreviewComments({
       void setMode(on, latestRef.current.showIcons).then(now => {
         announce(now ? HTML_WORDS.modeOn : ANNOUNCE.modeOff)
         // Keyboard activation moves focus into the page with the picker started (§10.1).
+        keyEntry.current = now && byKeyboard
         if (now && byKeyboard) void previewGateway.focusPage(panelId).catch(() => {})
       })
     },
@@ -293,6 +297,7 @@ export function usePreviewComments({
     [containerApi]
   )
 
+  const { note: revealNote, watch: watchReveal } = useRevealNote(state.notVisible, DRAWER_COPY.notOnScreen, announce)
   const reveal = useCallback(
     (row: DrawerRow) => {
       if (row.threadKey === undefined) return
@@ -303,11 +308,9 @@ export function usePreviewComments({
         store.getState().patch(panelId, { drawerOpen: false })
         focusPageSoon(panelId)
       }
-      void commentGateway.reveal(panelId, row.threadKey)
-      if (row.tags.some(tag => tag.text === DRAWER_COPY.notVisible))
-        announce(DRAWER_COPY.notOnScreen)
+      watchReveal(row.threadKey, row.tags.some(tag => tag.text === DRAWER_COPY.notVisible), commentGateway.reveal(panelId, row.threadKey))
     },
-    [narrow, panelId, store, announce]
+    [narrow, panelId, store, watchReveal]
   )
 
   // `returnFocus: false` – "Go to tab" moves focus to the editor itself, and
@@ -315,7 +318,7 @@ export function usePreviewComments({
   const closeWindow = useCallback(
     (returnFocus = true) => {
       setRequest(current => {
-        if (returnFocus && current?.opener === 'page') focusPageSoon(panelId)
+        if (closeReturnsToPage(current, returnFocus)) focusPageSoon(panelId)
         return null
       })
     },
@@ -339,16 +342,7 @@ export function usePreviewComments({
     return box ? { left: box.left, top: box.top, width: box.width, height: box.height } : null
   }, [pageAreaRef])
 
-  const onRootKeyDown = useCallback(
-    (event: PreviewKeyEventLike) => {
-      if (!enabled || !ready || menu !== null || request !== null) return
-      // The one rule main forwards the page's key by (`shared/commentModeKey`, M3).
-      if (!matchCommentModeKey(commentModeKeyFromDomEvent(event), isMacOS())) return
-      event.preventDefault()
-      toggleMode(false)
-    },
-    [enabled, ready, menu, request, toggleMode]
-  )
+  const onRootKeyDownCapture = useCallback((event: React.KeyboardEvent) => takeFindEscape(event, latestRef.current.mode, () => toggleMode(false)), [toggleMode, latestRef])
 
   // A drawer row's Open, or a step key from the page (C-13): its element comes into view behind the window,
   // out of any folded <details> (§19 Rev 4).
@@ -356,13 +350,29 @@ export function usePreviewComments({
     if (show && row.threadKey !== undefined) void commentGateway.reveal(panelId, row.threadKey)
     setRequest(rowWindowRequest(panelId, row, centreOf(getArea()), listAfter(), opener))
   }
-  usePageCommentStepKeys({ panelId, live: enabled && visible, drawerId, readList: refreshList, announce, open: ({ file, threadKey }) => openRow({ ...file, threadKey }, true, 'page') })
+  const stepFromChrome = usePageCommentStepKeys({ panelId, live: enabled && visible, drawerId, readList: refreshList, announce, open: ({ file, threadKey }, chrome) => openRow({ ...file, threadKey }, true, chrome ? 'drawer' : 'page') })
+  const onRootKeyDown = useCallback(
+    (event: PreviewKeyEventLike) => {
+      if (!enabled || !ready || menu !== null || request !== null) return
+      const step = commentStepFromDomEvent(event)
+      if (step !== null) return event.preventDefault(), stepFromChrome(step)
+      // I-1: focus in the chrome, where the page's own Esc cannot be reached.
+      if (takeModeEscape(event, latestRef.current.mode, () => toggleMode(false))) return
+      // The one rule main forwards the page's key by (`shared/commentModeKey`, M3).
+      if (!matchCommentModeKey(commentModeKeyFromDomEvent(event), isMacOS())) return
+      event.preventDefault()
+      // I-17: as from the page or the toggle by keyboard, the shortcut takes the keyboard into the page.
+      toggleMode(true)
+    },
+    [enabled, ready, menu, request, toggleMode, latestRef, stepFromChrome]
+  )
 
-  // C-06: the count's name adds how many open comments changed, from the list main last sent.
-  const changed = useMemo(() => listCounts(state.list.files).changed, [state.list.files])
+  // C-06, P-F22: how many open comments changed or are not found, from the list main last sent.
+  const { changed, notFound } = useMemo(() => listCounts(state.list.files), [state.list.files])
   const toolbar: CommentToolbarToolsProps = {
     mode: state.mode,
     changed,
+    notFound,
     drawerOpen: state.drawerOpen,
     drawerId,
     counts: state.counts,
@@ -371,9 +381,11 @@ export function usePreviewComments({
     modeUnavailableText: modeBlocked, // M-07
     onToggleMode: toggleMode,
     onToggleDrawer: () => setDrawerOpen(!latestRef.current.drawerOpen),
+    modeRef: modeButtonRef,
     listRef: listButtonRef
   }
 
+  const identity = settings?.comments ?? null
   const drawer: CommentDrawerProps | null =
     enabled && state.drawerOpen
       ? {
@@ -386,6 +398,7 @@ export function usePreviewComments({
           onClose: () => setDrawerOpen(false),
           onShowIconsChange: show => void setMode(latestRef.current.mode, show),
           onReveal: reveal,
+          revealNote,
           onOpenInSource: row => openInSource(row.filePath, row.line),
           onOpen: row => openRow(row, row.main === 'reveal'),
           onRetry: () => void refreshList(),
@@ -394,11 +407,14 @@ export function usePreviewComments({
           onDismissRemoved: removed.dismiss,
           onCopyText: text => {
             void textClipboard.writeText(text).then(ok => (ok ? announce(COMMENT_LIST_COPY.textCopied) : alert(COMMENT_LIST_COPY.copyTextFailed)))
-          }
+          },
+          onTurnOnMode: state.mode || modeBlocked !== null ? undefined : () => toggleMode(false),
+          bulk: { run: request => commentGateway.bulk({ panelId, ...request }), onSettled: listener => commentGateway.onBulkSettled(event => {
+              if (event.panelId === panelId) listener(event)
+            }), identity, onSaveIdentity: saveCommentIdentity }
         }
       : null
 
-  const identity = settings?.comments ?? null
   const layer: PreviewCommentsLayerProps = useMemo(
     () => ({
       menu,
@@ -423,12 +439,8 @@ export function usePreviewComments({
       },
       onCloseWindow: closeWindow,
       onNewComment: next => setRequest(next),
-      onSaveIdentity: data =>
-        updateCommentIdentity({
-          authorName: data.name,
-          authorEmail: data.email === '' ? undefined : data.email,
-          identityNoticeSeen: true
-        }),
+      newOnThread: threadKey => newOnThreadAction(panelId, state.list, threadKey, alert),
+      onSaveIdentity: saveCommentIdentity,
       onSave: (save, sel) => {
         // OD-06: a thread Erfana removes itself is never "removed outside Erfana".
         if (save.op === 'deleteThread' || save.op === 'deleteMessage') ownDelete(save.threadKey)
@@ -465,7 +477,7 @@ export function usePreviewComments({
       getArea,
       panelId,
       closeWindow,
-      updateCommentIdentity,
+      saveCommentIdentity,
       onWritten,
       refreshList,
       setMode,
@@ -479,11 +491,6 @@ export function usePreviewComments({
     ]
   )
 
-  return { enabled, toolbar, drawer, layer, onRootKeyDown }
-}
-
-/** The middle of a box: where a window opened from the drawer is anchored. */
-function centreOf(box: Box | null): { x: number; y: number } {
-  if (box === null) return { x: 0, y: 0 }
-  return { x: box.left + box.width / 2, y: box.top + box.height / 3 }
+  const pageFile = state.list.files.find(file => !file.frame)?.filePath ?? filePath
+  return { enabled, toolbar, drawer, layer, pageFile, onRootKeyDown, onRootKeyDownCapture }
 }

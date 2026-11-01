@@ -10,8 +10,8 @@
  * swaps the native page for a still while it is open – with the comment items
  * of the menu matrix (spec 024 `design/menu-matrix.md`, shared with the
  * Markdown Preview through `hostMenu.ts`): "Add comment" in comment mode
- * (M-03), "Comment on element" outside it (M-01, OD-01), and on a selection
- * "Comment on selection" then "Comment on the whole element" (M-02, M-04).
+ * (M-03), "Comment on this section" outside it (M-01, OD-01), and on a selection
+ * "Comment on selection" then "Comment on the whole section" (M-02, M-04).
  * When main minted no draft, or comments are unavailable for the page, the
  * same items stay – disabled, each with its reason line (M-05, M-06, M-08,
  * M-10; C-19). The window is {@link CommentWindow}.
@@ -24,7 +24,7 @@
  */
 import { useRef } from 'react'
 import type { AnchorSelection } from '../../../../../../shared/comments/anchorSel'
-import { HTML_WORDS, menuReasonText } from '../../../Comments/commentCopyWords'
+import { HTML_WORDS } from '../../../Comments/commentCopyWords'
 import { hostMenuItems, hostMenuLabel } from '../../../Comments/overlay/hostMenu'
 import type { ContextMenuItem } from '../../../ContextMenu/ContextMenu'
 import type { DraftScope } from './previewCommentRequests'
@@ -40,14 +40,14 @@ import { ContextMenu } from '../../../ContextMenu/ContextMenu'
 import { unavailableTooltip } from '../../../Comments/commentCopy'
 import type { Box } from '../../../Comments/commentPlacement'
 import type { IdentityFormData } from '../../../Comments/commentSchemas'
-import { CommentWindow } from '../../../Comments/CommentWindow'
+import { CommentWindow, type CommentWindowProps } from '../../../Comments/CommentWindow'
 import type { CommentWindowRequest, ElementDraft } from '../../../Comments/commentWindowTypes'
 
 
 /** Props for {@link PreviewCommentsLayer}. */
 export interface PreviewCommentsLayerProps {
   readonly menu: ElementDraft | null
-  /** Comment mode is on: the menu without a selection says "Add comment", else "Comment on element" (default on). */
+  /** Comment mode is on: the menu without a selection says "Add comment", else "Comment on this section" (default on). */
   readonly mode?: boolean
   /** Why comments are unavailable for the page (M-10): every item is disabled with that sentence. */
   readonly unavailable?: CommentUnavailableReason | null
@@ -66,6 +66,8 @@ export interface PreviewCommentsLayerProps {
   readonly onCloseWindow: (returnFocus?: boolean) => void
   /** A pin's thread view chose "New comment": show the new-comment view instead. */
   readonly onNewComment: (request: Extract<CommentWindowRequest, { kind: 'new' }>) => void
+  /** "New comment" with no pin's draft: a drawer row, a step key (C-22). */
+  readonly newOnThread?: CommentWindowProps['newOnThread']
   readonly onSaveIdentity: (identity: IdentityFormData) => Promise<boolean>
   /** Write; a new comment's chosen words ride along as `sel` (024-FR-004). */
   readonly onSave: (request: CommentSaveRequest, sel?: AnchorSelection) => Promise<CommentSaveResult>
@@ -108,7 +110,7 @@ export function PreviewCommentsLayer(props: PreviewCommentsLayerProps): React.JS
         ? unavailableTooltip(unavailable)
         : canComment
           ? null
-          : menuReasonText(menu.reason, menu.displayPath)
+          : HTML_WORDS.reasonText(menu.reason ?? 'not-commentable', menu.displayPath)
   // The matrix gives labels, order and each item's action, and keeps each item, disabled with its reason line,
   // when it cannot be used. The ref is written only on click; ContextMenu never runs a disabled item.
   const items: ContextMenuItem[] =
@@ -164,6 +166,7 @@ export function PreviewCommentsLayer(props: PreviewCommentsLayerProps): React.JS
           now={props.now}
           onClose={props.onCloseWindow}
           onNewComment={props.onNewComment}
+          newOnThread={props.newOnThread}
           onSaveIdentity={props.onSaveIdentity}
           onSave={props.onSave}
           onWritten={props.onWritten}

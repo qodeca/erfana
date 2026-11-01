@@ -173,7 +173,7 @@ Renderer (React, trusted)                         Main
 | `src/shared/ipc/markdown-comment-channels.ts`, `-schema.ts` *(new)* | `md-comment:list`, `md-comment:save`, `md-comment:command`, event `md-comment:changed`. No page channels, no tokens. |
 | `src/renderer/src/components/Comments/` *(new home)* | `CommentWindow`, `ThreadsView`, `NewCommentView`, `CommentDrawer`, `IdentityStep`, parts and CSS move here from `HtmlPreviewPanel/comments/`. |
 | `src/renderer/src/components/Editor/markdownComments/` *(new)* | `MarkdownCommentsLayer.tsx`, `useMarkdownComments.ts`, `blockPicker.ts`, `commentHighlight.ts`. |
-| `MarkdownToolbar.tsx` | Three tools (§9.1). |
+| `MarkdownToolbar.tsx` | Two tools (§9.1). |
 | `PreviewContextMenu.tsx` | "Add comment" item. |
 | `MarkdownPreview.tsx` | Mount the layer; right-click in comment mode without a selection opens the menu for the hovered block. |
 | `useExportHandlers.ts` | No change expected; a test pins that export HTML holds no comment UI (E-M10). |
@@ -220,14 +220,14 @@ split:         formatting … [Find]   (no comment tools: M11)
 editor only:   formatting … [Find]   (no comment tools: no preview)
 ```
 
-Same three controls, icons, accessible names and tooltips as HTML §10.1. They are the [Buttons](../../design-system/system/components/button/index.html) card's `.erf-button--icon` and `.erf-button--toggle` in the [Toolbar](../../design-system/system/components/toolbar/index.html) card's row (both proposed):
+The same two controls, icons, accessible names and tooltips as HTML §10.1 (Show comment icons is the drawer's checkbox, comments-v2 C-20). They are the [Buttons](../../design-system/system/components/button/index.html) card's `.erf-button--icon` and `.erf-button--toggle` in the [Toolbar](../../design-system/system/components/toolbar/index.html) card's row (both proposed):
 
-- Comment mode and Show comment icons are toggles with `aria-pressed`: pressed is a fill plus the lime foot. The view modes are a `role="radiogroup"` ("View mode") of `role="radio"` buttons: checked is the fill only. A mode that is on never looks like the view that is chosen.
-- Comments opens the drawer, so it is a disclosure (`aria-expanded`), but it is an on/off tool like the others: while the drawer is open it keeps the pressed signature, a fill plus the lime foot (owner decision, 2026-10-28). It carries the open count as an `.erf-counter`, and the needs-attention count as an `.erf-counter--attention` ([Badges](../../design-system/system/components/badge/index.html) card); the counter carries its own number, so it never relies on colour beside the lime foot.
-- Names and shortcuts show in the [Tooltip](../../design-system/system/components/tooltip/index.html) card's tooltip on hover and focus ("Comment mode ⌥⌘M"), not a `title`. Every icon tool has an `aria-label`; Comment mode carries `aria-keyshortcuts="Alt+Meta+M"`.
-- Focus is the decided [Focus](../../design-system/system/foundations/focus.html) ring: outward, offset `--space-1`.
+- Comment mode is a toggle with `aria-pressed`: pressed is a fill plus the 2px lime edge, with a transparent 2px edge when off so the icon never moves. The view modes wear the same look when checked (owner decision, 2026-10-31; before, they were solid violet). The target design is a `role="radiogroup"` ("View mode") of `role="radio"` buttons; the app still marks the mode with a class (the Toolbar card's open defect).
+- Comments opens the drawer, so it is a disclosure (`aria-expanded`), but it is an on/off tool like the others: while the drawer is open it keeps the pressed signature, a fill plus the lime foot (owner decision, 2026-10-28). It is the icon plus the open number at every width, with no words (owner decision, 2026-10-31), and the damaged count as an `.erf-counter--attention` ([Badges](../../design-system/system/components/badge/index.html) card); the counter carries its own number, so it never relies on colour beside the lime edge.
+- Names and shortcuts show in the [Tooltip](../../design-system/system/components/tooltip/index.html) card's tooltip on hover and focus ("Comment mode ⌥⌘M"), not a `title`; the shipping app uses a `title` for now. The count's tooltip equals its name ("7 comments, 1 damaged"; "Comments" when zero). Every icon tool has an `aria-label`; Comment mode carries `aria-keyshortcuts="Alt+Meta+M"`.
+- Focus is the inset ring the HTML band uses, recorded on the [Focus](../../design-system/system/foundations/focus.html) card (owner decision, 2026-10-31). An 8px gap comes before the comment tools, as in the band.
 
-**Where this differs from the cards, as shipped.** The Markdown toolbar's tools are 32 × 28 (`MarkdownToolbar.css:72`, `:102`), not the Toolbar card's 28 × 28 square, and the row sits on the primary surface; the comment tools match their row. **The Markdown toolbar keeps one Tab stop per control, as it ships** – no roving `tabindex`, no arrow keys – which differs from the Toolbar card's one stop with arrows; the card lists it as an open defect, and the comment tools add no keys of their own. Both differences are noted on the [states screen](markdown-comments/states.html).
+**Where this differs from the cards, as shipped.** The Markdown toolbar's tools are 32 × 28 (`MarkdownToolbar.css:72`, `:108`), not the Toolbar card's 28 × 28 square, and the row sits on the primary surface; the comment tools match their row. **The Markdown toolbar keeps one Tab stop per control, as it ships** – no roving `tabindex`, no arrow keys – which differs from the Toolbar card's one stop with arrows; the card lists it as an open defect, and the comment tools add no keys of their own. Both differences are noted on the [states screen](markdown-comments/states.html).
 
 ### 9.2 Comment mode, outline and label
 
@@ -242,16 +242,16 @@ Same three controls, icons, accessible names and tooltips as HTML §10.1. They a
 - **Outside comment mode** with a selection: the existing `PreviewContextMenu` gains **Add comment** (`message-square-plus`) as its first item, then a separator, then the prompt items and Copy selection.
 - **In comment mode** with no selection: a menu with **Add comment** only, labelled by the target's kind noun ("List item"). "Block" is not a UI word (Writing card).
 - **In comment mode** with a selection: **Add comment** (on the words) and **Comment on whole {label}**, label "Selection" ([selection-comments.md §6.1](selection-comments.md#61-entry)). Turning comment mode on with a selection opens the window on it at once.
-- Disabled with reason: the item keeps its action name ("Comment on frontmatter", "Add comment", "Comment on {kind}") when the target is inside the frontmatter, or the file is read-only or paused (spec 024 menu matrix M-15 – M-21). The item stays reachable (`aria-disabled`, decided [Menu](../../design-system/system/components/menu/index.html) card); its reason is the Menu card's visible [reason line](../../design-system/system/components/menu/index.html#reason) – a second line inside the item at `--text-base` in `--color-text-tertiary`, tied to it by `aria-describedby`, the item named from its label by `aria-labelledby`, skipped by arrows and typeahead. Never a hover tooltip or a `title`.
+- Disabled with reason: the item keeps its action name ("Comment on file settings", "Add comment", "Comment on {kind}") when the target is inside the frontmatter, or the file is read-only or paused (spec 024 menu matrix M-15 – M-21). The item stays reachable (`aria-disabled`, decided [Menu](../../design-system/system/components/menu/index.html) card); its reason is the Menu card's visible [reason line](../../design-system/system/components/menu/index.html#reason) – a second line inside the item at `--text-base` in `--color-text-tertiary`, tied to it by `aria-describedby`, the item named from its label by `aria-labelledby`, skipped by arrows and typeahead. Never a hover tooltip or a `title`.
 
 ### 9.4 Comment window
 
 Same component, same sizes, placement order (right of the block → left → below → above; a sheet under 400 px of preview width).
 
 - Context line: `{Kind} · {file}, line {n}` – `Paragraph · plan.md, line 12`. Titles use the kind noun too: "Comment on paragraph".
-- With a selection, a quote box under the context line: the selected phrase, in the serif preview font, with a left accent rule. Longer than 200 characters: cut with "…" and the note "Only the first 200 characters are kept."
+- With a selection, a quote box under the context line: the selected phrase, in the serif preview font, with a left accent rule. Longer than 200 characters: cut with "…" and the note "Erfana keeps only the first 200 characters of your selection."
 - Table rows and cells: second line "Saved before the table on line {n}." (the HTML "Added by a script – saved before …" slot).
-- Hint: "Plain text. Saved inside plan.md."
+- Hint: "Saves into plan.md."
 - Save refused by the render check: error under the field, text kept (§5.3 wording).
 - Banners in the window are the [Feedback](../../design-system/system/components/feedback/index.html) card's boxed `.erf-banner` (warning, info), each starting with a visually hidden severity word ("Warning: ", "Note: "), actions as `erf-button--secondary erf-button--sm`. The shipped `CommentBanner` (`CommentParts.tsx:89-110`) has no spoken severity word yet – the Feedback card's open defect, an app follow-up.
 
@@ -272,7 +272,7 @@ The look is the [Text highlights](../../design-system/system/foundations/highlig
 
 ### 9.7 Drawer
 
-Same drawer at the inline end of the preview area, beside the preview, never over the editor. Rows show the kind noun and line (`List item · line 18`), the excerpt, the author line, and the selected phrase in quotes when there is one. Tags: "Not found", "Damaged", "Resolved", "Text changed". The rows are the HTML drawer's, recorded in the [Rows and lists](../../design-system/system/components/row/index.html#exceptions) card's Exceptions; the shell and filter move toward the [Drawer](../../design-system/system/patterns/drawer/index.html) pattern and the [Segmented control](../../design-system/system/components/segmented/index.html) (comments-v2).
+Same drawer at the inline end of the preview area, never over the editor. Under 640 px of preview pane it takes the whole width and "Show in preview" closes it first, as in HTML (owner decision, 2026-10-31). Rows show the kind noun and line (`List item · line 18`), the excerpt, the author line, and the selected phrase in quotes when there is one. Tags: "Not found", "Damaged", "Resolved", "Text changed". The rows are the HTML drawer's, recorded in the [Rows and lists](../../design-system/system/components/row/index.html#exceptions) card's Exceptions; the shell and filter move toward the [Drawer](../../design-system/system/patterns/drawer/index.html) pattern and the [Segmented control](../../design-system/system/components/segmented/index.html) (comments-v2).
 
 Empty: the [States](../../design-system/system/patterns/states/index.html) pattern's inline empty state (`.erf-state--inline`) where the first row would be – title "No comments in this file yet", hint "Select text and right-click, or turn on comment mode."
 
@@ -284,13 +284,13 @@ Empty: the [States](../../design-system/system/patterns/states/index.html) patte
 | Mode tab | "Comment mode · {Kind}, line {n} · Esc to leave" |
 | Window context | "{Kind} · {file}, line {n}" · "Saved before the table on line {n}." |
 | Window title | "Comment on {kind}" – "Comment on paragraph" |
-| Selection quote, too long | "Only the first 200 characters are kept." |
+| Selection quote, too long | "Erfana keeps only the first 200 characters of your selection." |
 | Render check refused | "Erfana can't add a comment here without changing how the file looks. Your text is still here." |
 | Unsaved edits (same tab) | title "Save your edits first" · "{file} has unsaved changes. Save them first so your edits and this comment don't overwrite each other." · "Save {file}" |
 | Not found | "Erfana can't find this {kind} any more. The comment stays in {file}, line {n}." · drawer tag "Not found" |
 | Phrase gone | "The selected text changed. The comment is still on this {kind}." |
 | Banner severity (spoken only) | "Warning: " · "Note: " |
-| Frontmatter | "Comments can't be added to the frontmatter." |
+| Frontmatter | "You can't comment on the settings at the top of this file." |
 | Mode announce | "Comment mode on. Click a block, select text, or press Tab to pick one. Esc to leave." · "Showing {kind}, line {n}." |
 | Drawer empty | title "No comments in this file yet" · hint "Select text and right-click, or turn on comment mode." |
 | Shortcut labels | from `formatShortcut`: "⌥⌘M" on macOS, "Ctrl+Alt+M" on Windows and Linux; Save "⌘Enter" / "Ctrl+Enter" |

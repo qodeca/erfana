@@ -18,6 +18,8 @@ import type {
 import type { CommentFileView } from '../../../../../shared/ipc/comment-common-schema'
 import type { ContextMenuItem } from '../../ContextMenu/ContextMenu'
 import type { CommentDrawerProps } from '../CommentDrawer'
+import type { ModeEscapeKey } from '../commentModeEscape'
+import type { HostStepKey } from './useHostStepKeys'
 import type { CommentToolbarToolsProps } from '../CommentToolbarTools'
 import type { CommentWindowProps } from '../CommentWindow'
 import type { PreviewCommentAdapter } from './previewAdapter'
@@ -35,6 +37,8 @@ export interface RendererCommentSource {
   readonly save: (request: FileCommentSaveRequest) => Promise<FileCommentSaveResult>
   /** Called when main says the file changed on disk; returns the unsubscribe. */
   readonly onChanged: (callback: () => void) => () => void
+  /** A write answered "still saving" landed (W-10): as after a save answered in time, the preview needs the new text. */
+  readonly written?: () => void
 }
 
 /** Options for `useCommentOverlayHost`. */
@@ -45,6 +49,8 @@ export interface CommentOverlayHostOptions {
   readonly enabled: boolean
   /** The preview is shown where comments live (Markdown: preview-only view, tab visible). */
   readonly shown: boolean
+  /** The panel is in the view comments live in, tab shown or not. Leaving it leaves comment mode (024-FR-005); hiding the tab does not. */
+  readonly previewView: boolean
   /** This panel is the active one: the mode shortcut is its own (src/renderer/CLAUDE.md). */
   readonly activePanel: boolean
   readonly adapter: PreviewCommentAdapter
@@ -80,6 +86,10 @@ export interface CommentOverlayHost {
   readonly enabled: boolean
   readonly shown: boolean
   readonly mode: boolean
+  /** A key on the panel root, or on its dockview group: Esc leaves comment mode from there (`commentModeEscape.ts`). */
+  readonly onPanelKey: (event: ModeEscapeKey & HostStepKey) => void
+  /** The same on its way down through the panel root, for the Find bar, which stops its keys. */
+  readonly onPanelKeyCapture: (event: React.KeyboardEvent) => void
   readonly showIcons: boolean
   readonly toolbar: CommentToolbarToolsProps
   readonly drawer: CommentDrawerProps | null
@@ -88,6 +98,8 @@ export interface CommentOverlayHost {
   readonly window: CommentWindowProps | null
   readonly polite: string
   readonly assertive: string
+  /** C-13: where a step key landed, or that it had nowhere to go. */
+  readonly stepSaid: string
   /** The target under the pointer or picked by key in comment mode. */
   readonly outlined: HTMLElement | null
   readonly placements: readonly ThreadPlacement[]
@@ -99,6 +111,8 @@ export interface CommentOverlayHost {
     opener?: 'page' | 'drawer',
     blockKeys?: readonly string[]
   ) => void
+  /** The same for a step key: the window shows the thread, and has left any target it was opened on (C-13). */
+  readonly openStepped: (threadKeys: readonly string[], anchor: HTMLElement | null) => void
   readonly scrollTick: number
   /** The Comment button over a selection (C-16), while it shows, and what it does. */
   readonly selectionButton: SelectionButton | null
@@ -107,4 +121,8 @@ export interface CommentOverlayHost {
   readonly markOwner: string
   /** The threads of the open window: their words wear the active mark (R-01). */
   readonly activeThreads: readonly string[]
+  /** The target wearing "Show in preview"'s flash (K-22). */
+  readonly flash: HTMLElement | null
+  /** The element the open window belongs to (I-9). */
+  readonly windowTarget: HTMLElement | null
 }

@@ -104,9 +104,9 @@ test.describe('Claims: developer docs (dev-1)', () => {
     }
   })
 
-  test('e2e/ holds 73 *.e2e.ts specs (docs/testing/README.md)', () => {
+  test('e2e/ holds 76 *.e2e.ts specs (docs/testing/README.md)', () => {
     const specs = fs.readdirSync(path.join(ROOT, 'e2e')).filter((f) => f.endsWith('.e2e.ts'))
-    expect(specs.length).toBe(73)
+    expect(specs.length).toBe(76)
   })
 
   test('both darwin and win32 baselines are committed for all six visual states', () => {
@@ -147,7 +147,7 @@ test.describe('Claims: developer docs (dev-1)', () => {
   test('file sizes stated in docs/technical-debt.md', () => {
     expect(lineCount('scripts/fuses.js')).toBe(2370)
     expect(lineCount('src/main/services/preview/previewLiveVisibility.ts')).toBe(342)
-    expect(lineCount('src/main/services/preview/previewLiveWiring.ts')).toBe(434)
+    expect(lineCount('src/main/services/preview/previewLiveWiring.ts')).toBe(445)
   })
 
   test('GitHub-side CI state stated in docs/ci.md', async () => {

@@ -53,31 +53,6 @@
   gap: var(--space-2);
 }
 
-.view-mode-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-3) var(--space-6);
-  background-color: transparent;
-  border: var(--border-width) solid var(--color-border-default);
-  color: var(--color-text-primary);
-  cursor: pointer;
-  border-radius: 0;
-  font-size: var(--text-md);
-  transition: all var(--transition-normal);
-}
-
-.view-mode-btn:hover {
-  background-color: var(--color-bg-hover-solid);
-  border-color: var(--color-accent-secondary);
-}
-
-.view-mode-btn.active {
-  background-color: var(--color-btn-primary-bg);
-  border-color: var(--color-btn-primary-bg);
-  color: var(--color-btn-primary-text);
-}
-
 .toolbar-separator {
   width: 1px;
   height: var(--icon-size-lg);
@@ -131,30 +106,6 @@
 
 .markdown-toolbar .modified-indicator {
   font-size: var(--text-lg);
-}
-
-.markdown-toolbar .view-mode-btn {
-  width: var(--btn-height-md);
-  height: 28px;
-  padding: 0;
-  background-color: transparent;
-  border: var(--border-width) solid transparent;
-  color: var(--color-text-primary);
-  cursor: pointer;
-  border-radius: 0;
-  transition: all var(--transition-normal);
-}
-
-.markdown-toolbar .view-mode-btn:hover {
-  background-color: var(--color-bg-hover-solid);
-  border-color: var(--color-border-default);
-  color: var(--color-white);
-}
-
-.markdown-toolbar .view-mode-btn.active {
-  background-color: var(--color-btn-primary-bg);
-  border-color: var(--color-btn-primary-bg);
-  color: var(--color-btn-primary-text);
 }
 
 .toolbar-btn {

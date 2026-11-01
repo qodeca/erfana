@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Narrow to words on Edit of a thread's first message (comments-v2 C-07 "Add
+ * Comment on specific words on Edit of a thread's first message (comments-v2 C-07 "Add
  * a field to the new-comment window, and to Edit on a thread's first
  * message"; spec 024 024-FR-004, D-16). The field shows the target's text main
  * sent with the thread, opens on the stored words, and Save sends `sel` only
@@ -53,7 +53,7 @@ async function openEdit(user: ReturnType<typeof userEvent.setup>, index = 0): Pr
   await user.click(screen.getByRole('menuitem', { name: COPY.edit }))
 }
 
-/** Opens the Narrow to words field and selects `[start, end)` in it. */
+/** Opens the Comment on specific words field and selects `[start, end)` in it. */
 async function narrow(user: ReturnType<typeof userEvent.setup>, start: number, end: number): Promise<HTMLTextAreaElement> {
   await user.click(screen.getByTestId(TEST_IDS.COMMENT_NARROW_TOGGLE))
   const field = screen.getByTestId(TEST_IDS.COMMENT_NARROW_FIELD) as HTMLTextAreaElement
@@ -64,7 +64,7 @@ async function narrow(user: ReturnType<typeof userEvent.setup>, start: number, e
   return field
 }
 
-describe('024-AC-004 C-07 Narrow to words on Edit of the first message', () => {
+describe('024-AC-004 C-07 Comment on specific words on Edit of the first message', () => {
   let portalRoot: HTMLDivElement
   beforeEach(() => {
     portalRoot = document.createElement('div')
@@ -122,7 +122,7 @@ describe('024-AC-004 C-07 Narrow to words on Edit of the first message', () => {
     await narrow(user, 2, 3)
     await user.click(screen.getByTestId(TEST_IDS.COMMENT_EDIT_SAVE))
     expect(props.onSave).not.toHaveBeenCalled()
-    expect(screen.getByTestId(TEST_IDS.COMMENT_WORDS_NOTICE)).toHaveTextContent(SELECTION_COPY.blank('element'))
+    expect(screen.getByTestId(TEST_IDS.COMMENT_WORDS_NOTICE)).toHaveTextContent(SELECTION_COPY.blank('section'))
   })
 
   it('024-AC-004 C-07 a reply, or a thread main sent no text for, has no field', async () => {
@@ -138,10 +138,10 @@ describe('024-AC-004 C-07 Narrow to words on Edit of the first message', () => {
     await openEdit(user)
     await narrow(user, 20, 33)
     await user.click(screen.getByTestId(TEST_IDS.COMMENT_EDIT_SAVE))
-    expect(await screen.findByTestId(TEST_IDS.COMMENT_SAVE_ERROR)).toHaveTextContent(SELECTION_COPY.wordsNotInFile('element', 'index.html'))
+    expect(await screen.findByTestId(TEST_IDS.COMMENT_SAVE_ERROR)).toHaveTextContent(SELECTION_COPY.wordsNotInFile('section'))
     // useLiveText empties the region, then sets the sentence a frame later: wait for it.
     await waitFor(() =>
-      expect(screen.getByTestId(TEST_IDS.COMMENT_WINDOW_POLITE)).toHaveTextContent(SELECTION_COPY.wordsNotInFile('element', 'index.html'))
+      expect(screen.getByTestId(TEST_IDS.COMMENT_WINDOW_POLITE)).toHaveTextContent(SELECTION_COPY.wordsNotInFile('section'))
     )
   })
 

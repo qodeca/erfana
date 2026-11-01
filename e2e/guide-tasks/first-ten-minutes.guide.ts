@@ -3,19 +3,19 @@
 /**
  * Guide task: docs/user-guide/first-ten-minutes.md, followed as a newcomer.
  *
- * Goes from first launch (Home, no project) to a real Claude Code turn that
+ * Goes from first launch (Home, no project) to a real agent turn that
  * edits a Markdown file, and checks the edit lands on disk and in the app's
  * preview. Each step records the app time it took; the total plus the page's
  * reading time (200 words per minute) must fit in ten minutes.
  *
- * Needs ERFANA_GUIDE_CLAUDE_TOKEN_FILE: the path of a Claude Code OAuth token
- * file. The token is read only inside the terminal's shell, never here.
+ * The agent and its login: `guideAgent.ts`.
  */
 
 import * as fs from 'fs'
 import * as path from 'path'
 import { stubDialog } from 'electron-playwright-helpers'
 import { test, expect } from '../fixtures'
+import { askAgent, guideAgent } from './guideAgent'
 
 const PAGE = path.join(__dirname, '..', '..', 'docs', 'user-guide', 'first-ten-minutes.md')
 const AGENT_TURN_MS = 4 * 60_000
@@ -46,13 +46,7 @@ test('first ten minutes: from first launch to a reviewed agent edit', async ({
   window,
   terminalPage
 }) => {
-  const tokenFile = process.env.ERFANA_GUIDE_CLAUDE_TOKEN_FILE
-  if (!tokenFile || !fs.existsSync(tokenFile)) {
-    throw new Error(
-      'ERFANA_GUIDE_CLAUDE_TOKEN_FILE must name an existing Claude Code token file – ' +
-        'this guide task needs a real agent and has no stand-in.'
-    )
-  }
+  const agent = guideAgent()
   test.setTimeout(AGENT_TURN_MS + 3 * 60_000)
 
   const projectPath = testProject.path
@@ -98,40 +92,24 @@ test('first ten minutes: from first launch to a reviewed agent edit', async ({
     await expect(window.getByRole('button', { name: 'Terminal' }).first()).toBeVisible()
     await terminalPage.waitForReady()
 
-    // Harness setup – what a user's own Claude Code install already has.
-    const claudeJson = {
-      theme: 'dark',
-      hasCompletedOnboarding: true,
-      projects: Object.fromEntries(
-        [...new Set([projectPath, fs.realpathSync(projectPath)])].map((p) => [
-          p,
-          { hasTrustDialogAccepted: true, hasCompletedProjectOnboarding: true }
-        ])
-      )
-    }
-    fs.writeFileSync(path.join(homeDir, '.claude.json'), JSON.stringify(claudeJson, null, 2))
-    fs.mkdirSync(path.join(projectPath, '.claude'), { recursive: true })
-    fs.writeFileSync(
-      path.join(projectPath, '.claude', 'settings.json'),
-      JSON.stringify({ permissions: { defaultMode: 'acceptEdits' } }, null, 2)
-    )
+    // Harness setup – what a user's own agent install already has.
+    agent.prepare(homeDir, projectPath)
 
-    await terminalPage.sendCommand('CLAUDE_CODE_OAUTH_TOKEN="$(cat "$ERFANA_GUIDE_CLAUDE_TOKEN_FILE")" claude')
+    await terminalPage.sendCommand(agent.command)
     await expect
       .poll(async () => (await terminalPage.readScreen()).lines.join('\n'), {
-        message: 'Claude Code should start and wait for input',
+        message: `${agent.name} should start and wait for input`,
         timeout: 60_000
       })
-      .toMatch(/for shortcuts|accept edits/i)
+      .toMatch(agent.ready)
   })
 
   await timed('Agent turn 2: "Ask the agent to make a small change to a file in this project."', async () => {
-    await terminalPage.sendCommand(
+    await askAgent(
+      terminalPage,
       `In ${NOTE_FILE}, add one list item "- ${ADDED_ITEM}" after "- bread". Change nothing else.`,
-      false
+      ADDED_ITEM
     )
-    await terminalPage.waitForOutput(ADDED_ITEM)
-    await window.keyboard.press('Enter')
     await expect
       .poll(() => fs.readFileSync(notePath, 'utf-8'), {
         message: 'the agent should add the item to the file on disk',
@@ -154,7 +132,7 @@ test('first ten minutes: from first launch to a reviewed agent edit', async ({
     await expect(window.getByText(/changed on disk/i)).toHaveCount(0)
   })
 
-  // Leave Claude Code so teardown meets a plain shell.
+  // Leave the agent so teardown meets a plain shell.
   await terminalPage.interrupt()
   await terminalPage.interrupt()
 

@@ -7,7 +7,7 @@
  *
  * Three filters (OD-04):
  *
- * - **Open** – every open thread, found or not: "Not visible now" (S-02),
+ * - **Open** – every open thread, found or not: "Hidden on the page" (S-02),
  *   "Changed" and "Words changed" (S-03, S-04) and "Not found" (S-05) are
  *   neutral tags, never a filter. Enter on a not-found row is "Open in
  *   source": there is nothing in the preview to show.
@@ -46,12 +46,14 @@ export interface DrawerRow {
   readonly filter: DrawerFilter
   readonly fileKey: string
   readonly displayPath: string
-  /** Absolute, project space – "Open in source". */
+  /** Absolute, project space – "Open in file". */
   readonly filePath: string
   /** The file is a frame's, not the page's own. */
   readonly frame: boolean
   readonly line: number
   readonly label: string
+  /** The code behind the label, for hover only (D-03); never spoken (K-17). */
+  readonly code?: string
   readonly replies: number
   /** The first message; `''` for a block. */
   readonly excerpt: string
@@ -131,8 +133,9 @@ function threadRow(
     id: `${file.fileKey}/${thread.threadKey}`,
     filter: isResolved ? 'resolved' : 'open',
     line: thread.line,
-    // The HTML Preview names a script-built element by its own tag; Markdown names every target in words (C-03).
-    label: thread.runtime && words.preview === 'html' ? thread.runtime.tag : words.label(thread),
+    label: words.label(thread),
+    // A script-built element's code is its own tag, not the in-file element its comment sits before.
+    code: words.code(thread.runtime ?? thread),
     replies: thread.messages.length - 1,
     excerpt: first?.text ?? '',
     words: change?.state === 'words' ? `“${change.was}” → “${change.now ?? ''}”` : '',
@@ -223,6 +226,8 @@ export interface ListCounts {
   readonly resolved: number
   /** Open comments that are Changed or Words changed. */
   readonly changed: number
+  /** Open comments whose target is gone (S-05). */
+  readonly notFound: number
   /** Damaged blocks (S-07, S-08); newer-format blocks count in neither. */
   readonly damaged: number
 }
@@ -237,14 +242,16 @@ export function listCounts(files: readonly CommentFileView[]): ListCounts {
   let open = 0
   let resolved = 0
   let changed = 0
+  let notFound = 0
   let damaged = 0
   for (const file of files) {
     damaged += file.damaged.length
     for (const thread of file.threads) {
       if (thread.status === 'resolved') resolved += 1
       else open += 1
+      if (thread.status !== 'resolved' && !thread.attached) notFound += 1
       if (changeOf(thread) !== undefined) changed += 1
     }
   }
-  return { open, resolved, changed, damaged }
+  return { open, resolved, changed, notFound, damaged }
 }

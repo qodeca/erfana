@@ -85,7 +85,7 @@ describe('CommentWindow – v2 thread states', () => {
   // ---- C-05 not found (S-05) ----
   it('C-05 (HTML) a lost element keeps Reply and Resolve, and Resolve leads with the first focus', async () => {
     setup({ list: ready([fileView({ threads: [thread(1, { attached: false, quote: 'Buy now' })] })]) })
-    expect(screen.getByTestId('comment-not-found')).toHaveTextContent(WINDOW_COPY.notFound('element', 'index.html'))
+    expect(screen.getByTestId('comment-not-found')).toHaveTextContent(WINDOW_COPY.notFound('section', 'index.html'))
     expect(screen.getByTestId('comment-not-found-quote')).toHaveTextContent('Buy now')
     expect(screen.getByTestId('comment-comment-line')).toHaveTextContent('The comment itself is on line 11 of index.html.')
     expect(screen.getByTestId('comment-reply-field')).toBeInTheDocument()
@@ -99,7 +99,7 @@ describe('CommentWindow – v2 thread states', () => {
     const banner = screen.getByTestId('comment-not-found')
     expect(banner).toHaveTextContent(WINDOW_COPY.notFound('paragraph', 'notes.md'))
     expect(banner).not.toHaveTextContent(/element/)
-    expect(screen.getByText('paragraph, not found · notes.md')).toBeInTheDocument()
+    expect(screen.getByText('Paragraph, not found · notes.md')).toBeInTheDocument()
     expect(screen.getByTestId('comment-resolve')).toHaveClass('dialog-btn-primary')
   })
 
@@ -120,9 +120,19 @@ describe('CommentWindow – v2 thread states', () => {
     expect(screen.getByTestId('comment-resolve')).toHaveClass('dialog-btn-primary')
   })
 
+  it('P-F10 (HTML) a part restyled or moved with the same text says so, and shows no Was or Now', () => {
+    setup({ list: ready([fileView({ threads: [thread(1, { change: { state: 'changed', was: 'Buy now' } })] })]) })
+    const status = screen.getByTestId('comment-changed')
+    expect(status).toHaveTextContent('This part was restyled or moved. Its text is the same.')
+    expect(status).not.toHaveTextContent(WINDOW_COPY.changed)
+    expect(within(status).queryByTestId('comment-was')).toBeNull()
+    expect(within(status).queryByTestId('comment-now')).toBeNull()
+    expect(screen.getByTestId('comment-resolve')).toHaveClass('dialog-btn-primary')
+  })
+
   it('C-06 words changed with nothing left says the words are gone and shows Was only', () => {
     setup({ list: ready([fileView({ threads: [thread(1, { change: { state: 'words', was: 'cheap seats' } })] })]) })
-    expect(screen.getByTestId('comment-changed')).toHaveTextContent(WINDOW_COPY.wordsGone('element'))
+    expect(screen.getByTestId('comment-changed')).toHaveTextContent(WINDOW_COPY.wordsGone('section'))
     expect(screen.getByTestId('comment-was')).toHaveTextContent('cheap seats')
     expect(screen.queryByTestId('comment-now')).toBeNull()
   })
@@ -209,25 +219,25 @@ describe('CommentWindow – state table S-07 – S-09 and F-01', () => {
   const blockRequest = (key: string) => threadsRequest({ threadKeys: [], blockKeys: [key] })
   const primaries = () => document.querySelectorAll('.dialog-btn-primary')
 
-  it('S-07 (Markdown) a damaged comment: the warning sentence, read-only raw text, Copy raw text, Open in source, Delete damaged comment…, and no main button', () => {
+  it('S-07 (Markdown) a damaged comment: the warning sentence, read-only raw text, Copy comment text, Open in file, Delete damaged comment…, and no main button', () => {
     setup({ request: blockRequest('b1'), list: ready([fileView({ damaged: [damaged(1)] })]) }, true)
     const view = screen.getByTestId('comment-damaged')
-    expect(view).toHaveTextContent("Erfana can't read this comment, so it won't change it. Fix it in the source, or delete it.")
+    expect(view).toHaveTextContent("This comment is damaged, so Erfana can't read it. You can delete it, or fix it in the file.")
     expect(view.querySelector('.erf-comment-banner--warning')).not.toBeNull()
     expect(screen.getByTestId('comment-damaged-raw')).toHaveTextContent('<!-- erfana:comment {not json -->')
     expect(within(view).getByRole('button', { name: COPY.copyRaw })).toBeVisible()
     expect(within(view).getByRole('button', { name: COPY.openInSource })).toBeVisible()
     expect(screen.getByTestId('comment-delete-block')).toHaveTextContent('Delete damaged comment…')
-    // Rebuild from data… only for readable-mismatch / id-mismatch with valid @data (OD-05).
+    // Repair comment… only for readable-mismatch / id-mismatch with valid @data (OD-05).
     expect(screen.queryByTestId('comment-rebuild')).toBeNull()
     expect(primaries()).toHaveLength(0)
   })
 
-  it('S-07 (HTML) a damaged comment has the same parts – raw text, Copy raw text, Open in source, Delete – and no main button; none to delete in a read-only file', () => {
+  it('S-07 (HTML) a damaged comment has the same parts – raw text, Copy comment text, Open in file, Delete – and no main button; none to delete in a read-only file', () => {
     const { unmount } = setup({ request: blockRequest('b1'), list: ready([fileView({ damaged: [damaged(1)] })]) })
     const view = screen.getByTestId('comment-damaged')
     // The state table's sentence, never "comment block".
-    expect(view).toHaveTextContent("Erfana can't read this comment, so it won't change it. Fix it in the source, or delete it.")
+    expect(view).toHaveTextContent("This comment is damaged, so Erfana can't read it. You can delete it, or fix it in the file.")
     expect(view).not.toHaveTextContent(/comment block/)
     expect(view.querySelector('.erf-comment-banner--warning')).not.toBeNull()
     expect(within(view).getByRole('button', { name: COPY.copyRaw })).toBeVisible()
@@ -249,7 +259,7 @@ describe('CommentWindow – state table S-07 – S-09 and F-01', () => {
       },
       true
     )
-    expect(screen.getByTestId('comment-damaged')).toHaveTextContent('This comment contains git conflict markers. Resolve the conflict in the source.')
+    expect(screen.getByTestId('comment-damaged')).toHaveTextContent('This comment has two versions mixed together. Fix this in the file, or ask a developer to help.')
     expect(screen.queryByTestId('comment-rebuild')).toBeNull()
     expect(screen.queryByTestId('comment-delete-block')).toBeNull()
     expect(primaries()).toHaveLength(0)
@@ -262,7 +272,7 @@ describe('CommentWindow – state table S-07 – S-09 and F-01', () => {
         { request: blockRequest('b1'), list: ready([fileView({ writable: true, damaged: [damaged(1, { reason: 'conflict-marker', rebuild })] })]) },
         markdown
       )
-      expect(screen.getByTestId('comment-damaged')).toHaveTextContent('This comment contains git conflict markers. Resolve the conflict in the source.')
+      expect(screen.getByTestId('comment-damaged')).toHaveTextContent('This comment has two versions mixed together. Fix this in the file, or ask a developer to help.')
       expect(screen.getByTestId('comment-delete-block')).toBeVisible()
       expect(screen.queryByTestId('comment-rebuild')).toBeNull()
       expect(primaries()).toHaveLength(0)
@@ -276,19 +286,19 @@ describe('CommentWindow – state table S-07 – S-09 and F-01', () => {
         { request: blockRequest('n1'), list: ready([fileView({ newer: [{ blockKey: 'n1', version: 2, line: 70 }] })]) },
         markdown
       )
-      expect(screen.getByTestId('comment-newer')).toHaveTextContent('A newer version of Erfana wrote this comment, so it is read-only here.')
+      expect(screen.getByTestId('comment-newer')).toHaveTextContent('A newer version of Erfana wrote this comment. Update Erfana to change it.')
       unmount()
     }
   })
 
-  it('S-09 a newer-format comment is shown read-only with an info banner titled "Newer format – read-only", no actions that change it and no main button', () => {
+  it('S-09 a newer-format comment is shown read-only with an info banner titled "Needs a newer Erfana", no actions that change it and no main button', () => {
     for (const markdown of [false, true]) {
       const { unmount } = setup(
         { request: blockRequest('n1'), list: ready([fileView({ newer: [{ blockKey: 'n1', version: 2, line: 70 }] })]) },
         markdown
       )
       const view = screen.getByTestId('comment-newer')
-      expect(view).toHaveAccessibleName('Newer format – read-only')
+      expect(view).toHaveAccessibleName('Needs a newer Erfana')
       expect(view.querySelector('.erf-comment-banner--info')).not.toBeNull()
       expect(view).toHaveTextContent(/^.*A newer version of Erfana wrote this comment/)
       expect(screen.queryByTestId('comment-delete-block')).toBeNull()
@@ -332,7 +342,7 @@ describe('CommentWindow – v2 stepping (C-13)', () => {
     expect(screen.getByTestId('comment-stepper')).toHaveTextContent('2 of 3')
     // The live region clears, then speaks on the next tick, so a repeat is spoken again.
     await waitFor(() =>
-      expect(screen.getByTestId('comment-window-polite')).toHaveTextContent('Comment 2 of 3, on element, line 12.')
+      expect(screen.getByTestId('comment-window-polite')).toHaveTextContent('Comment 2 of 3, on section, line 12.')
     )
     await waitFor(() => expect(screen.getByTestId('comment-window-title')).toHaveFocus())
     await user.click(screen.getByTestId('comment-step-previous'))
@@ -360,7 +370,7 @@ describe('CommentWindow – v2 stepping (C-13)', () => {
     await user.click(screen.getByTestId('comment-step-next'))
     expect(props.onReveal).toHaveBeenCalledWith('t3')
     await waitFor(() =>
-      expect(screen.getByTestId('comment-window-polite')).toHaveTextContent('Comment 2 of 2, on element, line 13.')
+      expect(screen.getByTestId('comment-window-polite')).toHaveTextContent('Comment 2 of 2, on section, line 13.')
     )
     drawer.unmount()
   })
@@ -385,7 +395,6 @@ describe('CommentWindow – v2 stepping (C-13)', () => {
   })
 
   it('C-13 with nothing to step to, Alt+F9 from the preview and in the window keep the window where it is', async () => {
-    const user = userEvent.setup()
     const { props } = setup({ onReveal: vi.fn(), drawerId: 'drawer-3' })
     await waitFor(() => expect(screen.getByTestId('comment-window-title')).toHaveFocus())
     act(() => {
@@ -393,9 +402,11 @@ describe('CommentWindow – v2 stepping (C-13)', () => {
       // nothing to step to no longer swallows the key, so the host handles it.
       expect(stepOpenWindow('drawer-3', 'next')).toBe(false)
     })
-    await user.keyboard('{Alt>}{F9}{/Alt}')
+    fireEvent.keyDown(screen.getByTestId('comment-window-title'), { key: 'F9', code: 'F9', altKey: true })
     expect(props.onReveal).not.toHaveBeenCalled()
     expect(screen.getByTestId('comment-window-title')).toHaveFocus()
+    // K-26: a key with nothing to do says so.
+    await waitFor(() => expect(screen.getByTestId('comment-window-polite')).toHaveTextContent('No comments to go to.'))
   })
 
   it('C-13 Resolve and next resolves the shown comment in one write, then steps on', async () => {
@@ -458,14 +469,14 @@ describe('CommentWindow – v2 stepping (C-13)', () => {
     expect(screen.getByTestId('comment-reply-resolve')).toBeInTheDocument()
   })
 
-  it('C-13 the head keeps New comment and Open in source under More actions', async () => {
+  it('C-13 the head keeps New comment and Open in file under More actions', async () => {
     const user = userEvent.setup()
     setup({ list: ready([three()]) })
     await user.click(screen.getByTestId('comment-more-actions'))
     expect(await screen.findByText(COPY.openInSource)).toBeInTheDocument()
   })
 
-  it('C-13 More actions › Open in source opens the shown comment\'s file at its line', async () => {
+  it('C-13 More actions › Open in file opens the shown comment\'s file at its line', async () => {
     const user = userEvent.setup()
     const { props } = setup({ list: ready([three()]) })
     await user.click(screen.getByTestId('comment-more-actions'))

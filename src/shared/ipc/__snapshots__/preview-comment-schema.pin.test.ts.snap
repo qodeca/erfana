@@ -987,6 +987,32 @@ exports[`preview comment IPC schemas (characterisation) > PIN-C-002 the comment 
           "additionalProperties": false,
           "properties": {
             "command": {
+              "const": "new-on-thread",
+              "type": "string",
+            },
+            "panelId": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string",
+            },
+            "threadKey": {
+              "maxLength": 40,
+              "minLength": 1,
+              "pattern": "^[\\w-]+$",
+              "type": "string",
+            },
+          },
+          "required": [
+            "panelId",
+            "command",
+            "threadKey",
+          ],
+          "type": "object",
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "command": {
               "const": "keep-draft",
               "type": "string",
             },

@@ -14,8 +14,8 @@
  * - the reveal flash (a static highlight, so reduced motion needs nothing);
  * - comment marks over the words comments are about (spec 024 C-12), which
  *   take clicks only in comment mode (C-17);
- * - in comment mode, after a drag that selected words, the Comment button
- *   at the end of the selection (C-16) – a button in the shadow root, its
+ * - after a real selection, in and out of comment mode, the Comment button
+ *   at the end of the selection (C-16, D-10) – a button in the shadow root, its
  *   label generated content like every other word here.
  *
  * Pins and marks are visual only (C-11, differences table D-07): their layer
@@ -35,6 +35,7 @@
  */
 import { drawPin, showText, type PinPlacement } from './pins'
 import type { MarkPlacement } from './marks'
+import { NO_HOVER, type LinkedHover } from './overlayHits'
 import { boxOf, outlineBox, type Box, type Viewport } from './geometry'
 import { labelOf, type LabelParts, type LabelSuffix } from './label'
 import { isAltHeld } from './altHold'
@@ -73,6 +74,8 @@ export interface ViewModel {
   readonly pinLabel: (pin: PinPlacement) => string
   /** The element whose pin is drawn selected (the one a pick just opened). */
   readonly selected: Element | null
+  /** The pin or mark key that pick named, if any: its words alone take the active look. */
+  readonly selectedKey?: string | null
   readonly shields: readonly Box[]
   readonly indicator: { readonly visible: boolean; readonly bottom: boolean }
   readonly flash: Box | null
@@ -80,6 +83,8 @@ export interface ViewModel {
   readonly marks?: readonly MarkPlacement[]
   /** Marks take clicks (comment mode, C-17). */
   readonly marksClickable?: boolean
+  /** What the pointer lights across pins and marks (C-17). */
+  readonly hover?: LinkedHover
   /** The Comment button over a selection (C-16), while it shows. */
   readonly button?: Box | null
 }
@@ -160,6 +165,7 @@ export class OverlayView {
   private readonly label: HTMLDivElement
   private readonly labelTag: HTMLSpanElement
   private readonly labelRest: HTMLSpanElement
+  private readonly labelCode: HTMLSpanElement
   private readonly labelSize: HTMLSpanElement
   private readonly pinLayer: HTMLDivElement
   private readonly markLayer: HTMLDivElement
@@ -184,9 +190,11 @@ export class OverlayView {
     this.labelTag = doc.createElement('span')
     this.labelTag.className = 'erf-hpc-label__tag'
     this.labelRest = doc.createElement('span')
+    this.labelCode = doc.createElement('span')
+    this.labelCode.className = 'erf-hpc-label__code'
     this.labelSize = doc.createElement('span')
     this.labelSize.className = 'erf-hpc-label__size'
-    this.label.append(this.labelTag, this.labelRest, this.labelSize)
+    this.label.append(this.labelTag, this.labelRest, this.labelCode, this.labelSize)
     this.pinLayer = part(doc, 'erf-hpc-pins')
     this.pinLayer.setAttribute('aria-hidden', 'true')
     this.markLayer = part(doc, 'erf-hpc-marks')
@@ -205,18 +213,28 @@ export class OverlayView {
     shown(this.flash, model.flash !== null)
     if (model.flash !== null) place(this.flash, model.flash)
     this.renderOutline(model.outline, viewport)
-    this.renderMarks(model.marks ?? [], model.marksClickable === true)
+    this.renderMarks(model)
     this.renderPins(model)
     const button = model.button ?? null
     shown(this.button, button !== null)
     if (button !== null) place(this.button, button)
   }
 
-  private renderMarks(marks: readonly MarkPlacement[], clickable: boolean): void {
-    this.markLayer.classList.toggle('erf-hpc-marks--clickable', clickable)
+  private renderMarks(model: ViewModel): void {
+    const marks = model.marks ?? []
+    const hover = model.hover ?? NO_HOVER
+    const key = model.selectedKey ?? null
+    const open = (mark: MarkPlacement): boolean => mark.element === model.selected && (key === null || key === mark.key || key === mark.markKey)
+    this.markLayer.classList.toggle('erf-hpc-marks--clickable', model.marksClickable === true)
     while (this.markLayer.children.length > marks.length) this.markLayer.lastElementChild?.remove()
     while (this.markLayer.children.length < marks.length) this.markLayer.append(part(this.doc, 'erf-hpc-mark'))
-    marks.forEach((mark, i) => place(this.markLayer.children[i] as HTMLElement, mark.box))
+    marks.forEach((mark, i) => {
+      const el = this.markLayer.children[i] as HTMLElement
+      place(el, mark.box)
+      el.classList.toggle('erf-hpc-mark--active', hover.marks.has(mark) || open(mark))
+      el.classList.toggle('erf-hpc-mark--changed', mark.changed)
+      el.classList.toggle('erf-hpc-mark--light', mark.light)
+    })
   }
 
   private renderShields(boxes: readonly Box[]): void {
@@ -235,9 +253,12 @@ export class OverlayView {
     this.outline.classList.toggle('erf-hpc-outline--selected', outline.selected)
     showText(this.labelTag, outline.label.tag)
     showText(this.labelRest, outline.label.rest)
+    showText(this.labelCode, outline.label.code)
     showText(this.labelSize, outline.label.size)
-    // C-21 / D-05: the pixel size only while Alt is held.
-    shown(this.labelSize, isAltHeld(this.doc))
+    // C-21 / D-03 / D-05: the code and the pixel size only while Alt is held.
+    const details = isAltHeld(this.doc)
+    shown(this.labelCode, details)
+    shown(this.labelSize, details)
     this.placeLabel(outline.box, viewport)
   }
 
@@ -290,7 +311,8 @@ export class OverlayView {
       const existing = this.pinElements.get(pin.key)
       const el = drawPin(this.doc, existing, pin, {
         label: model.pinLabel(pin),
-        selected: pin.element === model.selected
+        selected: pin.element === model.selected,
+        hovered: pin.key === model.hover?.pin || pin.members?.some(member => member.key === model.hover?.pin) === true
       })
       if (existing === undefined) {
         this.pinElements.set(pin.key, el)

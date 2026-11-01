@@ -5,6 +5,7 @@
  * (docs/designs/comments/html-preview-comments.md §10.4, §10.7; R-003, R-007, R-008,
  * R-013, R-017, R-019, R-022, R-024).
  */
+import { StrictMode } from 'react'
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -50,7 +51,7 @@ const IDENTITY: CommentIdentitySettings = {
 }
 const AREA = { left: 0, top: 0, width: 1000, height: 700 }
 
-function setup(patch: Partial<CommentWindowProps> = {}) {
+function setup(patch: Partial<CommentWindowProps> = {}, wrapper?: typeof StrictMode) {
   const props: CommentWindowProps = {
     request: newRequest(),
     list: INITIAL_PANEL_COMMENT_STATE.list,
@@ -69,7 +70,7 @@ function setup(patch: Partial<CommentWindowProps> = {}) {
     onCopyRaw: vi.fn(),
     ...patch
   }
-  const view = render(<CommentWindow {...props} />)
+  const view = render(<CommentWindow {...props} />, { wrapper })
   return { props, ...view }
 }
 
@@ -104,10 +105,10 @@ describe('CommentWindow – new comment', () => {
   describe('R-013 dialog role, focus and context line', () => {
     it('is a labelled dialog with the element and file on its context line', () => {
       setup()
-      // A-02: "New comment on element" (was "New comment"); the selector stays on the context line.
-      const dialog = screen.getByRole('dialog', { name: 'New comment on element' })
+      // A-02, owner decision 2026-11-01: the plain kind word (was "New comment").
+      const dialog = screen.getByRole('dialog', { name: 'New comment on section' })
       expect(dialog).toHaveAttribute('aria-modal', 'true')
-      expect(within(dialog).getByText('button#buy.cta.primary · index.html, line 12')).toBeVisible()
+      expect(within(dialog).getByText('index.html, line 12')).toBeVisible()
       expect(screen.getByTestId('comment-window')).toHaveAttribute('data-view', 'new')
     })
 
@@ -147,8 +148,8 @@ describe('CommentWindow – new comment', () => {
           file: { ...request.file, frame: true, displayPath: 'child.html' }
         }
       })
-      expect(screen.getByText('li · child.html, line 12')).toBeVisible()
-      expect(screen.getByText('Added by a script – saved before <button id="buy">.')).toBeVisible()
+      expect(screen.getByText('child.html, line 12')).toBeVisible()
+      expect(screen.getByText('This part is created by a script, so the comment is saved near it in the file.')).toBeVisible()
     })
 
     it('notes the file of a frame', () => {
@@ -192,6 +193,14 @@ describe('CommentWindow – new comment', () => {
         'index.html'
       )
       expect(commentDrafts.get(draftKeyOf(newRequest()))).toBe('')
+    })
+
+    it('under StrictMode a landed save still finishes, not stuck on "Saving…"', async () => {
+      const user = userEvent.setup()
+      const { props } = setup({}, StrictMode)
+      await user.type(field(), 'Make it bigger')
+      await user.click(saveButton())
+      await waitFor(() => expect(props.onWritten).toHaveBeenCalled())
     })
 
     it('saves with Cmd+Enter too', async () => {
@@ -444,7 +453,7 @@ describe('CommentWindow – new comment', () => {
       await user.type(field(), 'x')
       await user.click(saveButton())
       expect(await screen.findByTestId('comment-save-error')).toHaveTextContent(
-        'This element changed in the file since you picked it. Pick it again – your text comes with you.'
+        'This section changed after you selected it. Select it again. Your text is safe.'
       )
       expect(screen.getByTestId('comment-cancel')).toBeVisible()
       await user.click(screen.getByTestId('comment-pick-again'))

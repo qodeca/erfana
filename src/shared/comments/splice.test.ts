@@ -471,7 +471,7 @@ describe('plan refusals', () => {
   })
 })
 
-describe('planRebuild (OD-05 "Rebuild from data…")', () => {
+describe('planRebuild (OD-05 "Repair comment…")', () => {
   const html = readFileSync(join(COMPAT, 'c04-damaged-and-newer.html'), 'utf8')
   const doc = analyzeCommentDocument(html)
   const damaged = doc.state.blocks.find(b => b.kind === 'damaged' && b.reason === 'readable-mismatch')!

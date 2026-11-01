@@ -84,7 +84,21 @@ test.describe('HTML preview — live-view budget', () => {
     // The evicted panel shows its still frame instead of a hole. The panel is
     // an inactive dockview tab (`renderer: 'always'` keeps it mounted), so the
     // frame is asserted ATTACHED, not visible.
-    await expect(preview.stillFrame('first.html')).toHaveCount(1, { timeout: PREVIEW_BUDGET_MS })
+    const still = preview.stillFrame('first.html')
+    await expect(still).toHaveCount(1, { timeout: PREVIEW_BUDGET_MS })
+
+    // The frame keeps the screen's pixels: a picture smaller than its box is
+    // stretched to fit, and reads as blurred.
+    await expect
+      .poll(() => still.evaluate((img: HTMLImageElement) => img.naturalWidth), { timeout: PREVIEW_BUDGET_MS })
+      .toBeGreaterThan(0)
+    const { picture, box, scale } = await still.evaluate((img: HTMLImageElement) => ({
+      picture: img.naturalWidth,
+      box: Number.parseFloat(img.style.width),
+      scale: window.devicePixelRatio
+    }))
+    expect(box, 'the still carries its CSS width').toBeGreaterThan(0)
+    expect(picture).toBeGreaterThanOrEqual(Math.floor(box * scale * 0.95))
 
     // Wake: activating the tab re-opens the page by itself.
     await preview.tab('first.html').click()

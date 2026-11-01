@@ -1,24 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The stepper's keys while focus is in a renderer-hosted preview (comments-v2
- * C-13: "Keys while focus is in the window or preview"; spec 024 024-NFR-006,
- * differences table § 3 "the stepper and its keys").
+ * The stepper's keys in a renderer-hosted preview's panel (comments-v2 C-13;
+ * spec 024 024-NFR-006, differences table § 3 "the stepper and its keys";
+ * I-25: a reviewer working down the drawer steps from there too).
  *
- * Alt+F9 / Alt+Shift+F9 on the preview's scroller step the open window – the
- * Markdown window is not modal, so it may be open while focus is in the
- * preview – or, with none open, open the window on the next (previous)
- * thread in the drawer's current filter and bring its target into view
- * (`commentStepKeys.ts`).
+ * Alt+F9 / Alt+Shift+F9 anywhere in the panel step the open window – the
+ * Markdown window is not modal, so it may be open while focus is elsewhere –
+ * or, with none open, open the window on the next (previous) thread in the
+ * drawer's current filter and bring its target into view
+ * (`commentStepKeys.ts`). With nothing to step to, it says so (K-26).
  *
- * The listener is the scroller's own, not the `window`'s: a key reaches it
- * only while focus is inside this panel's preview, so another tab's preview
- * never answers it (the active-panel rule of src/renderer/CLAUDE.md holds by
- * construction). It runs in any mode, as the window's own keys do.
+ * The host hands the panel's keys in (`onPanelKey`): the root's own keydown and
+ * dockview's group element. Neither fires for another tab's panel, so the
+ * active-panel rule of src/renderer/CLAUDE.md holds by construction. It runs in
+ * any mode, as the window's own keys do. A key the window took is
+ * `defaultPrevented` by then, and is left alone.
  *
  * @module components/Comments/overlay/useHostStepKeys
  */
-import { useEffect } from 'react'
 import { commentStepFromDomEvent } from '../../../../../shared/commentStepKey'
 import type { ThreadPlacement } from '../../../../../shared/ipc/file-comment-schema'
 import type { CommentFileView } from '../../../../../shared/ipc/comment-common-schema'
@@ -27,11 +27,13 @@ import { drawerFilterOf } from '../commentDrawerFilter'
 import { takePreviewStep, useForgetPanelStepsOnClose } from '../commentStepKeys'
 import type { PreviewCommentAdapter } from './previewAdapter'
 
+/** The slice of a key press the keys read: a React event and a native one both fit. */
+export type HostStepKey = Pick<KeyboardEvent, 'code' | 'altKey' | 'shiftKey' | 'ctrlKey' | 'metaKey' | 'defaultPrevented' | 'preventDefault'>
+
 /** Options for {@link useHostStepKeys}. */
 export interface HostStepKeysOptions {
   /** The host is live (comments on, the preview shown). */
   readonly live: boolean
-  readonly scroller: HTMLElement | null
   readonly adapter: PreviewCommentAdapter
   /** The listed file, or `null` before the first list. */
   readonly file: CommentFileView | null
@@ -40,43 +42,44 @@ export interface HostStepKeysOptions {
   readonly drawerId: string
   /** Open the window on these threads (the host's `openThreads`). */
   readonly openThreads: (threadKeys: readonly string[], anchor: HTMLElement | null) => void
+  /** The one reveal step, for the thread a step reached. */
+  readonly reveal: (threadKey: string) => void
   readonly announce: (text: string) => void
 }
 
+/** One key press in the panel: `true` when it was a step key. */
+function takeStepKey(event: HostStepKey, options: HostStepKeysOptions): boolean {
+  const step = commentStepFromDomEvent(event)
+  const { live, adapter, file, placements, drawerId, openThreads, announce, reveal } = options
+  if (step === null || !live || event.defaultPrevented) return false
+  event.preventDefault()
+  takePreviewStep(
+    {
+      panelKey: drawerId,
+      files: () => (file === null ? [] : [file]),
+      filter: drawerFilterOf(drawerId),
+      noun: adapter.words.noun,
+      announce,
+      open: ({ threadKey }) => {
+        const placement = placements.find(p => p.threadKey === threadKey)
+        const target = placement === undefined ? null : adapter.attach(placement)
+        reveal(threadKey)
+        openThreads([threadKey], target)
+      }
+    },
+    step
+  )
+  return true
+}
+
 /**
- * Wire the step keys on the preview's scroller.
+ * The step keys of one panel.
  *
  * @param options - {@link HostStepKeysOptions}
+ * @returns Takes a key press from the panel; `true` when it was a step key.
  */
-export function useHostStepKeys(options: HostStepKeysOptions): void {
+export function useHostStepKeys(options: HostStepKeysOptions): (event: HostStepKey) => boolean {
   const latest = useLatestRef(options)
-  const { live, scroller } = options
   useForgetPanelStepsOnClose(options.drawerId)
-  useEffect(() => {
-    if (!live || scroller === null) return undefined
-    const onKeyDown = (event: KeyboardEvent): void => {
-      const step = commentStepFromDomEvent(event)
-      if (step === null) return
-      const { adapter, file, placements, drawerId, openThreads, announce } = latest.current
-      event.preventDefault()
-      takePreviewStep(
-        {
-          panelKey: drawerId,
-          files: () => (file === null ? [] : [file]),
-          filter: drawerFilterOf(drawerId),
-          noun: adapter.words.noun,
-          announce,
-          open: ({ threadKey }) => {
-            const placement = placements.find(p => p.threadKey === threadKey)
-            const target = placement === undefined ? null : adapter.attach(placement)
-            target?.scrollIntoView({ block: 'center' })
-            openThreads([threadKey], target)
-          }
-        },
-        step
-      )
-    }
-    scroller.addEventListener('keydown', onKeyDown)
-    return () => scroller.removeEventListener('keydown', onKeyDown)
-  }, [live, scroller, latest])
+  return event => takeStepKey(event, latest.current)
 }

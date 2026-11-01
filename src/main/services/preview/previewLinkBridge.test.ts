@@ -38,6 +38,7 @@ const CONTEXT: PreviewLinkContext = {
 
 type SpiedDeps = PreviewLinkNavigationDeps & {
   requestOpenFile: Mock
+  loadSameFile: Mock
   openExternal: Mock
   recordFailure: Mock
   confine: Mock
@@ -52,6 +53,7 @@ function makeDeps(
 ): SpiedDeps {
   return {
     requestOpenFile: vi.fn(),
+    loadSameFile: vi.fn(),
     openExternal: vi.fn().mockResolvedValue(undefined),
     recordFailure: vi.fn(),
     confine: vi.fn().mockResolvedValue(verdict),
@@ -186,6 +188,32 @@ describe('createPreviewLinkBridge — budgets', () => {
     // allowance. Well under ten gets through.
     await vi.waitFor(() => expect(deps.requestOpenFile.mock.calls.length).toBeGreaterThan(0))
     expect(deps.requestOpenFile.mock.calls.length).toBeLessThanOrEqual(2)
+  })
+
+  it('spends none of the page budget on navigations that real clicks already routed', async () => {
+    const deps = makeDeps()
+    const bridge = makeBridge(deps)
+
+    for (let i = 0; i < 5; i += 1) {
+      const href = `${IN_PROJECT}?click=${i}`
+      bridge.handleWillNavigate(href)
+      bridge.handleActivation(payload(href))
+    }
+
+    await vi.waitFor(() => expect(deps.requestOpenFile).toHaveBeenCalledTimes(5))
+    await new Promise((resolve) => setTimeout(resolve, 100)) // Past the holds' grace.
+    expect(deps.recordFailure).not.toHaveBeenCalled()
+    expect(deps.requestOpenFile).toHaveBeenCalledTimes(5)
+  })
+
+  it('still warns when the page itself navigates past its budget', async () => {
+    const deps = makeDeps()
+    const bridge = makeBridge(deps)
+
+    for (let i = 0; i < 3; i += 1) bridge.handleWillNavigate(`${IN_PROJECT}?i=${i}`)
+
+    await vi.waitFor(() => expect(deps.recordFailure).toHaveBeenCalledTimes(1))
+    expect(deps.requestOpenFile).toHaveBeenCalledTimes(2)
   })
 
   it('refills the budget in the next second', async () => {
@@ -631,5 +659,31 @@ describe('createPreviewLinkBridge — a click whose report lands late (fake time
     await advance(CLICK_SETTLE_CAP_MS * 2)
     expect(deps.requestOpenFile).not.toHaveBeenCalled()
     expect(deps.recordFailure).not.toHaveBeenCalled()
+  })
+})
+
+describe('createPreviewLinkBridge – a ?query link to the page on screen', () => {
+  const QUERY = (n: number): string => `${CONTEXT.currentUrl}?v=${n}`
+
+  it('loads once for one click, though the click also sends a navigation', () => {
+    const deps = makeDeps()
+    const bridge = makeBridge(deps)
+
+    bridge.handleLinkNote({ kind: 'seen', gestureId: 1, href: QUERY(1) })
+    bridge.handleWillNavigate(QUERY(1))
+    bridge.handleActivation({ ...(payload(QUERY(1)) as object), gestureId: 1 })
+
+    expect(deps.loadSameFile).toHaveBeenCalledTimes(1)
+    expect(deps.recordFailure).not.toHaveBeenCalled()
+  })
+
+  it('still limits a page that changes its own query by itself', async () => {
+    const deps = makeDeps()
+    const bridge = makeBridge(deps)
+
+    for (let n = 1; n <= 4; n += 1) bridge.handleWillNavigate(QUERY(n))
+
+    await vi.waitFor(() => expect(deps.recordFailure).toHaveBeenCalledTimes(2))
+    expect(deps.loadSameFile).toHaveBeenCalledTimes(2)
   })
 })

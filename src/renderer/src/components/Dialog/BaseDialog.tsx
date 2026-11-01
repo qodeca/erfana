@@ -87,7 +87,7 @@ export function getTabbable(root: HTMLElement): HTMLElement[] {
  * has gone. `role="tree"` covers the project tree without touching it;
  * `data-focus-return` lets any other widget opt in.
  */
-const FOCUS_RETURN_REGION = '[role="tree"], [data-focus-return]'
+export const FOCUS_RETURN_REGION = '[role="tree"], [data-focus-return]'
 
 /**
  * Where focus should go when a dialog closes: the opener while it is still in

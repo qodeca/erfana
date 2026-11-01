@@ -41,19 +41,6 @@ const SAVE_CODES = [
   'NOT_A_COMMENT_CODE'
 ]
 
-/** Every reason `readOnlyReasonText` words, a missing one and an unknown one. */
-const READ_ONLY_REASONS = [
-  'encoding',
-  'conflict-markers',
-  'too-large',
-  'too-many-blocks',
-  'unterminated-block',
-  'link',
-  'missing',
-  undefined,
-  'from-a-later-main'
-]
-
 /** A save request with only what `writtenAnnouncement` reads. */
 const save = (op: string, status?: 'open' | 'resolved'): CommentSaveRequest =>
   ({ op, ...(status ? { status } : {}) }) as unknown as CommentSaveRequest
@@ -74,8 +61,6 @@ const CALLS: Record<string, () => Record<string, string | copy.SaveFailureCopy>>
         copy.unavailableTooltip(reason as CommentUnavailableReason)
       ])
     ),
-  readOnlyReasonText: () =>
-    Object.fromEntries(READ_ONLY_REASONS.map(reason => [String(reason), copy.readOnlyReasonText(reason, FILE)])),
   fillFile: () => ({
     twice: copy.fillFile('{file} and {file} again.', FILE),
     none: copy.fillFile('No placeholder.', FILE)
@@ -96,7 +81,6 @@ const CALLS: Record<string, () => Record<string, string | copy.SaveFailureCopy>>
   deleteThreadText: () => ({ '0': copy.deleteThreadText(0), '1': copy.deleteThreadText(1), '2': copy.deleteThreadText(2) }),
   deleteBlockText: () => ({ [FILE]: copy.deleteBlockText(FILE) }),
   notFoundText: () => ({ 'line 42': copy.notFoundText(FILE, 42) }),
-  scriptBuiltText: () => ({ '<section>': copy.scriptBuiltText('<section>') }),
   frameFileText: () => ({ 'frame.html': copy.frameFileText('frame.html') }),
   readErrorText: () => ({ [FILE]: copy.readErrorText(FILE) }),
   unreadFilesText: () => ({ '1': copy.unreadFilesText(1), '3': copy.unreadFilesText(3) }),

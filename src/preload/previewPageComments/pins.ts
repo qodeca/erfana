@@ -127,14 +127,14 @@ export function placePins(
 
 /** The pin's name (§10.10 "Pin"): kept as `data-name` since pins are visual only (C-11). */
 export function pinName(pin: PinPlacement, label: string): string {
-  if (pin.members !== undefined) return `${pin.members.length} more commented elements here. Open.`
+  if (pin.members !== undefined) return `${pin.members.length} more commented sections here. Open.`
   if (pin.status === 'damaged') return `Damaged comment on ${label}. Open.`
   return `${pin.count} ${pin.count === 1 ? 'comment' : 'comments'} on ${label}${pin.changed === true ? ', changed' : ''}. Open.`
 }
 
 /** The pin's tooltip (§10.5 "Hover"). */
 export function pinTooltip(pin: PinPlacement): string {
-  if (pin.members !== undefined) return `${pin.members.length} more commented elements – click to open`
+  if (pin.members !== undefined) return `${pin.members.length} more commented sections – click to open`
   if (pin.status === 'damaged') return 'Damaged comment – click to open'
   return `${pin.count} ${pin.count === 1 ? 'comment' : 'comments'} – click to open`
 }
@@ -177,7 +177,7 @@ export function drawPin(
   doc: Document,
   existing: HTMLElement | undefined,
   pin: PinPlacement,
-  options: { readonly label: string; readonly selected: boolean }
+  options: { readonly label: string; readonly selected: boolean; readonly hovered?: boolean }
 ): HTMLElement {
   const el = existing ?? doc.createElement('div')
   if (el.dataset.content !== pin.content) {
@@ -189,7 +189,8 @@ export function drawPin(
     pin.members === undefined ? '' : 'erf-hpc-pin--stack',
     pin.members === undefined && pin.changed === true ? 'erf-hpc-pin--changed' : '',
     pin.status === 'damaged' ? 'erf-hpc-pin--damaged' : '',
-    options.selected ? 'erf-hpc-pin--selected' : ''
+    options.selected ? 'erf-hpc-pin--selected' : '',
+    options.hovered === true ? 'erf-hpc-pin--hover' : ''
   ]
     .filter(Boolean)
     .join(' ')

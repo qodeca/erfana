@@ -16,9 +16,10 @@
  *    within the drawer's current filter – or on the first (last) one when
  *    none was shown yet or it is gone ({@link stepTargetFrom}).
  *
- * The Markdown Preview reads the keys on its scroller; the HTML page's press
- * is matched by main (`previewInputForward.ts`) and forwarded as
- * `comment-next` / `comment-previous`.
+ * A step with nothing to go to says so (K-26). Both previews read the keys at
+ * panel level, drawer and toolbar included (I-25); the HTML page's own press is
+ * matched by main (`previewInputForward.ts`) and forwarded as `comment-next` /
+ * `comment-previous`.
  *
  * @module components/Comments/commentStepKeys
  */
@@ -130,7 +131,10 @@ export interface PreviewStepHost {
 export function takePreviewStep(host: PreviewStepHost, step: CommentStep): boolean {
   if (stepOpenWindow(host.panelKey, step)) return true
   const target = stepTargetFrom(host.panelKey, host.files(), host.filter, step)
-  if (target === null) return false
+  if (target === null) {
+    host.announce(WINDOW_COPY.noStepTarget)
+    return false
+  }
   host.open(target)
   const thread = target.file.threads.find(t => t.threadKey === target.threadKey)
   const at = stepPosition(target.file, [target.threadKey], host.filter)

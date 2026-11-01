@@ -16,6 +16,25 @@ import type { MarkPlacement } from './marks'
 import type { PinPlacement } from './pins'
 import type { PageWords } from './words'
 
+/** What one overlay click or context menu does (`routeOverlayEvent`). */
+export interface OverlayActions {
+  /** A pin or mark: open its threads. A stack pin names every pin merged into it (C-17); a mark's key names its words (I-13). */
+  icon(key: string, element: Element, event: MouseEvent, members?: PinPlacement['members']): void
+  /** Pick `element`, with the Comment button's words if any. */
+  element(kind: 'open' | 'menu', element: Element, event: MouseEvent, words?: PageWords): void
+}
+
+/** What the pointer lights up across pins and marks (C-17 linked hover, I-13). */
+export interface LinkedHover {
+  /** The pin in its hover look: the one a hovered mark belongs to. */
+  readonly pin: string | null
+  /** The marks raised to the active look. */
+  readonly marks: ReadonlySet<MarkPlacement>
+}
+
+/** Nothing lit. */
+export const NO_HOVER: LinkedHover = Object.freeze({ pin: null, marks: new Set<MarkPlacement>() })
+
 /** A pin, a comment mark, the Comment button or a shield under the pointer. */
 export type OverlayHit =
   | { readonly kind: 'pin'; readonly pin: PinPlacement }
@@ -43,6 +62,30 @@ export function hitAt(boxes: OverlayBoxes, point: Point): OverlayHit | null {
   if (mark !== undefined) return { kind: 'mark', mark }
   const shield = boxes.shields.find(s => contains(s.box, point))
   return shield === undefined ? null : { kind: 'shield', iframe: shield.frame }
+}
+
+/** A hovered mark lights its pin and every box of its words; a hovered pin lights all its marks, a stack pin's too. */
+export function linkedHover(hit: OverlayHit | null, marks: readonly MarkPlacement[]): LinkedHover {
+  if (hit?.kind === 'mark') {
+    const { key, markKey } = hit.mark
+    return { pin: key, marks: new Set(marks.filter(mark => mark.markKey === markKey)) }
+  }
+  if (hit?.kind !== 'pin') return NO_HOVER
+  const keys = new Set([hit.pin.key, ...(hit.pin.members ?? []).map(member => member.key)])
+  return { pin: null, marks: new Set(marks.filter(mark => keys.has(mark.key))) }
+}
+
+/** One trusted primary click, or context menu, on what `hit` is. */
+export function routeOverlayEvent(hit: OverlayHit, event: MouseEvent, act: OverlayActions): void {
+  const primaryClick = event.type === 'click' && event.button === 0 && event.detail > 0
+  if (hit.kind === 'pin' && primaryClick) act.icon(hit.pin.key, hit.pin.element, event, hit.pin.members)
+  if (hit.kind === 'mark' && primaryClick) act.icon(hit.mark.markKey, hit.mark.element, event)
+  // The Comment button opens the window on its words (C-16).
+  if (hit.kind === 'button' && primaryClick) act.element('open', hit.words.target, event, hit.words)
+  if (hit.kind !== 'shield') return
+  // A shield exists only in comment mode (`shieldsOf`).
+  if (primaryClick) act.element('open', hit.iframe, event)
+  if (event.type === 'contextmenu') act.element('menu', hit.iframe, event)
 }
 
 /** The page element an overlay hit stands for. */

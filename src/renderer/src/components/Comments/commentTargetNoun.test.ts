@@ -55,8 +55,8 @@ describe('024-AC-008 C-03 the Markdown noun of a target', () => {
     expect(nounTagOf({ tag: 'ul', runtime: { tag: 'li' } })).toBe('li')
   })
 
-  it('024-AC-008 C-03 the HTML Preview keeps "element" whatever the place (D-04)', () => {
-    expect(HTML_WORDS.noun({ tag: 'tr', place: ROW_2 })).toBe('element')
+  it('024-AC-008 C-03 the HTML Preview keeps "section" whatever the place (D-04)', () => {
+    expect(HTML_WORDS.noun({ tag: 'tr', place: ROW_2 })).toBe('section')
   })
 })
 
@@ -66,7 +66,7 @@ describe('024-AC-008 C-03 every place that names a Markdown target says the same
     const request = { kind: 'threads', panelId: 'p', fileKey: 'f1', threadKeys: ['t1'], blockKeys: [], point: { x: 0, y: 0 }, opener: 'page', listAfter: 0 } as const
     expect(headingOf(request, selection as never, MARKDOWN_WORDS).title).toBe('Comment on row 2, column 3')
     const lost = { ...selection, threads: [{ ...cellThread, attached: false }] }
-    expect(headingOf(request, lost as never, MARKDOWN_WORDS).context).toContain('row 2, column 3')
+    expect(headingOf(request, lost as never, MARKDOWN_WORDS).context).toContain('Row 2, column 3')
     const draft: CommentWindowRequest = {
       kind: 'new',
       panelId: 'p',
@@ -84,8 +84,8 @@ describe('024-AC-008 C-03 every place that names a Markdown target says the same
     const files = [fileView({ displayPath: 'plan.md', threads: [cellThread] })]
     expect(drawerRows(files, new Set(), MARKDOWN_WORDS).open[0].label).toBe('Row 2, column 3 · line 5')
     expect(openThreadsOf(files, MARKDOWN_WORDS).get('t1')?.label).toBe('Row 2, column 3 · line 5')
-    // The HTML Preview still names a script-built element by its tag.
-    expect(drawerRows(files, new Set(), HTML_WORDS).open[0].label).toBe('td')
+    // The HTML Preview's row is in plain words too; a script-built element's tag is its code (D-03).
+    expect(drawerRows(files, new Set(), HTML_WORDS).open[0]).toMatchObject({ label: 'Section · line 5', code: 'td' })
   })
 
   it('024-AC-008 C-03 the menu label and its items', () => {

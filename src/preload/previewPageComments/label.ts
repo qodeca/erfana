@@ -2,22 +2,26 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The overlay's element label (docs/designs/comments/html-preview-comments.md §10.2,
- * §10.10; test J-001): `button#buy.cta.primary 120×40`, at most two classes
- * then `…`, at most 40 characters, plus a suffix – ` · script` for a JS-built
- * element, ` · frame other.html` for a same-project frame, ` · 2 comments`,
- * or `iframe · refused frame` / `iframe · inline frame` for a frame that is
- * not commentable inside.
+ * §10.10; test J-001; owner decision 2026-11-01, differences table D-03, D-05):
+ * plain words, `Section · “Buy now”`, within 40 characters, plus a suffix –
+ * ` · script` for a JS-built element, ` · frame other.html` for a same-project
+ * frame, ` · 2 comments`, ` · refused frame` or ` · inline frame` for a frame
+ * that is not commentable inside. The code (`button#buy.cta.primary`: at most
+ * two classes then `…`) and the size stay apart: the view shows them only while
+ * Alt is held, the one hover a label the pointer cannot reach can offer.
  *
- * The label is page text (ids and classes come from the page), so it is only
- * ever set as `textContent`, never parsed as markup.
+ * The page gives no line number here (D-34), so the part's opening words tell
+ * nested parts apart. They, like the ids and classes, are page text: only ever
+ * set as `textContent`, never parsed as markup, and never sent to main.
  */
 import { LABEL_MAX_CHARS, LABEL_MAX_CLASSES } from './constants'
 import type { Box } from './geometry'
 
-/** The three styled runs of a label: the tag (accent), the rest (paper), the size (muted). */
+/** The styled runs of a label: the kind word (accent), the rest (paper), the code and the size (muted). */
 export interface LabelParts {
   readonly tag: string
   readonly rest: string
+  readonly code: string
   readonly size: string
 }
 
@@ -29,7 +33,13 @@ export type LabelSuffix =
   | { readonly kind: 'refused-frame' }
   | { readonly kind: 'inline-frame' }
 
+/** The HTML Preview's `{kind}` word (`commentCopyWords.ts`, HTML_NOUN), as a label starts it. */
+const KIND_WORD = 'Section'
 const ELLIPSIS = '…'
+/** The quote marks and separator around the opening words: ` · “` and `”`. */
+const WORDS_FRAME_CHARS = 5
+/** Text a reader never sees as words. */
+const UNREAD_PARENTS: ReadonlySet<string | undefined> = new Set(['script', 'style', 'noscript', 'template'])
 
 /** `text` cut to `max` characters, ending in `…` when it was longer. */
 function cut(text: string, max: number): string {
@@ -66,6 +76,24 @@ function commentsText(count: number): string {
 }
 
 /**
+ * The first `room` characters of the words in `element`, and no more of the
+ * page than that: this runs as the pointer moves, over elements of any size.
+ * Controls and format characters go, so a bidi control cannot reorder the label.
+ */
+function openingWords(element: Element, room: number): string {
+  const walker = element.ownerDocument.createTreeWalker(element, 4 /* NodeFilter.SHOW_TEXT */)
+  let words = ''
+  while ([...words].length <= room) {
+    // SHOW_TEXT yields only text nodes, each below `element`, so each has a parent.
+    const node = walker.nextNode() as Text | null
+    if (node === null) break
+    if (UNREAD_PARENTS.has(node.parentElement?.localName)) continue
+    words = `${words} ${node.data.replace(/[\p{Cc}\p{Cf}]/gu, ' ')}`.replace(/\s+/g, ' ').trimStart()
+  }
+  return cut(words.trimEnd(), room).replace(/ …$/, ELLIPSIS)
+}
+
+/**
  * The label of `element`, sized from `box` (its border box).
  *
  * @param comments - Open comments on the element's pin, if it has one.
@@ -76,14 +104,17 @@ export function labelOf(
   suffix: LabelSuffix,
   comments: number
 ): LabelParts {
-  const tag = cut(element.localName, LABEL_MAX_CHARS)
-  const room = LABEL_MAX_CHARS - [...tag].length
-  // The suffix says what the element is; the id and classes give way to it.
+  // The suffix says what the element is; its opening words give way to it.
   const after = `${suffixText(suffix)}${commentsText(comments)}`
-  const nameRoom = room - [...after].length
-  const name = nameRoom > 1 ? cut(nameOf(element), nameRoom) : ''
-  const rest = room > 0 ? cut(`${name}${after}`, room) : ''
-  return { tag, rest, size: `${Math.round(box.width)}×${Math.round(box.height)}` }
+  const room = LABEL_MAX_CHARS - KIND_WORD.length - [...after].length
+  const words = room > WORDS_FRAME_CHARS ? openingWords(element, room - WORDS_FRAME_CHARS) : ''
+  const rest = cut(`${words === '' ? '' : ` · “${words}”`}${after}`, LABEL_MAX_CHARS - KIND_WORD.length)
+  return {
+    tag: KIND_WORD,
+    rest,
+    code: cut(`${element.localName}${nameOf(element)}`, LABEL_MAX_CHARS),
+    size: `${Math.round(box.width)}×${Math.round(box.height)}`
+  }
 }
 
 /** The label as one line of text (a pin's label). Never sent to main: the live region words main's facts (S-L-A). */

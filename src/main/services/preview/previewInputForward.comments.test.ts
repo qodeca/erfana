@@ -156,3 +156,98 @@ describe('C-13 the comment stepper keys with focus in the page', () => {
     expect(forwarded).toEqual(['comment-previous'])
   })
 })
+
+describe('K-1 main records the menu key', () => {
+  function attached(state: Partial<CommentKeyState> = {}) {
+    const listeners: Array<(event: InputForwardEvent, input: ForwardableInput) => void> = []
+    const target = {
+      on: (_event: 'before-input-event', listener: (event: InputForwardEvent, input: ForwardableInput) => void) => void listeners.push(listener),
+      removeListener: () => {}
+    }
+    const pressed = vi.fn()
+    const forwarded: string[] = []
+    attachInputForwarding(target, key => forwarded.push(key), 'darwin', { ...ON, menuKeyPressed: pressed, ...state })
+    const press = (input: ForwardableInput): ReturnType<typeof vi.fn> => {
+      const event = { preventDefault: vi.fn() }
+      listeners.forEach(listener => listener(event, input))
+      return event.preventDefault
+    }
+    return { press, pressed, forwarded }
+  }
+  const SHIFT_F10 = keyDown({ key: 'F10', code: 'F10', shift: true })
+  const MENU_KEY = keyDown({ key: 'ContextMenu', code: 'ContextMenu' })
+
+  it.each([
+    ['Shift+F10', SHIFT_F10],
+    ['the Menu key', MENU_KEY]
+  ])('K-1 %s is recorded, and stays with the page: nothing is forwarded or cancelled', (_name, input) => {
+    const { press, pressed, forwarded } = attached()
+    const preventDefault = press(input)
+    expect(pressed).toHaveBeenCalledTimes(1)
+    expect(preventDefault).not.toHaveBeenCalled()
+    expect(forwarded).toEqual([])
+  })
+
+  it.each([
+    ['plain F10', keyDown({ key: 'F10', code: 'F10' })],
+    ['Ctrl+Shift+F10', { ...SHIFT_F10, control: true }],
+    ['Cmd+Shift+F10', { ...SHIFT_F10, meta: true }],
+    ['Alt+Shift+F10', { ...SHIFT_F10, alt: true }],
+    ['Alt+Menu', { ...MENU_KEY, alt: true }],
+    ['a release', { ...SHIFT_F10, type: 'keyUp' }],
+    ['a held key repeating', { ...SHIFT_F10, isAutoRepeat: true }]
+  ])('L-1 %s is not a press of the menu key', (_name, input) => {
+    const { press, pressed } = attached()
+    press(input)
+    expect(pressed).not.toHaveBeenCalled()
+  })
+
+  describe('L-1 in comment mode the picker keys are recorded instead', () => {
+    const ENTER = keyDown({ key: 'Enter', code: 'Enter' })
+    const inMode = (state: Partial<CommentKeyState> = {}) => {
+      const pickKeyPressed = vi.fn()
+      return { ...attached({ modeOn: () => true, pickKeyPressed, ...state }), pickKeyPressed }
+    }
+
+    it.each([
+      ['Enter', ENTER],
+      ['Shift+F10', SHIFT_F10],
+      ['the Menu key', MENU_KEY]
+    ])('L-1 %s is recorded, and stays with the page', (_name, input) => {
+      const { press, pickKeyPressed, forwarded } = inMode()
+      const preventDefault = press(input)
+      expect(pickKeyPressed).toHaveBeenCalledTimes(1)
+      expect(preventDefault).not.toHaveBeenCalled()
+      expect(forwarded).toEqual([])
+    })
+
+    it.each([
+      ['a held Enter', { ...ENTER, isAutoRepeat: true }],
+      ['a release', { ...ENTER, type: 'keyUp' }],
+      ['Tab, which only moves', keyDown({ key: 'Tab', code: 'Tab' })],
+      ['a letter', keyDown({ key: 'a', code: 'KeyA' })]
+    ])('L-1 %s buys no pick', (_name, input) => {
+      const { press, pickKeyPressed } = inMode()
+      press(input)
+      expect(pickKeyPressed).not.toHaveBeenCalled()
+    })
+
+    it('L-1 Enter buys nothing outside comment mode or with comments off', () => {
+      const outside = inMode({ modeOn: () => false })
+      outside.press(ENTER)
+      expect(outside.pickKeyPressed).not.toHaveBeenCalled()
+      const off = inMode({ enabled: () => false })
+      off.press(ENTER)
+      expect(off.pickKeyPressed).not.toHaveBeenCalled()
+    })
+  })
+
+  it('L-1 it is recorded only while the page could ask: comments on, comment mode off', () => {
+    const off = attached({ enabled: () => false })
+    off.press(SHIFT_F10)
+    expect(off.pressed).not.toHaveBeenCalled()
+    const mode = attached({ modeOn: () => true })
+    mode.press(SHIFT_F10)
+    expect(mode.pressed).not.toHaveBeenCalled()
+  })
+})

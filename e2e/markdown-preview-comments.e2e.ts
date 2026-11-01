@@ -39,6 +39,7 @@ import { ProjectTreePage } from './pages/project-tree.page'
 import { TabBarPage } from './pages/tab-bar.page'
 import { reviewer, setGlobalSetting } from './pages/html-preview.comments-ui'
 import { TEST_IDS } from '../src/renderer/src/constants/testids'
+import { ACCENT_RGB, barRowsIn, type BarRows } from './utils/bar-rows'
 import { PIN_BOX_PX, placePin, type Box } from '../src/shared/comments/overlayCore/pinLayout'
 
 const FILE = 'review.md'
@@ -51,6 +52,11 @@ const TEXT = [
   '- beta release notes',
   '',
   'Closing paragraph.',
+  '',
+  '| Name | Team |',
+  '| --- | --- |',
+  '| Ada | Core |',
+  '| Lin | Docs |',
   ''
 ].join('\n')
 
@@ -60,7 +66,10 @@ const REPLY = 'MdReply-13-Pz04: agreed'
 const MOD = process.platform === 'darwin' ? 'Meta' : 'Control'
 const MODE_KEY = process.platform === 'darwin' ? 'Meta+Alt+KeyM' : 'Control+Alt+KeyM'
 
-test.use({ testProjectFiles: { [FILE]: TEXT } })
+const FOLD = 'fold.md'
+const FOLD_TEXT = 'Intro paragraph.\n\nFolded paragraph.\n\nEnd paragraph.\n'
+
+test.use({ testProjectFiles: { [FILE]: TEXT, [FOLD]: FOLD_TEXT } })
 
 test.describe('Markdown Preview comments', () => {
   test.afterEach(async ({ windowWithTestProject }) => {
@@ -134,6 +143,33 @@ test.describe('Markdown Preview comments', () => {
     await expect(md.icons()).toHaveCount(0, { timeout: MD_COMMENT_BUDGET_MS })
   })
 
+  test('P-F01 a first Reply on a teammate\'s file asks for the name, then sends itself', async ({
+    windowWithTestProject,
+    testProject
+  }) => {
+    const page = windowWithTestProject
+    const file = path.join(testProject.path, FILE)
+    const md = await openReview(page)
+    await md.modeOn()
+    await md.target('p', 3).click()
+    await expect(md.window()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await md.saveNewComment(NOTE, FILE, NAME)
+    await expect(md.icons()).toHaveCount(1, { timeout: MD_COMMENT_BUDGET_MS })
+    // Now as someone who received the file: the notice was never shown to them.
+    await setGlobalSetting(page, 'comments', { identityNoticeSeen: false })
+    await md.modeButton().click()
+    await md.icons().first().click()
+    const win = md.window()
+    await expect(win).toHaveAttribute('data-view', 'threads', { timeout: MD_COMMENT_BUDGET_MS })
+    await page.getByTestId('comment-reply-field').fill(REPLY)
+    await page.getByTestId('comment-reply').click()
+    await expect(win).toHaveAttribute('data-view', 'identity')
+    await page.getByTestId('comment-identity-name').fill(NAME)
+    await page.getByTestId('comment-identity-continue').click()
+    await expect(win.getByTestId('comment-message')).toHaveCount(2, { timeout: MD_COMMENT_BUDGET_MS })
+    expect(await fsp.readFile(file, 'utf-8')).toContain(REPLY)
+  })
+
   test('024-AC-029 keyboard only: the shortcut, Tab and Alt+Down to a list item, Enter, save, Esc', async ({
     windowWithTestProject,
     testProject
@@ -175,6 +211,80 @@ test.describe('Markdown Preview comments', () => {
     await page.keyboard.press('Escape')
     await expect(md.modeButton()).toHaveAttribute('aria-pressed', 'false')
     await expect(md.modeButton()).toBeFocused()
+  })
+
+  test('A-15, K-12 keyboard only: Tab stays at its level and says so; Alt+Down goes back the way Alt+Up came', async ({ windowWithTestProject }) => {
+    const page = windowWithTestProject
+    const md = await openReview(page)
+    await page.keyboard.press(MODE_KEY)
+    await expect(md.target('h1', 1)).toBeFocused({ timeout: MD_COMMENT_BUDGET_MS })
+    await page.keyboard.press('Tab')
+    await page.keyboard.press('Tab')
+    await expect(md.target('ul', 5)).toBeFocused()
+    await page.keyboard.press('Alt+ArrowDown')
+    await page.keyboard.press('Tab')
+    await expect(md.target('li', 6)).toBeFocused()
+    await page.keyboard.press('Alt+ArrowUp')
+    await expect(md.target('ul', 5)).toBeFocused()
+    await page.keyboard.press('Alt+ArrowDown')
+    await expect(md.target('li', 6)).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(md.target('li', 6)).toBeFocused()
+    await expect(md.announce()).toHaveText('Last list item at this level – Alt+Up for the parent.')
+  })
+
+  test('I-25, K-26 Alt+F9 from the toolbar: with no comment it says so, in the panel, with no mouse', async ({ windowWithTestProject }) => {
+    const page = windowWithTestProject
+    const md = await openReview(page)
+    await md.modeButton().focus()
+    await page.keyboard.press('Alt+F9')
+    await expect(page.getByTestId('comment-step-live')).toHaveText('No comments to go to.')
+    await expect(md.modeButton()).toBeFocused()
+  })
+
+  test('I-1 Esc leaves comment mode from the toolbar after a mouse click on the toggle', async ({ windowWithTestProject }) => {
+    const page = windowWithTestProject
+    const md = await openReview(page)
+    await md.modeOn()
+    await expect(md.modeButton()).toBeFocused()
+    await page.keyboard.press('Escape')
+    await expect(md.modeButton()).toHaveAttribute('aria-pressed', 'false')
+    await expect(md.modeTab()).toHaveCount(0)
+    await expect(md.modeButton()).toBeFocused()
+  })
+
+  test('I-3 after a cancelled pick the outline follows the pointer: the tab names what a click would hit', async ({ windowWithTestProject }) => {
+    const page = windowWithTestProject
+    await setGlobalSetting(page, 'comments', reviewer(NAME))
+    const md = await openReview(page)
+    await md.modeOn()
+    await md.target('p', 3).click()
+    await expect(md.window()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await page.keyboard.press('Escape')
+    await expect(md.window()).toHaveCount(0)
+    await expect(md.modeTab()).toHaveText('Comment mode · Paragraph, line 3 · Esc to leave')
+    await md.target('h1', 1).hover()
+    await expect(md.modeTab()).toHaveText('Comment mode · H1 heading, line 1 · Esc to leave')
+    await md.target('h1', 1).click()
+    await expect(md.window().getByTestId('comment-window-title')).toContainText('New comment on H1 heading', { timeout: MD_COMMENT_BUDGET_MS })
+  })
+
+  test('I-8 comment mode stays through a tab switch, and Esc still leaves from where the switch left focus', async ({
+    windowWithTestProject,
+    testProject
+  }) => {
+    const page = windowWithTestProject
+    await fsp.writeFile(path.join(testProject.path, 'other.md'), '# Other\n')
+    const md = await openReview(page)
+    await md.modeOn()
+    const tabs = new TabBarPage(page)
+    await new ProjectTreePage(page).fileRow('other.md').click()
+    await tabs.expectActive('other.md')
+    await tabs.activate(FILE)
+    await expect(md.modeButton()).toHaveAttribute('aria-pressed', 'true', { timeout: MD_COMMENT_BUDGET_MS })
+    await expect(md.modeTab()).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(md.modeButton()).toHaveAttribute('aria-pressed', 'false')
   })
 
   test('024-AC-006 comment tools show in the preview-only view only, and not at all with the setting off', async ({
@@ -226,7 +336,7 @@ test.describe('Markdown Preview comments', () => {
       await md.editor.setViewMode('preview')
       await expect(band).toBeVisible({ timeout: 1000 })
       await expect(band).toHaveAttribute('data-state', 'paused')
-      await expect(band).toContainText(`${FILE} has unsaved changes – comments are read-only until you save.`)
+      await expect(band).toContainText(`${FILE} has unsaved changes. Save the file to change comments.`)
       await expect(md.modeButton()).toHaveAttribute('aria-disabled', 'true')
       await expect(md.modeButton()).toHaveAttribute('title', /^Comment mode is unavailable: /)
       await band.getByTestId('comment-host-paused-save').click({ timeout: 1000 })
@@ -289,6 +399,94 @@ test.describe('Markdown Preview comments', () => {
     expect(written).toMatch(/"sel":\{"exact":"[^"]*beta"/)
   })
 
+  /** A drag from `from`'s text in one target to `to`'s in another, as a person makes it. */
+  async function dragBetween(page: Parameters<typeof setGlobalSetting>[0], from: { x: number; y: number }, to: { x: number; y: number }): Promise<void> {
+    await page.evaluate(() => window.getSelection()?.removeAllRanges())
+    await page.mouse.move(from.x, from.y)
+    await page.mouse.down()
+    await page.mouse.move(to.x, to.y, { steps: 8 })
+    await page.mouse.up()
+  }
+
+  test('I-16 a drag across two list items saves on the list, with the words; main keeps them', async ({ windowWithTestProject, testProject }) => {
+    const page = windowWithTestProject
+    const file = path.join(testProject.path, FILE)
+    const md = await openReview(page)
+
+    const from = await md.selectWords('li', 5, 'alpha')
+    const to = await md.selectWords('li', 6, 'release')
+    await dragBetween(page, from, to)
+    await expect(md.selectionButton()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await md.selectionButton().click()
+    await md.passIdentity(NAME)
+    await expect(md.window()).toContainText('New comment on list')
+    await expect(md.window()).not.toContainText('list item where')
+    await md.saveNewComment(NOTE, FILE, NAME)
+
+    const written = await fsp.readFile(file, 'utf-8')
+    expect(written).toMatch(/"sel":\{"exact":"[^"]*a beta r[^"]*"/)
+  })
+
+  test('I-16 a drag across two table cells in a row saves on the row, with the words', async ({ windowWithTestProject, testProject }) => {
+    const page = windowWithTestProject
+    const file = path.join(testProject.path, FILE)
+    const md = await openReview(page)
+
+    const from = await md.selectWordsIn(md.content().locator('td', { hasText: 'Ada' }), 'Ada')
+    const to = await md.selectWordsIn(md.content().locator('td', { hasText: 'Core' }), 'Core')
+    await dragBetween(page, from, to)
+    await expect(md.selectionButton()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await md.selectionButton().click()
+    await md.passIdentity(NAME)
+    await md.saveNewComment(NOTE, FILE, NAME)
+
+    const written = await fsp.readFile(file, 'utf-8')
+    expect(written).toContain('"sel":')
+    expect(written).toMatch(/"exact":"[^"]*da[^"]*Co/)
+  })
+
+  test('I-10 I-11 the Comment button is 28 px, and follows the selection on a scroll', async ({ windowWithTestProject }) => {
+    const page = windowWithTestProject
+    const md = await openReview(page)
+    await md.target('p', 3).evaluate(el => {
+      // Room to scroll, in the rendered content only: nothing here reaches the file.
+      el.closest<HTMLElement>('.markdown-preview-content')!.style.paddingBottom = '3000px'
+    })
+
+    const line = md.content().locator('p', { hasText: 'Closing paragraph.' })
+    const from = await md.selectWordsIn(line, 'Closing')
+    const to = await md.selectWordsIn(line, 'paragraph')
+    await dragBetween(page, from, to)
+    await expect(md.selectionButton()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    const before = (await md.selectionButton().boundingBox())!
+    expect(before.height).toBe(28)
+    await md.preview().evaluate(el => el.scrollBy(0, 30))
+    await expect.poll(async () => (await md.selectionButton().boundingBox())?.y).toBeLessThan(before.y)
+    await page.evaluate(() => window.getSelection()?.removeAllRanges())
+    await expect(md.selectionButton()).toHaveCount(0)
+  })
+
+  test('I-22 a right-click away from a selection is about what is under the pointer; on a bare word the menu matches what the system selected', async ({ windowWithTestProject }) => {
+    const page = windowWithTestProject
+    const md = await openReview(page)
+    const closing = (await md.content().locator('p', { hasText: 'Closing paragraph.' }).boundingBox())!
+    const y = closing.y + closing.height / 2
+
+    await md.selectWords('p', 3, 'paragraph of')
+    await page.mouse.click(closing.x + closing.width - 4, y, { button: 'right' })
+    await expect(page.getByRole('menu', { name: 'Paragraph' })).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await page.keyboard.press('Escape')
+
+    await page.evaluate(() => window.getSelection()?.removeAllRanges())
+    await page.mouse.click(closing.x + 20, y, { button: 'right' })
+    await expect(page.getByRole('menu').first()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    // macOS may select the word under a right-click. Blink does so only in a focused, active window, so `focused` says what this run proves.
+    const { word, focused } = await page.evaluate(() => ({ word: window.getSelection()?.toString().trim() ?? '', focused: document.hasFocus() }))
+    test.info().annotations.push({ type: 'I-22', description: `${process.platform}: window focused ${focused}, right-click selected "${word}"` })
+    await expect(page.getByRole('menu').first()).toHaveAttribute('aria-label', word === '' ? 'Paragraph' : 'Selection')
+    await page.keyboard.press('Escape')
+  })
+
   /** Comment on a target in comment mode and leave the mode on. */
   async function commentOn(md: MarkdownCommentsPage, tag: string, line: number): Promise<void> {
     await md.modeOn()
@@ -297,18 +495,18 @@ test.describe('Markdown Preview comments', () => {
     await md.saveNewComment(NOTE, FILE, NAME)
   }
 
-  test('C-20 (Markdown) a quieter toolbar: Comment mode and a labelled count; icons and underlines are the drawer checkbox', async ({
+  test('C-20 (Markdown) a quieter toolbar: Comment mode and an icon count; icons and underlines are the drawer checkbox', async ({
     windowWithTestProject
   }) => {
     const page = windowWithTestProject
     const md = await openReview(page)
-    // No "Show comment icons" tool in the row; with no comments the count reads "Comments".
+    // No "Show comment icons" tool in the row; with no comments the count is named "Comments".
     await expect(md.editor.toolbar().getByTestId(TEST_IDS.COMMENT_TOOL_ICONS)).toHaveCount(0)
     await expect(md.listButton()).toHaveAccessibleName('Comments')
     await commentOn(md, 'li', 5)
     await expect(md.listButton()).toHaveAccessibleName('1 comment', { timeout: MD_COMMENT_BUDGET_MS })
-    await expect(md.listButton()).toContainText('1 comment')
-    await expect(md.listButton()).not.toHaveAttribute('title')
+    await expect(md.listButton()).toHaveText('1')
+    await expect(md.listButton()).toHaveAttribute('title', '1 comment')
 
     await md.listButton().click()
     await expect(md.listButton()).toHaveAttribute('aria-expanded', 'true')
@@ -318,6 +516,28 @@ test.describe('Markdown Preview comments', () => {
     await expect(md.icons()).toHaveCount(0)
     await md.iconsCheckbox().check()
     await expect(md.icons()).toHaveCount(1)
+  })
+
+  test('the drawer fills a narrow preview, as in the HTML preview, and goes back beside the page when it is wide', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    const page = windowWithTestProject
+    const md = await openReview(page)
+    const setWidth = (width: number): Promise<void> =>
+      appWithTestProject.evaluate(({ BrowserWindow }, w) => BrowserWindow.getAllWindows()[0].setSize(w, 800), width)
+    const widthOf = async (selector: string): Promise<number> => (await page.locator(selector).first().boundingBox())?.width ?? 0
+    await setWidth(1800)
+    await md.listButton().click()
+    await expect(md.drawer()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await expect(md.drawer()).not.toHaveClass(/erf-comment-drawer--full/)
+
+    await setWidth(900)
+    await expect(md.drawer()).toHaveClass(/erf-comment-drawer--full/)
+    await expect.poll(async () => Math.round(await widthOf('.markdown-preview') - (await md.drawer().boundingBox())!.width)).toBe(0)
+
+    await setWidth(1800)
+    await expect(md.drawer()).not.toHaveClass(/erf-comment-drawer--full/)
   })
 
   test('C-15 (Markdown) the drawer filter is three cells on one row, and the sort menu orders the rows', async ({
@@ -331,7 +551,7 @@ test.describe('Markdown Preview comments', () => {
 
     await expect(md.filter('open')).toHaveText('Open 1')
     await expect(md.filter('resolved')).toHaveText('Resolved 0')
-    await expect(md.filter('cantEdit')).toHaveText("Can't edit 0")
+    await expect(md.filter('cantEdit')).toHaveText("Problems 0")
     // One row, equal widths: every cell shares the first cell's top and width (within a pixel).
     const boxes = await Promise.all((['open', 'resolved', 'cantEdit'] as const).map(which => md.filter(which).boundingBox()))
     for (const box of boxes) {
@@ -520,5 +740,371 @@ test.describe('Markdown Preview comments', () => {
     })
     expect(mark.inBlock, 'the marked words are not inside their paragraph').toBe(true)
     expect(mark.decoration).toMatch(/text-decoration:\s*underline/)
+  })
+
+  test('K-21 (Markdown) the solid, double and dashed bars really draw through ::highlight()', async ({ windowWithTestProject }, testInfo) => {
+    const page = windowWithTestProject
+    const md = await openReview(page)
+    const paragraph = md.target('p', 3)
+    const paint = (name: string | null): Promise<void> =>
+      paragraph.evaluate((el, highlight) => {
+        for (const old of ['erf-comment', 'erf-comment-active', 'erf-comment-changed']) CSS.highlights.delete(old)
+        if (highlight === null) return
+        const range = document.createRange()
+        range.selectNodeContents(el)
+        const mark = new Highlight(range)
+        mark.priority = -1
+        CSS.highlights.set(highlight, mark)
+      }, name)
+    const barsOf = async (name: string): Promise<BarRows> => {
+      await paint(name)
+      // Two frames: the highlight is painted on the next one.
+      await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))))
+      // The whole bar: it may hang below the paragraph's box.
+      const box = (await paragraph.boundingBox())!
+      const still = await page.screenshot({ path: testInfo.outputPath(`k21-${name}.png`), clip: { ...box, height: box.height + 10 } })
+      return barRowsIn(still, ACCENT_RGB)
+    }
+
+    // Polled: a highlight registered between frames shows on the next paint, and the still must wait for it.
+    await expect.poll(async () => (await barsOf('erf-comment')).solid, { message: 'erf-comment draws a solid bar' }).toBeGreaterThanOrEqual(1)
+    await expect.poll(async () => (await barsOf('erf-comment-active')).bands, { message: 'erf-comment-active draws two bars' }).toBe(2)
+    await expect
+      .poll(async () => barsOf('erf-comment-changed'), { message: 'erf-comment-changed draws a dashed bar, never a solid one' })
+      .toMatchObject({ solid: 0, dashes: expect.any(Number) })
+    expect((await barsOf('erf-comment-changed')).dashes).toBeGreaterThanOrEqual(3)
+  })
+})
+
+test.describe('Markdown Preview comments – reveal, marks and the drawer (plan step 10)', () => {
+  test.afterEach(async ({ windowWithTestProject }) => {
+    await setGlobalSetting(windowWithTestProject, 'comments', { identityNoticeSeen: false })
+  })
+
+  async function openFile(page: Parameters<typeof setGlobalSetting>[0], name: string): Promise<MarkdownCommentsPage> {
+    await setGlobalSetting(page, 'comments', { authorName: NAME, identityNoticeSeen: true })
+    const md = new MarkdownCommentsPage(page)
+    await new ProjectTreePage(page).fileRow(name).click()
+    await md.editor.waitForReady()
+    await md.waitForComments()
+    return md
+  }
+
+  const commentOn = async (md: MarkdownCommentsPage, text: string, file: string): Promise<void> => {
+    await md.content().locator('p', { hasText: text }).click()
+    await md.saveNewComment(NOTE, file, NAME)
+  }
+
+  const widen = (app: Parameters<Parameters<typeof test>[2]>[0]['appWithTestProject']): Promise<void> =>
+    app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1800, 800))
+
+  test('I-6, K-22, P-F07 (Markdown) Show in preview opens the folded part, scrolls and flashes', async ({ windowWithTestProject, appWithTestProject, testProject }, testInfo) => {
+    const page = windowWithTestProject
+    await widen(appWithTestProject)
+    const file = path.join(testProject.path, FOLD)
+    const md = await openFile(page, FOLD)
+    await md.modeOn()
+    await commentOn(md, 'Intro paragraph.', FOLD)
+    await commentOn(md, 'Folded paragraph.', FOLD)
+    await md.modeButton().click()
+    // An agent folds the second comment's paragraph into a section.
+    const written = await fsp.readFile(file, 'utf-8')
+    const start = written.lastIndexOf('<!-- erfana:comment v1')
+    await fsp.writeFile(
+      file,
+      `${written.slice(0, start)}<details>\n<summary>More</summary>\n\n${written.slice(start).replace(/\nEnd paragraph\.\n$/, '\n</details>\n\nEnd paragraph.\n')}`
+    )
+    const section = md.content().locator('details')
+    await expect(section).toHaveCount(1, { timeout: MD_COMMENT_BUDGET_MS })
+    await expect.poll(() => section.evaluate(el => (el as HTMLDetailsElement).open)).toBe(false)
+
+    await md.listButton().click()
+    const rows = md.drawer().getByTestId(TEST_IDS.COMMENT_DRAWER_ROW_MAIN)
+    await expect(rows).toHaveCount(2, { timeout: MD_COMMENT_BUDGET_MS })
+    await rows.first().focus()
+    await page.keyboard.press('ArrowDown')
+    await expect.poll(() => section.evaluate(el => (el as HTMLDetailsElement).open)).toBe(true)
+    await expect(section.locator('p', { hasText: 'Folded paragraph.' })).toBeInViewport()
+    const flash = page.getByTestId(TEST_IDS.COMMENT_HOST_FLASH)
+    await expect(flash).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath('i6-flash.png') })
+    await expect(flash).toHaveCount(0, { timeout: MD_COMMENT_BUDGET_MS })
+    await expect(page.getByTestId(TEST_IDS.COMMENT_DRAWER_REVEAL_NOTE)).toHaveCount(0)
+  })
+
+  test('I-9 (Markdown) the open window names its target: a selected icon and a quiet outline, gone with the window', async ({ windowWithTestProject }, testInfo) => {
+    const page = windowWithTestProject
+    const md = await openFile(page, FILE)
+    await md.modeOn()
+    await commentOn(md, 'Closing paragraph.', FILE)
+    await md.modeButton().click()
+    await expect(md.icons()).toHaveCount(1, { timeout: MD_COMMENT_BUDGET_MS })
+    await md.icons().click()
+    await expect(md.window()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await expect(md.icons()).toHaveClass(/erf-comment-host__icon--selected/)
+    const outline = page.getByTestId(TEST_IDS.COMMENT_HOST_WINDOW_TARGET)
+    await expect(outline).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath('i9-selected.png') })
+    await page.keyboard.press('Escape')
+    await expect(md.window()).toHaveCount(0)
+    await expect(outline).toHaveCount(0)
+    await expect(md.icons()).not.toHaveClass(/--selected/)
+  })
+
+  test('I-14 (Markdown) the new words of a Words changed comment wear the dashed bar', async ({ windowWithTestProject, testProject }, testInfo) => {
+    const page = windowWithTestProject
+    const file = path.join(testProject.path, FILE)
+    const md = await openFile(page, FILE)
+    const at = await md.selectWords('p', 3, 'paragraph of')
+    await page.mouse.click(at.x, at.y, { button: 'right' })
+    await page.getByTestId(TEST_IDS.COMMENT_MENU_SELECTION).click()
+    await md.saveNewComment(NOTE, FILE, NAME)
+    await expect.poll(() => md.markedWords(), { timeout: MD_COMMENT_BUDGET_MS }).toEqual(['paragraph of'])
+
+    const written = await fsp.readFile(file, 'utf-8')
+    await fsp.writeFile(file, written.replace('\nFirst paragraph of the review.', '\nFirst version here the review.'))
+    const changed = (): Promise<string[]> =>
+      page.evaluate(() => [...(CSS.highlights.get('erf-comment-changed') ?? [])].map(range => (range as Range).toString()))
+    await expect.poll(changed, { timeout: MD_COMMENT_BUDGET_MS }).toEqual(['version here'])
+    const paragraph = md.content().locator('p', { hasText: 'First version here' })
+    const box = (await paragraph.boundingBox())!
+    await expect
+      .poll(async () => (await barRowsIn(await page.screenshot({ path: testInfo.outputPath('i14-now-words.png'), clip: { ...box, height: box.height + 10 } }), ACCENT_RGB)).dashes)
+      .toBeGreaterThanOrEqual(3)
+  })
+
+  test('I-19 (Markdown) comment mode: the crosshair over the preview, and the tab moves away near the top', async ({ windowWithTestProject }, testInfo) => {
+    const page = windowWithTestProject
+    const md = await openFile(page, FILE)
+    const paragraph = md.target('p', 3)
+    await expect(paragraph).toHaveCSS('cursor', /^(auto|text)$/)
+    await md.modeOn()
+    await expect(paragraph).toHaveCSS('cursor', 'crosshair')
+    const pane = (await md.overlay().boundingBox())!
+    await page.mouse.move(pane.x + pane.width / 2, pane.y + 10)
+    await expect(md.modeTab()).toHaveClass(/--bottom/)
+    await page.screenshot({ path: testInfo.outputPath('i19-tab-bottom.png') })
+    await page.mouse.move(pane.x + pane.width / 2, pane.y + 200)
+    await expect(md.modeTab()).not.toHaveClass(/--bottom/)
+    await page.keyboard.press('Escape')
+    await expect(paragraph).not.toHaveCSS('cursor', 'crosshair')
+  })
+
+  test('I-20 (Markdown) the drawer sits beside the preview: it covers no icon, and the window stays out of it', async ({ windowWithTestProject, appWithTestProject }, testInfo) => {
+    const page = windowWithTestProject
+    await widen(appWithTestProject)
+    const md = await openFile(page, FILE)
+    await md.modeOn()
+    await commentOn(md, 'First paragraph of the review.', FILE)
+    await md.modeButton().click()
+    await expect(md.icons()).toHaveCount(1, { timeout: MD_COMMENT_BUDGET_MS })
+    const before = (await md.preview().boundingBox())!
+    await md.listButton().click()
+    await expect(md.drawer()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    const drawer = (await md.drawer().boundingBox())!
+    await expect.poll(async () => (await md.preview().boundingBox())!.width).toBeLessThanOrEqual(before.width - drawer.width + 1)
+    const icon = (await md.icons().boundingBox())!
+    expect(icon.x + icon.width, 'the icon runs under the drawer').toBeLessThanOrEqual(drawer.x)
+    await md.icons().click()
+    await expect(md.window()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    const win = (await md.window().boundingBox())!
+    expect(win.x + win.width, 'the window runs over the drawer').toBeLessThanOrEqual(drawer.x)
+    await page.screenshot({ path: testInfo.outputPath('i20-drawer-beside.png') })
+  })
+})
+
+test.describe('Markdown Preview comments – focus never gets lost', () => {
+  const TALL = 'tall.md'
+  const TALL_TEXT = ['# Tall', '', ...Array.from({ length: 150 }, (_, i) => `Paragraph ${i + 1} of the tall review.\n`)].join('\n')
+  test.use({ testProjectFiles: { [TALL]: TALL_TEXT } })
+
+  test.afterEach(async ({ windowWithTestProject }) => {
+    await setGlobalSetting(windowWithTestProject, 'comments', { identityNoticeSeen: false })
+  })
+
+  async function openTall(page: Parameters<typeof setGlobalSetting>[0]): Promise<MarkdownCommentsPage> {
+    const md = new MarkdownCommentsPage(page)
+    await new ProjectTreePage(page).fileRow(TALL).click()
+    await md.editor.waitForReady()
+    await expect(md.target('p', 3)).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await md.waitForComments()
+    return md
+  }
+
+  const scrollToEnd = (md: MarkdownCommentsPage): Promise<void> =>
+    md.preview().evaluate(el => {
+      el.scrollTop = el.scrollHeight
+    })
+
+  test('I-2 (Markdown) a drawer row whose target is off screen scrolls it in, so the window shows and takes focus', async ({ windowWithTestProject }) => {
+    const page = windowWithTestProject
+    await setGlobalSetting(page, 'comments', { authorName: NAME, identityNoticeSeen: true })
+    const md = await openTall(page)
+    await md.modeOn()
+    await md.target('p', 3).click()
+    await md.saveNewComment(NOTE, TALL, NAME)
+    await expect(md.icons()).toHaveCount(1, { timeout: MD_COMMENT_BUDGET_MS })
+    await scrollToEnd(md)
+    await md.listButton().click()
+    await expect(md.drawer()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await md.drawer().getByTestId(TEST_IDS.COMMENT_DRAWER_ROW_OPEN).click()
+    const win = md.window()
+    await expect(win).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await expect(page.getByTestId(TEST_IDS.COMMENT_EDGE_TAB)).toHaveCount(0)
+    await expect(win.getByTestId('comment-window-title')).toBeFocused()
+  })
+
+  test('K-2, K-3, K-7 (Markdown) with no mouse: fold, edge tab, typed text and mode off each keep focus', async ({ windowWithTestProject }) => {
+    const page = windowWithTestProject
+    await setGlobalSetting(page, 'comments', { authorName: NAME, identityNoticeSeen: true })
+    const md = await openTall(page)
+    await md.preview().focus()
+    await page.keyboard.press(MODE_KEY)
+    await expect(md.modeButton()).toHaveAttribute('aria-pressed', 'true')
+    // The keyboard entry picks a block a frame later: Enter acts on it.
+    await expect(md.content().locator('[data-line-start]:focus')).toHaveCount(1)
+    await page.keyboard.press('Enter')
+    const win = md.window()
+    await expect(win).toHaveAttribute('data-view', 'new', { timeout: MD_COMMENT_BUDGET_MS })
+    const field = win.getByTestId(TEST_IDS.COMMENT_NEW_FIELD)
+    await expect(field).toBeFocused()
+
+    // K-2: the target scrolls away with focus in the empty window: the tab takes focus before the window hides.
+    await scrollToEnd(md)
+    const tab = page.getByTestId(TEST_IDS.COMMENT_EDGE_TAB)
+    await expect(tab).toBeFocused()
+
+    // K-3: pressed with the keyboard, it brings the window back with focus inside.
+    await page.keyboard.press('Enter')
+    await expect(tab).toHaveCount(0)
+    await expect(field).toBeFocused()
+
+    // K-2: typed text holds the window open.
+    await page.keyboard.type(NOTE)
+    await scrollToEnd(md)
+    await expect(field).toBeFocused()
+    await expect(tab).toHaveCount(0)
+    await expect(win).toBeVisible()
+
+    // K-5: closed, focus goes back to the picked block; K-7: leaving the mode from there hands it to the preview.
+    await page.keyboard.press('Escape')
+    await expect(win).toHaveCount(0, { timeout: MD_COMMENT_BUDGET_MS })
+    await page.keyboard.press(MODE_KEY)
+    await expect(md.modeButton()).toHaveAttribute('aria-pressed', 'false')
+    await expect(md.preview()).toBeFocused()
+  })
+
+  test('K-30 (Markdown) the comment-mode frame stays in forced colours', async ({ windowWithTestProject }) => {
+    const page = windowWithTestProject
+    const md = await openTall(page)
+    await md.modeOn()
+    await page.emulateMedia({ forcedColors: 'active' })
+    await expect(page.getByTestId(TEST_IDS.COMMENT_HOST_OVERLAY)).toHaveCSS('outline-style', 'solid')
+    await page.emulateMedia({ forcedColors: 'none' })
+  })
+})
+
+test.describe('Markdown Preview comments – the review loop (plan step 13)', () => {
+  test.afterEach(async ({ windowWithTestProject }) => {
+    await setGlobalSetting(windowWithTestProject, 'comments', { identityNoticeSeen: false })
+  })
+
+  async function open(page: Parameters<typeof setGlobalSetting>[0]): Promise<MarkdownCommentsPage> {
+    const md = new MarkdownCommentsPage(page)
+    await new ProjectTreePage(page).fileRow(FILE).click()
+    await md.editor.waitForReady()
+    await expect(md.target('p', 3)).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await md.waitForComments()
+    return md
+  }
+
+  /** Comments on the closing and the first paragraph: the later one first, so line 3 stays line 3. */
+  async function twoComments(md: MarkdownCommentsPage): Promise<void> {
+    await md.modeOn()
+    await md.target('p', 8).click()
+    await expect(md.window()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await md.saveNewComment(`${NOTE} (closing)`, FILE, NAME)
+    await expect(md.icons()).toHaveCount(1, { timeout: MD_COMMENT_BUDGET_MS })
+    await md.target('p', 3).click()
+    await expect(md.window()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await md.saveNewComment(NOTE, FILE, NAME)
+    await expect(md.icons()).toHaveCount(2, { timeout: MD_COMMENT_BUDGET_MS })
+    await md.modeButton().click()
+  }
+
+  test('024-AC-039 (Markdown) Resolve all changed comments, review first, then Delete all resolved comments; each one write', async ({
+    windowWithTestProject,
+    testProject
+  }) => {
+    const page = windowWithTestProject
+    const file = path.join(testProject.path, FILE)
+    const md = await open(page)
+    await twoComments(md)
+
+    // An agent rewrites the first paragraph: its comment reads Changed.
+    // Its line, not the words the comment stored about it: those sit in the block above.
+    const rewritten = (await fsp.readFile(file, 'utf-8')).replace(/^First paragraph of the review\.$/m, 'First paragraph, rewritten by an agent.')
+    await fsp.writeFile(file, rewritten)
+    await md.listButton().click()
+    const action = md.drawer().getByTestId(TEST_IDS.COMMENT_BULK_ACTION)
+    await expect(action).toHaveText('Resolve all changed comments', { timeout: MD_COMMENT_BUDGET_MS })
+
+    await action.click()
+    const items = md.drawer().getByTestId(TEST_IDS.COMMENT_BULK_ITEM)
+    await expect(items).toHaveCount(1)
+    await expect(items.getByTestId(TEST_IDS.COMMENT_NOW)).toContainText('rewritten by an agent')
+    await expect(items.getByTestId(TEST_IDS.COMMENT_WAS)).toContainText('First paragraph of the review.')
+    await expect(md.drawer().getByTestId(TEST_IDS.COMMENT_BULK_CANCEL)).toBeFocused()
+    await md.drawer().getByTestId(TEST_IDS.COMMENT_BULK_CANCEL).click()
+    expect(await fsp.readFile(file, 'utf-8')).toBe(rewritten)
+
+    await action.click()
+    await md.drawer().getByTestId(TEST_IDS.COMMENT_BULK_CONFIRM).click()
+    await expect(md.drawer().getByTestId(TEST_IDS.COMMENT_BULK_OUTCOME)).toHaveText('Resolved 1 comment.', { timeout: MD_COMMENT_BUDGET_MS })
+    const after = await fsp.readFile(file, 'utf-8')
+    expect(after.match(/status: resolved/g)?.length).toBe(1)
+    expect(after.match(/status: open/g)?.length).toBe(1)
+
+    await md.filter('resolved').click()
+    const remove = md.drawer().getByTestId(TEST_IDS.COMMENT_BULK_ACTION)
+    await expect(remove).toHaveText('Delete all resolved comments', { timeout: MD_COMMENT_BUDGET_MS })
+    await remove.click()
+    await expect(md.drawer().getByTestId(TEST_IDS.COMMENT_BULK_ITEM)).toHaveCount(1)
+    await md.drawer().getByTestId(TEST_IDS.COMMENT_BULK_CONFIRM).click()
+    await expect(md.drawer().getByTestId(TEST_IDS.COMMENT_BULK_OUTCOME)).toHaveText('Deleted 1 comment.', { timeout: MD_COMMENT_BUDGET_MS })
+    const last = await fsp.readFile(file, 'utf-8')
+    expect(last).not.toContain(`${NOTE}\n`)
+    expect(last).toContain(`${NOTE} (closing)`)
+    expect(last.match(/erfana:comment/g)?.length).toBe(1)
+  })
+
+  test('P-F20 (Markdown) Copy text reaches the clipboard, and the window\'s text can be selected', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    const page = windowWithTestProject
+    const md = await open(page)
+    await md.modeOn()
+    await md.target('p', 3).click()
+    await expect(md.window()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await md.saveNewComment(NOTE, FILE, NAME)
+    await expect(md.icons()).toHaveCount(1, { timeout: MD_COMMENT_BUDGET_MS })
+    await md.modeButton().click()
+    await md.icons().first().click()
+    const win = md.window()
+    await expect(win).toHaveAttribute('data-view', 'threads', { timeout: MD_COMMENT_BUDGET_MS })
+    await expect(win.getByTestId(TEST_IDS.COMMENT_MESSAGE_TEXT).first()).toHaveCSS('user-select', 'text')
+    await win.getByTestId(TEST_IDS.COMMENT_MESSAGE_ACTIONS).first().click()
+    await page.getByRole('menuitem', { name: 'Copy text' }).click()
+    await expect.poll(() => appWithTestProject.evaluate(({ clipboard }) => clipboard.readText())).toBe(NOTE)
+  })
+
+  test('P-F21 (Markdown) the empty drawer turns comment mode on', async ({ windowWithTestProject }) => {
+    const page = windowWithTestProject
+    const md = await open(page)
+    await md.listButton().click()
+    await md.drawer().getByTestId(TEST_IDS.COMMENT_DRAWER_TURN_ON_MODE).click()
+    await expect(md.modeButton()).toHaveAttribute('aria-pressed', 'true')
+    await expect(md.drawer().getByTestId(TEST_IDS.COMMENT_DRAWER_TURN_ON_MODE)).toHaveCount(0)
   })
 })

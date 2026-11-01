@@ -28,8 +28,12 @@ import {
   CommentFileViewSchema,
   CommentMessageTextSchema,
   CommentReasonedRefusalSchema,
+  CommentRefusalReasonSchema,
   CommentTargetPlaceSchema,
   commentThreadOpSchemas,
+  type CommentBulkRequest,
+  type CommentBulkResult,
+  type CommentBulkSettled,
   type CommentReasonedRefusal,
   type CommentSaveResult
 } from './comment-common-schema'
@@ -38,7 +42,7 @@ import {
   CommentPickViewSchema,
   CommentTagNameSchema
 } from './preview-comment-page-schema'
-import { COMMENT_DRAFT_TOKEN_PATTERN } from './preview-comment-schema'
+import { COMMENT_DRAFT_TOKEN_PATTERN, CommentSaveSettledSchema } from './preview-comment-schema'
 import { PanelIdSchema } from './preview-schema'
 
 /**
@@ -173,6 +177,8 @@ export const ThreadPlacementSchema = z
     tag: CommentTagNameSchema,
     /** The words the thread is about (its valid `anchor.sel`), for the underline (024-FR-004). */
     sel: FileCommentSelSchema.optional(),
+    /** The new words of a Words changed comment, as main found them (S-04, I-14): underlined instead of `sel`. */
+    now: FileCommentSelSchema.optional(),
     /** C-03: where the target sits when its tag alone does not name it (a table row or cell, a diagram). */
     place: CommentTargetPlaceSchema.optional()
   })
@@ -230,14 +236,36 @@ export const FileCommentChangedSchema = z
   .strict()
 export type FileCommentChanged = z.infer<typeof FileCommentChangedSchema>
 
+/**
+ * `file-comment:gitName`'s answer (P-F33): `name` is held to the identity
+ * form's own rules in main; absent when git knows none. Nothing is stored.
+ */
+export const FileCommentGitNameResultSchema = z.union([
+  z.object({ ok: z.literal(true), name: z.string().min(1).max(PREVIEW_LIMITS.COMMENT_AUTHOR_NAME_MAX_CHARS * 2).optional() }).strict(),
+  CommentReasonedRefusalSchema
+])
+export type FileCommentGitNameResult = z.infer<typeof FileCommentGitNameResultSchema>
+
 /** Any refusal of this family. */
 export type FileCommentRefusal = CommentReasonedRefusal
+
+/**
+ * `file-comment:saveSettled` (W-10): the HTML family's settle event for a save
+ * of this family, with main's finer reason (C-19) – "changed during the save"
+ * must not read as an invitation to save again.
+ */
+export const FileCommentSaveSettledSchema = CommentSaveSettledSchema.safeExtend({ reason: CommentRefusalReasonSchema.optional() })
+export type FileCommentSaveSettled = z.infer<typeof FileCommentSaveSettledSchema>
 
 /** The `window.api.fileComments` contract (`src/preload/fileCommentsBridge.ts`). */
 export interface FileCommentsBridge {
   list(request: FileCommentListRequest): Promise<FileCommentListResult>
   openDraft(request: FileCommentOpenDraftRequest): Promise<FileCommentOpenDraftResult>
   save(request: FileCommentSaveRequest): Promise<FileCommentSaveResult>
+  bulk(request: CommentBulkRequest): Promise<CommentBulkResult>
+  gitName(): Promise<FileCommentGitNameResult>
   release(request: FileCommentReleaseRequest): Promise<FileCommentReleaseResult>
   onChanged(callback: (payload: FileCommentChanged) => void): () => void
+  onSaveSettled(callback: (payload: FileCommentSaveSettled) => void): () => void
+  onBulkSettled(callback: (payload: CommentBulkSettled) => void): () => void
 }

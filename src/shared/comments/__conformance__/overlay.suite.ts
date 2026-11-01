@@ -13,7 +13,8 @@
  * (`src/renderer/src/components/Editor/markdownComments/MarkdownComments.overlay.conformance.test.tsx`).
  * Every case title starts `024-AC-001 ({preview})`. It covers what jsdom can
  * show: comment mode on and off, the gesture table, the Esc order and the
- * label. Pin placement and the underline run in Playwright, per preview.
+ * label. Pin placement and the underline run in Playwright, per preview. The
+ * Comment button and the menu's subject are `selection.suite.ts`, beside this.
  *
  * Where the differences table makes the hosts differ on purpose, the driver
  * says so and the case checks that host's behaviour instead: the floating
@@ -32,7 +33,9 @@
  * the host's stated reason, never silently passed.
  */
 import { afterEach, beforeEach, describe, expect, it, type TestFunction } from 'vitest'
-import type { OptionalPart, OverlayDriver, OverlayPick, OverlayTargetId } from './overlayDriver'
+import { OVERLAY_FIXTURE } from './overlayDriver'
+import type { ModeLeaveDriver, ModeLeavePlace, OptionalPart, OverlayDriver, OverlayPick, OverlayTargetId } from './overlayDriver'
+import { MODE_TAB_AVOID_PX } from '../overlayCore/reveal'
 
 /** The longest name part a label shows before its size (design §10.2: at most 40 characters). */
 const LABEL_NAME_MAX_CHARS = 40
@@ -134,6 +137,17 @@ export function runOverlaySuite(
         expect(d.modeIndicatorText()).toBe(d.modeIndicatorIdle)
         d.modeOff()
         expect(d.modeIndicatorText()).toBeNull()
+      })
+
+      caseIt('OVL-M-07 leaving the mode with focus on the picked target hands focus on: it never falls out of the preview', ctx => {
+        if (d.pickByKeys === undefined || d.focusHeldInPreview === undefined) {
+          ctx.skip(notOwned('pickFocus'))
+          return
+        }
+        d.modeOn()
+        d.pickByKeys()
+        d.modeOff()
+        expect(d.focusHeldInPreview()).toBe(true)
       })
 
       caseIt('OVL-M-06 the fixture is laid out whole', () => {
@@ -311,6 +325,68 @@ export function runOverlaySuite(
         expect(d.outlinedTarget()).toBe('container')
       })
 
+      caseIt('OVL-L-05 after a cancelled pick the outline follows the pointer again, and a click hits what it shows', async () => {
+        d.modeOn()
+        d.click('inner')
+        await d.cancelPick()
+        d.hover({ target: 'second' })
+        expect(d.outlinedTarget()).toBe('second')
+        expect(d.outlineSelected()).toBe(false)
+        expect(d.labelText('second')).toBe(d.labels.second)
+        d.click('second')
+        expect(d.picks().at(-1)).toEqual(open('second'))
+      })
+
+      caseIt('OVL-L-06 after a cancelled pick, the pick stays outlined until the pointer really moves off it', async () => {
+        d.modeOn()
+        d.click('inner')
+        await d.cancelPick()
+        expect(d.outlinedTarget()).toBe('inner')
+        d.hover({ target: 'inner', dx: 2 })
+        expect(d.outlinedTarget()).toBe('inner')
+        expect(d.outlineSelected()).toBe(true)
+      })
+
+      caseIt('OVL-L-07 Enter after the pointer took over acts on what is outlined, not on the old pick', async () => {
+        d.modeOn()
+        d.click('inner')
+        await d.cancelPick()
+        d.hover({ target: 'second' })
+        d.pressEnter()
+        expect(d.picks().at(-1)).toEqual({ kind: 'open', via: 'keyboard', target: 'second' })
+      })
+
+      // Letting go outside the level is `overlayCore/pointerFollow`'s test: nothing in the fixture lies outside `container`.
+      caseIt('OVL-L-08 a level picked by keys holds while the pointer moves inside it', () => {
+        d.modeOn()
+        d.hover({ target: 'second' })
+        d.levelUpByKeys()
+        expect(d.outlinedTarget()).toBe('container')
+        d.hover({ target: 'second', dx: 2 })
+        expect(d.outlinedTarget()).toBe('container')
+      })
+
+      caseIt('OVL-L-09 while the window is open, the outline stays on its target', async ctx => {
+        if (d.open === undefined || d.notOwned?.window !== undefined) {
+          ctx.skip(notOwned('window'))
+          return
+        }
+        d.modeOn()
+        await d.open('window', 'inner')
+        d.hover({ target: 'second' })
+        expect(d.outlinedTarget()).toBe('inner')
+      })
+
+      caseIt('OVL-L-10 the mode tab moves away while the pointer is near the top, and comes back (I-19)', () => {
+        d.modeOn()
+        expect(d.modeTabMovedAway()).toBe(false)
+        const near = OVERLAY_FIXTURE.first.box.top + OVERLAY_FIXTURE.first.box.height / 2
+        d.hover({ target: 'first', dy: MODE_TAB_AVOID_PX - 1 - near })
+        expect(d.modeTabMovedAway()).toBe(true)
+        d.hover({ target: 'first', dy: MODE_TAB_AVOID_PX - near })
+        expect(d.modeTabMovedAway()).toBe(false)
+      })
+
       caseIt(`OVL-L-04 a label's name never runs past ${LABEL_NAME_MAX_CHARS} characters, and it ends in the size`, ctx => {
         if (!d.floatingLabel) {
           ctx.skip(notOwned('floatingLabel'))
@@ -324,6 +400,88 @@ export function runOverlaySuite(
           expect(label.slice(cut + 1), target).toMatch(/^\d+×\d+$/)
         }
       })
+    })
+  })
+}
+
+/** Who may hold focus when Esc is pressed, for {@link runModeLeaveSuite}. */
+const LEAVE_PLACES: readonly ModeLeavePlace[] = ['toggle', 'drawer', 'find', 'group']
+
+/**
+ * Leaving comment mode: the mode tab says "Esc to leave", so Esc does so from
+ * anywhere in the panel, with no mouse, in both previews (plan step 4; I-1,
+ * K-19). The Esc order stays menu → window → comment mode → Find.
+ *
+ * @param name - The preview, as every case title names it.
+ * @param makeDriver - A fresh driver on a laid-out panel, comment mode off. Called once per test.
+ */
+export function runModeLeaveSuite(name: string, makeDriver: () => ModeLeaveDriver | Promise<ModeLeaveDriver>): void {
+  describe(`leaving comment mode – ${name}`, () => {
+    let d: ModeLeaveDriver
+
+    beforeEach(async () => {
+      d = await makeDriver()
+    })
+
+    afterEach(async () => {
+      await d.dispose()
+    })
+
+    it.each(LEAVE_PLACES)(`024-AC-001 (${name}) LVE-01 Esc with focus on %s leaves comment mode, in one press`, async place => {
+      await d.modeOn()
+      await d.focusOn(place)
+      await d.pressEscape(place)
+      expect(d.isModeOn()).toBe(false)
+      expect(d.findOpen()).toBe(place === 'find')
+    })
+
+    it(`024-AC-001 (${name}) LVE-02 the second Esc in Find closes Find`, async () => {
+      await d.modeOn()
+      await d.focusOn('find')
+      await d.pressEscape('find')
+      await d.pressEscape('find')
+      expect(d.findOpen()).toBe(false)
+    })
+
+    it(`024-AC-001 (${name}) LVE-03 Esc from the toggle keeps focus on the toggle`, async () => {
+      await d.modeOn()
+      await d.focusOn('toggle')
+      await d.pressEscape('toggle')
+      expect(d.focused()).toBe('toggle')
+    })
+
+    it.each(LEAVE_PLACES)(`024-AC-001 (${name}) LVE-04 comment mode off: Esc on %s stays the panel's`, async place => {
+      await d.focusOn(place)
+      expect(await d.pressEscape(place)).toBe(place !== 'find')
+    })
+
+    it(`024-AC-001 (${name}) LVE-05 Shift+Esc is not Esc`, async () => {
+      await d.modeOn()
+      await d.focusOn('toggle')
+      await d.pressEscape('toggle', { shift: true })
+      expect(d.isModeOn()).toBe(true)
+    })
+
+    it(`024-AC-001 (${name}) LVE-06 Esc outside the panel is not this panel's`, async () => {
+      await d.modeOn()
+      await d.pressEscapeOutside()
+      expect(d.isModeOn()).toBe(true)
+    })
+
+    it(`024-FR-005 (${name}) LVE-07 a tab switch keeps comment mode, with no press to get it back`, async () => {
+      await d.modeOn()
+      await d.setTabShown(false)
+      await d.setTabShown(true)
+      expect(d.isModeOn()).toBe(true)
+    })
+
+    it(`024-AC-001 (${name}) LVE-08 after coming back to the tab, Esc still leaves`, async () => {
+      await d.modeOn()
+      await d.setTabShown(false)
+      await d.setTabShown(true)
+      await d.focusOn('group')
+      await d.pressEscape('group')
+      expect(d.isModeOn()).toBe(false)
     })
   })
 }

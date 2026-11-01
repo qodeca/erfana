@@ -35,15 +35,16 @@ Preview renders GitHub-style Markdown, frontmatter, links and Mermaid diagrams b
 
 ## Comments
 
-**What it does:** Leave a comment on a paragraph, list item, heading or other block, or on words you select. The comment is saved inside the `.md` file as an HTML comment right before the block, so it does not show when the file is rendered, travels with the file through git, and a coding agent reading the file sees it. A comment icon marks each commented block, and commented words are underlined. The **Comments** list shows every comment in the file, filtered by **Open**, **Resolved** or **Can't edit** and sorted by **File order**, **Changed first** or **Latest activity**. **How to reach it:** in the **Preview Only** view, select **Comment mode** in the toolbar or press <kbd>⌥⌘M</kbd> / <kbd>Ctrl+Alt+M</kbd>, then select a block; or select words and select **Comment**; or right-click a block and choose its comment item. <kbd>Esc</kbd> leaves comment mode. Step-by-step: [Comment on a preview](../how-to/comment-on-a-preview.md).
+**What it does:** Leave a comment on a paragraph, list item, heading or other block, or on words you select. The comment is saved inside the `.md` file as an HTML comment right before the block, so it does not show when the file is rendered, travels with the file through git, and a coding agent reading the file sees it. A comment icon marks each commented block, and commented words are underlined. The **Comments** list shows every comment in the file, filtered by **Open**, **Resolved** or **Problems** and sorted by **File order**, **Changed first** or **Latest activity**. **How to reach it:** in the **Preview Only** view, select **Comment mode** in the toolbar or press <kbd>⌥⌘M</kbd> / <kbd>Ctrl+Alt+M</kbd>, then select a block; or select words and select **Comment**; or right-click a block and choose its comment item. <kbd>Esc</kbd> leaves comment mode. Step-by-step: [Comment on a preview](../how-to/comment-on-a-preview.md).
 
 The comment window stays beside the preview rather than covering it; <kbd>F6</kbd> moves between the window and the preview. Turn Markdown comments off, or change your name, in [Settings > Comments](settings.md#comments).
 
 | Limit | Behaviour |
 | --- | --- |
 | Views | Comments, icons and the comment count show only in the **Preview Only** view, never in the editor or a split view. |
-| Unsaved changes | While the editor holds unsaved changes, comments are read-only and a band above the preview says so, with a button to save the file and **Go to editor**. |
-| Frontmatter | The YAML frontmatter can't take a comment. |
+| Unsaved changes | While the editor holds unsaved changes, comments are read-only and a band above the preview says so. Its button is **Save** and your file's name, or **Go to editor** when the file also changed on disk. |
+| Frontmatter | The YAML frontmatter can't take a comment. Right-clicking it shows **Comment on file settings** turned off, with the reason. |
 | Generated parts | A part between a tool's START and END markers can't take a comment; comment on the text before or after it. |
 | How the file looks | Erfana tries up to 4 places for a comment and refuses to save if every one would change how the file renders. Your text is kept. |
-| File size | A file over 2 MB or 100,000 lines, or one nested very deeply (for example, lists or block quotes more than 32 levels deep), can be read but takes no new comments. |
+| Site builders | A tool that reads `.md` files as strict MDX can refuse the file, because comments are saved as HTML comments. See [If something goes wrong](../how-to/comment-on-a-preview.md#if-something-goes-wrong). |
+| File size | A file over 2 MB or 100,000 lines, or one nested very deeply (for example, lists or block quotes more than 32 levels deep), still opens in the preview, but Erfana shows no comments for it and takes no new ones. |

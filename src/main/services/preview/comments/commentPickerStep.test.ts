@@ -35,8 +35,8 @@ describe('pickerStepOf', () => {
   it('leaves out a parsed tag no tag name can spell, and keeps the event valid', () => {
     for (const tagName of ['a<b', '', 'x'.repeat(200), 'é']) {
       const step = pickerStepOf({ say: 'showing', entry: { tagName, line: 4 } })
-      // C-10: a tag no table names is spoken as "element".
-      expect(step, tagName).toEqual({ say: 'showing', element: { line: 4, role: 'element' } })
+      // C-10, K-33: a tag no table names is spoken as "section".
+      expect(step, tagName).toEqual({ say: 'showing', element: { line: 4, role: 'section' } })
       expect(event(step).success, tagName).toBe(true)
     }
     expect(pickerStepOf({ say: 'showing', entry: { tagName: 'p', line: 0 } }).element?.line).toBe(1)
@@ -45,8 +45,9 @@ describe('pickerStepOf', () => {
   it('C-10 (HTML) names the kind from a fixed table over the parsed tag, and the open comments from main', () => {
     expect(roleOf('H2')).toBe('heading level 2')
     expect(roleOf('li')).toBe('list item')
-    expect(roleOf('constructor')).toBe('element')
-    expect(roleOf('h7')).toBe('element')
+    // K-33: the fallback is the HTML `{kind}` word (was "element").
+    expect(roleOf('constructor')).toBe('section')
+    expect(roleOf('h7')).toBe('section')
     const one = pickerStepOf({ say: 'showing', entry: { tagName: 'h1', line: 2 }, comments: 1 })
     expect(one).toEqual({ say: 'showing', element: { tag: 'h1', line: 2, role: 'heading level 1', comments: 1 } })
     expect(event(one).success).toBe(true)

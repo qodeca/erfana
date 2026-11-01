@@ -10,14 +10,14 @@ Requirement: 024-FR-006 (acceptance 024-AC-007), with the definition-of-done ite
 
 | # | Check | HTML | Markdown |
 |---|---|---|---|
-| 1.1 | The Markdown Preview never says "element", "page", "block" (except "code block" and "block quote"), "pin" or a tag name; the HTML Preview says "element" | ☐ | ☐ |
-| 1.2 | Window titles: "New comment on {kind}", "Comment on {kind}", "Comments on {kind}" ("element" in HTML) (A-02) | ☐ | ☐ |
+| 1.1 | The Markdown Preview never says "element", "page", "block" (except "code block" and "block quote"), "pin" or a tag name; the HTML Preview says "section" | ☐ | ☐ |
+| 1.2 | Window titles: "New comment on {kind}", "Comment on {kind}", "Comments on {kind}" ("section" in HTML) (A-02) | ☐ | ☐ |
 | 1.3 | Comment-mode tab: "Comment mode · {target}, line {n} · Esc to leave" once something is outlined (A-03) | ☐ | ☐ |
 | 1.4 | First comment ever shows one privacy notice covering both file types; the other preview does not show it again (A-09) | ☐ | ☐ |
 | 1.5 | Toolbar: Comment mode toggle and the "7 comments" count, pressed look while on or open; no "Show comment icons" tool; the drawer has "Show comment icons and underlines" | ☐ | ☐ |
-| 1.6 | Empty drawer reads "No comments in this file yet. Select text and right-click, or turn on comment mode and click …" (A-08) | ☐ | ☐ |
+| 1.6 | Empty drawer reads "No comments yet. Select some text and right-click, or turn on comment mode and click …" (A-08) | ☐ | ☐ |
 | 1.7 | The comment mark (fill and bar) looks the same, differs from your selection and from links | ☐ | ☐ |
-| 1.8 | Only the forced differences D-01 to D-35 differ – in particular: modal window in HTML, non-modal with edge tab in Markdown (D-01, D-02); selector labels in HTML (D-03); floating label only in HTML (D-05); ghost icon only in Markdown (D-12); the HTML comment-mode tab without a target name (D-34) | ☐ | ☐ |
+| 1.8 | Only the forced differences in the differences table differ – in particular: modal window in HTML, non-modal with edge tab in Markdown (D-01, D-02); the code on hover only in HTML (D-03); floating label only in HTML (D-05); ghost icon only in Markdown (D-12); the HTML comment-mode tab without a target name (D-34) | ☐ | ☐ |
 
 ## 2. Menus (menu matrix)
 
@@ -25,12 +25,12 @@ Right-click, then repeat with ⇧F10 / Shift+F10 for every row you can reach by 
 
 | # | Check | HTML | Markdown |
 |---|---|---|---|
-| 2.1 | Mode off, nothing selected: one step to the window – "Comment on element" / "Comment on {kind}" (M-01, M-11) | ☐ | ☐ |
+| 2.1 | Mode off, nothing selected: one step to the window – "Comment on section" / "Comment on {kind}" (M-01, M-11) | ☐ | ☐ |
 | 2.2 | Mode off, words selected: "Comment on selection", "Comment on the whole {kind}" (M-02, M-12) | ☐ | ☐ |
 | 2.3 | Mode on, nothing selected: "Add comment" (M-03, M-13) | ☐ | ☐ |
 | 2.4 | Mode on, words selected: "Comment on selection", "Comment on the whole {kind}", no prompt items (M-04, M-14) | ☐ | ☐ |
 | 2.5 | Read-only file (for example a file with a git conflict): the items keep their names, are disabled and show a visible reason; comment mode is unavailable with the reason (M-05 to M-07, M-15 to M-17) | ☐ | ☐ |
-| 2.6 | Markdown frontmatter, with and without a selection: disabled items with "Comments can't be added to the frontmatter." (M-18 to M-21) | – | ☐ |
+| 2.6 | Markdown frontmatter, with and without a selection: disabled items with "You can't comment on the settings at the top of this file." (M-18 to M-21) | – | ☐ |
 | 2.7 | Markdown with unsaved editor edits: the paused band, disabled items with the band's sentence (M-15, M-16) | – | ☐ |
 | 2.8 | HTML outside comment mode by keyboard: ⇧F10 / Shift+F10 in the page opens Erfana's menu (§ 4 of the matrix) | ☐ | – |
 | 2.9 | Markdown editor and split views: no comment items, tools, icons, underlines or count (M-22) | – | ☐ |
@@ -42,7 +42,7 @@ Create each state, then check its drawer tag, icon, window banner, main button a
 | # | State | How to create it | HTML | Markdown |
 |---|---|---|---|---|
 | 3.1 | Open (S-01) | Add a comment | ☐ | ☐ |
-| 3.2 | Not visible now (S-02) | HTML: a hidden slide or tab; Markdown: a collapsed section | ☐ | ☐ |
+| 3.2 | Hidden right now (S-02) | HTML: a hidden slide or tab; Markdown: a collapsed section | ☐ | ☐ |
 | 3.3 | Changed (S-03) – notched icon, Was/Now, Resolve focused | Edit the commented text in the source | ☐ | ☐ |
 | 3.4 | Words changed (S-04) | Comment on selected words, then rewrite those words | ☐ | ☐ |
 | 3.5 | Not found (S-05) – info banner, Resolve focused; Markdown ghost icon | Delete the commented paragraph in the source | ☐ | ☐ |
@@ -59,12 +59,12 @@ Create each state, then check its drawer tag, icon, window banner, main button a
 | # | Check | HTML | Markdown |
 |---|---|---|---|
 | 4.1 | Keyboard only: pick a target with Tab and Alt+Up/Down, Enter, write, ⌘Enter / Ctrl+Enter to save | ☐ | ☐ |
-| 4.2 | "Narrow to words" field selects words by keyboard and saves them | ☐ | ☐ |
+| 4.2 | "Comment on specific words" field selects words by keyboard and saves them | ☐ | ☐ |
 | 4.3 | Clicking a commented target in comment mode opens its threads, not a blank comment (C-22) | ☐ | ☐ |
 | 4.4 | Stepper ‹ n of m ›, ⌥F9 / Alt+F9, "Resolve and next", "Reply and resolve" | ☐ | ☐ |
 | 4.5 | Esc order: menu, then window, then comment mode | ☐ | ☐ |
 | 4.6 | A draft survives closing the window ("Draft restored"); Markdown also across a view switch | ☐ | ☐ |
-| 4.7 | Moved target: HTML offers Pick again; Markdown saves to the moved block or offers Pick again (D-23) | ☐ | ☐ |
+| 4.7 | Moved target: HTML offers Select again; Markdown saves to the moved block or offers Select again (D-23) | ☐ | ☐ |
 
 ## 5. The file (Markdown placement)
 

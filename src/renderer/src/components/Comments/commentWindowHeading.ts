@@ -8,9 +8,8 @@
  *
  * @module HtmlPreviewPanel/comments/commentWindowHeading
  */
-import { COPY, frameFileText, scriptBuiltText } from './commentCopy'
-import { HTML_WORDS, type CommentWords } from './commentCopyWords'
-import { ancestorTag, elementLabel } from './commentFormat'
+import { COPY, SCRIPT_BUILT_TEXT, frameFileText } from './commentCopy'
+import { HTML_WORDS, capitalise, type CommentWords } from './commentCopyWords'
 import { WINDOW_COPY, headingQuote } from './commentWindowCopy'
 import type { CommentWindowRequest } from './commentWindowTypes'
 import type { selectThreads } from './ThreadsView'
@@ -20,6 +19,8 @@ export interface Heading {
   readonly title: string
   readonly context: string | null
   readonly note: string | null
+  /** The HTML target's code, for tests and tooling: the reader no longer sees it. */
+  readonly target?: string
 }
 
 /**
@@ -28,7 +29,7 @@ export interface Heading {
  * main sent with the pin – the target is main's description of the element
  * as it is in the file now, so the context line names it exactly as a
  * right-click would. `null` when there is no such draft (a drawer row, or
- * main sent none) or the file is read-only.
+ * main sent none) or the file takes no new comment.
  *
  * @param request - The window's request.
  * @param selection - What the list holds for it.
@@ -38,12 +39,55 @@ export function newCommentFrom(
   request: CommentWindowRequest,
   selection: ReturnType<typeof selectThreads>
 ): Extract<CommentWindowRequest, { kind: 'new' }> | null {
+  return takesNewComment(selection) ? newCommentOnPin(request) : null
+}
+
+/** Whether the file takes a new comment: at its limit, replies and resolves work and a new comment does not (F-04). */
+function takesNewComment(selection: ReturnType<typeof selectThreads>): boolean {
+  return selection !== null && selection.file.writable && selection.file.addRefusal === undefined
+}
+
+/**
+ * What the window's "New comment" does, in both previews, however the window
+ * was reached (owner decision, 2026-11-01). A draft main sent with the pin goes
+ * first: the window is on that target. Otherwise the host opens one on demand
+ * on the shown thread's target: a drawer row, a step key, or a step here left
+ * the pin's draft behind. A thread with no target left offers none.
+ *
+ * @param request - The window's request.
+ * @param selection - What the list holds for it.
+ * @param stepped - A step moved the window off the thread it opened on.
+ * @param onNewComment - Switches the window to a new-comment request.
+ * @param newOnThread - The host's way to a new comment on a listed thread's target.
+ * @returns The action, or `null` when none is offered.
+ */
+export function newCommentAction(
+  request: CommentWindowRequest,
+  selection: ReturnType<typeof selectThreads>,
+  stepped: boolean,
+  onNewComment?: (request: Extract<CommentWindowRequest, { kind: 'new' }>) => void,
+  newOnThread?: (threadKey: string) => (() => void) | null
+): (() => void) | null {
+  if (!takesNewComment(selection)) return null
+  const pinned = stepped ? null : newCommentOnPin(request)
+  if (pinned !== null && onNewComment !== undefined) return () => onNewComment(pinned)
+  const shown = selection?.threads[0]
+  return shown?.attached === true ? (newOnThread?.(shown.threadKey) ?? null) : null
+}
+
+/**
+ * The new comment a pin's draft stands for, whatever the file says: the caller
+ * knows it takes one.
+ *
+ * @param request - The window's request.
+ * @returns The request, or `null` when it carries no whole draft.
+ */
+export function newCommentOnPin(request: CommentWindowRequest): Extract<CommentWindowRequest, { kind: 'new' }> | null {
   if (request.kind !== 'threads') return null
   const { draftToken, draftKey, file, target } = request
   if (draftToken === undefined || draftKey === undefined || file === undefined || target === undefined) {
     return null
   }
-  if (selection === null || !selection.file.writable) return null
   return {
     kind: 'new',
     panelId: request.panelId,
@@ -76,17 +120,17 @@ export function headingOf(
       const title = words.newCommentTitle(target) + headingText(target.tag, request.words?.text)
       return { title, context: words.context(target, file.displayPath), note: null }
     }
-    const label = target.runtime ? target.runtime.tag : elementLabel(target)
     const note = target.runtime
-      ? scriptBuiltText(ancestorTag(target))
+      ? SCRIPT_BUILT_TEXT
       : file.frame
         ? frameFileText(file.displayPath)
         : null
-    // A-02: "New comment on element"; the selector stays in the context line (D-03).
+    // The owner's plain wording, 2026-10-31: no tag or selector in the window.
     return {
       title: words.newCommentTitle(target.tag),
-      context: `${label} · ${file.displayPath}, line ${target.line}`,
-      note
+      context: `${file.displayPath}, line ${target.line}`,
+      note,
+      target: words.code(target)
     }
   }
   if (selection === null) return { title: 'Comments', context: null, note: null }
@@ -98,15 +142,14 @@ export function headingOf(
   }
   // C-05: a lost target says so on the context line; where the comment itself is follows the banner.
   const lost = selection.threads.length > 0 && selection.threads.every(thread => !thread.attached && thread.status === 'open')
+  const context = lost ? WINDOW_COPY.notFoundContext(capitalise(words.noun(first)), file) : words.context(first, file)
   if (words.preview !== 'html') {
     const title = words.threadsTitle(first, selection.threads.length) + headingText(first.tag, first.quote)
-    const context = lost ? WINDOW_COPY.notFoundContext(words.noun(first), file) : words.context(first, file)
     return { title, context, note: null }
   }
-  const label = first.runtime ? first.runtime.tag : elementLabel(first)
   return {
     title: words.threadsTitle(first, selection.threads.length),
-    context: lost ? WINDOW_COPY.notFoundContext(label, file) : `${label} · ${file}, line ${first.line}`,
+    context,
     note: selection.file.frame ? frameFileText(file) : null
   }
 }

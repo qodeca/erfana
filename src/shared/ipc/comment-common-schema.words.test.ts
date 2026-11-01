@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The C-07 and C-03 wire fields, in both channel families (spec 024
- * 024-NFR-005; comments-v2 C-07 "Narrow to words" on Edit, C-03 kind nouns):
+ * 024-NFR-005; comments-v2 C-07 "Comment on specific words" on Edit, C-03 kind nouns):
  * the edit's optional `sel`, a thread's words and place, a placement's place.
  * Every field is optional and strict – an unknown key or an out-of-range
  * value is refused.

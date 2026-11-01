@@ -147,6 +147,7 @@ describe('R-012 comments tokens', () => {
 
     it.each([
       'accent',
+      'accentDeep',
       'accentHover',
       'ink',
       'paper',

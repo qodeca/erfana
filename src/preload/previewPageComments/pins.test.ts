@@ -96,8 +96,8 @@ describe('placePins (J-005)', () => {
     ])
     const stack = pins[3]
     expect(stack.members?.map(m => m.key)).toEqual(ids.slice(3).map(id => `k-${id}`))
-    expect(pinName(stack, 'p')).toBe('37 more commented elements here. Open.')
-    expect(pinTooltip(stack)).toBe('37 more commented elements – click to open')
+    expect(pinName(stack, 'p')).toBe('37 more commented sections here. Open.')
+    expect(pinTooltip(stack)).toBe('37 more commented sections – click to open')
     const drawn = drawPin(document, undefined, stack, { label: 'p', selected: false })
     expect(drawn.classList.contains('erf-hpc-pin--stack')).toBe(true)
     // A damaged pin merged in makes the stack damaged; a stack shows at most +99.

@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { logger } from '../../LoggingService'
 import { BASE_PAGE, commentedPage } from './__test-helpers__/commentedPages'
 import { eventFrom, FakeFrame, frameFile, serveLoad, stubFrameFiles, tokenOfTag } from './__test-helpers__/commentServiceHarness'
+import { ContextKeyGate, CONTEXT_KEY_WINDOW_MS } from './commentContextGate'
 import { CommentFrames } from './commentFrames'
 import {
   ANCHORS_PER_FRAME_PER_SECOND,
@@ -58,15 +59,31 @@ async function setup() {
   let mode = true
   let cursor = { ...AT }
   const out = sinks()
-  const handler = createCommentPickHandler({
+  let enabled = true
+  const menuKey = new ContextKeyGate()
+  const pagePress = new ContextKeyGate()
+  const forged = createCommentPickHandler({
     panelId: 'panel',
     frames,
     tokens,
     now: () => now,
     mode: () => mode,
+    enabled: () => enabled,
     sinks: out as unknown as PageSignalSinks,
+    menuKey,
+    pagePress,
     geometry: { viewRect: () => ({ x: 100, y: 50, width: 800, height: 600 }), contentBounds: () => ({ x: 10, y: 20 }), cursor: () => cursor }
   })
+  /** Picks the reader really made: main saw the press first. `forged` is the same handler with no press behind it. */
+  const handler: typeof forged = {
+    ...forged,
+    pick(event, payload) {
+      pagePress.press(now)
+      const { kind, via } = payload as { kind?: string; via?: string }
+      if (via === 'keyboard' && (kind === 'open' || kind === 'menu')) menuKey.press(now)
+      forged.pick(event, payload)
+    }
+  }
   return {
     tokens,
     files,
@@ -77,8 +94,13 @@ async function setup() {
     inner,
     out,
     handler,
+    forged,
+    pagePress,
     advance: (ms: number) => (now += ms),
+    /** A real Shift+F10 or Menu key, as main's `before-input-event` records it. */
+    pressMenuKey: () => menuKey.press(now),
     setMode: (on: boolean) => (mode = on),
+    setEnabled: (on: boolean) => (enabled = on),
     moveCursor: (to: { x: number; y: number }) => (cursor = to)
   }
 }
@@ -165,6 +187,287 @@ describe('commentPickHandler element picks', () => {
     expect(h.out.element).toHaveBeenCalledTimes(1)
   })
 
+  describe('D-10 an open pick outside comment mode: the Comment button over selected words', () => {
+    const SEL = { sel: { exact: 'ten', prefix: '', suffix: '' } }
+    const open = (token: string, patch: Record<string, unknown> = {}) => menuPick(token, 'button', { kind: 'open', screen: AT, ...SEL, ...patch })
+
+    it('D-10 accepted with selected words, a real press and the real cursor at the reported point', async () => {
+      const h = await setup()
+      h.setMode(false)
+      h.handler.pick(eventFrom(h.top), open(tokenOfTag(h.page.doc, 'button')))
+      expect(h.out.element).toHaveBeenCalledTimes(1)
+      expect(h.out.element.mock.calls[0][3]).toMatchObject({ kind: 'open', via: 'pointer', ...SEL })
+      // Words main cannot find on disk open nothing here: the opener is told.
+      expect(h.out.element.mock.calls[0][4]).toBe(true)
+    })
+
+    it('D-10 in comment mode words main cannot find still open the window, which says so', async () => {
+      const h = await setup()
+      h.setMode(true)
+      h.handler.pick(eventFrom(h.top), open(tokenOfTag(h.page.doc, 'button')))
+      expect(h.out.element.mock.calls[0][4]).toBe(false)
+    })
+
+    it('D-10 dropped with no real press: the renderer alone opens nothing', async () => {
+      const h = await setup()
+      h.setMode(false)
+      h.forged.pick(eventFrom(h.top), open(tokenOfTag(h.page.doc, 'button')))
+      expect(h.out.element).not.toHaveBeenCalled()
+      expect(JSON.stringify(vi.mocked(logger.warn).mock.calls)).toContain('no-press')
+    })
+
+    it('D-10 dropped with the cursor elsewhere, on the view or off it', async () => {
+      const h = await setup()
+      h.setMode(false)
+      h.moveCursor({ x: 5, y: 5 })
+      h.handler.pick(eventFrom(h.top), open(tokenOfTag(h.page.doc, 'button')))
+      h.moveCursor({ x: AT.x + 40, y: AT.y })
+      h.handler.pick(eventFrom(h.top), open(tokenOfTag(h.page.doc, 'button')))
+      expect(h.out.element).not.toHaveBeenCalled()
+      expect(JSON.stringify(vi.mocked(logger.warn).mock.calls)).toContain('cursor-elsewhere')
+    })
+
+    it('D-10 dropped with no reported point', async () => {
+      const h = await setup()
+      h.setMode(false)
+      h.handler.pick(eventFrom(h.top), open(tokenOfTag(h.page.doc, 'button'), { screen: undefined }))
+      expect(h.out.element).not.toHaveBeenCalled()
+    })
+
+    it('D-10 dropped with no words: a whole-element open stays comment mode\'s', async () => {
+      const h = await setup()
+      h.setMode(false)
+      h.handler.pick(eventFrom(h.top), open(tokenOfTag(h.page.doc, 'button'), { sel: undefined }))
+      expect(h.out.element).not.toHaveBeenCalled()
+      expect(JSON.stringify(vi.mocked(logger.warn).mock.calls)).toContain('mode-off')
+    })
+
+    it('D-10 dropped by keyboard: no key press opens a window outside the mode', async () => {
+      const h = await setup()
+      h.setMode(false)
+      h.handler.pick(eventFrom(h.top), open(tokenOfTag(h.page.doc, 'button'), { via: 'keyboard', screen: undefined, point: { x: 1, y: 2 } }))
+      expect(h.out.element).not.toHaveBeenCalled()
+      expect(JSON.stringify(vi.mocked(logger.warn).mock.calls)).toContain('mode-off')
+    })
+
+    it('D-10 dropped with no token: words with nothing to stand on', async () => {
+      const h = await setup()
+      h.setMode(false)
+      h.handler.pick(eventFrom(h.top), { kind: 'open', via: 'pointer', screen: AT, ...SEL, view: VIEW })
+      expect(h.out.element).not.toHaveBeenCalled()
+    })
+
+    it('D-10 a menu pick outside the mode stays dropped: only the open route widened', async () => {
+      const h = await setup()
+      h.setMode(false)
+      h.handler.pick(eventFrom(h.top), menuPick(tokenOfTag(h.page.doc, 'button'), 'button', { kind: 'menu', screen: AT, ...SEL }))
+      expect(h.out.element).not.toHaveBeenCalled()
+    })
+
+    it('D-10 the element checks still hold: a moved token is dropped', async () => {
+      const h = await setup()
+      h.setMode(false)
+      h.handler.pick(eventFrom(h.top), menuPick(tokenOfTag(h.page.doc, 'button'), 'p', { kind: 'open', screen: AT, ...SEL }))
+      expect(h.out.element).not.toHaveBeenCalled()
+    })
+
+    it('D-09 an icon pick outside the mode still needs its real press', async () => {
+      const h = await setup()
+      h.setMode(false)
+      const key = [...h.frames.get(1)!.pins.keys()][0]
+      h.forged.pick(eventFrom(h.top), { kind: 'icon', via: 'pointer', key, screen: AT, view: VIEW })
+      expect(h.out.icon).not.toHaveBeenCalled()
+      h.handler.pick(eventFrom(h.top), { kind: 'icon', via: 'pointer', key, screen: AT, view: VIEW })
+      expect(h.out.icon).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('L-1 K-1 the keyboard\'s context pick', () => {
+    const keyPick = (token: string) => menuPick(token, 'button', { kind: 'context', via: 'keyboard', screen: undefined, point: { x: 14, y: 304 } })
+    const offMode = async () => {
+      const h = await setup()
+      h.setMode(false)
+      // Nowhere near the view: the reader's hands are on the keyboard.
+      h.moveCursor({ x: -5_000, y: -5_000 })
+      return { h, token: tokenOfTag(h.page.doc, 'button') }
+    }
+
+    it('K-1 a real key main recorded opens the menu, with the pointer far away', async () => {
+      const { h, token } = await offMode()
+      h.pressMenuKey()
+      h.advance(CONTEXT_KEY_WINDOW_MS - 1)
+      h.handler.pick(eventFrom(h.top), keyPick(token))
+      expect(h.out.element).toHaveBeenCalledTimes(1)
+      expect(h.out.element.mock.calls[0][3]).toMatchObject({ kind: 'context', via: 'keyboard' })
+    })
+
+    it('L-1 a forged keyboard pick with no real key is refused', async () => {
+      const { h, token } = await offMode()
+      h.handler.pick(eventFrom(h.top), keyPick(token))
+      expect(h.out.element).not.toHaveBeenCalled()
+      expect(JSON.stringify(vi.mocked(logger.warn).mock.calls)).toContain('no-menu-key')
+    })
+
+    it('L-1 a page that claims the pointer route is held to the pointer rule, whatever key was pressed', async () => {
+      const { h, token } = await offMode()
+      h.pressMenuKey()
+      h.handler.pick(eventFrom(h.top), menuPick(token, 'button', { kind: 'context', screen: { x: 5, y: 5 } }))
+      expect(h.out.element).not.toHaveBeenCalled()
+      expect(JSON.stringify(vi.mocked(logger.warn).mock.calls)).toContain('cursor-elsewhere')
+    })
+
+    it('L-1 a key too long ago opens nothing', async () => {
+      const { h, token } = await offMode()
+      h.pressMenuKey()
+      h.advance(CONTEXT_KEY_WINDOW_MS)
+      h.handler.pick(eventFrom(h.top), keyPick(token))
+      expect(h.out.element).not.toHaveBeenCalled()
+    })
+
+    it('L-1 one key press opens one menu: a replay is refused', async () => {
+      const { h, token } = await offMode()
+      h.pressMenuKey()
+      h.handler.pick(eventFrom(h.top), keyPick(token))
+      h.handler.pick(eventFrom(h.top), keyPick(token))
+      expect(h.out.element).toHaveBeenCalledTimes(1)
+    })
+
+    it('L-1 a pick is never let through by a key pressed after it', async () => {
+      const { h, token } = await offMode()
+      h.handler.pick(eventFrom(h.top), keyPick(token))
+      h.pressMenuKey()
+      expect(h.out.element).not.toHaveBeenCalled()
+    })
+
+    it('L-1 the element checks still hold: a real key does not carry a forged token, and is spent by the try', async () => {
+      const { h, token } = await offMode()
+      h.pressMenuKey()
+      h.handler.pick(eventFrom(h.top), keyPick('zzzzzzzzzzzz'))
+      h.handler.pick(eventFrom(h.top), keyPick(token))
+      expect(h.out.element).not.toHaveBeenCalled()
+    })
+
+    it('L-1 with no recorder every keyboard pick is dropped (fail closed)', () => {
+      expect(new ContextKeyGate().take(0)).toBe(false)
+    })
+
+    it('L-1 clear() forgets a press, and a later release does not bring it back', () => {
+      const gate = new ContextKeyGate()
+      gate.press(0)
+      gate.clear()
+      gate.release(1)
+      expect(gate.take(2)).toBe(false)
+    })
+  })
+
+  describe('L-1 a pick needs a real press main saw on this view', () => {
+    const noPress = () => expect(JSON.stringify(vi.mocked(logger.warn).mock.calls)).toContain('no-press')
+    const contextAt = (token: string) => menuPick(token, 'button', { kind: 'context', screen: AT })
+    const offMode = async () => {
+      const h = await setup()
+      h.setMode(false)
+      return { h, token: tokenOfTag(h.page.doc, 'button') }
+    }
+    const pinOf = (h: Awaited<ReturnType<typeof setup>>) => [...h.frames.get(1)!.pins.keys()][0]
+
+    it('L-1 a pointer context pick with the cursor resting on the view and no press is refused', async () => {
+      const { h, token } = await offMode()
+      h.forged.pick(eventFrom(h.top), contextAt(token))
+      expect(h.out.element).not.toHaveBeenCalled()
+      noPress()
+    })
+
+    it('L-1 a real press lets one pointer context pick through, once', async () => {
+      const { h, token } = await offMode()
+      h.pagePress.press(10_000)
+      h.forged.pick(eventFrom(h.top), contextAt(token))
+      h.forged.pick(eventFrom(h.top), contextAt(token))
+      expect(h.out.element).toHaveBeenCalledTimes(1)
+    })
+
+    it('L-1 a press too long ago lets nothing through', async () => {
+      const { h, token } = await offMode()
+      h.pagePress.press(10_000)
+      h.advance(CONTEXT_KEY_WINDOW_MS)
+      h.forged.pick(eventFrom(h.top), contextAt(token))
+      expect(h.out.element).not.toHaveBeenCalled()
+    })
+
+    it('L-1 a Windows right-click, whose menu comes at the release, passes after a long hold', async () => {
+      const { h, token } = await offMode()
+      h.pagePress.press(10_000)
+      h.advance(CONTEXT_KEY_WINDOW_MS * 3)
+      h.pagePress.release(10_000 + CONTEXT_KEY_WINDOW_MS * 3)
+      h.forged.pick(eventFrom(h.top), contextAt(token))
+      expect(h.out.element).toHaveBeenCalledTimes(1)
+    })
+
+    it('L-1 the release of a press already spent buys nothing more', async () => {
+      const { h, token } = await offMode()
+      h.pagePress.press(10_000)
+      h.forged.pick(eventFrom(h.top), contextAt(token))
+      h.pagePress.release(10_001)
+      h.forged.pick(eventFrom(h.top), contextAt(token))
+      expect(h.out.element).toHaveBeenCalledTimes(1)
+    })
+
+    it('L-1 an icon pick needs a press too, by either route, and a real click opens it once', async () => {
+      const { h } = await offMode()
+      const key = pinOf(h)
+      h.forged.pick(eventFrom(h.top), { kind: 'icon', via: 'pointer', key, screen: AT, view: VIEW })
+      h.forged.pick(eventFrom(h.top), { kind: 'icon', via: 'keyboard', key, point: { x: 1, y: 2 }, view: VIEW })
+      expect(h.out.icon).not.toHaveBeenCalled()
+      noPress()
+      h.pagePress.press(10_000)
+      h.forged.pick(eventFrom(h.top), { kind: 'icon', via: 'pointer', key, screen: AT, view: VIEW })
+      h.forged.pick(eventFrom(h.top), { kind: 'icon', via: 'pointer', key, screen: AT, view: VIEW })
+      expect(h.out.icon).toHaveBeenCalledTimes(1)
+    })
+
+    it('L-1 a keyboard icon pick does not pass on a mouse press, nor a pointer one on a key', async () => {
+      const { h } = await offMode()
+      const key = pinOf(h)
+      h.pagePress.press(10_000)
+      h.forged.pick(eventFrom(h.top), { kind: 'icon', via: 'keyboard', key, point: { x: 1, y: 2 }, view: VIEW })
+      h.pressMenuKey()
+      h.forged.pick(eventFrom(h.top), { kind: 'icon', via: 'pointer', key, screen: AT, view: VIEW })
+      expect(h.out.icon).toHaveBeenCalledTimes(1)
+    })
+
+    it('L-1 the draft flood: a comment-mode menu or open pick with no real input opens nothing, so nothing mints', async () => {
+      const h = await setup()
+      const token = tokenOfTag(h.page.doc, 'button')
+      h.forged.pick(eventFrom(h.top), menuPick(token, 'button'))
+      h.forged.pick(eventFrom(h.top), menuPick(token, 'button', { kind: 'open' }))
+      h.forged.pick(eventFrom(h.top), menuPick(token, 'button', { via: 'keyboard', screen: undefined, point: { x: 1, y: 2 } }))
+      expect(h.out.element).not.toHaveBeenCalled()
+      h.pressMenuKey()
+      h.forged.pick(eventFrom(h.top), menuPick(token, 'button', { via: 'keyboard', screen: undefined, point: { x: 1, y: 2 } }))
+      expect(h.out.element).toHaveBeenCalledTimes(1)
+    })
+
+    it('L-1 a pick dropped for its mode does not spend the press', async () => {
+      const { h, token } = await offMode()
+      h.pagePress.press(10_000)
+      h.forged.pick(eventFrom(h.top), menuPick(token, 'button'))
+      h.forged.pick(eventFrom(h.top), contextAt(token))
+      expect(h.out.element).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it('D with comments off a pick opens nothing, whatever press main saw; Esc still leaves the mode', async () => {
+    const h = await setup()
+    const token = tokenOfTag(h.page.doc, 'button')
+    h.setEnabled(false)
+    h.handler.pick(eventFrom(h.top), menuPick(token, 'button'))
+    h.handler.pick(eventFrom(h.top), { kind: 'icon', via: 'pointer', key: [...h.frames.get(1)!.pins.keys()][0], screen: AT, view: VIEW })
+    expect(h.out.element).not.toHaveBeenCalled()
+    expect(h.out.icon).not.toHaveBeenCalled()
+    expect(JSON.stringify(vi.mocked(logger.warn).mock.calls)).toContain('comments-off')
+    h.handler.pick(eventFrom(h.top), { kind: 'exit', via: 'keyboard', view: VIEW })
+    expect(h.out.exit).toHaveBeenCalledTimes(1)
+  })
+
   it('M-033 SEC-04 a forged, unknown or stale token opens nothing', async () => {
     const h = await setup()
     h.handler.pick(eventFrom(h.top), menuPick('zzzzzzzzzzzz', 'button'))
@@ -247,6 +550,20 @@ describe('commentPickHandler pins, control picks and budgets', () => {
     h.handler.pick(eventFrom(h.child), { kind: 'icon', via: 'pointer', key, view: VIEW })
     expect(h.out.icon).toHaveBeenCalledTimes(1)
     expect(h.out.icon.mock.calls[0][2]).toBe(key)
+  })
+
+  it('I-13 a mark names a place its pin has: the opener hears the pin and the place; anything else is dropped', async () => {
+    const h = await setup()
+    const record = h.frames.get(h.top.frameTreeNodeId)!
+    const [key, pin] = [...record.pins][0]
+    record.pins.set(key, { ...pin, words: [{ exact: 'x', prefix: '', suffix: '' }], wordThreads: pin.threadIds.slice(0, 1) })
+    h.handler.pick(eventFrom(h.top), { kind: 'icon', via: 'pointer', key: `${key}-w0`, view: VIEW })
+    expect(h.out.icon).toHaveBeenCalledTimes(1)
+    expect(h.out.icon.mock.calls[0].slice(2, 3)).toEqual([key])
+    expect(h.out.icon.mock.calls[0][4]).toBe(0)
+    h.handler.pick(eventFrom(h.top), { kind: 'icon', via: 'pointer', key: `${key}-w1`, view: VIEW })
+    h.handler.pick(eventFrom(h.top), { kind: 'icon', via: 'pointer', key: 'p999-w0', view: VIEW })
+    expect(h.out.icon).toHaveBeenCalledTimes(1)
   })
 
   it('C-17 (HTML) a stack pin is opened only when every key it names is one of the frame’s own pins', async () => {

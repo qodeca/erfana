@@ -66,7 +66,7 @@ describe('commentSaveFlow add', () => {
     const result = await f.save({ panelId: 'panel', op: 'add', draftToken: token, text: 'Hi' })
     expect(result).toMatchObject({ ok: true, threadKey: expect.stringMatching(/^t/) })
     expect(f.writer.add).toHaveBeenCalledWith({
-      file: { realRoot: '/p', filePath: PAGE },
+      file: { realRoot: '/p', filePath: PAGE, expectedRealPath: PAGE },
       draft: { offset: 10, fileHash: 'h0', anchor: draft().anchor, ws: 'collapse' },
       view: draft().view,
       text: 'Hi'
@@ -195,7 +195,7 @@ describe('commentSaveFlow thread and block changes', () => {
     const k = keyed()
     const result = await k.save({ ...target(k), ...request } as CommentSaveRequest)
     expect(result).toEqual({ ok: true, threadKey: k.threadKey })
-    expect(k.writer.changeThread).toHaveBeenCalledWith({ file: { realRoot: '/p', filePath: PAGE }, threadId: 'c-1', rawHash: HASH, change })
+    expect(k.writer.changeThread).toHaveBeenCalledWith({ file: { realRoot: '/p', filePath: PAGE, expectedRealPath: PAGE }, threadId: 'c-1', rawHash: HASH, change })
     expect(k.landed).toHaveBeenCalledWith({ realPath: PAGE, fileHash: 'h1', scroll: SCROLL, page: PAGE })
   })
 
@@ -218,7 +218,7 @@ describe('commentSaveFlow thread and block changes', () => {
     const k = keyed()
     const request = { panelId: 'panel', op: 'deleteBlock' as const, fileKey: k.fileKey, blockKey: k.blockKey, rawHash: HASH }
     expect(await k.save(request)).toEqual({ ok: true, threadKey: null })
-    expect(k.writer.deleteDamagedBlock).toHaveBeenCalledWith({ file: { realRoot: '/p', filePath: PAGE }, rawHash: HASH, start: 42 })
+    expect(k.writer.deleteDamagedBlock).toHaveBeenCalledWith({ file: { realRoot: '/p', filePath: PAGE, expectedRealPath: PAGE }, rawHash: HASH, start: 42 })
     expect(await k.save({ ...request, rawHash: 'b'.repeat(64) })).toEqual({ ok: false, code: ErrorCode.COMMENT_KEY_INVALID })
     expect(await k.save({ ...request, blockKey: k.threadKey })).toEqual({ ok: false, code: ErrorCode.COMMENT_KEY_INVALID })
   })
@@ -296,14 +296,14 @@ describe('commentSaveFlow rebuildBlock (OD-05)', () => {
   it('rebuilds the block its key and hash name, keeping it open when no status is sent', async () => {
     const r = rebuilding()
     expect(await r.save(r.request)).toEqual({ ok: true, threadKey: null })
-    expect(r.rebuildDamagedBlock).toHaveBeenCalledExactlyOnceWith({ file: { realRoot: '/p', filePath: PAGE }, rawHash: HASH, start: 42 })
+    expect(r.rebuildDamagedBlock).toHaveBeenCalledExactlyOnceWith({ file: { realRoot: '/p', filePath: PAGE, expectedRealPath: PAGE }, rawHash: HASH, start: 42 })
     expect(r.landed).toHaveBeenCalledWith({ realPath: PAGE, fileHash: 'h1', scroll: SCROLL, page: PAGE })
   })
 
   it('"Mark resolved" passes the status on to the writer', async () => {
     const r = rebuilding()
     await r.save({ ...r.request, status: 'resolved' })
-    expect(r.rebuildDamagedBlock).toHaveBeenCalledWith({ file: { realRoot: '/p', filePath: PAGE }, rawHash: HASH, start: 42, status: 'resolved' })
+    expect(r.rebuildDamagedBlock).toHaveBeenCalledWith({ file: { realRoot: '/p', filePath: PAGE, expectedRealPath: PAGE }, rawHash: HASH, start: 42, status: 'resolved' })
   })
 
   it('SEC-08 refuses a block of another file, a hash that no longer matches, a wrong kind of key, and a writer that cannot rebuild', async () => {

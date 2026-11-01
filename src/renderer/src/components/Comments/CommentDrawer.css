@@ -123,6 +123,52 @@
   font-size: var(--text-base);
 }
 
+/* The filter's bulk action (024-FR-028), above the list. */
+.erf-comment-drawer__bulk {
+  flex: 0 0 auto;
+  padding: var(--space-6) var(--space-8) 0;
+}
+.erf-comment-drawer__bulk > .erf-comment-drawer__help {
+  margin: 0;
+}
+
+/* Its review, in the list's place: Cancel and the action stay at the end of what was read. */
+.erf-comment-bulk {
+  padding: var(--space-6) var(--space-8) var(--space-8);
+}
+.erf-comment-bulk__title {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+}
+.erf-comment-bulk__note {
+  margin: var(--space-3) 0 var(--space-6);
+  font-size: var(--text-base);
+  color: var(--color-text-tertiary);
+}
+.erf-comment-bulk__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.erf-comment-bulk__item {
+  padding-block: var(--space-4);
+  border-block-start: var(--border-width) solid var(--color-border-default);
+}
+.erf-comment-bulk__label,
+.erf-comment-bulk__excerpt {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--text-base);
+}
+.erf-comment-bulk__label {
+  color: var(--color-text-tertiary);
+}
+.erf-comment-bulk__excerpt {
+  color: var(--color-text-primary);
+}
+
 /* Main left files out of the list (design §19 Rev 4). Above the scroll, not in
    it: the windowed list's offset is measured once per filter, and the note
    stays in view however far the list scrolls. */
@@ -315,6 +361,9 @@
   padding: var(--space-12) var(--space-8);
   color: var(--color-text-tertiary);
   font-size: var(--text-base);
+}
+.erf-comment-drawer__empty-text {
+  margin: 0 0 var(--space-6);
 }
 .erf-comment-drawer__status {
   display: flex;

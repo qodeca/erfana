@@ -15,6 +15,7 @@
  * subscribers' own windows only.
  */
 import { stablePathDigest } from '../../../shared/stablePathDigest'
+import { createRearmingSingleFileWatcher } from '../watcher/rearmingSingleFileWatch'
 import { logger } from '../LoggingService'
 
 /** Files watched at once for comments, every window together. */
@@ -55,6 +56,15 @@ function closeQuietly(handle: FileCommentWatchHandle): Promise<void> {
  *
  * @param onChange - Told the real path whose file changed.
  */
+/** The production watch: one atomic-save-proof watcher per file. */
+export const defaultFileCommentWatch: FileCommentWatchFactory = (realPath, onChange) =>
+  createRearmingSingleFileWatcher(realPath, {
+    onChange,
+    onDeleted: onChange,
+    onError: () => {},
+    onWatchDead: () => {}
+  })
+
 export function createFileCommentWatches(deps: {
   readonly watch: FileCommentWatchFactory
   readonly onChange: (realPath: string) => void

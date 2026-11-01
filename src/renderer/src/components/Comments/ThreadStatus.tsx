@@ -13,7 +13,7 @@
  *   then a Was box (the stored text, struck through) and a Now box (the text
  *   there now, first 200 characters) in the C-21 quote style – the preview's
  *   serif in Markdown. Words with no prefix…suffix pair left: Was only, and
- *   "The words this comment is about are gone from this {kind}." When the
+ *   "The words this comment is about are no longer here." When the
  *   target is also hidden, the hidden sentence follows the boxes (§ 4 rule 8).
  *
  * Every text here comes from the file: React text nodes through
@@ -40,7 +40,7 @@ export interface ThreadStatusProps {
 }
 
 /** One quote box in the C-21 quote style, labelled Was or Now. */
-function QuoteBox({ label, text, was }: { readonly label: string; readonly text: string; readonly was: boolean }): React.JSX.Element {
+export function QuoteBox({ label, text, was }: { readonly label: string; readonly text: string; readonly was: boolean }): React.JSX.Element {
   const markdown = useCommentWords().preview === 'markdown'
   return (
     <div className="erf-comment-wasnow__item" data-testid={was ? TEST_IDS.COMMENT_WAS : TEST_IDS.COMMENT_NOW}>
@@ -95,6 +95,15 @@ export function ThreadStatus({ thread, state, fileName, hidden }: ThreadStatusPr
   const was = change?.was ?? thread.quote ?? ''
   const now = change?.now
   const gone = state === 'words' && now === undefined
+  // P-F10: Changed with no Now – main saw the part restyled or moved, and its text is the same.
+  if (state === 'changed' && change !== undefined && now === undefined) {
+    return (
+      <div className="erf-comment-status" data-testid={TEST_IDS.COMMENT_CHANGED}>
+        <CommentBanner kind="info">{WINDOW_COPY.restyled}</CommentBanner>
+        {hidden && <p className="erf-comment-note erf-comment-status-line">{words.notVisibleText(thread)}</p>}
+      </div>
+    )
+  }
   return (
     <div className="erf-comment-status" data-testid={TEST_IDS.COMMENT_CHANGED}>
       <CommentBanner kind="info">{gone ? WINDOW_COPY.wordsGone(noun) : WINDOW_COPY.changed}</CommentBanner>

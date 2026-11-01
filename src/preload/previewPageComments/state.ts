@@ -27,6 +27,8 @@ import {
 /** The overlay's colours, sizes, spaces and line height, resolved from Erfana's design tokens (§10.9). */
 export interface OverlayTheme {
   readonly accent: string
+  /** The comment bar on a light page, where the accent is under 3:1 (K-20). */
+  readonly accentDeep: string
   readonly accentHover: string
   readonly ink: string
   readonly paper: string
@@ -51,6 +53,7 @@ export interface OverlayTheme {
  */
 export const DEFAULT_THEME: OverlayTheme = Object.freeze({
   accent: '#A0A8FF', // --color-accent-primary (--color-brand-violet)
+  accentDeep: '#3F3FBA', // --color-brand-indigo
   accentHover: '#8b94ff', // --color-brand-violet-hover
   ink: '#161312', // --color-brand-black
   paper: '#F8FAF8', // --color-brand-white
@@ -73,12 +76,12 @@ export interface IconRuntime {
   readonly tag: string
 }
 
-/** One pin: the element is found by `token` (and `runtime`); text never arrives. */
+/** One pin: the element is found by `token` (and `runtime`); comment text never arrives, only the words it quotes (`words`). */
 export interface IconState {
   readonly key: string
   readonly token: string
   readonly runtime?: IconRuntime
-  /** Open threads on the element; a damaged block counts as one. */
+  /** Open conversations on the element; a damaged block counts as one. */
   readonly count: number
   readonly status: 'open' | 'damaged'
   /** The words its open threads are about (spec 024 C-12): page text, which the overlay marks. */
@@ -92,6 +95,8 @@ export interface IconWords {
   readonly exact: string
   readonly prefix: string
   readonly suffix: string
+  /** Their thread changed (K-20): the mark is dashed. Main knows; the page only draws it. */
+  readonly changed?: true
 }
 
 /** One child frame, in `WebFrameMain.frames` order (§19 R3-4). */
@@ -140,6 +145,7 @@ const MAX_CHILD_FRAMES = 1_000
 
 const THEME_RULES: Readonly<Record<keyof OverlayTheme, RegExp>> = {
   accent: COLOUR,
+  accentDeep: COLOUR,
   accentHover: COLOUR,
   ink: COLOUR,
   paper: COLOUR,
@@ -199,7 +205,7 @@ function parseWords(raw: unknown): IconWords[] {
     if (!isBag(item)) continue
     const { exact, prefix, suffix } = item
     if (!isText(exact, 1, SEL_EXACT_MAX_CHARS) || !isText(prefix, 0, SEL_CONTEXT_MAX_CHARS) || !isText(suffix, 0, SEL_CONTEXT_MAX_CHARS)) continue
-    words.push({ exact, prefix, suffix })
+    words.push({ exact, prefix, suffix, ...(item.changed === true ? { changed: true as const } : {}) })
   }
   return words
 }

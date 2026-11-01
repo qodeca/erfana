@@ -98,6 +98,8 @@ describe('Markdown Preview comments – comments-v2', () => {
     Element.prototype.scrollIntoView ??= vi.fn()
     Range.prototype.getBoundingClientRect ??= () => new DOMRect()
     Range.prototype.getClientRects ??= () => [] as unknown as DOMRectList
+    // The selection is drawn over the whole preview: a right-click counts only on its lines (I-22).
+    vi.spyOn(Range.prototype, 'getClientRects').mockReturnValue([new DOMRect(-1, -1, 10_000, 10_000)] as unknown as DOMRectList)
     resetStores()
     api = installApi(fileView([thread('t1', 9, 'li'), thread('w1', 6, 'p')]), [ON_ITEM, WORDS])
     setSettings()
@@ -155,7 +157,7 @@ describe('Markdown Preview comments – comments-v2', () => {
       await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
       await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
       await waitFor(() => expect(content().querySelector('h1')).toHaveFocus())
-      for (let i = 0; i < 4; i += 1) await user.keyboard('{Tab}')
+      await user.keyboard('{Tab}{Tab}{Alt>}{ArrowDown}{/Alt}{Tab}')
       expect(listItem(9)).toHaveFocus()
       await user.keyboard('{Enter}')
       expect(await screen.findByRole('dialog', { name: 'Comment on list item' })).toBeVisible()
@@ -178,6 +180,38 @@ describe('Markdown Preview comments – comments-v2', () => {
       caretAt(paragraph(), paragraph().textContent!.indexOf('ten'))
       plainClick(paragraph())
       expect(await screen.findByRole('dialog', { name: 'Comment on paragraph' })).toBeVisible()
+    })
+
+    describe('S-03 (Markdown) a Changed comment opened from its words', () => {
+      const changed = { state: 'changed' as const, was: 'ten customers', now: 'nine customers' }
+
+      beforeEach(() => {
+        api.list.mockResolvedValue({ ok: true, file: fileView([thread('t1', 9, 'li'), thread('w1', 6, 'p', { change: changed })]), placements: [ON_ITEM, WORDS] })
+      })
+
+      async function readyChanged(): Promise<void> {
+        render(<Harness content={DOC} />)
+        await waitFor(() => expect(screen.getByTestId(TEST_IDS.COMMENT_TOOL_LIST)).toHaveAccessibleName(/^2 comments/))
+      }
+
+      it('S-03 (Markdown) outside comment mode it opens on the title, never on Resolve', async () => {
+        await readyChanged()
+        caretAt(paragraph(), paragraph().textContent!.indexOf('customers'))
+        plainClick(paragraph())
+        const dialog = await screen.findByRole('dialog', { name: 'Comment on paragraph' })
+        await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true))
+        expect(screen.getByTestId(TEST_IDS.COMMENT_WINDOW_TITLE)).toHaveFocus()
+      })
+
+      it('S-03 (Markdown) in comment mode Resolve and next leads, as the state table says', async () => {
+        const user = userEvent.setup()
+        await readyChanged()
+        await user.click(modeTool())
+        caretAt(paragraph(), paragraph().textContent!.indexOf('customers'))
+        plainClick(paragraph())
+        await screen.findByRole('dialog', { name: 'Comment on paragraph' })
+        await waitFor(() => expect(screen.getByTestId(TEST_IDS.COMMENT_RESOLVE_NEXT)).toHaveFocus())
+      })
     })
 
     it('C-17 (Markdown) a click beside the words, or a drag over them, opens nothing', async () => {
@@ -233,24 +267,24 @@ describe('Markdown Preview comments – comments-v2', () => {
           MD_SPOKEN_COPY.target('paragraph', 6, 'We ship the beta to ten customers by Friday.', 1) + MD_SPOKEN_COPY.hint
         )
       )
-      // The list, then its first item: past the third step the keys are no longer added.
-      await user.keyboard('{Tab}{Tab}{Tab}')
+      // The list, into it, then its second item: past the third step the keys are no longer added.
+      await user.keyboard('{Tab}{Alt>}{ArrowDown}{/Alt}{Tab}')
       expect(listItem(9)).toHaveFocus()
       await waitFor(() => expect(polite().textContent).toBe(MD_SPOKEN_COPY.target('list item', 9, 'two', 1)))
       expect(polite().textContent).toBe('List item, line 9: “two”. 1 comment.')
     })
 
-    it('C-10 (Markdown) Tab past either end of the preview says so', async () => {
+    it('C-10 (Markdown) Tab past either end of a level says so, with the one template and its kind word', async () => {
       const user = userEvent.setup()
       await ready()
       await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
       await waitFor(() => expect(content().querySelector('h1')).toHaveFocus())
       await user.keyboard('{Shift>}{Tab}{/Shift}')
-      await waitFor(() => expect(polite()).toHaveTextContent(MD_SPOKEN_COPY.first))
-      for (let i = 0; i < 5; i += 1) await user.keyboard('{Tab}')
+      await waitFor(() => expect(polite()).toHaveTextContent('First H1 heading at this level.'))
+      for (let i = 0; i < 3; i += 1) await user.keyboard('{Tab}')
       await waitFor(() => expect(polite()).toHaveTextContent('Paragraph, line 11: “Second paragraph here.”.'))
       await user.keyboard('{Tab}')
-      await waitFor(() => expect(polite()).toHaveTextContent(MD_SPOKEN_COPY.last))
+      await waitFor(() => expect(polite()).toHaveTextContent('Last paragraph at this level – Alt+Up for the parent.'))
     })
   })
 
@@ -344,7 +378,7 @@ describe('Markdown Preview comments – comments-v2', () => {
       selectWords(paragraph(), 'beta')
       fireEvent.mouseUp(paragraph(), { button: 0 })
       expect(await screen.findByTestId(TEST_IDS.COMMENT_SELECTION_BUTTON, {}, { timeout: SELECTION_BUTTON_DELAY_MS * 10 })).toBeVisible()
-      fireEvent.contextMenu(paragraph(), { clientX: 10, clientY: 10 })
+      fireEvent.contextMenu(paragraph(), { clientX: 110, clientY: 205 })
       const menu = await screen.findByRole('menu', { name: SELECTION_COPY.menuLabel })
       const items = within(menu).getAllByRole('menuitem').map(el => el.querySelector('.context-menu-label')?.textContent ?? el.textContent)
       expect(items.slice(0, 2)).toEqual([SELECTION_COPY.commentOnSelection, SELECTION_COPY.commentOnWhole('paragraph')])
@@ -352,7 +386,7 @@ describe('Markdown Preview comments – comments-v2', () => {
       window.getSelection()?.removeAllRanges()
       fireEvent.click(modeTool(), { detail: 1 })
       await waitFor(() => expect(polite()).toHaveTextContent(MARKDOWN_COPY.modeOn))
-      expect(modeTool().title).toContain('click a paragraph or select text')
+      expect(modeTool().title).toContain('Click a paragraph or select text')
       // The empty drawer teaches both gestures too.
       api.list.mockResolvedValue({ ok: true, file: fileView([]), placements: [] })
       await user.click(screen.getByTestId(TEST_IDS.COMMENT_TOOL_LIST))
@@ -360,8 +394,8 @@ describe('Markdown Preview comments – comments-v2', () => {
     })
   })
 
-  describe('C-07 (Markdown) Narrow to words by keyboard', () => {
-    it('C-07 (Markdown) the keyboard route is complete: pick, Enter, Narrow to words, select, Save with the words', async () => {
+  describe('C-07 (Markdown) Comment on specific words by keyboard', () => {
+    it('C-07 (Markdown) the keyboard route is complete: pick, Enter, Comment on specific words, select, Save with the words', async () => {
       const user = userEvent.setup()
       api = installApi(fileView([]), [])
       render(<Harness content={DOC} />)
@@ -390,14 +424,15 @@ describe('Markdown Preview comments – comments-v2', () => {
   })
 
   describe('C-15 / C-20 the Markdown toolbar and OD-06 in the host', () => {
-    it('C-20 (Markdown) the toolbar has Comment mode and the labelled count only; the drawer has the icons checkbox', async () => {
+    it('C-20 (Markdown) the toolbar has Comment mode and the count only, icons and a number; the drawer has the icons checkbox', async () => {
       const user = userEvent.setup()
       await ready()
       const toolbar = screen.getByTestId('harness-toolbar')
       expect(within(toolbar).getAllByRole('button')).toHaveLength(2)
       expect(screen.queryByTestId(TEST_IDS.COMMENT_TOOL_ICONS)).toBeNull()
       const count = screen.getByTestId(TEST_IDS.COMMENT_TOOL_LIST)
-      expect(count).toHaveTextContent('2 comments')
+      expect(count).toHaveTextContent(/^2$/)
+      expect(count).toHaveAccessibleName('2 comments')
       await user.click(count)
       expect(count).toHaveAttribute('aria-expanded', 'true')
       expect(screen.getByRole('checkbox', { name: COMMENT_LIST_COPY.showIcons })).toBeChecked()
@@ -417,7 +452,7 @@ describe('Markdown Preview comments – comments-v2', () => {
       await waitFor(() => expect(count).toHaveAccessibleName('1 comment, 1 damaged'))
       expect(count.querySelector('.erf-counter--attention')).toHaveTextContent('1')
       await user.click(count)
-      expect(await screen.findByTestId(TEST_IDS.COMMENT_FILTER_CANT_EDIT)).toHaveTextContent("Can't edit 1")
+      expect(await screen.findByTestId(TEST_IDS.COMMENT_FILTER_CANT_EDIT)).toHaveTextContent("Problems 1")
     })
 
     it('OD-06 (Markdown) open comments removed outside Erfana are noted in the drawer, session only', async () => {

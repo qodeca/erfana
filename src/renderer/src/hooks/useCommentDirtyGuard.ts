@@ -22,8 +22,9 @@
  * {@link useUnsavedSourcesFeed} sends it, so a race between this check and
  * the write is still refused there (`COMMENT_UNSAVED_SOURCE`).
  *
- * Limitation (design §7.8): a tab in ANOTHER window is not seen; the disk
- * re-hash at save still prevents a stale overwrite.
+ * Limitation (design §7.8, 024-FR-015 as lowered): a tab in ANOTHER window is
+ * not seen; the disk re-hash at save still prevents a stale overwrite, and a
+ * Markdown write main refuses for it gets one sentence with no buttons.
  *
  * @module hooks/useCommentDirtyGuard
  */

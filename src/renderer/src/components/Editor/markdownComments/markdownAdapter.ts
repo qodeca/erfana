@@ -40,6 +40,7 @@
  *
  * @module Editor/markdownComments/markdownAdapter
  */
+import { foldsHiding, type FoldTree } from '../../../../../shared/comments/overlayCore/reveal'
 import { markdownTextHash } from '../../../../../shared/markdownComments/mdLocate'
 import { PREVIEW_LIMITS } from '../../../../../shared/preview-limits'
 import type { PickedTargetRequest, ThreadPlacement } from '../../../../../shared/ipc/file-comment-schema'
@@ -116,12 +117,16 @@ function isTarget(el: Element, root: Element): boolean {
  * closed section still shows its own `<summary>`.
  */
 function collapsedIn(el: Element, root: Element): boolean {
-  for (let up = el.parentElement; up !== null && up !== root; up = up.parentElement) {
-    if (!(up instanceof HTMLDetailsElement) || up.open) continue
-    const summary = up.querySelector(':scope > summary')
-    if (summary === null || !summary.contains(el)) return true
+  return foldsHiding(el, foldsBelow(root)).length > 0
+}
+
+/** The preview's folds below `root`: raw `details`, whose own first `summary` shows while it is closed. */
+function foldsBelow(root: Element): FoldTree<Element> {
+  return {
+    parentOf: el => (el.parentElement === root ? null : el.parentElement),
+    isClosed: el => el instanceof HTMLDetailsElement && !el.open,
+    showsWhileClosed: (fold, child) => child === fold.querySelector(':scope > summary')
   }
-  return false
 }
 
 /** What one scan of the rendered content's line stamps answers. */
@@ -362,6 +367,16 @@ export function createMarkdownAdapter(source: MarkdownAdapterSource): PreviewCom
     return root !== null && drawn !== undefined && collapsedIn(drawn, root)
   }
 
+  // A block in a raw section is stamped and placed by main, but is no target here.
+  const renderedOf = (placement: ThreadPlacement): HTMLElement | null =>
+    attach(placement) ?? (indexNow()?.firstByStampKind.get(lineTagKey(String(placement.line), placement.tag)) as HTMLElement | undefined) ?? null
+
+  const openFolds = (target: HTMLElement): void => {
+    const root = source.root()
+    if (root === null) return
+    for (const fold of foldsHiding<Element>(target, foldsBelow(root))) (fold as HTMLDetailsElement).open = true
+  }
+
   return {
     words: MARKDOWN_WORDS,
     targetAt,
@@ -375,6 +390,8 @@ export function createMarkdownAdapter(source: MarkdownAdapterSource): PreviewCom
     describe,
     attach,
     hiddenNow,
+    renderedOf,
+    openFolds,
     root: source.root
   }
 }

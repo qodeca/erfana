@@ -5,7 +5,7 @@
  * (docs/designs/comments/html-preview-comments.md §7.7, §10.4; R-004, R-017;
  * docs/designs/comments/html-comments/window.html "A thread").
  *
- * - Every message has the same `…` menu – Edit, Delete… – because anyone may
+ * - Every message has the same `…` menu – Edit, Copy text, Delete… – because anyone may
  *   edit or delete any comment (decision 31). Nothing implies an author is
  *   verified: no badge, no avatar (threat S19).
  * - The author's name is shown; the email sits in the name's tooltip and the
@@ -16,8 +16,8 @@
  * - An edit takes focus in its field and keeps its text in `commentDrafts`;
  *   Esc backs out of an edit or a confirmation first (`useInnerStep`), and
  *   leaving either returns focus to the `…` button.
- * - **Narrow to words** (comments-v2 C-07): Edit on the FIRST message also
- *   shows the words the comment is about and the Narrow to words field, on
+ * - **Comment on specific words** (comments-v2 C-07): Edit on the FIRST message also
+ *   shows the words the comment is about and the Comment on specific words field, on
  *   the target's text main sent with the thread. Save sends `sel` only when
  *   the range moved: the words chosen, or `null` for the whole target; main
  *   re-checks them as it does for a new comment (024-FR-004).
@@ -41,6 +41,7 @@ import { validateCommentText } from './commentSchemas'
 import { CommentField, DialogButton, VisibleText } from './CommentParts'
 import type { ThreadContext } from './CommentThread'
 import { SELECTION_COPY } from './commentCopyWords'
+import { WINDOW_COPY } from './commentWindowCopy'
 import { useCommentWords } from './commentWords'
 import { CommentWordsPicker, type WordsSpan } from './CommentWordsPicker'
 import type { NewCommentWords } from './commentWindowTypes'
@@ -337,6 +338,7 @@ export function CommentMessageView({
                 setMode('edit')
               }
             },
+            { label: WINDOW_COPY.copyText, action: () => ctx.onCopyText(message.text) },
             { label: COPY.delete, danger: true, action: () => setMode('confirm') }
           ]}
         />

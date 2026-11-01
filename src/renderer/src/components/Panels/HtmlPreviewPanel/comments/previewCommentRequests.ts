@@ -7,15 +7,42 @@
  * A draft from main carries the target's text as main parsed it, and – when
  * the pick was made on a selection that main found in the file – the words'
  * range in it. "Comment on selection" opens the window on that range; "Comment
- * on the whole element", "Add comment" and "Comment on element" open it with
- * no words chosen, the Narrow to words field starting from the whole text.
+ * on the whole element", "Add comment" and "Comment on this section" open it with
+ * no words chosen, the Comment on specific words field starting from the whole text.
  *
  * @module HtmlPreviewPanel/comments/previewCommentRequests
  */
 import type { AnchorSelection } from '../../../../../../shared/comments/anchorSel'
 import type { CommentSaveRequest } from '../../../../../../shared/ipc/preview-comment-schema'
+import type { Box } from '../../../Comments/commentPlacement'
 import type { DrawerRow } from '../../../Comments/commentRows'
-import type { CommentWindowRequest, ElementDraft, NewCommentWords } from '../../../Comments/commentWindowTypes'
+import { pinDraftOf, type CommentWindowRequest, type ElementDraft, type NewCommentWords, type PinDraft } from '../../../Comments/commentWindowTypes'
+
+/**
+ * The thread window a pin's event opens, with the draft main sent for "New comment".
+ *
+ * @param panelId - The panel.
+ * @param pin - Main's event: an icon click, or a pick on a commented element.
+ * @param listAfter - The list generation the window must not be older than (M2).
+ * @param mode - Comment mode is on: off, the click opens on the title (state table, first-focus exception).
+ * @returns The threads-view request.
+ */
+export function pinWindowRequest(panelId: string, pin: PinDraft, listAfter: number, mode: boolean): CommentWindowRequest {
+  return {
+    kind: 'threads',
+    panelId,
+    fileKey: pin.fileKey,
+    threadKeys: pin.threadKeys,
+    blockKeys: pin.blockKeys,
+    point: pin.point,
+    opener: 'page',
+    listAfter,
+    ...(mode ? {} : { outsideMode: true as const }),
+    ...pinDraftOf(pin),
+    target: pin.target,
+    file: { fileKey: pin.fileKey, displayPath: pin.displayPath, filePath: pin.filePath, frame: pin.frame }
+  }
+}
 
 /** What a menu item or a pick comments on: the selected words, or the whole element. */
 export type DraftScope = 'words' | 'whole'
@@ -60,6 +87,18 @@ export function withWords(request: CommentSaveRequest, sel: AnchorSelection | un
   return { ...request, sel: { exact: sel.exact, prefix: sel.prefix, suffix: sel.suffix } }
 }
 
+/**
+ * Whether closing the window hands native focus to the page: the page opened
+ * it, and the close leaves focus to the window ("Go to tab" moves it itself).
+ *
+ * @param request - The window closing.
+ * @param returnFocus - `false` when the caller moves focus itself.
+ * @returns `true` when the page takes focus back.
+ */
+export function closeReturnsToPage(request: CommentWindowRequest | null, returnFocus: boolean): boolean {
+  return returnFocus && request?.opener === 'page'
+}
+
 /** What a thread window needs from a drawer row – or from a step key's target (C-13). */
 export type RowTarget = Pick<DrawerRow, 'fileKey' | 'displayPath' | 'filePath' | 'frame' | 'threadKey' | 'blockKey'>
 
@@ -92,4 +131,10 @@ export function rowWindowRequest(
     // The file, so a failed list read can name it (M7).
     file: { fileKey: row.fileKey, displayPath: row.displayPath, filePath: row.filePath, frame: row.frame }
   }
+}
+
+/** The middle of a box: where a window opened from the drawer is anchored. */
+export function centreOf(box: Box | null): { x: number; y: number } {
+  if (box === null) return { x: 0, y: 0 }
+  return { x: box.left + box.width / 2, y: box.top + box.height / 3 }
 }

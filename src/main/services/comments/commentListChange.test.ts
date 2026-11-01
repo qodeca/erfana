@@ -14,7 +14,8 @@ import { markdownKind } from '../../../shared/markdownComments/markdownKind'
 import type { MdIndex } from '../../../shared/markdownComments/mdIndex'
 import { markdownTextHash } from '../../../shared/markdownComments/mdLocate'
 import { createInProcessMarkdownJobs } from './markdown/markdownCommentJobs'
-import { wordsBetween } from './commentListChange'
+import { PREVIEW_LIMITS } from '../../../shared/preview-limits'
+import { changeOf, nowWordsIn, wordsBetween } from './commentListChange'
 import type { ListSummary } from './commentListCore'
 import { assembleSplice } from './commentWriteCore'
 
@@ -110,6 +111,19 @@ describe('C-06 derived Changed and Words changed in the list job', () => {
   })
 })
 
+describe('I-14 the new words a preview marks', () => {
+  const sel = { exact: 'Friday', prefix: 'ship by ', suffix: ' and' }
+  it('I-14 the text between the pair, with what stands around it now', () => {
+    expect(nowWordsIn('We ship by Thursday and test.', sel)).toEqual({ exact: 'Thursday', prefix: 'We ship by ', suffix: ' and test.' })
+  })
+  it('I-14 no pair, no words to mark (S-04)', () => {
+    expect(nowWordsIn('Release whenever ready.', sel)).toBeUndefined()
+  })
+  it('I-14 words longer than a selection can be stay unmarked: the list keeps Now for the window', () => {
+    expect(nowWordsIn(`We ship by ${'x'.repeat(201)} and test.`, sel)).toBeUndefined()
+  })
+})
+
 describe('C-06 wordsBetween: the unique prefix…suffix pair', () => {
   const sel = { exact: 'Friday', prefix: 'ship by ', suffix: ' and' }
   it('C-06 finds the text between one pair', () => {
@@ -129,5 +143,69 @@ describe('C-06 wordsBetween: the unique prefix…suffix pair', () => {
     expect(wordsBetween(`[${'y'.repeat(400)}]`, at)).toBe('y'.repeat(400))
     expect(wordsBetween(`[${'y'.repeat(401)}]`, at)).toBeUndefined()
     expect(wordsBetween('] then [middle] then', at)).toBe('middle')
+  })
+})
+
+describe('P-F09 a comment on a part with no text survives an agent editing above it (D-65, 024-FR-003)', () => {
+  const ABOVE = 'An agent added this paragraph.\n\nAnd this one, with more to say.\n\n'
+  const IMAGE = '![Architecture](docs/arch.png)\n\nThe text after it.\n'
+  const DIVIDER = 'Before the rule.\n\n---\n\nAfter the rule.\n'
+
+  it.each([
+    ['an image alone in its paragraph', IMAGE, 'p'],
+    ['a divider', DIVIDER, 'hr']
+  ])('P-F09 %s: still found, in its place, with no false Changed', async (_name, text, tag) => {
+    const commented = await addComment(text, tag)
+    // A divider above too: the path of a divider below it no longer agrees.
+    const summary = await list(`${ABOVE}---\n\n${commented}`)
+    expect(summary.threads[0]).toMatchObject({ attached: true })
+    expect(summary.threads[0].change).toBeUndefined()
+    expect(summary.placements?.map(p => p.tag)).toEqual([tag])
+  })
+
+  it('P-F09 words put between the comment and its image are not "right after": it reads as Changed, never as untouched', async () => {
+    const commented = await addComment(IMAGE, 'p')
+    const summary = await list(edit(commented, '![Architecture]', 'Words between.\n\n![Architecture]'))
+    expect(summary.threads[0].change).toEqual({ state: 'changed', was: '', now: 'Words between.' })
+  })
+
+  it('P-F09 a paragraph with text right after the block never takes the comment by position alone', async () => {
+    const commented = await addComment(IMAGE, 'p')
+    const summary = await list(edit(commented, '![Architecture](docs/arch.png)\n\n', ''))
+    expect(summary.placements ?? []).toHaveLength(1)
+    expect(summary.threads[0].change?.state).toBe('changed')
+  })
+})
+
+describe('P-F10 Changed says only what was seen (S-03, D-22)', () => {
+  const anchorOn = (text: string): { index: MdIndex; target: MdIndex['elements'][number] } => {
+    const index = markdownKind.parse(text, 0).index as MdIndex
+    return { index, target: index.elements.find(t => t.tag === 'p')! }
+  }
+
+  it('P-F10 (HTML) new classes with the same text: changed, with no Now – its text is the same', () => {
+    const { index, target } = anchorOn('Same words.\n')
+    const quote = { exact: 'Same words.', prefix: '', suffix: '' }
+    const anchor = { tag: 'p', path: 'p', quote, cls: ['old'] }
+    expect(changeOf({ index, target: { ...target, classes: ['new'] }, anchor, via: 'position', html: true })).toEqual({ state: 'changed', was: 'Same words.' })
+  })
+
+  it('P-F10 (HTML) found another way than by position, same text: changed, with no Now', () => {
+    const { index, target } = anchorOn('Same words.\n')
+    const anchor = { tag: 'p', path: 'p', quote: { exact: 'Same words.', prefix: '', suffix: '' } }
+    expect(changeOf({ index, target, anchor, via: 'quote', html: true })).toEqual({ state: 'changed', was: 'Same words.' })
+  })
+
+  it('P-F10 a long text that differs only past the quote cap still counts as changed text: Now stays', () => {
+    const long = 'x'.repeat(PREVIEW_LIMITS.COMMENT_QUOTE_MAX_CHARS)
+    const { index, target } = anchorOn(`${long} now.\n`)
+    const anchor = { tag: 'p', path: 'p', quote: { exact: `${long} was.`, prefix: '', suffix: '' } }
+    expect(changeOf({ index, target, anchor, via: 'position', html: true })).toMatchObject({ state: 'changed', now: long })
+  })
+
+  it('P-F10 text that really changed keeps Was and Now', () => {
+    const { index, target } = anchorOn('New words.\n')
+    const anchor = { tag: 'p', path: 'p', quote: { exact: 'Old words.', prefix: '', suffix: '' } }
+    expect(changeOf({ index, target, anchor, via: 'position', html: true })).toEqual({ state: 'changed', was: 'Old words.', now: 'New words.' })
   })
 })

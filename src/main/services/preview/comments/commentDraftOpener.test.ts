@@ -86,6 +86,22 @@ function tokensOfTag(doc: InstrumentedDocument, tag: string): string[] {
 const DRAFT_KEY = /^[0-9a-f]{32}$/
 
 describe('commentDraftOpener', () => {
+  it.each([
+    ['no view rectangle', null],
+    ['an empty one', { x: 0, y: 0, width: 0, height: 0 }]
+  ])('C a keyboard pick with %s opens nothing and mints nothing; the window\'s own New comment still opens', async (_name, rect) => {
+    const s = await setup(commentedPage().text)
+    const opener = createCommentDraftOpener({ ...s.deps, geometry: { ...s.deps.geometry, viewRect: () => rect } })
+    const token = tokenOfTag(s.load.doc, 'p')
+    const entry = s.tokens.lookup(s.record.loadId!, token)!
+    await opener.element(s.top, s.record, entry, pick({ via: 'keyboard', token, tag: 'p', point: { x: 1, y: 2 } }))
+    expect(s.emitted).toHaveLength(0)
+    expect(s.keys.size.drafts).toBe(0)
+    // A hidden view has an empty rectangle while the window stands over it, and this command is not the page's.
+    expect(await opener.onThread(s.top, s.record, entry, undefined, VIEW)).toEqual({ ok: true })
+    expect(s.emitted).toHaveLength(1)
+  })
+
   it('opens a draft with its token, its element key and the file\'s keys – and no unsaved flag (L3)', async () => {
     const s = await setup(commentedPage().text)
     const token = tokenOfTag(s.load.doc, 'p')
@@ -165,6 +181,25 @@ describe('commentDraftOpener', () => {
     expect(s.keys.size.drafts).toBe(0)
   })
 
+  describe('D-10 the Comment button outside comment mode needs its words on disk', () => {
+    const open = (token: string, exact: string) => pick({ kind: 'open', via: 'pointer', token, tag: 'p', screen: { x: 1, y: 2 }, sel: { exact, prefix: '', suffix: '' } })
+
+    it('hostile: words a script put on the page open nothing, and no draft is minted', async () => {
+      const s = await setup(commentedPage().text)
+      const token = tokenOfTag(s.load.doc, 'p')
+      await s.opener.element(s.top, s.record, s.tokens.lookup(s.record.loadId!, token), open(token, 'words the file never held'), true)
+      expect(s.emitted).toEqual([])
+      expect(s.keys.size.drafts).toBe(0)
+    })
+
+    it('in comment mode the same words still open the window, which says they are missing', async () => {
+      const s = await setup(commentedPage().text)
+      const token = tokenOfTag(s.load.doc, 'p')
+      await s.opener.element(s.top, s.record, s.tokens.lookup(s.record.loadId!, token), open(token, 'words the file never held'))
+      expect(s.emitted[0]).toMatchObject({ kind: 'open', wordsMissing: true, draftToken: expect.any(String) })
+    })
+  })
+
   describe('a read-only file: the menu names the same refusal a save would meet (C-19)', () => {
     // A complete hunk, its markers at the start of their lines.
     const CONFLICT = '\n<<<<<<< HEAD\na\n=======\nb\n>>>>>>> x\n'
@@ -200,6 +235,19 @@ describe('commentDraftOpener', () => {
     const openKey = [...s.record.pins].find(([, pin]) => pin.threadIds.length > 0)![0]
     await s.opener.icon(s.top, s.record, openKey, pick({ kind: 'icon', key: openKey }))
     expect(s.emitted[1]).toMatchObject({ kind: 'icon', threadKeys: [expect.stringMatching(/^t/)], blockKeys: [] })
+  })
+
+  it('I-13 (HTML) a mark opens the one thread on its words, with no blocks; a place the pin does not have opens the pin', async () => {
+    const html = insertBefore(commentedPage().text, '<p id="para"', damagedBlock('c-9'))
+    const s = await setup(html)
+    const [key, pin] = [...s.record.pins].find(([, p]) => p.threadIds.length > 0)!
+    const sel = { exact: 'marked', prefix: '', suffix: '' }
+    const other = pin.threadIds[0]
+    s.record.pins.set(key, { ...pin, threadIds: [...pin.threadIds, 't-other'], words: [sel], wordThreads: [other], attention: 1 })
+    await s.opener.icon(s.top, s.record, key, pick({ kind: 'icon', key }), 0)
+    expect(s.emitted[0]).toMatchObject({ kind: 'icon', threadKeys: [expect.stringMatching(/^t/)], blockKeys: [] })
+    await s.opener.icon(s.top, s.record, key, pick({ kind: 'icon', key }), 5)
+    expect((s.emitted[1] as { threadKeys: string[] }).threadKeys).toHaveLength(pin.threadIds.length + 1)
   })
 
   it('C-17 (HTML) a stack pin opens the threads and blocks of every pin merged into it, in document order; unknown keys add nothing', async () => {

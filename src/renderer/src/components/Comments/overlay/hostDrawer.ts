@@ -3,8 +3,8 @@
 /**
  * What the drawer's rows open in a renderer-hosted preview
  * (`useCommentOverlayHost.ts`): the window on a damaged or newer-format
- * block, where a row's thread is in the preview now, and which threads are
- * "Not visible now" (S-02, D-13). Kept apart from the host only because of
+ * block, the one reveal step of "Show in preview", and which threads are
+ * "Hidden on the page" (S-02, D-13). Kept apart from the host only because of
  * the 500-line ratchet.
  *
  * @module components/Comments/overlay/hostDrawer
@@ -12,69 +12,69 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ThreadPlacement } from '../../../../../shared/ipc/file-comment-schema'
 import type { CommentFileView } from '../../../../../shared/ipc/comment-common-schema'
-import { DRAWER_COPY } from '../commentCopy'
-import type { DrawerRow } from '../commentRows'
-import type { CommentWindowRequest } from '../commentWindowTypes'
+import type { CommentWindowRequest, WindowOpener } from '../commentWindowTypes'
 import { pointOf } from './hostParts'
+import { drawn } from './hostWindow'
 import type { PreviewCommentAdapter } from './previewAdapter'
 
+/** What a threads window opens on, and from where. */
+interface ThreadsWindowOn {
+  readonly threadKeys: readonly string[]
+  readonly blockKeys: readonly string[]
+  /** The pane the window is placed in, and the element it opens beside; `null`: the pane's upper middle. */
+  readonly area: HTMLElement | null
+  readonly anchor: HTMLElement | null
+  readonly opener: WindowOpener
+  /** A click in the preview opened it with comment mode off. */
+  readonly outsideMode?: boolean
+}
+
 /**
- * The window a block row's Open asks for: the block's raw text and its actions.
+ * The window on a file's threads, or on a damaged or newer-format block.
  *
  * @param file - The listed file.
- * @param blockKey - The damaged or newer-format block.
  * @param panelId - The panel.
- * @param area - The pane the window is placed in.
  * @param listAfter - The list generation the window must not be older than.
- * @returns The threads-view request on that block.
+ * @param on - {@link ThreadsWindowOn}
+ * @returns The threads-view request.
  */
-export function blockWindowRequest(
-  file: CommentFileView,
-  blockKey: string,
-  panelId: string,
-  area: HTMLElement | null,
-  listAfter: number
-): CommentWindowRequest {
+export function threadsWindowRequest(file: CommentFileView, panelId: string, listAfter: number, on: ThreadsWindowOn): CommentWindowRequest {
   return {
     kind: 'threads',
     panelId,
     fileKey: file.fileKey,
-    threadKeys: [],
-    blockKeys: [blockKey],
-    point: pointOf(null, area),
-    opener: 'drawer',
+    threadKeys: on.threadKeys,
+    blockKeys: on.blockKeys,
+    point: pointOf(on.anchor, on.area),
+    opener: on.opener,
     listAfter,
+    ...(on.outsideMode === true ? { outsideMode: true as const } : {}),
     file: { fileKey: file.fileKey, displayPath: file.displayPath, filePath: file.filePath, frame: false }
   }
 }
 
 /**
- * The element a row's thread is attached to now, or `null` ("Show in preview").
+ * The one reveal step (I-6, K-22, P-F07): open the sections folding the
+ * thread's target away, scroll it in, and say whether it can be seen.
  *
- * @param row - The drawer row.
+ * @param threadKey - The thread.
  * @param placements - Where main placed the listed threads.
  * @param adapter - The preview's adapter.
- * @returns The rendered target.
+ * @returns The target when it is drawn now, else `null`: not rendered, or hidden some other way.
  */
-export function rowTarget(row: DrawerRow, placements: readonly ThreadPlacement[], adapter: PreviewCommentAdapter): HTMLElement | null {
-  const placement = placements.find(p => p.threadKey === row.threadKey)
-  return placement === undefined ? null : adapter.attach(placement)
+export function revealThread(threadKey: string | undefined, placements: readonly ThreadPlacement[], adapter: PreviewCommentAdapter): HTMLElement | null {
+  const placement = placements.find(p => p.threadKey === threadKey)
+  const target = placement === undefined ? null : (adapter.renderedOf?.(placement) ?? adapter.attach(placement))
+  if (target === null) return null
+  adapter.openFolds?.(target)
+  target.scrollIntoView({ block: 'center' })
+  return drawn(target)
 }
 
-/**
- * A row's "Show in preview": its target scrolled into view, or – while the
- * target is hidden (S-02) – the HTML Preview's sentence that it is not on
- * screen right now.
- */
-export function revealRow(
-  row: DrawerRow,
-  placements: readonly ThreadPlacement[],
-  adapter: PreviewCommentAdapter,
-  say: (text: string) => void
-): void {
-  const target = rowTarget(row, placements, adapter)
-  if (target !== null) target.scrollIntoView({ block: 'center' })
-  else if (row.tags.some(tag => tag.text === DRAWER_COPY.notVisible)) say(adapter.words.notOnScreen)
+/** The preview area's box on screen, for the comment window's placement. */
+export function areaBox(area: HTMLElement | null | undefined): { left: number; top: number; width: number; height: number } | null {
+  const box = area?.getBoundingClientRect()
+  return box ? { left: box.left, top: box.top, width: box.width, height: box.height } : null
 }
 
 const NOT_VISIBLE_NONE: readonly string[] = []
@@ -82,7 +82,7 @@ const NOT_VISIBLE_NONE: readonly string[] = []
 /**
  * The open, found threads whose target the preview renders but hides right
  * now – a collapsed section (state table S-02; differences table D-13). They
- * feed the drawer's "Not visible now" tag and the window's sentence, as main's
+ * feed the drawer's "Hidden on the page" tag and the window's sentence, as main's
  * report does for the HTML Preview. Read again when a section opens or closes
  * (`toggle`, which does not bubble, is caught on its way down) and whenever
  * the list changes.

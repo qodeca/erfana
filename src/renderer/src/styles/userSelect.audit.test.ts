@@ -45,6 +45,8 @@ interface AuditSurface {
  */
 export const AUDIT_211_SURFACES: readonly AuditSurface[] = [
   { surface: 'MarkdownPreview content', file: 'src/renderer/src/styles/utilities.css', selector: '.markdown-preview-content', css: utilitiesCss },
+  { surface: 'Comment message text (P-F20)', file: 'src/renderer/src/styles/utilities.css', selector: '.erf-comment-message__text', css: utilitiesCss },
+  { surface: 'Comment window quotes (P-F20)', file: 'src/renderer/src/styles/utilities.css', selector: '.erf-comment-words__text', css: utilitiesCss },
   { surface: 'Dialog body', file: 'src/renderer/src/styles/utilities.css', selector: '.dialog-body', css: utilitiesCss },
   { surface: 'Dialog title', file: 'src/renderer/src/styles/utilities.css', selector: '.dialog-title', css: utilitiesCss },
   { surface: 'FilePicker filename', file: 'src/renderer/src/styles/utilities.css', selector: '.file-picker-filename', css: utilitiesCss },

@@ -52,7 +52,7 @@ import {
 } from '../../../../shared/htmlComments'
 import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
 import type { TargetVia } from '../../../../shared/comments/reattach'
-import { changeOf } from '../../comments/commentListChange'
+import { changeOf, nowWordsOf } from '../../comments/commentListChange'
 
 /** Characters in one element token (`ELEMENT_TOKEN_PATTERN`). */
 export const TOKEN_CHARS = 12
@@ -212,6 +212,12 @@ function isChanged(index: HtmlIndex, target: { readonly startOffset: number; rea
   return el !== undefined && changeOf({ index, target: el, anchor, via: target.via, html: true }) !== undefined
 }
 
+/** The words a pin marks: the comment's, or – Words changed – the ones main found in their place (S-04, I-14). */
+function markedWords(index: HtmlIndex, target: { readonly state: string; readonly startOffset?: number }, anchor: CommentAnchor): AnchorSelection | undefined {
+  const el = target.state === 'attached' && target.startOffset !== undefined ? index.elementAt(target.startOffset) : undefined
+  return (el === undefined ? undefined : nowWordsOf(index, el, anchor)) ?? anchorSelectionOf(anchor)
+}
+
 /** Reduce the parsed blocks to pin data, each pointing at its element's token. */
 function loadBlocks(index: HtmlIndex, offsets: Int32Array): CommentLoadBlock[] {
   const { blocks } = parseIndexedBlocks(index)
@@ -223,8 +229,8 @@ function loadBlocks(index: HtmlIndex, offsets: Int32Array): CommentLoadBlock[] {
           ? tokenIndexAt(offsets, block.target.startOffset)
           : NO_TARGET
       const runtime = block.data.anchor.runtime
-      const sel = block.data.status === 'open' ? anchorSelectionOf(block.data.anchor) : undefined
       const changed = block.data.status === 'open' && block.target.state === 'attached' && isChanged(index, block.target, block.data.anchor)
+      const sel = block.data.status === 'open' ? markedWords(index, block.target, block.data.anchor) : undefined
       return {
         kind: 'ok',
         id: block.data.id,

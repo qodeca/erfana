@@ -34,7 +34,9 @@ import {
   thread,
   type FakeCommentsBridge
 } from './__test-helpers__/commentTestKit'
+import { carriedDrafts } from '../../../Comments/commentCarriedDrafts'
 import { ANNOUNCE, COPY, DRAWER_COPY } from '../../../Comments/commentCopy'
+import { REVEAL_SETTLE_MS } from './useRevealNote'
 import { COMMENT_LIST_COPY, HTML_WORDS, SELECTION_COPY } from '../../../Comments/commentCopyWords'
 import { drawerRows } from '../../../Comments/commentRows'
 import { usePreviewComments, type PreviewComments } from './usePreviewComments'
@@ -194,6 +196,24 @@ describe('usePreviewComments', () => {
     })
   })
 
+  describe('S-03 a window opened from the page: which route it came by', () => {
+    const iconDraft = { panelId: PANEL, kind: 'icon', point: { x: 1, y: 2 }, displayPath: 'index.html', filePath: 'index.html', frame: false, fileKey: 'f1', threadKeys: ['t1'], blockKeys: [] }
+
+    it('outside comment mode: the window is marked, so no write button takes first focus', () => {
+      render(<Harness onValue={onValue} />)
+      act(() => fake.emitDraft(iconDraft as never))
+      expect(latest.layer.request).toMatchObject({ kind: 'threads', outsideMode: true })
+    })
+
+    it('in comment mode: the ordinary first-focus rule holds', () => {
+      render(<Harness onValue={onValue} />)
+      act(() => latest.toolbar.onToggleMode(true))
+      act(() => fake.emitDraft(iconDraft as never))
+      expect(latest.layer.request).toMatchObject({ kind: 'threads' })
+      expect(latest.layer.request).not.toHaveProperty('outsideMode')
+    })
+  })
+
   it('ignores another panel’s events', () => {
     render(<Harness onValue={onValue} />)
     act(() => fake.emitDraft(menuDraft({ panelId: 'preview-other' })))
@@ -295,7 +315,7 @@ describe('usePreviewComments', () => {
     act(() => fake.emitMode({ panelId: PANEL, on: true, reason: 'escape' }))
     await waitFor(() => expect(latest.layer.polite).toBe(HTML_WORDS.modeOn))
     act(() => fake.emitMode({ panelId: PANEL, on: false, reason: 'picker', say: 'showing', element: { tag: 'p', line: 12 } }))
-    await waitFor(() => expect(latest.layer.polite).toBe('Showing p, line 12.'))
+    await waitFor(() => expect(latest.layer.polite).toBe('Showing a section, line 12.'))
     // A picker event is not a mode change, whatever its `on` says.
     expect(latest.toolbar.mode).toBe(true)
     act(() => fake.emitMode({ panelId: PANEL, on: true, reason: 'picker', say: 'top' }))
@@ -316,19 +336,19 @@ describe('usePreviewComments', () => {
     expect(latest.layer.request).toMatchObject({ kind: 'new', words: { ...words, start: 0, end: 0 } })
   })
 
-  it('024-AC-004 (g) words main could not find in the file: the window opens on the whole element and says so', async () => {
+  it('024-AC-004 (g) words main could not find in the file: the window opens on the whole section and says so', async () => {
     render(<Harness onValue={onValue} />)
     act(() => fake.emitDraft(menuDraft({ kind: 'open', selection: true, wordsMissing: true })))
     // The window says so itself (owner rule, 024-FR-004): the request carries it, the panel announces nothing.
     expect(latest.layer.request).toMatchObject({ kind: 'new', wordsMissing: true })
     expect(latest.layer.request).not.toHaveProperty('words')
-    // "Comment on the whole element" from a menu on such words asks for no notice.
+    // "Comment on the whole section" from a menu on such words asks for no notice.
     const menu = menuDraft({ selection: true, wordsMissing: true })
     act(() => latest.layer.onCloseWindow())
     act(() => fake.emitDraft(menu))
     act(() => latest.layer.onAddComment(menu))
     expect(latest.layer.request).not.toHaveProperty('wordsMissing')
-    expect(latest.layer.polite).not.toBe(SELECTION_COPY.wordsNotInFile('element', 'index.html'))
+    expect(latest.layer.polite).not.toBe(SELECTION_COPY.wordsNotInFile('section'))
   })
 
   it('024-AC-004 a save sends the words the window chose as sel', async () => {
@@ -458,7 +478,7 @@ describe('usePreviewComments', () => {
 
   describe('menu matrix § 2 and § 3 – a file that cannot take a new comment (HTML)', () => {
     const CONFLICTED = fileView({ writable: false, readOnlyReason: 'conflict-markers' })
-    const MODE_BLOCKED = 'Comment mode is unavailable: index.html has unresolved git conflicts. Resolve them first.'
+    const MODE_BLOCKED = 'Comment mode is unavailable: index.html has two versions mixed together. Fix this first, or ask a developer to help.'
 
     it('M-07 the page\'s file is read-only: the toggle is unavailable with its reason, and asking for the mode only says why', async () => {
       fake.bridge.list.mockResolvedValue({ ok: true, files: [CONFLICTED] })
@@ -507,7 +527,7 @@ describe('usePreviewComments', () => {
       render(<Harness onValue={onValue} />)
       await waitFor(() =>
         expect(latest.toolbar.modeUnavailableText).toBe(
-          "Comment mode is unavailable: A comment in index.html has no end, so Erfana won't add comments. Fix it in the source."
+          "Comment mode is unavailable: One comment in index.html is broken, so Erfana can't add new ones. Fix or delete the broken comment first."
         )
       )
     })
@@ -555,7 +575,7 @@ describe('usePreviewComments', () => {
       await waitFor(() => expect(latest.layer.request).toMatchObject({ kind: 'threads', threadKeys: ['t1'], opener: 'page' }))
       expect(fake.bridge.list).toHaveBeenCalled()
       expect(fake.bridge.reveal).toHaveBeenCalledWith(PANEL, 't1')
-      await waitFor(() => expect(latest.layer.polite).toBe('Comment 1 of 2, on element, line 11.'))
+      await waitFor(() => expect(latest.layer.polite).toBe('Comment 1 of 2, on section, line 11.'))
       act(() => latest.layer.onCloseWindow())
       act(() => forwardedKey?.({ panelId: PANEL, key: 'comment-previous', accel: false }))
       await waitFor(() => expect(latest.layer.request).toMatchObject({ kind: 'threads', threadKeys: ['t3'] }))
@@ -588,6 +608,15 @@ describe('usePreviewComments', () => {
       await waitFor(() => expect(latest.toolbar.changed).toBe(1))
     })
 
+    it('P-F22 (HTML) the toolbar counts open comments not found; a resolved one is history', async () => {
+      fake.bridge.list.mockResolvedValue({
+        ok: true,
+        files: [fileView({ threads: [thread(1, { attached: false }), thread(2), thread(3, { status: 'resolved', attached: false })] })]
+      })
+      render(<Harness onValue={onValue} />)
+      await waitFor(() => expect(latest.toolbar.notFound).toBe(1))
+    })
+
     it('OD-06 (HTML) an open comment removed outside Erfana is noted in the drawer; one Erfana deleted is not; Copy text and dismiss', async () => {
       fake.bridge.list.mockResolvedValue({ ok: true, files: [fileView({ threads: [thread(1), thread(2)] })] })
       render(<Harness onValue={onValue} />)
@@ -606,6 +635,38 @@ describe('usePreviewComments', () => {
       await waitFor(() => expect(latest.layer.polite).toBe(COMMENT_LIST_COPY.textCopied))
       act(() => latest.drawer?.onDismissRemoved?.())
       expect(latest.drawer?.removed).toEqual([])
+    })
+
+    it('P-F21 the drawer offers to turn the mode on only while it is off', async () => {
+      render(<Harness onValue={onValue} />)
+      act(() => latest.toolbar.onToggleDrawer())
+      await waitFor(() => expect(latest.drawer?.list.status).toBe('ready'))
+      act(() => latest.drawer?.onTurnOnMode?.())
+      await waitFor(() => expect(latest.toolbar.mode).toBe(true))
+      expect(fake.bridge.setMode).toHaveBeenCalledWith({ panelId: PANEL, on: true, showIcons: expect.any(Boolean) })
+      expect(latest.drawer?.onTurnOnMode).toBeUndefined()
+    })
+
+    it('a bulk action goes out for this panel, and hears only this panel\'s settle', async () => {
+      render(<Harness onValue={onValue} />)
+      act(() => latest.toolbar.onToggleDrawer())
+      const request = { change: 'resolve', files: [] } as never
+      await act(async () => {
+        await latest.drawer?.bulk?.run(request)
+      })
+      expect(fake.bridge.bulk).toHaveBeenCalledWith({ panelId: PANEL, ...(request as object) })
+
+      let emit: (event: { panelId: string }) => void = () => {}
+      fake.bridge.onBulkSettled.mockImplementation((callback: typeof emit) => {
+        emit = callback
+        return () => {}
+      })
+      const heard = vi.fn()
+      latest.drawer?.bulk?.onSettled(heard)
+      emit({ panelId: 'preview-other' })
+      expect(heard).not.toHaveBeenCalled()
+      emit({ panelId: PANEL })
+      expect(heard).toHaveBeenCalledWith({ panelId: PANEL })
     })
 
     it('E-005 an anchor status after the list wins over the flag the list was read with', async () => {
@@ -713,6 +774,29 @@ describe('usePreviewComments', () => {
       act(() => latest.drawer?.onReveal(row))
       expect(fake.bridge.reveal).toHaveBeenCalledWith(PANEL, 't1')
       await waitFor(() => expect(latest.layer.polite).toBe(DRAWER_COPY.notOnScreen))
+    })
+
+    it('I-6 a target that stays hidden gets the drawer\'s visible note, and a hidden sentence is said only then', async () => {
+      render(<Harness onValue={onValue} />)
+      act(() => latest.toolbar.onToggleDrawer())
+      act(() => usePreviewCommentStore.getState().patch(PANEL, { notVisible: ['t1'] }))
+      const [row] = drawerRows([fileView({ threads: [thread(1)] })], new Set(['t1'])).open
+      act(() => latest.drawer?.onReveal(row))
+      expect(latest.drawer?.revealNote ?? null).toBeNull()
+      await waitFor(() => expect(latest.drawer?.revealNote).toBe(DRAWER_COPY.notOnScreen))
+      await waitFor(() => expect(latest.layer.polite).toBe(DRAWER_COPY.notOnScreen))
+    })
+
+    it('I-6 a target its closed section hid: the page reports it visible, and no note comes', async () => {
+      render(<Harness onValue={onValue} />)
+      act(() => latest.toolbar.onToggleDrawer())
+      act(() => usePreviewCommentStore.getState().patch(PANEL, { notVisible: ['t1'] }))
+      const [row] = drawerRows([fileView({ threads: [thread(1)] })], new Set(['t1'])).open
+      act(() => latest.drawer?.onReveal(row))
+      act(() => usePreviewCommentStore.getState().patch(PANEL, { notVisible: [] }))
+      await act(() => new Promise(done => setTimeout(done, REVEAL_SETTLE_MS + 50)))
+      expect(latest.drawer?.revealNote ?? null).toBeNull()
+      expect(latest.layer.polite).not.toBe(DRAWER_COPY.notOnScreen)
     })
 
     it('Show in preview closes a full-width drawer first', () => {
@@ -866,7 +950,7 @@ describe('usePreviewComments', () => {
   })
 
   describe('§19 Rev 4 owner test: open in source', () => {
-    it('Open in source closes the window, opens the editor at the line, and leaves focus to it', async () => {
+    it('Open in file closes the window, opens the editor at the line, and leaves focus to it', async () => {
       render(<Harness onValue={onValue} />)
       act(() => fake.emitDraft(pinDraft()))
       expect(latest.layer.request).not.toBeNull()
@@ -882,13 +966,51 @@ describe('usePreviewComments', () => {
       expect(focusPage).not.toHaveBeenCalled()
     })
 
-    it("the drawer's Open in source leaves the drawer open", () => {
+    it("the drawer's Open in file leaves the drawer open", () => {
       render(<Harness onValue={onValue} />)
       act(() => latest.toolbar.onToggleDrawer())
       const [row] = drawerRows([fileView({ damaged: [damaged(1)] })], new Set()).cantEdit
       act(() => latest.drawer?.onOpenInSource(row))
       expect(mocks.openFileInPanel).toHaveBeenCalled()
       expect(latest.drawer).not.toBeNull()
+    })
+  })
+
+  describe('I-23 text carried by Pick again stays in view until it is kept', () => {
+    const TARGET = { tag: 'p', classes: [], line: 4, excerpt: 'Text' }
+    const onCommented = () => ({ ...pinDraft(), draftToken: 'a'.repeat(32), draftKey: 'b'.repeat(32), target: TARGET })
+
+    afterEach(() => carriedDrafts.clear(PANEL))
+
+    it('I-23 in comment mode, a pick on a commented element opens a new comment there', () => {
+      render(<Harness onValue={onValue} />)
+      act(() => fake.emitMode({ panelId: PANEL, on: true, reason: 'shortcut' }))
+      carriedDrafts.put(PANEL, 'Make it bigger')
+      act(() => fake.emitDraft(onCommented()))
+      expect(latest.layer.request).toMatchObject({ kind: 'new', draftToken: 'a'.repeat(32), draftKey: 'b'.repeat(32), target: TARGET })
+    })
+
+    it('I-23 with the mode off, it opens the thread: the text waits', () => {
+      render(<Harness onValue={onValue} />)
+      carriedDrafts.put(PANEL, 'Make it bigger')
+      act(() => fake.emitDraft(onCommented()))
+      expect(latest.layer.request).toMatchObject({ kind: 'threads' })
+      expect(carriedDrafts.peek(PANEL)).toBe('Make it bigger')
+    })
+
+    it('I-23 with no draft from main, it opens the thread: nothing can be saved there', () => {
+      render(<Harness onValue={onValue} />)
+      act(() => fake.emitMode({ panelId: PANEL, on: true, reason: 'shortcut' }))
+      carriedDrafts.put(PANEL, 'Make it bigger')
+      act(() => fake.emitDraft(pinDraft()))
+      expect(latest.layer.request).toMatchObject({ kind: 'threads' })
+    })
+
+    it('I-23 with nothing carried, a pick on a commented element opens its thread (C-22)', () => {
+      render(<Harness onValue={onValue} />)
+      act(() => fake.emitMode({ panelId: PANEL, on: true, reason: 'shortcut' }))
+      act(() => fake.emitDraft(onCommented()))
+      expect(latest.layer.request).toMatchObject({ kind: 'threads' })
     })
   })
 
@@ -967,7 +1089,7 @@ describe('usePreviewComments', () => {
     await waitFor(() => expect(latest.layer.polite).toBe(COPY.rawCopied))
     mocks.writeText.mockResolvedValueOnce(false)
     act(() => latest.layer.onCopyRaw('raw'))
-    await waitFor(() => expect(latest.layer.assertive).toBe("Couldn't copy the raw text."))
+    await waitFor(() => expect(latest.layer.assertive).toBe("Couldn't copy the comment text."))
   })
 
   it('saves through the gateway and measures the page area', async () => {

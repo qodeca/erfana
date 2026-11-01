@@ -56,7 +56,7 @@
 <p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</p>
 <p class="ds-lede" id="decision">
   A drawer is a <strong>flow sibling</strong> at the inline end of a view, never an overlay: the content beside it
-  shrinks, and nothing is covered. It opens in one step, sits between a minimum and a maximum width, and below a <span data-claim="drawer-full-below-px" title="DRAWER_FULL_BELOW_PX in useDrawerSheet.ts – host width in px below which the comment drawer goes full width">640</span>px
+  shrinks, and nothing is covered. It opens in one step, sits between a minimum and a maximum width, and below a <span data-claim="drawer-full-below-px" title="DRAWER_FULL_BELOW_PX in useNarrowPanel.ts – host width in px below which the comment drawer goes full width">640</span>px
   host it takes the whole width. Inside, top to bottom: a header (title and a close button), a fixed controls band, a
   note slot that stays in view, and one list that scrolls. Opening puts focus on the close button; closing returns it to
   the button that opened the drawer.
@@ -86,7 +86,7 @@
 
 <h2 id="states">Every state</h2>
 <p class="ds-muted">Drawn at the app's scale: a preview panel with its band, the page, and the comment drawer – the
-reference instance (<code>CommentDrawer.css</code>, the drawer rules; <code>useDrawerSheet.ts</code>, the full-width switch).</p>
+reference instance (<code>CommentDrawer.css</code>, the drawer rules; <code>useNarrowPanel.ts</code>, the full-width switch, shared by both previews).</p>
 <div class="ds-frames dr-frames">
 
 <figure class="ds-frame">
@@ -199,10 +199,10 @@ Only <code>.erf-drawer__scroll</code> scrolls, and it holds its overscroll so th
     </div>
   </div>
 </div>
-<figcaption><strong>Full width, below a <span data-claim="drawer-full-below-px" title="DRAWER_FULL_BELOW_PX in useDrawerSheet.ts – host width in px below which the comment drawer goes full width">640</span>px host</strong> – a 600px panel. The drawer takes the whole row and the page
+<figcaption><strong>Full width, below a <span data-claim="drawer-full-below-px" title="DRAWER_FULL_BELOW_PX in useNarrowPanel.ts – host width in px below which the comment drawer goes full width">640</span>px host</strong> – a 600px panel. The drawer takes the whole row and the page
 steps aside; with nothing beside it, the drawer now behaves like a sheet: <kbd>Esc</kbd> closes it, and an action that
-shows something on the page (“Show on page”) closes it first. The container query does this in plain DOM; the preview
-measures itself in <code>useDrawerSheet.ts</code> because its page is a native view that CSS cannot hide.</figcaption>
+shows something on the page (“Show in preview”) closes it first. The container query does this in plain DOM; both
+previews measure themselves in <code>useNarrowPanel.ts</code> (the Markdown preview measures its pane), and the HTML preview needs that because its page is a native view that CSS cannot hide (owner decision, 2026-10-31).</figcaption>
 </figure>
 
 <figure class="ds-frame">
@@ -251,7 +251,7 @@ content the drawer sat beside.</figcaption>
 
 <h3 id="resize">Drag the corner</h3>
 <p class="ds-muted">A panel you can resize by its bottom-right corner – the page shrinks beside the drawer, then under
-<span data-claim="drawer-full-below-px" title="DRAWER_FULL_BELOW_PX in useDrawerSheet.ts – host width in px below which the comment drawer goes full width">640</span>px the drawer takes the whole width.</p>
+<span data-claim="drawer-full-below-px" title="DRAWER_FULL_BELOW_PX in useNarrowPanel.ts – host width in px below which the comment drawer goes full width">640</span>px the drawer takes the whole width.</p>
 <div class="ds-frame ds-resize" aria-hidden="true" inert>
   <div class="dr-panel">
     <div class="dr-band"><span class="erf-button erf-button--toggle erf-button--icon" aria-pressed="true"><svg data-icon="messages-square" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/><path d="M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"/></svg></span></div>
@@ -317,7 +317,7 @@ reachable. Inside, each part is one tab stop – the close button, the filter gr
   <thead><tr><th>Part</th><th>Token</th></tr></thead>
   <tbody>
     <tr><td>Width · floor · ceiling</td><td><code>--comments-drawer-width</code> (<code data-token="--comments-drawer-width">320px</code>) · <code>calc(var(--space-20) * 7)</code> · <code>calc(var(--space-24) * 10)</code>, as <code>--erf-drawer-width</code>, <code>--erf-drawer-min-width</code>, <code>--erf-drawer-max-width</code></td></tr>
-    <tr><td>Full-width switch</td><td><span data-claim="drawer-full-below-px" title="DRAWER_FULL_BELOW_PX in useDrawerSheet.ts – host width in px below which the comment drawer goes full width">640</span>px, written once in the container query (a condition cannot read a custom property); <code>DRAWER_FULL_BELOW_PX</code> in <code>useDrawerSheet.ts</code></td></tr>
+    <tr><td>Full-width switch</td><td><span data-claim="drawer-full-below-px" title="DRAWER_FULL_BELOW_PX in useNarrowPanel.ts – host width in px below which the comment drawer goes full width">640</span>px, written once in the container query (a condition cannot read a custom property); <code>DRAWER_FULL_BELOW_PX</code> in <code>useNarrowPanel.ts</code></td></tr>
     <tr><td>Surface · edge</td><td><code>--color-bg-secondary</code> · <code>--border-width</code> <code>--color-border-default</code></td></tr>
     <tr><td>Title</td><td><code>--text-base</code> · <code>--font-semibold</code> · <code>--color-text-emphasis</code></td></tr>
     <tr><td>Padding</td><td>Header <code>--space-4</code>, start <code>--space-8</code> · controls <code>--space-8</code> sides, <code>--space-6</code> below · note <code>--space-6</code> above</td></tr>
@@ -369,8 +369,14 @@ reachable. Inside, each part is one tab stop – the close button, the filter gr
 
 <section id="exceptions">
 <h2>Exceptions</h2>
-<p class="ds-muted">None recorded. A shipping drawer that departs from this card carries a
+<p class="ds-muted">A shipping drawer that departs from this card carries a
 <code>deviates:</code> marker at the site and gets a row here, naming the file.</p>
+<table>
+  <thead><tr><th>File</th><th>Departure</th><th>Why it is still there</th></tr></thead>
+  <tbody>
+    <tr><td><code>Comments/overlay/CommentOverlayLayer.css</code></td><td>The Markdown drawer is positioned at the end of the preview pane (<code>position: absolute</code>), not a flow sibling. Above the full-width switch the preview and the overlay layer give up its width, so nothing is covered.</td><td>The preview, its overlay layer and the drawer are siblings in one pane that other features also fill.</td></tr>
+  </tbody>
+</table>
 </section>
 </main>
 </body>

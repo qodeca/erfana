@@ -73,9 +73,9 @@ For the version-by-version test-addition history, see [`docs/CHANGELOG.md`](../C
 
 - Playwright setup and configuration for Electron (four projects in `playwright.config.ts`: `electron` functional, `transcription` env-gated, `bench` env-gated benchmarks, `visual` regression)
 - Testing patterns for third-party components (Monaco, xterm.js, Mermaid)
-- Complete selector catalog (351 testids) – see [e2e-selectors.md](./e2e-selectors.md)
+- Complete selector catalog (419 testids) – see [e2e-selectors.md](./e2e-selectors.md)
 - Test helper utilities documentation
-- Troubleshooting guide
+- [Troubleshooting guide](./e2e-troubleshooting.md)
 
 **The macOS E2E workflow is currently disabled on CI** (2026-04-25, pre-migration commit `997ba65`, which does not resolve on `qodeca/erfana`) — the `macos-latest` functional `electron` and `visual` suites run locally only until the instability is root-caused. See [docs/ci.md § E2E Tests (disabled)](../ci.md#e2e-tests-e2eyml-disabled) for the disable rationale and re-enable command. The one E2E run on CI is the advisory `E2E (Linux, xvfb)` job (`e2e-linux.yml`), which runs the `electron` project headless on pull requests to `develop` and `main`; `npm run test:e2e:linux` is the same run locally.
 
@@ -86,7 +86,7 @@ npm run test:e2e:visual            # Visual regression tests (visual project) �
 npm run test:e2e:update-screenshots  # Update visual baselines
 ```
 
-**E2E test files** (a selection of the 73 specs in `e2e/`, counted 2026-10-28 – the full list is in [e2e-testing.md § Test files](./e2e-testing.md#test-files)):
+**E2E test files** (a selection of the 76 specs in `e2e/`, counted 2026-11-01 – the full list is in [e2e-testing.md § Test files](./e2e-testing.md#test-files)):
 - `html-preview-corpus.e2e.ts` - HTML-preview corpus acceptance (#74): the fixture corpus renders, the native view is sized on open, and the process-isolation floor holds
 - `html-preview-links.e2e.ts` - in-page links and independent previews (sd-074b): a new tab per target and reuse on a second click, `javascript:` refused, a link out of the project refused, `#anchor` scrolls; plus the external-link case, where an `https:` link asks first and the cancelled outcome is read back from the main log
 - `html-preview-perf.e2e.ts` - the save-to-visible-change gate (sd-074b AC24), asserting the P95 against its budget

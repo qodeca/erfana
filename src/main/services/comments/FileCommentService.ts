@@ -24,7 +24,9 @@
  *   runs the one shared `CommentWriter`, with this family's kinds. The writer
  *   refuses while ANY window's editor holds unsaved edits for the file, asks
  *   again right before the rename (C6), and reports a file that changed after
- *   the rename (C12).
+ *   the rename (C12). Past {@link SAVE_TIMEOUT_MS} the save answers
+ *   `COMMENT_SAVE_PENDING` (W-10), and `sendSettled` says how it ended once it
+ *   has; the draft stays in flight until then.
  * - **changed** goes to the windows whose panels listed the file, and to no
  *   other (`fileCommentWatches.ts`).
  *
@@ -32,35 +34,36 @@
  * reason. Logs name a path by digest only and carry no comment text, words,
  * names or e-mails (C20).
  */
-import { relative, resolve, sep } from 'node:path'
-import { encodeText } from '../../../shared/comments/encoding'
+import { resolve } from 'node:path'
 import { ErrorCode } from '../../../shared/errors'
-import type { CommentReasonedRefusal, CommentSaveResult } from '../../../shared/ipc/comment-common-schema'
+import type { CommentBulkRequest, CommentBulkResult, CommentBulkSettled, CommentReasonedRefusal, CommentSaveResult } from '../../../shared/ipc/comment-common-schema'
 import type {
   FileCommentChanged,
   FileCommentListResult,
   FileCommentOpenDraftResult,
   FileCommentSaveRequest,
+  FileCommentSaveSettled,
   PickedTargetRequest,
   ThreadPlacement
 } from '../../../shared/ipc/file-comment-schema'
 import type { CommentFileKind } from '../../../shared/comments/fileKind'
 import { stablePathDigest } from '../../../shared/stablePathDigest'
-import { createRearmingSingleFileWatcher } from '../watcher/rearmingSingleFileWatch'
 import { logger } from '../LoggingService'
+import type { BulkThread } from './commentBulkCore'
+import { resolveBulkFile, runBulkFiles } from './commentBulkFlow'
 import { CommentWriter, type CommentIdentity, type CommentWriteResult, type CommentWriterDeps } from './CommentWriter'
 import { confineCommentFile, readConfinedCommentBytes, type CommentFileTarget } from './commentFileAccess'
 import { sharedCommentParseClient } from './CommentParseWorkerAdapter'
 import type { CommentFileJob, CommentFileJobRunner } from './commentFileJobs'
 import type { CommentFileKindLookup } from './commentFileKinds'
 import type { CommentKeyStoreDeps } from './commentKeyStore'
-import { fileView, refusedView, type ListedFile } from './commentListBuilder'
+import { displayBytes, displayPathOf, fileView, refusedView, type ListedFile } from './commentListBuilder'
 import type { ListSummary } from './commentListCore'
 import { refusalCode, type CommentRefusal } from './commentRefusals'
-import { changeOf } from './commentSaveFlow'
+import { boundedWrite, changeOf, SAVE_TIMEOUT_MS } from './commentSaveFlow'
 import type { CommentUnsavedSources } from './commentUnsavedSources'
 import { FileCommentPanels, type FileCommentPanel } from './fileCommentPanels'
-import { createFileCommentWatches, type FileCommentWatchFactory, type FileCommentWatches } from './fileCommentWatches'
+import { createFileCommentWatches, defaultFileCommentWatch, type FileCommentWatchFactory, type FileCommentWatches } from './fileCommentWatches'
 
 /** Who asks, and in which project: the sender's window, the project root as opened and as resolved. */
 export interface FileCommentCaller {
@@ -81,6 +84,12 @@ export interface FileCommentServiceDeps {
   readonly identity: () => CommentIdentity | undefined
   /** Send `file-comment:changed` to one window. */
   readonly send: (windowId: number, payload: FileCommentChanged) => void
+  /** Send `file-comment:saveSettled` to one window: a save that outlasted its answer ended (W-10). */
+  readonly sendSettled?: (windowId: number, payload: FileCommentSaveSettled) => void
+  /** Send `file-comment:bulkSettled` to one window: a file a bulk action answered "still saving" for ended (L-2). */
+  readonly sendBulkSettled?: (windowId: number, payload: CommentBulkSettled) => void
+  /** Longest a save waits before it answers `COMMENT_SAVE_PENDING`; {@link SAVE_TIMEOUT_MS} by default. */
+  readonly saveTimeoutMs?: number
   /** Where a kind's jobs run; the comment parse worker by default. */
   readonly jobsFor?: CommentWriterDeps['jobsFor']
   /** One runner for every kind (the suites' in-process runner). */
@@ -105,6 +114,9 @@ export interface FileCommentServiceDeps {
 /** A thread operation of `file-comment:save`. */
 type ThreadOp = Exclude<FileCommentSaveRequest, { op: 'add' }>
 
+/** What a late settle names a write by: the request's own key. */
+type WriteRef = Pick<FileCommentSaveSettled, 'op' | 'draftToken' | 'threadKey' | 'blockKey'>
+
 /** A refusal with its code and reason. */
 function refusal(reason: CommentRefusal): CommentReasonedRefusal {
   return { ok: false, code: refusalCode(reason), reason }
@@ -117,15 +129,6 @@ const openingKey = (windowId: number, panelId: string): string => `${windowId}:$
 const KEY_INVALID = refusal('key-invalid')
 const COMMENTS_OFF = refusal('comments-off')
 const TOO_MANY = refusal('too-many-blocks')
-
-/** The production watch: one atomic-save-proof watcher per file. */
-const defaultWatch: FileCommentWatchFactory = (realPath, onChange) =>
-  createRearmingSingleFileWatcher(realPath, {
-    onChange,
-    onDeleted: onChange,
-    onError: () => {},
-    onWatchDead: () => {}
-  })
 
 /** The `file-comment:*` service; one per process. */
 export class FileCommentService {
@@ -148,7 +151,7 @@ export class FileCommentService {
   constructor(private readonly deps: FileCommentServiceDeps) {
     this.panels = new FileCommentPanels(deps.keys)
     this.watches = createFileCommentWatches({
-      watch: deps.watch ?? defaultWatch,
+      watch: deps.watch ?? defaultFileCommentWatch,
       onChange: realPath => this.changed(realPath),
       ...(deps.watchMax === undefined ? {} : { max: deps.watchMax })
     })
@@ -256,6 +259,21 @@ export class FileCommentService {
     return this.changeExisting(caller, panel, request)
   }
 
+  /** `file-comment:bulk` (024-FR-028): one write, named by keys, on the panel's own file. */
+  async bulk(caller: FileCommentCaller, request: CommentBulkRequest): Promise<CommentBulkResult> {
+    const panel = this.panels.get(caller.windowId, request.panelId)
+    if (panel === undefined) return NOT_OPEN
+    if (!this.enabled(panel)) return COMMENTS_OFF
+    const file = writeTargetOf(caller, panel)
+    const work = request.files.map(named => {
+      const found = resolveBulkFile(panel.keys, panel.binding, named, (_file, key) => key === panel.realPath)
+      return { fileKey: named.fileKey, threads: found?.threads ?? null, write: (threads: readonly BulkThread[]) => this.writer.changeThreads({ file, threads, change: request.change }) }
+    })
+    const { windowId } = caller
+    const { panelId } = panel.binding
+    return runBulkFiles(work, this.deps.saveTimeoutMs, undefined, late => this.deps.sendBulkSettled?.(windowId, { panelId, ...late }))
+  }
+
   /** The window closed: forget its panels and release their watches; a list still running for it records nothing. */
   forgetWindow(windowId: number): void {
     this.windowEpochs.set(windowId, (this.windowEpochs.get(windowId) ?? 0) + 1)
@@ -279,7 +297,7 @@ export class FileCommentService {
       panel.keys.settleDraft(request.draftToken, false)
       return KEY_INVALID
     }
-    const result = await this.writer.addPicked({
+    const write = this.writer.addPicked({
       file: writeTargetOf(caller, panel),
       pick: request.target,
       ...(request.sel === undefined ? {} : { sel: request.sel }),
@@ -289,8 +307,12 @@ export class FileCommentService {
     // A write consumes the draft – also one whose bytes changed right after the rename
     // (`changed-during-save`): its thread landed, so a retry would add a second. Any
     // other refusal wrote nothing and leaves the draft, with the window's text, for the next try.
-    panel.keys.settleDraft(request.draftToken, result.ok || result.reason === 'changed-during-save')
-    return this.answer(panel, result)
+    // Settled when the WRITE settles, not when the answer goes: no second write while one runs.
+    void write.then(
+      result => panel.keys.settleDraft(request.draftToken, result.ok || result.reason === 'changed-during-save'),
+      () => panel.keys.settleDraft(request.draftToken, false)
+    )
+    return this.answerInTime(caller, panel, write, { op: 'add', draftToken: request.draftToken })
   }
 
   private async changeExisting(caller: FileCommentCaller, panel: FileCommentPanel, request: ThreadOp): Promise<CommentSaveResult> {
@@ -298,19 +320,40 @@ export class FileCommentService {
     if (request.op === 'deleteBlock') {
       const block = panel.keys.resolve(panel.binding, request.blockKey, 'block')
       if (!block.ok || block.value.realPath !== panel.realPath) return KEY_INVALID
-      return this.answer(panel, await this.writer.deleteDamagedBlock({ file, rawHash: request.rawHash, start: block.value.start }))
+      const write = this.writer.deleteDamagedBlock({ file, rawHash: request.rawHash, start: block.value.start })
+      return this.answerInTime(caller, panel, write, { op: request.op, blockKey: request.blockKey })
     }
     if (request.op === 'rebuildBlock') {
       // OD-05: named by its block key, as a block delete is.
       const block = panel.keys.resolve(panel.binding, request.blockKey, 'block')
       if (!block.ok || block.value.realPath !== panel.realPath) return KEY_INVALID
       const status = request.status === undefined ? {} : { status: request.status }
-      return this.answer(panel, await this.writer.rebuildDamagedBlock({ file, rawHash: request.rawHash, start: block.value.start, ...status }))
+      const write = this.writer.rebuildDamagedBlock({ file, rawHash: request.rawHash, start: block.value.start, ...status })
+      return this.answerInTime(caller, panel, write, { op: request.op, blockKey: request.blockKey })
     }
     const thread = panel.keys.resolve(panel.binding, request.threadKey, 'thread')
     if (!thread.ok || thread.value.realPath !== panel.realPath) return KEY_INVALID
-    const result = await this.writer.changeThread({ file, threadId: thread.value.threadId, rawHash: request.rawHash, change: changeOf(request) })
+    const write = this.writer.changeThread({ file, threadId: thread.value.threadId, rawHash: request.rawHash, change: changeOf(request) })
+    return this.answerInTime(caller, panel, write, { op: request.op, threadKey: request.threadKey })
+  }
+
+  /** The answer to a write within the time limit; past it `COMMENT_SAVE_PENDING`, and how it ended goes to the sender's window (W-10). */
+  private async answerInTime(caller: FileCommentCaller, panel: FileCommentPanel, write: Promise<CommentWriteResult>, ref: WriteRef): Promise<CommentSaveResult> {
+    const timeoutMs = this.deps.saveTimeoutMs ?? SAVE_TIMEOUT_MS
+    const result = await boundedWrite(write, timeoutMs, () => this.settleLate(caller.windowId, panel.binding.panelId, write, ref))
+    if (result === 'pending') return { ok: false, code: ErrorCode.COMMENT_SAVE_PENDING }
+    if (result === 'failed') return { ok: false, code: ErrorCode.COMMENT_WRITE_FAILED }
     return this.answer(panel, result)
+  }
+
+  /** A write that outlasted its answer: tell the window how it ended, whatever that was. */
+  private settleLate(windowId: number, panelId: string, write: Promise<CommentWriteResult>, ref: WriteRef): void {
+    const send = (ending: Pick<FileCommentSaveSettled, 'ok' | 'code' | 'reason'>): void =>
+      this.deps.sendSettled?.(windowId, { panelId, ...ref, ...ending })
+    void write.then(
+      result => send(result.ok ? { ok: true } : { ok: false, code: result.code, reason: result.reason }),
+      () => send({ ok: false, code: ErrorCode.COMMENT_WRITE_FAILED })
+    )
   }
 
   /** Comments are on in Settings for the panel's kind. */
@@ -405,6 +448,7 @@ export class FileCommentService {
       line: placement.line,
       tag: placement.tag,
       ...(placement.sel === undefined ? {} : { sel: { exact: placement.sel.exact, prefix: placement.sel.prefix, suffix: placement.sel.suffix } }),
+      ...(placement.now === undefined ? {} : { now: placement.now }),
       ...(placement.place === undefined ? {} : { place: placement.place })
     }))
   }
@@ -446,19 +490,4 @@ function writeTargetOf(caller: FileCommentCaller, panel: FileCommentPanel): Comm
 /** A panel as a watch subscriber. */
 function subscriberOf(panel: FileCommentPanel): string {
   return `${panel.binding.windowId}\u0000${panel.binding.panelId}`
-}
-
-/** Project-relative and `/`-separated, for "Saved inside {file}". */
-function displayPathOf(root: string, requestedPath: string): string {
-  return relative(root, requestedPath).split(sep).join('/')
-}
-
-/**
- * The bytes a list parses: the editor's unsaved text when it was sent and
- * differs from the file (C-09), else the file. Display only – never written.
- */
-function displayBytes(disk: Buffer, bufferText: string | undefined): Uint8Array {
-  if (bufferText === undefined) return disk
-  const buffer = encodeText(bufferText)
-  return disk.equals(buffer) ? disk : buffer
 }

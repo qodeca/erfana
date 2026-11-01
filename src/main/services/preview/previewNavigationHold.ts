@@ -49,6 +49,13 @@ export const CLICK_SETTLE_CAP_MS = 1000
  */
 const MAX_PENDING_CLICKS = 16
 
+/**
+ * Navigations held at once. The bridge charges a page's budget only when a hold
+ * ends, so a page looping `location.href` could otherwise grow this set; past
+ * the bound the oldest is let go, where the budget refuses it.
+ */
+const MAX_HELD_NAVIGATIONS = 16
+
 /** The per-view hold the link bridge drives. */
 export interface NavigationHold {
   /** The preload saw a trusted click on `href`; its report or withdrawal follows. */
@@ -116,6 +123,10 @@ export function createNavigationHold(): NavigationHold {
     clickSettled,
 
     hold(href: string, dispatch: () => void): void {
+      if (heldNavigations.size >= MAX_HELD_NAVIGATIONS) {
+        const [oldest] = heldNavigations
+        release(oldest)
+      }
       const navigation: HeldNavigation = {
         href,
         dispatch,

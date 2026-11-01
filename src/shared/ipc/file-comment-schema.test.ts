@@ -17,6 +17,7 @@ import {
   FILE_COMMENT_LINE_MAX,
   FILE_COMMENT_ORDINAL_MAX,
   FileCommentChangedSchema,
+  FileCommentSaveSettledSchema,
   FileCommentListRequestSchema,
   FileCommentListResultSchema,
   FileCommentOpenDraftRequestSchema,
@@ -74,6 +75,16 @@ describe('024-AC-028 item 5: every new field has a named cap', () => {
     expect(ok(FileCommentSaveRequestSchema, add({ exact: 'w'.repeat(SEL_EXACT_MAX_CHARS + 1), prefix: '', suffix: '' }))).toBe(false)
     expect(ok(FileCommentSaveRequestSchema, add({ exact: 'w', prefix: 'p'.repeat(SEL_CONTEXT_MAX_CHARS + 1), suffix: '' }))).toBe(false)
     expect(ok(FileCommentSaveRequestSchema, add({ exact: '', prefix: '', suffix: '' }))).toBe(false)
+  })
+
+  it('W-10 a settled write keeps the shared rules, and may name its finer reason', () => {
+    const token = 'a'.repeat(32)
+    expect(ok(FileCommentSaveSettledSchema, { panelId: 'p', op: 'add', draftToken: token, ok: true })).toBe(true)
+    expect(ok(FileCommentSaveSettledSchema, { panelId: 'p', op: 'add', draftToken: token, ok: false, code: ErrorCode.COMMENT_WRITE_FAILED, reason: 'changed-during-save' })).toBe(true)
+    expect(ok(FileCommentSaveSettledSchema, { panelId: 'p', op: 'add', draftToken: token, ok: false })).toBe(false)
+    expect(ok(FileCommentSaveSettledSchema, { panelId: 'p', op: 'add', draftToken: token, ok: false, code: ErrorCode.COMMENT_SAVE_PENDING })).toBe(false)
+    expect(ok(FileCommentSaveSettledSchema, { panelId: 'p', op: 'add', threadKey: 'k', ok: true })).toBe(false)
+    expect(ok(FileCommentSaveSettledSchema, { panelId: 'p', op: 'add', draftToken: token, ok: true, extra: 1 })).toBe(false)
   })
 
   it('stamp: a safe whole number', () => {

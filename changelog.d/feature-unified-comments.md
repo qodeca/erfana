@@ -8,8 +8,8 @@
   the editor holds unsaved changes. A new **Comments in Markdown preview** switch in
   **Settings > Comments** turns them off. Spec 024.
 - **You can comment on selected words, in both previews.** Select words and select **Comment**, or
-  right-click and choose **Comment on selection**; the words are underlined, and **Narrow to words**
-  picks fewer of them. Erfana keeps the words only when it finds them in the file as written.
+  right-click and choose **Comment on selection**; the words are underlined, and **Comment on specific
+  words** picks fewer of them. Erfana keeps the words only when it finds them in the file as written.
   Spec 024.
 - **The HTML preview's right-click offers a comment outside comment mode.** When the page does not
   use its own right-click, Erfana's menu offers to comment on the element or the selection. Spec 024,
@@ -23,7 +23,7 @@
 
 - **One comment experience in both previews.** The comment window, the Comments list and the words
   are the same in the HTML and the Markdown preview. The list now filters by **Open**, **Resolved** and
-  **Can't edit** and sorts by **File order**, **Changed first** or **Latest activity**; a comment
+  **Problems** and sorts by **File order**, **Changed first** or **Latest activity**; a comment
   whose target changed is marked **Changed** with what it was and what it is now; a note says when
   open comments were removed outside Erfana. The identity notice is shown once for both previews.
   Spec 024, comments-v2.
@@ -36,7 +36,7 @@
 - **New `file-comment:*` channels for Markdown comments.** Sender-gated before the payload is read,
   strict capped schemas, single-use draft tokens bound to the window, the panel and the file, events
   only to the owning window, and every Markdown parse checked against size and nesting limits before
-  it runs. The unsaved-edits check now asks every window. See `docs/security.md` § Markdown Preview
+  it runs. The unsaved-edits check for these files asks every window. See `docs/security.md` § Markdown Preview
   comments and the `file-comment:*` channels. Spec 024.
 
 ### Internal

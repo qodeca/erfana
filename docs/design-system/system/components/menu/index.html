@@ -262,11 +262,11 @@ Typeahead matches the label, never the reason. Both ids must be unique in the wi
        class=&quot;erf-menu-item erf-menu-item--described&quot;
        aria-labelledby=&quot;mi-comment-label&quot; aria-describedby=&quot;mi-comment-reason&quot;&gt;
     &lt;span class=&quot;erf-menu-icon&quot; aria-hidden=&quot;true&quot;&gt;…&lt;/span&gt;
-    &lt;span class=&quot;erf-menu-label&quot; id=&quot;mi-comment-label&quot;&gt;Comment on frontmatter&lt;/span&gt;
-    &lt;span class=&quot;erf-menu-desc&quot; id=&quot;mi-comment-reason&quot;&gt;Comments can't be added to the frontmatter.&lt;/span&gt;
+    &lt;span class=&quot;erf-menu-label&quot; id=&quot;mi-comment-label&quot;&gt;Comment on file settings&lt;/span&gt;
+    &lt;span class=&quot;erf-menu-desc&quot; id=&quot;mi-comment-reason&quot;&gt;You can't comment on the settings at the top of this file.&lt;/span&gt;
   &lt;/div&gt;
 &lt;/div&gt;</code></pre>
-<p class="ds-muted">A screen reader says roughly “Comment on frontmatter, dimmed, menu item, Comments can't be added to the
+<p class="ds-muted">A screen reader says roughly “Comment on file settings, dimmed, menu item, Comments can't be added to the
 frontmatter.” The reason is a visible line, not a tooltip or a <code>title</code>: a keyboard or touch user never sees a
 tooltip that only hover opens, and a reason that has to be found is not a reason.</p>
 
@@ -368,14 +368,14 @@ tooltip that only hover opens, and a reason that has to be found is not a reason
 <figure class="ds-frame">
 <div class="erf-menu" aria-hidden="true">
   <div class="erf-menu-item"><span class="erf-menu-icon">✎</span><span class="erf-menu-label">Rename…</span><span class="erf-menu-shortcut">↩</span></div>
-  <div class="erf-menu-item erf-menu-item--described" aria-disabled="true"><span class="erf-menu-icon">✚</span><span class="erf-menu-label">Comment on frontmatter</span><span class="erf-menu-desc">Comments can't be added to the frontmatter.</span></div>
+  <div class="erf-menu-item erf-menu-item--described" aria-disabled="true"><span class="erf-menu-icon">✚</span><span class="erf-menu-label">Comment on file settings</span><span class="erf-menu-desc">You can't comment on the settings at the top of this file.</span></div>
 </div>
 <figcaption><strong>Disabled with a reason</strong> – The label is dim; the reason stays <code>--color-text-tertiary</code>, because it is information, not the inactive control.</figcaption>
 </figure>
 <figure class="ds-frame">
 <div class="erf-menu" aria-hidden="true">
   <div class="erf-menu-item"><span class="erf-menu-icon">✎</span><span class="erf-menu-label">Rename…</span><span class="erf-menu-shortcut">↩</span></div>
-  <div class="erf-menu-item erf-menu-item--described is-focus" aria-disabled="true"><span class="erf-menu-icon">✚</span><span class="erf-menu-label">Comment on frontmatter</span><span class="erf-menu-desc">Comments can't be added to the frontmatter.</span></div>
+  <div class="erf-menu-item erf-menu-item--described is-focus" aria-disabled="true"><span class="erf-menu-icon">✚</span><span class="erf-menu-label">Comment on file settings</span><span class="erf-menu-desc">You can't comment on the settings at the top of this file.</span></div>
 </div>
 <figcaption><strong>Disabled with a reason + focus</strong> – Reached by the arrows like any disabled item. One ring around both lines; no fill.</figcaption>
 </figure>

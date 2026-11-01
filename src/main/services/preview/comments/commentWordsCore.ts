@@ -9,7 +9,7 @@
  * visible text as MAIN parsed it from disk – parse5's readable text, collapsed
  * the way a selection reads it (`shared/comments/selectionWords.ts`). Found,
  * the draft carries that text with the words' range in it; the window shows
- * them and its Narrow to words field. Not found – a script added them, or the
+ * them and its Comment on specific words field. Not found – a script added them, or the
  * page changed them – the draft carries the text with no range and says the
  * words are missing, and the comment is saved on the whole element.
  *

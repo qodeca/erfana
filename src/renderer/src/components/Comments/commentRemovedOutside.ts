@@ -40,7 +40,7 @@ export type OpenThreads = ReadonlyMap<string, RemovedComment>
  *
  * @param files - Main's list.
  * @param words - The preview's words, for the target label.
- * @returns Open threads by thread key.
+ * @returns Open conversations by thread key.
  */
 export function openThreadsOf(files: readonly CommentFileView[], words: CommentWords): OpenThreads {
   const open = new Map<string, RemovedComment>()
@@ -52,7 +52,7 @@ export function openThreadsOf(files: readonly CommentFileView[], words: CommentW
         threadKey: thread.threadKey,
         text: first?.text ?? '',
         author: first?.by.name ?? '',
-        label: thread.runtime && words.preview === 'html' ? thread.runtime.tag : words.label(thread)
+        label: words.label(thread)
       })
     }
   }

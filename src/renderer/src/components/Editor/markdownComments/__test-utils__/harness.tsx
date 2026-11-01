@@ -19,7 +19,9 @@ import { DialogProvider } from '../../../Dialog'
 import { ToastProvider } from '../../../Toast/ToastContext'
 import { MarkdownPreview } from '../../MarkdownPreview'
 import type { ViewMode } from '../../MarkdownEditorPanel/types'
-import { useMarkdownComments } from '../useMarkdownComments'
+import { useMarkdownComments, type UseMarkdownCommentsOptions } from '../useMarkdownComments'
+import { SearchBar } from '../../../Search'
+import type { SearchProvider } from '../../../../providers/search'
 
 export const PANEL_ID = 'editor-notes'
 export const FILE_PATH = '/project/notes.md'
@@ -35,6 +37,8 @@ export interface FileCommentsMock {
   onChanged: Mock
   /** Fire `file-comment:changed` for the harness panel. */
   emitChanged: () => void
+  /** Fire `file-comment:saveSettled` for the harness panel. */
+  emitSettled: (payload: Record<string, unknown>) => void
 }
 
 /** One open thread on the block that starts on `line` with `tag`. */
@@ -71,6 +75,7 @@ export function fileView(threads: CommentThreadView[] = [], patch: Partial<Comme
 /** Install the bridges the preview and the host call; returns the comment bridge's mocks. */
 export function installApi(file: CommentFileView = fileView(), placements: ThreadPlacement[] = []): FileCommentsMock {
   const listeners = new Set<(payload: unknown) => void>()
+  const settleListeners = new Set<(payload: unknown) => void>()
   const mock = {
     list: vi.fn(async () => ({ ok: true, file, placements })),
     openDraft: vi.fn(async () => ({ ok: true, draftToken: DRAFT_TOKEN })),
@@ -79,7 +84,12 @@ export function installApi(file: CommentFileView = fileView(), placements: Threa
     onChanged: vi.fn((callback: (payload: unknown) => void) => {
       listeners.add(callback)
       return () => listeners.delete(callback)
-    })
+    }),
+    onSaveSettled: vi.fn((callback: (payload: unknown) => void) => {
+      settleListeners.add(callback)
+      return () => settleListeners.delete(callback)
+    }),
+    onBulkSettled: vi.fn(() => () => {})
   }
   window.api = {
     file: {
@@ -90,7 +100,8 @@ export function installApi(file: CommentFileView = fileView(), placements: Threa
   } as unknown as typeof window.api
   return {
     ...mock,
-    emitChanged: () => listeners.forEach(listener => listener({ panelId: PANEL_ID, filePath: FILE_PATH, stamp: 1 }))
+    emitChanged: () => listeners.forEach(listener => listener({ panelId: PANEL_ID, filePath: FILE_PATH, stamp: 1 })),
+    emitSettled: payload => settleListeners.forEach(listener => listener({ panelId: PANEL_ID, ...payload }))
   }
 }
 
@@ -127,10 +138,26 @@ export interface HarnessProps {
   readonly onViewMode?: (mode: ViewMode) => void
   /** The panel's re-read after a comment save (`MarkdownEditorPanel` passes its reload). */
   readonly onFileWritten?: () => void
+  /** dockview draws this tab. */
+  readonly isVisible?: boolean
+  /** The panel's dockview api, for its group element. */
+  readonly panelApi?: UseMarkdownCommentsOptions['panelApi']
+  /** Mount the real Find bar, as the preview pane does (it opens from the search store). */
+  readonly withFind?: boolean
 }
 
+/** Enough provider for the Find bar to open and close: these tests never search. */
+const NO_SEARCH = {
+  id: 'harness',
+  name: 'Harness',
+  capabilities: { randomAccess: true, matchList: true, wholeWord: true },
+  search: async () => [],
+  clearHighlights: () => {},
+  onCountChange: () => () => {}
+} as unknown as SearchProvider
+
 /** The panel, reduced: tools, band, and the pane with the preview and the overlay. */
-export function Harness({ content, viewMode = 'preview', onViewMode = () => {}, onFileWritten }: HarnessProps): React.JSX.Element {
+export function Harness({ content, viewMode = 'preview', onViewMode = () => {}, onFileWritten, isVisible = true, panelApi, withFind = false }: HarnessProps): React.JSX.Element {
   const [editorRef] = useState(() => ({ current: null }))
   const comments = useMarkdownComments({
     panelId: PANEL_ID,
@@ -140,22 +167,26 @@ export function Harness({ content, viewMode = 'preview', onViewMode = () => {}, 
     setViewMode: onViewMode,
     editorRef,
     isActivePanel: true,
-    isVisible: true,
+    isVisible,
+    ...(panelApi === undefined ? {} : { panelApi }),
     ...(onFileWritten === undefined ? {} : { onFileWritten })
   })
   return (
     <ToastProvider>
       <DialogProvider>
+      <div className="markdown-editor-panel" data-testid="harness-panel" {...comments.panelKeys}>
       <div className="markdown-toolbar" role="toolbar" aria-label="Markdown formatting" data-testid="harness-toolbar">
         {comments.tools}
       </div>
       {comments.band}
       {viewMode !== 'editor' && (
         <div className="preview-pane" data-testid="harness-pane">
+          {withFind && <SearchBar provider={NO_SEARCH} />}
           <MarkdownPreview content={content} filePath={FILE_PATH} />
           {viewMode === 'preview' && comments.overlay}
         </div>
       )}
+      </div>
       </DialogProvider>
     </ToastProvider>
   )

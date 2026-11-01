@@ -86,11 +86,11 @@ const SMALL = { runs: RUNS, guardMs: RELOAD_GUARD_MS, openMs: PREVIEW_BUDGET_MS 
  * every run finish – on any Windows host, as no time is asserted; the runs and
  * what they record are unchanged.
  */
-const WINDOWS_HOST = process.platform === 'win32'
+const SLOW_HOST = process.platform === 'win32' || process.platform === 'linux' // Linux: the Docker run stalls the same way (2026-10-31), and the same guard failed with the small still frame too.
 const WIN_SMALL = { runs: RUNS, guardMs: 120_000, openMs: 120_000 }
 const WIN_LARGEST = { runs: 3, guardMs: 600_000, openMs: 600_000 }
-const small = WINDOWS_HOST ? WIN_SMALL : SMALL
-const largest = WINDOWS_HOST ? WIN_LARGEST : LARGEST
+const small = SLOW_HOST ? WIN_SMALL : SMALL
+const largest = SLOW_HOST ? WIN_LARGEST : LARGEST
 const SIZES = [
   { label: '0.5 MB', rel: 'comments/size-05.html', bytes: MB / 2, ...small },
   { label: '1 MB', rel: 'comments/size-1.html', bytes: MB, ...small },
@@ -187,7 +187,7 @@ async function timedReload(app: ElectronApplication, needle: string, guardMs = R
     try {
       await new Promise<void>((resolve, reject) => {
         // A guard against a reload that never finishes, not a wait for state.
-        const timer = setTimeout(() => reject(new Error('the reload never finished')), guard)
+        const timer = setTimeout(() => reject(new Error(`the reload never finished: ${n}, ${guard} ms`)), guard)
         wc.once('did-finish-load', () => {
           clearTimeout(timer)
           resolve()
@@ -310,7 +310,7 @@ test.describe('HTML Preview comments – performance records (P7)', () => {
     appWithTestProject
   }, testInfo) => {
     // The 25 MB page takes a minute or more per load on the emulated Windows box (LARGEST); the others under 3 s.
-    test.setTimeout(WINDOWS_HOST ? 5_400_000 : 1_800_000)
+    test.setTimeout(SLOW_HOST ? 5_400_000 : 1_800_000)
     const app = appWithTestProject
     const page = windowWithTestProject
     const preview = new HtmlPreviewPage(page, app)
@@ -342,7 +342,7 @@ test.describe('HTML Preview comments – performance records (P7)', () => {
           else expect(await newest()).toBeUndefined()
         }
         row[kind] = { ...summary(runs), runs }
-        await preview.tabClose().click()
+        await preview.tabClose().click({ timeout: size.guardMs }) // The 25 MB page keeps the renderer busy: a guard, as above.
         await expect.poll(async () => (await preview.livePreviews()).length, { timeout: PREVIEW_BUDGET_MS }).toBe(0)
       }
       results.push(row)

@@ -25,10 +25,12 @@ import { PanelIdSchema } from './preview-schema'
 
 /** Characters of one file path in a comment payload. */
 export const COMMENT_PATH_MAX_CHARS = 4_096
+/** Files one bulk action names at most: the most a page's list holds (`preview:commentList`). */
+export const COMMENT_BULK_FILES_MAX = 64
 /**
  * Characters of a target's text a draft – or a thread, for Edit on its first
  * message – carries for the words of a comment (spec 024 024-FR-004, C-07
- * "Narrow to words"). A longer text is sent as the part around the selected
+ * "Comment on specific words"). A longer text is sent as the part around the selected
  * words, or not at all.
  */
 export const COMMENT_WORDS_TEXT_MAX_CHARS = 10_000
@@ -144,6 +146,83 @@ export const CommentSaveResultSchema = z.union([
 ])
 export type CommentSaveResult = z.infer<typeof CommentSaveResultSchema>
 
+/** What a bulk action does (024-FR-028, plan step 13): nothing else can be asked for in bulk. */
+export const CommentBulkChangeSchema = z.enum(['resolve', 'deleteResolved'])
+export type CommentBulkChange = z.infer<typeof CommentBulkChangeSchema>
+
+const unique = (values: readonly string[]): boolean => new Set(values).size === values.length
+
+/** One file of a bulk action: the threads the person reviewed, each with the block hash they saw. */
+export const CommentBulkFileSchema = z
+  .object({
+    fileKey: KeySchema,
+    threads: z
+      .array(z.object({ threadKey: KeySchema, rawHash: CommentRawHashSchema }).strict())
+      .min(1)
+      .max(PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE)
+      .refine(threads => unique(threads.map(thread => thread.threadKey)), { message: 'a thread is named once' })
+  })
+  .strict()
+export type CommentBulkFile = z.infer<typeof CommentBulkFileSchema>
+
+/** A bulk action: keys and hashes only, never a path, an author or a status of the renderer's choosing. */
+export const CommentBulkRequestSchema = z
+  .object({
+    panelId: PanelIdSchema,
+    change: CommentBulkChangeSchema,
+    files: z
+      .array(CommentBulkFileSchema)
+      .min(1)
+      .max(COMMENT_BULK_FILES_MAX)
+      .refine(files => unique(files.map(file => file.fileKey)), { message: 'a file is named once' })
+  })
+  .strict()
+export type CommentBulkRequest = z.infer<typeof CommentBulkRequestSchema>
+
+/**
+ * How one file's write ended: every named thread changed, or none did.
+ * `changedDuringSave`: the write landed and the file then changed, by someone
+ * else, before main could read it back – done, and worth a look.
+ */
+export const CommentBulkFileResultSchema = z.union([
+  z
+    .object({
+      fileKey: KeySchema,
+      ok: z.literal(true),
+      done: z.number().int().min(1).max(PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE),
+      changedDuringSave: z.literal(true).optional()
+    })
+    .strict(),
+  CommentReasonedRefusalSchema.extend({ fileKey: KeySchema }).strict()
+])
+export type CommentBulkFileResult = z.infer<typeof CommentBulkFileResultSchema>
+
+/** A bulk action's answer: each file's outcome, or a refusal of the whole request. */
+export const CommentBulkResultSchema = z.union([
+  z.object({ ok: z.literal(true), files: z.array(CommentBulkFileResultSchema).min(1).max(COMMENT_BULK_FILES_MAX) }).strict(),
+  CommentReasonedRefusalSchema
+])
+export type CommentBulkResult = z.infer<typeof CommentBulkResultSchema>
+
+/**
+ * `preview:commentBulkSettled`, `file-comment:bulkSettled` (security review
+ * L-2): a file a bulk action answered `COMMENT_SAVE_PENDING` for ended after
+ * all. Sent only for such a file: every other outcome was in the answer.
+ */
+export const CommentBulkSettledSchema = z
+  .object({
+    panelId: PanelIdSchema,
+    fileKey: KeySchema,
+    ok: z.boolean(),
+    changedDuringSave: z.literal(true).optional(),
+    code: z.enum(ErrorCode).optional(),
+    reason: CommentRefusalReasonSchema.optional()
+  })
+  .strict()
+  .refine(event => event.ok === (event.code === undefined), { message: 'a failed write names its code, a landed one none' })
+  .refine(event => event.code !== ErrorCode.COMMENT_SAVE_PENDING, { message: 'a settled write is no longer pending' })
+export type CommentBulkSettled = z.infer<typeof CommentBulkSettledSchema>
+
 /**
  * The target's text and the selected range in it, from MAIN's parse of the
  * file (spec 024 024-FR-004, C-07): what the window's words and its Narrow to
@@ -190,7 +269,7 @@ export const commentThreadOpSchemas = [
   // `resolve`: "Reply and resolve" – the reply and the resolve in one write (comments-v2 C-13).
   z.object({ ...threadTarget, op: z.literal('reply'), text: CommentMessageTextSchema, resolve: z.literal(true).optional() }).strict(),
   // C-07 `sel`, on the first message only: the words the comment is about – set or changed by the
-  // Narrow to words field, `null` for the whole target, absent to leave them as they are. Main keeps
+  // Comment on specific words field, `null` for the whole target, absent to leave them as they are. Main keeps
   // them only where its own parse finds them, as for an `add` (024-FR-004), else drops them and says so.
   z
     .object({
@@ -213,7 +292,7 @@ export const commentThreadOpSchemas = [
       rawHash: CommentRawHashSchema
     })
     .strict(),
-  // OD-05 "Rebuild from data…": re-render a hand-damaged block's readable lines from its valid
+  // OD-05 "Repair comment…": re-render a hand-damaged block's readable lines from its valid
   // `@data`; `status: 'resolved'` is "Mark resolved" (the status its line claims), `'open'` "Keep open".
   z
     .object({
@@ -256,7 +335,7 @@ export const CommentThreadViewSchema = z
     classes: z.array(z.string().max(100)).max(PREVIEW_LIMITS.COMMENT_MAX_CLASSES),
     /** Found in the file now (else "Not found"). */
     attached: z.boolean(),
-    /** Found, but not rendered right now ("Not visible now", decision 30). */
+    /** Found, but not rendered right now ("Hidden on the page", decision 30). */
     notVisible: z.boolean(),
     /**
      * The element's text as the block stored it – "It was attached to:" (§10.10).
@@ -284,8 +363,9 @@ export const CommentThreadViewSchema = z
      * Derived, never written (comments-v2 C-06; state table S-03, S-04): the
      * target's text is not what the comment stored (`changed`), or the words
      * a selection comment is about are gone from it (`words`). `was` is the
-     * stored text, `now` the text there now – absent when no words are found.
-     * Both visible like `quote`.
+     * stored text, `now` the text there now – absent when no words are found,
+     * or for `changed` when the text is the same and only the part's `id`,
+     * classes or place differ (HTML). Both visible like `quote`.
      */
     change: z
       .object({
@@ -303,7 +383,7 @@ export const CommentThreadViewSchema = z
       .strict()
       .optional(),
     /**
-     * C-07: the target's text as main parsed it, for the Narrow to words field
+     * C-07: the target's text as main parsed it, for the Comment on specific words field
      * of Edit on the first message, with the range of the words the comment is
      * about (none: `start === end`). Absent when the target is not found, has
      * no text, or its text is too long to send ({@link COMMENT_WORDS_TEXT_MAX_CHARS}).

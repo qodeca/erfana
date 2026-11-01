@@ -28,6 +28,7 @@
  */
 import type { RandomBytes } from '../../../shared/htmlComments'
 import type { CommentFileKindId } from '../../../shared/comments/fileKind'
+import type { BulkWriteJob, BulkWriteJobResult } from './commentBulkCore'
 import { CommentDocCache, type KindDocCache } from './commentJobDocs'
 import type { ListJob, ListJobResult } from './commentListCore'
 import type { WriteJob, WriteJobResult } from './commentWriteCore'
@@ -51,10 +52,11 @@ export interface CommentJobResult {
 export interface CommentJobResults {
   list: ListJobResult
   write: WriteJobResult
+  bulkWrite: BulkWriteJobResult
 }
 
 /** The jobs shared code asks of every file kind. */
-export type CommentFileJob = ListJob | WriteJob
+export type CommentFileJob = ListJob | WriteJob | BulkWriteJob
 
 /** Their answers. */
 export type CommentFileJobResult = JobResultOf<CommentFileJob>

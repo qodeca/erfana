@@ -95,7 +95,7 @@ describe('C-19 refusal table', () => {
     expect(refusalCopy(ErrorCode.COMMENT_LIMIT, 'file-size', context)?.text).toContain('larger than 25 MB')
     expect(refusalCopy(ErrorCode.COMMENT_LIMIT, 'meta-charset', context)?.action).toBe('banner')
     expect(refusalCopy(ErrorCode.COMMENT_PATH_REFUSED, 'outside-project', context)).toEqual({
-      text: 'notes.md is outside this project, so Erfana won\'t write to it.',
+      text: 'notes.md is not in this project, so you can\'t comment on it here.',
       action: 'close'
     })
     expect(refusalCopy(ErrorCode.COMMENT_PATH_REFUSED, 'kind-mismatch', context)?.text).toBe(WINDOW_COPY.notCommentable)
@@ -110,7 +110,7 @@ describe('C-19 refusal table', () => {
 
   it('C-14 a moved target offers Pick again with the text kept', () => {
     expect(refusalCopy(ErrorCode.COMMENT_TARGET_MOVED, undefined, context)).toEqual({
-      text: 'This paragraph changed in the file since you picked it. Pick it again – your text comes with you.',
+      text: 'This paragraph changed after you selected it. Select it again. Your text is safe.',
       action: 'pick-again'
     })
   })
@@ -164,7 +164,7 @@ describe('C-03 (window) heading text in Markdown titles', () => {
   it('C-05 the context line of a lost target says not found', () => {
     const file = fileView({ displayPath: 'notes.md', threads: [thread(1, { tag: 'p', attached: false })] })
     const selection = { file, threads: file.threads, damaged: [], newer: [] }
-    expect(headingOf(threadsRequest(), selection, MARKDOWN_WORDS).context).toBe('paragraph, not found · notes.md')
+    expect(headingOf(threadsRequest(), selection, MARKDOWN_WORDS).context).toBe('Paragraph, not found · notes.md')
   })
 })
 
@@ -193,6 +193,16 @@ describe('C-18 docked placement', () => {
       /margin|edge/
     )
     expect(placeDocked({ ...base, column: null }).kind).not.toMatch(/margin|edge/)
+  })
+
+  it('K-2 a window holding typed text never folds: it stays in the pane, at the edge nearest its target', () => {
+    const above = placeDocked({ ...base, holdOpen: true, anchor: { left: 100, top: -90, width: 400, height: 40 } })
+    const below = placeDocked({ ...base, holdOpen: true, anchor: { left: 100, top: 5000, width: 400, height: 40 } })
+    expect(above.kind).not.toBe('edge')
+    expect(below.kind).not.toBe('edge')
+    if (above.kind === 'edge' || below.kind === 'edge' || above.kind === 'sheet' || below.kind === 'sheet') throw new Error('expected a place in the pane')
+    expect(above.top).toBeGreaterThanOrEqual(base.area.top)
+    expect(below.top + base.size.height).toBeLessThanOrEqual(base.area.top + base.area.height)
   })
 
   it('C-18 a target scrolled out of the pane shows the edge tab on the side it went', () => {

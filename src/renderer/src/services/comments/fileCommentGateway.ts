@@ -22,8 +22,10 @@
  * @module services/comments/fileCommentGateway
  */
 import { ErrorCode } from '../../../../shared/errors'
+import type { CommentBulkRequest, CommentBulkResult, CommentBulkSettled } from '../../../../shared/ipc/comment-common-schema'
 import type {
   FileCommentChanged,
+  FileCommentGitNameResult,
   FileCommentListRequest,
   FileCommentListResult,
   FileCommentOpenDraftRequest,
@@ -32,6 +34,7 @@ import type {
   FileCommentReleaseResult,
   FileCommentSaveRequest,
   FileCommentSaveResult,
+  FileCommentSaveSettled,
   FileCommentsBridge
 } from '../../../../shared/ipc/file-comment-schema'
 
@@ -75,6 +78,10 @@ export const fileCommentGateway = {
     ask<FileCommentOpenDraftResult>(api => api.openDraft(request), UNAVAILABLE),
   save: (request: FileCommentSaveRequest): Promise<FileCommentSaveResult> =>
     ask<FileCommentSaveResult>(api => api.save(request), UNAVAILABLE),
+  bulk: (request: CommentBulkRequest): Promise<CommentBulkResult> =>
+    ask<CommentBulkResult>(api => api.bulk(request), UNAVAILABLE),
+  /** The name git knows, for the identity step of either preview (P-F33); a failure is no suggestion. */
+  gitName: (): Promise<FileCommentGitNameResult> => ask<FileCommentGitNameResult>(api => api.gitName(), UNAVAILABLE),
   release: (request: FileCommentReleaseRequest): Promise<FileCommentReleaseResult> =>
     ask<FileCommentReleaseResult>(api => api.release(request), UNAVAILABLE),
   onChanged: (callback: (payload: FileCommentChanged) => void): (() => void) => {
@@ -82,6 +89,26 @@ export const fileCommentGateway = {
     if (api === undefined) return noop
     try {
       return api.onChanged(callback)
+    } catch {
+      return noop
+    }
+  },
+  /** A save answered "still saving" ended (W-10). */
+  onSaveSettled: (callback: (payload: FileCommentSaveSettled) => void): (() => void) => {
+    const api = bridge()
+    if (api === undefined) return noop
+    try {
+      return api.onSaveSettled(callback)
+    } catch {
+      return noop
+    }
+  },
+  /** A file of a bulk action answered "still saving" ended (L-2). */
+  onBulkSettled: (callback: (payload: CommentBulkSettled) => void): (() => void) => {
+    const api = bridge()
+    if (api === undefined) return noop
+    try {
+      return api.onBulkSettled(callback)
     } catch {
       return noop
     }

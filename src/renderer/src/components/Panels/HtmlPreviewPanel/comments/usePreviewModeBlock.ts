@@ -18,7 +18,7 @@
 import { useCallback, useEffect } from 'react'
 import type { CommentFileView } from '../../../../../../shared/ipc/comment-common-schema'
 import { useLatestRef } from '../../../../hooks/useLatestRef'
-import { MD_SURFACE_COPY, menuReasonText } from '../../../Comments/commentCopyWords'
+import { HTML_WORDS, MD_SURFACE_COPY } from '../../../Comments/commentCopyWords'
 
 /** Options for {@link usePreviewModeBlock}. */
 export interface PreviewModeBlockOptions {
@@ -56,8 +56,8 @@ export function pageBlockReason(files: readonly CommentFileView[]): string | nul
   const page = files.find(file => !file.frame)
   if (page === undefined) return null
   // F-04: a full file stays writable for replies, but takes no new comment.
-  if (page.writable) return page.addRefusal === undefined ? null : menuReasonText(page.addRefusal, page.displayPath)
-  return menuReasonText(page.readOnlyReason ?? 'read-only', page.displayPath)
+  if (page.writable) return page.addRefusal === undefined ? null : HTML_WORDS.reasonText(page.addRefusal, page.displayPath)
+  return HTML_WORDS.reasonText(page.readOnlyReason ?? 'read-only', page.displayPath)
 }
 
 /**

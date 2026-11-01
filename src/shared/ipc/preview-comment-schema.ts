@@ -33,7 +33,7 @@ import {
   CommentRefusalReasonSchema,
   commentThreadOpSchemas
 } from './comment-common-schema'
-import type { CommentSaveResult } from './comment-common-schema'
+import type { CommentBulkRequest, CommentBulkResult, CommentBulkSettled, CommentSaveResult } from './comment-common-schema'
 import {
   CommentKeySchema as KeySchema,
   CommentPickerSaySchema as PickerSaySchema,
@@ -113,12 +113,15 @@ export const CommentPanelRequestSchema = z.object({ panelId: PanelIdSchema }).st
 export type CommentPanelRequest = z.infer<typeof CommentPanelRequestSchema>
 
 /**
- * `preview:commentCommand` – "Show in preview" (§7.10), or keep an open
+ * `preview:commentCommand` – "Show in preview" (§7.10), keep an open
  * new-comment window's draft alive (spec 024 C-14.2; main caps a draft's whole
- * life, `commentKeyStore.ts` `DRAFT_MAX_AGE_MS`).
+ * life, `commentKeyStore.ts` `DRAFT_MAX_AGE_MS`), or start a new comment on a
+ * listed thread's target for a window that has no pin's draft (C-22). That one
+ * answers with an ack; the draft comes as `preview:commentDraftOpened`.
  */
 export const CommentCommandRequestSchema = z.discriminatedUnion('command', [
   z.object({ panelId: PanelIdSchema, command: z.literal('reveal'), threadKey: KeySchema }).strict(),
+  z.object({ panelId: PanelIdSchema, command: z.literal('new-on-thread'), threadKey: KeySchema }).strict(),
   z
     .object({ panelId: PanelIdSchema, command: z.literal('keep-draft'), draftToken: z.string().regex(COMMENT_DRAFT_TOKEN_PATTERN) })
     .strict()
@@ -243,7 +246,7 @@ export const CommentDraftOpenedSchema = z
         ...DisplaySchema,
         /** Absent: the menu's items are disabled, each with the reason line for `reason`. */
         ...DraftSchema,
-        /** Why main minted no draft (C-19): only without one; the renderer words it (`menuReasonText`). */
+        /** Why main minted no draft (C-19): only without one; the renderer words it (`CommentWords.reasonText`). */
         reason: CommentRefusalReasonSchema.optional(),
         /** The pick was made on a text selection: the menu is the selection menu (M-02, M-04). */
         selection: z.literal(true).optional(),
@@ -416,13 +419,16 @@ export interface PreviewCommentsBridge {
   setMode(request: CommentSetModeRequest): Promise<CommentSetModeResult>
   list(panelId: string): Promise<CommentListResult>
   reveal(panelId: string, threadKey: string): Promise<CommentAck>
+  newOnThread(panelId: string, threadKey: string): Promise<CommentAck>
   /** C-14.2: keep the open new-comment window's draft alive. */
   keepDraft(panelId: string, draftToken: string): Promise<CommentAck>
   save(request: CommentSaveRequest): Promise<CommentSaveResult>
+  bulk(request: CommentBulkRequest): Promise<CommentBulkResult>
   setUnsavedSources(paths: readonly string[]): Promise<CommentAck>
   onDraftOpened(callback: (payload: CommentDraftOpened) => void): () => void
   onCommentsChanged(callback: (payload: CommentsChanged) => void): () => void
   onAnchorStatus(callback: (payload: CommentAnchorStatus) => void): () => void
   onModeChanged(callback: (payload: CommentModeChanged) => void): () => void
   onSaveSettled(callback: (payload: CommentSaveSettled) => void): () => void
+  onBulkSettled(callback: (payload: CommentBulkSettled) => void): () => void
 }

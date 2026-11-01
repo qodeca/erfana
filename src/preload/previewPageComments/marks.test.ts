@@ -56,6 +56,39 @@ describe('C-12 (HTML) MarkResolver', () => {
     ])
   })
 
+  it('K-20 a mark knows its ground: light pages take the deep bar; a dark page or a dark block keeps the violet', () => {
+    document.body.innerHTML = '<p id="p">the beta</p>'
+    const element = document.getElementById('p')!
+    drawRanges(1)
+    const icon = (key: string): IconState => ({ key, token: token(1), count: 1, status: 'open', words: [words] })
+    const place = (key: string): boolean => new MarkResolver(() => 1).place([{ icon: icon(key), element, visible: true }], VIEWPORT)[0].light
+    expect(place('blank page')).toBe(true)
+    document.body.style.backgroundColor = 'rgb(232, 232, 232)'
+    expect(place('grey')).toBe(true)
+    document.body.style.backgroundColor = 'rgb(0, 0, 0)'
+    expect(place('black')).toBe(false)
+    element.style.backgroundColor = 'rgb(255, 255, 255)'
+    expect(place('white block on black')).toBe(true)
+    element.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'
+    expect(place('a faint tint is not its ground')).toBe(false)
+    document.body.style.backgroundColor = ''
+  })
+
+  it('K-20 a mark says whether its own words changed', () => {
+    document.body.innerHTML = '<p id="p">the beta and the gamma</p>'
+    const element = document.getElementById('p')!
+    drawRanges(1)
+    const icon: IconState = { key: 'k', token: token(1), count: 2, status: 'open', words: [{ ...words, changed: true }, { exact: 'gamma', prefix: 'the ', suffix: '' }] }
+    expect(new MarkResolver(() => 1).place([{ icon, element, visible: true }], VIEWPORT).map(m => m.changed)).toEqual([true, false])
+  })
+
+  it('K-20 main\'s changed flag on words survives the parse, and nothing else does', () => {
+    const state = (changed: unknown) =>
+      parseCommentState({ mode: false, commentable: true, icons: [{ key: 'k', token: token(1), count: 1, status: 'open', words: [{ ...words, changed }] }] })?.icons[0].words?.[0]
+    expect(state(true)).toEqual({ ...words, changed: true })
+    expect(state('yes')).toEqual(words)
+  })
+
   it('C-12 (HTML) finds the words again only after the page changed, and stops at the cap', () => {
     document.body.innerHTML = '<p id="p">the beta</p>'
     const element = document.getElementById('p')!
@@ -98,7 +131,7 @@ describe('C-16 and C-17 (HTML) overlay hits', () => {
     const frame = document.getElementById('f') as HTMLIFrameElement
     const box = { left: 0, top: 0, width: 50, height: 50 }
     const pin = { key: 'k', count: 1, status: 'open' as const, element: p, content: 'lines' as const, box }
-    const mark = { key: 'k', element: p, box }
+    const mark = { key: 'k', element: p, markKey: 'k-w0', box, changed: false, light: true }
     const boxes = { button: { words: { target: p }, box }, pins: [pin], marks: [mark], shields: [{ frame, box }] }
     const at = { x: 5, y: 5 }
     expect(hitAt(boxes, at)?.kind).toBe('button')

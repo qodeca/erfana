@@ -818,7 +818,7 @@ One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns 
 
 **Severity**: Low
 
-**Impact**: `src/main/services/preview/previewLiveVisibility.ts` (334 lines when filed, 342 on 2026-10-29) and `previewLiveWiring.ts` (371 then, 434 now) are reached only through the `PreviewLiveView` / `PreviewViewService` tests and e2e. `previewLiveVisibility.ts` owns the synchronous-hide invariant that keeps an untrusted page from covering Erfana's own permission prompt.
+**Impact**: `src/main/services/preview/previewLiveVisibility.ts` (334 lines when filed, 342 on 2026-10-29) and `previewLiveWiring.ts` (371 then, 445 now) are reached only through the `PreviewLiveView` / `PreviewViewService` tests and e2e. `previewLiveVisibility.ts` owns the synchronous-hide invariant that keeps an untrusted page from covering Erfana's own permission prompt.
 
 **Recommended Solution**: a direct test file for each, behind a per-file coverage floor.
 
@@ -1030,6 +1030,17 @@ The `files.exclude` list, the project path filter and the Windows native directo
 - **D1 – (Windows) a root whose real path cannot be resolved is watched as given.** `realpathSync.native` can fail on some RAM, network or virtual drives; for any code other than `ENOENT` (or `EPERM`, reported as `ENOENT`), `resolveRealRoot` logs `Native watcher: resolving the root failed, watching it as given` and every handle opens under the caller's spelling, which may be an 8.3 short name. Harmless on Electron 39's libuv 1.51.0, which does not abort on a short-name watch ([W0 spike](./spikes/211-windows-fs-watch.md)). **The re-check trigger has fired:** Electron 44.9.0, which v0.22.0 ships, bundles libuv 1.52.1 (read with `ELECTRON_RUN_AS_NODE=1 electron -p process.versions.uv` on 2026-10-25), the line this entry was waiting for; [File watching § Watch backends](./file-watching/README.md#watch-backends-211) now treats the `realpathSync.native` guard as load-bearing. Whether this fallback path aborts on such a drive has not been tested. Fix: re-check R13 (the short-name abort, [design](./designs/large-projects/211-large-project-windows-watcher.md) §8) and the D15 self-event match on such a drive. Where: `NativeRecursiveWatcher.ts` (`resolveRealRoot`).
 
 **Status**: Accepted — recorded from the #211 QG-6, QG-7, QG-8 and QG-11a verdicts. User-visible limits of the same change are in [Known issues § Excluded folders](./known-issues.md#excluded-folders-filesexclude-known-limits).
+
+---
+
+### 66. Two unused leftovers in the comments code (spec 024, 2026-11)
+
+**Severity**: Low
+
+- **`COMMENT_FILTER_ATTENTION` has no user.** `src/renderer/src/constants/commentTestids.ts` still defines `COMMENT_FILTER_ATTENTION: 'comment-filter-attention'`, but no file under `src/` or `e2e/` reads it; the drawer filter it named was replaced by `COMMENT_FILTER_CANT_EDIT`. It is still counted in the 145 `COMMENT_` ids that `testids.test.ts` checks, so removing it means changing that count. Fix: delete the id and lower the count.
+- **`CommentPickerRoleSchema` keeps a value nothing produces.** The enum in `src/shared/ipc/preview-comment-schema.ts` includes `'element'`, but `roleOf` in `src/main/services/preview/comments/commentPickerStep.ts` falls back to `'section'` and never returns it. The value stays because the `PIN-C-002` snapshot (`src/shared/ipc/preview-comment-schema.pin.test.ts`) pins the schema's wire shape. Fix: drop the value and regenerate the snapshot in the same change, on purpose.
+
+**Status**: Open – left for a follow-up; neither changes behaviour.
 
 ---
 

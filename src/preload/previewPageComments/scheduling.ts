@@ -110,7 +110,8 @@ export class PageWatch {
         this.changes += 1
         this.throttled()
       })
-      this.mutations.observe(doc, { childList: true, subtree: true, attributes: true })
+      // Text alone can be a page's reaction (D-09). This stops at a shadow root: a click in a shadow host is the page's anyway (`pageControls.ts`).
+      this.mutations.observe(doc, { childList: true, subtree: true, attributes: true, characterData: true })
       return
     }
     for (const type of REDRAW_EVENTS) win.removeEventListener(type, this.redraw, { capture: true })

@@ -14,17 +14,18 @@
  *   ("The words this comment is about are gone").
  * - **Changed** (S-03): the target's visible text (collapsed, NFC) is not
  *   `anchor.quote.exact`; in HTML also when its `id` or classes differ, or its
- *   re-attach went through anything but position.
+ *   re-attach went through anything but position. Only then, with the text the
+ *   same, the change has no `now`: the window must not say the text changed.
  *
  * Pure: reads the parse, never changes it. Bounded: a target's text is read
  * only up to {@link CHANGE_TEXT_MAX_CHARS}, so 500 comments on one huge
  * target cannot make a list slow.
  */
 import { visibleInline, type CommentAnchor } from '../../../shared/htmlComments'
-import { anchorSelectionOf, type AnchorSelection } from '../../../shared/comments/anchorSel'
+import { anchorSelectionOf, isAnchorSelection, SEL_CONTEXT_MAX_CHARS, type AnchorSelection } from '../../../shared/comments/anchorSel'
 import { exactOf } from '../../../shared/comments/quoteText'
 import type { TargetVia } from '../../../shared/comments/reattach'
-import { locateWords, occurrences } from '../../../shared/comments/selectionWords'
+import { headOf, locateWords, occurrences, tailOf } from '../../../shared/comments/selectionWords'
 import type { IndexedTarget, TargetIndex } from '../../../shared/comments/targetIndex'
 import type { CommentThreadView } from '../../../shared/ipc/comment-common-schema'
 import { PREVIEW_LIMITS } from '../../../shared/preview-limits'
@@ -75,26 +76,62 @@ function suffixWithinGap(text: string, suffix: string, start: number): number {
 }
 
 /**
- * The text between the one `prefix` and the first `suffix` after it, when the
- * pair is unique and at most {@link WORDS_GAP_MAX_CHARS} apart; else `undefined`.
+ * Where the text between the one `prefix` and the first `suffix` after it is,
+ * trimmed, when the pair is unique and at most {@link WORDS_GAP_MAX_CHARS}
+ * apart; else `undefined`.
  *
  * Linear in the prefix's hits (security review L-3): each suffix search reads
  * only the gap after its start, and the walk stops at the first start with no
  * suffix anywhere after it – the starts ascend, so no later one has one either.
  */
-export function wordsBetween(text: string, sel: AnchorSelection): string | undefined {
+function spanBetween(text: string, sel: AnchorSelection): { readonly start: number; readonly end: number } | undefined {
   if (sel.prefix === '' && sel.suffix === '') return undefined
   const starts = sel.prefix === '' ? [0] : occurrences(text, sel.prefix).map(at => at + sel.prefix.length)
   const lastSuffix = sel.suffix === '' ? text.length : text.lastIndexOf(sel.suffix)
-  const found: string[] = []
+  const found: { start: number; end: number }[] = []
   for (const start of starts) {
     if (lastSuffix < start) break
     const end = sel.suffix === '' ? text.length : suffixWithinGap(text, sel.suffix, start)
     if (end < 0 || end - start > WORDS_GAP_MAX_CHARS) continue
-    found.push(text.slice(start, end).trim())
+    const raw = text.slice(start, end)
+    const lead = raw.length - raw.trimStart().length
+    found.push({ start: start + lead, end: start + lead + raw.trim().length })
     if (found.length > 1) return undefined
   }
-  return found.length === 1 && found[0] !== '' ? found[0] : undefined
+  return found.length === 1 && found[0].end > found[0].start ? found[0] : undefined
+}
+
+/** The text between the one `prefix` and the first `suffix` after it ({@link spanBetween}). */
+export function wordsBetween(text: string, sel: AnchorSelection): string | undefined {
+  const span = spanBetween(text, sel)
+  return span === undefined ? undefined : text.slice(span.start, span.end)
+}
+
+/**
+ * Main's found "now" words as words a preview can find again and mark (S-04,
+ * I-14), with what stands around them now; `undefined` with no pair, or words a
+ * selection could not hold: those stay unmarked, and the window still shows Now.
+ */
+export function nowWordsIn(text: string, sel: AnchorSelection): AnchorSelection | undefined {
+  const span = spanBetween(text, sel)
+  if (span === undefined) return undefined
+  const words = {
+    exact: text.slice(span.start, span.end),
+    prefix: tailOf(text.slice(0, span.start), SEL_CONTEXT_MAX_CHARS),
+    suffix: headOf(text.slice(span.end), SEL_CONTEXT_MAX_CHARS)
+  }
+  return isAnchorSelection(words) ? words : undefined
+}
+
+/**
+ * The "now" words of a Words changed comment on `target`, or `undefined` when
+ * its words are still there, or none were found.
+ */
+export function nowWordsOf(index: TargetIndex, target: IndexedTarget, anchor: CommentAnchor): AnchorSelection | undefined {
+  const sel = anchorSelectionOf(anchor)
+  const text = sel === undefined ? undefined : selectableText(index, target)
+  if (sel === undefined || text === undefined || locateWords(text, sel) !== null) return undefined
+  return nowWordsIn(text, sel)
 }
 
 function sameClasses(stored: readonly string[] | undefined, now: readonly string[] | undefined): boolean {
@@ -130,5 +167,6 @@ export function changeOf(input: ChangeInput): ListedChange | undefined {
   const moved = via === undefined || (html && via !== 'position')
   const identity = html && ((anchor.id ?? undefined) !== (target.id ?? undefined) || !sameClasses(anchor.cls, target.classes))
   if (!textChanged && !moved && !identity) return undefined
-  return { state: 'changed', was: shown(was ?? ''), now: shown(now) }
+  // Compared whole, not as shown: a difference past the quote cap is still a changed text.
+  return now === (was ?? '') ? { state: 'changed', was: shown(was ?? '') } : { state: 'changed', was: shown(was ?? ''), now: shown(now) }
 }

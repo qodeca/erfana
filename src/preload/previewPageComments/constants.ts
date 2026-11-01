@@ -90,8 +90,8 @@ export const ANCHOR_CHECK_MIN_MS = 250
 export const RENDER_FALLBACK_MS = 250
 /** Longest frame-scroll restore loop (§7.5 step 6). */
 export const RESTORE_BUDGET_MS = 1_000
-/** How long a revealed element stays highlighted (§10.8 reduced motion: static, 1.5 s). */
-export const REVEAL_FLASH_MS = 1_500
+/** How long a revealed element stays highlighted (§10.8 reduced motion: static, 1.5 s): one number with the Markdown host. */
+export { REVEAL_FLASH_MS } from '../../shared/comments/overlayCore/reveal'
 /** Fastest repeat of a `commentHello` asking main for the frame list again (§19 R3-4). */
 export const HELLO_REPEAT_MIN_MS = 1_000
 /** Repeated hellos one document may send. */
@@ -127,8 +127,6 @@ export {
 export const TINY_ELEMENT_PX = 8
 /** How far a tiny element's ring is pushed out. */
 export const TINY_RING_OUTSET_PX = 2
-/** Pointer distance from the top edge that moves the mode tab to the bottom (§10.1). */
-export const MODE_TAB_AVOID_PX = 48
 /** Longest overlay label (§10.2). */
 export const LABEL_MAX_CHARS = 40
 /** Classes a label shows before `…` (§10.2). */

@@ -135,6 +135,9 @@ export interface PreviewLinkBridge {
   dispose(): void
 }
 
+/** One link to route, without its click's id. */
+type Activation = Omit<LinkActivationPayload, 'gestureId'>
+
 /** Build the bridge for one live view. */
 export function createPreviewLinkBridge(
   context: PreviewLinkContext,
@@ -170,16 +173,18 @@ export function createPreviewLinkBridge(
    * second (lens review F25).
    */
   const isDuplicate = (href: string): boolean => {
+    if (wasRouted(href)) return true
+    recentHrefs.set(href, now())
+    return false
+  }
+
+  /** `true` when this href was routed inside the window; old stamps go on the way. */
+  const wasRouted = (href: string): boolean => {
     const timestamp = now()
     for (const [seen, at] of recentHrefs) {
       if (timestamp - at >= DEDUPE_WINDOW_MS) recentHrefs.delete(seen)
     }
-    const previous = recentHrefs.get(href)
-    if (previous !== undefined && timestamp - previous < DEDUPE_WINDOW_MS) {
-      return true
-    }
-    recentHrefs.set(href, timestamp)
-    return false
+    return recentHrefs.has(href)
   }
 
   /**
@@ -203,33 +208,34 @@ export function createPreviewLinkBridge(
     }
 
     const { gestureId, ...activation } = parsed.data
-    if (withinRateLimit(provenance)) {
-      admit(activation, provenance)
+    if (provenance === 'gesture') {
+      if (withinRateLimit(provenance)) dispatch(activation, provenance)
+      else deps.recordFailure(rateLimitedFailure())
     } else {
-      // Never silent: a click that goes nowhere with no trace is the failure
-      // mode this whole feature exists to remove.
-      deps.recordFailure(rateLimitedFailure())
+      navigationHold.hold(activation.href, () => dispatchNavigation(activation))
     }
     // After the gesture has claimed its href, so a navigation held for this
     // click is let go only to be dropped as its duplicate.
     if (gestureId !== undefined) navigationHold.clickSettled(gestureId)
   }
 
-  /** Route a gesture now, and a navigation once the click behind it, if any, has settled. */
-  const admit = (
-    activation: Omit<LinkActivationPayload, 'gestureId'>,
-    provenance: LinkProvenance
-  ): void => {
-    const dispatch = (): void => {
-      if (disposed) return
-      if (isDuplicate(activation.href)) return
-      void routeLinkActivation({ ...activation, provenance }, context, deps)
-    }
-    if (provenance === 'gesture') {
-      dispatch()
-      return
-    }
-    navigationHold.hold(activation.href, dispatch)
+  const dispatch = (activation: Activation, provenance: LinkProvenance): void => {
+    if (disposed) return
+    if (isDuplicate(activation.href)) return
+    void routeLinkActivation({ ...activation, provenance }, context, deps)
+  }
+
+  /**
+   * A held navigation, now that the click behind it, if any, has settled. Only
+   * here is it known to be the page's own: a navigation a click already routed
+   * is that click, and spends none of the page's tiny budget. An over-budget
+   * one is never silent: a link that goes nowhere with no trace is the failure
+   * mode this whole feature exists to remove.
+   */
+  const dispatchNavigation = (activation: Activation): void => {
+    if (disposed || wasRouted(activation.href)) return
+    if (withinRateLimit('navigation')) dispatch(activation, 'navigation')
+    else deps.recordFailure(rateLimitedFailure())
   }
 
   return {
@@ -277,7 +283,7 @@ function malformedPayloadFailure(): PreviewFailureInput {
 function rateLimitedFailure(): PreviewFailureInput {
   return {
     type: 'blocked-link',
-    resourceUrlOrHost: '(too many links at once)',
+    resourceUrlOrHost: 'The page opened too many links at once, so Erfana stopped the extra ones.',
     reasonCode: ErrorCode.PREVIEW_LINK_BLOCKED
   }
 }

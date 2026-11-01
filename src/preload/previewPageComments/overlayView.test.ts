@@ -22,7 +22,7 @@ describe('OverlayView text', () => {
     const view = new OverlayView(document, root, 17)
     view.render(
       {
-        outline: { box: { left: 10, top: 40, width: 491, height: 24 }, selected: true, label: { tag: 'p', rest: '#team-copy', size: '491×24' } },
+        outline: { box: { left: 10, top: 40, width: 491, height: 24 }, selected: true, label: { tag: 'Section', rest: ' · “Team”', code: 'p#team-copy', size: '491×24' } },
         pins: [{ key: 'k', count: 3, status: 'open', element: document.body, content: '3', box: { left: 500, top: 20, width: 24, height: 24 } }],
         pinLabel: () => 'p#team-copy',
         selected: null,
@@ -34,7 +34,7 @@ describe('OverlayView text', () => {
     )
     expect(textNodes(root)).toEqual([])
     expect(root.querySelector('[aria-live], [role="status"], [role="alert"]')).toBeNull()
-    expect(drawnText(root.querySelector('.erf-hpc-label'))).toBe('p#team-copy491×24')
+    expect(drawnText(root.querySelector('.erf-hpc-label'))).toBe('Section · “Team”p#team-copy491×24')
     expect(drawnText(root.querySelector('.erf-hpc-tab'))).toBe(MODE_TAB_TEXT)
     expect(drawnText(root.querySelector('.erf-hpc-pin'))).toBe('3')
   })

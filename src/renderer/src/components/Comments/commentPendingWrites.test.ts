@@ -17,6 +17,7 @@ import {
   onCommentWriteSettled,
   resetCommentPendingWrites,
   trackCommentWrite,
+  renewTrackedDraft,
   useCommentWritePending,
   writeKeyOf
 } from './commentPendingWrites'
@@ -37,6 +38,15 @@ describe('commentPendingWrites', () => {
     commentDrafts.reset()
     fake.uninstall()
     vi.useRealTimers()
+  })
+
+  it('W-10 a renewed draft: main names the write by the token it was given, and the write still ends (C-14.2)', () => {
+    const renewed = 'e'.repeat(32)
+    const write = trackCommentWrite(ADD, { file: 'a.md' })
+    renewTrackedDraft(PANEL, DRAFT_TOKEN, renewed)
+    write.answered(PENDING)
+    fake.emitSettled({ panelId: PANEL, op: 'add', draftToken: renewed, ok: true })
+    expect(isCommentWritePending(PANEL, renewed)).toBe(false)
   })
 
   it('names a write by the key main names it by', () => {

@@ -32,7 +32,8 @@
  * button over a selection (C-16) is drawn here too.
  *
  * A thread whose target changed since the comment (C-06) gives its icon a
- * corner notch and "N changed" in its name, and its words a dashed bar.
+ * corner notch and "N changed" in its name, and its words – the new ones,
+ * when they changed – a dashed bar.
  * Each icon's block carries `aria-details` pointing at the icon (C-11), so a
  * screen reader says "has details" while reading; it is the one attribute
  * written into the content, marked so exports and copies strip it
@@ -43,6 +44,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { ThreadPlacement } from '../../../../../shared/ipc/file-comment-schema'
 import type { CommentFileView } from '../../../../../shared/ipc/comment-common-schema'
+import { modeTabMovesAway } from '../../../../../shared/comments/overlayCore/reveal'
 import { renderIcon } from '../../../utils/iconRegistry'
 import { TEST_IDS } from '../../../constants/testids'
 import { MD_SURFACE_COPY, SELECTION_COPY } from '../commentCopyWords'
@@ -85,6 +87,10 @@ export interface CommentOverlayLayerProps {
   readonly markOwner?: string
   /** Threads whose window is open: their words wear the active mark (R-01). */
   readonly activeThreads?: readonly string[]
+  /** The target wearing "Show in preview"'s static flash (K-22). */
+  readonly flash?: HTMLElement | null
+  /** The element the open window belongs to: its icon takes the selected look, the target a quiet outline (I-9). */
+  readonly windowTarget?: HTMLElement | null
 }
 
 /**
@@ -122,14 +128,15 @@ function PinGlyph({ content }: { readonly content: PinContent }): React.JSX.Elem
 }
 
 /** An icon's classes: the look its state takes (state table § 4) and the linked hover (C-17). */
-function iconClass(spot: IconSpot, hovered: boolean): string {
+function iconClass(spot: IconSpot, hovered: boolean, selected: boolean): string {
   if (spot.content === null) return 'erf-comment-host__ghost'
   return [
     'erf-comment-host__icon',
     spot.stack ? 'erf-comment-host__icon--stack' : '',
     spot.changed ? 'erf-comment-host__icon--changed' : '',
     spot.damaged ? 'erf-comment-host__icon--damaged' : '',
-    hovered ? 'erf-comment-host__icon--hover' : ''
+    hovered ? 'erf-comment-host__icon--hover' : '',
+    selected ? 'erf-comment-host__icon--selected' : ''
   ]
     .filter(Boolean)
     .join(' ')
@@ -137,6 +144,34 @@ function iconClass(spot: IconSpot, hovered: boolean): string {
 
 /** While the pointer is on marked words: the pane's pointer cursor and title (C-17). */
 const MARK_HOVER_CLASS = 'erf-comment-host-pane--mark'
+/** Comment mode: the crosshair over the preview (I-19, open decision 4). */
+const MODE_CLASS = 'erf-comment-host-pane--mode'
+
+/**
+ * Whether the mode tab moves away (I-19): the pointer near the pane's top.
+ *
+ * @param area - The pane.
+ * @param mode - Comment mode is on.
+ * @returns The tab belongs at the bottom edge.
+ */
+function useTabMovesAway(area: HTMLElement | null, mode: boolean): boolean {
+  const [away, setAway] = useState(false)
+  useEffect(() => {
+    if (area === null || !mode) return undefined
+    const onMove = (event: MouseEvent): void => setAway(modeTabMovesAway(event.clientY - area.getBoundingClientRect().top))
+    const onLeave = (): void => setAway(false)
+    area.addEventListener('mousemove', onMove)
+    area.addEventListener('mouseleave', onLeave)
+    area.classList.add(MODE_CLASS)
+    return () => {
+      area.removeEventListener('mousemove', onMove)
+      area.removeEventListener('mouseleave', onLeave)
+      area.classList.remove(MODE_CLASS)
+      setAway(false)
+    }
+  }, [area, mode])
+  return away
+}
 
 /** The words of open, attached selection comments, as marks in the rendered content now. */
 function commentMarks(
@@ -147,12 +182,14 @@ function commentMarks(
 ): CommentMark[] {
   const openThreads = file?.threads.filter(t => t.status === 'open' && t.attached) ?? []
   const open = new Set(openThreads.map(t => t.threadKey))
-  const changed = new Set(openThreads.filter(t => t.change?.state === 'changed').map(t => t.threadKey))
+  const changed = new Set(openThreads.filter(t => t.change !== undefined).map(t => t.threadKey))
   const marks: CommentMark[] = []
   for (const placement of placements) {
-    if (placement.sel === undefined || !open.has(placement.threadKey)) continue
+    // Words changed (S-04, I-14): the words main found in their place.
+    const words = placement.now ?? placement.sel
+    if (words === undefined || !open.has(placement.threadKey)) continue
     const element = adapter.attach(placement)
-    const range = element === null ? null : rangeOfWords(element, placement.sel)
+    const range = element === null ? null : rangeOfWords(element, words)
     if (range === null) continue
     const { threadKey } = placement
     marks.push({ range, threadKey, active: active.has(threadKey), changed: changed.has(threadKey) })
@@ -245,9 +282,18 @@ export function CommentOverlayLayer(props: CommentOverlayLayerProps): React.JSX.
   }, [owner, showIcons, adapter, placements, file, resized, activeThreads, hovered, markHover])
   useEffect(() => () => setCommentMarks(owner, []), [owner])
 
-  const areaBox = area?.getBoundingClientRect() ?? null
+  // The layer, not the pane: with the drawer open beside the preview, it stops at the drawer (I-20).
+  const [layer, setLayer] = useState<HTMLDivElement | null>(null)
+  const areaBox = (layer ?? area)?.getBoundingClientRect() ?? null
+  const tabAway = useTabMovesAway(area, mode)
   const spots = areaBox !== null && showIcons ? iconSpots(adapter, placements, file, areaBox) : []
   const outline = areaBox !== null && mode && outlined !== null && outlined.isConnected ? relativeBox(outlined, areaBox) : null
+  const boxOfDrawn = (element: HTMLElement | null | undefined): IconSpot['box'] | null =>
+    areaBox !== null && element != null && element.isConnected ? relativeBox(element, areaBox) : null
+  const flash = boxOfDrawn(props.flash)
+  const windowTarget = props.windowTarget ?? null
+  // The picked target's ring already says it.
+  const quiet = windowTarget === outlined ? null : boxOfDrawn(windowTarget)
   // C-11: each icon's block points at it; taken back when the icon goes.
   const iconBase = `erf-comment-icon-${useId().replace(/[^\w-]/g, '')}`
   const iconId = (spot: IconSpot): string => `${iconBase}-${spot.key.replace(/[^\w-]/g, '_')}`
@@ -277,7 +323,7 @@ export function CommentOverlayLayer(props: CommentOverlayLayerProps): React.JSX.
     : null
 
   return (
-    <div className={`erf-comment-host${mode ? ' erf-comment-host--mode' : ''}`} data-testid={TEST_IDS.COMMENT_HOST_OVERLAY}>
+    <div ref={setLayer} className={`erf-comment-host${mode ? ' erf-comment-host--mode' : ''}`} data-testid={TEST_IDS.COMMENT_HOST_OVERLAY}>
       <div className="erf-comment-sr" role="status" aria-live="polite" data-testid={TEST_IDS.COMMENT_ANNOUNCE}>
         {props.polite}
       </div>
@@ -285,7 +331,7 @@ export function CommentOverlayLayer(props: CommentOverlayLayerProps): React.JSX.
         {props.assertive}
       </div>
       {tab !== null && (
-        <div className="erf-comment-host__tab" data-testid={TEST_IDS.COMMENT_HOST_MODE_TAB}>
+        <div className={`erf-comment-host__tab${tabAway ? ' erf-comment-host__tab--bottom' : ''}`} data-testid={TEST_IDS.COMMENT_HOST_MODE_TAB}>
           {tab}
         </div>
       )}
@@ -294,6 +340,20 @@ export function CommentOverlayLayer(props: CommentOverlayLayerProps): React.JSX.
           className="erf-comment-host__outline"
           style={{ left: outline.left, top: outline.top, width: outline.width, height: outline.height }}
           data-testid={TEST_IDS.COMMENT_HOST_OUTLINE}
+        />
+      )}
+      {quiet !== null && (
+        <div
+          className="erf-comment-host__window-target"
+          style={{ left: quiet.left, top: quiet.top, width: quiet.width, height: quiet.height }}
+          data-testid={TEST_IDS.COMMENT_HOST_WINDOW_TARGET}
+        />
+      )}
+      {flash !== null && (
+        <div
+          className="erf-comment-host__flash"
+          style={{ left: flash.left, top: flash.top, width: flash.width, height: flash.height }}
+          data-testid={TEST_IDS.COMMENT_HOST_FLASH}
         />
       )}
       {props.selectionButton != null && (
@@ -317,7 +377,11 @@ export function CommentOverlayLayer(props: CommentOverlayLayerProps): React.JSX.
           type="button"
           tabIndex={-1}
           id={iconId(spot)}
-          className={iconClass(spot, markHover !== null && spot.threadKeys.includes(markHover))}
+          className={iconClass(
+            spot,
+            markHover !== null && spot.threadKeys.includes(markHover),
+            spot.threadKeys.some(key => activeThreads.includes(key)) || (windowTarget !== null && spot.elements.includes(windowTarget))
+          )}
           style={{ left: spot.box.left, top: spot.box.top, width: spot.box.width, height: spot.box.height }}
           aria-label={spot.name}
           title={spot.name}

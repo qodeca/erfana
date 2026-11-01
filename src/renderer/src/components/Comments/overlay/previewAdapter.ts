@@ -31,7 +31,7 @@ export interface PreviewCommentAdapter {
   readonly words: CommentWords
   /** The target that holds `node` (pointer, focus), climbing to the nearest one; `null` outside every target. */
   targetAt(node: Node | null): HTMLElement | null
-  /** Every target in document order: the keyboard picker's Tab order (C-08). */
+  /** Every target in document order: the keyboard picker reads its levels from this (C-08, A-15). */
   targetsInOrder(): HTMLElement[]
   /** The target that holds `target`, or `null` at the top level. */
   parentOf(target: HTMLElement): HTMLElement | null
@@ -58,6 +58,14 @@ export interface PreviewCommentAdapter {
    * collapsed section (state table S-02, D-13). Absent: the preview hides nothing.
    */
   hiddenNow?(placement: ThreadPlacement): boolean
+  /**
+   * The element a listed thread's target is drawn as, target or not: a block
+   * inside a raw section is no target of its own, yet main places a comment on
+   * it. Absent: {@link attach} answers.
+   */
+  renderedOf?(placement: ThreadPlacement): HTMLElement | null
+  /** Open every closed section hiding `target` (I-6). Absent: the preview folds nothing. */
+  openFolds?(target: HTMLElement): void
   /** The rendered text column (C-18: a docked window sits in the margin beside it); `null` when unmounted. */
   root?(): HTMLElement | null
 }

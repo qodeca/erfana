@@ -31,9 +31,12 @@ export interface RecordedPick {
 export const pickRecorder = {
   via: 'pointer' as RecordedPick['via'],
   picks: [] as RecordedPick[],
+  /** Every sentence the overlay said, oldest first. */
+  said: [] as string[],
   reset(): void {
     this.via = 'pointer'
     this.picks.length = 0
+    this.said.length = 0
   }
 }
 
@@ -57,9 +60,13 @@ export function recordPicks(
         pickRecorder.picks.push({ kind: 'open', via: 'pointer', element: at })
         options.onOpenMark(threadKey, at)
       },
-      onMenu: (target, at) => {
+      onMenu: (target, at, byKey) => {
         pickRecorder.picks.push({ kind: 'menu', via: pickRecorder.via, element: target })
-        options.onMenu(target, at)
+        options.onMenu(target, at, byKey)
+      },
+      onSay: text => {
+        pickRecorder.said.push(text)
+        options.onSay(text)
       },
       onExit: () => {
         pickRecorder.picks.push({ kind: 'exit', via: 'keyboard', element: null })

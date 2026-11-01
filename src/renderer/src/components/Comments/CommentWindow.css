@@ -127,6 +127,15 @@
   overflow-wrap: anywhere;
 }
 
+/* A thread view stays mounted under the identity step: no box of its own while shown. */
+.erf-comment-window__threads {
+  display: contents;
+}
+
+.erf-comment-window__threads[hidden] {
+  display: none;
+}
+
 .erf-comment-window__body {
   flex: 1 1 auto;
   min-block-size: 0;
@@ -151,7 +160,7 @@
 
 /* The foot's closing actions ("New comment", "Close") as one group: in a
    narrow window the group wraps whole onto a second row, right-aligned, under
-   "Open in source", instead of leaving one button stranded. */
+   "Open in file", instead of leaving one button stranded. */
 .erf-comment-window__foot-end {
   display: flex;
   flex-wrap: wrap;

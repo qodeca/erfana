@@ -36,6 +36,8 @@ let drawnLists = new WeakSet<object>()
 const MAX_AWAITED_THREADS = 16
 /** New threads saved here whose icon has not been drawn yet. */
 const awaitedThreads = new Set<string>()
+/** Who wants to hear that an awaited thread's icon is drawn (the waiting sign, `useSavingSign`). */
+const drawnListeners = new Set<(threadKey: string) => void>()
 
 /**
  * Put `name` on the performance timeline, replacing its previous mark.
@@ -84,9 +86,21 @@ export function noteCommentPinsDrawn(list: object, drawnKeys: readonly string[])
     markCommentTiming(COMMENT_TIMING_MARKS.pinsVisible)
   }
   if (awaitedThreads.size === 0) return
-  let saved = false
-  for (const key of drawnKeys) saved = awaitedThreads.delete(key) || saved
-  if (saved) markCommentTiming(COMMENT_TIMING_MARKS.savedVisible)
+  const saved = drawnKeys.filter(key => awaitedThreads.delete(key))
+  if (saved.length === 0) return
+  markCommentTiming(COMMENT_TIMING_MARKS.savedVisible)
+  for (const key of saved) for (const listener of [...drawnListeners]) listener(key)
+}
+
+/**
+ * Hear when the icon of a thread passed to {@link awaitSavedPin} is drawn.
+ *
+ * @param listener - Called with the thread's key.
+ * @returns The unsubscribe.
+ */
+export function onSavedPinDrawn(listener: (threadKey: string) => void): () => void {
+  drawnListeners.add(listener)
+  return () => drawnListeners.delete(listener)
 }
 
 /** Test helper: forget what was drawn and awaited. */

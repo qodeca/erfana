@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * "Rebuild from data…" for a hand-damaged comment (comments-v2 OD-05, § 4.1;
+ * "Repair comment…" for a hand-damaged comment (comments-v2 OD-05, § 4.1;
  * spec 024 024-FR-014, state table S-07).
  *
  * Offered only for a block the parse read as `readable-mismatch` or

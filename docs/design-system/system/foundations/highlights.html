@@ -100,7 +100,7 @@ current hit sits above its results only because it is registered second.</p>
 <tbody>
   <tr><td>1</td><th scope="row">Changed words</th><td><span class="hl-sample-ground"><span class="hl-changed">dashed bar</span></span> – no fill</td><td><code>erf-comment-changed</code></td><td>No – comments v2 proposal</td></tr>
   <tr><td>2</td><th scope="row">Comment mark</th><td><span class="hl-sample-ground"><span class="hl-mark">fill and bar</span></span></td><td><code>erf-comment</code></td><td>No – comments v2 proposal</td></tr>
-  <tr><td>3</td><th scope="row">Open thread's mark</th><td><span class="hl-sample-ground"><span class="hl-mark hl-mark--active">fill and double bar</span></span> – not a stronger fill</td><td><code>erf-comment-active</code></td><td>No – comments v2 proposal</td></tr>
+  <tr><td>3</td><th scope="row">Open conversation's mark</th><td><span class="hl-sample-ground"><span class="hl-mark hl-mark--active">fill and double bar</span></span> – not a stronger fill</td><td><code>erf-comment-active</code></td><td>No – comments v2 proposal</td></tr>
   <tr><td>4</td><th scope="row">Find result</th><td><span class="hl-sample-ground"><span class="hl-find">lime-muted fill</span></span></td><td><code>search-results</code></td><td>Yes, Markdown preview – <code>MarkdownPreview.css</code></td></tr>
   <tr><td>5</td><th scope="row">Find, current hit</th><td><span class="hl-sample-ground"><span class="hl-find-current">lime, black text</span></span></td><td><code>search-current</code></td><td>Yes, Markdown preview – <code>MarkdownPreview.css</code></td></tr>
   <tr><td>–</td><th scope="row">The selection</th><td><span class="hl-sample-ground"><span class="hl-selection">selected text</span></span></td><td><code>::selection</code></td><td>The browser's default today; the preview setting it to <code>--color-bg-selected</code> is proposed</td></tr>
@@ -210,6 +210,7 @@ would all but vanish on white (see the contrast table).</p>
   <tr><th scope="row">Comment mark – black text, floor at a full fill</th><td>White and grey pages</td><td data-contrast="--color-brand-black on --color-accent-primary" data-min="4.5" data-result="pass">8.39:1 · pass</td></tr>
   <tr><th scope="row">Comment mark – text on the 35% fill</th><td>Dark preview</td><td class="hl-unbaked">Not measured yet – the bake reads tokens only, and the mix is not a token (open defect 1)</td></tr>
   <tr><th scope="row">Bar – brand violet</th><td>Dark preview</td><td data-contrast="--color-accent-primary on --color-bg-preview" data-min="3" data-result="pass">7.89:1 · pass</td></tr>
+  <tr><th scope="row">Bar – brand violet</th><td>Black page</td><td data-contrast="--color-accent-primary on --color-brand-black" data-min="3" data-result="pass">8.39:1 · pass</td></tr>
   <tr><th scope="row">Bar – brand violet</th><td>White page</td><td data-contrast="--color-accent-primary on --color-white" data-min="3" data-result="fail">2.20:1 · fail</td></tr>
   <tr><th scope="row">Bar – deep violet</th><td>White page</td><td data-contrast="--color-brand-indigo on --color-white" data-min="3" data-result="pass">7.98:1 · pass</td></tr>
   <tr><th scope="row">Bar – deep violet</th><td>Grey page</td><td data-contrast="--color-brand-indigo on --color-gray-100" data-min="3" data-result="pass">6.51:1 · pass</td></tr>
@@ -219,7 +220,8 @@ would all but vanish on white (see the contrast table).</p>
 </table>
 <p class="ds-muted">The floor row is a bound, not the value: on a light ground a 35% fill is lighter than the full
 violet, so dark text on the real mark is at least that ratio. On the dark ground no such bound exists, which is why
-that row waits for the token. The violet bar fails on white, which is why light grounds take the deep violet.</p>
+that row waits for the token. The violet bar fails on white, which is why light grounds take the deep violet. The HTML
+overlay switches where the two bars tie, so every page gets the better one (<code>overlayCore/markGround.ts</code>).</p>
 
 <h2 id="forced">Forced colours</h2>
 <p class="ds-muted">A Windows contrast theme drops every colour above. Each highlight keeps a shape and takes a system
@@ -265,6 +267,7 @@ other hits by more than a fill. See <a href="forced-colors.html#map">Forced colo
     the preview still paints the browser's default selection.</li>
   <li>Find sets no <code>priority</code>; once comment marks ship, Find must set one above them.</li>
   <li>How Chromium layers a lower highlight's bar under a higher one's fill is drawn, not checked.</li>
+  <li>On a mid-grey page neither bar reaches 3:1. The better one is drawn, and the fill still marks the words.</li>
 </ol>
 
 <h2 id="related">Related</h2>

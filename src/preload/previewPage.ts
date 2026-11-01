@@ -142,7 +142,12 @@ function isFragmentOfCurrentDocument(href: string): boolean {
   try {
     const target = new URL(href)
     const current = new URL(window.location.href)
-    return target.origin === current.origin && target.pathname === current.pathname
+    // `search` too: `?lang=en` is a new load of this file, and main acts on it.
+    return (
+      target.origin === current.origin &&
+      target.pathname === current.pathname &&
+      target.search === current.search
+    )
   } catch {
     return false
   }

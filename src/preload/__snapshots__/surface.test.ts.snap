@@ -139,8 +139,12 @@ exports[`preload surface > window.api.file and window.api.terminal expose the ex
 
 exports[`preload surface > window.api.fileComments exposes the expected members 1`] = `
 [
+  "bulk",
+  "gitName",
   "list",
+  "onBulkSettled",
   "onChanged",
+  "onSaveSettled",
   "openDraft",
   "release",
   "save",
@@ -270,9 +274,12 @@ exports[`preload surface > window.api.preview exposes the expected members 1`] =
 
 exports[`preload surface > window.api.previewComments exposes the expected members 1`] = `
 [
+  "bulk",
   "keepDraft",
   "list",
+  "newOnThread",
   "onAnchorStatus",
+  "onBulkSettled",
   "onCommentsChanged",
   "onDraftOpened",
   "onModeChanged",

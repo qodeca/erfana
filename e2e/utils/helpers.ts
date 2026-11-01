@@ -361,7 +361,16 @@ export async function dismissDialogIfPresent(
   }
 }
 
-export async function openProject(page: Page, projectPath: string): Promise<void> {
+/**
+ * Open a project and wait for its tree. `anyRow` waits for any row, not a file
+ * row: the tree draws only the rows in view, so with many folders above them
+ * the root files are not drawn at all.
+ */
+export async function openProject(
+  page: Page,
+  projectPath: string,
+  options: { anyRow?: boolean } = {}
+): Promise<void> {
   await page.reload()
   await page.waitForLoadState('domcontentloaded')
   await dismissDialogIfPresent(page)
@@ -376,8 +385,9 @@ export async function openProject(page: Page, projectPath: string): Promise<void
     await (window as any).api.file.openProjectByPath({ projectPath: p })
   }, projectPath)
 
-  const fileNodes = page.locator(`[data-testid^="${TEST_IDS.PROJECT_TREE_NODE_FILE}-"]`)
-  await expect(fileNodes.first()).toBeVisible({ timeout: 15000 })
+  const rowPrefix = options.anyRow ? TEST_IDS.PROJECT_TREE_NODE : TEST_IDS.PROJECT_TREE_NODE_FILE
+  const rows = page.locator(`[data-testid^="${rowPrefix}-"]`)
+  await expect(rows.first()).toBeVisible({ timeout: 15000 })
 
   const terminalBtn = byTestId(page, TEST_IDS.ACTIVITY_BAR_BTN_TERMINAL)
   await expect(terminalBtn).toBeVisible({ timeout: 10000 })

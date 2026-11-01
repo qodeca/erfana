@@ -28,9 +28,11 @@
  * drag selects words (spec 024 024-FR-004). The click that ends it is still
  * prevented, so a link or a button under it does nothing.
  *
- * Outside comment mode a trusted `contextmenu` passes to the page untouched;
- * the controller hears of it and, only if no page listener cancelled it, asks
- * main for Erfana's menu (OD-01). Touches are
+ * Outside comment mode a trusted `contextmenu`, Shift+F10 or Menu key passes to
+ * the page untouched; the controller hears of it and, only if no page listener
+ * cancelled it, asks main for Erfana's menu (OD-01, K-1). A trusted press,
+ * release and click are read there too, never stopped: the Comment button and
+ * underline clicks outside the mode (`outsideMode.ts`, D-09, D-10). Touches are
  * stopped too (passive: the click they make is what gets cancelled), and so is
  * the release of every key whose press was a picker action. A click on a pin
  * is stopped in any mode, so a pin click never reaches the page. Wheel and
@@ -41,12 +43,14 @@
  * `showPopover()` would otherwise hide the overlay with nothing to repair.
  *
  * Main forwards only the comment-mode toggle; the picker keys are handled
- * here: Tab / Shift+Tab, Alt+↑ / Alt+↓ (matched on `code`, so Option on macOS
- * and any layout work), Enter, Shift+F10 / ContextMenu, Esc.
+ * here, by the overlay core's one rule (`overlayCore/pickerKeys`). The window
+ * taking focus starts the picker (K-6): no message says the keyboard came in,
+ * and none is needed, because the page sees it arrive.
  */
 import { reduceCommentMode } from '../../shared/comments/overlayCore/modeState'
+import { pickerStepOf, type PickerStep } from '../../shared/comments/overlayCore/pickerKeys'
 import { setAltHeld } from './altHold'
-import type { CommentController, PickerAction } from './controller'
+import type { CommentController } from './controller'
 import { watchDocumentElement } from './documentWatch'
 
 /** The click family comment mode swallows (§7.1 step 3, plus `pointerup`). */
@@ -102,28 +106,13 @@ function swallow(event: Event): void {
   if (event.type !== 'contextmenu') event.preventDefault()
 }
 
-/** The picker action a key press means, or `null` for any other key (which the page keeps). */
-export function pickerActionOf(event: KeyboardEvent): PickerAction | null {
-  if (event.ctrlKey || event.metaKey) return null
-  if (event.altKey) {
-    if (event.shiftKey) return null
-    if (event.code === 'ArrowUp') return 'up'
-    return event.code === 'ArrowDown' ? 'down' : null
-  }
-  if (event.key === 'Tab') return event.shiftKey ? 'previous' : 'next'
-  if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) return 'menu'
-  if (event.shiftKey) return null
-  if (event.key === 'Enter') return 'open'
-  return event.key === 'Escape' ? 'exit' : null
-}
-
 /**
  * Whether the overlay keeps a picker key from the page. Esc follows the mode
  * machine's own word (`consumed`: only while the mode is on); every other
  * picker key is the picker's.
  */
-function isOverlayKey(action: PickerAction, modeOn: boolean): boolean {
-  return action !== 'exit' || reduceCommentMode({ on: modeOn }, { type: 'escape' }).consumed
+function isOverlayKey(step: PickerStep, modeOn: boolean): boolean {
+  return step !== 'exit' || reduceCommentMode({ on: modeOn }, { type: 'escape' }).consumed
 }
 
 /** One key across its press and release (the physical key; `key` where the engine gives no `code`). */
@@ -143,6 +132,7 @@ interface Handlers {
   readonly move: Handler
   readonly out: Handler
   readonly visibility: Handler
+  readonly focus: Handler
   readonly userInput: Handler
   readonly ready: Handler
 }
@@ -158,8 +148,9 @@ function handlersOf(controller: CommentController, doc: Document): Handlers {
     guarded(event) {
       if (!event.isTrusted) return
       const onOverlay = controller.isOverlayEvent(event)
+      if (!controller.mode) controller.outside.seen(event, onOverlay)
       if (!controller.mode && !onOverlay) {
-        if (event.type === 'contextmenu') controller.pageContextMenu(event as MouseEvent)
+        if (event.type === 'contextmenu') controller.menu.contextMenu(event as MouseEvent)
         return
       }
       // A primary press on the page keeps its default: it may start a selection (024-FR-004) – except on a control,
@@ -183,16 +174,17 @@ function handlersOf(controller: CommentController, doc: Document): Handlers {
       const key = event as KeyboardEvent
       if (!key.isTrusted) return
       altFrom(key)
-      const action = controller.mode ? pickerActionOf(key) : null
-      if (action === null || !isOverlayKey(action, controller.mode)) {
+      const step = controller.mode ? pickerStepOf(key) : null
+      if (step === null || !isOverlayKey(step, controller.mode)) {
         // A press the page keeps: a release left over from a swallowed one
         // (focus moved before it came) must not be swallowed now.
         swallowedKeys.delete(keyOf(key))
+        if (!controller.mode && !key.repeat && pickerStepOf(key) === 'menu') controller.menu.key(key)
         return
       }
       swallow(key)
       swallowedKeys.add(keyOf(key))
-      controller.pickerAction(action)
+      controller.pickerAction(step)
     },
     keyUp(event) {
       if (event.isTrusted) altFrom(event as KeyboardEvent)
@@ -209,6 +201,10 @@ function handlersOf(controller: CommentController, doc: Document): Handlers {
     },
     visibility(event) {
       if (event.isTrusted) controller.visibilityChanged()
+    },
+    focus(event) {
+      // Focus events pass the window on their way to any element: only the window's own counts.
+      if (event.isTrusted && event.target === doc.defaultView) controller.startPicker()
     },
     userInput(event) {
       if (event.isTrusted) controller.userInput()
@@ -238,6 +234,7 @@ function registrationsOf(win: Window, doc: Document, on: Handlers): Registration
     ...onWindow(['keydown'], on.keyDown, CAPTURE),
     ...onWindow(['keyup'], on.keyUp, CAPTURE),
     ...onWindow(['pointermove'], on.move, PASSIVE),
+    ...onWindow(['focus'], on.focus, PASSIVE),
     { target: doc, type: 'pointerout', listener: on.out, options: PASSIVE },
     // The view hidden behind a menu's or window's still frame (and shown again).
     { target: doc, type: 'visibilitychange', listener: on.visibility, options: PASSIVE },

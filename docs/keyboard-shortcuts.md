@@ -48,7 +48,19 @@ The running page is a native view that swallows every key, so the preview's shor
 
 ### Comment mode
 
-**Cmd+Option+M** (macOS) or **Ctrl+Alt+M** (Windows, Linux) turns HTML preview comment mode on and off. One rule serves both processes, `matchCommentModeKey` in `src/shared/commentModeKey.ts`: main matches it in the page's `before-input-event` (`previewInputForward.ts`), and the panel matches it on its own chrome and dockview group element (`usePreviewComments`). It matches the **typed** key `m` with exactly those modifiers – no Shift, no other modifier, a press only – so AltGr+M on a layout where that types a character (µ on German) keeps typing it. On macOS, where Option changes the typed character, the physical `KeyM` stands in when the typed key is not printable ASCII. **Esc** leaves comment mode. The keys inside comment mode (Tab, Alt+Up / Down Arrow, Enter, Shift+F10) are listed in [HTML preview § Comments](./html-preview/README.md#comments).
+**Cmd+Option+M** (macOS) or **Ctrl+Alt+M** (Windows, Linux) turns comment mode on and off, in the HTML preview and in the Markdown **Preview Only** view. One rule serves both processes, `matchCommentModeKey` in `src/shared/commentModeKey.ts`: main matches it in the page's `before-input-event` (`previewInputForward.ts`), and the panels match it on their own chrome and dockview group element (`usePreviewComments`, `useHostPointerKeys`). It matches the **typed** key `m` with exactly those modifiers – no Shift, no other modifier, a press only – so AltGr+M on a layout where that types a character (µ on German) keeps typing it. On macOS, where Option changes the typed character, the physical `KeyM` stands in when the typed key is not printable ASCII. **Esc** leaves comment mode.
+
+The comment keys are one table for both previews. The [user bindings](./user-guide/reference/keyboard-shortcuts.md#comments) live in the guide.
+
+| Key | Where | What it does | Source |
+| --- | --- | --- | --- |
+| Tab, Shift+Tab | Comment mode | Next or previous part at the same level; stops at either end and says so | `pickerStepOf` in `src/shared/comments/overlayCore/pickerKeys.ts` |
+| Alt+Up, Alt+Down | Comment mode | Parent; back the way Alt+Up came, else the first child | `pickerStepOf` |
+| Enter | Comment mode | Comment on the outlined part | `pickerStepOf` |
+| Esc | Comment mode | Leaves the mode | `pickerStepOf` |
+| Shift+F10 or the Menu key | Comment mode, or focus on the preview outside it | Opens the comment menu | `pickerStepOf`; [outside the mode](#dialog-shortcuts) |
+| Alt+F9, Alt+Shift+F9 | Anywhere in the panel | Next or previous open comment; matched on the physical key | `src/shared/commentStepKey.ts` |
+| F6 | Comment window and preview, Markdown only | Moves focus between them. The HTML window is modal (differences table D-01), so it has no dock and F6 does nothing | `CommentWindowShell.tsx` |
 
 ## Image viewer
 
@@ -57,6 +69,8 @@ The image panel handles its own keys in `imageViewer.logic.ts`; the [user-facing
 ## Dialog shortcuts
 
 `BaseDialog` owns Escape and focus trapping where enabled. Native focus determines what Enter activates, so a focused Cancel button cancels. `CameraDialog` keeps shutter-on-Enter only when focus is outside a button, select or input; it checks that target before calling `preventDefault()`. `PromptDialog` submits on `Cmd/Ctrl+Enter`, leaving plain Enter for textarea newlines. `FilePickerDialog` handles arrows, Enter, Escape and copying the selected path; `ChatBubble` uses `Cmd/Ctrl+Enter` to send. User bindings are in the [dialog shortcut reference](./user-guide/reference/keyboard-shortcuts.md#dialogs-and-file-picker).
+
+**Shift+F10** or the **Menu key** outside comment mode, focus in the HTML preview's page, opens Erfana's comment menu on the selected words, the focused element, or the element at the middle of the view. The page's preload handles the key, because macOS fires no `contextmenu` for it, and main accepts the menu only within a second of a real press it recorded in `before-input-event`. The page keeps the key: if it cancels the key or the `contextmenu`, no menu opens ([security](security.md)).
 
 ## Context menus
 

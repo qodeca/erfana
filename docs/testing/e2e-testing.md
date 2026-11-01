@@ -5,7 +5,7 @@
 Erfana supports automated E2E testing using Playwright with Electron. This guide covers setup, configuration, and test patterns.
 
 **Related documentation**:
-- [E2E Selectors](./e2e-selectors.md) – Complete testid catalog (351 testids)
+- [E2E Selectors](./e2e-selectors.md) – Complete testid catalog (419 testids)
 - [E2E Third-Party](./e2e-third-party.md) – Monaco, xterm.js, Mermaid testing
 - [E2E Helpers](./e2e-helpers.md) – Test utilities and patterns (backward-compatible adapter)
 - [E2E Debugging](./e2e-debugging.md) – Debugging and CI/CD
@@ -81,10 +81,22 @@ What `scripts/e2e-linux.sh` does:
 
 1. Builds the image from `e2e/docker/Dockerfile` for the host's native architecture (arm64 on Apple Silicon, amd64 elsewhere): Node 24, the Electron runtime libraries, xvfb plus the openbox window manager, real `bash` and `zsh`, `git`, Python 3.12 and a C++ toolchain for node-pty.
 2. Mounts the repo read-write at `/work`, running as your own user id (HOME is `/tmp/home`). `node_modules`, `out/` and the npm download cache live in **named Docker volumes** (`erfana-e2e-node-modules-<hash>`, `erfana-e2e-out-<hash>`, `erfana-e2e-npm-cache-<hash>`), so the macOS copies on the host are never touched. The image tag carries the same hash.
-3. Runs `npm ci` (never `npm install`), runs `npx electron-vite build`, then `xvfb-run -a … npx playwright test <args>` (`e2e/docker/run-suite.sh`). The script compares the hash of `package-lock.json` before and after and fails if it changed; the suite's own exit code wins when both fail.
+3. Runs `npm ci` (never `npm install`), runs `npx electron-vite build` with a 4 GB Node memory limit, as the CI builds do, then `xvfb-run -a … npx playwright test <args>` (`e2e/docker/run-suite.sh`). The script compares the hash of `package-lock.json` before and after and fails if it changed; the suite's own exit code wins when both fail.
 4. Writes the HTML report and the test results straight to `.local/e2e-linux/` (git-ignored, emptied at the start of every run); the repo-root `playwright-report/` and `test-results/` are not used.
 
 The first run takes a few minutes longer (image build, `npm ci`, native rebuild); later runs reuse the volumes. A full run takes about 8 minutes on an Apple Silicon Mac.
+
+#### Sizing the Docker machine
+
+The full suite was tested at 8 CPUs, 32 GB and `ERFANA_E2E_LINUX_SHM=4g`. Use at least that size; on Colima, `colima start --cpu 8 --memory 32`.
+
+- The script gives the container 1 GB of shared memory (`/dev/shm`, which Chromium uses). Set `ERFANA_E2E_LINUX_SHM` to change it, for example `ERFANA_E2E_LINUX_SHM=4g npm run test:e2e:linux`.
+- A small machine can fail a heavy test for lack of resources. In a Docker machine with 6 CPUs and 12 GB, the 25 MB page in `e2e/html-preview-comments.perf.e2e.ts` (F-002) did not finish its reload in 600 s. With 8 CPUs, 32 GB and 4 GB of shared memory it finished: median 38.5 s with comments on, 19.0 s with them off ([known limits](../../specs/spec-t3-024-unified-comments/verification/known-limits.md)).
+- On Colima, `colima start` for a new profile makes that profile the current Docker context. Restore your previous context afterwards (`docker context use <name>`), and pass the profile to a run through `DOCKER_CONTEXT` (`DOCKER_CONTEXT=colima-<profile> npm run test:e2e:linux`), which the script's `docker` calls honour.
+
+#### A full run is noisy
+
+ With 2 workers, `dockview-resize`, the `file-operations` copy test and 024-AC-024 in `markdown-comments.timing.e2e.ts` (save P95 about 1,010 ms under load, 770–840 ms alone) have each failed once in a full run and then passed alone 3 of 3. Rerun a failing test alone before you treat it as real.
 
 `--no-sandbox` is not needed: Playwright's `electron.launch` adds it itself unless `chromiumSandbox: true` is passed, and nothing in the app code or the fixtures changes for the container. The one environment change the fixtures needed is `XAUTHORITY` in the env allowlist (`e2e/fixtures/isolation.ts`): `xvfb-run` protects its display with an auth file, and without the variable the app cannot open the display.
 
@@ -526,7 +538,7 @@ These `ERFANA_E2E_*` variables change behaviour for tests. Most are read by the 
 
 ### Test files
 
-All 73 specs in `e2e/` (`ls e2e/*.e2e.ts | wc -l`, counted 2026-10-28). The three `*.bench.ts` files beside them belong to the `bench` project (see the table above) and are not listed here:
+All 76 specs in `e2e/` (`ls e2e/*.e2e.ts | wc -l`, counted 2026-11-01). The three `*.bench.ts` files beside them belong to the `bench` project (see the table above) and are not listed here:
 
 - `app-launch.e2e.ts` – Application launch, activity bar, welcome panel visibility
 - `file-operations.e2e.ts` – Project tree file management: New File / New Folder from the toolbar, Rename and Delete from the row context menu, Copy + Paste, and the cancel path of each. Every assertion is made twice — against the tree AND against the filesystem — because a tree that disagrees with disk is the failure this file exists to catch. Two named behaviours are pinned rather than assumed: `createFile` appends `.md` when the typed name has no markdown extension, and it refuses to overwrite an existing file (the test asserts the existing bytes survive)
@@ -609,6 +621,9 @@ All 73 specs in `e2e/` (`ls e2e/*.e2e.ts | wc -l`, counted 2026-10-28). The thre
 - `html-preview-comments.frames.e2e.ts` – HTML Preview comments on script-built pages and frames: the JS slide deck (E-005), a comment inside a same-project frame written into that frame's file (E-006), one file in two previews (E-017) and a Vue-style server-rendered page (E-025)
 - `html-preview-comments.perf.e2e.ts` – HTML Preview comments performance records (F-001 – F-003), printed as `HPC-PERF {…}` lines; only F-001, save to pin visible, is gated (P95 < 1,000 ms on macOS and Linux, record only on the emulated Windows host)
 - `html-preview-comments.safety.e2e.ts` – HTML Preview comments file safety and hostile pages: an agent editing the file while the window is open, damaged and conflicted blocks under "Needs attention", the still frame behind the menu, "Element not found" with the block kept, 200 comments on one page and the folded-section case
+- `html-preview-comments.selection.e2e.ts` – HTML Preview comments on selected words (024-AC-004, OD-01, C-16): in comment mode a drag selects and Enter on the Comment button opens the window on the words; outside comment mode, on a page that already has a comment, "Comment on selection" from the right-click menu writes a block whose anchor carries `sel`
+- `markdown-preview-comments.e2e.ts` – Markdown Preview comments, end to end (spec 024): the round trip on disk (comment, reply, resolve, re-open, delete, file back byte for byte), keyboard-only use (024-AC-029), the preview-only view and the setting (024-AC-006), pausing on unsaved edits (024-AC-016), comments on selected words (024-AC-005), the drawer's filter and sort, and the shared overlay rule for icons and underlines (024-AC-001)
+- `markdown-comments.timing.e2e.ts` – Markdown Preview comments large-file timing (024-NFR-001, 024-AC-024): about 1 MB with 200 comments, 20 samples, `MD-TIMING {…}` lines; pins P50 and P95 ≤ 500 ms and save ≤ 1,000 ms on macOS and Linux, record only on Windows
 - `context-menu-keyboard.e2e.ts` – #90: context menus work from the keyboard. Shift+F10 on a tree row opens its menu with focus on the first item; the arrows move with wrap, Home / End jump, typing jumps to an item, and Escape closes it and returns focus to the row. On a dock tab, Tab closes the menu and returns focus to the tab
 - `deleted-folder-tabs.e2e.ts` – #252: a tab whose file vanishes where the project watcher cannot see it (inside the ignored `dist/`) is marked deleted, and a file brought back with "Save to restore it" is watched again, so a later outside edit reaches the editor
 - `dialog-focus-and-recents-keyboard.e2e.ts` – #91: a modal dialog keeps Tab inside itself and gives focus back to what opened it, focus returns to the tree after a context-menu dialog, and ([24]) a recent project opens with the keyboard alone. Needs real Chromium tabbing, which jsdom does not do

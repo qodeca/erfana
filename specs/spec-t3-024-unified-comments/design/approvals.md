@@ -27,7 +27,7 @@ Found by reading comments-v2 § 8 and § 8.1 and checking each card's status on 
 | Card | Path | What comments-v2 and spec 024 change | Items |
 |---|---|---|---|
 | Menu | `docs/design-system/system/components/menu/index.html` | The reason line under a disabled item (D-1) is already drawn on the card (`#reason`), but its example names the item "Can't comment here"; spec 024 keeps the action name ("Comment on selection", disabled, with the reason). The Exceptions row for the HTML comment menu gains the outside-comment-mode menu, whose opener is also page content. The "No reason line in the app" defect is closed when C-19 ships | C-19, D-1, OD-01, 024-FR-027 |
-| Form controls | `docs/design-system/system/components/form/index.html` | The "Narrow to words" field is a second use of the read-only state (D-3). The card's Read-only rules keep the resting look; C-07 drew a `--color-bg-tertiary` fill, which the card does not have – approved as the card's look, not C-07's | C-07, D-3 |
+| Form controls | `docs/design-system/system/components/form/index.html` | The "Comment on specific words" field is a second use of the read-only state (D-3). The card's Read-only rules keep the resting look; C-07 drew a `--color-bg-tertiary` fill, which the card does not have – approved as the card's look, not C-07's | C-07, D-3 |
 | Permission band – text updated 2026-10-30 | `docs/design-system/system/components/permission-band/index.html` | Spec 024 commit 14: the pressed-state note names two on/off comment tools, and the "three comment tools" note says two tools, decided under the 2026-10-29 sign-off (D-2); Show comment icons is the drawer's checkbox. Tier thresholds still to be re-measured | C-15, C-20, D-2 |
 | Permission band | `docs/design-system/system/components/permission-band/index.html` | The quieter toolbar (D-2): "Show comment icons" leaves the row, the Comments list becomes the labelled count "7 comments ▲1", the tier thresholds are re-measured; the card's "proposed, not yet decided here: three comment tools" note becomes two tools | C-15, C-20, D-2 |
 | Rows and lists | `docs/design-system/system/components/row/index.html` | Exceptions row "HTML-preview comments drawer": Enter or a click now opens the thread (R-10, C-13), arrows only reveal, only the active row keeps its Open button; "Show on page" becomes "Show in preview" in both previews (differences A-05); the row applies to the Markdown drawer too | C-13, R-10, C-03 |
@@ -38,11 +38,11 @@ Found by reading comments-v2 § 8 and § 8.1 and checking each card's status on 
 | Screen | What changes | Items |
 |---|---|---|
 | `toolbar.html` | Quieter toolbar and the count's name (D-2); tooltip text that teaches selection | C-15, C-16, C-20 |
-| `window.html` | Not found as an info state with Reply and Resolve; Changed and Words changed with Was/Now; "Narrow to words"; stepper and "Resolve and next"; moved, expired, updated, removed and refused states; damaged with Rebuild from data; disabled primary and clamped quote; threads footer order; titles "New comment on element" (A-02) | C-05, C-06, C-07, C-13, C-14, C-19, C-21, C-22, OD-05 |
-| `drawer.html` | Filter Open · Resolved · Can't edit; sort menu; Changed, Words changed and Not found tags; removed-outside note; rows that open on click; the icons-and-underlines checkbox; empty-state text (A-08) | C-06, C-13, C-15, C-16, C-20, OD-04, OD-06 |
+| `window.html` | Not found as an info state with Reply and Resolve; Changed and Words changed with Was/Now; "Comment on specific words"; stepper and "Resolve and next"; moved, expired, updated, removed and refused states; damaged with Rebuild from data; disabled primary and clamped quote; threads footer order; titles "New comment" (A-02) | C-05, C-06, C-07, C-13, C-14, C-19, C-21, C-22, OD-05 |
+| `drawer.html` | Filter Open · Resolved · Problems (renamed 2026-11-01); sort menu; Changed, Words changed and Not found tags; removed-outside note; rows that open on click; the icons-and-underlines checkbox; empty-state text (A-08) | C-06, C-13, C-15, C-16, C-20, OD-04, OD-06 |
 | `overlay.html` | Notched changed icon; icons hidden from assistive tech; stack icon; label inside the outline; mode tab text (A-03) | C-06, C-10, C-11, C-17, C-21 |
 | `identity.html` | One notice and Settings text for both previews | C-04 |
-| `identity.html` – text updated 2026-10-30 | The Settings frames' HTML switch description reads comments-v2 C-04's exact text, "Lets you comment on elements and selected text in previewed pages." (was "Lets you add comments to elements of a previewed page."), matching `SETTINGS_COPY.flagHint`; decided under the 2026-10-29 sign-off | C-04 |
+| `identity.html` – text updated 2026-10-30 | The Settings frames' HTML switch description reads comments-v2 C-04's exact text, "Lets you comment on sections and selected text in previewed pages." (was "Lets you add comments to elements of a previewed page."), matching `SETTINGS_COPY.flagHint`; decided under the 2026-10-29 sign-off | C-04 |
 | `index.html` | The right-click menu outside comment mode, one step (A-01) | OD-01, C-16 |
 
 ### 2.3 What still has to happen before the first UI commit
@@ -53,15 +53,29 @@ Found by reading comments-v2 § 8 and § 8.1 and checking each card's status on 
 2. Refresh comments-v2 § 8.1 with the table in § 3 below (024-FR-025).
 3. Run `npm run design -- --check`.
 
+### 2.4 Owner decisions of 2026-10-31
+
+The owner changed these after watching the app, so the design pages follow the code. The rows above stay as the 2026-10-29 record; where they differ, this section wins.
+
+- Preview toolbars are icons only. The Comments list is the icon plus the open number at every width, not the labelled count "7 comments ▲1"; its tooltip equals its name, which withdraws "no title that repeats the name" for this tool.
+- The HTML band and the Markdown toolbar share one pressed look, one inset focus ring and an 8px gap before the comment tools. The Markdown view modes wear that look instead of solid violet.
+- In both previews the drawer takes the whole width under 640 px of preview width, and "Show in preview" closes it first.
+
+Cards changed in content, status and `reviewed` left alone: Permission band, Toolbar, Buttons, Tooltip, Icons, Focus, Drawer, and the screens `toolbar.html`, `index.html` and `drawer.html`.
+
 ## 3. comments-v2 § 8.1, refreshed against the current cards
 
 | # | Card | Status | Question | Now |
 |---|---|---|---|---|
 | D-1 | Menu | decided | A description line under a disabled item (C-19) | The card already draws it (`#reason`). Approved 2026-10-29, with the item keeping its action name (024-FR-027) |
 | D-2 | Comment tools (`html-comments/toolbar.html`), Permission band | decided | The quieter toolbar and the count's new name (C-20) | Approved 2026-10-29 |
-| D-3 | Form | decided | A read-only state for the "Narrow to words" field (C-07) | The card already has a Read-only state; the field uses it as drawn there. Approved 2026-10-29 |
+| D-3 | Form | decided | A read-only state for the "Comment on specific words" field (C-07) | The card already has a Read-only state; the field uses it as drawn there. Approved 2026-10-29 |
 | D-4 | Focus | decided | No two-tone ring on a picked Markdown block (C-08) | Answered by the owner on 2026-10-28; unchanged |
 | D-5 | Segmented | proposed | Drawer filter cells on one row | Proposed card – direction of travel; no approval needed |
 | D-6 | Toolbar | proposed | `--toolbar-tool-height` (28 px) | Proposed card – direction of travel |
 | D-7 | Colours | proposed | `--color-info-bg` / `--color-info-border` | Proposed card – direction of travel |
 | D-8 | Claims ledger | – | Numeric claims for the counter | Done |
+
+## 2.5 Plain-language comment messages (2026-10-31)
+
+The owner approved one table of 85 rewritten messages for the comments feature, for readers who are not developers. It covers `decided` screens and the differences, state and menu tables, and it removes the tag and selector from the comment window.

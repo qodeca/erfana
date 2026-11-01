@@ -47,6 +47,7 @@ import { MARKDOWN_WORDS, MD_SURFACE_COPY } from '../../Comments/commentCopyWords
 import { CommentWordsContext } from '../../Comments/commentWords'
 import { awaitSavedPin, noteCommentSaveStart } from '../../Comments/overlay/commentTiming'
 import { useCommentOverlayHost, type RendererCommentSource } from '../../Comments/overlay/useCommentOverlayHost'
+import { usePreviewGroupKeys, type UsePreviewGroupKeysOptions } from '../../Panels/HtmlPreviewPanel/hooks/usePreviewGroupKeys'
 import type { MonacoEditorHandle } from '../MonacoMarkdownEditor'
 import type { ViewMode } from '../MarkdownEditorPanel/types'
 import { createMarkdownAdapter } from './markdownAdapter'
@@ -67,6 +68,8 @@ export interface UseMarkdownCommentsOptions {
   readonly isActivePanel: boolean
   /** dockview draws this panel. */
   readonly isVisible: boolean
+  /** The panel's dockview api: a tab switch leaves focus on its group element, outside the panel root. */
+  readonly panelApi?: UsePreviewGroupKeysOptions['api']
   /**
    * A comment save wrote the file and this panel holds no unsaved edits: read
    * the file now. Main's atomic write has finished when the save answers, and
@@ -94,6 +97,15 @@ export interface MarkdownComments {
    * panel hidden). Always present.
    */
   readonly prefetch: (filePath: string, mode: ViewMode) => void
+  /** Spread on the panel root: Esc leaves comment mode from anywhere in the panel (`commentModeEscape.ts`). Always present. */
+  readonly panelKeys: PanelKeys
+}
+
+/** What the panel root takes. */
+interface PanelKeys {
+  readonly ref: RefObject<HTMLDivElement>
+  readonly onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void
+  readonly onKeyDownCapture: (event: React.KeyboardEvent<HTMLDivElement>) => void
 }
 
 /** A list read started before the host asked for it. */
@@ -153,6 +165,10 @@ export function useMarkdownComments(options: UseMarkdownCommentsOptions): Markdo
   // 024-NFR-001: the list read started with the file's load, while the preview renders (see `prefetch`).
   const early = useRef<EarlyList | null>(null)
   const fileWrittenRef = useLatestRef(options.onFileWritten)
+  // The written text reaches the preview from the save itself, not only from the watcher.
+  const readWritten = useCallback(() => {
+    if (!useProjectStore.getState().dirtyPanelIds.has(panelId)) fileWrittenRef.current?.()
+  }, [panelId, fileWrittenRef])
   const source = useMemo<RendererCommentSource>(
     () => ({
       list: bufferText => {
@@ -162,16 +178,16 @@ export function useMarkdownComments(options: UseMarkdownCommentsOptions): Markdo
       openDraft: target => fileCommentGateway.openDraft({ panelId, filePath, ...(target === undefined ? {} : { target }) }),
       save: async request => {
         const answer = await (request.op === 'add' ? timedAdd(request) : fileCommentGateway.save(request))
-        // The written text reaches the preview from the save itself, not only from the watcher.
-        if (answer.ok && !useProjectStore.getState().dirtyPanelIds.has(panelId)) fileWrittenRef.current?.()
+        if (answer.ok) readWritten()
         return answer
       },
+      written: readWritten,
       onChanged: callback =>
         fileCommentGateway.onChanged(payload => {
           if (payload.panelId === panelId) callback()
         })
     }),
-    [panelId, filePath, fileWrittenRef]
+    [panelId, filePath, readWritten]
   )
   const visibleRef = useLatestRef(isVisible)
   const prefetch = useCallback(
@@ -221,6 +237,7 @@ export function useMarkdownComments(options: UseMarkdownCommentsOptions): Markdo
     filePath,
     enabled,
     shown,
+    previewView: viewMode === 'preview',
     activePanel: isActivePanel,
     adapter,
     source,
@@ -253,9 +270,22 @@ export function useMarkdownComments(options: UseMarkdownCommentsOptions): Markdo
     else guard.goToTab()
   }, [panelId, setViewMode, guard])
 
-  if (!enabled) return { tools: null, band: null, overlay: null, prefetch }
+  // Keys typed in the panel's own DOM are its; those from a portalled overlay bubble through React to the root too.
+  const { onPanelKey } = host
+  const panelRoot = useRef<HTMLDivElement>(null)
+  const onKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (event.target instanceof Node && event.currentTarget.contains(event.target)) onPanelKey(event)
+    },
+    [onPanelKey]
+  )
+  usePreviewGroupKeys({ api: options.panelApi, rootRef: panelRoot, onKey: onPanelKey })
+  const panelKeys = useMemo(() => ({ ref: panelRoot, onKeyDown, onKeyDownCapture: host.onPanelKeyCapture }), [onKeyDown, host.onPanelKeyCapture])
+
+  if (!enabled) return { tools: null, band: null, overlay: null, prefetch, panelKeys }
   return {
     prefetch,
+    panelKeys,
     tools:
       viewMode === 'preview' ? (
         <CommentWordsContext.Provider value={MARKDOWN_WORDS}>
@@ -273,7 +303,7 @@ export function useMarkdownComments(options: UseMarkdownCommentsOptions): Markdo
       ) : null,
     overlay: (
       <MarkdownCommentsOverlay
-        host={host}
+        host={host.window === null ? host : { ...host, window: { ...host.window, onGoToUnsaved: goToEditor } }}
         adapter={adapter}
         filePath={filePath}
         content={content}

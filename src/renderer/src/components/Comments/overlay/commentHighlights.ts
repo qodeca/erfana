@@ -27,7 +27,7 @@
 
 /** The highlight name the stylesheet paints (`CommentOverlayLayer.css`). */
 export const COMMENT_HIGHLIGHT = 'erf-comment'
-/** The open thread's words (Text highlights card, "Open thread's mark"). */
+/** The open thread's words (Text highlights card, "Open conversation's mark"). */
 export const COMMENT_ACTIVE_HIGHLIGHT = 'erf-comment-active'
 /** The words of a Changed thread (C-06 "'now' words get a dashed accent underline"). */
 export const COMMENT_CHANGED_HIGHLIGHT = 'erf-comment-changed'

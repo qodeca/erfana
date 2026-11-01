@@ -93,6 +93,12 @@ export interface OverlayPick {
   readonly target: OverlayTargetId | null
 }
 
+/** A key press as `KeyboardEvent` names it; the driver presses and releases it with focus in the page. */
+export interface PickerKeyPress extends GestureModifiers {
+  readonly key: string
+  readonly code: string
+}
+
 /** A layer Esc can close, top first: the element menu, the comment window, comment mode, Find. */
 export type OverlayLayer = 'menu' | 'window' | 'mode' | 'find'
 
@@ -100,7 +106,7 @@ export type OverlayLayer = 'menu' | 'window' | 'mode' | 'find'
 export type HostedLayer = Exclude<OverlayLayer, 'mode'>
 
 /** A part of the overlay a host may leave out, with the reason it gives in `notOwned`. */
-export type OptionalPart = HostedLayer | 'modeIndicator' | 'floatingLabel'
+export type OptionalPart = HostedLayer | 'modeIndicator' | 'floatingLabel' | 'pickFocus'
 
 /**
  * One host's overlay, on the fixture, ready for one test. Gestures are trusted
@@ -133,6 +139,8 @@ export interface OverlayDriver {
    * Markdown Preview's own menu, comment items first, and the page never sees it.
    */
   readonly rightClickOutsideMode: 'page' | 'menu'
+  /** The word each target's end sentence uses (D-04: "section" in HTML, the kind noun in Markdown). */
+  readonly kinds: Readonly<Record<OverlayTargetId, string>>
   /** Why each part the host does not own is not here; read by the suite when it skips. */
   readonly notOwned?: Readonly<Partial<Record<OptionalPart, string>>>
 
@@ -140,10 +148,15 @@ export interface OverlayDriver {
   modeOn(): void
   /** Turn comment mode off, the way the host's toolbar or shortcut does. */
   modeOff(): void
+  /** Turn comment mode on from the keyboard, with no mouse: settled once the picker has started. */
+  modeOnByKeys(): void | Promise<void>
   /** Whether comment mode is on, as the overlay itself sees it. */
   isModeOn(): boolean
   /** The comment-mode indicator's words while it is shown, else `null`. Optional: see `notOwned.modeIndicator`. */
   modeIndicatorText?(): string | null
+
+  /** The mode tab has moved away from the top edge (A-03, I-19). */
+  modeTabMovedAway(): boolean
 
   /** The targets the host laid out (the whole fixture). */
   targets(): readonly OverlayTargetId[]
@@ -172,7 +185,23 @@ export interface OverlayDriver {
   middleClick(target: OverlayTargetId): void
   /** Press and release Esc with focus in the page. */
   pressEscape(): void
+  /** Press Enter with focus in the page. */
+  pressEnter(): void
+  /** Press Alt+Up with focus in the page: the picker climbs one level. */
+  levelUpByKeys(): void
+  /** Press and release one key with focus in the page. */
+  pressKey(press: PickerKeyPress): void
+  /** The last sentence the picker said at a level end, else `null`. */
+  saidAtEnd(): string | null
+  /** End a pick with nothing written: the menu or window it opened is gone (HTML: both are outside the page). */
+  cancelPick(): void | Promise<void>
+  /** Move the pick by keys, so real focus sits on the target. Optional: see `notOwned.pickFocus`. */
+  pickByKeys?(): void
+  /** Focus is on something that can hold it inside the preview, never `<body>` or a target that lost its `tabindex`. */
+  focusHeldInPreview?(): boolean
 
+  /** A key asked for the menu outside comment mode, with no pointer (HTML: the pick main checks; K-1). */
+  keyboardMenuAsked(): boolean
   /** Every pick so far, oldest first. */
   picks(): readonly OverlayPick[]
   /** The target the last pointer or keyboard pick named, or `null`. */
@@ -195,6 +224,203 @@ export interface OverlayDriver {
   /** Open a layer the host owns (`menu` and `window` on `target`), settled when it is shown. Optional: see `notOwned`. */
   open?(layer: HostedLayer, target?: OverlayTargetId): void | Promise<void>
 
+  /** Remove everything the driver added. */
+  dispose(): void | Promise<void>
+}
+
+/** The Comment button as drawn: where it is, and whether it went below the line. */
+export interface DrawnCommentButton {
+  readonly top: number
+  readonly below: boolean
+}
+
+/** {@link OverlayDriver} plus what `selection.suite.ts` needs: a selection drawn on a line the suite chooses. */
+export interface SelectionDriver extends OverlayDriver {
+  /** Words selected in `target`, drawn on one line at `line`, as a finished selection leaves them. */
+  selectWords(target: OverlayTargetId, line: OverlayTargetBox): void
+  /** The same by a mouse: press, words selected, release, and the `click` that ends it. */
+  dragSelect(target: OverlayTargetId, line: OverlayTargetBox): void
+  /** Settled once the button's wait after a mouse selection has passed. */
+  waitForButton(): Promise<void>
+  /** The selection's line is now at `line`, and the preview says it scrolled. */
+  scrollSelection(line: OverlayTargetBox): void
+  /** A page script clears the selection, with no input; settled well past any wait the host keeps. */
+  clearSelectionByScript(): Promise<void>
+  /** The Comment button, while it is drawn. Reading it forces no redraw. */
+  commentButton(): DrawnCommentButton | null
+  /** Whether the last keyboard pick carried selected words. */
+  lastPickHadWords(): Promise<boolean>
+  /** Whether the menu the last right-click asked for is about the selected words. */
+  menuAboutWords(): Promise<boolean>
+}
+
+/**
+ * Where focus sits in the panel, off the page: the mode toggle, the drawer, the
+ * Find field, or dockview's group element (where a tab switch leaves it).
+ */
+export type ModeLeavePlace = 'toggle' | 'drawer' | 'find' | 'group'
+
+/** One preview's whole panel, for leaving comment mode. Driven by keys only, after turning the mode on as a mouse does. */
+export interface ModeLeaveDriver {
+  /** Turn comment mode on with a mouse click on the toggle: focus stays there and the page has none. */
+  modeOn(): Promise<void>
+  /** Whether comment mode is on, as the toolbar shows it. */
+  isModeOn(): boolean
+  /** Put focus on `place` (opening the drawer or Find first when it is one of those). */
+  focusOn(place: ModeLeavePlace): Promise<void>
+  /** Press Esc at `place`, settled; true when the key was left unclaimed (`preventDefault` not called). */
+  pressEscape(place: ModeLeavePlace, modifiers?: GestureModifiers): Promise<boolean>
+  /** Press Esc with focus in another panel, such as the terminal. */
+  pressEscapeOutside(): Promise<void>
+  /** Whether the Find bar is open. */
+  findOpen(): boolean
+  /** Where focus is now, or `null` for anywhere else. */
+  focused(): ModeLeavePlace | null
+  /** dockview hides or shows this tab. */
+  setTabShown(shown: boolean): Promise<void>
+  /** Remove everything the driver added. */
+  dispose(): void | Promise<void>
+}
+
+/**
+ * {@link ModeLeaveDriver} plus the panel's other keys: the step keys, the mode
+ * shortcut and Esc from the preview itself, with no mouse.
+ */
+export interface PanelKeyDriver extends ModeLeaveDriver {
+  /** The file has one open comment (call before anything else). */
+  withComment(): Promise<void>
+  /** Press Alt+F9 at `place`, settled. */
+  pressStep(place: ModeLeavePlace): Promise<void>
+  /** Press the mode shortcut at `place`, settled. */
+  pressModeKey(place: ModeLeavePlace): Promise<void>
+  /** Esc with keyboard focus in the preview, in comment mode, settled. */
+  pressEscapeInPreview(): Promise<void>
+  /** The keyboard reached the preview and the picker can act there. */
+  keysInPreview(): boolean
+  /** A comment window is open. */
+  windowOpen(): boolean
+  /** The last sentence the panel said politely; it lands a frame after the key. */
+  said(): string
+}
+
+/** Who the reader is to the comment window: nobody yet, a name in Settings with the notice unseen, or all set. */
+export type WindowRulesIdentity = 'none' | 'notice-unseen' | 'ready'
+
+/** What one test opens: a thread on a writable file (a teammate's). */
+export interface WindowRulesSetup {
+  readonly identity: WindowRulesIdentity
+  /** An editor in this window holds the file (`dirty`), and the file also changed on disk (`conflict`). */
+  readonly editor?: 'clean' | 'dirty' | 'conflict'
+  /** Main refuses every write as unsaved, though this window's tabs are clean. */
+  readonly refusedUnsaved?: boolean
+  /** The threads of the file, in order; the first is the one shown. One open thread by default. */
+  readonly threads?: readonly WindowRulesThread[]
+  /** The file cannot be written. */
+  readonly readOnly?: boolean
+  /** The file is at its comment limit: replies and resolves work, a new comment does not (F-04). */
+  readonly full?: boolean
+  /** Where the window opened: on its target in the preview (icon, underline, pick), or anywhere else (a drawer row, a step key). */
+  readonly opened?: 'target' | 'elsewhere'
+  /** The window came from a click in the page with comment mode off: one more key must not write (S-03 – S-05). */
+  readonly outsideMode?: boolean
+}
+
+/** One thread of the fixture: plain open, Changed (S-03), or Not found (S-05). */
+export type WindowRulesThread = 'open' | 'changed' | 'not-found'
+
+/** What holds focus in the window. `window` is the frame itself, which draws no ring. */
+export type WindowFocus = 'title' | 'resolve' | 'resolve-next' | 'window' | 'other'
+
+/**
+ * The comment window as a host mounts it, for the rules both previews share.
+ * Driven by keys only: a person with no mouse can do everything here.
+ */
+export interface WindowRulesDriver {
+  /** The host's name, for messages. */
+  readonly host: string
+  /** Whether main refuses a write for another window's unsaved edits (HTML asks about its own window only: D-61). */
+  readonly seesOtherWindows: boolean
+  /** The file's name as the banner's Save button says it. */
+  readonly fileName: string
+  /** Open the window on one open thread, settled when its first focus has landed. */
+  open(setup: WindowRulesSetup): Promise<void>
+  /** The view the window shows now. */
+  view(): string
+  /** Type into the reply field and send with the Save shortcut. */
+  replyByKeys(text: string): Promise<void>
+  /** Press Resolve with the keyboard. */
+  resolveByKeys(): Promise<void>
+  /** Answer the identity step with the keyboard: the name, then Continue. */
+  continueByKeys(name: string): Promise<void>
+  /** Press Esc. */
+  pressEscape(): Promise<void>
+  /** The writes that reached main, by operation. */
+  writes(): readonly string[]
+  /** What the reply field holds, `null` when no reply box is shown. */
+  replyText(): string | null
+  /** The names of the buttons in the window's unsaved or refusal banner. */
+  bannerButtons(): readonly string[]
+  /** The banner's words. */
+  bannerText(): string
+  /** Press the banner's button that saves the file, with the keyboard. */
+  saveFromBannerByKeys(): Promise<void>
+  /** Editor saved calls so far. */
+  editorSaves(): number
+  /** The focused element is inside the comment window, never `<body>`. */
+  focusInWindow(): boolean
+  /** What holds focus in the window now. */
+  focused(): WindowFocus
+  /** Step to the next comment with the keyboard (Alt+F9). */
+  stepByKeys(): Promise<void>
+  /** The shown thread is removed outside Erfana while the window is open (W-04). */
+  removeShown(): Promise<void>
+  /** The window's actions in order: the foot's buttons, then More actions' items, opened by keys. */
+  actions(): Promise<readonly string[]>
+  /** Open a message's `…` menu and choose Copy text, by keys alone: the menu's items, and what reached the clipboard. */
+  copyTextByKeys(): Promise<{ readonly items: readonly string[]; readonly copied: readonly string[] }>
+  /** Remove everything the driver added. */
+  dispose(): void | Promise<void>
+}
+
+/** Where a comment's target is: in plain view, inside a closed section, or kept from showing any other way. */
+export type RevealTarget = 'plain' | 'folded' | 'hidden'
+
+/** "Show in preview" in one host, on a fixture holding one target of each {@link RevealTarget}. */
+export interface RevealDriver {
+  /** "Show in preview" on the comment on `target`, settled. */
+  show(target: RevealTarget): Promise<void>
+  /** The target last scrolled to, or `null`. */
+  scrolledTo(): RevealTarget | null
+  /** The target wearing the flash now, or `null`. */
+  flashed(): RevealTarget | null
+  /** The closed section around `folded` is open now. */
+  sectionOpen(): boolean
+  /** Settled once the flash's time has passed. */
+  flashEnds(): Promise<void>
+  /** Remove everything the driver added. */
+  dispose(): void | Promise<void>
+}
+
+/** What had focus when the window opened (`gone-*`: and it left the document while the window was open). */
+export type FocusOpener = 'drawer-row' | 'gone-row' | 'target' | 'gone-target' | 'toolbar' | 'nothing'
+
+/** Why the window closed. `go-to-tab` is the one close that moves focus on by itself. */
+export type FocusClose = 'escape' | 'close-button' | 'saved' | 'thread-gone' | 'go-to-tab'
+
+/** Where focus ended up after the close. `body` is the failure this table exists to catch. */
+export type FocusHome = 'opener' | 'drawer' | 'preview' | 'editor' | 'body'
+
+/**
+ * The comment window over a stage with a toolbar, a drawer, a preview and an
+ * editor, for the focus-return table. Driven by keys only.
+ */
+export interface FocusTableDriver {
+  /** Open the window from `opener`, on what `close` needs, settled when its first focus has landed. */
+  open(opener: FocusOpener, close: FocusClose): Promise<void>
+  /** Close the window for `close`, settled when it is gone. */
+  close(close: FocusClose): Promise<void>
+  /** Where focus is now; the page taking native focus back counts as `preview`. */
+  home(): FocusHome
   /** Remove everything the driver added. */
   dispose(): void | Promise<void>
 }

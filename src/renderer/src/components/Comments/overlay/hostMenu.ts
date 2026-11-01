@@ -66,7 +66,7 @@ function nounOf(input: Pick<HostMenuInput, 'tag' | 'place'>): NounSource {
  * @param input - {@link HostMenuInput}
  * @param actions - {@link HostMenuActions}
  * @returns Without a selection one item: "Comment on {kind}" outside comment
- *   mode, "Add comment" in it, "Comment on frontmatter" on the frontmatter.
+ *   mode, "Add comment" in it, "Comment on file settings" on the frontmatter.
  *   With one, "Comment on selection" then "Comment on the whole {kind}". Each
  *   disabled with its reason when it cannot be used.
  */

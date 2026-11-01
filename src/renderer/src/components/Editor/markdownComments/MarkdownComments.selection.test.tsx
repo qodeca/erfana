@@ -18,7 +18,7 @@ import { SEL_EXACT_MAX_CHARS } from '../../../../../shared/comments/anchorSel'
 import { editorSaveRegistry } from '../../../services/editorSaveRegistry'
 import { useProjectStore } from '../../../stores/useProjectStore'
 import { TEST_IDS } from '../../../constants/testids'
-import { MARKDOWN_COPY, SELECTION_COPY, markdownReadOnlyReasonText } from '../../Comments/commentCopyWords'
+import { MARKDOWN_COPY, MARKDOWN_WORDS, SELECTION_COPY } from '../../Comments/commentCopyWords'
 import { COMMENT_HIGHLIGHT, COMMENT_HIGHLIGHT_PRIORITY } from '../../Comments/overlay/commentHighlights'
 import { SELECTION_BUTTON_DELAY_MS } from '../../Comments/overlay/useSelectionComments'
 import * as COPY_MODULE from '../../Comments/commentCopy'
@@ -96,6 +96,8 @@ describe('Markdown Preview selection comments (024-AC-005)', () => {
     // jsdom has no layout for ranges; the preview's own mouse-up reads one.
     Range.prototype.getBoundingClientRect ??= () => new DOMRect()
     Range.prototype.getClientRects ??= () => [] as unknown as DOMRectList
+    // The selection is drawn over the whole preview: a right-click counts only on its lines (I-22).
+    vi.spyOn(Range.prototype, 'getClientRects').mockReturnValue([new DOMRect(-1, -1, 10_000, 10_000)] as unknown as DOMRectList)
     resetStores()
     api = installApi(fileView([thread('t1', 9, 'li')]), [{ threadKey: 't1', line: 9, tag: 'li' }])
     setSettings()
@@ -126,6 +128,18 @@ describe('Markdown Preview selection comments (024-AC-005)', () => {
     await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1))
     return api.save.mock.calls[0][0] as Record<string, unknown>
   }
+
+  it('K-11 in comment mode a key acts on what is outlined: after moving off the words, the menu is the outlined target’s', async () => {
+    const user = userEvent.setup()
+    await ready()
+    selectWords(paragraph(), 'ten customers by')
+    await user.keyboard('{Control>}{Alt>}m{/Alt}{/Control}')
+    await waitFor(() => expect(paragraph()).toHaveFocus())
+    await user.keyboard('{Tab}{Shift>}{F10}{/Shift}')
+    const menu = await screen.findByTestId(TEST_IDS.COMMENT_CONTEXT_MENU)
+    expect(menu).not.toHaveAccessibleName(SELECTION_COPY.menuLabel)
+    expect(screen.queryByTestId(TEST_IDS.COMMENT_MENU_SELECTION)).toBeNull()
+  })
 
   it('024-AC-005 (a) M-12: three words, right-click, Comment on selection saves them as anchor.sel on the paragraph', async () => {
     const user = userEvent.setup()
@@ -203,7 +217,7 @@ describe('Markdown Preview selection comments (024-AC-005)', () => {
     expect([...(saved.sel as { exact: string }).exact].length).toBeLessThanOrEqual(SEL_EXACT_MAX_CHARS)
   })
 
-  it('024-AC-005 (e): with the keyboard only, Narrow to words chooses words in the field and saves them', async () => {
+  it('024-AC-005 (e): with the keyboard only, Comment on specific words chooses words in the field and saves them', async () => {
     const user = userEvent.setup()
     await ready()
     await user.click(modeTool())
@@ -258,7 +272,7 @@ describe('Markdown Preview selection comments (024-AC-005)', () => {
     await waitFor(() => expect(modeTool()).toHaveAttribute('aria-disabled', 'true'))
     selectWords(paragraph(), 'beta')
     fireEvent.contextMenu(paragraph(), { clientX: 10, clientY: 10 })
-    const reason = markdownReadOnlyReasonText('link', 'notes.md')
+    const reason = MARKDOWN_WORDS.reasonText('link', 'notes.md')
     for (const id of [TEST_IDS.COMMENT_MENU_SELECTION, TEST_IDS.COMMENT_MENU_WHOLE]) {
       const item = await screen.findByTestId(id)
       expect(item).toHaveAttribute('aria-disabled', 'true')
@@ -278,6 +292,18 @@ describe('Markdown Preview selection comments (024-AC-005)', () => {
     expect(await screen.findByText(SELECTION_COPY.crossed('paragraph'))).toBeVisible()
     const saved = await saveTyped(user, 'Date')
     expect(saved).toMatchObject({ target: { lineStart: 6, tag: 'p' }, sel: { exact: 'by Friday.' } })
+  })
+
+  it('I-16 a drag across two list items goes to the list, with no cut notice', async () => {
+    const user = userEvent.setup()
+    await ready()
+    select(block('li[data-line-start="8"]'), 2, 3, block('li[data-line-start="9"]'))
+    fireEvent.contextMenu(block('li[data-line-start="8"]'), { clientX: 10, clientY: 10 })
+    await user.click(await screen.findByTestId(TEST_IDS.COMMENT_MENU_SELECTION))
+    expect(await screen.findByRole('dialog', { name: 'New comment on list' })).toBeVisible()
+    expect(screen.queryByText(SELECTION_COPY.crossed('list item'))).toBeNull()
+    const saved = await saveTyped(user, 'Both')
+    expect(saved).toMatchObject({ target: { tag: 'ul' } })
   })
 
   it('024-AC-005 (i): a selection of only spaces is refused as words – the menu is about the block', async () => {
@@ -310,7 +336,7 @@ describe('Markdown Preview selection comments (024-AC-005)', () => {
     await user.click(await screen.findByTestId(TEST_IDS.COMMENT_MENU_SELECTION))
     api.list.mockResolvedValue({ ok: true, file: fileView([thread('saved', 6, 'p')]), placements: [{ threadKey: 'saved', line: 6, tag: 'p' }] })
     await saveTyped(user, 'Which beta?')
-    await waitFor(() => expect(polite()).toHaveTextContent(SELECTION_COPY.wordsDropped('paragraph', 'notes.md')))
+    await waitFor(() => expect(polite()).toHaveTextContent(SELECTION_COPY.wordsDropped('paragraph')))
   })
 
   it('024-AC-005: the words of an open selection comment are marked while they are found; a resolved one is not', async () => {
@@ -371,6 +397,8 @@ describe('comments-v2 owner decisions and the Markdown focus model', () => {
     Element.prototype.scrollIntoView ??= vi.fn()
     Range.prototype.getBoundingClientRect ??= () => new DOMRect()
     Range.prototype.getClientRects ??= () => [] as unknown as DOMRectList
+    // The selection is drawn over the whole preview: a right-click counts only on its lines (I-22).
+    vi.spyOn(Range.prototype, 'getClientRects').mockReturnValue([new DOMRect(-1, -1, 10_000, 10_000)] as unknown as DOMRectList)
     resetStores()
     api = installApi(fileView([thread('t1', 6, 'p')]), [
       { threadKey: 't1', line: 6, tag: 'p', sel: { exact: 'ten customers', prefix: 'beta to ', suffix: ' by' } }
@@ -386,6 +414,7 @@ describe('comments-v2 owner decisions and the Markdown focus model', () => {
 
   it('C-08 turning comment mode on from the keyboard focuses the block holding the selection; outside the mode Shift+F10 opens the menu at the selection', async () => {
     const user = userEvent.setup()
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 800, 600))
     vi.spyOn(Range.prototype, 'getClientRects').mockReturnValue([new DOMRect(40, 120, 60, 18)] as unknown as DOMRectList)
     render(<Harness content={DOC} />)
     await waitFor(() => expect(api.list).toHaveBeenCalled())

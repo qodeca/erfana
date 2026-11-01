@@ -24,6 +24,12 @@
  * pair, Alt+F9 / Alt+Shift+F9 (comments-v2 C-13), is two rows of the frozen
  * list, likewise taken only while comments are on.
  *
+ * Some keys are noted and NOT forwarded: Shift+F10 or the Menu key, and in
+ * comment mode Enter, stay the page's, and main only records that they
+ * happened, as the evidence a keyboard pick needs
+ * (`comments/commentContextGate.ts`, K-1, L-1). The forward list is unchanged,
+ * and the page is told nothing.
+ *
  * @see docs/designs/html-preview/sd-074-html-preview.md §1.9, §0 (Enumerated keystrokes)
  * @see docs/designs/html-preview/multi-page/design-issue-124-part3.md §3.7
  */
@@ -31,6 +37,7 @@
 import { COMMENT_MODE_KEY, matchCommentModeKey } from '../../../shared/commentModeKey'
 import { matchPreviewNavKey, type PreviewNavAction } from '../../../shared/previewNavKeys'
 import { commentStepOf, type CommentStep } from '../../../shared/commentStepKey'
+import { pickerStepOf, type PickerStep } from '../../../shared/comments/overlayCore/pickerKeys'
 
 /** A forwarded key. `accel` true ⇒ requires Cmd (macOS) / Ctrl (else). */
 export interface ForwardedShortcut {
@@ -102,6 +109,10 @@ export interface CommentKeyState {
   readonly enabled: () => boolean
   /** Comment mode is on: Esc stays with the page, whose preload leaves the mode. */
   readonly modeOn: () => boolean
+  /** A real Shift+F10 or Menu key press reached the page, comment mode off (K-1). */
+  readonly menuKeyPressed?: () => void
+  /** A real Enter, Shift+F10 or Menu key press reached the page, comment mode on (L-1). */
+  readonly pickKeyPressed?: () => void
 }
 
 /**
@@ -118,6 +129,8 @@ export interface ForwardableInput {
   meta: boolean
   alt: boolean
   shift: boolean
+  /** A held key repeating: not a press (K-1). */
+  isAutoRepeat?: boolean
 }
 
 /** The slice of the `before-input-event` event object this module uses. */
@@ -192,6 +205,27 @@ export function matchCommentToggle(
   return matchCommentModeKey(input, platform === 'darwin')
 }
 
+/**
+ * Whether a key press is a fresh Shift+F10 or Menu key: the picker's own rule
+ * (`overlayCore/pickerKeys`), so main records the press the page acts on.
+ */
+export function isMenuKeyPress(input: ForwardableInput): boolean {
+  return freshPickerStep(input) === 'menu'
+}
+
+/** Whether a key press is one the picker opens a window or menu with, in comment mode. */
+export function isPickKeyPress(input: ForwardableInput): boolean {
+  const step = freshPickerStep(input)
+  return step === 'menu' || step === 'open'
+}
+
+/** The picker step of a fresh press; a release or a held key repeating is no press. */
+function freshPickerStep(input: ForwardableInput): PickerStep | null {
+  if (input.type !== 'keyDown' || input.isAutoRepeat === true) return null
+  const { key, code, shift: shiftKey, alt: altKey, control: ctrlKey, meta: metaKey } = input
+  return pickerStepOf({ key, code, shiftKey, altKey, ctrlKey, metaKey })
+}
+
 /** One row of the frozen list against one key press. `step` is `null` while comments are off for the view. */
 function matchesShortcut(
   shortcut: ForwardedShortcut,
@@ -231,6 +265,12 @@ export function attachInputForwarding(
     if (key !== null) {
       event.preventDefault()
       onShortcut(key)
+    }
+    if (comments === undefined || !comments.enabled()) return
+    if (comments.modeOn()) {
+      if (isPickKeyPress(input)) comments.pickKeyPressed?.()
+    } else if (isMenuKeyPress(input)) {
+      comments.menuKeyPressed?.()
     }
   }
 

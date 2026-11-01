@@ -14,6 +14,7 @@
 /** `commentState.theme` – the same fields as the preload's `OverlayTheme`. */
 export interface CommentOverlayTheme {
   readonly accent: string
+  readonly accentDeep: string
   readonly accentHover: string
   readonly ink: string
   readonly paper: string
@@ -33,6 +34,7 @@ export interface CommentOverlayTheme {
 /** The theme every frame gets. */
 export const COMMENT_OVERLAY_THEME: CommentOverlayTheme = Object.freeze({
   accent: '#A0A8FF', // --color-accent-primary (--color-brand-violet)
+  accentDeep: '#3F3FBA', // --color-brand-indigo
   accentHover: '#8b94ff', // --color-brand-violet-hover
   ink: '#161312', // --color-brand-black
   paper: '#F8FAF8', // --color-brand-white

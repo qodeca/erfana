@@ -69,6 +69,8 @@ describe('Markdown Preview comments – the window and the content marks', () =>
     Element.prototype.scrollIntoView ??= vi.fn()
     Range.prototype.getBoundingClientRect ??= () => new DOMRect()
     Range.prototype.getClientRects ??= () => [] as unknown as DOMRectList
+    // The selection is drawn over the whole preview: a right-click counts only on its lines (I-22).
+    vi.spyOn(Range.prototype, 'getClientRects').mockReturnValue([new DOMRect(-1, -1, 10_000, 10_000)] as unknown as DOMRectList)
     resetStores()
     api = installApi(fileView([thread('t1', 6, 'li'), thread('w1', 3, 'p')]), [ON_ITEM, WORDS])
     setSettings()
@@ -234,8 +236,8 @@ describe('Markdown Preview comments – the window and the content marks', () =>
     await user.type(await screen.findByTestId('comment-new-field'), 'Which beta?')
     await user.click(screen.getByTestId('comment-save'))
     // D-16: the Markdown window says the HTML window's sentence, with the target's kind.
-    const shown = SELECTION_COPY.wordsNotInFile('paragraph', 'notes.md')
-    const dropped = SELECTION_COPY.wordsDropped('paragraph', 'notes.md')
+    const shown = SELECTION_COPY.wordsNotInFile('paragraph')
+    const dropped = SELECTION_COPY.wordsDropped('paragraph')
     await waitFor(() => expect(document.body).toHaveTextContent(shown))
     await waitFor(() => expect(api.list.mock.calls.length).toBeGreaterThan(1))
     await act(async () => {})

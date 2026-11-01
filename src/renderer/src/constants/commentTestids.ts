@@ -153,6 +153,20 @@ export const COMMENT_TEST_IDS = {
   // Drawer
   /** The comments drawer */
   COMMENT_DRAWER: 'comment-drawer',
+  /** The drawer's bulk action ("Resolve all changed comments", "Delete all resolved comments"). */
+  COMMENT_BULK_ACTION: 'comment-bulk-action',
+  /** The sentence that holds a bulk action back while a file has unsaved edits. */
+  COMMENT_BULK_PAUSED: 'comment-bulk-paused',
+  /** The review of a bulk action, in the list's place. */
+  COMMENT_BULK_REVIEW: 'comment-bulk-review',
+  /** One comment in the review. */
+  COMMENT_BULK_ITEM: 'comment-bulk-item',
+  COMMENT_BULK_CANCEL: 'comment-bulk-cancel',
+  COMMENT_BULK_CONFIRM: 'comment-bulk-confirm',
+  /** How a bulk action ended. */
+  COMMENT_BULK_OUTCOME: 'comment-bulk-outcome',
+  /** The empty drawer's "Turn on comment mode" (P-F21). */
+  COMMENT_DRAWER_TURN_ON_MODE: 'comment-drawer-turn-on-mode',
   /** Close the drawer */
   COMMENT_DRAWER_CLOSE: 'comment-drawer-close',
   /** Filter: Open */
@@ -177,6 +191,8 @@ export const COMMENT_TEST_IDS = {
   COMMENT_DRAWER_ERROR: 'comment-drawer-error',
   /** Note: main left files out of the list (its file count or byte budget) */
   COMMENT_DRAWER_UNREAD: 'comment-drawer-unread',
+  /** The drawer's sentence when "Show in preview" could not show its target (I-6). */
+  COMMENT_DRAWER_REVEAL_NOTE: 'comment-drawer-reveal-note',
 
   // Settings
   /** Settings › Comments section */
@@ -205,6 +221,10 @@ export const COMMENT_TEST_IDS = {
   COMMENT_HOST_OVERLAY: 'comment-host-overlay',
   /** The outline around the outlined or picked target */
   COMMENT_HOST_OUTLINE: 'comment-host-outline',
+  /** The static highlight on a target "Show in preview" reached (K-22). */
+  COMMENT_HOST_FLASH: 'comment-host-flash',
+  /** The quiet outline on the target of the open window (I-9). */
+  COMMENT_HOST_WINDOW_TARGET: 'comment-host-window-target',
   /** A comment icon (a real button, outside the Tab order – D-07) */
   COMMENT_HOST_ICON: 'comment-host-icon',
   /** A not-found comment's ghost, at its place between two blocks (a real button – C-05, R-16) */

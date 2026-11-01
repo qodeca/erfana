@@ -22,6 +22,10 @@ export const FileCommentChannels = {
   OPEN_DRAFT: 'file-comment:openDraft',
   /** Add, reply, edit, resolve, re-open or delete. */
   SAVE: 'file-comment:save',
+  /** "Resolve all changed comments", "Delete all resolved comments": one write (024-FR-028). */
+  BULK: 'file-comment:bulk',
+  /** The name git knows for the open project: a suggestion for the identity step (P-F33). Payload-free. */
+  GIT_NAME: 'file-comment:gitName',
   /** The panel closed: forget its record, keys and file watch (the sender's window only). */
   RELEASE: 'file-comment:release'
 } as const
@@ -29,7 +33,11 @@ export const FileCommentChannels = {
 /** Main → renderer events, sent only to the window that owns the panel. */
 export const FileCommentEvents = {
   /** A listed file changed on disk: list it again. */
-  CHANGED: 'file-comment:changed'
+  CHANGED: 'file-comment:changed',
+  /** A save answered `COMMENT_SAVE_PENDING` settled after all: written, or refused with its code (W-10). */
+  SAVE_SETTLED: 'file-comment:saveSettled',
+  /** A file a bulk action answered `COMMENT_SAVE_PENDING` for ended after all (L-2). */
+  BULK_SETTLED: 'file-comment:bulkSettled'
 } as const
 
 export type FileCommentChannel = (typeof FileCommentChannels)[keyof typeof FileCommentChannels]

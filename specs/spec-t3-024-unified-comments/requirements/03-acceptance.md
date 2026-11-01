@@ -42,6 +42,7 @@
 | 024-AC-036 | Markdown work is bounded | 024-NFR-008 | ⬜ |
 | 024-AC-037 | Markdown property tests | 024-FR-012 | ⬜ |
 | 024-AC-038 | Every error path writes nothing and keeps the draft | 024-FR-013 | ⬜ |
+| 024-AC-039 | Resolve all changed comments, with review first | 024-FR-028 | ⬜ |
 
 ## Detailed test cases
 
@@ -125,7 +126,7 @@
 
 **When:** A reviewer checks it against the designs, and the owner runs the hands-on acceptance test in both previews.
 
-**Then:** Every difference in the designs is in the table, no row is marked *chosen*, the owner's checklist walk is recorded in `verification/` with its date and outcome, and every extra difference the owner notices is fixed or added as *forced* with its reason before merge. This is a process check.
+**Then:** Every difference in the designs is in the table, no row is marked *chosen*, the owner's checklist walk is recorded in `verification/` with its date and outcome, and every extra difference the owner notices is fixed or added as *forced* with its reason before merge. This is a process check. Owner decision (2026-11-01): rows marked "To be removed by plan step N" or "Under test, plan step 8" are allowed until the alignment plan ends, and none is left after it.
 
 ---
 
@@ -229,11 +230,11 @@
 
 **Tests:** 024-FR-015
 
-**Given:** A Markdown file with an unsaved edit (a) in the editor of this panel, (b) in another panel, (c) in another window; and (d) a file saved by an outside tool while paused; then switched to the preview-only view.
+**Given:** A Markdown file with an unsaved edit (a) in the editor of this panel, (b) in another panel, (c) in another window (lowered 2026-11-01, see 024-FR-015); and (d) a file saved by an outside tool while paused; then switched to the preview-only view.
 
 **When:** The user tries to comment, reply and resolve; tests wait on the paused state's test id, never on time.
 
-**Then:** The band shows Save {file}, Reply, Resolve, New comment and comment mode are disabled and the count stays clickable; in (d) the conflict variant offers Go to editor; after Save {file} a comment saves normally.
+**Then:** In (a), (b) and (d) the band shows Save {file}, Reply, Resolve, New comment and comment mode are disabled and the count stays clickable; in (d) the conflict variant offers Go to editor; after Save {file} a comment saves normally. In (c) no band shows; a write is refused, and the window says so in one sentence with no dead buttons.
 
 ---
 
@@ -498,6 +499,18 @@
 **When:** A comment save runs into each case, mostly at main-service integration level.
 
 **Then:** Each case shows its listed message with a next step, leaves the file byte-identical, and keeps the draft text.
+
+---
+
+### 024-AC-039: Resolve all changed comments
+
+**Tests:** 024-FR-028
+
+**Given:** A file in each preview with open Changed, open Words changed, open unchanged, Not found and resolved comments.
+
+**When:** The user chooses Resolve all changed comments, first cancels the review, then repeats it and confirms.
+
+**Then:** The review lists only the open Changed and Words changed comments, with Was and Now; cancelling leaves the file byte-identical; confirming resolves only those comments.
 
 ---
 

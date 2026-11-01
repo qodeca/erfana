@@ -30,6 +30,7 @@ import { useCallback, useEffect, useRef } from 'react'
 import { useLatestRef } from '../../../hooks/useLatestRef'
 import type { FileCommentOpenDraftResult, ThreadPlacement } from '../../../../../shared/ipc/file-comment-schema'
 import type { CommentDock } from '../CommentWindowShell'
+import type { CommentWindowRequest } from '../commentWindowTypes'
 import type { NounSource } from '../commentTargetNoun'
 import { nounTargetOf, type PreviewCommentAdapter } from './previewAdapter'
 
@@ -63,6 +64,30 @@ export function threadTarget(threadKey: string, placements: readonly ThreadPlace
 }
 
 /**
+ * The element an open window belongs to (I-9): a new comment's pick, the thread
+ * a step moved to, or the window's first thread.
+ *
+ * @param request - The open window, or `null`.
+ * @param stepped - The thread a step moved it to, or `null`.
+ * @param picked - The picked element of a new comment's draft.
+ * @param placements - Where main placed the listed threads.
+ * @param adapter - The preview's adapter.
+ * @returns The rendered target, or `null` when there is none.
+ */
+export function windowTargetOf(
+  request: CommentWindowRequest | null,
+  stepped: string | null,
+  picked: (draftToken: string) => HTMLElement | null,
+  placements: readonly ThreadPlacement[],
+  adapter: PreviewCommentAdapter
+): HTMLElement | null {
+  if (request === null) return null
+  if (request.kind === 'new') return picked(request.draftToken)
+  const shown = stepped ?? request.threadKeys[0]
+  return shown === undefined ? null : threadTarget(shown, placements, adapter)
+}
+
+/**
  * `el` when it has a layout box, else `null`. A target that is not drawn –
  * `display: none`, inside a closed `<details>`, a pane not laid out – is no
  * anchor: the dock falls back to the request's point instead of folding the
@@ -73,6 +98,52 @@ export function threadTarget(threadKey: string, placements: readonly ThreadPlace
  */
 export function drawn(el: HTMLElement | null): HTMLElement | null {
   return el !== null && el.getClientRects().length > 0 ? el : null
+}
+
+/**
+ * The target of a thread window opened on one: where it was, or – re-rendered
+ * since – where its first thread is now. `null` when it is gone, so the window
+ * offers no "New comment" that could do nothing.
+ *
+ * @param target - The target the window opened on, or `null`.
+ * @param threadKeys - The window's threads.
+ * @param placements - Where main placed the listed threads.
+ * @param adapter - The preview's adapter.
+ * @returns The rendered target.
+ */
+export function targetNow(
+  target: HTMLElement | null,
+  threadKeys: readonly string[],
+  placements: readonly ThreadPlacement[],
+  adapter: PreviewCommentAdapter
+): HTMLElement | null {
+  if (target === null) return null
+  if (target.isConnected) return target
+  const first = threadKeys[0]
+  return first === undefined ? null : threadTarget(first, placements, adapter)
+}
+
+/**
+ * The target "New comment" goes on for the thread a window shows, however the
+ * window got there (owner decision, 2026-11-01): the one it opened on while it
+ * shows that thread, else where main places the thread now. `null` when the
+ * thread has none that takes a comment.
+ *
+ * @param threadKey - The thread shown.
+ * @param opened - What the window was opened on: its threads, and its target or `null`.
+ * @param placements - Where main placed the listed threads.
+ * @param adapter - The preview's adapter.
+ * @returns The rendered target.
+ */
+export function newTargetOf(
+  threadKey: string,
+  opened: { readonly threadKeys: readonly string[]; readonly target: HTMLElement | null },
+  placements: readonly ThreadPlacement[],
+  adapter: PreviewCommentAdapter
+): HTMLElement | null {
+  const onIt = opened.threadKeys.includes(threadKey) ? targetNow(opened.target, opened.threadKeys, placements, adapter) : null
+  const target = onIt ?? threadTarget(threadKey, placements, adapter)
+  return target !== null && adapter.canComment(target).ok ? target : null
 }
 
 /**

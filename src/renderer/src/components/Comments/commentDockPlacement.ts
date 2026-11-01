@@ -6,7 +6,8 @@
  *
  * - When the target is scrolled out of the pane, the window folds to an
  *   edge tab at the pane's top or bottom edge ("Comment on paragraph, line
- *   12 ↑"), which brings it back.
+ *   12 ↑"), which brings it back. A window holding typed text does not fold:
+ *   it stays in the pane, at the edge nearest its target.
  * - When at least {@link MARGIN_MIN_PX} is free between the text column's
  *   right edge and the pane's, the window sits in that margin, top-aligned
  *   with its target.
@@ -47,6 +48,8 @@ export interface DockInput {
   /** The rendered text column; `null` when unknown. */
   readonly column: Box | null
   readonly viewportHeight: number
+  /** The window holds typed text: it stays open with its target scrolled away. */
+  readonly holdOpen?: boolean
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -60,13 +63,15 @@ function clamp(value: number, min: number, max: number): number {
  * @returns An edge tab, the margin, or the shipped placement.
  */
 export function placeDocked(input: DockInput): DockedPlacement {
-  const { anchor, point, size, area, column, viewportHeight } = input
+  const { point, size, area, column, viewportHeight, holdOpen = false } = input
   const right = area.left + area.width
   const bottom = area.top + area.height
-  if (anchor !== null && (anchor.top + anchor.height <= area.top || anchor.top >= bottom)) {
-    const above = anchor.top + anchor.height <= area.top
+  const away = input.anchor !== null && (input.anchor.top + input.anchor.height <= area.top || input.anchor.top >= bottom)
+  if (input.anchor !== null && away && !holdOpen) {
+    const above = input.anchor.top + input.anchor.height <= area.top
     return { kind: 'edge', above, left: right - EDGE_PX, top: above ? area.top + EDGE_PX : bottom - EDGE_PX }
   }
+  const anchor = input.anchor !== null && away ? { ...input.anchor, top: clamp(input.anchor.top, area.top, bottom) } : input.anchor
   const free = column === null ? 0 : right - (column.left + column.width)
   if (column !== null && free >= MARGIN_MIN_PX) {
     const maxHeight = Math.max(0, Math.min(WINDOW_MAX_HEIGHT_PX, area.height - 2 * EDGE_PX))

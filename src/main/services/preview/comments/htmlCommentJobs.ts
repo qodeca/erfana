@@ -22,6 +22,7 @@
  */
 import { htmlKind } from '../../../../shared/comments/htmlKind'
 import type { CommentDocument, RandomBytes } from '../../../../shared/htmlComments'
+import { runBulkWriteJob, type BulkWriteJob } from '../../comments/commentBulkCore'
 import { createInProcessCommentJobs, type CommentFileJobRunner, type CommentJobTable } from '../../comments/commentFileJobs'
 import { documentOf, freshDocumentOf } from '../../comments/commentJobDocs'
 import { runListJob, type ListJob } from '../../comments/commentListCore'
@@ -43,7 +44,7 @@ export interface InstrumentJobResult {
 }
 
 /** The HTML jobs on a commented file. */
-export type HtmlFileJob = DraftJob | PinJob | ExcerptJob | ListJob | WriteJob
+export type HtmlFileJob = DraftJob | PinJob | ExcerptJob | ListJob | WriteJob | BulkWriteJob
 
 /** Every HTML job. */
 export type HtmlCommentJob = InstrumentJob | HtmlFileJob
@@ -82,7 +83,8 @@ export const htmlCommentJobTable: CommentJobTable<HtmlCommentJob, CommentDocumen
     run: (bytes, job, env) => runWriteJob(bytes, job, { ...env, kind: htmlKind, read: freshDocumentOf }),
     // The block bytes, when they own their buffer; a view into a larger one is copied.
     transferables: result => (result.ok ? rawTransferablesOf(result.insert) : [])
-  }
+  },
+  bulkWrite: { run: (bytes, job, env) => runBulkWriteJob(bytes, job, { ...env, kind: htmlKind, read: freshDocumentOf }) }
 }
 
 /**

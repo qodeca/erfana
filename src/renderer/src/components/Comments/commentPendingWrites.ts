@@ -7,7 +7,8 @@
  *
  * A save past main's 15 s answer limit is answered `COMMENT_SAVE_PENDING`:
  * still being written, not failed. Main reports how it ended later with
- * `preview:commentSaveSettled`, naming the write by the request's own key.
+ * `preview:commentSaveSettled` (`file-comment:saveSettled` in a preview the
+ * renderer draws), naming the write by the request's own key.
  * Until then:
  *
  * - the write is **outstanding** for its draft, its element and its thread:
@@ -35,6 +36,8 @@ import type {
   CommentSaveResult,
   CommentSaveSettled
 } from '../../../../shared/ipc/preview-comment-schema'
+import type { FileCommentSaveSettled } from '../../../../shared/ipc/file-comment-schema'
+import { fileCommentGateway } from '../../services/comments/fileCommentGateway'
 import { commentGateway } from '../../services/preview/commentGateway'
 import { commentDrafts } from '../../stores/usePreviewCommentStore'
 
@@ -48,12 +51,18 @@ export const PENDING_WRITE_MAX_MS = 120_000
 
 /** A write that settled after its answer, with what the window needs to word it. */
 export interface SettledCommentWrite {
-  readonly event: CommentSaveSettled
+  /** Main's event; only the file-comment family names a finer `reason`. */
+  readonly event: CommentSaveSettled | FileCommentSaveSettled
   readonly request: CommentSaveRequest
   /** The file as the reader knows it. */
   readonly file: string
   /** The session draft the write was typed in, if any. */
   readonly draftKey?: string
+}
+
+/** Main's finer reason for a refused write, when its family names one. */
+export function reasonOf({ event }: SettledCommentWrite): string | undefined {
+  return 'reason' in event ? event.reason : undefined
 }
 
 /** What a tracked write knows besides its request. */
@@ -74,7 +83,7 @@ export interface TrackedCommentWrite {
 
 interface Entry {
   readonly request: CommentSaveRequest
-  readonly key: string
+  key: string
   readonly options: TrackCommentWriteOptions
   awaiting: boolean
   timer?: ReturnType<typeof setTimeout>
@@ -113,7 +122,7 @@ function end(entry: Entry): void {
   changed()
 }
 
-function onSettled(event: CommentSaveSettled): void {
+function onSettled(event: CommentSaveSettled | FileCommentSaveSettled): void {
   const key = event.draftToken ?? event.blockKey ?? event.threadKey
   const entry = [...entries].find(
     candidate =>
@@ -133,6 +142,16 @@ function onSettled(event: CommentSaveSettled): void {
     ...(draftKey === undefined ? {} : { draftKey })
   }
   for (const listener of [...settledListeners]) listener(settled)
+}
+
+/** Both families' settle events; a panel belongs to one of them. */
+function listenForSettles(): () => void {
+  const offPreview = commentGateway.onSaveSettled(onSettled)
+  const offFile = fileCommentGateway.onSaveSettled(onSettled)
+  return () => {
+    offPreview()
+    offFile()
+  }
 }
 
 /**
@@ -156,7 +175,7 @@ export function trackCommentWrite(
   const entry: Entry = { request, key: writeKeyOf(request), options, awaiting: false }
   entries.add(entry)
   // Listening from the send on: the settle event cannot overtake the answer.
-  unlisten ??= commentGateway.onSaveSettled(onSettled)
+  unlisten ??= listenForSettles()
   changed()
   return {
     answered: result => {
@@ -169,6 +188,21 @@ export function trackCommentWrite(
       entry.timer = setTimeout(() => end(entry), PENDING_WRITE_MAX_MS)
       changed()
     }
+  }
+}
+
+/**
+ * The write tracked as draft `from` went to main as `to`: an open window's
+ * draft is renewed under a new token (C-14.2), and main names a late write by
+ * the token it was given. The window keeps the token it knows.
+ *
+ * @param panelId - The panel.
+ * @param from - The token the write was tracked with.
+ * @param to - The token main was given.
+ */
+export function renewTrackedDraft(panelId: string, from: string, to: string): void {
+  for (const entry of entries) {
+    if (entry.request.panelId === panelId && entry.key === from) entry.key = to
   }
 }
 

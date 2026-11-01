@@ -9,16 +9,16 @@
  * | Tool | Pattern | Accessible name |
  * |---|---|---|
  * | Comment mode | toggle, `aria-pressed` | "Comment mode" – never changes |
- * | Comments count | disclosure, `aria-expanded` + `aria-controls` | its visible text first: "7 comments, 4 changed, 1 damaged" |
+ * | Comments count | disclosure, `aria-expanded` + `aria-controls` | "7 comments, 4 changed, 1 damaged" |
  *
  * C-20, the quieter toolbar: "Show comment icons" left the row at every tier
- * – it is the drawer's checkbox now – and the list tool is a labelled count,
- * "7 comments" with the ▲ attention counter for damaged comments beside it
- * (C-15, the Badges card's `.erf-counter--attention`; the ▲ is generated
- * content with empty alternative text, so the words are in the tool's name).
- * At the narrow tier (a container under 446px) it is the icon and the
- * number. The count carries no `title` that repeats its name. While the
- * drawer is open the count wears the pressed signature, like every on/off
+ * – it is the drawer's checkbox now. Preview toolbars are icons only, so the
+ * list tool is the icon and the number, at every width, with the ▲ attention
+ * counter for damaged comments beside it (C-15, the Badges card's
+ * `.erf-counter--attention`; the ▲ is generated content with empty alternative
+ * text, so the words are in the tool's name). The number alone does not say
+ * what it counts, so the count's `title` repeats its name. In the HTML Preview a
+ * "2 not found" hint sits beside it (P-F22): those comments have no icon there. While the drawer is open the count wears the pressed signature, like every on/off
  * tool in the row (R-19) – it stays a disclosure.
  *
  * Unavailable is `aria-disabled`, never `disabled`: the tool keeps focus and
@@ -33,7 +33,7 @@
 import { renderIcon } from '../../utils/iconRegistry'
 import type { CommentUnavailableReason } from '../../../../shared/ipc/preview-comment-schema'
 import type { CommentCounts } from '../../stores/usePreviewCommentStore'
-import { TOOL_COPY, commentModeAriaShortcut, unavailableTooltip } from './commentCopy'
+import { COPY, TOOL_COPY, commentModeAriaShortcut } from './commentCopy'
 import { COMMENT_LIST_COPY } from './commentCopyWords'
 import { useCommentWords } from './commentWords'
 import { TEST_IDS } from '../../constants/testids'
@@ -63,6 +63,14 @@ export interface CommentToolbarToolsProps {
   readonly counts: CommentCounts | null
   /** Open comments that are Changed or Words changed (C-06): the name adds ", {n} changed". */
   readonly changed?: number
+  /**
+   * Open comments whose target is gone (S-05), where the preview has nowhere to
+   * show them (D-12, P-F22): a hint beside the count, with no place. Markdown
+   * leaves it out: its ghost icon stands at the comment's own place.
+   */
+  readonly notFound?: number
+  /** A saved comment's icon is on its way (P-F17): the count says so, words only (the States card: the wait can't be estimated). */
+  readonly saving?: boolean
   /** The page has loaded (comment mode needs a live page). */
   readonly ready: boolean
   readonly unavailable: CommentUnavailableReason | null
@@ -116,6 +124,8 @@ export function CommentToolbarTools({
   drawerId,
   counts,
   changed = 0,
+  notFound = 0,
+  saving = false,
   ready,
   unavailable,
   onToggleMode,
@@ -129,17 +139,17 @@ export function CommentToolbarTools({
   const classes = TOOL_CLASS[variant]
   const modeBlocked = !ready || unavailable !== null || modeUnavailableText !== null
   const modeTitle =
-    unavailable !== null
-      ? unavailableTooltip(unavailable)
-      : modeUnavailableText !== null
-        ? modeUnavailableText
+    modeUnavailableText !== null
+      ? modeUnavailableText
+      : unavailable !== null
+        ? words.unavailableText(unavailable)
         : !ready
           ? TOOL_COPY.modeNotReady
           : words.modeTooltip(mode)
   const readBlocked = unavailable !== null && UNREADABLE.has(unavailable)
   const open = counts?.open ?? 0
   const damaged = counts?.attention ?? 0
-  const listName = COMMENT_LIST_COPY.countName(open, changed, damaged)
+  const listName = COMMENT_LIST_COPY.countName(open, changed, damaged, notFound)
 
   return (
     <>
@@ -169,8 +179,9 @@ export function CommentToolbarTools({
         aria-expanded={drawerOpen}
         aria-controls={drawerOpen ? drawerId : undefined}
         aria-disabled={readBlocked ? 'true' : undefined}
-        // Only a reason gets a tooltip; the name is the visible text (C-20).
-        title={readBlocked && unavailable !== null ? unavailableTooltip(unavailable) : undefined}
+        aria-busy={saving ? 'true' : undefined}
+        // Icons only: the tooltip says what the count is, or why it is unavailable.
+        title={readBlocked && unavailable !== null ? words.unavailableText(unavailable) : listName}
         data-testid={TEST_IDS.COMMENT_TOOL_LIST}
         onClick={() => {
           if (readBlocked && !drawerOpen) return
@@ -180,8 +191,9 @@ export function CommentToolbarTools({
         <span className="erf-comment-count__icon" aria-hidden="true">
           {renderIcon('messages-square', { size: 16, 'aria-hidden': true })}
         </span>
-        <span className="erf-comment-count__text">{COMMENT_LIST_COPY.count(open)}</span>
         {open > 0 && <span className="erf-comment-count__number">{open}</span>}
+        {saving && <span className="erf-counter">{COPY.saving}</span>}
+        {notFound > 0 && <span className="erf-counter">{COMMENT_LIST_COPY.notFoundCount(notFound)}</span>}
         {damaged > 0 && <span className="erf-counter erf-counter--attention">{damaged}</span>}
       </button>
     </>

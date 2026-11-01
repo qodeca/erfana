@@ -8,8 +8,9 @@
  * It runs the real preview, the real `useMarkdownComments` and the real
  * renderer overlay host through the panel harness (`harness.tsx`), with only
  * the comment bridge mocked. The fixture is a block quote: the quote is
- * `container`; its one list item, which holds a nested item (`inner`), is
- * `first`; two paragraphs are `second` and `long`. jsdom has no layout, so
+ * `container`; a nested quote is `first`, and its paragraph is `inner`; two
+ * paragraphs are `second` and `long`, so the levels are the HTML page's (a list
+ * would add its own `ul` target between them). jsdom has no layout, so
  * each fixture block gets its fixture box and a gesture is delivered to the
  * innermost fixture block under its point (`fixtureTargetAt`).
  *
@@ -31,32 +32,42 @@ import {
   fixtureTargetAt,
   type GestureModifiers,
   type GesturePoint,
-  type OverlayDriver,
   type OverlayLayer,
-  type OverlayTargetId
+  type OverlayTargetBox,
+  type OverlayTargetId,
+  type SelectionDriver
 } from '../../../../../../shared/comments/__conformance__/overlayDriver'
 import { Harness, fileView, installApi, resetStores, setSettings } from './harness'
 import { pickRecorder } from './pickRecorder'
 
-/** The fixture as Markdown: a quote holding a list item (with a nested item) and two paragraphs. */
-export const OVERLAY_DOC = ['> - First block', '>   - Buy now', '>', '> Second paragraph text', '>', '> Long label', ''].join('\n')
+/** The fixture as Markdown: a quote holding a nested quote (with its paragraph) and two paragraphs. */
+export const OVERLAY_DOC = ['> > Buy now', '>', '> Second paragraph text', '>', '> Long label', ''].join('\n')
 
 /** Where each fixture target is in the rendered preview. */
 const SELECTORS: Readonly<Record<OverlayTargetId, string>> = {
-  container: 'blockquote[data-line-start="1"]',
-  first: 'blockquote > ul > li[data-line-start="1"]',
-  inner: 'li > ul > li[data-line-start="2"]',
-  second: 'blockquote > p[data-line-start="4"]',
-  long: 'blockquote > p[data-line-start="6"]'
+  container: ':scope > blockquote',
+  first: ':scope > blockquote > blockquote',
+  inner: ':scope > blockquote > blockquote > p',
+  second: ':scope > blockquote > p[data-line-start="3"]',
+  long: ':scope > blockquote > p[data-line-start="5"]'
 }
 
 /** What the mode tab says while each target is outlined (A-03, Markdown words). */
 const MARKDOWN_LABELS: Readonly<Record<OverlayTargetId, string>> = {
   container: 'Comment mode · Block quote, line 1 · Esc to leave',
-  first: 'Comment mode · List item, line 1 · Esc to leave',
-  inner: 'Comment mode · List item, line 2 · Esc to leave',
-  second: 'Comment mode · Paragraph, line 4 · Esc to leave',
-  long: 'Comment mode · Paragraph, line 6 · Esc to leave'
+  first: 'Comment mode · Block quote, line 1 · Esc to leave',
+  inner: 'Comment mode · Paragraph, line 1 · Esc to leave',
+  second: 'Comment mode · Paragraph, line 3 · Esc to leave',
+  long: 'Comment mode · Paragraph, line 5 · Esc to leave'
+}
+
+/** The kind word of each target (D-04). */
+const MARKDOWN_KINDS: Readonly<Record<OverlayTargetId, string>> = {
+  container: 'block quote',
+  first: 'block quote',
+  inner: 'paragraph',
+  second: 'paragraph',
+  long: 'paragraph'
 }
 
 /** The pane's (and every other element's) box: the fixture fits inside it, at the viewport's origin. */
@@ -77,6 +88,11 @@ const PAGE_EVENTS = [
   'keydown',
   'keyup'
 ] as const
+
+/** The start of `second`'s text: what `selectIn` selects there. */
+const SELECTED_WORDS = 'Second'
+/** Longer than the button's wait, in real time. */
+const BUTTON_WAIT_MS = 400
 
 const byTestId = (id: string): HTMLElement | null => document.querySelector<HTMLElement>(`[data-testid="${id}"]`)
 
@@ -109,7 +125,7 @@ function commonAncestor(a: Element, b: Element): Element {
  *
  * @returns The driver; `dispose` unmounts it and puts back what it replaced.
  */
-export async function createMarkdownOverlayDriver(): Promise<OverlayDriver> {
+export async function createMarkdownOverlayDriver(): Promise<SelectionDriver> {
   const portal = document.createElement('div')
   portal.id = 'portal-root'
   document.body.appendChild(portal)
@@ -120,12 +136,19 @@ export async function createMarkdownOverlayDriver(): Promise<OverlayDriver> {
   // jsdom has no layout: scrolling does nothing and a range has an empty box.
   const scrollIntoView = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollIntoView')
   const rangeBox = Object.getOwnPropertyDescriptor(Range.prototype, 'getBoundingClientRect')
+  const rangeRects = Object.getOwnPropertyDescriptor(Range.prototype, 'getClientRects')
   Element.prototype.scrollIntoView = vi.fn()
   Range.prototype.getBoundingClientRect = () => new DOMRect()
+  /** Every range is drawn on the one line `box` (the suite's `LINE`s). */
+  const drawRangesAt = (box: OverlayTargetBox): void => {
+    const rect = new DOMRect(box.left, box.top, box.width, box.height)
+    Range.prototype.getClientRects = () => [rect] as unknown as DOMRectList
+  }
   const restoreLayout = (): void => {
     for (const [proto, name, original] of [
       [Element.prototype, 'scrollIntoView', scrollIntoView],
-      [Range.prototype, 'getBoundingClientRect', rangeBox]
+      [Range.prototype, 'getBoundingClientRect', rangeBox],
+      [Range.prototype, 'getClientRects', rangeRects]
     ] as const) {
       if (original === undefined) Reflect.deleteProperty(proto, name)
       else Object.defineProperty(proto, name, original)
@@ -136,7 +159,7 @@ export async function createMarkdownOverlayDriver(): Promise<OverlayDriver> {
   const elements = new Map<OverlayTargetId, HTMLElement>()
   await waitFor(() => {
     for (const target of Object.keys(SELECTORS) as OverlayTargetId[]) {
-      const el = document.querySelector<HTMLElement>(`.markdown-preview-content ${SELECTORS[target]}`)
+      const el = document.querySelector('.markdown-preview-content')?.querySelector<HTMLElement>(SELECTORS[target]) ?? null
       if (el === null) throw new Error(`no fixture target ${target}`)
       elements.set(target, el)
     }
@@ -206,7 +229,7 @@ export async function createMarkdownOverlayDriver(): Promise<OverlayDriver> {
       if (detail === 2) mouse(el, 'dblclick', { x, y, button: 0, detail })
     }
   }
-  const picks: OverlayDriver['picks'] = () =>
+  const picks: SelectionDriver['picks'] = () =>
     pickRecorder.picks.map(p => ({ kind: p.kind, via: p.via, target: targetOf(p.element) }))
   const outlinedTarget = (): OverlayTargetId | null => {
     const outline = byTestId(TEST_IDS.COMMENT_HOST_OUTLINE)
@@ -236,6 +259,19 @@ export async function createMarkdownOverlayDriver(): Promise<OverlayDriver> {
     mouse(el, 'contextmenu', { x, y, button: 2 })
     mouse(el, 'auxclick', { x, y, button: 2, detail: 1 })
   }
+  const selectionButton = (): HTMLElement | null => byTestId(TEST_IDS.COMMENT_SELECTION_BUTTON)
+  /** The first words of `target`'s own text selected. */
+  const selectIn = (target: OverlayTargetId): void => {
+    const text = [...(elements.get(target)?.childNodes ?? [])].find(node => node.nodeType === Node.TEXT_NODE)
+    if (text === undefined) throw new Error(`no text in ${target}`)
+    const range = document.createRange()
+    range.setStart(text, 0)
+    range.setEnd(text, Math.min(SELECTED_WORDS.length, text.textContent?.length ?? 0))
+    act(() => {
+      window.getSelection()?.removeAllRanges()
+      window.getSelection()?.addRange(range)
+    })
+  }
   const key = (type: 'keyDown' | 'keyUp', target: Element): void => {
     fireEvent[type](target, { key: 'Escape', code: 'Escape' })
   }
@@ -246,19 +282,26 @@ export async function createMarkdownOverlayDriver(): Promise<OverlayDriver> {
     labels: MARKDOWN_LABELS,
     modeIndicatorIdle: 'Comment mode · Esc to leave',
     rightClickOutsideMode: 'menu',
+    kinds: MARKDOWN_KINDS,
     notOwned: {
       floatingLabel:
         'differences table D-05: the Markdown Preview draws no label at the outline – every block has its own box, and the comment-mode tab names the outlined block (its words are checked by OVL-L-01)',
       find: 'Find in the preview-only view is the editor panel’s find bar, outside the preview host this harness mounts'
     },
+    // `detail` 1: a mouse click. A keyboard press has none, and would start the picker a frame later.
     modeOn() {
-      if (!isModeOn()) fireEvent.click(modeTool())
+      if (!isModeOn()) fireEvent.click(modeTool(), { detail: 1 })
     },
     modeOff() {
-      if (isModeOn()) fireEvent.click(modeTool())
+      if (isModeOn()) fireEvent.click(modeTool(), { detail: 1 })
+    },
+    async modeOnByKeys() {
+      fireEvent.click(modeTool(), { detail: 0 })
+      await waitFor(() => expect(pickRecorder.said.length).toBeGreaterThan(0))
     },
     isModeOn,
     modeIndicatorText: tabText,
+    modeTabMovedAway: () => byTestId(TEST_IDS.COMMENT_HOST_MODE_TAB)?.className.includes('--bottom') === true,
     targets: () => [...elements.keys()],
     hover(point) {
       begin()
@@ -284,15 +327,46 @@ export async function createMarkdownOverlayDriver(): Promise<OverlayDriver> {
       mouse(commonAncestor(start.el, end.el), 'click', { x: end.x, y: end.y, button: 0, detail: 1 })
     },
     selectText(target) {
-      const text = [...(elements.get(target)?.childNodes ?? [])].find(node => node.nodeType === Node.TEXT_NODE)
-      if (text === undefined) throw new Error(`no text in ${target}`)
-      const range = document.createRange()
-      range.setStart(text, 0)
-      range.setEnd(text, Math.min(6, text.textContent?.length ?? 0))
-      act(() => {
-        window.getSelection()?.removeAllRanges()
-        window.getSelection()?.addRange(range)
-      })
+      drawRangesAt(OVERLAY_FIXTURE[target].box)
+      selectIn(target)
+    },
+    selectWords(target, line) {
+      drawRangesAt(line)
+      selectIn(target)
+    },
+    dragSelect(target, line) {
+      begin()
+      const { x, y, el } = at({ target })
+      press(el, x - 10, y, 0, { detail: 1 })
+      drawRangesAt(line)
+      selectIn(target)
+      release(el, x + 10, y, 0, { detail: 1 })
+      mouse(el, 'click', { x: x + 10, y, button: 0, detail: 1 })
+    },
+    async waitForButton() {
+      await waitFor(() => expect(selectionButton()).not.toBeNull(), { timeout: BUTTON_WAIT_MS * 3 })
+    },
+    scrollSelection(line) {
+      drawRangesAt(line)
+      fireEvent.scroll(scroller())
+    },
+    async clearSelectionByScript() {
+      act(() => window.getSelection()?.removeAllRanges())
+      // jsdom fires `selectionchange` a task later.
+      await act(() => new Promise(resolve => setTimeout(resolve, BUTTON_WAIT_MS)))
+    },
+    commentButton() {
+      const button = selectionButton()
+      if (button === null) return null
+      return { top: Number.parseFloat(button.style.top), below: button.className.includes('--below') }
+    },
+    async lastPickHadWords() {
+      await waitFor(() => expect(commentWindow()).not.toBeNull())
+      return commentWindow()?.textContent?.includes(SELECTED_WORDS) === true
+    },
+    async menuAboutWords() {
+      await waitFor(() => expect(menu()).not.toBeNull())
+      return byTestId(TEST_IDS.COMMENT_MENU_SELECTION) !== null
     },
     selectedText: () => window.getSelection()?.toString() ?? '',
     rightClick,
@@ -314,6 +388,51 @@ export async function createMarkdownOverlayDriver(): Promise<OverlayDriver> {
       key('keyDown', target)
       key('keyUp', target)
     },
+    pressEnter() {
+      begin('keyboard')
+      act(() => scroller().focus())
+      fireEvent.keyDown(scroller(), { key: 'Enter', code: 'Enter' })
+      fireEvent.keyUp(scroller(), { key: 'Enter', code: 'Enter' })
+    },
+    levelUpByKeys() {
+      begin('keyboard')
+      act(() => scroller().focus())
+      fireEvent.keyDown(scroller(), { key: 'ArrowUp', code: 'ArrowUp', altKey: true })
+      fireEvent.keyUp(document.activeElement ?? scroller(), { key: 'ArrowUp', code: 'ArrowUp', altKey: true })
+    },
+    pressKey({ key: name, code, shift, alt, ctrl, meta }) {
+      begin('keyboard')
+      if (!scroller().contains(document.activeElement)) act(() => scroller().focus())
+      const init = { key: name, code, shiftKey: shift === true, altKey: alt === true, ctrlKey: ctrl === true, metaKey: meta === true }
+      fireEvent.keyDown(document.activeElement ?? scroller(), init)
+      fireEvent.keyUp(document.activeElement ?? scroller(), init)
+    },
+    saidAtEnd() {
+      const last = pickRecorder.said.at(-1) ?? ''
+      return /at this level|Top level|Nothing inside/.test(last) ? last : null
+    },
+    async cancelPick() {
+      await waitFor(() => expect(commentWindow()).not.toBeNull())
+      act(() => {
+        commentWindow()?.querySelector<HTMLElement>('textarea')?.focus()
+      })
+      const active = document.activeElement ?? scroller()
+      key('keyDown', active)
+      key('keyUp', active)
+      await waitFor(() => expect(commentWindow()).toBeNull())
+    },
+    pickByKeys() {
+      begin('keyboard')
+      act(() => scroller().focus())
+      fireEvent.keyDown(scroller(), { key: 'Tab', code: 'Tab' })
+      fireEvent.keyUp(document.activeElement ?? scroller(), { key: 'Tab', code: 'Tab' })
+    },
+    // jsdom keeps focus on an element that lost its `tabindex`; Chromium drops it to <body>.
+    focusHeldInPreview() {
+      const active = document.activeElement
+      return active instanceof HTMLElement && scroller().contains(active) && active.hasAttribute('tabindex')
+    },
+    keyboardMenuAsked: () => menu() !== null,
     picks,
     pickedTarget: () => picks().filter(p => p.kind !== 'exit').at(-1)?.target ?? null,
     outlinedTarget,

@@ -28,7 +28,7 @@ import type { MdIndex, MdTarget } from '../../../shared/markdownComments/mdIndex
 import { positionTargetOf } from '../../../shared/markdownComments/mdLocate'
 import { placeOf, type MdTargetPlace } from '../../../shared/markdownComments/mdPlace'
 import { attachedCarrierOf, threadWordsReader } from './commentEditWords'
-import { changeOf, type ListedChange } from './commentListChange'
+import { changeOf, nowWordsOf, type ListedChange } from './commentListChange'
 import { rebuildViewOf } from './commentRebuild'
 import { addRefusal, type JobDocument } from './commentJobDocs'
 import type { CommentRefusal } from './commentRefusals'
@@ -56,6 +56,8 @@ export interface ListedPlacement {
   readonly tag: string
   /** The block's valid `anchor.sel` (024-FR-004): the preview underlines these words while it finds them. */
   readonly sel?: AnchorSelection
+  /** The words of a Words changed comment now (S-04, I-14): what the preview marks instead of {@link sel}. */
+  readonly now?: AnchorSelection
   /** C-03: where a Markdown target sits when its tag does not name it (a table row or cell, a diagram). */
   readonly place?: MdTargetPlace
 }
@@ -188,7 +190,7 @@ function threadPlace(doc: KindDocument, block: OkBlock, found: FoundTarget | und
   return target === undefined ? undefined : placeOf(target)
 }
 
-/** Reads an attached thread's words for the Narrow to words field of Edit on its first message (C-07). */
+/** Reads an attached thread's words for the Comment on specific words field of Edit on its first message (C-07). */
 type WordsReader = ReturnType<typeof threadWordsReader>
 
 function threadOf(doc: KindDocument, block: OkBlock, line: number, wordsOf: WordsReader): ListedThread {
@@ -263,12 +265,14 @@ function placementsOf(doc: KindDocument, line: (offset: number) => number): List
     if (carrier === undefined) continue
     const target = placedOn(doc, block, carrier)
     const sel = anchorSelectionOf(block.data.anchor)
+    const now = block.data.status === 'open' ? nowWordsOf(doc.index, carrier, block.data.anchor) : undefined
     const place = isMarkdownIndex(doc.index) ? placeOf(target as MdTarget) : undefined
     placements.push({
       threadId: block.data.id,
       line: line(target.start),
       tag: target.tag,
       ...(sel === undefined ? {} : { sel }),
+      ...(now === undefined ? {} : { now }),
       ...(place === undefined ? {} : { place })
     })
   }

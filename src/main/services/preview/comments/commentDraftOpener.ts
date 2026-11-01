@@ -25,16 +25,19 @@
  * that commits another document while the draft is built would otherwise get
  * a menu labelled with the new file over a draft that writes into the old
  * one; such a pick opens nothing. Nothing is minted or sent once the view is
- * gone or the frame's record left it (`isCurrent`).
+ * gone or the frame's record left it (`isCurrent`). The Comment button outside
+ * comment mode (D-10) opens nothing for words main could not find on disk: they
+ * are the page's claim, and that route has no comment mode to vouch for the pick.
  */
-import { CommentPickRuntimeSchema, type CommentDraftOpened, type CommentPick } from '../../../../shared/ipc/preview-comment-schema'
+import { ErrorCode } from '../../../../shared/errors'
+import { CommentPickRuntimeSchema, type CommentAck, type CommentDraftOpened, type CommentPick, type CommentPickView } from '../../../../shared/ipc/preview-comment-schema'
 import type { PreviewBounds } from '../../../../shared/ipc/preview-types'
 import type { HtmlFileJobRunner } from './htmlCommentJobs'
 import type { CommentBinding, CommentKeyStore } from '../../comments/commentKeyStore'
 import type { CommentFrameLike, FrameRecord } from './commentFrames'
 import { NOT_COMMENTABLE, buildDraft, buildPin, draftKeyOf, type BuiltDraft, type BuiltPin, type CommentDraft } from './commentDraftBuilder'
 import { menuPoint } from './commentMenuPoint'
-import type { PinGroup } from './commentPins'
+import { threadsOfWords, type PinGroup } from './commentPins'
 import { captureFreshStill, waitForPaint, type FreshStillDeps, type PickFramePlace } from './commentStillCapture'
 import type { FrameOffset } from './commentScripts'
 import { samePathKey } from '../../comments/commentUnsavedSources'
@@ -76,8 +79,10 @@ export interface DraftOpenerDeps {
 
 /** Opens drafts and pin threads for one view. */
 export interface CommentDraftOpener {
-  element(frame: CommentFrameLike, record: FrameRecord, entry: ElementTokenEntry | undefined, pick: CommentPick): Promise<void>
-  icon(frame: CommentFrameLike, record: FrameRecord, pinKey: string, pick: CommentPick): Promise<void>
+  element(frame: CommentFrameLike, record: FrameRecord, entry: ElementTokenEntry | undefined, pick: CommentPick, wordsRequired?: boolean): Promise<void>
+  icon(frame: CommentFrameLike, record: FrameRecord, pinKey: string, pick: CommentPick, word?: number): Promise<void>
+  /** A new comment on the element a listed thread stands on (C-22): the window is up, so nothing is painted or captured. */
+  onThread(frame: CommentFrameLike, record: FrameRecord, entry: ElementTokenEntry, runtime: PinGroup['runtime'], view: CommentPickView): Promise<CommentAck>
 }
 
 /** Where `frame` sits below the top frame (S8: `frames` order is `window[i]` order). */
@@ -95,7 +100,7 @@ export function placeOf(frame: CommentFrameLike, main: CommentFrameLike | undefi
  * the page describes. `undefined` when that element is not one a pick could
  * name (a stored runtime tag or path the pick schema refuses).
  */
-export function pinPickOf(pin: PinGroup, pick: CommentPick): CommentPick | undefined {
+export function pinPickOf(pin: Pick<PinGroup, 'runtime'>, pick: CommentPick): CommentPick | undefined {
   const base: CommentPick = { kind: pick.kind, via: pick.via, view: pick.view }
   if (pin.runtime === undefined) return base
   const runtime = CommentPickRuntimeSchema.safeParse({ path: pin.runtime.path, tag: pin.runtime.tag })
@@ -120,7 +125,7 @@ export function openThreadsOn(record: Pick<FrameRecord, 'pins'>, pick: CommentPi
 export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpener {
   const { geometry } = deps
 
-  function pointOf(pick: CommentPick, offset: FrameOffset | null): { x: number; y: number } {
+  function pointOf(pick: CommentPick, offset: FrameOffset | null): { x: number; y: number } | null {
     return menuPoint({
       pick,
       frameOffset: offset,
@@ -156,7 +161,8 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
     frame: CommentFrameLike,
     record: FrameRecord,
     entry: ElementTokenEntry | undefined,
-    pick: CommentPick
+    pick: CommentPick,
+    wordsRequired = false
   ): Promise<void> {
     const commented = openThreadsOn(record, pick)
     if (commented !== undefined) return icon(frame, record, commented, pick)
@@ -177,12 +183,14 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
             platform: deps.platform
           })
     const offset = await painted
-    if (!stillCurrent(record, file)) return
+    const point = pointOf(pick, offset)
+    if (!stillCurrent(record, file) || point === null) return
+    if (wordsRequired && built.ok && built.wordsMissing === true) return
     deps.emit({
       panelId: deps.panelId,
       // A right-click outside comment mode (OD-01) opens the same menu.
       kind: pick.kind === 'open' ? 'open' : 'menu',
-      point: pointOf(pick, offset),
+      point,
       ...display(file, frame),
       ...minted(built),
       // C-19: a menu with no draft names why, so its items stay, disabled, with their reason line.
@@ -252,9 +260,11 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
   /**
    * A pin's threads and blocks, and a draft on its element for "New comment".
    * A stack pin's click (C-17) names the other pins merged into it: their
-   * threads and blocks follow the first pin's, in document order.
+   * threads and blocks follow the first pin's, in document order. A mark's
+   * click (I-13) names the place of its words in the pin: only the thread on
+   * them opens, as an underline's does in the Markdown Preview.
    */
-  async function icon(frame: CommentFrameLike, record: FrameRecord, pinKey: string, pick: CommentPick): Promise<void> {
+  async function icon(frame: CommentFrameLike, record: FrameRecord, pinKey: string, pick: CommentPick, word?: number): Promise<void> {
     const pin = record.pins.get(pinKey)
     const file = record.file
     if (pin === undefined || file === undefined) return
@@ -263,19 +273,37 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
     const entry = record.loadId === undefined ? undefined : deps.tokens.lookup(record.loadId, pin.token)
     const painted = paintAndCapture(placeOf(frame, deps.mainFrame()), pick)
     const built = await pinOf(frame, file, entry, pin, pick, stackedEntries(record, stacked))
-    const { blocks } = built
+    const marked = word === undefined ? [] : threadsOfWords(pin, word)
+    const threadIds = marked.length > 0 ? marked : [pin, ...stacked].flatMap(p => p.threadIds)
+    const blocks = marked.length > 0 ? [] : built.blocks
     const offset = await painted
-    if (!stillCurrent(record, file)) return
+    const point = pointOf(pick, offset)
+    if (!stillCurrent(record, file) || point === null) return
     deps.emit({
       panelId: deps.panelId,
       kind: 'icon',
-      point: pointOf(pick, offset),
+      point,
       ...display(file, frame),
-      threadKeys: [pin, ...stacked].flatMap(p => p.threadIds).map(threadId => deps.keys.keyFor(deps.binding, { kind: 'thread', realPath, threadId })),
+      threadKeys: threadIds.map(threadId => deps.keys.keyFor(deps.binding, { kind: 'thread', realPath, threadId })),
       blockKeys: blocks.map(({ rawHash, start }) => deps.keys.keyFor(deps.binding, { kind: 'block', realPath, rawHash, start })),
       ...minted(built.draft)
     })
   }
 
-  return { element, icon }
+  async function onThread(frame: CommentFrameLike, record: FrameRecord, entry: ElementTokenEntry, runtime: PinGroup['runtime'], view: CommentPickView): Promise<CommentAck> {
+    const file = record.file
+    // Where the drawer's and a step's window stands: a third of the way down the page's middle.
+    const point = { x: Math.round(view.w / 2), y: Math.round(view.h / 3) }
+    const onPin = pinPickOf({ runtime }, { kind: 'menu', via: 'keyboard', view })
+    if (file === undefined || onPin === undefined) return { ok: false, code: ErrorCode.COMMENT_TARGET_MOVED }
+    const pick = { ...onPin, point }
+    const built = await buildDraft({ realRoot: deps.realRoot, file, entry, pick, frame: frame.parent !== null, pageRealPath: deps.currentPage(), jobs: deps.jobs, platform: deps.platform })
+    if (!built.ok) return { ok: false, code: built.code ?? ErrorCode.COMMENT_TARGET_MOVED }
+    if (!stillCurrent(record, file)) return { ok: false, code: ErrorCode.COMMENT_TARGET_MOVED }
+    // Not the page's pick: a view hidden behind the window has an empty rectangle, and this one still opens.
+    deps.emit({ panelId: deps.panelId, kind: 'open', point: pointOf(pick, null) ?? point, ...display(file, frame), ...minted(built), ...wordsOf(built, pick) })
+    return { ok: true }
+  }
+
+  return { element, icon, onThread }
 }

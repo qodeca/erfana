@@ -161,6 +161,16 @@ describe('M-067 menuPoint', () => {
   it('is clamped to the panel: a forged or stale value only misplaces the menu inside its preview', () => {
     expect(menuPoint({ ...base, pick: { via: 'pointer', screen: { x: -5_000, y: 9_000 } } })).toEqual({ x: 100, y: 449 })
     expect(menuPoint({ ...base, hostZoom: Number.NaN, pageZoom: -1, pick: { via: 'keyboard' } })).toEqual({ x: 100, y: 50 })
-    expect(menuPoint({ ...base, viewRect: null, pick: { via: 'keyboard', point: { x: 3, y: 4 } } })).toEqual({ x: 3, y: 4 })
+  })
+
+  it('C a keyboard pick with no view rectangle, or an empty one, has no point: it fails closed', () => {
+    const keyboard = { ...base, pick: { via: 'keyboard' as const, point: { x: 3, y: 4 } } }
+    expect(menuPoint({ ...keyboard, viewRect: null })).toBeNull()
+    expect(menuPoint({ ...keyboard, viewRect: { x: 0, y: 0, width: 0, height: 400 } })).toBeNull()
+    expect(menuPoint({ ...keyboard, viewRect: { x: 0, y: 0, width: 600, height: 0 } })).toBeNull()
+  })
+
+  it('a pointer pick keeps its point with no view rectangle: the screen says where', () => {
+    expect(menuPoint({ ...base, viewRect: null })).toEqual({ x: 290, y: 230 })
   })
 })

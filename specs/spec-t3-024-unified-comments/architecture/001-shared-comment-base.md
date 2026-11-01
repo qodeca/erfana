@@ -40,6 +40,7 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | **New** `markdownComments/{mdIndex,slots,renderCheck,mdAnchor,markdownKind}.ts` | – | `src/shared/markdownComments/` | M | Markdown has no tags or ids in the source, so placement and re-attach are new (design §5, §6) |
 | **New** `src/shared/markdown/previewPipeline.ts` | inside `MarkdownPreview.tsx` | plugin list, sanitize schema, frontmatter split | M | One pipeline for the preview and main's render check |
 | **Added since** `agentNotes`, `noteLines`, `anchorSel`, `selectionWords`, `spokenExcerpt`, `cutText`, `targetIndex`, `commentableExtensions`, `foreignComments` (9) | – | `src/shared/comments/` | S | – |
+| **Added since** `spliceMany` | – | `src/shared/comments/` | S | – |
 | **Added since** `markdownComments/{markdownLimits,mdCommentScan,mdHast,mdHints,mdLocate,mdRender,mdSlots,mdSource}.ts` (8) | – | `src/shared/markdownComments/` | M | Markdown's limits, comment tokenizer, rendered tree, target hint, locate, render check, slots and line coordinates: rules of the Markdown source, which has no tags or ids (design `markdown-format.md`; § 8 C3, C4, C7, C9, C11, C19) |
 | **Added since** `markdownComments/mdPlace.ts` (1) | – | `src/shared/markdownComments/` | M | A table row's, cell's and diagram's place in main's Markdown index – what the C-03 nouns "row 2", "header row", "row 2, column 3" and "diagram" are named from; HTML names every target "element" (D-04) |
 
@@ -55,9 +56,11 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | `commentE2eHook` (1) | stays | H | It exposes served loads |
 | **Added since** `commentInsertIndent`, `commentListChange`, `commentPathConfine`, `commentRebuild`, `fileCommentPanels`, `fileCommentWatches`, `kindCommentJobs` (7) | `src/main/services/comments/` | S | – |
 | **Added since** `commentEditWords` (1) | `src/main/services/comments/` | S | – |
+| **Added since** `commentBulkCore`, `commentBulkFlow`, `commentGitName` (3) | `src/main/services/comments/` | S | – |
 | **Added since** `commentFileKinds`, `src/main/ipc/comments/file-comments.ts` (2) | `src/main/services/comments/`, `src/main/ipc/comments/` | S – composition roots | They name every registered kind; the base itself never imports a kind (§ 8 C24) |
 | **Added since** `markdown/markdownCommentJobs` (1) | `src/main/services/comments/markdown/` | M | The Markdown kind's jobs in the parse worker (§ 8 C19, C22) |
-| **Added since** `commentContextGate`, `commentDraftKeys`, `commentWordsCore`, `commentPickerSpeaker`, `htmlCommentJobs`, `htmlCommentParseClient` (6) | stay in `src/main/services/preview/comments/` | H | They check the page's right-click, draft words and picker steps against main's parse5 parse, and run the HTML kind's jobs in the parse worker – all about a page in another process |
+| **Added since** `commentContextGate`, `commentDraftKeys`, `commentWordsCore`, `commentPickerSpeaker`, `htmlCommentJobs`, `htmlCommentParseClient`, `commentThreadActions` (7) | stay in `src/main/services/preview/comments/` | H | They check the page's right-click, draft words and picker steps against main's parse5 parse, and run the HTML kind's jobs in the parse worker – all about a page in another process |
+| **Added since** `previewSaveFlows` (1) | stays in `src/main/services/preview/comments/` | H | One view's save and bulk paths over one writer; the file family's are `FileCommentService`'s |
 
 ### Overlay
 
@@ -70,6 +73,20 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | **Added since** `src/renderer/src/components/Comments/overlay/{useCommentOverlayHost,useHostPointerKeys,useSelectionComments,previewAdapter,pickerKeys,hostTypes,hostParts,hostMenu,hostWindow,hostDrawer,domWords,commentContentAttrs,contentGuard}.ts` (13) | S (for renderer-hosted previews) | – |
 | **Added since** `src/renderer/src/components/Editor/markdownComments/{useMarkdownComments,MarkdownCommentsOverlay,MarkdownCommentsBand}.tsx` (3) | M | The Markdown Preview's composition root, the surfaces it draws in its pane, and its paused band (D-24: only the Markdown Preview draws the editor's unsaved text) |
 | **Added since** `src/renderer/src/components/Comments/overlay/useHostStepKeys.ts` (1) | S (for renderer-hosted previews) | – |
+| **Added since** `src/renderer/src/components/Comments/overlay/useHostCommentMode.ts` (1) | S (for renderer-hosted previews) | – |
+| **Added since** `src/renderer/src/components/Comments/overlay/useHostThreads.ts` (1) | S (for renderer-hosted previews) | – |
+| **Added since** `src/shared/comments/overlayCore/pointerFollow.ts` (1) | S | Pure rule both overlays run: when the pointer takes the picker over. No imports, no DOM |
+| **Added since** `src/shared/comments/overlayCore/pickerKeys.ts` (1) | S | Pure rule both overlays run: the picker's keys and its tree walk. No imports, no DOM |
+| **Added since** `src/shared/comments/overlayCore/selectionRules.ts` (1) | S | Pure rule both overlays run: where the Comment button sits, and when a right-click is about the selection. No imports, no DOM |
+| **Added since** `src/shared/comments/overlayCore/reveal.ts` (1) | S | Pure rule both overlays run: which folds to open for "Show in preview", the flash's length, and when the mode tab moves away. No imports, no DOM |
+| **Added since** `src/shared/comments/overlayCore/markGround.ts` (1) | S | Pure rule: which comment bar a page's ground takes. No imports, no DOM |
+| **Added since** `src/renderer/src/components/Comments/overlay/useHostReveal.ts` (1) | S (for renderer-hosted previews) | The renderer host's "Show in preview": the flash and the drawer's note |
+| **Added since** `src/renderer/src/components/Comments/overlay/useHostList.ts` (1) | S (for renderer-hosted previews) | The renderer host's comment list and what main said about the read: off, or unreadable for good (F-05) |
+| **Added since** `src/renderer/src/components/Comments/overlay/useSavingSign.ts` (1) | S (for renderer-hosted previews) | The waiting sign between a save's answer and the new icon (P-F17) |
+| **Added since** `src/renderer/src/components/Panels/HtmlPreviewPanel/comments/useRevealNote.ts` (1) | H | The HTML Preview's half: waits for the page's report, because the target opens in the page |
+| **Added since** `src/renderer/src/components/Comments/overlay/useHostPanelKeys.ts` (1) | S (for renderer-hosted previews) | – |
+| **Added since** `src/renderer/src/components/Comments/commentWindowDismiss.ts` (1) | S | – |
+| **Added since** `src/renderer/src/components/Comments/commentModeEscape.ts` (1) | S | – |
 | **Added since** `src/renderer/src/components/Comments/overlay/{iconLayout,commentTiming}.ts` (2) | S (for renderer-hosted previews) | Icon placement with the 3-per-row cap, ghost and damaged icons (C-05, C-17, S-01..S-08); the 024-NFR-001 `performance.mark` points |
 
 ### Renderer
@@ -81,12 +98,15 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | `usePreviewComments`, `PreviewCommentsLayer`, `commentLive` | split: shared `useComments.ts` and `CommentsHost.tsx`; the HTML parts become `HtmlPreviewPanel/comments/htmlCommentSource.ts` | S + H | Page-driven drafts, still images and main-driven mode changes exist only in HTML |
 | `useDrawerSheet` | stays | H | It hides the native view behind a full-width drawer (`usePreviewCoveredStore`) |
 | `services/preview/commentGateway.ts` and **new** `services/comments/fileCommentGateway.ts` | both implement one `CommentSource` interface | H / S | HTML is addressed per view, through page draft tokens. Text previews are addressed per file |
-| **Added since** `CommentWindowShell`, `CommentStepper`, `CommentWordsPicker`, `DamagedBlockView`, `ThreadStatus`, `CommentDrawerRow`, `CommentDrawerSort`, `CommentRemovedNote`, `commentRemovedOutside`, `commentCarriedDrafts`, `commentDockPlacement`, `commentCopyWords`, `commentWindowCopy`, `commentWindowStates`, `commentWords`, `useThreadSession` (16) | `src/renderer/src/components/Comments/` | S | – |
-| **Added since** `previewCommentRequests`, `usePreviewDraftKeepAlive` (2) | stay in `HtmlPreviewPanel/comments/` | H | A page draft token and the window it opens, and its keep-alive, exist only because the HTML page picks in another process |
+| **Added since** `CommentWindowShell`, `CommentStepper`, `CommentWordsPicker`, `DamagedBlockView`, `ThreadStatus`, `CommentDrawerRow`, `CommentDrawerSort`, `useNarrowPanel`, `CommentRemovedNote`, `commentRemovedOutside`, `commentCarriedDrafts`, `commentDockPlacement`, `commentCopyWords`, `commentWindowCopy`, `commentWindowStates`, `commentWords`, `useThreadSession` (16) | `src/renderer/src/components/Comments/` | S | – |
+| **Added since** `previewCommentRequests`, `previewNewOnThread`, `usePreviewDraftKeepAlive` (3) | stay in `HtmlPreviewPanel/comments/` | H | A page draft token and the window it opens, and its keep-alive, exist only because the HTML page picks in another process |
 | **Added since** `usePreviewModeBlock` (1) | stays in `HtmlPreviewPanel/comments/` | H | M-07: main holds the HTML comment mode, so turning it off for a read-only page goes through main's mode request; the Markdown host keeps its mode in the renderer |
 | **Added since** `commentDrawerFilter`, `commentStepKeys` (2) | `src/renderer/src/components/Comments/` | S | – |
 | **Added since** `commentTargetNoun` (1) | `src/renderer/src/components/Comments/` | S | – |
+| **Added since** `commentBulk`, `useDrawerBulk`, `CommentDrawerBulk` (3) | `src/renderer/src/components/Comments/` | S | – |
 | **Added since** `usePageCommentStepKeys` (1) | stays in `HtmlPreviewPanel/comments/` | H | The page's Alt+F9 / Alt+Shift+F9 reach the renderer only as keys main forwards from another process (C-13) |
+| **Added since** `src/renderer/src/components/Comments/{useIdentityGate,useWindowPause,useWindowFirstFocus,commentWindowDock}.ts`, `{CommentUnsavedActions,CommentPausedBand}.tsx` (6) | S | The name step before a thread write, the pause and its buttons, the band and the one first-focus rule: one behaviour in both previews (plan steps 2 and 3); the dock is split off for the line limit |
+| **Added since** `src/renderer/src/components/Panels/HtmlPreviewPanel/comments/PreviewPausedBand.tsx` (1) | H | The HTML Preview's words for the shared band: its page draws the file on disk, so the conflict sentence is the tab's |
 
 `commentCopy` keeps one string table with a `TargetNouns` map per preview (C-03), so both previews import one module (024-AC-008).
 
@@ -185,7 +205,7 @@ export interface PreviewCommentAdapter {
 - `preview:commentSetUnsavedSources` today lists `.html`/`.htm` paths only (`useUnsavedSourcesFeed.ts:54`), and only while the HTML bridge exists; § 8 C6 widens it to every commentable extension in every window.
 - **Changed HTML payloads (optional fields only):**
   - `preview-page:commentPick.sel?` (S5)
-  - `commentState.icons[].selRange?` (underline – character offsets within the target's text, numbers only; never strings, § 8 C16)
+  - `commentState.icons[].selRange?` (underline – the marked words and their place in the target's text; never comment text, names or emails, § 8 C16)
   - `preview:commentsChanged.stamp` (C-14)
   - a `reason` next to `code` in save answers (C-19)
 - **Page-reachable surface:** no new channel, no new listener, no `invoke`. The contract test stays, except the one import allow-list line (§2).
