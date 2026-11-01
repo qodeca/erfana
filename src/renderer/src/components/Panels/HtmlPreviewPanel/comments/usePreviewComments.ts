@@ -53,7 +53,8 @@ import { useLiveText } from '../../../Comments/commentLive'
 import { takeFindEscape, takeModeEscape } from '../../../Comments/commentModeEscape'
 import { COMMENT_LIST_COPY, HTML_WORDS, MD_SPOKEN_COPY } from '../../../Comments/commentCopyWords'
 import { useRemovedOutside } from '../../../Comments/commentRemovedOutside'
-import { closeReturnsToPage, newCommentRequest, pinWindowRequest, rowWindowRequest, withWords, type RowTarget } from './previewCommentRequests'
+import { centreOf, closeReturnsToPage, newCommentRequest, pinWindowRequest, rowWindowRequest, withWords, type RowTarget } from './previewCommentRequests'
+import { newOnThreadAction } from './previewNewOnThread'
 import { usePageCommentStepKeys } from './usePageCommentStepKeys'
 import { pickerAnnouncement } from './commentLive'
 import { usePreviewDraftKeepAlive } from './usePreviewDraftKeepAlive'
@@ -431,6 +432,7 @@ export function usePreviewComments({
       },
       onCloseWindow: closeWindow,
       onNewComment: next => setRequest(next),
+      newOnThread: threadKey => newOnThreadAction(panelId, state.list, threadKey, alert),
       onSaveIdentity: data =>
         updateCommentIdentity({
           authorName: data.name,
@@ -489,10 +491,4 @@ export function usePreviewComments({
 
   const pageFile = state.list.files.find(file => !file.frame)?.filePath ?? filePath
   return { enabled, toolbar, drawer, layer, pageFile, onRootKeyDown, onRootKeyDownCapture }
-}
-
-/** The middle of a box: where a window opened from the drawer is anchored. */
-function centreOf(box: Box | null): { x: number; y: number } {
-  if (box === null) return { x: 0, y: 0 }
-  return { x: box.left + box.width / 2, y: box.top + box.height / 3 }
 }

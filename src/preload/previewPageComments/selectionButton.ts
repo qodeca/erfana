@@ -19,6 +19,14 @@ import { rectsOf, type PageWords } from './words'
 /** The button's width, CSS pixels: the icon, "Comment" at the overlay's size, and its padding. */
 export const COMMENT_BUTTON_WIDTH_PX = 88
 
+/** Where a keyboard menu on selected words opens: at the selection's last line (menu matrix § 4), or `null` with no box. */
+export function selectionEnd(win: Window): Point | null {
+  const selection = win.getSelection()
+  if (selection === null || selection.rangeCount === 0) return null
+  const last = rectsOf(selection.getRangeAt(0)).at(-1)
+  return last === undefined ? null : { x: Math.round(last.left), y: Math.round(last.bottom) }
+}
+
 /** The selection's Comment button. */
 export class SelectionButton {
   private words: PageWords | null = null
@@ -61,10 +69,7 @@ export class SelectionButton {
 
   /** Where a keyboard menu on the words opens: at the selection's last line (menu matrix § 4), or `null` with no box. */
   menuPoint(): Point | null {
-    const selection = this.win.getSelection()
-    if (this.words === null || selection === null || selection.rangeCount === 0) return null
-    const last = rectsOf(selection.getRangeAt(0)).at(-1)
-    return last === undefined ? null : { x: Math.round(last.left), y: Math.round(last.bottom) }
+    return this.words === null ? null : selectionEnd(this.win)
   }
 
   /**

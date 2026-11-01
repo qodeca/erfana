@@ -60,6 +60,8 @@ export interface CommentServiceApi {
   setMode(on: boolean, showIcons: boolean): Promise<CommentSetModeResult>
   list(): Promise<CommentListResult>
   reveal(threadKey: string): CommentAck
+  /** Start a new comment on a listed thread's target; the draft comes as `draftOpened`. */
+  newOnThread(threadKey: string): Promise<CommentAck>
   /** C-14.2: keep an open new-comment window's draft alive. */
   keepDraft(draftToken: string): CommentAck
   save(request: CommentSaveRequest): Promise<CommentSaveResult>

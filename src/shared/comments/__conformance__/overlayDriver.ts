@@ -197,6 +197,8 @@ export interface OverlayDriver {
   /** Focus is on something that can hold it inside the preview, never `<body>` or a target that lost its `tabindex`. */
   focusHeldInPreview?(): boolean
 
+  /** A key asked for the menu outside comment mode, with no pointer (HTML: the pick main checks; K-1). */
+  keyboardMenuAsked(): boolean
   /** Every pick so far, oldest first. */
   picks(): readonly OverlayPick[]
   /** The target the last pointer or keyboard pick named, or `null`. */
@@ -292,8 +294,8 @@ export interface WindowRulesSetup {
   readonly opened?: 'target' | 'elsewhere'
 }
 
-/** One thread of the fixture: plain open, or Changed (S-03). */
-export type WindowRulesThread = 'open' | 'changed'
+/** One thread of the fixture: plain open, Changed (S-03), or Not found (S-05). */
+export type WindowRulesThread = 'open' | 'changed' | 'not-found'
 
 /** What holds focus in the window. `window` is the frame itself, which draws no ring. */
 export type WindowFocus = 'title' | 'resolve' | 'resolve-next' | 'window' | 'other'

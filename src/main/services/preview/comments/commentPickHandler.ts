@@ -27,11 +27,13 @@
  *   recorded it at the frame's last navigation (SEC-09), and the tag the page
  *   says the tokened element has is the tag main recorded for the token
  *   (R3-13 L5) – a token moved onto another element is refused;
- * - for a `context` pick – the reader's right-click outside comment mode that
- *   the page did not cancel (OD-01) – comment mode is OFF (in the mode the
- *   preload sends `menu`), the real cursor is over the view at the point the
- *   page reports (`commentContextGate.ts`, security review L-1), and the
- *   element checks above hold: it only ever opens a menu;
+ * - for a `context` pick – the reader's right-click, Shift+F10 or Menu key
+ *   outside comment mode that the page did not cancel (OD-01, K-1) – comment
+ *   mode is OFF (in the mode the preload sends `menu`), main has its own
+ *   evidence of the gesture (`commentContextGate.ts`, security review L-1: the
+ *   real cursor at the reported point for a pointer pick, a real key press in
+ *   the last second for a keyboard one), and the element checks above hold: it
+ *   only ever opens a menu;
  * - for a pin pick: the key is one of the frame's pins;
  * - for a keyboard-picker step that reached an element: comment mode is on,
  *   and the token passes the element pick's frame and file checks, so the
@@ -49,7 +51,7 @@ import { stablePathDigest } from '../../../../shared/stablePathDigest'
 import { logger } from '../../LoggingService'
 import { samePathKey } from '../../comments/commentUnsavedSources'
 import type { CommentFrameLike, CommentFrames, FrameRecord } from './commentFrames'
-import { realContextClick, type ContextGateGeometry } from './commentContextGate'
+import { realContextClick, type ContextGateGeometry, type ContextKeyGate } from './commentContextGate'
 import type { PickerStepEvent } from './commentPickerSpeaker'
 import type { ElementTokenEntry, ElementTokenTable } from './ElementTokenTable'
 
@@ -126,6 +128,8 @@ export interface PickHandlerDeps {
   readonly platform?: NodeJS.Platform
   /** Where the view and the real cursor are, for a `context` pick (L-1); absent: every `context` pick is dropped. */
   readonly geometry?: ContextGateGeometry
+  /** Main's record of the menu key, for a keyboard `context` pick (L-1); absent: every such pick is dropped. */
+  readonly menuKey?: Pick<ContextKeyGate, 'take'>
 }
 
 /** The handler: one entry per page channel. Never throws. */
@@ -269,8 +273,9 @@ export function createCommentPickHandler(deps: PickHandlerDeps): CommentPickHand
     }
     // A menu or open pick comes only in comment mode; a right-click outside it only out of it (OD-01).
     if (deps.mode() !== (pick.kind !== 'context')) return drop(pick.kind === 'context' ? 'mode-on' : 'mode-off')
-    // L-1: a page renderer cannot pop Erfana's menu at will – the real cursor must be at the click it reports.
-    if (pick.kind === 'context' && (deps.geometry === undefined || !realContextClick(pick, deps.geometry))) return drop('cursor-elsewhere')
+    // L-1: a page renderer cannot pop Erfana's menu at will – main must have seen the gesture itself.
+    if (pick.kind === 'context' && pick.via === 'keyboard' && deps.menuKey?.take(deps.now()) !== true) return drop('no-menu-key')
+    if (pick.kind === 'context' && pick.via === 'pointer' && (deps.geometry === undefined || !realContextClick(pick, deps.geometry))) return drop('cursor-elsewhere')
     elementPick(frame, record, pick)
   }
 

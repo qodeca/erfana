@@ -374,6 +374,7 @@ export async function createMarkdownOverlayDriver(): Promise<OverlayDriver> {
       const active = document.activeElement
       return active instanceof HTMLElement && scroller().contains(active) && active.hasAttribute('tabindex')
     },
+    keyboardMenuAsked: () => menu() !== null,
     picks,
     pickedTarget: () => picks().filter(p => p.kind !== 'exit').at(-1)?.target ?? null,
     outlinedTarget,

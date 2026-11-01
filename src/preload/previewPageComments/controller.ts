@@ -23,12 +23,13 @@ import { OverlayView, outlineModelOf, type OutlineModel } from './overlayView'
 import { pointerTakesOver } from '../../shared/comments/overlayCore/pointerFollow'
 import { PickHold } from './pickHold'
 import { movePicker, type PickerMove, type PickerStep, type PickerTree } from '../../shared/comments/overlayCore/pickerKeys'
-import { pageTree, pickableExcept, type PickablePredicate } from './picker'
+import { focusedElement, pageTree, pickableExcept, pickerStart, type PickablePredicate } from './picker'
 import { MarkResolver, type MarkPlacement } from './marks'
 import { elementOfHit, hitAt, type OverlayHit } from './overlayHits'
 import { HelloRepeater, RevealFlash } from './revealFlash'
-import { contextPayload, describeTarget, elementPoint, PickBudgets, screenOf, stackPart, StepSender, stepElementOf, viewOf, wordsPart, type PickKind, type PickPayload } from './picks'
-import { SelectionButton } from './selectionButton'
+import { describeTarget, elementPoint, PickBudgets, screenOf, stackPart, StepSender, stepElementOf, viewOf, wordsPart, type PickKind, type PickPayload } from './picks'
+import { PageMenu } from './pageMenu'
+import { SelectionButton, selectionEnd } from './selectionButton'
 import { readSelection, type PageWords } from './words'
 import { placePins, type PinInput, type PinPlacement } from './pins'
 import { CursorSheet, PageWatch, RenderScheduler, ScrollRestore } from './scheduling'
@@ -85,6 +86,8 @@ export class CommentController {
   private readonly flash: RevealFlash
   private readonly hellos: HelloRepeater
   private keyboardMenuAt = Number.NEGATIVE_INFINITY
+  /** Erfana's menu outside comment mode: the right-click and the keyboard's route (OD-01, K-1). */
+  readonly menu: PageMenu
   private ready = false
 
   constructor(private readonly deps: ControllerDeps) {
@@ -106,6 +109,8 @@ export class CommentController {
     this.button = new SelectionButton(deps.win)
     this.flash = new RevealFlash(now, () => this.scheduler.soon())
     this.hellos = new HelloRepeater(now, deps.send)
+    const open = (): boolean => !this.state.mode && this.state.commentable
+    this.menu = new PageMenu({ win: deps.win, tokens: this.tokens, now, open, words: () => this.selectionWords(), wordsPoint: () => selectionEnd(deps.win), keyTarget: () => this.menuKeyTarget(), send: payload => this.sendPick(payload) })
   }
 
   /** Comment mode is on for this frame. */
@@ -250,19 +255,6 @@ export class CommentController {
     }
   }
 
-  /**
-   * A trusted right-click outside comment mode (OD-01): read now, and sent
-   * as a `context` pick after the dispatch only when no page listener
-   * cancelled it – on the selected words, or the element under the pointer.
-   */
-  pageContextMenu(event: MouseEvent): void {
-    if (this.state.mode || !this.state.commentable || !(event.target instanceof Element)) return
-    const payload = contextPayload(this.tokens, event.target, event, this.selectionWords(), this.deps.win)
-    setTimeout(() => {
-      if (!event.defaultPrevented) this.sendPick(payload)
-    }, 0)
-  }
-
   /** The keyboard reached the top frame in comment mode (K-6): the picker starts, with no hold, so the pointer still leads. */
   startPicker(): void {
     if (!this.state.mode || !this.entering || !this.deps.isTop || this.current?.isConnected === true) return
@@ -320,12 +312,18 @@ export class CommentController {
 
   private ensureCurrent(): Element | null {
     if (this.current?.isConnected === true) return this.current
-    const viewport = viewportOf(this.deps.win)
-    const hit = (this.pointer !== null ? this.hitElement(this.pointer) : null) ?? this.hitElement({ x: viewport.width / 2, y: viewport.height / 2 })
-    const { body, documentElement } = this.deps.doc
-    // The page's bare margin is no place to start: nothing can be said about it.
-    this.current = hit === null || hit === body || hit === documentElement ? (body !== null ? (this.tree.firstChild(body) ?? body) : hit) : hit
+    this.current = pickerStart((this.pointer !== null ? this.hitElement(this.pointer) : null) ?? this.centreElement(), this.deps.doc, this.tree)
     return this.current
+  }
+
+  private centreElement(): Element | null {
+    const viewport = viewportOf(this.deps.win)
+    return this.hitElement({ x: viewport.width / 2, y: viewport.height / 2 })
+  }
+
+  /** The focused element, else the picker's start with no pointer: a key has nothing to do with where the mouse is (I-18). */
+  private menuKeyTarget(): Element | null {
+    return focusedElement(this.deps.doc, this.pickable) ?? pickerStart(this.centreElement(), this.deps.doc, this.tree)
   }
 
   /** A drag selected words: the outline goes around them and holds there, so Enter acts on what is outlined (K-11). */

@@ -45,6 +45,7 @@ function service(overrides: Partial<CommentServiceApi> = {}): CommentServiceApi 
     setMode: vi.fn(async (on: boolean, showIcons: boolean) => ({ ok: true as const, on, showIcons })),
     list: vi.fn(async () => ({ ok: true as const, files: [] })),
     reveal: vi.fn(() => ({ ok: true as const })),
+    newOnThread: vi.fn(async () => ({ ok: true as const })),
     keepDraft: vi.fn(() => ({ ok: true as const })),
     save: vi.fn(async () => ({ ok: true as const, threadKey: 't1' })),
     e2eState: vi.fn(),
@@ -89,6 +90,8 @@ describe('preview comment handlers', () => {
     expect(await invoke(PreviewCommentChannels.LIST, { panelId: PANEL })).toEqual({ ok: true, files: [] })
     expect(await invoke(PreviewCommentChannels.COMMAND, { panelId: PANEL, command: 'reveal', threadKey: 't1' })).toEqual({ ok: true })
     expect(svc.reveal).toHaveBeenCalledWith('t1')
+    expect(await invoke(PreviewCommentChannels.COMMAND, { panelId: PANEL, command: 'new-on-thread', threadKey: 't1' })).toEqual({ ok: true })
+    expect(svc.newOnThread).toHaveBeenCalledWith('t1')
     const save = { panelId: PANEL, op: 'add', draftToken: DRAFT, text: SECRET_TEXT }
     expect(await invoke(PreviewCommentChannels.SAVE, save)).toEqual({ ok: true, threadKey: 't1' })
     expect(svc.save).toHaveBeenCalledWith(save)

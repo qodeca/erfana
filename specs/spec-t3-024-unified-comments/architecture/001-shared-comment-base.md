@@ -57,7 +57,7 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | **Added since** `commentEditWords` (1) | `src/main/services/comments/` | S | – |
 | **Added since** `commentFileKinds`, `src/main/ipc/comments/file-comments.ts` (2) | `src/main/services/comments/`, `src/main/ipc/comments/` | S – composition roots | They name every registered kind; the base itself never imports a kind (§ 8 C24) |
 | **Added since** `markdown/markdownCommentJobs` (1) | `src/main/services/comments/markdown/` | M | The Markdown kind's jobs in the parse worker (§ 8 C19, C22) |
-| **Added since** `commentContextGate`, `commentDraftKeys`, `commentWordsCore`, `commentPickerSpeaker`, `htmlCommentJobs`, `htmlCommentParseClient` (6) | stay in `src/main/services/preview/comments/` | H | They check the page's right-click, draft words and picker steps against main's parse5 parse, and run the HTML kind's jobs in the parse worker – all about a page in another process |
+| **Added since** `commentContextGate`, `commentDraftKeys`, `commentWordsCore`, `commentPickerSpeaker`, `htmlCommentJobs`, `htmlCommentParseClient`, `commentThreadActions` (7) | stay in `src/main/services/preview/comments/` | H | They check the page's right-click, draft words and picker steps against main's parse5 parse, and run the HTML kind's jobs in the parse worker – all about a page in another process |
 
 ### Overlay
 
@@ -89,7 +89,7 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | `useDrawerSheet` | stays | H | It hides the native view behind a full-width drawer (`usePreviewCoveredStore`) |
 | `services/preview/commentGateway.ts` and **new** `services/comments/fileCommentGateway.ts` | both implement one `CommentSource` interface | H / S | HTML is addressed per view, through page draft tokens. Text previews are addressed per file |
 | **Added since** `CommentWindowShell`, `CommentStepper`, `CommentWordsPicker`, `DamagedBlockView`, `ThreadStatus`, `CommentDrawerRow`, `CommentDrawerSort`, `useNarrowPanel`, `CommentRemovedNote`, `commentRemovedOutside`, `commentCarriedDrafts`, `commentDockPlacement`, `commentCopyWords`, `commentWindowCopy`, `commentWindowStates`, `commentWords`, `useThreadSession` (16) | `src/renderer/src/components/Comments/` | S | – |
-| **Added since** `previewCommentRequests`, `usePreviewDraftKeepAlive` (2) | stay in `HtmlPreviewPanel/comments/` | H | A page draft token and the window it opens, and its keep-alive, exist only because the HTML page picks in another process |
+| **Added since** `previewCommentRequests`, `previewNewOnThread`, `usePreviewDraftKeepAlive` (3) | stay in `HtmlPreviewPanel/comments/` | H | A page draft token and the window it opens, and its keep-alive, exist only because the HTML page picks in another process |
 | **Added since** `usePreviewModeBlock` (1) | stays in `HtmlPreviewPanel/comments/` | H | M-07: main holds the HTML comment mode, so turning it off for a read-only page goes through main's mode request; the Markdown host keeps its mode in the renderer |
 | **Added since** `commentDrawerFilter`, `commentStepKeys` (2) | `src/renderer/src/components/Comments/` | S | – |
 | **Added since** `commentTargetNoun` (1) | `src/renderer/src/components/Comments/` | S | – |

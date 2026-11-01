@@ -128,22 +128,24 @@ describe('Markdown Preview comments – the thread window', () => {
       expect(await screen.findByRole('dialog', { name: 'New comment on list item' })).toBeVisible()
     })
 
-    it('I-4 a thread opened from a drawer row offers none, as in the HTML Preview: it names no picked target', async () => {
+    it('C-22 a thread opened from a drawer row offers it too, on the thread\'s target (owner decision, 2026-11-01)', async () => {
       const user = userEvent.setup()
       await ready()
       await openDrawerRow(user)
       await screen.findByTestId(TEST_IDS.COMMENT_WINDOW)
-      expect(newOnTarget()).toBeNull()
+      await user.click(await screen.findByTestId(TEST_IDS.COMMENT_NEW_ON_ELEMENT))
+      expect(await screen.findByRole('dialog', { name: 'New comment on list item' })).toBeVisible()
+      expect(api.openDraft.mock.calls[0][0]).toMatchObject({ target: { lineStart: 6, tag: 'li' } })
     })
 
-    it('I-4 a thread reached by the step key offers none, as in the HTML Preview', async () => {
+    it('C-22 a thread reached by the step key offers it too', async () => {
       const user = userEvent.setup()
       await ready()
       await user.click(screen.getByTestId(TEST_IDS.COMMENT_TOOL_LIST))
       await screen.findByTestId(TEST_IDS.COMMENT_DRAWER)
       fireEvent.keyDown(document.querySelector<HTMLElement>('.markdown-preview')!, { key: 'F9', code: 'F9', altKey: true })
       await screen.findByTestId(TEST_IDS.COMMENT_WINDOW)
-      expect(newOnTarget()).toBeNull()
+      expect(await screen.findByTestId(TEST_IDS.COMMENT_NEW_ON_ELEMENT)).toBeVisible()
     })
 
     it('I-4 a ghost icon offers none: its target is gone', async () => {

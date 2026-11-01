@@ -99,6 +99,29 @@ export function targetNow(
 }
 
 /**
+ * The target "New comment" goes on for the thread a window shows, however the
+ * window got there (owner decision, 2026-11-01): the one it opened on while it
+ * shows that thread, else where main places the thread now. `null` when the
+ * thread has none that takes a comment.
+ *
+ * @param threadKey - The thread shown.
+ * @param opened - What the window was opened on: its threads, and its target or `null`.
+ * @param placements - Where main placed the listed threads.
+ * @param adapter - The preview's adapter.
+ * @returns The rendered target.
+ */
+export function newTargetOf(
+  threadKey: string,
+  opened: { readonly threadKeys: readonly string[]; readonly target: HTMLElement | null },
+  placements: readonly ThreadPlacement[],
+  adapter: PreviewCommentAdapter
+): HTMLElement | null {
+  const onIt = opened.threadKeys.includes(threadKey) ? targetNow(opened.target, opened.threadKeys, placements, adapter) : null
+  const target = onIt ?? threadTarget(threadKey, placements, adapter)
+  return target !== null && adapter.canComment(target).ok ? target : null
+}
+
+/**
  * The extras of a new-comment request on `target` (W-07, W-08).
  *
  * @param target - The picked target.

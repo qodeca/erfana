@@ -63,6 +63,19 @@ export const READ_SCROLL_SCRIPT = `(() => {
   return { x: window.scrollX, y: window.scrollY, hash: location.hash, openSections }
 })()`
 
+/** The top frame's view, as a pick reports it (`picks.ts` `viewOf`): the file records where the reader was. */
+export const READ_VIEW_SCRIPT = `(() => {
+  const hash = location.hash
+  return {
+    w: Math.round(window.innerWidth),
+    h: Math.round(window.innerHeight),
+    dpr: window.devicePixelRatio,
+    x: Math.round(window.scrollX),
+    y: Math.round(window.scrollY),
+    ...(hash.length > 1 && hash.length <= ${PREVIEW_LIMITS.COMMENT_VIEW_HASH_MAX_CHARS} ? { hash } : {})
+  }
+})()`
+
 /**
  * Wait two animation frames – one is not enough for the selected outline to
  * reach a capture (S6) – then, for `childIndex` ≥ 0, report where the content

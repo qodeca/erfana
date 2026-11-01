@@ -28,7 +28,7 @@ type ThreadsRequest = Extract<CommentWindowProps['request'], { kind: 'threads' }
 /** What every host's window is given. */
 export type WindowRulesProps = Pick<
   CommentWindowProps,
-  'request' | 'list' | 'identity' | 'notVisible' | 'getArea' | 'onClose' | 'onSaveIdentity' | 'onSave' | 'onWritten' | 'onRefresh' | 'onPickAgain' | 'onOpenInSource' | 'onCopyRaw' | 'onNewOnTarget'
+  'request' | 'list' | 'identity' | 'notVisible' | 'getArea' | 'onClose' | 'onSaveIdentity' | 'onSave' | 'onWritten' | 'onRefresh' | 'onPickAgain' | 'onOpenInSource' | 'onCopyRaw' | 'newOnThread'
 >
 
 /** One preview, for {@link windowRulesDriver}. */
@@ -41,17 +41,23 @@ export interface WindowRulesHost {
    */
   readonly mount: (props: WindowRulesProps, editor: 'clean' | 'dirty' | 'conflict', preview?: () => HTMLElement | null) => ReactNode
   /** How a window opened on its target differs in this preview: what its request and its props carry for "New comment". */
-  readonly onTarget: { readonly request?: Partial<ThreadsRequest>; readonly props?: Pick<CommentWindowProps, 'onNewOnTarget'> }
+  readonly onTarget: { readonly request?: Partial<ThreadsRequest>; readonly props?: Pick<CommentWindowProps, 'newOnThread'> }
   /** The host's own close: `true` when it hands native focus to the page. Absent: focus stays in this document. */
   readonly closeFocusesPage?: (request: WindowRulesProps['request'], returnFocus: boolean) => boolean
 }
 
 const FILE_NAME = 'index.html'
 const CHANGED = { change: { state: 'changed', was: 'Buy now', now: 'Buy today' } } as const
+/** What each thread of the fixture adds to a plain open one. */
+const THREADS: Readonly<Record<NonNullable<WindowRulesSetup['threads']>[number], Parameters<typeof thread>[1]>> = {
+  open: {},
+  changed: CHANGED,
+  'not-found': { attached: false }
+}
 
 /** The list a setup opens on. */
 function listOf(setup: WindowRulesSetup): CommentListState {
-  const threads = (setup.threads ?? ['open']).map((state, i) => thread(i + 1, state === 'changed' ? CHANGED : {}))
+  const threads = (setup.threads ?? ['open']).map((state, i) => thread(i + 1, THREADS[state]))
   const patch = { ...(setup.readOnly === true ? { writable: false } : {}), ...(setup.full === true ? { addRefusal: 'too-many-blocks' as const } : {}) }
   return { status: 'ready', files: [fileView({ threads, ...patch })], generation: 1 }
 }
@@ -84,7 +90,10 @@ function Stage({ host, setup, onSave, onStage }: { readonly host: WindowRulesHos
     onOpenInSource: vi.fn(),
     onCopyRaw: vi.fn()
   }))
-  return <>{host.mount({ ...props, ...onTarget.props, list, identity, onSaveIdentity: saveIdentity, onSave }, setup.editor ?? 'clean')}</>
+  // Each host finds a listed thread's target its own way; a removed thread has none (its tests cover the finding).
+  const listed = (threadKey: string): boolean => list.files.some(file => file.threads.some(shown => shown.threadKey === threadKey))
+  const newOnThread: CommentWindowProps['newOnThread'] = threadKey => (listed(threadKey) ? () => {} : null)
+  return <>{host.mount({ ...props, newOnThread, ...onTarget.props, list, identity, onSaveIdentity: saveIdentity, onSave }, setup.editor ?? 'clean')}</>
 }
 
 /** The names of the window's foot buttons, then of More actions' items: opened with the keyboard, then closed. */

@@ -52,6 +52,8 @@ The build guard is not the security control; the contract scan and the pure-core
 
 **Review.** The `security-auditor` reviewed this change (spec 024 commit 9) on 2026-10-30: no critical or high findings; the medium and low findings (gaps in the scan and the build guard) are fixed. It reviews again as part of the full spec 024 pull request (§ 8 C21). Widening the allow-list further – a second folder, a subfolder, or any import inside `overlayCore` – needs a new ADR and the same review.
 
+**Later note (2026-11-01, K-1).** The keyboard's menu outside comment mode added a use of `overlayCore/pickerKeys` in main (`previewInputForward.ts`), so the page and main agree on which press is the menu key; main importing the core is not an allow-list change. In the page it added logic only: the existing `keydown` listener, and the existing `preview-page:commentPick` fields with `kind: 'context'` and `via: 'keyboard'`. No channel, listener or field was added, and `previewPage.surface.pin.test.ts` passes unchanged.
+
 ## Alternatives considered
 
 ### One overlay implementation loaded in both places

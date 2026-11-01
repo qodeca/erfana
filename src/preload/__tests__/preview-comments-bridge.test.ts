@@ -27,6 +27,13 @@ describeBridge('previewComments bridge', previewCommentsBridge, {
       wire: [{ panelId: 'preview-a', command: 'reveal', threadKey: 'tkey' }]
     },
     {
+      // C-22: a new comment on a listed thread's target rides the same channel.
+      method: 'newOnThread',
+      args: ['preview-a', 'tkey'],
+      channel: 'preview:commentCommand',
+      wire: [{ panelId: 'preview-a', command: 'new-on-thread', threadKey: 'tkey' }]
+    },
+    {
       // C-14 (HTML): the draft keep-alive rides the same sender-gated command channel.
       method: 'keepDraft',
       args: ['preview-a', 'a'.repeat(32)],

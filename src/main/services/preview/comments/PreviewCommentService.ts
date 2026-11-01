@@ -26,22 +26,14 @@
  * a comment's text or an author.
  */
 import { webFrameMain } from 'electron'
-import { ErrorCode } from '../../../../shared/errors'
-import type {
-  CommentAck,
-  CommentAnchors,
-  CommentListResult,
-  CommentModeChanged,
-  CommentSaveRequest,
-  CommentSaveResult,
-  CommentSetModeResult
-} from '../../../../shared/ipc/preview-comment-schema'
+import type { CommentAck, CommentAnchors, CommentListResult, CommentModeChanged, CommentSaveRequest, CommentSaveResult, CommentSetModeResult } from '../../../../shared/ipc/preview-comment-schema'
 import { logger } from '../../LoggingService'
 import type { PreviewCommentServing } from './commentInstrumentation'
 import type { HtmlFileJobRunner } from './htmlCommentJobs'
 import { sharedHtmlCommentParseClient } from './htmlCommentParseClient'
 import { CommentWriter, type CommentWriterDeps } from '../../comments/CommentWriter'
 import { registerCommentE2eSource } from './commentE2eHook'
+import { ContextKeyGate } from './commentContextGate'
 import { CommentFrames, type CommentFrameLike, type FrameRecord } from './commentFrames'
 import { createCommentFrameBroadcaster, type CommentFrameBroadcaster, type CommentStateExtras } from './commentFrameBroadcaster'
 import type { CommentBinding } from '../../comments/commentKeyStore'
@@ -55,10 +47,10 @@ import { accentRgb } from './commentOverlayTheme'
 import { createCommentPanelStatus, type CommentPanelStatus } from './commentPanelStatus'
 import { createCommentReloadCoordinator, type CommentReloadCoordinator } from './commentReloadCoordinator'
 import { createCommentSaveFlow, type LateSettle } from '../../comments/commentSaveFlow'
+import { createThreadActions, type ThreadActions } from './commentThreadActions'
 import { attachCommentServiceEvents, type CommentEventContents, type FrameFromIds } from './commentServiceEvents'
 import { waitForPaint, type FreshStillDeps } from './commentStillCapture'
 import type { CommentE2ePanelState, CommentServiceApi, PreviewCommentShared } from './commentServiceTypes'
-import { samePathKey } from '../../comments/commentUnsavedSources'
 import { createFrameFileMap } from './frameFileMap'
 
 /** The slice of the view's `webContents` comments use. */
@@ -113,12 +105,14 @@ export class PreviewCommentService implements CommentServiceApi {
   private readonly jobs: HtmlFileJobRunner
   private readonly frames: CommentFrames
   private readonly keys = new CommentDraftKeys()
+  private readonly menuKey = new ContextKeyGate()
   private readonly status: CommentPanelStatus
   private readonly broadcaster: CommentFrameBroadcaster
   private readonly coordinator: CommentReloadCoordinator
   private readonly signals: CommentPickHandler
   private readonly speak: (step: PickerStepEvent) => Promise<void>
   private readonly opener: CommentDraftOpener
+  private readonly threads: ThreadActions
   private readonly saveFlow: (request: CommentSaveRequest) => Promise<CommentSaveResult>
   private readonly detach: Array<() => void> = []
 
@@ -154,6 +148,7 @@ export class PreviewCommentService implements CommentServiceApi {
       platform: deps.platform
     })
     this.opener = this.buildOpener(tokens, mainFrame)
+    this.threads = createThreadActions({ binding: this.binding, keys: this.keys, frames: this.frames, tokens, opener: this.opener, contents: deps.contents, showPin: (frame, reveal) => this.broadcaster.send(frame, { reveal }), platform: deps.platform })
     this.saveFlow = this.buildSaveFlow()
     this.speak = createPickerSpeaker({ realRoot: deps.realRoot, jobs: this.jobs, platform: deps.platform, say: step => this.onStep(step) })
     this.signals = createCommentPickHandler({
@@ -164,6 +159,7 @@ export class PreviewCommentService implements CommentServiceApi {
       mode: () => this.mode,
       platform: deps.platform,
       geometry: { ...deps.geometry, cursor: deps.shared.cursor },
+      menuKey: this.menuKey,
       sinks: {
         hello: frame => this.guard(this.onHello(frame)),
         exit: () => this.changeMode(false, 'escape'),
@@ -212,6 +208,11 @@ export class PreviewCommentService implements CommentServiceApi {
     return this.enabled()
   }
 
+  /** A real Shift+F10 or Menu key reached the page outside comment mode: a keyboard menu may follow (L-1). */
+  menuKeyPressed(): void {
+    this.menuKey.press(this.deps.now())
+  }
+
   /** The comment-mode shortcut reached the page (Ctrl+Alt+M / Cmd+Option+M). */
   toggleMode(): void {
     this.changeMode(!this.mode, 'shortcut')
@@ -235,20 +236,12 @@ export class PreviewCommentService implements CommentServiceApi {
 
   /** "Show in preview" (`preview:commentCommand`): scroll the thread's pin into view in its frame. */
   reveal(threadKey: string): CommentAck {
-    const thread = this.keys.resolve(this.binding, threadKey, 'thread')
-    if (!thread.ok) return { ok: false, code: ErrorCode.COMMENT_KEY_INVALID }
-    const wanted = samePathKey(thread.value.realPath, this.deps.platform)
-    for (const frame of this.frames.liveFrames()) {
-      const record = this.frames.get(frame.frameTreeNodeId)
-      if (record?.file === undefined || samePathKey(record.file.realPath, this.deps.platform) !== wanted) continue
-      for (const [pinKey, pin] of record.pins) {
-        if (!pin.threadIds.includes(thread.value.threadId)) continue
-        this.broadcaster.send(frame, { reveal: pinKey })
-        return { ok: true }
-      }
-    }
-    // Resolved, orphaned or not on screen: there is no pin to scroll to.
-    return { ok: false, code: ErrorCode.COMMENT_TARGET_MOVED }
+    return this.threads.reveal(threadKey)
+  }
+
+  /** "New comment" in a window with no pin's draft (`preview:commentCommand`, C-22). */
+  newOnThread(threadKey: string): Promise<CommentAck> {
+    return this.threads.newComment(threadKey)
   }
 
   /** Keep an open new-comment window's draft alive (`preview:commentCommand` `keep-draft`, C-14.2). */

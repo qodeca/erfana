@@ -5,10 +5,9 @@
  * (`useCommentOverlayHost.ts`), and the target that window stands on.
  *
  * From the preview – an icon, an underline or a pick – the window stands on its
- * target, so it can offer "New comment" (I-4, P-F05), and text carried by Pick
- * again goes to a new comment there instead (I-23). A drawer row or a step key
- * stands on no target, as in the HTML Preview, where main sends a draft only
- * with a pin.
+ * target, and text carried by Pick again goes to a new comment there instead
+ * (I-23). A drawer row or a step key was not opened on one: "New comment" there
+ * finds the thread's target itself (`hostWindow.ts` `newTargetOf`).
  *
  * @module components/Comments/overlay/useHostThreads
  */

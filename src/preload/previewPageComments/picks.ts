@@ -35,8 +35,8 @@ import type { PageSel, PageWords } from './words'
 /**
  * What a pick asks for. `parent` = Alt+↑ out of a frame's `<body>`; `exit` =
  * Esc; `step` = the keyboard picker moved, for the window's live region;
- * `context` = the reader's right-click outside comment mode that the page did
- * not cancel (OD-01).
+ * `context` = the reader's right-click, or Shift+F10 or Menu key, outside comment
+ * mode that the page did not cancel (OD-01, K-1).
  */
 export type PickKind = 'menu' | 'open' | 'icon' | 'parent' | 'exit' | 'step' | 'context'
 /** What a `step` reached: an element (with its label), the top of the page, or no child. */
@@ -338,4 +338,10 @@ export class PickBudgets {
 export function contextPayload(tokens: TokenRegistry, element: Element, event: MouseEvent, words: PageWords | null, win: Window): PickPayload {
   const target = describeTarget(tokens, words?.target ?? element)
   return { kind: 'context', via: 'pointer', ...target, ...wordsPart(words, target), screen: screenOf(event), view: viewOf(win) }
+}
+
+/** A key press's `context` pick (K-1): on the selected words, or on `element`, opening at `point`. */
+export function contextKeyPayload(tokens: TokenRegistry, element: Element, words: PageWords | null, point: Point, win: Window): PickPayload {
+  const target = describeTarget(tokens, element)
+  return { kind: 'context', via: 'keyboard', ...target, ...wordsPart(words, target), point, view: viewOf(win) }
 }

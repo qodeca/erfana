@@ -325,7 +325,8 @@ export function wirePreviewLiveView(owner: PreviewLiveWiringOwner): PreviewLiveP
         platform: deps.platform,
         comments: {
           enabled: () => late.comments?.acceptsToggle() ?? false,
-          modeOn: () => late.comments?.isModeOn() ?? false
+          modeOn: () => late.comments?.isModeOn() ?? false,
+          menuKeyPressed: () => late.comments?.menuKeyPressed()
         }
       },
       {

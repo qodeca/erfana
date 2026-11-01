@@ -1,27 +1,39 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * A right-click out of comment mode (OD-01 `context` pick) opens Erfana's
- * menu only when the real cursor is where the page says the click was
- * (security review L-1).
+ * A `context` pick out of comment mode (OD-01) opens Erfana's menu only when
+ * main itself saw the reader ask for it (security review L-1). The pick comes
+ * from the page's renderer: a compromised one could send it at any moment and
+ * pop Erfana's menu over whatever the reader is doing. So a page alone can
+ * never open the menu, and each route answers to its own evidence.
  *
- * The pick comes from the page's renderer. A compromised one could send it
- * at any moment and pop Erfana's menu over whatever the reader is doing; a
- * real right-click leaves the cursor on the view, at the event's
- * `screenX/Y`. So main reads the cursor itself (`screen.getCursorScreenPoint`)
- * and keeps the pick only when the cursor is over the view's rectangle on
- * screen and within {@link CONTEXT_CURSOR_SLACK_DIP} of the reported point.
- * Anything else – no reported point, no view rectangle, no cursor source –
- * is dropped: the gate fails closed.
+ * **Pointer.** A real right-click leaves the cursor on the view, at the
+ * event's `screenX/Y`. Main reads the cursor itself
+ * (`screen.getCursorScreenPoint`) and keeps the pick only when the cursor is
+ * over the view's rectangle on screen and within
+ * {@link CONTEXT_CURSOR_SLACK_DIP} of the reported point. Anything else – no
+ * reported point, no view rectangle, no cursor source – is dropped: the gate
+ * fails closed. All values are screen DIPs: the window's content origin plus
+ * the view's rectangle in the window (`commentMenuPoint.ts` uses the same frame).
  *
- * All values are screen DIPs: the window's content origin plus the view's
- * rectangle in the window (`commentMenuPoint.ts` uses the same frame).
+ * **Keyboard (owner decision, 2026-11-01; K-1).** A key press has no cursor, so
+ * a `via: 'keyboard'` pick needs a real Shift+F10 or Menu key press instead:
+ * {@link ContextKeyGate}. Main records it in `before-input-event`, which runs
+ * before the page sees the key and which no page API reaches. The press is
+ * good for {@link CONTEXT_KEY_WINDOW_MS}, and for one pick: a renderer cannot
+ * bank presses or replay one. What a compromised renderer gains over the
+ * pointer route is the choice of element and point for a menu the reader
+ * really asked for at that moment: `commentMenuPoint.ts` clamps the point to
+ * the panel, and the element checks and the menu's own confirmation still stand.
  */
 import type { CommentPick } from '../../../../shared/ipc/preview-comment-schema'
 import type { PreviewBounds } from '../../../../shared/ipc/preview-types'
 
 /** How far the cursor may be from the reported point: a click's own jitter, never another place. */
 export const CONTEXT_CURSOR_SLACK_DIP = 4
+
+/** How long a recorded key press lets a keyboard `context` pick through. */
+export const CONTEXT_KEY_WINDOW_MS = 1_000
 
 /** Where the view is and where the cursor is now. */
 export interface ContextGateGeometry {
@@ -51,4 +63,21 @@ export function realContextClick(pick: Pick<CommentPick, 'screen'>, geometry: Co
   const overView = cursor.x >= left && cursor.x < left + rect.width && cursor.y >= top && cursor.y < top + rect.height
   const atPoint = Math.abs(cursor.x - reported.x) <= CONTEXT_CURSOR_SLACK_DIP && Math.abs(cursor.y - reported.y) <= CONTEXT_CURSOR_SLACK_DIP
   return overView && atPoint
+}
+
+/** The last real menu key press on one view, spent by the pick it let through (module comment). */
+export class ContextKeyGate {
+  private pressedAt: number | null = null
+
+  /** Main saw a real press, at `now`. */
+  press(now: number): void {
+    this.pressedAt = now
+  }
+
+  /** Whether a press lets a pick through at `now`. A press is spent by the attempt, whatever becomes of the pick. */
+  take(now: number): boolean {
+    const pressedAt = this.pressedAt
+    this.pressedAt = null
+    return pressedAt !== null && now >= pressedAt && now - pressedAt < CONTEXT_KEY_WINDOW_MS
+  }
 }

@@ -113,12 +113,15 @@ export const CommentPanelRequestSchema = z.object({ panelId: PanelIdSchema }).st
 export type CommentPanelRequest = z.infer<typeof CommentPanelRequestSchema>
 
 /**
- * `preview:commentCommand` – "Show in preview" (§7.10), or keep an open
+ * `preview:commentCommand` – "Show in preview" (§7.10), keep an open
  * new-comment window's draft alive (spec 024 C-14.2; main caps a draft's whole
- * life, `commentKeyStore.ts` `DRAFT_MAX_AGE_MS`).
+ * life, `commentKeyStore.ts` `DRAFT_MAX_AGE_MS`), or start a new comment on a
+ * listed thread's target for a window that has no pin's draft (C-22). That one
+ * answers with an ack; the draft comes as `preview:commentDraftOpened`.
  */
 export const CommentCommandRequestSchema = z.discriminatedUnion('command', [
   z.object({ panelId: PanelIdSchema, command: z.literal('reveal'), threadKey: KeySchema }).strict(),
+  z.object({ panelId: PanelIdSchema, command: z.literal('new-on-thread'), threadKey: KeySchema }).strict(),
   z
     .object({ panelId: PanelIdSchema, command: z.literal('keep-draft'), draftToken: z.string().regex(COMMENT_DRAFT_TOKEN_PATTERN) })
     .strict()
@@ -416,6 +419,7 @@ export interface PreviewCommentsBridge {
   setMode(request: CommentSetModeRequest): Promise<CommentSetModeResult>
   list(panelId: string): Promise<CommentListResult>
   reveal(panelId: string, threadKey: string): Promise<CommentAck>
+  newOnThread(panelId: string, threadKey: string): Promise<CommentAck>
   /** C-14.2: keep the open new-comment window's draft alive. */
   keepDraft(panelId: string, draftToken: string): Promise<CommentAck>
   save(request: CommentSaveRequest): Promise<CommentSaveResult>

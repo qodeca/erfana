@@ -284,6 +284,7 @@ function driverOn(h: Harness): OverlayDriver {
       h.controller.pointerLeft()
     },
     picks,
+    keyboardMenuAsked: () => (h.sent(COMMENT_PICK_CHANNEL) as Array<{ kind: string; via: string }>).some(p => p.kind === 'context' && p.via === 'keyboard'),
     pickedTarget() {
       const last = picks().filter(p => p.kind !== 'exit').at(-1)
       return last?.target ?? null

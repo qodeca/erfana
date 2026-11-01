@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { logger } from '../../LoggingService'
 import { BASE_PAGE, commentedPage } from './__test-helpers__/commentedPages'
 import { eventFrom, FakeFrame, frameFile, serveLoad, stubFrameFiles, tokenOfTag } from './__test-helpers__/commentServiceHarness'
+import { ContextKeyGate, CONTEXT_KEY_WINDOW_MS } from './commentContextGate'
 import { CommentFrames } from './commentFrames'
 import {
   ANCHORS_PER_FRAME_PER_SECOND,
@@ -58,6 +59,7 @@ async function setup() {
   let mode = true
   let cursor = { ...AT }
   const out = sinks()
+  const menuKey = new ContextKeyGate()
   const handler = createCommentPickHandler({
     panelId: 'panel',
     frames,
@@ -65,6 +67,7 @@ async function setup() {
     now: () => now,
     mode: () => mode,
     sinks: out as unknown as PageSignalSinks,
+    menuKey,
     geometry: { viewRect: () => ({ x: 100, y: 50, width: 800, height: 600 }), contentBounds: () => ({ x: 10, y: 20 }), cursor: () => cursor }
   })
   return {
@@ -78,6 +81,8 @@ async function setup() {
     out,
     handler,
     advance: (ms: number) => (now += ms),
+    /** A real Shift+F10 or Menu key, as main's `before-input-event` records it. */
+    pressMenuKey: () => menuKey.press(now),
     setMode: (on: boolean) => (mode = on),
     moveCursor: (to: { x: number; y: number }) => (cursor = to)
   }
@@ -163,6 +168,76 @@ describe('commentPickHandler element picks', () => {
     // A real click: the cursor within a few DIPs of the reported point.
     context({ x: AT.x + 3, y: AT.y - 2 })
     expect(h.out.element).toHaveBeenCalledTimes(1)
+  })
+
+  describe('L-1 K-1 the keyboard\'s context pick', () => {
+    const keyPick = (token: string) => menuPick(token, 'button', { kind: 'context', via: 'keyboard', screen: undefined, point: { x: 14, y: 304 } })
+    const offMode = async () => {
+      const h = await setup()
+      h.setMode(false)
+      // Nowhere near the view: the reader's hands are on the keyboard.
+      h.moveCursor({ x: -5_000, y: -5_000 })
+      return { h, token: tokenOfTag(h.page.doc, 'button') }
+    }
+
+    it('K-1 a real key main recorded opens the menu, with the pointer far away', async () => {
+      const { h, token } = await offMode()
+      h.pressMenuKey()
+      h.advance(CONTEXT_KEY_WINDOW_MS - 1)
+      h.handler.pick(eventFrom(h.top), keyPick(token))
+      expect(h.out.element).toHaveBeenCalledTimes(1)
+      expect(h.out.element.mock.calls[0][3]).toMatchObject({ kind: 'context', via: 'keyboard' })
+    })
+
+    it('L-1 a forged keyboard pick with no real key is refused', async () => {
+      const { h, token } = await offMode()
+      h.handler.pick(eventFrom(h.top), keyPick(token))
+      expect(h.out.element).not.toHaveBeenCalled()
+      expect(JSON.stringify(vi.mocked(logger.warn).mock.calls)).toContain('no-menu-key')
+    })
+
+    it('L-1 a page that claims the pointer route is held to the pointer rule, whatever key was pressed', async () => {
+      const { h, token } = await offMode()
+      h.pressMenuKey()
+      h.handler.pick(eventFrom(h.top), menuPick(token, 'button', { kind: 'context', screen: { x: 5, y: 5 } }))
+      expect(h.out.element).not.toHaveBeenCalled()
+      expect(JSON.stringify(vi.mocked(logger.warn).mock.calls)).toContain('cursor-elsewhere')
+    })
+
+    it('L-1 a key too long ago opens nothing', async () => {
+      const { h, token } = await offMode()
+      h.pressMenuKey()
+      h.advance(CONTEXT_KEY_WINDOW_MS)
+      h.handler.pick(eventFrom(h.top), keyPick(token))
+      expect(h.out.element).not.toHaveBeenCalled()
+    })
+
+    it('L-1 one key press opens one menu: a replay is refused', async () => {
+      const { h, token } = await offMode()
+      h.pressMenuKey()
+      h.handler.pick(eventFrom(h.top), keyPick(token))
+      h.handler.pick(eventFrom(h.top), keyPick(token))
+      expect(h.out.element).toHaveBeenCalledTimes(1)
+    })
+
+    it('L-1 a pick is never let through by a key pressed after it', async () => {
+      const { h, token } = await offMode()
+      h.handler.pick(eventFrom(h.top), keyPick(token))
+      h.pressMenuKey()
+      expect(h.out.element).not.toHaveBeenCalled()
+    })
+
+    it('L-1 the element checks still hold: a real key does not carry a forged token, and is spent by the try', async () => {
+      const { h, token } = await offMode()
+      h.pressMenuKey()
+      h.handler.pick(eventFrom(h.top), keyPick('zzzzzzzzzzzz'))
+      h.handler.pick(eventFrom(h.top), keyPick(token))
+      expect(h.out.element).not.toHaveBeenCalled()
+    })
+
+    it('L-1 with no recorder every keyboard pick is dropped (fail closed)', () => {
+      expect(new ContextKeyGate().take(0)).toBe(false)
+    })
   })
 
   it('M-033 SEC-04 a forged, unknown or stale token opens nothing', async () => {

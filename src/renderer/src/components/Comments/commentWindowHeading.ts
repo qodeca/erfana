@@ -48,27 +48,31 @@ function takesNewComment(selection: ReturnType<typeof selectThreads>): boolean {
 }
 
 /**
- * What the window's "New comment" does, in both previews: the HTML Preview
- * switches to the draft main sent with the pin; a host that mints drafts itself
- * opens one on demand from the target (I-4, P-F05). Only a window opened on its
- * target has one, so a drawer row or a step key offers none.
+ * What the window's "New comment" does, in both previews, however the window
+ * was reached (owner decision, 2026-11-01). A draft main sent with the pin goes
+ * first: the window is on that target. Otherwise the host opens one on demand
+ * on the shown thread's target: a drawer row, a step key, or a step here left
+ * the pin's draft behind. A thread with no target left offers none.
  *
  * @param request - The window's request.
  * @param selection - What the list holds for it.
+ * @param stepped - A step moved the window off the thread it opened on.
  * @param onNewComment - Switches the window to a new-comment request.
- * @param onNewOnTarget - Opens a new comment on the target the window opened on.
+ * @param newOnThread - The host's way to a new comment on a listed thread's target.
  * @returns The action, or `null` when none is offered.
  */
 export function newCommentAction(
   request: CommentWindowRequest,
   selection: ReturnType<typeof selectThreads>,
+  stepped: boolean,
   onNewComment?: (request: Extract<CommentWindowRequest, { kind: 'new' }>) => void,
-  onNewOnTarget?: () => void
+  newOnThread?: (threadKey: string) => (() => void) | null
 ): (() => void) | null {
   if (!takesNewComment(selection)) return null
-  if (onNewOnTarget !== undefined) return onNewOnTarget
-  const next = newCommentOnPin(request)
-  return next === null || onNewComment === undefined ? null : () => onNewComment(next)
+  const pinned = stepped ? null : newCommentOnPin(request)
+  if (pinned !== null && onNewComment !== undefined) return () => onNewComment(pinned)
+  const shown = selection?.threads[0]
+  return shown?.attached === true ? (newOnThread?.(shown.threadKey) ?? null) : null
 }
 
 /**

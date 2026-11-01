@@ -110,8 +110,8 @@ export interface CommentWindowProps {
   readonly onClose: (returnFocus?: boolean) => void
   /** "New comment" in an icon's thread view: switch to a new comment on that target. */
   readonly onNewComment?: (request: Extract<CommentWindowRequest, { kind: 'new' }>) => void
-  /** The same for a host that mints its drafts on demand; only while the window is on its target (I-4). */
-  readonly onNewOnTarget?: () => void
+  /** What "New comment" does for the thread shown, `null` when the host can't find its target (I-4, owner decision 2026-11-01). */
+  readonly newOnThread?: (threadKey: string) => (() => void) | null
   readonly onSaveIdentity: (identity: IdentityFormData) => Promise<boolean>
   /** Write; with a new comment, `sel` carries the chosen words (024-FR-004) – a preview that offers none ignores it. */
   readonly onSave: (request: CommentSaveRequest, sel?: AnchorSelection) => Promise<CommentSaveResult>
@@ -194,7 +194,7 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
   const modal = props.modal ?? words.preview === 'html'
   const pause = useWindowPause(selection?.file.filePath ?? null, visibleString(selection?.file.displayPath ?? ''), props.pausedText ?? null, firstFocusRef, () => props.onClose(false), props.onGoToUnsaved)
   const heading = headingOf(request, selection, words)
-  const newComment = session.stepped || pause.text !== null ? null : newCommentAction(request, selection, props.onNewComment, props.onNewOnTarget)
+  const newComment = pause.text !== null ? null : newCommentAction(request, selection, session.stepped, props.onNewComment, props.newOnThread)
   const notVisible = useMemo(() => new Set(props.notVisible), [props.notVisible])
   const shownThread = selection?.threads[0]
 

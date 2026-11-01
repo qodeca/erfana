@@ -27,7 +27,8 @@
  * one; such a pick opens nothing. Nothing is minted or sent once the view is
  * gone or the frame's record left it (`isCurrent`).
  */
-import { CommentPickRuntimeSchema, type CommentDraftOpened, type CommentPick } from '../../../../shared/ipc/preview-comment-schema'
+import { ErrorCode } from '../../../../shared/errors'
+import { CommentPickRuntimeSchema, type CommentAck, type CommentDraftOpened, type CommentPick, type CommentPickView } from '../../../../shared/ipc/preview-comment-schema'
 import type { PreviewBounds } from '../../../../shared/ipc/preview-types'
 import type { HtmlFileJobRunner } from './htmlCommentJobs'
 import type { CommentBinding, CommentKeyStore } from '../../comments/commentKeyStore'
@@ -78,6 +79,8 @@ export interface DraftOpenerDeps {
 export interface CommentDraftOpener {
   element(frame: CommentFrameLike, record: FrameRecord, entry: ElementTokenEntry | undefined, pick: CommentPick): Promise<void>
   icon(frame: CommentFrameLike, record: FrameRecord, pinKey: string, pick: CommentPick): Promise<void>
+  /** A new comment on the element a listed thread stands on (C-22): the window is up, so nothing is painted or captured. */
+  onThread(frame: CommentFrameLike, record: FrameRecord, entry: ElementTokenEntry, runtime: PinGroup['runtime'], view: CommentPickView): Promise<CommentAck>
 }
 
 /** Where `frame` sits below the top frame (S8: `frames` order is `window[i]` order). */
@@ -95,7 +98,7 @@ export function placeOf(frame: CommentFrameLike, main: CommentFrameLike | undefi
  * the page describes. `undefined` when that element is not one a pick could
  * name (a stored runtime tag or path the pick schema refuses).
  */
-export function pinPickOf(pin: PinGroup, pick: CommentPick): CommentPick | undefined {
+export function pinPickOf(pin: Pick<PinGroup, 'runtime'>, pick: CommentPick): CommentPick | undefined {
   const base: CommentPick = { kind: pick.kind, via: pick.via, view: pick.view }
   if (pin.runtime === undefined) return base
   const runtime = CommentPickRuntimeSchema.safeParse({ path: pin.runtime.path, tag: pin.runtime.tag })
@@ -277,5 +280,19 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
     })
   }
 
-  return { element, icon }
+  async function onThread(frame: CommentFrameLike, record: FrameRecord, entry: ElementTokenEntry, runtime: PinGroup['runtime'], view: CommentPickView): Promise<CommentAck> {
+    const file = record.file
+    // Where the drawer's and a step's window stands: a third of the way down the page's middle.
+    const point = { x: Math.round(view.w / 2), y: Math.round(view.h / 3) }
+    const onPin = pinPickOf({ runtime }, { kind: 'menu', via: 'keyboard', view })
+    if (file === undefined || onPin === undefined) return { ok: false, code: ErrorCode.COMMENT_TARGET_MOVED }
+    const pick = { ...onPin, point }
+    const built = await buildDraft({ realRoot: deps.realRoot, file, entry, pick, frame: frame.parent !== null, pageRealPath: deps.currentPage(), jobs: deps.jobs, platform: deps.platform })
+    if (!built.ok) return { ok: false, code: built.code ?? ErrorCode.COMMENT_TARGET_MOVED }
+    if (!stillCurrent(record, file)) return { ok: false, code: ErrorCode.COMMENT_TARGET_MOVED }
+    deps.emit({ panelId: deps.panelId, kind: 'open', point: pointOf(pick, null), ...display(file, frame), ...minted(built), ...wordsOf(built, pick) })
+    return { ok: true }
+  }
+
+  return { element, icon, onThread }
 }

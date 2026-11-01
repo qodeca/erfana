@@ -134,7 +134,8 @@ export function registerPreviewCommentHandlers(deps: PreviewCommentHandlerDeps):
     run: (request, window) => {
       const service = registry.get(request.panelId, window.id)
       if (service === undefined) return KEY_INVALID
-      return request.command === 'reveal' ? service.reveal(request.threadKey) : service.keepDraft(request.draftToken)
+      if (request.command === 'reveal') return service.reveal(request.threadKey)
+      return request.command === 'new-on-thread' ? service.newOnThread(request.threadKey) : service.keepDraft(request.draftToken)
     }
   })
 

@@ -8,7 +8,7 @@ One name per state. "Words changed" is the one name for a selection comment whos
 
 *Owner decision (2026-10-31):* every comment message was rewritten for readers who are not developers, in one approved table. The HTML word "element" became "section", "thread" became "conversation", and the window no longer shows a tag or selector. The strings below are the new ones; a row dated earlier that still shows old wording is history.
 
-*Owner decision (2026-11-01):* the third drawer filter is called "Problems", not "Can't edit" (S-07, S-08, S-09 and the toolbar paragraph). Window titles use the plain kind word, with no "this" (W-04). Delete has no Undo, and there is no visible first-use hint and no visible save note, so no state below stands for them. "Resolve all changed comments" is added (§ 2). A difference in how a state behaves today is in the [differences table](differences-table.md) § 5; for example W-10 is HTML-only until plan step 11 (D-62).
+*Owner decision (2026-11-01):* the third drawer filter is called "Problems", not "Can't edit" (S-07, S-08, S-09 and the toolbar paragraph). Window titles use the plain kind word, with no "this" (W-04). Delete has no Undo, and there is no visible first-use hint and no visible save note, so no state below stands for them. "Resolve all changed comments" is added (§ 2). A difference in how a state behaves today is in the [differences table](differences-table.md) § 5; for example W-10 is HTML-only until plan step 11 (D-62). A thread window offers "New comment" however it was reached (W-02, D-40).
 
 ## 1. Comment states
 
@@ -53,7 +53,7 @@ States of an open window, not of a stored comment. Same columns where they apply
 | # | State | When | Banner and text | Main button |
 |---|---|---|---|---|
 | W-01 | Moved draft | The target moved or the draft expired and main cannot find it again (C-14.1); Markdown first tries the one-quote match (D-23) | "This {kind} changed after you selected it. Select it again. Your text is safe." | **Pick again** (after Cancel) |
-| W-02 | Carried draft | The next new-comment window in the panel after Pick again. While the text waits in comment mode, a pick, icon or underline on a commented target opens that window too, not the target's threads (I-23); with the mode off, the threads open and the text keeps waiting | "Your text from the last comment is here." | Save |
+| W-02 | Carried draft | The next new-comment window in the panel after Pick again. While the text waits in comment mode, a pick, icon or underline on a commented target opens that window too, not the target's threads (I-23); with the mode off, the threads open and the text keeps waiting. "New comment" in a thread window, reached any way – a drawer row and a step key included, in both previews – also opens that window, on the shown thread's target (owner decision, 2026-11-01) | "Your text from the last comment is here." | Save |
 | W-03 | Updated from the file | The file changed while a thread was open (C-14.4) | Info strip "Updated just now"; a "New since you opened" divider; a thread resolved elsewhere folds | As the comment's state |
 | W-04 | Removed while open | The open comment was removed outside Erfana (C-14.5) | "Someone removed this comment from {file}. Your reply is still here." – read-only | **Copy text**; also "New comment on {kind}" |
 | W-05 | Thread changed on reply | `BLOCK_CHANGED` on Reply (C-14.6) | "This conversation changed. You see the new version above. Your reply is still here, so send it again." | Reply (stays enabled) |

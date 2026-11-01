@@ -229,7 +229,7 @@
       "quote": "# HTML Preview comments (v0.23.0): PreviewCommentService",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/PreviewCommentService.ts:101",
+      "source": "src/main/services/preview/comments/PreviewCommentService.ts:93",
       "match": "export class PreviewCommentService",
       "note": "Said \"37 modules\"; a file count no single line pins, so it was dropped (37 non-test files today)."
     },
@@ -5257,7 +5257,7 @@
       "quote": "the comment menus keep each item's action name, disabled with its reason",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/PreviewCommentsLayer.tsx:111",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/PreviewCommentsLayer.tsx:113",
       "match": ": menuReasonText(menu.reason, menu.displayPath)",
       "note": "Spec 024 replaced the disabled \"Can't comment here\" with the item's own name and a reason line; the row moved from Open to Fixed."
     },
@@ -7553,7 +7553,7 @@
       "quote": "the \"Add comment\" menu is a `ContextMenu` inside `PreviewCommentsLayer.tsx` (no `CommentContextMenu.tsx`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/PreviewCommentsLayer.tsx:142",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/PreviewCommentsLayer.tsx:144",
       "match": "<ContextMenu",
       "note": "CommentContextMenu.tsx does not exist; the menu is rendered by PreviewCommentsLayer."
     },
@@ -7655,7 +7655,7 @@
       "quote": "10 per second per view in main",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentPickHandler.ts:62",
+      "source": "src/main/services/preview/comments/commentPickHandler.ts:64",
       "match": "export const MAIN_PICKS_PER_SECOND = 10"
     },
     {
@@ -7755,7 +7755,7 @@
       "quote": "Adds only the toggle shortcut (typed key `m` + Ctrl+Alt / Cmd+Option; AltGr not captured)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/previewInputForward.ts:86",
+      "source": "src/main/services/preview/previewInputForward.ts:92",
       "match": "Ctrl+Alt+M, Cmd+Option+M on macOS"
     },
     {
@@ -24851,7 +24851,7 @@
       "quote": "`PREVIEW_FORWARDED_SHORTCUTS` in `src/main/services/preview/previewInputForward.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/previewInputForward.ts:57",
+      "source": "src/main/services/preview/previewInputForward.ts:63",
       "match": "export const PREVIEW_FORWARDED_SHORTCUTS = Object.freeze(["
     },
     {
@@ -24932,7 +24932,7 @@
       "quote": "**Zoom is not forwarded.**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/previewInputForward.ts:61",
+      "source": "src/main/services/preview/previewInputForward.ts:67",
       "match": "// NO zoom keys. Cmd/Ctrl +/-/0 reach a focused preview through the View menu"
     },
     {
@@ -24973,7 +24973,7 @@
       "quote": "and the panel matches it on its own chrome and dockview group element (`usePreviewComments`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/usePreviewComments.ts:360",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/usePreviewComments.ts:361",
       "match": "if (!matchCommentModeKey(commentModeKeyFromDomEvent(event), isMacOS())) return"
     },
     {
@@ -25278,7 +25278,7 @@
       "quote": "come from one table for both processes, `src/shared/previewNavKeys.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/previewInputForward.ts:169",
+      "source": "src/main/services/preview/previewInputForward.ts:179",
       "match": "const navAction = matchPreviewNavKey(input, platform)"
     },
     {
@@ -25318,7 +25318,7 @@
       "quote": "main matches it in the page's `before-input-event` (`previewInputForward.ts`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/previewInputForward.ts:192",
+      "source": "src/main/services/preview/previewInputForward.ts:202",
       "match": "return matchCommentModeKey(input, platform === 'darwin')"
     },
     {
@@ -34936,7 +34936,7 @@
       "quote": "press <kbd>⌘S</kbd> / <kbd>Ctrl+S</kbd> while the HTML preview is active",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/previewInputForward.ts:59",
+      "source": "src/main/services/preview/previewInputForward.ts:65",
       "match": "{ key: 's', accel: true }",
       "note": "Cmd/Ctrl+S is one of the accelerators forwarded out of the focused preview page to the host."
     },
@@ -48756,7 +48756,7 @@
       "quote": "per view: 64 hellos and 128 anchor reports a second",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentPickHandler.ts:79",
+      "source": "src/main/services/preview/comments/commentPickHandler.ts:81",
       "match": "ANCHORS_PER_VIEW_PER_SECOND = 128"
     },
     {
@@ -49069,7 +49069,7 @@
       "quote": "CommentPickerElement is `{tag,line,added}` (preview-comment-schema.ts:409-411)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/ipc/preview-comment-schema.ts:328",
+      "source": "src/shared/ipc/preview-comment-schema.ts:331",
       "match": "added: z.literal(true).optional()"
     },
     {
@@ -49111,7 +49111,7 @@
       "quote": "after a coordinate hit test (controller.ts:229-231, verified)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/controller.ts:213",
+      "source": "src/preload/previewPageComments/controller.ts:218",
       "match": "event.detail > 0"
     },
     {
@@ -49192,7 +49192,7 @@
       "quote": "publishChanged fires only when counts change (PreviewCommentService.ts:481-488)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/PreviewCommentService.ts:496",
+      "source": "src/main/services/preview/comments/PreviewCommentService.ts:489",
       "match": "if (text === this.lastChanged && !force) return"
     },
     {
@@ -51700,7 +51700,7 @@
       "quote": "Enumerated keyboard forwarding – `f` / `s` / `w` / `Escape`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/previewInputForward.ts:72",
+      "source": "src/main/services/preview/previewInputForward.ts:78",
       "match": "{ key: 'Escape', accel: false },"
     },
     {
@@ -51831,7 +51831,7 @@
       "quote": "Per frame: picks 5 a second, hellos 5, anchor reports 8.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentPickHandler.ts:75",
+      "source": "src/main/services/preview/comments/commentPickHandler.ts:77",
       "match": "export const ANCHORS_PER_FRAME_PER_SECOND = 8"
     },
     {
@@ -51841,7 +51841,7 @@
       "quote": "**64 hellos and 128 anchor reports a second**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentPickHandler.ts:79",
+      "source": "src/main/services/preview/comments/commentPickHandler.ts:81",
       "match": "export const ANCHORS_PER_VIEW_PER_SECOND = 128"
     },
     {
@@ -55032,7 +55032,7 @@
       "quote": "within 4 DIP of the reported point",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentContextGate.ts:24",
+      "source": "src/main/services/preview/comments/commentContextGate.ts:33",
       "match": "export const CONTEXT_CURSOR_SLACK_DIP = 4"
     },
     {

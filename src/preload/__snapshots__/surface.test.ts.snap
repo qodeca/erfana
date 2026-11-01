@@ -272,6 +272,7 @@ exports[`preload surface > window.api.previewComments exposes the expected membe
 [
   "keepDraft",
   "list",
+  "newOnThread",
   "onAnchorStatus",
   "onCommentsChanged",
   "onDraftOpened",

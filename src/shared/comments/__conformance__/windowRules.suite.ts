@@ -144,8 +144,8 @@ const TWO: readonly WindowRulesThread[] = ['open', 'open']
 
 /**
  * What the window offers in each state, one list for both previews (plan step
- * 5, "Done when"). "New comment" needs a target in the preview, and a file that
- * takes one; a step leaves that target.
+ * 5, "Done when"; owner decision 2026-11-01). "New comment" needs a target the
+ * preview can find, and a file that takes one – however the window was reached.
  */
 const WINDOW_ACTIONS: ReadonlyArray<{
   readonly state: string
@@ -156,12 +156,18 @@ const WINDOW_ACTIONS: ReadonlyArray<{
 }> = [
   { state: 'on its target', setup: OPEN, expected: ['Open in file', 'New comment', 'Close'] },
   { state: 'on its target, more comments to step to', setup: { ...OPEN, threads: TWO }, expected: ['Close', 'Resolve and next', 'New comment', 'Open in file'] },
-  { state: 'opened elsewhere', setup: {}, expected: ['Open in file', 'Close'] },
-  { state: 'opened elsewhere, more comments to step to', setup: { threads: TWO }, expected: ['Close', 'Resolve and next', 'Open in file'] },
-  { state: 'after a step', setup: { ...OPEN, threads: TWO }, step: true, expected: ['Close', 'Resolve and next', 'Open in file'] },
+  { state: 'opened elsewhere', setup: {}, expected: ['Open in file', 'New comment', 'Close'] },
+  { state: 'opened elsewhere, more comments to step to', setup: { threads: TWO }, expected: ['Close', 'Resolve and next', 'New comment', 'Open in file'] },
+  { state: 'after a step', setup: { ...OPEN, threads: TWO }, step: true, expected: ['Close', 'Resolve and next', 'New comment', 'Open in file'] },
+  { state: 'after a step from elsewhere', setup: { threads: TWO }, step: true, expected: ['Close', 'Resolve and next', 'New comment', 'Open in file'] },
+  { state: 'its target is gone', setup: { threads: ['not-found'] }, expected: ['Open in file', 'Close'] },
+  { state: 'after a step onto a thread whose target is gone', setup: { threads: ['open', 'not-found'] }, step: true, expected: ['Close', 'Resolve and next', 'Open in file'] },
   { state: 'unsaved edits', setup: { ...OPEN, editor: 'dirty' }, expected: ['Open in file', 'Close'] },
+  { state: 'unsaved edits, opened elsewhere', setup: { editor: 'dirty' }, expected: ['Open in file', 'Close'] },
   { state: 'read-only file', setup: { ...OPEN, readOnly: true }, expected: ['Open in file', 'Close'] },
+  { state: 'read-only file, opened elsewhere', setup: { readOnly: true }, expected: ['Open in file', 'Close'] },
   { state: 'file at its comment limit', setup: { ...OPEN, full: true }, expected: ['Open in file', 'Close'] },
+  { state: 'file at its comment limit, opened elsewhere', setup: { full: true }, expected: ['Open in file', 'Close'] },
   { state: 'removed while open', setup: OPEN, remove: true, expected: ['Copy text', NEW_ON_KIND, 'Close'] },
   { state: 'removed while open, opened elsewhere', setup: {}, remove: true, expected: ['Copy text', 'Close'] }
 ]

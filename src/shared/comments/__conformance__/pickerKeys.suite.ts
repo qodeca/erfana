@@ -165,6 +165,15 @@ export function runPickerKeySuite(name: string, makeDriver: () => OverlayDriver 
       expect(d.picks().at(-1)).toEqual({ kind: 'menu', via: 'keyboard', target: 'long' })
     })
 
+    it.each([
+      ['Shift+F10', SHIFT_F10],
+      ['the Menu key', MENU_KEY]
+    ] as const)(`${title}KEY-24 K-1: outside comment mode %s asks for the menu, with no mouse`, async (_key, press) => {
+      d.pressKey(press)
+      await vi.waitFor(() => expect(d.keyboardMenuAsked()).toBe(true))
+      expect(d.isModeOn()).toBe(false)
+    })
+
     it(`${title}KEY-09 Esc leaves the mode and the page never sees it`, async () => {
       await walkTo('second')
       d.pressKey(ESCAPE)

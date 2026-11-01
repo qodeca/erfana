@@ -24,6 +24,11 @@
  * pair, Alt+F9 / Alt+Shift+F9 (comments-v2 C-13), is two rows of the frozen
  * list, likewise taken only while comments are on.
  *
+ * One key is noted and NOT forwarded: Shift+F10 or the Menu key outside comment
+ * mode stays the page's, and main only records that it happened, as the
+ * evidence a keyboard menu needs (`comments/commentContextGate.ts`, K-1). The
+ * forward list is unchanged, and the page is told nothing.
+ *
  * @see docs/designs/html-preview/sd-074-html-preview.md §1.9, §0 (Enumerated keystrokes)
  * @see docs/designs/html-preview/multi-page/design-issue-124-part3.md §3.7
  */
@@ -31,6 +36,7 @@
 import { COMMENT_MODE_KEY, matchCommentModeKey } from '../../../shared/commentModeKey'
 import { matchPreviewNavKey, type PreviewNavAction } from '../../../shared/previewNavKeys'
 import { commentStepOf, type CommentStep } from '../../../shared/commentStepKey'
+import { pickerStepOf } from '../../../shared/comments/overlayCore/pickerKeys'
 
 /** A forwarded key. `accel` true ⇒ requires Cmd (macOS) / Ctrl (else). */
 export interface ForwardedShortcut {
@@ -102,6 +108,8 @@ export interface CommentKeyState {
   readonly enabled: () => boolean
   /** Comment mode is on: Esc stays with the page, whose preload leaves the mode. */
   readonly modeOn: () => boolean
+  /** A real Shift+F10 or Menu key press reached the page, comment mode off (K-1). */
+  readonly menuKeyPressed?: () => void
 }
 
 /**
@@ -118,6 +126,8 @@ export interface ForwardableInput {
   meta: boolean
   alt: boolean
   shift: boolean
+  /** A held key repeating: not a press (K-1). */
+  isAutoRepeat?: boolean
 }
 
 /** The slice of the `before-input-event` event object this module uses. */
@@ -192,6 +202,16 @@ export function matchCommentToggle(
   return matchCommentModeKey(input, platform === 'darwin')
 }
 
+/**
+ * Whether a key press is a fresh Shift+F10 or Menu key: the picker's own rule
+ * (`overlayCore/pickerKeys`), so main records the press the page acts on.
+ */
+export function isMenuKeyPress(input: ForwardableInput): boolean {
+  if (input.type !== 'keyDown' || input.isAutoRepeat === true) return false
+  const { key, code, shift: shiftKey, alt: altKey, control: ctrlKey, meta: metaKey } = input
+  return pickerStepOf({ key, code, shiftKey, altKey, ctrlKey, metaKey }) === 'menu'
+}
+
 /** One row of the frozen list against one key press. `step` is `null` while comments are off for the view. */
 function matchesShortcut(
   shortcut: ForwardedShortcut,
@@ -232,6 +252,7 @@ export function attachInputForwarding(
       event.preventDefault()
       onShortcut(key)
     }
+    if (comments?.menuKeyPressed !== undefined && comments.enabled() && !comments.modeOn() && isMenuKeyPress(input)) comments.menuKeyPressed()
   }
 
   target.on('before-input-event', listener)

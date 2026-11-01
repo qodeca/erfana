@@ -40,7 +40,7 @@ import { ContextMenu } from '../../../ContextMenu/ContextMenu'
 import { unavailableTooltip } from '../../../Comments/commentCopy'
 import type { Box } from '../../../Comments/commentPlacement'
 import type { IdentityFormData } from '../../../Comments/commentSchemas'
-import { CommentWindow } from '../../../Comments/CommentWindow'
+import { CommentWindow, type CommentWindowProps } from '../../../Comments/CommentWindow'
 import type { CommentWindowRequest, ElementDraft } from '../../../Comments/commentWindowTypes'
 
 
@@ -66,6 +66,8 @@ export interface PreviewCommentsLayerProps {
   readonly onCloseWindow: (returnFocus?: boolean) => void
   /** A pin's thread view chose "New comment": show the new-comment view instead. */
   readonly onNewComment: (request: Extract<CommentWindowRequest, { kind: 'new' }>) => void
+  /** "New comment" with no pin's draft: a drawer row, a step key (C-22). */
+  readonly newOnThread?: CommentWindowProps['newOnThread']
   readonly onSaveIdentity: (identity: IdentityFormData) => Promise<boolean>
   /** Write; a new comment's chosen words ride along as `sel` (024-FR-004). */
   readonly onSave: (request: CommentSaveRequest, sel?: AnchorSelection) => Promise<CommentSaveResult>
@@ -164,6 +166,7 @@ export function PreviewCommentsLayer(props: PreviewCommentsLayerProps): React.JS
           now={props.now}
           onClose={props.onCloseWindow}
           onNewComment={props.onNewComment}
+          newOnThread={props.newOnThread}
           onSaveIdentity={props.onSaveIdentity}
           onSave={props.onSave}
           onWritten={props.onWritten}

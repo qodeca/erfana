@@ -959,6 +959,63 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     await expect(chrome.modeButton()).toBeFocused()
   })
 
+  test('K-1, I-18 no mouse: outside comment mode Shift+F10 opens the menu with the pointer far away, and the page cannot fake it', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    const app = appWithTestProject
+    const page = windowWithTestProject
+    const preview = new HtmlPreviewPage(page, app)
+    const chrome = new CommentChrome(page, preview, 'e001.html')
+    const target = HtmlPreviewPage.target(PAGE)
+    await openCommentPage(preview, app, PAGE, TITLE)
+    await expect(chrome.modeButton()).not.toHaveAttribute('aria-disabled', 'true', { timeout: PREVIEW_BUDGET_MS })
+    await bringAppToFront(app)
+    // A pointer main reads as nowhere near the view: only a real key can let this menu through (L-1).
+    await app.evaluate(() => {
+      ;(globalThis as Record<string, unknown>).__erfanaE2eCursor = { x: -9_000, y: -9_000 }
+    })
+
+    // The page's own events first: they are not trusted, so nothing asks, and no real key stands behind them.
+    await preview.eval(
+      `document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'F10', code: 'F10', shiftKey: true, bubbles: true, cancelable: true }));
+       document.body.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })); 'sent'`,
+      target
+    )
+    await expect(chrome.menu()).toHaveCount(0)
+
+    expect(await pressInPage(app, 'F10', ['shift'], target)).toBe(true)
+    await expect(chrome.menu()).toBeVisible({ timeout: PREVIEW_BUDGET_MS })
+    await expect(chrome.menu()).toContainText('Comment on section')
+    await page.keyboard.press('Escape')
+    await expect(chrome.menu()).toHaveCount(0, { timeout: PREVIEW_BUDGET_MS })
+  })
+
+  test('C-22 a window opened from a drawer row offers New comment, on that thread\'s target', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    const app = appWithTestProject
+    const page = windowWithTestProject
+    const preview = new HtmlPreviewPage(page, app)
+    const chrome = new CommentChrome(page, preview, 'index.html')
+    await setGlobalSetting(page, 'comments', reviewer(NAME_A))
+
+    const panelId = await openCommentPage(preview, app, STATIC, STATIC_TITLE)
+    await chrome.modeOn(app, panelId, STATIC_TARGET)
+    await clickElement(app, 'team-copy', 'left', STATIC_TARGET)
+    await expect(chrome.window()).toHaveAttribute('data-view', 'new', { timeout: PREVIEW_BUDGET_MS })
+    await chrome.saveNewComment(NOTE_A, STATIC)
+    await expectPin(app, 'team-copy', true, STATIC_TARGET)
+
+    await chrome.openDrawer()
+    await chrome.drawerRows().first().getByTestId('comment-drawer-row-main').click()
+    await expect(chrome.window()).toHaveAttribute('data-view', 'threads', { timeout: PREVIEW_BUDGET_MS })
+    await page.getByTestId(TEST_IDS.COMMENT_NEW_ON_ELEMENT).click()
+    await expect(chrome.window()).toHaveAttribute('data-view', 'new', { timeout: PREVIEW_BUDGET_MS })
+    await expect(chrome.window()).toContainText(`${STATIC}, line `)
+  })
+
   test('E-016c a pick made with the page holding the keyboard opens the window with the keyboard in its field; Ctrl/Cmd+Enter saves', async ({
     windowWithTestProject,
     appWithTestProject,

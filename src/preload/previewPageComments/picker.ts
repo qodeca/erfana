@@ -54,3 +54,16 @@ export function pageTree(body: () => Element, ok: PickablePredicate): PickerTree
     }
   }
 }
+
+/** Where the picker starts from `hit`: the page's bare margin is no place to start, nothing can be said about it. */
+export function pickerStart(hit: Element | null, doc: Document, tree: PickerTree<Element>): Element | null {
+  const { body, documentElement } = doc
+  if (hit !== null && hit !== body && hit !== documentElement) return hit
+  return body !== null ? (tree.firstChild(body) ?? body) : hit
+}
+
+/** The element holding focus in `doc`, or `null` when nothing a reader can see does. */
+export function focusedElement(doc: Document, ok: PickablePredicate): Element | null {
+  const { activeElement, body, documentElement } = doc
+  return activeElement === null || activeElement === body || activeElement === documentElement || !ok(activeElement) ? null : activeElement
+}

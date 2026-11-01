@@ -14,6 +14,7 @@
  */
 import type { AnchorSelection } from '../../../../../../shared/comments/anchorSel'
 import type { CommentSaveRequest } from '../../../../../../shared/ipc/preview-comment-schema'
+import type { Box } from '../../../Comments/commentPlacement'
 import type { DrawerRow } from '../../../Comments/commentRows'
 import { pinDraftOf, type CommentWindowRequest, type ElementDraft, type NewCommentWords, type PinDraft } from '../../../Comments/commentWindowTypes'
 
@@ -128,4 +129,10 @@ export function rowWindowRequest(
     // The file, so a failed list read can name it (M7).
     file: { fileKey: row.fileKey, displayPath: row.displayPath, filePath: row.filePath, frame: row.frame }
   }
+}
+
+/** The middle of a box: where a window opened from the drawer is anchored. */
+export function centreOf(box: Box | null): { x: number; y: number } {
+  if (box === null) return { x: 0, y: 0 }
+  return { x: box.left + box.width / 2, y: box.top + box.height / 3 }
 }

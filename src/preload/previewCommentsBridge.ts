@@ -21,6 +21,8 @@ export const previewCommentsBridge: PreviewCommentsBridge = {
   list: (panelId) => ipcRenderer.invoke(PreviewCommentChannels.LIST, { panelId }),
   reveal: (panelId, threadKey) =>
     ipcRenderer.invoke(PreviewCommentChannels.COMMAND, { panelId, command: 'reveal', threadKey }),
+  newOnThread: (panelId, threadKey) =>
+    ipcRenderer.invoke(PreviewCommentChannels.COMMAND, { panelId, command: 'new-on-thread', threadKey }),
   keepDraft: (panelId, draftToken) =>
     ipcRenderer.invoke(PreviewCommentChannels.COMMAND, { panelId, command: 'keep-draft', draftToken }),
   save: (request) => ipcRenderer.invoke(PreviewCommentChannels.SAVE, request),

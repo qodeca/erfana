@@ -99,7 +99,7 @@ export type CommentWindowRequest =
       /**
        * A pin's draft on its element, when main sent one: the thread view's
        * "New comment" adds a thread there. Absent from a drawer row. A host
-       * that mints drafts on demand sends none: `CommentWindow`'s `onNewOnTarget`.
+       * that mints drafts on demand sends none: `CommentWindow`'s `newOnThread`.
        */
       readonly draftToken?: string
       /** Main's element key for that draft (with `draftToken`). */

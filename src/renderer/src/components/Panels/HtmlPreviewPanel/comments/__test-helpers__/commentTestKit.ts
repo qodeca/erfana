@@ -203,6 +203,7 @@ export function installCommentsBridge(): FakeCommentsBridge {
       showIcons: r.showIcons
     })),
     list: vi.fn(async () => ({ ok: true as const, files: [] as CommentFileView[] })),
+    newOnThread: vi.fn(async () => ({ ok: true as const })),
     reveal: vi.fn(async () => ({ ok: true as const })),
     keepDraft: vi.fn(async () => ({ ok: true as const })),
     save: vi.fn(async () => ({ ok: true as const, threadKey: 't9' })),

@@ -28,9 +28,9 @@
  * drag selects words (spec 024 024-FR-004). The click that ends it is still
  * prevented, so a link or a button under it does nothing.
  *
- * Outside comment mode a trusted `contextmenu` passes to the page untouched;
- * the controller hears of it and, only if no page listener cancelled it, asks
- * main for Erfana's menu (OD-01). Touches are
+ * Outside comment mode a trusted `contextmenu`, Shift+F10 or Menu key passes to
+ * the page untouched; the controller hears of it and, only if no page listener
+ * cancelled it, asks main for Erfana's menu (OD-01, K-1). Touches are
  * stopped too (passive: the click they make is what gets cancelled), and so is
  * the release of every key whose press was a picker action. A click on a pin
  * is stopped in any mode, so a pin click never reaches the page. Wheel and
@@ -147,7 +147,7 @@ function handlersOf(controller: CommentController, doc: Document): Handlers {
       if (!event.isTrusted) return
       const onOverlay = controller.isOverlayEvent(event)
       if (!controller.mode && !onOverlay) {
-        if (event.type === 'contextmenu') controller.pageContextMenu(event as MouseEvent)
+        if (event.type === 'contextmenu') controller.menu.contextMenu(event as MouseEvent)
         return
       }
       // A primary press on the page keeps its default: it may start a selection (024-FR-004) – except on a control,
@@ -176,6 +176,7 @@ function handlersOf(controller: CommentController, doc: Document): Handlers {
         // A press the page keeps: a release left over from a swallowed one
         // (focus moved before it came) must not be swallowed now.
         swallowedKeys.delete(keyOf(key))
+        if (!controller.mode && !key.repeat && pickerStepOf(key) === 'menu') controller.menu.key(key)
         return
       }
       swallow(key)

@@ -57,7 +57,7 @@ import { targetText } from './domWords'
 import { areaBox, bringRowIn, revealRow, useNotVisible } from './hostDrawer'
 import { draftKeyOf, noNewCommentText, pointOf, spokenTarget, threadsOn, toolbarCounts, viewOf } from './hostParts'
 import { hostMenuItems, hostMenuLabel, targetlessMenu } from './hostMenu'
-import { drawn, newRequestExtras, targetNow, threadTarget, useDraftKeepAlive, type HostDock } from './hostWindow'
+import { drawn, newRequestExtras, newTargetOf, threadTarget, useDraftKeepAlive, type HostDock } from './hostWindow'
 import type { CommentOverlayHost, CommentOverlayHostOptions, HostMenu } from './hostTypes'
 import { useSelectionComments, useWordsCheck } from './useSelectionComments'
 import { nounTargetOf } from './previewAdapter'
@@ -413,7 +413,11 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
         }
       : null
 
-  const newTarget = request?.kind === 'threads' && blocked === null ? targetNow(onTarget, request.threadKeys, placements, adapter) : null
+  const newOnThread = (threadKey: string): (() => void) | null => {
+    if (request?.kind !== 'threads' || blocked !== null) return null
+    const target = newTargetOf(threadKey, { threadKeys: request.threadKeys, target: onTarget }, placements, adapter)
+    return target === null ? null : () => void openNew(target, 'page')
+  }
   const window_: CommentWindowProps | null =
     live && request !== null
       ? {
@@ -424,7 +428,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
           getArea: () => areaBox(optionsRef.current.area),
           onClose: closeWindow,
           onNewComment: next => setRequest(next),
-          ...(newTarget === null ? {} : { onNewOnTarget: () => void openNew(newTarget, 'page') }),
+          newOnThread,
           onSaveIdentity: data =>
             updateCommentIdentity({
               authorName: data.name,

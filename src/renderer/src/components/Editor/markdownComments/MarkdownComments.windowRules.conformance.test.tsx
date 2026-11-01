@@ -17,7 +17,7 @@ const FILE = 'index.html'
 const MARKDOWN_HOST: WindowRulesHost = {
   host: 'Markdown',
   seesOtherWindows: true,
-  onTarget: { props: { onNewOnTarget: () => {} } },
+  onTarget: { props: { newOnThread: () => () => {} } },
   mount: (props, editor, preview) => (
     <CommentWordsContext.Provider value={MARKDOWN_WORDS}>
       <CommentWindow

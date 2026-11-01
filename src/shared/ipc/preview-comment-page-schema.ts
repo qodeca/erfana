@@ -117,7 +117,7 @@ export const CommentPickSchema = z
   .object({
     /**
      * `step`: the keyboard picker moved – nothing is picked; the window's live region says it (§10.8).
-     * `context`: the reader's right-click outside comment mode that the page did not cancel (OD-01) – a menu, never a write.
+     * `context`: the reader's right-click, Shift+F10 or Menu key outside comment mode that the page did not cancel (OD-01, K-1) – a menu, never a write.
      */
     kind: z.enum(['menu', 'open', 'icon', 'parent', 'exit', 'step', 'context']),
     via: z.enum(['pointer', 'keyboard']),

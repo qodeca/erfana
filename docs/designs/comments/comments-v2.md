@@ -597,6 +597,8 @@ Cards: docs/design-system/system/components/button/index.html; docs/designs/comm
 
 When the clicked target has open threads, open the threads view with reply fields, and make 'New comment' the first footer button. Right-click → 'Add comment' stays an explicit new thread. Markdown inherits the rule. While text carried by Pick again waits in comment mode, the click opens a new comment instead, so the text stays in view until it is kept (state table W-02).
 
+**Owner decision (2026-11-01):** 'New comment' also shows in a thread window opened from a drawer row or a step key, and after a step inside the window, in both previews, whenever the shown thread's target can be found and the file takes a new comment. The HTML Preview had no draft there, because main sent one only with an icon or a pick, so main now builds it when the button is pressed (`preview:commentCommand` `new-on-thread`), from its own record of the load. The window for that comment opens on the thread's target and takes any carried text. It returns focus to the preview, not the drawer row (differences table D-40; WIN-15).
+
 Several open threads on one element (**owner decision, 2026-10-28**, R-21): the window foot holds Close only – no 'Resolve and next', because it would be unclear which thread it resolves. Each thread keeps its own Resolve, and the head's ‹ › stepper still moves to the next element. With R-06, 'New comment' is the first item in the head's More actions menu while the stepper shows.
 
 Cards: docs/designs/comments/html-comments/window.html (threads footer order).
