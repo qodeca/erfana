@@ -39,7 +39,7 @@ Found by reading comments-v2 § 8 and § 8.1 and checking each card's status on 
 |---|---|---|
 | `toolbar.html` | Quieter toolbar and the count's name (D-2); tooltip text that teaches selection | C-15, C-16, C-20 |
 | `window.html` | Not found as an info state with Reply and Resolve; Changed and Words changed with Was/Now; "Comment on specific words"; stepper and "Resolve and next"; moved, expired, updated, removed and refused states; damaged with Rebuild from data; disabled primary and clamped quote; threads footer order; titles "New comment" (A-02) | C-05, C-06, C-07, C-13, C-14, C-19, C-21, C-22, OD-05 |
-| `drawer.html` | Filter Open · Resolved · Can't edit; sort menu; Changed, Words changed and Not found tags; removed-outside note; rows that open on click; the icons-and-underlines checkbox; empty-state text (A-08) | C-06, C-13, C-15, C-16, C-20, OD-04, OD-06 |
+| `drawer.html` | Filter Open · Resolved · Problems (renamed 2026-11-01); sort menu; Changed, Words changed and Not found tags; removed-outside note; rows that open on click; the icons-and-underlines checkbox; empty-state text (A-08) | C-06, C-13, C-15, C-16, C-20, OD-04, OD-06 |
 | `overlay.html` | Notched changed icon; icons hidden from assistive tech; stack icon; label inside the outline; mode tab text (A-03) | C-06, C-10, C-11, C-17, C-21 |
 | `identity.html` | One notice and Settings text for both previews | C-04 |
 | `identity.html` – text updated 2026-10-30 | The Settings frames' HTML switch description reads comments-v2 C-04's exact text, "Lets you comment on sections and selected text in previewed pages." (was "Lets you add comments to elements of a previewed page."), matching `SETTINGS_COPY.flagHint`; decided under the 2026-10-29 sign-off | C-04 |

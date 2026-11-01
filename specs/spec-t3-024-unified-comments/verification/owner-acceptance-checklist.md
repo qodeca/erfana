@@ -10,14 +10,14 @@ Requirement: 024-FR-006 (acceptance 024-AC-007), with the definition-of-done ite
 
 | # | Check | HTML | Markdown |
 |---|---|---|---|
-| 1.1 | The Markdown Preview never says "element", "page", "block" (except "code block" and "block quote"), "pin" or a tag name; the HTML Preview says "element" | ☐ | ☐ |
-| 1.2 | Window titles: "New comment on {kind}", "Comment on {kind}", "Comments on {kind}" ("element" in HTML) (A-02) | ☐ | ☐ |
+| 1.1 | The Markdown Preview never says "element", "page", "block" (except "code block" and "block quote"), "pin" or a tag name; the HTML Preview says "section" | ☐ | ☐ |
+| 1.2 | Window titles: "New comment on {kind}", "Comment on {kind}", "Comments on {kind}" ("section" in HTML) (A-02) | ☐ | ☐ |
 | 1.3 | Comment-mode tab: "Comment mode · {target}, line {n} · Esc to leave" once something is outlined (A-03) | ☐ | ☐ |
 | 1.4 | First comment ever shows one privacy notice covering both file types; the other preview does not show it again (A-09) | ☐ | ☐ |
 | 1.5 | Toolbar: Comment mode toggle and the "7 comments" count, pressed look while on or open; no "Show comment icons" tool; the drawer has "Show comment icons and underlines" | ☐ | ☐ |
-| 1.6 | Empty drawer reads "No comments in this file yet. Select text and right-click, or turn on comment mode and click …" (A-08) | ☐ | ☐ |
+| 1.6 | Empty drawer reads "No comments yet. Select some text and right-click, or turn on comment mode and click …" (A-08) | ☐ | ☐ |
 | 1.7 | The comment mark (fill and bar) looks the same, differs from your selection and from links | ☐ | ☐ |
-| 1.8 | Only the forced differences D-01 to D-35 differ – in particular: modal window in HTML, non-modal with edge tab in Markdown (D-01, D-02); selector labels in HTML (D-03); floating label only in HTML (D-05); ghost icon only in Markdown (D-12); the HTML comment-mode tab without a target name (D-34) | ☐ | ☐ |
+| 1.8 | Only the forced differences in the differences table differ – in particular: modal window in HTML, non-modal with edge tab in Markdown (D-01, D-02); the code on hover only in HTML (D-03); floating label only in HTML (D-05); ghost icon only in Markdown (D-12); the HTML comment-mode tab without a target name (D-34) | ☐ | ☐ |
 
 ## 2. Menus (menu matrix)
 
@@ -25,7 +25,7 @@ Right-click, then repeat with ⇧F10 / Shift+F10 for every row you can reach by 
 
 | # | Check | HTML | Markdown |
 |---|---|---|---|
-| 2.1 | Mode off, nothing selected: one step to the window – "Comment on this section" / "Comment on {kind}" (M-01, M-11) | ☐ | ☐ |
+| 2.1 | Mode off, nothing selected: one step to the window – "Comment on section" / "Comment on {kind}" (M-01, M-11) | ☐ | ☐ |
 | 2.2 | Mode off, words selected: "Comment on selection", "Comment on the whole {kind}" (M-02, M-12) | ☐ | ☐ |
 | 2.3 | Mode on, nothing selected: "Add comment" (M-03, M-13) | ☐ | ☐ |
 | 2.4 | Mode on, words selected: "Comment on selection", "Comment on the whole {kind}", no prompt items (M-04, M-14) | ☐ | ☐ |
