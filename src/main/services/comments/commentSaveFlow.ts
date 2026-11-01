@@ -30,6 +30,7 @@ import type { CommentSaveRequest, CommentSaveResult, CommentSaveSettled } from '
 import { TimeoutError, withTimeout } from '../../utils/withTimeout'
 import { logger } from '../LoggingService'
 import type { CommentWriter, CommentWriteResult, ThreadChange } from './CommentWriter'
+import type { CommentFileTarget } from './commentFileAccess'
 import type { CommentBinding, CommentKeyStore } from './commentKeyStore'
 import { samePathKey } from './commentUnsavedSources'
 
@@ -152,6 +153,8 @@ export function createCommentSaveFlow<D extends SaveDraft, S>(
 ): (request: CommentSaveRequest) => Promise<CommentSaveResult> {
   const timeoutMs = deps.timeoutMs ?? SAVE_TIMEOUT_MS
   const same = (a: string, b: string): boolean => samePathKey(a, deps.platform) === samePathKey(b, deps.platform)
+  /** The file a key or draft names: its real path is a confinement's own output, which the writer must reach again (security review L-4). */
+  const targetOf = (realPath: string): CommentFileTarget => ({ realRoot: deps.realRoot, filePath: realPath, expectedRealPath: realPath })
 
   /**
    * A write that outlasted its answer settled: hand a landed one to `land`,
@@ -196,7 +199,7 @@ export function createCommentSaveFlow<D extends SaveDraft, S>(
     const draft = claim.value
     const scroll = await deps.captureScroll()
     const write = deps.writer.add({
-      file: { realRoot: deps.realRoot, filePath: draft.realPath },
+      file: targetOf(draft.realPath),
       draft: { offset: draft.offset, fileHash: draft.fileHash, anchor: draft.anchor, ...(draft.ws === undefined ? {} : { ws: draft.ws }) },
       view: draft.view,
       text: request.text
@@ -234,7 +237,7 @@ export function createCommentSaveFlow<D extends SaveDraft, S>(
       const block = deps.keys.resolve(deps.binding, request.blockKey, 'block')
       if (!block.ok || !same(block.value.realPath, realPath) || block.value.rawHash !== request.rawHash) return INVALID
       const scroll = await deps.captureScroll()
-      write = deps.writer.deleteDamagedBlock({ file: { realRoot: deps.realRoot, filePath: realPath }, rawHash: request.rawHash, start: block.value.start })
+      write = deps.writer.deleteDamagedBlock({ file: targetOf(realPath), rawHash: request.rawHash, start: block.value.start })
       return finish(write, scroll, null, { op: 'deleteBlock', blockKey: request.blockKey })
     }
     if (request.op === 'rebuildBlock') {
@@ -244,14 +247,14 @@ export function createCommentSaveFlow<D extends SaveDraft, S>(
       if (rebuild === undefined || !block.ok || !same(block.value.realPath, realPath) || block.value.rawHash !== request.rawHash) return INVALID
       const scroll = await deps.captureScroll()
       const status = request.status === undefined ? {} : { status: request.status }
-      write = rebuild({ file: { realRoot: deps.realRoot, filePath: realPath }, rawHash: request.rawHash, start: block.value.start, ...status })
+      write = rebuild({ file: targetOf(realPath), rawHash: request.rawHash, start: block.value.start, ...status })
       return finish(write, scroll, null, { op: 'rebuildBlock', blockKey: request.blockKey })
     }
     const thread = deps.keys.resolve(deps.binding, request.threadKey, 'thread')
     if (!thread.ok || !same(thread.value.realPath, realPath)) return INVALID
     const scroll = await deps.captureScroll()
     write = deps.writer.changeThread({
-      file: { realRoot: deps.realRoot, filePath: realPath },
+      file: targetOf(realPath),
       threadId: thread.value.threadId,
       rawHash: request.rawHash,
       change: changeOf(request)

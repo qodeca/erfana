@@ -12,14 +12,19 @@
  * (024-FR-022); Cancel there goes back to the review. Focus goes to Cancel
  * when the review opens, and back to the drawer when it ends.
  *
+ * A file answered "still saving" goes on in main; the sentence follows main's
+ * word on how it ended (security review L-2), so a late refusal reaches the
+ * reader while the drawer is up. With the drawer closed, the list shows the
+ * outcome the next time it opens.
+ *
  * @module components/Comments/useDrawerBulk
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { CommentBulkChange, CommentBulkRequest, CommentBulkResult } from '../../../../shared/ipc/comment-common-schema'
+import type { CommentBulkChange, CommentBulkRequest, CommentBulkResult, CommentBulkSettled } from '../../../../shared/ipc/comment-common-schema'
 import type { CommentIdentitySettings } from '../../../../shared/ipc/global-settings-schema'
 import { useCommentDirtyGuard } from '../../hooks/useCommentDirtyGuard'
 import type { CommentListState } from '../../stores/usePreviewCommentStore'
-import { bulkFiles, bulkItems, bulkOutcome, type BulkItem, type BulkOutcome } from './commentBulk'
+import { bulkFiles, bulkItems, bulkOutcome, settleBulkFile, type BulkItem, type BulkOutcome } from './commentBulk'
 import { MD_SURFACE_COPY } from './commentCopyWords'
 import type { DrawerFilter } from './commentRows'
 import type { IdentityFormData } from './commentSchemas'
@@ -30,6 +35,8 @@ import { identityMissing } from './useIdentityGate'
 export interface DrawerBulkHost {
   /** Run one action: one write per file, in main. */
   readonly run: (request: Omit<CommentBulkRequest, 'panelId'>) => Promise<CommentBulkResult>
+  /** Hear how a file answered "still saving" ended, for this panel; answers the way to stop. */
+  readonly onSettled: (listener: (event: CommentBulkSettled) => void) => () => void
   readonly identity: CommentIdentitySettings | null
   readonly onSaveIdentity: (identity: IdentityFormData) => Promise<boolean>
 }
@@ -66,7 +73,8 @@ export function useDrawerBulk(list: CommentListState, filter: DrawerFilter, host
   const words = useCommentWords()
   const [step, setStep] = useState<{ readonly change: CommentBulkChange; readonly askName: boolean } | null>(null)
   const [busy, setBusy] = useState(false)
-  const [outcome, setOutcome] = useState<BulkOutcome | null>(null)
+  /** The last run, as main has answered for it so far: what the sentence is derived from. */
+  const [lastRun, setLastRun] = useState<{ readonly change: CommentBulkChange; readonly items: readonly BulkItem[]; readonly result: CommentBulkResult } | null>(null)
   const actionRef = useRef<HTMLButtonElement>(null)
   const cancelRef = useRef<HTMLButtonElement>(null)
   const files = useMemo(() => (list.status === 'ready' ? list.files : []), [list])
@@ -80,6 +88,18 @@ export function useDrawerBulk(list: CommentListState, filter: DrawerFilter, host
 
   const reviewItems = useMemo(() => (step === null ? [] : bulkItems(files, step.change, words)), [files, step, words])
   const review = step !== null && reviewItems.length > 0 && paused === null ? { ...step, items: reviewItems } : null
+
+  const outcome = useMemo(() => (lastRun === null ? null : bulkOutcome(lastRun.change, lastRun.items.length, lastRun.result, lastRun.items, words)), [lastRun, words])
+
+  const onSettled = host?.onSettled
+  useEffect(
+    () =>
+      onSettled?.(event => {
+        setLastRun(run => (run === null ? null : { ...run, result: settleBulkFile(run.result, event, run.items) }))
+        relist()
+      }),
+    [onSettled, relist]
+  )
 
   const reviewing = review !== null && !review.askName
   useEffect(() => {
@@ -101,7 +121,7 @@ export function useDrawerBulk(list: CommentListState, filter: DrawerFilter, host
     const { items, change: running } = review
     const result = await host.run({ change: running, files: bulkFiles(items) })
     setBusy(false)
-    setOutcome(bulkOutcome(running, items.length, result, items, words))
+    setLastRun({ change: running, items, result })
     backToDrawer()
     relist()
   }
@@ -116,7 +136,7 @@ export function useDrawerBulk(list: CommentListState, filter: DrawerFilter, host
     actionRef,
     cancelRef,
     open: next => {
-      setOutcome(null)
+      setLastRun(null)
       setStep({ change: next, askName: false })
     },
     cancel: () => {

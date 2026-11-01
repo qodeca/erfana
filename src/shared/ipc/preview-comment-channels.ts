@@ -68,7 +68,9 @@ export const PreviewCommentEvents = {
   /** Main turned comment mode on or off: Esc in the page (its exit pick), or the shortcut. */
   MODE_CHANGED: 'preview:commentModeChanged',
   /** A save answered `COMMENT_SAVE_PENDING` settled after all: written, or refused with its code. */
-  SAVE_SETTLED: 'preview:commentSaveSettled'
+  SAVE_SETTLED: 'preview:commentSaveSettled',
+  /** A file a bulk action answered `COMMENT_SAVE_PENDING` for ended after all (L-2). */
+  BULK_SETTLED: 'preview:commentBulkSettled'
 } as const
 
 export type PreviewCommentChannel =

@@ -12,8 +12,9 @@
  * **Pointer.** A real press reaches the view's `input-event` in main
  * (`previewStillFrameFreshness.ts`), which no page API reaches. That is proof
  * that the reader pressed, and it says nothing about what the press was on: the
- * renderer still names the element and the point. A `context` pick must also
- * pass {@link realContextClick}: main reads the cursor itself
+ * renderer still names the element and the point. A `context` pick, and an
+ * `open` pick outside comment mode (the Comment button, differences table
+ * D-10), must also pass {@link realContextClick}: main reads the cursor itself
  * (`screen.getCursorScreenPoint`) and keeps the pick only when the cursor is
  * over the view's rectangle on screen and within
  * {@link CONTEXT_CURSOR_SLACK_DIP} of the reported point. Anything else – no
@@ -53,9 +54,9 @@ export interface ContextGateGeometry {
 }
 
 /**
- * Whether `pick` is a right-click the reader really made (module comment).
+ * Whether `pick` is a click the reader really made there (module comment).
  *
- * @param pick - A checked `context` pick.
+ * @param pick - A checked `context` pick, or the Comment button's `open` pick.
  * @param geometry - {@link ContextGateGeometry}
  * @returns `true` only when the real cursor is over the view and at the reported point.
  */

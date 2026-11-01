@@ -36,6 +36,25 @@ export interface GestureInput {
   readonly selectionCollapsed: boolean
 }
 
+/** What the overlay saw of a press-and-release outside comment mode. */
+export interface OutsideGestureInput {
+  readonly down: GesturePoint
+  readonly up: GesturePoint
+  /** The release's click count (`MouseEvent.detail`). */
+  readonly clicks: number
+}
+
+/**
+ * Whether a press-and-release outside comment mode is the reader's own
+ * selecting: a drag of at least {@link SELECT_DRAG_MIN_PX}, or a double- or
+ * triple-click. Stricter than {@link classifyGesture}: a page can select by
+ * script on a plain click, and that must earn nothing (differences table D-10).
+ * A coordinate that is not a number makes no distance.
+ */
+export function selectsOutsideMode(input: OutsideGestureInput): boolean {
+  return input.clicks >= 2 || Math.hypot(input.up.x - input.down.x, input.up.y - input.down.y) >= SELECT_DRAG_MIN_PX
+}
+
 /**
  * `select` when the selection holds words, or when the pointer travelled at
  * least {@link SELECT_DRAG_MIN_PX} (straight-line distance from press to

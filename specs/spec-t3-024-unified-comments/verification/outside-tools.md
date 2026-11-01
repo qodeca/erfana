@@ -4,7 +4,7 @@ What each outside tool does to an `erfana:comment v1` block in a Markdown file, 
 
 ## Method
 
-The sample is the shipped golden `src/shared/htmlComments/__fixtures__/v1/01-minimal.block.txt`, placed in a Markdown file in two places: at top level, directly before a long paragraph (no blank line between), and inside a list item, indented to the item's content column (2 spaces). A second file puts a blank line between the block and the paragraph. Each tool runs on a copy; `diff` shows what changed. The parse column comes from `unified` + `remark-parse` + `remark-gfm` as installed in the repo (the CommonMark/GFM parse the Markdown kind reads blocks from, 024-FR-003).
+The sample is the shipped golden `src/shared/comments/__fixtures__/v1/01-minimal.block.txt`, placed in a Markdown file in two places: at top level, directly before a long paragraph (no blank line between), and inside a list item, indented to the item's content column (2 spaces). A second file puts a blank line between the block and the paragraph. Each tool runs on a copy; `diff` shows what changed. The parse column comes from `unified` + `remark-parse` + `remark-gfm` as installed in the repo (the CommonMark/GFM parse the Markdown kind reads blocks from, 024-FR-003).
 
 ## Results
 

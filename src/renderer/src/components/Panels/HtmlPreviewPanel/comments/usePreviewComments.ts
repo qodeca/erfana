@@ -409,7 +409,9 @@ export function usePreviewComments({
             void textClipboard.writeText(text).then(ok => (ok ? announce(COMMENT_LIST_COPY.textCopied) : alert(COMMENT_LIST_COPY.copyTextFailed)))
           },
           onTurnOnMode: state.mode || modeBlocked !== null ? undefined : () => toggleMode(false),
-          bulk: { run: request => commentGateway.bulk({ panelId, ...request }), identity, onSaveIdentity: saveCommentIdentity }
+          bulk: { run: request => commentGateway.bulk({ panelId, ...request }), onSettled: listener => commentGateway.onBulkSettled(event => {
+              if (event.panelId === panelId) listener(event)
+            }), identity, onSaveIdentity: saveCommentIdentity }
         }
       : null
 

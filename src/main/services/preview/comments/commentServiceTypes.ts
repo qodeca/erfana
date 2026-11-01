@@ -23,7 +23,7 @@ import type {
 } from '../../../../shared/ipc/preview-comment-schema'
 import type { HtmlFileJobRunner } from './htmlCommentJobs'
 import type { CommentIdentity } from '../../comments/CommentWriter'
-import type { CommentBulkRequest, CommentBulkResult } from '../../../../shared/ipc/comment-common-schema'
+import type { CommentBulkRequest, CommentBulkResult, CommentBulkSettled } from '../../../../shared/ipc/comment-common-schema'
 import type { CommentUnsavedSources } from '../../comments/commentUnsavedSources'
 
 /** What a window hears once comments are off: its keys and drafts are no longer good here. */
@@ -37,6 +37,7 @@ export interface PreviewCommentEmitters {
   modeChanged(windowId: number, payload: CommentModeChanged): void
   /** A save answered `COMMENT_SAVE_PENDING` settled after all. */
   saveSettled(windowId: number, payload: CommentSaveSettled): void
+  bulkSettled(windowId: number, payload: CommentBulkSettled): void
 }
 
 /** One panel's state as the e2e hook reports it (`commentE2eHook.ts`). */

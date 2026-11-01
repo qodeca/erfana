@@ -229,7 +229,7 @@
       "quote": "# HTML Preview comments (v0.23.0): PreviewCommentService",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/PreviewCommentService.ts:95",
+      "source": "src/main/services/preview/comments/PreviewCommentService.ts:97",
       "match": "export class PreviewCommentService",
       "note": "Said \"37 modules\"; a file count no single line pins, so it was dropped (37 non-test files today)."
     },
@@ -6038,7 +6038,7 @@
       "quote": "`preventDefault` only in the comment-mode guard (`swallow` in `input.ts`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/input.ts:102",
+      "source": "src/preload/previewPageComments/input.ts:104",
       "match": "function swallow(event: Event): void {"
     },
     {
@@ -7460,7 +7460,7 @@
       "quote": "Blocked in comment mode (`input.ts` cancels `mousedown` and `dragstart`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/input.ts:58",
+      "source": "src/preload/previewPageComments/input.ts:60",
       "match": "'mousedown',"
     },
     {
@@ -7645,7 +7645,7 @@
       "quote": "10 per second per view in main",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentPickHandler.ts:65",
+      "source": "src/main/services/preview/comments/commentPickHandler.ts:68",
       "match": "export const MAIN_PICKS_PER_SECOND = 10"
     },
     {
@@ -48736,7 +48736,7 @@
       "quote": "A save past its 15 s limit answers `COMMENT_SAVE_PENDING`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/comments/commentSaveFlow.ts:37",
+      "source": "src/main/services/comments/commentSaveFlow.ts:38",
       "match": "SAVE_TIMEOUT_MS = 15_000"
     },
     {
@@ -48746,7 +48746,7 @@
       "quote": "per view: 64 hellos and 128 anchor reports a second",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentPickHandler.ts:82",
+      "source": "src/main/services/preview/comments/commentPickHandler.ts:85",
       "match": "ANCHORS_PER_VIEW_PER_SECOND = 128"
     },
     {
@@ -49101,7 +49101,7 @@
       "quote": "after a coordinate hit test (controller.ts:229-231, verified)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/controller.ts:243",
+      "source": "src/preload/previewPageComments/controller.ts:245",
       "match": "event.detail > 0"
     },
     {
@@ -49182,7 +49182,7 @@
       "quote": "publishChanged fires only when counts change (PreviewCommentService.ts:481-488)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/PreviewCommentService.ts:481",
+      "source": "src/main/services/preview/comments/PreviewCommentService.ts:489",
       "match": "if (text === this.lastChanged && !force) return"
     },
     {
@@ -51821,7 +51821,7 @@
       "quote": "Per frame: picks 5 a second, hellos 5, anchor reports 8.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentPickHandler.ts:78",
+      "source": "src/main/services/preview/comments/commentPickHandler.ts:81",
       "match": "export const ANCHORS_PER_FRAME_PER_SECOND = 8"
     },
     {
@@ -51831,7 +51831,7 @@
       "quote": "**64 hellos and 128 anchor reports a second**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentPickHandler.ts:82",
+      "source": "src/main/services/preview/comments/commentPickHandler.ts:85",
       "match": "export const ANCHORS_PER_VIEW_PER_SECOND = 128"
     },
     {
@@ -53507,7 +53507,7 @@
       "quote": "the input guards stop `beforetoggle` and `toggle` on the host",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/previewPageComments/input.ts:72",
+      "source": "src/preload/previewPageComments/input.ts:74",
       "match": "export const TOGGLE_EVENTS = ['beforetoggle', 'toggle'] as const"
     },
     {
@@ -54962,7 +54962,7 @@
       "quote": "then **Resolve all changed comments**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentBulk.ts:88",
+      "source": "src/renderer/src/components/Comments/commentBulk.ts:89",
       "match": "action: 'Resolve all changed comments'"
     },
     {
@@ -54972,7 +54972,7 @@
       "quote": "then **Delete all resolved comments**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentBulk.ts:96",
+      "source": "src/renderer/src/components/Comments/commentBulk.ts:97",
       "match": "action: 'Delete all resolved comments'"
     },
     {
@@ -54982,7 +54982,7 @@
       "quote": "such as **Resolve 3 comments**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentBulk.ts:91",
+      "source": "src/renderer/src/components/Comments/commentBulk.ts:92",
       "match": "confirm: n => `Resolve ${comments(n)}`"
     },
     {
@@ -55112,7 +55112,7 @@
       "quote": "a Markdown comment's write is refused for a tab in any window",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/comments/FileCommentService.ts:159",
+      "source": "src/main/services/comments/FileCommentService.ts:161",
       "match": "hasUnsavedSource: realPath => deps.unsaved.hasAny(realPath)",
       "note": "Said the guard sees every window; the HTML write asks its own window only (previewSaveFlows.ts, deps.shared.unsaved.has)."
     },
@@ -55123,7 +55123,7 @@
       "quote": "within 4 DIP of the reported point",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/commentContextGate.ts:40",
+      "source": "src/main/services/preview/comments/commentContextGate.ts:41",
       "match": "export const CONTEXT_CURSOR_SLACK_DIP = 4"
     },
     {

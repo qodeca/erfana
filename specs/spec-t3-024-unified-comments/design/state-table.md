@@ -28,6 +28,8 @@ A comment is in exactly one of these states (§ 4 decides when two apply).
 
 **Toolbar.** The number counts S-01 to S-05: "7 comments". The ▲ badge counts S-07 and S-08: "7 comments ▲1". The accessible name starts with the visible text and adds only non-zero parts: "7 comments, 4 changed, 2 not found, 1 damaged" (C-06, C-15, R-14; "not found" in HTML only, where it is also drawn as a hint, D-12). With no comments: "Comments", no number (C-20). The drawer filter cells show plain counts: "Open 7" · "Resolved 2" · "Problems 2" (R-09).
 
+*Owner decision (2026-11-01):* in the HTML Preview outside comment mode, a plain click on the words of S-01 to S-04 opens the thread after 320 ms, unless the page cancelled the click, changed in response, or the target is a link or control; and the Comment button follows a real drag or double-click, above the words, else below them, else hidden (differences table D-09, D-10). Comment mode and the right-click stay the sure routes. A stated limit: a page handler that changes nothing at once and the thread can both act.
+
 ## 2. File states
 
 These sit over every comment state: they disable writing and add a band or a reason, and leave the comment's own state, tag and icon as they are.

@@ -14,6 +14,7 @@ Requirement: 024-FR-027 (a), with 024-FR-004, 024-FR-006, 024-FR-019 (OD-01) and
 - **Items** are listed in order, top to bottom. `─` is a separator. Item text is exact; `{kind}` is the Markdown kind noun in lower case (comments-v2 C-03, "block quote" per 024-FR-007).
 - **A disabled item keeps its action name** and shows its reason as the Menu card's visible reason line (`docs/design-system/system/components/menu/index.html#reason`): a second line inside the item, `aria-disabled="true"`, named from its label with `aria-labelledby`, the reason tied with `aria-describedby`. Every disabled item carries its own reason line, even when two share one reason. Reason texts are in § 3.
 - **Menu label** (the menu's accessible name): "Selection" when text is selected; otherwise "Section" (HTML) or the capitalised kind noun, for example "List item" (Markdown).
+- **Comment button.** It is no menu, but it shares the selection's subject: in the HTML Preview outside comment mode it stands in for the menu's **Comment on selection** after a real drag or double-click, and the right-click stays the sure route (differences table D-10).
 - **Target.** "The target" is the element or block the item acts on: the picked one in comment mode; outside comment mode the nearest commentable element or block under the pointer (Markdown: the nearest `[data-line-start]` block); with a selection, the smallest commentable element or block that holds the whole selection (024-FR-004).
 
 ## 1. Matrix

@@ -88,7 +88,8 @@ export function installApi(file: CommentFileView = fileView(), placements: Threa
     onSaveSettled: vi.fn((callback: (payload: unknown) => void) => {
       settleListeners.add(callback)
       return () => settleListeners.delete(callback)
-    })
+    }),
+    onBulkSettled: vi.fn(() => () => {})
   }
   window.api = {
     file: {

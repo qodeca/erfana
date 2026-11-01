@@ -74,6 +74,63 @@ describe('runBulkFiles', () => {
     finish(WRITTEN)
     await vi.waitFor(() => expect(land).toHaveBeenCalledTimes(1))
   })
+
+  it('L-1 a file that changed right after its write landed counts as done, with the warning: nothing says it stayed unwritten', async () => {
+    const land = vi.fn()
+    const changed: CommentWriteResult = { ok: false, code: ErrorCode.COMMENT_WRITE_FAILED, reason: 'changed-during-save' }
+    expect(await runBulkFiles([work('a', async () => changed)], 1000, land)).toEqual({
+      ok: true,
+      files: [{ fileKey: 'a', ok: true, done: 1, changedDuringSave: true }]
+    })
+    // No hash of what is on disk: the file watch reloads the view, not the landing path.
+    expect(land).not.toHaveBeenCalled()
+  })
+
+  describe('L-2 a write past the time limit tells the reader how it ended, per file', () => {
+    /** A write still running when its time limit passes, and the run that answered "still saving". */
+    async function outlasted(): Promise<{ settled: ReturnType<typeof vi.fn>; finish: (result: CommentWriteResult) => void; fail: (error: Error) => void }> {
+      let finish: (result: CommentWriteResult) => void = () => {}
+      let fail: (error: Error) => void = () => {}
+      const write = new Promise<CommentWriteResult>((resolve, reject) => {
+        finish = resolve
+        fail = reject
+      })
+      const settled = vi.fn()
+      await runBulkFiles([work('a', () => write)], 1, () => {}, settled)
+      expect(settled).not.toHaveBeenCalled()
+      return { settled, finish, fail }
+    }
+
+    it('a late refusal names its file, code and reason', async () => {
+      const { settled, finish } = await outlasted()
+      finish(REFUSED)
+      await vi.waitFor(() => expect(settled).toHaveBeenCalledExactlyOnceWith({ fileKey: 'a', ok: false, code: ErrorCode.COMMENT_BLOCK_CHANGED, reason: 'block-changed' }))
+    })
+
+    it('a late landing says so', async () => {
+      const { settled, finish } = await outlasted()
+      finish(WRITTEN)
+      await vi.waitFor(() => expect(settled).toHaveBeenCalledExactlyOnceWith({ fileKey: 'a', ok: true }))
+    })
+
+    it('a late write whose file changed right after it landed says landed, with the warning', async () => {
+      const { settled, finish } = await outlasted()
+      finish({ ok: false, code: ErrorCode.COMMENT_WRITE_FAILED, reason: 'changed-during-save' })
+      await vi.waitFor(() => expect(settled).toHaveBeenCalledExactlyOnceWith({ fileKey: 'a', ok: true, changedDuringSave: true }))
+    })
+
+    it('a late write that threw is that file failing', async () => {
+      const { settled, fail } = await outlasted()
+      fail(new Error('disk'))
+      await vi.waitFor(() => expect(settled).toHaveBeenCalledExactlyOnceWith({ fileKey: 'a', ok: false, code: ErrorCode.COMMENT_WRITE_FAILED }))
+    })
+
+    it('a write that answered in time sends no settle', async () => {
+      const settled = vi.fn()
+      await runBulkFiles([work('a', async () => REFUSED)], 1000, () => {}, settled)
+      expect(settled).not.toHaveBeenCalled()
+    })
+  })
 })
 
 describe('createCommentBulkFlow', () => {
@@ -105,7 +162,8 @@ describe('createCommentBulkFlow', () => {
     const { run, landed } = flow(changeThreads)
     expect(await run(request('t1'))).toEqual({ ok: true, files: [{ fileKey: 'f1', ok: true, done: 1 }] })
     expect(changeThreads).toHaveBeenCalledWith({
-      file: { realRoot: '/p', filePath: '/p/a.html' },
+      // L-4: the key's real path is what the writer must reach again: a swapped folder redirects nothing.
+      file: { realRoot: '/p', filePath: '/p/a.html', expectedRealPath: '/p/a.html' },
       threads: [{ threadId: 'one', rawHash: 'r'.repeat(64) }],
       change: 'resolve'
     })

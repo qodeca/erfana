@@ -22,6 +22,10 @@ export interface DrawerBulkSetup {
   readonly editor?: 'clean' | 'dirty'
   /** Main refuses this file, by its place in `files`. */
   readonly refuseFile?: number
+  /** The file at this place landed, then changed before main could read it back (L-1). */
+  readonly changedFile?: number
+  /** The file at this place outlasts its answer: main says "still saving" for it (L-2). */
+  readonly pendingFile?: number
   /** The drawer is opened on a filter other than Open. */
   readonly filter?: 'open' | 'resolved'
   readonly canTurnOnMode?: boolean
@@ -56,6 +60,8 @@ export interface DrawerBulkDriver {
   answerName(name: string): Promise<void>
   sent(): readonly SentBulk[]
   outcome(): string | null
+  /** Main says how the pending file ended (L-2): landed, or refused. */
+  settleLate(ending: 'landed' | 'refused'): Promise<void>
   /** The empty drawer's button: its name, or `null`. */
   turnOnMode(): string | null
   turnOnModeByKeys(): Promise<void>
@@ -169,6 +175,31 @@ export function runDrawerBulkSuite(name: string, makeDriver: () => DrawerBulkDri
       expect(d.action()).toBe('Resolve all changed comments')
       await d.openReview()
       expect(d.reviewed()).toEqual(['words'])
+    })
+
+    it(`L-1 (${name}) BLK-13 a file that changed right after its write landed counts as done, with a warning`, async () => {
+      await d.open({ files: [['changed']], identity: 'ready', changedFile: 0 })
+      await d.openReview()
+      await d.confirmByKeys()
+      expect(d.outcome()).toMatch(/^Resolved 1 comment\. .*index\.html.*changed during the save/)
+    })
+
+    it(`L-2 (${name}) BLK-14 a refusal past the time limit replaces "still saving": the reader hears why`, async () => {
+      await d.open({ files: [['changed']], identity: 'ready', pendingFile: 0 })
+      await d.openReview()
+      await d.confirmByKeys()
+      const waiting = d.outcome()
+      await d.settleLate('refused')
+      expect(d.outcome()).not.toBe(waiting)
+      expect(d.outcome()).not.toMatch(/saving/i)
+    })
+
+    it(`L-2 (${name}) BLK-15 a landing past the time limit says the comments changed`, async () => {
+      await d.open({ files: [['changed', 'changed']], identity: 'ready', pendingFile: 0 })
+      await d.openReview()
+      await d.confirmByKeys()
+      await d.settleLate('landed')
+      expect(d.outcome()).toBe('Resolved 2 comments.')
     })
 
     it(`P-F21 (${name}) BLK-11 the empty drawer's button turns comment mode on, by keys, and keeps focus in the drawer`, async () => {

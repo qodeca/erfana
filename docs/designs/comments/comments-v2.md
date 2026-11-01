@@ -468,7 +468,7 @@ Comment button (called the 'chip' in earlier drafts – the Badges card's chip i
 - Look: `--color-bg-elevated` with the Surfaces card's floating edge and shadow (`--color-border-subtle` plus `--shadow-md`, `foundations/surfaces.html#floating`), radius 0, `--text-sm`. The HTML overlay keeps its ink ground with an accent edge, because the page's ground colour is unknown (differences table D-37).
 - Takes no focus and does not alter the selection. It follows the selection on a scroll, goes while the selection is out of view and comes back with it. Esc or a collapsed selection ends it, including a script clearing the selection (owner decision, 2026-11-01, I-10).
 - Click → new-comment window on the words.
-- Markdown: shown inside and outside comment mode. HTML: only in comment mode (the page owns its mouse outside it; see OD-01), drawn in the overlay shadow root with the label as generated content so Find ignores it.
+- Shown inside and outside comment mode, in both previews (owner decision, 2026-11-01; differences table D-10). HTML draws it in the overlay shadow root with the label as generated content so Find ignores it. Outside the mode the page owns its controls, so HTML places it above the words, else below them, else hides it, and shows it only after a real drag or double-click: a selection a script makes, or the page blocks, shows none ([spike](spike-outside-mode.md)).
 - This resolves INT-03 (labelled button) vs BEN-04 (24px icon only): the label wins for learnability.
 
 Menu with a selection: 'Comment on selection' (matches 'Copy selection'), then 'Comment on the whole {kind}' (HTML: 'Comment on the whole section'). Without a selection: 'Add comment'.
@@ -497,7 +497,7 @@ Cards: docs/designs/comments/selection-comments/index.html (Comment button frame
 
 Underline:
 - Markdown: a plain click inside an underlined range (no drag, not on a link) opens the window with only that thread expanded and its phrase in the active fill; other threads on the block are folded below. Hit-test with `caretRangeFromPoint` against cached Ranges. Hover shows a pointer, the active fill and the title 'Comment by {name} – click to open'.
-- HTML: in comment mode, underline boxes take clicks and open that one thread, as in Markdown (I-13). The pick names the mark by its pin's key and the words' place in the pin, and main finds the thread, because no thread id reaches the page. Hover shows the pointer and the active look; the title is left out, because an author's name does not reach the page (differences table D-53). Outside the mode the page keeps its clicks.
+- HTML: in comment mode, underline boxes take clicks and open that one thread, as in Markdown (I-13). The pick names the mark by its pin's key and the words' place in the pin, and main finds the thread, because no thread id reaches the page. Hover shows the pointer and the active look; the title is left out, because an author's name does not reach the page (differences table D-53). Outside the mode a plain click on plain text opens that thread too, by the same pick, after a 320 ms wait so a double-click still selects a word. The page keeps the click when it cancelled it, changed in response, or the target is a link, a control or pointer-cursor text (owner decision, 2026-11-01; differences table D-09; [spike](spike-outside-mode.md)).
 - Linked hover: hovering or focusing an underline puts its pin in the hover state; hovering a pin raises all its underlines to the active fill.
 - In a multi-thread window, each thread starts with its quote box.
 

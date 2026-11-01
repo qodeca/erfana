@@ -23,7 +23,10 @@
  * - for an element or pin pick: comments are on, and main saw the real input
  *   behind it, spent once (`commentContextGate.ts`, security review L-1);
  * - for an element pick: comment mode is on (the page's preload asks for a
- *   menu only then, so one without it is not from the preload), the frame is
+ *   menu only then, so one without it is not from the preload) – or, for an
+ *   `open` pick, it is the Comment button over selected words outside the mode
+ *   (D-10): a pointer pick with a token and words, with the real cursor at the
+ *   reported point as well as the real press – and the frame is
  *   commentable, the token is in the load
  *   bound to THAT frame (SEC-26), the load is of the frame's own file as main
  *   recorded it at the frame's last navigation (SEC-09), and the tag the page
@@ -289,9 +292,12 @@ export function createCommentPickHandler(deps: PickHandlerDeps): CommentPickHand
       deps.sinks.icon(frame, record, key, { ...pick, stack }, mark?.word)
       return
     }
+    // Outside comment mode an open pick is only the Comment button's (D-10): a press proves the reader pressed, not on what.
+    const buttonPick = pick.kind === 'open' && !deps.mode() && pick.via === 'pointer' && pick.sel !== undefined && pick.token !== undefined
     // A menu or open pick comes only in comment mode; a right-click outside it only out of it (OD-01).
-    if (deps.mode() !== (pick.kind !== 'context')) return drop(pick.kind === 'context' ? 'mode-on' : 'mode-off')
-    if (pick.kind === 'context' && pick.via === 'pointer' && (deps.geometry === undefined || !realContextClick(pick, deps.geometry))) return drop('cursor-elsewhere')
+    if (deps.mode() !== (pick.kind !== 'context') && !buttonPick) return drop(pick.kind === 'context' ? 'mode-on' : 'mode-off')
+    const needsCursor = buttonPick || (pick.kind === 'context' && pick.via === 'pointer')
+    if (needsCursor && (deps.geometry === undefined || !realContextClick(pick, deps.geometry))) return drop('cursor-elsewhere')
     if (!spentInput(pick)) return
     elementPick(frame, record, pick)
   }

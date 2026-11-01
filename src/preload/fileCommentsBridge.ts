@@ -25,5 +25,6 @@ export const fileCommentsBridge: FileCommentsBridge = {
   gitName: () => ipcRenderer.invoke(FileCommentChannels.GIT_NAME),
   release: (request) => ipcRenderer.invoke(FileCommentChannels.RELEASE, request),
   onChanged: (callback) => subscribe(FileCommentEvents.CHANGED, callback),
-  onSaveSettled: (callback) => subscribe(FileCommentEvents.SAVE_SETTLED, callback)
+  onSaveSettled: (callback) => subscribe(FileCommentEvents.SAVE_SETTLED, callback),
+  onBulkSettled: (callback) => subscribe(FileCommentEvents.BULK_SETTLED, callback)
 }

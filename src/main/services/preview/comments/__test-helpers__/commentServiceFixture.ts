@@ -75,7 +75,8 @@ export async function commentServiceFixture(pageHtml: string, overrides: Partial
     commentsChanged: vi.fn(),
     anchorStatus: vi.fn(),
     modeChanged: vi.fn(),
-    saveSettled: vi.fn()
+    saveSettled: vi.fn(),
+    bulkSettled: vi.fn()
   }
   let enabled = true
   let now = 1_000

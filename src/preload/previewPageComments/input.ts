@@ -30,7 +30,9 @@
  *
  * Outside comment mode a trusted `contextmenu`, Shift+F10 or Menu key passes to
  * the page untouched; the controller hears of it and, only if no page listener
- * cancelled it, asks main for Erfana's menu (OD-01, K-1). Touches are
+ * cancelled it, asks main for Erfana's menu (OD-01, K-1). A trusted press,
+ * release and click are read there too, never stopped: the Comment button and
+ * underline clicks outside the mode (`outsideMode.ts`, D-09, D-10). Touches are
  * stopped too (passive: the click they make is what gets cancelled), and so is
  * the release of every key whose press was a picker action. A click on a pin
  * is stopped in any mode, so a pin click never reaches the page. Wheel and
@@ -146,6 +148,7 @@ function handlersOf(controller: CommentController, doc: Document): Handlers {
     guarded(event) {
       if (!event.isTrusted) return
       const onOverlay = controller.isOverlayEvent(event)
+      if (!controller.mode) controller.outside.seen(event, onOverlay)
       if (!controller.mode && !onOverlay) {
         if (event.type === 'contextmenu') controller.menu.contextMenu(event as MouseEvent)
         return

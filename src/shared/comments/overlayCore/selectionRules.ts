@@ -18,6 +18,13 @@ export const SELECTION_BUTTON_DELAY_MS = 150
 /** Below this distance from the view's top, the button goes under the line (C-16 "flipped below"). */
 export const SELECTION_BUTTON_FLIP_PX = 48
 
+/**
+ * How long a click on an underline outside comment mode waits for a second
+ * press (differences table D-09): the second press is a double-click selecting
+ * a word, and a thread opened on the first click would take it away.
+ */
+export const UNDERLINE_CLICK_WAIT_MS = 320
+
 /** A line box, or a view. */
 export interface LineBox {
   readonly left: number
@@ -45,6 +52,18 @@ export function lastLineInView<B extends LineBox>(lines: readonly B[], view: Lin
 /** Whether the button goes under a line whose top is `top`, in a view starting at `viewTop`. */
 export function buttonGoesBelow(top: number, viewTop: number): boolean {
   return top - viewTop < SELECTION_BUTTON_FLIP_PX
+}
+
+/**
+ * Where the button may go outside comment mode, in the order to try: above
+ * the line, then below it, each only when it fits the view. Above is out near
+ * the view's top, by the same rule as in comment mode.
+ *
+ * @returns The tops to try; none fits: no button.
+ */
+export function outsideButtonTops(line: LineBox, height: number, gap: number, view: LineBox): number[] {
+  const tops = [...(buttonGoesBelow(line.top, view.top) ? [] : [line.top - gap - height]), line.bottom + gap]
+  return tops.filter(top => top >= view.top && top + height <= view.bottom)
 }
 
 /** The key of the words at place `word` of the pin `pin`, for a pick from their mark. */

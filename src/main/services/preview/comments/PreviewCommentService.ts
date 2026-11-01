@@ -22,8 +22,9 @@
  * reloads the view once, keeping the reader's place, so its elements can be
  * picked.
  *
- * Nothing the page sends writes, and nothing sent to the page carries a path,
- * a comment's text or an author.
+ * Nothing the page sends writes. Main's messages to the page carry no path, no
+ * comment text and no author; the HTML main serves is the file itself, so the
+ * page's own scripts can read the comment blocks stored in it.
  */
 import { webFrameMain } from 'electron'
 import type { CommentBulkRequest, CommentBulkResult } from '../../../../shared/ipc/comment-common-schema'
@@ -32,6 +33,7 @@ import { logger } from '../../LoggingService'
 import type { PreviewCommentServing } from './commentInstrumentation'
 import type { HtmlFileJobRunner } from './htmlCommentJobs'
 import { sharedHtmlCommentParseClient } from './htmlCommentParseClient'
+import type { LateBulkSettle } from '../../comments/commentBulkFlow'
 import { CommentWriter, type CommentWriterDeps } from '../../comments/CommentWriter'
 import { commentE2ePanelState, registerCommentE2eSource } from './commentE2eHook'
 import { ContextKeyGate } from './commentContextGate'
@@ -153,7 +155,7 @@ export class PreviewCommentService implements CommentServiceApi {
     })
     this.opener = this.buildOpener(tokens, mainFrame)
     this.threads = createThreadActions({ binding: this.binding, keys: this.keys, frames: this.frames, tokens, opener: this.opener, contents: deps.contents, showPin: (frame, reveal) => this.broadcaster.send(frame, { reveal }), platform: deps.platform })
-    ;[this.saveFlow, this.bulkFlow] = createPreviewSaveFlows({ ...deps, binding: this.binding, jobs: this.jobs, keys: this.keys, coordinator: this.coordinator, onLateSettled: settled => this.onLateSettled(settled) })
+    ;[this.saveFlow, this.bulkFlow] = createPreviewSaveFlows({ ...deps, binding: this.binding, jobs: this.jobs, keys: this.keys, coordinator: this.coordinator, onLateSettled: settled => this.onLateSettled(settled), onBulkSettled: settled => this.onBulkFileSettled(settled) })
     this.speak = createPickerSpeaker({ realRoot: deps.realRoot, jobs: this.jobs, platform: deps.platform, say: step => this.onStep(step) })
     this.signals = createCommentPickHandler({
       panelId: deps.panelId,
@@ -467,6 +469,12 @@ export class PreviewCommentService implements CommentServiceApi {
   private onLateSettled(settled: LateSettle): void {
     if (settled.ok) this.publishChanged(true)
     this.deps.shared.emit.saveSettled(this.windowId, { panelId: this.panelId, ...settled })
+  }
+
+  /** The same for a file a bulk action answered "still saving" for (security review L-2). */
+  private onBulkFileSettled(settled: LateBulkSettle): void {
+    if (settled.ok) this.publishChanged(true)
+    this.deps.shared.emit.bulkSettled(this.windowId, { panelId: this.panelId, ...settled })
   }
 
   /**

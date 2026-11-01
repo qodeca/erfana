@@ -42,7 +42,7 @@ import {
   type FileCommentChanged,
   type FileCommentSaveSettled
 } from '../../../shared/ipc/file-comment-schema'
-import { CommentBulkRequestSchema, CommentBulkResultSchema, type CommentReasonedRefusal } from '../../../shared/ipc/comment-common-schema'
+import { CommentBulkRequestSchema, CommentBulkResultSchema, CommentBulkSettledSchema, type CommentBulkSettled, type CommentReasonedRefusal } from '../../../shared/ipc/comment-common-schema'
 import { logger } from '../../services/LoggingService'
 import { suggestedGitName } from '../../services/comments/commentGitName'
 import { refusalCode, type CommentRefusal } from '../../services/comments/commentRefusals'
@@ -112,6 +112,11 @@ function sendEvent<T>(channel: FileCommentEvent, schema: ZodType<T>, windowId: n
 /** Send `file-comment:changed` to one window. */
 export function sendFileCommentChanged(windowId: number, payload: FileCommentChanged): void {
   sendEvent(FileCommentEvents.CHANGED, FileCommentChangedSchema, windowId, payload)
+}
+
+/** Send `file-comment:bulkSettled` to one window (L-2). */
+export function sendFileCommentBulkSettled(windowId: number, payload: CommentBulkSettled): void {
+  sendEvent(FileCommentEvents.BULK_SETTLED, CommentBulkSettledSchema, windowId, payload)
 }
 
 /** Send `file-comment:saveSettled` to one window (W-10). */

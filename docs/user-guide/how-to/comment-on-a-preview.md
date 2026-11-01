@@ -21,7 +21,7 @@ Outside comment mode, right-click the part and choose the comment item, such as 
 ## Comment on selected words
 
 1. Select some words in the preview.
-2. Select **Comment** next to the selection, or right-click it and choose **Comment on selection**. In the HTML preview the **Comment** button shows in comment mode; outside it, use the right-click menu.
+2. Select **Comment** next to the selection, or right-click it and choose **Comment on selection**. In the HTML preview, outside comment mode, **Comment** moves or stays away if the page has a button in that spot, and a page that blocks selecting shows none; the right-click menu still works there.
 3. Type the comment and select **Save**. The words are underlined in the preview.
 
 To comment on fewer words, select them in **Comment on specific words** in the comment window. To comment on the whole part instead, choose **Comment on the whole paragraph** (the item names the part). If the selected words are not in the file as written – for example, a script on the page added them – Erfana saves the comment on the whole part and says so.

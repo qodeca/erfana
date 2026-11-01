@@ -25,7 +25,7 @@ import type { CommentUnsavedSources } from '../../services/comments/commentUnsav
 import { FileCommentService } from '../../services/comments/FileCommentService'
 import type { ProjectSession } from '../../services/session/ProjectSession'
 import { commentIdentityOf } from '../preview/buildPreviewGraph'
-import { registerFileCommentHandlers, sendFileCommentChanged, sendFileCommentSaveSettled } from './file-comment-handlers'
+import { registerFileCommentHandlers, sendFileCommentBulkSettled, sendFileCommentChanged, sendFileCommentSaveSettled } from './file-comment-handlers'
 
 /** What a kind takes from the app settings. */
 interface KindSettings {
@@ -64,6 +64,7 @@ export function registerFileComments(deps: FileCommentsDeps): FileCommentsBundle
     identity: () => commentIdentityOf(deps.getSettings()),
     send: sendFileCommentChanged,
     sendSettled: sendFileCommentSaveSettled,
+    sendBulkSettled: sendFileCommentBulkSettled,
     isKindEnabled: kind => KIND_SETTINGS.get(kind.id)?.enabled(deps.getSettings()) ?? false,
     writeOptions: kind => KIND_SETTINGS.get(kind.id)?.writeOptions(deps.getSettings()) ?? {}
   })

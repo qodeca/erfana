@@ -36,7 +36,7 @@
  */
 import { resolve } from 'node:path'
 import { ErrorCode } from '../../../shared/errors'
-import type { CommentBulkRequest, CommentBulkResult, CommentReasonedRefusal, CommentSaveResult } from '../../../shared/ipc/comment-common-schema'
+import type { CommentBulkRequest, CommentBulkResult, CommentBulkSettled, CommentReasonedRefusal, CommentSaveResult } from '../../../shared/ipc/comment-common-schema'
 import type {
   FileCommentChanged,
   FileCommentListResult,
@@ -86,6 +86,8 @@ export interface FileCommentServiceDeps {
   readonly send: (windowId: number, payload: FileCommentChanged) => void
   /** Send `file-comment:saveSettled` to one window: a save that outlasted its answer ended (W-10). */
   readonly sendSettled?: (windowId: number, payload: FileCommentSaveSettled) => void
+  /** Send `file-comment:bulkSettled` to one window: a file a bulk action answered "still saving" for ended (L-2). */
+  readonly sendBulkSettled?: (windowId: number, payload: CommentBulkSettled) => void
   /** Longest a save waits before it answers `COMMENT_SAVE_PENDING`; {@link SAVE_TIMEOUT_MS} by default. */
   readonly saveTimeoutMs?: number
   /** Where a kind's jobs run; the comment parse worker by default. */
@@ -267,7 +269,9 @@ export class FileCommentService {
       const found = resolveBulkFile(panel.keys, panel.binding, named, (_file, key) => key === panel.realPath)
       return { fileKey: named.fileKey, threads: found?.threads ?? null, write: (threads: readonly BulkThread[]) => this.writer.changeThreads({ file, threads, change: request.change }) }
     })
-    return runBulkFiles(work, this.deps.saveTimeoutMs)
+    const { windowId } = caller
+    const { panelId } = panel.binding
+    return runBulkFiles(work, this.deps.saveTimeoutMs, undefined, late => this.deps.sendBulkSettled?.(windowId, { panelId, ...late }))
   }
 
   /** The window closed: forget its panels and release their watches; a list still running for it records nothing. */

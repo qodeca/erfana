@@ -1,6 +1,6 @@
 # Spike – HTML comments outside comment mode
 
-> Status: finished, 2026-11-01. Plan step 8, findings I-5, P-F08, I-15. All trial code was removed; this report is the only thing kept.
+> Status: finished, 2026-11-01. Plan step 8, findings I-5, P-F08, I-15. All trial code was removed; this report is the only thing kept. The owner decided on 2026-11-01 to build both features: see D-09 and D-10 in the differences table, and `outsideMode.ts` in the preload.
 > Basis: commit `c0fb19b0`, the real app and real preload, driven by trusted input.
 
 ## Answers

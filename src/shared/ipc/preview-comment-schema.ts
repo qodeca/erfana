@@ -33,7 +33,7 @@ import {
   CommentRefusalReasonSchema,
   commentThreadOpSchemas
 } from './comment-common-schema'
-import type { CommentBulkRequest, CommentBulkResult, CommentSaveResult } from './comment-common-schema'
+import type { CommentBulkRequest, CommentBulkResult, CommentBulkSettled, CommentSaveResult } from './comment-common-schema'
 import {
   CommentKeySchema as KeySchema,
   CommentPickerSaySchema as PickerSaySchema,
@@ -430,4 +430,5 @@ export interface PreviewCommentsBridge {
   onAnchorStatus(callback: (payload: CommentAnchorStatus) => void): () => void
   onModeChanged(callback: (payload: CommentModeChanged) => void): () => void
   onSaveSettled(callback: (payload: CommentSaveSettled) => void): () => void
+  onBulkSettled(callback: (payload: CommentBulkSettled) => void): () => void
 }

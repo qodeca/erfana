@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { describe, expect, it } from 'vitest'
-import { SELECTION_BUTTON_FLIP_PX, buttonGoesBelow, lastLineInView, markKeyOf, parseMarkKey, pointerOnLines } from './selectionRules'
+import { SELECTION_BUTTON_FLIP_PX, buttonGoesBelow, lastLineInView, markKeyOf, outsideButtonTops, parseMarkKey, pointerOnLines } from './selectionRules'
 
 const VIEW = { left: 0, top: 100, right: 500, bottom: 400 }
 const line = (top: number): { left: number; top: number; right: number; bottom: number } => ({ left: 10, top, right: 200, bottom: top + 20 })
@@ -40,5 +40,26 @@ describe('overlayCore selectionRules', () => {
     expect(pointerOnLines(lines, { x: 200, y: 125 })).toBe(false)
     expect(pointerOnLines(lines, { x: 50, y: 140 })).toBe(false)
     expect(pointerOnLines([], { x: 50, y: 125 })).toBe(false)
+  })
+})
+
+describe('outsideButtonTops (differences table D-10)', () => {
+  const VIEW = { left: 0, top: 0, right: 800, bottom: 600 }
+  const line = (top: number): { left: number; top: number; right: number; bottom: number } => ({ left: 100, top, right: 300, bottom: top + 20 })
+
+  it('above, then below', () => {
+    expect(outsideButtonTops(line(100), 28, 8, VIEW)).toEqual([64, 128])
+  })
+
+  it('near the view’s top: below only, as in comment mode', () => {
+    expect(outsideButtonTops(line(SELECTION_BUTTON_FLIP_PX - 1), 28, 8, VIEW)).toEqual([SELECTION_BUTTON_FLIP_PX - 1 + 28])
+  })
+
+  it('near the view’s bottom: above only', () => {
+    expect(outsideButtonTops(line(570), 28, 8, VIEW)).toEqual([534])
+  })
+
+  it('no room at all: nowhere', () => {
+    expect(outsideButtonTops(line(20), 28, 8, { ...VIEW, bottom: 60 })).toEqual([])
   })
 })

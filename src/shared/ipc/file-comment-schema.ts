@@ -33,6 +33,7 @@ import {
   commentThreadOpSchemas,
   type CommentBulkRequest,
   type CommentBulkResult,
+  type CommentBulkSettled,
   type CommentReasonedRefusal,
   type CommentSaveResult
 } from './comment-common-schema'
@@ -266,4 +267,5 @@ export interface FileCommentsBridge {
   release(request: FileCommentReleaseRequest): Promise<FileCommentReleaseResult>
   onChanged(callback: (payload: FileCommentChanged) => void): () => void
   onSaveSettled(callback: (payload: FileCommentSaveSettled) => void): () => void
+  onBulkSettled(callback: (payload: CommentBulkSettled) => void): () => void
 }

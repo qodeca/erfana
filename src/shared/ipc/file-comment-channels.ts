@@ -35,7 +35,9 @@ export const FileCommentEvents = {
   /** A listed file changed on disk: list it again. */
   CHANGED: 'file-comment:changed',
   /** A save answered `COMMENT_SAVE_PENDING` settled after all: written, or refused with its code (W-10). */
-  SAVE_SETTLED: 'file-comment:saveSettled'
+  SAVE_SETTLED: 'file-comment:saveSettled',
+  /** A file a bulk action answered `COMMENT_SAVE_PENDING` for ended after all (L-2). */
+  BULK_SETTLED: 'file-comment:bulkSettled'
 } as const
 
 export type FileCommentChannel = (typeof FileCommentChannels)[keyof typeof FileCommentChannels]

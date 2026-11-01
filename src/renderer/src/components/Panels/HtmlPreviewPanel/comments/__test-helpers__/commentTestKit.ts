@@ -213,7 +213,8 @@ export function installCommentsBridge(): FakeCommentsBridge {
     onCommentsChanged: vi.fn(subscribe(listeners.changed)),
     onAnchorStatus: vi.fn(subscribe(listeners.anchors)),
     onModeChanged: vi.fn(subscribe(listeners.mode)),
-    onSaveSettled: vi.fn(subscribe(listeners.settled))
+    onSaveSettled: vi.fn(subscribe(listeners.settled)),
+    onBulkSettled: vi.fn(() => () => {})
   }
   const holder = window as unknown as { api?: Record<string, unknown> }
   const before = holder.api

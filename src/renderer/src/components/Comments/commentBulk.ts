@@ -13,7 +13,8 @@
  *
  * @module components/Comments/commentBulk
  */
-import type { CommentBulkChange, CommentBulkRequest, CommentBulkResult, CommentFileView, CommentThreadView } from '../../../../shared/ipc/comment-common-schema'
+import { ErrorCode } from '../../../../shared/errors'
+import type { CommentBulkChange, CommentBulkRequest, CommentBulkResult, CommentBulkSettled, CommentFileView, CommentThreadView } from '../../../../shared/ipc/comment-common-schema'
 import type { CommentWords } from './commentCopyWords'
 
 /** One comment a bulk action will change, as the review shows it. */
@@ -102,6 +103,29 @@ export const BULK_COPY: Readonly<
   }
 }
 
+/** A file's write landed, and the file then changed by someone else (L-1): the comments did change, so this is a note, not a failure. */
+const changedAfterwards = (file: string): string => `${file} changed during the save, so check the comment list.`
+
+/**
+ * The answer, once main said how a file answered "still saving" ended (L-2).
+ *
+ * @param result - The answer so far.
+ * @param event - Main's event; one for no pending file changes nothing.
+ * @param items - What the review showed, for how many comments a landed file holds.
+ * @returns The answer with that file's ending in it.
+ */
+export function settleBulkFile(result: CommentBulkResult, event: CommentBulkSettled, items: readonly BulkItem[]): CommentBulkResult {
+  if (!result.ok) return result
+  const { fileKey, ok, changedDuringSave, code, reason } = event
+  const files = result.files.map(file => {
+    if (file.fileKey !== fileKey || file.ok || file.code !== ErrorCode.COMMENT_SAVE_PENDING) return file
+    if (!ok) return { fileKey, ok: false as const, code: code ?? ErrorCode.COMMENT_WRITE_FAILED, ...(reason === undefined ? {} : { reason }) }
+    const done = items.filter(item => item.fileKey === fileKey).length
+    return { fileKey, ok: true as const, done, ...(changedDuringSave === true ? { changedDuringSave } : {}) }
+  })
+  return { ok: true, files }
+}
+
 /** The sentences after a bulk action. */
 export interface BulkOutcome {
   /** Every comment changed. */
@@ -111,7 +135,8 @@ export interface BulkOutcome {
 
 /**
  * What a bulk action's answer means to the reader. Files that were refused
- * wrote nothing, so their comments are all still there.
+ * wrote nothing, so their comments are all still there; one that changed right
+ * after its write landed counts as done, with a note.
  *
  * @param change - The action.
  * @param all - How many comments were asked for.
@@ -125,7 +150,9 @@ export function bulkOutcome(change: CommentBulkChange, all: number, result: Comm
   if (!result.ok) return { ok: false, text: words.saveFailure(result.code, pathOf(items[0]?.fileKey ?? ''), undefined, result.reason).text }
   const done = result.files.reduce((total, file) => total + (file.ok ? file.done : 0), 0)
   const refused = result.files.find(file => !file.ok)
-  if (refused === undefined || refused.ok) return { ok: true, text: BULK_COPY[change].done(done) }
+  const changed = result.files.find(file => file.ok && file.changedDuringSave === true)
+  const note = changed === undefined ? '' : ` ${changedAfterwards(pathOf(changed.fileKey))}`
+  if (refused === undefined || refused.ok) return { ok: note === '', text: `${BULK_COPY[change].done(done)}${note}` }
   const why = words.saveFailure(refused.code, pathOf(refused.fileKey), undefined, refused.reason).text
-  return { ok: false, text: done === 0 ? why : `${BULK_COPY[change].some(done, all)} ${why}` }
+  return { ok: false, text: done === 0 ? why : `${BULK_COPY[change].some(done, all)} ${why}${note}` }
 }

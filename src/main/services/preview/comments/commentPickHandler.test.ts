@@ -187,6 +187,92 @@ describe('commentPickHandler element picks', () => {
     expect(h.out.element).toHaveBeenCalledTimes(1)
   })
 
+  describe('D-10 an open pick outside comment mode: the Comment button over selected words', () => {
+    const SEL = { sel: { exact: 'ten', prefix: '', suffix: '' } }
+    const open = (token: string, patch: Record<string, unknown> = {}) => menuPick(token, 'button', { kind: 'open', screen: AT, ...SEL, ...patch })
+
+    it('D-10 accepted with selected words, a real press and the real cursor at the reported point', async () => {
+      const h = await setup()
+      h.setMode(false)
+      h.handler.pick(eventFrom(h.top), open(tokenOfTag(h.page.doc, 'button')))
+      expect(h.out.element).toHaveBeenCalledTimes(1)
+      expect(h.out.element.mock.calls[0][3]).toMatchObject({ kind: 'open', via: 'pointer', ...SEL })
+    })
+
+    it('D-10 dropped with no real press: the renderer alone opens nothing', async () => {
+      const h = await setup()
+      h.setMode(false)
+      h.forged.pick(eventFrom(h.top), open(tokenOfTag(h.page.doc, 'button')))
+      expect(h.out.element).not.toHaveBeenCalled()
+      expect(JSON.stringify(vi.mocked(logger.warn).mock.calls)).toContain('no-press')
+    })
+
+    it('D-10 dropped with the cursor elsewhere, on the view or off it', async () => {
+      const h = await setup()
+      h.setMode(false)
+      h.moveCursor({ x: 5, y: 5 })
+      h.handler.pick(eventFrom(h.top), open(tokenOfTag(h.page.doc, 'button')))
+      h.moveCursor({ x: AT.x + 40, y: AT.y })
+      h.handler.pick(eventFrom(h.top), open(tokenOfTag(h.page.doc, 'button')))
+      expect(h.out.element).not.toHaveBeenCalled()
+      expect(JSON.stringify(vi.mocked(logger.warn).mock.calls)).toContain('cursor-elsewhere')
+    })
+
+    it('D-10 dropped with no reported point', async () => {
+      const h = await setup()
+      h.setMode(false)
+      h.handler.pick(eventFrom(h.top), open(tokenOfTag(h.page.doc, 'button'), { screen: undefined }))
+      expect(h.out.element).not.toHaveBeenCalled()
+    })
+
+    it('D-10 dropped with no words: a whole-element open stays comment mode\'s', async () => {
+      const h = await setup()
+      h.setMode(false)
+      h.handler.pick(eventFrom(h.top), open(tokenOfTag(h.page.doc, 'button'), { sel: undefined }))
+      expect(h.out.element).not.toHaveBeenCalled()
+      expect(JSON.stringify(vi.mocked(logger.warn).mock.calls)).toContain('mode-off')
+    })
+
+    it('D-10 dropped by keyboard: no key press opens a window outside the mode', async () => {
+      const h = await setup()
+      h.setMode(false)
+      h.handler.pick(eventFrom(h.top), open(tokenOfTag(h.page.doc, 'button'), { via: 'keyboard', screen: undefined, point: { x: 1, y: 2 } }))
+      expect(h.out.element).not.toHaveBeenCalled()
+      expect(JSON.stringify(vi.mocked(logger.warn).mock.calls)).toContain('mode-off')
+    })
+
+    it('D-10 dropped with no token: words with nothing to stand on', async () => {
+      const h = await setup()
+      h.setMode(false)
+      h.handler.pick(eventFrom(h.top), { kind: 'open', via: 'pointer', screen: AT, ...SEL, view: VIEW })
+      expect(h.out.element).not.toHaveBeenCalled()
+    })
+
+    it('D-10 a menu pick outside the mode stays dropped: only the open route widened', async () => {
+      const h = await setup()
+      h.setMode(false)
+      h.handler.pick(eventFrom(h.top), menuPick(tokenOfTag(h.page.doc, 'button'), 'button', { kind: 'menu', screen: AT, ...SEL }))
+      expect(h.out.element).not.toHaveBeenCalled()
+    })
+
+    it('D-10 the element checks still hold: a moved token is dropped', async () => {
+      const h = await setup()
+      h.setMode(false)
+      h.handler.pick(eventFrom(h.top), menuPick(tokenOfTag(h.page.doc, 'button'), 'p', { kind: 'open', screen: AT, ...SEL }))
+      expect(h.out.element).not.toHaveBeenCalled()
+    })
+
+    it('D-09 an icon pick outside the mode still needs its real press', async () => {
+      const h = await setup()
+      h.setMode(false)
+      const key = [...h.frames.get(1)!.pins.keys()][0]
+      h.forged.pick(eventFrom(h.top), { kind: 'icon', via: 'pointer', key, screen: AT, view: VIEW })
+      expect(h.out.icon).not.toHaveBeenCalled()
+      h.handler.pick(eventFrom(h.top), { kind: 'icon', via: 'pointer', key, screen: AT, view: VIEW })
+      expect(h.out.icon).toHaveBeenCalledTimes(1)
+    })
+  })
+
   describe('L-1 K-1 the keyboard\'s context pick', () => {
     const keyPick = (token: string) => menuPick(token, 'button', { kind: 'context', via: 'keyboard', screen: undefined, point: { x: 14, y: 304 } })
     const offMode = async () => {

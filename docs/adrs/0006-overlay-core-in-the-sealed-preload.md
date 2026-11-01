@@ -60,6 +60,8 @@ The build guard is not the security control; the contract scan and the pure-core
 
 **Later note (2026-11-01, K-20, I-14, I-19).** `overlayCore/reveal` and `overlayCore/markGround` are new pure files, with no imports; the page's `openAround` and mode tab now use them. The page reads the computed `background-color` of a mark's ancestors, in its isolated world, to choose the bar: a read only. Main→page gains two values on the existing `commentState`: `theme.accentDeep` (a colour) and `icons[].words[].changed` (a boolean); the new words of a Words changed comment travel as `words`, which is page text. No page→main field, channel or listener was added, and no comment text, thread id or author reaches the page. `previewPage.surface.pin.test.ts` passes unchanged.
 
+**Later note (2026-11-01, D-09, D-10).** The HTML Comment button and underline clicks outside comment mode added rules to `overlayCore/gesture` and `overlayCore/selectionRules`, and pure functions only. The preload reads events its guards already receive: no channel, message field, listener or `preventDefault` was added, and the PIN-S snapshot did not change. The page observer now also watches `characterData`, an option on an existing observer, so a page's reaction that only rewrites text counts as a reaction.
+
 ## Alternatives considered
 
 ### One overlay implementation loaded in both places

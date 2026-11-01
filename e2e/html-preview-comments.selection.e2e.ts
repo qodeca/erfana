@@ -37,6 +37,7 @@ import {
   setGlobalSetting,
   singleBlockInsert,
   waitForBox,
+  waitForOverlay,
   waitForViewShown
 } from './pages/html-preview.comments-ui'
 import { waitForCommentLoad } from './pages/html-preview.comments'
@@ -156,6 +157,61 @@ test.describe('HTML Preview comments – selected words (024-AC-004)', () => {
 
     const text = expectWordsBlock(before, await diskBytes(file))
     expect(text).toContain('Note-SEL-a2')
+  })
+
+  test('D-10 outside comment mode a real drag shows the Comment button; its click opens the window; only Save writes sel', async ({
+    windowWithTestProject,
+    appWithTestProject,
+    testProject
+  }) => {
+    const app = appWithTestProject
+    const page = windowWithTestProject
+    const preview = new HtmlPreviewPage(page, app)
+    const chrome = new CommentChrome(page, preview, 'selection.html')
+    const file = path.join(testProject.path, PAGE)
+    await setGlobalSetting(page, 'comments', reviewer(NAME))
+    const before = await diskBytes(file)
+
+    await openCommentPage(preview, app, PAGE, TITLE)
+    await waitForViewShown(app, TARGET)
+    // The second line: the first sits within 48 px of the view's top, where the button goes below.
+    const box = await waitForBox(app, 'other', TARGET)
+    const y = Math.round(box.top + box.height / 2)
+    const to = { x: Math.round(box.left + box.width * 0.45), y }
+    expect(await dragInPage(app, { x: Math.round(box.left + 2), y }, to, TARGET), 'no preview to drag in').toBe(true)
+    // This page has no comments: the overlay's host comes up with the button.
+    await waitForOverlay(preview, app, TARGET)
+    await expect(chrome.window()).toHaveCount(0)
+    expect(await mouseAt(app, { x: to.x - 40, y: Math.round(box.top - 18) }, 'left', TARGET), 'no preview to click').toBe(true)
+    await expect(chrome.window()).toHaveAttribute('data-view', /^(identity|new)$/, { timeout: PREVIEW_BUDGET_MS })
+    expect(await diskBytes(file), 'nothing is written before Save').toEqual(before)
+    await chrome.saveNewComment('Note-SEL-d10: outside the mode', PAGE, NAME)
+
+    const text = expectWordsBlock(before, await diskBytes(file))
+    expect(text).toContain('Note-SEL-d10')
+  })
+
+  test('D-09 outside comment mode a plain click on an underline opens its thread', async ({ windowWithTestProject, appWithTestProject }) => {
+    const app = appWithTestProject
+    const page = windowWithTestProject
+    const preview = new HtmlPreviewPage(page, app)
+    const chrome = new CommentChrome(page, preview, 'selection.html')
+    await setGlobalSetting(page, 'comments', reviewer(NAME))
+
+    const panelId = await openCommentPage(preview, app, PAGE, TITLE)
+    await chrome.modeOn(app, panelId, TARGET)
+    const at = await selectWords(app)
+    expect(await pressInPage(app, 'Enter', [], TARGET)).toBe(true)
+    await expect(chrome.window()).toHaveAttribute('data-view', /^(identity|new)$/, { timeout: PREVIEW_BUDGET_MS })
+    await chrome.saveNewComment('Note-SEL-d09', PAGE, NAME)
+    await waitForCommentLoad(app, PAGE, 'page', 1)
+    await expectPin(app, 'ship', true, TARGET)
+    await chrome.modeButton().click()
+    await expect(chrome.modeButton()).toHaveAttribute('aria-pressed', 'false', { timeout: PREVIEW_BUDGET_MS })
+
+    await waitForViewShown(app, TARGET)
+    expect(await mouseAt(app, at, 'left', TARGET), 'no preview to click').toBe(true)
+    await expect(chrome.window()).toContainText('Note-SEL-d09', { timeout: PREVIEW_BUDGET_MS })
   })
 
   test('I-22 a right-click away from selected words is about what is under the pointer', async ({ windowWithTestProject, appWithTestProject }) => {

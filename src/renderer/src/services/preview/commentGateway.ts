@@ -21,7 +21,7 @@
  * @module services/preview/commentGateway
  */
 import { ErrorCode } from '../../../../shared/errors'
-import type { CommentBulkRequest, CommentBulkResult } from '../../../../shared/ipc/comment-common-schema'
+import type { CommentBulkRequest, CommentBulkResult, CommentBulkSettled } from '../../../../shared/ipc/comment-common-schema'
 import type {
   CommentAck,
   CommentAnchorStatus,
@@ -104,5 +104,7 @@ export const commentGateway = {
   onModeChanged: (callback: (payload: CommentModeChanged) => void): (() => void) =>
     listen(cb => previewCommentsGateway.onModeChanged(cb), callback),
   onSaveSettled: (callback: (payload: CommentSaveSettled) => void): (() => void) =>
-    listen(cb => previewCommentsGateway.onSaveSettled(cb), callback)
+    listen(cb => previewCommentsGateway.onSaveSettled(cb), callback),
+  onBulkSettled: (callback: (payload: CommentBulkSettled) => void): (() => void) =>
+    listen(cb => previewCommentsGateway.onBulkSettled(cb), callback)
 }

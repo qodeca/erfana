@@ -15,7 +15,7 @@ import { modeTabMovesAway } from '../../shared/comments/overlayCore/reveal'
 import { COMMENT_HELLO_CHANNEL, COMMENT_PICK_CHANNEL } from './constants'
 import { EMPTY_FRAME_MAP, iframeOfKey, mapChildFrames, shieldsOf, suffixFor, type FrameMap, type Shield } from './frames'
 import { openAround, SectionRestore } from './foldedSections'
-import { boxOf, clipToViewport, isRendered, viewportOf, type Box, type Point, type Viewport } from './geometry'
+import { boxOf, clipToViewport, contains, isRendered, viewportOf, type Box, type Point, type Viewport } from './geometry'
 import { IconResolver } from './iconResolver'
 import { labelOf, labelText } from './label'
 import { OverlayHost } from './overlayHost'
@@ -29,6 +29,7 @@ import { MarkResolver, type MarkPlacement } from './marks'
 import { elementOfHit, hitAt, linkedHover, NO_HOVER, routeOverlayEvent, type OverlayHit } from './overlayHits'
 import { HelloRepeater, RevealFlash } from './revealFlash'
 import { describeTarget, elementPoint, PickBudgets, screenOf, stackPart, StepSender, stepElementOf, viewOf, wordsPart, type PickKind, type PickPayload } from './picks'
+import { OutsideMode } from './outsideMode'
 import { PageMenu } from './pageMenu'
 import { onSelection, SelectionButton, selectionEnd, selectionInView } from './selectionButton'
 import { readSelection, type PageWords } from './words'
@@ -46,8 +47,6 @@ export interface ControllerDeps {
   /** `window === window.top`: only the top frame draws the mode indicator. */
   readonly isTop: boolean
 }
-
-export type { OverlayHit } from './overlayHits'
 
 /** The comment overlay of one frame. */
 export class CommentController {
@@ -90,6 +89,8 @@ export class CommentController {
   private keyboardMenuAt = Number.NEGATIVE_INFINITY
   /** Erfana's menu outside comment mode: the right-click and the keyboard's route (OD-01, K-1). */
   readonly menu: PageMenu
+  /** The button and underline clicks outside comment mode (D-09, D-10). */
+  readonly outside: OutsideMode
   private ready = false
 
   constructor(private readonly deps: ControllerDeps) {
@@ -105,7 +106,7 @@ export class CommentController {
     this.restorer = new ScrollRestore(deps.win, now)
     this.sections = new SectionRestore(deps.win, doc, now)
     this.pickable = pickableExcept(element => this.host.isHost(element))
-    this.tree = pageTree(() => this.body(), this.pickable)
+    this.tree = pageTree(() => doc.body ?? (doc.documentElement as Element), this.pickable)
     this.icons = new IconResolver(this.tokens, () => this.watch.version)
     this.markResolver = new MarkResolver(() => this.watch.version)
     this.button = new SelectionButton(deps.win, now, () => this.scheduler.soon())
@@ -113,6 +114,7 @@ export class CommentController {
     this.hellos = new HelloRepeater(now, deps.send)
     const open = (): boolean => !this.state.mode && this.state.commentable
     this.menu = new PageMenu({ win: deps.win, tokens: this.tokens, now, open, words: () => this.selectionWords(), wordsAt: point => this.wordsAt(point), wordsPoint: () => selectionEnd(deps.win), keyTarget: () => this.menuKeyTarget(), send: payload => this.sendPick(payload) })
+    this.outside = new OutsideMode({ win: deps.win, doc, open, isOverlay: element => this.host.isHost(element), button: this.button, tokens: this.tokens, words: () => this.selectionWords(), markAt: point => this.marks.find(mark => contains(mark.box, point)) ?? null, pageVersion: () => this.watch.version, openMark: (mark, event) => this.pickIcon(mark.markKey, mark.element, event), redraw: () => this.scheduler.soon() })
   }
 
   /** Comment mode is on for this frame. */
@@ -287,11 +289,8 @@ export class CommentController {
     this.cursor.set(false)
     this.flash.dispose()
     this.button.dispose()
+    this.outside.dispose()
     this.host.dispose()
-  }
-
-  private body(): Element {
-    return this.deps.doc.body ?? (this.deps.doc.documentElement as Element)
   }
 
   private hitElement(point: Point): Element | null {
@@ -463,12 +462,12 @@ export class CommentController {
     )
     this.marks = this.markResolver.place(pinned, viewport)
     const theme = this.state.theme
-    this.buttonBox = this.state.mode ? this.button.box(viewport, pxOf(theme.pinTarget) + 2 * pxOf(theme.space1), pxOf(theme.space4)) : null
+    this.buttonBox = this.button.box(viewport, pxOf(theme.pinTarget) + 2 * pxOf(theme.space1), pxOf(theme.space4), this.state.mode ? undefined : box => this.outside.leavesFree(box))
     this.shields = this.state.mode ? shieldsOf(doc, this.frameMap, viewport) : []
     this.watch.observeSizes(pinned.map(r => r.element as Element))
     const flash = this.flash.current()
     const hover = this.state.mode && this.pointer !== null ? linkedHover(this.overlayHit(this.pointer), this.marks) : NO_HOVER
-    const needed = this.state.mode || this.pins.length > 0 || this.marks.length > 0 || flash !== null
+    const needed = this.state.mode || this.pins.length > 0 || this.marks.length > 0 || flash !== null || this.buttonBox !== null
     if (!needed && this.view === null) return
     const root = this.host.ensure()
     if (root === null) return

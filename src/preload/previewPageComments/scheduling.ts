@@ -110,7 +110,7 @@ export class PageWatch {
         this.changes += 1
         this.throttled()
       })
-      this.mutations.observe(doc, { childList: true, subtree: true, attributes: true })
+      this.mutations.observe(doc, { childList: true, subtree: true, attributes: true, characterData: true }) // text alone can be a page's reaction (D-09)
       return
     }
     for (const type of REDRAW_EVENTS) win.removeEventListener(type, this.redraw, { capture: true })

@@ -21,6 +21,7 @@
  * focus on the toggle, which takes the keyboard only in a focused contents.
  */
 import type { ZodType } from 'zod'
+import { CommentBulkSettledSchema } from '../../../shared/ipc/comment-common-schema'
 import { PreviewCommentEvents } from '../../../shared/ipc/preview-comment-channels'
 import {
   CommentAnchorStatusSchema,
@@ -84,6 +85,8 @@ export function createPreviewCommentEmitters(deps: PreviewCommentEmitterDeps): P
     modeChanged: (windowId, payload) =>
       send(PreviewCommentEvents.MODE_CHANGED, CommentModeChangedSchema, windowId, payload, payload.reason === 'escape'),
     saveSettled: (windowId, payload) =>
-      send(PreviewCommentEvents.SAVE_SETTLED, CommentSaveSettledSchema, windowId, payload)
+      send(PreviewCommentEvents.SAVE_SETTLED, CommentSaveSettledSchema, windowId, payload),
+    bulkSettled: (windowId, payload) =>
+      send(PreviewCommentEvents.BULK_SETTLED, CommentBulkSettledSchema, windowId, payload)
   }
 }

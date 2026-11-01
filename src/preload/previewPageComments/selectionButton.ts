@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The Comment button over a selection, in comment mode (spec 024 024-FR-004;
- * comments-v2 C-16; differences table D-10: in the HTML Preview only in
- * comment mode, because outside it the page owns its mouse).
+ * The Comment button over a selection (spec 024 024-FR-004; comments-v2 C-16;
+ * differences table D-10), in and out of comment mode. Outside it the page owns
+ * its controls, so {@link SelectionButton.box} takes where the page leaves room
+ * (`outsideMode.ts` says when it shows).
  *
  * It holds the words a drag selected (or that were selected when the mode
  * came on) and says where the button goes, by the overlay core's one rule
@@ -18,7 +19,7 @@
  * PIN-S): while the words are held, a timer asks for a redraw.
  */
 import { classifyGesture } from '../../shared/comments/overlayCore/gesture'
-import { SELECTION_BUTTON_DELAY_MS, buttonGoesBelow, lastLineInView, pointerOnLines, type LineBox } from '../../shared/comments/overlayCore/selectionRules'
+import { SELECTION_BUTTON_DELAY_MS, buttonGoesBelow, lastLineInView, outsideButtonTops, pointerOnLines, type LineBox } from '../../shared/comments/overlayCore/selectionRules'
 import { clipToViewport, type Box, type Point, type Viewport } from './geometry'
 import { rectsOf, type PageWords } from './words'
 
@@ -60,6 +61,7 @@ export class SelectionButton {
   /** When the wait after a mouse selection ends. */
   private dueAt = Number.NEGATIVE_INFINITY
   private timer: ReturnType<typeof setTimeout> | null = null
+  private reading: ReturnType<typeof setTimeout> | null = null
 
   /**
    * @param win - The frame's window.
@@ -91,6 +93,26 @@ export class SelectionButton {
   press(at: Point): void {
     this.downAt = at
     this.words = null
+    if (this.reading !== null) clearTimeout(this.reading)
+    this.reading = null
+  }
+
+  /**
+   * A real selecting gesture ended outside comment mode (`outsideMode.ts`).
+   * The words are read a task later, so the page has had its turn at the
+   * release; the button's wait runs from now.
+   *
+   * @param read - The words main could keep, if any.
+   */
+  selected(read: () => PageWords | null): void {
+    const dueAt = this.now() + SELECTION_BUTTON_DELAY_MS
+    this.reading = setTimeout(() => {
+      this.reading = null
+      this.words = read()
+      if (this.words === null) return
+      this.dueAt = dueAt
+      this.watch()
+    }, 0)
   }
 
   /**
@@ -124,8 +146,11 @@ export class SelectionButton {
    * and the words dropped – once the selection is gone or its target left the
    * page. Also `null`, with the words kept, while the wait runs or the
    * selection is out of view.
+   *
+   * @param clear - Outside comment mode: whether the page leaves a box free.
+   *   Above the line, else below it, else no button, with the words kept.
    */
-  box(viewport: Viewport, height: number, gap: number): Box | null {
+  box(viewport: Viewport, height: number, gap: number, clear?: (box: Box) => boolean): Box | null {
     if (this.words === null) return null
     const selection = this.win.getSelection()
     if (selection === null || selection.isCollapsed || selection.rangeCount === 0 || !this.words.target.isConnected) {
@@ -137,6 +162,10 @@ export class SelectionButton {
     if (last === null || this.now() < this.dueAt) return null
     const width = COMMENT_BUTTON_WIDTH_PX
     const left = Math.max(0, Math.min(last.right - width, viewport.width - width))
+    if (clear !== undefined) {
+      const free = outsideButtonTops(last, height, gap, viewOf(viewport)).find(top => clear({ left, top, width, height }))
+      return free === undefined ? null : clipToViewport({ left, top: free, width, height }, viewport)
+    }
     const top = buttonGoesBelow(last.top, 0) ? last.bottom + gap : last.top - gap - height
     return clipToViewport({ left, top, width, height }, viewport)
   }
@@ -144,7 +173,8 @@ export class SelectionButton {
   /** Stop the timer (tests, and the document's end). */
   dispose(): void {
     if (this.timer !== null) clearTimeout(this.timer)
-    this.timer = null
+    if (this.reading !== null) clearTimeout(this.reading)
+    this.timer = this.reading = null
   }
 
   /** One redraw after the wait; `box` asks again for as long as the words are held. */

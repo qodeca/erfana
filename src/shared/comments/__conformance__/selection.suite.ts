@@ -7,9 +7,10 @@
  * is, because of the 500-line ratchet.
  *
  * The rule itself is `overlayCore/selectionRules`; this suite proves each host
- * follows it. Comment-mode cases, because outside the mode only the Markdown
- * Preview has the button for now (D-10). Line boxes are the suite's: jsdom has
- * no layout.
+ * follows it, in and out of comment mode (D-10). What only the HTML Preview
+ * needs outside the mode, because a page owns its controls, is in
+ * `previewPageComments/outsideMode.test.ts`. Line boxes are the suite's: jsdom
+ * has no layout.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { OVERLAY_FIXTURE, type OverlayTargetBox, type SelectionDriver } from './overlayDriver'
@@ -80,6 +81,28 @@ export function runSelectionSuite(name: string, makeDriver: () => SelectionDrive
       })
 
       it(`I-10 (${name}) SEL-05 a line near the top takes the button below it`, async () => {
+        d.dragSelect('second', NEAR_TOP)
+        await d.waitForButton()
+        expect(d.commentButton()?.below).toBe(true)
+      })
+    })
+
+    describe('outside comment mode (D-10)', () => {
+      it(`D-10 (${name}) SEL-12 a mouse selection shows the button after its wait`, async () => {
+        d.dragSelect('second', LINE)
+        expect(d.commentButton()).toBeNull()
+        await d.waitForButton()
+        expect(d.commentButton()).not.toBeNull()
+      })
+
+      it(`D-10 (${name}) SEL-13 it goes when a script clears the selection`, async () => {
+        d.dragSelect('second', LINE)
+        await d.waitForButton()
+        await d.clearSelectionByScript()
+        expect(d.commentButton()).toBeNull()
+      })
+
+      it(`D-10 (${name}) SEL-14 a line near the top takes the button below it`, async () => {
         d.dragSelect('second', NEAR_TOP)
         await d.waitForButton()
         expect(d.commentButton()?.below).toBe(true)

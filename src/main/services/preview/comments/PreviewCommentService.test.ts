@@ -175,6 +175,29 @@ describe('PreviewCommentService', () => {
     expect(fixture.emit.saveSettled).toHaveBeenCalledExactlyOnceWith(1, { panelId: 'html-preview-index', op: 'add', draftToken, ok: true })
   })
 
+  it('L-2 a late bulk refusal reaches the owning window, by its file key', async () => {
+    let finish: (result: CommentWriteResult) => void = () => {}
+    const changeThreads = vi.fn(() => new Promise<CommentWriteResult>(resolve => (finish = resolve)))
+    f = await commentServiceFixture(commentedPage().text, { createWriter: () => ({ add: vi.fn(), changeThread: vi.fn(), deleteDamagedBlock: vi.fn(), changeThreads }) as never })
+    await f.loadPage()
+    const list = await f.service.list()
+    if (!list.ok) throw new Error('list')
+    const [file] = list.files
+    const [{ threadKey, rawHash }] = file.threads
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const running = f.service.bulk({ panelId: 'html-preview-index', change: 'resolve', files: [{ fileKey: file.fileKey, threads: [{ threadKey, rawHash }] }] })
+      await vi.waitFor(() => expect(changeThreads).toHaveBeenCalledTimes(1))
+      await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS)
+      expect(await running).toEqual({ ok: true, files: [{ fileKey: file.fileKey, ok: false, code: ErrorCode.COMMENT_SAVE_PENDING }] })
+    } finally {
+      vi.useRealTimers()
+    }
+    finish({ ok: false, code: ErrorCode.COMMENT_BLOCK_CHANGED, reason: 'block-changed' } as unknown as CommentWriteResult)
+    await flush()
+    expect(f.emit.bulkSettled).toHaveBeenCalledExactlyOnceWith(1, { panelId: 'html-preview-index', fileKey: file.fileKey, ok: false, code: ErrorCode.COMMENT_BLOCK_CHANGED, reason: 'block-changed' })
+  })
+
   it('H1 a late refusal tells the owning window its code, and re-sends no counts', async () => {
     const { fixture, finish, draftToken } = await pendingSave()
     finish({ ok: false, code: ErrorCode.COMMENT_TARGET_MOVED, reason: 'target-moved' } as unknown as CommentWriteResult)

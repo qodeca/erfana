@@ -13,7 +13,7 @@ import userEvent from '@testing-library/user-event'
 import { expect } from 'vitest'
 import { ErrorCode } from '../../../../../shared/errors'
 import type { DrawerBulkDriver, DrawerBulkSetup, BulkThreadState, SentBulk } from '../../../../../shared/comments/__conformance__/drawerBulk.suite'
-import type { CommentBulkRequest, CommentBulkResult, CommentFileView } from '../../../../../shared/ipc/comment-common-schema'
+import type { CommentBulkRequest, CommentBulkResult, CommentBulkSettled, CommentFileView } from '../../../../../shared/ipc/comment-common-schema'
 import type { CommentDirtyGuard } from '../../../hooks/useCommentDirtyGuard'
 import { TEST_IDS } from '../../../constants/testids'
 import type { CommentListState } from '../../../stores/usePreviewCommentStore'
@@ -55,6 +55,10 @@ function filesOf(setup: DrawerBulkSetup): CommentFileView[] {
 interface Fake {
   readonly sent: SentBulk[]
   readonly turnOn: () => void
+  /** The drawer's listener for main's late endings. */
+  settled: Set<(event: CommentBulkSettled) => void>
+  /** The file main answered "still saving" for. */
+  pendingKey?: string
 }
 
 /** The drawer, with main's fake answers landing in the list it shows. */
@@ -73,6 +77,11 @@ function Stage({ setup, words, fake }: { readonly setup: DrawerBulkSetup; readon
     const results = request.files.map((file): Extract<CommentBulkResult, { ok: true }>['files'][number] => {
       const place = files.findIndex(f => f.fileKey === file.fileKey)
       if (place === setup.refuseFile) return { fileKey: file.fileKey, ok: false, code: ErrorCode.COMMENT_BLOCK_CHANGED, reason: 'block-changed' }
+      if (place === setup.changedFile) return { fileKey: file.fileKey, ok: true, done: file.threads.length, changedDuringSave: true }
+      if (place === setup.pendingFile) {
+        fake.pendingKey = file.fileKey
+        return { fileKey: file.fileKey, ok: false, code: ErrorCode.COMMENT_SAVE_PENDING }
+      }
       return { fileKey: file.fileKey, ok: true, done: file.threads.length }
     })
     const done = new Set(results.filter(r => r.ok).map(r => r.fileKey))
@@ -100,6 +109,10 @@ function Stage({ setup, words, fake }: { readonly setup: DrawerBulkSetup; readon
           onTurnOnMode={setup.canTurnOnMode === true ? fake.turnOn : undefined}
           bulk={{
             run,
+            onSettled: listener => {
+              fake.settled.add(listener)
+              return () => fake.settled.delete(listener)
+            },
             identity,
             onSaveIdentity: async data => {
               setIdentity({ authorName: data.name, identityNoticeSeen: true })
@@ -124,6 +137,7 @@ export function drawerBulkDriver(words: CommentWords, guard: { current: CommentD
   let turnedOn = 0
   const fake: Fake = {
     sent: [],
+    settled: new Set(),
     turnOn: () => {
       turnedOn += 1
     }
@@ -174,6 +188,14 @@ export function drawerBulkDriver(words: CommentWords, guard: { current: CommentD
     outcome: () => {
       const shown = screen.queryByTestId(TEST_IDS.COMMENT_BULK_OUTCOME)
       return shown === null ? null : within(shown).getByText(/./).textContent
+    },
+    async settleLate(ending) {
+      const fileKey = fake.pendingKey as string
+      const event: CommentBulkSettled =
+        ending === 'landed' ? { panelId: 'p', fileKey, ok: true } : { panelId: 'p', fileKey, ok: false, code: ErrorCode.COMMENT_BLOCK_CHANGED, reason: 'block-changed' }
+      await act(async () => {
+        for (const listener of fake.settled) listener(event)
+      })
     },
     turnOnMode: () => screen.queryByTestId(TEST_IDS.COMMENT_DRAWER_TURN_ON_MODE)?.textContent ?? null,
     turnOnModeByKeys: () => press(TEST_IDS.COMMENT_DRAWER_TURN_ON_MODE),

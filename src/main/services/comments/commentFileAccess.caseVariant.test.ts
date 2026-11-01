@@ -85,6 +85,17 @@ describe('§19 Rev 4 a path naming the project root in another letter case', () 
     expect(result).toEqual({ ok: true, realPath: page, id })
   })
 
+  it.for(FOLDING_PLATFORMS)('L-4 %s rules: a confined path confines to itself, so a key\'s spelling is what the writer reaches again', async platform => {
+    const page = await project.write('index.html', PAGE)
+    const first = await confineCommentFile({ realRoot: project.root, filePath: join(variantRoot, 'index.html') }, { platform })
+    if (!first.ok) throw new Error('not confined')
+
+    const again = await confineCommentFile({ realRoot: project.root, filePath: first.realPath, expectedRealPath: first.realPath }, { platform })
+
+    expect(again).toMatchObject({ ok: true, realPath: first.realPath })
+    expect(first.realPath).toBe(page)
+  })
+
   it.for(FOLDING_PLATFORMS)('%s rules: the root given in the other case works the same', async platform => {
     const page = await project.write('index.html', PAGE)
 

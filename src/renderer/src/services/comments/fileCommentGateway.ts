@@ -22,7 +22,7 @@
  * @module services/comments/fileCommentGateway
  */
 import { ErrorCode } from '../../../../shared/errors'
-import type { CommentBulkRequest, CommentBulkResult } from '../../../../shared/ipc/comment-common-schema'
+import type { CommentBulkRequest, CommentBulkResult, CommentBulkSettled } from '../../../../shared/ipc/comment-common-schema'
 import type {
   FileCommentChanged,
   FileCommentGitNameResult,
@@ -99,6 +99,16 @@ export const fileCommentGateway = {
     if (api === undefined) return noop
     try {
       return api.onSaveSettled(callback)
+    } catch {
+      return noop
+    }
+  },
+  /** A file of a bulk action answered "still saving" ended (L-2). */
+  onBulkSettled: (callback: (payload: CommentBulkSettled) => void): (() => void) => {
+    const api = bridge()
+    if (api === undefined) return noop
+    try {
+      return api.onBulkSettled(callback)
     } catch {
       return noop
     }

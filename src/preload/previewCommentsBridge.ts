@@ -33,5 +33,6 @@ export const previewCommentsBridge: PreviewCommentsBridge = {
   onCommentsChanged: (callback) => subscribe(PreviewCommentEvents.COMMENTS_CHANGED, callback),
   onAnchorStatus: (callback) => subscribe(PreviewCommentEvents.ANCHOR_STATUS, callback),
   onModeChanged: (callback) => subscribe(PreviewCommentEvents.MODE_CHANGED, callback),
-  onSaveSettled: (callback) => subscribe(PreviewCommentEvents.SAVE_SETTLED, callback)
+  onSaveSettled: (callback) => subscribe(PreviewCommentEvents.SAVE_SETTLED, callback),
+  onBulkSettled: (callback) => subscribe(PreviewCommentEvents.BULK_SETTLED, callback)
 }

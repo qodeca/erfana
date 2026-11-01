@@ -55,6 +55,7 @@ describeBridge('previewComments bridge', previewCommentsBridge, {
     { method: 'onCommentsChanged', channel: 'preview:commentsChanged' },
     { method: 'onAnchorStatus', channel: 'preview:commentAnchorStatus' },
     { method: 'onModeChanged', channel: 'preview:commentModeChanged' },
-    { method: 'onSaveSettled', channel: 'preview:commentSaveSettled' }
+    { method: 'onSaveSettled', channel: 'preview:commentSaveSettled' },
+    { method: 'onBulkSettled', channel: 'preview:commentBulkSettled' }
   ]
 })

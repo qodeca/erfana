@@ -24,7 +24,7 @@ function gatedJobs(): { readonly jobs: CommentFileJobRunner; readonly release: (
     release: () => open(),
     jobs: {
       runJob: async (bytes, job) => {
-        if (job.kind === 'write') await gate
+        if (job.kind === 'write' || job.kind === 'bulkWrite') await gate
         return inner.runJob(bytes, job)
       }
     }
@@ -64,6 +64,25 @@ describe('W-10 a slow file-comment save (I-29)', () => {
     expect(settled).toHaveBeenCalledWith(1, { panelId: PANEL, op: 'add', draftToken: draft.draftToken, ok: true })
     expect(String(await h.project.read('notes.txt'))).toContain('Slow.')
     expect(String(await h.project.read('notes.txt')).split('Slow.').length).toBe(3)
+  })
+
+  it('L-2 a bulk file past the limit answers pending, then reports how it ended to the sender\'s window', async () => {
+    const release = await slowHarness(5_000)
+    const bulkSettled = vi.fn()
+    release()
+    await h.add('notes.txt', 1, 'First.')
+    const { jobs, release: open } = gatedJobs()
+    const slow = await fileCommentHarness({ jobs, service: { saveTimeoutMs: TIME_LIMIT_MS, sendBulkSettled: bulkSettled } })
+    await slow.project.write('notes.txt', String(await h.project.read('notes.txt')))
+    const { file } = await slow.listOk('notes.txt')
+    const [thread] = file.threads
+    const request = { panelId: PANEL, change: 'resolve' as const, files: [{ fileKey: file.fileKey, threads: [{ threadKey: thread.threadKey, rawHash: thread.rawHash }] }] }
+    expect(await slow.service.bulk(slow.caller(), request)).toEqual({ ok: true, files: [{ fileKey: file.fileKey, ok: false, code: ErrorCode.COMMENT_SAVE_PENDING }] })
+    expect(bulkSettled).not.toHaveBeenCalled()
+    open()
+    await vi.waitFor(() => expect(bulkSettled).toHaveBeenCalledExactlyOnceWith(1, { panelId: PANEL, fileKey: file.fileKey, ok: true }))
+    await slow.service.clear()
+    await slow.project.dispose()
   })
 
   it('I-29 a thread write past the limit reports by its thread key; one that is refused names its code and reason', async () => {

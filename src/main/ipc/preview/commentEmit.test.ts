@@ -40,6 +40,7 @@ describe('createPreviewCommentEmitters', () => {
     emit.anchorStatus(1, { panelId: PANEL, notVisible: [] })
     emit.modeChanged(1, { panelId: PANEL, on: true, reason: 'shortcut' })
     emit.saveSettled(1, { panelId: PANEL, op: 'reply', threadKey: 't1', ok: false, code: ErrorCode.COMMENT_BLOCK_CHANGED })
+    emit.bulkSettled(1, { panelId: PANEL, fileKey: 'f1', ok: false, code: ErrorCode.COMMENT_BLOCK_CHANGED, reason: 'block-changed' })
     emit.draftOpened(1, {
       panelId: PANEL,
       kind: 'icon',
@@ -57,6 +58,7 @@ describe('createPreviewCommentEmitters', () => {
       PreviewCommentEvents.ANCHOR_STATUS,
       PreviewCommentEvents.MODE_CHANGED,
       PreviewCommentEvents.SAVE_SETTLED,
+      PreviewCommentEvents.BULK_SETTLED,
       PreviewCommentEvents.DRAFT_OPENED
     ])
     for (const silent of [other, anonymous, gone]) expect(silent.send).not.toHaveBeenCalled()

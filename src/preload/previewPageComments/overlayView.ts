@@ -14,8 +14,8 @@
  * - the reveal flash (a static highlight, so reduced motion needs nothing);
  * - comment marks over the words comments are about (spec 024 C-12), which
  *   take clicks only in comment mode (C-17);
- * - in comment mode, after a drag that selected words, the Comment button
- *   at the end of the selection (C-16) – a button in the shadow root, its
+ * - after a real selection, in and out of comment mode, the Comment button
+ *   at the end of the selection (C-16, D-10) – a button in the shadow root, its
  *   label generated content like every other word here.
  *
  * Pins and marks are visual only (C-11, differences table D-07): their layer

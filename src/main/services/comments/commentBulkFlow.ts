@@ -13,10 +13,15 @@
  * can be run again on what is left.
  *
  * A write past the time limit answers `COMMENT_SAVE_PENDING` for its file and
- * goes on under its lock; the file watch shows the result when it lands.
+ * goes on under its lock; however it ends, the reader is told, per file
+ * (`preview:commentBulkSettled`, `file-comment:bulkSettled`; security review L-2).
+ *
+ * A file that changed right after the rename (`changed-during-save`) is a
+ * write that landed, as `FileCommentService` treats a draft: its comments did
+ * change, so it counts as done, with a warning, and never as nothing written.
  */
 import { ErrorCode } from '../../../shared/errors'
-import type { CommentBulkFile, CommentBulkFileResult, CommentBulkRequest, CommentBulkResult } from '../../../shared/ipc/comment-common-schema'
+import type { CommentBulkFile, CommentBulkFileResult, CommentBulkRequest, CommentBulkResult, CommentBulkSettled } from '../../../shared/ipc/comment-common-schema'
 import { logger } from '../LoggingService'
 import type { BulkThread } from './commentBulkCore'
 import type { CommentBinding, CommentKeyStore } from './commentKeyStore'
@@ -26,6 +31,9 @@ import { samePathKey } from './commentUnsavedSources'
 import type { CommentWriteResult, CommentWriter } from './CommentWriter'
 
 type Written = Extract<CommentWriteResult, { ok: true }>
+
+/** How a file that outlasted its answer ended (no panel: the service adds it). */
+export type LateBulkSettle = Omit<CommentBulkSettled, 'panelId'>
 
 /** One file's write of a bulk action, or `threads: null` when a key did not hold. */
 export interface BulkFileWork {
@@ -62,22 +70,39 @@ export function resolveBulkFile<D>(
   return isFile(file.value.realPath, file.value.realPath) ? { realPath: file.value.realPath, threads } : null
 }
 
-async function runOne(work: BulkFileWork, timeoutMs: number, land: (written: Written) => void): Promise<CommentBulkFileResult> {
+/** A refusal that came after the write landed (module comment). */
+function landedAnyway(result: CommentWriteResult): boolean {
+  if (result.ok || result.reason !== 'changed-during-save') return false
+  logger.warn('Comments: a file changed right after a bulk write landed')
+  return true
+}
+
+async function runOne(work: BulkFileWork, timeoutMs: number, land: (written: Written) => void, settled: (late: LateBulkSettle) => void): Promise<CommentBulkFileResult> {
   const { fileKey, threads } = work
   if (threads === null) return { fileKey, ok: false, ...KEY_REFUSED }
   const write = work.write(threads)
   const outlasted = (): void => {
     void write.then(
       result => {
-        if (result.ok) land(result)
+        if (result.ok) {
+          land(result)
+          settled({ fileKey, ok: true })
+        } else if (landedAnyway(result)) settled({ fileKey, ok: true, changedDuringSave: true })
+        else settled({ fileKey, ok: false, code: result.code, reason: result.reason })
       },
-      () => logger.warn('Comments: a bulk write that outlasted its time limit failed')
+      () => {
+        logger.warn('Comments: a bulk write that outlasted its time limit failed')
+        settled({ fileKey, ok: false, code: ErrorCode.COMMENT_WRITE_FAILED })
+      }
     )
   }
   const result = await boundedWrite(write, timeoutMs, outlasted)
   if (result === 'pending') return { fileKey, ok: false, code: ErrorCode.COMMENT_SAVE_PENDING }
   if (result === 'failed') return { fileKey, ok: false, code: ErrorCode.COMMENT_WRITE_FAILED }
-  if (!result.ok) return { fileKey, ok: false, code: refusalCode(result.reason), reason: result.reason }
+  if (!result.ok) {
+    if (landedAnyway(result)) return { fileKey, ok: true, done: threads.length, changedDuringSave: true }
+    return { fileKey, ok: false, code: refusalCode(result.reason), reason: result.reason }
+  }
   land(result)
   return { fileKey, ok: true, done: threads.length }
 }
@@ -88,11 +113,17 @@ async function runOne(work: BulkFileWork, timeoutMs: number, land: (written: Wri
  * @param files - One entry per file.
  * @param timeoutMs - Longest one write waits before its file answers "still saving".
  * @param land - A write landed, in time or late.
+ * @param settled - A file answered "still saving" ended.
  * @returns Each file's outcome, in request order.
  */
-export async function runBulkFiles(files: readonly BulkFileWork[], timeoutMs = SAVE_TIMEOUT_MS, land: (written: Written) => void = () => {}): Promise<CommentBulkResult> {
+export async function runBulkFiles(
+  files: readonly BulkFileWork[],
+  timeoutMs = SAVE_TIMEOUT_MS,
+  land: (written: Written) => void = () => {},
+  settled: (late: LateBulkSettle) => void = () => {}
+): Promise<CommentBulkResult> {
   const outcomes: CommentBulkFileResult[] = []
-  for (const file of files) outcomes.push(await runOne(file, timeoutMs, land))
+  for (const file of files) outcomes.push(await runOne(file, timeoutMs, land, settled))
   return { ok: true, files: outcomes }
 }
 
@@ -105,6 +136,8 @@ export interface BulkFlowDeps<D, S> {
   readonly captureScroll: () => Promise<S | undefined>
   readonly currentPage: () => string
   readonly landed: (write: LandedWrite<S>) => void
+  /** A file answered "still saving" ended: tell the window how. */
+  readonly lateSettled?: (settled: LateBulkSettle) => void
   readonly timeoutMs?: number
   readonly platform?: NodeJS.Platform
 }
@@ -118,11 +151,17 @@ export function createCommentBulkFlow<D, S>(deps: BulkFlowDeps<D, S>): (request:
     const scroll = await deps.captureScroll()
     const work = request.files.map((named): BulkFileWork => {
       const found = resolveBulkFile(deps.keys, deps.binding, named, same)
-      const file = { realRoot: deps.realRoot, filePath: found?.realPath ?? '' }
+      // The key's real path is a confinement's own output (`frameFileMap.ts`): a folder swapped for a link since then
+      // resolves elsewhere and is refused, as a panel's listed file is (security review L-4).
+      const realPath = found?.realPath ?? ''
+      const file = { realRoot: deps.realRoot, filePath: realPath, expectedRealPath: realPath }
       return { fileKey: named.fileKey, threads: found?.threads ?? null, write: threads => changeThreads({ file, threads, change: request.change }) }
     })
-    return runBulkFiles(work, deps.timeoutMs, written =>
-      deps.landed({ realPath: written.realPath, fileHash: written.fileHash, ...(scroll === undefined ? {} : { scroll, page: deps.currentPage() }) })
+    return runBulkFiles(
+      work,
+      deps.timeoutMs,
+      written => deps.landed({ realPath: written.realPath, fileHash: written.fileHash, ...(scroll === undefined ? {} : { scroll, page: deps.currentPage() }) }),
+      deps.lateSettled
     )
   }
 }

@@ -412,7 +412,9 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
               .then(ok => (ok ? announce(COMMENT_LIST_COPY.textCopied) : alert(COMMENT_LIST_COPY.copyTextFailed)))
           },
           onTurnOnMode: mode || blocked !== null ? undefined : () => toggleMode(false),
-          bulk: { run: request => fileCommentGateway.bulk({ panelId, ...request }), identity, onSaveIdentity: saveCommentIdentity }
+          bulk: { run: request => fileCommentGateway.bulk({ panelId, ...request }), onSettled: listener => fileCommentGateway.onBulkSettled(event => {
+              if (event.panelId === panelId) listener(event)
+            }), identity, onSaveIdentity: saveCommentIdentity }
         }
       : null
 

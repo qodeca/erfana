@@ -7,7 +7,7 @@
  */
 import type { CommentBulkRequest, CommentBulkResult } from '../../../../shared/ipc/comment-common-schema'
 import type { CommentSaveRequest, CommentSaveResult } from '../../../../shared/ipc/preview-comment-schema'
-import { createCommentBulkFlow } from '../../comments/commentBulkFlow'
+import { createCommentBulkFlow, type LateBulkSettle } from '../../comments/commentBulkFlow'
 import type { HtmlFileJobRunner } from './htmlCommentJobs'
 import { createCommentSaveFlow, type LateSettle, type SaveDraft } from '../../comments/commentSaveFlow'
 import { CommentWriter, type CommentWriterDeps } from '../../comments/CommentWriter'
@@ -22,6 +22,7 @@ interface PreviewSaveFlowDeps<D extends SaveDraft> extends Pick<PreviewCommentSe
   readonly keys: CommentKeyStore<D>
   readonly coordinator: CommentReloadCoordinator
   readonly onLateSettled: (settled: LateSettle) => void
+  readonly onBulkSettled: (settled: LateBulkSettle) => void
 }
 
 /**
@@ -50,5 +51,5 @@ export function createPreviewSaveFlows<D extends SaveDraft>(
     landed: (write: Parameters<CommentReloadCoordinator['arm']>[0]) => coordinator.arm(write),
     platform: deps.platform
   }
-  return [createCommentSaveFlow({ ...flow, lateSettled: deps.onLateSettled }), createCommentBulkFlow(flow)]
+  return [createCommentSaveFlow({ ...flow, lateSettled: deps.onLateSettled }), createCommentBulkFlow({ ...flow, lateSettled: deps.onBulkSettled })]
 }

@@ -179,9 +179,20 @@ export const CommentBulkRequestSchema = z
   .strict()
 export type CommentBulkRequest = z.infer<typeof CommentBulkRequestSchema>
 
-/** How one file's write ended: every named thread changed, or none did. */
+/**
+ * How one file's write ended: every named thread changed, or none did.
+ * `changedDuringSave`: the write landed and the file then changed, by someone
+ * else, before main could read it back – done, and worth a look.
+ */
 export const CommentBulkFileResultSchema = z.union([
-  z.object({ fileKey: KeySchema, ok: z.literal(true), done: z.number().int().min(1).max(PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE) }).strict(),
+  z
+    .object({
+      fileKey: KeySchema,
+      ok: z.literal(true),
+      done: z.number().int().min(1).max(PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE),
+      changedDuringSave: z.literal(true).optional()
+    })
+    .strict(),
   CommentReasonedRefusalSchema.extend({ fileKey: KeySchema }).strict()
 ])
 export type CommentBulkFileResult = z.infer<typeof CommentBulkFileResultSchema>
@@ -192,6 +203,25 @@ export const CommentBulkResultSchema = z.union([
   CommentReasonedRefusalSchema
 ])
 export type CommentBulkResult = z.infer<typeof CommentBulkResultSchema>
+
+/**
+ * `preview:commentBulkSettled`, `file-comment:bulkSettled` (security review
+ * L-2): a file a bulk action answered `COMMENT_SAVE_PENDING` for ended after
+ * all. Sent only for such a file: every other outcome was in the answer.
+ */
+export const CommentBulkSettledSchema = z
+  .object({
+    panelId: PanelIdSchema,
+    fileKey: KeySchema,
+    ok: z.boolean(),
+    changedDuringSave: z.literal(true).optional(),
+    code: z.enum(ErrorCode).optional(),
+    reason: CommentRefusalReasonSchema.optional()
+  })
+  .strict()
+  .refine(event => event.ok === (event.code === undefined), { message: 'a failed write names its code, a landed one none' })
+  .refine(event => event.code !== ErrorCode.COMMENT_SAVE_PENDING, { message: 'a settled write is no longer pending' })
+export type CommentBulkSettled = z.infer<typeof CommentBulkSettledSchema>
 
 /**
  * The target's text and the selected range in it, from MAIN's parse of the
