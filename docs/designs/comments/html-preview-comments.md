@@ -417,7 +417,7 @@ Before enabling Save: `findEditorTabsShowing(api, projectPath)` with the **proje
 | S12 | Writes into excluded, dot-folder or out-of-project files | Same rules the protocol layer uses to serve (decision 35): never-served paths are never written. Gitignored pages shown in frames are commentable; the residual (a malicious repo can gitignore a page and frame it) is no worse than risk 17 today, because the write still needs the user's Save |
 | S13 | `-->` breakout plants live HTML/script in the user's file (**critical**) | §5.4 escaping + §7.6 step 8 post-write verification; fail closed |
 | S14 | Page-supplied snapshot carries breakout or prompt-injection text to agents | Snapshot captured by the preload, capped, nested blocks stripped, escaped, labelled `snapshotSource: "page"` and "captured from the page" in readable text; popup shows its size and first line |
-| S15 | XSS from a hostile block into React or the overlay | React text nodes only; ESLint `no-restricted-syntax` bans `dangerouslySetInnerHTML` under `comments/`; overlay receives numbers only |
+| S15 | XSS from a hostile block into React or the overlay | React text nodes only; ESLint `no-restricted-syntax` bans `dangerouslySetInnerHTML` under `comments/`; overlay receives numbers, keys, tokens and the marked words only, as text |
 | S16 | Prototype pollution / huge JSON in `@data` | Size cap before parse; reviver; strict zod with depth/count caps; zod ≥ 4.6.7 |
 | S17 | ReDoS in the parser | parse5 tokenizer (linear); anchored header regexes on capped strings |
 | S18 | Bidi / zero-width spoofing of authors or text | Refuse in author/email; `\uXXXX` in text; render with `<bdi>` / `unicode-bidi: isolate`; visible `⟨U+202E⟩` tokens in the UI |

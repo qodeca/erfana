@@ -205,7 +205,7 @@ export interface PreviewCommentAdapter {
 - `preview:commentSetUnsavedSources` today lists `.html`/`.htm` paths only (`useUnsavedSourcesFeed.ts:54`), and only while the HTML bridge exists; § 8 C6 widens it to every commentable extension in every window.
 - **Changed HTML payloads (optional fields only):**
   - `preview-page:commentPick.sel?` (S5)
-  - `commentState.icons[].selRange?` (underline – character offsets within the target's text, numbers only; never strings, § 8 C16)
+  - `commentState.icons[].selRange?` (underline – the marked words and their place in the target's text; never comment text, names or emails, § 8 C16)
   - `preview:commentsChanged.stamp` (C-14)
   - a `reason` next to `code` in save answers (C-19)
 - **Page-reachable surface:** no new channel, no new listener, no `invoke`. The contract test stays, except the one import allow-list line (§2).

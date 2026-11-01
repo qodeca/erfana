@@ -412,7 +412,7 @@ The pins come in two classes. **Invariants** are never updated: writer bytes, go
 
 `docs/security.md` gains the Markdown comments entries.
 
-**Metric:** Every checklist item's test exists and passes. The page-reachable surface of the `previewPage` preload – its exposed APIs and the list of channels and message fields it sends or receives – matches a checked-in snapshot taken from v0.23.1, with only these listed additions: the `overlayCore` import, `commentPick.sel` and the selection offsets in `commentState` (numbers only). The main-window preload (`src/preload/index.ts`, `window.api.fileComments`) is outside this metric and covered by item 10.
+**Metric:** Every checklist item's test exists and passes. The page-reachable surface of the `previewPage` preload – its exposed APIs and the list of channels and message fields it sends or receives – matches a checked-in snapshot taken from v0.23.1, with only these listed additions: the `overlayCore` import, `commentPick.sel` and the selection offsets and marked words in `commentState` (never comment text, names or emails). The main-window preload (`src/preload/index.ts`, `window.api.fileComments`) is outside this metric and covered by item 10.
 
 **Measurement Method:** The named tests; a `security-auditor` review on the commits that widen the preload import and add `file-comment:*`, and again on the full pull request; gate and corpus runs use a made-up identity.
 
