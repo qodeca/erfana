@@ -25,6 +25,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { DockviewApi } from 'dockview'
 import type { CommentSaveRequest } from '../../../../../../shared/ipc/preview-comment-schema'
 import { commentGateway } from '../../../../services/preview/commentGateway'
+import { useSaveCommentIdentity } from '../../../Comments/useIdentityGate'
 import { previewGateway } from '../../../../services/previewGateway'
 import { textClipboard } from '../../../../services/textClipboard'
 import { useGlobalSettingsStore } from '../../../../stores/useGlobalSettingsStore'
@@ -125,7 +126,7 @@ export function usePreviewComments({
   visible = true
 }: UsePreviewCommentsOptions): PreviewComments {
   const settings = useGlobalSettingsStore(s => s.settings)
-  const updateCommentIdentity = useGlobalSettingsStore(s => s.updateCommentIdentity)
+  const saveCommentIdentity = useSaveCommentIdentity()
   // Read defensively: a partial settings object may lack `htmlPreview`.
   const enabled =
     settings !== null &&
@@ -384,6 +385,7 @@ export function usePreviewComments({
     listRef: listButtonRef
   }
 
+  const identity = settings?.comments ?? null
   const drawer: CommentDrawerProps | null =
     enabled && state.drawerOpen
       ? {
@@ -405,11 +407,12 @@ export function usePreviewComments({
           onDismissRemoved: removed.dismiss,
           onCopyText: text => {
             void textClipboard.writeText(text).then(ok => (ok ? announce(COMMENT_LIST_COPY.textCopied) : alert(COMMENT_LIST_COPY.copyTextFailed)))
-          }
+          },
+          onTurnOnMode: state.mode || modeBlocked !== null ? undefined : () => toggleMode(false),
+          bulk: { run: request => commentGateway.bulk({ panelId, ...request }), identity, onSaveIdentity: saveCommentIdentity }
         }
       : null
 
-  const identity = settings?.comments ?? null
   const layer: PreviewCommentsLayerProps = useMemo(
     () => ({
       menu,
@@ -435,12 +438,7 @@ export function usePreviewComments({
       onCloseWindow: closeWindow,
       onNewComment: next => setRequest(next),
       newOnThread: threadKey => newOnThreadAction(panelId, state.list, threadKey, alert),
-      onSaveIdentity: data =>
-        updateCommentIdentity({
-          authorName: data.name,
-          authorEmail: data.email === '' ? undefined : data.email,
-          identityNoticeSeen: true
-        }),
+      onSaveIdentity: saveCommentIdentity,
       onSave: (save, sel) => {
         // OD-06: a thread Erfana removes itself is never "removed outside Erfana".
         if (save.op === 'deleteThread' || save.op === 'deleteMessage') ownDelete(save.threadKey)
@@ -477,7 +475,7 @@ export function usePreviewComments({
       getArea,
       panelId,
       closeWindow,
-      updateCommentIdentity,
+      saveCommentIdentity,
       onWritten,
       refreshList,
       setMode,

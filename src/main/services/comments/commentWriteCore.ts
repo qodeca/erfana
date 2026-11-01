@@ -168,7 +168,7 @@ export type WriteJobResult =
   | { readonly kind: 'write'; readonly ok: false; readonly refusal: CommentRefusal }
 
 /** Planner refusals as save refusals. */
-const PLAN_REFUSALS: Readonly<Record<PlanFailure, CommentRefusal>> = {
+export const PLAN_REFUSALS: Readonly<Record<PlanFailure, CommentRefusal>> = {
   'read-only': 'read-only',
   'not-eligible': 'target-moved',
   'not-found': 'block-changed',

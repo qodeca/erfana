@@ -20,6 +20,7 @@
 import { BrowserWindow, type IpcMainInvokeEvent } from 'electron'
 import type { ZodType } from 'zod'
 import { ErrorCode } from '../../../shared/errors'
+import { CommentBulkRequestSchema, CommentBulkResultSchema } from '../../../shared/ipc/comment-common-schema'
 import { PreviewCommentChannels } from '../../../shared/ipc/preview-comment-channels'
 import {
   CommentAckSchema,
@@ -68,7 +69,7 @@ interface CommentRoute<Request> {
 const KEY_INVALID = { ok: false, code: ErrorCode.COMMENT_KEY_INVALID } as const
 const WRITE_FAILED = { ok: false, code: ErrorCode.COMMENT_WRITE_FAILED } as const
 
-/** Register the five comment channels. Returns the function that removes them. */
+/** Register the six comment channels. Returns the function that removes them. */
 export function registerPreviewCommentHandlers(deps: PreviewCommentHandlerDeps): () => void {
   const { registry, unsaved, isTrustedSender } = deps
   const resolveWindow =
@@ -145,6 +146,14 @@ export function registerPreviewCommentHandlers(deps: PreviewCommentHandlerDeps):
     result: CommentSaveResultSchema,
     refused: WRITE_FAILED,
     run: (request, window) => registry.get(request.panelId, window.id)?.save(request) ?? KEY_INVALID
+  })
+
+  register({
+    channel: PreviewCommentChannels.BULK,
+    request: CommentBulkRequestSchema,
+    result: CommentBulkResultSchema,
+    refused: WRITE_FAILED,
+    run: (request, window) => registry.get(request.panelId, window.id)?.bulk(request) ?? KEY_INVALID
   })
 
   register({

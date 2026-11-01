@@ -374,6 +374,8 @@ export interface WindowRulesDriver {
   removeShown(): Promise<void>
   /** The window's actions in order: the foot's buttons, then More actions' items, opened by keys. */
   actions(): Promise<readonly string[]>
+  /** Open a message's `…` menu and choose Copy text, by keys alone: the menu's items, and what reached the clipboard. */
+  copyTextByKeys(): Promise<{ readonly items: readonly string[]; readonly copied: readonly string[] }>
   /** Remove everything the driver added. */
   dispose(): void | Promise<void>
 }

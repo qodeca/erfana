@@ -68,6 +68,7 @@ import type { TextQuote } from '../../../shared/comments/format'
 import { atomicWriteBytesStrict, errnoOf, fileIdKey, type StrictWriteFailure } from '../../utils/atomicWriteBytesStrict'
 import { logger } from '../LoggingService'
 import { sharedCommentParseClient } from './CommentParseWorkerAdapter'
+import { areSplicesInOrder, assembleSplices, type BulkChange, type BulkPlanRequest, type BulkThread } from './commentBulkCore'
 import {
   confineCommentFile,
   loadCommentBytes,
@@ -87,9 +88,8 @@ import {
   type Refused
 } from './commentRefusals'
 import {
-  assembleSplice,
   isSafeInsert,
-  isSpliceWithin,
+  type ByteSplice,
   type CommentDraftTarget,
   type ThreadChange,
   type WriteAct,
@@ -146,8 +146,18 @@ export interface RebuildDamagedBlockRequest extends DeleteDamagedBlockRequest {
   readonly status?: 'open' | 'resolved'
 }
 
+/**
+ * Change several threads of one file in one write (024-FR-028): all of them,
+ * or none when any no longer matches what the person reviewed.
+ */
+export interface BulkChangeRequest {
+  readonly file: CommentFileTarget
+  readonly threads: readonly BulkThread[]
+  readonly change: BulkChange
+}
+
 /** The operation a save performed, as logged. */
-export type CommentWriteOp = 'add' | ThreadChange['op'] | 'deleteBlock' | 'rebuildBlock'
+export type CommentWriteOp = 'add' | ThreadChange['op'] | 'deleteBlock' | 'rebuildBlock' | BulkChange
 
 export type CommentWriteResult =
   | {
@@ -226,8 +236,21 @@ interface WriteJob {
   readonly file: CommentFileTarget
   /** The operation writes the acting author (add, reply, status), so an identity is required. */
   readonly needsAuthor: boolean
-  readonly request: WritePlanRequest
+  readonly request: WritePlanRequest | BulkPlanRequest
 }
+
+/** The worker's plan, as one shape for a single write and a bulk one. */
+type PlannedSplices =
+  | Refused
+  | {
+      readonly ok: true
+      readonly splices: readonly ByteSplice[]
+      readonly inputHash: string
+      readonly outputHash: string
+      readonly threadId: string | null
+      readonly wordsDropped?: true
+      readonly raw?: Uint8Array
+    }
 
 /**
  * The settings identity as a v1 author, or `undefined` when it is missing or
@@ -335,6 +358,12 @@ export class CommentWriter {
     })
   }
 
+  /** Resolve or delete several threads in one write (024-FR-028). A resolve writes the acting author. */
+  changeThreads(request: BulkChangeRequest): Promise<CommentWriteResult> {
+    const { change, threads } = request
+    return this.run({ op: change, file: request.file, needsAuthor: change === 'resolve', request: { change, threads } })
+  }
+
   private async run(job: WriteJob): Promise<CommentWriteResult> {
     const confined = await this.confine(job)
     if (!confined.ok) return this.refuse(job, job.file.filePath, confined)
@@ -381,17 +410,17 @@ export class CommentWriter {
     const loaded = await loadCommentBytes(job.file, { platform: this.platform, kinds: this.kinds })
     if (!loaded.ok) return loaded
     if (loaded.realPath !== realPath) return refused('changed')
-    const planned = await runner.jobs.runJob(loaded.bytes, { ...runner.options, kind: 'write', request: job.request, act })
-    if (planned.kind === 'failed') return jobFailureRefusal(planned.failure)
-    if (!planned.ok) return refused(planned.refusal)
+    const planned = await this.plan(job, loaded.bytes, act, runner)
+    if (!planned.ok) return planned
     // The bytes read: handed back when they were lent, main's own view when they were copied.
     const read = planned.raw ?? loaded.bytes
-    // Main's own checks of the worker's answer: a range inside the bytes read, an insert that is
-    // one comment and nothing more (S-L-C), and blanks around it that the bytes read call for (L-4).
-    if (!isSpliceWithin(planned, read.length) || !isSafeInsert(planned.insert) || !insertBlanksFit(read, planned)) return refused('verify-failed')
+    // Main's own checks of the worker's answer: ranges inside the bytes read, in order; each insert one
+    // comment and nothing more (S-L-C), with blanks around it that the bytes read call for (L-4).
+    const { splices } = planned
+    if (!areSplicesInOrder(splices, read.length) || !splices.every(splice => isSafeInsert(splice.insert) && insertBlanksFit(read, splice))) return refused('verify-failed')
     // Rebuilt from the bytes read – and the strict write below re-reads the file and
-    // requires these very bytes on disk: outside the block, the bytes written are the bytes read.
-    const out = assembleSplice(read, planned)
+    // requires these very bytes on disk: outside the blocks, the bytes written are the bytes read.
+    const out = assembleSplices(read, splices)
     if (out.length > PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES) return refused('file-size')
     const written = await atomicWriteBytesStrict(realPath, out, {
       expectedHash: planned.inputHash,
@@ -406,6 +435,19 @@ export class CommentWriter {
     if (!(await this.stillWritten(realPath, out))) return refused('changed-during-save')
     const words = planned.wordsDropped === true ? { wordsDropped: true as const } : {}
     return { ok: true, realPath: written.path, fileHash: planned.outputHash, threadId: planned.threadId, ...words }
+  }
+
+  /** The worker's plan for `job`. A failed job refuses, as its plan would have. */
+  private async plan(job: WriteJob, bytes: Uint8Array, act: WriteAct, runner: KindRunner): Promise<PlannedSplices> {
+    const { request } = job
+    if ('threads' in request) {
+      const planned = await runner.jobs.runJob(bytes, { ...runner.options, kind: 'bulkWrite', request, act })
+      if (planned.kind === 'failed') return jobFailureRefusal(planned.failure)
+      return planned.ok ? { ...planned, threadId: null } : refused(planned.refusal)
+    }
+    const planned = await runner.jobs.runJob(bytes, { ...runner.options, kind: 'write', request, act })
+    if (planned.kind === 'failed') return jobFailureRefusal(planned.failure)
+    return planned.ok ? { ...planned, splices: [planned] } : refused(planned.refusal)
   }
 
   /** Step 7 (C12): the file holds the bytes just written when read again; a failed read counts as changed. */

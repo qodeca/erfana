@@ -65,6 +65,7 @@ export const previewCommentsGateway: PreviewCommentsBridge = {
   newOnThread: (...args) => commentsBridge().newOnThread(...args),
   keepDraft: (...args) => commentsBridge().keepDraft(...args),
   save: (...args) => commentsBridge().save(...args),
+  bulk: (...args) => commentsBridge().bulk(...args),
   setUnsavedSources: (...args) => commentsBridge().setUnsavedSources(...args),
   onDraftOpened: (...args) => commentsBridge().onDraftOpened(...args),
   onCommentsChanged: (...args) => commentsBridge().onCommentsChanged(...args),

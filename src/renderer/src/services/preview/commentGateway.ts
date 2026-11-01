@@ -21,6 +21,7 @@
  * @module services/preview/commentGateway
  */
 import { ErrorCode } from '../../../../shared/errors'
+import type { CommentBulkRequest, CommentBulkResult } from '../../../../shared/ipc/comment-common-schema'
 import type {
   CommentAck,
   CommentAnchorStatus,
@@ -90,6 +91,8 @@ export const commentGateway = {
     ask(() => previewCommentsGateway.keepDraft(panelId, draftToken), UNAVAILABLE),
   save: (request: CommentSaveRequest): Promise<CommentSaveResult> =>
     ask(() => previewCommentsGateway.save(request), UNAVAILABLE),
+  bulk: (request: CommentBulkRequest): Promise<CommentBulkResult> =>
+    ask(() => previewCommentsGateway.bulk(request), UNAVAILABLE),
   setUnsavedSources: (paths: readonly string[]): Promise<CommentAck> =>
     ask(() => previewCommentsGateway.setUnsavedSources(paths), UNAVAILABLE),
   onDraftOpened: (callback: (payload: CommentDraftOpened) => void): (() => void) =>

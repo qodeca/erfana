@@ -48,6 +48,7 @@ function service(overrides: Partial<CommentServiceApi> = {}): CommentServiceApi 
     newOnThread: vi.fn(async () => ({ ok: true as const })),
     keepDraft: vi.fn(() => ({ ok: true as const })),
     save: vi.fn(async () => ({ ok: true as const, threadKey: 't1' })),
+    bulk: vi.fn(async () => ({ ok: true as const, files: [{ fileKey: 'k'.repeat(32), ok: true as const, done: 1 }] })),
     e2eState: vi.fn(),
     ...overrides
   } as CommentServiceApi
@@ -97,6 +98,40 @@ describe('preview comment handlers', () => {
     expect(svc.save).toHaveBeenCalledWith(save)
     expect(await invoke(PreviewCommentChannels.SET_UNSAVED_SOURCES, { paths: ['/p/index.html'] })).toEqual({ ok: true })
     expect(unsaved.set).toHaveBeenCalledWith(1, ['/p/index.html'])
+  })
+
+  describe('preview:commentBulk (024-FR-028)', () => {
+    const key = 'k'.repeat(32)
+    const BULK = { panelId: PANEL, change: 'deleteResolved', files: [{ fileKey: key, threads: [{ threadKey: key, rawHash: 'a'.repeat(64) }] }] }
+
+    it('goes to the sender window\'s own service', async () => {
+      const { svc } = register()
+      expect(await invoke(PreviewCommentChannels.BULK, BULK)).toEqual({ ok: true, files: [{ fileKey: key, ok: true, done: 1 }] })
+      expect(svc.bulk).toHaveBeenCalledWith(BULK)
+    })
+
+    it('an untrusted sender is refused before the payload is read', async () => {
+      const { svc } = register({ trusted: false })
+      const poisoned = new Proxy({}, { get: () => { throw new Error('payload was read') } })
+      expect(await invoke(PreviewCommentChannels.BULK, poisoned)).toEqual({ ok: false, code: ErrorCode.COMMENT_WRITE_FAILED })
+      expect(svc.bulk).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      ['an extra field', { ...BULK, path: '/etc/passwd' }],
+      ['an unknown change', { ...BULK, change: 'removeAll' }],
+      ['no files', { ...BULK, files: [] }]
+    ])('refuses %s', async (_case, request) => {
+      const { svc } = register()
+      expect(await invoke(PreviewCommentChannels.BULK, request)).toEqual({ ok: false, code: ErrorCode.COMMENT_WRITE_FAILED })
+      expect(svc.bulk).not.toHaveBeenCalled()
+    })
+
+    it('a panel of another window is not found', async () => {
+      const { svc } = register()
+      expect(await invoke(PreviewCommentChannels.BULK, { ...BULK, panelId: 'html-preview-/p/other.html' })).toEqual(KEY_INVALID)
+      expect(svc.bulk).not.toHaveBeenCalled()
+    })
   })
 
   it('SEC-07 an untrusted sender is refused before the payload is read', async () => {

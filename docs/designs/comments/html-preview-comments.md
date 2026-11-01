@@ -518,7 +518,7 @@ Resolved by Anna K. · 25 Oct     [Re-open] [v]
 - ⌘Enter / Ctrl+Enter saves the focused field; Esc closes; a typed draft is kept in memory per element for the session ("Draft restored").
 - Focus: new comment → text field; thread → window title (`tabindex="-1"`); delete confirmation → Cancel; close → back to the opener (list row, or native focus to the page with the picker on the same element).
 - Saving: "Saving…" (`aria-disabled`) → write → reload → restore → pin within 1 s with one flash → announce "Comment saved to index.html."
-- `[...]` per message: Edit (in place), Delete… (inline danger confirmation, destructive button right, focus on Cancel).
+- `[...]` per message: Edit (in place), Copy text (plan step 13, P-F20), Delete… (inline danger confirmation, destructive button right, focus on Cancel).
 - Damaged: warning banner, raw block in a read-only monospace box, [Copy comment text] [Open in file] [Delete damaged comment…]; conflict markers get their own wording.
 - Unsaved source: warning banner with [Go to tab] [Save {file}]; draft stays editable; clears itself if autosave gets there first.
 - Not found / not visible: banner, stored quote struck through, Delete and Open in file.

@@ -26,6 +26,7 @@
  * a comment's text or an author.
  */
 import { webFrameMain } from 'electron'
+import type { CommentBulkRequest, CommentBulkResult } from '../../../../shared/ipc/comment-common-schema'
 import type { CommentAck, CommentAnchors, CommentListResult, CommentModeChanged, CommentSaveRequest, CommentSaveResult, CommentSetModeResult } from '../../../../shared/ipc/preview-comment-schema'
 import { logger } from '../../LoggingService'
 import type { PreviewCommentServing } from './commentInstrumentation'
@@ -46,7 +47,8 @@ import { buildCommentList } from '../../comments/commentListBuilder'
 import { accentRgb } from './commentOverlayTheme'
 import { createCommentPanelStatus, type CommentPanelStatus } from './commentPanelStatus'
 import { createCommentReloadCoordinator, type CommentReloadCoordinator } from './commentReloadCoordinator'
-import { createCommentSaveFlow, type LateSettle } from '../../comments/commentSaveFlow'
+import type { LateSettle } from '../../comments/commentSaveFlow'
+import { createPreviewSaveFlows } from './previewSaveFlows'
 import { createThreadActions, type ThreadActions } from './commentThreadActions'
 import { attachCommentServiceEvents, type CommentEventContents, type FrameFromIds } from './commentServiceEvents'
 import { waitForPaint, type FreshStillDeps } from './commentStillCapture'
@@ -83,7 +85,7 @@ export interface PreviewCommentServiceDeps {
   /** Resolve a frame from its process and routing ids; `webFrameMain.fromId` by default. */
   readonly frameFromIds?: FrameFromIds
   /** The writer; a real `CommentWriter` by default. */
-  readonly createWriter?: (deps: CommentWriterDeps) => Pick<CommentWriter, 'add' | 'changeThread' | 'deleteDamagedBlock'> & Partial<Pick<CommentWriter, 'rebuildDamagedBlock'>>
+  readonly createWriter?: (deps: CommentWriterDeps) => Pick<CommentWriter, 'add' | 'changeThread' | 'deleteDamagedBlock'> & Partial<Pick<CommentWriter, 'rebuildDamagedBlock' | 'changeThreads'>>
 }
 
 const electronFrameFromIds: FrameFromIds = (processId, routingId) =>
@@ -115,6 +117,7 @@ export class PreviewCommentService implements CommentServiceApi {
   private readonly opener: CommentDraftOpener
   private readonly threads: ThreadActions
   private readonly saveFlow: (request: CommentSaveRequest) => Promise<CommentSaveResult>
+  private readonly bulkFlow: (request: CommentBulkRequest) => Promise<CommentBulkResult>
   private readonly detach: Array<() => void> = []
 
   constructor(private readonly deps: PreviewCommentServiceDeps) {
@@ -150,7 +153,7 @@ export class PreviewCommentService implements CommentServiceApi {
     })
     this.opener = this.buildOpener(tokens, mainFrame)
     this.threads = createThreadActions({ binding: this.binding, keys: this.keys, frames: this.frames, tokens, opener: this.opener, contents: deps.contents, showPin: (frame, reveal) => this.broadcaster.send(frame, { reveal }), platform: deps.platform })
-    this.saveFlow = this.buildSaveFlow()
+    ;[this.saveFlow, this.bulkFlow] = createPreviewSaveFlows({ ...deps, binding: this.binding, jobs: this.jobs, keys: this.keys, coordinator: this.coordinator, onLateSettled: settled => this.onLateSettled(settled) })
     this.speak = createPickerSpeaker({ realRoot: deps.realRoot, jobs: this.jobs, platform: deps.platform, say: step => this.onStep(step) })
     this.signals = createCommentPickHandler({
       panelId: deps.panelId,
@@ -267,6 +270,11 @@ export class PreviewCommentService implements CommentServiceApi {
     return this.enabled() ? this.keys.withWords(request, this.saveFlow) : Promise.resolve(COMMENTS_OFF)
   }
 
+  /** One bulk action, one write per file (`preview:commentBulk`). */
+  bulk(request: CommentBulkRequest): Promise<CommentBulkResult> {
+    return this.enabled() ? this.bulkFlow(request) : Promise.resolve(COMMENTS_OFF)
+  }
+
   /**
    * Print with the overlay hidden in every frame, and show it again after
    * (M-064). Every live frame is sent `hidden` first, then two animation
@@ -350,27 +358,6 @@ export class PreviewCommentService implements CommentServiceApi {
       emit: payload => deps.shared.emit.draftOpened(deps.windowId, payload),
       jobs: this.jobs,
       isCurrent: record => !this.disposed && this.frames.get(record.ftn) === record,
-      platform: deps.platform
-    })
-  }
-
-  private buildSaveFlow(): (request: CommentSaveRequest) => Promise<CommentSaveResult> {
-    const { deps } = this
-    const writerDeps: CommentWriterDeps = {
-      identity: deps.shared.identity,
-      hasUnsavedSource: realPath => deps.shared.unsaved.has(deps.windowId, realPath),
-      jobs: this.jobs,
-      platform: deps.platform
-    }
-    return createCommentSaveFlow({
-      binding: this.binding,
-      realRoot: deps.realRoot,
-      keys: this.keys,
-      writer: deps.createWriter?.(writerDeps) ?? new CommentWriter(writerDeps),
-      captureScroll: () => this.coordinator.captureScroll(),
-      currentPage: deps.currentPage,
-      landed: write => this.coordinator.arm(write),
-      lateSettled: settled => this.onLateSettled(settled),
       platform: deps.platform
     })
   }

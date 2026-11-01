@@ -44,7 +44,19 @@ These sit over every comment state: they disable writing and add a band or a rea
 
 **Drawer note – removed outside (OD-06).** Not a comment state: when a re-read finds open comments gone and the file changed outside Erfana, an info note sits above the list: "{n} open comments were removed from {file} outside Erfana." with **Show** (main) and Dismiss. Show expands a read-only list with Copy text per item. Session only; never written; does not count toward the toolbar.
 
-**Drawer action – Resolve all changed comments (owner decision, 2026-11-01; 024-FR-028).** Not a comment state: an action in the drawer, in both previews, for the open comments in Changed or Words changed (S-03, S-04). Review comes first: it lists those comments with their Was and Now, and nothing is resolved until the person confirms. It is offered only when the file is writable, and the agent still never writes a status. Plan step 13 builds it; its exact words and steps go in this table then.
+**Drawer action – Resolve all changed comments (owner decision, 2026-11-01; 024-FR-028).** Not a comment state: an action in the drawer, in both previews, for the open comments in Changed or Words changed (S-03, S-04). Review comes first: it lists those comments with their Was and Now, and nothing is resolved until the person confirms. It is offered only when the file is writable, and the agent still never writes a status.
+
+| Step | What the person sees |
+|---|---|
+| Offered | Filter Open, with at least one Changed or Words changed comment in a writable file: the button **Resolve all changed comments**, above the list. A comment in a file that cannot be written is left out. With unsaved edits the button gives way to the band's sentence (F-02) |
+| Review | In the list's place: "Resolve {n} comments?", "Check what changed first. Each comment is marked resolved with your name.", then each comment with its Was and Now. Focus on **Cancel**; Esc is Cancel, and nothing is written |
+| Name | A reader with no name, or who has not seen the notice, gets the identity step here (024-FR-022); Cancel goes back to the review |
+| Confirm | **Resolve {n} comments**. One write per file; a file's comments all change, or none do (a comment that changed since the review refuses its whole file) |
+| Result | "Resolved {n} comments." Part of them: "Resolved {done} of {n} comments." and the reason for the first file refused; the refused comments stay listed and the action stays offered |
+
+**Drawer action – Delete all resolved comments (owner decision, 2026-11-01; plan step 13, P-F23).** The same steps, on filter Resolved, for the resolved comments (S-06): "Delete {n} comments?", "These comments leave the file. This can't be undone.", the list without Was and Now, **Cancel** focused, the danger button **Delete {n} comments**, then "Deleted {n} comments." A delete writes no name, so it asks for none. There is no way to remove open comments in bulk: the owner declined "Remove all comments".
+
+**Drawer action – Turn on comment mode (plan step 13, P-F21).** The drawer with no comment at all holds the button **Turn on comment mode** under its sentence, unless the mode is on or cannot turn on. It adds no hint.
 
 ## 3. Window-only states
 

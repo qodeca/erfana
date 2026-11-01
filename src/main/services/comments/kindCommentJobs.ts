@@ -29,12 +29,13 @@ import {
   type CommentFileJobRunner,
   type CommentJobTable
 } from './commentFileJobs'
+import { runBulkWriteJob } from './commentBulkCore'
 import { kindDocumentOf } from './commentJobDocs'
 import { runListJob } from './commentListCore'
 import { rawTransferablesOf } from './commentParseWorker'
 import { runWriteJob } from './commentWriteCore'
 
-/** `kind`'s `list` and `write` jobs, by name. */
+/** `kind`'s `list`, `write` and `bulkWrite` jobs, by name. */
 export function createKindCommentJobTable(kind: CommentFileKind): CommentJobTable<CommentFileJob, KindDocument> {
   return {
     list: { run: (bytes, job, env) => runListJob(kindDocumentOf(bytes, kind, env.cache), job, kind) },
@@ -42,7 +43,8 @@ export function createKindCommentJobTable(kind: CommentFileKind): CommentJobTabl
       run: (bytes, job, env) => runWriteJob(bytes, job, { ...env, kind, read: read => kindDocumentOf(read, kind, env.cache) }),
       // The block bytes, when they own their buffer; a view into a larger one is copied.
       transferables: result => (result.ok ? rawTransferablesOf(result.insert) : [])
-    }
+    },
+    bulkWrite: { run: (bytes, job, env) => runBulkWriteJob(bytes, job, { ...env, kind, read: read => kindDocumentOf(read, kind, env.cache) }) }
   }
 }
 

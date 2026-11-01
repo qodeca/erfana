@@ -239,6 +239,7 @@ export function ThreadsView(props: ThreadsViewProps): React.JSX.Element {
     sharedNames,
     replyIsPrimary: open.length === 1,
     run,
+    onCopyText: props.onCopy,
     focusAfter,
     setFocusAfter,
     stepFoot,

@@ -128,6 +128,14 @@ export function runWindowRulesSuite(name: string, makeDriver: () => WindowRulesD
       expect(d.focused()).toBe('title')
     })
 
+    it(`P-F20 (${name}) WIN-16 a message's menu offers Copy text after Edit, and it copies that message`, async () => {
+      await d.open({ identity: 'ready' })
+      const { items, copied } = await d.copyTextByKeys()
+      expect(items).toEqual(['Edit', 'Copy text', 'Delete…'])
+      expect(copied).toHaveLength(1)
+      expect(copied[0]).not.toBe('')
+    })
+
     it.each(WINDOW_ACTIONS)(`024-FR-006 (${name}) WIN-15 same actions: $state`, async ({ setup, expected, step, remove }) => {
       await d.open({ identity: 'ready', ...setup })
       if (step === true) await d.stepByKeys()

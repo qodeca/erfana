@@ -19,6 +19,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CommentIdentitySettings } from '../../../../shared/ipc/global-settings-schema'
 import type { CommentSaveRequest } from '../../../../shared/ipc/preview-comment-schema'
 import { useLatestRef } from '../../hooks/useLatestRef'
+import { useGlobalSettingsStore } from '../../stores/useGlobalSettingsStore'
+import type { IdentityFormData } from './commentSchemas'
 
 /** The name is unset, or the one-time privacy notice is unseen. */
 export function identityMissing(identity: CommentIdentitySettings | null): boolean {
@@ -29,6 +31,19 @@ export function identityMissing(identity: CommentIdentitySettings | null): boole
 export function writeNeedsAuthor(save: CommentSaveRequest): boolean {
   if (save.op === 'rebuildBlock') return save.status === 'resolved'
   return save.op === 'add' || save.op === 'reply' || save.op === 'setStatus'
+}
+
+/**
+ * Store what the identity step answered, the notice seen with it.
+ *
+ * @returns The save; resolves `false` when the settings write failed.
+ */
+export function useSaveCommentIdentity(): (data: IdentityFormData) => Promise<boolean> {
+  const update = useGlobalSettingsStore(s => s.updateCommentIdentity)
+  return useCallback(
+    data => update({ authorName: data.name, authorEmail: data.email === '' ? undefined : data.email, identityNoticeSeen: true }),
+    [update]
+  )
 }
 
 /** What the window reads from the gate. */

@@ -229,7 +229,7 @@
       "quote": "# HTML Preview comments (v0.23.0): PreviewCommentService",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/PreviewCommentService.ts:93",
+      "source": "src/main/services/preview/comments/PreviewCommentService.ts:95",
       "match": "export class PreviewCommentService",
       "note": "Said \"37 modules\"; a file count no single line pins, so it was dropped (37 non-test files today)."
     },
@@ -831,7 +831,7 @@
       "quote": "at most 64 files and 64 MB in all",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/comments/commentListBuilder.ts:35",
+      "source": "src/main/services/comments/commentListBuilder.ts:37",
       "match": "COMMENT_LIST_MAX_FILES = 64"
     },
     {
@@ -7521,7 +7521,7 @@
       "quote": "the IPC bundle is `src/main/ipc/preview/comment-handlers.ts`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/ipc/preview/comment-handlers.ts:72",
+      "source": "src/main/ipc/preview/comment-handlers.ts:73",
       "match": "export function registerPreviewCommentHandlers(",
       "note": "Module map named ipc/preview/commentHandlers.ts; the shipped file is comment-handlers.ts."
     },
@@ -9461,7 +9461,7 @@
       "quote": "then every comment, reply and resolve was a separate `CommentWriter` save",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/comments/CommentWriter.ts:252",
+      "source": "src/main/services/comments/CommentWriter.ts:275",
       "match": "export class CommentWriter {"
     },
     {
@@ -14701,7 +14701,7 @@
       "quote": "## HTML Preview comments (77 testids)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/constants/commentTestids.ts:179",
+      "source": "src/renderer/src/constants/commentTestids.ts:193",
       "match": "COMMENT_DRAWER_UNREAD: 'comment-drawer-unread',",
       "note": "Said 76; the section lacked comment-drawer-unread."
     },
@@ -14712,7 +14712,7 @@
       "quote": "| `comment-drawer-unread` | Note that main left files out of the list",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/constants/commentTestids.ts:179",
+      "source": "src/renderer/src/constants/commentTestids.ts:193",
       "match": "COMMENT_DRAWER_UNREAD: 'comment-drawer-unread',",
       "note": "Row was missing."
     },
@@ -18075,7 +18075,7 @@
       "quote": "The **Show comment icons** button hides or shows the pins for this tab only",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:401",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:402",
       "match": "pins: 'Show comment icons',"
     },
     {
@@ -24963,7 +24963,7 @@
       "quote": "and the panel matches it on its own chrome and dockview group element (`usePreviewComments`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/usePreviewComments.ts:361",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/usePreviewComments.ts:362",
       "match": "if (!matchCommentModeKey(commentModeKeyFromDomEvent(event), isMacOS())) return"
     },
     {
@@ -30379,7 +30379,7 @@
       "quote": "| all | M/services/comments/, M/services/preview/comments/, R/components/Comments/, HtmlPreviewPanel/comments/ |",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/comments/CommentWriter.ts:252",
+      "source": "src/main/services/comments/CommentWriter.ts:275",
       "match": "export class CommentWriter",
       "note": "Spec 024 moved the shared write path to src/main/services/comments/ and the shared UI to components/Comments/; the Source column follows."
     },
@@ -32253,7 +32253,7 @@
       "quote": "Select **Comment mode** in the toolbar",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:399",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:400",
       "match": "mode: 'Comment mode'"
     },
     {
@@ -32315,7 +32315,7 @@
       "quote": "It is saved inside the `.html` file",
       "status": "verified",
       "evidence": "app",
-      "source": "src/main/services/comments/CommentWriter.ts:396",
+      "source": "src/main/services/comments/CommentWriter.ts:425",
       "match": "atomicWriteBytesStrict(realPath, out,",
       "test": "e2e/html-preview-comments.e2e.ts"
     },
@@ -35607,7 +35607,7 @@
       "quote": "select **Comment mode** in the toolbar",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:399",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:400",
       "match": "mode: 'Comment mode',"
     },
     {
@@ -35637,7 +35637,7 @@
       "quote": "<kbd>Esc</kbd> leaves comment mode.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:410",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:411",
       "match": "or select text. Press Esc to stop."
     },
     {
@@ -39627,7 +39627,7 @@
       "quote": "Leave it empty and Erfana asks for a name the next time you comment.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/useIdentityGate.ts:25",
+      "source": "src/renderer/src/components/Comments/useIdentityGate.ts:27",
       "match": "!identity.authorName",
       "note": "Repointed evidence to the comment window, which shows the identity step when no name is saved."
     },
@@ -48644,7 +48644,7 @@
       "quote": "Rows virtualised above ~200 items.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/CommentDrawer.tsx:67",
+      "source": "src/renderer/src/components/Comments/CommentDrawer.tsx:69",
       "match": "VIRTUALISE_ABOVE = 200"
     },
     {
@@ -48684,7 +48684,7 @@
       "quote": "not ready: \"Comment mode – available once the page has loaded\"",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:400",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:401",
       "match": "Comment mode – available once the page has loaded"
     },
     {
@@ -48694,7 +48694,7 @@
       "quote": "\"Comment icons are hidden\"",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:403",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:404",
       "match": "Comment icons are hidden"
     },
     {
@@ -48856,7 +48856,7 @@
       "quote": "New comment and Close are one group (`.erf-comment-window__foot-end`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/ThreadsView.tsx:359",
+      "source": "src/renderer/src/components/Comments/ThreadsView.tsx:360",
       "match": "erf-comment-window__foot-end"
     },
     {
@@ -49049,7 +49049,7 @@
       "quote": "The picker says only 'Showing p, line 42.' (commentCopy.ts:463-466)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:448",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:449",
       "match": "`Showing a section, line ${line}.`"
     },
     {
@@ -49132,7 +49132,7 @@
       "quote": "Resolve leaves a window showing just 'Resolved by…' (CommentThread.tsx:141-146)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/CommentThread.tsx:335",
+      "source": "src/renderer/src/components/Comments/CommentThread.tsx:337",
       "match": "{'Resolved by '}"
     },
     {
@@ -49182,7 +49182,7 @@
       "quote": "publishChanged fires only when counts change (PreviewCommentService.ts:481-488)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/comments/PreviewCommentService.ts:494",
+      "source": "src/main/services/preview/comments/PreviewCommentService.ts:481",
       "match": "if (text === this.lastChanged && !force) return"
     },
     {
@@ -49400,7 +49400,7 @@
       "quote": "The drawer draws one heading from the first row (CommentDrawer.tsx:367-370)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/CommentDrawer.tsx:427",
+      "source": "src/renderer/src/components/Comments/CommentDrawer.tsx:455",
       "match": "visible[0].displayPath"
     },
     {
@@ -49984,7 +49984,7 @@
       "quote": "(its name says how many are open, for example \"Comments, 3 open, 1 needs attention\")",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:430",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:431",
       "match": "return `Comments, ${open} open, ${attention} ${attention === 1 ? 'needs' : 'need'} attention`"
     },
     {
@@ -50044,7 +50044,7 @@
       "quote": "Erfana writes the file in one step and only if it is still exactly the file it read",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/comments/CommentWriter.ts:397",
+      "source": "src/main/services/comments/CommentWriter.ts:426",
       "match": "expectedHash: planned.inputHash,"
     },
     {
@@ -54712,7 +54712,7 @@
       "quote": "| comment | Comment mode: pin a note |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Comments/commentCopy.ts:399",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:400",
       "match": "mode: 'Comment mode',"
     },
     {
@@ -55052,7 +55052,7 @@
       "quote": "at most 64 watched files for the whole process",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/comments/fileCommentWatches.ts:21",
+      "source": "src/main/services/comments/fileCommentWatches.ts:22",
       "match": "export const FILE_COMMENT_WATCHES_MAX = 64"
     },
     {

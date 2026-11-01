@@ -33,7 +33,7 @@ import {
   CommentRefusalReasonSchema,
   commentThreadOpSchemas
 } from './comment-common-schema'
-import type { CommentSaveResult } from './comment-common-schema'
+import type { CommentBulkRequest, CommentBulkResult, CommentSaveResult } from './comment-common-schema'
 import {
   CommentKeySchema as KeySchema,
   CommentPickerSaySchema as PickerSaySchema,
@@ -423,6 +423,7 @@ export interface PreviewCommentsBridge {
   /** C-14.2: keep the open new-comment window's draft alive. */
   keepDraft(panelId: string, draftToken: string): Promise<CommentAck>
   save(request: CommentSaveRequest): Promise<CommentSaveResult>
+  bulk(request: CommentBulkRequest): Promise<CommentBulkResult>
   setUnsavedSources(paths: readonly string[]): Promise<CommentAck>
   onDraftOpened(callback: (payload: CommentDraftOpened) => void): () => void
   onCommentsChanged(callback: (payload: CommentsChanged) => void): () => void

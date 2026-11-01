@@ -328,6 +328,8 @@ The pins come in two classes. **Invariants** are never updated: writer bytes, go
 **Acceptance Criteria:**
 - [ ] Both tables exist and are approved by the owner before the first UI commit, and the overlay and drawer tests assert every cell.
 
+*Plan step 13:* the identity step suggests the name git knows, read in main, in an empty name field (P-F33). It is only a suggestion: nothing is stored until Continue, the notice is unchanged, and e-mail stays optional and is not suggested. This changes neither 024-FR-022 nor its acceptance criterion.
+
 ### 024-FR-028: Resolve all changed comments
 
 **Description:** After an agent has worked on a file, the drawer in both previews shall offer **Resolve all changed comments** for the open comments in Changed or Words changed (owner decision, 2026-11-01). Review comes first: the person sees those comments with their Was and Now, and nothing is resolved until they confirm. Agents still never write a comment's status (024-FR-008). The action arrives through plan step 13, in its own pull request, so 024-FR-021 does not apply to it.

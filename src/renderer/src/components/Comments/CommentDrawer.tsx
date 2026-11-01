@@ -52,12 +52,14 @@ import { COMMENT_LIST_COPY, type CommentSortOrder } from './commentCopyWords'
 import { formatCommentTime } from './commentFormat'
 import { DRAWER_FILTERS, drawerRows, sortRows, type DrawerFilter, type DrawerRow } from './commentRows'
 import { ActionButton, CommentBanner, VisibleText } from './CommentParts'
+import { CommentDrawerBulkBar, CommentDrawerBulkReview } from './CommentDrawerBulk'
 import { DrawerRowView, type RowPlacement } from './CommentDrawerRow'
 import { CommentDrawerSort } from './CommentDrawerSort'
 import { useDrawerFilterState } from './commentDrawerFilter'
 import { CommentRemovedNote } from './CommentRemovedNote'
 import type { RemovedComment } from './commentRemovedOutside'
 import { useCommentWords } from './commentWords'
+import { useDrawerBulk, type DrawerBulkHost } from './useDrawerBulk'
 import './CommentWindow.css'
 import './CommentDrawer.css'
 import './CommentToolbarTools.css'
@@ -121,6 +123,10 @@ export interface CommentDrawerProps {
   readonly onDismissRemoved?: () => void
   /** Copy a removed comment's text (OD-06 "Copy text"). */
   readonly onCopyText?: (text: string) => void
+  /** The empty drawer's way in (P-F21); absent while the mode is on or cannot turn on. */
+  readonly onTurnOnMode?: () => void
+  /** "Resolve all changed comments" and "Delete all resolved comments" (024-FR-028); absent: neither is offered. */
+  readonly bulk?: DrawerBulkHost
 }
 
 const NONE_REMOVED: readonly RemovedComment[] = []
@@ -161,6 +167,7 @@ export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
   const visible = useMemo(() => sortRows(rows[filter], order), [rows, filter, order])
   const current = Math.min(active, Math.max(0, visible.length - 1))
   const windowed = list.status === 'ready' && visible.length > VIRTUALISE_ABOVE
+  const bulk = useDrawerBulk(list, filter, props.bulk, props.onRetry, () => closeRef.current?.focus())
 
   // Opening the drawer from the toolbar puts focus on its first control.
   useEffect(() => {
@@ -284,7 +291,23 @@ export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
       </div>
     )
   } else if (rows.none) {
-    body = <p className="erf-comment-drawer__empty">{words.drawerNone}</p>
+    body = (
+      <div className="erf-comment-drawer__empty">
+        <p className="erf-comment-drawer__empty-text">{words.drawerNone}</p>
+        {props.onTurnOnMode !== undefined && (
+          <ActionButton
+            testId={TEST_IDS.COMMENT_DRAWER_TURN_ON_MODE}
+            onClick={() => {
+              props.onTurnOnMode?.()
+              // The button goes with the mode: focus must not fall to <body>.
+              closeRef.current?.focus()
+            }}
+          >
+            {DRAWER_COPY.turnOnMode}
+          </ActionButton>
+        )}
+      </div>
+    )
   } else if (visible.length === 0) {
     body = <p className="erf-comment-drawer__empty">{FILTER_COPY[filter].empty}</p>
   } else {
@@ -405,6 +428,7 @@ export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
         {/* D-32, C-06: HTML change detection compares text, not attributes or styles. */}
         {words.preview === 'html' && <p className="erf-comment-drawer__help">{COMMENT_LIST_COPY.changeLimit}</p>}
       </div>
+      <CommentDrawerBulkBar bulk={bulk} />
       <CommentRemovedNote
         removed={props.removed ?? NONE_REMOVED}
         file={props.pageFile}
@@ -422,11 +446,17 @@ export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
         </div>
       )}
       <div className="erf-comment-drawer__scroll" ref={scrollRef}>
-        {list.status === 'ready' && visible.length > 0 && (
-          // A file name is the page author's: bidi and invisible characters drawn as tokens (S-L-B).
-          <p className="erf-comment-drawer__file"><VisibleText text={visible[0].displayPath} /></p>
+        {bulk.review !== null ? (
+          <CommentDrawerBulkReview bulk={bulk} />
+        ) : (
+          <>
+            {list.status === 'ready' && visible.length > 0 && (
+              // A file name is the page author's: bidi and invisible characters drawn as tokens (S-L-B).
+              <p className="erf-comment-drawer__file"><VisibleText text={visible[0].displayPath} /></p>
+            )}
+            {body}
+          </>
         )}
-        {body}
       </div>
     </aside>
   )

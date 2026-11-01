@@ -54,6 +54,8 @@ import type { CommentWindowProps } from '../CommentWindow'
 import type { CommentWindowRequest, NewCommentWords } from '../commentWindowTypes'
 import { useLiveText } from '../commentLive'
 import { renewTrackedDraft } from '../commentPendingWrites'
+import { useSaveCommentIdentity } from '../useIdentityGate'
+import { fileCommentGateway } from '../../../services/comments/fileCommentGateway'
 import { useCommentSettleNotices } from '../useCommentSettleNotices'
 import type { AnchorSelection } from '../../../../../shared/comments/anchorSel'
 import { pointerOnLines } from '../../../../../shared/comments/overlayCore/selectionRules'
@@ -89,7 +91,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
   const words = adapter.words
   const live = enabled && shown
   const identity = useGlobalSettingsStore(s => s.settings?.comments ?? null)
-  const updateCommentIdentity = useGlobalSettingsStore(s => s.updateCommentIdentity)
+  const saveCommentIdentity = useSaveCommentIdentity()
   const state = usePanelCommentState(panelId)
   const store = usePreviewCommentStore
   const drawerId = `comment-drawer-${useId().replace(/[^\w-]/g, '')}`
@@ -408,7 +410,9 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
             void textClipboard
               .writeText(text)
               .then(ok => (ok ? announce(COMMENT_LIST_COPY.textCopied) : alert(COMMENT_LIST_COPY.copyTextFailed)))
-          }
+          },
+          onTurnOnMode: mode || blocked !== null ? undefined : () => toggleMode(false),
+          bulk: { run: request => fileCommentGateway.bulk({ panelId, ...request }), identity, onSaveIdentity: saveCommentIdentity }
         }
       : null
 
@@ -429,12 +433,7 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
           onClose: closeWindow,
           onNewComment: next => setRequest(next),
           newOnThread,
-          onSaveIdentity: data =>
-            updateCommentIdentity({
-              authorName: data.name,
-              authorEmail: data.email === '' ? undefined : data.email,
-              identityNoticeSeen: true
-            }),
+          onSaveIdentity: saveCommentIdentity,
           onSave: save,
           onWritten,
           onRefresh: () => void refreshList(),

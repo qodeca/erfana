@@ -22,8 +22,10 @@
  * @module services/comments/fileCommentGateway
  */
 import { ErrorCode } from '../../../../shared/errors'
+import type { CommentBulkRequest, CommentBulkResult } from '../../../../shared/ipc/comment-common-schema'
 import type {
   FileCommentChanged,
+  FileCommentGitNameResult,
   FileCommentListRequest,
   FileCommentListResult,
   FileCommentOpenDraftRequest,
@@ -76,6 +78,10 @@ export const fileCommentGateway = {
     ask<FileCommentOpenDraftResult>(api => api.openDraft(request), UNAVAILABLE),
   save: (request: FileCommentSaveRequest): Promise<FileCommentSaveResult> =>
     ask<FileCommentSaveResult>(api => api.save(request), UNAVAILABLE),
+  bulk: (request: CommentBulkRequest): Promise<CommentBulkResult> =>
+    ask<CommentBulkResult>(api => api.bulk(request), UNAVAILABLE),
+  /** The name git knows, for the identity step of either preview (P-F33); a failure is no suggestion. */
+  gitName: (): Promise<FileCommentGitNameResult> => ask<FileCommentGitNameResult>(api => api.gitName(), UNAVAILABLE),
   release: (request: FileCommentReleaseRequest): Promise<FileCommentReleaseResult> =>
     ask<FileCommentReleaseResult>(api => api.release(request), UNAVAILABLE),
   onChanged: (callback: (payload: FileCommentChanged) => void): (() => void) => {

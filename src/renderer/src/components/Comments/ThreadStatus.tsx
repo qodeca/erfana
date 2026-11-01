@@ -40,7 +40,7 @@ export interface ThreadStatusProps {
 }
 
 /** One quote box in the C-21 quote style, labelled Was or Now. */
-function QuoteBox({ label, text, was }: { readonly label: string; readonly text: string; readonly was: boolean }): React.JSX.Element {
+export function QuoteBox({ label, text, was }: { readonly label: string; readonly text: string; readonly was: boolean }): React.JSX.Element {
   const markdown = useCommentWords().preview === 'markdown'
   return (
     <div className="erf-comment-wasnow__item" data-testid={was ? TEST_IDS.COMMENT_WAS : TEST_IDS.COMMENT_NOW}>

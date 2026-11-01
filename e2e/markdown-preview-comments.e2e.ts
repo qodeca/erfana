@@ -1003,3 +1003,108 @@ test.describe('Markdown Preview comments – focus never gets lost', () => {
     await page.emulateMedia({ forcedColors: 'none' })
   })
 })
+
+test.describe('Markdown Preview comments – the review loop (plan step 13)', () => {
+  test.afterEach(async ({ windowWithTestProject }) => {
+    await setGlobalSetting(windowWithTestProject, 'comments', { identityNoticeSeen: false })
+  })
+
+  async function open(page: Parameters<typeof setGlobalSetting>[0]): Promise<MarkdownCommentsPage> {
+    const md = new MarkdownCommentsPage(page)
+    await new ProjectTreePage(page).fileRow(FILE).click()
+    await md.editor.waitForReady()
+    await expect(md.target('p', 3)).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await md.waitForComments()
+    return md
+  }
+
+  /** Comments on the closing and the first paragraph: the later one first, so line 3 stays line 3. */
+  async function twoComments(md: MarkdownCommentsPage): Promise<void> {
+    await md.modeOn()
+    await md.target('p', 8).click()
+    await expect(md.window()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await md.saveNewComment(`${NOTE} (closing)`, FILE, NAME)
+    await expect(md.icons()).toHaveCount(1, { timeout: MD_COMMENT_BUDGET_MS })
+    await md.target('p', 3).click()
+    await expect(md.window()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await md.saveNewComment(NOTE, FILE, NAME)
+    await expect(md.icons()).toHaveCount(2, { timeout: MD_COMMENT_BUDGET_MS })
+    await md.modeButton().click()
+  }
+
+  test('024-AC-039 (Markdown) Resolve all changed comments, review first, then Delete all resolved comments; each one write', async ({
+    windowWithTestProject,
+    testProject
+  }) => {
+    const page = windowWithTestProject
+    const file = path.join(testProject.path, FILE)
+    const md = await open(page)
+    await twoComments(md)
+
+    // An agent rewrites the first paragraph: its comment reads Changed.
+    // Its line, not the words the comment stored about it: those sit in the block above.
+    const rewritten = (await fsp.readFile(file, 'utf-8')).replace(/^First paragraph of the review\.$/m, 'First paragraph, rewritten by an agent.')
+    await fsp.writeFile(file, rewritten)
+    await md.listButton().click()
+    const action = md.drawer().getByTestId(TEST_IDS.COMMENT_BULK_ACTION)
+    await expect(action).toHaveText('Resolve all changed comments', { timeout: MD_COMMENT_BUDGET_MS })
+
+    await action.click()
+    const items = md.drawer().getByTestId(TEST_IDS.COMMENT_BULK_ITEM)
+    await expect(items).toHaveCount(1)
+    await expect(items.getByTestId(TEST_IDS.COMMENT_NOW)).toContainText('rewritten by an agent')
+    await expect(items.getByTestId(TEST_IDS.COMMENT_WAS)).toContainText('First paragraph of the review.')
+    await expect(md.drawer().getByTestId(TEST_IDS.COMMENT_BULK_CANCEL)).toBeFocused()
+    await md.drawer().getByTestId(TEST_IDS.COMMENT_BULK_CANCEL).click()
+    expect(await fsp.readFile(file, 'utf-8')).toBe(rewritten)
+
+    await action.click()
+    await md.drawer().getByTestId(TEST_IDS.COMMENT_BULK_CONFIRM).click()
+    await expect(md.drawer().getByTestId(TEST_IDS.COMMENT_BULK_OUTCOME)).toHaveText('Resolved 1 comment.', { timeout: MD_COMMENT_BUDGET_MS })
+    const after = await fsp.readFile(file, 'utf-8')
+    expect(after.match(/status: resolved/g)?.length).toBe(1)
+    expect(after.match(/status: open/g)?.length).toBe(1)
+
+    await md.filter('resolved').click()
+    const remove = md.drawer().getByTestId(TEST_IDS.COMMENT_BULK_ACTION)
+    await expect(remove).toHaveText('Delete all resolved comments', { timeout: MD_COMMENT_BUDGET_MS })
+    await remove.click()
+    await expect(md.drawer().getByTestId(TEST_IDS.COMMENT_BULK_ITEM)).toHaveCount(1)
+    await md.drawer().getByTestId(TEST_IDS.COMMENT_BULK_CONFIRM).click()
+    await expect(md.drawer().getByTestId(TEST_IDS.COMMENT_BULK_OUTCOME)).toHaveText('Deleted 1 comment.', { timeout: MD_COMMENT_BUDGET_MS })
+    const last = await fsp.readFile(file, 'utf-8')
+    expect(last).not.toContain(`${NOTE}\n`)
+    expect(last).toContain(`${NOTE} (closing)`)
+    expect(last.match(/erfana:comment/g)?.length).toBe(1)
+  })
+
+  test('P-F20 (Markdown) Copy text reaches the clipboard, and the window\'s text can be selected', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    const page = windowWithTestProject
+    const md = await open(page)
+    await md.modeOn()
+    await md.target('p', 3).click()
+    await expect(md.window()).toBeVisible({ timeout: MD_COMMENT_BUDGET_MS })
+    await md.saveNewComment(NOTE, FILE, NAME)
+    await expect(md.icons()).toHaveCount(1, { timeout: MD_COMMENT_BUDGET_MS })
+    await md.modeButton().click()
+    await md.icons().first().click()
+    const win = md.window()
+    await expect(win).toHaveAttribute('data-view', 'threads', { timeout: MD_COMMENT_BUDGET_MS })
+    await expect(win.getByTestId(TEST_IDS.COMMENT_MESSAGE_TEXT).first()).toHaveCSS('user-select', 'text')
+    await win.getByTestId(TEST_IDS.COMMENT_MESSAGE_ACTIONS).first().click()
+    await page.getByRole('menuitem', { name: 'Copy text' }).click()
+    await expect.poll(() => appWithTestProject.evaluate(({ clipboard }) => clipboard.readText())).toBe(NOTE)
+  })
+
+  test('P-F21 (Markdown) the empty drawer turns comment mode on', async ({ windowWithTestProject }) => {
+    const page = windowWithTestProject
+    const md = await open(page)
+    await md.listButton().click()
+    await md.drawer().getByTestId(TEST_IDS.COMMENT_DRAWER_TURN_ON_MODE).click()
+    await expect(md.modeButton()).toHaveAttribute('aria-pressed', 'true')
+    await expect(md.drawer().getByTestId(TEST_IDS.COMMENT_DRAWER_TURN_ON_MODE)).toHaveCount(0)
+  })
+})

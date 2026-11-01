@@ -68,7 +68,7 @@ const IDENTITIES: Readonly<Record<WindowRulesSetup['identity'], CommentIdentityS
 }
 
 /** The window, holding the identity as the settings store would. */
-function Stage({ host, setup, onSave, onStage }: { readonly host: WindowRulesHost; readonly setup: WindowRulesSetup; readonly onSave: CommentWindowProps['onSave']; readonly onStage: (removeShown: () => void) => void }): React.JSX.Element {
+function Stage({ host, setup, onSave, onStage, onCopy }: { readonly host: WindowRulesHost; readonly setup: WindowRulesSetup; readonly onSave: CommentWindowProps['onSave']; readonly onStage: (removeShown: () => void) => void; readonly onCopy: (text: string) => void }): React.JSX.Element {
   const [identity, setIdentity] = useState(IDENTITIES[setup.identity])
   const onTarget = setup.opened === 'target' ? host.onTarget : {}
   const [list, setList] = useState(() => listOf(setup))
@@ -88,7 +88,7 @@ function Stage({ host, setup, onSave, onStage }: { readonly host: WindowRulesHos
     onRefresh: vi.fn(),
     onPickAgain: vi.fn(),
     onOpenInSource: vi.fn(),
-    onCopyRaw: vi.fn()
+    onCopyRaw: onCopy
   }))
   // Each host finds a listed thread's target its own way; a removed thread has none (its tests cover the finding).
   const listed = (threadKey: string): boolean => list.files.some(file => file.threads.some(shown => shown.threadKey === threadKey))
@@ -137,6 +137,7 @@ const banner = (): HTMLElement | null =>
 export function windowRulesDriver(host: WindowRulesHost, guard: { current: CommentDirtyGuard }): WindowRulesDriver {
   const user = userEvent.setup()
   const writes: string[] = []
+  const copied: string[] = []
   let editorSaves = 0
   const settled = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0))
   let removeShown = (): void => {}
@@ -165,7 +166,7 @@ export function windowRulesDriver(host: WindowRulesHost, guard: { current: Comme
         writes.push(save.op)
         return { ok: true, threadKey: 't1' }
       }
-      render(<Stage host={host} setup={setup} onSave={onSave} onStage={onStage} />)
+      render(<Stage host={host} setup={setup} onSave={onSave} onStage={onStage} onCopy={text => copied.push(text)} />)
       await waitFor(() => expect(win().contains(document.activeElement)).toBe(true))
     },
     view: () => win().getAttribute('data-view') ?? '',
@@ -220,6 +221,15 @@ export function windowRulesDriver(host: WindowRulesHost, guard: { current: Comme
       await settled()
     },
     actions: () => windowActions(user),
+    async copyTextByKeys() {
+      screen.getByTestId(TEST_IDS.COMMENT_MESSAGE_ACTIONS).focus()
+      await user.keyboard('{Enter}')
+      const menu = await screen.findByRole('menu')
+      const items = within(menu).getAllByRole('menuitem').map(item => item.textContent ?? '')
+      await user.keyboard('{ArrowDown}{Enter}')
+      await settled()
+      return { items, copied }
+    },
     dispose() {
       cleanup()
       commentDrafts.reset()

@@ -50,7 +50,7 @@ let made: string
 let dispose: (() => void) | null = null
 let closed: Array<() => void> = []
 
-function fakeService(): { [K in 'list' | 'openDraft' | 'save' | 'release' | 'forgetWindow']: ReturnType<typeof vi.fn> } {
+function fakeService(): { [K in 'list' | 'openDraft' | 'save' | 'bulk' | 'release' | 'forgetWindow']: ReturnType<typeof vi.fn> } {
   return {
     list: vi.fn(async () => ({
       ok: true,
@@ -59,6 +59,7 @@ function fakeService(): { [K in 'list' | 'openDraft' | 'save' | 'release' | 'for
     })),
     openDraft: vi.fn(async () => ({ ok: true, draftToken: TOKEN })),
     save: vi.fn(async () => ({ ok: true, threadKey: 't1' })),
+    bulk: vi.fn(async () => ({ ok: true, files: [{ fileKey: 'k'.repeat(32), ok: true, done: 1 }] })),
     release: vi.fn(() => true),
     forgetWindow: vi.fn()
   }
@@ -93,7 +94,8 @@ function register(options: RegisterOptions = {}) {
     options.snapshot === undefined ? { generation: 1, root, realRoot: root, caseSensitive: process.platform === 'linux', ownerWebContentsId: null } : options.snapshot
   const during = options.duringConfinement
   dispose = registerFileCommentHandlers({
-    service: service as unknown as Pick<FileCommentService, 'list' | 'openDraft' | 'save' | 'release' | 'forgetWindow'>,
+    service: service as unknown as Pick<FileCommentService, 'list' | 'openDraft' | 'save' | 'bulk' | 'release' | 'forgetWindow'>,
+    gitName,
     session: { current: options.current ?? (() => snapshot) },
     isTrustedSender: () => options.trusted !== false,
     resolveWindow: () => (options.window === undefined ? window : options.window),
@@ -115,6 +117,8 @@ function register(options: RegisterOptions = {}) {
   return service
 }
 
+const gitName = vi.fn(async (_root: string): Promise<string | undefined> => 'Grace Hopper')
+
 const invoke = (channel: string, arg: unknown): Promise<unknown> => handlers[channel]({ sender: { id: 3 } }, arg)
 const refused = (code: ErrorCode, reason: string) => ({ ok: false, code, reason })
 
@@ -133,6 +137,50 @@ afterEach(async () => {
 })
 
 describe('file-comment handlers', () => {
+  const key = 'k'.repeat(32)
+  const BULK = { panelId: PANEL, change: 'resolve', files: [{ fileKey: key, threads: [{ threadKey: key, rawHash: 'a'.repeat(64) }] }] }
+
+  it('024-FR-028 file-comment:bulk reaches the service with the sender\'s window, and names no path', async () => {
+    const service = register()
+    service.bulk.mockResolvedValue({ ok: true, files: [{ fileKey: key, ok: true, done: 1 }] })
+    expect(await invoke(FileCommentChannels.BULK, BULK)).toEqual({ ok: true, files: [{ fileKey: key, ok: true, done: 1 }] })
+    expect(service.bulk.mock.calls[0][0]).toMatchObject({ windowId: 7 })
+  })
+
+  it.each([
+    ['an extra field', { ...BULK, author: 'Mallory' }],
+    ['a path in a file', { ...BULK, files: [{ ...BULK.files[0], filePath: '/etc/passwd' }] }],
+    ['no files', { ...BULK, files: [] }],
+    ['no threads', { ...BULK, files: [{ fileKey: key, threads: [] }] }],
+    ['a thread named twice', { ...BULK, files: [{ fileKey: key, threads: [BULK.files[0].threads[0], BULK.files[0].threads[0]] }] }],
+    ['another change', { ...BULK, change: 'deleteAll' }],
+    ['a status', { ...BULK, change: 'resolve', status: 'open' }]
+  ])('024-FR-028 file-comment:bulk refuses %s before the service runs', async (_case, request) => {
+    const service = register()
+    expect(await invoke(FileCommentChannels.BULK, request)).toEqual(refused(ErrorCode.COMMENT_WRITE_FAILED, 'bad-request'))
+    expect(service.bulk).not.toHaveBeenCalled()
+  })
+
+  it('P-F33 file-comment:gitName takes no payload, and asks git about the open project only', async () => {
+    register()
+    expect(await invoke(FileCommentChannels.GIT_NAME, undefined)).toEqual({ ok: true, name: 'Grace Hopper' })
+    expect(gitName).toHaveBeenCalledWith(root)
+    gitName.mockClear()
+    expect(await invoke(FileCommentChannels.GIT_NAME, { root: '/elsewhere' })).toEqual(refused(ErrorCode.COMMENT_WRITE_FAILED, 'bad-request'))
+    expect(gitName).not.toHaveBeenCalled()
+  })
+
+  it('P-F33 no git name answers ok with none, and an untrusted sender never reaches git', async () => {
+    register()
+    gitName.mockResolvedValueOnce(undefined)
+    expect(await invoke(FileCommentChannels.GIT_NAME, undefined)).toEqual({ ok: true })
+    dispose?.()
+    register({ trusted: false })
+    gitName.mockClear()
+    expect(await invoke(FileCommentChannels.GIT_NAME, undefined)).toEqual(refused(ErrorCode.COMMENT_WRITE_FAILED, 'untrusted-sender'))
+    expect(gitName).not.toHaveBeenCalled()
+  })
+
   it('serve each channel for the sender\'s own window, with the confined path', async () => {
     const service = register()
     const filePath = join(root, 'notes.txt')

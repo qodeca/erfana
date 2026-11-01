@@ -31,6 +31,8 @@ import {
   CommentRefusalReasonSchema,
   CommentTargetPlaceSchema,
   commentThreadOpSchemas,
+  type CommentBulkRequest,
+  type CommentBulkResult,
   type CommentReasonedRefusal,
   type CommentSaveResult
 } from './comment-common-schema'
@@ -233,6 +235,16 @@ export const FileCommentChangedSchema = z
   .strict()
 export type FileCommentChanged = z.infer<typeof FileCommentChangedSchema>
 
+/**
+ * `file-comment:gitName`'s answer (P-F33): `name` is held to the identity
+ * form's own rules in main; absent when git knows none. Nothing is stored.
+ */
+export const FileCommentGitNameResultSchema = z.union([
+  z.object({ ok: z.literal(true), name: z.string().min(1).max(PREVIEW_LIMITS.COMMENT_AUTHOR_NAME_MAX_CHARS * 2).optional() }).strict(),
+  CommentReasonedRefusalSchema
+])
+export type FileCommentGitNameResult = z.infer<typeof FileCommentGitNameResultSchema>
+
 /** Any refusal of this family. */
 export type FileCommentRefusal = CommentReasonedRefusal
 
@@ -249,6 +261,8 @@ export interface FileCommentsBridge {
   list(request: FileCommentListRequest): Promise<FileCommentListResult>
   openDraft(request: FileCommentOpenDraftRequest): Promise<FileCommentOpenDraftResult>
   save(request: FileCommentSaveRequest): Promise<FileCommentSaveResult>
+  bulk(request: CommentBulkRequest): Promise<CommentBulkResult>
+  gitName(): Promise<FileCommentGitNameResult>
   release(request: FileCommentReleaseRequest): Promise<FileCommentReleaseResult>
   onChanged(callback: (payload: FileCommentChanged) => void): () => void
   onSaveSettled(callback: (payload: FileCommentSaveSettled) => void): () => void

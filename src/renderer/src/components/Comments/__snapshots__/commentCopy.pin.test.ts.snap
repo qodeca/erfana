@@ -75,6 +75,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-010 every string on Wind
     "show": "Show",
     "showIcons": "Show comment icons",
     "title": "Comments",
+    "turnOnMode": "Turn on comment mode",
   },
   "FILE_LIMIT_TEXT": "This file is too big for comments. The limit is 25 MB.",
   "IDENTITY_COPY": {
@@ -390,6 +391,7 @@ exports[`commentCopy strings (characterisation) > PIN-C-011 every string on macO
     "show": "Show",
     "showIcons": "Show comment icons",
     "title": "Comments",
+    "turnOnMode": "Turn on comment mode",
   },
   "FILE_LIMIT_TEXT": "This file is too big for comments. The limit is 25 MB.",
   "IDENTITY_COPY": {

@@ -5,7 +5,7 @@
  * (docs/designs/comments/html-preview-comments.md §7.7, §10.4; R-004, R-017;
  * docs/designs/comments/html-comments/window.html "A thread").
  *
- * - Every message has the same `…` menu – Edit, Delete… – because anyone may
+ * - Every message has the same `…` menu – Edit, Copy text, Delete… – because anyone may
  *   edit or delete any comment (decision 31). Nothing implies an author is
  *   verified: no badge, no avatar (threat S19).
  * - The author's name is shown; the email sits in the name's tooltip and the
@@ -41,6 +41,7 @@ import { validateCommentText } from './commentSchemas'
 import { CommentField, DialogButton, VisibleText } from './CommentParts'
 import type { ThreadContext } from './CommentThread'
 import { SELECTION_COPY } from './commentCopyWords'
+import { WINDOW_COPY } from './commentWindowCopy'
 import { useCommentWords } from './commentWords'
 import { CommentWordsPicker, type WordsSpan } from './CommentWordsPicker'
 import type { NewCommentWords } from './commentWindowTypes'
@@ -337,6 +338,7 @@ export function CommentMessageView({
                 setMode('edit')
               }
             },
+            { label: WINDOW_COPY.copyText, action: () => ctx.onCopyText(message.text) },
             { label: COPY.delete, danger: true, action: () => setMode('confirm') }
           ]}
         />

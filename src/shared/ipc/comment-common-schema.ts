@@ -25,6 +25,8 @@ import { PanelIdSchema } from './preview-schema'
 
 /** Characters of one file path in a comment payload. */
 export const COMMENT_PATH_MAX_CHARS = 4_096
+/** Files one bulk action names at most: the most a page's list holds (`preview:commentList`). */
+export const COMMENT_BULK_FILES_MAX = 64
 /**
  * Characters of a target's text a draft – or a thread, for Edit on its first
  * message – carries for the words of a comment (spec 024 024-FR-004, C-07
@@ -143,6 +145,53 @@ export const CommentSaveResultSchema = z.union([
   CommentReasonedRefusalSchema
 ])
 export type CommentSaveResult = z.infer<typeof CommentSaveResultSchema>
+
+/** What a bulk action does (024-FR-028, plan step 13): nothing else can be asked for in bulk. */
+export const CommentBulkChangeSchema = z.enum(['resolve', 'deleteResolved'])
+export type CommentBulkChange = z.infer<typeof CommentBulkChangeSchema>
+
+const unique = (values: readonly string[]): boolean => new Set(values).size === values.length
+
+/** One file of a bulk action: the threads the person reviewed, each with the block hash they saw. */
+export const CommentBulkFileSchema = z
+  .object({
+    fileKey: KeySchema,
+    threads: z
+      .array(z.object({ threadKey: KeySchema, rawHash: CommentRawHashSchema }).strict())
+      .min(1)
+      .max(PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE)
+      .refine(threads => unique(threads.map(thread => thread.threadKey)), { message: 'a thread is named once' })
+  })
+  .strict()
+export type CommentBulkFile = z.infer<typeof CommentBulkFileSchema>
+
+/** A bulk action: keys and hashes only, never a path, an author or a status of the renderer's choosing. */
+export const CommentBulkRequestSchema = z
+  .object({
+    panelId: PanelIdSchema,
+    change: CommentBulkChangeSchema,
+    files: z
+      .array(CommentBulkFileSchema)
+      .min(1)
+      .max(COMMENT_BULK_FILES_MAX)
+      .refine(files => unique(files.map(file => file.fileKey)), { message: 'a file is named once' })
+  })
+  .strict()
+export type CommentBulkRequest = z.infer<typeof CommentBulkRequestSchema>
+
+/** How one file's write ended: every named thread changed, or none did. */
+export const CommentBulkFileResultSchema = z.union([
+  z.object({ fileKey: KeySchema, ok: z.literal(true), done: z.number().int().min(1).max(PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE) }).strict(),
+  CommentReasonedRefusalSchema.extend({ fileKey: KeySchema }).strict()
+])
+export type CommentBulkFileResult = z.infer<typeof CommentBulkFileResultSchema>
+
+/** A bulk action's answer: each file's outcome, or a refusal of the whole request. */
+export const CommentBulkResultSchema = z.union([
+  z.object({ ok: z.literal(true), files: z.array(CommentBulkFileResultSchema).min(1).max(COMMENT_BULK_FILES_MAX) }).strict(),
+  CommentReasonedRefusalSchema
+])
+export type CommentBulkResult = z.infer<typeof CommentBulkResultSchema>
 
 /**
  * The target's text and the selected range in it, from MAIN's parse of the

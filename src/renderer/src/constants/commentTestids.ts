@@ -153,6 +153,20 @@ export const COMMENT_TEST_IDS = {
   // Drawer
   /** The comments drawer */
   COMMENT_DRAWER: 'comment-drawer',
+  /** The drawer's bulk action ("Resolve all changed comments", "Delete all resolved comments"). */
+  COMMENT_BULK_ACTION: 'comment-bulk-action',
+  /** The sentence that holds a bulk action back while a file has unsaved edits. */
+  COMMENT_BULK_PAUSED: 'comment-bulk-paused',
+  /** The review of a bulk action, in the list's place. */
+  COMMENT_BULK_REVIEW: 'comment-bulk-review',
+  /** One comment in the review. */
+  COMMENT_BULK_ITEM: 'comment-bulk-item',
+  COMMENT_BULK_CANCEL: 'comment-bulk-cancel',
+  COMMENT_BULK_CONFIRM: 'comment-bulk-confirm',
+  /** How a bulk action ended. */
+  COMMENT_BULK_OUTCOME: 'comment-bulk-outcome',
+  /** The empty drawer's "Turn on comment mode" (P-F21). */
+  COMMENT_DRAWER_TURN_ON_MODE: 'comment-drawer-turn-on-mode',
   /** Close the drawer */
   COMMENT_DRAWER_CLOSE: 'comment-drawer-close',
   /** Filter: Open */

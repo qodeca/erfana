@@ -21,6 +21,8 @@
  * offset. Text and emails go to Erfana's own window here – and never to the
  * page (§4.1 B5).
  */
+import { relative, sep } from 'node:path'
+import { encodeText } from '../../../shared/comments/encoding'
 import { CommentFileViewSchema, type CommentFileView } from '../../../shared/ipc/preview-comment-schema'
 import { PREVIEW_LIMITS } from '../../../shared/preview-limits'
 import { stablePathDigest } from '../../../shared/stablePathDigest'
@@ -234,4 +236,19 @@ export async function buildCommentList(input: ListInput): Promise<CommentList> {
     logger.warn('Preview comments: the comment list reached its byte budget', { unread: overBudget })
   }
   return { files: views.map(view => withNotVisible(input, view)), unread: cut + overBudget }
+}
+
+/** Project-relative and `/`-separated, for "Saved inside {file}". */
+export function displayPathOf(root: string, requestedPath: string): string {
+  return relative(root, requestedPath).split(sep).join('/')
+}
+
+/**
+ * The bytes a list parses: the editor's unsaved text when it was sent and
+ * differs from the file (C-09), else the file. Display only – never written.
+ */
+export function displayBytes(disk: Buffer, bufferText: string | undefined): Uint8Array {
+  if (bufferText === undefined) return disk
+  const buffer = encodeText(bufferText)
+  return disk.equals(buffer) ? disk : buffer
 }

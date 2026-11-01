@@ -48,6 +48,8 @@ export const PreviewCommentChannels = {
   COMMAND: 'preview:commentCommand',
   /** Add, reply, edit, resolve, re-open or delete – the only page-driven write (§7.6). */
   SAVE: 'preview:commentSave',
+  /** "Resolve all changed comments", "Delete all resolved comments": one write per file (024-FR-028). */
+  BULK: 'preview:commentBulk',
   /**
    * The files this window holds unsaved editor changes for (decision 13). Main
    * refuses a save into any of them with `COMMENT_UNSAVED_SOURCE`.

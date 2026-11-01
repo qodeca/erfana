@@ -34,10 +34,9 @@
  * reason. Logs name a path by digest only and carry no comment text, words,
  * names or e-mails (C20).
  */
-import { relative, resolve, sep } from 'node:path'
-import { encodeText } from '../../../shared/comments/encoding'
+import { resolve } from 'node:path'
 import { ErrorCode } from '../../../shared/errors'
-import type { CommentReasonedRefusal, CommentSaveResult } from '../../../shared/ipc/comment-common-schema'
+import type { CommentBulkRequest, CommentBulkResult, CommentReasonedRefusal, CommentSaveResult } from '../../../shared/ipc/comment-common-schema'
 import type {
   FileCommentChanged,
   FileCommentListResult,
@@ -49,21 +48,22 @@ import type {
 } from '../../../shared/ipc/file-comment-schema'
 import type { CommentFileKind } from '../../../shared/comments/fileKind'
 import { stablePathDigest } from '../../../shared/stablePathDigest'
-import { createRearmingSingleFileWatcher } from '../watcher/rearmingSingleFileWatch'
 import { logger } from '../LoggingService'
+import type { BulkThread } from './commentBulkCore'
+import { resolveBulkFile, runBulkFiles } from './commentBulkFlow'
 import { CommentWriter, type CommentIdentity, type CommentWriteResult, type CommentWriterDeps } from './CommentWriter'
 import { confineCommentFile, readConfinedCommentBytes, type CommentFileTarget } from './commentFileAccess'
 import { sharedCommentParseClient } from './CommentParseWorkerAdapter'
 import type { CommentFileJob, CommentFileJobRunner } from './commentFileJobs'
 import type { CommentFileKindLookup } from './commentFileKinds'
 import type { CommentKeyStoreDeps } from './commentKeyStore'
-import { fileView, refusedView, type ListedFile } from './commentListBuilder'
+import { displayBytes, displayPathOf, fileView, refusedView, type ListedFile } from './commentListBuilder'
 import type { ListSummary } from './commentListCore'
 import { refusalCode, type CommentRefusal } from './commentRefusals'
 import { boundedWrite, changeOf, SAVE_TIMEOUT_MS } from './commentSaveFlow'
 import type { CommentUnsavedSources } from './commentUnsavedSources'
 import { FileCommentPanels, type FileCommentPanel } from './fileCommentPanels'
-import { createFileCommentWatches, type FileCommentWatchFactory, type FileCommentWatches } from './fileCommentWatches'
+import { createFileCommentWatches, defaultFileCommentWatch, type FileCommentWatchFactory, type FileCommentWatches } from './fileCommentWatches'
 
 /** Who asks, and in which project: the sender's window, the project root as opened and as resolved. */
 export interface FileCommentCaller {
@@ -128,15 +128,6 @@ const KEY_INVALID = refusal('key-invalid')
 const COMMENTS_OFF = refusal('comments-off')
 const TOO_MANY = refusal('too-many-blocks')
 
-/** The production watch: one atomic-save-proof watcher per file. */
-const defaultWatch: FileCommentWatchFactory = (realPath, onChange) =>
-  createRearmingSingleFileWatcher(realPath, {
-    onChange,
-    onDeleted: onChange,
-    onError: () => {},
-    onWatchDead: () => {}
-  })
-
 /** The `file-comment:*` service; one per process. */
 export class FileCommentService {
   private readonly panels: FileCommentPanels
@@ -158,7 +149,7 @@ export class FileCommentService {
   constructor(private readonly deps: FileCommentServiceDeps) {
     this.panels = new FileCommentPanels(deps.keys)
     this.watches = createFileCommentWatches({
-      watch: deps.watch ?? defaultWatch,
+      watch: deps.watch ?? defaultFileCommentWatch,
       onChange: realPath => this.changed(realPath),
       ...(deps.watchMax === undefined ? {} : { max: deps.watchMax })
     })
@@ -264,6 +255,19 @@ export class FileCommentService {
     const file = panel.keys.resolve(panel.binding, request.fileKey, 'file')
     if (!file.ok || file.value.realPath !== panel.realPath) return KEY_INVALID
     return this.changeExisting(caller, panel, request)
+  }
+
+  /** `file-comment:bulk` (024-FR-028): one write, named by keys, on the panel's own file. */
+  async bulk(caller: FileCommentCaller, request: CommentBulkRequest): Promise<CommentBulkResult> {
+    const panel = this.panels.get(caller.windowId, request.panelId)
+    if (panel === undefined) return NOT_OPEN
+    if (!this.enabled(panel)) return COMMENTS_OFF
+    const file = writeTargetOf(caller, panel)
+    const work = request.files.map(named => {
+      const found = resolveBulkFile(panel.keys, panel.binding, named, (_file, key) => key === panel.realPath)
+      return { fileKey: named.fileKey, threads: found?.threads ?? null, write: (threads: readonly BulkThread[]) => this.writer.changeThreads({ file, threads, change: request.change }) }
+    })
+    return runBulkFiles(work, this.deps.saveTimeoutMs)
   }
 
   /** The window closed: forget its panels and release their watches; a list still running for it records nothing. */
@@ -482,19 +486,4 @@ function writeTargetOf(caller: FileCommentCaller, panel: FileCommentPanel): Comm
 /** A panel as a watch subscriber. */
 function subscriberOf(panel: FileCommentPanel): string {
   return `${panel.binding.windowId}\u0000${panel.binding.panelId}`
-}
-
-/** Project-relative and `/`-separated, for "Saved inside {file}". */
-function displayPathOf(root: string, requestedPath: string): string {
-  return relative(root, requestedPath).split(sep).join('/')
-}
-
-/**
- * The bytes a list parses: the editor's unsaved text when it was sent and
- * differs from the file (C-09), else the file. Display only – never written.
- */
-function displayBytes(disk: Buffer, bufferText: string | undefined): Uint8Array {
-  if (bufferText === undefined) return disk
-  const buffer = encodeText(bufferText)
-  return disk.equals(buffer) ? disk : buffer
 }

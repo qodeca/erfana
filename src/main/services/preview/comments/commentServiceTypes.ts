@@ -23,6 +23,7 @@ import type {
 } from '../../../../shared/ipc/preview-comment-schema'
 import type { HtmlFileJobRunner } from './htmlCommentJobs'
 import type { CommentIdentity } from '../../comments/CommentWriter'
+import type { CommentBulkRequest, CommentBulkResult } from '../../../../shared/ipc/comment-common-schema'
 import type { CommentUnsavedSources } from '../../comments/commentUnsavedSources'
 
 /** What a window hears once comments are off: its keys and drafts are no longer good here. */
@@ -69,6 +70,8 @@ export interface CommentServiceApi {
   /** C-14.2: keep an open new-comment window's draft alive. */
   keepDraft(draftToken: string): CommentAck
   save(request: CommentSaveRequest): Promise<CommentSaveResult>
+  /** "Resolve all changed comments", "Delete all resolved comments": one write per file (024-FR-028). */
+  bulk(request: CommentBulkRequest): Promise<CommentBulkResult>
   e2eState(): CommentE2ePanelState
 }
 

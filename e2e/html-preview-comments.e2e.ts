@@ -1452,3 +1452,89 @@ test.describe('HTML Preview comments – the pin at the page edge (§19 Rev 4 ow
     await expect(chrome.window()).toHaveCount(0)
   })
 })
+
+test.describe('HTML Preview comments – the review loop (plan step 13)', () => {
+  test.afterEach(async ({ windowWithTestProject }) => {
+    await resetCommentSettings(windowWithTestProject)
+  })
+
+  test('024-AC-039 (HTML) Resolve all changed comments, review first, then Delete all resolved comments; each one write', async ({
+    windowWithTestProject,
+    appWithTestProject,
+    testProject
+  }) => {
+    const app = appWithTestProject
+    const page = windowWithTestProject
+    const preview = new HtmlPreviewPage(page, app)
+    const chrome = new CommentChrome(page, preview, 'e002.html')
+    const file = path.join(testProject.path, REVIEW)
+    await setGlobalSetting(page, 'comments', reviewer('Reviewer Step13'))
+
+    await openCommentPage(preview, app, REVIEW, REVIEW_TITLE)
+    // An agent rewrites the button's words: its comment reads Changed.
+    // The page's own tag, not the words the comment stored about it in the block above.
+    const rewritten = (await fsp.readFile(file, 'utf-8')).replace(/^(\s*<button id="cta"[^>]*>)[^<]+/m, '$1Rewritten by an agent')
+    await fsp.writeFile(file, rewritten)
+    await chrome.openDrawer()
+    const action = chrome.drawer().getByTestId(TEST_IDS.COMMENT_BULK_ACTION)
+    await expect(action).toHaveText('Resolve all changed comments', { timeout: PREVIEW_BUDGET_MS })
+
+    await action.click()
+    const items = chrome.drawer().getByTestId(TEST_IDS.COMMENT_BULK_ITEM)
+    await expect(items).toHaveCount(1)
+    await expect(items.getByTestId(TEST_IDS.COMMENT_NOW)).toContainText('Rewritten by an agent')
+    await expect(items.getByTestId(TEST_IDS.COMMENT_WAS)).toBeVisible()
+    await expect(chrome.drawer().getByTestId(TEST_IDS.COMMENT_BULK_CANCEL)).toBeFocused()
+    await chrome.drawer().getByTestId(TEST_IDS.COMMENT_BULK_CANCEL).click()
+    expect(await fsp.readFile(file, 'utf-8')).toBe(rewritten)
+
+    await action.click()
+    await chrome.drawer().getByTestId(TEST_IDS.COMMENT_BULK_CONFIRM).click()
+    await expect(chrome.drawer().getByTestId(TEST_IDS.COMMENT_BULK_OUTCOME)).toHaveText('Resolved 1 comment.', { timeout: PREVIEW_BUDGET_MS })
+    await expect.poll(async () => (await fsp.readFile(file, 'utf-8')).match(/status: resolved/g)?.length).toBe(2)
+    expect((await fsp.readFile(file, 'utf-8')).match(/status: open/g)?.length).toBe(1)
+
+    await chrome.filter('resolved').click()
+    const remove = chrome.drawer().getByTestId(TEST_IDS.COMMENT_BULK_ACTION)
+    await expect(remove).toHaveText('Delete all resolved comments', { timeout: PREVIEW_BUDGET_MS })
+    await remove.click()
+    await expect(chrome.drawer().getByTestId(TEST_IDS.COMMENT_BULK_ITEM)).toHaveCount(2)
+    await chrome.drawer().getByTestId(TEST_IDS.COMMENT_BULK_CONFIRM).click()
+    await expect(chrome.drawer().getByTestId(TEST_IDS.COMMENT_BULK_OUTCOME)).toHaveText('Deleted 2 comments.', { timeout: PREVIEW_BUDGET_MS })
+    await expect.poll(async () => (await fsp.readFile(file, 'utf-8')).match(/erfana:comment/g)?.length).toBe(1)
+    expect(await fsp.readFile(file, 'utf-8')).toContain('status: open')
+  })
+
+  test('P-F20 (HTML) Copy text reaches the clipboard, and the window\'s text can be selected', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    const app = appWithTestProject
+    const page = windowWithTestProject
+    const preview = new HtmlPreviewPage(page, app)
+    const chrome = new CommentChrome(page, preview, 'e002.html')
+    await setGlobalSetting(page, 'comments', reviewer('Reviewer Step13'))
+    await openCommentPage(preview, app, REVIEW, REVIEW_TITLE)
+    await clickPin(app, 'cta', HtmlPreviewPage.target(REVIEW))
+    const win = chrome.window()
+    await expect(win).toHaveAttribute('data-view', 'threads', { timeout: PREVIEW_BUDGET_MS })
+    const text = win.getByTestId(TEST_IDS.COMMENT_MESSAGE_TEXT).first()
+    await expect(text).toHaveCSS('user-select', 'text')
+    await win.getByTestId(TEST_IDS.COMMENT_MESSAGE_ACTIONS).first().click()
+    await page.getByRole('menuitem', { name: 'Copy text' }).click()
+    const shown = await text.textContent()
+    await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe(shown)
+  })
+
+  test('P-F21 (HTML) the empty drawer turns comment mode on', async ({ windowWithTestProject, appWithTestProject }) => {
+    const app = appWithTestProject
+    const page = windowWithTestProject
+    const preview = new HtmlPreviewPage(page, app)
+    const chrome = new CommentChrome(page, preview, 'e001.html')
+    await openPage(preview, app, PAGE, TITLE)
+    await chrome.openDrawer()
+    await chrome.drawer().getByTestId(TEST_IDS.COMMENT_DRAWER_TURN_ON_MODE).click()
+    await expect(page.getByTestId('preview-band-comment-mode')).toHaveAttribute('aria-pressed', 'true', { timeout: PREVIEW_BUDGET_MS })
+    await expect(chrome.drawer().getByTestId(TEST_IDS.COMMENT_DRAWER_TURN_ON_MODE)).toHaveCount(0)
+  })
+})

@@ -14,6 +14,7 @@ import { previewCommentsBridge } from '../previewCommentsBridge'
 vi.mock('electron', async () => ({ ipcRenderer: (await import('./bridgeHarness')).ipc }))
 
 const setMode = { panelId: 'preview-a', on: true, showIcons: false }
+const bulk = { panelId: 'preview-a', change: 'resolve', files: [{ fileKey: 'k'.repeat(32), threads: [{ threadKey: 'k'.repeat(32), rawHash: 'a'.repeat(64) }] }] } as const
 const save = { panelId: 'preview-a', op: 'add', draftToken: 'd'.repeat(22), text: 'Hi' }
 
 describeBridge('previewComments bridge', previewCommentsBridge, {
@@ -41,6 +42,7 @@ describeBridge('previewComments bridge', previewCommentsBridge, {
       wire: [{ panelId: 'preview-a', command: 'keep-draft', draftToken: 'a'.repeat(32) }]
     },
     { method: 'save', args: [save], channel: 'preview:commentSave', wire: [save] },
+    { method: 'bulk', args: [bulk], channel: 'preview:commentBulk', wire: [bulk] },
     {
       method: 'setUnsavedSources',
       args: [['/p/a.html']],

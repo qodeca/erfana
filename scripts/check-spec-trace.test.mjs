@@ -44,8 +44,8 @@ describe('check-spec-trace', () => {
     expect([...passedTitles([vitest, pw])].sort()).toEqual(['C-01 a', 'OD-03 c'])
   })
 
-  it('requires all 38 acceptance criteria, the P0 and P1 changes and the eight owner decisions', () => {
-    expect(REQUIRED.acceptance).toHaveLength(38)
+  it('requires all 39 acceptance criteria, the P0 and P1 changes and the eight owner decisions', () => {
+    expect(REQUIRED.acceptance).toHaveLength(39)
     expect(REQUIRED.p0).toHaveLength(16)
     expect(REQUIRED.p1).toHaveLength(6)
     expect(REQUIRED.owner).toEqual(['OD-01', 'OD-02', 'OD-03', 'OD-04', 'OD-05', 'OD-06', 'OD-07', 'OD-08'])

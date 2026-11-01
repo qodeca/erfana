@@ -367,7 +367,8 @@ export const DRAWER_COPY = {
   notFound: 'Not found', // A-10: one tag in both previews
   damaged: 'Damaged',
   resolved: 'Resolved',
-  notOnScreen: "This comment's target isn't on screen right now"
+  notOnScreen: "This comment's target isn't on screen right now",
+  turnOnMode: 'Turn on comment mode' // P-F21: the empty drawer's button, with no hint beside it
 } as const
 
 /** "Couldn't read comments from {file}." */

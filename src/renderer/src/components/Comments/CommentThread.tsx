@@ -77,6 +77,8 @@ export interface ThreadContext {
    */
   readonly replyIsPrimary: boolean
   readonly run: RunCommentOp
+  /** Copy a message's text (P-F20): the window says how it went. */
+  readonly onCopyText: (text: string) => void
   /** The focus a status change asked for, until a control takes it. */
   readonly focusAfter: FocusAfter | null
   /** Ask for (or, with `null`, drop) the focus after a status change. */

@@ -15,7 +15,10 @@
  * - {@link IdentityEditor} – the inline "Change" form under "Commenting as …".
  *
  * Name required, email optional; both validated by `IdentityFormSchema`
- * (bidi and control characters refused, SEC-18).
+ * (bidi and control characters refused, SEC-18). The step suggests the name
+ * git knows (P-F33) – read in main – in a field left empty and untouched. It
+ * is only a suggestion: nothing is stored until Continue, the notice stays
+ * word for word, and git's e-mail is never offered.
  *
  * @module HtmlPreviewPanel/comments/IdentityStep
  */
@@ -24,6 +27,7 @@ import { IDENTITY_COPY, COPY } from './commentCopy'
 import { validateIdentity, type IdentityFormData, type IdentityFormErrors } from './commentSchemas'
 import { CommentInput, DialogButton } from './CommentParts'
 import { TEST_IDS } from '../../constants/testids'
+import { fileCommentGateway } from '../../services/comments/fileCommentGateway'
 
 /** Props shared by both identity forms. */
 interface IdentityFormProps {
@@ -84,6 +88,18 @@ export interface IdentityStepProps extends IdentityFormProps {
  */
 export function IdentityStep(props: IdentityStepProps): React.JSX.Element {
   const form = useIdentityForm(props)
+  const { setName } = form
+  useEffect(() => {
+    if (props.initialName !== '') return undefined
+    let current = true
+    void fileCommentGateway.gitName().then(answer => {
+      // What the person typed meanwhile is theirs: a suggestion only fills an empty field.
+      if (current && answer.ok && answer.name !== undefined) setName(typed => (typed === '' ? (answer.name ?? '') : typed))
+    })
+    return () => {
+      current = false
+    }
+  }, [props.initialName, setName])
   // The name field takes focus when it is empty (§10.7 card: "focus in Name").
   useEffect(() => {
     const timer = setTimeout(() => form.nameRef.current?.focus(), 20)

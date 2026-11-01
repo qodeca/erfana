@@ -23,7 +23,7 @@ const range = (prefix, from, to, width) =>
   Array.from({ length: to - from + 1 }, (_, i) => `${prefix}${String(from + i).padStart(width, '0')}`)
 
 export const REQUIRED = {
-  acceptance: range('024-AC-', 1, 38, 3),
+  acceptance: range('024-AC-', 1, 39, 3),
   p0: ['C-01', 'C-02', 'C-03', 'C-04', 'C-05', 'C-06', 'C-07', 'C-08', 'C-09', 'C-10', 'C-11', 'C-12', 'C-14', 'C-16', 'C-19', 'C-22'],
   p1: ['C-13', 'C-15', 'C-17', 'C-18', 'C-20', 'C-21'],
   owner: range('OD-', 1, 8, 2)

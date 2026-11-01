@@ -25,10 +25,11 @@
  * name or an e-mail (C20).
  */
 import { BrowserWindow, type IpcMainInvokeEvent } from 'electron'
-import type { ZodType } from 'zod'
+import { z, type ZodType } from 'zod'
 import { FileCommentChannels, FileCommentEvents, type FileCommentEvent } from '../../../shared/ipc/file-comment-channels'
 import {
   FileCommentChangedSchema,
+  FileCommentGitNameResultSchema,
   FileCommentListRequestSchema,
   FileCommentListResultSchema,
   FileCommentOpenDraftRequestSchema,
@@ -41,8 +42,9 @@ import {
   type FileCommentChanged,
   type FileCommentSaveSettled
 } from '../../../shared/ipc/file-comment-schema'
-import type { CommentReasonedRefusal } from '../../../shared/ipc/comment-common-schema'
+import { CommentBulkRequestSchema, CommentBulkResultSchema, type CommentReasonedRefusal } from '../../../shared/ipc/comment-common-schema'
 import { logger } from '../../services/LoggingService'
+import { suggestedGitName } from '../../services/comments/commentGitName'
 import { refusalCode, type CommentRefusal } from '../../services/comments/commentRefusals'
 import type { FileCommentCaller, FileCommentService } from '../../services/comments/FileCommentService'
 import type { ProjectSession } from '../../services/session/ProjectSession'
@@ -62,7 +64,7 @@ export interface FileCommentHostWindow {
 
 /** Injected collaborators. */
 export interface FileCommentHandlerDeps {
-  readonly service: Pick<FileCommentService, 'list' | 'openDraft' | 'save' | 'release' | 'forgetWindow'>
+  readonly service: Pick<FileCommentService, 'list' | 'openDraft' | 'save' | 'bulk' | 'release' | 'forgetWindow'>
   /** The open project: its roots, and the window that owns it. */
   readonly session: Pick<ProjectSession, 'current'>
   /** The top-level-frame gate; {@link defaultIsTrustedSender} by default. */
@@ -71,6 +73,8 @@ export interface FileCommentHandlerDeps {
   readonly resolveWindow?: (event: IpcMainInvokeEvent) => FileCommentHostWindow | null
   /** File system and path flavour of the confinement check; the real ones by default. */
   readonly confinement?: ConfinementDeps
+  /** The name git knows for a folder; {@link suggestedGitName} by default. */
+  readonly gitName?: (root: string) => Promise<string | undefined>
 }
 
 /** One channel: its schemas and its work, given the caller and the confined path. */
@@ -115,11 +119,12 @@ export function sendFileCommentSaveSettled(windowId: number, payload: FileCommen
   sendEvent(FileCommentEvents.SAVE_SETTLED, FileCommentSaveSettledSchema, windowId, payload)
 }
 
-/** Register the four `file-comment:*` request channels. Returns the function that removes them. */
+/** Register the six `file-comment:*` request channels. Returns the function that removes them. */
 export function registerFileCommentHandlers(deps: FileCommentHandlerDeps): () => void {
   const { service, session } = deps
   const isTrustedSender = deps.isTrustedSender ?? defaultIsTrustedSender
   const confinement = deps.confinement ?? defaultConfinementDeps
+  const gitName = deps.gitName ?? suggestedGitName
   const resolveWindow =
     deps.resolveWindow ??
     ((event: IpcMainInvokeEvent) => BrowserWindow.fromWebContents(event.sender) as FileCommentHostWindow | null)
@@ -220,6 +225,27 @@ export function registerFileCommentHandlers(deps: FileCommentHandlerDeps): () =>
     // Thread operations name keys only (C17): no path to confine, the key names the file.
     pathOf: request => (request.op === 'add' ? request.filePath : undefined),
     run: (caller, request) => service.save(caller, request)
+  })
+
+  register({
+    channel: FileCommentChannels.BULK,
+    request: CommentBulkRequestSchema,
+    result: CommentBulkResultSchema,
+    // Keys only (C17), looked up in the sender's own window: no path to confine.
+    pathOf: () => undefined,
+    run: (caller, request) => service.bulk(caller, request)
+  })
+
+  register({
+    channel: FileCommentChannels.GIT_NAME,
+    // No payload at all: the folder is the open project's and the key is fixed.
+    request: z.undefined(),
+    result: FileCommentGitNameResultSchema,
+    pathOf: () => undefined,
+    run: async caller => {
+      const name = await gitName(caller.realRoot)
+      return name === undefined ? { ok: true } : { ok: true, name }
+    }
   })
 
   register({
