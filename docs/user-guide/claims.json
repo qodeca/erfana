@@ -30287,7 +30287,7 @@
       "quote": "git status unaffected",
       "status": "verified",
       "evidence": "app",
-      "source": "src/main/services/workers/git-status.worker.ts:292",
+      "source": "src/main/services/workers/git-status.worker.ts:308",
       "match": "'status', '--porcelain=v1'",
       "note": "git status runs over the whole repository; the worker applies no files.exclude filter. Real-app test: excluded scratch/ is absent from the tree while the git status bar shows U1.",
       "test": "e2e/guide-tasks/claims-user-1.guide.ts"
@@ -39971,7 +39971,7 @@
       "quote": "**Git status still counts excluded files.**",
       "status": "verified",
       "evidence": "app",
-      "source": "src/main/services/workers/git-status.worker.ts:292",
+      "source": "src/main/services/workers/git-status.worker.ts:308",
       "match": "'status', '--porcelain=v1', '--branch', '-z', '--no-renames', '-uall'",
       "test": "e2e/guide-tasks/claims-user-3.guide.ts"
     },
@@ -42886,7 +42886,7 @@
       "quote": "Erfana runs `git status` to show changed files in the project tree",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/workers/git-status.worker.ts:292",
+      "source": "src/main/services/workers/git-status.worker.ts:308",
       "match": "'status', '--porcelain=v1'"
     },
     {
