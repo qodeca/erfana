@@ -1,6 +1,6 @@
 # Build Troubleshooting
 
-**Last updated**: October 2026 (v0.23.1)
+**Last updated**: November 2026 (v0.24.0)
 
 This document provides solutions to common build errors.
 

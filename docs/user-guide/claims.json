@@ -11864,11 +11864,11 @@
       "id": "docs-build-readme/01",
       "audience": "developer",
       "doc": "docs/build/README.md",
-      "quote": "**Last updated**: October 2026 (v0.23.1)",
+      "quote": "**Last updated**: November 2026 (v0.24.0)",
       "status": "fixed",
       "evidence": "source",
       "source": "package.json:3",
-      "match": "\"version\": \"0.23.1\"",
+      "match": "\"version\": \"0.24.0\"",
       "note": "page said v0.22.0"
     },
     {
@@ -12770,11 +12770,11 @@
       "id": "docs-build-troubleshooting/01",
       "audience": "developer",
       "doc": "docs/build/troubleshooting.md",
-      "quote": "**Last updated**: October 2026 (v0.23.1)",
+      "quote": "**Last updated**: November 2026 (v0.24.0)",
       "status": "fixed",
       "evidence": "source",
       "source": "package.json:3",
-      "match": "\"version\": \"0.23.1\"",
+      "match": "\"version\": \"0.24.0\"",
       "note": "page said v0.22.0"
     },
     {
@@ -48866,8 +48866,8 @@
       "quote": "[html-preview-comments.md](html-preview-comments.md) (shipped v0.23.1)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:3",
-      "match": "\"version\": \"0.23.1\""
+      "source": "src/main/services/comments/corpus/__test-helpers__/corpusOracle.ts:160",
+      "match": "v0.23.1"
     },
     {
       "id": "designs-comments-comments-v2/t02",
@@ -53544,11 +53544,11 @@
       "id": "docs-README/s01",
       "audience": "developer",
       "doc": "docs/README.md",
-      "quote": "Latest release: v0.23.1",
+      "quote": "Latest release: v0.24.0",
       "status": "verified",
       "evidence": "source",
       "source": "package.json:3",
-      "match": "\"version\": \"0.23.1\""
+      "match": "\"version\": \"0.24.0\""
     },
     {
       "id": "docs-README/s02",
