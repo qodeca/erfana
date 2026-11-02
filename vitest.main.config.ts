@@ -117,6 +117,26 @@ export default defineConfig({
         'src/main/services/browser/browserProfileDeletes.ts': { lines: 94, functions: 98, branches: 83, statements: 94 },
         // measured 100/100/100/100
         'src/main/services/browser/BrowserProfileService.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Built-in browser CDP session (spec 025 commit 9, 025-NFR-001 bullet 2,
+        // 025-FR-038, 025-FR-056, S6, S23): the only sendCommand caller, the
+        // method allow-list and its pinned parameters, the flood budget, the log
+        // buffer and the hang probe. A coverage drop in the allow-list is a hole
+        // in the page isolation. Each floor is pinned ~2 points under the value
+        // measured when it landed (2026-11-03, on the cdp suites alone).
+        // measured 99.45/100/93.75/97.85
+        'src/main/services/browser/cdp/BrowserCdpSession.ts': { lines: 97, functions: 98, branches: 91, statements: 95 },
+        // measured 100/100/95.65/98.91
+        'src/main/services/browser/cdp/cdpAllowList.ts': { lines: 98, functions: 98, branches: 93, statements: 96 },
+        // measured 100/100/100/100
+        'src/main/services/browser/cdp/cdpPinned.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/cdp/cdpFloodBudget.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/cdp/browserLogBuffer.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/97.1/100
+        'src/main/services/browser/cdp/cdpLogCollector.ts': { lines: 98, functions: 98, branches: 95, statements: 98 },
+        // measured 100/100/95.12/98.88
+        'src/main/services/browser/cdp/browserHangProbe.ts': { lines: 98, functions: 98, branches: 93, statements: 96 },
         // Multi-page HTML preview (#124). These modules decide what the preview
         // BrowserView is allowed to load and where it may navigate — frame/scheme
         // gating, request filtering, URL normalisation, page and tab scope — plus
