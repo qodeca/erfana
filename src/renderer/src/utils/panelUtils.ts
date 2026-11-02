@@ -17,7 +17,7 @@
 
 import { PROMPT_REGISTRY } from '../prompts/registry'
 import { promptRenderer } from '../prompts/renderer'
-import { withApplyFooter } from '../prompts/applyFooter'
+import { pickBrowserCaptureVariables, withPromptFooter } from '../prompts/browserCaptureFooter'
 import { validateVariables } from '../prompts/validation'
 import { createDefaultManagers } from './panelManager.factory'
 import { showErrorToast } from './toastHelpers'
@@ -184,6 +184,80 @@ interface ExecutePromptOptions {
   terminalTimeout?: number
   /** Show toast notification on error (default: true) */
   showToast?: boolean
+  /**
+   * Send to this terminal instead of the active one. The send never waits for
+   * a terminal and never opens one: an unknown or closed id fails. The text is
+   * stripped of control characters except line breaks, sent as one bracketed
+   * paste and submitted with Enter, whatever the template's `autoExecute`.
+   */
+  terminalId?: string
+  /**
+   * Open the terminal panel before sending (default: true). With `false` the
+   * panel is left as it is and no terminal is waited for or opened.
+   */
+  openPanel?: boolean
+  /**
+   * After a successful send, show the terminal panel if it is hidden, without
+   * moving keyboard focus (025-FR-060).
+   */
+  reveal?: 'withoutFocus'
+}
+
+interface SendToTargetOptions {
+  content: string
+  autoExecute: boolean
+  terminalId?: string
+  openPanel: boolean
+  reveal?: 'withoutFocus'
+  managers?: PanelManagers
+  showToast: boolean
+}
+
+/**
+ * Send to a named terminal, or to the active one without waiting for it.
+ * Used when `executePromptTemplate` gets any of `terminalId`, `openPanel: false`
+ * or `reveal`; every other call keeps the `openPanelAndSendContent` path.
+ */
+async function sendToTargetTerminal({
+  content,
+  autoExecute,
+  terminalId,
+  openPanel,
+  reveal,
+  managers,
+  showToast
+}: SendToTargetOptions): Promise<PromptResult> {
+  const { panelManager, terminalManager } = managers ?? getDefaultManagers()
+
+  if (openPanel) {
+    panelManager.setActivePanel('terminal', 'right')
+  }
+
+  let sent: boolean
+  if (terminalId !== undefined) {
+    sent = terminalManager.sendToTerminalId
+      ? await terminalManager.sendToTerminalId(terminalId, content)
+      : false
+  } else {
+    sent = await terminalManager.sendToTerminal(content, autoExecute)
+  }
+
+  if (!sent) {
+    const error = new AppError('Failed to send content to terminal', ErrorCode.PROMPT_SEND_FAILED)
+    logger.error(error.message)
+    if (showToast) {
+      showErrorToast('Terminal Error', ERROR_MESSAGES[ErrorCode.PROMPT_SEND_FAILED])
+    }
+    return { success: false, error }
+  }
+
+  // setActivePanel only changes which sidebar panel shows; it never moves
+  // keyboard focus, so the browser tab keeps it.
+  if (reveal === 'withoutFocus') {
+    panelManager.setActivePanel('terminal', 'right')
+  }
+
+  return { success: true, completionTs: Date.now() }
 }
 
 /**
@@ -242,11 +316,12 @@ export async function executePromptTemplate(
   }
 
   // Render template with variables.
-  // For mutation prompts, compose the apply-to-document footer onto the
-  // template BEFORE rendering so the footer can interpolate {{fileRef}}.
+  // Compose the footer onto the template BEFORE rendering so the apply footer
+  // can interpolate {{fileRef}}. A browser-capture template gets only its
+  // whitelisted variables, so no page-derived text can reach the prompt.
   const renderedPrompt = promptRenderer.render(
-    withApplyFooter(config.template, !!config.mutatesDocument),
-    variables
+    withPromptFooter(config.template, config),
+    config.browserCapture ? pickBrowserCaptureVariables(variables) : variables
   )
 
   // Determine target panel (Copilot removed; default to terminal)
@@ -254,6 +329,18 @@ export async function executePromptTemplate(
 
   // Debug logging for issue #41
   logger.info(`executePromptTemplate: promptId=${promptId}, config.autoExecute=${config.autoExecute}, typeof=${typeof config.autoExecute}`)
+
+  if (options?.terminalId !== undefined || options?.openPanel === false || options?.reveal !== undefined) {
+    return await sendToTargetTerminal({
+      content: renderedPrompt,
+      autoExecute: config.autoExecute || false,
+      terminalId: options.terminalId,
+      openPanel: options.openPanel ?? true,
+      reveal: options.reveal,
+      managers: options.managers,
+      showToast
+    })
+  }
 
   // Execute prompt by sending to target panel
   return await openPanelAndSendContent({

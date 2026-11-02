@@ -30,7 +30,7 @@ const DropdownSchema = z.object({
  */
 export const PromptFrontmatterSchema = z.object({
   /** The area where this prompt appears (e.g., markdown-preview, code-editor) */
-  area: z.enum(['markdown-preview', 'code-editor', 'global', 'diagram-viewer']),
+  area: z.enum(['markdown-preview', 'code-editor', 'global', 'diagram-viewer', 'browser']),
 
   /** Optional sub-area for more specific placement */
   subArea: z.enum(['context-menu', 'toolbar', 'command-palette', 'mermaid-error', 'mermaid-direction', 'chat']).optional(),
@@ -80,7 +80,16 @@ export const PromptFrontmatterSchema = z.object({
    * rendered prompt (see prompts/applyFooter.ts), instructing the CLI agent to
    * edit the file in place rather than print the result to the terminal.
    */
-  mutatesDocument: z.boolean().optional().default(false)
+  mutatesDocument: z.boolean().optional().default(false),
+
+  /**
+   * Whether this prompt sends a built-in browser capture (spec 025, 025-FR-032).
+   * When true, the browser-capture footer (prompts/browserCaptureFooter.ts) is
+   * composed onto the rendered prompt instead of the apply footer, and only the
+   * capture variables (userInput, contextRef, screenshotRef, cropRef) reach the
+   * renderer, so no page-derived text can enter the prompt.
+   */
+  browserCapture: z.boolean().optional().default(false)
 })
 
 /**

@@ -62,6 +62,15 @@ export interface PromptVariables {
 
   /** Selected diagram type from dropdown (e.g., "flowchart", "sequenceDiagram") */
   diagramType?: string
+
+  /** Browser capture: `@`-reference to the context file, relative to the project root */
+  contextRef?: string
+
+  /** Browser capture: `@`-reference to the viewport screenshot, relative to the project root */
+  screenshotRef?: string
+
+  /** Browser capture: `@`-reference to the element crop, relative to the project root */
+  cropRef?: string
 }
 
 /**
@@ -124,4 +133,7 @@ export interface PromptConfig {
 
   /** Whether this prompt mutates the source document (composes the apply-to-document footer) */
   mutatesDocument?: boolean
+
+  /** Whether this prompt sends a built-in browser capture (composes the browser-capture footer) */
+  browserCapture?: boolean
 }

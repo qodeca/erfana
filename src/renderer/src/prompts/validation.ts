@@ -33,7 +33,14 @@ export const PROMPT_REQUIREMENTS: Record<string, (keyof PromptVariables)[]> = {
   'mermaid-bug-report': ['mermaidError', 'mermaidCode', 'filePath'],
 
   // Global prompts
-  'organize-import': ['importedFilePath']
+  'organize-import': ['importedFilePath'],
+
+  // Built-in browser prompts (spec 025). The element crop is optional: a pick
+  // with no visible box (zero size, off-screen) has nothing to crop.
+  'browser-explain': ['contextRef', 'screenshotRef'],
+  'browser-ask': ['contextRef', 'screenshotRef', 'userInput'],
+  'browser-change': ['contextRef', 'screenshotRef', 'userInput'],
+  'browser-prompt': ['contextRef', 'screenshotRef', 'userInput']
 }
 
 /**

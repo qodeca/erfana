@@ -38,6 +38,16 @@ function createValidVariables(templateId: string): Partial<PromptVariables> {
       return { mermaidError: 'Syntax error', mermaidCode: 'graph TD A-->B', filePath: '/path/file.md' }
     case 'organize-import':
       return { importedFilePath: '/imports/file.pdf' }
+    case 'browser-explain':
+      return { contextRef: '@.erfana/browser/captures/a.md', screenshotRef: '@.erfana/browser/captures/a.png' }
+    case 'browser-ask':
+    case 'browser-change':
+    case 'browser-prompt':
+      return {
+        contextRef: '@.erfana/browser/captures/a.md',
+        screenshotRef: '@.erfana/browser/captures/a.png',
+        userInput: 'Do something'
+      }
     default:
       return {}
   }
@@ -82,7 +92,10 @@ describe('validation.ts', () => {
         'targetDirection',
         'directionLabel',
         'userInstruction',
-        'diagramType'
+        'diagramType',
+        'contextRef',
+        'screenshotRef',
+        'cropRef'
       ]
 
       Object.values(PROMPT_REQUIREMENTS).forEach((requirements) => {

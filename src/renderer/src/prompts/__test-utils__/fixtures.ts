@@ -68,6 +68,7 @@ export function mockPromptFrontmatter(
     enabled: true,
     requiresInput: false,
     mutatesDocument: false,
+    browserCapture: false,
     ...overrides
   }
 }

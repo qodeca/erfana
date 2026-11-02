@@ -6,9 +6,13 @@ import { logger } from '../utils/logger'
 import { terminalGateway } from '../services/terminalGateway'
 import type { ShellKind } from '../../../shared/shellKind'
 import { formatPathsForTerminal, platformDefaultShellKind } from '../utils/shellPathEscape'
+import { stripControlCharacters, toBracketedPaste } from '../utils/bracketedPaste'
 
 /** Shortest gap between two recorded activity timestamps for one terminal. */
 export const ACTIVITY_THROTTLE_MS = 250
+
+/** Wait between a paste and its Enter, so the PTY and the program take the paste first. */
+const PASTE_ENTER_DELAY_MS = 200
 
 interface TerminalStore {
   // Active terminal ID (null if no terminal is active)
@@ -32,6 +36,12 @@ interface TerminalStore {
   markUserInput: (id: string) => void
   hasUserInteracted: () => boolean
   sendToTerminal: (text: string, autoExecute?: boolean) => Promise<boolean>
+  /**
+   * Type a prompt into the named terminal (active or not): control characters
+   * except line breaks removed, one bracketed paste, then Enter. False when the
+   * id is empty, nothing is left to send, or a write fails.
+   */
+  sendToTerminalId: (terminalId: string, text: string) => Promise<boolean>
 
   // Scroll lock state (global - affects all terminals)
   scrollLocked: boolean
@@ -172,6 +182,41 @@ export function createTerminalStore(
       return true
     } catch (error) {
       logger.error('sendToTerminal: Unexpected error', error instanceof Error ? error : undefined)
+      return false
+    }
+  },
+
+  sendToTerminalId: async (terminalId: string, text: string): Promise<boolean> => {
+    if (!terminalId) {
+      logger.warn('sendToTerminalId: No terminal id given')
+      return false
+    }
+    if (stripControlCharacters(text).trim() === '') {
+      logger.warn(`sendToTerminalId: Nothing to send to ${terminalId}`)
+      return false
+    }
+
+    try {
+      const pasteResult = await terminalOps.write(terminalId, toBracketedPaste(text))
+      if (!pasteResult.success) {
+        logger.error(`sendToTerminalId: Write failed: ${pasteResult.error}`)
+        return false
+      }
+
+      // Same bookkeeping as sendToTerminal: a prompt sent for the user counts as their input.
+      get().markUserInput(terminalId)
+      get().markActivity(terminalId)
+
+      await new Promise(resolve => setTimeout(resolve, PASTE_ENTER_DELAY_MS))
+
+      const enterResult = await terminalOps.write(terminalId, '\r')
+      if (!enterResult.success) {
+        logger.error(`sendToTerminalId: Failed to send Enter: ${enterResult.error}`)
+        return false
+      }
+      return true
+    } catch (error) {
+      logger.error('sendToTerminalId: Unexpected error', error instanceof Error ? error : undefined)
       return false
     }
   },
