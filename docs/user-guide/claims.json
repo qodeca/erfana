@@ -8336,7 +8336,7 @@
       "quote": "(`checks.yml` Guard 5 reads `README.md`)",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/checks.yml:410",
+      "source": ".github/workflows/checks.yml:414",
       "match": "# Guard 5: minisign release-pubkey drift detector."
     },
     {
@@ -8579,7 +8579,7 @@
       "quote": "| **L3 – static CI guard** (awk/grep) | `.github/workflows/checks.yml`",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/checks.yml:589",
+      "source": ".github/workflows/checks.yml:593",
       "match": "grep -qE '^[[:space:]]*extraFiles[[:space:]]*:'"
     },
     {
@@ -10630,7 +10630,7 @@
       "quote": "`.github/workflows/checks.yml` **Guard 5** (release-pubkey drift detector)",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/checks.yml:410",
+      "source": ".github/workflows/checks.yml:414",
       "match": "# Guard 5: minisign release-pubkey drift detector."
     },
     {
@@ -11454,7 +11454,7 @@
       "quote": "`release-guards` gets **3** (checkout-only, awk/grep scripts, no install)",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/checks.yml:320",
+      "source": ".github/workflows/checks.yml:324",
       "match": "timeout-minutes: 3"
     },
     {
@@ -11566,7 +11566,7 @@
       "quote": "`npm run check:headers` + `pipx run --spec \"reuse[charset-normalizer]\" reuse lint`",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/checks.yml:245",
+      "source": ".github/workflows/checks.yml:249",
       "match": "run: pipx run --spec \"reuse[charset-normalizer]\" reuse lint"
     },
     {
@@ -11586,7 +11586,7 @@
       "quote": "| `audit-signatures` (npm audit signatures) | `npm audit signatures` | no |",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/checks.yml:296",
+      "source": ".github/workflows/checks.yml:300",
       "match": "run: npm audit signatures"
     },
     {
@@ -11596,7 +11596,7 @@
       "quote": "Its checkout uses `fetch-depth: 0`",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/checks.yml:329",
+      "source": ".github/workflows/checks.yml:333",
       "match": "fetch-depth: 0"
     },
     {
@@ -11606,7 +11606,7 @@
       "quote": "`npm run typecheck` + `npm run design -- --check` + `npm run test:main` on `windows-latest`",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/checks.yml:279",
+      "source": ".github/workflows/checks.yml:283",
       "match": "run: npm run test:main"
     },
     {
@@ -11816,7 +11816,7 @@
       "quote": "(30-day retention when the ref is `develop` or `main`, 14 days otherwise)",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/e2e.yml:102",
+      "source": ".github/workflows/e2e.yml:103",
       "match": "&& 30 || 14 }}"
     },
     {
@@ -12683,7 +12683,7 @@
       "quote": "the step named `Guard - no forbidden entitlements` in the `release-guards` job",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/checks.yml:355",
+      "source": ".github/workflows/checks.yml:359",
       "match": "- name: Guard - no forbidden entitlements"
     },
     {
@@ -12693,7 +12693,7 @@
       "quote": "`checks.yml` has a guard that fails the build if any workflow references it or `altool`",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/checks.yml:388",
+      "source": ".github/workflows/checks.yml:392",
       "match": "'\\bAZ_CLIENT_SECRET\\b|\\baltool\\b'"
     },
     {
@@ -12703,7 +12703,7 @@
       "quote": "Guard 5 has a third leg for `README.md`, but it is wrapped in `if [ -n \"$README\" ]`",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/checks.yml:436",
+      "source": ".github/workflows/checks.yml:440",
       "match": "if [ -n \"$README\" ] && [ \"$CANONICAL\" != \"$README\" ]; then"
     },
     {
@@ -13058,7 +13058,7 @@
       "quote": "Windows CI **exists**: `.github/workflows/checks.yml` runs a `windows-checks` job on `windows-latest`",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/checks.yml:249",
+      "source": ".github/workflows/checks.yml:253",
       "match": "runs-on: windows-latest"
     },
     {
@@ -13946,7 +13946,7 @@
       "quote": "30-day retention on `develop` or `main`, 14-day on PRs",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/e2e.yml:102",
+      "source": ".github/workflows/e2e.yml:103",
       "match": "&& 30 || 14 }}"
     },
     {
@@ -21464,7 +21464,7 @@
       "quote": "the `Guard - release pubkey drift across docs` step (Guard 5) of the `Release readiness guards` job",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/checks.yml:418",
+      "source": ".github/workflows/checks.yml:422",
       "match": "- name: Guard - release pubkey drift across docs"
     },
     {
@@ -21474,7 +21474,7 @@
       "quote": "its step name at `:349` (`:418` on 2026-10-29)",
       "status": "fixed",
       "evidence": "source",
-      "source": ".github/workflows/checks.yml:418",
+      "source": ".github/workflows/checks.yml:422",
       "match": "- name: Guard - release pubkey drift across docs",
       "note": "The 'today' line numbers had drifted to :418"
     },
@@ -21579,7 +21579,7 @@
       "quote": "(the `Windows checks` job runs only typecheck, the design-sync check and `test:main`",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/checks.yml:248",
+      "source": ".github/workflows/checks.yml:252",
       "match": "name: Windows checks"
     },
     {
@@ -22441,7 +22441,7 @@
       "quote": "runs an advisory `windows-checks` job (typecheck + design-sync check + `test:main`) on `windows-latest`",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/checks.yml:249",
+      "source": ".github/workflows/checks.yml:253",
       "match": "runs-on: windows-latest"
     },
     {
@@ -22821,7 +22821,7 @@
       "quote": "runs a `windows-checks` job on `windows-latest` (typecheck + `npm run design -- --check` + `npm run test:main`, `shell: bash`)",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/checks.yml:279",
+      "source": ".github/workflows/checks.yml:283",
       "match": "run: npm run test:main"
     },
     {
@@ -23236,7 +23236,7 @@
       "quote": "Added a `windows-checks` job to `.github/workflows/checks.yml`",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/checks.yml:247",
+      "source": ".github/workflows/checks.yml:251",
       "match": "windows-checks:"
     },
     {
@@ -24066,7 +24066,7 @@
       "quote": "typecheck + `test:main` + `npm run design -- --check` on every push",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/checks.yml:276",
+      "source": ".github/workflows/checks.yml:280",
       "match": "run: npm run design -- --check"
     },
     {
@@ -48013,7 +48013,7 @@
       "quote": "| `windows-checks` (Windows checks) |",
       "status": "verified",
       "evidence": "app",
-      "source": ".github/workflows/checks.yml:248",
+      "source": ".github/workflows/checks.yml:252",
       "match": "name: Windows checks",
       "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): Windows checks is not a required context on main or develop"
     },
@@ -48035,7 +48035,7 @@
       "quote": "`npm audit signatures`, `Release readiness guards`, and `Windows checks` run on every push but are not required to merge",
       "status": "verified",
       "evidence": "app",
-      "source": ".github/workflows/checks.yml:318",
+      "source": ".github/workflows/checks.yml:322",
       "match": "name: Release readiness guards",
       "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): main: strict, contexts Lint/Typecheck/Unit tests/Build/License compliance/Secret scan/Coverage, enforce_admins true, no review rule, force pushes and deletions off, conversation resolution off; develop: same seven, strict, enforce_admins false"
     },
@@ -48221,7 +48221,7 @@
       "quote": "Required status checks (strict mode — branch must be up to date before merge), read live from the API on **2026-08-23**",
       "status": "verified",
       "evidence": "app",
-      "source": ".github/workflows/checks.yml:231",
+      "source": ".github/workflows/checks.yml:235",
       "match": "name: License compliance",
       "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): main: strict, contexts Lint/Typecheck/Unit tests/Build/License compliance/Secret scan/Coverage, enforce_admins true, no review rule, force pushes and deletions off, conversation resolution off; develop: same seven, strict, enforce_admins false"
     },
@@ -48243,7 +48243,7 @@
       "quote": "`npm audit signatures` and `Release readiness guards` are **not** required checks",
       "status": "verified",
       "evidence": "app",
-      "source": ".github/workflows/checks.yml:282",
+      "source": ".github/workflows/checks.yml:286",
       "match": "name: npm audit signatures",
       "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): main: strict, contexts Lint/Typecheck/Unit tests/Build/License compliance/Secret scan/Coverage, enforce_admins true, no review rule, force pushes and deletions off, conversation resolution off; develop: same seven, strict, enforce_admins false"
     },
@@ -48384,7 +48384,7 @@
       "quote": "`Windows checks` is advisory; `e2e` is intentionally excluded until stable",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/checks.yml:253",
+      "source": ".github/workflows/checks.yml:257",
       "match": "from branch-protection required checks until proven stable, mirroring",
       "note": "The Windows checks job comment records it is excluded from required checks, mirroring how e2e is kept out (next line)"
     },
@@ -52243,7 +52243,7 @@
       "quote": "the leg is wrapped in `if [ -n \"$README\" ]`",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/checks.yml:436",
+      "source": ".github/workflows/checks.yml:440",
       "match": "if [ -n \"$README\" ]"
     },
     {
@@ -53751,7 +53751,7 @@
       "quote": "This is the same command the CI job runs.",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/checks.yml:279",
+      "source": ".github/workflows/checks.yml:283",
       "match": "run: npm run test:main"
     },
     {
@@ -54458,7 +54458,7 @@
       "quote": "running `typecheck + design-sync check + test:main` on `windows-latest`",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/checks.yml:279",
+      "source": ".github/workflows/checks.yml:283",
       "match": "run: npm run test:main"
     },
     {
