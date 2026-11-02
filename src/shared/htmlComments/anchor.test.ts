@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { PREVIEW_LIMITS } from '../preview-limits'
-import { addTo, ch, elementOf, fixedId, makeComment } from './__fixtures__/commentTestData'
+import { addTo, ch, elementOf, fixedId, makeComment } from '../comments/__fixtures__/commentTestData'
 import {
   buildAnchor,
   buildDraftAnchor,
@@ -20,11 +20,11 @@ import {
   resolveBlockTarget,
   resolveRelativePath
 } from './anchor'
-import { encodeText } from './encoding'
-import type { CommentAnchor, CommentData, RuntimeAnchor } from './format'
+import { encodeText } from '../comments/encoding'
+import type { CommentAnchor, CommentData, RuntimeAnchor } from '../comments/format'
 import { indexHtml, type HtmlIndex } from './htmlIndex'
 import { parseCommentBlocks, parseCommentFile } from './parse'
-import { addReply } from './thread'
+import { addReply } from '../comments/thread'
 
 function comment(n: number, anchor: CommentAnchor): CommentData {
   return makeComment({ id: fixedId('c-', n), anchor })

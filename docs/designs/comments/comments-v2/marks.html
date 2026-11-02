@@ -258,8 +258,8 @@
   <strong>Linked hover (C-17).</strong> Hovering or focusing a mark puts its icon in the hover look; hovering an
   icon raises <em>all</em> its marks to the active fill. In Markdown a plain click inside a mark (no drag, not on
   a link) opens the window with only that thread expanded; the pointer is a hand and the title reads
-  "Comment by {name} – click to open". In HTML, marks take clicks only in comment mode; outside it the page keeps
-  its clicks. <strong>Icon step:</strong> 24px hit box plus a 2px gap, so neighbouring hit areas never overlap
+  "Comment by {name} – click to open". In HTML, outside comment mode a plain click on plain text opens the thread too, unless the page
+  cancelled the click, changed in response, or the target is a link or control. <strong>Icon step:</strong> 24px hit box plus a 2px gap, so neighbouring hit areas never overlap
   (v0.23.1 stepped 22px, overlapping by 2px). Beyond the cap, the rest of the row merges into a stack icon.
 </div>
 <div class="c2-grid">
@@ -282,7 +282,7 @@
     <div class="mk-scene page-area"><div class="page">
       <h4>Schedule</h4>
       <p class="erf-mdc-block mk-narrower mk-gap">We will <span class="erf-comment-mark erf-comment-mark--on-light erf-comment-mark--active">ship by Friday</span> after the review.<span class="erf-hpc-pin erf-hpc-pin--hover" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><rect class="erf-hpc-pin__line" x="6" y="6" width="12" height="2"></rect><rect class="erf-hpc-pin__line" x="6" y="10" width="8" height="2"></rect></svg></span></p>
-    </div><div class="erf-hpc-root" aria-hidden="true"><div class="erf-hpc-frame"></div><div class="erf-hpc-tab erf-hpc-tab--bottom">Comment mode – Esc to leave</div></div></div></figure>
+    </div><div class="erf-hpc-root" aria-hidden="true"><div class="erf-hpc-frame"></div><div class="erf-hpc-tab erf-hpc-tab--bottom">Comment mode · Esc to leave</div></div></div></figure>
 </div>
 
 <div class="c2-grid">
@@ -338,9 +338,9 @@
   (<code data-token="--input-height-sm">28px</code>), on <code>--color-bg-elevated</code> with the Surfaces card's
   floating edge and shadow (<code>--color-border-subtle</code> plus <code>--shadow-md</code>). It is a button, not
   a chip: the Badges card's chip is a static label. It takes no focus, does not
-  change the selection, and hides on Esc, scroll or collapse. <strong>Markdown:</strong> inside and outside
-  comment mode. <strong>HTML:</strong> only in comment mode – outside it the page owns its mouse, and the
-  right-click menu offers "Comment on selection" instead (OD-01). In HTML the label is generated content in the
+  change the selection. It follows the selection on a scroll and ends on Esc or collapse. Both previews show it inside and outside comment mode.
+  <strong>HTML, outside the mode:</strong> the page owns its controls, so the button sits above the words, else below
+  them, else hides, and a selection a script makes shows none; the right-click menu stays the sure route (D-10). In HTML the label is generated content in the
   overlay's shadow root, so Find never counts it.
 </div>
 <div class="c2-grid">
@@ -348,9 +348,9 @@
     <div class="mk-scene mk-scene--tall page-area"><div class="page">
       <h4>Release</h4>
       <p>Read the <a href="#mark">release plan</a> first. We will <span class="mk-page-sel">ship the beta to ten <span class="c2-anchor">customers<span class="erf-comment-button mk-chip" aria-hidden="true"><svg data-icon="message-square-plus" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M12 8v6"/><path d="M9 11h6"/></svg><span class="erf-comment-button__text" data-text="Comment"></span></span></span></span> in the first week, then widen the group.</p>
-    </div><div class="erf-hpc-root" aria-hidden="true"><div class="erf-hpc-frame"></div><div class="erf-hpc-tab erf-hpc-tab--bottom">Comment mode – Esc to leave</div></div></div></figure>
+    </div><div class="erf-hpc-root" aria-hidden="true"><div class="erf-hpc-frame"></div><div class="erf-hpc-tab erf-hpc-tab--bottom">Comment mode · Esc to leave</div></div></div></figure>
 
-  <figure><figcaption><strong>C-16 · HTML, outside comment mode</strong> – no Comment button: the page owns its mouse</figcaption>
+  <figure><figcaption><strong>C-16 · HTML, a page control in both places</strong> – no Comment button: outside comment mode it never covers a control</figcaption>
     <div class="mk-scene mk-scene--tall page-area"><div class="page">
       <h4>Release</h4>
       <p>Read the <a href="#mark">release plan</a> first. We will <span class="mk-page-sel">ship the beta to ten customers</span> in the first week, then widen the group.</p>

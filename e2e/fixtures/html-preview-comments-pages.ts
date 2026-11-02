@@ -12,7 +12,7 @@
  */
 
 import { commentOn } from '../../src/main/services/preview/comments/__test-helpers__/commentedPages'
-import { addTo, fixedId } from '../../src/shared/htmlComments/__fixtures__/commentTestData'
+import { addTo, fixedId } from '../../src/shared/comments/__fixtures__/commentTestData'
 
 /** A page of `count` paragraphs `#p-0` … `#p-{count-1}`, each with one open block on its own lines. */
 export function manyCommentsPage(count: number, title = '-HPC-MANY-'): string {

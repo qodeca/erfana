@@ -17,18 +17,18 @@ Project panel displays hierarchical file tree with filtering, visual indicators,
 
 ```
 <ProjectPanel>
-  <Header> FolderOpen icon + Label + Chevron toggle </Header>
-  <ControlPanel> FilterButtons </ControlPanel>
+  <Header> FolderOpen icon + "Project" + Chevron toggle </Header>
   <PanelErrorBoundary key={projectPath ?? 'none'} componentName="Project tree">
-    <ProjectTree />
+    <ProjectTree showControlPanel filterMode onFilterModeChange />
+      (toolbar, then the control panel with the filter buttons, then the rows)
   </PanelErrorBoundary>
 </ProjectPanel>
 ```
 
 ### Responsibilities
 
-**ProjectPanel**: Header, control panel visibility, filter mode state & persistence, panel-scoped error containment
-**ProjectTree**: Tree rendering (virtualised), expansion/collapse, keyboard navigation, context menu, file opening, filtering, reading lazy folders on expand
+**ProjectPanel**: Header, control panel visibility, filter mode state & persistence, panel-scoped error containment, file opening (`handleFileSelect`)
+**ProjectTree**: Toolbar, control panel markup, tree rendering (virtualised), expansion/collapse, keyboard navigation, context menu, filtering, reading lazy folders on expand
 
 ### Error Containment (#60)
 
@@ -42,11 +42,11 @@ See: [UI Components - Error containment](./ui-components.md#error-containment) f
 
 ### Refresh Button
 
-Manual refresh button in the toolbar (rightmost position) triggers both tree content and git status refresh in parallel.
+Manual refresh button in the toolbar (rightmost position, after Open/Change project, Close project, New file, New folder and Import) triggers both tree content and git status refresh in parallel.
 
 **Keyboard Shortcut**: Cmd+Alt+R (macOS) / Ctrl+Alt+R (Windows/Linux)
 **Visual Feedback**: Icon spins during refresh (CSS animation)
-**Accessibility**: Tooltip with shortcut, ARIA label, focus state
+**Accessibility**: Tooltip "Refresh (<shortcut>)", ARIA label "Refresh project tree and git status"
 
 **Use Cases**:
 - Force refresh after external file changes
@@ -59,17 +59,17 @@ Collapsible panel with chevron toggle (common pattern across panels).
 
 ### Toggle Behavior
 
-**Chevron**: ChevronDown (visible) / ChevronLeft (collapsed), 8px spacing, 150ms rotation
-**State**: Local component state (`showControlPanel`)
+**Chevron**: ChevronDown (shown) / ChevronLeft (hidden) – the icon is swapped, not rotated; tooltip "Show Filter Options" / "Hide Filter Options"; colour transition `var(--transition-normal)` (0.15s)
+**State**: Local component state (`showControlPanel`), hidden by default
 
 ### Filter Options
 
-Two mutually exclusive radio buttons:
-- **All Files** - Show all
-- **Markdown Only** - Show only .md files + folders containing them
+Under the label "File Filter", two mutually exclusive toggle buttons:
+- **All Files** (`Files` icon) - Show all
+- **Markdown Only** (`FileText` icon) - Show only Markdown files + folders containing them
 
-**Visual**: Radio with checkmark icons, gray text (`var(--color-accent-drag)` when active), 12px spacing
-**Persistence**: electron-store, survives restarts
+**Visual**: the active button gets `.filter-option.active` – text in `var(--color-accent-drag)` on `var(--color-accent-drag-bg)`
+**Persistence**: electron-store key `projectFilterMode` (`SettingsService`), survives restarts; default `all`
 
 See: [IPC Patterns](./ipc-patterns.md) for filter persistence channels
 
@@ -159,8 +159,8 @@ See: [Known Issues](./known-issues.md#git-status-global-gitignore-not-supported)
 4. Extension: `.key`, `.pem`, `.p12`, `.pfx`, `.keystore`, `.jks`, `.crt`, `.cer`
 5. Password/token files: a name containing `password` or `token` **and** ending `.txt` or `.json`
 
-**Visual**: Color `var(--color-warning-bright)` (amber – a RETIRED token; new code should use `var(--color-warning)`), icon ⚠️ (14px), ARIA label "Sensitive file"
-**Detection**: `isSensitiveFile()` in `ProjectTreeNode.tsx` – plain string comparison
+**Visual**: Color `var(--color-warning-bright)` (amber – a RETIRED token; new code should use `var(--color-warning)`), lucide `AlertTriangle` icon (14px) before the name, ARIA label "Warning: sensitive file", tooltip "Sensitive file - may contain credentials"
+**Detection**: `isSensitiveFile()` in `ProjectTreeNode.tsx`, files only (folders are never flagged) – plain string comparison
 (exact match, prefix, `includes`, `endsWith`), not regex
 **Location**: `ProjectTreeNode.tsx`
 
@@ -174,15 +174,15 @@ name matches another category, as `credentials` and `known_hosts` do.
 
 Files/folders starting with `.`
 
-**Visual**: 70% opacity, italic font
+**Visual**: 70% opacity, italic font; full opacity on row hover
 **CSS**: Sensitive files override opacity (always 100% visible, keep italic)
-**Examples**: `.git/`, `.env`, `.gitignore`, `.DS_Store`
+**Examples**: `.github/`, `.env`, `.gitignore`, `.DS_Store` (`.git` itself is not shown: it is a default `tree.hiddenPatterns` name, `DEFAULT_TREE_HIDDEN_PATTERNS`)
 
 ### Icon System
 
-**Files**: Blue FileText (markdown), Amber AlertTriangle (sensitive), Gray FileText (regular)
-**Folders**: Blue FolderOpen (expanded), Gray Folder (collapsed), Amber + folder (sensitive)
-**Size**: 14px
+**Files**: `FileText` in `var(--color-brand-violet)` (`.md` / `.markdown`), `File` (any other file); a sensitive file adds the amber `AlertTriangle` before its name, a symlink a `Link` icon
+**Folders**: `ChevronDown` (expanded) / `ChevronRight` (collapsed) – no folder icon
+**Size**: 16px icons drawn at `var(--icon-size-sm)`
 
 ## Context Menu Operations
 
@@ -268,7 +268,7 @@ Single Responsibility, Open/Closed, Testable (`commands.test.tsx`, `strategies.t
 
 **Validation** (utils/fileValidation.ts):
 - Empty name, 255 char limit, invalid chars (`/\\?*:|\"<>`)
-- Windows reserved (CON, PRN, AUX, COM1-9, LPT1-9)
+- Windows reserved (CON, PRN, AUX, NUL, COM1-9, LPT1-9)
 - Case-insensitive duplicates
 - Dotfile edge cases (`.CON` valid, `CON` reserved)
 
@@ -324,7 +324,7 @@ See: [File Watching](./file-watching/README.md#directorywatcherservice-directory
 
 Since v0.22.0 the tree stays fast on projects with tens of thousands of files:
 
-- **Virtualised rows.** `buildVisibleRows` (`ProjectTree/visibleRows.ts`) flattens the expanded part of the tree into one list, and `@tanstack/react-virtual` draws only the rows on screen. A click or a git refresh redraws only the rows that changed. While dragging, the rows inside the target folder are tinted (`FolderDropHighlight.tsx`); a drop on a sibling or on the item's own folder does nothing, and auto-scroll follows the pointer. A cut item is dimmed until it is pasted
+- **Virtualised rows.** `buildVisibleRows` (`ProjectTree/visibleRows.ts`) flattens the expanded part of the tree into one list, and `@tanstack/react-virtual` draws only the rows on screen. A click or a git refresh redraws only the rows that changed. While dragging, the rows inside the target folder are tinted (`data-in-drop-zone` on each row; `FolderDropHighlight.tsx` is not rendered); a drop on a sibling or on the item's own folder does nothing, and auto-scroll follows the pointer. A cut item is dimmed until it is pasted
 - **Lazy folders.** The main-process walk leaves folders on the watcher's ignore list (`dist`, `build`, `.venv`, `.next`, `coverage`, …) unread, and past 50,000 entries leaves the rest unread too; such rows arrive with `lazy` set and no children. Expanding one runs one shallow `file:readDirectory` of that folder (`useLazyFolderChildren`), and the result is kept in `useLazyFolderStore` so every consumer of the project's files sees it (`useMergedProjectFiles`)
 - **Placeholder line.** While a lazy folder is read, a "Loading…" line sits under it (`TreePlaceholderRow.tsx`); "Could not read this folder" if the read fails. The line takes no focus and no drag, and a drop on it lands in the folder
 - **Incomplete tree.** When some folders are unread, a file name clicked in the terminal is also searched for on disk (`file:findByName`, bounded in time and size), and the file chooser says its list may be incomplete

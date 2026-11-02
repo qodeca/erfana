@@ -477,6 +477,18 @@ describe('previewPage preload – link activation', () => {
 
     expect(send).not.toHaveBeenCalled()
   })
+
+  it('tells main about a link to this file with another ?query', async () => {
+    const link = mount('<a href="?lang=pl">Polski</a>', 'a')
+
+    userClick(link)
+    await settle()
+
+    expect(send).toHaveBeenCalledWith(
+      'preview-page:linkActivated',
+      expect.objectContaining({ href: expect.stringContaining('?lang=pl') })
+    )
+  })
 })
 
 describe('previewPage preload – CSP refusals', () => {

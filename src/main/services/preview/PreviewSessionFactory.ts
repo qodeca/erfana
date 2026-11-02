@@ -95,8 +95,7 @@ export interface PreviewSessionLike {
 
 /**
  * The slice of a preview `WebContents` the service and its collaborators use.
- * Kept broad enough to satisfy the narrow surfaces of the find/still-frame/export
- * controllers and the input-forwarding target, so one handle flows to them all.
+ * Broad enough for the find, still-frame, export and input-forwarding surfaces.
  */
 export interface PreviewWebContentsHandle {
   /**
@@ -114,6 +113,7 @@ export interface PreviewWebContentsHandle {
   readonly mainFrame?: unknown
 
   loadURL(url: string): Promise<void>
+  getURL(): string
   reload(): void
   reloadIgnoringCache(): void
   destroy(): void

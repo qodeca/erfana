@@ -44,10 +44,12 @@ export const PreviewCommentChannels = {
   SET_MODE: 'preview:commentSetMode',
   /** Every comment of the page on screen and its same-project frames, read from disk. */
   LIST: 'preview:commentList',
-  /** A command for the page – today only "Show on page" (`reveal`). */
+  /** A command for the page – today only "Show in preview" (`reveal`). */
   COMMAND: 'preview:commentCommand',
   /** Add, reply, edit, resolve, re-open or delete – the only page-driven write (§7.6). */
   SAVE: 'preview:commentSave',
+  /** "Resolve all changed comments", "Delete all resolved comments": one write per file (024-FR-028). */
+  BULK: 'preview:commentBulk',
   /**
    * The files this window holds unsaved editor changes for (decision 13). Main
    * refuses a save into any of them with `COMMENT_UNSAVED_SOURCE`.
@@ -61,12 +63,14 @@ export const PreviewCommentEvents = {
   DRAFT_OPENED: 'preview:commentDraftOpened',
   /** The tab's comment counts, or its availability, changed. */
   COMMENTS_CHANGED: 'preview:commentsChanged',
-  /** Which threads' elements are not rendered right now ("Not visible now"). */
+  /** Which threads' elements are not rendered right now ("Hidden on the page"). */
   ANCHOR_STATUS: 'preview:commentAnchorStatus',
   /** Main turned comment mode on or off: Esc in the page (its exit pick), or the shortcut. */
   MODE_CHANGED: 'preview:commentModeChanged',
   /** A save answered `COMMENT_SAVE_PENDING` settled after all: written, or refused with its code. */
-  SAVE_SETTLED: 'preview:commentSaveSettled'
+  SAVE_SETTLED: 'preview:commentSaveSettled',
+  /** A file a bulk action answered `COMMENT_SAVE_PENDING` for ended after all (L-2). */
+  BULK_SETTLED: 'preview:commentBulkSettled'
 } as const
 
 export type PreviewCommentChannel =

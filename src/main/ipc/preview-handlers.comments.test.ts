@@ -17,9 +17,11 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ErrorCode } from '../../shared/errors'
+import { FileCommentChannels } from '../../shared/ipc/file-comment-channels'
 import { PreviewCommentChannels } from '../../shared/ipc/preview-comment-channels'
 import type { GlobalSettings } from '../../shared/ipc/global-settings-schema'
 import type { PreviewCommentRegistry } from '../services/preview/comments/commentServiceTypes'
+import type { ProjectSessionSnapshot } from '../services/session/ProjectSession'
 import { registerPreviewHandlers, type PreviewHandlerBundle } from './preview-handlers'
 import type { PreviewGraph } from './preview/buildPreviewGraph'
 
@@ -60,7 +62,7 @@ const KEY_INVALID = { ok: false, code: ErrorCode.COMMENT_KEY_INVALID }
 
 let bundle: PreviewHandlerBundle | undefined
 
-function setup() {
+function setup(session?: Parameters<typeof registerPreviewHandlers>[0]['session']) {
   const list = vi.fn(async () => ({ ok: true as const, files: [] }))
   const registry: PreviewCommentRegistry = {
     get: vi.fn(() => ({ panelId: PANEL, windowId: 1, list }) as never),
@@ -78,9 +80,10 @@ function setup() {
   bundle = registerPreviewHandlers({
     getProjectPath: () => '/p',
     globalSettings: { getSettings: () => ({ htmlPreview: { enabled: true } }) as GlobalSettings, onSettingsChanged: () => () => {} },
-    graph
+    graph,
+    session
   })
-  return { registry, unsaved, list }
+  return { registry, unsaved, list, graph }
 }
 
 /** An invoke from a frame at `url`; `child` makes it a sub-frame. */
@@ -131,5 +134,50 @@ describe('SEC-07 the comment channels of registerPreviewHandlers', () => {
     // Electron turns the gate's throw into the renderer's rejected invoke.
     expect(() => handlers[PreviewCommentChannels.LIST](from('erfana-preview://tok123/index.html'), { panelId: PANEL })).toThrow(/Untrusted sender/)
     expect(s.registry.get).not.toHaveBeenCalled()
+  })
+})
+
+describe('the file-comment family at the composition root (spec 024)', () => {
+  /** A session whose project changes are driven by the test. */
+  function fakeSession() {
+    const listeners: Array<(prev: ProjectSessionSnapshot | null, next: ProjectSessionSnapshot | null) => void> = []
+    const snapshot = (root: string): ProjectSessionSnapshot => ({ generation: 1, root, realRoot: root, caseSensitive: true, ownerWebContentsId: null })
+    return {
+      session: {
+        current: () => null,
+        onChange: vi.fn((listener: (typeof listeners)[number]) => {
+          listeners.push(listener)
+          return () => void listeners.splice(listeners.indexOf(listener), 1)
+        })
+      },
+      change: (from: string, to: string) => listeners.forEach(listener => listener(snapshot(from), snapshot(to))),
+      listening: () => listeners.length
+    }
+  }
+
+  it('registers the file-comment channels only when a session is given, and removes them on dispose', async () => {
+    setup()
+    expect(handlers[FileCommentChannels.LIST]).toBeUndefined()
+    await bundle?.dispose()
+    const fake = fakeSession()
+    setup(fake.session)
+    for (const channel of Object.values(FileCommentChannels)) expect(handlers[channel], channel).toBeDefined()
+    await bundle?.dispose()
+    bundle = undefined
+    for (const channel of Object.values(FileCommentChannels)) expect(handlers[channel], channel).toBeUndefined()
+    expect(fake.listening()).toBe(0)
+  })
+
+  it('a previewed page is refused on the file-comment channels before the payload is read', async () => {
+    setup(fakeSession().session)
+    const answer = await handlers[FileCommentChannels.LIST](from('erfana-preview://tok123/index.html'), { panelId: 'p', filePath: '/p/a.md' })
+    expect(answer).toEqual({ ok: false, code: ErrorCode.COMMENT_WRITE_FAILED, reason: 'untrusted-sender' })
+  })
+
+  it('the session also feeds the main-side preview teardown on a project switch', () => {
+    const fake = fakeSession()
+    const { graph } = setup(fake.session)
+    fake.change('/old', '/new')
+    expect(graph.service.onProjectChanged).toHaveBeenCalledWith('/old', '/new')
   })
 })

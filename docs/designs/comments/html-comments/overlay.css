@@ -91,8 +91,8 @@
 .erf-hpc-pin--damaged .erf-hpc-pin__body { fill: var(--color-warning); }
 /* Damaged and selected keeps the warning fill, so its ! stays ink: accent on it is about 1.05:1. */
 .erf-hpc-pin--damaged.erf-hpc-pin--selected .erf-hpc-pin__count { color: var(--color-brand-black); }
-/* deviates: docs/designs/comments/html-comments/overlay.html — pin focus: the passed-in accent with an
-   ink halo; pins are focusable but outside the Tab order (Exceptions, "Pin focus") */
+/* deviates: docs/designs/comments/html-comments/overlay.html — icon focus, drawn for the Markdown preview's
+   icons only: HTML icons take no focus since C-11 (Exceptions, "Pin focus") */
 .erf-hpc-pin:focus-visible,
 .erf-hpc-pin--focus { outline: var(--border-width-thick) solid var(--color-accent-primary);
                       outline-offset: var(--space-1);

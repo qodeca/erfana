@@ -80,7 +80,7 @@ A well-meaning future contributor will propose "just pin to the official release
 - `docs/CHANGELOG.md` §0.9.4 — user-facing summary
 - `docs/build/whisper-binaries.md` — operational runbook
 - `docs/windows/implementation-plan.md` §"Phase 4 — Local Whisper parity"
-- `.github/workflows/whisper-binaries.yml` — the 4-job workflow
+- `.github/workflows/whisper-binaries.yml` – the workflow that builds and publishes the binaries
 - `.github/workflows/whisper-binaries-canary.yml` — monthly credential canary
-- `src/main/services/whisper-assets.ts` — pinned RELEASE_TAG + SHAs
+- `src/main/services/whisper-assets.ts` — pinned RELEASE_TAG + SHAs (currently `whisper-build-v1.8.4-erfana2`)
 - First published release: `whisper-build-v1.8.4-erfana1` (see `docs/windows/phase4-binary-spec.md`)

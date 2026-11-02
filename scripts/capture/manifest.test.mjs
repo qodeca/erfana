@@ -75,7 +75,8 @@ describe('validateManifest', () => {
     const rows = loadManifest(path.join(import.meta.dirname, 'shots.json'))
     expect(rows.filter((r) => r.file.startsWith('docs/user-guide/images/')).length).toBe(52)
     const demo = rows.filter((r) => r.scene === 'readme-demo')
-    expect([0, 4]).toContain(demo.length)
+    // The README video (spec 023): the WebP and its still; no GIF or MP4 (023-FR-010).
+    expect(demo.map((r) => r.file).sort()).toEqual(['docs/assets/readme/demo-still.png', 'docs/assets/readme/demo.webp'])
   })
 
   it('defaults kind to still and lists every problem at once', () => {

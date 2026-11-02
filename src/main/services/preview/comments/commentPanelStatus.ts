@@ -6,7 +6,7 @@
  *
  * - The files the drawer lists: the page's, then each same-project frame's,
  *   each once.
- * - The threads whose element is not rendered right now ("Not visible now"),
+ * - The threads whose element is not rendered right now ("Hidden on the page"),
  *   as main-minted keys.
  * - The tab's counts, added over the files on screen, and why comments are
  *   unavailable for it – the feature flag, the page's overlay going, or
@@ -18,10 +18,10 @@
 import type { CommentUnavailableReason, CommentsChanged } from '../../../../shared/ipc/preview-comment-schema'
 import type { PreviewCommentServing } from './commentInstrumentation'
 import type { CommentFrameLike, CommentFrames, FrameRecord } from './commentFrames'
-import type { CommentBinding, CommentKeyStore } from './commentKeyStore'
-import type { ListedFile } from './commentListBuilder'
+import type { CommentBinding, CommentKeyStore } from '../../comments/commentKeyStore'
+import type { ListedFile } from '../../comments/commentListBuilder'
 import { addCounts, countsOf, type CommentCounts } from './commentPins'
-import { samePathKey } from './commentUnsavedSources'
+import { samePathKey } from '../../comments/commentUnsavedSources'
 
 /** Instrumentation's reasons as the renderer names them (§10.10 "Unavailable"). */
 const UNAVAILABLE: Readonly<Record<string, CommentUnavailableReason>> = {

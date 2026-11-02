@@ -116,6 +116,7 @@ function makePage() {
         remove(ipcListeners, channel, listener)
     },
     loadURL: vi.fn<(url: string) => Promise<void>>(() => Promise.resolve()),
+    getURL: () => shown,
     reload: vi.fn<() => void>(),
     reloadIgnoringCache: vi.fn<() => void>(),
     destroy: vi.fn<() => void>(() => {

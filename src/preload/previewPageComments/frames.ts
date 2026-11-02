@@ -26,6 +26,7 @@
 import { boxOf, clipToViewport, isRendered, type Box, type Viewport } from './geometry'
 import { frameFileOf, type LabelSuffix } from './label'
 import type { ChildFrameState } from './state'
+import type { TokenRegistry } from './tokens'
 
 /** An element that holds a child frame. */
 export type FrameElement = HTMLIFrameElement | HTMLFrameElement
@@ -128,4 +129,14 @@ export function shieldsOf(doc: Document, map: FrameMap, viewport: Viewport): Shi
 export function iframeSuffix(map: FrameMap, frame: FrameElement): LabelSuffix {
   if (!isShielded(map, frame)) return { kind: 'frame', file: frameFileOf(frame.src) }
   return isInline(frame) || showsInlineDocument(frame) ? { kind: 'inline-frame' } : { kind: 'refused-frame' }
+}
+
+/**
+ * What an element's label says it is: a frame (by its child frame's state),
+ * an element a script built (no token of its own below a tokened one), or
+ * nothing more.
+ */
+export function suffixFor(element: Element, map: FrameMap, tokens: Pick<TokenRegistry, 'tokenOf' | 'nearestTokened'>): LabelSuffix {
+  if (isFrameElement(element)) return iframeSuffix(map, element)
+  return tokens.tokenOf(element) === undefined && tokens.nearestTokened(element) !== undefined ? { kind: 'script' } : { kind: 'none' }
 }

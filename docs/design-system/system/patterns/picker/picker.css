@@ -1,0 +1,153 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * The element picker – pointing at one element on a page Erfana does not own.
+ *
+ * PROPOSED – not adopted. Lifted from the decided feature screen
+ * docs/designs/comments/html-comments/overlay.html (its overlay.css mirrors
+ * src/preload/previewPageComments/overlayStyles.ts), so a second feature – the
+ * built-in browser (spec 025) – draws the same outline and label instead of a
+ * copy that drifts. Nothing here changes the comment overlay; when both
+ * features ship, overlayStyles.ts and the browser's still-image layer read
+ * these rules (as resolved literals inside a page, as tokens outside one).
+ *
+ * The parts:
+ *   .erf-picker-outline   the two-tone outline on the hovered element
+ *   --selected            the picked element on the still image: adds a fill
+ *   .erf-picker-label     tag#id.classes then size, on ink
+ *   .erf-picker-flash     the static box shown after a send (no animation)
+ *   .erf-picker-frame     the browser's pick-mode frame, drawn in the gutter
+ *                         OUTSIDE the page's rectangle (the comment overlay
+ *                         keeps its own violet frame inside the page)
+ *   --away                the frame, dashed, while focus is elsewhere
+ *   .erf-picker-owned     the lime top edge on a surface that answers the pick
+ *                         (prompt-actions panel, instruction dialog)
+ *
+ * Positions are the component's (it measures the element); this file draws.
+ * The two-tone outline is allowed by the Focus card only for the comment
+ * overlay today – extending it here is browser note OD-2, an owner call.
+ * Classes are prefixed erf-.
+ */
+
+/* ---------- outline ---------- */
+
+/* Two-tone: a 2px accent ring with a 1px ink line on both sides. On a white
+   page the ink line carries the edge, on a black page the accent does, so one
+   of the two always clears 3:1 (the card measures both). Drawn instantly. */
+.erf-picker-outline {
+  position: absolute;
+  box-sizing: border-box;
+  pointer-events: none;
+  border: var(--border-width-thick) solid var(--color-accent-primary);
+  outline: var(--border-width) solid var(--color-brand-black);
+  box-shadow: inset 0 0 0 var(--border-width) var(--color-brand-black);
+}
+
+/* The picked element on the still image: the same outline plus a light accent
+   fill, so "picked" differs from "hovered" by more than colour. */
+.erf-picker-outline--selected {
+  background: color-mix(in srgb, var(--color-accent-primary) 12%, transparent);
+}
+
+/* ---------- label ---------- */
+
+/* Mono on ink. Tag in the accent, #id and up to three classes in paper (cut at
+   40 characters at a whole character, by the component), size in the primary
+   grey and never cut. Above the element's top-left; the component flips it
+   below at the page top and moves it inside the outline when crowded. */
+.erf-picker-label {
+  position: absolute;
+  box-sizing: border-box;
+  max-inline-size: 100%;
+  padding: 0 var(--space-2);
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--color-brand-black);
+  border: var(--border-width) solid var(--color-accent-primary);
+  color: var(--color-brand-white);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  white-space: nowrap;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+.erf-picker-label__tag { color: var(--color-accent-primary); }
+.erf-picker-label__size {
+  margin-inline-start: var(--space-4);
+  color: var(--color-text-primary);
+}
+
+/* ---------- flash ---------- */
+
+/* After a successful send: a static box for 1 s, no movement, so reduced
+   motion needs no variant (Motion card). */
+.erf-picker-flash {
+  position: absolute;
+  box-sizing: border-box;
+  pointer-events: none;
+  border: var(--border-width-thick) solid var(--color-accent-primary);
+  outline: var(--border-width) solid var(--color-brand-black);
+  background: color-mix(in srgb, var(--color-accent-primary) 24%, transparent);
+}
+
+/* ---------- the browser's pick-mode frame ---------- */
+
+/* Put on the page view itself. A lime edge at the Focus card's offset, so it
+   sits in the same 4px gutter as the page-focus ring and the page never
+   resizes when the state changes. Lime against the violet ring: the two key
+   states differ by hue, and in forced colours by shape (dashed). */
+.erf-picker-frame {
+  outline: var(--border-width-thick) solid var(--color-accent-secondary);
+  outline-offset: var(--space-1);
+}
+
+/* Pick mode on, focus elsewhere (the browser's Out state): the same lime edge,
+   dashed, so pick mode never shows by text alone while the keys go to another
+   panel. The first click on the page after a return only returns focus (browser
+   note OD-11). In forced colours it turns dotted (below), so Browse, Pick and
+   Out still differ by shape. */
+.erf-picker-frame--away { outline-style: dashed; }
+
+/* ---------- a surface that answers the pick ---------- */
+
+/* Put on a floating Erfana surface drawn over the still image that answers the
+   reviewer's own pick – the browser's prompt-actions panel and instruction
+   dialog. A 2px lime top edge, the pick frame's colour, ties the surface to
+   the frame around it: "this belongs to pick mode", and it goes when pick mode
+   goes. Identity, not boundary: the surface's own subtle border and shadow
+   still draw its edge on any page colour (lime on a white page is near 1:1).
+   Not a security signal either – a page can paint lime; the place (over the
+   still image, never inside the page) is what the reviewer can trust. */
+.erf-picker-owned {
+  border-block-start: var(--border-width-thick) solid var(--color-accent-secondary);
+}
+
+/* ---------- user settings ---------- */
+
+/* Forced colours: box-shadow and fills are dropped, so the outline is drawn as
+   three real lines – a 1px Canvas outline, the 2px Highlight border and a 1px
+   CanvasText line inside (a pseudo-element, not a shadow) – so a dark and a
+   light line surround the element over unforced pixels too. "Picked" is a
+   shape, not a fill: a double border. */
+@media (forced-colors: active) {
+  .erf-picker-outline,
+  .erf-picker-flash { border-color: Highlight; outline-color: Canvas; }
+  .erf-picker-outline::after,
+  .erf-picker-flash::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: var(--border-width) solid CanvasText;
+    pointer-events: none;
+  }
+  .erf-picker-outline--selected { border-style: double; border-width: calc(var(--border-width-thick) * 2); }
+  /* Opt out of the forced palette for the label only: without it the system
+     keeps HighlightText but drops the Highlight ground, so the words go black
+     on black (R2-H3). With it the pair stays Highlight / HighlightText. */
+  .erf-picker-label { forced-color-adjust: none; background: Highlight; border-color: HighlightText; color: HighlightText; }
+  .erf-picker-label__tag,
+  .erf-picker-label__size { color: HighlightText; }
+  .erf-picker-frame { outline-color: Highlight; outline-style: dashed; }
+  .erf-picker-frame--away { outline-style: dotted; }
+}

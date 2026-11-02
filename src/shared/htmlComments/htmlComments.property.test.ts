@@ -21,9 +21,9 @@ import {
   documentArb,
   fcParams,
   layoutArb
-} from './__fixtures__/arbitraries'
-import { ADA, LINE_SEP, ch, fixedId, makeComment } from './__fixtures__/commentTestData'
-import { encodeText, utf8Length } from './encoding'
+} from '../comments/__fixtures__/arbitraries'
+import { ADA, LINE_SEP, ch, fixedId, makeComment } from '../comments/__fixtures__/commentTestData'
+import { encodeText, utf8Length } from '../comments/encoding'
 import {
   AGENT_NOTE_LINES,
   assertSafeCommentText,
@@ -32,7 +32,7 @@ import {
   type BlockLayout,
   type CommentAnchor,
   type CommentData
-} from './format'
+} from '../comments/format'
 import { indexHtml, type HtmlIndex, type IndexedElement } from './htmlIndex'
 import {
   analyzeCommentDocument,
@@ -171,6 +171,8 @@ describe('serializer properties', () => {
     return makeComment({ msgs })
   }
 
+  const NEAR_CAP_MAX_CHARS = 600_000
+
   /** Comments near the 2 MB cap: many long messages of one character that escapes to several bytes. */
   const nearCapArb = fc
     .record({
@@ -178,7 +180,12 @@ describe('serializer properties', () => {
       length: fc.integer({ min: 2_000, max: PREVIEW_LIMITS.COMMENT_MESSAGE_MAX_CHARS }),
       fill: fc.constantFrom('a', '-', '<', '"', ch(0x1f600), LINE_SEP, ch(0xe9))
     })
-    .map(({ count, length, fill }) => nearCap(count, length, fill))
+    // #429: keep generated blocks near the cap (at most 600,000 message characters, up to
+    // about 3.6 MB once escaped), so a run stays cheap under coverage. The explicit examples
+    // below still hold the 6 MB refused case.
+    .map(({ count, length, fill }) =>
+      nearCap(Math.min(count, Math.ceil(NEAR_CAP_MAX_CHARS / length)), length, fill)
+    )
 
   it(
     'P-007 every block the serializer accepts is within 2 MB and reads back ok; the rest are refused as limit',
@@ -221,7 +228,8 @@ describe('serializer properties', () => {
       expect(accepted).toBeGreaterThan(0)
       expect(refused).toBeGreaterThan(0)
     },
-    PROPERTY_TIMEOUT_MS
+    // #429: this property serializes blocks of several MB, so it gets three times the budget.
+    3 * PROPERTY_TIMEOUT_MS
   )
 })
 
@@ -258,8 +266,14 @@ function shifted(block: ParsedBlock, shift: (offset: number, isEnd: boolean) => 
   }
 }
 
-/** P-003 and P-005 for one insertion; returns the document with the block added. */
-function checkInsertion(doc: CommentDocument, plan: SplicePlan): CommentDocument {
+/**
+ * P-003 and P-005 for one insertion; returns the document with the block
+ * added. The block sits on `targetStart`: by position when it went right
+ * before it; through its stored id, path or quote when it went before other
+ * tools' comments there (024-FR-023), which the position rule does not skip
+ * (U-081).
+ */
+function checkInsertion(doc: CommentDocument, plan: SplicePlan, targetStart: number): CommentDocument {
   const newText = applySplice(doc.text, plan)
   const verified = verifyCommentSplice(doc, newText, plan)
   if (!verified.ok) throw new Error(`verifyCommentSplice: ${verified.reason}`)
@@ -277,7 +291,10 @@ function checkInsertion(doc: CommentDocument, plan: SplicePlan): CommentDocument
   expect(after[added]).toMatchObject({
     kind: 'ok',
     data: plan.data,
-    target: { state: 'attached', via: 'position', startOffset: plan.start + delta }
+    target:
+      plan.start === targetStart
+        ? { state: 'attached', via: 'position', startOffset: plan.start + delta }
+        : { state: 'attached', startOffset: shift(targetStart, false) }
   })
   expect(
     after.filter((_, i) => i !== added).map(block => shifted(block, offset => offset))
@@ -297,7 +314,7 @@ describe('document properties', () => {
             const data = makeComment({ id: NEW_BLOCK_ID, anchor: buildAnchor(doc.index, el) })
             const planned = planInsert(doc, { targetStart: el.start, data, ws })
             if (!planned.ok) throw new Error(`planInsert before <${el.tag}>: ${planned.reason}`)
-            const added = checkInsertion(doc, planned.plan)
+            const added = checkInsertion(doc, planned.plan, el.start)
             const block = added.state.blocks.find(
               b => b.kind === 'ok' && b.data.id === NEW_BLOCK_ID
             )!

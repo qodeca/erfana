@@ -21,9 +21,9 @@ const createFile = async () => {
     isInternalOperationRef,
     setLoading,
     async () => {
-      const createdFilePath = await window.api.file.createFile(targetPath, fileName)
-      await refreshFileTree()
-      return createdFilePath
+      const filePath = await api.file.createFile({ dirPath: targetPath!, name: fileName })
+      await refreshProjectTree()
+      return filePath
     }
   )
 }
@@ -31,10 +31,10 @@ const createFile = async () => {
 
 **How `withWatcherPause` works** (`src/renderer/src/components/ProjectTree/withWatcherPause.ts`):
 1. Sets `isInternalOperationRef.current = true` + `setLoading(true)`
-2. Calls `window.api.directoryWatch.pause(projectPath)` (IPC to main process)
+2. Calls `directoryWatchGateway.pause(projectPath)` (IPC `directory-watch:pause` to the main process)
 3. Executes the operation
 4. Resets `isInternalOperationRef.current = false` **before** calling resume (prevents race condition – AC-010) – on the error path too since #210, so a catch-up sent at resume is not skipped
-5. Calls `window.api.directoryWatch.resume(projectPath)`
+5. Calls `directoryWatchGateway.resume(projectPath)`
 6. Sets `setLoading(false)` in finally block (even on error)
 
 **Dual-layer suppression**:
@@ -62,10 +62,10 @@ useEffect(() => {
   })
 
   // Listen for changes and deletion
-  const unsubscribeChanged = window.api.fileWatch.onFileChanged((data) => {
+  const unsubscribeChanged = fileWatchGateway.onFileChanged((data) => {
     if (data.filePath === filePath) handleExternalChange()
   })
-  const unsubscribeDeleted = window.api.fileWatch.onFileDeleted((data) => {
+  const unsubscribeDeleted = fileWatchGateway.onFileDeleted((data) => {
     if (data.filePath === filePath) setIsFileDeleted(true)
   })
 
@@ -96,15 +96,15 @@ Effect:
 - Eliminates UI updates from old watchers after `stopAll()` and project change
 - Prevents flicker and tree corruption during rapid switches
 
-### Auto‑Restore Watcher Boundaries
+### Watcher boundaries follow the open project
 
-On app launch, when restoring the last project:
+Erfana does not reopen the last project at launch (#60 – a crash caused by a project must not repeat on relaunch). Whenever the open-project session changes, `ProjectService.updateServices(root)` points all three services at the new root:
 
-- `fileService.setProjectPath(lastPath)`
-- `fileWatcherService.setProjectPath(lastPath)`
-- `directoryWatcherService.setProjectPath(lastPath)`
+- `fileService.setProjectPath(root)`
+- `fileWatcherService.setProjectPath(root)`
+- `directoryWatcherService.setProjectPath(root)`
 
-This ensures watcher boundary checks ("inside project root") are correct immediately after auto‑restore.
+This keeps the watcher boundary checks ("inside project root") in step with the project that is open; `''` means no project.
 
 ### Expanded State Preservation Pattern
 
@@ -174,7 +174,7 @@ echo "# New File" > /path/to/project/new-file.md
 
 # Expected:
 # - File appears in tree automatically
-# - Within 500ms (75ms ThrottledWorker collection delay)
+# - After the 75 ms ThrottledWorker collection window and the renderer's 250 ms debounce
 # - No manual refresh needed
 ```
 
@@ -197,14 +197,14 @@ mkdir /path/to/project/folder-D
 git checkout feature-branch
 
 # Expected:
-# - Tree refreshes once after all changes settle (~1 second)
+# - Tree refreshes once after changes settle (250 ms debounce; a steady stream is held back at most about 1 s – DIRECTORY_WATCHER.MAX_WAIT)
 # - Expanded folders remain expanded
 # - Console log: "📁 Directory changed, refreshing project tree... (X events)"
 ```
 
 **Test 8: Internal CRUD (no double refresh)**
 ```typescript
-// 1. Open the main-process log (Help → Open logs folder)
+// 1. Open the main-process log (Settings → Logging → Logs folder → Open)
 // 2. Create file via Erfana's "New File" button
 // 3. Check the log
 
@@ -253,17 +253,17 @@ Key test files:
 - `ProjectService.switching.test.ts` – project switching orchestration (AC-009/014)
 - `useGitStatus.test.ts` – visibility gating and cooldowns (5 of the file's 39 tests, counted 2026-10-25, AC-012)
 
-Single-flight tree refresh ([#208](https://github.com/qodeca/erfana/issues/208), see [Technical Details § Tree refresh is single-flight](./technical-details.md#tree-refresh-is-single-flight-208)) – 53 tests in five new files, plus `isTreeReadCurrent` cases added to `useProjectManagement.logic.test.ts`. All drive reads with deferred promises and microtask flushing; fake timers appear only where a timer is the subject, and fake only the timer pair involved:
+Single-flight tree refresh ([#208](https://github.com/qodeca/erfana/issues/208), see [Technical Details § Tree refresh is single-flight](./technical-details.md#tree-refresh-is-single-flight-208)) – five new files (test counts below re-counted 2026-10-29), plus `isTreeReadCurrent` cases added to `useProjectManagement.logic.test.ts`. All drive reads with deferred promises and microtask flushing; fake timers appear only where a timer is the subject, and fake only the timer pair involved:
 - `src/shared/coalescingRunner.test.ts` – the runner's state machine: trailing run, latest task wins, never two at once, re-entrancy, per-run errors, `onIdle` ordering (12 tests; runs in the main vitest project)
 - `src/main/services/FileService.readDirectory.singleFlight.test.ts` – one walk per path, one follow-up walk for N callers, key normalisation without case folding, hidden-pattern snapshot, the five `readDirectory` log lines, and the 60 s slow-walk warning (14 tests, AC2/AC3/AC6). Split from the main `FileService` suite because its mocks hoist to module scope
-- `src/renderer/src/hooks/useProjectManagement.refreshSingleFlight.test.ts` – one refresh read per scope, stale-result dropping after a newer read, a switch, a close or from a stale caller, spinner and toast ownership, the never-rejects contract (19 tests, AC2/AC3/AC4/AC6)
+- `src/renderer/src/hooks/useProjectManagement.refreshSingleFlight.test.ts` – one refresh read per scope, stale-result dropping after a newer read, a switch, a close or from a stale caller, spinner and toast ownership, the never-rejects contract (21 tests, AC2/AC3/AC4/AC6)
 - `src/main/utils/processMemorySnapshot.test.ts` – MB rounding, per-process working sets, one failing source never hides the other (5 tests, AC5)
-- `src/main/services/DirectoryWatcherService.health.test.ts` – the 120 s health line at `info` (`warn` when stressed) with the memory fields, and silence after `stopAll()` (3 tests, AC5). Split from `DirectoryWatcherService.test.ts`, which fakes only the timeout pair on purpose
+- `src/main/services/DirectoryWatcherService.health.test.ts` – the 120 s health line at `info` (`warn` when stressed) with the memory fields, and silence after `stopAll()` (6 tests, AC5; later additions cover the #211 health fields). Split from `DirectoryWatcherService.test.ts`, which fakes only the timeout pair on purpose
 
 Catch-up after a pause ([#210](https://github.com/qodeca/erfana/issues/210)):
-- `src/main/services/watcher/PauseEpisode.test.ts` – the pure episode: `change` never counts, a completed owner read covers earlier drops, a failed read or a drop after the read began stays uncovered, another window's read covers nothing, kind-matched own-change filtering (subtree vs exact, `copied-2` is not inside `copied`), the 256-record cap (10 tests; paths built with `path.join`, so they hold on Windows)
+- `src/main/services/watcher/PauseEpisode.test.ts` – the pure episode: `change` never counts, a completed owner read covers earlier drops, a failed read or a drop after the read began stays uncovered, another window's read covers nothing, kind-matched own-change filtering (subtree vs exact, `copied-2` is not inside `copied`), the 256-record cap (27 tests, including the later `recordUnknownDrop` and #252 removal cases; paths built with `path.join`, so they hold on Windows)
 - `DirectoryWatcherService.pipeline.test.ts` › `#210 catch-up after a pause` – the service end to end: exactly one `catchUp: true` send, which reads cover (subfolder, other window, trailing separator), own change filtered, safety timeout, nested pauses (9 tests)
-- `file-handlers.test.ts` › `#210 watcher catch-up hooks` – `beginTreeRead` before the walk and a commit only on success; each mutation channel records its change on success only (18 tests). Renderer: one catch-up case each in `useDirectoryWatcher.test.ts`, `useDirectoryWatcher.logic.test.ts` and `withWatcherPause.test.ts`
+- `file-handlers.test.ts` › `#210 watcher catch-up hooks` – `beginTreeRead` before the walk and a commit only on success; each mutation channel records its change on success only (20 tests). Renderer: one catch-up case each in `useDirectoryWatcher.test.ts`, `useDirectoryWatcher.logic.test.ts` and `withWatcherPause.test.ts`
 
 ### Large projects on Windows (#211)
 

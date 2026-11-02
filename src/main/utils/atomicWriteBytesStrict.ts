@@ -21,7 +21,8 @@
  *    temp sweep ignore that prefix), with the original mode bits, and fsync.
  *    On Windows the target's `Zone.Identifier` stream (the mark of the web)
  *    is copied onto it, best effort, so a downloaded page keeps its mark.
- * 3. Re-read the target – `O_NOFOLLOW` open, regular file, the opened inode
+ * 3. Ask the caller's `beforeRename` veto, when given (a slow answer must not
+ *    widen the gap below). Then re-read the target – `O_NOFOLLOW` open, regular file, the opened inode
  *    equal to the name's, no other hard links – and require the very file the
  *    caller read (its dev/ino) holding the very bytes (SHA-256). Anything else
  *    is `changed`: the caller re-reads and decides again.
@@ -75,6 +76,8 @@ export type StrictWriteFailure =
   | 'busy'
   /** Any other I/O error. */
   | 'io'
+  /** The caller's {@link StrictWriteOptions.beforeRename} check said no, right before the rename. */
+  | 'vetoed'
 
 /** A strict write that wrote nothing, and why. */
 export interface StrictWriteRefusal {
@@ -116,6 +119,15 @@ export interface StrictWriteOptions {
   readonly maxBytes: number
   /** `process.platform`; a test sets `win32` to run the Windows steps on any host. */
   readonly platform?: NodeJS.Platform
+  /**
+   * The caller's last check, run once the temp file is written and BEFORE
+   * the target is re-read and verified (step 3), so however long it takes,
+   * the byte and identity re-check stays the last step before the rename;
+   * `false` writes nothing (`vetoed`). A comment write asks again whether an
+   * editor now holds unsaved changes for the file (spec 024 § 8 C6). Absent:
+   * no check.
+   */
+  readonly beforeRename?: () => Promise<boolean>
 }
 
 /** Why a no-follow read returned no bytes. */
@@ -393,14 +405,19 @@ export async function atomicWriteBytesStrict(
     }
     if (platform === 'win32') await copyZoneIdentifier(target, tempPath)
     step = 'verify'
-    const changed =
-      (await verifyUnchanged(target, options)) ?? (await folderMoved(target, options.expectedDir))
-    if (changed === null) {
-      step = 'rename'
-      await renameWithRetry(tempPath, target)
-      return { ok: true, path: target }
+    // The caller's veto first, so the byte and identity re-check stays the last step before the rename
+    if (options.beforeRename !== undefined && !(await options.beforeRename())) {
+      refusal = { ok: false, reason: 'vetoed' }
+    } else {
+      const changed =
+        (await verifyUnchanged(target, options)) ?? (await folderMoved(target, options.expectedDir))
+      if (changed === null) {
+        step = 'rename'
+        await renameWithRetry(tempPath, target)
+        return { ok: true, path: target }
+      }
+      refusal = changed
     }
-    refusal = changed
   } catch (error) {
     refusal = stepFailure(step, error)
   }

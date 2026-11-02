@@ -1,3 +1,5 @@
+> **Status:** proposal, not shipped – none of the graph-engine files named on this page exist in `src/` on `develop`; see the warning in the [implementation guide](./README.md).
+
 #### 1.6 Related Sidebar UI
 
 **File:** `src/renderer/src/components/Panels/RelatedSidebar.tsx`

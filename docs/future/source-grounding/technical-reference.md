@@ -96,9 +96,9 @@ Input document types:
 |-----------|------------|-------------|
 | LLM | Claude Code (via Anthropic) | Ollama for offline use |
 | Embeddings | bge-small-en-v1.5 (ONNX) | nomic-embed-text-v1.5, all-MiniLM-L6-v2 |
-| Vector DB | SQLite + sqlite-vec (erfana native) | ChromaDB, pgvector |
-| Full-text search | SQLite FTS5 (erfana native) | – |
-| Document parsing | PyMuPDF + LiteParse (erfana planned) | Unstructured |
+| Vector DB | SQLite + sqlite-vec (planned in Graph Engine M2, not in erfana today) | ChromaDB, pgvector |
+| Full-text search | SQLite FTS5 (planned in Graph Engine M1, not in erfana today) | – |
+| Document parsing | LiteParse (shipped in erfana's import system) + PyMuPDF (not used) | Unstructured |
 | Frontend | Erfana (already built) | – |
 
 ---

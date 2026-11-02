@@ -441,6 +441,9 @@ describe('design folder hygiene', () => {
       'docs/design-system/system/patterns/states/states.css',
       'docs/design-system/system/components/feedback/feedback.css',
       'docs/design-system/system/components/form/form.css',
+      'docs/design-system/system/components/origin-field/origin-field.css',
+      'docs/design-system/system/patterns/picker/picker.css',
+      'docs/design-system/system/patterns/site-prompts/site-prompts.css',
       'docs/design-system/system/components/segmented/segmented.css',
       'docs/design-system/system/components/status-bar/status-bar.css',
       'docs/design-system/system/patterns/drawer/drawer.css'

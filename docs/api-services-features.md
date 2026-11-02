@@ -43,7 +43,7 @@ Implements `IGitStatusWorker` by spawning a `worker_threads` Worker running `git
 
 ### Native git binary resolution
 
-`git-status.worker.ts` resolves the native git binary via a platform-aware allowlist before falling back to `where git` / `which git`. On Windows, `fs.access(X_OK)` is existence-only (no POSIX execute-bit), so each allowlist candidate is additionally verified via a `git --version` liveness probe to reject truncated or renamed files. POSIX retains full `X_OK` semantics and skips the liveness probe.
+`git-status.worker.ts` resolves the native git binary through `resolveGitBinary()` in `src/main/utils/hardenedGit.ts`: a platform-aware allowlist first, then the absolute finder (`%SystemRoot%\System32\where.exe` on Windows, `/usr/bin/which` elsewhere), accepting only an absolute hit. On Windows, `fs.access(X_OK)` is existence-only (no POSIX execute-bit), so each allowlist candidate is additionally verified via a `git --version` liveness probe to reject truncated or renamed files. POSIX retains full `X_OK` semantics and skips the liveness probe.
 
 **Windows probe order (#160):** `C:\Program Files\Git\cmd\git.exe` → `…\bin\git.exe` → `C:\Program Files (x86)\Git\cmd\git.exe` → `…\bin\git.exe` → `C:\ProgramData\chocolatey\bin\git.exe` → `%USERPROFILE%\scoop\apps\git\current\cmd\git.exe`.
 
@@ -112,7 +112,7 @@ File-based project locking for multi-instance support.
 
 ### Key Features
 - Multiple independent Erfana instances can run simultaneously
-- File-based locks in `~/.erfana/locks/` (SHA-256 hashed filenames)
+- File-based locks in `<userData>/locks/` (Electron's `app.getPath('userData')`; SHA-256 hashed filenames)
 - Atomic lock creation with O_EXCL flag (prevents race conditions)
 - Hybrid stale detection: PID check (same host) + 60-min timeout (cross-host)
 - Focus request polling for cross-instance window coordination
@@ -147,7 +147,7 @@ Request focus from the lock holder (triggers window focus via polling).
 Cleanup stale locks from dead processes or timed-out network locks.
 
 #### Also public
-- `getLocksDirectory(): string` – Resolved `~/.erfana/locks/` path
+- `getLocksDirectory(): string` – Resolved `<userData>/locks/` path
 - `computeLockHash(projectPath: string): Promise<string>` – SHA-256 lock filename derivation
 - `dispose(): Promise<void>` – Stop heartbeats/polling and release held locks on shutdown
 
@@ -248,7 +248,7 @@ Handles external file operations for Spec #012 (external file drop to project tr
 - Path traversal protection (sanitizes dangerous patterns from filenames)
 - Copy, move and batch move from external locations into the project
 - **A move asks first** (v0.22.0): the original is deleted only after the user answers Move in a native box, modal to the window that owns the project (`ExternalMoveConfirmer.ts`). The box names each file and its folder (home-relative), never a full path; at most ten files per box, and a batch's boxes are one decision – Cancel, or a box that cannot be shown, moves none of them. After the answer the source and target are checked again, and the original is removed only if it is still the entry the box showed
-- Files picked in the Add files dialog are recorded per window with their on-disk identity (`ExternalSourceGrants.ts`), so a move can name the whole pick in one box. A record is used once, lapses after a few minutes and is not consent on its own
+- Files picked in the Add files dialog are recorded per window with their on-disk identity (`ExternalSourceGrants.ts`), so a move can name the whole pick in one box. A record is used once, lapses after ten minutes (`SOURCE_GRANT_TTL_MS`) and is not consent on its own
 - A symbolic link can be copied but not moved; a source already inside the project is refused (move it from the project tree)
 - Conflict resolution (replace or auto-number)
 
@@ -303,7 +303,7 @@ Audio-to-text transcription using the OpenAI API. Handles chunking for long file
 ### Public Methods
 
 #### `transcribe(filePath, language, onProgress, signal?): Promise<TranscriptionResult>`
-Transcribe audio to text. Accepts MP3/WAV/M4A/OGG/FLAC, language code or `'auto'`, progress callback, optional AbortSignal. Returns `{ success, transcript, duration, language, error?, errorCode? }`.
+Transcribe audio to text. Accepts MP3/WAV/M4A/OGG/FLAC, language code or `'auto'`, progress callback, optional AbortSignal. Returns `{ success, transcript?, duration?, language?, error?, errorCode? }`.
 
 ### Related Files
 - `src/main/ipc/transcription-handlers.ts` – IPC handlers (import, cancel, validate, API key CRUD)
@@ -366,7 +366,7 @@ Local audio transcription via whisper.cpp child process. Offline, no API depende
 - `validateAudioPath(filePath)` returns canonical realpath; `checkCpuSupport()` returns `{ok} | {ok:false, reason}` memoised; `__resetCpuProbeForTests()` test hook.
 
 ### Public method
-`transcribe({ filePath, language, model, signal?, onProgress? }): Promise<TranscriptionResult>` — returns `{ success, transcript, duration, language, error?, errorCode? }`.
+`transcribe({ filePath, language, model, signal?, onProgress? }): Promise<TranscriptionResult>` — returns `{ success, transcript?, duration?, language?, error?, errorCode? }`.
 
 ### Related files
 - `WhisperModelManager.ts` (install + verify), `transcription-handlers.ts` (backend routing), `whisper-assets.ts` (pinned release), `whisper-pubkeys.ts` (trust keys).
@@ -381,7 +381,7 @@ Local audio transcription via whisper.cpp child process. Offline, no API depende
 Manages API key encryption/decryption using Electron's safeStorage API. Service-agnostic design supports multiple API providers.
 
 ### Key Features
-- Platform-native encryption via `safeStorage.encryptString()`
+- Platform-native encryption via `safeStorage.encryptStringAsync()`
 - **Never writes plaintext** (v0.22.0): when the system cannot encrypt (for example Linux without a keyring), `storeKey` throws `ApiKeyEncryptionUnavailableError` and the Settings screen says the key was not saved. A plaintext key file left by an older version is still read
 - Keys stored as binary files in `~/.erfana/{serviceName}-api-key.enc`
 - Path traversal protection (validates service name format: `[a-z0-9-]+`)
@@ -546,7 +546,7 @@ Central Strategy-pattern registry mapping file extensions to `IConverter` implem
 - `isSupported(extension: string): boolean`
 - `getSupportedExtensions(): string[]` / `getExtensionsByConversionType()` / `getCategories(): FileTypeCategory[]`
 - `mightBeTextFile(extension: string): boolean`
-- `updateConverterExtensions(category: FileTypeCategory, extensions: string[]): void` – Two-phase registration hook consumed by `DependencyDetector`; remembers the converter an extension was taken from
+- `updateConverterExtensions(category: FileTypeCategory, extensions: string[]): void` – Two-phase registration hook called by `ImportToolStatusService` with the `DependencyDetector` result; remembers the converter an extension was taken from
 - `removeConverterExtensions(category: FileTypeCategory, extensions: readonly string[]): void` – The reverse, for a tool that is no longer found (#250); never removes a converter's native extensions
 
 Exports both the class and a shared `converterRegistry` singleton.
@@ -617,7 +617,23 @@ Export HTML content to DOCX. As with PDF, `fileName` is a suggested name run thr
 
 ## HTML preview (#74)
 
-The sandboxed HTML-preview subsystem is a service *family* under `src/main/services/preview/` (WebContentsView lifecycle, `erfana-preview://` protocol handler, request/host filter, per-project allowlist store, sealed session, watch pool, PDF/find controllers; since #124 also same-tab navigation with its own Back/Forward history – `previewPageNavigator`, `previewTabHistory` – the frame guard `previewFrameGuard`, the window-edge resize hold `previewResizeHold` and keyboard focus return `previewHostFocus`; since v0.23.0 also HTML Preview comments under `services/preview/comments/` – the per-view façade `PreviewCommentService` (built by `previewLiveComments`), the single disk write path `CommentWriter` with its per-file lock `commentFileLock`, the comment parse worker `CommentParseWorkerAdapter` / `commentParseWorker` that runs the `commentFileJobs` and the instrumentation of served pages (`commentInstrumentation`, `ElementTokenTable`), and the main-minted draft and comment keys `commentKeyStore` – plus the link-scan worker `PreviewLinkScanWorkerAdapter` / `previewLinkScanWorker`, which scans each loaded page for the files auto-refresh watches off the main thread), not a single service, so it is documented in its own doc rather than duplicated here. For the full write-up see [HTML preview](./html-preview/README.md); for the per-service catalogue see [`src/main/services/CLAUDE.md`](../src/main/services/CLAUDE.md) § "HTML preview (#74)". IPC surface: [IPC patterns § HTML preview](./ipc-patterns.md#html-preview-preview-handlersts-constants-in-preview-channelsts-74).
+The sandboxed HTML-preview subsystem is a service *family* under `src/main/services/preview/` (WebContentsView lifecycle, `erfana-preview://` protocol handler, request/host filter, per-project allowlist store, sealed session, watch pool, PDF/find controllers; since #124 also same-tab navigation with its own Back/Forward history – `previewPageNavigator`, `previewTabHistory` – the frame guard `previewFrameGuard`, the window-edge resize hold `previewResizeHold` and keyboard focus return `previewHostFocus`; since v0.23.0 also HTML Preview comments under `services/preview/comments/` – the per-view façade `PreviewCommentService` (built by `previewLiveComments`) and the instrumentation of served pages (`commentInstrumentation`, `ElementTokenTable`); since spec 024 the parts both previews share live in `services/comments/` (see [Comments – the shared base](#comments--the-shared-base-spec-024) below) – plus the link-scan worker `PreviewLinkScanWorkerAdapter` / `previewLinkScanWorker`, which scans each loaded page for the files auto-refresh watches off the main thread), not a single service, so it is documented in its own doc rather than duplicated here. For the full write-up see [HTML preview](./html-preview/README.md); for the per-service catalogue see [`src/main/services/CLAUDE.md`](../src/main/services/CLAUDE.md) § "HTML preview (#74)". IPC surface: [IPC patterns § HTML preview](./ipc-patterns.md#html-preview-preview-handlersts-constants-in-preview-channelsts-74).
+
+## Comments – the shared base (spec 024)
+
+Comments in the HTML Preview and the Markdown Preview run on one base, with the parts each file type forces kept apart. Design and module map: [spec 024 architecture note 001](../specs/spec-t3-024-unified-comments/architecture/001-shared-comment-base.md); threat model: [Security § Markdown Preview comments and the `file-comment:*` channels](./security.md#markdown-preview-comments-and-the-file-comment-channels).
+
+| Layer | Where | What it holds |
+|---|---|---|
+| Format core (pure) | `src/shared/comments/` | The `erfana:comment v1` format (`format`, `blocks`, `thread`, `identity`, `encoding`, `conflictMarkers`, `splice`, `reattach`, `anchorSel`), the `CommentFileKind` seam (`fileKind.ts`) and the HTML kind (`htmlKind.ts`, wrapping the parse5 parts that stay in `src/shared/htmlComments/`), and `overlayCore/` – pin layout, the select-or-pick gesture and the comment-mode state machine, pure and shared with the page preload ([ADR 0006](./adrs/0006-overlay-core-in-the-sealed-preload.md)) |
+| Markdown kind | `src/shared/markdownComments/`, `src/shared/markdown/previewPipeline.ts` | Index, slots, anchor, the render check and the limits checked before any parse; one Markdown pipeline for the preview and main's render check |
+| Main process | `src/main/services/comments/` | `CommentWriter` – the one disk write path for every kind – with `commentFileLock`, `commentFileAccess` and `commentPathConfine`; the kind registry `commentFileKinds`; the comment parse worker (`CommentParseWorkerAdapter`, `commentParseWorker`, `kindCommentJobs`, Markdown jobs in `markdown/`); `commentKeyStore` (main-minted draft tokens and keys); `commentUnsavedSources`; and `FileCommentService` with `fileCommentPanels` and `fileCommentWatches` for previews the renderer draws |
+| IPC | `src/main/ipc/comments/` | `file-comment-handlers.ts` (the `file-comment:*` channels) and `file-comments.ts` (the composition root and per-kind Settings) – [IPC patterns § File comments](./ipc-patterns.md#file-comments-commentsfile-comment-handlersts-constants-in-file-comment-channelsts-spec-024) |
+| Renderer | `src/renderer/src/components/Comments/` | The comment window, drawer, toolbar tools, identity step and every string (`commentCopy`, `commentCopyWords`); `overlay/` is the renderer overlay host – outline, pins, underlines, keyboard picker and selection button – driven by a `PreviewCommentAdapter`. The Markdown Preview's adapter and band are in `Editor/markdownComments/`; its bridge is reached only through `services/comments/fileCommentGateway.ts` |
+
+The HTML-only parts stay where they were: `services/preview/comments/` (per-view tokens, frames, served bytes, page signals, drafts from a page token, selected words and spoken excerpts read from main's own parse), `src/preload/previewPageComments/` (the overlay inside the sealed page) and `HtmlPreviewPanel/comments/` (the panel's comment layer and hooks).
+
+**Adding a file kind.** A later text-file preview with `<!-- -->` comments supplies a `CommentFileKind` (registered in `commentFileKinds.ts`), a `PreviewCommentAdapter` and a row in `KIND_SETTINGS` (`src/main/ipc/comments/file-comments.ts`); without that row its comments are off. The `.txt` conformance kind under `src/shared/comments/__conformance__/txt/` proves the seam in tests and is never registered in production.
 
 ## BrowserLaunchService
 
@@ -694,7 +710,7 @@ PNG / PDF / clipboard export for the image a viewer tab is showing (#73). The wh
 
 ### Related files
 - `src/main/ipc/image-export-handlers.ts` – the single `image-export:run` handler
-- `src/renderer/imageExport.html` + `src/preload/imageExport.ts` + `src/renderer/src/imageExport/harness.ts` – the harness's own entry, preload and page. The preload exposes four verbs and deliberately **not** `imageExport.run`
+- `src/renderer/imageExport.html` + `src/preload/imageExport.ts` + `src/renderer/src/imageExport/harness.ts` – the harness's own entry, preload and page. The preload exposes three verbs (`ready`, `onRender`, `postResult`) and deliberately **not** `imageExport.run`
 - `src/renderer/src/components/Panels/ImageViewerPanel/hooks/useImageExportHandlers.ts` – the renderer side; see [UI components § Image Viewer Panel](./ui-components.md#image-viewer-panel)
 
 ---

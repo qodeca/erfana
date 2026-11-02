@@ -30,7 +30,7 @@ One addition to the public format serves both previews: an optional `anchor.sel`
 | S2 | The words are stored as `anchor.sel = { exact, prefix, suffix }`: normalised as quotes are today (whitespace collapsed, trimmed, NFC), `exact` 1–200 characters, `prefix` and `suffix` up to 32. A longer selection is cut at 200 and the window says so. |
 | S3 | The words never decide the target. If they cannot be found any more, the comment stays on its element or block, keeps its pin, loses its underline, and shows "The selected text changed". It is not "needs attention". |
 | S4 | **Three ways in, same in both previews.** (a) Comment mode: drag selects text instead of picking; right-click or ⇧F10 / Shift+F10 then offers **Add comment** (on the words) and **Comment on whole {label}**. (b) Select first, then turn on comment mode (toggle or ⌥⌘M / Ctrl+Alt+M): the new-comment window opens on the selection at once. (c) Markdown only: right-click a selection outside comment mode (the existing menu). |
-| S5 | HTML: the selected words come from untrusted page text. Main accepts `sel` only when its `exact` text occurs in the target element's **source** text (the parse5 `visibleText` that `quoteOf` already uses), with prefix and suffix corroborating when the text occurs more than once. Otherwise the window offers **Comment on the whole element instead**. A script-built target (no token of its own) cannot be verified; it accepts `sel` exactly as it accepts today's `runtime.quote`, and the window says "Added by a script". |
+| S5 | HTML: the selected words come from untrusted page text. Main accepts `sel` only when its `exact` text occurs in the target element's **source** text (the parse5 `visibleText` that `quoteOf` already uses), with prefix and suffix corroborating when the text occurs more than once. Otherwise the window offers **Comment on the whole section instead**. A script-built target (no token of its own) cannot be verified; it accepts `sel` exactly as it accepts today's `runtime.quote`, and the window says "Added by a script". |
 | S6 | A selection never spans two frames (each frame has its own Selection). A selection that crosses a frame boundary is cut to the frame where it started (inferred browser behaviour; checked in P0). |
 | S7 | The underline is never the only cue: the pin and the drawer row carry the same thread. Resolved threads and "pins hidden" draw no underline. Find, export and copy never include it. |
 | S8 | Keyboard: element and block picking stays the complete keyboard route (HTML §10.8). Keyboard text selection works only where the page has a caret (Shift+arrows in editable or caret-browsing content); this is a known limit, not a gap in the guaranteed route. |
@@ -98,7 +98,7 @@ The same function runs in main against the source text for verification (§5.4),
 |---|---|
 | Comment mode, a selection | **Add comment** (`message-square-plus`, on the words) · **Comment on whole {label}** (`square-dashed`) |
 | Comment mode, no selection | **Add comment** (unchanged) |
-| Selection that cannot be commented (refused frame, `srcdoc`, read-only file) | **Add comment** disabled, "Can't comment here", the reason on the [Menu](../../design-system/system/components/menu/index.html#reason) card's visible reason line (decided), tied by `aria-describedby` – never a tooltip (unchanged wording; see [markdown-preview-comments.md](markdown-preview-comments.md) §9.3) |
+| Selection that cannot be commented (refused frame, `srcdoc`, read-only file) | **Comment on selection** and **Comment on the whole {kind}** disabled with their names kept (spec 024 menu matrix M-06, M-08, M-16), the reason on the [Menu](../../design-system/system/components/menu/index.html#reason) card's visible reason line (decided), tied by `aria-describedby` – never a tooltip (see [markdown-preview-comments.md](markdown-preview-comments.md) §9.3) |
 
 Menu label: "Selection" when a selection exists, "Element" otherwise.
 
@@ -118,7 +118,7 @@ sel?: { exact: string 1–200, prefix: string ≤ 32, suffix: string ≤ 32 }
 
 In `commentDraftCore.ts`, after the existing token, tag and file-hash checks:
 
-1. In-file target: run §4 against the element's source `visibleText` from the parse5 index. Exactly one match → accept `sel`. No match or a tie → drop `sel` and return `selRefused: 'not-in-file'`. The window then shows "This text isn't in {file} as written – a script may have changed it." with **Comment on the whole element instead**.
+1. In-file target: run §4 against the element's source `visibleText` from the parse5 index. Exactly one match → accept `sel`. No match or a tie → drop `sel` and return `selRefused: 'not-in-file'`. The window then shows "This text isn't in {file} as written – a script may have changed it." with **Comment on the whole section instead**.
 2. Script-built target: no source text exists. Accept `sel` within the schema limits, as `runtime.quote` is accepted today (a known, documented trust level – HTML §19 Rev 3).
 3. Text with bidi or zero-width controls: kept, and shown as visible tokens in the window (existing threat S18 rule).
 
@@ -158,7 +158,7 @@ Everything in [markdown-preview-comments.md](markdown-preview-comments.md) stays
 ### 7.1 Comment window
 
 - Context line as today (`{label} · {file}, line {n}`), then the selected words in a quote box: serif for Markdown (the document's font), the system sans for HTML (the page's font is unknown), left accent rule.
-- Over 200 characters: cut with "…" and "Only the first 200 characters are kept."
+- Over 200 characters: cut with "…" and "Erfana keeps only the first 200 characters of your selection."
 - Thread view: the quote box sits under the context line for the whole window; every thread on the element that has its own `sel` shows its words above its first message.
 - Text no longer found: info banner "The selected text changed. The comment is still on this {element|kind}." with the stored words struck through (the existing `.erf-comment-quote` look). Banners are the [Feedback](../../design-system/system/components/feedback/index.html) card's boxed `.erf-banner`, starting with a visually hidden "Note: " or "Warning: "; the action is `erf-button--secondary erf-button--sm`. The shipped `CommentBanner` has no spoken severity word yet (Feedback card's open defect).
 
@@ -172,9 +172,9 @@ Rows of selection comments start their excerpt with the words in quotes: `"ship 
 |---|---|
 | Menu (selection) | "Add comment" · "Comment on whole {label}" · menu label "Selection" |
 | Outline label | "{label} · selection" |
-| Window, long selection | "Only the first 200 characters are kept." |
-| Window, refused (HTML) | "This text isn't in {file} as written – a script may have changed it." · button "Comment on the whole element instead" |
-| Window, script-built (HTML) | "Added by a script – saved before <{ancestor}>." (existing) |
+| Window, long selection | "Erfana keeps only the first 200 characters of your selection." |
+| Window, refused (HTML) | "This text isn't in {file} as written – a script may have changed it." · button "Comment on the whole section instead" |
+| Window, script-built (HTML) | "This part is created by a script, so the comment is saved near it in the file." (existing) |
 | Text gone | "The selected text changed. The comment is still on this element." / "… on this {kind}." (Markdown kind noun – Writing card) |
 | Drawer tag | "Text changed" |
 | Announce | "Text selected in {label}. Press {menu key} to comment." – the key from `formatShortcut`: "⇧F10" on macOS, "Shift+F10" on Windows and Linux · "Comment mode on. Commenting on the selected text." |
@@ -199,7 +199,7 @@ As both existing designs. Additions: the selected words are read as part of the 
 | R-S02 | Preload | Underline boxes per line of a wrapped selection; rebuilt after a DOM change; none for resolved threads or with pins hidden |
 | E-S01 | e2e HTML | Comment mode → drag → ⇧F10 / Shift+F10 → Add comment → save → underline + pin → reopen shows the words |
 | E-S02 | e2e HTML | Select with the mode off → ⌥⌘M / Ctrl+Alt+M → window opens on the selection |
-| E-S03 | e2e HTML | Script rewrites the text → "not in file" → Comment on the whole element instead |
+| E-S03 | e2e HTML | Script rewrites the text → "not in file" → Comment on the whole section instead |
 | E-S04 | e2e both | Edit the words in the file → "Text changed", pin stays |
 | E-S05 | e2e both | Find in page never counts underline; PDF export contains none |
 | X-S01 | Agent check | Claude Code and Codex, "apply the review comments", on HTML and Markdown files with `sel` comments – they change those words, not the whole element |

@@ -20,6 +20,24 @@
   never decides a system rule itself; <em>decided</em> on a screen means approved for build. See
   <a href="README.md">README.md</a>.
 </p>
+<h2 id="browser">browser</h2>
+<table>
+<thead><tr><th>Screen</th><th>What it shows</th><th>Status</th><th>Reviewed</th></tr></thead>
+<tbody>
+  <tr><td><a href="browser/index.html">Built-in browser – screens</a></td><td>The six screens of spec 025&#x27;s browser tab, and where each surface is drawn</td><td><span class="ds-status" data-status="proposed">proposed</span></td><td class="ds-mono">not yet reviewed</td></tr>
+  <tr><td><a href="browser/menus-and-data.html">Menus and data</a></td><td>The page right-click menu, Clear browsing data and Forget, and the Linux keyring notices – one frame per state</td><td><span class="ds-status" data-status="proposed">proposed</span></td><td class="ds-mono">not yet reviewed</td></tr>
+  <tr><td><a href="browser/page-states.html">Page states</a></td><td>The load-error page with every error code, the certificate warning, and the crashed and hung tab – one frame per state</td><td><span class="ds-status" data-status="proposed">proposed</span></td><td class="ds-mono">not yet reviewed</td></tr>
+  <tr><td><a href="browser/picking.html">Picking</a></td><td>Pick overlay and label, pick-mode frame, banner and the “Page paused” chip – one frame per state</td><td><span class="ds-status" data-status="proposed">proposed</span></td><td class="ds-mono">not yet reviewed</td></tr>
+  <tr><td><a href="browser/prompt-actions.html">Prompt actions</a></td><td>The prompt-actions panel, the instruction dialog, the send notice, and the capture-failed and shell-guard messages – one frame per state</td><td><span class="ds-status" data-status="proposed">proposed</span></td><td class="ds-mono">not yet reviewed</td></tr>
+  <tr><td><a href="browser/site-prompts.html">Site prompts</a></td><td>Permission prompts and the in-use chip, full screen and pointer lock, the popup origin strip, downloads, the sign-in box and page dialogs – one frame per state</td><td><span class="ds-status" data-status="proposed">proposed</span></td><td class="ds-mono">not yet reviewed</td></tr>
+  <tr><td><a href="browser/tab-and-toolbar.html">Tab and toolbar</a></td><td>The editor tab, navigation row, origin field, suggestions, refused addresses, find, zoom, pop-ups, certificate sign, width presets, target chooser and the empty tab – one frame per state</td><td><span class="ds-status" data-status="proposed">proposed</span></td><td class="ds-mono">not yet reviewed</td></tr>
+</tbody>
+</table>
+<p class="ds-muted">Design notes</p>
+<ul>
+  <li><a href="browser/README.md"><code>browser/README.md</code></a></li>
+</ul>
+
 <h2 id="clipboard">clipboard</h2>
 <p class="ds-muted">Design notes</p>
 <ul>
@@ -35,12 +53,12 @@
   <tr><td><a href="comments/comments-v2/index.html">Comments v2 – overview</a></td><td>What v2 changes, which card draws each change, and the select → comment → step → resolve journey in both previews</td><td><span class="ds-status" data-status="proposed">proposed</span></td><td class="ds-mono">2026-10-28</td></tr>
   <tr><td><a href="comments/comments-v2/marks.html">Comments v2 – marks, icons and the chip</a></td><td>What a comment looks like on the content in both previews: the mark on every ground, changed words, linked hover, icon states and steps, the not-found ghost, the Comment chip and the label inside the outline</td><td><span class="ds-status" data-status="proposed">proposed</span></td><td class="ds-mono">2026-10-28</td></tr>
   <tr><td><a href="comments/comments-v2/menus-toolbar.html">Comments v2 – toolbars, menus, keyboard and bands</a></td><td>Toolbars in both previews with the on/off tools pressed, every right-click menu, Markdown keyboard picking, the non-modal window and the paused and review bands</td><td><span class="ds-status" data-status="proposed">proposed</span></td><td class="ds-mono">2026-10-28</td></tr>
-  <tr><td><a href="comments/comments-v2/window.html">Comments v2 – the comment window</a></td><td>Every v2 window state in both previews: quote, Narrow to words, stepper, Resolve and next, changed, not found, moved drafts, refusals, rebuild</td><td><span class="ds-status" data-status="proposed">proposed</span></td><td class="ds-mono">2026-10-28</td></tr>
+  <tr><td><a href="comments/comments-v2/window.html">Comments v2 – the comment window</a></td><td>Every v2 window state in both previews: quote, Comment on specific words, stepper, Resolve and next, changed, not found, moved drafts, refusals, rebuild</td><td><span class="ds-status" data-status="proposed">proposed</span></td><td class="ds-mono">2026-10-28</td></tr>
   <tr><td><a href="comments/html-comments/drawer.html">Comments drawer</a></td><td>Every comment in the page – Open, Resolved, Needs attention – and the keyboard route to all of them</td><td><span class="ds-status" data-status="decided">decided</span></td><td class="ds-mono">2026-10-26</td></tr>
   <tr><td><a href="comments/html-comments/identity.html">Who is commenting</a></td><td>The one-time privacy notice, the identity step inside the comment window, the inline Change, and Settings › Comments</td><td><span class="ds-status" data-status="decided">decided</span></td><td class="ds-mono">2026-10-26</td></tr>
   <tr><td><a href="comments/html-comments/index.html">Commenting on a page</a></td><td>The whole journey – pins, comment mode, right-click, the first comment, save, reopen – drawn as still frames</td><td><span class="ds-status" data-status="decided">decided</span></td><td class="ds-mono">2026-10-26</td></tr>
   <tr><td><a href="comments/html-comments/overlay.html">Comment overlay in the page</a></td><td>Hover outline, tag label, the speech-bubble pin and the comment-mode frame – drawn inside the page from resolved tokens</td><td><span class="ds-status" data-status="decided">decided</span></td><td class="ds-mono">2026-10-26</td></tr>
-  <tr><td><a href="comments/html-comments/toolbar.html">Comment tools in the toolbar</a></td><td>Comment mode, the comments list and pins on or off – every state, the unavailable reasons, and the re-measured narrow tiers</td><td><span class="ds-status" data-status="decided">decided</span></td><td class="ds-mono">2026-10-26</td></tr>
+  <tr><td><a href="comments/html-comments/toolbar.html">Comment tools in the toolbar</a></td><td>Comment mode and the comments list – every state, the unavailable reasons, and the re-measured narrow tiers</td><td><span class="ds-status" data-status="decided">decided</span></td><td class="ds-mono">2026-10-26</td></tr>
   <tr><td><a href="comments/html-comments/window.html">Comment window</a></td><td>New comment, threads, edit, delete, damaged, read-only, not found, not visible, saving and every save error</td><td><span class="ds-status" data-status="decided">decided</span></td><td class="ds-mono">2026-10-26</td></tr>
   <tr><td><a href="comments/markdown-comments/index.html">Commenting in the Markdown preview</a></td><td>The HTML Preview comment journey on a Markdown file – select text or pick a block, write, save, reopen</td><td><span class="ds-status" data-status="proposed">proposed</span></td><td class="ds-mono">2026-10-28</td></tr>
   <tr><td><a href="comments/markdown-comments/placement.html">Where a Markdown comment is written</a></td><td>The slot for each kind of block, and the three places that would change how the file renders</td><td><span class="ds-status" data-status="proposed">proposed</span></td><td class="ds-mono">2026-10-28</td></tr>
@@ -55,6 +73,7 @@
   <li><a href="comments/html-preview-comments.md"><code>comments/html-preview-comments.md</code></a></li>
   <li><a href="comments/markdown-preview-comments.md"><code>comments/markdown-preview-comments.md</code></a></li>
   <li><a href="comments/selection-comments.md"><code>comments/selection-comments.md</code></a></li>
+  <li><a href="comments/spike-outside-mode.md"><code>comments/spike-outside-mode.md</code></a></li>
 </ul>
 
 <h2 id="context-meter">context-meter</h2>

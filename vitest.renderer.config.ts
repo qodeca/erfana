@@ -72,39 +72,41 @@ export default defineConfig({
         // value measured when they landed (2026-10-26); never raise one above what
         // the Coverage job actually measures.
         // measured 100/96.87/96.25/99.09 (windowed list, 2026-10-26)
-        'src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentDrawer.tsx': { lines: 98, functions: 93, branches: 95, statements: 96 },
+        'src/renderer/src/components/Comments/CommentDrawer.tsx': { lines: 98, functions: 93, branches: 95, statements: 96 },
         // measured 100/100/100/100
-        'src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentParts.tsx': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/renderer/src/components/Comments/CommentParts.tsx': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/97.22/98.33 (lines/functions/branches/statements)
-        'src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentThread.tsx': { lines: 98, functions: 98, branches: 95, statements: 98 },
+        'src/renderer/src/components/Comments/CommentThread.tsx': { lines: 98, functions: 98, branches: 95, statements: 98 },
         // measured 100/100/96.29/100 – split out of CommentThread.tsx (max-lines)
-        'src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentMessage.tsx': { lines: 98, functions: 98, branches: 95, statements: 98 },
+        'src/renderer/src/components/Comments/CommentMessage.tsx': { lines: 98, functions: 98, branches: 95, statements: 98 },
         // measured 100/100/100/100
         'src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentLive.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // split from the commentLive.ts above (spec 024 § 8 C22); same floor
+        'src/renderer/src/components/Comments/commentLive.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
-        'src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentToolbarTools.tsx': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/renderer/src/components/Comments/CommentToolbarTools.tsx': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/95.83/100
-        'src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentWindow.tsx': { lines: 98, functions: 98, branches: 93, statements: 98 },
+        'src/renderer/src/components/Comments/CommentWindow.tsx': { lines: 98, functions: 98, branches: 93, statements: 98 },
         // measured 100/100/100/100
-        'src/renderer/src/components/Panels/HtmlPreviewPanel/comments/IdentityStep.tsx': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/renderer/src/components/Comments/IdentityStep.tsx': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/96.36/98.5
-        'src/renderer/src/components/Panels/HtmlPreviewPanel/comments/NewCommentView.tsx': { lines: 98, functions: 98, branches: 94, statements: 96 },
+        'src/renderer/src/components/Comments/NewCommentView.tsx': { lines: 98, functions: 98, branches: 94, statements: 96 },
         // measured 100/100/100/100
         'src/renderer/src/components/Panels/HtmlPreviewPanel/comments/PreviewCommentsLayer.tsx': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/97.22/98.07
-        'src/renderer/src/components/Panels/HtmlPreviewPanel/comments/ThreadsView.tsx': { lines: 98, functions: 98, branches: 95, statements: 96 },
+        'src/renderer/src/components/Comments/ThreadsView.tsx': { lines: 98, functions: 98, branches: 95, statements: 96 },
         // measured 100/96.07/91.22/98.86
         'src/renderer/src/components/Panels/HtmlPreviewPanel/comments/usePreviewComments.ts': { lines: 98, functions: 94, branches: 89, statements: 96 },
         // measured 100/100/100/100
-        'src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/renderer/src/components/Comments/commentCopy.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/95.16/100
-        'src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentFormat.ts': { lines: 98, functions: 98, branches: 93, statements: 98 },
+        'src/renderer/src/components/Comments/commentFormat.ts': { lines: 98, functions: 98, branches: 93, statements: 98 },
         // measured 100/100/100/100
-        'src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentPlacement.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/renderer/src/components/Comments/commentPlacement.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/89.65/100
-        'src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentRows.ts': { lines: 98, functions: 98, branches: 87, statements: 98 },
+        'src/renderer/src/components/Comments/commentRows.ts': { lines: 98, functions: 98, branches: 87, statements: 98 },
         // measured 100/100/93.1/100
-        'src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentSchemas.ts': { lines: 98, functions: 98, branches: 91, statements: 98 },
+        'src/renderer/src/components/Comments/commentSchemas.ts': { lines: 98, functions: 98, branches: 91, statements: 98 },
         // measured 100/100/92.1/98.03
         'src/renderer/src/components/Settings/sections/CommentsSection.tsx': { lines: 98, functions: 98, branches: 90, statements: 96 },
         // measured 100/100/100/100
@@ -129,6 +131,8 @@ export default defineConfig({
         '**/__test__/**',
         '**/__test-helpers__/**',
         '**/__fixtures__/**',
+        // Spec 024 shared test suites and test-only file kinds (overlay.suite.ts, the .txt preview).
+        '**/__conformance__/**',
         '**/__test-utils__/**',
         '**/test-utils/**',
         'src/renderer/src/utils/testHelpers.ts',

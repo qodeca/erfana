@@ -28,6 +28,8 @@
  * hashing prevents a global selector here from matching them at runtime.
  */
 .markdown-preview-content,
+.erf-comment-message__text,
+.erf-comment-words__text,
 .dialog-body,
 .dialog-title,
 .file-picker-filename,

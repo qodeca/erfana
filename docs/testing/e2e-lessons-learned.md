@@ -1,10 +1,10 @@
-# E2E Lessons Learned
+# E2E lessons learned
 
 Hard-won insights from implementing E2E testing for Electron apps with Playwright.
 
 **Related documentation**:
-- [E2E Testing Guide](./e2e-testing.md) - Main E2E documentation
-- [E2E Troubleshooting](./e2e-troubleshooting.md) - Common issues and fixes
+- [E2E Testing Guide](./e2e-testing.md) – Main E2E documentation
+- [E2E Troubleshooting](./e2e-troubleshooting.md) – Common issues and fixes
 
 ---
 
@@ -65,16 +65,14 @@ After clicking "Quit" in a dialog, the page becomes invalid. Any subsequent oper
 **Lesson**: Wrap post-close operations in try-catch. This error is success, not failure.
 
 ```typescript
-try {
-  // KNOWN_WAIT: Inter-dialog pause during quit – page may be destroyed
-  await page.waitForTimeout(300)
-} catch {
-  // Page closed - this is expected after quit
-  break
-}
+// From the quit loop in closeApp() (e2e/utils/helpers.ts)
+const clicked = await confirmBtn.elementHandle()
+await confirmBtn.click()
+// A destroyed page or a reused node ends the wait – both are fine here
+await clicked?.waitForElementState('hidden', { timeout: 1500 }).catch(() => undefined)
 ```
 
-> **Do not copy that `waitForTimeout` into a test.** The project rule is condition-based waits only – use a POM wait, `waitForIpcComplete`, or an auto-retrying `expect`. This snippet is the documented exception, quoted from the quit loop in `closeApp()` (`e2e/utils/helpers.ts`): it is a teardown path with no assertion, and the thing it waits on is the next dialog on a page that may already be destroyed, so there is no observable state left to poll. The exception mechanism is defined in [E2E Testing § Condition-based waits](./e2e-testing.md#condition-based-waits) – a genuinely necessary timeout carries a `// KNOWN_WAIT: <reason>` annotation, as it does in the source.
+> **No fixed sleep is needed even here.** The quit loop used to pause with `waitForTimeout(300)` between dialogs; it now waits for the clicked dialog to hide and swallows the error a destroyed page throws. The project rule is condition-based waits only – use a POM wait, `waitForIpcComplete`, or an auto-retrying `expect`. The exception mechanism is defined in [E2E Testing § Condition-based waits](./e2e-testing.md#condition-based-waits) – a genuinely necessary timeout carries a `// KNOWN_WAIT: <reason>` annotation, as the 100 ms log-flush pause before `electronApp.close()` in `closeApp()` does.
 
 ---
 
@@ -113,7 +111,7 @@ await page.reload()  // Too late - state was already loaded
 **Correct pattern**:
 ```typescript
 // Worker-scoped fixture creates isolated user data directory
-const userDataDir = await fs.promises.mkdtemp(path.join(e2eTempDir, `worker-${workerInfo.workerIndex}-`))
+const userDataDir = await fs.promises.mkdtemp(path.join(E2E_TEMP_DIR, `worker-${workerInfo.workerIndex}-`))
 
 // Pass to Electron launch - fresh localStorage before any code runs
 const app = await electron.launch({
@@ -129,7 +127,7 @@ const app = await electron.launch({
 
 During E2E teardown, `closeApp()` triggers `window.close()` which fires the BrowserWindow `close` event. If `webContents` is already destroyed (race with Playwright cleanup), calling `webContents.send()` throws an uncaught "Object has been destroyed" exception that shows a native error dialog and blocks the process.
 
-**Fix**: Add `if (mainWindow.webContents.isDestroyed()) return` guard before any `webContents.send()` in the close handler.
+**Fix**: the close handler in `src/main/index.ts` returns early when `isRendererGone(mainWindow)` is true – the window or its `webContents` is destroyed, or the renderer has crashed – before it calls `webContents.send('quit:requested', …)`.
 
 **Lesson**: Always check `webContents.isDestroyed()` before sending IPC in lifecycle handlers. Electron's close/destroy sequence has race conditions that E2E tests expose.
 
@@ -160,12 +158,12 @@ Two convergent patterns that surfaced while stabilizing a visual-regression flak
 
 **10a. Prefer deterministic fixture data over masking ephemeral content.**
 
-The `visualTestProject` fixture originally did `mkdtemp(path.join(tmp, 'visual-project-'))`, producing paths like `.e2e-temp/visual-project-kb339w`. The random suffix leaked into the project tree label, terminal title, and toast path — causing ~2 % pixel drift in the `(b) editor-loaded` snapshot.
+The `visualTestProject` fixture originally did `mkdtemp(path.join(tmp, 'visual-project-'))`, producing paths like `.e2e-temp/visual-project-kb339w`. The random suffix leaked into the project tree label, terminal title, and toast path – causing ~2 % pixel drift in the `(b) editor-loaded` snapshot.
 
 Fix: split into outer random parent + fixed inner leaf.
 
 ```ts
-const tmpParent = await fs.promises.mkdtemp(path.join(e2eTempDir, 'visual-'))
+const tmpParent = await fs.promises.mkdtemp(path.join(E2E_TEMP_DIR, 'visual-'))
 const projectPath = path.join(tmpParent, 'visual-project')   // deterministic leaf
 ```
 
@@ -176,18 +174,18 @@ Isolation preserved (outer parent unique per worker); visible labels stable. Mas
 `userEvent.type(input, 'test')` can drop the first keystroke under CPU contention if React hasn't finished settling the initial render. Two fixes compared:
 
 ```ts
-// Side-effect gate — works but fragile; depends on click dispatching focus
+// Side-effect gate – works but fragile; depends on click dispatching focus
 await user.click(input)
 await user.type(input, 'test')
 
-// Observable-state gate — deterministic; waits for the actual signal
+// Observable-state gate – deterministic; waits for the actual signal
 await waitFor(() => expect(document.activeElement).toBe(input))
 await user.type(input, 'test')
 ```
 
 The observable-state gate is strictly more robust: it waits for the specific DOM state the next line depends on, instead of relying on a side-effect chain. Same pattern applies to `toHaveFocus()` and any other "is the UI ready?" check.
 
-**Related**: mask specificity matters — pick the narrowest element that covers ephemeral content. In this codebase, `(b) editor-loaded` and `(c) terminal-open` now both mask `TERMINAL_INSTANCE` (xterm canvas only), not the full `TERMINAL_PANEL`, so panel-chrome regressions still register.
+**Related**: mask specificity matters – pick the narrowest element that covers ephemeral content. In this codebase, `(b) editor-loaded` and `(c) terminal-open` now both mask `TERMINAL_INSTANCE` (xterm canvas only), not the full `TERMINAL_PANEL`, so panel-chrome regressions still register.
 
 **Lesson**: flakes are usually a signal that the test is expressing *timing* instead of *causality*. Find the observable signal the test actually depends on and wait for that; remove ephemeral content at the source rather than papering over it with masks.
 
@@ -196,15 +194,15 @@ The observable-state gate is strictly more robust: it waits for the specific DOM
 ## 11. A `window` listener inside a dockview panel fires once per open panel
 
 Dockview keeps **every** opened panel mounted. A background tab is not a torn-down
-component — it is a live React tree with live effects and live global listeners.
+component – it is a live React tree with live effects and live global listeners.
 
 `MarkdownEditorPanel` mounts `useKeyboardShortcuts`, which registers on `window`.
 With N tabs open, that is N listeners, and one keypress was handled N times: a
 single `Cmd/Ctrl+W` closed every tab, and a single `Cmd/Ctrl+S` wrote every open
-buffer to disk — including files the user never chose to save.
+buffer to disk – including files the user never chose to save.
 
-**Lesson**: anything panel-scoped that reaches for a global — `window`
-listeners, `document` handlers, singleton stores keyed by "current" anything —
+**Lesson**: anything panel-scoped that reaches for a global – `window`
+listeners, `document` handlers, singleton stores keyed by "current" anything –
 needs an explicit active-panel gate. Wire it to the dockview panel API
 (`props.api.isActive`, kept in step via `onDidActiveChange`) and read the flag
 through a ref so toggling it never re-registers the listener.
@@ -226,7 +224,7 @@ compiles cleanly:
 
 React passes the synthetic mouse event as the first argument. That event became
 the file's new content, and the panel crashed on the next render with
-`content.split is not a function` — the whole renderer dropped to the
+`content.split is not a function` – the whole renderer dropped to the
 `RootErrorBoundary` recovery screen.
 
 **Lesson**: wrap the call at the JSX site (`onClick={() => onReload()}`) whenever
@@ -237,4 +235,4 @@ an argument of the wrong type rather than trusting its own signature.
 existing unit test used `toHaveBeenCalledOnce()` and never failed. Assert the
 **argument list** (`toHaveBeenCalledWith()`), and in an e2e test assert the app
 did not crash (`expect(byTestId(page, TEST_IDS.ROOT_ERROR_BOUNDARY)).toHaveCount(0)`)
-— otherwise a repeat reads as "wrong content" rather than "the app died".
+– otherwise a repeat reads as "wrong content" rather than "the app died".

@@ -17,13 +17,13 @@ In ten minutes you can open a folder, preview a Markdown file and use the termin
 
 ## Start and review an agent turn
 
-1. Open **Terminal** from the right activity bar; type the command for your installed CLI agent.
+1. The terminal opens with the project. If you closed it, select **Terminal** on the right activity bar. Type the command for your installed CLI agent.
 2. Ask the agent to make a small change to a file in this project.
-3. Review the changed source and preview. Erfana autosaves your editor changes, and external file changes appear in the open tab.
+3. Review the changed source and preview. Erfana autosaves your editor changes, and external file changes reload in the open tab. If the tab has unsaved edits, a "changed on disk" bar lets you choose instead.
 
 ![Screenshot of an agent edit appearing in the Markdown preview.](images/run-an-agent/edit-lands.png)
 
-The screenshot uses an isolated demo project and a real Claude Code session. Its capture-only edit approvals differ from a normal Claude Code session, which asks before editing by default.
+The screenshot uses an isolated demo project and a real Claude Code session. That demo project sets Claude Code to accept edits without asking, so no approval prompt appears in the screenshot.
 
 ## Choose what to do next
 

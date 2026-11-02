@@ -118,12 +118,17 @@ All IPC handler inputs are validated:
 
 ```typescript
 // file-watcher-handlers.ts
-ipcMain.handle('file-watch:start', async (event, filePath: string) => {
-  // Validate input
-  if (!filePath || typeof filePath !== 'string') {
-    return { success: false, error: 'Invalid file path' }
+registerHandle('file-watch:start', async (event, filePath: string) => {
+  try {
+    // Validate input
+    if (!filePath || typeof filePath !== 'string') {
+      throw new Error('Invalid file path')
+    }
+    await fileWatcherService.watchFile(filePath, event.sender)
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: getErrorMessage(error) } // logged first
   }
-  // ... proceed
 })
 ```
 

@@ -28,13 +28,71 @@ const appVersion: string = JSON.parse(
  * of values the second entry needs, or import it with `import type`, which is
  * erased and cannot create a chunk. See `src/preload/imageExport.ts`. Relaxing
  * this check is not a fix.
+ *
+ * It also keeps the shared overlay core (`src/shared/comments/overlayCore/`,
+ * spec 024, docs/adrs/0006-overlay-core-in-the-sealed-preload.md) in the
+ * sealed preview-page entry alone. The shared-chunk check above catches a
+ * second entry importing a core module the preview page imports too, but not
+ * one it imports alone (today `gesture.ts`), which Rollup inlines silently.
+ * The security control is the preload contract scan; this keeps the bundle
+ * honest about it.
+ *
+ * The other way round, every module the `previewPage` entry bundles must be
+ * the entry itself, its overlay folder or the overlay core: anything else
+ * reached the sealed page past the contract scan. Module ids are compared
+ * with `/` separators and lower-cased, so a drive letter's or folder's case on
+ * Windows cannot slip one past either check.
  */
+const OVERLAY_CORE_DIR = '/src/shared/comments/overlayCore/'.toLowerCase()
+const OVERLAY_CORE_ENTRY = 'previewPage'
+/** The only places a module of the `previewPage` chunk may come from (ADR 0005 decision 6, ADR 0006). */
+const PREVIEW_PAGE_SOURCES = [
+  resolve('src/preload/previewPage.ts'),
+  `${resolve('src/preload/previewPageComments')}/`,
+  `${resolve('src/shared/comments/overlayCore')}/`
+].map(comparableModuleId)
+
+function comparableModuleId(id: string): string {
+  return id.replace(/\\/g, '/').toLowerCase()
+}
+
+function isPreviewPageSource(id: string): boolean {
+  const comparable = comparableModuleId(id)
+  return PREVIEW_PAGE_SOURCES.some((source) =>
+    source.endsWith('/') ? comparable.startsWith(source) : comparable === source
+  )
+}
+
 function assertSelfContainedPreloads(): Plugin {
   return {
     name: 'erfana:preload-self-contained',
     apply: 'build',
     writeBundle(_options, bundle): void {
       const outputs = Object.values(bundle)
+
+      const overlayCoreOutsideItsEntry = outputs
+        .filter((output): output is Rollup.OutputChunk => output.type === 'chunk')
+        .filter((chunk) => !(chunk.isEntry && chunk.name === OVERLAY_CORE_ENTRY))
+        .filter((chunk) => chunk.moduleIds.some((id) => comparableModuleId(id).includes(OVERLAY_CORE_DIR)))
+        .map((chunk) => chunk.fileName)
+      if (overlayCoreOutsideItsEntry.length > 0) {
+        throw new Error(
+          `Preload output ${overlayCoreOutsideItsEntry.join(', ')} bundles the shared overlay core, which only the ` +
+            `${OVERLAY_CORE_ENTRY} entry may import (ADR 0006). Relaxing this check is not a fix.`
+        )
+      }
+
+      const foreignInPreviewPage = outputs
+        .filter((output): output is Rollup.OutputChunk => output.type === 'chunk')
+        .filter((chunk) => chunk.isEntry && chunk.name === OVERLAY_CORE_ENTRY)
+        .flatMap((chunk) => chunk.moduleIds.filter((id) => !isPreviewPageSource(id)))
+      if (foreignInPreviewPage.length > 0) {
+        throw new Error(
+          `The ${OVERLAY_CORE_ENTRY} preload bundles module(s) from outside src/preload/previewPage.ts, ` +
+            `src/preload/previewPageComments/ and src/shared/comments/overlayCore/: ${foreignInPreviewPage.join(', ')} ` +
+            '(ADR 0005 decision 6, ADR 0006). Relaxing this check is not a fix.'
+        )
+      }
 
       const sharedChunks = outputs
         .filter((output): output is Rollup.OutputChunk => output.type === 'chunk')
@@ -174,8 +232,8 @@ export default defineConfig({
         input: {
           index: resolve('src/main/index.ts'),
           'git-status.worker': resolve('src/main/services/workers/git-status.worker.ts'),
-          // HTML Preview comments: the persistent parse worker (design §19 R3-12).
-          'comment-parse.worker': resolve('src/main/services/preview/comments/commentParseWorker.ts'),
+          // Comments: the persistent parse worker and its file-kind composition root (design §19 R3-12; spec 024 C22).
+          'comment-parse.worker': resolve('src/main/services/workers/comment-parse.worker.ts'),
           // HTML Preview auto-refresh: the link scan worker, so no page is scanned on main (#124 audit).
           'preview-link-scan.worker': resolve('src/main/services/preview/previewLinkScanWorker.ts'),
           // DOCX conversion runs in a killable utilityProcess child (#1 lens-review).
@@ -193,6 +251,12 @@ export default defineConfig({
     // Runs on every `electron-vite build` — local, CI's Build job, the e2e
     // build step and the packaged release builds alike, so no wiring can drift.
     plugins: [assertSelfContainedPreloads()],
+    resolve: {
+      // `.ts` first: Vite's default order tries `.js` before `.ts`, so a stray
+      // `pinLayout.js` beside `pinLayout.ts` would be bundled while the contract
+      // scans read only the `.ts` (ADR 0006). The rest is Vite's default order.
+      extensions: ['.ts', '.mts', '.tsx', '.mjs', '.js', '.jsx', '.json']
+    },
     build: {
       externalizeDeps: false,
       rollupOptions: {

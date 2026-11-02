@@ -8,10 +8,10 @@
 
 ### Tree Flattening
 - **Memoized** inside `useDragDropTree` – a single `flattenInto` pass builds the flattened list and the path→node index together, recomputed only when `files` changes (after operations)
-- Typical project (500 files) flattens in <5ms
+- The pass is timed (flatten timing instrumentation, covered in `useDragDropTree.test.ts`); measure on your own project rather than relying on a fixed figure
 
 ### Watcher Pause/Resume
-- **Duration**: Typically <100ms for small operations
+- **Duration**: the pause lasts as long as the operation plus its tree refresh; a pause never resumed is ended by the 10 s safety timeout (`PAUSE_CONTROLLER.SAFETY_TIMEOUT_MS`)
 - **Trade-off**: Prevents race conditions at cost of brief delay
 - Alternative (no pause): Risk of stale data, ghost files, duplicate entries
 
@@ -29,7 +29,7 @@ const sensors = useSensors(
 ## Implemented Enhancements (v0.6.5)
 
 - **Auto-expand folders on hover** - Folders expand after 1 second hover during drag
-- **Auto-scroll** - 50px edge threshold with 60fps smooth scrolling during drag
+- **Auto-scroll** - scrolling near the edges during a drag; since the tree was virtualised this is dnd-kit's own `DndContext` auto-scroll, driven by the live pointer (the `AUTO_SCROLL` constants in `ProjectTree/constants.ts` are no longer used)
 
 ## Known Limitations
 
@@ -61,7 +61,7 @@ const sensors = useSensors(
    - Persist custom order in project settings
    - Visual indicator between items
 
-6. **Progress Indicators**
+5. **Progress Indicators**
    - Show progress bar for large folder copies
    - Cancelable operations
    - Background operation queue

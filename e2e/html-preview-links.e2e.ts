@@ -137,12 +137,25 @@ function externalLinkPage(host: string): string {
 `
 }
 
+/** One file that reads its own address, as a language switch does. */
+const QUERY_PAGE = `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Query page -QUERY-1</title></head>
+<body>
+  <p><a id="pl" href="query.html?lang=pl">Polski</a></p>
+  <p><a id="en" href="query.html?lang=en">English</a></p>
+  <p><a id="plain" href="query.html">No choice</a></p>
+</body>
+</html>
+`
+
 test.use({
   testProjectFiles: {
     'links/index.html': corpus('links/index.html'),
     'links/target.html': corpus('links/target.html'),
     'links/base-self.html': corpus('links/base-self.html'),
     'links/cancelling.html': CANCELLING_PAGE,
+    'links/query.html': QUERY_PAGE,
     'links/cancelled-target.html': CANCELLED_TARGET_PAGE,
     'self-contained/index.html': corpus('self-contained/index.html'),
     // Placeholder; the test rewrites it with a run-unique host before opening it.
@@ -271,6 +284,33 @@ test.describe('HTML preview — link routing', () => {
     // A fragment on the same document is a scroll, so only the barrier's own
     // target may appear.
     expect((await preview.livePreviews()).length).toBe(before + 1)
+  })
+})
+
+test.describe('HTML preview — a link with another ?query', () => {
+  test('should load the page in the same tab, as a browser does, with no warning', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open('links/query.html')
+    await preview.waitForTitled('-QUERY-1')
+    const target = HtmlPreviewPage.target('links/query.html')
+    const before = (await preview.livePreviews()).length
+
+    for (const [id, search] of [
+      ['pl', '?lang=pl'],
+      ['en', '?lang=en'],
+      ['plain', '']
+    ]) {
+      expect(await clickLink(appWithTestProject, id, target)).toBe(true)
+      await expect
+        .poll(() => preview.eval('location.search', target), { timeout: PREVIEW_BUDGET_MS })
+        .toBe(search)
+    }
+
+    expect((await preview.livePreviews()).length).toBe(before)
+    expect(await preview.failureBadgeCount()).toBe(0)
   })
 })
 

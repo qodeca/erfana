@@ -9,24 +9,18 @@
  * over every sibling DOM, so this panel's page must be hidden rather than left
  * painting over the list.
  *
- * Two rules, each of which once froze the OTHER preview tab on its still frame
- * when the reader switched tabs with the drawer open (owner bug, rev 4):
- *
- * - **The hide is this panel's gate, never the global occluder.** It goes
- *   through `usePreviewCoveredStore`, which the overlay guard applies to this
- *   panel only. dockview keeps every opened tab mounted, so an occluder left
- *   registered by a hidden tab hid the preview on screen too.
- * - **A hidden tab is not measured.** dockview hides an inactive tab with
- *   `display: none`, so its root measures 0×0 – which is "not drawn", not
- *   "narrow". The last real answer stands, so the tab comes back as it left.
+ * **The hide is this panel's gate, never the global occluder.** It goes through
+ * `usePreviewCoveredStore`, which the overlay guard applies to this panel only.
+ * dockview keeps every opened tab mounted, so an occluder left registered by a
+ * hidden tab hid the preview on screen too (owner bug, rev 4).
  *
  * @module HtmlPreviewPanel/comments/useDrawerSheet
  */
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { usePreviewCoveredStore } from '../../../../stores/usePreviewCoveredStore'
+import { DRAWER_FULL_BELOW_PX, useNarrowPanel } from '../../../Comments/useNarrowPanel'
 
-/** Under this panel width the drawer takes the whole width (§10.6). */
-export const DRAWER_FULL_BELOW_PX = 640
+export { DRAWER_FULL_BELOW_PX }
 
 /** Options for {@link useDrawerSheet}. */
 export interface UseDrawerSheetOptions {
@@ -50,22 +44,7 @@ export interface UseDrawerSheetOptions {
  * ```
  */
 export function useDrawerSheet({ panelId, panelRootRef, drawerOpen }: UseDrawerSheetOptions): boolean {
-  const [narrow, setNarrow] = useState(false)
-
-  // Re-run on open: the drawer may open in a panel resized while it was shut.
-  useEffect(() => {
-    const root = panelRootRef.current
-    if (!root || typeof ResizeObserver === 'undefined') return undefined
-    const measure = (): void => {
-      const { width, height } = root.getBoundingClientRect()
-      if (width === 0 && height === 0) return
-      setNarrow(width < DRAWER_FULL_BELOW_PX)
-    }
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(root)
-    return () => observer.disconnect()
-  }, [panelRootRef, drawerOpen])
+  const narrow = useNarrowPanel(panelRootRef, drawerOpen)
 
   const covers = drawerOpen && narrow
   useEffect(() => {

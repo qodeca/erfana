@@ -6,7 +6,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 # Documentation capture – operator runbook
 
 `npm run docs:screenshots` drives the real app with Playwright and regenerates every screenshot of
-the user guide (`docs/user-guide/images/`) and the README demo (`docs/assets/readme/`). It runs on
+the user guide (`docs/user-guide/images/`) and the README video (a draft in `.local/capture/readme-video/`, then `docs/assets/readme/` on approval). It runs on
 macOS only, with a real Claude Code login. Nothing is faked, and nothing reaches `docs/` until every
 check has passed.
 
@@ -44,7 +44,7 @@ check has passed.
 export ERFANA_CAPTURE_CLAUDE_TOKEN_FILE="$PWD/.local/capture/claude-token"
 npm run docs:screenshots                                 # every row
 npm run docs:screenshots -- --only open-a-project/welcome   # one row
-npm run docs:screenshots -- --only readme-demo           # one scene: the README demo's 4 files
+npm run docs:screenshots -- --only readme-demo           # the README video, as a draft
 npm run docs:screenshots -- --check                      # no app: manifest, files, links, budget
 ```
 
@@ -52,10 +52,12 @@ npm run docs:screenshots -- --check                      # no app: manifest, fil
 |---|---|
 | `--only <ids>` | Comma-separated row ids (`run-an-agent/edit-lands`) or scene ids (`agent`, `readme-demo`). An unknown id is an error. The report says "partial run". |
 | `--check` | No app launch. Checks that the manifest rows, the image files, the design's screenshot list and the guide's image links agree, and that the size budget holds. |
+| `--approve-readme-video` | Copies the passed README video draft into `docs/assets/readme/` and removes `demo.gif` and `demo.mp4`. Takes no other option. |
 | `--skip-build` | Skips `electron-vite build`. Use it only when `out/` was built from this checkout. |
 | `ERFANA_CAPTURE_CLAUDE_TOKEN_FILE` | The token file. The sandbox shell exports it as `CLAUDE_CODE_OAUTH_TOKEN`. The script reads it only into memory, to add to the deny-list. It is never printed, logged or written. |
+| `ERFANA_CAPTURE_ALLOW_USERNAME` | `1` lets the bare login name through the privacy pass; nothing else. The real Open dialog's sidebar lists the home folder by that name. Owner decision, 2026-10-29: allowed for the README video, as the owner's name is already public in the repository. The home path stays denied. |
 | `ERFANA_CAPTURE_DENY_EXTRA` | Extra deny-list words, comma-separated, matched as whole words: an organisation or account label that must never be on screen. |
-| `ERFANA_CAPTURE_EVIDENCE_DIR` | Keeps the report, the demo's legibility frames and its contact sheet in a new `capture-<time>/` folder there. The sandbox itself is deleted after a successful run. |
+| `ERFANA_CAPTURE_EVIDENCE_DIR` | Keeps the report and the contact sheet in a new `capture-<time>/` folder there. The sandbox itself is deleted after a successful run. |
 
 A full run takes about three minutes. Two agent scenes call Claude Code, and each turn is one short
 edit.
@@ -65,13 +67,14 @@ edit.
 | Code | Meaning | What to do |
 |---|---|---|
 | 0 | Every selected file written; the report is printed | Review the images (below) |
-| 1 | A scene failed, or the demo is not legible at 800 px | The raw shots stay in the sandbox. `playwright/*/error-context.md` there names the step. A shot that never settles leaves `raw/unsettled-a.png` and `-b.png` |
+| 1 | A scene failed, or a README video check failed (the report names it) | The raw shots stay in the sandbox. `playwright/*/error-context.md` there names the step. A shot that never settles leaves `raw/unsettled-a.png` and `-b.png` |
 | 2 | Not macOS | – |
 | 3 | No agent login | Set `ERFANA_CAPTURE_CLAUDE_TOKEN_FILE` (only rows marked `agent` need it) |
 | 4 | The sandbox path is unsafe | See [Sandbox](#sandbox) |
 | 5 | Privacy hit | The report names the row, the layer and the kind of match, never the value. Nothing was copied |
 | 6 | Over budget | The report names the file, its size and its limit |
 | 7 | `--check` drift | The report lists every disagreement |
+| 8 | A README video prerequisite is missing | The message names it: Screen Recording, Accessibility or Do Not Disturb |
 
 Nothing is retried silently. Re-run a failed row on purpose with `--only`.
 
@@ -151,44 +154,70 @@ committed.
 
 A hit in any layer stops the run with exit 5 before anything is copied.
 
-## README demo (`--only readme-demo`)
+## README video (`--only readme-demo`)
 
-The storyboard is #139's
-([design § Demo loop](../../docs/designs/readme/README.md#demo-loop)): open the project
-from Recent projects, then Claude Code idle, select the plan's list, Visualize > Flowcharts, the
-prompt reaches the terminal, the agent works (sped up), the Mermaid block lands and renders, then a
-hold.
+The README showcase video follows [spec 023](../../specs/spec-t3-023-readme-video/requirements/01-overview.md).
+It is one real session, recorded from the screen, with no cuts.
 
-- **Recorder.** Playwright `recordVideo`, 1280×800. The scene starts with a one-colour sync flash, and
-  the post-process finds its first frame, so every mark lands on the video's own timeline.
-- **Edit.** There is one cut, from the opened project to Claude Code idle. The folding of the project
-  panel, Claude Code's start-up and a first prompt happen off camera. There is one speed-up, the
-  agent's work, to about 5 s. Holds are cloned frames, not waits. The loop comes out at about 18 s, at
-  12 fps.
-- **No start-up header after the cut.** Claude Code keeps its start-up header (logo, version, model,
-  folder) at the top of its screen until enough output has pushed it off, and it repaints the header
-  after any clear. The first prompt is therefore Erfana's own **Explain** on the plan's list, which is
-  also why Erfana's status bar is already there in S1 (it appears only after a finished turn). Its
-  expanded prompt is taller than the terminal, so S1 opens on the end of that exchange with the
-  header gone. `run.mjs` fails the run (exit 1) if any sampled frame reads "Claude Code v…".
-- **Encode.** `demo.webp` (`libwebp_anim`, `-loop 0`), `demo.gif` and `demo.mp4` come from one
-  lossless edited source. `demo-still.png` is the S5 window at 1280×800. The GIF uses a 32-colour
-  palette: with 256 colours it measured 7.7 MB, over the 5 MiB cap (64 colours: 5.2 MB; 32: 3.8 MB).
-- **Capture-only zoom.** The window's Electron zoom factor is set to **1.25** for this scene only, and
-  reset before the app closes. The app's defaults are not changed. Playwright's page screenshot clips
-  the layout under a zoom factor, so this scene's shots use Electron's own `capturePage()`.
-- **Legibility.** From each encoded file, the frame where the prompt has reached the terminal and the
-  frame at the end of the agent's work are scaled to 800 px wide. The terminal region is read by OCR.
-  Pass: the known line (`Pasted text`, from Claude Code's `[Pasted text #1 +N lines]`) is read back,
-  and the capital-letter height is at least 7 px. Measured on 2026-09-25 at zoom 1.25 over six runs
-  (six frames each): **7.3 px** in most frames, 7.7 px at most and **7.0 px** at least (two frames of
-  one run). The known line was read back in every file. The margin over the bar is thin; if
-  a run fails it, raise `DEMO_ZOOM` in `scenes/readme-demo.capture.ts`, but check the layout first:
-  at 1.3 the default panel widths no longer fit the window. Without the zoom the spike measured
-  6.0–6.7 px.
-- **Review.** With `ERFANA_CAPTURE_EVIDENCE_DIR` set, the 1-fps contact sheet and the legibility
-  frames are kept. Check them frame by frame: no Claude Code start-up screen, no `/status`, `/usage`
-  or `/cost` output, and no context-meter tooltip.
+**Before you run it** (the run checks each one and stops with exit 8, naming the one that fails):
+
+- **Screen Recording** is allowed for the terminal that runs the command (System Settings → Privacy &
+  Security → Screen & System Audio Recording).
+- **Accessibility** is allowed for that terminal. The run drives the real Open and Save dialogs with
+  key presses, and the window picker with a mouse click.
+- **Do Not Disturb** is on, so no notification lands in a frame.
+- A screen with room for a 1920×1080 window (the window must fit inside one screen's work area).
+- Do not use the mouse or keyboard while it records (about two minutes), and keep the screens awake
+  and the Mac unlocked: a sleeping screen has no screen input to record. Run it under
+  `caffeinate -di` (prefix the command) so the screens do not sleep.
+
+**The story.** Nine steps, in this order. Each label shows in the title bar while its step plays:
+
+| Step | Label |
+|---|---|
+| open | Open a project |
+| agent | Start Claude Code in the terminal |
+| import | Import a file: PDF to Markdown |
+| edit | Claude edits, the preview updates |
+| transcribe | Transcribe a voice memo |
+| html | Preview an HTML page |
+| comment | Comment mode: pin a note |
+| export | Export to PDF |
+| screenshot | Capture window for the agent |
+
+The labels and their app names live in `demo-story.mjs`. The app names a label uses (Import a file,
+Comment mode, Export to PDF, Capture window) each have a claim-ledger entry, so a rename in the app
+fails `npm run check:claims`.
+
+- **Off camera.** The scene sets the panel widths (tree about 15 %, preview about 52 %, terminal
+  about 33 %), downloads the local speech model into `.local/capture/whisper/`, opens each real dialog
+  once to put it in list view with its sidebar hidden (the sidebar lists your own folders), then
+  closes the project so the video starts from Recent projects.
+- **Recorder.** ffmpeg's AVFoundation screen input records the window's area of the screen,
+  losslessly, with no pointer. The screen that shows the window is found with a magenta flash, which
+  also syncs the scene's log to the recording.
+- **Edit.** Everything from the first step to the last plays. Only the waits the scene marks (an agent
+  turn, a conversion, a transcription) are sped up, each by a whole number that shows next to the label
+  as `×N`. The loop is 50–70 s: about 60 s of story, a 2 s hold on the last frame, then a 1 s fade
+  back to the first frame.
+- **Encode.** One animated WebP (`libwebp_anim`, `-loop 0`, 12 fps, no sound). The run tries quality
+  90 first and steps down until the file is at most 30 MB. `demo-still.png` is the last story frame.
+- **Checks.** The run fails (exit 1) when any step has no result, the length is outside 50–70 s, the
+  layout is out of range, the terminal has fewer than 80 columns, the preview took longer than 2 s to
+  show the agent's edit, or the window screenshot is not the window's size. Legibility: each label at
+  880 px, and the terminal at 1920 px, must be read back by OCR with a capital height of at least
+  7 px. Privacy: every WebP page and the still go through the privacy pass (exit 5 on a hit).
+- **Draft, then approval.** A passed run writes `demo.webp`, `demo-still.png`, `report.txt` and
+  `contact-sheet.png` to `.local/capture/readme-video/` (git-ignored). `docs/assets/readme/` and
+  `README.md` do not change. After the owner has watched the draft:
+
+  ```sh
+  npm run docs:screenshots -- --approve-readme-video
+  ```
+
+  copies the two files into `docs/assets/readme/` and removes the retired `demo.gif` and `demo.mp4`.
+  It refuses a draft whose report does not say "README video: every check passed". Then update the
+  README's `<picture>` and its alt text by hand.
 
 ## Reviewing the images
 
@@ -245,8 +274,10 @@ the real one shows your own folders.
 | `manifest.mjs` | Load and validate `shots.json`, `--only`, budget, `--check` |
 | `sandbox.mjs` | Sandbox layout, guard, settings, project reset |
 | `privacy.mjs` | Deny-list, text scan, frame sampling, OCR |
-| `encode.mjs` | ffmpeg argument lists, demo edit, sync flash |
-| `legibility.mjs` | The demo's legibility check |
+| `encode.mjs` | ffmpeg argument lists, the video edit, sync flash |
+| `demo-story.mjs` | The README video's story, labels, edit plan and limits |
+| `macos.mjs`, `lib/macos.ts` | The video's macOS prerequisites; real key presses, clicks, dialogs and the screen recorder |
+| `legibility.mjs` | The video's legibility check |
 | `lib/app.ts`, `lib/terminal.ts`, `lib/shots.ts` | Launch, PTY stream and waits, stable shots |
 | `scenes/*.capture.ts` | One scene per page group, plus `readme-demo` |
 | `playwright.capture.config.ts`, `tsconfig.json` | Their own configs; `npx tsc --noEmit -p scripts/capture/tsconfig.json` type-checks the scenes |

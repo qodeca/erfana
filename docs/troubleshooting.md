@@ -7,37 +7,42 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 
 For app recovery, terminal availability, preview and Mermaid errors, use the [user troubleshooting reference](./user-guide/reference/troubleshooting.md).
 
-## Installation & Setup
+## Installation and setup
 
-### node-pty Build Failure
+### node-pty build failure
 
 **Symptom:** Terminal panel unavailable, build fails during `npm install`
 
 **Error:**
-```
+
+```text
 ModuleNotFoundError: No module named 'distutils'
 ```
 
 **Cause:** node-pty fails to build on Python 3.13 (its `distutils` module was removed). Only 3.13 fails.
 
 **Solution:**
+
 1. Use Python 3.12 (known good) or 3.14.x (3.14.3 verified):
+
    ```bash
    brew install python@3.12
    brew link python@3.12
    ```
+
 2. Rebuild node-pty:
+
    ```bash
    npm rebuild node-pty
    ```
 
 See [Known issues – node-pty build failure](./known-issues.md#node-pty-build-failure) and [CONTRIBUTING](../CONTRIBUTING.md#local-setup) for the full setup notes.
 
-**Tracking:** https://github.com/microsoft/node-pty/issues
+**Tracking:** <https://github.com/microsoft/node-pty/issues>
 
 ---
 
-### Dockview CSS Not Loading
+### Dockview CSS not loading
 
 **Symptom:** Layout broken, panels not styled correctly
 
@@ -45,6 +50,7 @@ See [Known issues – node-pty build failure](./known-issues.md#node-pty-build-f
 
 **Solution:**
 Update import in your component:
+
 ```typescript
 // ❌ WRONG
 import 'dockview/dist/styles.css'
@@ -57,12 +63,13 @@ import 'dockview/dist/styles/dockview.css'
 
 ---
 
-### electron-store Import Error
+### electron-store import error
 
 **Symptom:** `ERR_REQUIRE_ESM` error during startup
 
 **Error:**
-```
+
+```text
 ERR_REQUIRE_ESM: require() of ES Module not supported
 ```
 
@@ -70,6 +77,7 @@ ERR_REQUIRE_ESM: require() of ES Module not supported
 
 **Solution:**
 All SettingsService methods are async and use dynamic `import()`:
+
 ```typescript
 // ✅ CORRECT pattern
 const lastPath = await settingsService.getLastProjectPath()
@@ -84,25 +92,27 @@ const lastPath = settingsService.getLastProjectPath()
 
 ---
 
-## Project Tree Unavailable
+## Project tree unavailable
 
 The project-scoped panel boundary is keyed by project path; see [user recovery](./user-guide/reference/troubleshooting.md#project-tree-unavailable) and [UI containment](./ui-components.md#error-containment). Logs carry `[PanelErrorBoundary]` entries.
 
 ## Terminal
 
-### Terminal Not Available
+### Terminal not available
 
 **Symptom:** Terminal panel shows the "Terminal not available" message (node-pty did not load). A "Terminal error" panel is a different case: node-pty loaded but the shell could not start, and its message says why.
 
 **Check:**
+
 ```typescript
-const result = await window.api.terminal.isAvailable()
+const result = await window.api.terminal.isAvailable(terminalId)
 if (!result.available) {
   // node-pty not available, check build logs
 }
 ```
 
 **Solution:** Rebuild node-pty
+
 ```bash
 npm rebuild node-pty --build-from-source
 ```
@@ -111,20 +121,23 @@ npm rebuild node-pty --build-from-source
 
 ---
 
-## File System
+## File system
 
-### Files Not Auto-Refreshing
+### Files not auto-refreshing
 
 **Symptom:** External file changes don't appear in Erfana
 
 **Debug Steps:**
+
 1. Check if file watcher is active:
+
    ```typescript
    // In the main-process log, should see (FileWatcherService.ts):
    👁️  Starting watch for: /path/to/file.md
    ```
 
 2. Check for debounce timing (300ms for files):
+
    ```bash
    # Edit file externally
    echo "test" >> file.md
@@ -134,11 +147,13 @@ npm rebuild node-pty --build-from-source
    ```
 
 **Common Causes:**
+
 - File is paused (during save operation)
 - File path contains special characters
 - Network file system (NFS/SMB) - may require polling
 
 **Solution for Network FS:**
+
 ```typescript
 // In src/main/services/watcher/singleFileWatch.ts (SINGLE_FILE_WATCH_OPTIONS)
 const watcher = chokidar.watch(filePath, {
@@ -151,17 +166,19 @@ const watcher = chokidar.watch(filePath, {
 
 ---
 
-### Directory Tree Not Updating
+### Directory tree not updating
 
 **Symptom:** New files/folders don't appear in project tree
 
 **Debug Steps:**
+
 1. Check directory watcher is active
 2. Verify the debounce: the main-process directory watcher runs with `awaitWriteFinish: false` (`watcher/directoryWatchBuilders.ts`); the renderer debounces the resulting `directory-watch:changed` events by `DIRECTORY_WATCHER.DEBOUNCE_DELAY` (250 ms, `ProjectTree/constants.ts`)
 3. Check whether the path is dropped: excluded (`files.exclude`), hidden (`tree.hiddenPatterns`, e.g. `.git`) or ignored (`watcher.ignoreList`: `node_modules`, build output, virtualenvs, …)
 
 **Solution:**
 If the file is in a dropped directory, create it elsewhere or change the list that drops it. One project path filter (`ProjectPathFilter`, `src/main/utils/projectPathFilter.ts`) decides this for the tree walk and both watcher backends: its `shouldDrop(rel)` tests the **project-relative** path against the exclude list, the hidden names and the ignore patterns (default ignore list: `DEFAULT_WATCHER_IGNORE_PATTERNS` in `src/shared/constants.ts`). The directory watcher asks it (`shouldDropAbs` / `shouldDropWatchRel` in `src/main/services/watcher/DirectoryWatcherCore.ts`) from chokidar's function-based `ignored` predicate (Linux, or `ERFANA_DIRECTORY_WATCHER=chokidar`), from the native watcher's `shouldDrop` option (macOS and Windows) and, as a backstop for every event, in `queueEvent` (`watcher/DirectoryWatcherEvents.ts`):
+
 ```typescript
 // src/main/services/watcher/directoryWatchBuilders.ts (createChokidarWatcher)
 chokidar.watch(dirPath, {
@@ -172,25 +189,27 @@ chokidar.watch(dirPath, {
   // ...
 })
 ```
+
 Per-project overrides go in `.erfana/settings.json` (`files.exclude`, `watcher.ignoreList`, `tree.hiddenPatterns`); `ProjectService` builds the filter when the project opens and hands it to the watcher with `setPathFilter`, so a change applies after the project is reopened.
 
 ---
 
-### Duplicate Refresh on File Creation
+### Duplicate refresh on file creation
 
 **Symptom:** Project tree refreshes twice when creating file via UI
 
 **Cause:** CRUD operation not wrapped in `withWatcherPause()`.
 
-**Solution:** wrap the operation in `withWatcherPause()` (`src/renderer/src/components/ProjectTree/withWatcherPause.ts`), which pauses the directory watcher, runs the operation, and resumes it in a `finally` block:
+**Solution:** wrap the operation in `withWatcherPause()` (`src/renderer/src/components/ProjectTree/withWatcherPause.ts`), which pauses the directory watcher, runs the operation, and resumes the watcher afterwards – also when the operation throws:
+
 ```typescript
 const createdFilePath = await withWatcherPause(
   projectPath,
   isInternalOperationRef,
   setLoading,
   async () => {
-    const path = await window.api.file.createFile(targetPath, fileName)
-    await refreshFileTree()
+    const path = await window.api.file.createFile({ dirPath: targetPath, name: fileName })
+    await refreshProjectTree()
     return path
   }
 )
@@ -201,9 +220,9 @@ const createdFilePath = await withWatcherPause(
 
 ---
 
-## Markdown Editing
+## Markdown editing
 
-### Preview Not Updating
+### Preview not updating
 
 **Symptom:** Preview pane shows stale content
 
@@ -211,6 +230,7 @@ const createdFilePath = await withWatcherPause(
 
 **Solution:**
 Ensure `MonacoMarkdownEditor` is keyed by the view mode so it remounts when the layout changes (the file path is passed as a prop, not as the key):
+
 ```tsx
 <MonacoMarkdownEditor
   key={`editor-${viewMode}`}  // Forces remount on view-mode change
@@ -223,40 +243,45 @@ Ensure `MonacoMarkdownEditor` is keyed by the view mode so it remounts when the 
 
 ---
 
-### Scroll Sync Not Working
+### Scroll sync not working
 
 **Symptom:** Editor and preview scrolling not synchronized in split view
 
 **Debug Steps:**
+
 1. Check scroll map is built:
+
    ```typescript
    // In the renderer debug log, should see (useScrollSync.ts):
    Scroll map rebuilt: 296 entries
    ```
 
 2. Verify data-line attributes in preview:
+
    ```html
    <p data-line-start="42" data-line-end="42">...</p>
    ```
 
 **Common Causes:**
+
 - React refs not initialized (check `editorRef.current` and `previewRef.current`)
 - Scroll map empty (not built)
 - View mode not a split view
 
 **Solution:**
-`useScrollSync` (`src/renderer/src/components/Editor/MarkdownEditorPanel/hooks/useScrollSync.ts`) exposes `rebuildScrollMap()`, which bails out unless both refs are set and the view is a split mode, then rebuilds after a double `requestAnimationFrame`. Ensure it is called after a view-mode or content change:
+`useScrollSync` (`src/renderer/src/components/Editor/MarkdownEditorPanel/hooks/useScrollSync.ts`) exposes `rebuildScrollMap()`, which bails out unless both refs are set and the view is a split mode, then rebuilds after a double `requestAnimationFrame`. Ensure it is called after a view-mode or file change:
+
 ```typescript
-const { rebuildScrollMap } = useScrollSync({ editorRef, previewRef, viewMode, currentFilePath, currentContent })
+const { rebuildScrollMap } = useScrollSync({ editorRef, previewRef, viewMode, currentFilePath })
 ```
 
 ---
 
-## Mermaid Diagram Rendering Error
+## Mermaid diagram rendering error
 
 See [user recovery](./user-guide/reference/troubleshooting.md#mermaid-diagram-rendering-error). Contributor detail: `MermaidDiagram.tsx` sends `mermaid-bug-report.md` to the terminal from the error box. `zenuml` is listed in `mermaidDirections.ts` but its package is not a dependency, so it errors.
 
-## See Also
+## See also
 
 - [Advanced Troubleshooting](./troubleshooting-advanced.md) - Terminal, Performance, UI/Layout, Development
 - [Known Issues](./known-issues.md) - Complete list of known issues and workarounds
@@ -264,4 +289,3 @@ See [user recovery](./user-guide/reference/troubleshooting.md#mermaid-diagram-re
 - [Development Tasks](./development-tasks.md) - Common development patterns
 - [API Services](./api-services.md) - Service class overview
 - [HTML preview](./html-preview/README.md) - links, [Back and Forward](./html-preview/README.md#back-and-forward), [Open in default browser](./html-preview/README.md#open-in-default-browser), keyboard entry into the page; the preview and open-in-browser toasts are listed in [Error codes](./error-codes.md)
- 

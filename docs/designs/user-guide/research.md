@@ -104,7 +104,8 @@ What the design takes from these:
   -c:v vp8 -qmin 0 -qmax 50 -crf 8 -deadline realtime -speed 8 -b:v 1M`. So each frame is a JPEG
   screencast frame re-encoded as VP8 at a 1 Mbit/s target – two lossy steps before ours.
 - **tesseract.js** (*local*, 2026-09-25). Version 7.0.0 is installed as a transitive dependency
-  (`node_modules/tesseract.js`). It is not in `package.json`.
+  (`node_modules/tesseract.js`). It was not in `package.json` then; it is a direct
+  devDependency now (`"tesseract.js": "^7.0.0"`).
 
 ## Capture
 
@@ -123,12 +124,12 @@ What the design takes from these:
   – https://chromium.googlesource.com/chromium/src/+/main/ui/display/display_switches.cc and https://chromium.googlesource.com/chromium/src/+/main/ui/gfx/switches.cc (read 2026-09-24, relayed)
 - **The scale switch works in this repo** (*local*, 2026-09-25). The committed darwin baselines
   `e2e/screenshots/terminal-open-darwin.png` and `editor-loaded-darwin.png` are exactly 1280×800
-  px. They were captured with `--force-device-scale-factor=1` (`e2e/fixtures/index.ts`,
-  `buildVisualLaunchOptions`). That is consistent with the switch being honoured. The claim that
+  px. They were captured with `--force-device-scale-factor=1` (`buildVisualLaunchOptions`, then in
+  `e2e/fixtures/index.ts`, now in `e2e/fixtures/launch-helpers.ts`). That is consistent with the switch being honoured. The claim that
   they were taken on a Retina Mac is *inferred*; the spike re-checks it at `=2`.
 - **Terminal text is not in the DOM** (*local*). The terminal draws with the WebGL addon.
-  `TerminalPage.waitForPrompt()` ends in `waitForTimeout(PTY_INIT_DELAY_MS)`
-  (`e2e/pages/terminal.page.ts`). `window.api.terminal.onData` is exposed by the preload
+  `TerminalPage.waitForPrompt()` then ended in `waitForTimeout(PTY_INIT_DELAY_MS)`
+  (`e2e/pages/terminal.page.ts`); it now polls xterm's screen buffer instead. `window.api.terminal.onData` is exposed by the preload
   (`src/preload/index.ts`), so a page-side subscription gives a condition to wait on without
   sleeping.
 - **The HTML preview is a separate view** (*local*). It is a `WebContentsView`; e2e already walks

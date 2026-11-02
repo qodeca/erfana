@@ -78,6 +78,8 @@ Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (
 
 **Workaround**: Delete `.e2e-temp` by hand between runs. The directory is git-ignored, so this is unbounded litter and log noise rather than breakage — but the repeated teardown line does bury real failures in the e2e output.
 
+**Update (2026-10-19)**: the main cause is fixed – Playwright removed a test's project folder while the app still had it open. `appWithTestProject` now depends on `testProject` (`e2e/fixtures/index.ts`), so the app closes first. A leftover-folder count after a full run has not been re-measured, so the item stays open.
+
 **Tracking**: [#134](https://github.com/qodeca/erfana/issues/134).
 
 ---
@@ -286,7 +288,7 @@ Then relaunch Erfana and grant the permission again when prompted. A relaunch is
 
 ### Visual regression E2E suite hangs on GitHub `macos-latest` CI
 
-**Issue**: All 5 visual tests in `e2e/visual-regression.e2e.ts` time out at `page.waitForLoadState('domcontentloaded')` (30s) on GitHub `macos-latest` runners; they pass 5/5 locally (including with `CI=true` and video recording enabled).
+**Issue**: All 5 visual tests in `e2e/visual-regression.e2e.ts` (the suite has 6 today; the sixth has not been tried on CI) time out at `page.waitForLoadState('domcontentloaded')` (30s) on GitHub `macos-latest` runners; they pass 5/5 locally (including with `CI=true` and video recording enabled).
 
 **Root cause**: Not isolated. Electron main process launches, `BrowserWindow` exists, `firstWindow()` returns a Page, but the `domcontentloaded` event never propagates. Candidate causes: GPU/renderer init hang on virtualized runners, `app.evaluate(resize)` → `firstWindow()` timing race, `--force-device-scale-factor=1` interaction. The regular `electron` project succeeds on the same runner, so the issue is specific to the visual fixture setup.
 
@@ -306,13 +308,15 @@ Re-enable with `gh workflow enable "E2E Tests"` once the root cause is isolated.
 
 ### E2E terminal-driven tests sensitive to user's shell init speed
 
-**Issue**: E2E tests that drive the terminal via `terminal.sendCommand` assume the PTY's interactive shell will be ready 1500 ms after the panel becomes visible. The 1500 ms is a blind sleep in `TerminalPage.waitForPrompt` (the `PTY_INIT_DELAY_MS` constant in `e2e/pages/terminal.page.ts`), not a real readiness probe. On a developer machine with a heavy `.zshrc` (oh-my-zsh, slow plugins, async work), `exec -l "$SHELL" -i` in `TerminalService` can take >1500 ms to source startup files, leaving the typed command in the kernel PTY buffer with no shell to execute it; CI runners and clean dev machines have well under 500 ms init and pass the test, hiding the dependency.
+**Issue** (historical – see "Now" below): E2E tests that drive the terminal via `terminal.sendCommand` used to assume the PTY's interactive shell would be ready 1500 ms after the panel became visible – a blind sleep in `TerminalPage.waitForPrompt`, not a real readiness probe. On a developer machine with a heavy `.zshrc` (oh-my-zsh, slow plugins, async work), `exec -l "$SHELL" -i` in `TerminalService` can take >1500 ms to source startup files, leaving the typed command in the kernel PTY buffer with no shell to execute it; CI runners and clean dev machines have well under 500 ms init and pass the test, hiding the dependency.
+
+**Now**: `TerminalPage.waitForPrompt` (`e2e/pages/terminal.page.ts`) waits for a settled prompt instead of sleeping – two equal screen reads showing a drawn prompt, within `PROMPT_TIMEOUT_MS` (30 s) – so a slow shell only makes the wait longer.
 
 **Symptom** (pre-fix): `e2e/directory-watcher.e2e.ts` times out at its 2000 ms budget with the new file never appearing in the tree on macOS dev machines with a heavy `.zshrc`. Instrumented PTY tracing showed the keystrokes reach the kernel PTY buffer and the kernel TTY line discipline echoes each character back, but no shell prompt is rendered and no command executes. The shell's first real output (e.g. an `(eval):N: warning: 1 jobs SIGHUPed` line) only arrives 5–6 s later, after the test has given up and `closeApp` has torn the PTY down.
 
 **Fix applied** (`directory-watcher.e2e.ts`): When `process.env.ERFANA_E2E_FAST_SHELL === '1'`, the POSIX bootstrap in `TerminalService` (`src/main/services/TerminalService.ts`) execs into `/bin/sh -i` instead of `-l "$SHELL" -i`. `/bin/sh` reads no user rc files and starts in well under 50 ms, eliminating the environment dependency. `directory-watcher.e2e.ts` opts in by setting `ERFANA_E2E_FAST_SHELL: '1'` on `electron.launch(...)`; production behaviour is unchanged. Post-fix observation: pipeline latency 190–283 ms, well within the 500 ms NFR-001 target.
 
-**Still latent**: `e2e/third-party-components.e2e.ts` "xterm.js terminal: Type command and verify output" only asserts the terminal element is still visible after `echo "..."`. The user's `$SHELL` is still used there, and the assertion would pass even if the command never ran — the test is silently broken on slow-init machines without producing a failure signal. If you want that test to actually verify execution, set `ERFANA_E2E_FAST_SHELL: '1'` on its `electron.launch(...)` and add a real output check.
+**No longer latent**: `e2e/third-party-components.e2e.ts` "xterm.js terminal: Type command and verify output" now checks the printed line (`terminal.waitForOutputLine(window, 'E2E Terminal Test')`), so a command that never ran fails the test.
 
 See [E2E troubleshooting § Terminal commands not executing](./testing/e2e-troubleshooting.md#terminal-commands-not-executing).
 

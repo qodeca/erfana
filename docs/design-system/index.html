@@ -35,14 +35,14 @@
 <main>
 <h1>Erfana design system</h1>
 <p class="ds-lede">
-  30 cards, generated from the folder itself. Every page reads a synced copy of the app's
+  33 cards, generated from the folder itself. Every page reads a synced copy of the app's
   <code>design-tokens.css</code> and the real bundled Cascadia Mono, and every number a card quotes is
   baked in from the source by <code>npm run design</code> – no page runs JavaScript.
 </p>
 
 <ul class="ix-summary" aria-label="Cards by status">
   <li><span class="ds-status" data-status="decided">decided</span> 5</li>
-  <li><span class="ds-status" data-status="proposed">proposed</span> 25</li>
+  <li><span class="ds-status" data-status="proposed">proposed</span> 28</li>
   <li><span class="ds-status" data-status="superseded">superseded</span> 0</li>
 </ul>
 
@@ -135,7 +135,7 @@
     </a>
 </div>
 
-<h2 id="components">Components <span class="ix-count">14</span></h2>
+<h2 id="components">Components <span class="ix-count">15</span></h2>
 <div class="ix-grid">
     <a class="ix-card" href="system/components/badge/index.html">
       <span class="ix-card__name">Badges, chips and keys</span>
@@ -166,6 +166,11 @@
       <span class="ix-card__name">Menu</span>
       <span class="ix-card__sub">A role is a promise – arrows, typeahead, and the precedence rule for a disabled danger item</span>
       <span class="ix-card__meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-10-28</span>
+    </a>
+    <a class="ix-card" href="system/components/origin-field/index.html">
+      <span class="ix-card__name">Origin field</span>
+      <span class="ix-card__sub">A one-line field that says where you are – badge, host emphasis, what is cut first and what never is</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
     </a>
     <a class="ix-card" href="system/components/permission-band/index.html">
       <span class="ix-card__name">Permission band</span>
@@ -209,7 +214,7 @@
     </a>
 </div>
 
-<h2 id="patterns">Patterns <span class="ix-count">3</span></h2>
+<h2 id="patterns">Patterns <span class="ix-count">5</span></h2>
 <div class="ix-grid">
     <a class="ix-card" href="system/patterns/dialog/index.html">
       <span class="ix-card__name">Dialog</span>
@@ -219,6 +224,16 @@
     <a class="ix-card" href="system/patterns/drawer/index.html">
       <span class="ix-card__name">Drawer</span>
       <span class="ix-card__sub">A side panel beside the content, not over it – header, fixed controls, a note that stays, and one scroller</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
+    </a>
+    <a class="ix-card" href="system/patterns/picker/index.html">
+      <span class="ix-card__name">Element picker</span>
+      <span class="ix-card__sub">Pointing at one element on a page Erfana does not own – outline, label, picked look, flash and mode frame</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
+    </a>
+    <a class="ix-card" href="system/patterns/site-prompts/index.html">
+      <span class="ix-card__name">Site prompts</span>
+      <span class="ix-card__sub">A page asks in a strip row above the page, named by its origin – one row per kind, in a fixed order, never taking focus behind your back</span>
       <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
     </a>
     <a class="ix-card" href="system/patterns/states/index.html">
@@ -245,9 +260,12 @@
   <tr><td>Add a text field or select</td><td><a href="system/components/form/index.html">Form controls</a></td></tr>
   <tr><td>Add a toolbar to a panel</td><td><a href="system/components/toolbar/index.html">Toolbar</a></td></tr>
   <tr><td>Add a tooltip</td><td><a href="system/components/tooltip/index.html">Tooltip</a></td></tr>
+  <tr><td>Add an address field with suggestions</td><td><a href="system/components/origin-field/index.html">Origin field</a></td></tr>
   <tr><td>Animate something</td><td><a href="system/foundations/motion.html">Motion</a></td></tr>
   <tr><td>Announce a change to a screen reader</td><td><a href="system/components/feedback/index.html">Feedback</a></td></tr>
   <tr><td>Ask for a name in a dialog</td><td><a href="system/patterns/dialog/index.html">Dialog</a></td></tr>
+  <tr><td>Ask for a sign-in from a page</td><td><a href="system/patterns/site-prompts/index.html">Site prompts</a></td></tr>
+  <tr><td>Ask for a site permission</td><td><a href="system/patterns/site-prompts/index.html">Site prompts</a></td></tr>
   <tr><td>Ask save or discard</td><td><a href="system/patterns/dialog/index.html">Dialog</a></td></tr>
   <tr><td>Ask the user to allow a remote host</td><td><a href="system/components/permission-band/index.html">Permission band</a></td></tr>
   <tr><td>Ask the user to confirm a destructive action</td><td><a href="system/patterns/dialog/index.html">Dialog</a></td></tr>
@@ -273,9 +291,11 @@
   <tr><td>Group toolbar buttons</td><td><a href="system/components/toolbar/index.html">Toolbar</a></td></tr>
   <tr><td>Handle a toolbar that does not fit</td><td><a href="system/components/toolbar/index.html">Toolbar</a></td></tr>
   <tr><td>Highlight a search hit</td><td><a href="system/foundations/highlights.html">Text highlights</a></td></tr>
+  <tr><td>Highlight an element on a third-party page</td><td><a href="system/patterns/picker/index.html">Element picker</a></td></tr>
   <tr><td>Keep a mark from looking like a link or a selection</td><td><a href="system/foundations/highlights.html">Text highlights</a></td></tr>
   <tr><td>Keep focus visible under a sticky header</td><td><a href="system/foundations/focus.html">Focus and keyboard</a></td></tr>
   <tr><td>Label a destructive action</td><td><a href="system/components/button/index.html">Buttons</a></td></tr>
+  <tr><td>Label a picked element</td><td><a href="system/patterns/picker/index.html">Element picker</a></td></tr>
   <tr><td>Let the user resize two panes</td><td><a href="system/components/splitter/index.html">Splitter</a></td></tr>
   <tr><td>Make a banner or a social image</td><td><a href="system/foundations/brand.html">Brand</a></td></tr>
   <tr><td>Make a divider keyboard-operable</td><td><a href="system/components/splitter/index.html">Splitter</a></td></tr>
@@ -299,12 +319,14 @@
   <tr><td>Show a count on an icon</td><td><a href="system/components/badge/index.html">Badges, chips and keys</a></td></tr>
   <tr><td>Show a field error</td><td><a href="system/components/form/index.html">Form controls</a></td></tr>
   <tr><td>Show a file&#x27;s git state</td><td><a href="system/components/badge/index.html">Badges, chips and keys</a></td></tr>
+  <tr><td>Show a host in a one-line field</td><td><a href="system/components/origin-field/index.html">Origin field</a></td></tr>
   <tr><td>Show a hostname</td><td><a href="system/components/row/index.html">Rows and lists</a></td></tr>
   <tr><td>Show a keyboard shortcut</td><td><a href="system/components/badge/index.html">Badges, chips and keys</a>, <a href="system/components/tooltip/index.html">Tooltip</a></td></tr>
   <tr><td>Show a level such as context usage</td><td><a href="system/components/feedback/index.html">Feedback</a></td></tr>
   <tr><td>Show a list beside a page</td><td><a href="system/patterns/drawer/index.html">Drawer</a></td></tr>
   <tr><td>Show a live value under a terminal</td><td><a href="system/components/status-bar/index.html">Status bar</a></td></tr>
   <tr><td>Show a note across a whole panel</td><td><a href="system/components/feedback/index.html">Feedback</a></td></tr>
+  <tr><td>Show a page&#x27;s own dialog</td><td><a href="system/patterns/site-prompts/index.html">Site prompts</a></td></tr>
   <tr><td>Show a toast</td><td><a href="system/components/feedback/index.html">Feedback</a></td></tr>
   <tr><td>Show an empty panel or list</td><td><a href="system/patterns/states/index.html">Empty, loading and error states</a></td></tr>
   <tr><td>Show an error, warning or success</td><td><a href="system/components/feedback/index.html">Feedback</a></td></tr>
@@ -313,7 +335,9 @@
   <tr><td>Show progress</td><td><a href="system/components/feedback/index.html">Feedback</a></td></tr>
   <tr><td>Show text that changed under a comment</td><td><a href="system/foundations/highlights.html">Text highlights</a></td></tr>
   <tr><td>Show that a panel or the app failed</td><td><a href="system/patterns/states/index.html">Empty, loading and error states</a></td></tr>
+  <tr><td>Show that pick mode is on</td><td><a href="system/patterns/picker/index.html">Element picker</a></td></tr>
   <tr><td>Show that something is loading</td><td><a href="system/foundations/motion.html">Motion</a>, <a href="system/patterns/states/index.html">Empty, loading and error states</a></td></tr>
+  <tr><td>Show the current address</td><td><a href="system/components/origin-field/index.html">Origin field</a></td></tr>
   <tr><td>Show which tab is active</td><td><a href="system/components/tabs/index.html">Tabs</a></td></tr>
   <tr><td>Size a clickable target</td><td><a href="system/foundations/surfaces.html">Surfaces and elevation</a></td></tr>
   <tr><td>Size an icon</td><td><a href="system/components/icon/index.html">Icons</a></td></tr>
@@ -332,7 +356,7 @@
 <table>
 <thead><tr><th>Family</th><th>Tokens</th><th>Owner</th></tr></thead>
 <tbody>
-  <tr><td><code>--color-*</code></td><td class="ds-num">110</td><td><a href="system/foundations/colors.html">Colours</a></td></tr>
+  <tr><td><code>--color-*</code></td><td class="ds-num">112</td><td><a href="system/foundations/colors.html">Colours</a></td></tr>
   <tr><td><code>--text-*</code></td><td class="ds-num">8</td><td><a href="system/foundations/type.html">Typography</a></td></tr>
   <tr><td><code>--font-*</code></td><td class="ds-num">8</td><td><a href="system/foundations/type.html">Typography</a></td></tr>
   <tr><td><code>--leading-*</code></td><td class="ds-num">5</td><td><a href="system/foundations/type.html">Typography</a></td></tr>

@@ -15,6 +15,11 @@ done
 if [ "$wm_up" -ne 1 ]; then
   echo "warning: openbox did not start within 5 s; focus and maximize tests may fail" >&2
 fi
+# Park the real X pointer in a corner. Xvfb starts it at the screen centre, over
+# the preview; sendInputEvent moves only the page's pointer, and Chromium on
+# Linux makes up a pointer move at the real one when windows change under it –
+# a hover the comment picker follows (the E-007 flake, spec 024, 2026-10-31).
+xdotool mousemove 0 0 || echo "warning: could not park the X pointer" >&2
 "$@"
 status=$?
 kill "$wm_pid" 2>/dev/null

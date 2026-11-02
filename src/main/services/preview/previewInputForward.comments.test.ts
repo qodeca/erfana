@@ -28,9 +28,9 @@ const CTRL_ALT_M = keyDown({ key: 'm', code: 'KeyM', control: true, alt: true })
 const CMD_OPT_M = keyDown({ key: 'µ', code: 'KeyM', meta: true, alt: true })
 
 describe('M-052 the comment-mode toggle', () => {
-  it('is its own frozen row, and no other key joined the forward list', () => {
+  it('is its own frozen row, and only the comment stepper pair (C-13) joined the forward list', () => {
     expect(Object.isFrozen(PREVIEW_COMMENT_TOGGLE)).toBe(true)
-    expect(PREVIEW_FORWARDED_SHORTCUTS.map(row => row.key)).toEqual(['f', 's', 'w', 'Escape', 'back', 'forward'])
+    expect(PREVIEW_FORWARDED_SHORTCUTS.map(row => row.key)).toEqual(['f', 's', 'w', 'Escape', 'back', 'forward', 'comment-next', 'comment-previous'])
   })
 
   it('M-052 matches the typed m with exactly Ctrl+Alt (Windows, Linux) or Cmd+Option (macOS)', () => {
@@ -116,5 +116,138 @@ describe('Esc in comment mode', () => {
     expect(forwarded).toEqual(['comment-mode'])
     detach()
     expect(target.removeListener).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('C-13 the comment stepper keys with focus in the page', () => {
+  const ALT_F9 = keyDown({ key: 'F9', code: 'F9', alt: true })
+  const ALT_SHIFT_F9 = keyDown({ key: 'F9', code: 'F9', alt: true, shift: true })
+
+  it('024-AC-019 C-13 Alt+F9 is the next comment and Alt+Shift+F9 the previous, on every system, while comments are on', () => {
+    for (const platform of ['darwin', 'win32', 'linux'] as const) {
+      expect(matchForwardedShortcut(ALT_F9, platform, ON)).toBe('comment-next')
+      expect(matchForwardedShortcut(ALT_SHIFT_F9, platform, ON)).toBe('comment-previous')
+      expect(matchForwardedShortcut(ALT_F9, platform, MODE_ON)).toBe('comment-next')
+    }
+  })
+
+  it('024-AC-019 C-13 off for the view, or with Ctrl, Cmd or no Alt, the press stays with the page', () => {
+    expect(matchForwardedShortcut(ALT_F9, 'win32', OFF)).toBeNull()
+    expect(matchForwardedShortcut(ALT_F9, 'win32')).toBeNull()
+    expect(matchForwardedShortcut({ ...ALT_F9, control: true }, 'win32', ON)).toBeNull()
+    expect(matchForwardedShortcut({ ...ALT_F9, meta: true }, 'darwin', ON)).toBeNull()
+    expect(matchForwardedShortcut(keyDown({ key: 'F9', code: 'F9' }), 'win32', ON)).toBeNull()
+    expect(matchForwardedShortcut(keyDown({ key: 'F8', code: 'F8', alt: true }), 'win32', ON)).toBeNull()
+    expect(matchForwardedShortcut({ ...ALT_F9, type: 'keyUp' }, 'win32', ON)).toBeNull()
+  })
+
+  it('024-AC-019 C-13 matches the physical key: an F-row that types something else still steps', () => {
+    expect(matchForwardedShortcut(keyDown({ key: 'MediaPlayPause', code: 'F9', alt: true }), 'darwin', ON)).toBe('comment-next')
+  })
+
+  it('024-AC-019 C-13 the forwarder hides the press from the page and reports the step', () => {
+    let listener: ((event: InputForwardEvent, input: ForwardableInput) => void) | undefined
+    const target = { on: vi.fn((_: 'before-input-event', l: typeof listener) => (listener = l)), removeListener: vi.fn() }
+    const forwarded: string[] = []
+    attachInputForwarding(target, key => forwarded.push(key), 'win32', ON)
+    const event = { preventDefault: vi.fn() }
+    listener!(event, ALT_SHIFT_F9)
+    expect(event.preventDefault).toHaveBeenCalledTimes(1)
+    expect(forwarded).toEqual(['comment-previous'])
+  })
+})
+
+describe('K-1 main records the menu key', () => {
+  function attached(state: Partial<CommentKeyState> = {}) {
+    const listeners: Array<(event: InputForwardEvent, input: ForwardableInput) => void> = []
+    const target = {
+      on: (_event: 'before-input-event', listener: (event: InputForwardEvent, input: ForwardableInput) => void) => void listeners.push(listener),
+      removeListener: () => {}
+    }
+    const pressed = vi.fn()
+    const forwarded: string[] = []
+    attachInputForwarding(target, key => forwarded.push(key), 'darwin', { ...ON, menuKeyPressed: pressed, ...state })
+    const press = (input: ForwardableInput): ReturnType<typeof vi.fn> => {
+      const event = { preventDefault: vi.fn() }
+      listeners.forEach(listener => listener(event, input))
+      return event.preventDefault
+    }
+    return { press, pressed, forwarded }
+  }
+  const SHIFT_F10 = keyDown({ key: 'F10', code: 'F10', shift: true })
+  const MENU_KEY = keyDown({ key: 'ContextMenu', code: 'ContextMenu' })
+
+  it.each([
+    ['Shift+F10', SHIFT_F10],
+    ['the Menu key', MENU_KEY]
+  ])('K-1 %s is recorded, and stays with the page: nothing is forwarded or cancelled', (_name, input) => {
+    const { press, pressed, forwarded } = attached()
+    const preventDefault = press(input)
+    expect(pressed).toHaveBeenCalledTimes(1)
+    expect(preventDefault).not.toHaveBeenCalled()
+    expect(forwarded).toEqual([])
+  })
+
+  it.each([
+    ['plain F10', keyDown({ key: 'F10', code: 'F10' })],
+    ['Ctrl+Shift+F10', { ...SHIFT_F10, control: true }],
+    ['Cmd+Shift+F10', { ...SHIFT_F10, meta: true }],
+    ['Alt+Shift+F10', { ...SHIFT_F10, alt: true }],
+    ['Alt+Menu', { ...MENU_KEY, alt: true }],
+    ['a release', { ...SHIFT_F10, type: 'keyUp' }],
+    ['a held key repeating', { ...SHIFT_F10, isAutoRepeat: true }]
+  ])('L-1 %s is not a press of the menu key', (_name, input) => {
+    const { press, pressed } = attached()
+    press(input)
+    expect(pressed).not.toHaveBeenCalled()
+  })
+
+  describe('L-1 in comment mode the picker keys are recorded instead', () => {
+    const ENTER = keyDown({ key: 'Enter', code: 'Enter' })
+    const inMode = (state: Partial<CommentKeyState> = {}) => {
+      const pickKeyPressed = vi.fn()
+      return { ...attached({ modeOn: () => true, pickKeyPressed, ...state }), pickKeyPressed }
+    }
+
+    it.each([
+      ['Enter', ENTER],
+      ['Shift+F10', SHIFT_F10],
+      ['the Menu key', MENU_KEY]
+    ])('L-1 %s is recorded, and stays with the page', (_name, input) => {
+      const { press, pickKeyPressed, forwarded } = inMode()
+      const preventDefault = press(input)
+      expect(pickKeyPressed).toHaveBeenCalledTimes(1)
+      expect(preventDefault).not.toHaveBeenCalled()
+      expect(forwarded).toEqual([])
+    })
+
+    it.each([
+      ['a held Enter', { ...ENTER, isAutoRepeat: true }],
+      ['a release', { ...ENTER, type: 'keyUp' }],
+      ['Tab, which only moves', keyDown({ key: 'Tab', code: 'Tab' })],
+      ['a letter', keyDown({ key: 'a', code: 'KeyA' })]
+    ])('L-1 %s buys no pick', (_name, input) => {
+      const { press, pickKeyPressed } = inMode()
+      press(input)
+      expect(pickKeyPressed).not.toHaveBeenCalled()
+    })
+
+    it('L-1 Enter buys nothing outside comment mode or with comments off', () => {
+      const outside = inMode({ modeOn: () => false })
+      outside.press(ENTER)
+      expect(outside.pickKeyPressed).not.toHaveBeenCalled()
+      const off = inMode({ enabled: () => false })
+      off.press(ENTER)
+      expect(off.pickKeyPressed).not.toHaveBeenCalled()
+    })
+  })
+
+  it('L-1 it is recorded only while the page could ask: comments on, comment mode off', () => {
+    const off = attached({ enabled: () => false })
+    off.press(SHIFT_F10)
+    expect(off.pressed).not.toHaveBeenCalled()
+    const mode = attached({ modeOn: () => true })
+    mode.press(SHIFT_F10)
+    expect(mode.pressed).not.toHaveBeenCalled()
   })
 })

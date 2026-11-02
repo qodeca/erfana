@@ -1,14 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * CommentsSection – Settings › Comments for HTML Preview comments
- * (docs/designs/comments/html-preview-comments.md decision 3, §3 "Feature flag",
+ * CommentsSection – Settings › Comments, for both previews' comments
+ * (spec 024 024-FR-022, comments-v2 C-04; HTML Preview:
+ * docs/designs/comments/html-preview-comments.md decision 3, §3 "Feature flag",
  * §7.9, §10.7, §10.10 "Settings"; R-014;
  * docs/designs/comments/html-comments/identity.html "Settings › Comments").
  *
  * - **Comments in HTML preview** – the feature flag
  *   (`htmlPreview.comments.enabled`, default on). Off restores today's
- *   preview exactly; the fields below keep their values but take no input.
+ *   preview exactly.
+ * - **Comments in Markdown preview** – `markdownPreview.comments.enabled`,
+ *   default on (spec 024). The name and email are shared by both previews,
+ *   so they take input while EITHER switch is on, and keep their values
+ *   but take none when both are off.
  * - **Your name** / **Your email (optional)** – app-level only (a cloned
  *   repository cannot preset who you are, S20), saved on blur, affecting new
  *   comments only. Validated by the comment window's own schema: a bidi or
@@ -35,14 +40,15 @@
  */
 import { useId, useState } from 'react'
 import { useGlobalSettingsStore } from '../../../stores/useGlobalSettingsStore'
-import { SETTINGS_COPY } from '../../Panels/HtmlPreviewPanel/comments/commentCopy'
+import { isAnyPreviewCommentsEnabled } from '../../../../../shared/ipc/global-settings-schema'
+import { SETTINGS_COPY } from '../../Comments/commentCopy'
 import {
   AuthorEmailSchema,
   AuthorNameSchema
-} from '../../Panels/HtmlPreviewPanel/comments/commentSchemas'
-import { CommentBanner, CommentInput } from '../../Panels/HtmlPreviewPanel/comments/CommentParts'
-import { useLiveText } from '../../Panels/HtmlPreviewPanel/comments/commentLive'
-import '../../Panels/HtmlPreviewPanel/comments/CommentWindow.css'
+} from '../../Comments/commentSchemas'
+import { CommentBanner, CommentInput } from '../../Comments/CommentParts'
+import { useLiveText } from '../../Comments/commentLive'
+import '../../Comments/CommentWindow.css'
 import './CommentsSection.css'
 import { TEST_IDS } from '../../../constants/testids'
 
@@ -59,12 +65,17 @@ export function CommentsSection(): React.JSX.Element {
   const settings = useGlobalSettingsStore(s => s.settings)
   const updateCommentIdentity = useGlobalSettingsStore(s => s.updateCommentIdentity)
   const updateEnabled = useGlobalSettingsStore(s => s.updateHtmlPreviewCommentsEnabled)
+  const updateMarkdownEnabled = useGlobalSettingsStore(s => s.updateMarkdownPreviewCommentsEnabled)
   const titleId = useId()
   const flagId = useId()
+  const markdownFlagId = useId()
   const identity = settings?.comments
   // Not `isHtmlPreviewCommentsEnabled`: a partial settings object (an older
   // file, a test fixture) may lack `htmlPreview` and must read as on.
   const enabled = settings !== null && settings.htmlPreview?.comments?.enabled !== false
+  const markdownEnabled = settings !== null && settings.markdownPreview?.comments?.enabled !== false
+  // The identity is shared: usable while either preview's comments are on (024-FR-022).
+  const identityUsable = settings !== null && isAnyPreviewCommentsEnabled(settings)
   const [name, setName] = useState(identity?.authorName ?? '')
   const [email, setEmail] = useState(identity?.authorEmail ?? '')
   const [nameError, setNameError] = useState<string | null>(null)
@@ -145,6 +156,26 @@ export function CommentsSection(): React.JSX.Element {
           onChange={event => void updateEnabled(event.target.checked)}
         />
       </div>
+      <div className="settings-row">
+        <div className="settings-field">
+          <label htmlFor={markdownFlagId} className="settings-label">
+            {SETTINGS_COPY.markdownFlagLabel}
+          </label>
+          <p id={`${markdownFlagId}-d`} className="erf-comment-settings__desc">
+            {SETTINGS_COPY.markdownFlagHint}
+          </p>
+        </div>
+        <input
+          type="checkbox"
+          id={markdownFlagId}
+          className="settings-checkbox"
+          checked={markdownEnabled}
+          disabled={!settings}
+          aria-describedby={`${markdownFlagId}-d`}
+          data-testid={TEST_IDS.COMMENT_SETTINGS_MD_TOGGLE}
+          onChange={event => void updateMarkdownEnabled(event.target.checked)}
+        />
+      </div>
       <div className="erf-comment-settings__fields">
         <CommentInput
           label={SETTINGS_COPY.nameLabel}
@@ -157,7 +188,7 @@ export function CommentsSection(): React.JSX.Element {
           hint={SETTINGS_COPY.nameHint}
           error={nameError}
           autoComplete="name"
-          disabled={!enabled}
+          disabled={!identityUsable}
           testId={TEST_IDS.COMMENT_SETTINGS_NAME}
         />
         {name.trim() === '' && <p className="erf-comment-note">{SETTINGS_COPY.nameEmpty}</p>}
@@ -173,7 +204,7 @@ export function CommentsSection(): React.JSX.Element {
           error={emailError}
           type="email"
           autoComplete="email"
-          disabled={!enabled}
+          disabled={!identityUsable}
           testId={TEST_IDS.COMMENT_SETTINGS_EMAIL}
         />
       </div>

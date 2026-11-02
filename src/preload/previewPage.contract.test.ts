@@ -17,11 +17,20 @@
  * listens" became "listens on that one literal and nothing else". Widening any
  * rule here changes the sealed box's security posture and needs the same
  * deliberate review.
+ *
+ * WIDENED ON PURPOSE for spec 024 (docs/adrs/0006-overlay-core-in-the-sealed-preload.md,
+ * § 8 C15): the overlay may also import the pure shared overlay core,
+ * `src/shared/comments/overlayCore/` – its modules, nothing below them. The
+ * bans below scan that folder too, and the import rule now reads the syntax
+ * tree and compares resolved paths (`__tests__/sourceScan.ts`) instead of
+ * matching import lines. `overlayCore.contract.test.ts` keeps the core
+ * import-free, global-free and inert on load.
  */
 import { describe, expect, it } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import ts from 'typescript'
+import { comparablePath, isTypeScriptSourceName, moduleReferences, resolveRelative } from './__tests__/sourceScan'
 
 import {
   PREVIEW_PAGE_LINK_CHANNEL,
@@ -72,15 +81,54 @@ const SOURCE = code(RAW)
 
 const COMMENTS_DIR = join(__dirname, 'previewPageComments')
 
+/** The shared overlay core the overlay may import (ADR 0006). */
+const OVERLAY_CORE_DIR = join(__dirname, '..', 'shared', 'comments', 'overlayCore')
+
+/** Every non-test module of `dir`, file name → raw text. */
+function modulesOf(dir: string): ReadonlyMap<string, string> {
+  return new Map(
+    readdirSync(dir)
+      .filter(name => name.endsWith('.ts') && !name.endsWith('.test.ts'))
+      .map(name => [name, readFileSync(join(dir, name), 'utf8')])
+  )
+}
+
+const COMMENT_RAW = modulesOf(COMMENTS_DIR)
+const OVERLAY_CORE_RAW = modulesOf(OVERLAY_CORE_DIR)
+
 /** Every non-test module of the comment overlay, by file name. */
 const COMMENT_SOURCES: ReadonlyMap<string, string> = new Map(
-  readdirSync(COMMENTS_DIR)
-    .filter(name => name.endsWith('.ts') && !name.endsWith('.test.ts'))
-    .map(name => [name, code(readFileSync(join(COMMENTS_DIR, name), 'utf8'))])
+  [...COMMENT_RAW].map(([name, raw]) => [name, code(raw)])
 )
 
-/** Both preload sources as one text. */
-const ALL = [SOURCE, ...COMMENT_SOURCES.values()].join('\n')
+/** Every non-test module of the shared overlay core, by file name. */
+const OVERLAY_CORE_SOURCES: ReadonlyMap<string, string> = new Map(
+  [...OVERLAY_CORE_RAW].map(([name, raw]) => [name, code(raw)])
+)
+
+/** The one subfolder of the overlay: test doubles, which the import rule below keeps out of the bundle. */
+const TEST_HELPERS_DIR = '__test-helpers__'
+
+/** A folder entry, as `readdirSync(…, { withFileTypes: true })` gives it. */
+interface FolderEntry {
+  readonly name: string
+  isDirectory(): boolean
+}
+
+/**
+ * The entries of a folder the preview-page bundle reads that are not
+ * TypeScript source modules (`allowedDirs` aside): a stray `x.js` beside
+ * `x.ts` is what the bundler would load, and the scans read only `.ts`.
+ */
+function strayEntries(entries: readonly FolderEntry[], allowedDirs: readonly string[] = []): string[] {
+  return entries
+    .filter(entry => !(entry.isDirectory() && allowedDirs.includes(entry.name)))
+    .filter(entry => entry.isDirectory() || !isTypeScriptSourceName(entry.name))
+    .map(entry => entry.name)
+}
+
+/** Every source the preview-page bundle can hold, as one text. */
+const ALL = [SOURCE, ...COMMENT_SOURCES.values(), ...OVERLAY_CORE_SOURCES.values()].join('\n')
 
 describe('previewPage preload contract', () => {
   /**
@@ -200,7 +248,7 @@ describe('previewPage preload contract', () => {
   it('SEC-02 the overlay cancels events in one place: the comment-mode guard', () => {
     // `swallow` (input.ts) is the one function that calls `preventDefault`;
     // it runs for comment-mode events and pin clicks only.
-    const callers = [...COMMENT_SOURCES].filter(([, text]) => text.includes('preventDefault'))
+    const callers = [...COMMENT_SOURCES, ...OVERLAY_CORE_SOURCES].filter(([, text]) => text.includes('preventDefault'))
     expect(callers.map(([name]) => name)).toEqual(['input.ts'])
     const input = COMMENT_SOURCES.get('input.ts') ?? ''
     expect(input.match(/preventDefault/g)).toHaveLength(1)
@@ -232,11 +280,14 @@ describe('previewPage preload contract', () => {
     // A value import from a shared module makes Rollup hoist a chunk a
     // sandboxed preload cannot require (#73 build guard). The one relative
     // import is this entry's own overlay folder, bundled into the same file.
-    const imports = SOURCE.match(/^import .*/gm) ?? []
-    expect(imports).toEqual([
-      "import { ipcRenderer } from 'electron'",
-      "import { commentsRequested, installPreviewPageComments } from './previewPageComments'"
+    // Read on the syntax tree (§ 8 C15): a re-export, `require()` or `import()`
+    // counts as an import too.
+    const entry = join(__dirname, 'previewPage.ts')
+    expect(moduleReferences(entry, RAW).map(({ specifier, names }) => [specifier, names])).toEqual([
+      ['electron', ['ipcRenderer']],
+      ['./previewPageComments', ['commentsRequested', 'installPreviewPageComments']]
     ])
+    expect(resolveRelative(entry, './previewPageComments')).toBe(comparablePath(join(COMMENTS_DIR, 'index.ts')))
   })
 
   it('strips comments without cutting strings or regexes that hold `//`', () => {
@@ -252,17 +303,63 @@ describe('previewPage preload contract', () => {
     ])
   })
 
-  it('the overlay imports ipcRenderer from electron in index.ts only, and otherwise only its own modules', () => {
-    for (const [name, text] of COMMENT_SOURCES) {
-      for (const statement of text.match(/^import [\s\S]*?from '[^']+'/gm) ?? []) {
-        const from = /from '([^']+)'$/.exec(statement)?.[1] ?? ''
-        if (from === 'electron') {
-          expect(name).toBe('index.ts')
-          expect(statement).toBe("import { ipcRenderer } from 'electron'")
-        } else {
-          expect(from, `${name}: ${from}`).toMatch(/^\.\/[A-Za-z]+$/)
+  it('024-AC-028 the overlay imports ipcRenderer from electron in index.ts only, and otherwise only its own modules and the overlayCore modules, by resolved path', () => {
+    // ADR 0005 decision 6 as amended by ADR 0006. Each module the overlay
+    // names – import, re-export, `require()`, `import()` – must resolve to a
+    // file directly in its own folder or directly in overlayCore; a subfolder
+    // (`__test-helpers__`), a sibling folder reached through `..`, an alias or
+    // a package fails.
+    const allowedDirs = [COMMENTS_DIR, OVERLAY_CORE_DIR].map(comparablePath)
+    let coreImports = 0
+    for (const [name, raw] of COMMENT_RAW) {
+      const file = join(COMMENTS_DIR, name)
+      for (const { specifier, names, line } of moduleReferences(file, raw)) {
+        const where = `${name}:${line} ${specifier}`
+        if (specifier === 'electron') {
+          expect(name, where).toBe('index.ts')
+          expect(names, where).toEqual(['ipcRenderer'])
+          continue
         }
+        const target = resolveRelative(file, specifier)
+        expect(target, where).not.toBeNull()
+        expect(allowedDirs, where).toContain(dirname(target as string))
+        expect(target, where).toMatch(/\/[A-Za-z]+\.ts$/)
+        if (dirname(target as string) === allowedDirs[1]) coreImports += 1
       }
     }
+    // The preload really uses the core (pins, geometry, constants, controller).
+    expect(coreImports).toBeGreaterThan(0)
+  })
+
+  it('024-AC-028 the overlay folder and the overlay core hold TypeScript sources only', () => {
+    // What the scans read must be what the bundle loads: no `.js`, `.mjs`,
+    // `.d.ts` or other file beside the `.ts` modules, and no subfolder but the
+    // overlay's test helpers.
+    expect(strayEntries(readdirSync(COMMENTS_DIR, { withFileTypes: true }), [TEST_HELPERS_DIR])).toEqual([])
+    expect(strayEntries(readdirSync(OVERLAY_CORE_DIR, { withFileTypes: true }))).toEqual([])
+  })
+
+  it('024-AC-028 the folder check catches a stray module beside a source', () => {
+    const entry = (name: string, directory = false): FolderEntry => ({ name, isDirectory: () => directory })
+    const entries = [
+      entry('pins.ts'),
+      entry('pins.test.ts'),
+      entry('overlay.conformance.test.ts'),
+      entry(TEST_HELPERS_DIR, true),
+      entry('pins.js'),
+      entry('pins.d.ts'),
+      entry('pins.mjs'),
+      entry('nested', true)
+    ]
+    expect(strayEntries(entries, [TEST_HELPERS_DIR])).toEqual(['pins.js', 'pins.d.ts', 'pins.mjs', 'nested'])
+    expect(strayEntries(entries)).toEqual([TEST_HELPERS_DIR, 'pins.js', 'pins.d.ts', 'pins.mjs', 'nested'])
+  })
+
+  it('024-AC-028 the bans above scan the shared overlay core too', () => {
+    // A ban that never saw overlayCore would pass however the core changed.
+    expect([...OVERLAY_CORE_SOURCES.keys()].sort()).toEqual(
+      expect.arrayContaining(['gesture.ts', 'modeState.ts', 'pinLayout.ts'])
+    )
+    for (const text of OVERLAY_CORE_SOURCES.values()) expect(ALL).toContain(text)
   })
 })

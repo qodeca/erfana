@@ -1,7 +1,7 @@
 {
   "sequence": {
-    "current": 22,
-    "next": 23
+    "current": 25,
+    "next": 26
   },
   "registry": [
     {
@@ -337,11 +337,105 @@
         "implemented": 0,
         "list": []
       }
+    },
+    {
+      "id": 23,
+      "tier": "T3",
+      "slug": "readme-video",
+      "name": "README showcase video",
+      "status": "active",
+      "scope": "feature",
+      "description": "1920x1080 showcase video for the GitHub README: nine features in one real, continuous run (tree, preview, terminal; real Claude Code and OS dialogs), recorded on macOS, sped-up parts marked, WebP plus still PNG under 30 MB, gated by automatic checks and owner approval. Replaces the #139 demo loop.",
+      "created": "2026-10-29T11:20:00.000Z",
+      "path": "spec-t3-023-readme-video",
+      "last_modified": "2026-10-29T15:30:00.000Z",
+      "sections_count": 3,
+      "requirements_count": 24,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "ux": [],
+        "e2e_test_designs": [],
+        "issues": []
+      }
+    },
+    {
+      "id": 24,
+      "tier": "T3",
+      "slug": "unified-comments",
+      "name": "Unified comments (HTML + Markdown Preview)",
+      "status": "active",
+      "scope": "feature",
+      "description": "One comment experience across Erfana: a shared comment base for the HTML and Markdown Previews with a seam for later text-file previews; Markdown Preview comments; text-selection comments in both; erfana:comment v1 with optional fields only, readable by v0.23.1; byte-exact saves; Claude Code gate; comments-v2 P0/P1 changes; one PR, one release.",
+      "created": "2026-10-29T19:00:00.000Z",
+      "path": "spec-t3-024-unified-comments",
+      "last_modified": "2026-10-29T22:05:00.000Z",
+      "sections_count": 3,
+      "requirements_count": 35,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [
+          "specs/spec-t3-024-unified-comments/architecture/001-shared-comment-base.md"
+        ],
+        "solution_specs": [],
+        "designs": [
+          "docs/designs/comments/comments-v2.md",
+          "docs/designs/comments/markdown-preview-comments.md",
+          "docs/designs/comments/selection-comments.md",
+          "docs/designs/comments/html-preview-comments.md"
+        ],
+        "ux": [],
+        "e2e_test_designs": [],
+        "issues": [
+          "#426",
+          "#429",
+          "#440"
+        ]
+      }
+    },
+    {
+      "id": 25,
+      "tier": "T4",
+      "slug": "built-in-browser",
+      "name": "Built-in browser with element prompts",
+      "status": "active",
+      "scope": "feature",
+      "description": "Built-in web browser in Erfana tabs: open any http/https/file page, one persistent profile per project in .erfana/browser, with cookies encrypted at rest (self-ignored by git), Chrome-like site behaviour (permissions, downloads, certificate warnings, basic auth, popups, DevTools, width presets), pick mode with refinement, hover-only and cross-frame picking, four web prompt actions (Explain, Ask, Change, Prompt) sent through the prompt-template path with a context file (HTML as-is, styles, React hints, recent errors) and an annotated screenshot; terminal links open in a browser tab; no flag; 14-day Electron security release duty.",
+      "created": "2026-10-31T22:42:00.358Z",
+      "path": "spec-t4-025-built-in-browser",
+      "last_modified": "2026-11-01T18:24:20.000Z",
+      "sections_count": 5,
+      "requirements_count": 74,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [
+          "docs/designs/browser/README.md",
+          "docs/designs/browser/index.html",
+          "docs/designs/browser/tab-and-toolbar.html",
+          "docs/designs/browser/picking.html",
+          "docs/designs/browser/prompt-actions.html",
+          "docs/designs/browser/site-prompts.html",
+          "docs/designs/browser/page-states.html",
+          "docs/designs/browser/menus-and-data.html",
+          "docs/designs/browser/browser.css",
+          "docs/design-system/system/components/origin-field/index.html",
+          "docs/design-system/system/patterns/picker/index.html",
+          "docs/design-system/system/patterns/site-prompts/index.html"
+        ],
+        "ux": [],
+        "e2e_test_designs": [],
+        "issues": []
+      }
     }
   ],
   "metadata": {
-    "schema_version": "2.0.0",
+    "schema_version": "3.0.0",
     "created": "2025-12-22T00:00:00.000Z",
-    "last_updated": "2026-04-03T18:20:00.000Z"
+    "last_updated": "2026-11-01T18:24:20.000Z",
+    "version": 28
   }
 }

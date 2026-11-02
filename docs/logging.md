@@ -308,7 +308,7 @@ Performance instrumentation added for large-project debugging (#151):
 - **File operations**: `FileService: readDirectory completed` with `durationMs`, `fileCount` (info level); since #208 one of five `readDirectory` lines for tree walks, all carrying `pathDigest`, and a `readId` (`behindReadId` on the joined line) – see [Tree reads and memory](#tree-reads-and-memory-208)
 - **Project switch**: Per-stage logging with `durationMs` for failure identification
 - **Watcher health**: `DirectoryWatcherService` logs a health snapshot every 120s – `info` level since #208 (`warn` when the watcher is stressed), so it reaches `main.log` at the default level, and it now carries process memory; see [Tree reads and memory](#tree-reads-and-memory-208). Since #211 it also carries the path-filter and Windows-backend counters – see [Large projects on Windows](#large-projects-on-windows-211)
-- **Buffer pressure**: `ThrottledWorker` logs at 80% and 50% buffer capacity (warn/info level)
+- **Buffer pressure**: `ThrottledWorker` logs a `ThrottledWorker buffer pressure` warning once when its buffer reaches 80%, re-arms it silently when the buffer falls below 50%, and logs `ThrottledWorker buffer overflow` (warn) when it drops the oldest items
 - **Rate-limited errors**: `RateLimitedLogger` (`src/main/utils/RateLimitedLogger.ts`) prevents log spam during cascading EMFILE errors (10s default cooldown)
 
 ### Renderer console-error rate cap (#60)

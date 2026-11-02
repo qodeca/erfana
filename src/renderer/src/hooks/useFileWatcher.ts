@@ -19,6 +19,7 @@ import {
   type FileWatchSlot
 } from './fileWatchSlot'
 import { logger } from '../utils/logger'
+import { useLatestRef } from './useLatestRef'
 import { fileGateway } from '../services/fileGateway'
 import { fileWatchGateway } from '../services/fileWatchGateway'
 
@@ -65,12 +66,12 @@ export interface FileWatcherState {
   isReloading: boolean
 }
 
-/**
- * File watcher actions
- */
+/** File watcher actions */
 export interface FileWatcherActions {
   /** Reload file content from disk */
   reloadFromDisk: () => Promise<void>
+  /** Our own write landed (a comment save): take the file only while the tab is unedited before AND after the read */
+  reloadIfUnedited: () => Promise<void>
   /** Keep local version and dismiss conflict notification */
   keepLocal: () => void
   /** Dismiss external change notification without action */
@@ -88,9 +89,7 @@ export interface FileWatcherActions {
   notifySaveComplete: (savedContent: string) => void
 }
 
-/**
- * Return type for useFileWatcher hook
- */
+/** Return type for useFileWatcher hook */
 export type UseFileWatcherReturn = FileWatcherState & FileWatcherActions
 
 /**
@@ -106,6 +105,8 @@ export interface UseFileWatcherOptions {
   onContentUpdate: (content: string) => void
   /** Callback when file is reloaded (for state updates) */
   onReload?: () => void
+  /** The editor's text now (`undefined`: no editor mounted); `reloadIfUnedited` compares it across its read */
+  bufferNow?: () => string | undefined
 }
 
 /**
@@ -273,6 +274,19 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
     }
   }, [filePath, onContentUpdate, onReload, clearDeletedState])
 
+  const bufferNowRef = useLatestRef(options.bufferNow)
+  const reloadIfUnedited = useCallback(async () => {
+    if (!filePath || hasLocalChangesRef.current) return
+    const before = bufferNowRef.current?.()
+    const content = await fileGateway.readFile({ filePath }).catch((error: unknown) => {
+      logger.error('Error reading the file after our own write', error instanceof Error ? error : undefined)
+      return null
+    })
+    // Typed during the read: the edits win – autosave or the watcher's conflict path settles the file.
+    if (content === null || hasLocalChangesRef.current || bufferNowRef.current?.() !== before) return
+    await reloadFromDisk(content)
+  }, [filePath, reloadFromDisk, bufferNowRef])
+
   /**
    * Keep local version and dismiss conflict notification
    */
@@ -432,6 +446,7 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
     isReloading,
     // Actions
     reloadFromDisk,
+    reloadIfUnedited,
     keepLocal,
     dismissConflict,
     clearDeletedState,

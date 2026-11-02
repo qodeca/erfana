@@ -16,7 +16,7 @@ import {
   elementOf,
   fixedId,
   makeComment
-} from '../../../../../shared/htmlComments/__fixtures__/commentTestData'
+} from '../../../../../shared/comments/__fixtures__/commentTestData'
 import type { InstrumentOutcome, InstrumentedDocument } from '../commentParseCore'
 
 /** The page every builder starts from. Ids name the elements the blocks target. */

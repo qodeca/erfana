@@ -1,5 +1,7 @@
 # Packaging & Deployment
 
+> **Status:** proposal, not shipped – no graph-engine code exists in `src/` on `develop`, and spec 004 (graph foundation) is still `draft` in `specs/registry.json`.
+
 > ⚠️ **WORK IN PROGRESS - NOT READY FOR DEVELOPMENT**
 >
 > This documentation is currently under active development and review. The Graph Engine specification, architecture, and implementation details are subject to significant changes. **DO NOT start implementation work based on these documents.**
@@ -278,10 +280,11 @@ npm run build:mac
 ```
 
 **Output:**
-- `dist/erfana-darwin-arm64.dmg` (Apple Silicon)
-- `dist/erfana-darwin-x64.dmg` (Intel)
+- `release/<version>/erfana-<version>-arm64.dmg` (Apple Silicon only – Erfana ships no Intel build)
 
 **Code Signing:**
+
+> Erfana keeps its builder config in `electron-builder.yml` (`mac:` block), not a `build` key in package.json; the snippet below is illustrative.
 
 ```json
 {
@@ -342,10 +345,11 @@ npm run build:win
 ```
 
 **Output:**
-- `dist/erfana-win-x64.exe` (installer)
-- `dist/erfana-win-x64-portable.exe` (portable)
+- `release/<version>/erfana-<version>-setup.exe` (NSIS installer – Erfana ships no portable build)
 
 **Code Signing:**
+
+> Erfana's Windows signing is configured in `electron-builder.yml` (`win:` block, `azureSignOptions`), not with a `.pfx` file; the snippet below is illustrative.
 
 ```json
 {

@@ -2,7 +2,7 @@
 
 **Last updated**: October 2026 (v0.22.0 – asar fuses on)
 
-This document explains the Electron fuses configuration and security decisions. `scripts/fuses.js` is the single `afterPack` hook, so it also carries five non-fuse responsibilities: it restores the executable bit on bundled `node-pty` `spawn-helper` binaries (see [afterPack also chmods node-pty spawn-helper](#afterpack-also-chmods-node-pty-spawn-helper)), prunes foreign-arch native binaries, stages and re-verifies the per-arch `ffmpeg` binary, renames the bundle for test builds, and verifies the packed contents — the `app/` tree against the `files:` allowlist plus the `extraFiles`/`extraResources` destinations beside and above it (see [afterPack also verifies the packed app/ contents](#afterpack-also-verifies-the-packed-app-contents)).
+This document explains the Electron fuses configuration and security decisions. `scripts/fuses.js` is the single `afterPack` hook, so it also carries five non-fuse responsibilities: it restores the executable bit on bundled `node-pty` `spawn-helper` binaries (see [afterPack also chmods node-pty spawn-helper](#afterpack-also-chmods-node-pty-spawn-helper)), prunes foreign-arch native binaries, stages and re-verifies the per-arch `ffmpeg` binary, refuses a test build whose product name lacks the `(TEST BUILD)` suffix, and verifies the packed contents — the `app/` tree against the `files:` allowlist plus the `extraFiles`/`extraResources` destinations beside and above it (see [afterPack also verifies the packed app/ contents](#afterpack-also-verifies-the-packed-app-contents)).
 
 ---
 
@@ -51,7 +51,7 @@ afterSign: ./scripts/resign.js
 `afterPack` does seven things, in this order:
 
 1. Resolve the packed Electron binary – and, on a test build, refuse it via `assertTestBuildName` unless the product name ends in `(TEST BUILD)` – then `assertEffectiveAsarConfig`: the build's effective `asar`/`asarUnpack` (CLI overrides and `mac:`/`win:` keys included) must equal the pinned `ASAR_OPTIONS`/`ASAR_UNPACK`, with no `electronFuses` and no `disableAsarIntegrity`.
-2. Prune foreign-platform/arch `ffprobe-static` binaries and `node-pty` prebuilds (plus a `.pdb` strip on `win32`; on an asar build `files:` already keeps the `.pdb` files and node-pty's unused `conpty/` folder out).
+2. Prune foreign-platform/arch `ffprobe-static` binaries and `node-pty` prebuilds (plus a `.pdb` strip on `win32`; on an asar build `files:` already keeps the `.pdb` files and node-pty's unused `conpty/` folder out). On `win32`, `ensurePatchedConptyBuild` (#305) then requires the source-built, patched `build/Release/conpty.node` and deletes the unpatched `conpty.node` from the kept prebuild, so node-pty cannot fall back to it.
 3. Restore the `node-pty` `spawn-helper` execute bit (`0755`, Unix only).
 4. `ensurePackedMediaBinaries` – copy this pack's cached `ffmpeg` into the bundle, re-verify it (size floor always, SHA-256 only on pinned arches), and `chmod 0755` the packed `ffmpeg` + every `ffprobe`.
 5. `applyAndVerifyFuses` – flip the Electron fuses and reset the ad-hoc Darwin signature on the main binary (refused without `app.asar`), read the wire back, and check the embedded integrity hash against the archive.
@@ -227,7 +227,7 @@ Three guardrails keep such a build from being mistaken for a release:
 
 **Risk**: Attacker could enable remote debugging via `--inspect` flag and connect to debug port.
 
-**Mitigation**: `EnableNodeCliInspectArguments: isTestBuild` – `false` for every production build, which disables the `--inspect` flag. The fuse is flipped on only by an opt-in `ERFANA_TEST_BUILD=true` build, whose bundle is renamed `Erfana (TEST BUILD).app` and is never distributed.
+**Mitigation**: `EnableNodeCliInspectArguments: isTestBuild` – `false` for every production build, which disables the `--inspect` flag. The fuse is flipped on only by an opt-in `ERFANA_TEST_BUILD=true` build, whose product name makes electron-builder name the bundle `Erfana (TEST BUILD).app`, and which is never distributed.
 
 ---
 

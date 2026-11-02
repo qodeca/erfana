@@ -41,6 +41,7 @@ ADRs are **not** retrofitted for every historical choice — only for decisions 
 | [0003](./0003-dual-pubkey-trust-primary-rotation.md) | Dual-pubkey trust chain (primary + offline rotation) | accepted | 2026-04-23 |
 | [0004](./0004-per-spawn-toctou-rehash.md) | Per-spawn re-hash for TOCTOU close (5-tuple spawn log) | accepted | 2026-04-23 |
 | [0005](./0005-sub-frame-preload-one-receive-channel.md) | Sub-frame preload with one receive channel (HTML Preview comments) | accepted | 2026-10-26 |
+| [0006](./0006-overlay-core-in-the-sealed-preload.md) | Overlay core in the sealed preload (amends 0005 decision 6) | accepted | 2026-10-29 |
 
 ## When to write an ADR
 
@@ -55,4 +56,4 @@ Do **not** write one when:
 
 - The answer is in the code and the code is short.
 - The question is "how", not "why".
-- A deferred-work ledger entry already captures the rationale (e.g. `docs/windows/deferred-work.md` D1-D12).
+- A deferred-work ledger entry already captures the rationale (e.g. `docs/windows/deferred-work.md` D1-D8 and `docs/windows/deferred-work-phase4.md` D9-D12).

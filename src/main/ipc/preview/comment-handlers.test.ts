@@ -45,7 +45,10 @@ function service(overrides: Partial<CommentServiceApi> = {}): CommentServiceApi 
     setMode: vi.fn(async (on: boolean, showIcons: boolean) => ({ ok: true as const, on, showIcons })),
     list: vi.fn(async () => ({ ok: true as const, files: [] })),
     reveal: vi.fn(() => ({ ok: true as const })),
+    newOnThread: vi.fn(async () => ({ ok: true as const })),
+    keepDraft: vi.fn(() => ({ ok: true as const })),
     save: vi.fn(async () => ({ ok: true as const, threadKey: 't1' })),
+    bulk: vi.fn(async () => ({ ok: true as const, files: [{ fileKey: 'k'.repeat(32), ok: true as const, done: 1 }] })),
     e2eState: vi.fn(),
     ...overrides
   } as CommentServiceApi
@@ -88,11 +91,47 @@ describe('preview comment handlers', () => {
     expect(await invoke(PreviewCommentChannels.LIST, { panelId: PANEL })).toEqual({ ok: true, files: [] })
     expect(await invoke(PreviewCommentChannels.COMMAND, { panelId: PANEL, command: 'reveal', threadKey: 't1' })).toEqual({ ok: true })
     expect(svc.reveal).toHaveBeenCalledWith('t1')
+    expect(await invoke(PreviewCommentChannels.COMMAND, { panelId: PANEL, command: 'new-on-thread', threadKey: 't1' })).toEqual({ ok: true })
+    expect(svc.newOnThread).toHaveBeenCalledWith('t1')
     const save = { panelId: PANEL, op: 'add', draftToken: DRAFT, text: SECRET_TEXT }
     expect(await invoke(PreviewCommentChannels.SAVE, save)).toEqual({ ok: true, threadKey: 't1' })
     expect(svc.save).toHaveBeenCalledWith(save)
     expect(await invoke(PreviewCommentChannels.SET_UNSAVED_SOURCES, { paths: ['/p/index.html'] })).toEqual({ ok: true })
     expect(unsaved.set).toHaveBeenCalledWith(1, ['/p/index.html'])
+  })
+
+  describe('preview:commentBulk (024-FR-028)', () => {
+    const key = 'k'.repeat(32)
+    const BULK = { panelId: PANEL, change: 'deleteResolved', files: [{ fileKey: key, threads: [{ threadKey: key, rawHash: 'a'.repeat(64) }] }] }
+
+    it('goes to the sender window\'s own service', async () => {
+      const { svc } = register()
+      expect(await invoke(PreviewCommentChannels.BULK, BULK)).toEqual({ ok: true, files: [{ fileKey: key, ok: true, done: 1 }] })
+      expect(svc.bulk).toHaveBeenCalledWith(BULK)
+    })
+
+    it('an untrusted sender is refused before the payload is read', async () => {
+      const { svc } = register({ trusted: false })
+      const poisoned = new Proxy({}, { get: () => { throw new Error('payload was read') } })
+      expect(await invoke(PreviewCommentChannels.BULK, poisoned)).toEqual({ ok: false, code: ErrorCode.COMMENT_WRITE_FAILED })
+      expect(svc.bulk).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      ['an extra field', { ...BULK, path: '/etc/passwd' }],
+      ['an unknown change', { ...BULK, change: 'removeAll' }],
+      ['no files', { ...BULK, files: [] }]
+    ])('refuses %s', async (_case, request) => {
+      const { svc } = register()
+      expect(await invoke(PreviewCommentChannels.BULK, request)).toEqual({ ok: false, code: ErrorCode.COMMENT_WRITE_FAILED })
+      expect(svc.bulk).not.toHaveBeenCalled()
+    })
+
+    it('a panel of another window is not found', async () => {
+      const { svc } = register()
+      expect(await invoke(PreviewCommentChannels.BULK, { ...BULK, panelId: 'html-preview-/p/other.html' })).toEqual(KEY_INVALID)
+      expect(svc.bulk).not.toHaveBeenCalled()
+    })
   })
 
   it('SEC-07 an untrusted sender is refused before the payload is read', async () => {
@@ -147,6 +186,27 @@ describe('preview comment handlers', () => {
     })
     expect(await invoke(PreviewCommentChannels.LIST, { panelId: PANEL })).toEqual(KEY_INVALID)
     expect(JSON.stringify(vi.mocked(logger.error).mock.calls)).not.toContain('secret.html')
+  })
+
+  it('C-14 (HTML) keep-draft renews a draft of the sender\'s own panel only, and the strict schema refuses anything else', async () => {
+    const { svc } = register()
+    expect(await invoke(PreviewCommentChannels.COMMAND, { panelId: PANEL, command: 'keep-draft', draftToken: DRAFT })).toEqual({ ok: true })
+    expect(svc.keepDraft).toHaveBeenCalledExactlyOnceWith(DRAFT)
+    for (const bad of [
+      { panelId: PANEL, command: 'keep-draft', draftToken: 'not-a-token' },
+      { panelId: PANEL, command: 'keep-draft', draftToken: DRAFT, threadKey: 't1' },
+      { panelId: PANEL, command: 'keep-draft' },
+      { panelId: PANEL, command: 'reveal', draftToken: DRAFT }
+    ]) {
+      expect(await invoke(PreviewCommentChannels.COMMAND, bad), JSON.stringify(bad)).toEqual(KEY_INVALID)
+    }
+    expect(svc.keepDraft).toHaveBeenCalledTimes(1)
+    expect(svc.reveal).not.toHaveBeenCalled()
+    dispose?.()
+    const foreign = service({ windowId: 2 })
+    register({ svc: foreign })
+    expect(await invoke(PreviewCommentChannels.COMMAND, { panelId: PANEL, command: 'keep-draft', draftToken: DRAFT })).toEqual(KEY_INVALID)
+    expect(foreign.keepDraft).not.toHaveBeenCalled()
   })
 
   it('a window\'s unsaved files are forgotten when it closes, and watched once', async () => {

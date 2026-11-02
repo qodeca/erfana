@@ -42,7 +42,7 @@ const unsubscribeData = window.api.terminal.onData((data) => {
 })
 ```
 
-#### 2. Terminal Configuration (`TerminalPanel.tsx`, the `new Terminal({...})` options in the xterm init effect)
+#### 2. Terminal Configuration (`TerminalPanel/hooks/useXtermSession.ts`, the `XTERM_OPTIONS` passed to `new Terminal({...})`)
 
 - `scrollOnUserInput: false` - Prevents auto-scroll when user types
 - `smoothScrollDuration: 0` - Eliminates animation lag for instant response
@@ -82,7 +82,7 @@ Comprehensive test suite in `TerminalPanel.scroll.test.tsx` (6 tests):
 
 **Example Test**:
 ```typescript
-it('should preserve scroll position when user is scrolled up', async () => {
+it('preserves scroll position when user is scrolled up (not at bottom)', async () => {
   // Simulate user scrolling up
   mockXtermInstance.buffer.active.viewportY = 10
   mockXtermInstance.buffer.active.baseY = 50
@@ -140,7 +140,7 @@ const handleScrollToBottom = () => {
 <button
   className="icon-btn"
   onClick={handleScrollToBottom}
-  title="Scroll to Bottom"
+  title="Scroll to bottom"
 >
   <ArrowDownToLine size={14} />
 </button>

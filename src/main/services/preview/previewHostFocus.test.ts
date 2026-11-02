@@ -53,6 +53,11 @@ describe('PREVIEW_HOST_FOCUS_KEYS', () => {
   })
 })
 
+it('024-AC-019 C-13 a comment step key hands focus to the host: the comment window it opens takes it', () => {
+  expect(movesFocusToHost('comment-next')).toBe(true)
+  expect(movesFocusToHost('comment-previous')).toBe(true)
+})
+
 describe('forwardWithHostFocus', () => {
   it('focuses the host contents BEFORE the forwarded Escape is emitted', () => {
     const { window, focus } = makeWindow()

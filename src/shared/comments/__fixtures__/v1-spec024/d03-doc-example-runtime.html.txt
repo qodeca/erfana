@@ -1,0 +1,10 @@
+<!-- erfana:comment v1 id=c-aaaaaaaaaaaaaacp
+note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.
+  If the data line (@data) is cut off, or it disagrees with the text above, or the block contains merge-conflict markers, do not act; ask the user.
+  Spec: docs/html-comments/format-v1.md in github.com/qodeca/erfana
+status: open
+target: <div id="deck"> (built by script: <h2> at section:nth-of-type(2) > h2:nth-of-type(1) inside this element; snapshot captured from the page)
+comment by Ada Lovelace <ada@example.com> at 2026-10-25T14:03:00Z:
+  Rename this slide to "Q3 2026 results".
+@data {"v":1,"id":"c\u002daaaaaaaaaaaaaacp","status":"open","anchor":{"tag":"div","id":"deck","path":"html \u003e body \u003e div:nth\u002dof\u002dtype(1)","runtime":{"path":"section:nth\u002dof\u002dtype(2) \u003e h2:nth\u002dof\u002dtype(1)","tag":"h2","quote":{"exact":"Q3 results","prefix":"","suffix":"Revenue grew"},"snapshot":"\u003ch2\u003eQ3 results\u003c/h2\u003e","snapshotSource":"page"}},"view":{"w":1280,"h":800,"dpr":2,"x":0,"y":120,"hash":"#2"},"msgs":[{"id":"m\u002da2b3c4d5e6f7g2h3","by":{"name":"Ada Lovelace","email":"ada@example.com","role":"human"},"at":"2026\u002d10\u002d25T14:03:00Z","text":"Rename this slide to \"Q3 2026 results\"."}]}
+-->

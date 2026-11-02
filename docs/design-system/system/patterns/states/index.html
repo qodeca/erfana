@@ -420,7 +420,7 @@ single token.</p>
     <tr><td><code>.editor-empty</code></td><td><code>Panels/MarkdownEditorPanel.css</code></td><td>“No file open” and a hint – and, reused by <code>EditorLoadError</code>, a load failure</td><td><span data-contrast="--color-text-secondary on --color-bg-primary" data-min="4.5" data-result="pass">5.00:1 · pass</span></td></tr>
     <tr><td><code>.emptyState</code></td><td><code>ImageViewerPanel/ImageViewerPanel.module.css</code></td><td>“No image to display” under a 32px icon</td><td><span data-contrast="--color-text-secondary on --color-bg-primary" data-min="4.5" data-result="pass">5.00:1 · pass</span></td></tr>
     <tr><td><code>.project-tree-empty</code></td><td><code>ProjectTree/ProjectTree.css</code></td><td>“No markdown files found”, “No files found”, “Open a project to get started”</td><td><span data-contrast="--color-text-secondary on --color-bg-tertiary" data-min="4.5" data-result="fail">4.15:1 · fail</span></td></tr>
-    <tr><td><code>.erf-comment-drawer__empty</code></td><td><code>HtmlPreviewPanel/comments/CommentDrawer.css</code></td><td>No comments, and each filter's empty sentence – today “No resolved comments.” alone, with no hint naming where the other comments are (frame 4 adds it)</td><td>–</td></tr>
+    <tr><td><code>.erf-comment-drawer__empty</code></td><td><code>components/Comments/CommentDrawer.css</code></td><td>No comments, and each filter's empty sentence – today “No resolved comments.” alone, with no hint naming where the other comments are (frame 4 adds it)</td><td>–</td></tr>
     <tr><td><code>.camera-empty-state</code></td><td><code>Dialog/CameraDialog.css</code></td><td>“No camera detected” over the black preview</td><td>–</td></tr>
     <tr><td><code>.window-picker-empty</code></td><td><code>Dialog/WindowPickerDialog.css</code></td><td>“No capturable windows found.” (shares its rule with the loading line)</td><td><span data-contrast="--color-text-secondary on --color-bg-primary" data-min="4.5" data-result="pass">5.00:1 · pass</span></td></tr>
     <tr><td><code>.frontmatter-empty</code></td><td><code>Editor/MarkdownPreview.css</code></td><td><code>[]</code> or <code>{}</code> for an empty frontmatter value</td><td><span data-contrast="--color-text-tertiary on --color-bg-preview" data-min="4.5" data-result="pass">8.01:1 · pass</span></td></tr>
@@ -521,8 +521,14 @@ A token for each lands with the first component that implements them.</p>
 
 <section id="exceptions">
 <h2>Exceptions</h2>
-<p class="ds-muted">None recorded. A shipping component that departs from this card carries a
+<p class="ds-muted">A shipping component that departs from this card carries a
 <code>deviates:</code> marker at the site and gets a row here, naming the file.</p>
+<table class="ds-tokens">
+  <thead><tr><th>File</th><th>Departure</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td><code>docs/designs/browser/page-states.html</code> (design, spec 025)</td><td>Load-error, certificate and crashed pages use the Buttons card’s <code>.erf-button</code> instead of <code>.erf-state__action</code>; the title is an <code>h1</code> at <code>--text-lg</code> in <code>--color-text-emphasis</code>; a boxed localhost hint; the certificate page adds a 2px <code>--color-error</code> top rule</td><td>The page owns the whole browser page area, Reload needs the Buttons card’s busy spinner, and the certificate page must not look like an ordinary load error</td></tr>
+  </tbody>
+</table>
 </section>
 
 </main>

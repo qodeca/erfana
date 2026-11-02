@@ -51,4 +51,14 @@ src/preload/__snapshots__/surface.test.ts.snap text eol=lf
 # files on purpose, pinned by SHA-256 in v1.lock.json (G-003) and replayed by
 # the agent-review check (X-001). Line-ending conversion would change them.
 src/shared/htmlComments/__fixtures__/** -text
+# Spec 024: the frozen v0.23.1 parser and writer, and every new comment fixture
+# folder, keep their bytes exactly (SHA-256 locks).
+src/shared/comments/__fixtures__/** -text
+src/shared/markdownComments/__fixtures__/** -text
 e2e/fixtures/html-preview-corpus/comments/** -text
+
+# Spec 024 pin snapshots stay LF on every checkout, like the preload surface
+# snapshot above, so a Windows checkout compares the same bytes.
+src/preload/__snapshots__/previewPage.surface.pin.test.ts.snap text eol=lf
+src/shared/ipc/__snapshots__/preview-comment-schema.pin.test.ts.snap text eol=lf
+src/renderer/src/components/Comments/__snapshots__/commentCopy.pin.test.ts.snap text eol=lf

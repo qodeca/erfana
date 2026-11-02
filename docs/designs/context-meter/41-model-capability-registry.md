@@ -6,7 +6,7 @@
 >
 > **Citation policy.** Source references name a **file and symbol**, not a line number (decision (i)).
 > Issue: https://github.com/qodeca/erfana/issues/41 · Related: #216, #217 (pre-migration issue numbers – the public `qodeca/erfana` tracker renumbered from #1 at the 2026-06 open-source migration, so these resolve to unrelated public issues; treat them as provenance only)
-> **Coverage-floor update (2026-09-05)**: the `modelId.ts` per-file floor that §9.5, §12, §14, §15 and §18 describe as INERT has been **active since #55** (its F4 finding moved the `thresholds` block under `test.coverage` in `vitest.main.ts` and added the required `Coverage` CI job) – 95% on lines/functions/branches/statements, enforced on every push. The follow-up issue §16 mentions for live-process probing / `resolvedModel` is [#48](https://github.com/qodeca/erfana/issues/48).
+> **Coverage-floor update (2026-09-05)**: the `modelId.ts` per-file floor that §9.5, §12, §14, §15 and §18 describe as INERT has been **active since #55** (its F4 finding moved the `thresholds` block under `test.coverage` in `vitest.main.ts` and added the required `Coverage` CI job) – 95% on lines/functions/branches/statements, enforced on every push. That file is now `vitest.main.config.ts`; the older `vitest.main.ts` name in the sections below is historical. The follow-up issue §16 mentions for live-process probing / `resolvedModel` is [#48](https://github.com/qodeca/erfana/issues/48).
 
 > **Supersedes** the Opus-only registry in [`216-claude-status-bar.md`](216-claude-status-bar.md) §2, §4 and §10.
 

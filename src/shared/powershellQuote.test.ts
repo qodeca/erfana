@@ -47,7 +47,12 @@ describe.skipIf(pwsh.status !== 0)('with pwsh on PATH', () => {
     const original = "C:\\Users\\Bob\u2019s Files\\it's \u2018a\u201A\u201B\\proj"
     const run = spawnSync(
       'pwsh',
-      ['-NoProfile', '-Command', `[Console]::Out.Write(${quotePowerShellLiteral(original)})`],
+      // UTF-8 output: a Windows host's default OEM code page would mangle the curly quotes.
+      [
+        '-NoProfile',
+        '-Command',
+        `[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); [Console]::Out.Write(${quotePowerShellLiteral(original)})`
+      ],
       { encoding: 'utf8' }
     )
     expect(run.stdout).toBe(original)

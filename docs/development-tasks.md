@@ -465,7 +465,7 @@ npm run build
 3. Verify: `screenshot()`, `evaluate()`
 4. Close: `close({ sessionId })`
 
-**Common Selectors:** `.app-dock-layout`, `.project-tree`, `.monaco-editor`, `.preview-pane`, `[title="Project"]`, `[title="Terminal"]`
+**Common Selectors:** `.app-dock-layout`, `.project-tree`, `.monaco-editor`, `.preview-pane`, `[data-testid="activity-bar-btn-files"]`, `[data-testid="activity-bar-btn-terminal"]` (the activity-bar buttons' `title` carries the shortcut too, e.g. "Project (⌘B)", so match by test id)
 
 See: [Testing Index](./testing/README.md) | [Test Scenarios](./testing/test-scenarios.md)
 

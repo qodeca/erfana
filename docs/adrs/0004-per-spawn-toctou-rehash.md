@@ -7,7 +7,7 @@
 
 ## Context
 
-Local Whisper binaries (`whisper-cli` + 4 sidecar DLLs on Windows) live in `{userData}/whisper/bin/`, a user-writable directory. An attacker with local write access to that directory (local malware running as the user, IT-managed deployment gone wrong, anything with read/write on `$HOME`) can swap the binary between **install time** (when `ensureBinary()` verified SHAs) and **spawn time** (when `LocalWhisperService.transcribe()` execs it). This is a classic **TOCTOU** (Time-Of-Check To Time-Of-Use) race.
+Local Whisper binaries (`whisper-cli` on macOS; `whisper.exe` + 4 sidecar DLLs on Windows) live in `{userData}/whisper/bin/`, a user-writable directory. An attacker with local write access to that directory (local malware running as the user, IT-managed deployment gone wrong, anything with read/write on `$HOME`) can swap the binary between **install time** (when `ensureBinary()` verified SHAs) and **spawn time** (when `LocalWhisperService.transcribe()` execs it). This is a classic **TOCTOU** (Time-Of-Check To Time-Of-Use) race.
 
 The install-time SHA verify + the source-pin in `whisper-assets.ts` give us strong guarantees about what we **put on disk**, but nothing about what we **spawn from disk** at the moment of spawn.
 
@@ -27,7 +27,7 @@ Implemented as `WhisperModelManager.verifyInstalledBinary()` returning `Verified
 - `manifestRevision` — from the `.last-seen-revision` sentinel for release correlation
 - `binaryVersion` — pinned filename (proxy; see Alternatives)
 
-The install-time keys `url` and `expectedSha` are logged once by `WhisperModelManager.ensureBinary()` at install-complete time. Future work: correlation-ID grouping the two events — tracked as [D9 in `docs/windows/deferred-work.md`](../windows/deferred-work.md).
+The install-time keys `url` and `expectedSha` are logged once by `WhisperModelManager.ensureBinary()` at install-complete time. *Current state:* `url` is logged when the manifest and artifact are fetched and the artifact's `expectedSha256` with its download; the `'Whisper binary installed'` log carries `binDir`, `manifestRevision`, `signingKeyRole`, `upstreamSha` and `upstreamLabel`. Future work: correlation-ID grouping the two events — tracked as [D9 in `docs/windows/deferred-work.md`](../windows/deferred-work.md).
 
 ## Consequences
 

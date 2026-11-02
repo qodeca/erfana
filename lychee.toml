@@ -1,0 +1,20 @@
+# Link check for the user-facing docs (npm run lint:docs), external URLs included.
+# scripts/check-links.mjs stays the offline gate for relative links and anchors;
+# lychee adds the web links it never fetches.
+include_fragments = "full"
+max_retries = 3
+retry_wait_time = 3
+timeout = 30
+max_concurrency = 8
+accept = ["200..=299", "429"]
+cache = true
+max_cache_age = "1d"
+exclude = [
+  # Local-only hosts in examples.
+  '^https?://(localhost|127\.0\.0\.1)',
+  # GitHub badges and release redirects are rate-limited for anonymous clients.
+  '^https://img\.shields\.io/',
+]
+exclude_path = ["node_modules"]
+# A link to a folder is valid on GitHub, which lists the folder; "." accepts it.
+index_files = ["README.md", "index.html", "."]

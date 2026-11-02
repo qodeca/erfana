@@ -1,6 +1,6 @@
 # E2E selector catalog
 
-All `data-testid` attributes available for E2E testing – **350 testids** across 38 sections (counted against `testids.ts` on 2026-10-26).
+All `data-testid` attributes available for E2E testing – **419 testids** across 38 sections (counted against `testids.ts` and `commentTestids.ts` on 2026-10-29).
 
 **Related documentation**:
 - [E2E Testing Guide](./e2e-testing.md) – Main E2E documentation
@@ -8,6 +8,8 @@ All `data-testid` attributes available for E2E testing – **350 testids** acros
 - Spec #011 (archived) – Specification
 
 > **Scope of the automated check**: `testids.test.ts` asserts per-section counts against `testids.ts` – it validates the **source of truth, not this page**. Nothing fails when a table here drifts, so add the row by hand whenever you add a testid.
+>
+> **How the sections are grouped**: each heading's count is the number of constants in that group, matching the per-group `toHaveLength` assertions in `testids.test.ts`, which select constants by key prefix (`TERMINAL_`, `SCREEN_PERMISSION`, `TOAST` and so on). Two groups differ from the block layout of `testids.ts`: the screen permission dialog ids sit inside its `// Terminal Panel` block but are counted as their own group here, and the comment ids come from `commentTestids.ts`. The `// Name (N)` banner comments in `testids.ts` are not checked by any test, and six of them lag the real counts: Project Tree (16, really 17), Terminal Panel (14, really 18 with the screen permission ids), Dialogs - File Picker (5, really 6), Toast Notification (6, really 8), Settings Overlay (27, really 33) and HTML Preview Comments in `commentTestids.ts` (76, really 77).
 
 ---
 
@@ -560,9 +562,9 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 
 ---
 
-## HTML Preview comments (76 testids)
+## Comments, HTML and Markdown Preview (145 testids)
 
-Constants: `TEST_IDS.COMMENT_*` (defined in `src/renderer/src/constants/commentTestids.ts`, spread into `TEST_IDS`). Rows, messages, threads and tags repeat – scope them with a parent locator (`drawer.getByTestId(…)`, `.nth(i)`).
+The count is the `COMMENT_` check in `src/renderer/src/constants/testids.test.ts`. Constants: `TEST_IDS.COMMENT_*` (defined in `src/renderer/src/constants/commentTestids.ts`, spread into `TEST_IDS`). Rows, messages, threads and tags repeat – scope them with a parent locator (`drawer.getByTestId(…)`, `.nth(i)`).
 
 **Toolbar**
 
@@ -578,7 +580,6 @@ Constants: `TEST_IDS.COMMENT_*` (defined in `src/renderer/src/constants/commentT
 |--------|---------|------|
 | `comment-context-menu` | The element menu (right-click in comment mode) | static |
 | `comment-menu-add` | Element menu: Add comment | static |
-| `comment-menu-disabled` | Element menu: disabled Can't comment here | static |
 | `comment-announce` | The tab's polite live region | static |
 | `comment-alert` | The tab's assertive live region | static |
 
@@ -587,6 +588,7 @@ Constants: `TEST_IDS.COMMENT_*` (defined in `src/renderer/src/constants/commentT
 | Testid | Element | Type |
 |--------|---------|------|
 | `comment-window` | The comment window (data-view: identity / new / threads) | static |
+| `comment-window-frame` | The docked window's hidden probe: the box its `position: fixed` resolves against | static |
 | `comment-window-title` | Window title (takes focus in the threads view) | static |
 | `comment-window-close` | Close (x) in the window head | static |
 | `comment-window-alert` | The window's own assertive live region | static |
@@ -657,17 +659,33 @@ Constants: `TEST_IDS.COMMENT_*` (defined in `src/renderer/src/constants/commentT
 | Testid | Element | Type |
 |--------|---------|------|
 | `comment-drawer` | The comments drawer | static |
+| `comment-bulk-action` | The drawer's bulk action ("Resolve all changed comments", "Delete all resolved comments") | static |
+| `comment-bulk-paused` | The sentence that holds a bulk action back while a file has unsaved edits | static |
+| `comment-bulk-review` | The review of a bulk action, in the list's place | static |
+| `comment-bulk-item` | One comment in the review | static |
+| `comment-bulk-cancel` | Bulk review: Cancel | static |
+| `comment-bulk-confirm` | Bulk review: Confirm | static |
+| `comment-bulk-outcome` | How a bulk action ended | static |
+| `comment-drawer-turn-on-mode` | The empty drawer's "Turn on comment mode" | static |
+| `comment-filter-cant-edit` | Filter: Can't edit (replaces Needs attention) | static |
+| `comment-drawer-sort` | The sort menu button; its items add `-file`, `-changed`, `-latest`, its menu `-menu` | static |
+| `comment-drawer-removed` | Note: open comments removed outside Erfana | static |
+| `comment-drawer-removed-show` | The note's Show / Hide | static |
+| `comment-drawer-removed-dismiss` | The note's Dismiss | static |
+| `comment-drawer-removed-copy` | A removed comment's Copy text | static |
+| `comment-drawer-reveal-note` | The sentence when "Show in preview" could not show its target | static |
 | `comment-drawer-close` | Close the drawer | static |
 | `comment-filter-open` | Filter: Open | static |
 | `comment-filter-resolved` | Filter: Resolved | static |
-| `comment-filter-attention` | Filter: Needs attention | static |
+| `comment-filter-attention` | Filter: Needs attention (unused, see technical debt entry 66) | static |
 | `comment-drawer-show-icons` | Show comment icons checkbox | static |
 | `comment-drawer-list` | The row list | static |
 | `comment-drawer-row` | A row | static |
-| `comment-drawer-row-main` | A row's main action (Show on page / Open in source) | static |
+| `comment-drawer-row-main` | A row's main action (Show in preview / Open in source) | static |
 | `comment-drawer-row-open` | A row's Open (the comment window) | static |
 | `comment-drawer-tag` | A tag on a row | static |
 | `comment-drawer-error` | List read error with Try again | static |
+| `comment-drawer-unread` | Note that main left files out of the list (its file count or byte budget) | static |
 
 **Settings**
 
@@ -679,3 +697,71 @@ Constants: `TEST_IDS.COMMENT_*` (defined in `src/renderer/src/constants/commentT
 | `settings-comment-email` | Your email | static |
 | `settings-comment-notice` | Visibility notice | static |
 | `settings-comment-alert` | Assertive region for blur-save errors | static |
+| `settings-toggle-md-comments` | Feature flag: Comments in Markdown preview | static |
+
+**Comment window, after comments-v2**
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `comment-changed` | The Changed / Words changed note above a thread | static |
+| `comment-was` | The Was box | static |
+| `comment-now` | The Now box | static |
+| `comment-comment-line` | "The comment itself is on line {n} of {file}." | static |
+| `comment-reply-resolve` | Reply and resolve | static |
+| `comment-resolve-next` | Resolve and next, in the foot | static |
+| `comment-stepper` | The stepper group in the head | static |
+| `comment-step-previous` | Previous comment | static |
+| `comment-step-next` | Next comment | static |
+| `comment-more-actions` | The head's More actions (…) button | static |
+| `comment-all-done` | All open comments are resolved | static |
+| `comment-carried` | "Your text from the last comment is here." | static |
+| `comment-pick-again` | Pick again, in the foot | static |
+| `comment-updated` | "Updated from {file} just now" | static |
+| `comment-new-since` | The "New since you opened" divider | static |
+| `comment-removed` | Removed outside Erfana while open | static |
+| `comment-copy-text` | Copy text | static |
+| `comment-retarget` | Comment on the whole {parent} | static |
+| `comment-words-dropped` | Saved on the whole target – the words were not kept | static |
+| `comment-edge-tab` | The docked window's edge tab | static |
+| `comment-window-polite` | The window's polite live region (a step's announcement) | static |
+| `comment-rebuild` | Rebuild from data… | static |
+| `comment-rebuild-confirm` | The rebuild confirmation | static |
+| `comment-rebuild-run` | Rebuild comment | static |
+| `comment-rebuild-keep-open` | Keep open (only the status line differs) | static |
+| `comment-rebuild-mark-resolved` | Mark resolved (only the status line differs) | static |
+| `comment-words-missing` | The selected words are not in the file – the window says the comment is on the whole target | static |
+| `comment-counter-live` | The text field's polite region – the counter's crossings | static |
+| `comment-step-live` | The Markdown Preview's polite region – where a step key from the preview landed | static |
+
+**Selections and the words step**
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `comment-menu-selection` | Menu item with a selection: Comment on selection | static |
+| `comment-menu-whole` | Menu item with a selection: Comment on the whole {kind} | static |
+| `comment-selection-button` | The floating Comment button over a selection | static |
+| `comment-words` | New-comment window: the words quote | static |
+| `comment-words-notice` | New-comment window: a notice about the words (cut, crossed, tie, blank) | static |
+| `comment-words-whole` | New-comment window: Comment on the whole {kind} after a tie | static |
+| `comment-narrow-toggle` | New-comment window: the Narrow to words disclosure | static |
+| `comment-narrow-field` | New-comment window: the read-only text field to select words in | static |
+| `comment-narrow-result` | New-comment window: the result line, Comment on: “…” | static |
+| `comment-narrow-whole` | New-comment window: Whole {kind}, which clears the words | static |
+
+**Renderer-hosted previews (Markdown Preview)**
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `context-menu-reason` | A menu item's reason line | static |
+| `comment-menu-comment-on` | Menu item outside comment mode: Comment on {kind} | static |
+| `comment-menu-frontmatter` | Menu item on the frontmatter, always disabled | static |
+| `comment-host-overlay` | The overlay over a renderer-hosted preview (outside the exported content) | static |
+| `comment-host-outline` | The outline around the outlined or picked target | static |
+| `comment-host-flash` | The static highlight on a target "Show in preview" reached | static |
+| `comment-host-window-target` | The quiet outline on the target of the open window | static |
+| `comment-host-icon` | A comment icon (a real button, outside the Tab order) | static |
+| `comment-host-ghost` | A not-found comment's ghost, between two blocks (a real button) | static |
+| `comment-host-mode-tab` | The comment-mode tab | static |
+| `comment-host-paused` | The paused band over the Markdown Preview | static |
+| `comment-host-paused-save` | Paused band: Save {file} | static |
+| `comment-host-paused-go-to-editor` | Paused band, changed on disk: Go to editor | static |

@@ -12,7 +12,7 @@
 import { performance } from 'node:perf_hooks'
 import { parentPort, workerData } from 'node:worker_threads'
 import { encodeText, indexHtml, parseIndexedBlocks } from '../../../../../shared/htmlComments'
-import { anchorLookupOf } from '../../../../../shared/htmlComments/anchorLookup'
+import { anchorLookupOf } from '../../../../../shared/comments/anchorLookup'
 import { instrumentDocument, NO_TARGET } from '../commentParseCore'
 
 /** The `workerData.role` this entry answers to. */

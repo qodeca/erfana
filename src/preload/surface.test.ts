@@ -75,6 +75,7 @@ describe('preload surface', () => {
     'markdownImage',
     'preview',
     'previewComments',
+    'fileComments',
     'claudeStatus',
     'screenshot',
     'utils'

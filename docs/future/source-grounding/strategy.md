@@ -154,7 +154,7 @@ For audit documents, citations should trace to:
 [Source: risk-assessment-q1.md, "verbatim quote here"]
 ```
 
-This leverages erfana's existing frontmatter metadata (`source`, `type`, `date`) for traceability.
+This leverages the frontmatter erfana's importers already write (`source` and `date` on every import; `type` only on video imports) for traceability.
 
 ---
 
@@ -163,6 +163,8 @@ This leverages erfana's existing frontmatter metadata (`source`, `type`, `date`)
 ### Audit summary template
 
 A new prompt template for erfana's prompt system (`src/renderer/src/prompts/templates/`):
+
+> Note: the current schema (`src/renderer/src/prompts/schema.ts`) accepts only the `area` values `markdown-preview`, `code-editor`, `global` and `diagram-viewer` and a fixed `subArea` list, so `area: document` / `subArea: audit` below would need a schema change first.
 
 ```yaml
 ---

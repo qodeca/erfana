@@ -1,0 +1,7 @@
+# maintaining-this-guide.md § Add an image: alt text starts "Screenshot of" and names its control.
+extends: existence
+message: "Start image alt text with 'Screenshot of' (or 'Animation of' for a moving demo)."
+level: error
+scope: alt
+raw:
+  - '^(?!Screenshot of |Animation of |Logo of |Diagram of |Badge: ).+'

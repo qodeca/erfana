@@ -1,0 +1,8 @@
+# Writing card: never an ampersand in a title – write "and".
+extends: existence
+message: "Write 'and', not '&', in a heading."
+level: error
+scope: heading
+nonword: true
+tokens:
+  - '&'

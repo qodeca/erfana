@@ -49,6 +49,8 @@ export interface FrameRecord {
   loadId?: string
   /** A document committed and has not said hello yet. */
   needsBind: boolean
+  /** Documents committed in the frame so far: which document a hello belongs to (F-001, the hello budget). */
+  navigation: number
   /** Pins of the bound load, by key. */
   readonly pins: Map<string, PinGroup>
   /** Pin keys by pin group id; a group keeps its key while the frame lives, and no key is reused. */
@@ -90,6 +92,7 @@ export class CommentFrames {
         key: `fr${this.nextKey++}`,
         bindKey: `ftn:${ftn}`,
         needsBind: false,
+        navigation: 0,
         pins: new Map(),
         pinKeys: new Map(),
         hidden: new Set()
@@ -138,6 +141,7 @@ export class CommentFrames {
     this.deps.files.navigated(ftn, url)
     const record = this.record(ftn)
     record.needsBind = true
+    record.navigation += 1
     record.loadId = undefined
     record.file = undefined
     record.loss = undefined

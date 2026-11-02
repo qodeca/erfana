@@ -19,6 +19,7 @@ import { logger } from '../../../../utils/logger'
 import type { MarkdownPreviewHandle } from '../../MarkdownPreview'
 import type { EditorFile } from '../types'
 import { pdfGateway, docxGateway } from '../../../../services/documentExportGateway'
+import { htmlWithoutCommentAttributes, stripCommentAttributes } from '../../../Comments/overlay/commentContentAttrs'
 
 // Re-export EditorFile for consumers who import from this module
 export type { EditorFile } from '../types'
@@ -189,7 +190,8 @@ export function useExportHandlers(
 
       // Get the inner content (the rendered markdown)
       const contentElement = previewElement.querySelector('.markdown-preview-content')
-      const html = contentElement?.innerHTML || previewElement.innerHTML
+      // Comments write a few marked attributes into the content (C-11): none reaches the file (024-FR-024).
+      const html = (contentElement ? htmlWithoutCommentAttributes(contentElement) : '') || htmlWithoutCommentAttributes(previewElement)
 
       const result = await pdfGateway.exportToPdf({ html, fileName })
 
@@ -275,7 +277,8 @@ export function useExportHandlers(
       // Convert Mermaid diagrams to PNG images before sending to main process.
       // This avoids jsdom/canvas dependency issues in the main process.
       // The conversion happens in the renderer where DOM/canvas APIs are available.
-      const conversionResult = await convertMermaidDiagramsToImages(contentElement)
+      // No comment attribute reaches the file (024-FR-024, C-11): stripped from the detached copy.
+      const conversionResult = await convertMermaidDiagramsToImages(contentElement, stripCommentAttributes)
 
       // Warn user if some diagrams failed to convert (partial success)
       if (conversionResult.failedDiagrams > 0) {

@@ -55,10 +55,10 @@ The app is packed into `app.asar`; native addons and executables are listed file
 `node-pty` ships prebuilt binaries. The rebuild happens at install time, not at package time:
 
 ```json
-"postinstall": "patch-package && electron-builder install-app-deps"
+"postinstall": "patch-package && install-electron && electron-builder install-app-deps"
 ```
 
-`patch-package` applies the committed `patches/node-pty+1.1.0.patch` (two hardened-Windows-11 build failures), then `electron-builder install-app-deps` rebuilds native modules against Electron's bundled Node.js.
+`patch-package` applies the committed `patches/node-pty+1.1.0.patch` (two hardened-Windows-11 build failures), `install-electron` downloads the Electron binary, then `electron-builder install-app-deps` rebuilds native modules against Electron's bundled Node.js.
 
 Because `electron-builder.yml` sets **`npmRebuild: false`**, the packager does *not* rebuild from source during packaging. Two consequences fall out of that, both handled in the `afterPack` hook:
 

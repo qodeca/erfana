@@ -1,0 +1,435 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+/**
+ * The HTML overlay against the shared overlay behaviour suite (spec 024,
+ * 024-FR-001, 024-FR-020; architecture note
+ * specs/spec-t3-024-unified-comments/architecture/001-shared-comment-base.md
+ * § 2, § 6 commit 4).
+ *
+ * The driver runs the real controller and input guards through the preload
+ * harness (`__test-helpers__/harness.ts`): trusted events in, recorded
+ * `commentPick` messages out, and the outline read back from the closed shadow
+ * root. Main turns comment mode on and off (a `commentState`), as it does for
+ * the toolbar and the forwarded shortcut.
+ *
+ * The element menu, the comment window and Find are not the page's: main shows
+ * the menu natively, the renderer draws the window and the find bar, and while
+ * either the menu or the window is open the page sits hidden behind a still
+ * frame, so no key reaches it. The suite skips those Esc steps for this host.
+ */
+import { expect, vi } from 'vitest'
+import { COMMENT_PICK_CHANNEL, REVEAL_FLASH_MS, TOKEN_ATTRIBUTE } from './constants'
+import { GUARDED_EVENTS } from './input'
+import {
+  createHarness,
+  lastStep,
+  microtasks,
+  mount,
+  token,
+  userKey,
+  userMouse,
+  userMove,
+  userUp,
+  type Harness
+} from './__test-helpers__/harness'
+import { runOverlaySuite } from '../../shared/comments/__conformance__/overlay.suite'
+import { runRevealSuite } from '../../shared/comments/__conformance__/reveal.suite'
+import { runPickerKeySuite } from '../../shared/comments/__conformance__/pickerKeys.suite'
+import { runSelectionSuite } from '../../shared/comments/__conformance__/selection.suite'
+import {
+  OVERLAY_FIXTURE,
+  type GestureModifiers,
+  type GesturePoint,
+  type OverlayPick,
+  type OverlayTargetBox,
+  type OverlayTargetId,
+  type RevealDriver,
+  type RevealTarget,
+  type SelectionDriver
+} from '../../shared/comments/__conformance__/overlayDriver'
+
+const T = TOKEN_ATTRIBUTE
+/** Which fixture target an element is. Not an id or a class, so the label never shows it. */
+const TARGET_ATTRIBUTE = 'data-ovl'
+
+const PAGE =
+  `<section id="stage" class="stage" ${T}="${token(1)}" ${TARGET_ATTRIBUTE}="container">` +
+  `<div id="first" ${T}="${token(2)}" ${TARGET_ATTRIBUTE}="first">First block ` +
+  `<button id="buy" class="cta primary" ${T}="${token(3)}" ${TARGET_ATTRIBUTE}="inner">Buy now</button></div>` +
+  `<p id="second" class="note lead extra" ${T}="${token(4)}" ${TARGET_ATTRIBUTE}="second">Second paragraph text</p>` +
+  `<article id="a-very-long-identifier-that-overflows-the-label" class="x" ${T}="${token(5)}" ${TARGET_ATTRIBUTE}="long">Long label</article>` +
+  `</section>`
+
+/** The words the HTML overlay's label shows for each fixture target, then the size it keeps for Alt (D-05). */
+const HTML_LABELS: Readonly<Record<OverlayTargetId, string>> = {
+  container: 'Section · “First block Buy now Second…” 600×400',
+  first: 'Section · “First block Buy now” 260×120',
+  inner: 'Section · “Buy now” 100×30',
+  second: 'Section · “Second paragraph text” 260×120',
+  long: 'Section · “Long label” 260×120'
+}
+
+/** The page's own listeners: bubble phase, registered after the preload's capture guards. */
+const PAGE_EVENTS = [...GUARDED_EVENTS, 'keydown', 'keyup'] as const
+
+const elementOf = (target: OverlayTargetId): HTMLElement => {
+  const el = document.querySelector<HTMLElement>(`[${TARGET_ATTRIBUTE}="${target}"]`)
+  if (el === null) throw new Error(`no fixture target ${target}`)
+  return el
+}
+
+const targetOf = (el: Element | null | undefined): OverlayTargetId | null =>
+  (el?.getAttribute(TARGET_ATTRIBUTE) as OverlayTargetId | null | undefined) ?? null
+
+const pointOf = ({ target, dx = 0, dy = 0 }: GesturePoint): { x: number; y: number } => {
+  const { left, top, width, height } = OVERLAY_FIXTURE[target].box
+  return { x: left + width / 2 + dx, y: top + height / 2 + dy }
+}
+
+/** The nearest element holding both `a` and `b` – where Chromium sends the `click` after a drag. */
+const commonAncestor = (a: Element, b: Element): Element => {
+  for (let el: Element | null = a; el !== null; el = el.parentElement) if (el.contains(b)) return el
+  return document.documentElement
+}
+
+const isShown = (el: Element | null | undefined): el is HTMLElement =>
+  el !== null && el !== undefined && !el.classList.contains('erf-hpc-hidden')
+
+const realRects = Range.prototype.getClientRects
+
+/** Every range is drawn on the one line `box`: jsdom has no layout. */
+function drawRangesAt(box: OverlayTargetBox): void {
+  const rect = new DOMRect(box.left, box.top, box.width, box.height)
+  Range.prototype.getClientRects = () => [rect] as unknown as DOMRectList
+}
+
+/** Longer than the button's wait and its redraw, in real time: the overlay's own timers run. */
+const BUTTON_WAIT_MS = 400
+const realTime = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
+
+/** The page sends which end; the window words it (`commentLive.ts`, pinned by its own test). */
+const END_SENTENCES: Readonly<Record<string, string>> = {
+  top: 'Top level – no parent to select.',
+  'no-child': 'Nothing inside to select.',
+  last: 'Last section at this level – Alt+Up for the parent.',
+  first: 'First section at this level.'
+}
+
+/** The driver over a harness whose page holds the fixture. */
+function driverOn(h: Harness): SelectionDriver {
+  h.state({ mode: false }) // Main's first state of the load: the mode is off, and can come on from here.
+  for (const target of Object.keys(OVERLAY_FIXTURE) as OverlayTargetId[]) {
+    h.doubles.setBox(elementOf(target), OVERLAY_FIXTURE[target].box)
+  }
+  const seen: string[] = []
+  const record = (event: Event): void => {
+    seen.push(event.type)
+  }
+  for (const type of PAGE_EVENTS) document.addEventListener(type, record)
+
+  /** A fresh gesture: a new rate-limit second, and a fresh record of what the page saw. */
+  const begin = (): void => {
+    h.clock.now += 1_000
+    seen.length = 0
+  }
+  const at = (point: GesturePoint): { x: number; y: number; el: Element } => {
+    const { x, y } = pointOf(point)
+    const el = document.elementFromPoint(x, y)
+    if (el === null) throw new Error(`nothing at ${x},${y}`)
+    return { x, y, el }
+  }
+  const move = (x: number, y: number): void => {
+    userMove(x, y)
+    userMouse(document.elementFromPoint(x, y) ?? document.body, 'mousemove', { x, y })
+  }
+  const modifiers = (m: GestureModifiers = {}): MouseEventInit => ({
+    shiftKey: m.shift === true,
+    altKey: m.alt === true,
+    ctrlKey: m.ctrl === true,
+    metaKey: m.meta === true
+  })
+  const press = (el: Element, x: number, y: number, button: number, init: MouseEventInit = {}): void => {
+    const buttons = button === 2 ? 2 : button === 1 ? 4 : 1
+    userMouse(el, 'pointerdown', { x, y, button, buttons, ...init })
+    userMouse(el, 'mousedown', { x, y, button, buttons, ...init })
+  }
+  const release = (el: Element, x: number, y: number, button: number, init: MouseEventInit = {}): void => {
+    userMouse(el, 'pointerup', { x, y, button, ...init })
+    userMouse(el, 'mouseup', { x, y, button, ...init })
+  }
+  /** `count` primary clicks in a row, with the browser's `detail` and the `dblclick` after the second. */
+  const clicks = (target: OverlayTargetId, count: number, m?: GestureModifiers): void => {
+    begin()
+    const { x, y, el } = at({ target })
+    move(x, y)
+    for (let detail = 1; detail <= count; detail += 1) {
+      press(el, x, y, 0, { detail, ...modifiers(m) })
+      release(el, x, y, 0, { detail, ...modifiers(m) })
+      userMouse(el, 'click', { x, y, button: 0, detail, ...modifiers(m) })
+      if (detail === 2) userMouse(el, 'dblclick', { x, y, button: 0, detail })
+    }
+  }
+  /** The first words of `target`'s own text selected. */
+  const selectIn = (target: OverlayTargetId): void => {
+    const text = [...elementOf(target).childNodes].find(node => node.nodeType === Node.TEXT_NODE)
+    if (text === undefined) throw new Error(`no text in ${target}`)
+    const range = document.createRange()
+    range.setStart(text, 0)
+    range.setEnd(text, Math.min(6, text.textContent?.length ?? 0))
+    const selection = window.getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+  }
+  const picks = (): OverlayPick[] =>
+    (h.sent(COMMENT_PICK_CHANNEL) as Array<{ kind: string; via: 'pointer' | 'keyboard'; token?: string }>)
+      .filter((p): p is { kind: OverlayPick['kind']; via: 'pointer' | 'keyboard'; token?: string } =>
+        p.kind === 'open' || p.kind === 'menu' || p.kind === 'exit'
+      )
+      .map(p => ({
+        kind: p.kind,
+        via: p.via,
+        target: p.token === undefined ? null : targetOf(h.controller.tokens.elementOf(p.token))
+      }))
+  const part = (selector: string): Element | null => {
+    h.controller.renderNow()
+    return h.root()?.querySelector(selector) ?? null
+  }
+  const outlinedTarget = (): OverlayTargetId | null => {
+    const outline = part('.erf-hpc-outline')
+    if (!isShown(outline)) return null
+    const box = ['left', 'top', 'width', 'height'].map(side => outline.style.getPropertyValue(side)).join(' ')
+    const hit = (Object.keys(OVERLAY_FIXTURE) as OverlayTargetId[]).find(target => {
+      const b = OVERLAY_FIXTURE[target].box
+      return `${b.left}px ${b.top}px ${b.width}px ${b.height}px` === box
+    })
+    return hit ?? null
+  }
+
+  return {
+    host: 'HTML Preview (page preload)',
+    floatingLabel: true,
+    labels: HTML_LABELS,
+    // A-03: the decided tab, the same words as the Markdown Preview's before a target is outlined.
+    modeIndicatorIdle: 'Comment mode · Esc to leave',
+    rightClickOutsideMode: 'page',
+    kinds: { container: 'section', first: 'section', inner: 'section', second: 'section', long: 'section' },
+    notOwned: {
+      menu: 'the element menu is main’s native menu; the page is hidden behind a still frame while it is open and gets no key',
+      window: 'the comment window is renderer UI over a still frame of the page; the page gets no key while it is open',
+      find: 'Find is the renderer’s find bar; main forwards its Esc to the renderer and the page never sees it',
+      pickFocus: 'differences table D-31: the page’s picker draws its outline in a closed shadow root and never moves the page’s focus or its tabindex, so leaving the mode has no focus to hand on'
+    },
+    modeOn: () => h.state({ mode: true }),
+    modeOff: () => h.state({ mode: false }),
+    // Main says the mode is on, then gives the page native focus (`preview:focusPage`).
+    modeOnByKeys() {
+      h.state({ mode: true })
+      h.controller.startPicker()
+    },
+    isModeOn: () => h.controller.mode,
+    modeIndicatorText() {
+      const tab = part('.erf-hpc-tab')
+      return isShown(tab) ? tab.getAttribute('data-text') : null
+    },
+    modeTabMovedAway: () => part('.erf-hpc-tab')?.classList.contains('erf-hpc-tab--bottom') === true,
+    targets: () => [...document.querySelectorAll(`[${TARGET_ATTRIBUTE}]`)].map(el => targetOf(el) as OverlayTargetId),
+    hover(point) {
+      begin()
+      const { x, y } = pointOf(point)
+      move(x, y)
+    },
+    click: (target, m) => clicks(target, 1, m),
+    doubleClick: target => clicks(target, 2),
+    tripleClick: target => clicks(target, 3),
+    drag(from, to) {
+      begin()
+      const start = at(from)
+      const end = at(to)
+      move(start.x, start.y)
+      press(start.el, start.x, start.y, 0, { detail: 1 })
+      const steps = Math.max(1, Math.ceil(Math.hypot(end.x - start.x, end.y - start.y)))
+      for (let i = 1; i <= steps; i += 1) {
+        move(start.x + ((end.x - start.x) * i) / steps, start.y + ((end.y - start.y) * i) / steps)
+      }
+      release(end.el, end.x, end.y, 0, { detail: 1 })
+      userMouse(commonAncestor(start.el, end.el), 'click', { x: end.x, y: end.y, button: 0, detail: 1 })
+    },
+    selectWords(target, line) {
+      selectIn(target)
+      drawRangesAt(line)
+    },
+    dragSelect(target, line) {
+      begin()
+      const { x, y, el } = at({ target })
+      press(el, x - 10, y, 0, { detail: 1 })
+      selectIn(target)
+      drawRangesAt(line)
+      release(el, x + 10, y, 0, { detail: 1 })
+      userMouse(el, 'click', { x: x + 10, y, button: 0, detail: 1 })
+      h.controller.renderNow()
+    },
+    async waitForButton() {
+      h.clock.now += BUTTON_WAIT_MS
+      await realTime(BUTTON_WAIT_MS)
+    },
+    scrollSelection(line) {
+      drawRangesAt(line)
+      h.controller.renderNow()
+    },
+    async clearSelectionByScript() {
+      window.getSelection()?.removeAllRanges()
+      h.clock.now += BUTTON_WAIT_MS
+      await realTime(BUTTON_WAIT_MS)
+    },
+    commentButton() {
+      const button = h.root()?.querySelector<HTMLElement>('.erf-hpc-button')
+      if (!isShown(button)) return null
+      const top = Number.parseFloat(button.style.top)
+      const line = [...Range.prototype.getClientRects.call(document.createRange())].at(-1)
+      return { top, below: line !== undefined && top >= line.bottom }
+    },
+    lastPickHadWords: () => Promise.resolve((h.sent(COMMENT_PICK_CHANNEL) as Array<{ kind: string; sel?: unknown }>).filter(p => p.kind !== 'step').at(-1)?.sel !== undefined),
+    async menuAboutWords() {
+      const asked = (): { sel?: unknown } | undefined =>
+        (h.sent(COMMENT_PICK_CHANNEL) as Array<{ kind: string; sel?: unknown }>).filter(p => p.kind === 'menu' || p.kind === 'context').at(-1)
+      await vi.waitFor(() => expect(asked()).toBeDefined())
+      return asked()?.sel !== undefined
+    },
+    selectText(target) {
+      drawRangesAt(OVERLAY_FIXTURE[target].box)
+      selectIn(target)
+    },
+    selectedText: () => window.getSelection()?.toString() ?? '',
+    rightClick(target) {
+      begin()
+      const { x, y, el } = at({ target })
+      move(x, y)
+      press(el, x, y, 2)
+      release(el, x, y, 2)
+      userMouse(el, 'contextmenu', { x, y, button: 2 })
+      userMouse(el, 'auxclick', { x, y, button: 2, detail: 1 })
+    },
+    middleClick(target) {
+      begin()
+      const { x, y, el } = at({ target })
+      move(x, y)
+      press(el, x, y, 1)
+      release(el, x, y, 1)
+      userMouse(el, 'auxclick', { x, y, button: 1, detail: 1 })
+    },
+    pressEscape() {
+      begin()
+      userKey({ key: 'Escape', code: 'Escape' })
+      userUp({ key: 'Escape', code: 'Escape' })
+    },
+    pressEnter() {
+      begin()
+      userKey({ key: 'Enter', code: 'Enter' })
+      userUp({ key: 'Enter', code: 'Enter' })
+    },
+    levelUpByKeys() {
+      begin()
+      userKey({ key: 'ArrowUp', code: 'ArrowUp', altKey: true })
+      userUp({ key: 'ArrowUp', code: 'ArrowUp', altKey: true })
+    },
+    pressKey({ key, code, shift, alt, ctrl, meta }) {
+      begin()
+      const init = { key, code, shiftKey: shift === true, altKey: alt === true, ctrlKey: ctrl === true, metaKey: meta === true }
+      userKey(init)
+      userUp(init)
+    },
+    saidAtEnd() {
+      return END_SENTENCES[lastStep(h, COMMENT_PICK_CHANNEL) ?? ''] ?? null
+    },
+    // Main's menu and window are not the page's: it was hidden and comes back, with the pointer away and returning.
+    cancelPick() {
+      h.controller.pointerLeft()
+    },
+    picks,
+    keyboardMenuAsked: () => (h.sent(COMMENT_PICK_CHANNEL) as Array<{ kind: string; via: string }>).some(p => p.kind === 'context' && p.via === 'keyboard'),
+    pickedTarget() {
+      const last = picks().filter(p => p.kind !== 'exit').at(-1)
+      return last?.target ?? null
+    },
+    outlinedTarget,
+    outlineSelected: () => part('.erf-hpc-outline')?.classList.contains('erf-hpc-outline--selected') === true,
+    labelText(target) {
+      const { x, y } = pointOf({ target })
+      move(x, y)
+      const label = part('.erf-hpc-label')
+      if (!isShown(label)) return null
+      const [tag, rest, , size] = [...label.children].map(span => span.getAttribute('data-text') ?? '')
+      return `${tag}${rest} ${size}`
+    },
+    pageSaw: () => [...seen],
+    openLayer: () => (h.controller.mode ? 'mode' : null),
+    dispose() {
+      for (const type of PAGE_EVENTS) document.removeEventListener(type, record)
+      window.getSelection()?.removeAllRanges()
+      Range.prototype.getClientRects = realRects
+      h.dispose()
+    }
+  }
+}
+
+/** One target of each kind, each 40 px tall on its own row. */
+const REVEAL_BOXES: Readonly<Record<RevealTarget, OverlayTargetBox>> = {
+  plain: { left: 10, top: 10, width: 200, height: 40 },
+  folded: { left: 10, top: 60, width: 200, height: 40 },
+  hidden: { left: 10, top: 110, width: 200, height: 40 }
+}
+
+/** The real controller, told to reveal by main, as `commentGateway.reveal` ends. */
+async function makeRevealDriver(): Promise<RevealDriver> {
+  const h = createHarness()
+  mount(
+    `<p id="plain" ${T}="${token(1)}">Plain</p>` +
+      `<details id="fold"><summary>More</summary><p id="folded" ${T}="${token(2)}">Folded</p></details>` +
+      `<p id="hidden" ${T}="${token(3)}">Hidden</p>`
+  )
+  await microtasks()
+  h.controller.documentReady()
+  const ids = Object.keys(REVEAL_BOXES) as RevealTarget[]
+  const element = (id: string): HTMLElement => document.getElementById(id) as HTMLElement
+  for (const id of ids) h.doubles.setBox(element(id), REVEAL_BOXES[id])
+  h.doubles.setVisible(element('hidden'), false)
+  const icons = ids.map((key, i) => ({ key, token: token(i + 1), count: 1, status: 'open' }))
+  h.state({ showIcons: true, icons })
+  const fold = element('fold') as HTMLDetailsElement
+  return {
+    async show(target) {
+      vi.useFakeTimers()
+      h.state({ showIcons: true, icons, reveal: target })
+    },
+    scrolledTo: () => (h.doubles.scrolledIntoView.at(-1)?.element.id ?? null) as RevealTarget | null,
+    flashed() {
+      h.controller.renderNow()
+      const flash = h.root()?.querySelector<HTMLElement>('.erf-hpc-flash')
+      if (!isShown(flash)) return null
+      return ids.find(id => flash.style.top === `${REVEAL_BOXES[id].top}px`) ?? null
+    },
+    sectionOpen: () => fold.open,
+    async flashEnds() {
+      h.clock.now += REVEAL_FLASH_MS
+      await vi.advanceTimersByTimeAsync(REVEAL_FLASH_MS)
+    },
+    dispose() {
+      vi.useRealTimers()
+      h.dispose()
+    }
+  }
+}
+
+const makeDriver = async (): Promise<SelectionDriver> => {
+  const h = createHarness()
+  mount(PAGE)
+  // The token window is open while the page parses: let the registry see the fixture, then close it.
+  await microtasks()
+  h.controller.documentReady()
+  return driverOn(h)
+}
+
+runOverlaySuite('HTML', makeDriver)
+runPickerKeySuite('HTML', makeDriver)
+runSelectionSuite('HTML', makeDriver)
+runRevealSuite('HTML', makeRevealDriver)

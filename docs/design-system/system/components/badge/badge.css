@@ -81,7 +81,7 @@
 
 /* ---------- counter ---------- */
 
-/* A neutral count beside a label: "12 blocked", "3 comments". Not a badge –
+/* A neutral count beside a label: "12 blocked", "Open 12". Not a badge –
    it sits in the text flow and never on an icon. */
 .erf-counter {
   display: inline-block;

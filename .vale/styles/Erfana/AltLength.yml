@@ -1,0 +1,7 @@
+# maintaining-this-guide.md § Add an image: keep alt text under 155 characters.
+extends: occurrence
+message: "Keep alt text under 155 characters."
+level: error
+scope: alt
+max: 154
+token: '.'

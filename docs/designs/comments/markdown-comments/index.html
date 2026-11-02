@@ -55,7 +55,7 @@
     <li><strong>Tool size – <a href="../../../design-system/system/components/button/index.html">Buttons</a> and
       <a href="../../../design-system/system/components/toolbar/index.html#tool-height">Toolbar</a>.</strong> The Markdown
       toolbar's icon tools are 32 × 28, not the card's 28 × 28 square, and the row sits on the panel's primary
-      surface. Both ship that way (<code>MarkdownToolbar.css:72</code>, <code>:102</code>); the comment tools match
+      surface. Both ship that way (<code>MarkdownToolbar.css:72</code>, <code>:108</code>); the comment tools match
       their row. The Buttons card's Exceptions row records the size.</li>
     <li><strong>Keyboard – <a href="../../../design-system/system/components/toolbar/index.html#open-defects">Toolbar</a>.</strong>
       The Markdown toolbar keeps one <kbd>Tab</kbd> stop per control, as it ships, with no roving
@@ -82,8 +82,7 @@
       <button class="erf-button erf-button--icon" type="button" aria-label="Find" aria-keyshortcuts="Meta+F" tabindex="-1"><svg data-icon="search" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg></button>
       <span class="erf-toolbar__group erf-mdc-bar__comments">
         <button class="erf-button erf-button--icon erf-button--toggle" type="button" aria-pressed="false" aria-label="Comment mode" aria-keyshortcuts="Alt+Meta+M" tabindex="-1"><svg data-icon="message-square-plus" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M12 8v6"/><path d="M9 11h6"/></svg></button>
-        <button class="erf-button erf-button--ghost erf-mdc-bar__count" type="button" aria-expanded="false" aria-label="Comments, 3 open" tabindex="-1"><svg data-icon="messages-square" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/><path d="M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"/></svg><span class="erf-counter">3</span></button>
-        <button class="erf-button erf-button--icon erf-button--toggle" type="button" aria-pressed="true" aria-label="Show comment icons" tabindex="-1"><svg data-icon="message-square" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg></button>
+        <button class="erf-button erf-button--ghost erf-mdc-bar__count erf-comment-count" type="button" aria-expanded="false" aria-label="3 comments" title="3 comments" tabindex="-1"><svg data-icon="messages-square" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/><path d="M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"/></svg><span class="erf-comment-count__number">3</span></button>
       </span>
       <span class="erf-toolbar__spacer"></span>
       <span class="erf-toolbar__group" role="radiogroup" aria-label="View mode">
@@ -117,7 +116,7 @@
   <div>
     <p class="mdc-step__no">1 · read</p>
     <h3 class="mdc-step__title" id="s1-t">Pins in the margin, words underlined</h3>
-    <p class="mdc-step__text">The <strong>preview-only</strong> view, the default for Markdown. Three comment tools
+    <p class="mdc-step__text">The <strong>preview-only</strong> view, the default for Markdown. Two comment tools
       follow Find, as in the HTML band. A pin's tail sits on its block's top-right corner, which in this
       preview is the content's right padding – clear of the text.</p>
     <p class="mdc-step__text">The paragraph's comment was made on a selection, so <strong>"ship by Friday"</strong>
@@ -190,7 +189,7 @@
               <label class="erf-comment-field__label" for="f3">Comment</label>
               <textarea class="erf-comment-textarea" id="f3" placeholder="What should change here?" aria-describedby="f3-h f3-c" tabindex="-1">Which staging – eu-1 or us-2? Name it here.</textarea>
               <div class="erf-comment-field__foot">
-                <p class="erf-comment-field__hint" id="f3-h">Plain text. Saved inside plan.md.</p>
+                <p class="erf-comment-field__hint" id="f3-h">Saves intoplan.md.</p>
                 <span class="erf-comment-counter" id="f3-c">43 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span>
               </div>
             </div>

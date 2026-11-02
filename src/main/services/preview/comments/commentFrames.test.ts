@@ -8,7 +8,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { PreviewCommentPageChannels } from '../../../../shared/ipc/preview-comment-channels'
 import { logger } from '../../LoggingService'
-import { BASE_PAGE, commentedPage, damagedBlock, insertBefore } from './__test-helpers__/commentedPages'
+import { addTo, fixedId } from '../../../../shared/comments/__fixtures__/commentTestData'
+import { BASE_PAGE, commentOn, commentedPage, damagedBlock, insertBefore } from './__test-helpers__/commentedPages'
 import { FakeFrame, frameFile, serveLoad, stubFrameFiles } from './__test-helpers__/commentServiceHarness'
 import { createCommentFrameBroadcaster, type CommentViewMode } from './commentFrameBroadcaster'
 import { CommentFrames, isLiveFrame } from './commentFrames'
@@ -196,6 +197,61 @@ describe('commentFrameBroadcaster', () => {
     }
     b.broadcaster.broadcastSoon()
     expect(b.queued).toHaveLength(2)
+  })
+
+  it('C-12 C-06 a pin carries its open threads\' words, and a notch when its target no longer reads as stored – still no comment text', async () => {
+    const s = setup()
+    let text = BASE_PAGE
+    const sel = { exact: 'now', prefix: 'Buy ', suffix: '' }
+    const onButton = commentOn(text, 'button', 0, { id: fixedId('c-', 1) })
+    text = addTo(text, 'button', { ...onButton, anchor: { ...onButton.anchor, sel } }, { ws: 'collapse' }).text
+    text = addTo(text, 'h1', commentOn(text, 'h1', 0, { id: fixedId('c-', 2) }), { ws: 'collapse' }).text
+    // The heading was rewritten after its comment: the thread is Changed.
+    text = text.replace('>Fresh coffee<', '>Stale tea leaves<')
+    serveLoad(s.tokens, text, PAGE)
+    s.frames.navigated(1, 'u', true)
+    s.files.set(1, frameFile(PAGE))
+    await s.frames.hello(s.top)
+    const broadcaster = createCommentFrameBroadcaster({ panelId: 'panel', frames: s.frames, mode: () => ({ mode: true, showIcons: true, hidden: false }), schedule: () => {} })
+    const icons = broadcaster.stateFor(s.top).icons as Array<Record<string, unknown>>
+    expect(icons).toHaveLength(2)
+    expect(icons.find(icon => icon.words !== undefined)).toMatchObject({ words: [sel], status: 'open' })
+    expect(icons.find(icon => icon.words !== undefined)).not.toHaveProperty('changed')
+    expect(icons.find(icon => icon.changed === true)).toMatchObject({ count: 1, status: 'open' })
+    expect(JSON.stringify(icons)).not.toContain('Stale')
+  })
+
+  it('§19 Rev 4 a frame served raw after a save keeps the sections it had open, and nothing else of the extras', async () => {
+    const b = await bound()
+    expect(b.broadcaster.stateFor(b.blank, { openSections: [0, 2], reveal: 'p1' })).toEqual({
+      mode: true,
+      theme: COMMENT_OVERLAY_THEME,
+      commentable: false,
+      openSections: [0, 2]
+    })
+  })
+
+  it('a send that fails with a non-Error is logged by its type, once per view', async () => {
+    const b = await bound()
+    vi.mocked(logger.debug).mockClear()
+    b.top.send.mockImplementation(() => {
+      throw 'gone'
+    })
+    b.broadcaster.send(b.top)
+    b.broadcaster.send(b.top)
+    expect(vi.mocked(logger.debug)).toHaveBeenCalledExactlyOnceWith('Preview comments: a frame state was not delivered', {
+      panelId: expect.any(String),
+      error: 'string'
+    })
+  })
+
+  it('without a schedule, broadcastSoon sends on the next turn of the event loop', async () => {
+    const b = await bound()
+    const broadcaster = createCommentFrameBroadcaster({ panelId: 'panel', frames: b.frames, mode: () => b.view })
+    broadcaster.broadcastSoon()
+    expect(b.top.send).not.toHaveBeenCalled()
+    await new Promise(resolve => setImmediate(resolve))
+    expect(b.top.send).toHaveBeenCalledTimes(1)
   })
 
   it('never sends to a detached frame, logs one failed send per view, and nothing after dispose', async () => {

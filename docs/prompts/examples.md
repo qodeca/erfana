@@ -222,6 +222,8 @@ Explain what this code does in simple terms:
 
 ## Advanced Examples
 
+The frontmatter below is shortened to show the body: a real template also needs `area` and `icon`, or the schema rejects it.
+
 ### With Multiple Conditions
 ```markdown
 ---

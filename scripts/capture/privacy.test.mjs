@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { buildDenyList, findEmails, sampleFrames, sampleTimes, scanText, stripAnsi } from './privacy.mjs'
+import { buildDenyList, findEmails, scanText, stripAnsi } from './privacy.mjs'
 
 const fakeMachine = {
   env: { ERFANA_CAPTURE_DENY_EXTRA: 'acmelabs' },
@@ -33,6 +33,13 @@ describe('buildDenyList', () => {
     const d = buildDenyList({ ...fakeMachine, git: () => '', fullName: () => '', userInfo: () => ({ username: 'ab', homedir: '/Users/ab' }) })
     expect(d.some((e) => e.value === '')).toBe(false)
     expect(d.some((e) => e.kind === 'username')).toBe(false)
+  })
+
+  it('drops only the bare user name when the owner allows it (break: the home path let through too)', () => {
+    const d = buildDenyList({ ...fakeMachine, env: { ERFANA_CAPTURE_ALLOW_USERNAME: '1' } })
+    expect(d.some((e) => e.kind === 'username')).toBe(false)
+    expect(d.find((e) => e.kind === 'home-path')?.value).toBe('/Users/jdoe')
+    expect(buildDenyList({ ...fakeMachine, env: { ERFANA_CAPTURE_ALLOW_USERNAME: 'yes' } }).some((e) => e.kind === 'username')).toBe(true)
   })
 })
 
@@ -96,19 +103,5 @@ describe('findEmails', () => {
 describe('stripAnsi', () => {
   it('removes CSI, OSC and control characters but keeps text and line breaks', () => {
     expect(stripAnsi('\x1b[1;32mgreen\x1b[0m\r\n\x1b]0;title\x07ok\x1b]8;;x\x1b\\\x07')).toBe('green\r\nok')
-  })
-})
-
-describe('frame sampling (R138-11)', () => {
-  it('at least one frame per second plus the first and the last (break: an off-by-one that drops the last frame)', () => {
-    expect(sampleFrames(30, 12)).toEqual([0, 12, 24, 29])
-    expect(sampleFrames(1, 12)).toEqual([0])
-    expect(sampleFrames(0, 12)).toEqual([])
-    expect(() => sampleFrames(5, 0)).toThrow()
-  })
-
-  it('by time for files whose frames are uneven', () => {
-    expect(sampleTimes(3.4)).toEqual([0, 1, 2, 3, 3.15])
-    expect(sampleTimes(0)).toEqual([])
   })
 })

@@ -140,8 +140,24 @@ const RENDERER_GATEWAY_FILES = [
   'src/renderer/src/services/claudeStatusGateway.ts',
   'src/renderer/src/services/screenshotGateway.ts',
   'src/renderer/src/services/utilsGateway.ts',
+  'src/renderer/src/services/comments/fileCommentGateway.ts',
   'src/renderer/src/services/bridgePresence.ts'
 ]
+
+// Comments in renderer-hosted previews (spec 024, 024-NFR-005 item 10): ONE file
+// names the `window.api.fileComments` bridge – not even the other gateways may.
+// The selectors match the name however it is reached (`api.fileComments`,
+// `api['fileComments']`, `hasBridge('fileComments')`, `{ fileComments } = api`), so
+// every renderer block except the gateway's own and the tests' carries them.
+// Proven by scripts/eslint-file-comments-gateway.test.mjs.
+const FILE_COMMENT_GATEWAY = 'src/renderer/src/services/comments/fileCommentGateway.ts'
+const FILE_COMMENTS_MESSAGE =
+  'Only services/comments/fileCommentGateway.ts may touch window.api.fileComments (spec 024, 024-NFR-005 item 10). Use fileCommentGateway.'
+const FILE_COMMENTS_SELECTORS = [
+  "MemberExpression[property.name='fileComments']",
+  "Literal[value='fileComments']",
+  "Property[key.name='fileComments']"
+].map((selector) => ({ selector, message: FILE_COMMENTS_MESSAGE }))
 
 // Selectors every renderer file obeys; the gateway selectors are added on top for non-test code.
 const RENDERER_RESTRICTED_SYNTAX = [
@@ -764,7 +780,12 @@ export default [
       ...RENDERER_TERMINAL_PANEL_FILES
     ],
     rules: {
-      'no-restricted-syntax': ['error', ...RENDERER_GATEWAY_SELECTORS, ...RENDERER_RESTRICTED_SYNTAX]
+      'no-restricted-syntax': [
+        'error',
+        ...RENDERER_GATEWAY_SELECTORS,
+        ...RENDERER_RESTRICTED_SYNTAX,
+        ...FILE_COMMENTS_SELECTORS
+      ]
     }
   },
   //  - TEMPORARY, the TerminalPanel files: shared families + gateway selectors
@@ -772,7 +793,12 @@ export default [
   {
     files: RENDERER_TERMINAL_PANEL_FILES,
     rules: {
-      'no-restricted-syntax': ['error', ...RENDERER_TERMINAL_PANEL_SELECTORS, ...RENDERER_RESTRICTED_SYNTAX]
+      'no-restricted-syntax': [
+        'error',
+        ...RENDERER_TERMINAL_PANEL_SELECTORS,
+        ...RENDERER_RESTRICTED_SYNTAX,
+        ...FILE_COMMENTS_SELECTORS
+      ]
     }
   },
   //  - tests and their helpers: shared families only
@@ -783,9 +809,17 @@ export default [
       'no-restricted-syntax': ['error', ...RENDERER_RESTRICTED_SYNTAX]
     }
   },
-  //  - the gateways: shared families only
+  //  - the gateways: shared families, and no other gateway names the file-comment bridge
   {
     files: RENDERER_GATEWAY_FILES,
+    ignores: [FILE_COMMENT_GATEWAY],
+    rules: {
+      'no-restricted-syntax': ['error', ...RENDERER_RESTRICTED_SYNTAX, ...FILE_COMMENTS_SELECTORS]
+    }
+  },
+  //  - the file-comment gateway: shared families only
+  {
+    files: [FILE_COMMENT_GATEWAY],
     rules: {
       'no-restricted-syntax': ['error', ...RENDERER_RESTRICTED_SYNTAX]
     }
@@ -794,14 +828,20 @@ export default [
   {
     files: RENDERER_PATTERN_OWNERS,
     rules: {
-      'no-restricted-syntax': ['error', ...RENDERER_GATEWAY_SELECTORS]
+      'no-restricted-syntax': ['error', ...RENDERER_GATEWAY_SELECTORS, ...FILE_COMMENTS_SELECTORS]
     }
   },
   // HTML Preview comments render page and file text, so raw HTML is banned there
   // (docs/designs/comments/html-preview-comments.md SEC-25). A separate rule from
   // `no-restricted-syntax`, so it adds to the blocks above instead of replacing them.
   {
-    files: ['src/renderer/src/components/Panels/HtmlPreviewPanel/comments/**/*.{ts,tsx}'],
+    // Spec 024 (024-NFR-005 item 2): every renderer comment folder – the shared
+    // base and the Markdown Preview's – is under the same ban.
+    files: [
+      'src/renderer/src/components/Panels/HtmlPreviewPanel/comments/**/*.{ts,tsx}',
+      'src/renderer/src/components/Comments/**/*.{ts,tsx}',
+      'src/renderer/src/components/Editor/markdownComments/**/*.{ts,tsx}'
+    ],
     rules: {
       'react/no-danger': 'error'
     }

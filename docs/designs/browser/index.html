@@ -1,0 +1,51 @@
+<!-- @card group="Built-in browser" name="Built-in browser – screens" subtitle="The six screens of spec 025's browser tab, and where each surface is drawn" status="proposed" reviewed="never" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana – built-in browser, screens</title>
+<link rel="stylesheet" href="../../design-system/tokens.css">
+<link rel="stylesheet" href="../../design-system/ds.css">
+<link rel="stylesheet" href="browser.css">
+</head>
+<body class="brw-page">
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../index.html">Feature designs</a> <span aria-hidden="true">/</span> <span aria-current="page">Built-in browser</span></nav>
+<main>
+<h1>Built-in browser – screens</h1>
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed · design note <a href="README.md">README.md</a> · spec 025 v0.12.0</p>
+<p class="ds-lede" id="decision">
+  A browser tab in the editor area that opens a web page, lets you point at one element on it, and sends that
+  element to the agent in Erfana’s terminal. Three zones never mix: <strong>Erfana chrome above the page</strong>
+  (the navigation row, the reserved pick row and, on demand, strip rows in which the site asks for things),
+  <strong>the page</strong> inside a 4px frame Erfana owns, and <strong>your pick, answered over a still image of
+  the page</strong>. The address field is the only truth about where you are.
+</p>
+<div class="ds-note"><strong>Proposed, and static.</strong> Every screen draws one frame per state, to scale, with the
+  design system’s own CSS and the shared <a href="browser.css">browser.css</a>. Frames that follow an open decision the
+  owner has answered (2026-11-01) are captioned “Owner decision OD-n”; “Assumption” marks a placement no decision covers. Build nothing from a surface
+  until the owner approves its screen (025-FR-043).
+  The owner approved the six screens as a group on 2026-11-01 (025-FR-043); status stays proposed (README § Design review).</div>
+
+<h2 id="screens">The six screens</h2>
+<ul class="brw-screens">
+  <li><a href="tab-and-toolbar.html">Tab and toolbar</a><span>The editor tab, New browser tab and Open in browser tab, navigation row, pick-row status slot, origin field, suggestions, refused addresses, find bar, zoom chip, pop-up-blocked control, certificate sign, width presets, target chooser and the empty tab.</span></li>
+  <li><a href="picking.html">Picking</a><span>The pick overlay and label on light, dark and accent pages, refinement with ↑ ↓, the lime pick frame, the banner and the “Page paused” chip.</span></li>
+  <li><a href="prompt-actions.html">Prompt actions</a><span>The prompt-actions panel and the instruction dialog over the still image, the send notice, and the capture-failed and shell-guard messages.</span></li>
+  <li><a href="site-prompts.html">Site prompts</a><span>Permission prompts and in-use indicators, the fullscreen notice, the popup origin strip, downloads, the sign-in box and page dialogs.</span></li>
+  <li><a href="page-states.html">Page states</a><span>The load-error page, the certificate warning page, and the crashed and hung tab.</span></li>
+  <li><a href="menus-and-data.html">Menus and data</a><span>The page right-click menu, the Clear browsing data dialog and Forget, and the Linux keyring notices.</span></li>
+</ul>
+
+<h2 id="cards">Cards this design adds</h2>
+<ul>
+  <li><a href="../../design-system/system/components/origin-field/index.html">Origin field</a> – how a one-line field shows where you are: badge, host emphasis, elision order, suggestions.</li>
+  <li><a href="../../design-system/system/patterns/picker/index.html">Element picker</a> – the two-tone outline, the label, the selected look, the flash and the pick frame, for the HTML preview and the browser.</li>
+  <li><a href="../../design-system/system/patterns/site-prompts/index.html">Site prompts</a> – a page’s requests as strip rows above the page, with their origin, queue and focus rules.</li>
+</ul>
+</main>
+</body>
+</html>

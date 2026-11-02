@@ -69,14 +69,13 @@
   align-items: center;
   justify-content: center;
   width: var(--btn-height-md);
-  height: 28px;
+  height: var(--space-14);
   padding: 0;
   background-color: transparent;
   border: none;
   border-radius: 0;
   color: var(--color-text-primary);
   cursor: pointer;
-  transition: all var(--transition-normal);
 }
 
 .markdown-toolbar .toolbar-btn:hover:not(:disabled) {
@@ -93,32 +92,41 @@
   cursor: not-allowed;
 }
 
+/* The same inset ring as `.erf-band__tool`, so both preview toolbars show focus alike. */
+.markdown-toolbar .toolbar-btn:focus-visible,
+.markdown-toolbar .view-mode-btn:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--space-1) * -1);
+}
+
 /* View mode buttons */
 .markdown-toolbar .view-mode-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   width: var(--btn-height-md);
-  height: 28px;
+  height: var(--space-14);
   padding: 0;
   background-color: transparent;
-  border: var(--border-width) solid transparent;
+  border: none;
+  /* Both states carry the 2px edge, so the icon never moves when the state flips. */
+  border-block: var(--border-width-thick) solid transparent;
   color: var(--color-text-primary);
   cursor: pointer;
   border-radius: 0;
-  transition: all var(--transition-normal);
 }
 
 .markdown-toolbar .view-mode-btn:hover {
   background-color: var(--color-bg-hover-solid);
-  border-color: var(--color-border-default);
   color: var(--color-white);
 }
 
-.markdown-toolbar .view-mode-btn.active {
-  background-color: var(--color-btn-primary-bg);
-  border-color: var(--color-btn-primary-bg);
-  color: var(--color-btn-primary-text);
+/* On: the preview toolbars' one pressed look, a fill plus a lime edge. */
+.markdown-toolbar .view-mode-btn.active,
+.markdown-toolbar .view-mode-btn.active:hover {
+  background-color: var(--color-bg-selected);
+  border-block-end-color: var(--color-brand-lime);
+  color: var(--color-text-primary);
 }
 
 /* Separator between button groups */
@@ -127,4 +135,48 @@
   height: var(--icon-size-lg);
   background-color: var(--color-border-default);
   margin: 0 var(--space-4);
+}
+
+/*
+ * Comment tools (spec 024, differences table D-28): the Markdown toolbar's
+ * own 32 x 28 tools, one Tab stop each. Pressed (mode on) and open (drawer) take the band's fill plus lime edge; unavailable is
+ * aria-disabled, so the tool keeps focus and its tooltip says why (C-19.1).
+ */
+.markdown-toolbar .erf-md-comment-tool {
+  border-block: var(--border-width-thick) solid transparent;
+}
+
+.markdown-toolbar .erf-md-comment-tool:not(.erf-md-comment-tool--count) {
+  margin-inline-start: var(--space-4);
+}
+
+.markdown-toolbar .erf-md-comment-tool[aria-pressed='true'],
+.markdown-toolbar .erf-md-comment-tool[aria-pressed='true']:hover,
+.markdown-toolbar .erf-md-comment-tool[aria-expanded='true'],
+.markdown-toolbar .erf-md-comment-tool[aria-expanded='true']:hover {
+  background-color: var(--color-bg-selected);
+  border-block-end-color: var(--color-brand-lime);
+  color: var(--color-text-primary);
+}
+
+@media (forced-colors: active) {
+  .markdown-toolbar .view-mode-btn.active,
+  .markdown-toolbar .erf-md-comment-tool[aria-pressed='true'],
+  .markdown-toolbar .erf-md-comment-tool[aria-expanded='true'] {
+    border-block-end-color: Highlight;
+  }
+}
+
+.markdown-toolbar .erf-md-comment-tool[aria-disabled='true'] {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+.markdown-toolbar .erf-md-comment-tool--count {
+  width: auto;
+  min-width: var(--btn-height-md);
+  gap: var(--space-2);
+  padding-inline: var(--space-3);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
 }

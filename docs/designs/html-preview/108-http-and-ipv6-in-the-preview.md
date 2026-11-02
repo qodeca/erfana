@@ -10,7 +10,7 @@ in a throwaway Electron harness that mirrors the preview: the same scheme
 privileges as `previewScheme.ts` (`standard`, `secure`, `supportFetchAPI`,
 `corsEnabled`), `sandbox: true`, and the same unconditional deny in
 `setPermissionRequestHandler` / `setPermissionCheckHandler` that
-`previewSessionPolicy.ts:96-97` installs.
+`previewSessionPolicy.ts:161-162` installs.
 
 **Electron 39.8.10 (Chromium 142), macOS.** The harness was deleted; it lives only
 in this record.

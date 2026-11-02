@@ -24,8 +24,8 @@ The image viewer opens project images in a tab, reports file details, and offers
 
 ## Export
 
-**What it does:** Save the image as PNG or PDF, or copy it to the clipboard. **How to reach it:** the image viewer toolbar; see [export images](../how-to/view-and-export-images.md).
+**What it does:** Save the image with **Export as PNG** or **Export as PDF**, or copy it with **Copy to clipboard**. **How to reach it:** The image viewer toolbar; see [export images](../how-to/view-and-export-images.md).
 
 ## File changes
 
-**What it does:** An open image refreshes when its file changes and shows **Reloaded from disk**. Deleting the file adds **(deleted)** to its tab and a banner with **Reload**. **How to reach it:** The viewer watches open images, with a 100-file watch cap; see the [walkthrough](../how-to/view-and-export-images.md).
+**What it does:** An open image refreshes when its file changes and shows **Reloaded from disk**. Deleting the file adds **(deleted)** to its tab and a banner with **Reload**. **How to reach it:** The viewer watches open images. **Limits:** Erfana watches at most 100 files at a time; past that, a banner says auto-refresh is unavailable. See the [walkthrough](../how-to/view-and-export-images.md).

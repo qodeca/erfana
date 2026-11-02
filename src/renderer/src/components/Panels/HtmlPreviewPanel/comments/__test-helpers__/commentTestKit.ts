@@ -20,7 +20,7 @@ import type {
   CommentThreadView,
   PreviewCommentsBridge
 } from '../../../../../../../shared/ipc/preview-comment-schema'
-import type { CommentWindowRequest } from '../commentWindowTypes'
+import type { CommentWindowRequest } from '../../../../Comments/commentWindowTypes'
 
 type Message = CommentThreadView['messages'][number]
 
@@ -203,14 +203,18 @@ export function installCommentsBridge(): FakeCommentsBridge {
       showIcons: r.showIcons
     })),
     list: vi.fn(async () => ({ ok: true as const, files: [] as CommentFileView[] })),
+    newOnThread: vi.fn(async () => ({ ok: true as const })),
     reveal: vi.fn(async () => ({ ok: true as const })),
+    bulk: vi.fn(async () => ({ ok: true as const, files: [{ fileKey: 'f', ok: true as const, done: 1 }] })),
+    keepDraft: vi.fn(async () => ({ ok: true as const })),
     save: vi.fn(async () => ({ ok: true as const, threadKey: 't9' })),
     setUnsavedSources: vi.fn(async () => ({ ok: true as const })),
     onDraftOpened: vi.fn(subscribe(listeners.draft)),
     onCommentsChanged: vi.fn(subscribe(listeners.changed)),
     onAnchorStatus: vi.fn(subscribe(listeners.anchors)),
     onModeChanged: vi.fn(subscribe(listeners.mode)),
-    onSaveSettled: vi.fn(subscribe(listeners.settled))
+    onSaveSettled: vi.fn(subscribe(listeners.settled)),
+    onBulkSettled: vi.fn(() => () => {})
   }
   const holder = window as unknown as { api?: Record<string, unknown> }
   const before = holder.api

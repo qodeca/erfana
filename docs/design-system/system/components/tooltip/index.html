@@ -143,7 +143,7 @@ should take.</p>
     <tr><td><strong>The control has its own name</strong> – visible text, or <code>aria-label</code> on an icon button</td><td>The tooltip is a description. If it is removed, the control must still say what it is.</td></tr>
     <tr><td><strong><code>title</code> is never the accessible name</strong>, and never a tooltip</td><td>Browsers fall back to <code>title</code> for the name only when nothing else names the control, and screen readers do not treat that fallback alike – so it never stands in for <code>aria-label</code> or visible text. It is not shown on keyboard focus or touch, cannot be hovered and cannot be styled.</td></tr>
     <tr><td>The trigger points at it: <code>aria-describedby="&lt;tooltip id&gt;"</code>; the tooltip has <code>role="tooltip"</code> and stays in the DOM</td><td>A description is read after the name. Removing the node or toggling <code>aria-hidden</code> on it is not needed and only risks losing it.</td></tr>
-    <tr><td>A tooltip that only repeats the visible name adds nothing – leave it out</td><td>A text button already says it. Tooltips belong on icon buttons and on controls with a shortcut.</td></tr>
+    <tr><td>A tooltip that only repeats the visible name adds nothing – leave it out</td><td>A text button already says it. Tooltips belong on icon buttons and on controls with a shortcut. An icon tool that shows no words may repeat its name: the Comments list does (owner decision, 2026-10-31).</td></tr>
     <tr><td><strong>Hoverable</strong> (1.4.13)</td><td>The pointer can move onto the tooltip – no <code>pointer-events: none</code>, and the gap is bridged – so a magnifier user can read it.</td></tr>
     <tr><td><strong>Persistent</strong> (1.4.13)</td><td>It stays until hover or focus leaves, or it is dismissed. No timeout.</td></tr>
     <tr><td><strong>Dismissible</strong> (1.4.13)</td><td><kbd>Esc</kbd> hides it without moving the pointer or focus – and is consumed, so the dialog behind it stays open. A second <kbd>Esc</kbd> reaches the dialog.</td></tr>
@@ -188,8 +188,17 @@ cannot have. They are the part a test must prove.</p>
 
 <section id="exceptions">
 <h2>Exceptions</h2>
-<p class="ds-muted">None recorded. No <code>deviates:</code> marker points at this card yet; a shipping file that
-departs from it on purpose carries one at the site and gets a row here.</p>
+<p class="ds-muted">No <code>deviates:</code> marker points at this card yet; a shipping file that
+departs from it on purpose carries one at the site and gets a row here. Proposed screens that depart are listed too.</p>
+<table>
+  <thead><tr><th>File</th><th>Departure</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td><code>docs/designs/browser/tab-and-toolbar.html</code> (proposed screen, spec 025)</td><td>The editor tab’s tooltip opens beside the tab, inside the strip’s band, with two one-line lines (the formatted address, then “Title:” and the title).</td><td>A page-supplied title must never cover the origin field or the row that holds focus (browser note H-02).</td></tr>
+    <tr><td><code>docs/designs/browser/tab-and-toolbar.html</code> (proposed screen, spec 025)</td><td>The Pick element tooltip opens inside the pick row’s band, beside the toggle – after the banner’s first clause in pick mode – not above it.</td><td>Above is the address bar and below is the page; this place keeps it visible on keyboard focus (R2-H5, R3-M1).</td></tr>
+    <tr><td><code>docs/designs/browser/tab-and-toolbar.html</code> (proposed screen, spec 025)</td><td>The address bar’s Badge tooltip stays inside the pick row’s band: it never covers the editor tab strip, the live page, the field, More, the banner’s first clause (“Picking – …”) or the target button. Out of pick mode it starts under the badge; in pick mode after the first clause; it always ends before the target. Two lines at most – when the full description does not fit, the deck’s short form, with the full text kept as the accessible description. Box: capped at the pick row’s full height, with <code>padding-block: var(--space-1)</code> and <code>line-height: var(--leading-tight)</code> (the card’s own padding and line height differ), so two lines survive raised text spacing (R7-M4). Pop-up window (no pick row): it opens inside the pop-up origin strip’s band, beside the badge after the address, short form only. When the band has no room – in a pop-up, or in pick mode at the narrowest widths (owner decision OD-16) – it does not show; the word or accessible description carries the state. It also shows without a pointer while the field has keyboard focus and the badge is icon-only. Esc while it shows because the field has keyboard focus: the first press hides it and is consumed (focus and field unchanged), the next does the field’s Esc, and it stays hidden until the field loses and regains focus. Esc while it shows on hover with focus elsewhere: the press does that state’s routing action and hides the tooltip in the same press; it stays hidden until the pointer leaves the badge and re-enters.</td><td>The badge segment cannot take focus, so keyboard users get its description from the field’s focus (R5-M7). Above would cover the tab strip, below would cover the live page; the band is Erfana’s own chrome (R6-M1).</td></tr>
+  </tbody>
+</table>
+
 </section>
 
 <section id="defects">

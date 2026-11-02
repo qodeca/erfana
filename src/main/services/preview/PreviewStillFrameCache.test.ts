@@ -65,7 +65,7 @@ describe('PreviewStillFrameCache', () => {
     const resized = makeImage({ width: 1024, height: 512 }, SHORT_DATA_URL)
     const captured = makeImage({ width: 2048, height: 1024 }, 'unused', resized)
     const wc = makeWc(vi.fn(async () => captured))
-    const cache = createPreviewStillFrameCache({ now: () => 123, maxEdgePx: 1024 })
+    const cache = createPreviewStillFrameCache({ now: () => 123, maxSharpEdgePx: 1024 })
 
     await cache.captureIfStale(wc, PANEL, SIZE)
 
@@ -106,7 +106,7 @@ describe('PreviewStillFrameCache', () => {
     const resized = makeImage({ width: 1024, height: 512 }, SHORT_DATA_URL)
     const captured = makeImage({ width: 2048, height: 1024 }, 'unused', resized)
     const wc = makeWc(vi.fn(async () => captured))
-    const cache = createPreviewStillFrameCache({ maxEdgePx: 1024 })
+    const cache = createPreviewStillFrameCache({ maxSharpEdgePx: 1024 })
 
     await cache.captureIfStale(wc, PANEL, SIZE)
 
@@ -340,7 +340,7 @@ describe('PreviewStillFrameCache', () => {
   it('emits NO frame when the data URL is over budget', async () => {
     const img = makeImage({ width: 100, height: 100 }, 'x'.repeat(100))
     const wc = makeWc(vi.fn(async () => img))
-    const cache = createPreviewStillFrameCache({ maxDataUrlChars: 10 })
+    const cache = createPreviewStillFrameCache({ maxDataUrlChars: 10, maxSharpDataUrlChars: 10 })
 
     await cache.captureIfStale(wc, PANEL, SIZE)
 

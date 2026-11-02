@@ -311,6 +311,22 @@ describe('convertMermaidDiagramsToImages', () => {
       })
     })
 
+    it('024-AC-032 prepares a detached copy, never the live content, before serializing', async () => {
+      const container = document.createElement('div')
+      container.appendChild(document.createElement('p'))
+      document.body.appendChild(container)
+      const live = container.innerHTML
+      const prepare = vi.fn((clone: Element) => clone.querySelector('p')!.setAttribute('data-prepared', ''))
+
+      const result = await convertMermaidDiagramsToImages(container, prepare)
+
+      expect(prepare).toHaveBeenCalledTimes(1)
+      expect(prepare.mock.calls[0][0]).not.toBe(container)
+      expect(result.html).toContain('<p data-prepared=""></p>')
+      expect(container.innerHTML).toBe(live)
+      container.remove()
+    })
+
     it('does not call Image or canvas APIs when no diagrams present', async () => {
       const container = createMockContainer([])
 

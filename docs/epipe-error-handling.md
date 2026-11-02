@@ -122,7 +122,7 @@ try {
 
 1. **Normal Shutdown**:
    - Open project with terminal session
-   - Quit application (Cmd+Q / Ctrl+Q)
+   - Quit application (Cmd+Q on macOS; File → Quit on Windows and Linux)
    - **Expected**: Clean exit, no EPIPE errors in console
 
 2. **Terminal PTY Termination**:

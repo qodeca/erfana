@@ -27,7 +27,8 @@
  * ever be inserted before the BOM.
  */
 import { parse, type DefaultTreeAdapterMap } from 'parse5'
-import { BOM_CHAR } from './encoding'
+import { BOM_CHAR } from '../comments/encoding'
+import type { IndexedCommentNode, IndexedTarget, TargetIndex } from '../comments/targetIndex'
 import { boundedTreeAdapter, parseLimitsFor, type HtmlParseLimits } from './parseBounds'
 
 type ChildNode = DefaultTreeAdapterMap['childNode']
@@ -69,7 +70,7 @@ const NTH_OF_TYPE = ':nth-of-type('
 const NTH_DIGITS = /^[1-9]\d*$/
 
 /** One element that may receive a comment block before its start tag. */
-export interface IndexedElement {
+export interface IndexedElement extends IndexedTarget {
   readonly node: Parse5Element
   /** parse5's tag name (lowercase for HTML, adjusted case for SVG such as `foreignObject`). */
   readonly tag: string
@@ -90,7 +91,7 @@ export interface IndexedElement {
 }
 
 /** One comment node of the document. */
-export interface IndexedComment {
+export interface IndexedComment extends IndexedCommentNode {
   /** Offset of `<!--`. */
   readonly start: number
   /** Offset just after the comment's closing `>` (the end of the file when unterminated). */
@@ -138,9 +139,11 @@ export function attributeOf(node: Parse5Element, name: string): string | undefin
 
 /**
  * The parsed document plus the lookups every comment module needs. Build it
- * with {@link indexHtml}; it is immutable once built.
+ * with {@link indexHtml}; it is immutable once built. It is the HTML kind's
+ * {@link TargetIndex}, so the shared quote, lookup and re-attach modules read
+ * it without knowing about parse5.
  */
-export class HtmlIndex {
+export class HtmlIndex implements TargetIndex<IndexedElement> {
   readonly elements: readonly IndexedElement[]
   readonly comments: readonly IndexedComment[]
   /** The tag of EVERY element, implied and template ones included, in tree order. */
@@ -272,6 +275,11 @@ export class HtmlIndex {
       segments.push(this.segmentOf(cur))
     }
     return segments.reverse().join(' > ')
+  }
+
+  /** {@link TargetIndex.pathOfTarget}: the element's {@link HtmlIndex.pathOf}. */
+  pathOfTarget(el: IndexedElement): string {
+    return this.pathOf(el.node)
   }
 }
 

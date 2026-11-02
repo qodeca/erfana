@@ -159,7 +159,7 @@ stops. A role without its keyboard tells a screen-reader user to press keys that
     </span>
   </div>
 </div>
-<figcaption><span class="ds-frame__step">4</span><strong><kbd>Space</kbd> on a view mode</strong> – split horizontal is now the mode. The view modes are one of many, so the group is <code>role="radiogroup"</code> named “View mode” and each mode is <code>role="radio"</code>; the current one is <code>aria-checked="true"</code>, and the fill repeats it for the eye – no lime foot, which belongs to an on/off toggle (<a href="#view-modes">View modes beside toggles</a>). Its name stays “Split horizontal”. Never only a class.</figcaption>
+<figcaption><span class="ds-frame__step">4</span><strong><kbd>Space</kbd> on a view mode</strong> – split horizontal is now the mode. The view modes are one of many, so the group is <code>role="radiogroup"</code> named “View mode” and each mode is <code>role="radio"</code>; the current one is <code>aria-checked="true"</code>, and the fill and the lime foot repeat it for the eye, the same look as an on toggle (<a href="#view-modes">View modes beside toggles</a>). Its name stays “Split horizontal”. Never only a class.</figcaption>
 </figure>
 
 <figure class="ds-frame">
@@ -233,17 +233,19 @@ stops. A role without its keyboard tells a screen-reader user to press keys that
 
 <h2 id="view-modes">View modes beside toggles</h2>
 <p class="ds-muted">A toolbar often holds both kinds of state: a <strong>view-mode group</strong> (one of many, always
-exactly one) and <strong>on/off toggles</strong> (Wrap, Show pins). They must not look alike, or a reader cannot tell
-“this is the current mode” from “this is switched on”.</p>
+exactly one) and <strong>on/off toggles</strong> (Wrap, Show pins). <strong>Owner decision, 2026-10-31:</strong> both wear
+one pressed look, in the HTML band and the Markdown toolbar alike: a <code>--color-bg-selected</code> fill plus a 2px
+<code>--color-brand-lime</code> bottom edge, with a transparent 2px edge when off so the icon never moves. The separate
+group and the role tell a mode from a toggle.</p>
 <table>
   <thead><tr><th>Control</th><th>Role and state</th><th>Look</th></tr></thead>
   <tbody>
-    <tr><td>View mode, the selected one</td><td><code>role="radio"</code> in a <code>role="radiogroup"</code>, <code>aria-checked="true"</code></td><td>Filled (<code>--color-bg-selected</code>) and a bright glyph – no lime foot</td></tr>
+    <tr><td>View mode, the selected one</td><td><code>role="radio"</code> in a <code>role="radiogroup"</code>, <code>aria-checked="true"</code></td><td>Fill <em>plus</em> the lime foot</td></tr>
     <tr><td>Toggle, on</td><td><code>aria-pressed="true"</code></td><td>Fill <em>plus</em> the lime foot</td></tr>
     <tr><td>Either, off</td><td><code>aria-checked="false"</code> or <code>aria-pressed="false"</code></td><td>No fill, a tertiary glyph</td></tr>
   </tbody>
 </table>
-<p class="ds-muted">Both looks are <code>.erf-button--toggle</code>; the attribute picks the look, so nothing extra is
+<p class="ds-muted">Both are <code>.erf-button--toggle</code>; either attribute draws the look, so nothing extra is
 written. The mode group sits in its own <code>erf-toolbar__group</code>, with a separator between it and the toggles.</p>
 <div class="ds-frames tl-frames-wide">
 <figure class="ds-frame">
@@ -258,14 +260,14 @@ written. The mode group sits in its own <code>erf-toolbar__group</code>, with a 
     </span>
   </div>
 </div>
-<figcaption><strong>Toggles left, modes right</strong> – Wrap is on (fill and lime foot), Show pins is off. In the mode group, split horizontal is the mode (fill only). A listener hears “Wrap, toggle button, pressed” and “Split horizontal, radio button, checked, 2 of 4”.</figcaption>
+<figcaption><strong>Toggles left, modes right</strong> – Wrap is on (fill and lime foot), Show pins is off. In the mode group, split horizontal is the mode (the same fill and lime foot). A listener hears “Wrap, toggle button, pressed” and “Split horizontal, radio button, checked, 2 of 4”.</figcaption>
 </figure>
 </div>
 
 <h2 id="tool-height">Tool height</h2>
 <p class="ds-muted">
   One height for every tool in a toolbar, and for anything that has to line up with one: a count button
-  (“3 comments”), a menu button, a find field, a floating action over a canvas. The proposal is a token,
+  (the comments list), a menu button, a find field, a floating action over a canvas. The proposal is a token,
   <code>--toolbar-tool-height</code>, at the value of <code>--input-height-sm</code>
   (<code data-token="--input-height-sm">28px</code>). It is a <strong>proposed token, not yet in
   <code>design-tokens.css</code></strong>; adding it is an owner decision. Until then <code>toolbar.css</code> carries a
@@ -302,10 +304,10 @@ records it as an <a href="../button/index.html#exceptions">exception</a>); this 
     <span class="tl-find">Find</span>
     <span class="erf-button erf-button--icon"><svg data-icon="arrow-down" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></span>
     <span class="erf-toolbar__spacer"></span>
-    <span class="erf-button erf-button--ghost"><span>Comments</span><span>3</span></span>
+    <span class="erf-button erf-button--ghost"><svg data-icon="messages-square" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/><path d="M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"/></svg><span>3</span></span>
   </div>
 </div>
-<figcaption><strong>Tools, a find field and a count button on one line</strong> – every edge at the tool height. The count button (“Comments, 3”) is a ghost button with the count as its last word.</figcaption>
+<figcaption><strong>Tools, a find field and a count button on one line</strong> – every edge at the tool height. The count button is a ghost button: the icon and the number, no words (owner decision, 2026-10-31). Its tooltip is its name, “3 comments”.</figcaption>
 </figure>
 <figure class="ds-frame">
 <div class="tl-canvas" aria-hidden="true">
@@ -358,8 +360,8 @@ records it as an <a href="../button/index.html#exceptions">exception</a>); this 
   <li><strong>View-mode buttons carry their state in a class only</strong> – <code>MarkdownToolbar.tsx</code> marks the current
     mode with <code>.active</code> and no <code>aria-pressed</code> or <code>aria-checked</code>, and the modes are not a radio group, so a
     screen reader cannot tell which mode is on.</li>
-  <li><strong>Literal sizes</strong> – <code>MarkdownToolbar.css</code> sets its buttons to <code>height: 28px</code> (lines 72 and 102)
-    and its separator to <code>width: 1px</code>, off the button scale and the border token. The height is the proposed
+  <li><strong>Literal sizes</strong> – <code>MarkdownToolbar.css</code> sets its buttons to <code>height: var(--space-14)</code> (lines 72 and 108), a
+    spacing token, and its separator to <code>width: 1px</code> (line 134), off the button scale and the border token. The height is the proposed
     tool height; it becomes the token once <code>--toolbar-tool-height</code> exists.</li>
   <li><strong>The image viewer scrolls instead of overflowing</strong> (#73) – a locked requirement there, kept as a legitimate
     exception once it carries a <code>deviates:</code> marker.</li>
@@ -375,7 +377,7 @@ records it as an <a href="../button/index.html#exceptions">exception</a>); this 
     <tr><td><code>--space-4</code></td><td><code data-token="--space-4">8px</code></td><td>The margin either side of a separator</td></tr>
     <tr><td><code>--icon-size-lg</code></td><td><code data-token="--icon-size-lg">24px</code></td><td>A separator's height</td></tr>
     <tr><td><code>--color-bg-selected</code></td><td>The violet, muted</td><td>A checked view mode and an on toggle</td></tr>
-    <tr><td><code>--color-brand-lime</code></td><td><code data-token="--color-brand-lime">#E3E829</code></td><td>An on toggle's foot – never a view mode's</td></tr>
+    <tr><td><code>--color-brand-lime</code></td><td><code data-token="--color-brand-lime">#E3E829</code></td><td>The foot of an on toggle and a checked view mode</td></tr>
   </tbody>
 </table>
 
@@ -390,8 +392,15 @@ records it as an <a href="../button/index.html#exceptions">exception</a>); this 
 
 <section id="exceptions">
 <h2>Exceptions</h2>
-<p class="ds-muted">None recorded. A shipping toolbar that departs from this card carries a
-<code>deviates:</code> marker at the site and gets a row here, naming the file.</p>
+<p class="ds-muted">A shipping toolbar that departs from this card carries a
+<code>deviates:</code> marker at the site and gets a row here, naming the file. Proposed screens that depart are listed too, so the card does not drift from them.</p>
+<table>
+  <thead><tr><th>File</th><th>Departure</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td><code>docs/designs/browser/tab-and-toolbar.html</code> (proposed screen, spec 025)</td><td>The browser tab’s navigation, pick and find rows use <code>--color-bg-primary</code> and 28px tools in <code>--space-3</code> padding, not this card’s surface and height, and its tools sit <code>--space-2</code> (4px) apart so an outward focus ring lands in the gap, never on the next tool (M-37).</td><td>They copy the HTML preview bar (Permission band, decided), so Erfana’s two web-page surfaces look alike. Proposed here: a <code>--toolbar-tool-height</code> token instead of the screen’s local height override.</td></tr>
+  </tbody>
+</table>
+
 </section>
 </main>
 </body>

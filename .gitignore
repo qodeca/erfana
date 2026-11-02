@@ -66,3 +66,6 @@ playwright-report/
 # --- Per-machine agent files, never committed ---
 /skills-lock.json
 /.claude/CLAUDE.md
+
+# lychee link-check cache (npm run lint:docs)
+.lycheecache

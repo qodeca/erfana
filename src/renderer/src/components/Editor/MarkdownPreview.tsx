@@ -15,14 +15,9 @@ import {
   createContext,
   useContext
 } from 'react'
-import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import remarkBreaks from 'remark-breaks'
-import rehypeRaw from 'rehype-raw'
-import rehypeSanitize from 'rehype-sanitize'
 import type { PluggableList } from 'unified'
-import { defaultSchema } from 'hast-util-sanitize'
+import { PREVIEW_REHYPE_CORE, previewRemarkPlugins } from '../../../../shared/markdown/previewPipeline'
 import { PreviewContextMenu } from '../ContextMenu/PreviewContextMenu'
 import { MermaidDiagram } from './MermaidDiagram'
 import { DiagramViewer } from './DiagramViewer'
@@ -46,6 +41,7 @@ import { TEST_IDS } from '../../constants/testids'
 import { notePreviewRenderStart, notePreviewRenderCommit } from '../../utils/previewRenderTiming'
 import { useIdleDebouncedValue } from '../../hooks/useIdleDebouncedValue'
 import { rehypeCollectLinks, rehypeHeadingIds, rehypeShiftLines } from './previewRehypePlugins'
+import { ParsedMarkdown } from './markdownBodyParse'
 import { PreviewWorkContext, PreviewWorkTracker } from './previewWork'
 import { LinkTargetCache } from './linkTargetCache'
 import { MarkdownImage, MarkdownImageStoreContext, MARKDOWN_IMAGE_SETTLED_EVENT } from './MarkdownImage'
@@ -163,13 +159,8 @@ export interface MarkdownPreviewHandle {
  *
  * Reference: https://github.com/rehypejs/rehype-sanitize
  */
-const sanitizationSchema = {
-  ...defaultSchema,
-  protocols: {
-    ...defaultSchema.protocols,
-    href: [...(defaultSchema.protocols?.href || []), 'tel']
-  }
-}
+// The schema itself lives in shared/markdown/previewPipeline.ts (PREVIEW_SANITIZE_SCHEMA),
+// shared with main's comment render check (spec 024).
 
 /**
  * Helper function to extract line range from node position
@@ -215,16 +206,9 @@ function withLineRange<T extends keyof JSX.IntrinsicElements>(
 }
 
 /**
- * Stable remark plugins array (base version without breaks)
- * Defined at module level to maintain referential equality across renders
+ * Remark plugins come from `previewRemarkPlugins` (shared/markdown/previewPipeline.ts):
+ * module-level arrays, so they keep referential equality across renders.
  */
-const remarkPluginsBase = [remarkGfm]
-
-/**
- * Remark plugins array with breaks enabled
- * Defined at module level to maintain referential equality across renders
- */
-const remarkPluginsWithBreaks = [remarkGfm, remarkBreaks]
 
 /**
  * Rehype plugins for HTML rendering, sanitization and per-document bookkeeping.
@@ -244,8 +228,8 @@ const remarkPluginsWithBreaks = [remarkGfm, remarkBreaks]
  */
 function buildRehypePlugins(lineOffset: number, linkSink: Set<string>): PluggableList {
   return [
-    rehypeRaw,
-    [rehypeSanitize, sanitizationSchema],
+    // rehypeRaw then rehypeSanitize – shared with main's comment render check.
+    ...PREVIEW_REHYPE_CORE,
     // After sanitize: ids must not get the `user-content-` clobber prefix, and
     // line numbers must be final before the renderers read them.
     rehypeHeadingIds,
@@ -653,9 +637,7 @@ const MarkdownBody = memo(function MarkdownBody({
   const rehypePlugins = useMemo(() => buildRehypePlugins(lineOffset, linkSink), [lineOffset, linkSink])
   return (
     <RenderTimingProbe onCommit={onCommit}>
-      <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
-        {source}
-      </ReactMarkdown>
+      <ParsedMarkdown source={source} remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components} />
     </RenderTimingProbe>
   )
 })
@@ -773,7 +755,7 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
 
     // Select remark plugins based on preserveLineBreaks setting
     // Uses pre-defined arrays to maintain referential equality
-    const remarkPlugins = preserveLineBreaks ? remarkPluginsWithBreaks : remarkPluginsBase
+    const remarkPlugins = previewRemarkPlugins(preserveLineBreaks)
 
     // Use refs to avoid recreating handleInternalLink when props change
     const filePathRef = useRef(filePath)

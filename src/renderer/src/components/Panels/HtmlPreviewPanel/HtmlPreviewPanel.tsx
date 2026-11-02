@@ -64,8 +64,9 @@ import { previewPlaceholderLabel, selectFallback, selectPanelView } from './html
 import './HtmlPreviewPanel.css'
 import { previewGateway } from '../../../services/previewGateway'
 import { usePreviewComments } from './comments/usePreviewComments'
-import { CommentToolbarTools } from './comments/CommentToolbarTools'
-import { CommentDrawer } from './comments/CommentDrawer'
+import { PreviewPausedBand } from './comments/PreviewPausedBand'
+import { CommentToolbarTools } from '../../Comments/CommentToolbarTools'
+import { CommentDrawer } from '../../Comments/CommentDrawer'
 import { PreviewCommentsLayer } from './comments/PreviewCommentsLayer'
 
 /** Parameters passed to {@link HtmlPreviewPanel} via dockview. */
@@ -357,7 +358,7 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
   return (
     // Back/Forward keys with focus anywhere in THIS panel's chrome – a React
     // handler on the root, so another panel's keys never reach it (§3.7).
-    <div className="html-preview-panel" ref={panelRootRef} onKeyDown={onRootKeyDown}>
+    <div className="html-preview-panel" ref={panelRootRef} onKeyDown={onRootKeyDown} onKeyDownCapture={comments.onRootKeyDownCapture}>
       {/* Move announcements (part 3 §3.8, RU3-1). On the ROOT, mounted in every
           view: a move started from the failed banner mounts the band in the
           same render it lands, and a live region created with its text is not
@@ -420,6 +421,7 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
               </>
             }
           />
+          {comments.enabled && <PreviewPausedBand filePath={comments.pageFile} />}
           {/* Everything below the strip. This wrapper is the find bar's
               positioning context, so the bar's offset measures from BELOW the
               strip — it used to be positioned against the panel root, which put

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The unsaved-HTML-sources feed to main (docs/designs/comments/html-preview-comments.md
- * §7.8, decision 13; R-007).
+ * The unsaved-sources feed to main (docs/designs/comments/html-preview-comments.md
+ * §7.8, decision 13; R-007), widened to every commentable file and gated on
+ * either preview's comments being on (spec 024 024-FR-026, § 8 C6).
  */
 import { act, renderHook } from '@testing-library/react'
 import type { DockviewApi } from 'dockview'
@@ -13,11 +14,13 @@ import {
   installCommentsBridge,
   type FakeCommentsBridge
 } from '../components/Panels/HtmlPreviewPanel/comments/__test-helpers__/commentTestKit'
+import { useGlobalSettingsStore } from '../stores/useGlobalSettingsStore'
 import { useProjectStore } from '../stores/useProjectStore'
+import { getDefaultGlobalSettings } from '../../../shared/ipc/global-settings-schema'
 import {
   UNSAVED_SOURCES_ATTEMPTS,
   UNSAVED_SOURCES_RETRY_MS,
-  unsavedHtmlSources,
+  unsavedCommentSources,
   useUnsavedSourcesFeed
 } from './useUnsavedSourcesFeed'
 
@@ -27,31 +30,35 @@ const panelsBy = (entries: Record<string, unknown>) =>
     'getPanel'
   >
 
-describe('unsavedHtmlSources', () => {
-  it('lists the dirty HTML files once each, sorted', () => {
+describe('unsavedCommentSources', () => {
+  it('lists the dirty commentable files once each, sorted: HTML and Markdown (024-FR-026)', () => {
     const api = panelsBy({
       a: { filePath: '/p/b.html' },
       b: { filePath: '/p/a.htm' },
       c: { filePath: '/p/b.html' },
       d: { filePath: '/p/notes.md' },
       e: {},
-      f: { filePath: `/p/${'x'.repeat(5000)}.html` }
+      f: { filePath: `/p/${'x'.repeat(5000)}.html` },
+      g: { filePath: '/p/plan.MARKDOWN' },
+      h: { filePath: '/p/notes.txt' }
     })
-    expect(unsavedHtmlSources(api, new Set(['a', 'b', 'c', 'd', 'e', 'f', 'gone']))).toEqual([
+    expect(unsavedCommentSources(api, new Set(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'gone']))).toEqual([
       '/p/a.htm',
-      '/p/b.html'
+      '/p/b.html',
+      '/p/notes.md',
+      '/p/plan.MARKDOWN'
     ])
   })
 
   it('is empty without a dockview', () => {
-    expect(unsavedHtmlSources(null, new Set(['a']))).toEqual([])
+    expect(unsavedCommentSources(null, new Set(['a']))).toEqual([])
   })
 
   it('caps the list at the schema maximum', () => {
     const entries: Record<string, unknown> = {}
     for (let i = 0; i < COMMENT_UNSAVED_SOURCES_MAX + 5; i += 1)
       entries[`p${i}`] = { filePath: `/p/${i}.html` }
-    expect(unsavedHtmlSources(panelsBy(entries), new Set(Object.keys(entries)))).toHaveLength(
+    expect(unsavedCommentSources(panelsBy(entries), new Set(Object.keys(entries)))).toHaveLength(
       COMMENT_UNSAVED_SOURCES_MAX
     )
   })
@@ -64,7 +71,7 @@ describe('useUnsavedSourcesFeed', () => {
     useProjectStore.setState({
       dockviewApi: panelsBy({
         e1: { filePath: '/p/index.html' },
-        e2: { filePath: '/p/x.md' }
+        e2: { filePath: '/p/x.txt' }
       }) as DockviewApi,
       dirtyPanelIds: new Set()
     })
@@ -80,7 +87,7 @@ describe('useUnsavedSourcesFeed', () => {
     expect(fake.bridge.setUnsavedSources).toHaveBeenLastCalledWith([])
     act(() => useProjectStore.setState({ dirtyPanelIds: new Set(['e1']) }))
     expect(fake.bridge.setUnsavedSources).toHaveBeenLastCalledWith(['/p/index.html'])
-    // A Markdown tab going dirty changes nothing main cares about.
+    // A tab of a file no preview comments on changes nothing main cares about.
     act(() => useProjectStore.setState({ dirtyPanelIds: new Set(['e1', 'e2']) }))
     expect(fake.bridge.setUnsavedSources).toHaveBeenCalledTimes(2)
     act(() => useProjectStore.setState({ dirtyPanelIds: new Set() }))
@@ -130,6 +137,36 @@ describe('useUnsavedSourcesFeed', () => {
       unmount()
       await wait(UNSAVED_SOURCES_RETRY_MS * 5)
       expect(fake.bridge.setUnsavedSources).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('024-FR-026 runs while either preview comments are on', () => {
+    const withComments = (html: boolean, markdown: boolean): void => {
+      const defaults = getDefaultGlobalSettings()
+      useGlobalSettingsStore.setState({
+        settings: {
+          ...defaults,
+          htmlPreview: { ...defaults.htmlPreview, comments: { enabled: html } },
+          markdownPreview: { comments: { enabled: markdown } }
+        }
+      })
+    }
+    afterEach(() => useGlobalSettingsStore.setState({ settings: null }))
+
+    it('reports with only Markdown comments on', () => {
+      withComments(false, true)
+      useProjectStore.setState({ dirtyPanelIds: new Set(['e1']) })
+      renderHook(() => useUnsavedSourcesFeed())
+      expect(fake.bridge.setUnsavedSources).toHaveBeenLastCalledWith(['/p/index.html'])
+    })
+
+    it('sends nothing with both off, and the current list once one is turned on', () => {
+      withComments(false, false)
+      useProjectStore.setState({ dirtyPanelIds: new Set(['e1']) })
+      renderHook(() => useUnsavedSourcesFeed())
+      expect(fake.bridge.setUnsavedSources).not.toHaveBeenCalled()
+      act(() => withComments(true, false))
+      expect(fake.bridge.setUnsavedSources).toHaveBeenLastCalledWith(['/p/index.html'])
     })
   })
 

@@ -9,11 +9,11 @@
  */
 import { vi, type Mock } from 'vitest'
 import { PreviewCommentPageChannels } from '../../../../../shared/ipc/preview-comment-channels'
-import { createInProcessCommentFileJobs } from '../commentFileJobs'
+import { createInProcessCommentFileJobs } from '../htmlCommentJobs'
 import type { PreviewCommentServing } from '../commentInstrumentation'
 import { READ_SCROLL_SCRIPT } from '../commentScripts'
 import { createPreviewCommentRegistry, type PreviewCommentEmitters } from '../commentServiceTypes'
-import { createCommentUnsavedSources } from '../commentUnsavedSources'
+import { createCommentUnsavedSources } from '../../../comments/commentUnsavedSources'
 import { ElementTokenTable } from '../ElementTokenTable'
 import { PreviewCommentService, type PreviewCommentServiceDeps } from '../PreviewCommentService'
 import { makeProject, type TempProject } from './commentWriterHarness'
@@ -75,7 +75,8 @@ export async function commentServiceFixture(pageHtml: string, overrides: Partial
     commentsChanged: vi.fn(),
     anchorStatus: vi.fn(),
     modeChanged: vi.fn(),
-    saveSettled: vi.fn()
+    saveSettled: vi.fn(),
+    bulkSettled: vi.fn()
   }
   let enabled = true
   let now = 1_000
@@ -145,10 +146,17 @@ export async function commentServiceFixture(pageHtml: string, overrides: Partial
     await flush()
     await settle()
   }
-  const pick = async (frame: FakeFrame, payload: unknown): Promise<void> => {
+  /** A pick with nothing behind it: what a compromised renderer can send at any moment. */
+  const forgedPick = async (frame: FakeFrame, payload: unknown): Promise<void> => {
     view.ipc.get(PreviewCommentPageChannels.PICK)?.(eventFrom(frame), payload)
     for (let i = 0; i < 6; i++) await flush()
     await settle()
+  }
+  /** A pick the reader really made: main saw the press and the key first. */
+  const pick = async (frame: FakeFrame, payload: unknown): Promise<void> => {
+    service.pagePressed('down')
+    service.menuKeyPressed()
+    await forgedPick(frame, payload)
   }
   const anchors = (frame: FakeFrame, payload: unknown): void => {
     view.ipc.get(PreviewCommentPageChannels.ANCHORS)?.(eventFrom(frame), payload)
@@ -176,6 +184,7 @@ export async function commentServiceFixture(pageHtml: string, overrides: Partial
     navigate,
     hello,
     pick,
+    forgedPick,
     anchors,
     loadPage,
     setEnabled: (on: boolean) => (enabled = on),

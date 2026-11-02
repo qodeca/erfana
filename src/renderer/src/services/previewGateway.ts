@@ -62,11 +62,15 @@ export const previewCommentsGateway: PreviewCommentsBridge = {
   setMode: (...args) => commentsBridge().setMode(...args),
   list: (...args) => commentsBridge().list(...args),
   reveal: (...args) => commentsBridge().reveal(...args),
+  newOnThread: (...args) => commentsBridge().newOnThread(...args),
+  keepDraft: (...args) => commentsBridge().keepDraft(...args),
   save: (...args) => commentsBridge().save(...args),
+  bulk: (...args) => commentsBridge().bulk(...args),
   setUnsavedSources: (...args) => commentsBridge().setUnsavedSources(...args),
   onDraftOpened: (...args) => commentsBridge().onDraftOpened(...args),
   onCommentsChanged: (...args) => commentsBridge().onCommentsChanged(...args),
   onAnchorStatus: (...args) => commentsBridge().onAnchorStatus(...args),
   onModeChanged: (...args) => commentsBridge().onModeChanged(...args),
-  onSaveSettled: (...args) => commentsBridge().onSaveSettled(...args)
+  onSaveSettled: (...args) => commentsBridge().onSaveSettled(...args),
+  onBulkSettled: (...args) => commentsBridge().onBulkSettled(...args)
 }

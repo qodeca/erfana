@@ -75,6 +75,12 @@ export interface EditorContentLayoutProps {
   onPreviewRendered?: (info: PreviewRenderedInfo) => void
   /** Called when text selection changes in editor */
   onSelectionChange: (text: string) => void
+  /**
+   * Drawn in the preview pane of the preview-only view ONLY, beside the
+   * preview: the Markdown comment overlay (spec 024, 024-FR-005 – no comment
+   * UI in the editor or split views).
+   */
+  previewOverlay?: React.ReactNode
 }
 
 /**
@@ -139,7 +145,8 @@ export function EditorContentLayout({
   onOpenFile,
   onPreviewRendered,
   onSelectionChange,
-  isVisible = true
+  isVisible = true,
+  previewOverlay = null
 }: EditorContentLayoutProps): JSX.Element {
   return (
     <div className={`editor-content view-mode-${viewMode}`} role="region" aria-label="Editor" data-testid={TEST_IDS.EDITOR_CONTENT}>
@@ -248,6 +255,7 @@ export function EditorContentLayout({
               {(viewMode === 'preview' || activePaneId === 'preview') && (
                 <SearchBar provider={previewProvider} />
               )}
+              {viewMode === 'preview' && previewOverlay}
             </div>
           )}
         </>

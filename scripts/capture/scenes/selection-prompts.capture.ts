@@ -106,10 +106,10 @@ test('selection-prompts', async () => {
     const before = fs.readFileSync(file, 'utf8')
     await page.getByTestId(TEST_IDS.DIALOG_BTN_CONFIRM).click()
     await waitForPty(page, 'Pasted text', { from })
-    // The agent at work: it has read the file and has not finished its turn.
-    // Its spinner never holds still, so this one shot is taken without the
-    // settle loop.
-    await waitForPty(page, 'Read 1 file', { from, timeout: 5 * 60_000 })
+    // The agent at work: it has looked at the file (Claude Code prints either
+    // line, run to run) and has not finished its turn. Its spinner never holds
+    // still, so this one shot is taken without the settle loop.
+    await waitForPty(page, ['Read 1 file', 'Searched for'], { from, timeout: 5 * 60_000 })
     expect(stopHookCount(sb.stopLog)).toBe(turns)
     await blurAll(page)
     await shot(cap, 'turn-a-selection/prompt-in-terminal', { noSettle: true })

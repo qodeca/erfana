@@ -27,7 +27,7 @@
  * it crosses a worker boundary cheaply (R3-12).
  */
 import { PREVIEW_LIMITS } from '../preview-limits'
-import { cryptoRandomBytes, randomBase32, type RandomBytes } from './format'
+import { cryptoRandomBytes, randomBase32, type RandomBytes } from '../comments/format'
 import { indexHtml, type HtmlIndex } from './htmlIndex'
 
 /** The attribute carrying a token in the served copy. */

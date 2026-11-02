@@ -91,25 +91,16 @@ export const verifyUniqueTestIds = async (window: Page) => {
 /**
  * Wait for app to be fully ready (activity bar visible)
  */
-export const waitForAppReady = async (window: Page) => {
-  await window.waitForLoadState('domcontentloaded')
-  await waitForTestId(window, TEST_IDS.ACTIVITY_BAR)
-}
-
-/**
- * Open project via UI (triggers system file picker)
- */
-export const openProject = async (window: Page, projectPath: string) => {
-  // Click files button to show project tree
-  await byTestId(window, TEST_IDS.ACTIVITY_BAR_BTN_FILES).click()
-
-  // Use the open project button
-  await byTestId(window, TEST_IDS.PROJECT_TREE_BTN_OPEN).click()
-
-  // Note: This triggers system file picker - for automation,
-  // pass project path as CLI argument instead
+export async function waitForAppReady(page: Page): Promise<void> {
+  await page.waitForLoadState('domcontentloaded')
+  await waitForTestId(page, TEST_IDS.ACTIVITY_BAR, { timeout: 10000 })
 }
 ```
+
+Two ways to open a project, both in `e2e/utils/helpers.ts`:
+
+- `openProject(page, projectPath)` – reloads the page, then calls `window.api.file.openProjectByPath({ projectPath })` directly and waits for the first file node and the terminal button. No dialog is involved.
+- `openProjectViaUI(electronApp, page, projectPath)` – stubs the native picker with `stubDialog(electronApp, 'showOpenDialog', …)`, then clicks `TEST_IDS.PROJECT_TREE_BTN_OPEN`, so the real open-project flow runs without a system file picker.
 
 ### Editor helpers
 
@@ -121,7 +112,7 @@ import { monaco } from './utils/helpers'
 // Wait for Monaco to be fully initialized (uses Playwright auto-retry)
 await monaco.waitForReady(page)
 
-// Focus editor (handles overlapping layers, verifies cursor visibility)
+// Focus editor (handles overlapping layers, retries until Monaco reports focus)
 await monaco.focus(page)
 
 // Set content (clears existing, inserts new as one input event)
@@ -133,7 +124,7 @@ const content = await monaco.getContent(page)
 // Get Monaco's internal textarea locator (for advanced use)
 const textarea = monaco.getTextArea(page)
 
-// Wait for cursor visibility (focus verification)
+// Wait for the cursor in a focused editor (focus verification)
 await monaco.waitForCursor(page)
 
 // Search operations
@@ -151,10 +142,10 @@ await monaco.executeCommand(page, 'Format Document')
 
 | Method | Description |
 |--------|-------------|
-| `waitForReady(page)` | Waits for `.monaco-editor` container to be attached |
-| `focus(page)` | Clicks with `force: true`, verifies cursor visibility |
+| `waitForReady(page)` | Waits for the `editor-monaco` testid to be visible and Monaco's internal textarea to be attached |
+| `focus(page)` | Clicks with `force: true` until the editor carries Monaco's `focused` class (the blinking cursor is not a stable signal) |
 | `getTextArea(page)` | Returns Monaco's internal textarea locator |
-| `waitForCursor(page)` | Waits for cursor to be visible (focus verification) |
+| `waitForCursor(page)` | Waits for the cursor to be attached in a focused editor (`.monaco-editor.focused .cursor`) – attached, not visible, because it blinks |
 | `setContent(content)` | Selects all, then inserts the new content with `keyboard.insertText` — never `keyboard.type`, which Monaco drops characters from during re-layout (#129) |
 | `getContent(page)` | Reads the whole document from the Monaco model through the e2e test hook (`window.__erfanaTest.editorValue`) – no focus, selection or clipboard involved. Throws while no editor has mounted, so poll it when the content is still changing. For what is on screen use `MonacoPage.visibleText()`; it is on the POM class only, not on this adapter |
 
@@ -308,16 +299,15 @@ export async function closeApp(
   // Handle quit confirmation dialog(s) with retry loop
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const confirmBtn = page.locator('[data-testid="dialog-btn-confirm"]')
+      const confirmBtn = byTestId(page, TEST_IDS.DIALOG_BTN_CONFIRM)
       await expect(confirmBtn).toBeVisible({ timeout: 1500 })
+      // Hold the clicked element: a next dialog reuses the same test id
+      const clicked = await confirmBtn.elementHandle()
       await confirmBtn.click()
 
-      try {
-        await page.waitForTimeout(300)
-      } catch {
-        // Page closed after clicking - expected
-        break
-      }
+      // Wait for this dialog to go before looking for the next one
+      await clicked?.waitForElementState('hidden', { timeout: 1500 }).catch(() => undefined)
+      continue
     } catch {
       // No dialog visible - done
       break
@@ -335,6 +325,6 @@ export async function closeApp(
 
 **Key elements**:
 1. **Trigger via `window.close()`** - exercises the real quit flow
-2. **Retry loop** - handles race conditions and multiple dialogs
+2. **Retry loop** - handles multiple dialogs; it waits for the clicked dialog to hide (`waitForElementState('hidden')`) rather than sleeping
 3. **Try-catch everywhere** - page invalidation is expected, not an error
 4. **Fallback close** - ensures cleanup even if dialog handling fails

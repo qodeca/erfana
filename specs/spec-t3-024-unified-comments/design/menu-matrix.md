@@ -1,0 +1,94 @@
+# Comment menu matrix
+
+Approved by the owner on 2026-10-29 (pre-approval given in the session that built spec 024; recorded per the owner's instruction). See [approvals.md](approvals.md).
+
+Requirement: 024-FR-027 (a), with 024-FR-004, 024-FR-006, 024-FR-019 (OD-01) and 024-NFR-006. Acceptance: 024-AC-035 – the overlay tests assert every cell, in both previews.
+
+*Owner decision (2026-10-31):* every comment message was rewritten for readers who are not developers, in one approved table. The HTML word "element" became "section", "thread" became "conversation", and the window no longer shows a tag or selector. The strings below are the new ones; a row dated earlier that still shows old wording is history.
+
+*Owner decision (2026-11-01):* the item uses the plain kind word, with no "this": "Comment on section" in the HTML Preview (M-01, M-05), as "Comment on {kind}" does in the Markdown Preview ("Comment on paragraph", M-11, M-15). "Add comment" stays in comment mode (I-24: the matrix asks for both labels). Rewritten from the review: the "cannot hold a comment" reason in § 3 now matches the shipped text (I-30). § 3 is now the one reason table the code holds, `reasonSentence` in `commentCopyWords.ts`, so the banner, the menu and the toggle say one sentence per reason (plan step 12; P-F12, P-F32; the read-only row kept the matrix's words, the too-large row the shipped words that name the limit). The keyboard menu of § 4 for HTML with comment mode off works since plan step 7 (D-50): the page handles the key itself, and main accepts it within about 1 second of a real key press it recorded, a change to security gate L-1 the owner decided on 2026-11-01.
+
+## How to read it
+
+- **Axes.** Preview (HTML, Markdown) × comment mode (off, on) × text selected (no, yes) × file state. File state is one of: **writable**; **read-only** (any reason a new comment cannot be written – see § 3); for Markdown also **paused** (unsaved editor edits, 024-FR-015) and **frontmatter** (the pointer, the focused block or any part of the selection is in the frontmatter).
+- **Items** are listed in order, top to bottom. `─` is a separator. Item text is exact; `{kind}` is the Markdown kind noun in lower case (comments-v2 C-03, "block quote" per 024-FR-007).
+- **A disabled item keeps its action name** and shows its reason as the Menu card's visible reason line (`docs/design-system/system/components/menu/index.html#reason`): a second line inside the item, `aria-disabled="true"`, named from its label with `aria-labelledby`, the reason tied with `aria-describedby`. Every disabled item carries its own reason line, even when two share one reason. Reason texts are in § 3.
+- **Menu label** (the menu's accessible name): "Selection" when text is selected; otherwise "Section" (HTML) or the capitalised kind noun, for example "List item" (Markdown).
+- **Comment button.** It is no menu, but it shares the selection's subject: in the HTML Preview outside comment mode it stands in for the menu's **Comment on selection** after a real drag or double-click, and the right-click stays the sure route (differences table D-10).
+- **Target.** "The target" is the element or block the item acts on: the picked one in comment mode; outside comment mode the nearest commentable element or block under the pointer (Markdown: the nearest `[data-line-start]` block); with a selection, the smallest commentable element or block that holds the whole selection (024-FR-004).
+
+## 1. Matrix
+
+| # | Preview | Mode | Selected | File | Items, in order |
+|---|---|---|---|---|---|
+| M-01 | HTML | off | no | writable | 1. **Comment on section** – opens the new-comment window on the target in one step (A-01) |
+| M-02 | HTML | off | yes | writable | 1. **Comment on selection** · 2. **Comment on the whole section** |
+| M-03 | HTML | on | no | writable | 1. **Add comment** – on the picked element |
+| M-04 | HTML | on | yes | writable | 1. **Comment on selection** · 2. **Comment on the whole section** |
+| M-05 | HTML | off | no | read-only | 1. **Comment on section** – disabled, reason |
+| M-06 | HTML | off | yes | read-only | 1. **Comment on selection** – disabled, reason · 2. **Comment on the whole section** – disabled, reason |
+| M-07 | HTML | on | any | read-only | Not reachable: comment mode is unavailable while no new comment can be written (§ 2) |
+| M-08 | HTML | off or on | any | target cannot hold a comment (`html`, `head`, inside template content, an inline or refused frame) | The row's items for a writable file, each disabled with its reason |
+| M-09 | HTML | – | – | comments off in Settings | No Erfana menu; the page owns its right-click, as in v0.23.1 |
+| M-10 | HTML | off | any | comments unavailable for this file (nothing could be read) | The row's items, each disabled with "You can't comment on this file: {reason}." |
+| M-11 | Markdown | off | no | writable | 1. **Comment on {kind}** ─ the prompt items in their shipped order (Copy selection is hidden) |
+| M-12 | Markdown | off | yes | writable | 1. **Comment on selection** · 2. **Comment on the whole {kind}** ─ the prompt items ─ **Copy selection** |
+| M-13 | Markdown | on | no | writable | 1. **Add comment** – on the picked block |
+| M-14 | Markdown | on | yes | writable | 1. **Comment on selection** · 2. **Comment on the whole {kind}** – comment items only, no prompt items (R-13) |
+| M-15 | Markdown | off | no | read-only or paused | 1. **Comment on {kind}** – disabled, reason ─ the prompt items |
+| M-16 | Markdown | off | yes | read-only or paused | 1. **Comment on selection** – disabled, reason · 2. **Comment on the whole {kind}** – disabled, reason ─ the prompt items ─ **Copy selection** |
+| M-17 | Markdown | on | any | read-only or paused | Not reachable: comment mode is unavailable (§ 2) |
+| M-18 | Markdown | off | no | frontmatter | 1. **Comment on file settings** – disabled, reason ─ the prompt items |
+| M-19 | Markdown | off | yes | frontmatter | 1. **Comment on selection** – disabled, reason ─ the prompt items ─ **Copy selection** (no "whole" item: the frontmatter is not a commentable kind) |
+| M-20 | Markdown | on | no | frontmatter | The frontmatter is never outlined or reached by Tab; a right-click on it shows 1. **Add comment** – disabled, reason |
+| M-21 | Markdown | on | yes | frontmatter | 1. **Comment on selection** – disabled, reason |
+| M-22 | Markdown | – | – | editor, split horizontal or split vertical view | No comment items (OD-03, 024-FR-005); the shipped menu otherwise |
+| M-23 | Markdown | – | – | comments off in Settings | No comment items; the shipped menu otherwise |
+
+**Generated region (024-FR-023).** A target inside a START/END region is not known to the renderer, so the item is enabled; the window opens with the refusal "A tool creates this part, so a comment here could be lost. Comment on the text before or after it." and Save disabled, before anything is typed. Main refuses the save again if it is reached. Nothing is written.
+
+**A selection that cannot be found again at save time** (a tie that widening cannot break) is handled in the window, not the menu: the window offers "Comment on the whole {kind}" (024-FR-004).
+
+## 2. Comment mode and read-only files
+
+Comment mode is unavailable while no new comment can be written: the toggle is `aria-disabled`, its tooltip and the polite region say "Comment mode is unavailable: {reason}." (C-19.1). If the file becomes read-only or paused while the mode is on, the mode turns off and says the same sentence. Existing comments stay reachable through their icons, underlines and the drawer, read-only. So the "mode on × read-only" and "mode on × paused" cells are not reachable, and the tests assert the toggle state instead of a menu.
+
+## 3. Reasons
+
+| File state or target | Reason line (exact) | Previews |
+|---|---|---|
+| Unresolved git conflict in the file | {file} has two versions mixed together. Fix this first, or ask a developer to help. | both |
+| A comment with no end (unterminated) | One comment in {file} is broken, so Erfana can't add new ones. Fix or delete the broken comment first. | both |
+| 500 comments in the file | {file} has 500 comments, which is the limit. Delete resolved comments to add more. | both |
+| File too large | {file} is too big for comments. The limit is 25 MB. | HTML |
+| File too large | {file} is too big or too complex for comments. The size limit is 2 MB. | Markdown: "too complex" stands for its line and nesting limits (024-NFR-008) |
+| Not UTF-8 | Erfana can't add comments to this file because of its text format. Save the file as UTF-8, then try again. | both |
+| A link | {file} is only a link to another file. Open the real file to comment. | both |
+| Read-only on disk | {file} is read-only. | both |
+| Outside the project | {file} is not in this project, so you can't comment on it here. | both |
+| Paused – unsaved edits | {file} has unsaved changes. Save the file to change comments. | Markdown |
+| Paused – changed on disk too | {file} changed outside Erfana. Go to the editor and choose which version to keep. | Markdown |
+| Frontmatter | You can't comment on the settings at the top of this file. | Markdown |
+| Element cannot hold a comment, or a right-click on no target | You can't add a comment here. Try a nearby section. | HTML |
+| A right-click on no target (a gap, the margin) | You can't add a comment here. Try a nearby paragraph. | Markdown |
+| Inline frame (`srcdoc`) | Comments can't be added inside an inline frame. | HTML |
+| Frame from another site | Comments can't be added inside a frame from another site. | HTML |
+| Page still loading | Comments are available once the page has loaded. | HTML |
+| Nothing could be read | You can't comment on this file: {reason}. | both |
+
+The menu and the window use the same sentence for the same reason (C-19, one `commentCopy` table).
+
+## 4. Opening the menu from the keyboard
+
+| Preview | Mode | Key | Where it opens and what it targets |
+|---|---|---|---|
+| HTML | on | ⇧F10 / Shift+F10 or the Menu key | At the picked element's top-left + 4 px; with a selection, at the selection's last rectangle (shipped § 10.3, C-08) |
+| HTML | off | ⇧F10 / Shift+F10 or the Menu key, focus in the page | Erfana handles the key itself, because macOS fires no context-menu event for it, when the page did not cancel the key or that event (OD-01); main accepts it only within about 1 second of a real key press it recorded (L-1). With a selection: at the selection, items as M-02. Without one: at the focused element, which is the target; when nothing in the page has focus, the target is the element at the viewport centre, or the first element when the centre is the bare page (the picker's start rule, html § 10.8, with no pointer). Items as M-01 |
+| Markdown | on | ⇧F10 / Shift+F10 or the Menu key | At the focused block's rectangle (C-08.4) |
+| Markdown | off | ⇧F10 / Shift+F10 or the Menu key, focus on the preview | With a selection: at the selection's rectangle (C-08.5), items as M-12. Without one: at the first block whose top is in view, which is the target, items as M-11 |
+
+Esc closes the menu and returns focus where it was: native focus to the page (HTML), the focused block or the selection (Markdown). The menu keeps the decided Menu card's whole keyboard contract.
+
+## 5. What the tests assert per cell
+
+For every row: the item labels and their order, separators, which items are disabled, each disabled item's reason line text, its `aria-labelledby` and `aria-describedby`, the menu label, and – for keyboard rows – where the menu opens. M-07 and M-17 assert the toggle's disabled state and reason instead. M-09, M-22 and M-23 assert that no comment item exists.

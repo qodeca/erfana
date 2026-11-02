@@ -8,7 +8,8 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { accentRgb, COMMENT_OVERLAY_THEME, type CommentOverlayTheme } from './commentOverlayTheme'
-import { addCounts, countsOf, groupPins, NO_COUNTS } from './commentPins'
+import { addCounts, countsOf, groupPins, NO_COUNTS, threadsOfWords } from './commentPins'
+import type { AnchorSelection } from '../../../../shared/comments/anchorSel'
 import type { CommentLoadView } from './ElementTokenTable'
 
 type Block = CommentLoadView['blocks'][number]
@@ -61,8 +62,17 @@ describe('groupPins', () => {
   })
 })
 
+describe('C-06 (HTML) pin changed', () => {
+  it('C-06 (HTML) pin: a pin is changed when one of its open threads is, and says nothing otherwise', () => {
+    const changed = { ...open('c-1', 'aaaaaaaaaaaa'), changed: true as const }
+    const [pin, other] = groupPins({ blocks: [open('c-2', 'aaaaaaaaaaaa'), changed, open('c-3', 'bbbbbbbbbbbb')] })
+    expect(pin.changed).toBe(true)
+    expect(other).not.toHaveProperty('changed')
+  })
+})
+
 describe('countsOf and addCounts', () => {
-  it('counts open, resolved and what needs attention – an orphaned open thread included', () => {
+  it('OD-04 counts every open thread as open, found or not; attention is damaged blocks only; newer-format blocks in neither', () => {
     const blocks: Block[] = [
       open('c-1', 'aaaaaaaaaaaa'),
       open('c-2'),
@@ -70,7 +80,7 @@ describe('countsOf and addCounts', () => {
       { kind: 'damaged' },
       { kind: 'newer', token: 'bbbbbbbbbbbb' }
     ]
-    expect(countsOf({ blocks })).toEqual({ open: 1, resolved: 1, attention: 3 })
+    expect(countsOf({ blocks })).toEqual({ open: 2, resolved: 1, attention: 1 })
     expect(addCounts([{ open: 1, resolved: 2, attention: 3 }, { open: 4, resolved: 0, attention: 1 }])).toEqual({ open: 5, resolved: 2, attention: 4 })
     expect(addCounts([])).toEqual(NO_COUNTS)
   })
@@ -79,6 +89,7 @@ describe('countsOf and addCounts', () => {
 describe('COMMENT_OVERLAY_THEME', () => {
   const mapping: Record<keyof CommentOverlayTheme, string> = {
     accent: '--color-accent-primary',
+    accentDeep: '--color-brand-indigo',
     accentHover: '--color-brand-violet-hover',
     ink: '--color-brand-black',
     paper: '--color-brand-white',
@@ -108,5 +119,40 @@ describe('COMMENT_OVERLAY_THEME', () => {
   it('accentRgb reads the accent as three channels', () => {
     expect(accentRgb()).toEqual([0xa0, 0xa8, 0xff])
     expect(accentRgb({ ...COMMENT_OVERLAY_THEME, accent: '#010203' })).toEqual([1, 2, 3])
+  })
+})
+
+describe('I-13 which thread a mark belongs to', () => {
+  const sel = (exact: string): AnchorSelection => ({ exact, prefix: '', suffix: '' })
+  const ok = (id: string, words?: AnchorSelection): CommentLoadView['blocks'][number] =>
+    ({ kind: 'ok', token: 'a'.repeat(12), status: 'open', id, ...(words === undefined ? {} : { sel: words }) }) as CommentLoadView['blocks'][number]
+
+  it('K-20 each of a pin\'s words says whether its own thread changed: a neighbour on the element stays plain', () => {
+    const changed = { ...ok('t1', sel('one')), changed: true } as CommentLoadView['blocks'][number]
+    const [pin] = groupPins({ blocks: [changed, ok('t2', sel('two'))] })
+    expect(pin.words?.map(words => words.changed)).toEqual([true, undefined])
+    expect(threadsOfWords(pin, 0)).toEqual(['t1'])
+  })
+
+  it('I-13 one thread per words; the same words on two threads open both', () => {
+    const [pin] = groupPins({ blocks: [ok('t1', sel('one')), ok('t2', sel('two')), ok('t3', sel('one')), ok('t4')] })
+    expect(threadsOfWords(pin, 1)).toEqual(['t2'])
+    expect(threadsOfWords(pin, 0)).toEqual(['t1', 't3'])
+    expect(threadsOfWords(pin, 2)).toEqual(['t1', 't3'])
+  })
+
+  it('I-13 a place the pin does not have names no thread', () => {
+    const [pin] = groupPins({ blocks: [ok('t1', sel('one'))] })
+    expect(threadsOfWords(pin, 1)).toEqual([])
+  })
+
+  it('I-13 a pin with no words names no thread', () => {
+    const [pin] = groupPins({ blocks: [ok('t1')] })
+    expect(pin).not.toHaveProperty('words')
+    expect(threadsOfWords(pin, 0)).toEqual([])
+  })
+
+  it('I-13 words with no thread beside them name none', () => {
+    expect(threadsOfWords({ words: [sel('one')] }, 0)).toEqual([])
   })
 })

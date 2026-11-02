@@ -29,13 +29,15 @@ import { logger } from '../LoggingService'
  * - `w` closes the panel, destroying the page that holds focus – without this
  *   focus would go with it, to nothing;
  * - `Escape` closes the find bar and restores focus to the chrome, or with the
- *   bar closed focuses the band chip. Either way focus lands in the host.
+ *   bar closed focuses the band chip. Either way focus lands in the host;
+ * - `comment-next` / `comment-previous` open a comment window, which takes
+ *   focus (comments-v2 C-13) – the reader types into it next.
  *
  * NOT listed, because their renderer action moves no focus and the reader is
  * still in the page: `s` (export to PDF, whose save dialog main opens) and
  * `back` / `forward` (a history step inside the page the reader is in).
  */
-export const PREVIEW_HOST_FOCUS_KEYS = Object.freeze(['f', 'w', 'Escape'] as const)
+export const PREVIEW_HOST_FOCUS_KEYS = Object.freeze(['f', 'w', 'Escape', 'comment-next', 'comment-previous'] as const)
 
 /** The slice of the host `BrowserWindow` this module reads. Structural for tests. */
 export interface PreviewHostFocusWindow {

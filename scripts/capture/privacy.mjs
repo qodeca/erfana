@@ -62,7 +62,10 @@ export function buildDenyList({
     entries.push({ kind, value: v, word })
   }
   const info = userInfo()
-  add('username', info.username)
+  // The owner may allow the bare login name on screen (the real Open dialog's
+  // sidebar lists the home folder by it) with ERFANA_CAPTURE_ALLOW_USERNAME=1.
+  // The home path and every other kind stay denied.
+  if (env.ERFANA_CAPTURE_ALLOW_USERNAME !== '1') add('username', info.username)
   add('home-path', info.homedir)
   const host = hostname()
   add('hostname', host)
@@ -200,41 +203,6 @@ export function stripAnsi(s) {
     out += s[i]
   }
   return out
-}
-
-/**
- * Which frames of an encoded loop the privacy pass reads: at least one per
- * second, plus the first and the last (R138-11).
- *
- * @param {number} frameCount
- * @param {number} fps
- * @returns {number[]} frame indexes, ascending
- */
-export function sampleFrames(frameCount, fps) {
-  if (!Number.isInteger(frameCount) || frameCount <= 0) return []
-  if (!(fps > 0)) throw new Error('fps must be positive')
-  const step = Math.max(1, Math.floor(fps))
-  const set = new Set([0, frameCount - 1])
-  for (let i = 0; i < frameCount; i += step) set.add(i)
-  return [...set].sort((a, b) => a - b)
-}
-
-/**
- * The same rule by time, for encodings whose frames are not evenly spaced:
- * every whole second from 0, plus a moment just before the end (the last
- * frame). The margin covers a container whose length rounds to one frame
- * less than the edit's (a 12 fps frame is 83 ms).
- *
- * @param {number} duration - seconds
- * @returns {number[]}
- */
-export function sampleTimes(duration) {
-  if (!(duration > 0)) return []
-  const times = []
-  for (let t = 0; t < duration - 0.25; t += 1) times.push(t)
-  const last = Math.max(0, duration - 0.25)
-  if (last > times[times.length - 1]) times.push(Math.round(last * 1000) / 1000)
-  return times
 }
 
 /**

@@ -14,6 +14,7 @@ import { previewCommentsBridge } from '../previewCommentsBridge'
 vi.mock('electron', async () => ({ ipcRenderer: (await import('./bridgeHarness')).ipc }))
 
 const setMode = { panelId: 'preview-a', on: true, showIcons: false }
+const bulk = { panelId: 'preview-a', change: 'resolve', files: [{ fileKey: 'k'.repeat(32), threads: [{ threadKey: 'k'.repeat(32), rawHash: 'a'.repeat(64) }] }] } as const
 const save = { panelId: 'preview-a', op: 'add', draftToken: 'd'.repeat(22), text: 'Hi' }
 
 describeBridge('previewComments bridge', previewCommentsBridge, {
@@ -26,7 +27,22 @@ describeBridge('previewComments bridge', previewCommentsBridge, {
       channel: 'preview:commentCommand',
       wire: [{ panelId: 'preview-a', command: 'reveal', threadKey: 'tkey' }]
     },
+    {
+      // C-22: a new comment on a listed thread's target rides the same channel.
+      method: 'newOnThread',
+      args: ['preview-a', 'tkey'],
+      channel: 'preview:commentCommand',
+      wire: [{ panelId: 'preview-a', command: 'new-on-thread', threadKey: 'tkey' }]
+    },
+    {
+      // C-14 (HTML): the draft keep-alive rides the same sender-gated command channel.
+      method: 'keepDraft',
+      args: ['preview-a', 'a'.repeat(32)],
+      channel: 'preview:commentCommand',
+      wire: [{ panelId: 'preview-a', command: 'keep-draft', draftToken: 'a'.repeat(32) }]
+    },
     { method: 'save', args: [save], channel: 'preview:commentSave', wire: [save] },
+    { method: 'bulk', args: [bulk], channel: 'preview:commentBulk', wire: [bulk] },
     {
       method: 'setUnsavedSources',
       args: [['/p/a.html']],
@@ -39,6 +55,7 @@ describeBridge('previewComments bridge', previewCommentsBridge, {
     { method: 'onCommentsChanged', channel: 'preview:commentsChanged' },
     { method: 'onAnchorStatus', channel: 'preview:commentAnchorStatus' },
     { method: 'onModeChanged', channel: 'preview:commentModeChanged' },
-    { method: 'onSaveSettled', channel: 'preview:commentSaveSettled' }
+    { method: 'onSaveSettled', channel: 'preview:commentSaveSettled' },
+    { method: 'onBulkSettled', channel: 'preview:commentBulkSettled' }
   ]
 })

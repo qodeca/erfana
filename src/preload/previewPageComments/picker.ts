@@ -1,17 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Keyboard picker moves (docs/designs/comments/html-preview-comments.md §10.2, §10.8;
- * tests J-002, J-010).
- *
- * - Tab / Shift+Tab: the next / previous element at the same level, then the
- *   parent's next / previous sibling, climbing until one exists.
- * - Alt+↑: the parent, stopping at `<body>` ("Top of page").
- * - Alt+↓: back down the path Alt+↑ came up, else the first child.
+ * The page's tree for the keyboard picker (docs/designs/comments/html-preview-comments.md
+ * §10.2, §10.8; tests J-002, J-010). The keys and the moves are the overlay
+ * core's (`overlayCore/pickerKeys`); this is what a level is on an HTML page.
  *
  * Only elements a reader can see count: not `<script>`, `<style>` and other
  * non-rendered tags, not Erfana's own overlay, not anything without a box.
+ * `<body>` is the top: Alt+Up stops there.
  */
+import type { PickerTree } from '../../shared/comments/overlayCore/pickerKeys'
 import { isRendered } from './geometry'
 
 /** Tags that never draw a box of their own. */
@@ -37,39 +35,35 @@ export function pickableExcept(isOverlay: (element: Element) => boolean): Pickab
   return element => !SKIPPED_TAGS.has(element.localName) && !isOverlay(element) && isRendered(element)
 }
 
-function siblingOf(element: Element, forward: boolean, ok: PickablePredicate): Element | null {
-  let cur = forward ? element.nextElementSibling : element.previousElementSibling
-  while (cur !== null && !ok(cur)) cur = forward ? cur.nextElementSibling : cur.previousElementSibling
-  return cur
-}
-
-/**
- * The next (or previous) element at the same level, then the parent's next
- * (or previous) sibling. `null` when there is none below `body`.
- */
-export function stepOf(
-  element: Element,
-  forward: boolean,
-  body: Element,
-  ok: PickablePredicate
-): Element | null {
-  for (let cur: Element | null = element; cur !== null && cur !== body; cur = cur.parentElement) {
-    const sibling = siblingOf(cur, forward, ok)
-    if (sibling !== null) return sibling
+/** The page below and including `body`, as the picker walks it. `body` is read at each call: a page can replace it. */
+export function pageTree(body: () => Element, ok: PickablePredicate): PickerTree<Element> {
+  return {
+    parent(node) {
+      const top = body()
+      return node === top || !top.contains(node) ? null : node.parentElement
+    },
+    firstChild(node) {
+      for (const child of node.children) if (ok(child)) return child
+      return null
+    },
+    sibling(node, forward) {
+      if (node === body()) return null
+      let cur = forward ? node.nextElementSibling : node.previousElementSibling
+      while (cur !== null && !ok(cur)) cur = forward ? cur.nextElementSibling : cur.previousElementSibling
+      return cur
+    }
   }
-  return null
 }
 
-/** The parent of `element`, or `null` at `body` (or outside it). */
-export function parentOf(element: Element, body: Element): Element | null {
-  if (element === body || !body.contains(element)) return null
-  return element.parentElement
+/** Where the picker starts from `hit`: the page's bare margin is no place to start, nothing can be said about it. */
+export function pickerStart(hit: Element | null, doc: Document, tree: PickerTree<Element>): Element | null {
+  const { body, documentElement } = doc
+  if (hit !== null && hit !== body && hit !== documentElement) return hit
+  return body !== null ? (tree.firstChild(body) ?? body) : hit
 }
 
-/** The first pickable child of `element`, or `null`. */
-export function firstChildOf(element: Element, ok: PickablePredicate): Element | null {
-  for (const child of element.children) {
-    if (ok(child)) return child
-  }
-  return null
+/** The element holding focus in `doc`, or `null` when nothing a reader can see does. */
+export function focusedElement(doc: Document, ok: PickablePredicate): Element | null {
+  const { activeElement, body, documentElement } = doc
+  return activeElement === null || activeElement === body || activeElement === documentElement || !ok(activeElement) ? null : activeElement
 }

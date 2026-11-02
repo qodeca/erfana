@@ -11,7 +11,7 @@ Parent: [design-issue-124.md](design-issue-124.md). Covers P1-AC1 to P1-AC5, use
 
 Read in the working tree (*verified*) in Phase 3, not reproduced. WI-8 then reproduced all three causes (§1.8), and WI-9 fixed them (§1.4); the C2 and C3 rows below carry WI-8's corrections, and line references in them are from before WI-9.
 
-- **The issue's leading hypothesis is refuted.** `seqRef` (`usePreviewBounds.ts:225` after WI-9) and the live view's last seq (`lastSeq`, `previewLiveBounds.ts:61` since WI-1; `lastBoundsSeq` in `PreviewLiveView.ts` before) are created and destroyed together; every unmount sends `preview:close` and main drops the view. No counter survives a rebuild.
+- **The issue's leading hypothesis is refuted.** `seqRef` (`usePreviewBounds.ts` after WI-9) and the live view's last seq (`lastSeq`, `previewLiveBounds.ts` since WI-1; `lastBoundsSeq` in `PreviewLiveView.ts` before) are created and destroyed together; every unmount sends `preview:close` and main drops the view. No counter survives a rebuild.
 - **Ranked causes** (Phase 3 reading, corrected by WI-8):
 
 | # | Cause | Mechanism | Symptom |

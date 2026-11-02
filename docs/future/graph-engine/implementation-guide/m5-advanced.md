@@ -1,3 +1,5 @@
+> **Status:** proposal, not shipped – none of the graph-engine files named on this page exist in `src/` on `develop`; see the warning in the [implementation guide](./README.md).
+
 ## Milestone 5: Advanced Features (Polish & Maintenance)
 
 **Goal:** Production-ready polish and maintenance features.

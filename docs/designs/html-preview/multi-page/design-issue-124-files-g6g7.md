@@ -59,7 +59,7 @@ As built ([impl doc](design-issue-124-impl.md), G6; part 3 §3.4, §3.5): four n
 
 ### WI-23 – integration tests (real files, real symlinks in a temp folder)
 
-As built: 16, 12, 22 and 19 tests (353, 331, 423 and 235 lines). They run in `npm run test:main` and `npm run test:ci` – `vitest.main.ts` includes every `src/main/**/*.test.ts` – so there is no separate integration command (parent §4 and §5 corrected). The symlink cases skip on win32. `previewNavigation.integration.test.ts` confirmed the symlink first-open bug with two `it.fails`, which the fix below turned into `it`. **Superseded 2026-09-15 (#130)**: what actually shipped was a whole-file `describe.skipIf(win32)` on three of the four, hiding 54 passing tests from every Windows run; the skips are now scoped to the cases that need them.
+As built: 16, 12, 22 and 19 tests (353, 331, 423 and 235 lines). They run in `npm run test:main` and `npm run test:ci` – the `main` project (today in `vitest.main.projects.ts`, `MAIN_INCLUDE`) includes every `src/main/**/*.test.{ts,tsx}` – so there is no separate integration command (parent §4 and §5 corrected). The symlink cases skip on win32. `previewNavigation.integration.test.ts` confirmed the symlink first-open bug with two `it.fails`, which the fix below turned into `it`. **Superseded 2026-09-15 (#130)**: what actually shipped was a whole-file `describe.skipIf(win32)` on three of the four, hiding 54 passing tests from every Windows run; the skips are now scoped to the cases that need them.
 
 - C `src/main/services/preview/previewRequestKind.integration.test.ts`
 - C `src/main/services/preview/previewFrames.integration.test.ts`
@@ -196,6 +196,8 @@ The QG-6 judge's batches B0–B5 (with QG-7's security fixes folded in), then QG
 - ↑ `src/renderer/src/utils/openFileInPanel.ts` (`findEditorTabsShowing`; 389) and its test (455), `previewTabMove.ts` (497 → 491) and its test (499), `OverlayGuardService.ts` (comments; 463), `usePreviewEvents.ts` (header), `usePreviewLifecycle.ts` (digested lines, no `filePath`; 268) and its test (220)
 
 ### QG-8 TQ1 to TQ3 – tests and coverage
+
+Since renamed: `vitest.main.ts`, `vitest.renderer.ts` and `vitest.preload.ts` below are now `vitest.main.config.ts`, `vitest.renderer.config.ts` and `vitest.preload.config.ts`.
 
 - C `src/main/services/preview/previewLiveTeardown.test.ts` (TQ1; 447 lines)
 - ↑ `src/preload/previewBridge.test.ts` (TQ3 member pin, then the subscription table; 496) and `HtmlPreviewPanel/__test__/panelHarness.ts` (the mock typed from the bridge; TQ4's allowlist reset; 242)

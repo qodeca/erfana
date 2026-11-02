@@ -3,7 +3,7 @@ SPDX-License-Identifier: GPL-3.0-only
 SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 -->
 
-# Quick Reference
+# Quick reference
 
 One-page cheat sheet for common tasks.
 
@@ -14,7 +14,7 @@ One-page cheat sheet for common tasks.
 npm run dev              # Start dev server
 npm run build            # Production build
 npm run build:mac        # macOS package (.dmg)
-npm run build:win        # Windows package (NSIS .exe; needs Developer Mode)
+npm run build:win        # Windows package (NSIS .exe)
 
 # Quality
 npm run typecheck        # Type checking (node + web, and their tests + e2e)
@@ -36,11 +36,11 @@ npm run check:links          # Relative links and heading anchors in docs
 npm run check:version-drift  # Docs that state a stale version
 ```
 
-## Keyboard Shortcuts
+## Keyboard shortcuts
 
 See the complete [user shortcut reference](./user-guide/reference/keyboard-shortcuts.md).
 
-## Design Tokens (UI)
+## Design tokens (UI)
 
 ```css
 /* Colors */
@@ -63,31 +63,31 @@ See the complete [user shortcut reference](./user-guide/reference/keyboard-short
 --text-sm   /* 11px */
 ```
 
-Full guide: the [design system](design-system/index.html) — open it in a browser; how to use it is in [its README](design-system/README.md). The text-selection policy is on the [Theme card](design-system/system/foundations/theme.html#selection).
+Full guide: the [design system](design-system/index.html) – open it in a browser; how to use it is in [its README](design-system/README.md). The text-selection policy is on the [Theme card](design-system/system/foundations/theme.html#selection).
 
-## Project Structure
+## Project structure
 
-```
+```text
 src/
 ├── main/services/         # Backend services
 ├── main/ipc/              # IPC handlers
 ├── preload/               # Context bridge
-├── shared/                # Shared types/schemas
+├── shared/                # Code shared across processes (incl. IPC schemas)
 └── renderer/src/
     ├── components/        # React UI
     ├── stores/            # Zustand state
-    └── prompts/           # AI templates
+    └── prompts/           # Prompt templates ({{variable}} syntax, own renderer)
 ```
 
-## IPC Pattern
+## IPC pattern
 
-```
+```text
 Service (main) → Handler (ipc) → Preload → Renderer
 ```
 
 Schemas: `src/shared/ipc/*.ts`
 
-## Test Files
+## Test files
 
 | Scope | Pattern |
 |-------|---------|
@@ -95,7 +95,7 @@ Schemas: `src/shared/ipc/*.ts`
 | E2E test | `e2e/*.e2e.ts` |
 | Coverage | `coverage/<project>/` |
 
-## File Locations
+## File locations
 
 | What | Where |
 |------|-------|
@@ -104,19 +104,18 @@ Schemas: `src/shared/ipc/*.ts`
 | Services | `src/main/services/` |
 | Components | `src/renderer/src/components/` |
 | Stores | `src/renderer/src/stores/` |
-| Feature specs | `specs/` |
 | Documentation | `docs/` |
 
-## UI Rules (Non-negotiable)
+## UI rules (non-negotiable)
 
-Open [`docs/design-system/index.html`](design-system/index.html) first — the cards decide these, and
+Open [`docs/design-system/index.html`](design-system/index.html) first – the cards decide these, and
 render each rule live.
 
 Machine-enforced by `npm run lint:css` in the required `Lint` job:
 
-- Design tokens only — no raw hex outside `design-tokens.css`
+- Design tokens only – no raw hex outside `design-tokens.css`
 - `border-radius: 0` (or the circle token); nothing else
-- No bare `z-index` — use a rung from the scale
+- No bare `z-index` – use a rung from the scale
 - Design-system component CSS uses only `erf-` class names
 - No retired token (`--shadow-focus`, `--color-warning-bright` …) in `docs/design-system/` or `docs/designs/`
 
@@ -124,11 +123,11 @@ A departure from a card needs `/* deviates: docs/design-system/<card>.html – w
 
 Nobody checks these but you:
 
-- The focus ring is visible and reaches 3:1 — tab to it and look
+- The focus ring is visible and reaches 3:1 – tab to it and look
 - Every state has a non-colour cue as well as a colour one
 - Anything that loops forever stops under `prefers-reduced-motion: reduce`
 - Interactive targets are at least 24 x 24 (WCAG 2.2 SC 2.5.8)
 
 ---
 
-See: [Getting Started](./getting-started.md) | [Architecture](./architecture.md)
+See: [Getting started](./getting-started.md) | [Architecture](./architecture.md)

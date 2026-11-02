@@ -8,6 +8,7 @@
  * every live view; a view's service registers itself under its panel and
  * window, and leaves when the view goes.
  */
+import { ErrorCode } from '../../../../shared/errors'
 import type {
   CommentAck,
   CommentAnchorStatus,
@@ -20,9 +21,13 @@ import type {
   CommentSetModeResult,
   CommentsChanged
 } from '../../../../shared/ipc/preview-comment-schema'
-import type { CommentFileJobRunner } from './commentFileJobs'
-import type { CommentIdentity } from './CommentWriter'
-import type { CommentUnsavedSources } from './commentUnsavedSources'
+import type { HtmlFileJobRunner } from './htmlCommentJobs'
+import type { CommentIdentity } from '../../comments/CommentWriter'
+import type { CommentBulkRequest, CommentBulkResult, CommentBulkSettled } from '../../../../shared/ipc/comment-common-schema'
+import type { CommentUnsavedSources } from '../../comments/commentUnsavedSources'
+
+/** What a window hears once comments are off: its keys and drafts are no longer good here. */
+export const COMMENTS_OFF = { ok: false, code: ErrorCode.COMMENT_KEY_INVALID } as const
 
 /** Main → renderer comment events, each to the window that owns the view only. */
 export interface PreviewCommentEmitters {
@@ -32,6 +37,7 @@ export interface PreviewCommentEmitters {
   modeChanged(windowId: number, payload: CommentModeChanged): void
   /** A save answered `COMMENT_SAVE_PENDING` settled after all. */
   saveSettled(windowId: number, payload: CommentSaveSettled): void
+  bulkSettled(windowId: number, payload: CommentBulkSettled): void
 }
 
 /** One panel's state as the e2e hook reports it (`commentE2eHook.ts`). */
@@ -60,7 +66,13 @@ export interface CommentServiceApi {
   setMode(on: boolean, showIcons: boolean): Promise<CommentSetModeResult>
   list(): Promise<CommentListResult>
   reveal(threadKey: string): CommentAck
+  /** Start a new comment on a listed thread's target; the draft comes as `draftOpened`. */
+  newOnThread(threadKey: string): Promise<CommentAck>
+  /** C-14.2: keep an open new-comment window's draft alive. */
+  keepDraft(draftToken: string): CommentAck
   save(request: CommentSaveRequest): Promise<CommentSaveResult>
+  /** "Resolve all changed comments", "Delete all resolved comments": one write per file (024-FR-028). */
+  bulk(request: CommentBulkRequest): Promise<CommentBulkResult>
   e2eState(): CommentE2ePanelState
 }
 
@@ -103,5 +115,5 @@ export interface PreviewCommentShared {
   /** The cursor on screen (`screen.getCursorScreenPoint`), for a pick without a screen point. */
   readonly cursor?: () => { readonly x: number; readonly y: number }
   /** Where every comment parse runs; the process-wide comment parse worker by default (§19 R3-12). */
-  readonly jobs?: CommentFileJobRunner
+  readonly jobs?: HtmlFileJobRunner
 }

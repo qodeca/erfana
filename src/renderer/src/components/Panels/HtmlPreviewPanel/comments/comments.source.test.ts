@@ -11,7 +11,7 @@
  * attacker-controlled (anyone who can edit the HTML file writes them), so they
  * must only ever reach the DOM as React text.
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -20,6 +20,7 @@ const SRC = resolve(__dirname, '../../../..')
 /** Every non-test source file under `dir`. */
 function sources(dir: string): string[] {
   const out: string[] = []
+  if (!existsSync(dir)) return out
   for (const name of readdirSync(dir)) {
     const path = join(dir, name)
     if (statSync(path).isDirectory()) {
@@ -31,8 +32,16 @@ function sources(dir: string): string[] {
   return out
 }
 
+/**
+ * Every comment folder of the renderer, the shared base of spec 024 included
+ * (architecture note § 8 C15): the HTML parts, the shared components, the
+ * Markdown adapter and the file-comment gateway.
+ */
 const FILES = [
   ...sources(__dirname),
+  ...sources(resolve(SRC, 'components/Comments')),
+  ...sources(resolve(SRC, 'components/Editor/markdownComments')),
+  ...sources(resolve(SRC, 'services/comments')),
   resolve(SRC, 'components/Settings/sections/CommentsSection.tsx'),
   resolve(SRC, 'stores/usePreviewCommentStore.ts'),
   resolve(SRC, 'services/preview/commentGateway.ts'),
@@ -40,14 +49,18 @@ const FILES = [
   resolve(SRC, 'hooks/useUnsavedSourcesFeed.ts')
 ]
 
+const COMMENT_SOURCE_FLOOR = 29
+
 const code = (path: string): string =>
   readFileSync(path, 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/(^|[^:])\/\/.*$/gm, '$1')
 
 describe('comments source rules', () => {
-  it('scans the comments sources', () => {
-    expect(FILES.length).toBeGreaterThan(15)
+  // A floor, not a range: moving files into the shared folders must never make
+  // the scan see fewer files (spec 024, § 8 C15). Raise it as files are added.
+  it('scans the comments sources, and never fewer than before', () => {
+    expect(FILES.length).toBeGreaterThanOrEqual(COMMENT_SOURCE_FLOOR)
   })
 
   it.each(FILES.map(f => [relative(SRC, f), f]))(

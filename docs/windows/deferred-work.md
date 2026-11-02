@@ -22,7 +22,7 @@ This ledger covers **D1-D8** (Phase 2 review aftermath). **D9-D12** (Phase 4 aud
 
 | Phase | Items |
 |---|---|
-| **Phase 4** (whisper, OCP cleanup window) | ~~D1 `resolvePlatformBinary` extraction~~ (amended 2026-04-21 — whisper is not a probe-style caller; see D1 for revised promotion rule), D2 `MAX_FILENAME_LENGTH` consolidation, D3 `ExportLock` deduplication (**half-done 2026-08-24**: shared module extracted by #73, `PdfService`/`DocxService` not yet re-pointed — see [technical-debt #31](../technical-debt.md)) |
+| **Phase 4** (whisper, OCP cleanup window) | ~~D1 `resolvePlatformBinary` extraction~~ (amended 2026-04-21 — whisper is not a probe-style caller; see D1 for revised promotion rule), D2 `MAX_FILENAME_LENGTH` consolidation (promotion criterion met – `PreviewExportController` is a third truncating caller; not yet consolidated), D3 `ExportLock` deduplication (**half-done 2026-08-24**: shared module extracted by #73, `PdfService`/`DocxService` not yet re-pointed — see [technical-debt #31](../technical-debt.md)) |
 | **Phase 5** (distribution + signing) | D6 `DependencyDetector` cache TTL |
 | **Phase 6** (polish + CI guard) | ~~D5 Log-redaction pass for filename PII~~ (✅ RESOLVED 2026-06-05, `feature/windows-phase-6-polish`), ~~D7 Filename PII 40-char truncation review~~ (✅ RESOLVED 2026-06-05, bundled with D5). D4 Structured-error IPC serialization — **promoted to its own ticket** ([#220](https://github.com/qodeca/erfana/issues/220)) (design review found it larger/riskier than the umbrella implied; still deferred, now the active D-item). **Phase 4 items**: see [`deferred-work-phase4.md`](deferred-work-phase4.md) for D11 (ISP split of `IWhisperModelManager`) and D12 (rewrite the 5 skipped `WhisperModelManager.test.ts` cases). |
 | **Tracked-only** (no scheduled phase) | D8 IPC serialization ADR. **Phase 4 items**: see [`deferred-work-phase4.md`](deferred-work-phase4.md) for D9 (forensic-logging correlation ID) and D10 (`WhisperPlatform` tagged-union refactor, triggers when a 3rd platform lands). |
@@ -34,9 +34,9 @@ This ledger covers **D1-D8** (Phase 2 review aftermath). **D9-D12** (Phase 4 aud
 **Severity:** MEDIUM (architecture-reviewer M1, solution-reviewer SR-005)
 **Source:** Architecture — "Extract `resolvePlatformBinary` NOW, not in Phase 4"
 **Files implicated:**
-- `src/main/services/workers/git-status.worker.ts:38-54` (`buildWin32GitPaths` + `WIN32_GIT_PATHS` + `POSIX_GIT_PATHS`) + `:377-409` (`isExecutableGit` + call site)
-- `src/main/services/import/DependencyDetector.ts:19-22` (`WIN32_LIBREOFFICE_PATHS`)
-- `src/main/services/watcher/PlatformConfig.ts:196-201` (Phase 4 OCP comment block)
+- `src/main/utils/hardenedGit.ts:317-333` (`buildWin32GitPaths` + `WIN32_GIT_PATHS` + `POSIX_GIT_PATHS`) + `:341-367` (`isExecutableGit` + call site) – moved here from `workers/git-status.worker.ts`
+- `src/main/services/import/conversionToolGuard.ts:85` (`resolveLibreOffice`, which replays LiteParse's lookup; the old `WIN32_LIBREOFFICE_PATHS` list in `DependencyDetector.ts` is gone)
+- `src/main/services/watcher/PlatformConfig.ts:198-203` (Phase 4 OCP comment block)
 
 ### What
 
@@ -57,7 +57,7 @@ export async function resolvePlatformBinary(opts: {
 The two current callers diverge in non-trivial ways:
 
 - **git resolver**: 60-second cooldown cache, `--version` liveness probe, FD-pressure-aware error handling
-- **LibreOffice detector**: per-app-launch cache, `--version` liveness probe (added in review fix), shared resolver with the conversion guard (#250)
+- **LibreOffice detector**: per-app-launch cache, `--version` liveness probe (added in review fix; never run on Windows since #329), shared resolver with the conversion guard (#250)
 
 Premature extraction risks a leaky abstraction where the helper grows ad-hoc options. The Rule of Three says extract on the **third** caller.
 
@@ -78,8 +78,8 @@ These are the three load-bearing features `resolvePlatformBinary` was designed f
 
 ~1 day:
 - Extract `resolvePlatformBinary` to `src/main/utils/platformBinary.ts` with full unit tests
-- Migrate git-status.worker.ts (preserve cooldown semantics via opts)
-- Migrate DependencyDetector.ts
+- Migrate the git resolver in `hardenedGit.ts` (preserve cooldown semantics via opts)
+- Migrate `resolveLibreOffice` in `conversionToolGuard.ts`
 - Land the actual third probe-style caller
 
 ### Promotion criteria (revised)
@@ -103,8 +103,11 @@ These are the three load-bearing features `resolvePlatformBinary` was designed f
 **Source:** Architecture — "MAX_FILENAME_LENGTH in three places with three values"
 **Files:**
 - `src/main/utils/validateFilename.ts:71` → `255` (filesystem byte/char limit)
-- `src/main/services/DocxService.ts:100` → `200` (`.docx` extension headroom)
-- `src/main/services/PdfService.ts:631` → `200` (`.pdf` extension headroom)
+- `src/main/services/DocxService.ts:101` → `200` (`.docx` extension headroom)
+- `src/main/services/PdfService.ts:665` → `200` (`.pdf` extension headroom)
+- `src/main/services/preview/PreviewExportController.ts:35` → `200` (`.pdf` extension headroom, "matches PdfService") – the third truncating caller, added with the HTML preview's PDF export
+
+**Status:** OPEN. The first promotion criterion has fired – the preview PDF export added a third private `MAX_FILENAME_LENGTH = 200` – but the consolidation below has not been done.
 
 ### What
 
@@ -120,13 +123,13 @@ Push the per-caller max-length through `deriveSafeFilename(name, fallback?, maxL
 
 ~30 minutes:
 - Add `maxLength?: number` parameter to `deriveSafeFilename`
-- Update DocxService.sanitizeFilename + PdfService.getSavePath to pass `200` and remove their own truncation
-- Delete the two `MAX_FILENAME_LENGTH = 200` private constants
+- Update DocxService.sanitizeFilename, PdfService.getSavePath and PreviewExportController to pass `200` and remove their own truncation
+- Delete the three `MAX_FILENAME_LENGTH = 200` constants
 - Update tests
 
 ### Promotion criteria
 
-- A third service needs filename truncation (drift-prevention)
+- ~~A third service needs filename truncation (drift-prevention)~~ – **met** by `PreviewExportController`; the consolidation is still open
 - Or `validateFilename`'s 255-char limit is changed (forces re-evaluation of the 200/200 constants anyway)
 
 ### Risks if forgotten
@@ -191,7 +194,7 @@ LOW → **MEDIUM**. While there were two copies they stayed in sync by symmetry.
 ### 2026-06-05 design-review findings
 
 - **Recommended transport is Option B (return-object), not a message-string prefix.** The 3 filename handlers (`createFile` / `createFolder` / `rename`) should **return** a structured `{ ok, data, error: { code } }` object instead of throwing — `invoke` resolves objects with their props intact, and the renderer reads `result.error.code`. A message-string prefix would just re-introduce a string sentinel (the very thing this item exists to retire). This narrows Option B's original "~50 handlers, breaking change" framing to the 3 filename handlers as the first slice.
-- **`INVALID_FILENAME_MARKER` has a wider consumer list than the H3 fix suggested.** The marker is also used to *build the thrown message* in `validateFilename.ts:56,219` and is asserted by tests in `validateFilename.test.ts`. Full consumer list spans **~8 code files plus docs** (`docs/glossary.md`, `docs/error-codes.md`, `docs/windows/implementation-plan.md`, `docs/archive/phase2-closure-2026-04.md`). Any retirement must update all of these in lockstep.
+- **`INVALID_FILENAME_MARKER` has a wider consumer list than the H3 fix suggested.** The marker is also used to *build the thrown message* in `validateFilename.ts:56,222` and is asserted by tests in `validateFilename.test.ts`. Full consumer list spans **~8 code files plus docs** (`docs/glossary.md`, `docs/error-codes.md`, `docs/windows/implementation-plan.md`, `docs/archive/phase2-closure-2026-04.md`). Any retirement must update all of these in lockstep.
 
 ### What
 
@@ -302,11 +305,11 @@ Audit log calls that propagate `AppError` objects derived from user input. Add a
 
 **Severity:** LOW (security-auditor + solution-reviewer)
 **Source:** Security + solution — "Cache is permanent for the session"
-**File:** `src/main/services/import/DependencyDetector.ts:40,53` (`cachedResult` field at `:40`; the cache check is in `detect()` at `:53` — there is no `detectDependencies` method)
+**File:** `src/main/services/import/DependencyDetector.ts:59,76` (`cachedResult` field at `:59`; the cache check is in `detect()` at `:76` — there is no `detectDependencies` method)
 
 ### What
 
-Today, `cachedResult` lives forever once set. If LibreOffice is uninstalled mid-session, import attempts still spawn `soffice`. Add a 5-minute TTL or invalidate on app focus.
+Today, `cachedResult` lives for the session once set; the only reset is `clearCache()`, called by the import-tools "Check again" action (#250). If LibreOffice is uninstalled mid-session, import attempts still spawn `soffice`. Add a 5-minute TTL or invalidate on app focus.
 
 ### Why deferred
 
@@ -339,7 +342,7 @@ Today, `cachedResult` lives forever once set. If LibreOffice is uninstalled mid-
 
 **Severity:** LOW (security-auditor)
 **Source:** Security
-**File:** `src/main/utils/validateFilename.ts:217` (`name.slice(0, 37)`)
+**File:** `src/main/utils/validateFilename.ts:220` (`name.slice(0, 37)`)
 
 ### What
 
@@ -375,7 +378,7 @@ The Phase 2 plan (#161 step 4) called for "IPC serialization verification" of `A
 ### Cost when promoted
 
 ~30 minutes (only if D4 is itself deferred indefinitely):
-- Write an ADR under `docs/adrs/` (number 0001 is taken; use the next free number, 0005 at the time of writing), for example `docs/adrs/0005-ipc-error-marker-vs-structured.md`, documenting:
+- Write an ADR under `docs/adrs/` (use the next free number in `docs/adrs/`), for example `docs/adrs/NNNN-ipc-error-marker-vs-structured.md`, documenting:
   - The two options considered
   - Why marker-constant was chosen (smaller blast radius, preserves existing handler shape)
   - Promotion criteria for switching to structured errors (mirrors D4's criteria)
@@ -408,7 +411,7 @@ Re-read this document at the start of:
 - Any change to a file referenced above (re-evaluate the deferral)
 
 Historical triage points (no longer applicable):
-- ~~Phase 4 implementation (D1 + D2 + D3 trigger)~~ — Phase 4 shipped in v0.9.4 without triggering D1/D2/D3 (D1 amended 2026-04-21, see entry). **D3 has since fired**: issue #73 became the third `ExportLock` consumer on 2026-08-24 and extracted the shared module, leaving only the swap in `PdfService`/`DocxService` — see the D3 entry and [technical-debt #31](../technical-debt.md). D2 re-evaluates when a third service needs filename truncation.
+- ~~Phase 4 implementation (D1 + D2 + D3 trigger)~~ — Phase 4 shipped in v0.9.4 without triggering D1/D2/D3 (D1 amended 2026-04-21, see entry). **D3 has since fired**: issue #73 became the third `ExportLock` consumer on 2026-08-24 and extracted the shared module, leaving only the swap in `PdfService`/`DocxService` — see the D3 entry and [technical-debt #31](../technical-debt.md). D2's trigger has since fired too: `PreviewExportController` added a third truncating caller, and the consolidation is still open.
 - ~~Pre-0.9.4 PR merge (D12 promotion-criteria check)~~ — D12 was resolved 2026-04-23 (`fb3365e`); see [`deferred-work-phase4.md`](deferred-work-phase4.md).
 
 ### How to retire an item

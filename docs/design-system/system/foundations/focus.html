@@ -293,7 +293,7 @@ keyboard. The ratio under each frame is the ring against what it actually touche
 <div class="ds-note" id="two-tone">
   <strong>The two-tone ring is for a page Erfana does not own.</strong> The HTML Preview's comment overlay draws
   its ring inside a third-party page, from literal colours, with an ink line or halo beside the accent (the
-  overlay row below). That is the only place it is allowed. <strong>When the reader picks a block to comment on in
+  overlay row below), and the built-in browser's element picker draws the same ring inside the pages it shows (the picker row below; owner decision OD-2, 2026-11-01). Those are the only places it is allowed. <strong>When the reader picks a block to comment on in
   the Markdown Preview</strong> (comment mode), the picked block shows the one standard ring of this card –
   <code>var(--color-border-focus)</code> at <code>--border-width-thick</code> – because Erfana renders that DOM
   itself and its tokens apply. No Exceptions row allows the two-tone ring there. Owner decision, 2026-10-28.
@@ -331,13 +331,15 @@ keyboard. The ratio under each frame is the ring against what it actually touche
         draws it. Outward, it would float 6px off. See <code>SettingsOverlay.css</code> (#96). The card now decides this form (<a href="#fills">Rings on a filled control</a>), so the site's <code>deviates:</code> marker can go.</td>
     </tr>
     <tr>
-      <td>HTML-preview toolbar tools</td>
+      <td>HTML-preview and Markdown toolbar tools</td>
       <td>Offset 2px outward, or inset inside a scroller.</td>
       <td>Inset – the permitted case, recorded. The bar scrolls sideways when a narrow pane cannot fit it
         (<code>overflow-x: auto</code>, <code>PreviewNavControls.css</code>), so an outward ring is clipped at
         the scroll edge, and across the tools' 2px gap it would land on the neighbouring tool. Recorded because
         this card words its inset case for lists. The band's chip keeps the outward ring: it fits inside the
-        bar's padding. See <code>PreviewChromeBand.css</code>.</td>
+        bar's padding. See <code>PreviewChromeBand.css</code>. The Markdown toolbar's tools and view modes draw the same
+        inset ring, so both preview toolbars show focus alike (owner decision, 2026-10-31;
+        <code>MarkdownToolbar.css</code>).</td>
     </tr>
     <tr>
       <td>HTML-preview comment overlay (outline and pin ring, inside the page)</td>
@@ -347,6 +349,14 @@ keyboard. The ratio under each frame is the ring against what it actually touche
         the page's own properties. HTML Preview only – the Markdown Preview takes the standard ring
         (<a href="#two-tone">rule above</a>). See <code>overlayStyles.ts</code> and the
         <a href="../../../designs/comments/html-comments/overlay.html">Comment overlay</a> card.</td>
+    </tr>
+    <tr>
+      <td>Built-in browser element picker (outline inside the page, spec 025 – planned)</td>
+      <td>The ring is <code>var(--color-border-focus)</code> at <code>--border-width-thick</code>.</td>
+      <td>The two-tone outline – a 2px accent ring with a 1px ink line on both sides – drawn by the engine over a page Erfana
+        does not own, for the same reason as the comment overlay: tokens do not reach that page, and one colour vanishes on a
+        page in the accent colour. Owner decision OD-2 (2026-11-01). See the <a href="../patterns/picker/index.html">Element
+        picker</a> card and <a href="../../../designs/browser/picking.html">Picking</a>. No <code>src/</code> site yet.</td>
     </tr>
     <tr>
       <td>Comment pins</td>
@@ -374,5 +384,13 @@ keyboard. The ratio under each frame is the ring against what it actually touche
 </section>
 
 </main>
+<section id="approvals">
+<h2>Approvals</h2>
+<p class="ds-muted">
+  2026-10-29 – the owner approved the changes comments-v2 makes to this card (spec 024, 024-FR-025), before the
+  first UI commit of spec 024. The owner gave full sign-off for every approval spec 024 requires in the Claude Code
+  session that started the build; the record is <code>specs/spec-t3-024-unified-comments/design/approvals.md</code>.
+</p>
+</section>
 </body>
 </html>

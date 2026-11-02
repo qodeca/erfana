@@ -58,8 +58,9 @@ import {
   createPreviewCommentRegistry,
   type PreviewCommentShared
 } from '../../services/preview/comments/commentServiceTypes'
-import type { CommentIdentity } from '../../services/preview/comments/CommentWriter'
-import { createCommentUnsavedSources } from '../../services/preview/comments/commentUnsavedSources'
+import type { CommentIdentity } from '../../services/comments/CommentWriter'
+import { createCommentUnsavedSources } from '../../services/comments/commentUnsavedSources'
+import { e2eCursor } from '../../services/preview/comments/commentE2eHook'
 import { focusHostWhileKey } from '../../services/preview/previewHostFocus'
 import { createPreviewEmitters, type PreviewEmitTarget } from './emit'
 import { createPreviewCommentEmitters } from './commentEmit'
@@ -169,7 +170,7 @@ function defaultZoomFactor(window: Pick<PreviewWindowLike, 'webContents'>): numb
 }
 
 /** The reviewer from the app-level settings; the writer checks and trims it (§7.9). */
-function commentIdentityOf(settings: GlobalSettings): CommentIdentity | undefined {
+export function commentIdentityOf(settings: GlobalSettings): CommentIdentity | undefined {
   const { authorName, authorEmail } = settings.comments
   if (authorName === undefined) return undefined
   return authorEmail === undefined || authorEmail === '' ? { name: authorName } : { name: authorName, email: authorEmail }
@@ -187,7 +188,8 @@ function buildCommentShared(
     emit: createPreviewCommentEmitters({ resolveTargets }),
     identity: () => commentIdentityOf(getSettings()),
     isEnabled: () => isHtmlPreviewCommentsEnabled(getSettings()),
-    cursor: () => screen.getCursorScreenPoint()
+    // An e2e build's synthetic pointer stands in for the OS cursor `sendInputEvent` never moves (L-1).
+    cursor: () => e2eCursor() ?? screen.getCursorScreenPoint()
   }
 }
 

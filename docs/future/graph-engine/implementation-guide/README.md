@@ -1,5 +1,7 @@
 # Implementation Guide
 
+> **Status:** proposal, not shipped – no graph-engine code exists in `src/` on `develop`, and spec 004 (graph foundation) is still `draft` in `specs/registry.json`.
+
 > ⚠️ **WORK IN PROGRESS - NOT READY FOR DEVELOPMENT**
 >
 > This documentation is currently under active development and review. The Graph Engine specification, architecture, and implementation details are subject to significant changes. **DO NOT start implementation work based on these documents.**

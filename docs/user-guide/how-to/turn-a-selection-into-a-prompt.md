@@ -14,19 +14,22 @@ Select text in the editor or preview, then use its context menu to send a prompt
 1. Select the text to discuss or change.
 2. Right-click the selection.
 3. Select **Explain**, **Modify**, **Ask**, **Visualize**, or **Prompt**.
+4. If a dialog opens, type your instruction and select **Submit**, or press <kbd>⌘Enter</kbd> / <kbd>Ctrl+Enter</kbd>.
+
+**Explain** sends its prompt straight away. The other four open a dialog first. In the preview, the menu holds the same five items.
 
 ![Screenshot of the editor selection context menu.](../images/turn-a-selection/editor-menu.png)
 ![Screenshot of the preview selection context menu.](../images/turn-a-selection/preview-menu.png)
 ![Screenshot of the Modify dialog with an instruction.](../images/turn-a-selection/modify-dialog.png)
 ![Screenshot of the Visualize dialog with its diagram-type list open.](../images/turn-a-selection/visualize-dialog.png)
 
-The open diagram-type list is illustrative; choose one type in the app.
+In the **Visualize** dialog, choose one diagram from the **Diagram type** list. The **Your input** box is optional there.
 
 ![Screenshot of a prompt arriving in the terminal while the agent works.](../images/turn-a-selection/prompt-in-terminal.png)
 
 ## What happens next / If something goes wrong
 
-Read the prompt in the terminal before accepting an edit. Mermaid errors are covered in [troubleshooting](../reference/troubleshooting.md).
+Erfana pastes the prompt into the active terminal and presses Enter for you. Read the prompt in the terminal before accepting an edit. Mermaid errors are covered in [troubleshooting](../reference/troubleshooting.md).
 
 ## Related
 

@@ -59,14 +59,14 @@ Each layer defeats a specific attacker. A full break requires defeating **all fo
 - **What it is**: `{userData}/whisper/bin/` is user-writable. Between install-time verification (Layers 1+2) and spawn-time execution, an attacker with local write access can swap the binary. Layer 3 closes that window by re-hashing every pinned file (main + 4 sidecars) immediately before every `spawn()` — including per-chunk in a chunked transcription.
 - **What it defeats**: swap-at-rest attacks by user-space malware. Attacker would need to win a <50 ms race between `verifyInstalledBinary()` returning and `spawn()` creating the child — infeasible without kernel-level primitives.
 - **Where it lives**: `LocalWhisperService.runWhisper()` calls `WhisperModelManager.verifyInstalledBinary()` which returns `{spec, mainSha, revisionIndex}` and emits `logger.info('Whisper spawn', {...})` with the forensic 5-tuple.
-- **Cost**: ~50 ms per spawn (2.3 MB streaming SHA on Windows = main + 4 DLLs; ~1.8 MB on macOS = universal binary only). Per-chunk cost amortised negligibly against inference time.
+- **Cost**: ~50 ms per spawn (~3.3 MB streaming SHA on Windows = main + 4 DLLs; ~6.4 MB on macOS = static universal binary only, per the `erfana2` pins). Per-chunk cost amortised negligibly against inference time.
 - **Design choice**: see [ADR 0004](../adrs/0004-per-spawn-toctou-rehash.md) for the per-spawn-vs-cached trade-off.
 
 ### Layer 4 — Monotonic revision floor
 
 - **What it is**: `manifest.revisionIndex` must be `≥ max(MIN_REVISION_INDEX, persisted lastSeenRevision)`. `lastSeenRevision` is a sentinel file in `{userData}/whisper/.last-seen-revision` that records the highest revision this install has ever successfully fetched.
 - **What it defeats**: manifest-replay attacks where an attacker serves a **legitimately-signed-but-superseded** manifest (e.g. pre-revocation, pre-security-patch). Signature verifies (Layer 1 OK), artifact matches pin (Layer 2 OK), but the revision is below the monotonic floor.
-- **Where it lives**: `WhisperModelManager.ensureBinary()` guard at `WhisperModelManager.ts:324-332` (downgrade block), sentinel read/write at `readLastSeenRevision()` / `writeLastSeenRevision()`.
+- **Where it lives**: `WhisperModelManager.ensureBinary()` guard at `WhisperModelManager.ts:473-480` (downgrade block), sentinel read/write at `readLastSeenRevision()` / `writeLastSeenRevision()`.
 - **Error**: `WHISPER_DOWNGRADE_BLOCKED` with message "below floor <N>".
 - **Support case for stuck users**: see [`whisper-support-runbook.md`](whisper-support-runbook.md) §`WHISPER_DOWNGRADE_BLOCKED`.
 

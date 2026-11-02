@@ -52,15 +52,17 @@ export async function ptyLength(page: Page): Promise<number> {
  * only the visible characters are stable. The needle should be text only the
  * program's output contains, not the typed command echoing back (spike Q2).
  */
-export async function waitForPty(page: Page, needle: string, { from = 0, timeout = 30_000 } = {}): Promise<void> {
+export async function waitForPty(page: Page, needle: string | string[], { from = 0, timeout = 30_000 } = {}): Promise<void> {
+  // An array waits for any one of them: a real agent words the same work differently between runs.
+  const needles = Array.isArray(needle) ? needle : [needle]
   await page.waitForFunction(
-    ({ needle, from }) => {
+    ({ needles, from }) => {
       const raw = ((window as unknown as { __capturePty?: string }).__capturePty ?? '').slice(from)
       // eslint-disable-next-line no-control-regex
-      const text = raw.replace(/\x1b\[[0-9;?<>=]*[ -/]*[@-~]/g, '').replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
-      return text.replace(/\s+/g, '').includes(needle.replace(/\s+/g, ''))
+      const text = raw.replace(/\x1b\[[0-9;?<>=]*[ -/]*[@-~]/g, '').replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '').replace(/\s+/g, '')
+      return needles.some((n) => text.includes(n.replace(/\s+/g, '')))
     },
-    { needle, from },
+    { needles, from },
     { timeout, polling: 100 }
   )
 }

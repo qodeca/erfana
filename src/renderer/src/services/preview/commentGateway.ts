@@ -21,6 +21,7 @@
  * @module services/preview/commentGateway
  */
 import { ErrorCode } from '../../../../shared/errors'
+import type { CommentBulkRequest, CommentBulkResult, CommentBulkSettled } from '../../../../shared/ipc/comment-common-schema'
 import type {
   CommentAck,
   CommentAnchorStatus,
@@ -84,8 +85,14 @@ export const commentGateway = {
     ask(() => previewCommentsGateway.list(panelId), UNAVAILABLE),
   reveal: (panelId: string, threadKey: string): Promise<CommentAck> =>
     ask(() => previewCommentsGateway.reveal(panelId, threadKey), UNAVAILABLE),
+  newOnThread: (panelId: string, threadKey: string): Promise<CommentAck> =>
+    ask(() => previewCommentsGateway.newOnThread(panelId, threadKey), UNAVAILABLE),
+  keepDraft: (panelId: string, draftToken: string): Promise<CommentAck> =>
+    ask(() => previewCommentsGateway.keepDraft(panelId, draftToken), UNAVAILABLE),
   save: (request: CommentSaveRequest): Promise<CommentSaveResult> =>
     ask(() => previewCommentsGateway.save(request), UNAVAILABLE),
+  bulk: (request: CommentBulkRequest): Promise<CommentBulkResult> =>
+    ask(() => previewCommentsGateway.bulk(request), UNAVAILABLE),
   setUnsavedSources: (paths: readonly string[]): Promise<CommentAck> =>
     ask(() => previewCommentsGateway.setUnsavedSources(paths), UNAVAILABLE),
   onDraftOpened: (callback: (payload: CommentDraftOpened) => void): (() => void) =>
@@ -97,5 +104,7 @@ export const commentGateway = {
   onModeChanged: (callback: (payload: CommentModeChanged) => void): (() => void) =>
     listen(cb => previewCommentsGateway.onModeChanged(cb), callback),
   onSaveSettled: (callback: (payload: CommentSaveSettled) => void): (() => void) =>
-    listen(cb => previewCommentsGateway.onSaveSettled(cb), callback)
+    listen(cb => previewCommentsGateway.onSaveSettled(cb), callback),
+  onBulkSettled: (callback: (payload: CommentBulkSettled) => void): (() => void) =>
+    listen(cb => previewCommentsGateway.onBulkSettled(cb), callback)
 }

@@ -1,0 +1,11 @@
+{
+  "lockedOn": "2026-10-30",
+  "gate": {
+    "report": "specs/spec-t3-024-unified-comments/verification/claude-code-gate.md",
+    "round": 2,
+    "claudeCode": "2.1.314 (Claude Code)",
+    "model": "claude-opus-5-5"
+  },
+  "agentNote": "26e71c214300a880bed47240c6079980d3aacbe636c75d44445dafa6097fed87",
+  "goldens": "8e61a7564337264909170e80e376f3c842b478938923c2b49cc5bdff9186f7b5"
+}

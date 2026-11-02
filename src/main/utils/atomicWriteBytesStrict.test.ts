@@ -140,6 +140,38 @@ describe('atomicWriteBytesStrict', () => {
     expect(await readFile(file.path, 'utf8')).toBe('mine')
   })
 
+  it('L4 the veto runs first, then the re-check, then the rename: an outside write during a slow veto is refused as changed', async () => {
+    const file = await original('page.html', Buffer.from('what I read'))
+    const order: string[] = []
+    const result = await atomicWriteBytesStrict(file.path, Buffer.from('mine'), {
+      ...expecting(file, { expectedDir: dir }),
+      beforeRename: async () => {
+        order.push('veto')
+        // An agent writes while the veto is still deciding (the unsaved-files lookup is slow)
+        await writeFile(file.path, 'agent edit')
+        return true
+      }
+    })
+    expect(order).toEqual(['veto'])
+    // Had the re-check run before the veto, this write would have been replaced
+    expect(result).toEqual({ ok: false, reason: 'changed' })
+    expect(await readFile(file.path, 'utf8')).toBe('agent edit')
+    expect(await readdir(dir)).toEqual(['page.html'])
+  })
+
+  it('L4 a veto writes nothing and is asked before the target is re-read', async () => {
+    const file = await original('page.html', Buffer.from('what I read'))
+    const result = await atomicWriteBytesStrict(file.path, Buffer.from('mine'), {
+      ...expecting(file),
+      // The target changed too: a veto still answers vetoed, since it is asked first
+      expectedHash: sha256Hex(Buffer.from('something else')),
+      beforeRename: async () => false
+    })
+    expect(result).toEqual({ ok: false, reason: 'vetoed' })
+    expect(await readFile(file.path, 'utf8')).toBe('what I read')
+    expect(await readdir(dir)).toEqual(['page.html'])
+  })
+
   it('M-061 refuses another file under the same name holding the same bytes (changed): the dev/ino must match too', async () => {
     const file = await original('page.html', Buffer.from('same bytes'))
     // An editor's own atomic save: a new file renamed over the old one

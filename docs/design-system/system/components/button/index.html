@@ -213,7 +213,7 @@
     <tr><td>Hover</td><td>A fill appears or steps; the button never moves, so the pointer target never shifts under the cursor.</td></tr>
     <tr><td>Focus-visible</td><td>The one ring: <code>--border-width-thick</code> of <code>--color-border-focus</code>, offset <code>--space-1</code>. Keyboard only – never after a mouse click.</td></tr>
     <tr><td>Toggle pressed (on)</td><td>A fill <em>and</em> a lime bottom edge, and <code>aria-pressed="true"</code> for assistive tech. The label never changes when it is pressed – the state is the attribute, not the words.</td></tr>
-    <tr><td>Radio checked (one of many)</td><td>A fill and a brighter glyph, with no lime foot, and <code>aria-checked="true"</code>. Exactly one in the group is ever checked, so the reader compares it with its neighbours; the missing foot keeps it from reading as “on” beside a real toggle (<a href="../toolbar/index.html#view-modes">Toolbar – View modes beside toggles</a>).</td></tr>
+    <tr><td>Radio checked (one of many)</td><td>The same fill and lime bottom edge as a pressed toggle, and <code>aria-checked="true"</code> (owner decision, 2026-10-31). Exactly one in the group is ever checked, so the reader compares it with its neighbours (<a href="../toolbar/index.html#view-modes">Toolbar – View modes beside toggles</a>).</td></tr>
     <tr><td>Disabled</td><td>The label and icon take <code>--opacity-disabled</code>, the fill and edge are mixed towards transparent by the same amount, the cursor is not-allowed, and hover does nothing. The button itself is never given <code>opacity</code>, so a focus ring on an <code>aria-disabled</code> button keeps full strength. WCAG 1.4.3 exempts the label from contrast; it is still drawn legibly. Prefer explaining why nearby over a silent disabled button.</td></tr>
     <tr><td>Blocked</td><td>The disabled look on <code>aria-disabled="true"</code> – never <code>disabled</code>, never a third style – because a required field is empty. It stays in the tab order and names what is missing through <code>aria-describedby</code>. <kbd>Enter</kbd> and click do nothing.</td></tr>
     <tr><td>Busy</td><td>A spinner plus the <em>-ing</em> form of the button's verb, with an ellipsis: Save becomes “Saving…”, Check becomes “Checking…”, Load more becomes “Loading…”. <code>aria-busy="true"</code> and <code>aria-disabled="true"</code>, not <code>disabled</code>, so focus stays on the button instead of falling to <code>&lt;body&gt;</code>. The result is announced by the surface's live region, not by the button. <strong>The <code>::before</code> ring is the only busy spinner</strong>: feature CSS never adds a second one – no icon, no pseudo-element, no <code>.erf-progress</code> inside the button.</td></tr>
@@ -228,7 +228,7 @@ ring: <code>aria-disabled</code> buttons the keyboard can still reach. In both t
     <div class="bt-bar" inert aria-hidden="true">
       <button type="button" class="erf-button erf-button--icon is-focus" aria-disabled="true" aria-label="Back"><svg data-icon="arrow-left" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></button>
       <button type="button" class="erf-button erf-button--icon" aria-label="Forward"><svg data-icon="arrow-right" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></button>
-      <button type="button" class="erf-button erf-button--secondary is-focus" aria-disabled="true"><span>Open in source</span></button>
+      <button type="button" class="erf-button erf-button--secondary is-focus" aria-disabled="true"><span>Open in file</span></button>
     </div>
     <figcaption><strong>Disabled, focused</strong> – Back with nowhere to go, parked on by the panel after a move (the Permission band's case), and a secondary button. The glyph and label are dim; the ring is the full one ring.</figcaption>
   </figure>
@@ -372,7 +372,7 @@ important it is – importance is the variant. A tool in a toolbar takes the too
 <div class="ds-note">
   <strong>Proposed: the same rule, inline.</strong> The comment window confirms a delete in place, inside the
   message, rather than in a second dialog – Cancel first and focused, the destructive button on the right, a label
-  that says what goes (“Delete comment”, “Delete thread”, “Delete block”). See the proposed
+  that says what goes (“Delete comment”, “Delete conversation”, “Delete block”). See the proposed
   <a href="../../../../designs/comments/html-comments/window.html">Comment window</a> screen.
 </div>
 
@@ -433,7 +433,7 @@ deferred).</p>
 keyboard focus and is not reliably read (the <a href="../tooltip/index.html">Tooltip</a> card's rule):</p>
 <ul class="ds-muted">
   <li><strong>The comment tools describe themselves in <code>title</code></strong> –
-  <code>HtmlPreviewPanel/comments/CommentToolbarTools.tsx</code>: the mode button, the list button (including the reason
+  <code>components/Comments/CommentToolbarTools.tsx</code>: the mode button, the list button (including the reason
   it is unavailable) and the pins toggle.</li>
   <li><strong>The context meter's detail is a <code>title</code></strong> – <code>TerminalPanel/components/ClaudeStatusBar.tsx:118</code>
   puts the whole tooltip on the status bar's container.</li>
@@ -471,7 +471,9 @@ site and gets a row here, naming the file.</p>
 <table>
   <thead><tr><th>File</th><th>Departure</th><th>Why it is still there</th></tr></thead>
   <tbody>
-    <tr><td><code>Editor/MarkdownEditorPanel/components/MarkdownToolbar.css</code> (lines 72 and 102)</td><td>The formatting tools (<code>.toolbar-btn</code>) and the view-mode buttons (<code>.view-mode-btn</code>) are 32 × 28: the width is <code>--btn-height-md</code>, the height a <code>28px</code> literal – off the button scale.</td><td>It is the height the Toolbar card proposes for every tool (<a href="../toolbar/index.html#tool-height"><code>--toolbar-tool-height</code></a>). Not yet marked at the site: the marker, or the token, lands with the next change to that file.</td></tr>
+    <tr><td><code>Editor/MarkdownEditorPanel/components/MarkdownToolbar.css</code> (lines 72 and 108)</td><td>The formatting tools (<code>.toolbar-btn</code>) and the view-mode buttons (<code>.view-mode-btn</code>) are 32 × 28: the width is <code>--btn-height-md</code>, the height the spacing token <code>--space-14</code> – off the button scale.</td><td>It is the height the Toolbar card proposes for every tool (<a href="../toolbar/index.html#tool-height"><code>--toolbar-tool-height</code></a>). Not yet marked at the site: the marker, or the token, lands with the next change to that file.</td></tr>
+    <tr><td><code>docs/designs/browser/tab-and-toolbar.html</code> (proposed screen, spec 025)</td><td>The editor tab’s loading spinner draws this card’s busy ring with its <code>erf-button-spin</code> keyframes outside a button.</td><td>A tab is not a button and cannot take <code>aria-busy</code>; pending a shared spinner primitive.</td></tr>
+    <tr><td><code>docs/designs/browser/tab-and-toolbar.html</code> (proposed screen, spec 025)</td><td>In forced colours the pressed Pick element takes the full <code>Highlight</code> treatment – fill, edge, <code>HighlightText</code> label.</td><td>Proposed for this card: on and off must differ by more than one edge’s colour (browser M-33).</td></tr>
     <tr><td>This card</td><td>The “What ships today” block is mirrored by hand; no drift check holds it to <code>Dialog.css</code>. It is pending with the adoption.</td><td>Drift check pending</td></tr>
   </tbody>
 </table>

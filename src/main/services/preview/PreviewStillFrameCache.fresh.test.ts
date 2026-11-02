@@ -110,8 +110,40 @@ describe('PreviewStillFrameCache.captureFresh', () => {
   })
 
   it('a capture over the data-URL budget stores nothing', async () => {
-    const cache = new PreviewStillFrameCache({ maxDataUrlChars: 4 })
+    const cache = new PreviewStillFrameCache({ maxDataUrlChars: 4, maxSharpDataUrlChars: 4 })
     expect(await cache.captureFresh(contents(image('data:too-long')), PANEL, SIZE)).toBe(false)
     expect(cache.get(PANEL)).toBeUndefined()
+  })
+
+  /** An image whose encoding is as long as its width, so a smaller one fits a smaller budget. */
+  function sized(width: number): PreviewNativeImage {
+    return {
+      isEmpty: () => false,
+      getSize: () => ({ width, height: 100 }),
+      resize: (options) => sized(options.width ?? width),
+      toDataURL: () => 'x'.repeat(width)
+    }
+  }
+
+  it('keeps the screen pixels past the normal edge cap, up to the sharp one', async () => {
+    const cache = new PreviewStillFrameCache({ maxEdgePx: 1024 })
+    await cache.captureFresh(contents(sized(2600)), PANEL, SIZE)
+    expect(cache.get(PANEL)?.width).toBe(2600)
+
+    const capped = new PreviewStillFrameCache({ maxSharpEdgePx: 2000 })
+    await capped.captureFresh(contents(sized(2600)), PANEL, SIZE)
+    expect(capped.get(PANEL)?.width).toBe(2000)
+  })
+
+  it('falls back to the normal caps when the sharp picture is over its budget, rather than to no picture', async () => {
+    const cache = new PreviewStillFrameCache({ maxEdgePx: 1024, maxSharpDataUrlChars: 2000 })
+    expect(await cache.captureFresh(contents(sized(2600)), PANEL, SIZE)).toBe(true)
+    expect(cache.get(PANEL)?.width).toBe(1024)
+  })
+
+  it('keeps an idle capture sharp too, for a menu or a warning over the page', async () => {
+    const cache = new PreviewStillFrameCache({ maxEdgePx: 1024 })
+    await cache.captureIfStale(contents(sized(2600)), PANEL, SIZE)
+    expect(cache.get(PANEL)?.width).toBe(2600)
   })
 })

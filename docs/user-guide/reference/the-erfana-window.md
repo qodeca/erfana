@@ -14,9 +14,9 @@ Erfana opens a project beside the editor and terminal. The Home tab and activity
 - [Tabs](#tabs)
 - [Status bars](#status-bars)
 
-## Welcome and Home
+## Welcome and **Home**
 
-**What it does:** With no project, the welcome view shows the app version, **Open project**, and up to five recent projects; a recent entry can be reopened or removed from the list, with the mouse or the keyboard (<kbd>Tab</kbd> to the list, then the arrow keys and <kbd>Enter</kbd>). The **Home** tab remains available after opening a project. **How to reach it:** Launch Erfana or select the Home tab. The project panel also offers **Change project** and **Close project**. Closing a project returns to the welcome view; it does not delete the folder. Before switching or closing, Erfana saves every edited tab; it asks only about tabs that could not be saved, such as a file that changed on disk.
+**What it does:** With no project, the welcome view shows the app version, **Open project**, and up to five recent projects. You can reopen a recent project or remove it from the list. Use the mouse or the keyboard: <kbd>Tab</kbd> to the list, then the arrow keys and <kbd>Enter</kbd>. The **Home** tab remains available after opening a project. **How to reach it:** Launch Erfana or select the Home tab. The project panel also offers **Change project** and **Close project**. Closing a project returns to the welcome view; it does not delete the folder. Before switching or closing, Erfana saves every edited tab. It asks first only about tabs that could not be saved, such as a file that changed on disk, or when the terminal is busy.
 
 ## Activity bars
 
@@ -28,10 +28,10 @@ The two tooltips are shown together only for this picture; in the app they appea
 
 ## Tabs
 
-**What they do:** Open files appear as tabs. A modified tab shows an unsaved marker; editor, image, and HTML-preview tabs can show **(deleted)** when their files disappear from disk. **How to reach them:** Select a tab; select its close control or middle-select it to close. Right-click for **Close**, **Close Others**, or **Close All**. A tab with unsaved changes asks before closing.
+**What they do:** Open files appear as tabs. A modified tab shows an unsaved marker; editor and image tabs show **(deleted)** when their files disappear from disk. **How to reach them:** Select a tab; select its close control or middle-select it to close. Right-click for **Close**, **Close Others**, or **Close All**. A tab with unsaved changes asks before closing.
 
-![Screenshot of the tab context menu.](../images/the-window/tab-menu.png)
+![Screenshot of the tab context menu with Close, Close Others, and Close All.](../images/the-window/tab-menu.png)
 
 ## Status bars
 
-**What they do:** The editor statistics bar reports words, characters, lines, reading time and selection; the project Git bar reports branch and status. While Claude Code runs, a separate [Claude Code context meter](claude-code-status-bar.md) can appear. **How to reach them:** Open a Markdown file, the project tree, or a Claude Code terminal session respectively.
+**What they do:** The editor statistics bar reports words, characters, lines, reading time and selection; the project Git bar reports branch and status when the project is a Git repository. While Claude Code runs, a separate [Claude Code context meter](claude-code-status-bar.md) can appear. **How to reach them:** Open a Markdown file, the project tree, or a Claude Code terminal session respectively.

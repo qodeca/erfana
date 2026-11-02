@@ -138,6 +138,10 @@
   --color-accent-drag: var(--color-brand-violet);    /* Drag-drop highlight - Qodeca Violet */
   --color-accent-drag-bg: rgba(160, 168, 255, 0.2);  /* Drag-drop background */
   --color-accent-drag-bg-subtle: rgba(160, 168, 255, 0.05); /* Drag-drop subtle background */
+  /* The comment mark (comments-v2 C-12; Text highlights card, foundations/highlights.html):
+     a 35% accent fill and an accent bar under commented words, in both previews. */
+  --color-comment-mark: color-mix(in srgb, var(--color-accent-primary) 35%, transparent);
+  --color-comment-mark-bar: var(--color-accent-primary);
   --color-accent-drag-border: rgba(160, 168, 255, 0.3);  /* Drag-drop border */
 
   /* ============================================
@@ -338,6 +342,7 @@
    * BORDERS
    * ============================================ */
   --border-radius: 0;           /* Flat design - no rounded corners */
+  --comment-mark-bar-width: var(--border-width-thick); /* The comment mark's bar (C-12) */
   --border-radius-circle: 50%;  /* Exception for circular elements */
   --border-width: 1px;
   --border-width-thick: 2px;

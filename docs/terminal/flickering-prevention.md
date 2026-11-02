@@ -73,7 +73,7 @@ app.commandLine.appendSwitch('ignore-gpu-blocklist')
 
 ### 2. Enhanced WebGL Context Recovery
 
-**File**: `TerminalPanel.tsx` – the `webglAddon.onContextLoss` handler in the xterm init effect
+**File**: `TerminalPanel/hooks/useXtermSession.ts` – the `webglAddon.onContextLoss` handler in `loadWebgl` (delay `WEBGL_RECOVERY_DELAY_MS`; the code logs through `logger`, not `console`)
 
 **Strategy**: Automatic retry with GPU stabilization delay
 
@@ -111,7 +111,7 @@ webglAddon.onContextLoss(() => {
 
 ### 3. Integer Dimension Enforcement
 
-**File**: `TerminalPanel/terminalPanel.logic.ts` (`shouldApplyResize` and the `RESIZE_COL_THRESHOLD` / `RESIZE_ROW_THRESHOLD` constants), called from the resize path in `TerminalPanel.tsx`
+**File**: `TerminalPanel.tsx` – the `ResizeObserver` resize path, which inlines the check with literal `2` / `1`. The same rule exists as `shouldApplyResize` plus `RESIZE_COL_THRESHOLD` / `RESIZE_ROW_THRESHOLD` in `TerminalPanel/terminalPanel.logic.ts`, used only by the unwired `useTerminalResize` hook
 
 **Strategy**: Force integer dimensions to prevent fractional oscillation
 
@@ -135,7 +135,7 @@ if ((colsDiff >= RESIZE_COL_THRESHOLD || rowsDiff >= RESIZE_ROW_THRESHOLD) && co
 
 ### 4. Dimension Change Threshold
 
-**File**: `TerminalPanel/terminalPanel.logic.ts` (`RESIZE_COL_THRESHOLD = 2`, `RESIZE_ROW_THRESHOLD = 1`)
+**File**: `TerminalPanel.tsx` (inline `colsDiff >= 2 || rowsDiff >= 1`; mirrored by `RESIZE_COL_THRESHOLD = 2`, `RESIZE_ROW_THRESHOLD = 1` in `TerminalPanel/terminalPanel.logic.ts`)
 
 **Strategy**: Filter out tiny dimension changes caused by rounding noise
 

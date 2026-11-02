@@ -63,16 +63,21 @@
    - its surface is the panel's primary background, not the card's secondary;
    - its icon tools are 32 wide (`--btn-height-md`) and 28 tall. The height is
      the Toolbar card's proposed tool height (`--input-height-sm`), so only the
-     width differs from the card's square tool. The shipped literal is
-     MarkdownToolbar.css:72 and :102 – the Buttons card's Exceptions row and the
-     Toolbar card's open defect "Literal sizes" record it. */
+     width differs from the card's square tool. The shipped heights are
+     MarkdownToolbar.css:72 and :108 – the Buttons card's Exceptions row and the
+     Toolbar card's open defect "Literal sizes" record them. */
 .erf-mdc-bar { background-color: var(--color-bg-primary); }
 .erf-mdc-bar .erf-button--icon { inline-size: var(--btn-height-md); }
+/* The inset ring both preview toolbars share (owner decision, 2026-10-31). */
+.erf-mdc-bar .erf-button:is(:focus-visible, [class~='is-focus']) { outline-offset: calc(var(--space-1) * -1); }
+/* On keeps the row's text colour, as MarkdownToolbar.css does. */
+.erf-mdc-bar .erf-button--toggle:is([aria-pressed='true'], [aria-checked='true']) { color: var(--color-text-primary); }
 
 /* One gap before the comment group, none inside it – the HTML band's grouping. */
 .erf-mdc-bar__comments { margin-inline-start: var(--space-4); }
 
-/* Comments list: icon plus the open count (`.erf-counter`). It opens the
+/* Comments list: the icon plus the open number, at every width (owner decision,
+   2026-10-31). It opens the
    drawer, so its markup is a disclosure (aria-expanded), but it is an on/off
    tool like the others in the row: while the drawer is open it wears the
    Buttons card's pressed signature – fill plus the lime foot – read from the
@@ -83,7 +88,7 @@
 .erf-mdc-bar__count[aria-expanded='true'] {
   background: var(--color-bg-selected);
   border-block-end-color: var(--color-brand-lime);
-  color: var(--color-text-bright);
+  color: var(--color-text-primary);
 }
 @media (forced-colors: active) {
   .erf-mdc-bar__count[aria-expanded='true'] { border-block-end-color: Highlight; }
@@ -122,7 +127,8 @@
   color: var(--color-accent-secondary);
 }
 
-/* Mirror of `.toolbar-btn` and `.view-mode-btn`: 32 x 28. */
+/* Mirror of `.toolbar-btn` and `.view-mode-btn`: 32 x 28. Both on/off kinds carry
+   a 2px edge, so the icon never moves when the state flips. */
 .erf-mdc-tool {
   display: inline-flex;
   align-items: center;
@@ -132,37 +138,34 @@
   block-size: var(--input-height-sm);
   padding: 0;
   background-color: transparent;
-  border: var(--border-width) solid transparent;
+  border: none;
   border-radius: var(--border-radius);
   color: var(--color-text-primary);
   cursor: pointer;
 }
 .erf-mdc-tool:hover { background-color: var(--color-bg-hover-solid); color: var(--color-white); }
-/* The decided Focus ring: outward, offset --space-1. */
+/* The inset ring both preview toolbars share (owner decision, 2026-10-31). */
 .erf-mdc-tool:focus-visible {
   outline: var(--border-width-thick) solid var(--color-border-focus);
-  outline-offset: var(--space-1);
-}
-
-.erf-mdc-tool--view[aria-pressed='true'] {
-  background-color: var(--color-btn-primary-bg);
-  border-color: var(--color-btn-primary-bg);
-  color: var(--color-btn-primary-text);
+  outline-offset: calc(var(--space-1) * -1);
 }
 
 .erf-mdc-tool--comment-first { margin-inline-start: var(--space-4); }
 
-.erf-mdc-tool--toggle { border-block-end: var(--border-width-thick) solid transparent; }
+.erf-mdc-tool--toggle,
+.erf-mdc-tool--view { border-block: var(--border-width-thick) solid transparent; }
 .erf-mdc-tool--toggle[aria-pressed='true'],
-.erf-mdc-tool--toggle[aria-expanded='true'] {
+.erf-mdc-tool--toggle[aria-expanded='true'],
+.erf-mdc-tool--view[aria-pressed='true'] {
   background: var(--color-bg-selected);
   border-block-end-color: var(--color-brand-lime);
-  color: var(--color-text-emphasis);
+  color: var(--color-text-primary);
 }
 
 @media (forced-colors: active) {
   .erf-mdc-tool--toggle[aria-pressed='true'],
-  .erf-mdc-tool--toggle[aria-expanded='true'] { border-block-end-color: Highlight; }
+  .erf-mdc-tool--toggle[aria-expanded='true'],
+  .erf-mdc-tool--view[aria-pressed='true'] { border-block-end-color: Highlight; }
 }
 
 /* ================= the preview mirror ================= */

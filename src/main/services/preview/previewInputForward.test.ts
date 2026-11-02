@@ -42,7 +42,9 @@ describe('PREVIEW_FORWARDED_SHORTCUTS', () => {
       { key: 'w', accel: true },
       { key: 'Escape', accel: false },
       { key: 'back', accel: false, nav: true },
-      { key: 'forward', accel: false, nav: true }
+      { key: 'forward', accel: false, nav: true },
+      { key: 'comment-next', accel: false, comment: true },
+      { key: 'comment-previous', accel: false, comment: true }
     ])
   })
 

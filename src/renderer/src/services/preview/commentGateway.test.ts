@@ -34,6 +34,11 @@ describe('commentGateway', () => {
     await commentGateway.list('p')
     await commentGateway.reveal('p', 't1')
     await commentGateway.setUnsavedSources(['/a.html'])
+    await expect(commentGateway.newOnThread('p', 't1')).resolves.toEqual({ ok: true })
+    const bulk = { panelId: 'p', change: 'resolve', threads: [] } as never
+    await expect(commentGateway.bulk(bulk)).resolves.toMatchObject({ ok: true })
+    expect(fake.bridge.newOnThread).toHaveBeenCalledWith('p', 't1')
+    expect(fake.bridge.bulk).toHaveBeenCalledWith(bulk)
     expect(fake.bridge.setMode).toHaveBeenCalledWith({ panelId: 'p', on: true, showIcons: true })
     expect(fake.bridge.list).toHaveBeenCalledWith('p')
     expect(fake.bridge.reveal).toHaveBeenCalledWith('p', 't1')

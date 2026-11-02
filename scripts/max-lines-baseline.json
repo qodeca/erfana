@@ -1,7 +1,7 @@
 {
   "limit": 500,
   "files": {
-    "src/main/index.ts": 846,
+    "src/main/index.ts": 843,
     "src/main/ipc/file-handlers.ts": 763,
     "src/main/ipc/transcription-handlers.ts": 788,
     "src/main/services/ExternalFileService.ts": 909,
@@ -24,11 +24,11 @@
     "src/renderer/src/components/Dialog/CameraDialog.tsx": 558,
     "src/renderer/src/components/Editor/DiagramViewer/ChatBubble.tsx": 672,
     "src/renderer/src/components/Editor/MarkdownEditorPanel/hooks/useScrollSync.ts": 507,
-    "src/renderer/src/components/Editor/MarkdownPreview.tsx": 1335,
+    "src/renderer/src/components/Editor/MarkdownPreview.tsx": 1317,
     "src/renderer/src/components/Editor/MonacoMarkdownEditor.tsx": 580,
     "src/renderer/src/components/Editor/markdownImageStore.ts": 632,
     "src/renderer/src/components/Panels/ImageViewerPanel/imageViewer.logic.ts": 539,
-    "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx": 748,
+    "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx": 745,
     "src/renderer/src/components/Panels/TerminalPanel.tsx": 986,
     "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts": 783,
     "src/renderer/src/components/Panels/markdownEditorPanel.logic.ts": 691,
@@ -42,6 +42,6 @@
     "src/renderer/src/hooks/useTerminalFileLinks.ts": 643,
     "src/renderer/src/utils/filePathLinks.logic.ts": 683,
     "src/shared/constants.ts": 706,
-    "src/shared/errors.ts": 686
+    "src/shared/errors.ts": 688
   }
 }

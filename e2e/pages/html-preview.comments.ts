@@ -270,9 +270,10 @@ export async function clickAt(app: ElectronApplication, elementId: string, targe
 export const PIN_ACCENT_RGB = [0xa0, 0xa8, 0xff] as const
 
 /**
- * How many pixels of the pin's fill colour the preview shows around the
- * top-right corner of `elementId`, where its pin is drawn (§10.5: the tail
- * tip 4 px outside that corner, the 24 px bubble above it). Read from
+ * How many pixels of the pin's solid fill colour (each the corner of a 2 × 2
+ * block of it, so anti-aliased text fringes do not count) the preview shows
+ * around the top-right corner of `elementId`, where its pin is drawn (§10.5:
+ * the tail tip 4 px outside that corner, the 24 px bubble above it). Read from
  * `capturePage()`, the overlay's only outside view. `null` when the preview,
  * the element or the capture (an undrawn view) is missing – the caller polls.
  */
@@ -320,12 +321,25 @@ export async function accentPixelsNear(
     if (width <= 0 || height <= 0) return 0
     const bitmap = image.crop({ x: left, y: top, width, height }).toBitmap()
     const near = (a: number, b: number): boolean => Math.abs(a - b) <= 24
-    let count = 0
-    for (let i = 0; i + 3 < bitmap.length; i += 4) {
+    const matches = new Uint8Array(width * height)
+    for (let p = 0; p < matches.length; p += 1) {
+      const i = p * 4
       // BGRA on every platform Electron ships; RGBA accepted too.
       const bgra = near(bitmap[i], rgb[2]) && near(bitmap[i + 1], rgb[1]) && near(bitmap[i + 2], rgb[0])
       const rgba = near(bitmap[i], rgb[0]) && near(bitmap[i + 1], rgb[1]) && near(bitmap[i + 2], rgb[2])
-      if (bgra || rgba) count += 1
+      if (bgra || rgba) matches[p] = 1
+    }
+    // Count fill, not stray pixels: a pixel counts only when the 2 × 2 block it
+    // starts is all pin colour. Windows' LCD (ClearType) text anti-aliasing
+    // tints single pixels of a glyph's edge – a lone (140, 178, 255) on the
+    // italic "T" of a nearby line was within tolerance – while the pin's
+    // 24 px bubble is a solid fill.
+    let count = 0
+    for (let y = 0; y + 1 < height; y += 1) {
+      for (let x = 0; x + 1 < width; x += 1) {
+        const p = y * width + x
+        if (matches[p] && matches[p + 1] && matches[p + width] && matches[p + width + 1]) count += 1
+      }
     }
     return count
   }, { id: elementId, urlIncludes: target.urlIncludes, capMs: EXEC_READ_CAP_MS, rgb: [...PIN_ACCENT_RGB] })

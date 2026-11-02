@@ -47,3 +47,6 @@ e4e3c73cec9dbdd525082d68069754e54ca7b283:src/shared/ipc/preview-comment-schema.t
 e4e3c73cec9dbdd525082d68069754e54ca7b283:src/shared/ipc/preview-comment-schema.test.ts:generic-api-key:150
 e4e3c73cec9dbdd525082d68069754e54ca7b283:src/shared/ipc/preview-comment-schema.test.ts:generic-api-key:44
 e4e3c73cec9dbdd525082d68069754e54ca7b283:src/shared/ipc/preview-comment-schema.test.ts:generic-api-key:96
+# Spec 024 unified comments: a fake draft token (0123456789abcdef repeated) in two test harnesses – not a secret.
+a6b954465cd3fa5211f1cc8accd98f8cd67b6075:src/renderer/src/components/Comments/__conformance__/txt/txtPreview.conformance.test.tsx:generic-api-key:31
+d79d88055e00ed4d790b95da7b38ff1864729414:src/renderer/src/components/Editor/markdownComments/__test-utils__/harness.tsx:generic-api-key:26

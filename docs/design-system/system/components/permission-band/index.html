@@ -850,7 +850,7 @@ remote host</a> screen.</p>
   <br><br>
   <strong>The pressed state is a shape, not a colour</strong> (SC 1.4.1): the Rows and lists card's "selected" signature,
   a fill plus a 2px lime edge along the bottom. <strong>It is the one "on" look in the bar.</strong> It marks every
-  on/off tool – the link-mode toggle, Comment mode and Show comment icons, on <code>aria-pressed</code> – and a tool
+  on/off tool – the link-mode toggle and Comment mode, on <code>aria-pressed</code> – and a tool
   that opens a panel, the Comments list that opens the comments drawer, on <code>aria-expanded</code> for as long as
   the panel is open. An open panel is never drawn as a box, an outline or a fill of its own (owner decision,
   2026-10-28): a reader scanning the bar sees one signature for "this is on". Both states carry the edge – transparent when off, with a
@@ -917,13 +917,13 @@ remote host</a> screen.</p>
   </figure>
   <figure class="ds-frame">
     <div class="erf-band" inert aria-hidden="true"><div class="erf-band__bar">
-      <button class="erf-band__tool erf-band__tool--toggle erf-band__tool--comment erf-band__tool--count" type="button" aria-label="Comments, 3 open" aria-expanded="false" title="Comments, 3 open"><svg data-icon="messages-square" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/><path d="M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"/></svg><span>3</span></button>
+      <button class="erf-band__tool erf-band__tool--toggle erf-band__tool--comment erf-band__tool--count erf-comment-count" type="button" aria-label="3 comments" aria-expanded="false" title="3 comments"><svg data-icon="messages-square" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/><path d="M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"/></svg><span class="erf-comment-count__number">3</span></button>
     </div></div>
     <figcaption><strong>Comments list, drawer closed</strong> – <code>aria-expanded="false"</code>: no fill, a transparent edge</figcaption>
   </figure>
   <figure class="ds-frame">
     <div class="erf-band" inert aria-hidden="true"><div class="erf-band__bar">
-      <button class="erf-band__tool erf-band__tool--toggle erf-band__tool--comment erf-band__tool--count" type="button" aria-label="Comments, 3 open" aria-expanded="true" title="Comments, 3 open"><svg data-icon="messages-square" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/><path d="M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"/></svg><span>3</span></button>
+      <button class="erf-band__tool erf-band__tool--toggle erf-band__tool--comment erf-band__tool--count erf-comment-count" type="button" aria-label="3 comments" aria-expanded="true" title="3 comments"><svg data-icon="messages-square" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/><path d="M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"/></svg><span class="erf-comment-count__number">3</span></button>
     </div></div>
     <figcaption><strong>Comments list, drawer open</strong> – <code>aria-expanded="true"</code> keeps the pressed signature, fill plus the lime edge, the same look as Link mode on. Not a box</figcaption>
   </figure>
@@ -994,11 +994,17 @@ remote host</a> screen.</p>
   <strong>Decided here, 2026-10-28: the Comments list wears the pressed signature while the drawer is open</strong>
   – drawn above, beside the link-mode toggle. The rest of the comment tools stays proposed.
   <br><br>
-  <strong>Proposed, not yet decided here: three comment tools after Find</strong> – Comment mode, the Comments
-  list and Show comment icons, in this card's tool and toggle shapes. They make every tier wider, so the
-  thresholds below must be re-measured before they ship; the proposed
+  <strong>Decided, 2026-10-29 (spec 024 C-15, C-20; D-2): two comment tools after Find</strong> – Comment mode and
+  the Comments list, in this card's tool and toggle shapes. Show comment icons
+  left the row: it is the comments drawer's checkbox. The tools make every tier wider, so the
+  thresholds below must be re-measured before they ship; the
   <a href="../../../../designs/comments/html-comments/toolbar.html">Comment tools in the toolbar</a> card renders the row with
   them and prints what each tier then needs. This card changes when that one is promoted.
+  <br><br>
+  <strong>Owner decision, 2026-10-31: preview toolbars are icons only.</strong> The Comments list is the
+  <code>messages-square</code> icon plus the open count when above 0, at every width, with the ▲ counter beside it. Its
+  tooltip equals its name: “7 comments, 1 damaged”, or “Comments” when zero. The permission chip keeps its text. The
+  Markdown toolbar shares this tool, this pressed look and this inset ring.
 </div>
 
 <h2 id="load-status">Load status slot: still loading, stopped, Reload</h2>
@@ -1500,5 +1506,13 @@ is needed for it.</p>
 </section>
 
 </main>
+<section id="approvals">
+<h2>Approvals</h2>
+<p class="ds-muted">
+  2026-10-29 – the owner approved the changes comments-v2 makes to this card (spec 024, 024-FR-025), before the
+  first UI commit of spec 024. The owner gave full sign-off for every approval spec 024 requires in the Claude Code
+  session that started the build; the record is <code>specs/spec-t3-024-unified-comments/design/approvals.md</code>.
+</p>
+</section>
 </body>
 </html>

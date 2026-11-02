@@ -5,7 +5,7 @@
 Erfana supports automated E2E testing using Playwright with Electron. This guide covers setup, configuration, and test patterns.
 
 **Related documentation**:
-- [E2E Selectors](./e2e-selectors.md) – Complete testid catalog (274 testids)
+- [E2E Selectors](./e2e-selectors.md) – Complete testid catalog (419 testids)
 - [E2E Third-Party](./e2e-third-party.md) – Monaco, xterm.js, Mermaid testing
 - [E2E Helpers](./e2e-helpers.md) – Test utilities and patterns (backward-compatible adapter)
 - [E2E Debugging](./e2e-debugging.md) – Debugging and CI/CD
@@ -54,8 +54,8 @@ Erfana uses Electron fuses for security hardening. For E2E testing with debuggin
 # Production build (inspector disabled - secure)
 npm run build:mac
 
-# Test build (inspector enabled - for Playwright debugging)
-ERFANA_TEST_BUILD=true npm run build:mac
+# Test build (inspector enabled - for Playwright debugging); sets ERFANA_TEST_BUILD=true
+npm run build:mac:test
 ```
 
 > **Security note**: Test builds have reduced security (inspector enabled). Only use for testing, never distribute.
@@ -81,10 +81,22 @@ What `scripts/e2e-linux.sh` does:
 
 1. Builds the image from `e2e/docker/Dockerfile` for the host's native architecture (arm64 on Apple Silicon, amd64 elsewhere): Node 24, the Electron runtime libraries, xvfb plus the openbox window manager, real `bash` and `zsh`, `git`, Python 3.12 and a C++ toolchain for node-pty.
 2. Mounts the repo read-write at `/work`, running as your own user id (HOME is `/tmp/home`). `node_modules`, `out/` and the npm download cache live in **named Docker volumes** (`erfana-e2e-node-modules-<hash>`, `erfana-e2e-out-<hash>`, `erfana-e2e-npm-cache-<hash>`), so the macOS copies on the host are never touched. The image tag carries the same hash.
-3. Runs `npm ci` (never `npm install`), runs `npx electron-vite build`, then `xvfb-run -a … npx playwright test <args>` (`e2e/docker/run-suite.sh`). The script compares the hash of `package-lock.json` before and after and fails if it changed; the suite's own exit code wins when both fail.
+3. Runs `npm ci` (never `npm install`), runs `npx electron-vite build` with a 4 GB Node memory limit, as the CI builds do, then `xvfb-run -a … npx playwright test <args>` (`e2e/docker/run-suite.sh`). The script compares the hash of `package-lock.json` before and after and fails if it changed; the suite's own exit code wins when both fail.
 4. Writes the HTML report and the test results straight to `.local/e2e-linux/` (git-ignored, emptied at the start of every run); the repo-root `playwright-report/` and `test-results/` are not used.
 
 The first run takes a few minutes longer (image build, `npm ci`, native rebuild); later runs reuse the volumes. A full run takes about 8 minutes on an Apple Silicon Mac.
+
+#### Sizing the Docker machine
+
+The full suite was tested at 8 CPUs, 32 GB and `ERFANA_E2E_LINUX_SHM=4g`. Use at least that size; on Colima, `colima start --cpu 8 --memory 32`.
+
+- The script gives the container 1 GB of shared memory (`/dev/shm`, which Chromium uses). Set `ERFANA_E2E_LINUX_SHM` to change it, for example `ERFANA_E2E_LINUX_SHM=4g npm run test:e2e:linux`.
+- A small machine can fail a heavy test for lack of resources. In a Docker machine with 6 CPUs and 12 GB, the 25 MB page in `e2e/html-preview-comments.perf.e2e.ts` (F-002) did not finish its reload in 600 s. With 8 CPUs, 32 GB and 4 GB of shared memory it finished: median 38.5 s with comments on, 19.0 s with them off ([known limits](../../specs/spec-t3-024-unified-comments/verification/known-limits.md)).
+- On Colima, `colima start` for a new profile makes that profile the current Docker context. Restore your previous context afterwards (`docker context use <name>`), and pass the profile to a run through `DOCKER_CONTEXT` (`DOCKER_CONTEXT=colima-<profile> npm run test:e2e:linux`), which the script's `docker` calls honour.
+
+#### A full run is noisy
+
+ With 2 workers, `dockview-resize`, the `file-operations` copy test and 024-AC-024 in `markdown-comments.timing.e2e.ts` (save P95 about 1,010 ms under load, 770–840 ms alone) have each failed once in a full run and then passed alone 3 of 3. Rerun a failing test alone before you treat it as real.
 
 `--no-sandbox` is not needed: Playwright's `electron.launch` adds it itself unless `chromiumSandbox: true` is passed, and nothing in the app code or the fixtures changes for the container. The one environment change the fixtures needed is `XAUTHORITY` in the env allowlist (`e2e/fixtures/isolation.ts`): `xvfb-run` protects its display with an auth file, and without the variable the app cannot open the display.
 
@@ -104,7 +116,7 @@ The script sets `ERFANA_E2E_LINUX_CONTAINER=1`. Tests read it only through `IS_L
 | `context-menu-explain.e2e.ts` › "Editor: right-click shows menu with disabled Explain…" | skipped (#299) | Explain is already enabled at the first right-click under xvfb, so a selection exists. Cause not isolated. |
 | `html-preview-drag-freeze.e2e.ts` › "should show the page on its settled area when a fast drag ends…" | skipped on every non-macOS host | Existing skip, unrelated to the container. |
 | `html-preview-comments-preload.e2e.ts` › J-005 and SEC-24 | **fail, left as is** (owner decision, PR #425) | A test artefact, not an app fault: the screenshot shows the pin gone. The "pin gone" step expects 0 pin-coloured pixels near the element, but Linux renders text with coloured subpixel fringes (for example `231,190,140` and `140,186,231`), and one falls inside `accentPixelsNear`'s ±24 match of the pin colour `160,168,255` (either channel order), so the count stays at 1. Seen in the first Linux run of the comment specs (2026-10-28). |
-| `html-preview-comments.e2e.ts` › E-007 | flaky (passed on retry) | Once, Alt+↑ announced "Showing h2, line 28." instead of "Showing em, line 24." – a timing flake, not reproduced on macOS or Windows. |
+| `html-preview-comments.e2e.ts` › E-007 | flaky (passed on retry), fixed 2026-10-31 | The pick jumped to "h2, line 28" (the Team card's heading). Cause: Xvfb starts the real X pointer at the screen centre, over the Team card; `sendInputEvent` moves only the page's pointer, and Chromium on Linux makes up a pointer move at the real one when windows change, which the picker follows as a hover. Fix: `run-under-xvfb.sh` parks the X pointer in a corner with `xdotool` (installed in the Dockerfile). Not seen on macOS or Windows. |
 
 One test helper was changed for the container, safely for macOS and Windows too:
 
@@ -126,9 +138,7 @@ One test helper was changed for the container, safely for macOS and Windows too:
 
 ## Playwright configuration
 
-Create `playwright.config.ts` in the project root:
-
-Four Playwright projects are configured:
+`playwright.config.ts` in the project root configures four Playwright projects:
 
 | Project | Test match | Retries | Purpose |
 |---------|-----------|---------|---------|
@@ -185,6 +195,7 @@ Located in `e2e/pages/`:
 | `html-preview.navigation.ts` | Same-tab links and history (#124, part 3) – panel-scoped chrome (`backButton()`, `linkModeToggle()`, `moveAnnouncement()`, `previewTabs()`, `turnSameTabOn()`), main-side reads (`livePages()` / `waitForLivePages()`, `waitForPage()`, `scrollState()`, `previewZoomLevel()`), real input inside the page (`clickLink()` with `button` and `accel`, `pressNavKeyInPage()`, `navChord()`, `zoomInPreview()`) and save-dialog recording (`recordSaveDialogs()` / `savedDialogNames()`). Still holds its own `dismissAllToasts` copy (technical debt) |
 | `html-preview.focus.ts` | Keyboard focus into a previewed page and back (#124, QG-8 U1 and QG-11a H1) – plain functions taking the `ElectronApplication`, like `html-preview.native.ts`: `bandChip()`, `bringAppToFront()` (makes Erfana the OS key window and **fails** when the OS will not, naming the locked screen or inactive session as the cause), `focusState()` (native focus read main-side with `webContents.isFocused()` for the preview and its host window – `document.activeElement` cannot tell), `pressKeyInPage()` (real input through `webContents.sendInputEvent`; Playwright's `page.keyboard` drives the host and never reaches the page), and `recordHostFocusTrail()` / `hostFocusTrail()` (the order of host `focus()` calls and forwarded shortcuts, observable without OS focus) |
 | `html-preview.comments.ts` | HTML Preview comments (P3, P4; docs/designs/comments/html-preview-comments.md §12.4) – plain functions taking the `ElectronApplication`: `commentLoads()` and `commentUnavailable()` read the main-side e2e hook `globalThis.__erfanaE2eComments` (installed only in an unpackaged build with `ERFANA_E2E_TEST_HOOKS=1`, which the fixtures set), never the page's markup; `newestLoad()` / `namesFile()` / `waitForCommentLoad()` pick a file's load; `DOM_TOKENS_EXPR` reads the `data-erfana-el` tokens left in the live DOM – none since P4, the preload strips them. **Comment stub (P4)**, standing in for main's comment handlers until P5: `armCommentStub()` / `commentStubRecord()` record the picks and anchor reports the page's frames send on `webContents.ipc`, `sendCommentState()` sends one frame a `preview-page:commentState`, `enterStubCommentMode()` turns the mode on and waits for the overlay (`OVERLAY_HOSTS_EXPR`, which also proves the host's shadow root is closed), `OVERLAY_HOST_EXPR` / `OVERLAY_HOST_OPEN_EXPR` name the host and read whether it is in the top layer (for a page that fights it), `overlayReportedUnavailable()` reads whether a frame said `overlay: 'unavailable'`, `clickAt()` / `pickAt()` are a frame-aware trusted click and the pick it sent, and `accentPixelsNear()` counts the pin colour in `capturePage()` pixels at an element's top-right corner – the closed shadow root's only outside view |
+| `html-preview.comments-ui.ts` | HTML Preview comments – the reviewer's journeys (P7), shared by the four P7 specs (`html-preview-comments{,.frames,.safety,.perf}.e2e.ts`) on top of `html-preview.comments.ts`: `elementBox()` / `waitForBox()` (an element's box through same-project frames), trusted input `mouseAt()` / `clickPin()` / `pressInPage()`, pixel reads `pinCoverage()` / `accentInStill()` (the overlay is in a closed shadow root), the `CommentChrome` class (toolbar tools, drawer, menu and window of one preview tab), the disk oracle `singleBlockInsert()`, and `setGlobalSetting()` / `resetCommentSettings()` to put the identity back in `afterEach` |
 | `html-preview-bounds.harness.ts` (in `e2e/`) | Not a page object: the shared harness of the two bounds specs (#124, part 1) – a `bounds` fixture (`BoundsHarness`: the native view read main-side in DIP against its placeholder in CSS px, the layout moves the specs share, `sashNear(x)`), `LogTrail` (the drop-reason lines a test produced) and the seeded page. "Settled" means two reads 100 ms apart agree |
 
 > `ImageViewerPage` is **not** exposed as a composed fixture – the specs that use it construct it directly (the export specs go through `openImage()` in `e2e/utils/image-export-helpers.ts`, which is the same thing plus the export budget), because one of them needs its own launch environment. Three conventions in it are worth copying. Panel locators are scoped **inside** `[data-testid="image-viewer-panel"]`, so the full-screen portal (which renders the same test ids into `#portal-root`) can never satisfy a panel assertion — the deliberate exceptions are the `fullScreen*` locators, which scope to the overlay instead, and `exportStatus()`, which is looked up on the page because the panel-owned live region is rendered into whichever surface is on top and must resolve to exactly one element either way. Freshness is asserted on the **decoded** bytes via a `data-marker` attribute embedded in the SVG, not by diffing two multi-kilobyte data URLs — a failing assertion then names which version is on screen instead of dumping base64. And busy is `aria-disabled`, never `disabled`, so `clickExport()` arms a `MutationObserver` before the click rather than polling: a stubbed save dialog can settle inside one poll interval, so the busy transition has to be recorded, not sampled.
@@ -426,22 +437,12 @@ test.describe('Erfana E2E', () => {
 
 ### Test with project loaded
 
+The main process does not read a project path from argv, so open the project over IPC – which is what the `appWithTestProject` / `windowWithTestProject` fixtures do for you:
+
 ```typescript
-import { test, expect, _electron as electron } from '@playwright/test'
-import path from 'path'
+import { test, expect } from '../fixtures'
 
-test('should open project and display files', async () => {
-  const app = await electron.launch({
-    args: [
-      path.join(__dirname, '..'),
-      // Pass project path as argument
-      '/path/to/test/project',
-    ],
-  })
-
-  const window = await app.firstWindow()
-  await window.waitForLoadState('domcontentloaded')
-
+test('should open project and display files', async ({ windowWithTestProject: window }) => {
   // Wait for project tree to populate
   const projectTree = window.locator('[data-testid="project-tree"]')
   await expect(projectTree).toBeVisible()
@@ -449,10 +450,10 @@ test('should open project and display files', async () => {
   // Verify files are shown (not empty state)
   const emptyState = window.locator('[data-testid="project-tree-empty"]')
   await expect(emptyState).not.toBeVisible()
-
-  await app.close()
 })
 ```
+
+Outside the fixtures, call `window.api.file.openProjectByPath({ projectPath })` from `page.evaluate`, as `openProject()` in `e2e/utils/helpers.ts` does.
 
 ### Test fixture pattern
 
@@ -522,20 +523,22 @@ Some E2E tests require external API credentials:
 
 ### Erfana-specific environment variables
 
-Four `ERFANA_E2E_*` variables change app behaviour for tests. They are read by the app, not by Playwright, so they belong in the environment of the launched Electron process (`ERFANA_E2E_FORCE_CRASH`, `ERFANA_E2E_FAST_SHELL`, `ERFANA_E2E_BROWSER_SEAM`) or of the Playwright run itself (`ERFANA_E2E_TRANSCRIPTION`, a project gate):
+These `ERFANA_E2E_*` variables change behaviour for tests. Most are read by the app, so they belong in the environment of the launched Electron process (`ERFANA_E2E_FORCE_CRASH`, `ERFANA_E2E_FAST_SHELL`, `ERFANA_E2E_BROWSER_SEAM`, and `ERFANA_E2E_TEST_HOOKS`, which `buildAppEnv()` sets for every fixture launch); `ERFANA_E2E_TRANSCRIPTION` and `ERFANA_E2E_BENCH` are Playwright project gates read by `playwright.config.ts`, and `ERFANA_E2E_LINUX_CONTAINER` is set by `scripts/e2e-linux.sh` and read only by tests:
 
 | Variable | Effect |
 |----------|--------|
 | `ERFANA_E2E_FORCE_CRASH=1` | Launcher-only crash injection for `root-error-boundary.e2e.ts`: main appends `--erfana-force-crash` to `webPreferences.additionalArguments`, the preload re-exposes it as `window.__ERFANA_FORCE_CRASH__`, and `ForcedCrash` in `App.tsx` throws during render. Gated on `!app.isPackaged`, so packaged builds ignore it; the renderer can never set it |
-| `ERFANA_E2E_BROWSER_SEAM=1` | #124: in an unpackaged build only, a function at `globalThis.__erfanaE2eBrowserLaunch` in the main process replaces the real browser launch and receives `{ via, appPath, filePath }` (`browserLauncher.ts`; `app.isPackaged` is checked first). `html-preview-open-in-browser.e2e.ts` sets the variable in `test.beforeAll` (the fixtures launch Electron with `{ ...process.env }`) and restores the worker's value in `test.afterAll`; each test then arms a recording seam (`armBrowserSeam`), which refuses to arm unless the variable really reached an unpackaged app, and stubs the default-browser lookup, so no test ever starts a browser |
+| `ERFANA_E2E_BROWSER_SEAM=1` | #124: in an unpackaged build only, a function at `globalThis.__erfanaE2eBrowserLaunch` in the main process replaces the real browser launch and receives `{ via, appPath, filePath }` (`browserLauncher.ts`; `app.isPackaged` is checked first). `html-preview-open-in-browser.e2e.ts` sets the variable in `test.beforeAll` (the fixtures' `buildAppEnv()` passes every `ERFANA_*` variable through to the app) and restores the worker's value in `test.afterAll`; each test then arms a recording seam (`armBrowserSeam`), which refuses to arm unless the variable really reached an unpackaged app, and stubs the default-browser lookup, so no test ever starts a browser |
 | `ERFANA_E2E_FAST_SHELL=1` | POSIX only: the PTY bootstrap execs `/bin/sh -i` instead of `exec -l "$SHELL" -i`, skipping user rc files so terminal specs start in tens of milliseconds rather than seconds |
 | `ERFANA_E2E_TRANSCRIPTION=1` | Enables the `transcription` Playwright project (real, paid OpenAI calls; also needs `OPENAI_API_KEY`). Without it the project matches nothing and the `capability-summary` reporter prints a `SKIPPED CAPABILITIES` line |
+| `ERFANA_E2E_TEST_HOOKS=1` | In an unpackaged build only, installs the e2e test hooks – `window.__erfanaTest` (terminal screen, editor value) and main's `globalThis.__erfanaE2eComments`. Set by `buildAppEnv()` for every fixture launch |
+| `ERFANA_E2E_BENCH=1` | Enables the `bench` Playwright project (`*.bench.ts`); without it the project matches nothing |
 
 `ERFANA_TEST_BUILD=true` is a *build*-time variable, not a test-time one – see [Test build vs production build](#test-build-vs-production-build) above. Canonical table: [Testing overview § E2E environment variables](./README.md#e2eui-playwright-electron).
 
 ### Test files
 
-All 73 specs in `e2e/` (`ls e2e/*.e2e.ts | wc -l`, counted 2026-10-28). The three `*.bench.ts` files beside them belong to the `bench` project (see the table above) and are not listed here:
+All 76 specs in `e2e/` (`ls e2e/*.e2e.ts | wc -l`, counted 2026-11-01). The three `*.bench.ts` files beside them belong to the `bench` project (see the table above) and are not listed here:
 
 - `app-launch.e2e.ts` – Application launch, activity bar, welcome panel visibility
 - `file-operations.e2e.ts` – Project tree file management: New File / New Folder from the toolbar, Rename and Delete from the row context menu, Copy + Paste, and the cancel path of each. Every assertion is made twice — against the tree AND against the filesystem — because a tree that disagrees with disk is the failure this file exists to catch. Two named behaviours are pinned rather than assumed: `createFile` appends `.md` when the typed name has no markdown extension, and it refuses to overwrite an existing file (the test asserts the existing bytes survive)
@@ -618,6 +621,9 @@ All 73 specs in `e2e/` (`ls e2e/*.e2e.ts | wc -l`, counted 2026-10-28). The thre
 - `html-preview-comments.frames.e2e.ts` – HTML Preview comments on script-built pages and frames: the JS slide deck (E-005), a comment inside a same-project frame written into that frame's file (E-006), one file in two previews (E-017) and a Vue-style server-rendered page (E-025)
 - `html-preview-comments.perf.e2e.ts` – HTML Preview comments performance records (F-001 – F-003), printed as `HPC-PERF {…}` lines; only F-001, save to pin visible, is gated (P95 < 1,000 ms on macOS and Linux, record only on the emulated Windows host)
 - `html-preview-comments.safety.e2e.ts` – HTML Preview comments file safety and hostile pages: an agent editing the file while the window is open, damaged and conflicted blocks under "Needs attention", the still frame behind the menu, "Element not found" with the block kept, 200 comments on one page and the folded-section case
+- `html-preview-comments.selection.e2e.ts` – HTML Preview comments on selected words (024-AC-004, OD-01, C-16): in comment mode a drag selects and Enter on the Comment button opens the window on the words; outside comment mode, on a page that already has a comment, "Comment on selection" from the right-click menu writes a block whose anchor carries `sel`
+- `markdown-preview-comments.e2e.ts` – Markdown Preview comments, end to end (spec 024): the round trip on disk (comment, reply, resolve, re-open, delete, file back byte for byte), keyboard-only use (024-AC-029), the preview-only view and the setting (024-AC-006), pausing on unsaved edits (024-AC-016), comments on selected words (024-AC-005), the drawer's filter and sort, and the shared overlay rule for icons and underlines (024-AC-001)
+- `markdown-comments.timing.e2e.ts` – Markdown Preview comments large-file timing (024-NFR-001, 024-AC-024): about 1 MB with 200 comments, 20 samples, `MD-TIMING {…}` lines; pins P50 and P95 ≤ 500 ms and save ≤ 1,000 ms on macOS and Linux, record only on Windows
 - `context-menu-keyboard.e2e.ts` – #90: context menus work from the keyboard. Shift+F10 on a tree row opens its menu with focus on the first item; the arrows move with wrap, Home / End jump, typing jumps to an item, and Escape closes it and returns focus to the row. On a dock tab, Tab closes the menu and returns focus to the tab
 - `deleted-folder-tabs.e2e.ts` – #252: a tab whose file vanishes where the project watcher cannot see it (inside the ignored `dist/`) is marked deleted, and a file brought back with "Save to restore it" is watched again, so a later outside edit reaches the editor
 - `dialog-focus-and-recents-keyboard.e2e.ts` – #91: a modal dialog keeps Tab inside itself and gives focus back to what opened it, focus returns to the tree after a context-menu dialog, and ([24]) a recent project opens with the keyboard alone. Needs real Chromium tabbing, which jsdom does not do

@@ -87,6 +87,42 @@ describe('BaseDialog', () => {
       expect(document.activeElement).toBe(screen.getByTestId('second'))
     })
 
+    function FieldHarness(): JSX.Element {
+      const preferredRef = useRef<HTMLHeadingElement>(null)
+      return (
+        <BaseDialog isOpen onClose={vi.fn()} zIndex={1000} initialFocusRef={preferredRef}>
+          <h2 tabIndex={-1} ref={preferredRef} data-testid="title">
+            Title
+          </h2>
+          <textarea data-testid="field" />
+        </BaseDialog>
+      )
+    }
+
+    it('R-003 a click into a field before the first focus lands keeps focus there', () => {
+      render(<FieldHarness />)
+      const field = screen.getByTestId('field')
+      // A slow machine: the press and the focus it gives come inside the 10 ms delay.
+      fireEvent.pointerDown(field)
+      field.focus()
+      flushFocus()
+      expect(document.activeElement).toBe(field)
+    })
+
+    it('R-003 a programmatic focus inside the dialog is not a user move: the first pass still runs', () => {
+      render(<FieldHarness />)
+      screen.getByTestId('field').focus()
+      flushFocus()
+      expect(document.activeElement).toBe(screen.getByTestId('title'))
+    })
+
+    it('R-003 a press that left focus outside the dialog does not stop the first pass', () => {
+      render(<FieldHarness />)
+      fireEvent.pointerDown(document.body)
+      flushFocus()
+      expect(document.activeElement).toBe(screen.getByTestId('title'))
+    })
+
     it('falls back to the first focusable when initialFocusRef is empty', () => {
       function Harness(): JSX.Element {
         // Never attached to any element — the documented fallback path.

@@ -8,21 +8,15 @@
  * coordinate space of `getBoundingClientRect` and of `position: fixed` in the
  * overlay's top layer.
  */
+import { clipToViewport, type Box, type Viewport } from '../../shared/comments/overlayCore/pinLayout'
 import { TINY_ELEMENT_PX, TINY_RING_OUTSET_PX } from './constants'
 
-/** A rectangle in viewport CSS pixels. */
-export interface Box {
-  readonly left: number
-  readonly top: number
-  readonly width: number
-  readonly height: number
-}
-
-/** The frame's visible viewport size: scrollbars excluded ({@link viewportOf}). */
-export interface Viewport {
-  readonly width: number
-  readonly height: number
-}
+/**
+ * The box, the visible viewport ({@link viewportOf}), the viewport clip and
+ * the overlap test are the shared overlay core's (spec 024): pin placement
+ * runs on them there.
+ */
+export { clipToViewport, overlaps, type Box, type Viewport } from '../../shared/comments/overlayCore/pinLayout'
 
 /** A point in viewport CSS pixels. */
 export interface Point {
@@ -62,16 +56,6 @@ export function boxOf(element: Element): Box {
   return { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
 }
 
-/** The part of `box` inside the viewport, or `null` when none is. */
-export function clipToViewport(box: Box, viewport: Viewport): Box | null {
-  const left = Math.max(box.left, 0)
-  const top = Math.max(box.top, 0)
-  const right = Math.min(box.left + box.width, viewport.width)
-  const bottom = Math.min(box.top + box.height, viewport.height)
-  if (right <= left || bottom <= top) return null
-  return { left, top, width: right - left, height: bottom - top }
-}
-
 /** Whether `point` lies inside `box`. */
 export function contains(box: Box, point: Point): boolean {
   return (
@@ -79,16 +63,6 @@ export function contains(box: Box, point: Point): boolean {
     point.x < box.left + box.width &&
     point.y >= box.top &&
     point.y < box.top + box.height
-  )
-}
-
-/** Whether two boxes overlap. */
-export function overlaps(a: Box, b: Box): boolean {
-  return (
-    a.left < b.left + b.width &&
-    b.left < a.left + a.width &&
-    a.top < b.top + b.height &&
-    b.top < a.top + a.height
   )
 }
 

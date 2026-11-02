@@ -20,7 +20,29 @@
  */
 import { app } from 'electron'
 import type { CommentLoadView } from './ElementTokenTable'
+import type { CommentFrames } from './commentFrames'
+import type { CommentReloadCoordinator } from './commentReloadCoordinator'
 import type { CommentE2ePanelState } from './commentServiceTypes'
+
+/** One view's state for the hook, from the service's own parts: counts and outcomes only. */
+export function commentE2ePanelState(
+  panel: Pick<CommentE2ePanelState, 'panelId' | 'windowId' | 'mode' | 'showIcons' | 'hidden'>,
+  stats: ReturnType<CommentReloadCoordinator['stats']>,
+  frames: Pick<CommentFrames, 'all' | 'isCommentable'>,
+  held: { readonly drafts: number; readonly keys: number }
+): CommentE2ePanelState {
+  const records = frames.all()
+  return {
+    ...panel,
+    reloads: stats.reloads,
+    echoes: stats.echoes,
+    ...(stats.lastRestore === undefined ? {} : { lastRestore: stats.lastRestore }),
+    drafts: held.drafts,
+    keys: held.keys,
+    frames: records.length,
+    commentableFrames: records.filter(record => frames.isCommentable(record)).length
+  }
+}
 
 /**
  * What one preview view contributes to the hook: its served loads
@@ -52,6 +74,25 @@ const sources = new Set<CommentE2eSource>()
 /** The hook's gate: an unpackaged build started with `ERFANA_E2E_TEST_HOOKS=1`. */
 export function commentE2eHookEnabled(): boolean {
   return !app.isPackaged && process.env.ERFANA_E2E_TEST_HOOKS === '1'
+}
+
+/**
+ * The `globalThis` key an e2e spec puts its synthetic pointer under, in screen
+ * DIPs. `webContents.sendInputEvent` never moves the OS cursor, so without it
+ * the real-cursor gate on a right-click (`commentContextGate.ts`, L-1) would
+ * drop every e2e right-click.
+ */
+export const COMMENT_E2E_CURSOR_KEY = '__erfanaE2eCursor'
+
+/**
+ * The synthetic pointer an e2e spec set, behind the hook's gate – `undefined`
+ * in every shipped build, and for anything that is not two finite numbers.
+ */
+export function e2eCursor(): { x: number; y: number } | undefined {
+  if (!commentE2eHookEnabled()) return undefined
+  const value = (globalThis as Record<string, unknown>)[COMMENT_E2E_CURSOR_KEY] as { x?: unknown; y?: unknown } | undefined
+  const { x, y } = value ?? {}
+  return typeof x === 'number' && typeof y === 'number' && Number.isFinite(x) && Number.isFinite(y) ? { x, y } : undefined
 }
 
 function install(): void {

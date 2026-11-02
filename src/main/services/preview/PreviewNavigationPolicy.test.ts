@@ -75,6 +75,38 @@ describe('decideLinkIntent — in-project links', () => {
     expect(decide(CURRENT)).toEqual({ kind: 'same-document' })
   })
 
+  it('loads this same file again for another ?query, keeping the query', () => {
+    expect(decide(`${CURRENT}?lang=pl`)).toEqual({
+      kind: 'same-file-query',
+      url: `${CURRENT}?lang=pl`
+    })
+  })
+
+  it('treats a fragment under the same ?query as the same document', () => {
+    expect(
+      decideLinkIntent({
+        href: `${CURRENT}?lang=pl#part`,
+        currentUrl: `${CURRENT}?lang=pl`,
+        token: TOKEN
+      })
+    ).toEqual({ kind: 'same-document' })
+  })
+
+  it('loads the file without a query when the page on screen has one', () => {
+    expect(
+      decideLinkIntent({ href: CURRENT, currentUrl: `${CURRENT}?lang=pl`, token: TOKEN })
+    ).toEqual({ kind: 'same-file-query', url: CURRENT })
+  })
+
+  it('never treats another file, or another token, as a ?query step', () => {
+    const otherFile = CURRENT.replace(/[^/]+$/, 'other.html')
+    expect(decide(`${otherFile}?lang=pl`).kind).toBe('in-project')
+    expect(decide(`${CURRENT.replace(TOKEN, 'othertoken')}?lang=pl`)).toEqual({
+      kind: 'blocked',
+      reason: 'foreign-token'
+    })
+  })
+
   it('still treats a link to a DIFFERENT document as a navigation', () => {
     // The control: widening the same-document arm must not swallow real links.
     expect(decide(`erfana-preview://${TOKEN}/other.html`)).toEqual({

@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * One preview's input watch (issue #124). It has two outputs: whether the
- * cached still picture still shows the page (WI-10; RU3, part 1 §1.5), and the
- * gesture clock of the tab's history (QG-7 S1, QG-8 T1).
+ * One preview's input watch (issue #124). It has three outputs: whether the
+ * cached still picture still shows the page (WI-10; RU3, part 1 §1.5), the
+ * gesture clock of the tab's history (QG-7 S1, QG-8 T1), and the real presses
+ * a comment pick needs (`comments/commentContextGate.ts`, L-1).
  *
  * **Still-picture staleness.** During a splitter or window-edge drag the
  * renderer shows the still picture in place of the hidden page – unless it is
@@ -82,6 +83,18 @@ export const HISTORY_GESTURE_INPUT_TYPES: ReadonlySet<string> = new Set([
   'touchEnd'
 ])
 
+/**
+ * The `input-event` types that are a press on the view and its end: a mouse
+ * button – any button, for macOS Ctrl+click is a left press – or a finger, whose
+ * tap and long press reach the page as a click and a context menu.
+ */
+const PAGE_PRESS_INPUT_TYPES: ReadonlyMap<string, 'down' | 'up'> = new Map([
+  ['mouseDown', 'down'],
+  ['touchStart', 'down'],
+  ['mouseUp', 'up'],
+  ['touchEnd', 'up']
+])
+
 /** Whether an `input-event` type makes the cached still picture stale. */
 export function marksStillFrameStale(type: unknown): boolean {
   return typeof type === 'string' && STILL_FRAME_STALE_INPUT_TYPES.has(type)
@@ -106,6 +119,8 @@ export interface PreviewStillFrameFreshnessDeps {
   readonly refresh: () => void
   /** The clock a gesture's time is read from (`Date.now` in production). */
   readonly now: () => number
+  /** A real press on the view, or its end. */
+  readonly pagePress?: (phase: 'down' | 'up') => void
 }
 
 /** A running input watch. */
@@ -133,6 +148,8 @@ export function attachStillFrameFreshness(
     if (typeof type === 'string' && HISTORY_GESTURE_INPUT_TYPES.has(type)) {
       lastGesture = deps.now()
     }
+    const phase = typeof type === 'string' ? PAGE_PRESS_INPUT_TYPES.get(type) : undefined
+    if (phase !== undefined) deps.pagePress?.(phase)
     if (!marksStillFrameStale(type)) return
     deps.markStale()
     clearTimeout(timer)

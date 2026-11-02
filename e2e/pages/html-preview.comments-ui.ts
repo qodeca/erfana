@@ -188,8 +188,9 @@ export class CommentChrome {
     return this.drawer().getByTestId('comment-drawer-row')
   }
 
-  filter(key: 'open' | 'resolved' | 'attention'): Locator {
-    return this.drawer().getByTestId(`comment-filter-${key}`)
+  /** A drawer filter (OD-04: Open, Resolved, Problems). */
+  filter(key: 'open' | 'resolved' | 'cantEdit'): Locator {
+    return this.drawer().getByTestId(`comment-filter-${key === 'cantEdit' ? 'cant-edit' : key}`)
   }
 
   announce(): Locator {
@@ -252,6 +253,15 @@ export class CommentChrome {
     await this.page.getByTestId('comment-save').click()
     await expect(win).toHaveCount(0, { timeout: PREVIEW_BUDGET_MS })
     await expect(this.announce()).toHaveText(`Comment saved to ${file}.`, { timeout: PREVIEW_BUDGET_MS })
+  }
+
+  /**
+   * A window action in the header's "More actions" menu (C-13, C-19: with the
+   * comment stepper the foot keeps Close and Resolve and next only).
+   */
+  async moreAction(testId: string): Promise<void> {
+    await this.window().getByTestId('comment-more-actions').click()
+    await this.page.getByTestId(testId).click()
   }
 
   /** Open a message's `…` menu in the window and choose `item` ("Edit" or "Delete…"). */
@@ -435,12 +445,49 @@ export async function mouseAt(
       globalX = Math.round(content.x + bounds.x + x * zoom)
       globalY = Math.round(content.y + bounds.y + y * zoom)
     }
+    // sendInputEvent never moves the OS cursor: tell main where this synthetic pointer is, so its real-cursor gate on a
+    // right-click (L-1) sees the click a reader would make. Read only behind ERFANA_E2E_TEST_HOOKS (`e2eCursor`).
+    ;(globalThis as Record<string, unknown>).__erfanaE2eCursor = { x: globalX, y: globalY }
     wc.sendInputEvent({ type: 'mouseMove', x, y, globalX, globalY })
     if (which === 'none') return true
     wc.sendInputEvent({ type: 'mouseDown', x, y, globalX, globalY, button: which, clickCount: 1 })
     wc.sendInputEvent({ type: 'mouseUp', x, y, globalX, globalY, button: which, clickCount: 1 })
     return true
   }, { x: point.x, y: point.y, which: button, urlIncludes: target.urlIncludes })
+}
+
+/**
+ * A trusted left-button drag from `from` to `to` (top-level viewport CSS px)
+ * in steps, so Chromium selects the text it crosses (spec 024 024-FR-004: a
+ * drag selects, in comment mode too). The release makes the page's click.
+ */
+export async function dragInPage(
+  app: ElectronApplication,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  target: PreviewTarget = {}
+): Promise<boolean> {
+  return app.evaluate(({ webContents }, { a, b, urlIncludes }) => {
+    const wc = webContents.getAllWebContents().find((c) => {
+      try {
+        const url = c.getURL()
+        return url.startsWith('erfana-preview://') && (urlIncludes === undefined || url.includes(urlIncludes))
+      } catch {
+        return false
+      }
+    })
+    if (!wc) return false
+    const STEPS = 8
+    wc.sendInputEvent({ type: 'mouseMove', x: a.x, y: a.y })
+    wc.sendInputEvent({ type: 'mouseDown', x: a.x, y: a.y, button: 'left', clickCount: 1 })
+    for (let i = 1; i <= STEPS; i += 1) {
+      const x = Math.round(a.x + ((b.x - a.x) * i) / STEPS)
+      const y = Math.round(a.y + ((b.y - a.y) * i) / STEPS)
+      wc.sendInputEvent({ type: 'mouseMove', x, y, button: 'left', modifiers: ['leftbuttondown'] })
+    }
+    wc.sendInputEvent({ type: 'mouseUp', x: b.x, y: b.y, button: 'left', clickCount: 1 })
+    return true
+  }, { a: from, b: to, urlIncludes: target.urlIncludes })
 }
 
 /**
@@ -607,6 +654,33 @@ export async function pinCoverage(app: ElectronApplication, box: ElementBox, tar
     }
     return count / (width * height)
   }, { b: box, pin: pinBoxOf(box), urlIncludes: target.urlIncludes, rgb: [...PIN_ACCENT_RGB] })
+}
+
+/**
+ * The view's pixels over `box` and a little below it, as a PNG: the page's
+ * marks are drawn in a closed shadow root, so a still is their only outside
+ * view. `null` while the view cannot be captured – the caller polls.
+ */
+export async function pagePng(app: ElectronApplication, box: ElementBox, target: PreviewTarget = {}): Promise<Buffer | null> {
+  const base64 = await app.evaluate(async ({ webContents }, { b, urlIncludes }) => {
+    const wc = webContents.getAllWebContents().find((c) => {
+      try {
+        const url = c.getURL()
+        return url.startsWith('erfana-preview://') && (urlIncludes === undefined || url.includes(urlIncludes))
+      } catch {
+        return false
+      }
+    })
+    if (!wc) return null
+    const image = await wc.capturePage().catch(() => null)
+    if (image === null || image.isEmpty()) return null
+    const zoom = b.viewportWidth > 0 ? image.getSize().width / b.viewportWidth : 1
+    return image
+      .crop({ x: Math.round(b.left * zoom), y: Math.round(b.top * zoom), width: Math.round(b.width * zoom), height: Math.round((b.height + 8) * zoom) })
+      .toPNG()
+      .toString('base64')
+  }, { b: box, urlIncludes: target.urlIncludes })
+  return base64 === null ? null : Buffer.from(base64, 'base64')
 }
 
 /** A pin is drawn when its fill covers at least this share of its body (its ink "text lines" or number take the rest). */

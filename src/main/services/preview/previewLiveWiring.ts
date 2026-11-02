@@ -268,12 +268,20 @@ export function wirePreviewLiveView(owner: PreviewLiveWiringOwner): PreviewLiveP
         token,
         realRoot,
         windowId: params.window.id,
-        // Read at every click: a move changes the page on screen (issue #124).
+        // Read at every click: a move changes the page on screen (issue #124),
+        // and only the view itself knows its `?query`.
         get currentUrl(): string {
-          return urlFor(page.currentPage())
+          return wc.getURL() || urlFor(page.currentPage())
         }
       },
       {
+        loadSameFile: (url) => {
+          late.comments?.reloadStarting()
+          void page.startPageLoad(page.currentPage(), 'reload', () => {
+            // A failed load reports itself through `did-fail-load`.
+            wc.loadURL(url).catch(() => undefined)
+          })
+        },
         // In project space, so a link and a tree click mint one tab for one
         // file (part 3 §3.4); the disposition rides along (part 3 §3.2).
         requestOpenFile: (sourcePanelId, realTarget, anchor, windowId, disposition) =>
@@ -317,7 +325,9 @@ export function wirePreviewLiveView(owner: PreviewLiveWiringOwner): PreviewLiveP
         platform: deps.platform,
         comments: {
           enabled: () => late.comments?.acceptsToggle() ?? false,
-          modeOn: () => late.comments?.isModeOn() ?? false
+          modeOn: () => late.comments?.isModeOn() ?? false,
+          menuKeyPressed: () => late.comments?.menuKeyPressed(),
+          pickKeyPressed: () => late.comments?.menuKeyPressed()
         }
       },
       {
@@ -409,7 +419,8 @@ export function wirePreviewLiveView(owner: PreviewLiveWiringOwner): PreviewLiveP
     contents: wc,
     markStale: () => deps.stillFrameCache.markStale?.(panelId),
     refresh: () => visibility.captureWhileVisible(),
-    now: () => deps.now()
+    now: () => deps.now(),
+    pagePress: (phase) => late.comments?.pagePressed(phase)
   })
   // Last: it never throws (a failure leaves the view without comments).
   const comments = createPreviewLiveComments(params, { page, pipeline, bounds, visibility })

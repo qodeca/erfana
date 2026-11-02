@@ -9,9 +9,19 @@
  * - one speech-bubble pin per commented element (`pins.ts`);
  * - transparent click-shields over iframes that are not commentable inside;
  * - in the top frame in comment mode, the 2 px mode frame and the
- *   "Comment mode – Esc to leave" tab, which moves to the bottom edge while
+ *   "Comment mode · Esc to leave" tab, which moves to the bottom edge while
  *   the pointer is near the top;
- * - the reveal flash (a static highlight, so reduced motion needs nothing).
+ * - the reveal flash (a static highlight, so reduced motion needs nothing);
+ * - comment marks over the words comments are about (spec 024 C-12), which
+ *   take clicks only in comment mode (C-17);
+ * - after a real selection, in and out of comment mode, the Comment button
+ *   at the end of the selection (C-16, D-10) – a button in the shadow root, its
+ *   label generated content like every other word here.
+ *
+ * Pins and marks are visual only (C-11, differences table D-07): their layer
+ * is `aria-hidden`, and a pin has no role, name or tab stop. Assistive tech
+ * reaches comments through the picker's announcements, the drawer and the
+ * comment stepper.
  *
  * No text node in it (E-022, §10.2): Find in page counts text in a shadow
  * root, closed or not, so every word the overlay shows – the label, the mode
@@ -24,14 +34,36 @@
  * wrote is ever parsed as markup here – and positioned through `el.style`.
  */
 import { drawPin, showText, type PinPlacement } from './pins'
-import type { Box, Viewport } from './geometry'
-import type { LabelParts } from './label'
+import type { MarkPlacement } from './marks'
+import { NO_HOVER, type LinkedHover } from './overlayHits'
+import { boxOf, outlineBox, type Box, type Viewport } from './geometry'
+import { labelOf, type LabelParts, type LabelSuffix } from './label'
+import { isAltHeld } from './altHold'
 
 /** The outlined element, already clipped and snapped. */
 export interface OutlineModel {
   readonly box: Box
   readonly selected: boolean
   readonly label: LabelParts
+}
+
+/**
+ * The outline of `element` in `viewport` with its label (§10.2); `null` when
+ * it is off screen.
+ *
+ * @param comments - Open comments on the element's pin, for the label.
+ */
+export function outlineModelOf(
+  element: Element,
+  selected: boolean,
+  viewport: Viewport,
+  dpr: number,
+  suffix: LabelSuffix,
+  comments: number
+): OutlineModel | null {
+  const box = boxOf(element)
+  const outlined = outlineBox(box, viewport, dpr)
+  return outlined === null ? null : { box: outlined, selected, label: labelOf(element, box, suffix, comments) }
 }
 
 /** Everything one render shows. */
@@ -42,16 +74,36 @@ export interface ViewModel {
   readonly pinLabel: (pin: PinPlacement) => string
   /** The element whose pin is drawn selected (the one a pick just opened). */
   readonly selected: Element | null
+  /** The pin or mark key that pick named, if any: its words alone take the active look. */
+  readonly selectedKey?: string | null
   readonly shields: readonly Box[]
   readonly indicator: { readonly visible: boolean; readonly bottom: boolean }
   readonly flash: Box | null
+  /** Comment marks over commented words (C-12); none when absent. */
+  readonly marks?: readonly MarkPlacement[]
+  /** Marks take clicks (comment mode, C-17). */
+  readonly marksClickable?: boolean
+  /** What the pointer lights across pins and marks (C-17). */
+  readonly hover?: LinkedHover
+  /** The Comment button over a selection (C-16), while it shows. */
+  readonly button?: Box | null
 }
 
-/** The text of the mode tab (§10.10). */
-export const MODE_TAB_TEXT = 'Comment mode – Esc to leave'
+/** The Comment button's label (comments-v2 C-16; `SELECTION_COPY.button`). */
+export const COMMENT_BUTTON_TEXT = 'Comment'
+
+/**
+ * The text of the mode tab (§10.10). Differences table A-03: both previews
+ * read "Comment mode · Esc to leave" before a target is outlined; the HTML
+ * Preview names its target in the floating label instead (D-05), so its tab
+ * keeps this text.
+ */
+export const MODE_TAB_TEXT = 'Comment mode · Esc to leave'
 
 /** Gap between an element and its label. */
 const LABEL_GAP_PX = 2
+/** How far a box above the outline may miss containing it and still count as its own ancestor (outline rounding). */
+const CONTAIN_SLACK_PX = 2
 
 function part(doc: Document, className: string): HTMLDivElement {
   const el = doc.createElement('div')
@@ -70,6 +122,39 @@ function shown(el: HTMLElement, visible: boolean): void {
   el.classList.toggle('erf-hpc-hidden', !visible)
 }
 
+const SVG_NS = 'http://www.w3.org/2000/svg'
+
+/** Lucide `message-square-plus`, 24-unit view box (C-16). */
+const BUTTON_ICON_PATHS = [
+  'M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z',
+  'M12 7v6',
+  'M9 10h6'
+] as const
+
+/**
+ * The Comment button: the icon and its label. It takes no focus
+ * (`tabindex=-1`) and never moves the selection – its press is kept from
+ * the page by the guards and its click is a pick.
+ */
+function commentButton(doc: Document): HTMLButtonElement {
+  const button = doc.createElement('button')
+  button.type = 'button'
+  button.className = 'erf-hpc-button erf-hpc-hidden'
+  button.tabIndex = -1
+  const svg = doc.createElementNS(SVG_NS, 'svg')
+  svg.setAttribute('viewBox', '0 0 24 24')
+  svg.setAttribute('aria-hidden', 'true')
+  for (const d of BUTTON_ICON_PATHS) {
+    const path = doc.createElementNS(SVG_NS, 'path')
+    path.setAttribute('d', d)
+    svg.append(path)
+  }
+  const label = doc.createElement('span')
+  showText(label, COMMENT_BUTTON_TEXT)
+  button.append(svg, label)
+  return button
+}
+
 /** The overlay's content. */
 export class OverlayView {
   private readonly frame: HTMLDivElement
@@ -80,8 +165,11 @@ export class OverlayView {
   private readonly label: HTMLDivElement
   private readonly labelTag: HTMLSpanElement
   private readonly labelRest: HTMLSpanElement
+  private readonly labelCode: HTMLSpanElement
   private readonly labelSize: HTMLSpanElement
   private readonly pinLayer: HTMLDivElement
+  private readonly markLayer: HTMLDivElement
+  private readonly button: HTMLButtonElement
   private readonly pinElements = new Map<string, HTMLElement>()
 
   constructor(
@@ -102,11 +190,17 @@ export class OverlayView {
     this.labelTag = doc.createElement('span')
     this.labelTag.className = 'erf-hpc-label__tag'
     this.labelRest = doc.createElement('span')
+    this.labelCode = doc.createElement('span')
+    this.labelCode.className = 'erf-hpc-label__code'
     this.labelSize = doc.createElement('span')
     this.labelSize.className = 'erf-hpc-label__size'
-    this.label.append(this.labelTag, this.labelRest, this.labelSize)
+    this.label.append(this.labelTag, this.labelRest, this.labelCode, this.labelSize)
     this.pinLayer = part(doc, 'erf-hpc-pins')
-    container.append(this.frame, this.tab, this.shields, this.flash, this.outline, this.label, this.pinLayer)
+    this.pinLayer.setAttribute('aria-hidden', 'true')
+    this.markLayer = part(doc, 'erf-hpc-marks')
+    this.markLayer.setAttribute('aria-hidden', 'true')
+    this.button = commentButton(doc)
+    container.append(this.frame, this.tab, this.shields, this.markLayer, this.flash, this.outline, this.label, this.pinLayer, this.button)
     root.replaceChildren(container)
   }
 
@@ -119,7 +213,28 @@ export class OverlayView {
     shown(this.flash, model.flash !== null)
     if (model.flash !== null) place(this.flash, model.flash)
     this.renderOutline(model.outline, viewport)
+    this.renderMarks(model)
     this.renderPins(model)
+    const button = model.button ?? null
+    shown(this.button, button !== null)
+    if (button !== null) place(this.button, button)
+  }
+
+  private renderMarks(model: ViewModel): void {
+    const marks = model.marks ?? []
+    const hover = model.hover ?? NO_HOVER
+    const key = model.selectedKey ?? null
+    const open = (mark: MarkPlacement): boolean => mark.element === model.selected && (key === null || key === mark.key || key === mark.markKey)
+    this.markLayer.classList.toggle('erf-hpc-marks--clickable', model.marksClickable === true)
+    while (this.markLayer.children.length > marks.length) this.markLayer.lastElementChild?.remove()
+    while (this.markLayer.children.length < marks.length) this.markLayer.append(part(this.doc, 'erf-hpc-mark'))
+    marks.forEach((mark, i) => {
+      const el = this.markLayer.children[i] as HTMLElement
+      place(el, mark.box)
+      el.classList.toggle('erf-hpc-mark--active', hover.marks.has(mark) || open(mark))
+      el.classList.toggle('erf-hpc-mark--changed', mark.changed)
+      el.classList.toggle('erf-hpc-mark--light', mark.light)
+    })
   }
 
   private renderShields(boxes: readonly Box[]): void {
@@ -138,20 +253,55 @@ export class OverlayView {
     this.outline.classList.toggle('erf-hpc-outline--selected', outline.selected)
     showText(this.labelTag, outline.label.tag)
     showText(this.labelRest, outline.label.rest)
+    showText(this.labelCode, outline.label.code)
     showText(this.labelSize, outline.label.size)
+    // C-21 / D-03 / D-05: the code and the pixel size only while Alt is held.
+    const details = isAltHeld(this.doc)
+    shown(this.labelCode, details)
+    shown(this.labelSize, details)
     this.placeLabel(outline.box, viewport)
   }
 
-  /** Above the element's top-left; below it at the viewport top; inside a huge one. */
+  /**
+   * Above the element's top-left; below it at the viewport top; inside a huge
+   * one. C-21: when other content sits right above the outline – where the
+   * label would cover a neighbour's line – inside the outline's top-left
+   * corner instead, on its own solid ground (`.erf-hpc-label` is drawn on the
+   * ink colour), so it covers only the target's own first line (R-18).
+   */
   private placeLabel(box: Box, viewport: Viewport): void {
     const height = this.label.offsetHeight || this.labelHeight
     const width = this.label.offsetWidth
-    let top = box.top - height - LABEL_GAP_PX
+    const inside = this.touchesContent(box)
+    let top = inside ? Math.max(box.top, 0) : box.top - height - LABEL_GAP_PX
     if (top < 0) top = box.top + box.height + LABEL_GAP_PX
     if (top + height > viewport.height) top = Math.max(box.top, 0) + LABEL_GAP_PX
     const left = Math.max(0, Math.min(box.left, viewport.width - width))
+    this.label.classList.toggle('erf-hpc-label--inside', inside)
     this.label.style.left = `${left}px`
     this.label.style.top = `${top}px`
+  }
+
+  /**
+   * Whether the outline's top touches content: the element just above its
+   * top-left corner is not one of the target's own containers (whose box
+   * holds the outline). Text sitting directly in a container is not seen –
+   * the label then stays above, as before.
+   */
+  private touchesContent(box: Box): boolean {
+    const y = box.top - LABEL_GAP_PX - 1
+    // A document with no hit test (jsdom) has nothing to measure: the label stays above.
+    if (y < 0 || typeof this.doc.elementFromPoint !== 'function') return false
+    const above = this.doc.elementFromPoint(box.left + 1, y)
+    if (above === null) return false
+    const r = above.getBoundingClientRect()
+    const slack = CONTAIN_SLACK_PX
+    const holds =
+      r.left <= box.left + slack &&
+      r.top <= box.top + slack &&
+      r.right >= box.left + box.width - slack &&
+      r.bottom >= box.top + box.height - slack
+    return !holds
   }
 
   private renderPins(model: ViewModel): void {
@@ -161,7 +311,8 @@ export class OverlayView {
       const existing = this.pinElements.get(pin.key)
       const el = drawPin(this.doc, existing, pin, {
         label: model.pinLabel(pin),
-        selected: pin.element === model.selected
+        selected: pin.element === model.selected,
+        hovered: pin.key === model.hover?.pin || pin.members?.some(member => member.key === model.hover?.pin) === true
       })
       if (existing === undefined) {
         this.pinElements.set(pin.key, el)

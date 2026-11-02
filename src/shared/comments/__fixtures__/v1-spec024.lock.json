@@ -1,0 +1,27 @@
+{
+  "algorithm": "sha256",
+  "files": {
+    "v1-spec024/cases.ts": "2d1fc32ab18a2abe6c08464f9165abad8357a4cf4c15cbffe3f022577c4af9f1",
+    "v1-spec024/d01-doc-example-page.html.txt": "0a45cb4d3d8f234f19ebea9010132e746f4d4cb6641761b08cdf084228f81203",
+    "v1-spec024/d02-doc-example-resolved.html.txt": "05ec38eaa2171432e9198742434fa27454ca59e2908485456a5b7e4b9e40b6c8",
+    "v1-spec024/d03-doc-example-runtime.html.txt": "8790dbc9310c03bacd238a4b62d801a1a820079f1186ba6dcff4dadce132d3e6",
+    "v1-spec024/f01-html-selection.html": "7552069327f12e675c168746993dc5d9a02c0ac8f9a1cae9c513c5511ceea19e",
+    "v1-spec024/f02-markdown-list.md": "bd943296a050db15a10455c9cb35a12b45fb8bb757fe2326050417f2185b8d4d",
+    "v1-spec024/f03-markdown-mixed-crlf.md": "5816adea7710cba9bb1a9f9b6cb7ec4e85c3c661e1ec38ac51257702bd9d9678",
+    "v1-spec024/m01-paragraph.block.txt": "2a8dccc90eb6d27e5a852fa7aee0b1c7472cd21732823a43eb9b14840d9ebc34",
+    "v1-spec024/m02-heading.block.txt": "fda65b2a73ba65b5988bbf6a8663159b3468be44a0ab3913937296556542fb93",
+    "v1-spec024/m03-list-item-2.block.txt": "9be480eca5ca9bb0d4e92fb10b6086226004ac933321e37bcce7289f910c6430",
+    "v1-spec024/m04-list-item-1.block.txt": "add3ed1c28c2ea5a70c10e8df99d9702fa13c9253aa7c942e39af4ec04729de7",
+    "v1-spec024/m05-table-row.block.txt": "d6bc99de950986b63bdd1249c01a7fd6873d09079c990972ecedc5a65dbd7db5",
+    "v1-spec024/m06-quote-inner.block.txt": "d029303d60aa574d981a364ed9d67d08865d5ea23207b6e024ca588db820a6b4",
+    "v1-spec024/m07-code-block.block.txt": "cf3f90aaf7ee6ef8be72d9a9dbc2abdf09aaa9218dff9da142fc7b6c11e04e2a",
+    "v1-spec024/m08-image.block.txt": "2a8890a6aa649e1d95f0e1c48cfd5543d7ab526ba80e43f2acc376e525be23c9",
+    "v1-spec024/m09-divider.block.txt": "7775b9b9b9dcf242b70ea82c296eea694ee10f084a957d8c0838da872fad3790",
+    "v1-spec024/m10-html-block.block.txt": "5f87108f678c5a21d0fcfe7823454be3b908dfe7884e816f27f6779933989c9b",
+    "v1-spec024/m11-selection.block.txt": "5d523aec5cb9a4887830a31c61e1e8f861cb893d75f5eb5e00f658a8a63d3339",
+    "v1-spec024/s01-html-selection.block.txt": "cada3bb0ae32fb7a6860c0ec9f42ece44c9ea5b19e79fe0df769f474c5103d2e",
+    "v1-spec024/s02-html-selection-crlf-hostile.block.txt": "2bfea7b2a6004fc69b602b32fef630a85effbc562fc8b61a209c5a48e30fe0ea",
+    "v1-spec024/s03-html-selection-longest.block.txt": "dca4c38a60acf7520acffa40cd4589d2d99fb46d7a7b164497d475bb70218cd8",
+    "v1-spec024/s04-html-selection-invalid-kept.block.txt": "3e429f8fc7baa93713006474f6fcfa13928445644b012a6fb6b513b2691ccfe8"
+  }
+}

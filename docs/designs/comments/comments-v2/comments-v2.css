@@ -155,7 +155,7 @@
 .erf-comment-wasnow__label { margin: 0 0 var(--space-1); font-size: var(--text-sm); color: var(--color-text-tertiary); }
 .erf-comment-wasnow__was { text-decoration: line-through; color: var(--color-text-tertiary); }
 
-/* ================= C-07 Narrow to words ================= */
+/* ================= C-07 Comment on specific words ================= */
 
 /* The Form card's field edge and text size. Focus is the one ring from the
    Focus card (the field takes :focus-visible like any other field). Its
@@ -231,22 +231,29 @@
   cursor: pointer;
 }
 
-/* ================= C-20 toolbar: the list as a labelled count ================= */
+/* ================= C-20 toolbar: the list as the icon and the count ================= */
+
+/* Icons only, at every width (owner decision, 2026-10-31). Mirror of the
+   Markdown toolbar's `.erf-md-comment-tool--count`; the HTML band frames use the
+   shipped `.erf-band__tool--count` from nav.css. */
 
 .erf-comment-toolcount {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-3);
+  justify-content: center;
+  gap: var(--space-2);
   /* deviates-in-design: docs/design-system/system/components/toolbar/index.html#tool-height – proposed token */
   block-size: var(--toolbar-tool-height, var(--input-height-sm));
-  padding: 0 var(--space-4);
+  min-inline-size: var(--btn-height-md);
+  padding: 0 var(--space-3);
   background: transparent;
-  border: var(--border-width) solid transparent;
-  border-block-end: var(--border-width-thick) solid transparent;
+  border: none;
+  border-block: var(--border-width-thick) solid transparent;
   border-radius: var(--border-radius);
   color: var(--color-text-primary);
   font-family: var(--font-sans);
   font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
   cursor: pointer;
 }
@@ -256,14 +263,14 @@
    2026-10-28; replaces R-19's box). The markup stays a disclosure
    (aria-expanded); the look reads the same tokens as the band's pressed toggle
    (permission-band/nav.css). */
-.erf-comment-toolcount[aria-expanded='true'] { background: var(--color-bg-selected); color: var(--color-text-bright);
+.erf-comment-toolcount[aria-expanded='true'] { background: var(--color-bg-selected); color: var(--color-text-primary);
                                                border-block-end-color: var(--color-brand-lime); }
 @media (forced-colors: active) {
   .erf-comment-toolcount[aria-expanded='true'] { border-block-end-color: Highlight; }
 }
-/* The one focus ring (Focus card): the same width, colour and offset as everywhere. */
+/* The inset ring both preview toolbars share (owner decision, 2026-10-31). */
 .erf-comment-toolcount:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus);
-                                       outline-offset: var(--space-1); }
+                                       outline-offset: calc(var(--space-1) * -1); }
 
 /* ================= card chrome (documentation only) ================= */
 

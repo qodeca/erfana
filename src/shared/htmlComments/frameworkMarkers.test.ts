@@ -6,7 +6,7 @@
  * container, and the clicked element becomes a runtime path inside it.
  */
 import { describe, expect, it } from 'vitest'
-import { elementOf } from './__fixtures__/commentTestData'
+import { elementOf } from '../comments/__fixtures__/commentTestData'
 import { detectFrameworkRegions, frameworkPlacementFor } from './frameworkMarkers'
 import { indexHtml } from './htmlIndex'
 

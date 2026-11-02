@@ -36,6 +36,7 @@ const CONTEXT = {
 
 type SpiedDeps = PreviewLinkNavigationDeps & {
   requestOpenFile: Mock
+  loadSameFile: Mock
   openExternal: Mock
   recordFailure: Mock
   confine: Mock
@@ -46,6 +47,7 @@ function makeDeps(
 ): SpiedDeps {
   return {
     requestOpenFile: vi.fn(),
+    loadSameFile: vi.fn(),
     openExternal: vi.fn().mockResolvedValue(undefined),
     recordFailure: vi.fn(),
     confine: vi.fn().mockResolvedValue(verdict)
@@ -53,6 +55,16 @@ function makeDeps(
 }
 
 describe('routeLinkActivation', () => {
+  it('loads a ?query link to the same file in this view, and opens no tab', async () => {
+    const deps = makeDeps()
+
+    await routeLinkActivation({ href: `${CURRENT}?lang=pl`, provenance: 'gesture' }, CONTEXT, deps)
+
+    expect(deps.loadSameFile).toHaveBeenCalledWith(`${CURRENT}?lang=pl`)
+    expect(deps.requestOpenFile).not.toHaveBeenCalled()
+    expect(deps.recordFailure).not.toHaveBeenCalled()
+  })
+
   it('asks the OWNING window to open a confined in-project file', async () => {
     const deps = makeDeps()
 

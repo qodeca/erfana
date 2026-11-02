@@ -19,6 +19,8 @@
  * @module utils/previewRenderTiming
  */
 
+import { COMMENT_TIMING_MARKS, markCommentTiming } from '../components/Comments/overlay/commentTiming'
+
 /** One committed render of the preview body. */
 export interface PreviewRenderSample {
   /** `performance.now()` when the body subtree started rendering */
@@ -68,11 +70,15 @@ export function notePreviewRenderStart(): void {
 }
 
 /**
- * Record a committed preview body render, when recording is on.
+ * Record a committed preview body render, when recording is on. Always puts
+ * the `erfana:comments:preview-rendered` mark on the timeline (one entry,
+ * replaced each time): the start of "pins visible" in the comment timing
+ * (spec 024 024-NFR-001, `e2e/markdown-comments.timing.e2e.ts`).
  *
  * @param startedAt - `performance.now()` taken when the render pass began
  * @param committedAt - `performance.now()` taken in the commit's layout effect
  */
 export function notePreviewRenderCommit(startedAt: number, committedAt: number): void {
+  markCommentTiming(COMMENT_TIMING_MARKS.previewRendered)
   getSink()?.samples.push({ startedAt, committedAt, duration: committedAt - startedAt })
 }

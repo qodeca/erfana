@@ -25,16 +25,16 @@ import {
   FIXED_NOW,
   VIEW,
   seededRandom
-} from '../../../../../shared/htmlComments/__fixtures__/commentTestData'
+} from '../../../../../shared/comments/__fixtures__/commentTestData'
 import { sha256Hex } from '../../../../utils/atomicWriteBytesStrict'
-import { createInProcessCommentFileJobs } from '../commentFileJobs'
+import { createInProcessCommentFileJobs } from '../htmlCommentJobs'
 import {
   CommentWriter,
   type CommentDraftTarget,
   type CommentFileTarget,
   type CommentIdentity,
   type CommentWriterDeps
-} from '../CommentWriter'
+} from '../../../comments/CommentWriter'
 
 export { FIXED_NOW, VIEW }
 

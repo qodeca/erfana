@@ -20,7 +20,15 @@
  * HTML Preview comments add one row of their own, `PREVIEW_COMMENT_TOGGLE`,
  * taken only while comments are on for the view – and, while comment mode is
  * on, leave Esc with the page, whose preload leaves the mode
- * (html-preview-comments.md §3, §7.1, §10.1; M-052).
+ * (html-preview-comments.md §3, §7.1, §10.1; M-052). The comment stepper's
+ * pair, Alt+F9 / Alt+Shift+F9 (comments-v2 C-13), is two rows of the frozen
+ * list, likewise taken only while comments are on.
+ *
+ * Some keys are noted and NOT forwarded: Shift+F10 or the Menu key, and in
+ * comment mode Enter, stay the page's, and main only records that they
+ * happened, as the evidence a keyboard pick needs
+ * (`comments/commentContextGate.ts`, K-1, L-1). The forward list is unchanged,
+ * and the page is told nothing.
  *
  * @see docs/designs/html-preview/sd-074-html-preview.md §1.9, §0 (Enumerated keystrokes)
  * @see docs/designs/html-preview/multi-page/design-issue-124-part3.md §3.7
@@ -28,6 +36,8 @@
 
 import { COMMENT_MODE_KEY, matchCommentModeKey } from '../../../shared/commentModeKey'
 import { matchPreviewNavKey, type PreviewNavAction } from '../../../shared/previewNavKeys'
+import { commentStepOf, type CommentStep } from '../../../shared/commentStepKey'
+import { pickerStepOf, type PickerStep } from '../../../shared/comments/overlayCore/pickerKeys'
 
 /** A forwarded key. `accel` true ⇒ requires Cmd (macOS) / Ctrl (else). */
 export interface ForwardedShortcut {
@@ -39,6 +49,12 @@ export interface ForwardedShortcut {
    * `accel` is always `false` on such a row.
    */
   readonly nav?: true
+  /**
+   * A comment step (comments-v2 C-13): Alt+F9 / Alt+Shift+F9 on the physical
+   * key (`shared/commentStepKey`), taken only while comments are on for the
+   * view – off, the press stays with the page. `accel` is always `false`.
+   */
+  readonly comment?: true
 }
 
 /**
@@ -65,7 +81,12 @@ export const PREVIEW_FORWARDED_SHORTCUTS = Object.freeze([
   // Cmd/Ctrl rule – it is Alt on Windows and Linux – so `accel` is `false` for
   // both, and the renderer routes them on `key` alone.
   { key: 'back', accel: false, nav: true },
-  { key: 'forward', accel: false, nav: true }
+  { key: 'forward', accel: false, nav: true },
+  // The comment stepper's pair (comments-v2 C-13): with focus in the page the
+  // renderer opens the next (previous) comment's window – the page never sees
+  // the press, and nothing in the page's preload changes.
+  { key: 'comment-next', accel: false, comment: true },
+  { key: 'comment-previous', accel: false, comment: true }
 ] as const satisfies readonly ForwardedShortcut[])
 
 /**
@@ -88,6 +109,10 @@ export interface CommentKeyState {
   readonly enabled: () => boolean
   /** Comment mode is on: Esc stays with the page, whose preload leaves the mode. */
   readonly modeOn: () => boolean
+  /** A real Shift+F10 or Menu key press reached the page, comment mode off (K-1). */
+  readonly menuKeyPressed?: () => void
+  /** A real Enter, Shift+F10 or Menu key press reached the page, comment mode on (L-1). */
+  readonly pickKeyPressed?: () => void
 }
 
 /**
@@ -104,6 +129,8 @@ export interface ForwardableInput {
   meta: boolean
   alt: boolean
   shift: boolean
+  /** A held key repeating: not a press (K-1). */
+  isAutoRepeat?: boolean
 }
 
 /** The slice of the `before-input-event` event object this module uses. */
@@ -153,9 +180,10 @@ export function matchForwardedShortcut(
 
   const accelDown = platform === 'darwin' ? input.meta : input.control
   const navAction = matchPreviewNavKey(input, platform)
+  const step = comments !== undefined && comments.enabled() ? commentStepOf(input) : null
 
   for (const shortcut of PREVIEW_FORWARDED_SHORTCUTS) {
-    if (matchesShortcut(shortcut, input, accelDown, navAction)) {
+    if (matchesShortcut(shortcut, input, accelDown, navAction, step)) {
       // In comment mode the page's preload takes Esc: it leaves the mode first.
       return shortcut.key === 'Escape' && comments?.modeOn() === true ? null : shortcut.key
     }
@@ -177,15 +205,40 @@ export function matchCommentToggle(
   return matchCommentModeKey(input, platform === 'darwin')
 }
 
-/** One row of the frozen list against one key press. */
+/**
+ * Whether a key press is a fresh Shift+F10 or Menu key: the picker's own rule
+ * (`overlayCore/pickerKeys`), so main records the press the page acts on.
+ */
+export function isMenuKeyPress(input: ForwardableInput): boolean {
+  return freshPickerStep(input) === 'menu'
+}
+
+/** Whether a key press is one the picker opens a window or menu with, in comment mode. */
+export function isPickKeyPress(input: ForwardableInput): boolean {
+  const step = freshPickerStep(input)
+  return step === 'menu' || step === 'open'
+}
+
+/** The picker step of a fresh press; a release or a held key repeating is no press. */
+function freshPickerStep(input: ForwardableInput): PickerStep | null {
+  if (input.type !== 'keyDown' || input.isAutoRepeat === true) return null
+  const { key, code, shift: shiftKey, alt: altKey, control: ctrlKey, meta: metaKey } = input
+  return pickerStepOf({ key, code, shiftKey, altKey, ctrlKey, metaKey })
+}
+
+/** One row of the frozen list against one key press. `step` is `null` while comments are off for the view. */
 function matchesShortcut(
   shortcut: ForwardedShortcut,
   input: ForwardableInput,
   accelDown: boolean,
-  navAction: PreviewNavAction | null
+  navAction: PreviewNavAction | null,
+  step: CommentStep | null
 ): boolean {
   if (shortcut.nav === true) {
     return navAction === shortcut.key
+  }
+  if (shortcut.comment === true) {
+    return step !== null && shortcut.key === `comment-${step}`
   }
   if (input.key.toLowerCase() !== shortcut.key.toLowerCase()) {
     return false
@@ -212,6 +265,12 @@ export function attachInputForwarding(
     if (key !== null) {
       event.preventDefault()
       onShortcut(key)
+    }
+    if (comments === undefined || !comments.enabled()) return
+    if (comments.modeOn()) {
+      if (isPickKeyPress(input)) comments.pickKeyPressed?.()
+    } else if (isMenuKeyPress(input)) {
+      comments.menuKeyPressed?.()
     }
   }
 

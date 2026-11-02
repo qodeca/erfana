@@ -13,9 +13,9 @@ import { logger } from '../../LoggingService'
 import { BASE_PAGE, commentedPage } from './__test-helpers__/commentedPages'
 import { commentServiceFixture, SCROLL, type CommentServiceFixture } from './__test-helpers__/commentServiceFixture'
 import { FakeFrame, flush, serveLoad, tokenOfTag } from './__test-helpers__/commentServiceHarness'
-import type { CommentWriteResult } from './CommentWriter'
-import * as listBuilder from './commentListBuilder'
-import { SAVE_TIMEOUT_MS } from './commentSaveFlow'
+import type { CommentWriteResult } from '../../comments/CommentWriter'
+import * as listBuilder from '../../comments/commentListBuilder'
+import { SAVE_TIMEOUT_MS } from '../../comments/commentSaveFlow'
 import { READ_SCROLL_SCRIPT } from './commentScripts'
 
 vi.mock('../../LoggingService', () => ({
@@ -175,6 +175,29 @@ describe('PreviewCommentService', () => {
     expect(fixture.emit.saveSettled).toHaveBeenCalledExactlyOnceWith(1, { panelId: 'html-preview-index', op: 'add', draftToken, ok: true })
   })
 
+  it('L-2 a late bulk refusal reaches the owning window, by its file key', async () => {
+    let finish: (result: CommentWriteResult) => void = () => {}
+    const changeThreads = vi.fn(() => new Promise<CommentWriteResult>(resolve => (finish = resolve)))
+    f = await commentServiceFixture(commentedPage().text, { createWriter: () => ({ add: vi.fn(), changeThread: vi.fn(), deleteDamagedBlock: vi.fn(), changeThreads }) as never })
+    await f.loadPage()
+    const list = await f.service.list()
+    if (!list.ok) throw new Error('list')
+    const [file] = list.files
+    const [{ threadKey, rawHash }] = file.threads
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const running = f.service.bulk({ panelId: 'html-preview-index', change: 'resolve', files: [{ fileKey: file.fileKey, threads: [{ threadKey, rawHash }] }] })
+      await vi.waitFor(() => expect(changeThreads).toHaveBeenCalledTimes(1))
+      await vi.advanceTimersByTimeAsync(SAVE_TIMEOUT_MS)
+      expect(await running).toEqual({ ok: true, files: [{ fileKey: file.fileKey, ok: false, code: ErrorCode.COMMENT_SAVE_PENDING }] })
+    } finally {
+      vi.useRealTimers()
+    }
+    finish({ ok: false, code: ErrorCode.COMMENT_BLOCK_CHANGED, reason: 'block-changed' } as unknown as CommentWriteResult)
+    await flush()
+    expect(f.emit.bulkSettled).toHaveBeenCalledExactlyOnceWith(1, { panelId: 'html-preview-index', fileKey: file.fileKey, ok: false, code: ErrorCode.COMMENT_BLOCK_CHANGED, reason: 'block-changed' })
+  })
+
   it('H1 a late refusal tells the owning window its code, and re-sends no counts', async () => {
     const { fixture, finish, draftToken } = await pendingSave()
     finish({ ok: false, code: ErrorCode.COMMENT_TARGET_MOVED, reason: 'target-moved' } as unknown as CommentWriteResult)
@@ -224,7 +247,17 @@ describe('PreviewCommentService', () => {
     f.emit.modeChanged.mockClear()
     await f.pick(f.top, { kind: 'step', via: 'keyboard', say: 'showing', token: tokenOfTag(load.doc, 'button'), view: VIEW })
     // BASE_PAGE's `<button id="cta" class="btn">` is on line 8: its tag and line, not its id or class.
-    expect(f.emit.modeChanged).toHaveBeenLastCalledWith(1, { panelId: 'html-preview-index', on: true, reason: 'picker', say: 'showing', element: { tag: 'button', line: 8 } })
+    // C-10: plus its kind from main's table, and its first words from main's own read of the file (said once read).
+    const modeChanged = f.emit.modeChanged
+    await vi.waitFor(() =>
+      expect(modeChanged).toHaveBeenLastCalledWith(1, {
+        panelId: 'html-preview-index',
+        on: true,
+        reason: 'picker',
+        say: 'showing',
+        element: { tag: 'button', line: 8, role: 'button', excerpt: 'Buy now' }
+      })
+    )
     await f.pick(f.top, { kind: 'step', via: 'keyboard', say: 'top', view: VIEW })
     expect(f.emit.modeChanged).toHaveBeenLastCalledWith(1, { panelId: 'html-preview-index', on: true, reason: 'picker', say: 'top' })
     expect(f.service.isModeOn()).toBe(true)

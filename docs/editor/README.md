@@ -36,13 +36,13 @@ Global setting to preserve single line breaks in markdown preview:
 - Changes apply immediately without reload
 
 ### Context Menu with Prompt Templates (v0.6.4-beta)
-Right-click with text selected in Monaco editor shows a context menu of prompt templates sent to the CLI agent in the terminal.
+Right-click in the Monaco editor shows a context menu (Monaco's own menu is turned off with `contextmenu: false`): the prompt templates sent to the CLI agent in the terminal, then Cut, Copy and Paste.
 
 **Features:**
 - Prompts filtered by `area: code-editor`, `subArea: context-menu`
 - Actions: Explain (direct), Modify/Ask (with input dialog), Visualize (with dropdown)
-- "Copy selection" copies text to clipboard
-- Menu dismisses on Escape, click outside, or action execution
+- The prompt items, Cut and Copy are disabled without a selection; Paste is always enabled
+- Menu dismisses on Escape, Tab, click outside, or action execution
 
 **Templates** (5 editor-specific):
 - `editor-explain.md` - Explain selected code/text
@@ -145,24 +145,24 @@ Opening another project (picker or recent list) or closing the project first sav
 - `useFileWatcher.ts` - File change detection with race condition protection. Since #70 it holds its watch through the shared `fileWatchSlot.ts` (serialised acquire/release, so a start and its stop can never get out of order), and it takes `INDICATOR_DURATION_MS` from `constants/fileWatch.ts` rather than owning it. The read-only sibling for surfaces that never write is `useFileChangeSubscription.ts` — see [File Watching](../file-watching/README.md#single-file-watch-internals-70)
 - `useDividerPosition.ts` - Resizable split pane position management
 - `useEditorContextMenu.ts` - Context menu state and positioning
-- `useKeyboardShortcuts.ts` - Cmd/Ctrl+S (save) and Cmd/Ctrl+W (close tab, confirming unsaved changes). The listener sits on `window` and every open editor tab stays mounted, so it takes an `enabled` flag that `MarkdownEditorPanel` wires to `props.api.isActive` (kept in step via `onDidActiveChange`) – only the active tab acts on a press
+- `useKeyboardShortcuts.ts` - Cmd/Ctrl+S (save) and Cmd/Ctrl+W (close tab, confirming unsaved changes). The listener sits on `window` and every open editor tab stays mounted, so it takes an `enabled` flag that `MarkdownEditorPanel` wires to `useDockviewValue(props.api, DOCKVIEW_PANEL_ACTIVE)` (which follows `onDidActiveChange`) – only the active tab acts on a press
 - `useEditorSaveRegistration.ts` - Registers the tab's save, conflict flag and autosave hold in `services/editorSaveRegistry.ts` under its panel id while the panel is mounted, so the HTML preview's tab move (#124) can save another tab by id. See [File Watching](../file-watching/README.md)
 
 ## Monaco configuration
 
 ### Editor settings
 
-Monaco is configured for markdown editing in `MonacoMarkdownEditor.tsx`:
+Monaco is configured in `MonacoMarkdownEditor.tsx`. The language comes from the file path (`getMonacoLanguage(filePath)`, so a `.html`, `.css` or `.ts` file gets its own tokenizer and anything unknown falls back to `markdown`); the options set through `editor.updateOptions` include:
 
 ```typescript
 {
-  language: 'markdown',
   wordWrap: 'on',
   lineHeight: 20,     // compact
   fontSize: 13,       // compact
   padding: { top: 8, bottom: 8 },
   minimap: { enabled: false },
-  rulers: []
+  rulers: [],
+  contextmenu: false  // Erfana's EditorContextMenu replaces Monaco's
 }
 ```
 
@@ -171,12 +171,18 @@ Monaco is configured for markdown editing in `MonacoMarkdownEditor.tsx`:
 Monaco built-ins (when the editor has focus):
 
 - Text editing: Cmd/Ctrl+C/V/X/Z (copy/paste/cut/undo)
-- Find/replace: Cmd/Ctrl+H (Cmd/Ctrl+F is intercepted app-wide by `useSearchKeyboard.ts` and opens the app search bar instead of Monaco's find widget)
 - Multi-cursor: Alt+Click, Cmd/Ctrl+Alt+Up/Down
+- Cmd/Ctrl+F is registered as a no-op Monaco command, so Monaco's own find widget never opens; the window-level `useSearchKeyboard.ts` handler opens the app search bar instead
 
-Application-global shortcuts override Monaco's:
+Markdown commands that `MonacoMarkdownEditor.tsx` adds with `editor.addCommand`:
 
-- Cmd/Ctrl+B: toggle sidebar (`AppDockLayout.tsx`; Monaco's Bold binding loses – see the Conflicts section of the shortcuts doc)
+- Cmd/Ctrl+B: bold (`**`)
+- Cmd/Ctrl+I: italic (`*`)
+- Cmd/Ctrl+K: insert link
+
+Application-global shortcuts (outside Monaco's own keybindings):
+
+- Cmd/Ctrl+B: toggle the Project panel (`AppDockLayout.tsx`, a `window` keydown listener) – the same chord as the editor's bold command above; see the Conflicts section of the shortcuts doc
 - Cmd/Ctrl+F: open the app search bar (`useSearchKeyboard.ts`)
 - Cmd/Ctrl+S: save, and Cmd/Ctrl+W: close the tab (`useKeyboardShortcuts.ts`, not Monaco; gated to the active editor tab)
 - Cmd/Ctrl+Shift+N: New Window – the only `accelerator` declared in `src/main/menu.ts` besides the View-menu zoom items

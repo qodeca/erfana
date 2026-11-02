@@ -213,7 +213,7 @@ Exact locations where each component should be created or modified.
 | verify-claims | `src/renderer/src/prompts/templates/verify-claims.md` | `{{selectedText}}`, `{{fileRef}}` |
 | structure-transcript | `src/renderer/src/prompts/templates/structure-transcript.md` | `{{selectedText}}`, `{{fileRef}}`, `{{basename filePath}}` |
 
-Template frontmatter fields: `name`, `area`, `subArea`, `icon` (Lucide name), `targetPanel` (terminal), `autoExecute` (boolean), `requiresInput` (boolean), `inputPrompt` (string).
+Template frontmatter fields: `name`, `area`, `subArea`, `icon` (Lucide name), `targetPanel` (terminal), `autoExecute` (boolean), `requiresInput` (boolean), `inputLabel` (string), `inputPlaceholder` (string).
 
 ### Service modifications
 
@@ -246,7 +246,7 @@ Template frontmatter fields: `name`, `area`, `subArea`, `icon` (Lucide name), `t
 | Spec G | `specs/spec-t2-{id}-source-dependency-tracking/` |
 | Spec H | `specs/spec-t2-{id}-export-citation-format/` |
 
-IDs assigned sequentially from `specs/registry.json` (current max: 021).
+IDs assigned sequentially from `sequence.next` in `specs/registry.json`.
 
 ---
 

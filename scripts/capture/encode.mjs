@@ -2,13 +2,15 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Encoding for the capture, all through the bundled ffmpeg (`ffmpeg-static`):
- * stills (overlay, crop, scale, palette quantisation) and the README demo loop
- * (edit list, then animated WebP, GIF and MP4 from one trimmed source).
+ * stills (overlay, crop, scale, palette quantisation) and the README video
+ * (spec 023: the speed-up edit with captions, hold and fade, then an animated
+ * WebP).
  *
  * The argument builders are pure so the unit tests pin them; `runFfmpeg`
  * passes them as an argument array, never through a shell.
  *
- * Design: docs/designs/user-guide/README.md § Encoding, § Loop for #139.
+ * Design: docs/designs/user-guide/README.md § Encoding; the README video:
+ * specs/spec-t3-023-readme-video.
  */
 
 import { Buffer } from 'node:buffer'
@@ -17,9 +19,6 @@ import { createRequire } from 'node:module'
 import path from 'node:path'
 
 const require = createRequire(import.meta.url)
-
-/** Frame rate of the README loop (design encode table). */
-export const LOOP_FPS = 12
 
 /** Full-window stills are scaled to this width; crops keep 2×. */
 export const WINDOW_WIDTH = 1600
@@ -68,151 +67,66 @@ export function stillArgs({ input, overlay = null, crop = null, scaleWidth = nul
   return ['-hide_banner', '-loglevel', 'error', '-y', ...inputs, '-filter_complex', chain.join(';'), '-frames:v', '1', output]
 }
 
-/**
- * The edit of the README demo: cut, speed-up and holds (design § Loop for
- * #139, Edit). Each segment is a range of the raw recording in seconds.
- *
- * @typedef {{ from: number, to: number, speed?: number, holdStart?: number, holdEnd?: number, name?: string }} Segment
- */
+/** The macOS system font, which the app's UI uses (`--font-sans` starts with -apple-system). */
+export const SYSTEM_FONT = '/System/Library/Fonts/SFNS.ttf'
 
 /**
- * Plan the demo's edit from the scene's marks (seconds on the recording's
- * timeline). The only cut is between `projectOpen` and `claudeIdle`, so
- * Claude Code's start-up screen never reaches a frame; the only speed-up is
- * the agent's working time (S4).
+ * The README video's edit (spec 023): the screen recording, already cropped to
+ * the window, played segment by segment at each segment's speed with no cut,
+ * the step captions drawn centred in the title bar, then a hold on the last
+ * frame and a fade to the first (023-FR-009). One lossless source comes out;
+ * `storyWebpArgs` encodes it.
  *
- * @param {Record<string, number>} m - marks: startScreen, projectOpen, claudeIdle, selected, menuOpen, dialogOpen, handedOff, editLanded, end
- * @param {object} [t] - target seconds per storyboard shot
- * @returns {{ segments: Segment[], duration: number, times: { handOff: number, agentEnd: number, still: number } }}
+ * @param {object} o
+ * @param {string} o.input - the recording
+ * @param {Array<{ from: number, to: number, speed: number }>} o.segments - recording seconds
+ * @param {Array<{ file: string, from: number, to: number }>} o.captions - a text file per caption, output seconds
+ * @param {number} o.hold
+ * @param {number} o.fade
+ * @param {number} o.content - output seconds before the hold
+ * @param {{ fps: number, labelSize: number, titleBar: number }} o.video
+ * @param {string} [o.fontFile]
+ * @param {string} o.output
  */
-export function planDemoEdit(m, t = {}) {
-  const need = ['startScreen', 'projectOpen', 'claudeIdle', 'selected', 'menuOpen', 'dialogOpen', 'handedOff', 'editLanded', 'end']
-  for (const k of need) if (!Number.isFinite(m[k])) throw new Error(`demo mark missing: ${k}`)
-  for (let i = 1; i < need.length; i++) {
-    if (!(m[need[i]] >= m[need[i - 1]])) throw new Error(`demo marks out of order: ${need[i - 1]} → ${need[i]}`)
-  }
-  const target = { open: 2.5, establish: 1.5, select: 1.0, menu: 0.9, dialog: 0.9, handOff: 1.5, agent: 5, land: 3, hold: 2, ...t }
-  const seg = (name, from, to, holdTotal, speed = 1) => {
-    const len = (to - from) / speed
-    return { name, from, to, speed, holdStart: 0, holdEnd: Math.max(0, holdTotal - len) }
-  }
-  const segments = [
-    { ...seg('S0 open', m.startScreen, m.projectOpen, 0), holdStart: 1.0 },
-    seg('S1 establish', m.claudeIdle, m.selected, target.establish),
-    seg('S2 select', m.selected, m.menuOpen, target.select),
-    seg('S2 menu', m.menuOpen, m.dialogOpen, target.menu),
-    seg('S3 hand-off', m.dialogOpen, m.handedOff, target.dialog + target.handOff),
-    seg('S4 agent', m.handedOff, m.editLanded, target.agent, Math.max(1, (m.editLanded - m.handedOff) / target.agent)),
-    seg('S5-S6 land and hold', m.editLanded, m.end, target.land + target.hold)
-  ]
-  // The open shot is real time plus a short hold on the opened project.
-  const open = segments[0]
-  const openLen = open.holdStart + (open.to - open.from)
-  open.holdEnd = Math.max(0.3, target.open - openLen)
-  const len = (s) => s.holdStart + (s.to - s.from) / s.speed + s.holdEnd
-  const at = (n) => segments.slice(0, n).reduce((a, s) => a + len(s), 0)
-  const duration = at(segments.length)
-  return {
-    segments,
-    duration,
-    times: {
-      // The prompt has arrived in the terminal: the end of the hand-off shot.
-      handOff: at(5) - 0.2,
-      // The end of the agent's (sped-up) work, just before the edit lands.
-      agentEnd: at(6) - 0.2,
-      still: at(6) + 0.5
-    }
-  }
-}
-
-/**
- * The filter graph that applies an edit and resamples to the loop's frame
- * rate. Output label `[out]`.
- *
- * @param {Segment[]} segments
- * @param {number} [fps]
- */
-export function editFilter(segments, fps = LOOP_FPS) {
+export function storyArgs({ input, segments, captions, hold, fade, content, video, fontFile = SYSTEM_FONT, output }) {
   if (!segments.length) throw new Error('empty edit')
+  const fps = video.fps
   const n = segments.length
   const parts = [`[0:v]split=${n}${segments.map((_, i) => `[s${i}]`).join('')}`]
   segments.forEach((s, i) => {
-    if (!(s.to > s.from)) throw new Error(`segment ${s.name ?? i} is empty`)
-    const speed = s.speed ?? 1
-    const f = [`trim=start=${s.from.toFixed(3)}:end=${s.to.toFixed(3)}`, `setpts=(PTS-STARTPTS)/${speed.toFixed(4)}`, `fps=${fps}`]
-    const hs = s.holdStart ?? 0
-    const he = s.holdEnd ?? 0
-    if (hs > 0 || he > 0) {
-      f.push(`tpad=start_mode=clone:start_duration=${hs.toFixed(3)}:stop_mode=clone:stop_duration=${he.toFixed(3)}`)
-    }
-    parts.push(`[s${i}]${f.join(',')}[v${i}]`)
+    if (!(s.to > s.from)) throw new Error(`segment ${i} is empty`)
+    parts.push(`[s${i}]trim=start=${s.from.toFixed(3)}:end=${s.to.toFixed(3)},setpts=(PTS-STARTPTS)/${s.speed},fps=${fps}[v${i}]`)
   })
-  parts.push(`${segments.map((_, i) => `[v${i}]`).join('')}concat=n=${n}:v=1:a=0,fps=${fps},setsar=1[out]`)
-  return parts.join(';')
+  parts.push(`${segments.map((_, i) => `[v${i}]`).join('')}concat=n=${n}:v=1:a=0,fps=${fps},setsar=1[cut]`)
+  // Captions: white on a dark box, centred in the title bar.
+  const y = Math.round((video.titleBar - video.labelSize) / 2)
+  const draws = captions.map(
+    (c) =>
+      `drawtext=fontfile=${fontFile}:textfile=${c.file}:fontsize=${video.labelSize}:fontcolor=white:box=1:boxcolor=black@0.78:boxborderw=4:x=(w-text_w)/2:y=${y}:enable='between(t,${c.from.toFixed(3)},${c.to.toFixed(3)})'`
+  )
+  parts.push(`[cut]${draws.length ? draws.join(',') : 'null'},split[a][b]`)
+  // The hold, plus the fade's length of the same frame for the cross-fade to run over.
+  parts.push(`[a]tpad=stop_mode=clone:stop_duration=${(hold + fade).toFixed(3)}[held]`)
+  parts.push(`[b]trim=end_frame=1,setpts=PTS-STARTPTS,tpad=stop_mode=clone:stop_duration=${fade.toFixed(3)}[first]`)
+  parts.push(`[held][first]xfade=transition=fade:duration=${fade.toFixed(3)}:offset=${(content + hold).toFixed(3)},format=yuv444p[out]`)
+  return ['-hide_banner', '-loglevel', 'error', '-y', '-i', input, '-filter_complex', parts.join(';'), '-map', '[out]', '-c:v', 'ffv1', '-an', output]
 }
 
-/** Raw recording → one lossless, edited source at the loop's size and rate. */
-export function demoSourceArgs({ input, segments, width = 1280, height = 800, output }) {
-  const graph = `${editFilter(segments)};[out]scale=${even(width)}:${even(height)}:flags=lanczos,format=yuv444p[src]`
-  return ['-hide_banner', '-loglevel', 'error', '-y', '-i', input, '-filter_complex', graph, '-map', '[src]', '-c:v', 'ffv1', '-an', output]
+/** The README video as an endless, silent, animated WebP at one quality (023-FR-010). */
+export function storyWebpArgs(input, output, quality) {
+  return ['-hide_banner', '-loglevel', 'error', '-y', '-i', input, '-c:v', 'libwebp_anim', '-lossless', '0', '-q:v', String(int(quality)), '-compression_level', '6', '-loop', '0', '-an', output]
 }
 
 /**
- * Encoder arguments per loop format (design encode table, R138-9). All three
- * read the same edited source.
- *
- * @param {'webp'|'gif'|'mp4'} format
+ * WebP qualities to try, best first (023-NFR-002: sharpness wins up to the
+ * size limit, so the first one that fits is kept).
  */
-export function loopArgs(format, input, output) {
-  const head = ['-hide_banner', '-loglevel', 'error', '-y', '-i', input]
-  switch (format) {
-    case 'webp':
-      return [...head, '-c:v', 'libwebp_anim', '-lossless', '0', '-q:v', '80', '-compression_level', '6', '-loop', '0', '-an', output]
-    case 'gif':
-      return [
-        ...head,
-        '-filter_complex',
-        // 32 colours: the UI is mostly greys, and the agent's scrolling output
-        // changes most of every frame, so a full palette put an 18 s loop at
-        // about 7.7 MB, over #139's 5 MiB cap (measured 2026-09-25: 256 →
-        // 7.7 MB, 64 → 5.2 MB, 32 → 3.8 MB). WebP is the preferred format.
-        '[0:v]split[a][b];[a]palettegen=max_colors=32:stats_mode=full[p];[b][p]paletteuse=dither=none:diff_mode=rectangle',
-        '-loop',
-        '0',
-        '-an',
-        output
-      ]
-    case 'mp4':
-      return [
-        ...head,
-        '-c:v',
-        'libx264',
-        '-pix_fmt',
-        'yuv420p',
-        '-crf',
-        '23',
-        '-preset',
-        'slow',
-        '-movflags',
-        '+faststart',
-        '-an',
-        output
-      ]
-    default:
-      throw new Error(`unknown loop format: ${format}`)
-  }
-}
+export const WEBP_QUALITIES = [90, 85, 80, 75, 70, 65, 60]
 
 /** One frame at a time `t` (seconds), optionally scaled to a width. */
 export function frameAtArgs(input, t, output, scaleWidth = null) {
   const vf = scaleWidth ? ['-vf', `scale=${even(scaleWidth)}:-2:flags=lanczos`] : []
   return ['-hide_banner', '-loglevel', 'error', '-y', '-ss', Math.max(0, t).toFixed(3), '-i', input, '-frames:v', '1', ...vf, output]
-}
-
-/** Frames by index into numbered PNGs (`pattern` holds `%04d`). */
-export function framesByIndexArgs(input, indexes, pattern) {
-  const expr = indexes.map((i) => `eq(n\\,${int(i)})`).join('+')
-  return ['-hide_banner', '-loglevel', 'error', '-y', '-i', input, '-vf', `select=${expr}`, '-fps_mode', 'passthrough', pattern]
 }
 
 /** A 1-fps contact sheet for the human review of the loop (never committed). */
@@ -256,17 +170,6 @@ export function webpPageAt(delays, t) {
     if (t < end) return i
   }
   return delays.length - 1
-}
-
-/**
- * The WebP pages the privacy pass reads: the page on screen at every second
- * of the loop, plus the first and last page (R138-11).
- */
-export function webpSamplePages(delays) {
-  const total = delays.reduce((a, d) => a + d, 0) / 1000
-  const set = new Set([0, delays.length - 1])
-  for (let t = 0; t < total; t += 1) set.add(webpPageAt(delays, t))
-  return [...set].sort((a, b) => a - b)
 }
 
 /** Run ffmpeg with an argument array; rejects with its stderr on failure. */

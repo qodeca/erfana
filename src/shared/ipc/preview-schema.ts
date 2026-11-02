@@ -405,13 +405,14 @@ export type PreviewOpenFileRequestedPayload = z.infer<typeof PreviewOpenFileRequ
 
 /**
  * `preview:forwardedShortcut` event payload — the 4 accelerators of §1.9, plus
- * Back and Forward (issue #124, part 3 §3.7). Exactly the keys of
- * `PREVIEW_FORWARDED_SHORTCUTS`; `previewInputForward.test.ts` compares them.
+ * Back and Forward (issue #124, part 3 §3.7), plus the comment stepper's pair
+ * (comments-v2 C-13). Exactly the keys of `PREVIEW_FORWARDED_SHORTCUTS`;
+ * `previewInputForward.test.ts` compares them.
  */
 export const PreviewForwardedShortcutSchema = z
   .object({
     panelId: PanelIdSchema,
-    key: z.enum(['f', 's', 'w', 'Escape', 'back', 'forward']),
+    key: z.enum(['f', 's', 'w', 'Escape', 'back', 'forward', 'comment-next', 'comment-previous']),
     accel: z.boolean()
   })
   .strict()

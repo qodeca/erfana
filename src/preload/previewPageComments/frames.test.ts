@@ -282,6 +282,6 @@ describe('frames in the controller (J-017)', () => {
     expect(lastStep(h, COMMENT_PICK_CHANNEL)).toBe('showing iframe#mine')
     // A key main no longer knows moves nothing.
     h.state({ mode: true, childFrames, focusFrame: 'k-gone' })
-    expect(drawnText(h.root()?.querySelector('.erf-hpc-label'))).toBe('iframe#mine · frame mine.html400×200')
+    expect(drawnText(h.root()?.querySelector('.erf-hpc-label'))).toBe('Section · frame mine.htmliframe#mine400×200')
   })
 })

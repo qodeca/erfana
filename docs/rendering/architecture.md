@@ -5,13 +5,15 @@
 ```
 Markdown Input
     ↓
-remarkGfm (GitHub Flavored Markdown)
+remarkGfm (GitHub Flavored Markdown), plus remarkBreaks when editor.preserveLineBreaks is on
     ↓
 remark-rehype (Convert to HTML AST)
     ↓
 rehypeRaw (Parse embedded HTML, preserve line info)
     ↓
 rehypeSanitize (Filter dangerous content)
+    ↓
+rehypeHeadingIds, rehypeShiftLines, rehypeCollectLinks (previewRehypePlugins.ts – heading ids, line offsets, link list)
     ↓
 hast-util-to-jsx-runtime (react-markdown 10 converts the hast tree to React elements)
     ↓
@@ -38,7 +40,7 @@ Uses hast-util-sanitize's defaultSchema (GitHub's safe defaults):
 ### Custom Components
 React components for enhanced functionality:
 - Block elements with line tracking
-- Image handling with attribute preservation
+- Image handling through `MarkdownImage.tsx` (project-relative images are read by the main process and shown as `data:` URLs)
 - Interactive HTML5 elements
 - Semantic markup support
 
@@ -85,7 +87,7 @@ are stripped even though the CSP would permit them.
 `img`, `picture`, `source`
 
 ### Formatting
-`strong`, `em`, `b`, `i`, `s`, `strike`, `code`, `tt`, `samp`, `var`, `kbd`, `q`,
+`a`, `strong`, `em`, `b`, `i`, `s`, `strike`, `code`, `tt`, `samp`, `var`, `kbd`, `q`,
 `del`, `ins`, `sub`, `sup`, `ruby`, `rt`, `rp`, `span`
 
 ### Not allowed – note these are silently *unwrapped*, not removed
@@ -117,7 +119,7 @@ not meant to be read – `<style>`, and likewise `<title>`, `<textarea>`, `<xmp>
 
 ## Line Tracking
 
-All elements include attributes for:
+The block elements `MarkdownPreview.tsx` overrides (paragraphs, lists, headings, tables, `div`, `details`, …) carry line-range attributes for:
 - Scroll synchronization
 - Context menu operations
 - Source mapping
@@ -129,16 +131,7 @@ Attributes:
 
 ## Performance
 
-### Impact
-- Bundle size: ~28KB (0.25% increase)
-- Runtime: 0-30% overhead for HTML-heavy docs
-- Typical documents: Negligible impact
-
-### Optimization Opportunities
-- Lazy HTML parsing
-- AST caching
-- Worker thread processing
-- Incremental rendering
+How and when the preview re-renders while you type (debounce for slow documents, `useDeferredValue`) is described in [Markdown Preview § When the preview updates](../editor/markdown-preview.md#when-the-preview-updates-deferred-preview).
 
 ## Related Documentation
 - [Implementation Details](./implementation.md)

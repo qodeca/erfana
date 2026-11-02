@@ -42,8 +42,8 @@ defects on its first run: a warning strip that was permanently visible because `
 | Path | What it is |
 |---|---|
 | `system/foundations/` | Colours, typography, spacing, surfaces and elevation, focus and keyboard, motion, layering, theme (dark only, text selection), terminal and code colours, forced colours, text highlights (`highlights.html`), writing, brand (`brand.html`) |
-| `system/components/` | Badges, buttons, feedback, form controls, icons, menu, permission band, rows and lists, segmented control (`segmented/`), splitter, status bar (`status-bar/`), tabs, toolbar, tooltip – one folder each, with its `index.html` card and its component CSS |
-| `system/patterns/` | Recurring flows built from components: the dialog, the drawer (`drawer/`), and the empty, loading and error states – one folder each, like a component |
+| `system/components/` | Badges, buttons, feedback, form controls, icons, menu, origin field (`origin-field/`), permission band, rows and lists, segmented control (`segmented/`), splitter, status bar (`status-bar/`), tabs, toolbar, tooltip – one folder each, with its `index.html` card and its component CSS |
+| `system/patterns/` | Recurring flows built from components: the dialog, the drawer (`drawer/`), the element picker (`picker/`), site prompts (`site-prompts/`), and the empty, loading and error states – one folder each, like a component |
 | `ds.css`, `fonts.css` | Hand-written page chrome for the documentation itself |
 | `claims.json` | The claims ledger: every count or ratio a card quotes, with the code that derives it |
 | `tokens.css`, `fonts/`, `index.html`, `deviations.html` | **Generated** by `scripts/design-sync.mjs` – never edit |
@@ -295,9 +295,10 @@ card should probably absorb.
 ### Component CSS: proposed or adopted
 
 **Proposed** – authored here, no home in `src/` yet: under `system/components/`, `badge/badge.css`,
-`button/button.css`, `feedback/feedback.css`, `form/form.css`, `menu/menu.css`, `row/row.css`, `segmented/segmented.css`,
-`splitter/splitter.css`, `status-bar/status-bar.css`, `tabs/tabs.css`, `toolbar/toolbar.css` and `tooltip/tooltip.css`; under
-`system/patterns/`, `dialog/dialog.css`, `drawer/drawer.css` and `states/states.css`. Each also sits in
+`button/button.css`, `feedback/feedback.css`, `form/form.css`, `menu/menu.css`, `origin-field/origin-field.css`, `row/row.css`,
+`segmented/segmented.css`, `splitter/splitter.css`, `status-bar/status-bar.css`, `tabs/tabs.css`, `toolbar/toolbar.css` and
+`tooltip/tooltip.css`; under `system/patterns/`, `dialog/dialog.css`, `drawer/drawer.css`, `picker/picker.css`,
+`site-prompts/site-prompts.css` and `states/states.css`. Each also sits in
 `PROPOSED_NOT_YET_ADOPTED` in `scripts/design-claims.test.mjs`, which fails on a stylesheet that is neither listed
 there nor synced. (`row.css` and `tabs.css` are *consolidations* when adopted: the app already ships their
 rules several times over, under several class names. Their headers carry the list.)
@@ -332,13 +333,12 @@ A card decides; the app has to catch up. Checked on 2026-10-28 against GitHub an
 | `design-tokens.css` spacing header | Says "4px base grid"; the scale steps by 2px (`design-tokens.css:268`) | [Spacing](system/foundations/spacing.html) |
 | `--color-border-warning` | Duplicates `--color-warning-border` – same value, two names (`design-tokens.css:263`) | [Feedback](system/components/feedback/index.html) |
 | Retired tokens | `--color-warning-bright`, `--color-warning-icon`, `--color-error-bright` and `--color-error-text-light` are still read by app stylesheets, `Toast.css:91` among them. How many stylesheets still read one is baked on the [Colours card](system/foundations/colors.html#retired) | [Colours](system/foundations/colors.html), [Feedback](system/components/feedback/index.html) |
-| Success and warning | `--color-success` (lime) and `--color-warning` (amber-yellow) are both yellow, and their fills and edges read alike – only the icon and the text separate them (`design-tokens.css:202`, `:209`). The card draws two proposed ways out | [Feedback](system/components/feedback/index.html) |
+| Success and warning | `--color-success` (lime) and `--color-warning` (amber-yellow) are both yellow, and their fills and edges read alike – only the icon and the text separate them (`design-tokens.css:175`, `:177`). The card draws two proposed ways out | [Feedback](system/components/feedback/index.html) |
 | Info | There are no `--color-info-*` tokens beyond `--color-info`: no info background or border, so an info banner borrows the accent (`CommentWindow.css:441`, a recorded exception) | [Feedback](system/components/feedback/index.html) |
 | Elevation | `--color-bg-elevated` resolves to the same colour as `--color-bg-secondary`, so a floating surface has no fill step from a panel (`design-tokens.css:84`) | [Surfaces and elevation](system/foundations/surfaces.html) |
 | Control heights | The button heights and the field heights do not pair, so a button beside a field never lines up. Both scales are baked on their cards: [Buttons § heights](system/components/button/index.html#heights), [Form controls § sizes](system/components/form/index.html#sizes) | [Buttons](system/components/button/index.html), [Form controls](system/components/form/index.html) |
 | [#431](https://github.com/qodeca/erfana/issues/431) | Deleting a file or folder is permanent (`rm`), with no way back. The owner chose the system trash on 2026-10-28; the Dialog card keeps "deleted permanently" until the app changes | Dialog |
 | [#432](https://github.com/qodeca/erfana/issues/432) | Success and warning banners share an olive tint, because `--color-success` is the brand lime. The owner chose a distinct green on 2026-10-28; it needs a `design-tokens.css` change | Feedback |
-| Menu item reason line | The Menu card lets an item carry a visible reason line (`aria-describedby`), but `ContextMenu.tsx:26` has no field for it, so the comment menu's disabled "Can't comment here" ships with no reason (`PreviewCommentsLayer.tsx:111`) | [Menu](system/components/menu/index.html) |
 | Comment field against the Form card | The comment window keeps its own copy of the field rules (`erf-comment-*`); its hover darkens the border instead of brightening it and also reacts on read-only fields (`CommentWindow.css:300`); the too-long message types "4,000" instead of reading `COMMENT_MAX_CHARS` (`commentCopy.ts:279`) | [Form controls](system/components/form/index.html) |
 | Confirm inside the list clamp | `.erf-band__confirm` renders inside `.erf-band__scroll`, whose height is clamped (`PreviewChromeBand.css:215`). With one row and the question, the content is taller than the clamp, and at a narrower band Cancel and Confirm are cut and must be scrolled to – against "one question, on screen in full". The card's frames draw what ships and give the measurements | [Permission band](system/components/permission-band/index.html) |
 | Renamed folder dot | `.git-status-dot[data-git-status="renamed"]` paints `--color-git-renamed`, which fails 3:1 on the sidebar; the badge and the file name already use `--color-git-renamed-light` (`ProjectTree/ProjectTree.css:620`) | [Colours](system/foundations/colors.html) |
@@ -347,19 +347,18 @@ A card decides; the app has to catch up. Checked on 2026-10-28 against GitHub an
 | Tab close button | Hidden with `opacity: 0` and shown only on hover or when dirty (`Tabs/EditorTab.css:112`, `:118`, `:123`) – never for keyboard focus and never on the selected tab | [Tabs](system/components/tabs/index.html) |
 | Toolbar keyboard | `role="toolbar"` with no roving `tabindex` and no arrow keys (`MarkdownToolbar.tsx:130`, `MermaidToolbar.tsx:110`, `ImageViewerToolbar.tsx:173`) | [Toolbar](system/components/toolbar/index.html) |
 | Toolbar view mode | The current view mode is a `.active` class with no `aria-pressed`, so a screen reader cannot tell which mode is on (`MarkdownToolbar.tsx:291`) | [Toolbar](system/components/toolbar/index.html) |
-| Toolbar literals | `MarkdownToolbar.css` types its button height (`:72`, `:102`) and its separator width (`:126`) as pixel literals, off the button scale and the border token | [Toolbar](system/components/toolbar/index.html) |
+| Toolbar literals | `MarkdownToolbar.css` types its separator width as a pixel literal, off the border token | [Toolbar](system/components/toolbar/index.html) |
 | Dialog backdrop not inert | The page behind a modal is not `inert`; only Tab is trapped, so a pointer or a screen reader's virtual cursor still reaches it (`Dialog/BaseDialog.tsx:677` sets `aria-modal` only) | [Dialog](system/patterns/dialog/index.html) |
 | Dialog scrolls as a whole | `.dialog-container` caps its height in `vh` and scrolls itself (`Dialog/Dialog.css:60`–`61`), so a long body scrolls the title and the buttons away | [Dialog](system/patterns/dialog/index.html) |
 | Dialog name untested | `BaseDialog` does not require `aria-labelledby`, and no shared test fails if a dialog ships without a name; only some dialogs' own tests check it (`CameraDialog.test.tsx:823`) | [Dialog](system/patterns/dialog/index.html) |
 | Tooltip not hoverable | `pointer-events: none` on the shipping tooltips (`Dialog/Dialog.css:411`, `DiagramViewer/ChatBubble.css:349`) – the pointer cannot move onto them, which fails SC 1.4.13 | [Tooltip](system/components/tooltip/index.html) |
-| `title` as the only name | Icon buttons named only by `title=`, for example `TerminalToolbar.tsx:170` – no name on keyboard focus or touch | [Tooltip](system/components/tooltip/index.html) |
-| No selection colour | No renderer stylesheet declares `::selection`, so selected text takes the OS accent and the terminal its own colour | [Theme](system/foundations/theme.html) |
+| `title` as the only name | Icon buttons named only by `title=`, for example the Mermaid error's bug-report button (`Editor/MermaidDiagram.tsx:302`) – no name on keyboard focus or touch | [Tooltip](system/components/tooltip/index.html) |
+| No selection colour | No app-wide `::selection` rule. The renderer has two scoped ones: xterm's, which hides text selected in its screen-reader tree, and the Markdown preview's (`CommentOverlayLayer.css`). Other selected text takes the OS accent and the terminal its own colour | [Theme](system/foundations/theme.html) |
 | Selection-policy count | The `utilities.css:26` comment names two CSS-module surfaces that set `user-select: text`; `ImageViewerPanel.module.css` sets it on four (`:117`, `:307`, `:409`, `:518`) | [Theme](system/foundations/theme.html) |
 | Two terminal themes | `TERMINAL_THEME` (`terminalPanel.logic.ts:56`) and `XTERM_OPTIONS.theme` (`useXtermSession.ts:64`) carry the same palette twice; only the second ships, and the first carries scrollbar colours that are never applied | [Terminal and code colours](system/foundations/terminal.html) |
 | Terminal palette literals | The background, the selection, `theme.cursor` and `cursorAccent` (overridden by `--color-cursor` in CSS), the default text and the 16 ANSI colours are hex (`useXtermSession.ts:65`–`85`), so no token change reaches them. On the black background red, blue and bright black fall below 4.5:1 | [Terminal and code colours](system/foundations/terminal.html) |
 | Terminal header border | The header's bottom border is a literal translucent white, not `--color-border-default` (`TerminalPanel.css:26`) | [Terminal and code colours](system/foundations/terminal.html) |
 | Terminal scrollbar hover | `--color-gray-600` in the terminal (`TerminalPanel.css:160`) against `--scrollbar-thumb-hover` everywhere else | [Terminal and code colours](system/foundations/terminal.html) |
-| Shortcut notation | `commentCopy.ts:46` types "Cmd+Option+M" for macOS while `formatShortcut` renders the glyph form (⌥⌘M) everywhere else | [Writing](system/foundations/writing.html) |
 | Activity bar badge | `ActivityBarBadge.tsx:12` carries its full value only in `title`, not in the item's name | [Badges, chips and keys](system/components/badge/index.html) |
 | Hover lifts under reduced motion | Buttons move on hover with `transform` and no reduced-motion block: `Dialog/Dialog.css:171`, `:198`, `FileConflictNotification.css:87`, `DiagramViewer/ChatBubble.css:33` | [Motion](system/foundations/motion.html) |
 | No shared spinner | Every spinner is a local copy of its own keyframes; the Motion card bakes the count | [Motion](system/foundations/motion.html) |
@@ -367,7 +366,6 @@ A card decides; the app has to catch up. Checked on 2026-10-28 against GitHub an
 | Load error looks empty | `EditorLoadError` uses the empty state's class (`Panels/EditorLoadError.tsx:36`), so a failure looks exactly like nothing to show | [Empty, loading and error states](system/patterns/states/index.html) |
 | Crash heading | "Erfana stopped unexpectedly." is a heading that ends with a full stop; the Writing card puts no full stop on a title (`RootErrorFallback.tsx:55`, `RootErrorBoundary.tsx:61`) | [Empty, loading and error states](system/patterns/states/index.html), [Writing](system/foundations/writing.html) |
 | Em dashes in shipped strings | The permission band's confirm sentence and approval failures, its truncation line, and the clipboard toast use an em dash (`PreviewBandConfirm.tsx:169`–`170`, `permissionBand.logic.ts:354`–`372`, `PreviewChromeBand.tsx:420`, `textClipboard.ts:44`–`46`) | [Writing](system/foundations/writing.html) |
-| "block" in comment strings | "Delete block", "Delete block…" and "This block contains git conflict markers" use a word the Writing card keeps out of the UI (`commentCopy.ts:251`, `:252`, `:257`) | [Writing](system/foundations/writing.html) |
 | User guide shortcut notation | `docs/user-guide` writes one box per key with spelled-out modifiers (`<kbd>Cmd</kbd>+<kbd>B</kbd>`), against the card's one box per chord. **Owner decision pending** on which one changes | [Writing](system/foundations/writing.html) |
 | Unicode marks | "Allowed ✓" reads the glyph aloud (`PreviewBandRow.tsx:64`); emoji marks ship in the terminal error state and broken links (`TerminalStatusContent.tsx:71`, `markdownLinkResolver.ts:407`) | [Icons](system/components/icon/index.html) |
 
@@ -377,6 +375,7 @@ A card decides; the app has to catch up. Checked on 2026-10-28 against GitHub an
 |---|---|
 | [#90](https://github.com/qodeca/erfana/issues/90) | The context menu now implements the menu keyboard contract (closed, completed) |
 | [#91](https://github.com/qodeca/erfana/issues/91) | Dialogs claiming `aria-modal` now trap focus through `BaseDialog` (closed, completed) |
+| Menu item reason line | `ContextMenuItem` carries an optional `reason`, drawn as the Menu card's reason line with `aria-labelledby` and `aria-describedby` (`ContextMenu/ContextMenu.tsx`); the comment menus keep each item's action name, disabled with its reason (spec 024 menu matrix) – the old disabled "Can't comment here" with no reason is gone |
 
 **Say this plainly rather than letting the folder imply otherwise:** every open row still ships. A complete
 design system is not an accessible app – it is the specification an accessible app can be built against.

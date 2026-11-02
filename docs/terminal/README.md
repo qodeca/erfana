@@ -343,7 +343,7 @@ Three complementary mechanisms ensure scroll lock works reliably:
 **Architecture** (Pure Logic Extraction):
 - `useScrollLock.ts`: Hook encapsulating all three blocking mechanisms
 - `useTerminalStore.scrollLocked`: Global boolean state (single terminal architecture)
-- `TerminalPortalContext.TerminalControls`: `isScrollLocked()`, `toggleScrollLock()` for ChatBubble access
+- `TerminalPortalContext.TerminalControls`: `isScrollLocked()`, `toggleScrollLock()`; ChatBubble itself reads and sets `useTerminalStore.scrollLocked` directly
 
 **Coordination**:
 - When lock engages, calls `resetAll()` from `useScrollAnomalyRecovery` to clear recovery queue
@@ -382,8 +382,9 @@ Automatic scroll to bottom 1 second after executing prompt templates, respecting
 - `src/renderer/src/utils/promptScrollScheduler.logic.ts` (144 lines)
 - `src/renderer/src/utils/promptScrollScheduler.logic.test.ts` (873 lines, 39 tests)
 
-**Integration Points** (6 call sites):
+**Integration Points** (7 call sites in 6 files):
 - PreviewContextMenu (Explain, Modify, Ask)
+- EditorContextMenu (the same prompts from the Monaco editor)
 - ChatBubble (diagram chat + direction changes)
 - MermaidToolbar (direction buttons)
 - MermaidDiagram (bug report)
@@ -421,7 +422,7 @@ See [Scroll Fixes](./scroll-fixes.md) for related scroll preservation features.
 - `COLORTERM='truecolor'` - True color support
 
 **Shell Arguments** (Platform-Specific):
-- **macOS/Linux**: `-l` (login shell) - Sources RC files (.zprofile, .bash_profile) to load environment, Homebrew paths, and user configuration
+- **macOS/Linux**: `-c '<bootstrap>'`, whose last step is `exec -l "$SHELL" -i` (login interactive shell) - sources RC files (.zprofile, .bash_profile) to load environment, Homebrew paths, and user configuration
 - **Windows (PowerShell)**: `-NoLogo -NoProfile -NoExit` - One process: the bootstrap script sets the cwd, then dot-sources the user's profiles itself, and `-NoExit` keeps the same shell interactive (see [Bootstrap Pattern](./bootstrap-pattern.md))
 - **Windows (cmd.exe)**: `/D /S /K "…"`, passed as one ready-made command line rather than an argument array (v0.22.0 – the quoted array form left Command Prompt terminals blank). The shell starts in the validated project folder; see [Bootstrap Pattern § cmd.exe](./bootstrap-pattern.md#cmdexe)
 
@@ -522,11 +523,11 @@ Output reaches `onData` in batches (every 8 ms or at 64 KiB per terminal, in ord
 - `useTerminalFileDrop.ts` - External file drops onto the panel (document-level capture listeners, attached and detached by the session)
 - `useTerminalDragDrop.ts` - Deprecated, not used by the panel; use `useTerminalFileDrop`
 - `useScreenshotCapture.ts` - Cross-platform screenshot capture workflow (full-screen, window and area modes; #164)
-- `useTerminalResize.ts` - ResizeObserver-based terminal resize
-- `useTerminalPortal.ts` - DOM portal management for xterm
+- `useTerminalResize.ts` - ResizeObserver-based terminal resize; exported but not used by the panel, which keeps its own `ResizeObserver` in `TerminalPanel.tsx`
+- `useTerminalPortal.ts` - DOM portal management for xterm; exported but not used by the panel (the panel uses `useTerminalPortalOptional` from `context/TerminalPortalContext.tsx`)
 
 **Extracted Components** (`src/renderer/src/components/Panels/TerminalPanel/components/`):
-- `TerminalToolbar.tsx` - Screenshot, scroll, restart buttons
+- `TerminalToolbar.tsx` - Screenshot, scroll, restart buttons; exported but not rendered – the panel header buttons are written inline in `TerminalPanel.tsx`
 - `TerminalStatusContent.tsx` - Status state display (unavailable, loading, error)
 
 **Supporting Files**:
@@ -544,7 +545,7 @@ See [Terminal Architecture Review](https://github.com/qodeca/erfana/blob/1d814e0
 - WebGL addon loaded AFTER `xterm.open()` (order matters)
 - ResizeObserver for panel drag handling
 - useRef pattern to avoid useEffect cleanup issues
-- Clean screen on mount (`\x1b[2J\x1b[H`)
+- Clean screen and scrollback on mount (`\x1b[2J\x1b[3J\x1b[H`, `CLEAR_SEQUENCE` in `useXtermSession.ts`)
 
 **Critical Implementation Detail**: Terminal cleanup uses `useRef` for `terminalId` instead of including it in `useEffect` dependencies. Including `terminalId` in deps causes cleanup to run on ID change, disposing xterm before it can render. The cleanup effect depends only on `isAvailable` (and the session's stable `start` / `teardownTerminal`).
 
@@ -576,7 +577,7 @@ interface TerminalStore {
 
 ### Bracketed Paste Mode (v0.7.2+, #108)
 
-Terminal prompt writes are wrapped in **bracketed paste mode** escape sequences to prevent shell interpretation of pasted text:
+Multi-line terminal prompt writes are wrapped in **bracketed paste mode** escape sequences (line endings become `\r`) to prevent shell interpretation of pasted text; single-line text is written as is:
 
 ```
 \x1b[200~ ... text ... \x1b[201~
@@ -584,7 +585,7 @@ Terminal prompt writes are wrapped in **bracketed paste mode** escape sequences 
 
 Without bracketed paste, multi-line text or text containing special characters (e.g., `!`, `$`, newlines) could be interpreted by the shell as commands. The bracketed paste wrapper tells the shell to treat the entire block as literal paste content.
 
-**Implementation**: `useTerminalStore.sendToTerminal()` wraps the text payload before writing to the PTY.
+**Implementation**: `useTerminalStore.sendToTerminal()` wraps the text payload before writing to the PTY when it contains a line break.
 
 ## Addons
 
@@ -609,7 +610,7 @@ There is **no** "Send selection to terminal" item. Selected text reaches the ter
 through a prompt template: right-clicking a selection in the preview (or in the Monaco
 editor) offers **Explain**, **Modify**, **Ask**, **Visualize** and **Prompt**, plus
 **Copy selection**. Each prompt renders its template with the selection, pastes the result
-into the terminal in bracketed-paste mode and presses Enter automatically
+into the terminal (in bracketed-paste mode when it spans lines) and presses Enter automatically
 (`autoExecute`). See [Prompt Templates](../prompts/README.md).
 
 ### Keyboard Shortcuts

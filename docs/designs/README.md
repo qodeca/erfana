@@ -58,6 +58,7 @@ also `inert`.
 
 | Folder | Functionality |
 | --- | --- |
+| [`browser/`](browser/README.md) | The built-in browser tab (spec 025): tab and toolbar, picking, prompt actions, site prompts, page states, menus and data |
 | [`clipboard/`](clipboard/README.md) | The central text-clipboard service |
 | [`comments/`](comments/README.md) | Comments in the HTML and Markdown previews, including comments on selected text, with their screens |
 | [`context-meter/`](context-meter/README.md) | The Claude Code context-window meter and status bar |

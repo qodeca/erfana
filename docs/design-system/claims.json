@@ -923,7 +923,7 @@
     "ext": [
       ".ts"
     ],
-    "includePath": "comments/commentFormat\\.ts$",
+    "includePath": "Comments/commentFormat\\.ts$",
     "match": "export const COMMENT_MAX_CHARS = ([0-9_]+)\\b",
     "group": 1
   },
@@ -935,7 +935,7 @@
     "ext": [
       ".ts"
     ],
-    "includePath": "comments/commentFormat\\.ts$",
+    "includePath": "Comments/commentFormat\\.ts$",
     "match": "export const COMMENT_WARN_CHARS = ([0-9_]+)\\b",
     "group": 1
   },
@@ -1002,12 +1002,12 @@
   "drawer-full-below-px": {
     "kind": "capture",
     "card": "system/patterns/drawer/index.html",
-    "label": "DRAWER_FULL_BELOW_PX in useDrawerSheet.ts – host width in px below which the comment drawer goes full width",
+    "label": "DRAWER_FULL_BELOW_PX in useNarrowPanel.ts – host width in px below which the comment drawer goes full width",
     "dir": "src/renderer",
     "ext": [
       ".ts"
     ],
-    "includePath": "comments/useDrawerSheet\\.ts$",
+    "includePath": "Comments/useNarrowPanel\\.ts$",
     "match": "export const DRAWER_FULL_BELOW_PX = ([0-9]+)\\b",
     "group": 1
   },
@@ -1019,7 +1019,7 @@
     "ext": [
       ".css"
     ],
-    "includePath": "comments/CommentDrawer\\.css$",
+    "includePath": "Comments/CommentDrawer\\.css$",
     "match": "min-inline-size:\\s*([1-9][0-9]*)px",
     "group": 1
   },
