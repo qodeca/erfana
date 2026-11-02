@@ -32,6 +32,7 @@
     "check:headers": "node scripts/check-spdx-headers.mjs",
     "check:links": "node scripts/check-links.mjs",
     "check:claims": "node scripts/check-claims.mjs",
+    "check:trace:025": "node scripts/check-spec025-trace.mjs",
     "lint:docs": "npm run lint:docs:prose && npm run lint:docs:markdown && npm run lint:docs:links",
     "lint:docs:prose": "vale --minAlertLevel=error README.md docs/user-guide docs/getting-started.md docs/keyboard-shortcuts.md docs/settings.md docs/troubleshooting.md docs/quick-reference.md",
     "lint:docs:markdown": "markdownlint-cli2",
