@@ -14,6 +14,7 @@ import { pathToFileURL } from 'url'
 import type { IpcMainInvokeEvent } from 'electron'
 import { SCREENSHOT_CHANNELS } from '../../shared/ipc/screenshot-channels'
 import type { IScreenshotService } from '../services/ScreenshotService'
+import { createFakeWebContents, type FakeWebContents } from './__test-helpers__/appSender'
 
 // electron-vite declares ELECTRON_RENDERER_URL read-only; this file sets and clears it.
 const writableEnv: Record<string, string | undefined> = process.env
@@ -28,6 +29,25 @@ vi.mock('electron', () => ({
 const mockIs = { dev: false }
 vi.mock('@electron-toolkit/utils', () => ({ is: mockIs }))
 
+// The handlers' own check is the shared `isTrustedSender`, which the global
+// setup stubs to `true`; this suite asserts its refusals, so it runs the real
+// one. The outer registry gate (`isTrustedAppSender`) stays stubbed, as it was
+// when this suite was written – registry.test.ts proves that gate.
+//
+// A factory result survives `vi.resetModules()`, so `real` keeps the
+// `appWebContents` copy it loaded first; the factory captures that copy's
+// register function, so senders are registered where the predicate looks.
+const identity = vi.hoisted(() => ({
+  register: (_wc: unknown): void => {
+    throw new Error('senderValidation not loaded yet')
+  }
+}))
+vi.mock('./senderValidation', async (importOriginal) => {
+  const real = await importOriginal<typeof import('./senderValidation')>()
+  identity.register = (await import('./appWebContents')).registerAppWebContents as (wc: unknown) => void
+  return { ...real, isTrustedAppSender: () => true }
+})
+
 const RENDERER_FILE_URL = pathToFileURL(join(__dirname, '../renderer/index.html')).href
 
 const mockLogger = {
@@ -40,8 +60,20 @@ const mockLogger = {
 }
 vi.mock('../services/LoggingService', () => ({ logger: mockLogger }))
 
-function makeEvent(frame: { url: string; parent: unknown } | null): IpcMainInvokeEvent {
-  return { senderFrame: frame } as unknown as IpcMainInvokeEvent
+/**
+ * Build an event from a registered Erfana window, or from `sender` when given –
+ * an unregistered one stands in for a browser tab (025-NFR-001).
+ */
+function makeEvent(
+  frame: { url: string; parent: unknown } | null,
+  sender?: FakeWebContents
+): IpcMainInvokeEvent {
+  let from = sender
+  if (!from) {
+    from = createFakeWebContents()
+    identity.register(from)
+  }
+  return { senderFrame: frame, sender: from } as unknown as IpcMainInvokeEvent
 }
 
 const TRUSTED_FRAME = { url: RENDERER_FILE_URL, parent: null }
@@ -114,5 +146,25 @@ describe('screenshot-handlers — getScreenPermission', () => {
     expect(result).toBe('unknown')
     expect(service.getScreenRecordingPermission).not.toHaveBeenCalled()
     expect(mockLogger.warn).toHaveBeenCalled()
+  })
+  it('returns "unknown" for the exact renderer URL from an unregistered webContents', async () => {
+    const service = stubService()
+    const handler = await getHandler(SCREENSHOT_CHANNELS.GET_SCREEN_PERMISSION, service)
+
+    const result = await handler(makeEvent(TRUSTED_FRAME, createFakeWebContents()))
+
+    expect(result).toBe('unknown')
+    expect(service.getScreenRecordingPermission).not.toHaveBeenCalled()
+  })
+
+  it('returns "unknown" for a registered overlay window on its route hash', async () => {
+    // The overlays are app windows, but these channels are the main renderer's.
+    const service = stubService()
+    const handler = await getHandler(SCREENSHOT_CHANNELS.GET_SCREEN_PERMISSION, service)
+
+    const result = await handler(makeEvent({ url: `${RENDERER_FILE_URL}#/overlay`, parent: null }))
+
+    expect(result).toBe('unknown')
+    expect(service.getScreenRecordingPermission).not.toHaveBeenCalled()
   })
 })

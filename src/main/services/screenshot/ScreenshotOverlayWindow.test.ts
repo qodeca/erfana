@@ -23,6 +23,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
+import { createFakeWebContents } from '../../ipc/__test-helpers__/appSender'
+import { isAppWebContents } from '../../ipc/appWebContents'
 
 // electron-vite declares ELECTRON_RENDERER_URL read-only; this file sets and clears it.
 const writableEnv: Record<string, string | undefined> = process.env
@@ -62,7 +64,16 @@ function makeWindow() {
       frameIpcListeners[channel] = (frameIpcListeners[channel] ?? []).filter((l) => l !== listener)
     })
   }
+  // Identity members come from a plain fake, not vi.fn, so the suite's
+  // `vi.resetAllMocks()` cannot strip them (the overlay registers its
+  // webContents in the IPC identity set – spec 025, 025-NFR-001).
+  const identity = createFakeWebContents()
   const webContents = {
+    id: identity.id,
+    isDestroyed: identity.isDestroyed,
+    once: identity.once,
+    /** Fire 'destroyed', as Electron does when the overlay is torn down. */
+    destroyIdentity: identity.destroy,
     getURL: mockGetURL,
     on: vi.fn(),
     mainFrame: { ipc: frameIpc }
@@ -347,6 +358,24 @@ describe('AreaSelectOverlay.selectArea', () => {
 
     emitCancelled(windowInstances[0])
     await promise
+  })
+
+  it('registers each overlay webContents as an Erfana window, and drops it when destroyed', async () => {
+    // The overlay sends the global `logging:log`, so the app gate must trust it
+    // by identity; a closed overlay must stop being trusted.
+    const { AreaSelectOverlay } = await import('./ScreenshotOverlayWindow')
+    const overlay = new AreaSelectOverlay()
+
+    const promise = overlay.selectArea()
+    await vi.waitFor(() => expect(BrowserWindowCtor).toHaveBeenCalled())
+
+    const { webContents } = windowInstances[0]
+    expect(isAppWebContents(webContents)).toBe(true)
+
+    emitCancelled(windowInstances[0])
+    await promise
+    webContents.destroyIdentity()
+    expect(isAppWebContents(webContents)).toBe(false)
   })
 
   it('handles multi-display rounds — token-matched send from one overlay resolves the round (#164 round-2 F#23)', async () => {

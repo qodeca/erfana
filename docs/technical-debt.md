@@ -690,7 +690,9 @@ One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns 
 
 **Update (recorded 2026-10-25)**: since 2026-08-29 `senderValidation.ts` also exports `isTrustedAppSender`, the route-tolerant variant the process-wide gate in `registry.ts` uses, so there are four predicates to keep in step: `isTrustedSender` and `isTrustedAppSender` (`senderValidation.ts`), the local `isTrustedSender` in `claude-status-handlers.ts`, and `isTrustedPreviewSender`.
 
-**Status**: Pre-existing debt carried into #74; recorded from design §7.1.
+**Update (spec 025 commit 1, 2026-11)**: consolidated. `claude-status-handlers.ts`, `screenshot-handlers.ts` and `preview/isTrustedPreviewSender.ts` now call the shared `isTrustedSender`; their copies are gone. Every predicate in `senderValidation.ts` also requires the sender to be a registered Erfana window (`src/main/ipc/appWebContents.ts`, 025-NFR-001).
+
+**Status**: Resolved by spec 025 commit 1 (`feature/built-in-browser`). Pre-existing debt carried into #74; recorded from design §7.1.
 
 ---
 

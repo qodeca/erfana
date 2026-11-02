@@ -61,6 +61,7 @@ import {
 } from '../../../shared/ipc/screenshot-channels'
 import { AreaSelectionSchema, type AreaSelection } from '../../../shared/ipc/screenshot-schema'
 import { logger } from '../LoggingService'
+import { registerAppWebContents } from '../../ipc/appWebContents'
 
 const OVERLAY_PRELOAD_RELATIVE = '../preload/screenshotOverlay.js'
 
@@ -326,6 +327,11 @@ export class AreaSelectOverlay {
         nodeIntegrationInSubFrames: false
       }
     })
+    // The overlay renders Erfana's own UI and sends one global channel
+    // (`logging:log`), so it joins the identity set the IPC gates check (spec
+    // 025, 025-NFR-001). It still fails the exact-URL handler gates: it loads
+    // the renderer entry with a route hash.
+    registerAppWebContents(overlay.webContents)
     overlay.setAlwaysOnTop(true, 'screen-saver')
     overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
 

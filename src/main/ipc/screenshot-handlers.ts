@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import type { IpcMainInvokeEvent } from 'electron'
-import { join } from 'path'
-import { pathToFileURL } from 'url'
-import { is } from '@electron-toolkit/utils'
 import { createScreenshotService, type IScreenshotService } from '../services/ScreenshotService'
 import { SCREENSHOT_CHANNELS } from '../../shared/ipc/screenshot-channels'
 import {
@@ -17,35 +14,21 @@ import {
 } from '../../shared/ipc/screenshot-schema'
 import { logger } from '../services/LoggingService'
 import { registerHandle } from './registry'
-
-/**
- * Canonical `file://` URL of the bundled renderer entry point — mirrors the
- * exact `mainWindow.loadFile` call in `src/main/index.ts`. Used by
- * `validateMainRendererSender` to pin senders to the top-level main
- * renderer in production.
- */
-const RENDERER_FILE_URL = pathToFileURL(join(__dirname, '../renderer/index.html')).href
+import { isTrustedSender } from './senderValidation'
 
 /**
  * Verify a public screenshot IPC came from the main renderer's top-level
  * frame (#164 round-2 F#40). Sub-frames, the per-display overlay windows,
- * and any unexpected origin are rejected. Mirrors the same predicate the
- * clipboard handler uses (see `clipboard-handlers.ts`).
+ * and any unexpected origin are rejected.
+ *
+ * Delegates to the shared {@link isTrustedSender} (spec 025 commit 1): the
+ * sender must be a registered Erfana window, and its URL must be the exact
+ * renderer entry. The overlays are registered windows, but they load the entry
+ * with a route hash, so the exact-URL rule still keeps them out of these
+ * channels.
  */
 function validateMainRendererSender(event: IpcMainInvokeEvent): boolean {
-  const frame = event.senderFrame
-  if (!frame || frame.parent !== null) return false
-
-  const senderUrl = frame.url
-  const devUrl = process.env['ELECTRON_RENDERER_URL']
-  if (is.dev && devUrl) {
-    try {
-      return new URL(senderUrl).origin === new URL(devUrl).origin
-    } catch {
-      return false
-    }
-  }
-  return senderUrl === RENDERER_FILE_URL
+  return isTrustedSender(event)
 }
 
 /**

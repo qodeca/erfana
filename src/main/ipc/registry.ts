@@ -38,7 +38,17 @@
  * never touch global `ipcMain`, are scoped to one `WebContents`, and already
  * carry their own per-call token or frame check.
  *
+ * WHAT THE GATE CHECKS. Identity plus URL, never URL alone (spec 025,
+ * 025-NFR-001). `isTrustedAppSender` requires the sending `webContents` to be
+ * one of Erfana's own windows – registered in `appWebContents.ts` where the
+ * window is created – AND the top-level frame to be at the renderer entry URL.
+ * A URL only says what a frame loaded; a browser tab that loaded the renderer
+ * entry file would carry the same URL, but it is not a registered window, so
+ * it is refused. The URL check stays as an extra condition, so a registered
+ * window that navigated away is refused too.
+ *
  * @see src/main/ipc/senderValidation.ts — the predicate
+ * @see src/main/ipc/appWebContents.ts — the identity set
  * @see docs/designs/html-preview/sd-074b-preview-navigation-and-multiview.md §7
  */
 import { ipcMain } from 'electron'
@@ -94,7 +104,7 @@ function describeSender(event: IpcMainEvent | IpcMainInvokeEvent): string {
   }
 }
 
-/** Record a message from a sender that is not the app's own top-level renderer. */
+/** Record a message from a sender that is not an Erfana window's top-level renderer. */
 function rejected(channel: string, event: IpcMainEvent | IpcMainInvokeEvent): void {
   logger.warn('Rejected IPC from untrusted sender', {
     channel,

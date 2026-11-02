@@ -48,6 +48,7 @@ import { globalSettingsService } from './services/GlobalSettingsService'
 import { loggingService, logger } from './services/LoggingService'
 import { logNodePtyBinding } from './utils/logNodePtyBinding'
 import { createQuitGuard } from './utils/quitGuard'
+import { disposeWithin } from './utils/disposeWithin'
 import { armLastResortExit, LAUNCHER_WAIT_MS, runQuitSequence, waitBounded } from './utils/quitSequence'
 import { QUIT_TRACE_FILE, startConptyHostReaper } from './services/conptyHostReaper'
 import { gitWatcherService } from './services/GitWatcherService'
@@ -61,6 +62,7 @@ import { registerProcessCrashLogging } from './utils/processCrashLogging'
 import { writeCrashFallbackLine } from './utils/crashFallbackLog'
 import { isBenignShutdownTimerError } from './utils/isBenignShutdownTimerError'
 import { installDefaultSessionPermissions } from './services/session/defaultSessionPermissions'
+import { registerAppWebContents } from './ipc/appWebContents'
 import {
   registerAppCrashLogging,
   registerWindowErrorSignals,
@@ -224,6 +226,7 @@ function createWindow(): BrowserWindow {
     }
   })
 
+  registerAppWebContents(mainWindow.webContents) // IPC gates trust it by identity (025-NFR-001)
   // Log renderer hangs for this window (log-only — see rendererCrashHandlers).
   registerWindowResponsiveness(mainWindow)
 
@@ -678,44 +681,6 @@ const SHUTDOWN_TIMEOUT_MS = 2_000
  */
 const LOCK_DISPOSE_TIMEOUT_MS = 1_000
 const quitGuard = createQuitGuard()
-
-/**
- * Runs one disposer and returns when it settles or when `timeoutMs` elapses,
- * whichever is first. Never rejects: shutdown must always reach `app.exit(0)`.
- *
- * @param label - Disposer name, used in the log line
- * @param dispose - The disposer to run
- * @param timeoutMs - Upper bound on how long to wait
- */
-async function disposeWithin(
-  label: string,
-  dispose: () => Promise<void>,
-  timeoutMs: number
-): Promise<void> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-
-  const settled = Promise.resolve()
-    .then(dispose)
-    .then(() => 'settled' as const)
-    .catch((err) => {
-      logger.warn(`App quit: ${label} threw`, {
-        error: err instanceof Error ? err.message : String(err)
-      })
-      return 'settled' as const
-    })
-
-  const outcome = await Promise.race([
-    settled,
-    new Promise<'timeout'>((resolve) => {
-      timer = setTimeout(() => resolve('timeout'), timeoutMs)
-    })
-  ])
-
-  if (timer !== undefined) clearTimeout(timer)
-  if (outcome === 'timeout') {
-    logger.warn(`App quit: ${label} timed out`, { timeoutMs })
-  }
-}
 
 /**
  * Shutdown-scoped uncaught-exception guard.

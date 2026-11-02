@@ -15,6 +15,11 @@ import { pathToFileURL } from 'url'
 import type { IpcMainInvokeEvent } from 'electron'
 import { CLIPBOARD_CHANNELS } from '../../shared/ipc/clipboard-channels'
 import { CLIPBOARD_MAX_TEXT_LENGTH } from '../../shared/ipc/clipboard-schema'
+import {
+  createFakeWebContents,
+  registerInCurrentModule,
+  type FakeWebContents
+} from './__test-helpers__/appSender'
 
 // electron-vite declares ELECTRON_RENDERER_URL read-only; this file sets and clears it.
 const writableEnv: Record<string, string | undefined> = process.env
@@ -77,9 +82,18 @@ vi.mock('../services/LoggingService', () => ({
 // Helpers
 // =============================================================================
 
-/** Build a mock invoke event with a given sender frame shape. */
-function makeEvent(frame: { url: string; parent: unknown } | null): IpcMainInvokeEvent {
-  return { senderFrame: frame } as unknown as IpcMainInvokeEvent
+/**
+ * The main window's `webContents`. Registered afresh in each test's module
+ * copy by `getHandler` (the suite resets modules before every test).
+ */
+const APP_SENDER: FakeWebContents = createFakeWebContents()
+
+/** Build a mock invoke event with a given sender frame shape, from the main window by default. */
+function makeEvent(
+  frame: { url: string; parent: unknown } | null,
+  sender: FakeWebContents = APP_SENDER
+): IpcMainInvokeEvent {
+  return { sender, senderFrame: frame } as unknown as IpcMainInvokeEvent
 }
 
 const TRUSTED_FRAME = { url: RENDERER_FILE_URL, parent: null }
@@ -87,6 +101,7 @@ const TRUSTED_FRAME = { url: RENDERER_FILE_URL, parent: null }
 /** Register handlers and return the captured handler fn for a channel. */
 async function getHandler(channel: string): Promise<(...args: unknown[]) => Promise<unknown>> {
   const { registerClipboardHandlers } = await import('./clipboard-handlers')
+  await registerInCurrentModule(APP_SENDER)
   registerClipboardHandlers()
   const handler = mockIpcMainHandle.mock.calls.find((call) => call[0] === channel)?.[1]
   expect(handler).toBeDefined()
@@ -174,6 +189,16 @@ describe('clipboard-handlers', () => {
       const handler = await getHandler(CLIPBOARD_CHANNELS.readText)
 
       expect(() => handler(makeEvent(frame))).toThrow(/Untrusted sender/)
+      expect(mockClipboardReadText).not.toHaveBeenCalled()
+    })
+
+    it('throws at the outer gate for the exact renderer URL in an unregistered webContents', async () => {
+      // A browser tab that loaded the renderer entry file (025-NFR-001).
+      const handler = await getHandler(CLIPBOARD_CHANNELS.readText)
+
+      expect(() => handler(makeEvent(TRUSTED_FRAME, createFakeWebContents()))).toThrow(
+        /Untrusted sender/
+      )
       expect(mockClipboardReadText).not.toHaveBeenCalled()
     })
 

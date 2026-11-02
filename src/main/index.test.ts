@@ -104,6 +104,8 @@ describe('Main Process - Window Creation', () => {
         id: 1,
         setWindowOpenHandler: vi.fn(),
         on: vi.fn(), // Required for destroyed event handler (issue #59)
+        // Spec 025: registerAppWebContents drops the id on 'destroyed'.
+        once: vi.fn(),
         send: vi.fn(),
         isDestroyed: vi.fn(() => false),
         // #60: a crashed renderer can never answer the quit confirmation.
@@ -811,6 +813,19 @@ describe('Main Process - Window Creation', () => {
 
       expect(mockRegisterWindowErrorSignals).toHaveBeenCalledTimes(1)
       expect(mockRegisterWindowErrorSignals).toHaveBeenCalledWith(createdWindow)
+    })
+  })
+
+  describe('IPC identity gate (spec 025, 025-NFR-001)', () => {
+    it('should register the main window webContents as an Erfana window', async () => {
+      mockIs.dev = false
+
+      await import('./index')
+
+      // Same module copy index.ts loaded: no reset between the two imports.
+      const { isAppWebContents } = await import('./ipc/appWebContents')
+      expect(isAppWebContents(createdWindow.webContents)).toBe(true)
+      expect(createdWindow.webContents.once).toHaveBeenCalledWith('destroyed', expect.any(Function))
     })
   })
 

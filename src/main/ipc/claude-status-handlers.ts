@@ -13,10 +13,11 @@
  * `isDestroyed()` and re-validated against the change-payload schema.
  *
  * Security (design §8, §10):
- * - Sender validation: every handler verifies the request originated from the
- *   app's own top-level renderer frame (dev renderer URL or the bundled
- *   `file://` index) — the exact predicate used by the clipboard handlers. An
- *   untrusted sender is logged and dropped (no registration, no nudge).
+ * - Sender validation: every handler verifies the request came from the
+ *   top-level frame of a registered Erfana window at the exact renderer URL
+ *   (dev renderer origin or the bundled `file://` index) — the shared
+ *   `isTrustedSender` the clipboard handlers use. An untrusted sender is logged
+ *   and dropped (no registration, no nudge).
  * - No renderer-supplied pid/cwd: both come from the main-owned terminal record.
  * - No throws: every handler catches and sanitizes; failures hide the bar.
  *
@@ -24,9 +25,6 @@
  */
 import { webContents, BrowserWindow, app } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
-import { join } from 'path'
-import { pathToFileURL } from 'url'
-import { is } from '@electron-toolkit/utils'
 import { logger } from '../services/LoggingService'
 import { getUserFriendlyMessage } from '../../shared/errors'
 import { ClaudeStatusService } from '../services/claudeStatus/ClaudeStatusService'
@@ -42,44 +40,7 @@ import {
   type ClaudeStatusChangePayload
 } from '../../shared/ipc/claude-status-schema'
 import { registerHandle, unregisterHandle } from './registry'
-
-/**
- * Canonical `file://` URL of the bundled renderer entry point. MUST match
- * `src/main/index.ts`'s production loader so the trust gate pins exactly the URL
- * the window actually loads (mirrors `clipboard-handlers.ts`).
- */
-const RENDERER_FILE_URL = pathToFileURL(join(__dirname, '../renderer/index.html')).href
-
-/**
- * Verify the IPC request came from the app's own top-level renderer frame.
- *
- * Identical predicate to `clipboard-handlers.ts#isTrustedSender`:
- * - Development: only when `is.dev && ELECTRON_RENDERER_URL`, and the sender
- *   origin matches the electron-vite dev server.
- * - Production: the sender URL must equal the exact bundled renderer file URL.
- *
- * Sub-frames and any other origin are rejected.
- */
-function isTrustedSender(event: IpcMainInvokeEvent): boolean {
-  const frame = event.senderFrame
-
-  if (!frame || frame.parent !== null) {
-    return false
-  }
-
-  const senderUrl = frame.url
-
-  const devUrl = process.env['ELECTRON_RENDERER_URL']
-  if (is.dev && devUrl) {
-    try {
-      return new URL(senderUrl).origin === new URL(devUrl).origin
-    } catch {
-      return false
-    }
-  }
-
-  return senderUrl === RENDERER_FILE_URL
-}
+import { isTrustedSender } from './senderValidation'
 
 /**
  * Build the real `emit` that targets a single webContents.

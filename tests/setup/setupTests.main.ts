@@ -71,9 +71,13 @@ vi.mock('electron', () => {
 // process-wide gate was installed from `src/main/index.ts` at runtime and so was
 // never in the path of a unit test either. It does NOT leave the gate untested —
 // `src/main/ipc/registry.test.ts` declares its own mock for this module and
-// exercises trusted, untrusted and sub-frame senders against every verb. The
-// per-handler `isTrustedSender` checks (image export, clipboard, system, the
-// preview handlers) are a different predicate and are unaffected.
+// exercises trusted, untrusted and sub-frame senders against every verb.
+// Since spec 025 commit 1 the per-handler checks – `isTrustedSender`, and the
+// preview, Claude status and screenshot gates that now delegate to it – live
+// in this module too, so this stub covers them as well; a suite that asserts
+// their refusals opts out (`vi.unmock`, or a partial mock that keeps the real
+// `isTrustedSender`) and builds its senders with
+// `src/main/ipc/__test-helpers__/appSender.ts`.
 // NOTE: this is a wholesale factory, not `importOriginal`. `senderValidation`
 // imports `BrowserWindow` from `electron`, and `importOriginal` loads the module
 // OUTSIDE the mock above — where the real CommonJS `electron` package cannot
@@ -83,7 +87,7 @@ vi.mock('electron', () => {
 vi.mock('../../src/main/ipc/senderValidation', () => ({
   isTrustedAppSender: () => true,
   isTrustedSender: () => true,
-  isTrustedAppUrl: () => true,
+  isTrustedAppWebContents: () => true,
   RENDERER_FILE_URL: 'file:///test/renderer/index.html'
 }))
 

@@ -80,12 +80,23 @@ import {
   unregisterHandle,
   unregisterOn
 } from './registry'
+import { createAppSender, createFakeWebContents, type FakeWebContents } from './__test-helpers__/appSender'
 
 /** Same derivation `senderValidation.ts` uses for the production trust pin. */
 const RENDERER_FILE_URL = pathToFileURL(join(__dirname, '../renderer/index.html')).href
 
-function event(frame: { url: string; parent: unknown } | null): IpcMainInvokeEvent & IpcMainEvent {
-  return { senderFrame: frame } as unknown as IpcMainInvokeEvent & IpcMainEvent
+/** One of Erfana's own windows, registered as `src/main/index.ts` does. */
+const APP_SENDER = createAppSender()
+
+/**
+ * Build an event. The sender defaults to a registered app window, so the
+ * URL-based cases below prove the URL check still applies on top of identity.
+ */
+function event(
+  frame: { url: string; parent: unknown } | null,
+  sender: FakeWebContents = APP_SENDER
+): IpcMainInvokeEvent & IpcMainEvent {
+  return { sender, senderFrame: frame } as unknown as IpcMainInvokeEvent & IpcMainEvent
 }
 
 const TRUSTED = event({ url: RENDERER_FILE_URL, parent: null })
@@ -94,6 +105,21 @@ const SUB_FRAME = event({ url: RENDERER_FILE_URL, parent: {} })
 const NO_FRAME = event(null)
 /** Our own entry on a route hash — the screenshot overlay's real shape. */
 const HASHED = event({ url: `${RENDERER_FILE_URL}#/overlay`, parent: null })
+/**
+ * The exact renderer entry in a top-level frame of a `webContents` that is not
+ * an Erfana window – a browser tab that loaded the entry file (025-NFR-001).
+ */
+const UNREGISTERED = event({ url: RENDERER_FILE_URL, parent: null }, createFakeWebContents())
+/** A trusted-looking event with no sender at all. */
+const NO_SENDER = { senderFrame: { url: RENDERER_FILE_URL, parent: null } } as unknown as IpcMainInvokeEvent &
+  IpcMainEvent
+
+/** A registered window that has since been destroyed. */
+function destroyedSenderEvent(): IpcMainInvokeEvent & IpcMainEvent {
+  const sender = createAppSender()
+  sender.destroy()
+  return event({ url: RENDERER_FILE_URL, parent: null }, sender)
+}
 
 /** Drive the single listener registered on a `send` channel. */
 function send(channel: string, evt: IpcMainEvent, ...args: unknown[]): void {
@@ -124,7 +150,10 @@ describe('registerHandle', () => {
   it.each([
     ['a foreign origin', () => FOREIGN],
     ['a sub-frame', () => SUB_FRAME],
-    ['no sender frame', () => NO_FRAME]
+    ['no sender frame', () => NO_FRAME],
+    ['the renderer URL in an unregistered webContents', () => UNREGISTERED],
+    ['an event with no sender', () => NO_SENDER],
+    ['a destroyed app webContents', destroyedSenderEvent]
   ])('throws for %s and never runs the listener', (_label, make) => {
     const listener = vi.fn()
     registerHandle('c', listener)
@@ -144,7 +173,10 @@ describe('registerOn', () => {
   it.each([
     ['a foreign origin', () => FOREIGN],
     ['a sub-frame', () => SUB_FRAME],
-    ['no sender frame', () => NO_FRAME]
+    ['no sender frame', () => NO_FRAME],
+    ['the renderer URL in an unregistered webContents', () => UNREGISTERED],
+    ['an event with no sender', () => NO_SENDER],
+    ['a destroyed app webContents', destroyedSenderEvent]
   ])('drops %s silently — a send channel has no reply path', (_label, make) => {
     const listener = vi.fn()
     registerOn('c', listener)
@@ -204,6 +236,24 @@ describe('one-shot registrations', () => {
 
     expect(handlers.get('c')!(TRUSTED)).toBe('ok')
     expect(handlers.has('c')).toBe(false)
+  })
+
+  it('keeps the handler registered after an invoke from an unregistered webContents', () => {
+    const listener = vi.fn(() => 'ok')
+    registerHandleOnce('c', listener)
+
+    expect(() => handlers.get('c')!(UNREGISTERED)).toThrow(/Untrusted sender/)
+    expect(listener).not.toHaveBeenCalled()
+    expect(handlers.get('c')!(TRUSTED)).toBe('ok')
+  })
+
+  it('keeps the listener registered after a send from an unregistered webContents', () => {
+    const listener = vi.fn()
+    registerOnce('c', listener)
+
+    send('c', UNREGISTERED)
+    expect(listener).not.toHaveBeenCalled()
+    expect(listeners.get('c')).toHaveLength(1)
   })
 
   it('keeps the listener registered after a rejected send', () => {

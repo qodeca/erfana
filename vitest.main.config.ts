@@ -91,6 +91,12 @@ export default defineConfig({
         // The module is small and fully unit-reachable; measured at 100% when
         // this entry landed. See: docs/designs/large-projects/design-issue-60.md §2.6, §5
         'src/main/utils/rendererCrashHandlers.ts': { lines: 90, functions: 90, branches: 90, statements: 90 },
+        // The identity half of every IPC trust gate (spec 025 commit 1,
+        // 025-NFR-001): the set of Erfana window webContents. A gap here is an
+        // unexercised path in deciding who may call the privileged IPC, so it is
+        // pinned 2 points under the value measured when this entry landed.
+        // measured 100/100/100/100
+        'src/main/ipc/appWebContents.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // Multi-page HTML preview (#124). These modules decide what the preview
         // BrowserView is allowed to load and where it may navigate — frame/scheme
         // gating, request filtering, URL normalisation, page and tab scope — plus
