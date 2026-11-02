@@ -1,7 +1,7 @@
 {
   "limit": 500,
   "files": {
-    "src/main/index.ts": 810,
+    "src/main/index.ts": 806,
     "src/main/ipc/file-handlers.ts": 763,
     "src/main/ipc/transcription-handlers.ts": 788,
     "src/main/services/ExternalFileService.ts": 909,

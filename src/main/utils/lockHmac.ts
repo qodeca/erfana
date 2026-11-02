@@ -222,6 +222,55 @@ export function verifyLock(lock: LockInfo): 'valid' | 'missing' | 'invalid' | 'n
 }
 
 /**
+ * Label mixed into every purpose sub-key. A sub-key is
+ * `HMAC(secret, label + NUL + purpose)`, so a digest made for one purpose (a
+ * project lock, a browser profile marker, a pending delete) never verifies as
+ * another, and the secret itself never signs anything but locks.
+ */
+const PURPOSE_KEY_LABEL = 'erfana-hmac-purpose-v1'
+
+function purposeKey(key: Buffer, purpose: string): Buffer {
+  return createHmac('sha256', key).update(`${PURPOSE_KEY_LABEL}\0${purpose}`).digest()
+}
+
+/**
+ * Whether a signing key exists for this run. False where `safeStorage` is
+ * unavailable or is Linux's `basic_text` backend (spec 025, ADR 0009
+ * decision 7): callers keep trust decisions in memory only there.
+ */
+export function hasHmacKey(): boolean {
+  return getKey() !== null
+}
+
+/**
+ * HMAC-SHA-256 hex digest of `body` under the sub-key for `purpose`, or
+ * `undefined` when there is no key for this run ({@link hasHmacKey}).
+ *
+ * @param purpose a fixed, code-defined name – never user input
+ */
+export function signForPurpose(purpose: string, body: string): string | undefined {
+  const key = getKey()
+  if (!key) return undefined
+  return hmacHex(purposeKey(key, purpose), body)
+}
+
+/**
+ * Verify a digest made by {@link signForPurpose}. Same outcomes as
+ * {@link verifyLock}, without the legacy key: `'missing'` (no digest),
+ * `'no-key'` (nothing to verify with this run), `'valid'` or `'invalid'`.
+ */
+export function verifyForPurpose(
+  purpose: string,
+  body: string,
+  digest: string | undefined
+): 'valid' | 'missing' | 'invalid' | 'no-key' {
+  if (!digest) return 'missing'
+  const key = getKey()
+  if (!key) return 'no-key'
+  return digestsMatch(hmacHex(purposeKey(key, purpose), body), digest) ? 'valid' : 'invalid'
+}
+
+/**
  * Reset cached state — exported for tests only. Production never calls this.
  */
 export function _resetForTesting(): void {

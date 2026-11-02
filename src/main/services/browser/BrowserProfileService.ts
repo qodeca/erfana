@@ -1,0 +1,231 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+/**
+ * The project's browser profile and session (spec 025, 025-FR-015, 025-FR-016,
+ * 025-FR-018; ADR 0009; solution design § 3.1 and § 3.3 steps 1–2).
+ *
+ * {@link BrowserProfileService.openForTab} is what a new browser tab calls
+ * first (commit 7). On the project's first tab in this run it:
+ *
+ * 1. resolves the project's canonical path and checks it is still the open
+ *    project's real root;
+ * 2. requires this process to hold the project lock – one browser session per
+ *    project, in one process (ADR 0009 decision 4, S-24): a lock held by
+ *    another Erfana process refuses the tab; a free lock is taken through
+ *    `ProjectLockService`'s own rules;
+ * 3. guards `.erfana`, `.erfana/browser` and writes `.gitignore` (exactly `*`)
+ *    before anything else exists there (025-AC-016);
+ * 4. checks an existing profile's marker and git tracking, and sets a
+ *    distrusted profile aside (S3, S-12);
+ * 5. guards `profile`, `profile/Erfana`, `captures`; writes a fresh marker;
+ * 6. asks cloud sync to ignore the folder (S30, best effort);
+ * 7. creates the session with `session.fromPath(<canonical>/.erfana/browser/profile)`
+ *    and records it in the browser session registry.
+ *
+ * Every later tab re-runs steps 3 and 5 only (a deleted `.gitignore` is
+ * written again before the page loads). The session is never destroyed while
+ * the app runs (Electron cannot), so it is kept per canonical path.
+ *
+ * Session hardening (`browserSessionPolicy`, commit 6), the `erfana-local`
+ * handler (commit 11) and the trust store and keyring canary (commit 10) run
+ * after step 7 once they exist, before any page loads.
+ */
+import { join } from 'node:path'
+import type { Clock } from '../../../shared/clock'
+import type { IProjectLockService } from '../../interfaces/IProjectLockService'
+import { isSamePath } from '../../utils/pathCompare'
+import { redactPath } from '../../utils/redactUserInput'
+import { logger } from '../LoggingService'
+import type { ProjectSession } from '../session/ProjectSession'
+import {
+  BrowserProfileError,
+  canonicalProjectPath,
+  checkExistingLevel,
+  ensureBrowserFolder,
+  ensureProfileTree
+} from './browserProfileGuards'
+import { verifyProfileMarker, writeProfileMarker, type PurposeSigner } from './browserProfileMarker'
+import { deleteUnderBrowser, runPendingDeletes, setProfileAside, type DeleteOutcome } from './browserProfileDeletes'
+import { BROWSER_DIR_SEGMENTS, PROFILE_DIR_NAME } from './browserProfilePaths'
+
+/** `safeStorage`'s backend: macOS and Windows have one each; Linux reports its own. */
+export type StorageBackend =
+  | 'keychain'
+  | 'dpapi'
+  | 'basic_text'
+  | 'gnome_libsecret'
+  | 'kwallet'
+  | 'kwallet5'
+  | 'kwallet6'
+  | 'unknown'
+
+/** The backend in use: fixed per platform, read from `safeStorage` on Linux. */
+export function storageBackendFor(
+  platform: NodeJS.Platform,
+  linuxBackend: () => Exclude<StorageBackend, 'keychain' | 'dpapi'>
+): StorageBackend {
+  if (platform === 'darwin') return 'keychain'
+  if (platform === 'win32') return 'dpapi'
+  if (platform === 'linux') return linuxBackend()
+  return 'unknown'
+}
+
+/**
+ * Where Erfana's own trust decisions for this profile live (ADR 0009 decisions
+ * 6 and 7, S-26): signed files, or – with no signing key (Linux `basic_text`)
+ * – memory only, for this run.
+ */
+export type TrustPersistence = 'signed' | 'memory'
+
+/** The part of an Electron `Session` this service needs. */
+export type ProfileSession = object
+
+export interface BrowserProfile {
+  /** The project's canonical path (native real path). */
+  readonly projectRoot: string
+  readonly session: ProfileSession
+  readonly backend: StorageBackend
+  readonly trust: TrustPersistence
+  /** Name of the folder a distrusted profile was moved to this run, for a notice; null otherwise. */
+  readonly setAside: string | null
+}
+
+export interface BrowserProfileServiceDeps {
+  readonly projectSession: Pick<ProjectSession, 'current'>
+  readonly lockService: Pick<IProjectLockService, 'checkLock' | 'acquireLock'>
+  /** `session.fromPath` in production. */
+  readonly fromPath: (path: string) => ProfileSession
+  /** Records the session as a browser session (`browserSessionRegistry`). */
+  readonly registerSession: (session: ProfileSession) => void
+  readonly signer: PurposeSigner
+  readonly storageBackend: () => StorageBackend
+  readonly isTrackedByGit: (canonical: string) => Promise<boolean>
+  readonly markIgnoredBySync: (browserDir: string) => Promise<void>
+  readonly homeDir: string
+  readonly platform: NodeJS.Platform
+  readonly clock: Pick<Clock, 'now'>
+}
+
+export class BrowserProfileService {
+  /** Keyed by canonical path; a rejected open is removed so the next tab retries. */
+  private readonly profiles = new Map<string, Promise<BrowserProfile>>()
+
+  constructor(private readonly deps: BrowserProfileServiceDeps) {}
+
+  /**
+   * Prepare the open project's profile for a new browser tab and return its
+   * session, creating it on the project's first tab.
+   *
+   * @throws BrowserProfileError – the tab must not open; the toast names
+   *   `relPath` and the code says why
+   */
+  async openForTab(): Promise<BrowserProfile> {
+    const canonical = await this.openProjectCanonical()
+    const existing = this.profiles.get(canonical)
+    if (existing !== undefined) {
+      const profile = await existing
+      await ensureBrowserFolder(canonical)
+      await ensureProfileTree(canonical)
+      return profile
+    }
+    const created = this.createProfile(canonical)
+    this.profiles.set(canonical, created)
+    try {
+      return await created
+    } catch (error) {
+      this.profiles.delete(canonical)
+      throw error
+    }
+  }
+
+  /**
+   * Delete `.erfana/browser/<relBelowBrowser>` of the open project after the
+   * per-level re-guard; `[]` deletes the whole folder (Forget). On Windows a
+   * delete the running session blocks runs at the next start.
+   *
+   * @throws BrowserProfileError
+   */
+  async deleteBrowserData(relBelowBrowser: readonly string[]): Promise<DeleteOutcome> {
+    const canonical = await this.openProjectCanonical()
+    return deleteUnderBrowser(canonical, relBelowBrowser, this.deleteDeps())
+  }
+
+  /** Run deletes stored by earlier runs; at start, after the app is ready. */
+  async runPendingDeletes(): Promise<void> {
+    await runPendingDeletes(this.deleteDeps())
+  }
+
+  private deleteDeps(): { homeDir: string; platform: NodeJS.Platform; signer: PurposeSigner } {
+    return { homeDir: this.deps.homeDir, platform: this.deps.platform, signer: this.deps.signer }
+  }
+
+  private async openProjectCanonical(): Promise<string> {
+    const snapshot = this.deps.projectSession.current()
+    if (snapshot === null) throw new BrowserProfileError('no-project', '', 'No project is open')
+    const canonical = await canonicalProjectPath(snapshot.root)
+    if (!isSamePath(canonical, snapshot.realRoot, snapshot.caseSensitive)) {
+      throw new BrowserProfileError('no-project', '', 'The project folder moved since it was opened')
+    }
+    return canonical
+  }
+
+  /** One process per project's browser (ADR 0009 decision 4, S-24). */
+  private async requireProjectLock(canonical: string): Promise<void> {
+    const status = await this.deps.lockService.checkLock(canonical)
+    if (status.status === 'locked_by_self') return
+    if (status.status === 'locked_by_other') {
+      throw new BrowserProfileError(
+        'locked-elsewhere',
+        '',
+        `Another Erfana window (process ${status.holderPid}) has this project open`
+      )
+    }
+    if (status.status === 'unlocked') {
+      const acquired = await this.deps.lockService.acquireLock(canonical)
+      if (acquired.status === 'acquired') return
+      if (acquired.status === 'already_locked') {
+        throw new BrowserProfileError(
+          'locked-elsewhere',
+          '',
+          `Another Erfana window (process ${acquired.holderPid}) has this project open`
+        )
+      }
+    }
+    throw new BrowserProfileError('locked-elsewhere', '', 'The project lock could not be confirmed')
+  }
+
+  private async createProfile(canonical: string): Promise<BrowserProfile> {
+    await this.requireProjectLock(canonical)
+    await ensureBrowserFolder(canonical)
+    const setAside = await this.setAsideIfDistrusted(canonical)
+    const profileExisted = setAside === null && (await this.profileExists(canonical))
+    await ensureProfileTree(canonical)
+    if (!profileExisted) {
+      await writeProfileMarker(canonical, this.deps.homeDir, this.deps.signer, new Date(this.deps.clock.now()).toISOString())
+    }
+    await this.deps.markIgnoredBySync(join(canonical, ...BROWSER_DIR_SEGMENTS))
+    const session = this.deps.fromPath(join(canonical, ...BROWSER_DIR_SEGMENTS, PROFILE_DIR_NAME))
+    this.deps.registerSession(session)
+    const backend = this.deps.storageBackend()
+    const trust: TrustPersistence = this.deps.signer.hasKey() ? 'signed' : 'memory'
+    logger.info('Browser profile ready', { project: redactPath(canonical), backend, trust, setAside: setAside !== null })
+    return { projectRoot: canonical, session, backend, trust, setAside }
+  }
+
+  private profileExists(canonical: string): Promise<boolean> {
+    return checkExistingLevel(canonical, [...BROWSER_DIR_SEGMENTS, PROFILE_DIR_NAME], 'dir')
+  }
+
+  /** S3: move a profile Erfana did not create here, or that git tracks, out of the way. */
+  private async setAsideIfDistrusted(canonical: string): Promise<string | null> {
+    if (!(await this.profileExists(canonical))) return null
+    const tracked = await this.deps.isTrackedByGit(canonical)
+    const verdict = tracked
+      ? ({ trusted: false, reason: 'git-tracked' } as const)
+      : await verifyProfileMarker(canonical, this.deps.homeDir, this.deps.signer)
+    if (verdict.trusted) return null
+    const name = await setProfileAside(canonical, this.deps.clock.now())
+    logger.warn('Browser profile set aside', { project: redactPath(canonical), reason: verdict.reason })
+    return name
+  }
+}

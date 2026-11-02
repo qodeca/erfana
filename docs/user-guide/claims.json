@@ -951,7 +951,7 @@
       "quote": "`quit:requested` | Event: main asks the renderer to confirm a quit (`{ reason: 'close' }`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:252",
+      "source": "src/main/index.ts:250",
       "match": "send('quit:requested', { reason: 'close' })"
     },
     {
@@ -2241,7 +2241,7 @@
       "quote": "Fire-and-forget at app startup (`src/main/index.ts`, `importToolStatusService.getStatus()`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:594",
+      "source": "src/main/index.ts:590",
       "match": "importToolStatusService.getStatus().catch((error) => {"
     },
     {
@@ -2893,7 +2893,7 @@
       "quote": "**Installation**: Called early in `src/main/index.ts`, before the services start",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:75",
+      "source": "src/main/index.ts:74",
       "match": "installSafeConsole()"
     },
     {
@@ -3084,7 +3084,7 @@
       "quote": "Tags: `[crash] startup-settings-init`, `[crash] startup-logging-init`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:471",
+      "source": "src/main/index.ts:465",
       "match": "writeCrashFallbackLine('[crash] startup-settings-init', error)"
     },
     {
@@ -3505,7 +3505,7 @@
       "quote": "| `Exclude patterns disabled: match budget exceeded` | warn |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/utils/projectPathFilter.ts:83",
+      "source": "src/main/utils/projectPathFilter.ts:86",
       "match": "logger.warn('Exclude patterns disabled: match budget exceeded', { ...info })"
     },
     {
@@ -4600,7 +4600,7 @@
       "quote": "| Main process | `src/main/index.ts` (before-quit event) |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:715",
+      "source": "src/main/index.ts:711",
       "match": "app.on('before-quit',"
     },
     {
@@ -6381,8 +6381,8 @@
       "quote": "registered `erfana-preview://` scheme",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:78",
-      "match": "// Register the `erfana-preview://` privileged scheme"
+      "source": "src/main/services/appSchemes.ts:21",
+      "match": "Object.freeze({ scheme: PREVIEW_SCHEME, privileges: PREVIEW_SCHEME_PRIVILEGES })"
     },
     {
       "id": "docs-features-README/31",
@@ -7369,7 +7369,7 @@
       "quote": "| `src/main/index.ts` | import + call `registerClipboardHandlers()` |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:538",
+      "source": "src/main/index.ts:532",
       "match": "registerClipboardHandlers()"
     },
     {
@@ -8037,7 +8037,7 @@
       "quote": "privileges as `previewScheme.ts` (`standard`, `secure`, `supportFetchAPI`,",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/previewScheme.ts:41",
+      "source": "src/main/services/preview/previewScheme.ts:38",
       "match": "secure: true,"
     },
     {
@@ -8529,7 +8529,7 @@
       "quote": "`ERFANA_E2E_FORCE_CRASH=1` in the launching environment",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:190",
+      "source": "src/main/index.ts:188",
       "match": "process.env.ERFANA_E2E_FORCE_CRASH === '1'"
     },
     {
@@ -8610,7 +8610,7 @@
       "quote": "only through `erfana-preview://<opaque-root-token>/<path>`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/previewScheme.ts:20",
+      "source": "src/main/services/preview/previewScheme.ts:19",
       "match": "export const PREVIEW_SCHEME = 'erfana-preview'"
     },
     {
@@ -8741,7 +8741,7 @@
       "quote": "Registered in `src/main/index.ts` as `registerBrowserHandlers()`, next to `registerImageExportHandlers()`.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/index.ts:541",
+      "source": "src/main/index.ts:535",
       "match": "registerBrowserHandlers()",
       "note": "Cited index.ts :417; registration is now at :534–536. Named the call instead."
     },
@@ -8752,7 +8752,7 @@
       "quote": "the `!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1'` check in `src/main/index.ts`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/index.ts:190",
+      "source": "src/main/index.ts:188",
       "match": "!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1'",
       "note": "Cited src/main/index.ts:161; the check is at :187. Named the check instead."
     },
@@ -8828,7 +8828,7 @@
       "quote": "The app ships one window (`createWindow` in `src/main/index.ts`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/index.ts:200",
+      "source": "src/main/index.ts:198",
       "match": "function createWindow(): BrowserWindow",
       "note": "Cited src/main/index.ts:172, which is now a command-line switch. Named createWindow instead."
     },
@@ -9299,8 +9299,8 @@
       "quote": "privileged `erfana-preview:` scheme (`previewScheme.ts` privileges)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/preview/previewScheme.ts:39",
-      "match": "privileges: {"
+      "source": "src/main/services/preview/previewScheme.ts:36",
+      "match": "export const PREVIEW_SCHEME_PRIVILEGES = Object.freeze({"
     },
     {
       "id": "docs-spikes-html-preview-comments/02",
@@ -9504,7 +9504,7 @@
       "quote": "**File:** `src/main/index.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:429",
+      "source": "src/main/index.ts:423",
       "match": "app.whenReady()"
     },
     {
@@ -9999,7 +9999,7 @@
       "quote": "`!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1'`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:190",
+      "source": "src/main/index.ts:188",
       "match": "if (!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1') {"
     },
     {
@@ -10009,7 +10009,7 @@
       "quote": "preload: join(__dirname, '../preload/index.js'),",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:219",
+      "source": "src/main/index.ts:217",
       "match": "preload: join(__dirname, '../preload/index.js'),"
     },
     {
@@ -10019,7 +10019,7 @@
       "quote": "contextIsolation: true,    // NEVER disable",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:222",
+      "source": "src/main/index.ts:220",
       "match": "contextIsolation: true,"
     },
     {
@@ -10029,7 +10029,7 @@
       "quote": "nodeIntegration: false,    // NEVER enable",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:223",
+      "source": "src/main/index.ts:221",
       "match": "nodeIntegration: false,"
     },
     {
@@ -10419,8 +10419,8 @@
       "quote": "`registerWebContentsBaseline` (`src/main/utils/webContentsBaseline.ts`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/utils/webContentsBaseline.ts:45",
-      "match": "export function registerWebContentsBaseline(app: {"
+      "source": "src/main/utils/webContentsBaseline.ts:63",
+      "match": "export function registerWebContentsBaseline<T = WebContents>("
     },
     {
       "id": "docs-security/64",
@@ -11231,7 +11231,7 @@
       "quote": "Open DevTools in app with F12 (development builds only)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:456",
+      "source": "src/main/index.ts:450",
       "match": "optimizer.watchWindowShortcuts(window)"
     },
     {
@@ -11251,7 +11251,7 @@
       "quote": "A message box titled \"Erfana started with problems\"",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:413",
+      "source": "src/main/index.ts:407",
       "match": "title: 'Erfana started with problems',"
     },
     {
@@ -11261,7 +11261,7 @@
       "quote": "the lines tagged `[crash] startup-settings-init` and `[crash] startup-logging-init`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:471",
+      "source": "src/main/index.ts:465",
       "match": "writeCrashFallbackLine('[crash] startup-settings-init', error)"
     },
     {
@@ -13147,7 +13147,7 @@
       "quote": "in `src/main/index.ts`, beside the others (`registerBrowserHandlers()` is there)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:541",
+      "source": "src/main/index.ts:535",
       "match": "registerBrowserHandlers()"
     },
     {
@@ -13732,7 +13732,7 @@
       "quote": "Makes the main process append `--erfana-force-crash` to `webPreferences.additionalArguments`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:190",
+      "source": "src/main/index.ts:188",
       "match": "if (!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1') {"
     },
     {
@@ -14266,7 +14266,7 @@
       "quote": "window.close() → main process 'close' event → 'quit:requested' IPC",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:252",
+      "source": "src/main/index.ts:250",
       "match": "mainWindow.webContents.send('quit:requested', { reason: 'close' })"
     },
     {
@@ -14917,7 +14917,7 @@
       "quote": "installed only for an unpackaged app launched with `ERFANA_E2E_TEST_HOOKS=1`,",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:194",
+      "source": "src/main/index.ts:192",
       "match": "if (!app.isPackaged && process.env.ERFANA_E2E_TEST_HOOKS === '1') {"
     },
     {
@@ -16044,7 +16044,7 @@
       "quote": "app.commandLine.appendSwitch('enable-webgl2-compute-context')",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:174",
+      "source": "src/main/index.ts:172",
       "match": "app.commandLine.appendSwitch('enable-webgl2-compute-context')"
     },
     {
@@ -16054,7 +16054,7 @@
       "quote": "app.commandLine.appendSwitch('ignore-gpu-blocklist')",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:175",
+      "source": "src/main/index.ts:173",
       "match": "app.commandLine.appendSwitch('ignore-gpu-blocklist')"
     },
     {
@@ -16064,7 +16064,7 @@
       "quote": "// TODO: Test if still needed with Electron 39+ (Chromium 142)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:172",
+      "source": "src/main/index.ts:170",
       "match": "// TODO: Test if still needed with Electron 39+ (Chromium 142)"
     },
     {
@@ -16074,7 +16074,7 @@
       "quote": "(`src/main/index.ts` notes it is \"not needed for current functionality\")",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:226",
+      "source": "src/main/index.ts:224",
       "match": "// experimentalFeatures removed - not needed for current functionality"
     },
     {
@@ -21323,7 +21323,7 @@
       "quote": "(64 remembered nested folders, 512 handles)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/utils/projectPathFilter.ts:33",
+      "source": "src/main/utils/projectPathFilter.ts:36",
       "match": "export const MAX_WALK_HINTS = 64"
     },
     {
@@ -23266,7 +23266,7 @@
       "quote": "`main/index.ts:612-643` (dock menu and jump list carry only \"New Window\")",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:636",
+      "source": "src/main/index.ts:632",
       "match": "title: 'New Window',"
     },
     {
@@ -23296,7 +23296,7 @@
       "quote": "`src/main/index.ts:613-624` — macOS dock menu (`app.dock.setMenu`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:625",
+      "source": "src/main/index.ts:621",
       "match": "app.dock?.setMenu(dockMenu)"
     },
     {
@@ -23306,7 +23306,7 @@
       "quote": "`src/main/index.ts:626-643` — Windows jumplist (`app.setJumpList`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:630",
+      "source": "src/main/index.ts:626",
       "match": "app.setJumpList(["
     },
     {
@@ -24215,7 +24215,7 @@
       "quote": "| `src/main/index.test.ts:610` (`Window Title Configuration",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.test.ts:612",
+      "source": "src/main/index.test.ts:621",
       "match": "should set title to \"ERFANA v{version}\" in production mode"
     },
     {
@@ -25146,7 +25146,7 @@
       "quote": "`optimizer.watchWindowShortcuts` from `@electron-toolkit/utils`, attached to every window in `src/main/index.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:456",
+      "source": "src/main/index.ts:450",
       "match": "optimizer.watchWindowShortcuts(window)",
       "note": "The call sits inside app.on('browser-window-created') (line 450), so every window gets it. Observed while checking: the same helper, called without options, also swallows Cmd/Ctrl+Minus and Cmd/Ctrl+Shift+Equal on the app window in every build (its zoom option defaults to false); not stated on this page."
     },
@@ -25349,7 +25349,7 @@
       "quote": "In a packaged build the same helper binds no `F12` and blocks `Cmd/Ctrl+R`",
       "status": "verified",
       "evidence": "app",
-      "source": "src/main/index.ts:453",
+      "source": "src/main/index.ts:447",
       "match": "ignore CommandOrControl + R in production",
       "test": "e2e/guide-tasks/claims-user-0.guide.ts",
       "note": "Behaviour lives in @electron-toolkit/utils (not in src). Real-app test: unpackaged, F12 toggles DevTools (helper attached); then the test flips the loaded helper's is.dev (= !app.isPackaged) to false and sends native key input – F12 is not prevented and DevTools stays closed, Cmd/Ctrl+R is prevented and the page does not reload. The packaged branch is reached by that flip, not by a packaged build."
@@ -26377,7 +26377,7 @@
       "quote": "Erfana enables context isolation, disables node integration in the sandboxed renderer",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:223",
+      "source": "src/main/index.ts:221",
       "match": "nodeIntegration: false,",
       "note": "contextIsolation: true at src/main/index.ts:219; sandbox is Electron's default (comment line 217)."
     },
@@ -26516,7 +26516,7 @@
       "quote": "disables node integration in the sandboxed renderer",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:220",
+      "source": "src/main/index.ts:218",
       "match": "sandbox: true is the default since Electron 20"
     },
     {
@@ -27720,7 +27720,7 @@
       "quote": "One project path filter (`ProjectPathFilter`, `src/main/utils/projectPathFilter.ts`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/utils/projectPathFilter.ts:62",
+      "source": "src/main/utils/projectPathFilter.ts:65",
       "match": "export class ProjectPathFilter"
     },
     {
@@ -27730,7 +27730,7 @@
       "quote": "its `shouldDrop(rel)` tests the **project-relative** path",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/utils/projectPathFilter.ts:128",
+      "source": "src/main/utils/projectPathFilter.ts:137",
       "match": "readonly shouldDrop = (rel: string | null): boolean"
     },
     {
@@ -28200,7 +28200,7 @@
       "quote": "| APP-09 | Dock menu New Window | M | M/index.ts",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:625",
+      "source": "src/main/index.ts:621",
       "match": "app.dock?.setMenu(dockMenu)"
     },
     {
@@ -28210,7 +28210,7 @@
       "quote": "| APP-10 | Jump-list New Window | W | M/index.ts",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:636",
+      "source": "src/main/index.ts:632",
       "match": "title: 'New Window',"
     },
     {
@@ -33535,7 +33535,7 @@
       "quote": "On macOS, the Erfana Dock menu also offers **New Window**.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:619",
+      "source": "src/main/index.ts:615",
       "match": "label: 'New Window'"
     },
     {
@@ -33545,7 +33545,7 @@
       "quote": "On Windows, select **New Window** from Erfana's taskbar jump list.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:636",
+      "source": "src/main/index.ts:632",
       "match": "title: 'New Window'"
     },
     {
@@ -33555,7 +33555,7 @@
       "quote": "Both routes open a separate Erfana instance, like **File > New Window**.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:639",
+      "source": "src/main/index.ts:635",
       "match": "args: '--new-window'"
     },
     {
@@ -33576,7 +33576,7 @@
       "quote": "3. Close the window.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/index.ts:252",
+      "source": "src/main/index.ts:250",
       "match": "mainWindow.webContents.send('quit:requested', { reason: 'close' })",
       "note": "Step said 'Close the window, or quit from the app menu' then promised a confirmation; only the window close handler sends quit:requested, so the step now names closing the window only."
     },
@@ -33653,7 +33653,7 @@
       "quote": "Quitting from the app menu, or with **File > Exit** on Windows, closes Erfana without a confirmation.",
       "status": "fixed",
       "evidence": "app",
-      "source": "src/main/index.ts:720",
+      "source": "src/main/index.ts:716",
       "match": "if (!quitGuard.handleBeforeQuit(event)) return",
       "test": "e2e/quit-shutdown.e2e.ts",
       "note": "Page implied quitting from the app menu shows the confirmation. before-quit is always prevented and runs the shutdown to app.exit(0); quit:requested is sent only from the window close handler (index.ts:248), so a menu quit never asks."
@@ -33686,7 +33686,7 @@
       "quote": "Both routes open a separate Erfana instance",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:621",
+      "source": "src/main/index.ts:617",
       "match": "spawnNewInstance()"
     },
     {
@@ -35063,7 +35063,7 @@
       "quote": "If the settings file cannot be read at start-up, Erfana opens with default settings, says so",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:473",
+      "source": "src/main/index.ts:467",
       "match": "Your saved settings could not be loaded, so default settings are in use."
     },
     {
@@ -40035,7 +40035,7 @@
       "quote": "not watched for changes",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/utils/projectPathFilter.ts:131",
+      "source": "src/main/utils/projectPathFilter.ts:140",
       "match": "return this.isExcluded(rel) || this.isHidden(rel) || this.isIgnored(rel)"
     },
     {
@@ -40145,7 +40145,7 @@
       "quote": "The global file is read when Erfana starts",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:469",
+      "source": "src/main/index.ts:463",
       "match": "await globalSettingsService.initialize()"
     },
     {
@@ -41840,7 +41840,7 @@
       "quote": "The Erfana taskbar jump list also has **New Window**, which opens a separate instance.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:636",
+      "source": "src/main/index.ts:632",
       "match": "title: 'New Window',"
     },
     {
@@ -44543,7 +44543,7 @@
       "quote": "registered through `registry.ts` (never `ipcMain` directly)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:514",
+      "source": "src/main/index.ts:508",
       "match": "`src/main/ipc/registry.ts`, and an ESLint rule stops `ipcMain` being"
     },
     {
@@ -44563,7 +44563,7 @@
       "quote": "3. Register handler in `src/main/index.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:517",
+      "source": "src/main/index.ts:511",
       "match": "registerFileHandlers()"
     },
     {
@@ -45103,7 +45103,7 @@
       "quote": "(register via `registerClipboardHandlers()` at startup)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:538",
+      "source": "src/main/index.ts:532",
       "match": "registerClipboardHandlers()"
     },
     {
@@ -50339,7 +50339,7 @@
       "quote": "// sandbox: true is the default since Electron 20 (2022)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:220",
+      "source": "src/main/index.ts:218",
       "match": "// sandbox: true is the default since Electron 20 (2022)"
     },
     {
@@ -50349,7 +50349,7 @@
       "quote": "  webgl: true",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:224",
+      "source": "src/main/index.ts:222",
       "match": "webgl: true"
     },
     {
@@ -50481,7 +50481,7 @@
       "quote": "without the e2e test-hooks flag (`ERFANA_E2E_TEST_HOOKS=1`), which has the same `!app.isPackaged` gate",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/index.ts:194",
+      "source": "src/main/index.ts:192",
       "match": "process.env.ERFANA_E2E_TEST_HOOKS === '1'",
       "note": "Said buildAdditionalArguments otherwise returns []; it also appends TEST_HOOKS_ARG under ERFANA_E2E_TEST_HOOKS=1 behind the same unpackaged gate."
     },
@@ -51158,7 +51158,7 @@
       "quote": "**Status**: ✅ DOUBLE-GATED – inert in any packaged build",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:190",
+      "source": "src/main/index.ts:188",
       "match": "!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1'"
     },
     {
@@ -53860,7 +53860,7 @@
       "quote": "returns early when `isRendererGone(mainWindow)` is true",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/index.ts:249",
+      "source": "src/main/index.ts:247",
       "match": "if (isRendererGone(mainWindow)) return",
       "note": "Fix line described a webContents.isDestroyed() guard; the close handler now uses isRendererGone (destroyed or crashed, #60)."
     },
@@ -53871,7 +53871,7 @@
       "quote": "before it calls `webContents.send('quit:requested', …)`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:252",
+      "source": "src/main/index.ts:250",
       "match": "mainWindow.webContents.send('quit:requested', { reason: 'close' })"
     },
     {

@@ -89,3 +89,47 @@ describe('registerWebContentsBaseline', () => {
     expect(open()({ url: 'file:///etc/hosts' })).toEqual({ action: 'deny' })
   })
 })
+
+describe('registerWebContentsBaseline with a gate (spec 025, ADR 0009 decision 5)', () => {
+  function created(): {
+    emit: (wc: BaselineTarget) => void
+    gate: { classify: ReturnType<typeof vi.fn>; refuse: ReturnType<typeof vi.fn> }
+  } {
+    let listener: ((e: unknown, wc: BaselineTarget) => void) | undefined
+    const gate = { classify: vi.fn(), refuse: vi.fn() }
+    registerWebContentsBaseline<BaselineTarget>(
+      { on: (_event, l) => (listener = l) },
+      gate
+    )
+    return { emit: (wc) => listener!({}, wc), gate }
+  }
+
+  it('applies the baseline when the gate says so', () => {
+    const { emit, gate } = created()
+    gate.classify.mockReturnValue('baseline')
+    const { target, open } = makeTarget()
+    emit(target)
+    expect(open()({ url: 'https://example.com/' })).toEqual({ action: 'deny' })
+    expect(gate.refuse).not.toHaveBeenCalled()
+  })
+
+  it('skips the baseline for an exempt webContents', () => {
+    const { emit, gate } = created()
+    gate.classify.mockReturnValue('exempt')
+    const { target, open } = makeTarget()
+    emit(target)
+    expect(open()).toBeUndefined()
+  })
+
+  it('applies the baseline and then refuses a refused webContents', () => {
+    const { emit, gate } = created()
+    gate.classify.mockReturnValue('refused')
+    const { target, open } = makeTarget()
+    gate.refuse.mockImplementation(() => {
+      // The baseline is already in place when the refusal runs
+      expect(open()({ url: 'https://example.com/' })).toEqual({ action: 'deny' })
+    })
+    emit(target)
+    expect(gate.refuse).toHaveBeenCalledWith(target)
+  })
+})

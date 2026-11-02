@@ -97,6 +97,26 @@ export default defineConfig({
         // pinned 2 points under the value measured when this entry landed.
         // measured 100/100/100/100
         'src/main/ipc/appWebContents.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Built-in browser isolation and profile guards (spec 025 commits 4–5,
+        // 025-NFR-001, 025-FR-016, ADR 0009, ADR 0012): which webContents skip the
+        // baseline, which schemes are privileged, and every check that keeps the
+        // profile folder, its marker and its deletes inside the project. Each
+        // floor is pinned ~2 points under the value measured when it landed
+        // (2026-11-03); never raise one above what the Coverage job measures.
+        // measured 100/100/93.33/100
+        'src/main/services/browser/browserSessionRegistry.ts': { lines: 98, functions: 98, branches: 91, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/browserLocalScheme.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/appSchemes.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 93.4/95.23/83.33/92.52
+        'src/main/services/browser/browserProfileGuards.ts': { lines: 91, functions: 93, branches: 81, statements: 90 },
+        // measured 97.43/100/93.33/97.72
+        'src/main/services/browser/browserProfileMarker.ts': { lines: 95, functions: 98, branches: 91, statements: 95 },
+        // measured 96.05/100/85.71/96.77
+        'src/main/services/browser/browserProfileDeletes.ts': { lines: 94, functions: 98, branches: 83, statements: 94 },
+        // measured 100/100/100/100
+        'src/main/services/browser/BrowserProfileService.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // Multi-page HTML preview (#124). These modules decide what the preview
         // BrowserView is allowed to load and where it may navigate — frame/scheme
         // gating, request filtering, URL normalisation, page and tab scope — plus

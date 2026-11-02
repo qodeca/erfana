@@ -34,7 +34,7 @@ import { registerBrowserHandlers } from './ipc/browser-handlers'
 import { registerMarkdownImageHandlers } from './ipc/markdown-image-handlers'
 import { registerClaudeStatusHandlers } from './ipc/claude-status-handlers'
 import { registerPreviewHandlers } from './ipc/preview-handlers'
-import { registerPreviewScheme } from './services/preview/previewScheme'
+import { installBrowserAfterReady, installBrowserBeforeReady } from './services/browser/browserAppSetup'
 import { importToolStatusService, killActiveLibreOfficeProbes } from './services/import'
 import { FORCE_CRASH_ARG, LOGS_DIR_RELATIVE, TEST_HOOKS_ARG } from '../shared/constants'
 import { createApplicationMenu, setPreviewZoomHandler } from './menu'
@@ -57,7 +57,6 @@ import { projectLockService } from './services/ProjectLockService'
 import { gitStatusService } from './services/GitStatusService'
 import { installSafeConsole } from './utils/safeConsole'
 import { openExternalSafeDetached } from './utils/openExternalSafe'
-import { registerWebContentsBaseline } from './utils/webContentsBaseline'
 import { registerProcessCrashLogging } from './utils/processCrashLogging'
 import { writeCrashFallbackLine } from './utils/crashFallbackLog'
 import { isBenignShutdownTimerError } from './utils/isBenignShutdownTimerError'
@@ -75,10 +74,9 @@ import {
 installSafeConsole()
 registerProcessCrashLogging()
 
-// Register the `erfana-preview://` privileged scheme (#74). MUST run before
-// `app.whenReady()`, so it lives here at module scope beside the other pre-ready
-// setup (`registerSchemesAsPrivileged` is a no-op once the app is ready).
-registerPreviewScheme()
+// Pre-ready, at module scope: the one privileged-scheme registration (erfana-preview,
+// erfana-local), the disk-cache cap and the deny-by-default webContents baseline (spec 025)
+installBrowserBeforeReady(app)
 
 // Packaged: leave the launching folder (possibly a cloned repo) as cwd, so no
 // bare-name spawn can resolve into it (#250). Dev keeps the repo as cwd.
@@ -387,10 +385,6 @@ function createWindow(): BrowserWindow {
   return mainWindow
 }
 
-// Deny-by-default window-open and navigation policy for every webContents
-// (windows set stricter handlers of their own where they need them).
-registerWebContentsBaseline(app)
-
 /**
  * Tell the user, once, that start-up had to fall back.
  *
@@ -562,6 +556,8 @@ app.whenReady().then(async () => {
   // once. The menu holds a late-bound handler because it is installed before this
   // graph exists.
   setPreviewZoomHandler((step) => previewHandlers?.zoomFocused(step) ?? Promise.resolve(false))
+  // Built-in browser (spec 025): profiles, project-switch teardown, erfana-local refused here
+  installBrowserAfterReady({ defaultSession: session.defaultSession, projectSession: projectService.session, lockService: projectLockService })
 
   // RELIABILITY FIX (todo012): Clean up stale projects on startup
   // This runs asynchronously but doesn't block window creation

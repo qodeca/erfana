@@ -33,6 +33,12 @@ const reaperMock = (): Record<string, unknown> => ({
 })
 vi.mock('./services/conptyHostReaper', () => reaperMock())
 
+/** The built-in browser wiring (spec 025); its own suite is browserAppSetup.test.ts. */
+const mockBrowserAppSetup = {
+  installBrowserBeforeReady: vi.fn(),
+  installBrowserAfterReady: vi.fn()
+}
+
 /** Renderer token file — the source of truth for the window's paint colour. */
 const DESIGN_TOKENS_PATH = join(__dirname, '../renderer/src/styles/design-tokens.css')
 
@@ -185,6 +191,9 @@ describe('Main Process - Window Creation', () => {
     vi.doMock('./services/session/defaultSessionPermissions', () => ({
       installDefaultSessionPermissions: vi.fn()
     }))
+
+    // Mock the built-in browser wiring (covered by browserAppSetup.test.ts)
+    vi.doMock('./services/browser/browserAppSetup', () => mockBrowserAppSetup)
 
     // Mock menu module
     vi.doMock('./menu', () => ({
@@ -1274,6 +1283,24 @@ describe('Main Process - Window Creation', () => {
 
       const { electronApp } = await import('@electron-toolkit/utils')
       expect(electronApp.setAppUserModelId).toHaveBeenCalledWith(APP_ID)
+    })
+  })
+
+  describe('Built-in browser wiring (spec 025)', () => {
+    it('installs the browser setup before ready, once, and after ready with the project session and lock', async () => {
+      mockBrowserAppSetup.installBrowserBeforeReady.mockClear()
+      mockBrowserAppSetup.installBrowserAfterReady.mockClear()
+      mockIs.dev = false
+
+      await import('./index')
+
+      expect(mockBrowserAppSetup.installBrowserBeforeReady).toHaveBeenCalledTimes(1)
+      expect(mockBrowserAppSetup.installBrowserBeforeReady).toHaveBeenCalledWith(mockApp)
+      await vi.waitFor(() => expect(mockBrowserAppSetup.installBrowserAfterReady).toHaveBeenCalledTimes(1))
+      const deps = mockBrowserAppSetup.installBrowserAfterReady.mock.calls[0][0]
+      expect(deps).toHaveProperty('defaultSession')
+      expect(deps).toHaveProperty('projectSession')
+      expect(deps).toHaveProperty('lockService')
     })
   })
 

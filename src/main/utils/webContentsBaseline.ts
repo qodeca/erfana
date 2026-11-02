@@ -42,10 +42,36 @@ export function applyWebContentsBaseline(wc: BaselineTarget): void {
   })
 }
 
-export function registerWebContentsBaseline(app: {
-  on(event: 'web-contents-created', listener: (e: unknown, wc: WebContents) => void): unknown
-}): void {
+/**
+ * Decides, per created `webContents`, whether the baseline applies. The
+ * default applies it to every one. The built-in browser passes its session
+ * registry (`services/browser/browserSessionRegistry.ts`): only REGISTERED
+ * browser view ids skip the baseline, and an unregistered `webContents` in a
+ * browser session gets the baseline and is then refused (spec 025, ADR 0009
+ * decision 5).
+ */
+export interface BaselineGate<T> {
+  classify(wc: T): 'baseline' | 'exempt' | 'refused'
+  refuse(wc: T): void
+}
+
+const APPLY_TO_ALL: BaselineGate<unknown> = {
+  classify: () => 'baseline',
+  refuse: () => undefined
+}
+
+export function registerWebContentsBaseline<T = WebContents>(
+  app: {
+    on(event: 'web-contents-created', listener: (e: unknown, wc: T) => void): unknown
+  },
+  gate: BaselineGate<T> = APPLY_TO_ALL
+): void {
   app.on('web-contents-created', (_event, wc) => {
+    const verdict = gate.classify(wc)
+    if (verdict === 'exempt') return
+    // A refused webContents gets the baseline first, so it can open and
+    // navigate nothing in the moment before it is closed.
     applyWebContentsBaseline(wc as unknown as BaselineTarget)
+    if (verdict === 'refused') gate.refuse(wc)
   })
 }
