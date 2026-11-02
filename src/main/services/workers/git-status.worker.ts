@@ -213,6 +213,22 @@ function durableMessage(stderr: string): string {
   }
 }
 
+// -- Excluded paths ----------------------------------------------------------
+
+/**
+ * The built-in browser's profile and captures (spec 025, 025-FR-015) are never
+ * project changes. `.erfana/browser/.gitignore` normally hides them, but an
+ * agent or script can delete that file; without this exclusion the git panel
+ * would then list every Chromium profile file until the next browser tab
+ * rewrites it.
+ */
+export const BROWSER_PROFILE_PATHSPEC = [':(top,exclude).erfana/browser'] as const
+
+/** True for a repo-relative path inside `.erfana/browser/` (isomorphic-git filter). */
+export function isBrowserProfilePath(relPath: string): boolean {
+  return relPath === '.erfana/browser' || relPath.startsWith('.erfana/browser/')
+}
+
 // -- isomorphic-git strategy -------------------------------------------------
 
 async function executeIsomorphicGit(projectPath: string): Promise<GitStatusResponse> {
@@ -243,7 +259,7 @@ async function executeIsomorphicGit(projectPath: string): Promise<GitStatusRespo
 
     // Fresh cache per call: a persistent cache accumulates isomorphic-git internal
     // objects that trigger V8 cppgc thread-safety assertions in worker threads.
-    const matrix = await git.statusMatrix({ fs, dir: projectPath, cache: {} })
+    const matrix = await git.statusMatrix({ fs, dir: projectPath, cache: {}, filter: (f) => !isBrowserProfilePath(f) })
     const mapped = mapStatusMatrix(matrix, projectPath)
 
     return { isGitRepo: true, branch, isDetached, files: mapped.entries, counts: mapped.counts, truncated: mapped.truncated }
@@ -289,7 +305,7 @@ export async function executeNativeGit(projectPath: string, gitPath: string): Pr
 
   const statusResult = await execFileAsync(
     gitPath,
-    [...hardeningArgs, 'status', '--porcelain=v1', '--branch', '-z', '--no-renames', '-uall', '--ignore-submodules=all'],
+    [...hardeningArgs, 'status', '--porcelain=v1', '--branch', '-z', '--no-renames', '-uall', '--ignore-submodules=all', '--', ...BROWSER_PROFILE_PATHSPEC],
     { ...hardenedSpawnOptions(), maxBuffer: GIT_STATUS.NATIVE_GIT_MAX_BUFFER, timeout: GIT_STATUS.NATIVE_GIT_TIMEOUT }
   )
 
