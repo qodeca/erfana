@@ -702,11 +702,12 @@ function buildFuseConfig(electronPlatformName, { isTestBuild: testBuild = false 
     // Prevents attackers from executing arbitrary code via env vars
     [FuseV1Options.RunAsNode]: false,
 
-    // Cookie encryption stays off: the app persists no cookies worth protecting
-    // (file:// main window, in-memory preview partitions), and turning it on
-    // adds a keychain read at every start. Re-evaluated in
-    // docs/spikes/2026-10-22-asar-integrity.md.
-    [FuseV1Options.EnableCookieEncryption]: false,
+    // Cookie encryption is ON (ADR 0010, spec 025-FR-017): the built-in
+    // browser keeps a persistent per-project profile with sign-in cookies, so
+    // cookies on disk are encrypted with the OS key store. One-way: Electron
+    // cannot read encrypted cookies once the fuse is off again, so it must
+    // never be turned back off. Start-up cost is measured by 025-NFR-010.
+    [FuseV1Options.EnableCookieEncryption]: true,
 
     // Disable NODE_OPTIONS environment variable
     // Prevents command injection via environment
@@ -2276,7 +2277,7 @@ async function afterPack(context) {
 
   console.log('✅ Electron fuses applied successfully');
   console.log('   - RunAsNode: disabled');
-  console.log('   - CookieEncryption: disabled');
+  console.log('   - CookieEncryption: enabled');
   console.log('   - NodeOptions: disabled');
   console.log(`   - NodeCliInspect: ${isTestBuild ? 'ENABLED (test build)' : 'disabled'}`);
   console.log(`   - AsarIntegrity: enabled (embedded ${integrity ? `${integrity.algorithm} ${integrity.hash}` : 'n/a on this platform'})`);

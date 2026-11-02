@@ -8539,7 +8539,7 @@
       "quote": "shipped under the name `assertResourcesDestNoRepoLeak` (`scripts/fuses.js`",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:1930",
+      "source": "scripts/fuses.js:1931",
       "match": "function assertResourcesDestNoRepoLeak("
     },
     {
@@ -9035,7 +9035,7 @@
       "quote": "| `packedPayloadDir()` in `scripts/fuses.js` |",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:755",
+      "source": "scripts/fuses.js:756",
       "match": "function packedPayloadDir(resourcesDir)"
     },
     {
@@ -9045,7 +9045,7 @@
       "quote": "| `assertPackagedAsarContents()` in `scripts/fuses.js` |",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:1379",
+      "source": "scripts/fuses.js:1380",
       "match": "function assertPackagedAsarContents("
     },
     {
@@ -9075,7 +9075,7 @@
       "quote": "`GrantFileProtocolExtraPrivileges` stays on until a custom-protocol move",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:735",
+      "source": "scripts/fuses.js:736",
       "match": "[FuseV1Options.GrantFileProtocolExtraPrivileges]: true,"
     },
     {
@@ -9085,7 +9085,7 @@
       "quote": "Unpack patterns name binaries only (`assertUnpackPatternsBinaryOnly`)",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:1621",
+      "source": "scripts/fuses.js:1622",
       "match": "function assertUnpackPatternsBinaryOnly(patterns)"
     },
     {
@@ -9105,7 +9105,7 @@
       "quote": "`assertEffectiveAsarConfig` compares the effective config",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:1664",
+      "source": "scripts/fuses.js:1665",
       "match": "function assertEffectiveAsarConfig(config"
     },
     {
@@ -9826,11 +9826,11 @@
       "id": "docs-security/04",
       "audience": "developer",
       "doc": "docs/security.md",
-      "quote": "| `EnableCookieEncryption` | `false` |",
+      "quote": "| `EnableCookieEncryption` | `true` |",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:709",
-      "match": "[FuseV1Options.EnableCookieEncryption]: false"
+      "source": "scripts/fuses.js:710",
+      "match": "[FuseV1Options.EnableCookieEncryption]: true,"
     },
     {
       "id": "docs-security/05",
@@ -9839,7 +9839,7 @@
       "quote": "| `EnableNodeOptionsEnvironmentVariable` | `false` |",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:713",
+      "source": "scripts/fuses.js:714",
       "match": "[FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false"
     },
     {
@@ -9849,7 +9849,7 @@
       "quote": "| `EnableNodeCliInspectArguments` | `isTestBuild` – `false` on every production build",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:718",
+      "source": "scripts/fuses.js:719",
       "match": "[FuseV1Options.EnableNodeCliInspectArguments]: testBuild"
     },
     {
@@ -9859,7 +9859,7 @@
       "quote": "| `EnableEmbeddedAsarIntegrityValidation` | `true` |",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:723",
+      "source": "scripts/fuses.js:724",
       "match": "[FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true"
     },
     {
@@ -9869,7 +9869,7 @@
       "quote": "| `OnlyLoadAppFromAsar` | `true` |",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:727",
+      "source": "scripts/fuses.js:728",
       "match": "[FuseV1Options.OnlyLoadAppFromAsar]: true"
     },
     {
@@ -9879,7 +9879,7 @@
       "quote": "| `LoadBrowserProcessSpecificV8Snapshot` | `false` |",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:731",
+      "source": "scripts/fuses.js:732",
       "match": "[FuseV1Options.LoadBrowserProcessSpecificV8Snapshot]: false"
     },
     {
@@ -9889,7 +9889,7 @@
       "quote": "| `GrantFileProtocolExtraPrivileges` | `true` |",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:735",
+      "source": "scripts/fuses.js:736",
       "match": "[FuseV1Options.GrantFileProtocolExtraPrivileges]: true"
     },
     {
@@ -9899,7 +9899,7 @@
       "quote": "| `WasmTrapHandlers` | `true` |",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:738",
+      "source": "scripts/fuses.js:739",
       "match": "[FuseV1Options.WasmTrapHandlers]: true"
     },
     {
@@ -9919,7 +9919,7 @@
       "quote": "🔒 PRODUCTION BUILD: All security fuses enabled",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:2206",
+      "source": "scripts/fuses.js:2207",
       "match": "PRODUCTION BUILD: All security fuses enabled"
     },
     {
@@ -9929,7 +9929,7 @@
       "quote": "- Fuse wire read back and matches (all 9 fuses pinned)",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:2284",
+      "source": "scripts/fuses.js:2285",
       "match": "Fuse wire read back and matches (all 9 fuses pinned)"
     },
     {
@@ -10109,7 +10109,7 @@
       "quote": "`assertEffectiveAsarConfig` compares the build",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:1664",
+      "source": "scripts/fuses.js:1665",
       "match": "function assertEffectiveAsarConfig(config, platformOptions = {}) {"
     },
     {
@@ -10119,7 +10119,7 @@
       "quote": "`assertUnpackPatternsBinaryOnly` refuses an unpack pattern",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:1621",
+      "source": "scripts/fuses.js:1622",
       "match": "function assertUnpackPatternsBinaryOnly(patterns) {"
     },
     {
@@ -10129,7 +10129,7 @@
       "quote": "`assertPackagedAsarContents` reads the archive header",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:1379",
+      "source": "scripts/fuses.js:1380",
       "match": "function assertPackagedAsarContents("
     },
     {
@@ -10139,7 +10139,7 @@
       "quote": "It reads the exe's resources with resedit's `ignoreCert: true` option",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:1733",
+      "source": "scripts/fuses.js:1734",
       "match": "{ ignoreCert: true }"
     },
     {
@@ -12064,7 +12064,7 @@
       "quote": "`scripts/fuses.js` flips `EnableEmbeddedAsarIntegrityValidation` and `OnlyLoadAppFromAsar` on",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:727",
+      "source": "scripts/fuses.js:728",
       "match": "[FuseV1Options.OnlyLoadAppFromAsar]: true,"
     },
     {
@@ -12074,7 +12074,7 @@
       "quote": "The list is pinned in three places that must change together: `ASAR_OPTIONS` / `ASAR_UNPACK` in `scripts/fuses.js`",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:1572",
+      "source": "scripts/fuses.js:1573",
       "match": "const ASAR_OPTIONS = Object.freeze({ smartUnpack: false });"
     },
     {
@@ -12124,7 +12124,7 @@
       "quote": "`readEmbeddedAsarIntegrity` opens the `.exe` with `{ ignoreCert: true }`",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:1733",
+      "source": "scripts/fuses.js:1734",
       "match": "{ ignoreCert: true }"
     },
     {
@@ -12285,7 +12285,7 @@
       "quote": "On a test build, refuses a product name without the `(TEST BUILD)` suffix",
       "status": "fixed",
       "evidence": "source",
-      "source": "scripts/fuses.js:2204",
+      "source": "scripts/fuses.js:2205",
       "match": "assertTestBuildName(productFilename);",
       "note": "said afterPack renames the bundle; it only asserts the name"
     },
@@ -12377,7 +12377,7 @@
       "quote": "refuses a test build whose product name lacks the `(TEST BUILD)` suffix",
       "status": "fixed",
       "evidence": "source",
-      "source": "scripts/fuses.js:2204",
+      "source": "scripts/fuses.js:2205",
       "match": "assertTestBuildName(productFilename);",
       "note": "said afterPack renames the bundle for test builds"
     },
@@ -12395,11 +12395,11 @@
       "id": "docs-build-fuses/03",
       "audience": "developer",
       "doc": "docs/build/fuses.md",
-      "quote": "[FuseV1Options.EnableCookieEncryption]: false,",
+      "quote": "[FuseV1Options.EnableCookieEncryption]: true,",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:709",
-      "match": "[FuseV1Options.EnableCookieEncryption]: false,"
+      "source": "scripts/fuses.js:710",
+      "match": "[FuseV1Options.EnableCookieEncryption]: true,"
     },
     {
       "id": "docs-build-fuses/04",
@@ -12408,7 +12408,7 @@
       "quote": "On `win32`, `ensurePatchedConptyBuild` (#305) then requires the source-built",
       "status": "fixed",
       "evidence": "source",
-      "source": "scripts/fuses.js:2235",
+      "source": "scripts/fuses.js:2236",
       "match": "ensurePatchedConptyBuild(packedResourcesDir, context.electronPlatformName, { requireMatch });",
       "note": "afterPack step was undocumented"
     },
@@ -12440,7 +12440,7 @@
       "quote": "the closing summary reads `NodeCliInspect: ENABLED (test build)`",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:2281",
+      "source": "scripts/fuses.js:2282",
       "match": "NodeCliInspect: ${isTestBuild ? 'ENABLED (test build)' : 'disabled'}"
     },
     {
@@ -12478,20 +12478,22 @@
       "audience": "developer",
       "doc": "docs/build/fuses.md",
       "quote": "HTML previews run in in-memory partitions (no `persist:` prefix – `previewSessionPolicy.ts`)",
-      "status": "verified",
+      "status": "removed",
       "evidence": "source",
       "source": "src/main/services/preview/previewSessionPolicy.ts:135",
-      "match": "no `persist:` prefix"
+      "match": "no `persist:` prefix",
+      "note": "Spec 025 (ADR 0010) replaced the 'why it stays off' section; the preview-partition sentence went with it."
     },
     {
       "id": "docs-build-fuses/12",
       "audience": "developer",
       "doc": "docs/build/fuses.md",
       "quote": "the project-lock HMAC secret (`lockHmac.ts`)",
-      "status": "verified",
+      "status": "removed",
       "evidence": "source",
       "source": "src/main/utils/lockHmac.ts:44",
-      "match": "import { safeStorage } from 'electron'"
+      "match": "import { safeStorage } from 'electron'",
+      "note": "Spec 025 (ADR 0010) replaced the 'why it stays off' section; the lockHmac safeStorage sentence went with it."
     },
     {
       "id": "docs-build-fuses/13",
@@ -12816,7 +12818,7 @@
       "quote": "Keep `{ ignoreCert: true }` on the `resedit.NtExecutable.from` call",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:1733",
+      "source": "scripts/fuses.js:1734",
       "match": "resedit.NtExecutable.from(fs.readFileSync(electronBinaryPath), { ignoreCert: true })"
     },
     {
@@ -13782,7 +13784,7 @@
       "quote": "afterPack (`scripts/fuses.js`) leaves `EnableNodeCliInspectArguments` **on**",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:718",
+      "source": "scripts/fuses.js:719",
       "match": "[FuseV1Options.EnableNodeCliInspectArguments]: testBuild,"
     },
     {
@@ -14389,7 +14391,7 @@
       "quote": "leaves the `EnableNodeCliInspectArguments` fuse on",
       "status": "fixed",
       "evidence": "source",
-      "source": "scripts/fuses.js:718",
+      "source": "scripts/fuses.js:719",
       "match": "[FuseV1Options.EnableNodeCliInspectArguments]: testBuild,",
       "note": "Said \"enables the --inspect flag\" without naming the fuse."
     },
@@ -21548,7 +21550,7 @@
       "quote": "`scripts/fuses.js` is 2,370 lines against",
       "status": "verified",
       "evidence": "app",
-      "source": "scripts/fuses.js:2326",
+      "source": "scripts/fuses.js:2327",
       "match": "module.exports",
       "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
@@ -21589,7 +21591,7 @@
       "quote": "**Files**: `scripts/fuses.js` (`assertResourcesSiblingsAllowlist`, `EXPECTED_RESOURCES_ENTRIES`), `scripts/fuses.test.mjs`.",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:1986",
+      "source": "scripts/fuses.js:1987",
       "match": "function assertResourcesSiblingsAllowlist("
     },
     {
@@ -21599,7 +21601,7 @@
       "quote": "`resolvePackedResourcesDir` sits inside that block",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:767",
+      "source": "scripts/fuses.js:768",
       "match": "function resolvePackedResourcesDir(electronPlatformName, appOutDir, electronBinaryPath) {"
     },
     {
@@ -22861,7 +22863,7 @@
       "quote": "the `afterPack` step in `scripts/fuses.js` (`ensurePatchedConptyBuild`)",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:2235",
+      "source": "scripts/fuses.js:2236",
       "match": "ensurePatchedConptyBuild(packedResourcesDir"
     },
     {
@@ -45395,7 +45397,7 @@
       "quote": "refuse it via `assertTestBuildName` unless the product name ends in `(TEST BUILD)`",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:2204",
+      "source": "scripts/fuses.js:2205",
       "match": "assertTestBuildName(productFilename);"
     },
     {
@@ -45405,7 +45407,7 @@
       "quote": "then `assertEffectiveAsarConfig`: the build's effective `asar`/`asarUnpack`",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:2212",
+      "source": "scripts/fuses.js:2213",
       "match": "assertEffectiveAsarConfig(context.packager.config, context.packager.platformSpecificBuildOptions);"
     },
     {
@@ -45415,7 +45417,7 @@
       "quote": "On `win32`, `ensurePatchedConptyBuild` (#305) then requires the source-built, patched `build/Release/conpty.node`",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:2235",
+      "source": "scripts/fuses.js:2236",
       "match": "ensurePatchedConptyBuild(packedResourcesDir, context.electronPlatformName, { requireMatch });"
     },
     {
@@ -45425,7 +45427,7 @@
       "quote": "3. Restore the `node-pty` `spawn-helper` execute bit (`0755`, Unix only).",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:2250",
+      "source": "scripts/fuses.js:2251",
       "match": "chmodNodePtySpawnHelper(spawnHelperResources, { requireMatch });"
     },
     {
@@ -45435,7 +45437,7 @@
       "quote": "4. `ensurePackedMediaBinaries` – copy this pack's cached `ffmpeg` into the bundle",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:2258",
+      "source": "scripts/fuses.js:2259",
       "match": "ensurePackedMediaBinaries("
     },
     {
@@ -45445,7 +45447,7 @@
       "quote": "5. `applyAndVerifyFuses` – flip the Electron fuses",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:2270",
+      "source": "scripts/fuses.js:2271",
       "match": "const { integrity } = await applyAndVerifyFuses({"
     },
     {
@@ -45455,7 +45457,7 @@
       "quote": "6. `assertConfigMatchesAllowlist` + `assertPackagedAppContents` – verify the packed app against the `files:` allowlist",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:2315",
+      "source": "scripts/fuses.js:2316",
       "match": "assertPackagedAppContents(bundleResources, { platform: context.electronPlatformName });"
     },
     {
@@ -45465,7 +45467,7 @@
       "quote": "a merged-config shape check (`assertExtraContentAllowlist`)",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:843",
+      "source": "scripts/fuses.js:844",
       "match": "function assertExtraContentAllowlist(extraContent, { kind, allowedDests, allowedFrom = null }) {"
     },
     {
@@ -45495,7 +45497,7 @@
       "quote": "`pruneForeignFfprobeBinaries` keeps only the build target's `<plat>/<arch>`",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:2233",
+      "source": "scripts/fuses.js:2234",
       "match": "pruneForeignFfprobeBinaries(packedResourcesDir, context.electronPlatformName, context.arch, { requireMatch });"
     },
     {
@@ -45555,7 +45557,7 @@
       "quote": "the only statement after it is `verifyExtraContent()`",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:2323",
+      "source": "scripts/fuses.js:2324",
       "match": "verifyExtraContent(context, { bundleResources, extraFilesDir });"
     },
     {
@@ -45572,11 +45574,11 @@
       "id": "docs-build-fuses/m22",
       "audience": "developer",
       "doc": "docs/build/fuses.md",
-      "quote": "| `EnableCookieEncryption` | `false` |",
+      "quote": "| `EnableCookieEncryption` | `true` |",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:709",
-      "match": "[FuseV1Options.EnableCookieEncryption]: false,"
+      "source": "scripts/fuses.js:710",
+      "match": "[FuseV1Options.EnableCookieEncryption]: true,"
     },
     {
       "id": "docs-build-fuses/m23",
@@ -45585,7 +45587,7 @@
       "quote": "| `EnableNodeOptionsEnvironmentVariable` | `false` |",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:713",
+      "source": "scripts/fuses.js:714",
       "match": "[FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,"
     },
     {
@@ -45595,7 +45597,7 @@
       "quote": "| `EnableEmbeddedAsarIntegrityValidation` | `true` |",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:723",
+      "source": "scripts/fuses.js:724",
       "match": "[FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,"
     },
     {
@@ -45605,7 +45607,7 @@
       "quote": "| `OnlyLoadAppFromAsar` | `true` |",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:727",
+      "source": "scripts/fuses.js:728",
       "match": "[FuseV1Options.OnlyLoadAppFromAsar]: true,"
     },
     {
@@ -45615,7 +45617,7 @@
       "quote": "| `LoadBrowserProcessSpecificV8Snapshot` | `false` |",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:731",
+      "source": "scripts/fuses.js:732",
       "match": "[FuseV1Options.LoadBrowserProcessSpecificV8Snapshot]: false,"
     },
     {
@@ -45625,7 +45627,7 @@
       "quote": "| `GrantFileProtocolExtraPrivileges` | `true` |",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:735",
+      "source": "scripts/fuses.js:736",
       "match": "[FuseV1Options.GrantFileProtocolExtraPrivileges]: true,"
     },
     {
@@ -45635,7 +45637,7 @@
       "quote": "| `WasmTrapHandlers` | `true` |",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:738",
+      "source": "scripts/fuses.js:739",
       "match": "[FuseV1Options.WasmTrapHandlers]: true,"
     },
     {
@@ -45645,7 +45647,7 @@
       "quote": "| `EnableNodeCliInspectArguments` | `isTestBuild` – `false` on every production build |",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:718",
+      "source": "scripts/fuses.js:719",
       "match": "[FuseV1Options.EnableNodeCliInspectArguments]: testBuild,"
     },
     {
@@ -50369,7 +50371,7 @@
       "quote": "Loads the app only from `app.asar`, never from an `app/` folder beside it",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:725",
+      "source": "scripts/fuses.js:726",
       "match": "Load the app only from app.asar - never from an app/ folder beside it"
     },
     {
@@ -50379,7 +50381,7 @@
       "quote": "Follow-up: move the app to a custom protocol, then turn it off",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:734",
+      "source": "scripts/fuses.js:735",
       "match": "protocol, then turn this off."
     },
     {
@@ -50389,7 +50391,7 @@
       "quote": "applyAndVerifyFuses() refuses a bundle without app.asar",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:1774",
+      "source": "scripts/fuses.js:1775",
       "match": "Refusing to ship a bundle that cannot start."
     },
     {
@@ -50409,7 +50411,7 @@
       "quote": "✅ Electron fuses applied successfully",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:2277",
+      "source": "scripts/fuses.js:2278",
       "match": "✅ Electron fuses applied successfully"
     },
     {
@@ -50419,7 +50421,7 @@
       "quote": "   - NodeCliInspect: disabled",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:2281",
+      "source": "scripts/fuses.js:2282",
       "match": "NodeCliInspect: ${isTestBuild ? 'ENABLED (test build)' : 'disabled'}"
     },
     {
@@ -50429,7 +50431,7 @@
       "quote": "   - OnlyLoadAppFromAsar: enabled",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:2283",
+      "source": "scripts/fuses.js:2284",
       "match": "- OnlyLoadAppFromAsar: enabled"
     },
     {
@@ -50439,7 +50441,7 @@
       "quote": "Playwright's Electron launcher starts the app with `--inspect=0` and `--remote-debugging-port=0`",
       "status": "fixed",
       "evidence": "source",
-      "source": "scripts/fuses.js:717",
+      "source": "scripts/fuses.js:718",
       "match": "Test builds: Required for Playwright E2E testing via CDP",
       "note": "Said Playwright needs --remote-debugging-port and that the fuse blocks it; the fuse blocks --inspect, and Playwright passes both (playwright-core coreBundle.js: electronArguments = [\"--inspect=0\", \"--remote-debugging-port=0\", ...])."
     },
@@ -50450,7 +50452,7 @@
       "quote": "Every other fuse has the same value in both builds.",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:718",
+      "source": "scripts/fuses.js:719",
       "match": "[FuseV1Options.EnableNodeCliInspectArguments]: testBuild,"
     },
     {
@@ -50522,7 +50524,7 @@
       "quote": "(`ElectronAsarIntegrity` in `Info.plist` on macOS, an `INTEGRITY`/`ELECTRONASAR` resource in `Erfana.exe` on Windows)",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:721",
+      "source": "scripts/fuses.js:722",
       "match": "Info.plist ElectronAsarIntegrity on macOS, an INTEGRITY/ELECTRONASAR"
     },
     {
@@ -50582,7 +50584,7 @@
       "quote": "`applyAndVerifyFuses` reads the fuse wire back after the flip",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:1783",
+      "source": "scripts/fuses.js:1784",
       "match": "assertFuseWireMatches(await readWire(electronBinaryPath), config);"
     },
     {
@@ -50592,7 +50594,7 @@
       "quote": "A stray `app/` folder beside `app.asar` is refused.",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:1368",
+      "source": "scripts/fuses.js:1369",
       "match": "A stray `app/` folder beside `app.asar` is refused outright"
     },
     {
@@ -50602,7 +50604,7 @@
       "quote": "refuses `electronFuses` and `disableAsarIntegrity`",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:1680",
+      "source": "scripts/fuses.js:1681",
       "match": "electronFuses is set; the fuses are owned by this hook"
     },
     {
@@ -50692,7 +50694,7 @@
       "id": "docs-security/a-t36",
       "audience": "developer",
       "doc": "docs/security.md",
-      "quote": "HTML previews run in in-memory partitions (`PreviewStorageSeal`)",
+      "quote": "HTML previews still run in in-memory partitions",
       "status": "verified",
       "evidence": "source",
       "source": "src/main/services/preview/PreviewSessionFactory.ts:13",
@@ -50702,7 +50704,7 @@
       "id": "docs-security/a-t37",
       "audience": "developer",
       "doc": "docs/security.md",
-      "quote": "API keys and the project-lock secret already use `safeStorage`",
+      "quote": "API keys and the project-lock secret still use `safeStorage` directly",
       "status": "verified",
       "evidence": "source",
       "source": "src/main/services/ApiKeyService.ts:96",
@@ -50713,10 +50715,11 @@
       "audience": "developer",
       "doc": "docs/security.md",
       "quote": "It would add a keychain read to every start",
-      "status": "verified",
+      "status": "removed",
       "evidence": "source",
       "source": "scripts/fuses.js:707",
-      "match": "adds a keychain read at every start"
+      "match": "adds a keychain read at every start",
+      "note": "Spec 025 (ADR 0010) turned the cookie-encryption fuse on; the keychain-read-at-start argument for keeping it off was taken off the page."
     },
     {
       "id": "docs-security/a-t39",
@@ -51148,7 +51151,7 @@
       "quote": "SHA-256 header hash that electron-builder embeds at build time",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.js:1831",
+      "source": "scripts/fuses.js:1832",
       "match": "!== 'SHA256' || integrity.hash !== actual"
     },
     {

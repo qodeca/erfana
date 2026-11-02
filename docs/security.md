@@ -14,14 +14,14 @@ Erfana follows **2025 Electron security best practices** with comprehensive hard
 | Electron Fuses | ✅ all 9 pinned (`strictlyRequireAllFuses`); 5 hardening fuses on | v0.6.0 (all pinned since v0.22.0) |
 | ASAR Packaging | ✅ Enabled (native addons and executables unpacked) | v0.22.0 |
 | ASAR Integrity | ✅ Checked at start-up (`EnableEmbeddedAsarIntegrityValidation` + `OnlyLoadAppFromAsar`); see the limits below | v0.22.0 |
-| Cookie Encryption | ❌ Disabled (no persistent cookies to protect – re-evaluated v0.22.0) | v0.6.0 |
+| Cookie Encryption | ✅ Enabled (the built-in browser keeps per-project sign-in cookies – ADR 0010) | spec 025 |
 | Content Security Policy | ✅ Strict | v0.1.0 |
 | Path confinement in main | ✅ Every `file:*` path argument resolved and checked against the open project | v0.22.0 |
 
 **Notes**:
 - The app's JavaScript ships inside `app.asar`, and the app refuses to start if a single byte of the archive changes while the embedded hash stays the same – see [ASAR Configuration](#asar-configuration) and its limits: on Windows (per-user install) the check raises the bar and makes tampering visible but does not stop a same-user process, which can change `Erfana.exe` too. Native addons and executables (`node-pty`, `ffmpeg`, `ffprobe`, LiteParse) stay real files in `app.asar.unpacked/`, which the check does **not** cover
-- Cookie encryption stays off: Erfana keeps no persistent cookies worth protecting (spike: [docs/spikes/2026-10-22-asar-integrity.md](spikes/2026-10-22-asar-integrity.md))
-- `scripts/fuses.js` pins all 9 fuses of Electron 44 (`strictlyRequireAllFuses`, read back after the flip). Five harden the build – RunAsNode, NodeOptions, NodeCliInspect (the last one only in production builds; see below), EnableEmbeddedAsarIntegrityValidation and OnlyLoadAppFromAsar. EnableCookieEncryption is deliberately `false`; LoadBrowserProcessSpecificV8Snapshot, GrantFileProtocolExtraPrivileges and WasmTrapHandlers stay at Electron's defaults
+- Cookie encryption is on: the built-in browser (spec 025) keeps a persistent per-project profile with sign-in cookies, so cookies on disk are encrypted with the OS key store ([ADR 0010](adrs/0010-turn-on-cookie-encryption.md)). It is one-way – see [Cookie encryption](#cookie-encryption)
+- `scripts/fuses.js` pins all 9 fuses of Electron 44 (`strictlyRequireAllFuses`, read back after the flip). Five harden the build – RunAsNode, NodeOptions, NodeCliInspect (the last one only in production builds; see below), EnableEmbeddedAsarIntegrityValidation and OnlyLoadAppFromAsar. EnableCookieEncryption is `true` (ADR 0010); LoadBrowserProcessSpecificV8Snapshot, GrantFileProtocolExtraPrivileges and WasmTrapHandlers stay at Electron's defaults
 - Test builds (`ERFANA_TEST_BUILD=true`) enable NodeCliInspect for Playwright E2E testing - see [Test Builds](#test-builds-erfana_test_build)
 - `ERFANA_E2E_FORCE_CRASH=1` injects a renderer crash for the error-boundary E2E scenario. Double-gated on `!app.isPackaged`, so a packaged build ignores it - see [Crash Injection](#crash-injection-erfana_e2e_force_crash)
 
@@ -83,7 +83,7 @@ Attackers exploit legitimate Electron features (like `ELECTRON_RUN_AS_NODE`) to 
 | Fuse | Value | Security Impact |
 |------|-------|-----------------|
 | `RunAsNode` | `false` | Disables `ELECTRON_RUN_AS_NODE` env var (prevents arbitrary code execution) |
-| `EnableCookieEncryption` | `false` | Off: no persistent cookies to protect (file:// main window, in-memory preview partitions); settings are not cookies and are unaffected either way |
+| `EnableCookieEncryption` | `true` | On: the built-in browser's per-project profile keeps sign-in cookies, encrypted on disk with the OS key store; one-way – never turn it off again |
 | `EnableNodeOptionsEnvironmentVariable` | `false` | Disables `NODE_OPTIONS` env var (prevents command injection) |
 | `EnableNodeCliInspectArguments` | `isTestBuild` – `false` on every production build | Disables `--inspect` CLI args (prevents remote debugging). `true` only under `ERFANA_TEST_BUILD=true` – see [Test Builds](#test-builds-erfana_test_build) |
 | `EnableEmbeddedAsarIntegrityValidation` | `true` | Refuses to start when `app.asar` no longer matches the header hash embedded at build time (see ASAR Configuration below) |
@@ -107,7 +107,7 @@ await flipFuses(electronBinaryPath, {
   version: FuseVersion.V1,
   resetAdHocDarwinSignature: context.electronPlatformName === 'darwin',
   [FuseV1Options.RunAsNode]: false,
-  [FuseV1Options.EnableCookieEncryption]: false,  // no persistent cookies to protect
+  [FuseV1Options.EnableCookieEncryption]: true,  // ADR 0010 – one-way, never turn off
   [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
   [FuseV1Options.EnableNodeCliInspectArguments]: isTestBuild,  // false in production
   [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
@@ -131,7 +131,7 @@ Build logs show fuses applied during `npm run build:mac`:
    Applying fuses to: release/{version}/mac-arm64/Erfana.app
 ✅ Electron fuses applied successfully
    - RunAsNode: disabled
-   - CookieEncryption: disabled
+   - CookieEncryption: enabled
    - NodeOptions: disabled
    - NodeCliInspect: disabled
    - AsarIntegrity: enabled (embedded <algorithm> <hash>)
@@ -300,7 +300,7 @@ From v0.6.0 until v0.22.0 ASAR was off (v0.21.0 was never released). The recorde
 
 ### Cookie encryption
 
-`EnableCookieEncryption` stays `false`. The main window loads `file://`, HTML previews run in in-memory partitions (`PreviewStorageSeal`), and API keys and the project-lock secret already use `safeStorage`, so the fuse would encrypt nothing of value. It would add a keychain read to every start, and turning it off again later makes encrypted cookies unreadable. Revisit it if Erfana ever keeps a signed-in web session.
+`EnableCookieEncryption` is `true` since spec 025 ([ADR 0010](adrs/0010-turn-on-cookie-encryption.md)). The built-in browser keeps a persistent per-project profile under `.erfana/browser/`, and its sign-in cookies are worth protecting, so Chromium encrypts them with the OS key store (Keychain on macOS, DPAPI on Windows, the Secret Service keyring on Linux). HTML previews still run in in-memory partitions, and API keys and the project-lock secret still use `safeStorage` directly. The fuse is one-way: once it is off again, Electron cannot read the encrypted cookies, so it must never be turned back off. The start-up cost of the key-store read is measured by 025-NFR-010; on Linux without a keyring, the browser shows a notice (025-FR-018).
 
 ---
 
