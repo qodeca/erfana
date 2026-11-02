@@ -1,0 +1,61 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>file:// confinement probe</title>
+<link rel="stylesheet" href="../../hostile.css">
+<script src="../../canary.js"></script>
+</head>
+<body>
+<h1>file:// confinement</h1>
+<p>025-AC-005, 025-FR-005 rule 1. Open this file by its <code>file://</code> path. Its folder is <code>file-confined/site/</code>. A sibling image may display; nothing may read file content – a sibling or outside file by <code>fetch</code>, <code>XMLHttpRequest</code> or a frame's document – and an image outside the folder must not display. A service worker cannot register. <code>__canary</code> has the outcome; the two <code>img</code> results are in <code>#sibling-image</code> and <code>#outside-image</code> (<code>loaded</code> or <code>error</code>).</p>
+<img id="sibling-img" alt="sibling image" src="sibling.svg" width="32" height="32">
+<img id="outside-img" alt="outside image" src="../outside.svg" width="32" height="32">
+<p>Sibling image: <output id="sibling-image"></output> · outside image: <output id="outside-image"></output></p>
+<output id="result"></output>
+<ol id="attempts"></ol>
+<script>
+  ;[['sibling-img', 'sibling-image'], ['outside-img', 'outside-image']].forEach(function (pair) {
+    var img = document.getElementById(pair[0])
+    var out = document.getElementById(pair[1])
+    function report() { out.textContent = img.naturalWidth > 0 ? 'loaded' : 'error' }
+    if (img.complete) report()
+    img.addEventListener('load', report)
+    img.addEventListener('error', report)
+  })
+  var TARGETS = { sibling: 'sibling.txt', subfolder: 'sub/nested.txt', outside: '../outside.txt' }
+  Object.keys(TARGETS).forEach(function (kind) {
+    var url = TARGETS[kind]
+    window.__canary.attempt('fetch ' + kind, function () { return fetch(url).then(function (r) { return r.text() }) })
+    window.__canary.attempt('xhr ' + kind, function () {
+      return new Promise(function (resolve, reject) {
+        var xhr = new XMLHttpRequest()
+        xhr.open('GET', url)
+        xhr.onload = function () { resolve(xhr.responseText) }
+        xhr.onerror = function () { reject(new Error('xhr error')) }
+        xhr.send()
+      })
+    })
+    window.__canary.attempt('iframe contentDocument ' + kind, function () {
+      return new Promise(function (resolve, reject) {
+        var frame = document.createElement('iframe')
+        frame.onload = function () {
+          try {
+            resolve(frame.contentDocument && frame.contentDocument.body ? frame.contentDocument.body.textContent : null)
+          } catch (error) {
+            reject(error)
+          }
+        }
+        frame.src = url
+        document.body.appendChild(frame)
+      })
+    })
+  })
+  window.__canary.attempt('service worker', function () {
+    return navigator.serviceWorker ? navigator.serviceWorker.register('sw.js').then(function () { return 'registered' }) : null
+  })
+</script>
+</body>
+</html>

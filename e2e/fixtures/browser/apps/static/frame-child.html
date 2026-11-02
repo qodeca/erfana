@@ -1,0 +1,33 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Frame child</title>
+<link rel="stylesheet" href="/style.css">
+<script src="/fixture.js"></script>
+<style>body { margin: 4px; background: #fff8e1; }</style>
+</head>
+<body>
+<div class="wrap"><button id="frame-button"><span id="frame-label">Frame button</span></button></div>
+<p>Clock: <output id="clock">0</output> · origin <code id="origin"></code></p>
+<script>
+  var frameName = window.__fixture.param('name') || 'frame'
+  document.getElementById('frame-label').textContent = frameName + ' button'
+  document.getElementById('origin').textContent = location.origin
+  document.getElementById('frame-button').addEventListener('click', function () {
+    window.__fixture.record('click', frameName)
+  })
+  // A clock the test advances (025-AC-028: a clock in a cross-origin frame also stops).
+  var ticks = 0
+  window.__fixture.tick = function () {
+    ticks += 1
+    document.getElementById('clock').textContent = String(ticks)
+    return ticks
+  }
+  // ?error=1: an error from this frame, for the recent-errors list (025-AC-038).
+  if (window.__fixture.param('error') === '1') console.error('Error from frame ' + frameName + ' at ' + location.origin)
+</script>
+</body>
+</html>

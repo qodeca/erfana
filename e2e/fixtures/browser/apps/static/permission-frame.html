@@ -1,0 +1,23 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Permission frame</title>
+<link rel="stylesheet" href="/style.css">
+<script src="/fixture.js"></script>
+</head>
+<body style="margin: 4px; background: #fff8e1">
+<button id="frame-request-camera" type="button">Camera from the frame</button>
+<output id="frame-result-camera"></output>
+<script>
+  document.getElementById('frame-request-camera').addEventListener('click', function () {
+    var out = document.getElementById('frame-result-camera')
+    navigator.mediaDevices.getUserMedia({ video: true }).then(function () { out.textContent = 'granted' }, function (e) {
+      out.textContent = e.name === 'NotAllowedError' ? 'denied' : 'error:' + e.name
+    })
+  })
+</script>
+</body>
+</html>

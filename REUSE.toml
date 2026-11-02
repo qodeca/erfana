@@ -61,3 +61,21 @@ path = [
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2025-2026 Qodeca sp. z o.o."
 SPDX-License-Identifier = "GPL-3.0-only"
+
+# Spec 025 browser fixtures (e2e/fixtures/browser/README.md). The React
+# fixtures' JavaScript bundles are build output that contains React itself
+# (MIT) next to the fixture code, and their source maps embed React's source,
+# so they carry both licences (the .js files say so in their own header too).
+# The bundles' stylesheets hold only fixture CSS and stay under the blanket
+# block. The test certificates and keys are generated on first use into the
+# git-ignored certs/generated/ and never committed.
+[[annotations]]
+path = [
+  "e2e/fixtures/browser/apps/react18/bundle/**/*.js",
+  "e2e/fixtures/browser/apps/react18/bundle/**/*.js.map",
+  "e2e/fixtures/browser/apps/react19/bundle/**/*.js",
+  "e2e/fixtures/browser/apps/react19/bundle/**/*.js.map",
+]
+precedence = "override"
+SPDX-FileCopyrightText = ["2025-2026 Qodeca sp. z o.o.", "Meta Platforms, Inc. and affiliates"]
+SPDX-License-Identifier = "GPL-3.0-only AND MIT"

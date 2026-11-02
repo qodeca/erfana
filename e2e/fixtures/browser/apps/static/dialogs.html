@@ -1,0 +1,62 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dialogs fixture</title>
+<link rel="stylesheet" href="/style.css">
+<script src="/fixture.js"></script>
+</head>
+<body>
+<h1>Page dialogs and leave-page prompt</h1>
+<p>025-AC-014, 025-AC-075. Every keydown on the page is logged, so typing into an Erfana dialog can be shown not to reach the page.</p>
+<div class="row">
+  <button id="alert" type="button">alert</button>
+  <button id="alert-three" type="button">alert three times</button>
+  <button id="confirm" type="button">confirm</button>
+  <button id="prompt" type="button">prompt</button>
+  <button id="print" type="button">window.print()</button>
+  <label><input id="beforeunload" type="checkbox"> Ask before leaving (beforeunload)</label>
+  <label>File <input id="file-input" type="file"></label>
+</div>
+<p>confirm: <output id="confirm-result"></output> · prompt: <output id="prompt-result"></output></p>
+<ol id="log"></ol>
+<script>
+  var log = window.__fixture.record
+  function on(id, fn) { document.getElementById(id).addEventListener('click', fn) }
+  on('alert', function () { alert('Alert from the page'); log('alert-closed') })
+  on('alert-three', function () {
+    for (var i = 1; i <= 3; i += 1) { alert('Alert ' + i + ' of 3'); log('alert-closed', i) }
+  })
+  on('confirm', function () {
+    var answer = confirm('Confirm from the page?')
+    document.getElementById('confirm-result').textContent = String(answer)
+    log('confirm', answer)
+  })
+  on('prompt', function () {
+    var answer = prompt('Prompt from the page', 'default text')
+    document.getElementById('prompt-result').textContent = String(answer)
+    log('prompt', answer)
+  })
+  on('print', function () { window.print(); log('print-returned') })
+  function beforeUnload(event) {
+    event.preventDefault()
+    event.returnValue = ''
+  }
+  document.getElementById('beforeunload').addEventListener('change', function (event) {
+    if (event.target.checked) window.addEventListener('beforeunload', beforeUnload)
+    else window.removeEventListener('beforeunload', beforeUnload)
+    log('beforeunload', event.target.checked ? 'on' : 'off')
+  })
+  // Hook form, for a test that arms it without a click (Chromium shows the prompt only after a user gesture on the page).
+  window.__fixture.armBeforeUnload = function () {
+    var box = document.getElementById('beforeunload')
+    box.checked = true
+    box.dispatchEvent(new Event('change'))
+  }
+  document.getElementById('file-input').addEventListener('click', function () { log('file-input-click') })
+  document.addEventListener('keydown', function (event) { log('keydown', event.key) })
+</script>
+</body>
+</html>

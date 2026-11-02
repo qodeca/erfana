@@ -1,0 +1,34 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navigation fixture</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/style.css">
+<script src="/fixture.js"></script>
+</head>
+<body>
+<h1>Navigation by script and link</h1>
+<p>025-AC-002, 025-AC-003, 025-AC-004, 025-AC-025, 025-AC-066, 025-AC-076. The target is <code>?to=</code> (default <code>/page-b.html</code>) – pass a <code>/__hold/&lt;key&gt;</code> URL for a navigation the server holds, or a closed port for the load-error page.</p>
+<div class="row">
+  <button id="script-nav" type="button">Navigate by script</button>
+  <a id="link-nav" href="/page-b.html">Navigate by link</a>
+  <a id="redirect-link" href="/__redirect?to=/page-b.html">Through a redirect</a>
+  <button id="push-state" type="button">pushState</button>
+  <button id="reload" type="button">Reload by script</button>
+</div>
+<script>
+  var to = window.__fixture.param('to') || '/page-b.html'
+  document.getElementById('link-nav').href = to
+  document.getElementById('script-nav').addEventListener('click', function () { location.href = to })
+  document.getElementById('push-state').addEventListener('click', function () {
+    history.pushState({ pushed: true }, '', '/nav.html?pushed=1')
+    window.__fixture.record('pushState', location.href)
+  })
+  document.getElementById('reload').addEventListener('click', function () { location.reload() })
+  window.__fixture.navigate = function (url) { location.href = url || to }
+</script>
+</body>
+</html>

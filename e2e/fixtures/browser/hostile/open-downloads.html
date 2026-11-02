@@ -1,0 +1,38 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hostile – open downloads</title>
+<link rel="stylesheet" href="/hostile.css">
+<script src="/canary.js"></script>
+</head>
+<body>
+<h1>Open downloads</h1>
+<p>025-NFR-001 "open downloads". The page starts downloads of runnable file types and then tries to open what it downloaded. The test asserts nothing was opened or run (OS open-path spy) and no file was saved without the save dialog. <code>?downloads=</code> is the Downloads folder path the test resolves.</p>
+<a id="download-command" href="/__download/evil.command">evil.command</a>
+<a id="download-html" href="/__download/evil.html">evil.html</a>
+<a id="download-desktop" href="/__download/evil.desktop">evil.desktop</a>
+<a id="download-exe" href="/__download/evil.exe">evil.exe</a>
+<output id="result"></output>
+<ol id="attempts"></ol>
+<script>
+  var folder = window.__canary.param('downloads') || '/tmp'
+  // After load: a download started while the page is still parsing keeps its load event from ever firing.
+  window.addEventListener('load', function () {
+  ;['evil.command', 'evil.html', 'evil.desktop', 'evil.exe'].forEach(function (name) {
+    var a = document.createElement('a')
+    a.href = '/__download/' + name
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    var fileUrl = 'file://' + (folder.charAt(0) === '/' ? '' : '/') + folder.replace(/\\/g, '/') + '/' + name
+    window.__canary.attempt('open ' + fileUrl, function () { return window.open(fileUrl) && null })
+    window.__canary.attempt('fetch ' + fileUrl, function () { return fetch(fileUrl).then(function (r) { return r.text() }) })
+  })
+  window.__canary.note('auto downloads of runnable types', 'attempted', 'evil.command, evil.html, evil.desktop, evil.exe')
+  })
+</script>
+</body>
+</html>

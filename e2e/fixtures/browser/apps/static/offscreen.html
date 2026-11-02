@@ -1,0 +1,40 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Off-screen elements fixture</title>
+<link rel="stylesheet" href="/style.css">
+<script src="/fixture.js"></script>
+<style>
+  #tall { height: 250vh; background: linear-gradient(#e3f2fd, #1565c0); }
+  #above-parent { position: relative; height: 60px; background: #ffe0b2; }
+  #above-child { position: absolute; top: 320vh; left: 0; width: 240px; padding: 8px; background: #ef6c00; color: #ffffff; }
+  #zero-size { width: 0; height: 0; overflow: visible; }
+  #zero-child { width: 200px; padding: 8px; background: #ce93d8; }
+  #covered-wrap { position: relative; width: 260px; }
+  #covered { padding: 16px; background: #a5d6a7; }
+  #overlay { position: absolute; inset: 0; background: rgba(33, 33, 33, 0.6); pointer-events: none; }
+  #partly-left { position: relative; left: -120px; width: 240px; padding: 8px; background: #80deea; }
+</style>
+</head>
+<body>
+<h1>Off-screen, zero-size and covered elements</h1>
+<p>025-AC-035. <code>#tall</code> is taller than any viewport; <code>#above-child</code> sits far below its parent, so after <code>__fixture.scrollToAboveChild()</code> Up reaches a parent wholly above the viewport; <code>#zero-size</code> is 0 × 0 with a visible child; <code>#covered</code> lies under a <code>div</code> overlay that lets clicks through.</p>
+<div id="above-parent">Parent at the top<div id="above-child">Child far below its parent</div></div>
+<div class="row">
+  <div id="zero-size"><div id="zero-child">Child of a zero-size element</div></div>
+</div>
+<div style="height: 60px"></div>
+<div id="covered-wrap"><div id="covered">Covered element</div><div id="overlay"></div></div>
+<div id="partly-left">Partly off the left edge</div>
+<div id="tall">Taller than the viewport</div>
+<script>
+  window.__fixture.scrollToAboveChild = function () {
+    document.getElementById('above-child').scrollIntoView({ block: 'center' })
+    return window.scrollY
+  }
+</script>
+</body>
+</html>

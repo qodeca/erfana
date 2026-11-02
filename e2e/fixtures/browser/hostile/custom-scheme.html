@@ -1,0 +1,51 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hostile – open a custom scheme</title>
+<link rel="stylesheet" href="/hostile.css">
+<script src="/canary.js"></script>
+</head>
+<body>
+<h1>Open a custom scheme</h1>
+<p>025-NFR-001 "open a custom scheme", 025-AC-005. Links (for a test that clicks them), a frame and script navigations to app schemes. The test spies the OS external-open path and asserts it was never called; the page only records that it tried.</p>
+<ul id="links"></ul>
+<output id="result"></output>
+<ol id="attempts"></ol>
+<script>
+  var SCHEMES = [
+    'erfana://open?path=/etc/passwd',
+    'erfana-preview://0123456789abcdef/index.html',
+    'vscode://file/etc/passwd',
+    'x-erfana-hostile:ERFANA-HOSTILE-SCHEME-7f3a',
+    'ms-settings:privacy',
+    'smb://127.0.0.1/share'
+  ]
+  var list = document.getElementById('links')
+  SCHEMES.forEach(function (url, i) {
+    var item = document.createElement('li')
+    var link = document.createElement('a')
+    link.id = 'scheme-link-' + i
+    link.href = url
+    link.textContent = url
+    item.appendChild(link)
+    list.appendChild(item)
+    var frame = document.createElement('iframe')
+    frame.src = url
+    frame.style.display = 'none'
+    document.body.appendChild(frame)
+  })
+  window.__canary.note('frames to app schemes', 'attempted', SCHEMES.length + ' schemes')
+  // Script navigations and window.open run only when the test asks: each one may end or replace the page.
+  window.__canary.navigateTo = function (i) {
+    window.__canary.note('navigate ' + SCHEMES[i], 'attempted')
+    location.href = SCHEMES[i]
+  }
+  window.__canary.openScheme = function (i) {
+    return window.__canary.attempt('window.open ' + SCHEMES[i], function () { return window.open(SCHEMES[i]) && null })
+  }
+</script>
+</body>
+</html>

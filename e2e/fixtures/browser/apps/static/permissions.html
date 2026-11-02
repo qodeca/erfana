@@ -1,0 +1,103 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Permissions fixture</title>
+<link rel="stylesheet" href="/style.css">
+<script src="/fixture.js"></script>
+</head>
+<body>
+<h1>Permission requests</h1>
+<p>025-AC-019. Open over HTTPS (most of these APIs need a secure context) and on a different <code>*.test</code> host per site, for example <code>https://camera.test:{port}/permissions.html</code>. Each result lands in <code>#result-&lt;name&gt;</code> as <code>granted</code>, <code>denied</code> or <code>error:&lt;name&gt;</code>. Media tests run with <code>--use-fake-device-for-media-stream</code>.</p>
+<div class="row" id="buttons"></div>
+<div class="row">
+  <video id="video" width="160" height="90" muted playsinline style="background: #000000"></video>
+  <canvas id="lock-target" width="160" height="90" style="background: #b0bec5"></canvas>
+</div>
+<table id="results"></table>
+<p>Cross-origin frame (prompt names both origins):</p>
+<iframe id="permission-frame" title="cross-origin permission frame" allow="camera; microphone; geolocation"></iframe>
+<script>
+  var streams = []
+  function keep(stream) { streams.push(stream); return 'granted' }
+  function denied(error) {
+    return error && (error.name === 'NotAllowedError' || error.code === 1 || error.name === 'SecurityError') ? 'denied' : 'error:' + (error && error.name)
+  }
+  var REQUESTS = {
+    notifications: function () { return Notification.requestPermission() },
+    geolocation: function () {
+      return new Promise(function (resolve) {
+        navigator.geolocation.getCurrentPosition(function () { resolve('granted') }, function (e) { resolve(e.code === 1 ? 'denied' : 'error:' + e.code) })
+      })
+    },
+    camera: function () { return navigator.mediaDevices.getUserMedia({ video: true }).then(keep) },
+    microphone: function () { return navigator.mediaDevices.getUserMedia({ audio: true }).then(keep) },
+    screen: function () { return navigator.mediaDevices.getDisplayMedia({ video: true }).then(keep) },
+    'clipboard-read': function () { return navigator.clipboard.readText().then(function () { return 'granted' }) },
+    'clipboard-write': function () { return navigator.clipboard.writeText('copied by the page').then(function () { return 'granted' }) },
+    midi: function () { return navigator.requestMIDIAccess({ sysex: true }).then(function () { return 'granted' }) },
+    usb: function () { return navigator.usb.requestDevice({ filters: [] }).then(function () { return 'granted' }) },
+    hid: function () { return navigator.hid.requestDevice({ filters: [] }).then(function () { return 'granted' }) },
+    bluetooth: function () { return navigator.bluetooth.requestDevice({ acceptAllDevices: true }).then(function () { return 'granted' }) },
+    'fullscreen-video': function () { return document.getElementById('video').requestFullscreen().then(function () { return 'granted' }) },
+    'pointer-lock': function () { return Promise.resolve(document.getElementById('lock-target').requestPointerLock()).then(function () { return 'granted' }) },
+    'persistent-storage': function () { return navigator.storage.persist().then(function (ok) { return ok ? 'granted' : 'denied' }) },
+    'keyboard-lock': function () { return navigator.keyboard.lock().then(function () { return 'granted' }) }
+  }
+  function run(name) {
+    var out = document.getElementById('result-' + name)
+    out.textContent = 'pending'
+    var result
+    try {
+      result = Promise.resolve(REQUESTS[name]())
+    } catch (error) {
+      result = Promise.reject(error)
+    }
+    return result.then(function (value) { return value }, denied).then(function (value) {
+      out.textContent = String(value)
+      window.__fixture.record('permission', name + ' ' + value)
+      return value
+    })
+  }
+  var buttons = document.getElementById('buttons')
+  var table = document.getElementById('results')
+  Object.keys(REQUESTS).forEach(function (name) {
+    var button = document.createElement('button')
+    button.type = 'button'
+    button.id = 'request-' + name
+    button.textContent = name === 'clipboard-write' ? 'Copy' : 'Request ' + name
+    button.addEventListener('click', function () { run(name) })
+    buttons.appendChild(button)
+    var row = table.insertRow()
+    row.insertCell().textContent = name
+    var cell = row.insertCell()
+    var out = document.createElement('output')
+    out.id = 'result-' + name
+    cell.appendChild(out)
+  })
+  var both = document.createElement('button')
+  both.type = 'button'
+  both.id = 'request-two-at-once'
+  both.textContent = 'Camera and location at once'
+  both.addEventListener('click', function () { run('camera'); run('geolocation') })
+  buttons.appendChild(both)
+  var stop = document.createElement('button')
+  stop.type = 'button'
+  stop.id = 'stop-media'
+  stop.textContent = 'Stop camera, microphone and screen capture'
+  stop.addEventListener('click', function () {
+    streams.splice(0).forEach(function (s) { s.getTracks().forEach(function (t) { t.stop() }) })
+    window.__fixture.record('media-stopped')
+  })
+  buttons.appendChild(stop)
+  window.__fixture.request = run
+  window.__fixture.state = function (name) { return navigator.permissions.query({ name: name }).then(function (s) { return s.state }) }
+
+  var frameOrigin = location.protocol === 'https:' ? '{{origin static https other.test}}' : '{{origin static http other.test}}'
+  document.getElementById('permission-frame').src = frameOrigin + '/permission-frame.html'
+  window.__fixture.removeFrame = function () { document.getElementById('permission-frame').remove() }
+</script>
+</body>
+</html>

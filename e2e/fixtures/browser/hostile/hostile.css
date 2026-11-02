@@ -1,0 +1,17 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+html {
+  font: 15px/1.4 system-ui, sans-serif;
+}
+body {
+  margin: 16px;
+  background: #fff3e0;
+}
+#result {
+  display: block;
+  margin: 12px 0;
+  font-weight: bold;
+}
+#attempts {
+  font: 12px/1.3 ui-monospace, monospace;
+}

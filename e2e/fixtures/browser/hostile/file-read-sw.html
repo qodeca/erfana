@@ -1,0 +1,33 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hostile – read local files from a service worker</title>
+<link rel="stylesheet" href="/hostile.css">
+<script src="/canary.js"></script>
+<script src="/file-targets.js"></script>
+</head>
+<body>
+<h1>Read local files from a service worker</h1>
+<p>025-NFR-001 "read local files (from a service worker)". Open over HTTPS (a service worker needs a secure context). The worker fetches each target and posts back what it got.</p>
+<output id="result"></output>
+<ol id="attempts"></ol>
+<script>
+  window.__canary.attempt('service worker file reads', function () {
+    if (!('serviceWorker' in navigator)) return null
+    return navigator.serviceWorker.register('/file-read-sw-worker.js').then(function (registration) {
+      var worker = registration.installing || registration.waiting || registration.active
+      return new Promise(function (resolve) {
+        navigator.serviceWorker.addEventListener('message', function (event) {
+          var got = event.data.filter(function (r) { return r.ok })
+          resolve(got.length ? got.map(function (r) { return r.url + ' ' + r.text }).join(' | ') : null)
+        })
+        worker.postMessage(window.__fileTargets)
+      })
+    })
+  })
+</script>
+</body>
+</html>

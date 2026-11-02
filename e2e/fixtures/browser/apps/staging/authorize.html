@@ -1,0 +1,30 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Totally the real sign-in page</title>
+<link rel="stylesheet" href="/staging.css">
+</head>
+<body>
+<header><strong>Auth</strong> (second origin)</header>
+<h1>Authorize Staging?</h1>
+<p>The page title differs from the host on purpose: the popup's window title must come from the address, never from the page (025-AC-011).</p>
+<div class="panel">
+  <button id="approve" type="button">Approve</button>
+  <p>Page size <output id="size"></output></p>
+</div>
+<script>
+  var returnOrigin = new URLSearchParams(location.search).get('return_origin')
+  document.getElementById('size').textContent = window.innerWidth + ' × ' + window.innerHeight
+  document.cookie = 'auth_seen=1; path=/; SameSite=Lax'
+  function approve() {
+    if (window.opener && returnOrigin) window.opener.postMessage({ type: 'oauth-code', code: 'fixture-oauth-code' }, returnOrigin)
+    window.close()
+  }
+  document.getElementById('approve').addEventListener('click', approve)
+  if (new URLSearchParams(location.search).get('auto') === '1') approve()
+</script>
+</body>
+</html>

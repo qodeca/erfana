@@ -1,0 +1,53 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hostile – load the renderer entry and the dev server</title>
+<link rel="stylesheet" href="/hostile.css">
+<script src="/canary.js"></script>
+</head>
+<body>
+<h1>Load Erfana's renderer entry and dev-server origin</h1>
+<p>025-NFR-001, 025-AC-005, 025-AC-068. <code>?entry=</code> is the bundled renderer entry the test resolves (<code>file://…/out/renderer/index.html</code>); <code>?dev=</code> is the dev-server origin (default <code>http://localhost:5173</code>). The page frames and fetches both; <code>__canary.navigateTo('entry'|'dev')</code> tries a top-level navigation last, since it ends the page.</p>
+<output id="result"></output>
+<ol id="attempts"></ol>
+<div id="frames"></div>
+<script>
+  var targets = {
+    entry: window.__canary.param('entry'),
+    dev: window.__canary.param('dev') || 'http://localhost:5173'
+  }
+  Object.keys(targets).forEach(function (kind) {
+    var url = targets[kind]
+    if (!url) {
+      window.__canary.note(kind, 'blocked', 'no ' + kind + ' URL given')
+      return
+    }
+    window.__canary.attempt('fetch ' + kind, function () { return fetch(url).then(function (r) { return r.text() }) })
+    window.__canary.attempt('iframe ' + kind, function () {
+      return new Promise(function (resolve, reject) {
+        var frame = document.createElement('iframe')
+        frame.onload = function () {
+          try {
+            resolve(frame.contentDocument && frame.contentDocument.title ? 'title ' + frame.contentDocument.title : null)
+          } catch (error) {
+            reject(error)
+          }
+        }
+        frame.src = url
+        document.getElementById('frames').appendChild(frame)
+      })
+    })
+  })
+  window.__canary.navigateTo = function (kind) {
+    window.__canary.note('navigate ' + kind, 'attempted', targets[kind])
+    location.href = targets[kind]
+  }
+  window.__canary.openWindow = function (kind) {
+    return window.__canary.attempt('window.open ' + kind, function () { return window.open(targets[kind]) && null })
+  }
+</script>
+</body>
+</html>

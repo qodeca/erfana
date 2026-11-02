@@ -1,0 +1,94 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Elements fixture</title>
+<link rel="stylesheet" href="/style.css">
+<script src="/fixture.js"></script>
+<style>
+  .toolbar { display: inline-block; padding: 12px; background: #eceff1; }
+  .w10-6 { width: 10.6px; height: 24px; background: #ff7043; }
+</style>
+</head>
+<body>
+<h1>Elements</h1>
+<p>Labels, refinement and selectors: 025-AC-025, 025-AC-026, 025-AC-027, 025-AC-033, 025-AC-034. Call <code>__fixture.resetCounters()</code> before counting mutations or layout changes. Elements meant to be labelled by their classes carry no id; find them by <code>data-testid</code>.</p>
+
+<!-- A <span> inside a <button> inside a <div>: Up twice reaches the div. -->
+<div id="outer" class="toolbar"><button id="save-button" class="btn primary" type="button"><span id="save-label">Save changes</span></button></div>
+
+<div class="row">
+  <svg data-testid="chart" class="chart chart--bars chart--small" width="200" height="100" viewBox="0 0 200 100" role="img" aria-label="Bar chart">
+    <rect data-testid="bar-a" class="bar bar--a bar--tall" x="20" y="20" width="40" height="80" fill="#1565c0"/>
+    <rect class="bar bar--b" x="80" y="50" width="40" height="50" fill="#2e7d32"/>
+    <circle class="dot" cx="160" cy="40" r="16" fill="#c62828"/>
+  </svg>
+  <canvas id="canvas" width="300" height="150" style="border: 1px solid #757575"></canvas>
+</div>
+
+<div class="row">
+  <div id=":r1:" class="box">React-style id :r1:</div>
+  <div id="1abc" class="box">Digit-first id 1abc</div>
+  <div data-testid="w10-6" class="w10-6"></div>
+  <!-- "div." plus 35 letters is 39 characters, so the emoji spans characters 40 and 41 of the label. -->
+  <div data-testid="emoji-label" class="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa🎯tail box">Emoji at label character 40</div>
+  <!-- The class name itself has the emoji at its 40th character. -->
+  <div data-testid="emoji-class" class="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb🎯tail box">Emoji at class character 40</div>
+  <div data-testid="long-classes" class="alpha-component-wrapper beta-layout-container gamma-visual-style delta-extra epsilon-extra box">Long class list</div>
+</div>
+
+<script>
+  var ctx = document.getElementById('canvas').getContext('2d')
+  ctx.fillStyle = '#1565c0'
+  ctx.fillRect(20, 20, 100, 60)
+  ctx.fillStyle = '#c62828'
+  ctx.beginPath()
+  ctx.arc(200, 75, 40, 0, Math.PI * 2)
+  ctx.fill()
+
+  document.getElementById('save-button').addEventListener('click', function () {
+    window.__fixture.record('click', 'save-button')
+  })
+
+  // Counters the test reads; they live in script, never in the DOM, so
+  // reading them changes nothing (025-AC-026: zero mutations, no layout change).
+  var mutations = 0
+  new MutationObserver(function (records) {
+    mutations += records.length
+  }).observe(document, { subtree: true, childList: true, attributes: true, characterData: true })
+
+  var resizeChanges = 0
+  var firstReport = new WeakSet()
+  var watched = ['outer', 'save-button', 'canvas', ':r1:', '1abc'].map(function (id) {
+    return document.getElementById(id)
+  })
+  var resizeObserver = new ResizeObserver(function (observed) {
+    observed.forEach(function (entry) {
+      if (firstReport.has(entry.target)) resizeChanges += 1
+      else firstReport.add(entry.target)
+    })
+  })
+  watched.forEach(function (el) {
+    resizeObserver.observe(el)
+  })
+
+  window.__fixture.mutations = function () {
+    return mutations
+  }
+  // Parsing and the ready flag already count; a test zeroes both counters before it starts.
+  window.__fixture.resetCounters = function () {
+    mutations = 0
+    resizeChanges = 0
+  }
+  window.__fixture.resizeChanges = function () {
+    return resizeChanges
+  }
+  window.__fixture.bodySize = function () {
+    var r = document.body.getBoundingClientRect()
+    return { width: r.width, height: r.height }
+  }
+</script>
+</body>
+</html>

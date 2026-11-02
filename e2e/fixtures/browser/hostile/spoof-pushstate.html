@@ -1,0 +1,42 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>pushState spoof</title>
+<link rel="stylesheet" href="/hostile.css">
+<script src="/canary.js"></script>
+</head>
+<body>
+<h1>pushState to lookalike paths</h1>
+<p>The page rewrites its own path to read like another site. The address bar must keep showing this host first. <code>__spoof.next()</code> pushes the next path; a cross-origin push throws and is recorded as blocked.</p>
+<output id="result"></output>
+<ol id="attempts"></ol>
+<script>
+  var PATHS = [
+    '/https://accounts.google.com/signin',
+    '/@staging.test/login',
+    '/.staging.test/secure-login',
+    '/%E2%80%AEmoc.elgoog',
+    '/' + 'a'.repeat(2000) + '/staging.test',
+    '//staging.test/login'
+  ]
+  var index = -1
+  window.__spoof = {
+    paths: PATHS,
+    next: function () {
+      index = (index + 1) % PATHS.length
+      var path = PATHS[index]
+      return window.__canary.attempt('pushState ' + path.slice(0, 50), function () {
+        history.pushState({ spoof: index }, '', path)
+        // Only a same-origin push is possible; a URL now on another origin would be a leak.
+        return location.origin !== window.__origin ? location.href : null
+      })
+    }
+  }
+  window.__origin = location.origin
+  window.__spoof.next()
+</script>
+</body>
+</html>

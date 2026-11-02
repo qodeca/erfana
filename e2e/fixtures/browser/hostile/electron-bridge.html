@@ -1,0 +1,46 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hostile – reach window.electron</title>
+<link rel="stylesheet" href="/hostile.css">
+<script src="/canary.js"></script>
+</head>
+<body>
+<h1>Reach window.electron</h1>
+<p>025-NFR-001 "reach window.electron": Erfana's bridge globals and Node globals, from the page, a same-origin frame, a worker and a popup it writes into.</p>
+<output id="result"></output>
+<ol id="attempts"></ol>
+<iframe id="probe-frame" title="same-origin probe frame" src="about:blank"></iframe>
+<button id="open-probe-popup" type="button">Check a popup too</button>
+<script>
+  var GLOBALS = ['electron', 'api', 'imageExportApi', 'overlayApi', '__ERFANA_FORCE_CRASH__', 'require', 'process', 'module', 'Buffer', 'global', 'ipcRenderer']
+  function probe(win, where) {
+    GLOBALS.forEach(function (name) {
+      window.__canary.attempt(where + ' ' + name, function () { return win[name] !== undefined && win[name] !== null ? typeof win[name] : null })
+    })
+  }
+  probe(window, 'page')
+  probe(document.getElementById('probe-frame').contentWindow, 'frame')
+  var workerSource = 'postMessage(' + JSON.stringify(GLOBALS) + '.filter(function (n) { return typeof self[n] !== "undefined" }))'
+  window.__canary.attempt('worker globals', function () {
+    return new Promise(function (resolve, reject) {
+      var worker = new Worker(URL.createObjectURL(new Blob([workerSource], { type: 'text/javascript' })))
+      worker.onmessage = function (event) { resolve(event.data.length ? event.data.join(',') : null) }
+      worker.onerror = function () { reject(new Error('worker failed')) }
+    })
+  })
+  document.getElementById('open-probe-popup').addEventListener('click', function () {
+    var win = window.open('', 'probe', 'width=400,height=300')
+    if (win) {
+      probe(win, 'popup')
+      win.close()
+    } else {
+      window.__canary.note('popup', 'blocked', 'window.open returned null')
+    }
+  })
+</script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Shadow DOM fixture</title>
+<link rel="stylesheet" href="/style.css">
+<script src="/fixture.js"></script>
+</head>
+<body>
+<h1>Shadow DOM</h1>
+<p>025-AC-027 (Up from an open shadow root reaches its host), 025-AC-033 and 025-AC-034 (a closed shadow root).</p>
+<div class="row">
+  <div id="open-host" class="box"></div>
+  <div id="closed-host" class="box"></div>
+  <fixture-closed-card id="closed-card"></fixture-closed-card>
+</div>
+<script>
+  var style = '<style>button { font: inherit; min-height: 32px; padding: 4px 12px; } .inner { padding: 8px; background: #e8f5e9; }</style>'
+
+  var openRoot = document.getElementById('open-host').attachShadow({ mode: 'open' })
+  openRoot.innerHTML = style + '<div class="inner"><button id="open-button" class="shadow-btn"><span id="open-label">Open shadow button</span></button></div>'
+  var nested = document.createElement('div')
+  nested.id = 'nested-host'
+  openRoot.querySelector('.inner').appendChild(nested)
+  nested.attachShadow({ mode: 'open' }).innerHTML = style + '<button id="nested-button">Nested shadow button</button>'
+
+  var closedRoot = document.getElementById('closed-host').attachShadow({ mode: 'closed' })
+  closedRoot.innerHTML = style + '<div class="inner"><button id="closed-button"><span>Closed shadow button</span></button></div>'
+  closedRoot.getElementById('closed-button').addEventListener('click', function () {
+    window.__fixture.record('click', 'closed-button')
+  })
+
+  // A component whose whole UI sits in a closed root, as a design-system widget would.
+  customElements.define('fixture-closed-card', class extends HTMLElement {
+    constructor() {
+      super()
+      var root = this.attachShadow({ mode: 'closed' })
+      root.innerHTML = style + '<div class="inner"><strong>Closed card</strong> <button id="card-action">Card action</button></div>'
+    }
+  })
+</script>
+</body>
+</html>

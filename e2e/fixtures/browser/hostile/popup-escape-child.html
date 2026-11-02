@@ -1,0 +1,26 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hostile popup</title>
+<link rel="stylesheet" href="/hostile.css">
+<script src="/canary.js"></script>
+<script src="/escape-attacks.js"></script>
+</head>
+<body>
+<h1>Hostile popup</h1>
+<output id="result"></output>
+<ol id="attempts"></ol>
+<script>
+  window.__escape.run(window.opener)
+  var depth = Number(window.__canary.param('chain') || '0')
+  if (depth > 0 && depth < 3) {
+    // A popup's own popup must follow the same rules (025-FR-011).
+    var next = window.open('/popup-escape-child.html?chain=' + (depth + 1), 'chain-' + (depth + 1), 'width=360,height=280')
+    window.__canary.note('chained popup ' + (depth + 1), 'attempted', String(Boolean(next)))
+  }
+</script>
+</body>
+</html>

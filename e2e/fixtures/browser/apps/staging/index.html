@@ -1,0 +1,26 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Staging – home</title>
+<link rel="stylesheet" href="/staging.css">
+<script src="/session.js"></script>
+</head>
+<body>
+<header><strong>Staging</strong> · <span id="session">…</span></header>
+<h1>Staging site</h1>
+<p>025-AC-015, 025-AC-022, 025-AC-056. Cookie login below; <a id="basic-link" href="/basic">basic auth on /basic</a>; <a id="login-link" href="/login">popup sign-in on /login</a>; <a href="/app">the app page</a>.</p>
+<form id="login-form" method="post" action="/session">
+  <label>Email <input id="login-username" name="username" type="email" autocomplete="username"></label>
+  <label>Password <input id="login-password" name="password" type="password" autocomplete="current-password"></label>
+  <button id="login-submit" type="submit">Sign in</button>
+</form>
+<form id="logout-form" method="post" action="/logout"><button id="logout" type="submit">Sign out</button></form>
+<ul>
+  <li><a href="/basic-fetch.html">A page whose own request gets the basic-auth challenge</a></li>
+  <li><a href="/basic-frame.html">A cross-origin frame that gets the challenge</a></li>
+</ul>
+</body>
+</html>

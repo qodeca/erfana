@@ -1,0 +1,36 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>RTL title</title>
+<link rel="stylesheet" href="/hostile.css">
+<script src="/canary.js"></script>
+</head>
+<body>
+<h1>Bidi and invisible characters in the title</h1>
+<p>The title carries U+202E (right-to-left override) and other bidi and zero-width characters, so that reversed text looks like another site or file. <code>__spoof.next()</code> moves to the next title; <code>__spoof.titles</code> lists them.</p>
+<output id="result"></output>
+<ol id="attempts"></ol>
+<script>
+  var TITLES = [
+    '‮moc.elgoog.stnuocca//:sptth',
+    'invoice‮fdp.exe',
+    'staging.test⁦ – Erfana⁩',
+    'Sign​ in‍ to⁠ staging.test',
+    '‏‫staging.test‬ login'
+  ]
+  var index = 0
+  function show(i) {
+    document.title = TITLES[i]
+    window.__canary.note('title ' + i, 'attempted', JSON.stringify(TITLES[i]))
+  }
+  window.__spoof = {
+    titles: TITLES,
+    next: function () { index = (index + 1) % TITLES.length; show(index); return index }
+  }
+  show(0)
+</script>
+</body>
+</html>

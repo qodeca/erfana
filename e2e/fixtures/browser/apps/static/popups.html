@@ -1,0 +1,79 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Popups fixture</title>
+<link rel="stylesheet" href="/style.css">
+<script src="/fixture.js"></script>
+</head>
+<body>
+<h1>New tabs and popups</h1>
+<p>025-AC-005, 025-AC-011. Popups load <code>popup-child.html</code> on this origin, or the URL in <code>?popup=</code>. Open this page on <code>staging.test</code> (any site serves any <code>*.test</code> name) for the popup to show that host; a cookie the popup sets is then visible here.</p>
+<div class="row">
+  <a id="blank-link" target="_blank" href="/popup-child.html?via=blank-link">target=_blank link</a>
+  <a id="plain-link" href="/popup-child.html?via=plain-link">Plain link (middle-click)</a>
+</div>
+<div class="row">
+  <button id="open-noopener" type="button">window.open noopener</button>
+  <button id="open-auth" type="button">Sign-in popup 500 × 600</button>
+  <button id="open-default" type="button">window.open(url), no features</button>
+  <button id="open-big" type="button">Popup 99999 × 99999</button>
+  <button id="open-narrow" type="button">Popup 200 × 400</button>
+  <button id="open-over-toolbar" type="button">Popup at left=0, top=0</button>
+  <button id="open-blank-write" type="button">window.open('') and write</button>
+  <button id="open-one" type="button">User-activated popup</button>
+</div>
+<p>Message from popup: <output id="opener-message"></output></p>
+<p>Cookies seen here: <output id="opener-cookie"></output></p>
+<ol id="log"></ol>
+<script>
+  var target = window.__fixture.param('popup') || '/popup-child.html'
+  function child(via) {
+    return target + (target.indexOf('?') === -1 ? '?' : '&') + 'via=' + encodeURIComponent(via)
+  }
+  var opened = []
+  function openPopup(via, name, features) {
+    var url = child(via)
+    var win = name === undefined ? window.open(url) : window.open(url, name, features)
+    opened.push(win)
+    window.__fixture.record(win ? 'opened' : 'blocked', via)
+    return win
+  }
+  function on(id, fn) {
+    document.getElementById(id).addEventListener('click', fn)
+  }
+  on('open-noopener', function () { openPopup('noopener', '_blank', 'noopener') })
+  on('open-auth', function () { openPopup('auth', 'auth', 'width=500,height=600') })
+  on('open-default', function () { openPopup('default') })
+  on('open-big', function () { openPopup('big', 'big', 'width=99999,height=99999') })
+  on('open-narrow', function () { openPopup('narrow', 'narrow', 'width=200,height=400') })
+  on('open-over-toolbar', function () { openPopup('over-toolbar', 'positioned', 'width=500,height=400,left=0,top=0') })
+  on('open-blank-write', function () {
+    var win = window.open('')
+    window.__fixture.record(win ? 'opened' : 'blocked', 'blank-write')
+    if (win) win.document.write('<!doctype html><title>Written by opener</title><h1 id="written">Written by the opener</h1>')
+  })
+  var userOpens = 0
+  on('open-one', function () {
+    userOpens += 1
+    openPopup('user-' + userOpens, 'user' + userOpens, 'width=500,height=400')
+  })
+
+  // Called through page.evaluate, so there is no user activation (025-AC-011: 6 opens, "Pop-up blocked").
+  window.__fixture.openMany = function (count) {
+    var results = []
+    for (var i = 0; i < (count || 6); i += 1) results.push(openPopup('auto-' + i, 'auto' + i, 'width=400,height=300') !== null)
+    return results
+  }
+  window.__fixture.opened = function () { return opened.length }
+
+  window.addEventListener('message', function (event) {
+    document.getElementById('opener-message').textContent = String(event.data)
+    document.getElementById('opener-cookie').textContent = document.cookie
+    window.__fixture.record('message', String(event.data) + ' from ' + event.origin)
+  })
+</script>
+</body>
+</html>

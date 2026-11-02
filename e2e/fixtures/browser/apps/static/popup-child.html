@@ -1,0 +1,32 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Popup page – this title must not reach the window title</title>
+<link rel="stylesheet" href="/style.css">
+<script src="/fixture.js"></script>
+</head>
+<body style="background: #f3e5f5">
+<h1 id="popup">Popup page</h1>
+<p>Opened via <code id="via"></code>. Page size <output id="size"></output>; opener <output id="has-opener"></output>.</p>
+<button id="send-ok" type="button">Send ok to the opener and close</button>
+<script>
+  document.getElementById('via').textContent = window.__fixture.param('via') || '(none)'
+  function report() {
+    document.getElementById('size').textContent = window.innerWidth + ' × ' + window.innerHeight
+  }
+  report()
+  window.addEventListener('resize', report)
+  document.getElementById('has-opener').textContent = window.opener ? 'yes' : 'no'
+  document.cookie = 'popup_cookie=set-in-popup; path=/; SameSite=Lax'
+  function sendOk() {
+    if (window.opener) window.opener.postMessage('ok', '*')
+    window.close()
+  }
+  document.getElementById('send-ok').addEventListener('click', sendOk)
+  if (window.__fixture.param('auto') === '1') sendOk()
+</script>
+</body>
+</html>

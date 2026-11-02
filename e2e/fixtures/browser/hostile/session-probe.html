@@ -1,0 +1,50 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hostile – session isolation probe</title>
+<link rel="stylesheet" href="/hostile.css">
+<script src="/canary.js"></script>
+</head>
+<body>
+<h1>Session isolation probe</h1>
+<p>025-AC-046: a cookie, a local-storage entry and a permission set in a browser tab must be absent from Erfana's own session and from the HTML Preview's session, and the reverse. <code>__probe.write()</code> sets <code>erfana_isolation_probe=7f3a</code> as a persistent cookie, in <code>localStorage</code> and in IndexedDB, and asks for notifications; <code>__probe.read()</code> reports what this origin sees.</p>
+<output id="result"></output>
+<pre id="seen"></pre>
+<ol id="attempts"></ol>
+<script>
+  var KEY = 'erfana_isolation_probe'
+  var VALUE = '7f3a'
+  window.__probe = {
+    write: function () {
+      document.cookie = KEY + '=' + VALUE + '; Max-Age=86400; path=/; SameSite=Lax'
+      localStorage.setItem(KEY, VALUE)
+      return new Promise(function (resolve) {
+        var open = indexedDB.open(KEY, 1)
+        open.onupgradeneeded = function () { open.result.createObjectStore('probe') }
+        open.onsuccess = function () {
+          var tx = open.result.transaction('probe', 'readwrite')
+          tx.objectStore('probe').put(VALUE, KEY)
+          tx.oncomplete = function () { resolve(true) }
+        }
+        open.onerror = function () { resolve(false) }
+      }).then(function () {
+        return typeof Notification !== 'undefined' ? Notification.requestPermission() : 'no Notification API'
+      })
+    },
+    read: function () {
+      var seen = {
+        cookie: document.cookie,
+        localStorage: Object.keys(localStorage).map(function (k) { return k + '=' + localStorage.getItem(k) }),
+        notification: typeof Notification !== 'undefined' ? Notification.permission : 'no Notification API'
+      }
+      document.getElementById('seen').textContent = JSON.stringify(seen, null, 2)
+      return seen
+    }
+  }
+  window.__probe.read()
+</script>
+</body>
+</html>

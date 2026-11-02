@@ -1,0 +1,43 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Downloads fixture</title>
+<link rel="stylesheet" href="/style.css">
+<script src="/fixture.js"></script>
+</head>
+<body>
+<h1>Downloads</h1>
+<p>025-AC-005, 025-AC-020.</p>
+<ul>
+  <li><a id="download-link" href="/__download/report.txt?bytes=2048">report.txt (2 KiB)</a></li>
+  <li><a id="download-unsafe-name" href="/__download/..%2F..%2Fevil%3Cname%3E%3A%7C%3F.txt">A file name to sanitise</a></li>
+  <li><a id="download-drop" href="/__download-drop/dropped.bin?bytes=1048576">dropped.bin – the server drops it halfway</a></li>
+  <li><a id="download-held" href="/__download-held/held.bin?key=download&amp;bytes=1048576">held.bin – half now, the rest on <code>held.release('download')</code></a></li>
+  <li><button id="download-blob" type="button">blob: download of this origin</button></li>
+</ul>
+<ol id="log"></ol>
+<script>
+  function clickAnchor(href, name) {
+    var a = document.createElement('a')
+    a.href = href
+    if (name) a.download = name
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+  }
+  document.getElementById('download-blob').addEventListener('click', function () {
+    var url = URL.createObjectURL(new Blob(['blob download fixture\n'], { type: 'text/plain' }))
+    clickAnchor(url, 'blob.txt')
+    window.__fixture.record('blob-download', url)
+  })
+  // Through page.evaluate: a download with no user action (025-AC-020, "several files").
+  window.__fixture.downloadWithoutGesture = function (name) {
+    clickAnchor('/__download/' + encodeURIComponent(name || 'second.txt'))
+    window.__fixture.record('download-without-gesture', name || 'second.txt')
+  }
+</script>
+</body>
+</html>

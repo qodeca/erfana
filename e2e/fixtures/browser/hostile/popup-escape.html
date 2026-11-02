@@ -1,0 +1,31 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hostile – escape through popups</title>
+<link rel="stylesheet" href="/hostile.css">
+<script src="/canary.js"></script>
+</head>
+<body>
+<h1>Escape through popups</h1>
+<p>025-NFR-001 "escape through popups". Opens a same-site popup and a cross-site popup (on <code>hostile-other.test</code>); each runs <code>escape-attacks.js</code> and posts its results here, where they join this page's canary as <code>popup: …</code>. The popup also opens a popup of its own (a chain). Click <code>#open-popups</code>, or call <code>__canary.openPopups()</code> with a user gesture already given.</p>
+<button id="open-popups" type="button">Open the popups</button>
+<output id="result"></output>
+<ol id="attempts"></ol>
+<script>
+  var otherOrigin = location.protocol === 'https:' ? '{{origin hostile https hostile-other.test}}' : '{{origin hostile http hostile-other.test}}'
+  window.__canary.openPopups = function () {
+    var same = window.open('/popup-escape-child.html?chain=1', 'same-site', 'width=420,height=320')
+    var cross = window.open(otherOrigin + '/popup-escape-child.html?chain=1', 'cross-site', 'width=420,height=320')
+    window.__canary.note('popups opened', 'attempted', String(Boolean(same)) + ',' + String(Boolean(cross)))
+  }
+  document.getElementById('open-popups').addEventListener('click', window.__canary.openPopups)
+  window.addEventListener('message', function (event) {
+    if (!event.data || !event.data.attack) return
+    window.__canary.note('popup ' + event.origin + ': ' + event.data.attack, event.data.outcome, event.data.detail)
+  })
+</script>
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Console and network errors fixture</title>
+<link rel="stylesheet" href="/style.css">
+<script src="/fixture.js"></script>
+</head>
+<body>
+<h1>Console and network errors</h1>
+<p>025-AC-038, 025-AC-067, 025-AC-080. <code>__fixture.runSequence()</code> (or <code>?auto=1</code>, after load) logs 3 warnings, 25 errors and 1 warning, then requests a 500 and an <code>*.invalid</code> host. Each button below makes one more kind of failure.</p>
+<div class="row">
+  <button id="throw" type="button">Uncaught exception</button>
+  <button id="reject" type="button">Unhandled rejection</button>
+  <button id="fetch-404" type="button">404 request</button>
+  <button id="fetch-cors" type="button">CORS-blocked request</button>
+  <button id="fetch-cors-ok" type="button">CORS-open request (control)</button>
+  <button id="fetch-21" type="button">21 failed requests</button>
+  <button id="worker-fail" type="button">Failed request in a worker</button>
+  <button id="cancelled" type="button">Cancelled request</button>
+</div>
+<iframe id="error-frame" title="cross-origin frame that logs an error"></iframe>
+<ol id="log"></ol>
+<script>
+  var log = window.__fixture.record
+  var otherOrigin = location.protocol === 'https:' ? '{{origin static https other.test}}' : '{{origin static http other.test}}'
+  function settle(promise, label) {
+    return promise.then(function (r) { log('response', label + ' ' + r.status) }, function (e) { log('request-failed', label + ' ' + e.name) })
+  }
+  function on(id, fn) { document.getElementById(id).addEventListener('click', fn) }
+
+  window.__fixture.runSequence = function () {
+    var i
+    for (i = 1; i <= 3; i += 1) console.warn('early warning ' + i)
+    for (i = 1; i <= 25; i += 1) console.error('error ' + i)
+    console.warn('final warning')
+    return Promise.all([
+      settle(fetch('/__status/500'), '500'),
+      settle(fetch('http://errors.invalid/missing'), 'invalid-host')
+    ])
+  }
+  on('throw', function () { setTimeout(function () { throw new Error('Uncaught fixture exception') }) })
+  on('reject', function () { Promise.reject(new Error('Unhandled fixture rejection')) })
+  on('fetch-404', function () { settle(fetch('/__status/404'), '404') })
+  on('fetch-cors', function () { settle(fetch(otherOrigin + '/__status/200'), 'cors-blocked') })
+  on('fetch-cors-ok', function () { settle(fetch(otherOrigin + '/__cors'), 'cors-open') })
+  on('fetch-21', function () {
+    for (var n = 1; n <= 21; n += 1) settle(fetch('/__status/404?n=' + n), 'failed-' + n)
+  })
+  on('worker-fail', function () {
+    var worker = new Worker('/console-worker.js')
+    worker.onmessage = function (event) { log('worker', event.data) }
+  })
+  on('cancelled', function () {
+    // Held by the server (key "cancel-me") and aborted here: a cancelled request, not a failure.
+    var controller = new AbortController()
+    settle(fetch('/__hold/cancel-me', { signal: controller.signal }), 'cancelled')
+    controller.abort()
+  })
+  window.__fixture.consoleCanary = function (text) { console.log(text) }
+
+  document.getElementById('error-frame').src = otherOrigin + '/frame-child.html?name=error-frame&error=1'
+  if (window.__fixture.param('auto') === '1') window.addEventListener('load', function () { window.__fixture.runSequence() })
+</script>
+</body>
+</html>

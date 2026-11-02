@@ -1,0 +1,19 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hostile frame</title>
+<link rel="stylesheet" href="/hostile.css">
+<script src="/canary.js"></script>
+<script src="/escape-attacks.js"></script>
+</head>
+<body style="margin: 4px">
+<output id="result"></output>
+<ol id="attempts"></ol>
+<script>
+  window.__escape.run(window.parent)
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Auto-download fixture</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<h1>Auto-download</h1>
+<p>Starts a download of <code>auto.txt</code> as soon as it loads, with no user action.</p>
+<script>
+  window.addEventListener('load', function () {
+    var a = document.createElement('a')
+    a.href = '/__download/auto.txt'
+    document.body.appendChild(a)
+    a.click()
+  })
+</script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Staging – basic auth in a cross-origin frame</title>
+<link rel="stylesheet" href="/staging.css">
+</head>
+<body>
+<h1>Basic auth in a cross-origin frame</h1>
+<p>025-AC-022: the box title names the frame's host first – "auth.test, inside staging.test, asks you to sign in".</p>
+<iframe id="basic-frame" title="cross-origin basic-auth frame" style="width: 420px; height: 160px"></iframe>
+<script>
+  var authOrigin = location.protocol === 'https:' ? '{{origin staging https auth.test}}' : '{{origin staging http auth.test}}'
+  document.getElementById('basic-frame').src = authOrigin + '/basic'
+</script>
+</body>
+</html>
