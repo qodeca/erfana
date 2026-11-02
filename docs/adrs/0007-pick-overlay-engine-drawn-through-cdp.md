@@ -1,94 +1,65 @@
 # ADR 0007: Pick overlay drawn by the engine through the DevTools protocol
 
-- **Status**: proposed
+- **Status**: proposed – revised 2026-11-02 after the expert panel (`.local/panel/design-025-adr/`); acceptance waits for the engine-probe commit (solution design § 13, commit 8)
 - **Date**: 2026-11-02
 - **Deciders**: Marcin Obel (owner, pending), Claude Code
-- **Related**: [spec 025](../../specs/spec-t4-025-built-in-browser/requirements/02-requirements.md) 025-FR-025 to 025-FR-029, 025-FR-033, 025-FR-038, 025-NFR-001, 025-NFR-004 · [solution design](../../specs/spec-t4-025-built-in-browser/architecture/001-solution-design.md) § 4, § 5 · [ADR 0005](./0005-sub-frame-preload-one-receive-channel.md) (the preload route this ADR does not take) · [ADR 0008](./0008-freeze-with-debugger-pause-after-capture.md) (shares the debugger session) · [design note](../designs/browser/README.md) § Pick overlay and label
+- **Related**: [spec 025](../../specs/spec-t4-025-built-in-browser/requirements/02-requirements.md) 025-FR-025 to 025-FR-029, 025-FR-033, 025-FR-038, 025-NFR-001, 025-NFR-004 · [solution design](../../specs/spec-t4-025-built-in-browser/architecture/001-solution-design.md) § 4, § 5, § 11 Q1–Q2 · [ADR 0005](./0005-sub-frame-preload-one-receive-channel.md) · [ADR 0008](./0008-freeze-with-debugger-pause-after-capture.md) · [design note](../designs/browser/README.md) § Pick overlay and label
 
 ## Context
 
-The browser tab opens any site. Pick mode must outline the element under the mouse, show a label next to it, let the user refine to parent and child, and read the element's facts for the capture – in the top page and in every frame, including cross-site frames that run in another process, nested, `srcdoc`, `about:blank`-written and sandboxed frames (025-FR-029). 025-NFR-001 asks for **no Erfana code inside the page**: the browser view has no preload, and anything pick mode needs is driven from the main process; a preload is allowed only as a fallback, and then only send-only and frame-checked as in ADR 0005.
+Pick mode must outline the element under the mouse, label it, refine to parent and child, and read its facts – in the top page and in every frame, including cross-site frames in another process, nested, `srcdoc`, `about:blank`-written and sandboxed frames (025-FR-029). 025-NFR-001 asks for no Erfana code inside the page. Hover must keep reaching the page in pick mode (025-FR-025, 025-FR-028), and the highlight must follow the mouse within 50 ms at p95 (025-NFR-004).
 
-Two further rules shape the choice:
+Electron 44 gives main three tools:
 
-- **Hover must keep reaching the page in pick mode** (025-FR-025, 025-FR-028): the "click Pick element, hover the menu open, click the item" route depends on it. Only the press, release, click, context-menu and drag events are kept from the page.
-- **The highlight must follow the mouse within 50 ms** at the 95th percentile (025-NFR-004).
-
-Electron 44 gives the main process three tools that make a preload unnecessary:
-
-- `webContents.debugger` – a DevTools-protocol (CDP) client in main. `sendCommand(method, params, sessionId)` takes a session id, so a flattened auto-attach session reaches child targets (out-of-process frames, workers) over the same connection ([Electron debugger API](https://www.electronjs.org/docs/latest/api/debugger)).
-- `before-mouse-event` on `webContents` – emitted before the page receives a mouse event, with the event's type and view coordinates; `preventDefault` keeps that event from the page ([webContents events](https://www.electronjs.org/docs/latest/api/web-contents)).
-- The CDP `Overlay` domain – `Overlay.highlightNode` with a `HighlightConfig` whose `showInfo` draws the engine's node-info label. The overlay is painted by the engine above the document, outside the DOM, so it changes no layout and no page script can see it. The domain is marked **experimental** in the protocol definition ([Overlay.pdl](https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/pdl/domains/Overlay.pdl)).
+- `webContents.debugger` – a CDP client; `sendCommand(method, params, sessionId)` reaches flattened child sessions ([Electron debugger](https://www.electronjs.org/docs/latest/api/debugger)). Its `detach` event fires "when DevTools is invoked for the attached webContents".
+- `before-mouse-event` – emitted before the page receives a mouse event; `preventDefault` keeps the event from the page. Its `MouseInputEvent` carries view `x`/`y` and screen `globalX`/`globalY` ([webContents](https://www.electronjs.org/docs/latest/api/web-contents)).
+- The CDP `Overlay` domain, **experimental** ([Overlay.pdl](https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/pdl/domains/Overlay.pdl)): `highlightNode` with `showInfo`, and `highlightQuad` / `highlightRect` with a fill and an outline colour.
 
 ## Decision
 
-**Engine-drawn, main-driven picking with no preload.** One CDP session per browser view, owned by main, does the hit test, the highlight and the reads. The page and its frames run no Erfana code.
+**Engine-drawn, main-driven picking with no preload**, one CDP session per view.
 
-1. **One debugger session per view, attached before the first load.** `BrowserCdpSession` (new, `src/main/services/browser/cdp/`) calls `debugger.attach()` when the view is built, then `Target.setAutoAttach({ autoAttach: true, waitForDebuggerOnStart: true, flatten: true })`. Each new child target (iframe in another process, dedicated worker, service worker) gets its domains enabled and then `Runtime.runIfWaitingForDebugger`, and receives its own `Target.setAutoAttach`, so nested out-of-process frames attach too. Events are routed by the `sessionId` of the `message` event. The same session feeds the console and network log (025-FR-038) and the freeze (ADR 0008), so there is one CDP client per view.
-2. **A fixed allow-list of CDP methods.** `cdpAllowList.ts` (new) is a frozen list of method names; `BrowserCdpSession.send` refuses any other name and a unit test pins the list (solution design § 5). `Runtime.evaluate` and `Runtime.callFunctionOn` take only fixed expressions from code (the hang probe and the React lookup of 025-FR-037), never a string built from page data.
-3. **Hit test in main, from `before-mouse-event`.** In pick mode, each `mouseMove` that main sees is hit-tested with `DOM.getNodeForLocation` on the top target. When the hit is the owner element of a frame that runs in another process, main asks the frame's own session with the point moved into the frame's content box (`DOM.getBoxModel` of the owner), and repeats for nested frames. Only one hit test is in flight per view; the latest mouse position wins. The press, release, `contextMenu` and click events get `preventDefault` (the page never sees them, so drags never start); `mouseMove` and `mouseWheel` pass through, so hover content opens and stays and the wheel scrolls.
-4. **Not `Overlay.setInspectMode`.** DevTools' inspect mode swallows mouse moves, so hover menus do not open under it (observed DevTools behaviour, to be confirmed by the first e2e test of commit 13), which breaks the pointer-only route of 025-FR-028. It also confirms on its own click, while 025-FR-053 needs Erfana to re-run the hit test at the click point.
-5. **Highlight with `Overlay.highlightNode` on the session that owns the node.** `backendNodeId` plus a fixed `HighlightConfig`: `showInfo: true`, `showStyles: false`, `showAccessibilityInfo: false`, `showExtensionLines: false`, a translucent fill from `--color-accent-primary` (resolved at build time) for the content box and transparent padding, border and margin. `Overlay.hideHighlight` clears it. In a frame that runs in another process, the highlight is drawn in that frame's widget and clipped to the frame.
-6. **The label is the engine's node-info label.** It shows the tag, `#id` and classes and the box size `W × H` in the engine's own format. The engine elides long class lists itself, so 025-FR-026's exact text ("first three classes, cut to 40 characters") cannot be produced by an engine-drawn label. **This needs an owner choice and a spec change before UI code merges** – see *Owner choice* below.
-7. **Focus emulation while picking.** `Emulation.setFocusEmulationEnabled({ enabled: true })` on every frame target when pick mode starts, `false` when it ends (025-FR-025).
-8. **The same reads serve refinement and capture.** Parent: `DOM.describeNode` on the node's parent; from a shadow root to its host; from a frame's root element to the owner `<iframe>` through `DOM.getFrameOwner` on the parent's session. The selector chain, frame chain, outer HTML, computed and matched styles, box and layout chain of 025-FR-033 are read with `DOM` and `CSS` methods on the owning session. No method needs page JavaScript except the React lookup.
+1. **Session.** `BrowserCdpSession` attaches when the view is built and sends `Target.setAutoAttach({ autoAttach: true, waitForDebuggerOnStart: true, flatten: true })` (fixed parameters). Each child target gets its always-on domains sent **without awaiting each reply**, then `Runtime.runIfWaitingForDebugger`, and its own `setAutoAttach` for nested frames. Popups get a session of the **popup kind**, which has no pick, overlay or freeze methods (§ 5 of the solution design).
+2. **Domains only when needed.** Always on, every target: `Runtime` (console, exceptions, hang probe) and `Log`; `Network` only if the commit-8 probe shows `Log.entryAdded` (source `network`) cannot carry 025-FR-038's failed requests, and then with a bounded request-id map and zero body buffers. `DOM`, `CSS` and `Overlay` are enabled when pick mode starts and disabled when it ends; `Page` only where dialogs need it (ADR 0011). Console objects are released (`Runtime.releaseObjectGroup`, `Runtime.discardConsoleEntries`) after each entry is copied into the log buffer.
+3. **Flood budget.** Per target, at most 200 events and 1 MB of event payload per second; over budget, `Runtime` and `Log` are disabled for that target until the next navigation and the capture notes "logs truncated" (spec change S-14). `DOM.getDocument` is never called with `depth: -1`. Outer HTML is read by `Runtime.callFunctionOn` in an **isolated world** (`Page.createIsolatedWorld`) with a fixed function that cuts the string in the page to 20,001 UTF-16 units before it crosses the protocol (spec change S-14).
+4. **Hit test in main, from screen coordinates.** `before-mouse-event` may fire per frame widget, so an out-of-process frame's events can carry frame-local `x`/`y` (inferred). Main therefore uses `globalX`/`globalY` minus the view's screen origin, then `DOM.getNodeForLocation({ x, y, ignorePointerEventsNone: false })` on the top target – the element the user's click would hit – descending into out-of-process frames through the owner's content quad (`DOM.getContentQuads`, so transformed iframes work). One hit test in flight; the latest position wins. Outside pick mode the mouse router returns at once except for the click guard and the activation tracker.
+5. **Not `Overlay.setInspectMode`** – it swallows mouse moves (hover menus would not open) and confirms on its own click. Commit 8 keeps a probe that shows this.
+6. **The live highlight.** `Overlay.highlightNode` on the owning session, fixed `HighlightConfig`: `showInfo: true`, `showStyles: false`, `showAccessibilityInfo: false`, `showExtensionLines: false`, a low-alpha accent content fill and an opaque contrasting padding and margin band. In forced-colours mode (`nativeTheme.inForcedColorsMode`) the colours come from the system highlight colour. The engine cannot draw the Element picker card's two-tone outline; whether the decided Focus card allows a fill for the live highlight is owner question Q2.
+7. **The label (owner question Q1).** Recommended (the UX panel's view): option A – the engine label next to the element, **plus** the exact 025-FR-026 text from `src/shared/browser/elementLabel.ts` echoed in the pick row's status slot when it has room, replacing the banner's later clauses while hovering. The engine label scales with page zoom, not with Erfana's own zoom, and the engine places it; the echo is the stable, exact form and is what tests assert (a hook returns the requested node and box; one `capturePage` pixel check proves the live paint).
+8. **Crosshair.** Commit 8 probes `webContents.insertCSS('* { cursor: crosshair !important }', { cssOrigin: 'user' })` and whether it reaches frames; if it does not, the crosshair shows over the frame and still image only (spec change S-11).
+9. **Focus emulation** (`Emulation.setFocusEmulationEnabled`) on every frame target while pick mode is on, turned off at **every** pick end.
+10. **Reads.** Refinement and the 025-FR-033 facts use `DOM` and `CSS` on the owning session; the React lookup is the only main-world call (`Runtime.callFunctionOn`, fixed function identity, `userGesture: false`, `awaitPromise: false`, `throwOnSideEffect: true`).
+11. **DevTools coexistence** is proved by the commit-8 probe, not assumed. If opening DevTools detaches Erfana's session and re-attaching breaks DevTools, the recommended answer to Q5 is: pick mode is unavailable while DevTools is open, with the note "Close DevTools to pick", and a pick in progress ends with "DevTools took over – nothing was sent" (spec change S-9, screen change).
 
 ### Frame kinds
 
-| Frame kind | How it is reached | Supported |
-|---|---|---|
-| Top document, same-process frames, `srcdoc`, `about:blank` written by script, `<frame>` | Top target; `DOM.getNodeForLocation` returns the node and its `frameId` | Yes |
-| Cross-site frame in another process, nested at any depth | Auto-attached `iframe` target, flattened session | Yes |
-| Sandboxed frame without `allow-scripts` or `allow-same-origin` | Same as its process placement (in-process, or its own process under Chromium's sandboxed-frame isolation); the DOM and Overlay domains need no page script | Yes; origin recorded as `null` (025-FR-029). The React lookup reports "source not found" because the frame cannot run script |
-| Element inside an open or closed shadow root | CDP sees through both | Yes; the closed-root rule of 025-FR-033 applies to the selector chain |
-| Content of a plugin or PDF viewer in `<embed>` or `<object>` | Not a page document | **No** – the `<embed>` or `<object>` element itself is picked |
-| Content of a `<fencedframe>` | A separate page, not offered as a frame target in the same way (inferred) | **No** – the `<fencedframe>` element itself is picked |
-| `<canvas>`, WebGL, video frames | Pixels, not elements | The element is picked; the screenshot gets the crosshair of 025-FR-034 |
-
-The last three rows are a spec change to 025-FR-029 (solution design § 10). Each "Yes" row has an e2e test in the static-site fixture.
-
-### Owner choice: the label
-
-| Option | What the user sees | Spec change |
-|---|---|---|
-| **A (recommended)** – engine label | Engine-drawn box tint and the engine's label next to the element, in the engine's format (`button.cta.primary.large…  176 × 32`) | 025-FR-026: the label shows the tag, id, classes and size **as the engine formats them**; the 40-character and three-class rules move to the still image, where Erfana draws the label itself |
-| B – engine outline, Erfana label in the pick row | `Overlay.highlightQuad` with an accent `outlineColor` and no fill; the exact 025-FR-026 text in the pick row's status slot while hovering (the design's "status echo") | 025-FR-026: the label is shown in the pick row, not next to the element |
-
-Option A keeps the label next to the element, where the eye already is, and matches DevTools, which the team uses daily. Option B keeps the exact text but moves it away from the element. Both keep the two-tone outline of the Element picker card on the still image only, because the engine cannot draw it; the live highlight is a recorded deviation on that card.
+| Frame kind | Supported |
+|---|---|
+| Top document, same-process frames, `srcdoc`, script-written `about:blank`, `<frame>` | Yes |
+| Cross-site frame in another process, nested, transformed | Yes (auto-attach; owner quad) |
+| Sandboxed without `allow-scripts` / `allow-same-origin` | Yes; origin `null`; React lookup reports "source not found" |
+| Open or closed shadow root | Yes; closed-root rule of 025-FR-033 |
+| Plugin or PDF content in `<embed>` / `<object>`; `<fencedframe>` content | No – the host element is picked (spec change S-2) |
+| `<canvas>`, WebGL, video | The element; crosshair in the screenshot |
 
 ## Consequences
 
-- **No Erfana code in the page.** No preload, no isolated-world script, no `webContents.ipc` listener for the browser view. The hostile-page suite (025-NFR-001) can assert that the page has no `window.electron`, no IPC path and no overlay DOM.
-- **The engine owns the look of the live highlight.** The design's two-tone outline and its forced-colours lines apply on the still image only; the live highlight follows the engine. A `deviates:` marker on the browser component CSS and a row in the Element picker card's exceptions record it.
-- **Dependence on an experimental CDP domain.** `Overlay`, `DOM.getNodeForLocation` and `Emulation.setFocusEmulationEnabled` can change between Chromium versions. Every Electron update (025-NFR-002) runs the pick e2e suite; a failure blocks that update until the session code is fixed.
-- **One debugger per view, always attached.** It costs CDP traffic for every mouse move in pick mode and the log domains while browsing. It also means Chromium's own hung-renderer signal cannot be relied on while a client is attached (inferred from Chromium's `WebContentsImpl::RendererUnresponsive`, which returns early when a debugger is attached); 025-FR-056 therefore uses Erfana's own probe (solution design § 6.4).
-- **Risk – DevTools and Erfana's debugger at once.** Electron's documentation says the debugger `detach` event fires "when DevTools is invoked for the attached webContents", and [electron/electron#14540](https://github.com/electron/electron/issues/14540) reports the session being dropped when DevTools opens. 025-FR-013 needs both at once. Commit 11 of the solution design starts with an e2e probe: open DevTools, then pick, read and freeze. If the session is detached, `BrowserCdpSession` re-attaches on `detach` (reason other than target closed) and the probe repeats. If re-attaching breaks DevTools, the owner chooses between disabling pick mode while DevTools is open (a spec change to 025-FR-013) and shipping with DevTools taking over the page until it closes.
-- **The 50 ms budget is plausible but unmeasured.** Two to four CDP round trips per move on the same machine; the `bench` lane measures it (025-NFR-004). If it misses, the fallback is to hit-test on the top target only and descend into a frame only after the pointer rests for one frame.
+- No Erfana code in the page except fixed read functions run by CDP in an isolated world or, for React, in the main world – both main-driven (S-14 records it in the spec).
+- The live highlight follows the engine's look; the card's two-tone outline is drawn on the still image only (Q2).
+- `Overlay`, `DOM.getFrameOwner`, `DOM.getContentQuads` and `Emulation.setFocusEmulationEnabled` are experimental (`DOM.getNodeForLocation` is not); the probes of commit 8 stay as regression tests and run on every Electron update pull request.
+- `Runtime.enable` is detectable by pages (a known automation tell), which can lower the odds of 025-FR-024's best-effort Google sign-in; accepted, since 025-FR-038 needs console events.
+- Chromium's hung-renderer signal is suppressed while a debugger is attached (inferred); 025-FR-056 uses Erfana's probe.
 
 ## Alternatives considered
 
-### An isolated preload in every frame (the ADR 0005 pattern)
-
-- **Pros**: proven in the HTML Preview; full control over the outline and label look; hover and click handling in the page's own event loop.
-- **Cons**: puts Erfana code in every frame of every site the user visits, where the preview only ever runs project files; `about:blank` and `javascript:` frames get no preload (ADR 0005 consequence), so 025-FR-029 could not be met for written frames; the overlay can be fought and erased by the page (`document.open()`); it adds an IPC path from every frame of an arbitrary site. 025-NFR-001 prefers the main-driven route.
-- **Verdict**: rejected.
-
-### `Overlay.setInspectMode` (DevTools' own inspect mode)
-
-- **Pros**: the engine does the hit test and the highlight in one call, across frames.
-- **Cons**: swallows mouse moves, so hover-only content cannot be opened while picking; confirms on its own click, bypassing Erfana's click guard and re-hit-test (025-FR-047, 025-FR-053).
-- **Verdict**: rejected; Erfana does the hit test itself.
-
-### A transparent native view above the page for the outline and label
-
-- **Pros**: Erfana draws the exact look of the Element picker card.
-- **Cons**: a native view above the page takes the mouse, so hover and wheel stop reaching the page; making it click-through needs a separate window (`setIgnoreMouseEvents` exists on windows, not views), which cannot be positioned on Wayland.
-- **Verdict**: rejected.
+- **Isolated preload in every frame (ADR 0005 pattern)** – full control of the look, but Erfana code in every frame of every site, no preload in `about:blank` frames, and a page can fight or erase it. Rejected.
+- **`Overlay.setInspectMode`** – swallows hover and confirms by itself. Rejected.
+- **Outline-only via `highlightQuad` / `highlightRect` (no engine label)** – gives an outline that fits the Focus card but no label next to the element; kept as option B of Q2.
+- **A transparent native view above the page** – takes the mouse from the page; a click-through window cannot be positioned on Wayland. Rejected.
 
 ## References
 
-- [Electron – debugger](https://www.electronjs.org/docs/latest/api/debugger) – `sendCommand` with `sessionId`; `detach` when DevTools opens
-- [Electron – webContents](https://www.electronjs.org/docs/latest/api/web-contents) – `before-mouse-event`, `before-input-event`
-- [CDP Overlay domain definition](https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/pdl/domains/Overlay.pdl) – `highlightNode`, `HighlightConfig.showInfo`, `setInspectMode`; experimental
+- [Electron – debugger](https://www.electronjs.org/docs/latest/api/debugger), [webContents](https://www.electronjs.org/docs/latest/api/web-contents)
+- [CDP Overlay](https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/pdl/domains/Overlay.pdl)
 - [electron/electron#14540](https://github.com/electron/electron/issues/14540) – debugger and DevTools at once
-- `src/main/services/preview/previewInputForward.ts` – the existing `before-input-event` pattern this builds on
+- `src/main/services/preview/previewInputForward.ts` – the `before-input-event` pattern
