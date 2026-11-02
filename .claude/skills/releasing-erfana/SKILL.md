@@ -145,7 +145,7 @@ git status --porcelain
 
 ### 0.3 Version + CHANGELOG gate
 
-**Pre-skill checklist**, in the version-bump commit before the skill is invoked: fold the `changelog.d/` fragments below `## [Unreleased]`, bump the CLAUDE.md banner, run `npm run check:version-drift`.
+**Pre-skill checklist**, in the version-bump commit before the skill is invoked: fold the `changelog.d/` fragments below `## [Unreleased]`, bump the CLAUDE.md banner, run `npm run check:version-drift`, run `npm run check:claims` (a claim that pins the old version fails – [release.md § Lessons from v0.24.0](../../../docs/build/release.md#lessons-from-v0240)).
 
 Ask the operator (AskUserQuestion) for the **bump type** (patch / minor / major). The skill computes the proposed version from `package.json`. Then:
 

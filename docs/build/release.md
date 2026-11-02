@@ -440,6 +440,18 @@ npm ci                              # must succeed on the bumped lock
 
 Release-prep pull requests into `develop` do not land with a one-shot `gh pr merge --delete-branch`: `develop` requires a merge queue, so a PR lands by being **added to the queue**, and GitHub merges it only after the seven required checks pass on the queue's temporary branch. Enqueue it with `gh pr merge <n>` (no strategy flag needed – the queue sets it; gh adds the PR to the queue, or turns on auto-merge if its own checks are still running) or **Merge when ready** in the UI, then delete the feature branch once the queue has merged it. Do not reach for `--admin`, which bypasses the queue. How the queue works: [ci.md § Merge queue](../ci.md#merge-queue-develop). Direct pushes to `develop` (the develop-first step under [Branch protection](#branch-protection-phase-i--done-2026-04-25)) are not affected.
 
+## Lessons from v0.24.0
+
+v0.24.0 (2026-11-02) shipped spec 024's comments alignment. One step needed a fix before the develop-first push.
+
+### 1. Version-pinned claims fail `check:claims` after the bump
+
+Some entries in `docs/user-guide/claims.json` prove a page's version text against `package.json:3` with a match such as `"version": "0.23.1"`. After `npm version`, `npm run check:claims` reports each of them, and the required `Lint` job fails the same way. At v0.24.0 there were four: `docs/README.md` ("Latest release"), `docs/build/README.md` and `docs/build/troubleshooting.md` ("Last updated") and `docs/designs/comments/comments-v2.md` ("shipped v0.23.1").
+
+- Run `npm run check:claims` in the version-bump commit, before the develop-first push.
+- For a page that names the current version, update the page text and the claim's `quote` and `match` together.
+- For a page that names a past version, point the claim at code that still names it. `check-claims` refuses another doc as the source (Markdown outside `src/` and `.claude/skills/`) – see [maintaining-this-guide.md](../user-guide/maintaining-this-guide.md).
+
 ## Incident response
 
 Each trust anchor has a revocation + communication procedure.
