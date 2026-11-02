@@ -2,11 +2,12 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 // 025-FR-041: each Electron update opens its own pull request the day it appears.
 import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import yaml from 'js-yaml'
 
-const configPath = fileURLToPath(new URL('../.github/dependabot.yml', import.meta.url))
+const configPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.github', 'dependabot.yml')
 const config = yaml.load(readFileSync(configPath, 'utf8'))
 const npmBlocks = config.updates.filter(u => u['package-ecosystem'] === 'npm')
 
