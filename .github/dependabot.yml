@@ -8,6 +8,15 @@
 # Major updates match no group, so each still opens its own PR and a
 # breaking upgrade is reviewed on its own. Groups apply to version updates
 # only; security updates keep their own PRs.
+#
+# Electron (spec 025, 025-FR-041): the built-in browser ships Chromium to
+# every user, so each Electron release must open its own PR the day it
+# appears – the owner's trigger for the 14-day security-release duty
+# (025-NFR-002, docs/build/electron-security-log.md). `electron` is kept out
+# of every group, and the npm block runs daily. Dependabot allows only one
+# block per ecosystem, directory and target branch, so Electron cannot get a
+# daily block of its own; the grouped PRs are refreshed daily as a result.
+# scripts/dependabot-electron.test.mjs guards this.
 
 version: 2
 updates:
@@ -17,7 +26,7 @@ updates:
     # Only the ecosystem label: without a list Dependabot also adds (and re-creates) `dependencies`.
     labels: ["javascript"]
     schedule:
-      interval: "weekly"
+      interval: "daily"
     # Two group PRs plus one PR per major; the default of 5 would let a
     # handful of majors crowd out the grouped minor/patch PRs.
     open-pull-requests-limit: 10
@@ -38,6 +47,7 @@ updates:
           - "lucide-react"
           - "monaco-editor"
           - "shx"
+          - "electron"
       npm-development:
         dependency-type: "development"
         update-types:
@@ -51,6 +61,7 @@ updates:
           - "lucide-react"
           - "monaco-editor"
           - "shx"
+          - "electron"
     ignore:
       # Packages pinned through package.json `overrides` (docs/security.md
       # § Dependency overrides). They are transitive-only today, but ignore
