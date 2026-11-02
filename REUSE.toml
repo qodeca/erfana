@@ -79,3 +79,11 @@ path = [
 precedence = "override"
 SPDX-FileCopyrightText = ["2025-2026 Qodeca sp. z o.o.", "Meta Platforms, Inc. and affiliates"]
 SPDX-License-Identifier = "GPL-3.0-only AND MIT"
+
+# The Public Suffix List (spec 025, origin formatter, design OD-1 / Q10) is
+# upstream data under its own licence, kept verbatim below Erfana's header.
+[[annotations]]
+path = "src/shared/browser/publicSuffixList.dat"
+precedence = "override"
+SPDX-FileCopyrightText = "Public Suffix List contributors"
+SPDX-License-Identifier = "MPL-2.0"

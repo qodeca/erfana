@@ -129,6 +129,36 @@ export default defineConfig({
         'src/main/services/browserLaunch/BrowserLaunchService.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/shared/ipc/browser-schema.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Built-in browser shared modules (spec 025 commit 3, 025-NFR-001,
+        // 025-FR-014, 025-FR-036, S9, S10, S-15): the IPC payload gate, the
+        // key routing that decides what reaches a page, the context file's
+        // untrusted fence, and every page string or origin Erfana draws. Each
+        // floor is pinned ~2 points under the value measured when it landed
+        // (2026-11-03, macOS, on the shared browser suites alone).
+        // measured 100/100/100/100
+        'src/shared/ipc/browser-tab-schema.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/shared/ipc/browser-tab-channels.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/98.11/100
+        'src/shared/browser/contextFile.ts': { lines: 98, functions: 98, branches: 96, statements: 98 },
+        // measured 100/100/100/100
+        'src/shared/browser/pageText.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/90.9/100
+        'src/shared/browser/textCut.ts': { lines: 98, functions: 98, branches: 88, statements: 98 },
+        // measured 100/100/100/100
+        'src/shared/browser/elementLabel.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 98.3/100/96.61/98.57
+        'src/shared/browser/originFormat.ts': { lines: 96, functions: 98, branches: 94, statements: 96 },
+        // measured 100/100/91.11/96.87
+        'src/shared/browser/idnDisplay.ts': { lines: 98, functions: 98, branches: 89, statements: 94 },
+        // measured 100/100/86.88/94.87 (the uncovered branches are overflow guards)
+        'src/shared/browser/punycode.ts': { lines: 98, functions: 98, branches: 84, statements: 92 },
+        // measured 100/100/94.73/100
+        'src/shared/browser/publicSuffix.ts': { lines: 98, functions: 98, branches: 92, statements: 98 },
+        // measured 100/100/98.63/98.3
+        'src/shared/browser/browserKeys.ts': { lines: 98, functions: 98, branches: 96, statements: 96 },
+        // measured 100/100/94.44/99.45
+        'src/shared/browser/routingState.ts': { lines: 98, functions: 98, branches: 92, statements: 97 },
         // Offline link and wording check (#138). It reads contributor-controlled
         // Markdown in the local gate, and its path walk is what keeps a link from
         // probing or reading files outside the repository, so it carries the
