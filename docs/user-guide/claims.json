@@ -208,7 +208,7 @@
       "quote": "27 *-handlers.ts modules + registry.ts (registerHandle gate)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/registry.ts:112",
+      "source": "src/main/ipc/registry.ts:122",
       "match": "export function registerHandle(channel: string"
     },
     {
@@ -589,7 +589,7 @@
       "quote": "(`registerHandle` / `registerHandleOnce` / `registerOn` / `registerOnce`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/registry.ts:130",
+      "source": "src/main/ipc/registry.ts:140",
       "match": "export function registerHandleOnce("
     },
     {
@@ -599,7 +599,7 @@
       "quote": "(`isTrustedAppSender`, `src/main/ipc/senderValidation.ts`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/senderValidation.ts:81",
+      "source": "src/main/ipc/senderValidation.ts:126",
       "match": "export function isTrustedAppSender("
     },
     {
@@ -951,7 +951,7 @@
       "quote": "`quit:requested` | Event: main asks the renderer to confirm a quit (`{ reason: 'close' }`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:248",
+      "source": "src/main/index.ts:252",
       "match": "send('quit:requested', { reason: 'close' })"
     },
     {
@@ -2151,7 +2151,7 @@
       "quote": "LiteParse (pinned at 2.15.1; this was read from 2.14.7)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:63",
+      "source": "package.json:65",
       "match": "\"@llamaindex/liteparse\": \"2.15.1\","
     },
     {
@@ -2241,7 +2241,7 @@
       "quote": "Fire-and-forget at app startup (`src/main/index.ts`, `importToolStatusService.getStatus()`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:589",
+      "source": "src/main/index.ts:594",
       "match": "importToolStatusService.getStatus().catch((error) => {"
     },
     {
@@ -2342,7 +2342,7 @@
       "quote": "Uses the `@turbodocx/html-to-docx` npm package",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:66",
+      "source": "package.json:68",
       "match": "\"@turbodocx/html-to-docx\": \"^1.23.1\","
     },
     {
@@ -2893,7 +2893,7 @@
       "quote": "**Installation**: Called early in `src/main/index.ts`, before the services start",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:72",
+      "source": "src/main/index.ts:75",
       "match": "installSafeConsole()"
     },
     {
@@ -3084,7 +3084,7 @@
       "quote": "Tags: `[crash] startup-settings-init`, `[crash] startup-logging-init`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:466",
+      "source": "src/main/index.ts:471",
       "match": "writeCrashFallbackLine('[crash] startup-settings-init', error)"
     },
     {
@@ -4210,7 +4210,7 @@
       "quote": "**Tech**: xterm.js v6.0.0, node-pty v1.0.0, WebglAddon, FitAddon, WebLinksAddon",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:111",
+      "source": "package.json:113",
       "match": "\"@xterm/xterm\": \"^6.0.0\","
     },
     {
@@ -4600,7 +4600,7 @@
       "quote": "| Main process | `src/main/index.ts` (before-quit event) |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:748",
+      "source": "src/main/index.ts:715",
       "match": "app.on('before-quit',"
     },
     {
@@ -5025,7 +5025,7 @@
       "quote": "npm run design && open docs/design-system/index.html",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:43",
+      "source": "package.json:44",
       "match": "\"design\": \"node scripts/design-sync.mjs\","
     },
     {
@@ -6048,7 +6048,7 @@
       "quote": "whose `isTrustedAppSender` refuses every frame of a preview page, its main frame included",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/registry.ts:114",
+      "source": "src/main/ipc/registry.ts:124",
       "match": "if (!isTrustedAppSender(event)) {"
     },
     {
@@ -6381,7 +6381,7 @@
       "quote": "registered `erfana-preview://` scheme",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:75",
+      "source": "src/main/index.ts:78",
       "match": "// Register the `erfana-preview://` privileged scheme"
     },
     {
@@ -6471,7 +6471,7 @@
       "quote": "the demo project and `npm run docs:screenshots` (implemented)",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:41",
+      "source": "package.json:42",
       "match": "\"docs:screenshots\": \"node scripts/capture/run.mjs\"",
       "note": "Listed as proposed; the guide, capture script and npm script ship."
     },
@@ -6482,7 +6482,7 @@
       "quote": "- **Implementation:** shipped",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:41",
+      "source": "package.json:42",
       "match": "\"docs:screenshots\": \"node scripts/capture/run.mjs\"",
       "note": "Page read as an unshipped plan; added a line that the tooling and guide now exist."
     },
@@ -6493,7 +6493,7 @@
       "quote": "`\"docs:screenshots\": \"node scripts/capture/run.mjs\"`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:41",
+      "source": "package.json:42",
       "match": "\"docs:screenshots\": \"node scripts/capture/run.mjs\""
     },
     {
@@ -7188,7 +7188,7 @@
       "quote": "generated by `npm run design` from the folders and the screens' `@card` markers",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:43",
+      "source": "package.json:44",
       "match": "\"design\": \"node scripts/design-sync.mjs\""
     },
     {
@@ -7369,7 +7369,7 @@
       "quote": "| `src/main/index.ts` | import + call `registerClipboardHandlers()` |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:533",
+      "source": "src/main/index.ts:538",
       "match": "registerClipboardHandlers()"
     },
     {
@@ -7956,7 +7956,7 @@
       "quote": "`npm run docs:brand` screenshots its artwork into `docs/assets/readme/`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:42",
+      "source": "package.json:43",
       "match": "\"docs:brand\": \"node scripts/capture/brand.mjs\""
     },
     {
@@ -8109,7 +8109,7 @@
       "quote": "Status: **implemented** – the guide is in `docs/user-guide/` and the capture script ships as",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:41",
+      "source": "package.json:42",
       "match": "\"docs:screenshots\": \"node scripts/capture/run.mjs\"",
       "note": "Status said \"proposed\"; the guide and the capture script shipped (#138)."
     },
@@ -8120,7 +8120,7 @@
       "quote": "**Entry point:** `npm run docs:screenshots` → `node scripts/capture/run.mjs`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:41",
+      "source": "package.json:42",
       "match": "\"docs:screenshots\": \"node scripts/capture/run.mjs\""
     },
     {
@@ -8273,7 +8273,7 @@
       "quote": "It was not in `package.json` then; it is a direct",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:147",
+      "source": "package.json:149",
       "match": "\"tesseract.js\": \"^7.0.0\"",
       "note": "Said tesseract.js is not in package.json; it is now a devDependency."
     },
@@ -8366,7 +8366,7 @@
       "quote": "An npm script (`docs:brand`)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:42",
+      "source": "package.json:43",
       "match": "\"docs:brand\": \"node scripts/capture/brand.mjs\""
     },
     {
@@ -8376,7 +8376,7 @@
       "quote": "| F-64 | 96 | `npm run dev` |",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:46",
+      "source": "package.json:47",
       "match": "\"dev\": \"electron-vite dev\""
     },
     {
@@ -8386,7 +8386,7 @@
       "quote": "`npm run build`, `npm run build:mac`, `npm run build:win`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:52",
+      "source": "package.json:54",
       "match": "\"build:mac\": \"npm run build && electron-builder --mac\""
     },
     {
@@ -8418,7 +8418,7 @@
       "quote": "uses chokidar, which is now 5.0.0",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:68",
+      "source": "package.json:70",
       "match": "\"chokidar\": \"5.0.0\"",
       "note": "Body pins chokidar 3.6.0; package.json has 5.0.0. Recorded in the \"Changed since\" line."
     },
@@ -8529,7 +8529,7 @@
       "quote": "`ERFANA_E2E_FORCE_CRASH=1` in the launching environment",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:187",
+      "source": "src/main/index.ts:190",
       "match": "process.env.ERFANA_E2E_FORCE_CRASH === '1'"
     },
     {
@@ -8599,8 +8599,8 @@
       "quote": "`isTrustedSender` lives in `src/main/ipc/senderValidation.ts`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/ipc/senderValidation.ts:35",
-      "match": "export function isTrustedSender(event: IpcMainInvokeEvent)",
+      "source": "src/main/ipc/senderValidation.ts:105",
+      "match": "export function isTrustedSender(",
       "note": "No status line; the page read as a live plan (e.g. a planned src/main/ipc/isTrustedSender.ts and e2e/*.spec.ts names). Added a shipped status note saying §7–§8 are the plan."
     },
     {
@@ -8741,7 +8741,7 @@
       "quote": "Registered in `src/main/index.ts` as `registerBrowserHandlers()`, next to `registerImageExportHandlers()`.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/index.ts:536",
+      "source": "src/main/index.ts:541",
       "match": "registerBrowserHandlers()",
       "note": "Cited index.ts :417; registration is now at :534–536. Named the call instead."
     },
@@ -8752,7 +8752,7 @@
       "quote": "the `!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1'` check in `src/main/index.ts`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/index.ts:187",
+      "source": "src/main/index.ts:190",
       "match": "!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1'",
       "note": "Cited src/main/index.ts:161; the check is at :187. Named the check instead."
     },
@@ -8828,7 +8828,7 @@
       "quote": "The app ships one window (`createWindow` in `src/main/index.ts`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/index.ts:197",
+      "source": "src/main/index.ts:200",
       "match": "function createWindow(): BrowserWindow",
       "note": "Cited src/main/index.ts:172, which is now a command-line switch. Named createWindow instead."
     },
@@ -8909,7 +8909,7 @@
       "quote": "- Zustand stores for settings/state",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:82",
+      "source": "package.json:84",
       "match": "\"zustand\": \"^5.0.15\""
     },
     {
@@ -8940,7 +8940,7 @@
       "quote": "4. **better-sqlite3 Packaging**: Requires careful electron-vite configuration",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:117",
+      "source": "package.json:119",
       "match": "\"electron-vite\": \"^5.0.0\"",
       "note": "electron-vite is the build tool; better-sqlite3 is not yet a dependency (proposal)"
     },
@@ -8951,7 +8951,7 @@
       "quote": "none of the graph-engine files named on this page exist in `src/` on `develop`",
       "status": "fixed",
       "evidence": "source",
-      "source": "electron.vite.config.ts:233",
+      "source": "electron.vite.config.ts:247",
       "match": "index: resolve('src/main/index.ts')",
       "note": "Page had no status banner and read as a shipped plan; checked with test -e that GraphDatabaseService.ts, schema.sql, IndexingService.ts, SearchService.ts, graph-handlers.ts are absent"
     },
@@ -8962,7 +8962,7 @@
       "quote": "npm run dev",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:46",
+      "source": "package.json:47",
       "match": "\"dev\": \"electron-vite dev\""
     },
     {
@@ -8982,7 +8982,7 @@
       "quote": "none of the graph-engine files named on this page exist in `src/` on `develop`",
       "status": "fixed",
       "evidence": "source",
-      "source": "electron.vite.config.ts:233",
+      "source": "electron.vite.config.ts:247",
       "match": "index: resolve('src/main/index.ts')",
       "note": "Page had no status banner; RelatedSidebar.tsx, GlobalSearch.tsx, GraphEngineService.ts, MCPServerService.ts are absent"
     },
@@ -8993,7 +8993,7 @@
       "quote": "none of the graph-engine files named on this page exist in `src/` on `develop`",
       "status": "fixed",
       "evidence": "source",
-      "source": "electron.vite.config.ts:233",
+      "source": "electron.vite.config.ts:247",
       "match": "index: resolve('src/main/index.ts')",
       "note": "Page had no status banner; embedder.worker.ts, EmbeddingService.ts are absent"
     },
@@ -9004,7 +9004,7 @@
       "quote": "none of the graph-engine files named on this page exist in `src/` on `develop`",
       "status": "fixed",
       "evidence": "source",
-      "source": "electron.vite.config.ts:233",
+      "source": "electron.vite.config.ts:247",
       "match": "index: resolve('src/main/index.ts')",
       "note": "Page had no status banner; EntityService.ts, GraphService.ts, GraphPanel.tsx are absent"
     },
@@ -9165,7 +9165,7 @@
       "quote": "**Method:** `npm run build:mac:test`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:53",
+      "source": "package.json:55",
       "match": "\"build:mac:test\": \"npm run build && ERFANA_TEST_BUILD=true"
     },
     {
@@ -9197,7 +9197,7 @@
       "quote": "the app moved to Electron 44 and chokidar 5.0.0 (`package.json`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:114",
+      "source": "package.json:116",
       "match": "\"electron\": \"^44.9.0\"",
       "note": "Page said the libuv abort \"is not live in the shipped app\" for Electron 39 and called chokidar 3.6.0 \"today's\"; both are now stale – status line added"
     },
@@ -9208,7 +9208,7 @@
       "quote": "the Electron 39 and chokidar 3.6.0 figures below describe the build tested on that date",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:68",
+      "source": "package.json:70",
       "match": "\"chokidar\": \"5.0.0\"",
       "note": "chokidar is 5.0.0 now, not 3.6.0"
     },
@@ -9420,7 +9420,7 @@
       "quote": "plus its own bundle entry (`electron.vite.config.ts:176`)",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:234",
+      "source": "electron.vite.config.ts:248",
       "match": "'git-status.worker': resolve('src/main/services/workers/git-status.worker.ts'),"
     },
     {
@@ -9430,7 +9430,7 @@
       "quote": "Add `services/preview/comments/commentParseWorker.ts` and its adapter",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:236",
+      "source": "electron.vite.config.ts:250",
       "match": "'comment-parse.worker': resolve('src/main/services/workers/comment-parse.worker.ts'),",
       "note": "Proposal from the spike; shipped since"
     },
@@ -9504,7 +9504,7 @@
       "quote": "**File:** `src/main/index.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:76",
+      "source": "src/main/index.ts:429",
       "match": "app.whenReady()"
     },
     {
@@ -9514,7 +9514,7 @@
       "quote": "npm run build:mac",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:52",
+      "source": "package.json:54",
       "match": "\"build:mac\": \"npm run build && electron-builder --mac\""
     },
     {
@@ -9524,7 +9524,7 @@
       "quote": "npm run build:win",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:51",
+      "source": "package.json:53",
       "match": "\"build:win\": \"npm run build && electron-builder --win\""
     },
     {
@@ -9598,7 +9598,7 @@
       "quote": "npm run build:mac",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:52",
+      "source": "package.json:54",
       "match": "\"build:mac\": \"npm run build && electron-builder --mac\""
     },
     {
@@ -9788,7 +9788,7 @@
       "quote": "LiteParse (shipped in erfana's import system)",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:63",
+      "source": "package.json:65",
       "match": "\"@llamaindex/liteparse\": \"2.15.1\"",
       "note": "Said LiteParse was planned; it ships as LiteParseConverter"
     },
@@ -9799,7 +9799,7 @@
       "quote": "Last Updated**: October 2026 (Electron 44)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:114",
+      "source": "package.json:116",
       "match": "\"electron\": \"^44.9.0\""
     },
     {
@@ -9959,7 +9959,7 @@
       "quote": "npm run build:mac:test",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:53",
+      "source": "package.json:55",
       "match": "\"build:mac:test\": \"npm run build && ERFANA_TEST_BUILD=true electron-builder --mac"
     },
     {
@@ -9969,7 +9969,7 @@
       "quote": "**App Name**: Includes \"(TEST BUILD)\" suffix",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:53",
+      "source": "package.json:55",
       "match": "-c.productName=\\\"Erfana (TEST BUILD)\\\""
     },
     {
@@ -9979,7 +9979,7 @@
       "quote": "Placed in `release/test/{version}/` instead of `release/{version}/`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:53",
+      "source": "package.json:55",
       "match": "-c.directories.output=release/test/${npm_package_version}"
     },
     {
@@ -9999,7 +9999,7 @@
       "quote": "`!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1'`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:187",
+      "source": "src/main/index.ts:190",
       "match": "if (!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1') {"
     },
     {
@@ -10009,7 +10009,7 @@
       "quote": "preload: join(__dirname, '../preload/index.js'),",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:216",
+      "source": "src/main/index.ts:219",
       "match": "preload: join(__dirname, '../preload/index.js'),"
     },
     {
@@ -10019,7 +10019,7 @@
       "quote": "contextIsolation: true,    // NEVER disable",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:219",
+      "source": "src/main/index.ts:222",
       "match": "contextIsolation: true,"
     },
     {
@@ -10029,7 +10029,7 @@
       "quote": "nodeIntegration: false,    // NEVER enable",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:220",
+      "source": "src/main/index.ts:223",
       "match": "nodeIntegration: false,"
     },
     {
@@ -10079,7 +10079,7 @@
       "quote": "The `dompurify` override in `package.json` (`^3.4.17`)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:160",
+      "source": "package.json:162",
       "match": "\"dompurify\": \"^3.4.17\""
     },
     {
@@ -10229,7 +10229,7 @@
       "quote": "**Current**: 26.18.0 (`package.json` devDependency, exact pin)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:115",
+      "source": "package.json:117",
       "match": "\"electron-builder\": \"26.18.0\""
     },
     {
@@ -10239,7 +10239,7 @@
       "quote": "Full support for Electron 44.x (`^44.9.0` in `package.json`, 44.9.3 in the lockfile)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:114",
+      "source": "package.json:116",
       "match": "\"electron\": \"^44.9.0\""
     },
     {
@@ -10279,7 +10279,7 @@
       "quote": "`registerHandle` / `registerHandleOnce` / `registerOn` / `registerOnce`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/registry.ts:112",
+      "source": "src/main/ipc/registry.ts:122",
       "match": "export function registerHandle(channel: string, listener: InvokeListener): void {"
     },
     {
@@ -10289,8 +10289,8 @@
       "quote": "`event.senderFrame` exists and `frame.parent === null`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/senderValidation.ts:39",
-      "match": "if (!frame || frame.parent !== null) {"
+      "source": "src/main/ipc/senderValidation.ts:84",
+      "match": "if (!frame || frame.parent !== null) return false"
     },
     {
       "id": "docs-security/51",
@@ -10299,28 +10299,28 @@
       "quote": "`pathToFileURL(join(__dirname, '../renderer/index.html'))`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/senderValidation.ts:17",
+      "source": "src/main/ipc/senderValidation.ts:18",
       "match": "export const RENDERER_FILE_URL = pathToFileURL(join(__dirname, '../renderer/index.html')).href"
     },
     {
       "id": "docs-security/52",
       "audience": "developer",
       "doc": "docs/security.md",
-      "quote": "`claude-status-handlers.ts` (via a local copy of the same predicate)",
+      "quote": "`file:revealInFileManager`), `claude-status-handlers.ts`, `system-handlers.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/claude-status-handlers.ts:63",
-      "match": "function isTrustedSender(event: IpcMainInvokeEvent): boolean {"
+      "source": "src/main/ipc/claude-status-handlers.ts:43",
+      "match": "import { isTrustedSender } from './senderValidation'"
     },
     {
       "id": "docs-security/53",
       "audience": "developer",
       "doc": "docs/security.md",
-      "quote": "The preview handlers run the byte-identical copy `isTrustedPreviewSender`",
+      "quote": "The preview handlers run `isTrustedPreviewSender`, which delegates to `isTrustedSender`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/preview-handlers.ts:110",
-      "match": "const isTrustedSender = deps.isTrustedSender ?? isTrustedPreviewSender"
+      "source": "src/main/ipc/preview/isTrustedPreviewSender.ts:33",
+      "match": "return isTrustedSender(event)"
     },
     {
       "id": "docs-security/54",
@@ -10359,7 +10359,7 @@
       "quote": "`screenshot-handlers.ts` defines its own `validateMainRendererSender`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/screenshot-handlers.ts:35",
+      "source": "src/main/ipc/screenshot-handlers.ts:30",
       "match": "function validateMainRendererSender(event: IpcMainInvokeEvent): boolean {"
     },
     {
@@ -10409,7 +10409,7 @@
       "quote": "`installDefaultSessionPermissions` (`src/main/services/session/defaultSessionPermissions.ts`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/session/defaultSessionPermissions.ts:40",
+      "source": "src/main/services/session/defaultSessionPermissions.ts:48",
       "match": "export function installDefaultSessionPermissions(defaultSession: Session): void {"
     },
     {
@@ -10459,7 +10459,7 @@
       "quote": "| `lodash`, `lodash-es` | **exact** `4.18.1` |",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:159",
+      "source": "package.json:161",
       "match": "\"lodash-es\": \"4.18.1\""
     },
     {
@@ -10469,7 +10469,7 @@
       "quote": "| `chokidar` | **exact** `5.0.0` |",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:157",
+      "source": "package.json:159",
       "match": "\"chokidar\": \"5.0.0\""
     },
     {
@@ -10690,7 +10690,7 @@
       "quote": "sandboxed renderers with a validated IPC layer",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/registry.ts:114",
+      "source": "src/main/ipc/registry.ts:124",
       "match": "if (!isTrustedAppSender(event)) {"
     },
     {
@@ -10760,8 +10760,8 @@
       "quote": "Run `npm run test` for unit tests, `npm run test:e2e` for E2E tests",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:54",
-      "match": "\"test:e2e\": \"electron-vite build && playwright test --project=electron\","
+      "source": "package.json:56",
+      "match": "\"test:e2e\": \"npm run build:e2e && playwright test --project=electron\","
     },
     {
       "id": "docs-README/07",
@@ -11141,7 +11141,7 @@
       "quote": "`npm run build` runs `npm run typecheck` before `electron-vite build`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:47",
+      "source": "package.json:48",
       "match": "\"build\": \"npm run typecheck && electron-vite build\","
     },
     {
@@ -11151,7 +11151,7 @@
       "quote": "`npm run dev` (`electron-vite dev`) does not type-check",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:46",
+      "source": "package.json:47",
       "match": "\"dev\": \"electron-vite dev\","
     },
     {
@@ -11231,7 +11231,7 @@
       "quote": "Open DevTools in app with F12 (development builds only)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:451",
+      "source": "src/main/index.ts:456",
       "match": "optimizer.watchWindowShortcuts(window)"
     },
     {
@@ -11251,7 +11251,7 @@
       "quote": "A message box titled \"Erfana started with problems\"",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:409",
+      "source": "src/main/index.ts:413",
       "match": "title: 'Erfana started with problems',"
     },
     {
@@ -11261,7 +11261,7 @@
       "quote": "the lines tagged `[crash] startup-settings-init` and `[crash] startup-logging-init`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:466",
+      "source": "src/main/index.ts:471",
       "match": "writeCrashFallbackLine('[crash] startup-settings-init', error)"
     },
     {
@@ -11636,7 +11636,7 @@
       "quote": "| renderer | 85.94 / 86.24 / 79.7 / 85.11 | 84 / 85 / 78 / 84 |",
       "status": "verified",
       "evidence": "source",
-      "source": "vitest.renderer.config.ts:51",
+      "source": "vitest.renderer.config.ts:52",
       "match": "branches: 78,"
     },
     {
@@ -11666,7 +11666,7 @@
       "quote": "`main-perf` takes exactly those files, with `fileParallelism: false` (one worker) and `sequence.groupOrder: 1`",
       "status": "verified",
       "evidence": "source",
-      "source": "vitest.main.projects.ts:76",
+      "source": "vitest.main.projects.ts:80",
       "match": "sequence: { groupOrder: 1 },"
     },
     {
@@ -11716,7 +11716,7 @@
       "quote": "`electron.vite.config.ts` registers an `assertSelfContainedPreloads()` plugin on the preload config",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:253",
+      "source": "electron.vite.config.ts:267",
       "match": "plugins: [assertSelfContainedPreloads()],"
     },
     {
@@ -11888,7 +11888,7 @@
       "quote": "runs automatically via the `prebuild` npm script (`node scripts/prebuild.mjs`)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:49",
+      "source": "package.json:51",
       "match": "\"prebuild\": \"node scripts/prebuild.mjs\""
     },
     {
@@ -11908,7 +11908,7 @@
       "quote": "The `postinstall` script is `patch-package && install-electron && electron-builder install-app-deps`",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:48",
+      "source": "package.json:50",
       "match": "\"postinstall\": \"patch-package && install-electron && electron-builder install-app-deps\"",
       "note": "install-electron step was missing"
     },
@@ -11930,7 +11930,7 @@
       "quote": "Main process, five entries: `index`",
       "status": "fixed",
       "evidence": "source",
-      "source": "electron.vite.config.ts:236",
+      "source": "electron.vite.config.ts:250",
       "match": "'comment-parse.worker': resolve(",
       "note": "listed three main entries; comment-parse and preview-link-scan workers were missing"
     },
@@ -11941,7 +11941,7 @@
       "quote": "`preview-link-scan.worker` (~9 kB)",
       "status": "fixed",
       "evidence": "source",
-      "source": "electron.vite.config.ts:238",
+      "source": "electron.vite.config.ts:252",
       "match": "'preview-link-scan.worker': resolve(",
       "note": "entry was missing"
     },
@@ -11952,7 +11952,7 @@
       "quote": "Preload, four entries: ~38 kB `out/preload/index.js`",
       "status": "fixed",
       "evidence": "source",
-      "source": "electron.vite.config.ts:274",
+      "source": "electron.vite.config.ts:288",
       "match": "previewPage: resolve('src/preload/previewPage.ts')",
       "note": "sizes re-measured; previewPage now ~80 kB"
     },
@@ -11963,7 +11963,7 @@
       "quote": "`imageExport.html` is the hidden rasterize harness for image export",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:296",
+      "source": "electron.vite.config.ts:310",
       "match": "imageExport: resolve('src/renderer/imageExport.html')"
     },
     {
@@ -12154,7 +12154,7 @@
       "quote": "`jsdom: ^25.0.1` in `devDependencies`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:124",
+      "source": "package.json:126",
       "match": "\"jsdom\": \"^25.0.1\","
     },
     {
@@ -12174,7 +12174,7 @@
       "quote": "\"postinstall\": \"patch-package && install-electron && electron-builder install-app-deps\"",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:48",
+      "source": "package.json:50",
       "match": "\"postinstall\": \"patch-package && install-electron && electron-builder install-app-deps\"",
       "note": "install-electron step was missing"
     },
@@ -12195,7 +12195,7 @@
       "quote": "`@llamaindex/liteparse` is pinned exactly (`2.15.1`)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:63",
+      "source": "package.json:65",
       "match": "\"@llamaindex/liteparse\": \"2.15.1\","
     },
     {
@@ -12205,7 +12205,7 @@
       "quote": "\"overrides\":    { \"chokidar\": \"5.0.0\" }",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:157",
+      "source": "package.json:159",
       "match": "\"chokidar\": \"5.0.0\""
     },
     {
@@ -12215,7 +12215,7 @@
       "quote": "\"overrides\": { \"lodash\": \"4.18.1\", \"lodash-es\": \"4.18.1\" }",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:159",
+      "source": "package.json:161",
       "match": "\"lodash-es\": \"4.18.1\""
     },
     {
@@ -12225,7 +12225,7 @@
       "quote": "`dompurify` is floored at `^3.4.17`, forced through the tree.",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:160",
+      "source": "package.json:162",
       "match": "\"dompurify\": \"^3.4.17\""
     },
     {
@@ -12245,7 +12245,7 @@
       "quote": "// Do not set externalizeDeps: false here.",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:246",
+      "source": "electron.vite.config.ts:260",
       "match": "// Do not set externalizeDeps: false here."
     },
     {
@@ -12255,7 +12255,7 @@
       "quote": "\"electron-builder\": \"26.18.0\"",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:115",
+      "source": "package.json:117",
       "match": "\"electron-builder\": \"26.18.0\","
     },
     {
@@ -12265,7 +12265,7 @@
       "quote": "(`electron: ^44.9.0` in `package.json`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:114",
+      "source": "package.json:116",
       "match": "\"electron\": \"^44.9.0\","
     },
     {
@@ -12419,7 +12419,7 @@
       "quote": "whose product name makes electron-builder name the bundle `Erfana (TEST BUILD).app`",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:53",
+      "source": "package.json:55",
       "match": "-c.productName=\\\"Erfana (TEST BUILD)\\\"",
       "note": "said the bundle is renamed"
     },
@@ -12510,7 +12510,7 @@
       "quote": "previewPage: resolve('src/preload/previewPage.ts')",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:274",
+      "source": "electron.vite.config.ts:288",
       "match": "previewPage: resolve('src/preload/previewPage.ts')"
     },
     {
@@ -12520,7 +12520,7 @@
       "quote": "    externalizeDeps: false,  // Bundle all dependencies for sandbox compatibility",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:261",
+      "source": "electron.vite.config.ts:275",
       "match": "externalizeDeps: false,"
     },
     {
@@ -12551,7 +12551,7 @@
       "quote": "`out/preload/previewPage.js`: ~80 kB bundled",
       "status": "fixed",
       "evidence": "source",
-      "source": "electron.vite.config.ts:274",
+      "source": "electron.vite.config.ts:288",
       "match": "previewPage: resolve('src/preload/previewPage.ts')",
       "note": "previewPage bundle was missing from the size list; sizes re-measured"
     },
@@ -12784,7 +12784,7 @@
       "quote": "All four entries must be present.",
       "status": "fixed",
       "evidence": "source",
-      "source": "electron.vite.config.ts:270",
+      "source": "electron.vite.config.ts:284",
       "match": "imageExport: resolve('src/preload/imageExport.ts'),",
       "note": "said two preload entries"
     },
@@ -12806,7 +12806,7 @@
       "quote": "`package.json` declares `typescript: ^6.0.3`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:148",
+      "source": "package.json:150",
       "match": "\"typescript\": \"^6.0.3\","
     },
     {
@@ -13027,7 +13027,7 @@
       "quote": "which is `patch-package && install-electron && electron-builder install-app-deps`",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:48",
+      "source": "package.json:50",
       "match": "\"postinstall\": \"patch-package && install-electron && electron-builder install-app-deps\"",
       "note": "install-electron step was missing"
     },
@@ -13087,7 +13087,7 @@
       "quote": "allows it only in `src/main/ipc/registry.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "eslint.config.mjs:556",
+      "source": "eslint.config.mjs:564",
       "match": "`src/main/ipc/registry.ts` (exempt below)"
     },
     {
@@ -13117,7 +13117,7 @@
       "quote": "import { registerHandle } from './registry'",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/registry.ts:112",
+      "source": "src/main/ipc/registry.ts:122",
       "match": "export function registerHandle(channel: string, listener: InvokeListener): void {"
     },
     {
@@ -13127,7 +13127,7 @@
       "quote": "Use `registerOn` for fire-and-forget `send` channels",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/registry.ts:151",
+      "source": "src/main/ipc/registry.ts:161",
       "match": "export function registerOn(channel: string, listener: SendListener): void {"
     },
     {
@@ -13137,8 +13137,8 @@
       "quote": "import { isTrustedSender } from './senderValidation'",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/senderValidation.ts:35",
-      "match": "export function isTrustedSender(event: IpcMainInvokeEvent): boolean {"
+      "source": "src/main/ipc/senderValidation.ts:105",
+      "match": "export function isTrustedSender("
     },
     {
       "id": "development-tasks/07",
@@ -13147,7 +13147,7 @@
       "quote": "in `src/main/index.ts`, beside the others (`registerBrowserHandlers()` is there)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:536",
+      "source": "src/main/index.ts:541",
       "match": "registerBrowserHandlers()"
     },
     {
@@ -13548,7 +13548,7 @@
       "quote": "Runner: Vitest projects (`main`, `main-perf`, `preload`, `renderer`)",
       "status": "verified",
       "evidence": "source",
-      "source": "vitest.main.projects.ts:70",
+      "source": "vitest.main.projects.ts:74",
       "match": "name: 'main-perf',"
     },
     {
@@ -13639,7 +13639,7 @@
       "quote": "`vitest.renderer.config.ts` 84 / 85 / 78 / 84",
       "status": "verified",
       "evidence": "source",
-      "source": "vitest.renderer.config.ts:51",
+      "source": "vitest.renderer.config.ts:52",
       "match": "branches: 78,"
     },
     {
@@ -13732,7 +13732,7 @@
       "quote": "Makes the main process append `--erfana-force-crash` to `webPreferences.additionalArguments`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:187",
+      "source": "src/main/index.ts:190",
       "match": "if (!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1') {"
     },
     {
@@ -13914,8 +13914,8 @@
       "quote": "`npm run test:e2e:headed` for a visible window",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:57",
-      "match": "\"test:e2e:headed\": \"electron-vite build && playwright test --project=electron --headed\","
+      "source": "package.json:59",
+      "match": "\"test:e2e:headed\": \"npm run build:e2e && playwright test --project=electron --headed\","
     },
     {
       "id": "testing-e2e-debugging/02",
@@ -14266,7 +14266,7 @@
       "quote": "window.close() → main process 'close' event → 'quit:requested' IPC",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:248",
+      "source": "src/main/index.ts:252",
       "match": "mainWindow.webContents.send('quit:requested', { reason: 'close' })"
     },
     {
@@ -14354,11 +14354,11 @@
       "id": "testing-e2e-troubleshooting/01",
       "audience": "developer",
       "doc": "docs/testing/e2e-troubleshooting.md",
-      "quote": "`npm run test:e2e` is `electron-vite build && playwright test --project=electron`",
+      "quote": "`npm run test:e2e` is `npm run build:e2e && playwright test --project=electron`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:54",
-      "match": "\"test:e2e\": \"electron-vite build && playwright test --project=electron\","
+      "source": "package.json:56",
+      "match": "\"test:e2e\": \"npm run build:e2e && playwright test --project=electron\","
     },
     {
       "id": "testing-e2e-troubleshooting/02",
@@ -14378,7 +14378,7 @@
       "quote": "npm run build:mac:test",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:53",
+      "source": "package.json:55",
       "match": "\"build:mac:test\": \"npm run build && ERFANA_TEST_BUILD=true",
       "note": "Used `ERFANA_TEST_BUILD=true npm run build:mac`; the project script is build:mac:test, which also renames the app."
     },
@@ -14774,7 +14774,7 @@
       "quote": "# Test build (inspector enabled - for Playwright debugging); sets ERFANA_TEST_BUILD=true",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:53",
+      "source": "package.json:55",
       "match": "\"build:mac:test\": \"npm run build && ERFANA_TEST_BUILD=true",
       "note": "Used `ERFANA_TEST_BUILD=true npm run build:mac`; the project script is build:mac:test."
     },
@@ -14917,7 +14917,7 @@
       "quote": "installed only for an unpackaged app launched with `ERFANA_E2E_TEST_HOOKS=1`,",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:191",
+      "source": "src/main/index.ts:194",
       "match": "if (!app.isPackaged && process.env.ERFANA_E2E_TEST_HOOKS === '1') {"
     },
     {
@@ -15181,7 +15181,7 @@
       "quote": "- **xterm.js v6.0.0** - Modern terminal emulator for web",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:111",
+      "source": "package.json:113",
       "match": "\"@xterm/xterm\": \"^6.0.0\""
     },
     {
@@ -15191,7 +15191,7 @@
       "quote": "(`^1.0.0` in `package.json`, 1.1.0 in the lock file)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:77",
+      "source": "package.json:79",
       "match": "\"node-pty\": \"^1.0.0\""
     },
     {
@@ -15382,7 +15382,7 @@
       "quote": "each with its own 5 s `did-finish-load` watchdog",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/screenshot/ScreenshotOverlayWindow.ts:68",
+      "source": "src/main/services/screenshot/ScreenshotOverlayWindow.ts:69",
       "match": "const PER_OVERLAY_LOAD_BUDGET_MS = 5_000"
     },
     {
@@ -16044,7 +16044,7 @@
       "quote": "app.commandLine.appendSwitch('enable-webgl2-compute-context')",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:171",
+      "source": "src/main/index.ts:174",
       "match": "app.commandLine.appendSwitch('enable-webgl2-compute-context')"
     },
     {
@@ -16054,7 +16054,7 @@
       "quote": "app.commandLine.appendSwitch('ignore-gpu-blocklist')",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:172",
+      "source": "src/main/index.ts:175",
       "match": "app.commandLine.appendSwitch('ignore-gpu-blocklist')"
     },
     {
@@ -16064,7 +16064,7 @@
       "quote": "// TODO: Test if still needed with Electron 39+ (Chromium 142)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:169",
+      "source": "src/main/index.ts:172",
       "match": "// TODO: Test if still needed with Electron 39+ (Chromium 142)"
     },
     {
@@ -16074,7 +16074,7 @@
       "quote": "(`src/main/index.ts` notes it is \"not needed for current functionality\")",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:223",
+      "source": "src/main/index.ts:226",
       "match": "// experimentalFeatures removed - not needed for current functionality"
     },
     {
@@ -16084,7 +16084,7 @@
       "quote": "The app now runs Electron 44 (Chromium 152)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:114",
+      "source": "package.json:116",
       "match": "\"electron\": \"^44.9.0\""
     },
     {
@@ -16609,7 +16609,7 @@
       "quote": "`DocxService.ts` - DOCX generation via `@turbodocx/html-to-docx`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:66",
+      "source": "package.json:68",
       "match": "\"@turbodocx/html-to-docx\": \"^1.23.1\""
     },
     {
@@ -17161,7 +17161,7 @@
       "quote": "and filters nothing, so any type the bundled Mermaid version (`mermaid` `^12.2.0` in",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:127",
+      "source": "package.json:129",
       "match": "\"mermaid\": \"^12.2.0\",",
       "note": "Version now traced to package.json instead of an untraceable keyword list."
     },
@@ -17518,7 +17518,7 @@
       "quote": "remark-gfm for GitHub features",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:140",
+      "source": "package.json:142",
       "match": "\"remark-gfm\": \"^4.0.1\","
     },
     {
@@ -17528,7 +17528,7 @@
       "quote": "rehype-raw for HTML parsing",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:137",
+      "source": "package.json:139",
       "match": "\"rehype-raw\": \"^7.0.0\","
     },
     {
@@ -17538,7 +17538,7 @@
       "quote": "rehype-sanitize for security",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:138",
+      "source": "package.json:140",
       "match": "\"rehype-sanitize\": \"^6.0.0\","
     },
     {
@@ -17548,7 +17548,7 @@
       "quote": "react-markdown for AST generation",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:136",
+      "source": "package.json:138",
       "match": "\"react-markdown\": \"^10.1.0\","
     },
     {
@@ -19483,7 +19483,7 @@
       "quote": "Chokidar is pinned to exact `5.0.0`.",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:68",
+      "source": "package.json:70",
       "match": "\"chokidar\": \"5.0.0\","
     },
     {
@@ -20259,7 +20259,7 @@
       "quote": "`tests/setup/setupTests.main.ts` mocks `src/main/services/watcher/directoryWatchBackend.ts` wholesale",
       "status": "verified",
       "evidence": "source",
-      "source": "tests/setup/setupTests.main.ts:101",
+      "source": "tests/setup/setupTests.main.ts:105",
       "match": "vi.mock('../../src/main/services/watcher/directoryWatchBackend', () => ({"
     },
     {
@@ -20767,7 +20767,7 @@
       "quote": "`@tanstack/react-virtual` draws only the rows on screen",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:94",
+      "source": "package.json:96",
       "match": "\"@tanstack/react-virtual\": \"3.14.21\","
     },
     {
@@ -20869,7 +20869,7 @@
       "quote": "Both `npm run build:win` and `npm run build:unpack` stop with",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:50",
+      "source": "package.json:52",
       "match": "\"build:unpack\": \"npm run build && electron-builder --dir\""
     },
     {
@@ -21192,7 +21192,7 @@
       "quote": "npm run test:e2e:visual                   # Visual regression suite",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:58",
+      "source": "package.json:60",
       "match": "\"test:e2e:visual\": \"electron-vite build && playwright test --project=visual\""
     },
     {
@@ -21202,7 +21202,7 @@
       "quote": "npm run test:e2e:update-screenshots       # Update visual baselines",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:59",
+      "source": "package.json:61",
       "match": "\"test:e2e:update-screenshots\": \"electron-vite build && playwright test --project=visual --update-snapshots\""
     },
     {
@@ -21383,7 +21383,7 @@
       "quote": "committed `patches/node-pty+1.1.0.patch`, applied via `patch-package` in the `postinstall` hook",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:48",
+      "source": "package.json:50",
       "match": "\"postinstall\": \"patch-package && install-electron && electron-builder install-app-deps\""
     },
     {
@@ -21434,7 +21434,7 @@
       "quote": "an advisory `E2E (Linux, xvfb)` job (`.github/workflows/e2e-linux.yml`)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:56",
+      "source": "package.json:58",
       "match": "\"test:e2e:linux\": \"bash scripts/e2e-linux.sh\""
     },
     {
@@ -21559,7 +21559,7 @@
       "quote": "currently at `^4.3.1`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:75",
+      "source": "package.json:77",
       "match": "\"js-yaml\": \"^4.3.1\""
     },
     {
@@ -21671,7 +21671,7 @@
       "quote": "introduced exactly that map, `{ index, imageExport }`",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:296",
+      "source": "electron.vite.config.ts:310",
       "match": "imageExport: resolve('src/renderer/imageExport.html')"
     },
     {
@@ -21833,7 +21833,7 @@
       "quote": "`senderValidation.ts` also exports `isTrustedAppSender`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/senderValidation.ts:81",
+      "source": "src/main/ipc/senderValidation.ts:126",
       "match": "export function isTrustedAppSender(event: IpcMainEvent | IpcMainInvokeEvent): boolean {"
     },
     {
@@ -21841,10 +21841,11 @@
       "audience": "developer",
       "doc": "docs/technical-debt.md",
       "quote": "the local `isTrustedSender` in `claude-status-handlers.ts`",
-      "status": "verified",
+      "status": "removed",
       "evidence": "source",
       "source": "src/main/ipc/claude-status-handlers.ts:63",
-      "match": "function isTrustedSender(event: IpcMainInvokeEvent): boolean {"
+      "match": "function isTrustedSender(event: IpcMainInvokeEvent): boolean {",
+      "note": "Dated 2026-10-25 history: the local copy in claude-status-handlers.ts was removed by spec 025 commit 1, which now imports the shared isTrustedSender (recorded in the entry's later update)."
     },
     {
       "id": "docs-technical-debt/44",
@@ -21926,7 +21927,7 @@
       "quote": "`package.json` now pins `vitest` and `@vitest/coverage-v8` at `^5.0.5`",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:152",
+      "source": "package.json:154",
       "match": "\"vitest\": \"^5.0.5\"",
       "note": "The major vitest upgrade the advisory needed has landed"
     },
@@ -21948,7 +21949,7 @@
       "quote": "`package.json` now pins 26.18.0",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:115",
+      "source": "package.json:117",
       "match": "\"electron-builder\": \"26.18.0\"",
       "note": "Said package.json pins 26.16.1"
     },
@@ -21989,7 +21990,7 @@
       "quote": "(\"runs /usr/bin/open on macOS with the real path as one argument\")",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/browserLaunch/BrowserLaunchService.integration.test.ts:209",
+      "source": "src/main/services/browserLaunch/BrowserLaunchService.integration.test.ts:211",
       "match": "('runs /usr/bin/open on macOS with the real path as one argument'"
     },
     {
@@ -22470,7 +22471,7 @@
       "quote": "npm run dev              # smoke-test Electron + terminal",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:46",
+      "source": "package.json:47",
       "match": "\"dev\": \"electron-vite dev\""
     },
     {
@@ -22480,7 +22481,7 @@
       "quote": "npm run build:mac        # produces .dmg",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:52",
+      "source": "package.json:54",
       "match": "\"build:mac\": \"npm run build && electron-builder --mac\""
     },
     {
@@ -22521,7 +22522,7 @@
       "quote": "the script now reads `node scripts/prebuild.mjs` at `:46`",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:49",
+      "source": "package.json:51",
       "match": "\"prebuild\": \"node scripts/prebuild.mjs\"",
       "note": "said :27; the script is on line 46"
     },
@@ -22790,7 +22791,7 @@
       "quote": "The committed `patches/node-pty+1.1.0.patch` (applied via `patch-package` in `postinstall`)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:48",
+      "source": "package.json:50",
       "match": "\"postinstall\": \"patch-package && install-electron"
     },
     {
@@ -23265,7 +23266,7 @@
       "quote": "`main/index.ts:612-643` (dock menu and jump list carry only \"New Window\")",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:631",
+      "source": "src/main/index.ts:636",
       "match": "title: 'New Window',"
     },
     {
@@ -23295,7 +23296,7 @@
       "quote": "`src/main/index.ts:613-624` — macOS dock menu (`app.dock.setMenu`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:620",
+      "source": "src/main/index.ts:625",
       "match": "app.dock?.setMenu(dockMenu)"
     },
     {
@@ -23305,7 +23306,7 @@
       "quote": "`src/main/index.ts:626-643` — Windows jumplist (`app.setJumpList`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:625",
+      "source": "src/main/index.ts:630",
       "match": "app.setJumpList(["
     },
     {
@@ -24214,7 +24215,7 @@
       "quote": "| `src/main/index.test.ts:610` (`Window Title Configuration",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.test.ts:610",
+      "source": "src/main/index.test.ts:612",
       "match": "should set title to \"ERFANA v{version}\" in production mode"
     },
     {
@@ -24407,7 +24408,7 @@
       "quote": "`npm ci` runs `electron-builder install-app-deps`, which rebuilds `node-pty` for Electron",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:48",
+      "source": "package.json:50",
       "match": "electron-builder install-app-deps",
       "note": "Was: Python 3.12 or 3.14.x, node-pty fails on 3.13 (untraceable versions; replaced with the traceable reason Python is needed). Checker: source line was package.json:40 (the design script); postinstall is line 45."
     },
@@ -24439,7 +24440,7 @@
       "quote": "npm run dev          # Start the app in development mode",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:46",
+      "source": "package.json:47",
       "match": "\"dev\": \"electron-vite dev\"",
       "note": "Was 'Start development server'; electron-vite dev launches the Electron app with the dev server. Checker: source line was 38, dev script is line 43."
     },
@@ -24532,7 +24533,7 @@
       "quote": "npm run lint:css && npm run design -- --check && npm run test",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:43",
+      "source": "package.json:44",
       "match": "\"design\": \"node scripts/design-sync.mjs\"",
       "note": "Page text right; ledger cited package.json:35, the design script is line 40."
     },
@@ -25145,7 +25146,7 @@
       "quote": "`optimizer.watchWindowShortcuts` from `@electron-toolkit/utils`, attached to every window in `src/main/index.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:451",
+      "source": "src/main/index.ts:456",
       "match": "optimizer.watchWindowShortcuts(window)",
       "note": "The call sits inside app.on('browser-window-created') (line 450), so every window gets it. Observed while checking: the same helper, called without options, also swallows Cmd/Ctrl+Minus and Cmd/Ctrl+Shift+Equal on the app window in every build (its zoom option defaults to false); not stated on this page."
     },
@@ -25348,7 +25349,7 @@
       "quote": "In a packaged build the same helper binds no `F12` and blocks `Cmd/Ctrl+R`",
       "status": "verified",
       "evidence": "app",
-      "source": "src/main/index.ts:448",
+      "source": "src/main/index.ts:453",
       "match": "ignore CommandOrControl + R in production",
       "test": "e2e/guide-tasks/claims-user-0.guide.ts",
       "note": "Behaviour lives in @electron-toolkit/utils (not in src). Real-app test: unpackaged, F12 toggles DevTools (helper attached); then the test flips the loaded helper's is.dev (= !app.isPackaged) to false and sends native key input – F12 is not prevented and DevTools stays closed, Cmd/Ctrl+R is prevented and the page does not reload. The packaged branch is reached by that flip, not by a packaged build."
@@ -25422,7 +25423,7 @@
       "quote": "npm run dev              # Start dev server",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:46",
+      "source": "package.json:47",
       "match": "\"dev\": \"electron-vite dev\"",
       "note": "Ledger source line number was wrong (package.json had shifted); repointed to the exact line."
     },
@@ -25433,7 +25434,7 @@
       "quote": "npm run build            # Production build",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:47",
+      "source": "package.json:48",
       "match": "\"build\": \"npm run typecheck && electron-vite build\"",
       "note": "Ledger source line number was wrong (package.json had shifted); repointed to the exact line."
     },
@@ -25535,7 +25536,7 @@
       "quote": "src/renderer/src only (jsdom)",
       "status": "verified",
       "evidence": "source",
-      "source": "vitest.renderer.config.ts:20",
+      "source": "vitest.renderer.config.ts:21",
       "match": "environment: 'jsdom'"
     },
     {
@@ -25565,8 +25566,8 @@
       "quote": "# E2E tests (Playwright + Electron)",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:54",
-      "match": "\"test:e2e\": \"electron-vite build && playwright test --project=electron\"",
+      "source": "package.json:56",
+      "match": "\"test:e2e\": \"npm run build:e2e && playwright test --project=electron\"",
       "note": "Ledger source line number was wrong (package.json had shifted); repointed to the exact line."
     },
     {
@@ -25576,7 +25577,7 @@
       "quote": "npm run test:e2e:visual            # Visual regression baselines",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:58",
+      "source": "package.json:60",
       "match": "\"test:e2e:visual\": \"electron-vite build && playwright test --project=visual\"",
       "note": "Ledger source line number was wrong (package.json had shifted); repointed to the exact line."
     },
@@ -25587,7 +25588,7 @@
       "quote": "npm run test:e2e:update-screenshots # Refresh visual baselines",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:59",
+      "source": "package.json:61",
       "match": "playwright test --project=visual --update-snapshots",
       "note": "Ledger source line number was wrong (package.json had shifted); repointed to the exact line."
     },
@@ -25765,7 +25766,7 @@
       "quote": "├── stores/            # Zustand state",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:82",
+      "source": "package.json:84",
       "match": "\"zustand\": \"^5.0.15\"",
       "note": "Ledger source line number was wrong (package.json had shifted); repointed to the exact line."
     },
@@ -25797,7 +25798,7 @@
       "quote": "| Coverage | `coverage/<project>/` |",
       "status": "verified",
       "evidence": "source",
-      "source": "vitest.renderer.config.ts:34",
+      "source": "vitest.renderer.config.ts:35",
       "match": "reportsDirectory: 'coverage/renderer'"
     },
     {
@@ -25807,7 +25808,7 @@
       "quote": "| Unit test | `*.test.ts` or `*.test.tsx` |",
       "status": "verified",
       "evidence": "source",
-      "source": "vitest.renderer.config.ts:25",
+      "source": "vitest.renderer.config.ts:26",
       "match": "include: ['src/renderer/src/**/*.test.{ts,tsx}']"
     },
     {
@@ -25927,7 +25928,7 @@
       "quote": "npm run design           # Bake values into the cards",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:43",
+      "source": "package.json:44",
       "match": "\"design\": \"node scripts/design-sync.mjs\""
     },
     {
@@ -25947,7 +25948,7 @@
       "quote": "npm run check:version-drift  # Docs that state",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:40",
+      "source": "package.json:41",
       "match": "\"check:version-drift\": \"node scripts/check-version-drift.mjs\""
     },
     {
@@ -26027,7 +26028,7 @@
       "quote": "Service (main) → Handler (ipc) → Preload → Renderer",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/registry.ts:113",
+      "source": "src/main/ipc/registry.ts:123",
       "match": "ipcMain.handle(channel, (event: IpcMainInvokeEvent, ...args) => {"
     },
     {
@@ -26376,7 +26377,7 @@
       "quote": "Erfana enables context isolation, disables node integration in the sandboxed renderer",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:220",
+      "source": "src/main/index.ts:223",
       "match": "nodeIntegration: false,",
       "note": "contextIsolation: true at src/main/index.ts:219; sandbox is Electron's default (comment line 217)."
     },
@@ -26387,7 +26388,7 @@
       "quote": "exposes IPC through `contextBridge` with a sender check on every global channel",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/ipc/registry.ts:114",
+      "source": "src/main/ipc/registry.ts:124",
       "match": "if (!isTrustedAppSender(event)) {",
       "note": "Claimed 'input validation on every channel'; older pdf:/docx: handlers do not schema-validate payloads – what every global channel gets is the sender check in registry.ts. preload: src/preload/index.ts:234."
     },
@@ -26515,7 +26516,7 @@
       "quote": "disables node integration in the sandboxed renderer",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:217",
+      "source": "src/main/index.ts:220",
       "match": "sandbox: true is the default since Electron 20"
     },
     {
@@ -27965,7 +27966,7 @@
       "quote": "build fails during `npm install`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:48",
+      "source": "package.json:50",
       "match": "electron-builder install-app-deps",
       "note": "postinstall rebuilds native deps (node-pty) during npm install"
     },
@@ -27976,7 +27977,7 @@
       "quote": "electron-store v11+ is ES Module only",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:70",
+      "source": "package.json:72",
       "match": "\"electron-store\": \"^11.0.2\""
     },
     {
@@ -28199,7 +28200,7 @@
       "quote": "| APP-09 | Dock menu New Window | M | M/index.ts",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:620",
+      "source": "src/main/index.ts:625",
       "match": "app.dock?.setMenu(dockMenu)"
     },
     {
@@ -28209,7 +28210,7 @@
       "quote": "| APP-10 | Jump-list New Window | W | M/index.ts",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:631",
+      "source": "src/main/index.ts:636",
       "match": "title: 'New Window',"
     },
     {
@@ -33534,7 +33535,7 @@
       "quote": "On macOS, the Erfana Dock menu also offers **New Window**.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:614",
+      "source": "src/main/index.ts:619",
       "match": "label: 'New Window'"
     },
     {
@@ -33544,7 +33545,7 @@
       "quote": "On Windows, select **New Window** from Erfana's taskbar jump list.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:631",
+      "source": "src/main/index.ts:636",
       "match": "title: 'New Window'"
     },
     {
@@ -33554,7 +33555,7 @@
       "quote": "Both routes open a separate Erfana instance, like **File > New Window**.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:634",
+      "source": "src/main/index.ts:639",
       "match": "args: '--new-window'"
     },
     {
@@ -33575,7 +33576,7 @@
       "quote": "3. Close the window.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/index.ts:248",
+      "source": "src/main/index.ts:252",
       "match": "mainWindow.webContents.send('quit:requested', { reason: 'close' })",
       "note": "Step said 'Close the window, or quit from the app menu' then promised a confirmation; only the window close handler sends quit:requested, so the step now names closing the window only."
     },
@@ -33652,7 +33653,7 @@
       "quote": "Quitting from the app menu, or with **File > Exit** on Windows, closes Erfana without a confirmation.",
       "status": "fixed",
       "evidence": "app",
-      "source": "src/main/index.ts:753",
+      "source": "src/main/index.ts:720",
       "match": "if (!quitGuard.handleBeforeQuit(event)) return",
       "test": "e2e/quit-shutdown.e2e.ts",
       "note": "Page implied quitting from the app menu shows the confirmation. before-quit is always prevented and runs the shutdown to app.exit(0); quit:requested is sent only from the window close handler (index.ts:248), so a menu quit never asks."
@@ -33685,7 +33686,7 @@
       "quote": "Both routes open a separate Erfana instance",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:616",
+      "source": "src/main/index.ts:621",
       "match": "spawnNewInstance()"
     },
     {
@@ -33938,7 +33939,7 @@
       "quote": "A full `npm run docs:screenshots` regenerates",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:41",
+      "source": "package.json:42",
       "match": "\"docs:screenshots\": \"node scripts/capture/run.mjs\"",
       "note": "Ledger cited package.json:33 for the script; it is on line 38. Page text was already right."
     },
@@ -34429,7 +34430,7 @@
       "quote": "Monaco's built-in editing commands work, such as multiple cursors, undo and redo, and line operations",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:128",
+      "source": "package.json:130",
       "match": "\"monaco-editor\": \"^0.55.1\"",
       "note": "Specific Monaco default shortcuts (F1 palette, Alt+Up/Down, Cmd+D, Alt+click) are Monaco built-ins not defined in Erfana source; removed and kept a general statement."
     },
@@ -35062,7 +35063,7 @@
       "quote": "If the settings file cannot be read at start-up, Erfana opens with default settings, says so",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:468",
+      "source": "src/main/index.ts:473",
       "match": "Your saved settings could not be loaded, so default settings are in use."
     },
     {
@@ -36909,7 +36910,7 @@
       "quote": "| Undo; redo; toggle comment |",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:128",
+      "source": "package.json:130",
       "match": "\"monaco-editor\": \"^0.55.1\"",
       "test": "e2e/editor-outside-change.e2e.ts",
       "note": "Monaco built-in keys; source moved from an updateOptions call that does not bind them to the monaco-editor dependency."
@@ -36921,7 +36922,7 @@
       "quote": "| Move line; select next match; add cursor |",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:128",
+      "source": "package.json:130",
       "match": "\"monaco-editor\": \"^0.55.1\"",
       "note": "Monaco built-in keys; source moved from an updateOptions call that does not bind them to the monaco-editor dependency."
     },
@@ -36932,7 +36933,7 @@
       "quote": "| Command palette | <kbd>F1</kbd> | <kbd>F1</kbd> |",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:128",
+      "source": "package.json:130",
       "match": "\"monaco-editor\": \"^0.55.1\"",
       "note": "Monaco built-in key; source moved from an e2e page object (not src) to the monaco-editor dependency."
     },
@@ -40144,7 +40145,7 @@
       "quote": "The global file is read when Erfana starts",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:464",
+      "source": "src/main/index.ts:469",
       "match": "await globalSettingsService.initialize()"
     },
     {
@@ -41839,7 +41840,7 @@
       "quote": "The Erfana taskbar jump list also has **New Window**, which opens a separate instance.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:631",
+      "source": "src/main/index.ts:636",
       "match": "title: 'New Window',"
     },
     {
@@ -43240,7 +43241,7 @@
       "quote": "are built into the Monaco editor component, not defined by Erfana",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:128",
+      "source": "package.json:130",
       "match": "\"monaco-editor\": \"^0.55.1\"",
       "note": "Added: these keys are Monaco defaults, with no binding in Erfana src (cross-page note); proven by the monaco-editor dependency."
     },
@@ -44452,7 +44453,7 @@
       "quote": "| `screenshot:capture` |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/screenshot-handlers.ts:55",
+      "source": "src/main/ipc/screenshot-handlers.ts:38",
       "match": "`screenshot:capture`"
     },
     {
@@ -44462,7 +44463,7 @@
       "quote": "| `screenshot:enumerateWindows` |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/screenshot-handlers.ts:59",
+      "source": "src/main/ipc/screenshot-handlers.ts:42",
       "match": "`screenshot:enumerateWindows`"
     },
     {
@@ -44542,7 +44543,7 @@
       "quote": "registered through `registry.ts` (never `ipcMain` directly)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:509",
+      "source": "src/main/index.ts:514",
       "match": "`src/main/ipc/registry.ts`, and an ESLint rule stops `ipcMain` being"
     },
     {
@@ -44562,7 +44563,7 @@
       "quote": "3. Register handler in `src/main/index.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:512",
+      "source": "src/main/index.ts:517",
       "match": "registerFileHandlers()"
     },
     {
@@ -45102,7 +45103,7 @@
       "quote": "(register via `registerClipboardHandlers()` at startup)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:533",
+      "source": "src/main/index.ts:538",
       "match": "registerClipboardHandlers()"
     },
     {
@@ -45173,7 +45174,7 @@
       "quote": "Document import converter for 50+ formats via `@llamaindex/liteparse` with local OCR.",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:63",
+      "source": "package.json:65",
       "match": "\"@llamaindex/liteparse\": \"2.15.1\""
     },
     {
@@ -45754,7 +45755,7 @@
       "quote": "Erfana has no full-text index, vector store or MCP server today",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:61",
+      "source": "package.json:63",
       "match": "\"dependencies\": {",
       "note": "Added a status note: the gap table's 'What's specified' rows read as current state. package.json dependencies carry no SQLite, sqlite-vec, ONNX or MCP SDK package, and search_notes appears in no spec (spec 004 names erfana_graph_search)"
     },
@@ -46416,7 +46417,7 @@
       "quote": "\"postinstall\": \"patch-package && install-electron && electron-builder install-app-deps\"",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:48",
+      "source": "package.json:50",
       "match": "\"postinstall\": \"patch-package && install-electron && electron-builder install-app-deps\""
     },
     {
@@ -46426,7 +46427,7 @@
       "quote": "`patch-package` applies the committed `patches/node-pty+1.1.0.patch`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:48",
+      "source": "package.json:50",
       "match": "patch-package"
     },
     {
@@ -46446,7 +46447,7 @@
       "quote": "`@llamaindex/liteparse` is pinned exactly (`2.15.1`).",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:63",
+      "source": "package.json:65",
       "match": "\"@llamaindex/liteparse\": \"2.15.1\""
     },
     {
@@ -46466,7 +46467,7 @@
       "quote": "`sharp` and `tesseract.js`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:147",
+      "source": "package.json:149",
       "match": "\"tesseract.js\": \"^7.0.0\","
     },
     {
@@ -46476,7 +46477,7 @@
       "quote": "// externalizeDeps defaults to true for main process (electron-vite convention).",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:243",
+      "source": "electron.vite.config.ts:257",
       "match": "// externalizeDeps defaults to true for main process (electron-vite convention)."
     },
     {
@@ -46486,7 +46487,7 @@
       "quote": "\"dependencies\": { \"chokidar\": \"5.0.0\" },",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:68",
+      "source": "package.json:70",
       "match": "\"chokidar\": \"5.0.0\","
     },
     {
@@ -46496,7 +46497,7 @@
       "quote": "\"overrides\":    { \"chokidar\": \"5.0.0\" }",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:157",
+      "source": "package.json:159",
       "match": "\"chokidar\": \"5.0.0\","
     },
     {
@@ -46526,7 +46527,7 @@
       "quote": "\"overrides\": { \"lodash\": \"4.18.1\", \"lodash-es\": \"4.18.1\" }",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:159",
+      "source": "package.json:161",
       "match": "\"lodash-es\": \"4.18.1\","
     },
     {
@@ -46536,7 +46537,7 @@
       "quote": "`dompurify` is floored at `^3.4.17`, forced through the tree.",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:160",
+      "source": "package.json:162",
       "match": "\"dompurify\": \"^3.4.17\""
     },
     {
@@ -47780,7 +47781,7 @@
       "quote": "one frameless transparent area-select overlay per attached display",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/screenshot/ScreenshotOverlayWindow.ts:117",
+      "source": "src/main/services/screenshot/ScreenshotOverlayWindow.ts:118",
       "match": "screen.getAllDisplays()"
     },
     {
@@ -50338,7 +50339,7 @@
       "quote": "// sandbox: true is the default since Electron 20 (2022)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:217",
+      "source": "src/main/index.ts:220",
       "match": "// sandbox: true is the default since Electron 20 (2022)"
     },
     {
@@ -50348,7 +50349,7 @@
       "quote": "  webgl: true",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:221",
+      "source": "src/main/index.ts:224",
       "match": "webgl: true"
     },
     {
@@ -50469,8 +50470,8 @@
       "quote": "Playwright runs against a packaged app (the `e2e/` suite and its CI job launch the unpackaged app",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:54",
-      "match": "\"test:e2e\": \"electron-vite build && playwright test --project=electron\"",
+      "source": "package.json:56",
+      "match": "\"test:e2e\": \"npm run build:e2e && playwright test --project=electron\"",
       "note": "Said test builds serve Playwright E2E in CI/CD; no workflow or e2e file uses ERFANA_TEST_BUILD or build:mac:test, and the suite launches the repository root unpackaged (e2e/fixtures/index.ts:124)."
     },
     {
@@ -50480,7 +50481,7 @@
       "quote": "without the e2e test-hooks flag (`ERFANA_E2E_TEST_HOOKS=1`), which has the same `!app.isPackaged` gate",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/index.ts:191",
+      "source": "src/main/index.ts:194",
       "match": "process.env.ERFANA_E2E_TEST_HOOKS === '1'",
       "note": "Said buildAdditionalArguments otherwise returns []; it also appends TEST_HOOKS_ARG under ERFANA_E2E_TEST_HOOKS=1 behind the same unpackaged gate."
     },
@@ -50621,7 +50622,7 @@
       "quote": "(main process, the git-status, comment-parse and preview-link-scan workers, and the DOCX utility process)",
       "status": "fixed",
       "evidence": "source",
-      "source": "electron.vite.config.ts:230",
+      "source": "electron.vite.config.ts:244",
       "match": "intro: confineModulePathsIntro",
       "note": "Listed three bundles; the intro is set on the main build output, whose inputs are five entries (index, git-status, comment-parse and preview-link-scan workers, docx-convert process, electron.vite.config.ts:175-182), and all five built files carry the marker. The source comment in confineModulePaths.cjs:31-35 still says three."
     },
@@ -50632,7 +50633,7 @@
       "quote": "Scope: this covers code in the five bundles that carry the intro;",
       "status": "fixed",
       "evidence": "source",
-      "source": "electron.vite.config.ts:238",
+      "source": "electron.vite.config.ts:252",
       "match": "'preview-link-scan.worker': resolve('src/main/services/preview/previewLinkScanWorker.ts'),",
       "note": "Was 'three bundles'; five main-process entries get the intro."
     },
@@ -50643,7 +50644,7 @@
       "quote": "for code in the five bundles that carry the intro",
       "status": "fixed",
       "evidence": "source",
-      "source": "electron.vite.config.ts:236",
+      "source": "electron.vite.config.ts:250",
       "match": "'comment-parse.worker': resolve('src/main/services/workers/comment-parse.worker.ts'),",
       "note": "Was 'three bundles'; five main-process entries get the intro."
     },
@@ -50884,7 +50885,7 @@
       "quote": "an ESLint block scoped to `src/renderer/src/imageExport/**`",
       "status": "verified",
       "evidence": "source",
-      "source": "eslint.config.mjs:491",
+      "source": "eslint.config.mjs:499",
       "match": "files: ['src/renderer/src/imageExport/**/*.{ts,tsx}'],"
     },
     {
@@ -50894,7 +50895,7 @@
       "quote": "(type-only imports are exempt, being erased by the compiler)",
       "status": "verified",
       "evidence": "source",
-      "source": "eslint.config.mjs:546",
+      "source": "eslint.config.mjs:554",
       "match": "allowTypeImports: true,"
     },
     {
@@ -51157,7 +51158,7 @@
       "quote": "**Status**: ✅ DOUBLE-GATED – inert in any packaged build",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:187",
+      "source": "src/main/index.ts:190",
       "match": "!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1'"
     },
     {
@@ -51167,7 +51168,7 @@
       "quote": "`npm run build` runs the `prebuild` script (`node scripts/prebuild.mjs`) first",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:49",
+      "source": "package.json:51",
       "match": "\"prebuild\": \"node scripts/prebuild.mjs\"",
       "note": "Told the reader to create the aproba stub by hand before build:mac; the npm prebuild hook (scripts/prebuild.mjs) now writes it automatically on every build"
     },
@@ -51178,7 +51179,7 @@
       "quote": "`canvas` is no longer in the lockfile, so this chain no longer resolves today",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:124",
+      "source": "package.json:126",
       "match": "\"jsdom\": \"^25.0.1\"",
       "note": "Presented the jsdom → canvas → aproba chain as current; canvas is absent from package-lock.json, so it is now marked as the 26.0.0 record"
     },
@@ -51209,7 +51210,7 @@
       "quote": "an untrusted `send` is dropped and logged",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/registry.ts:99",
+      "source": "src/main/ipc/registry.ts:109",
       "match": "logger.warn('Rejected IPC from untrusted sender'"
     },
     {
@@ -51219,7 +51220,7 @@
       "quote": "keeps `ipcMain` from being imported anywhere else in `src/main/`",
       "status": "verified",
       "evidence": "source",
-      "source": "eslint.config.mjs:582",
+      "source": "eslint.config.mjs:590",
       "match": "ignores: ['src/main/ipc/registry.ts', 'src/main/**/*.test.ts']"
     },
     {
@@ -51229,7 +51230,7 @@
       "quote": "except that it ignores the URL's fragment and query",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/senderValidation.ts:101",
+      "source": "src/main/ipc/senderValidation.ts:60",
       "match": "url.hash = ''"
     },
     {
@@ -51319,7 +51320,7 @@
       "quote": "Rejections fail closed (empty display list, `supported: false`, `'unknown'` permission, `SCREENSHOT_FAILED`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/screenshot-handlers.ts:118",
+      "source": "src/main/ipc/screenshot-handlers.ts:101",
       "match": "return 'unknown'"
     },
     {
@@ -51329,7 +51330,7 @@
       "quote": "are attached per capture to each overlay's `webContents.mainFrame.ipc`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/screenshot/ScreenshotOverlayWindow.ts:265",
+      "source": "src/main/services/screenshot/ScreenshotOverlayWindow.ts:266",
       "match": "const ipc = overlay.webContents.mainFrame.ipc"
     },
     {
@@ -51349,7 +51350,7 @@
       "quote": "ESLint syntax selectors refuse any other call site",
       "status": "verified",
       "evidence": "source",
-      "source": "eslint.config.mjs:645",
+      "source": "eslint.config.mjs:653",
       "match": "MemberExpression[property.name='openExternal'][object.name!='deps']"
     },
     {
@@ -51399,7 +51400,7 @@
       "quote": "Audio-capable media requests, sub-frames and every other permission are refused.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/session/defaultSessionPermissions.ts:33",
+      "source": "src/main/services/session/defaultSessionPermissions.ts:41",
       "match": "query.mediaTypes.every((t) => t === CAMERA_MEDIA_TYPE)"
     },
     {
@@ -51509,7 +51510,7 @@
       "quote": "now extracts with `yauzl` 3.4.0 directly",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:80",
+      "source": "package.json:82",
       "match": "\"yauzl\""
     },
     {
@@ -51519,7 +51520,7 @@
       "quote": "`sharp` stays a `devDependency` for the documentation-capture scripts only",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:144",
+      "source": "package.json:146",
       "match": "\"sharp\": \"^0.35.4\""
     },
     {
@@ -51529,7 +51530,7 @@
       "quote": "| `dompurify` | `^3.4.17` |",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:160",
+      "source": "package.json:162",
       "match": "\"dompurify\": \"^3.4.17\""
     },
     {
@@ -51931,7 +51932,7 @@
       "quote": "ESLint `react/no-danger` is an error under `HtmlPreviewPanel/comments/`",
       "status": "verified",
       "evidence": "source",
-      "source": "eslint.config.mjs:846",
+      "source": "eslint.config.mjs:854",
       "match": "'react/no-danger': 'error'"
     },
     {
@@ -52712,7 +52713,7 @@
       "quote": "now lint-block `src/shared/**` from importing `src/main`, `src/renderer`, `src/preload` or `electron`",
       "status": "fixed",
       "evidence": "source",
-      "source": "eslint.config.mjs:438",
+      "source": "eslint.config.mjs:446",
       "match": "files: ['src/shared/**/*.ts'],",
       "note": "Said nothing lint-blocks src/shared from importing main, renderer or electron; the layer rules now do"
     },
@@ -52745,7 +52746,7 @@
       "quote": "which already carries the `ipcMain` rule and the layer patterns",
       "status": "fixed",
       "evidence": "source",
-      "source": "eslint.config.mjs:602",
+      "source": "eslint.config.mjs:610",
       "match": "patterns: MAIN_LAYER_PATTERNS",
       "note": "Said adding the block meant restructuring the config; the src/main block already holds the ipcMain rule and layer patterns, so the pattern can be added there"
     },
@@ -53689,7 +53690,7 @@
       "quote": "`npm run build:unpack` (`electron-builder --dir`)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:50",
+      "source": "package.json:52",
       "match": "\"build:unpack\": \"npm run build && electron-builder --dir\","
     },
     {
@@ -53710,7 +53711,7 @@
       "quote": "The build runs `prebuild` (the aproba shim) and `electron-builder --win` automatically.",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:49",
+      "source": "package.json:51",
       "match": "\"prebuild\": \"node scripts/prebuild.mjs\","
     },
     {
@@ -53859,7 +53860,7 @@
       "quote": "returns early when `isRendererGone(mainWindow)` is true",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/index.ts:245",
+      "source": "src/main/index.ts:249",
       "match": "if (isRendererGone(mainWindow)) return",
       "note": "Fix line described a webContents.isDestroyed() guard; the close handler now uses isRendererGone (destroyed or crashed, #60)."
     },
@@ -53870,7 +53871,7 @@
       "quote": "before it calls `webContents.send('quit:requested', …)`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:248",
+      "source": "src/main/index.ts:252",
       "match": "mainWindow.webContents.send('quit:requested', { reason: 'close' })"
     },
     {
@@ -53952,7 +53953,7 @@
       "quote": "1. Build: `npm run build`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:47",
+      "source": "package.json:48",
       "match": "\"build\": \"npm run typecheck && electron-vite build\""
     },
     {
@@ -54034,7 +54035,7 @@
       "quote": "is installed by the setup file of each vitest project (`main`, `renderer`, `preload`)",
       "status": "verified",
       "evidence": "source",
-      "source": "tests/setup/setupTests.main.ts:108",
+      "source": "tests/setup/setupTests.main.ts:112",
       "match": "installFlakeGuard('main')"
     },
     {
@@ -54127,7 +54128,7 @@
       "quote": "that one case; the other 18 run.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/browserLaunch/BrowserLaunchService.integration.test.ts:209",
+      "source": "src/main/services/browserLaunch/BrowserLaunchService.integration.test.ts:211",
       "match": "it.skipIf(process.platform === 'win32')"
     },
     {
@@ -55225,6 +55226,26 @@
       "evidence": "source",
       "source": "src/renderer/src/components/Comments/overlay/hostWindow.ts:41",
       "match": "export const DRAFT_REFRESH_MS = 4 * 60 * 1000"
+    },
+    {
+      "id": "docs-security/s025-01",
+      "audience": "developer",
+      "doc": "docs/security.md",
+      "quote": "`event.sender` is a `webContents` registered in",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/ipc/senderValidation.ts:80",
+      "match": "if (!isAppWebContents(event.sender as AppWebContentsLike | undefined)) return false"
+    },
+    {
+      "id": "docs-security/s025-02",
+      "audience": "developer",
+      "doc": "docs/security.md",
+      "quote": "the main window and the screenshot overlays",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/screenshot/ScreenshotOverlayWindow.ts:334",
+      "match": "registerAppWebContents(overlay.webContents)"
     }
   ],
   "reviewed": {

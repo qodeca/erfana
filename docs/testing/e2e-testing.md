@@ -33,7 +33,7 @@ Erfana supports automated E2E testing using Playwright with Electron. This guide
 ### Running tests
 
 ```bash
-# Functional E2E tests
+# Functional E2E tests (builds in e2e mode, with the main-process test hooks)
 npm run test:e2e
 
 # Run with visible window
@@ -404,6 +404,47 @@ are caught too. The one other
 copy is the bench driver `e2e/fixtures/terminalHiddenFloodDriver.cjs`, which
 runs outside Playwright and bounds its own calls.
 
+### Main-process test hooks and the test clock
+
+Some tests need to reach into the main process – for example, to move time
+forward instead of waiting 500 ms for a guard to expire. Those hooks live in
+`src/main/testHooks/` (spec 025 solution design § 12) and are locked twice:
+
+- **Build time** – they are compiled in only by `npm run build:e2e`
+  (`electron-vite build --mode e2e`), which sets `__ERFANA_TEST_HOOKS__` to
+  `true`. `npm run test:e2e` and `npm run test:e2e:headed` build this way. Every
+  other build sets the flag to `false`, so the hooks are dropped from the
+  bundle entirely.
+- **Run time** – an unpackaged app launched with `ERFANA_E2E_TEST_HOOKS=1`,
+  which `buildAppEnv()` sets for every fixture launch.
+
+A test reads them through `app.evaluate` on `globalThis.__erfanaTestHooks` –
+never through IPC, so a web page cannot reach them even in a test build:
+
+```typescript
+await app.evaluate(async () => {
+  await (globalThis as any).__erfanaTestHooks.clock.advance(500)
+})
+```
+
+`npm run check:no-test-hooks` proves a build is clean: it searches `out/` (or
+any folder or `app.asar` you name) for the sentinel string every hook module
+carries, `ERFANA_BROWSER_TEST_HOOK_SENTINEL`, and fails if it finds it. Run it
+after a normal `npx electron-vite build`; it fails, as it should, after
+`npm run build:e2e`.
+
+**The clock.** Code that measures time takes a `Clock` from
+`src/shared/clock.ts` instead of calling `Date.now()` and `setTimeout`
+directly. Main-process code uses `mainClock` (`src/main/utils/mainClock.ts`),
+which is the real clock in production. In an e2e build the hooks replace it at
+start-up with an offset clock: real time plus whatever the test has added with
+`clock.advance(ms)`, which fires every timer that falls due. Unit tests use
+`createManualClock()`, where time moves only when the test calls `advance(ms)`.
+A timer due at exactly `t` fires when time reaches `t`, never before – so a
+500 ms timer has not fired after `advance(499)` and has after `advance(500)`.
+Renderer clocks do not follow main's yet; `advance` is async so that can be
+added without changing the tests that call it.
+
 ## Test structure
 
 ### Basic test template
@@ -531,7 +572,7 @@ These `ERFANA_E2E_*` variables change behaviour for tests. Most are read by the 
 | `ERFANA_E2E_BROWSER_SEAM=1` | #124: in an unpackaged build only, a function at `globalThis.__erfanaE2eBrowserLaunch` in the main process replaces the real browser launch and receives `{ via, appPath, filePath }` (`browserLauncher.ts`; `app.isPackaged` is checked first). `html-preview-open-in-browser.e2e.ts` sets the variable in `test.beforeAll` (the fixtures' `buildAppEnv()` passes every `ERFANA_*` variable through to the app) and restores the worker's value in `test.afterAll`; each test then arms a recording seam (`armBrowserSeam`), which refuses to arm unless the variable really reached an unpackaged app, and stubs the default-browser lookup, so no test ever starts a browser |
 | `ERFANA_E2E_FAST_SHELL=1` | POSIX only: the PTY bootstrap execs `/bin/sh -i` instead of `exec -l "$SHELL" -i`, skipping user rc files so terminal specs start in tens of milliseconds rather than seconds |
 | `ERFANA_E2E_TRANSCRIPTION=1` | Enables the `transcription` Playwright project (real, paid OpenAI calls; also needs `OPENAI_API_KEY`). Without it the project matches nothing and the `capability-summary` reporter prints a `SKIPPED CAPABILITIES` line |
-| `ERFANA_E2E_TEST_HOOKS=1` | In an unpackaged build only, installs the e2e test hooks – `window.__erfanaTest` (terminal screen, editor value) and main's `globalThis.__erfanaE2eComments`. Set by `buildAppEnv()` for every fixture launch |
+| `ERFANA_E2E_TEST_HOOKS=1` | In an unpackaged build only, installs the e2e test hooks – `window.__erfanaTest` (terminal screen, editor value) and main's `globalThis.__erfanaE2eComments`, plus main's `globalThis.__erfanaTestHooks` in an e2e-mode build ([Main-process test hooks and the test clock](#main-process-test-hooks-and-the-test-clock)). Set by `buildAppEnv()` for every fixture launch |
 | `ERFANA_E2E_BENCH=1` | Enables the `bench` Playwright project (`*.bench.ts`); without it the project matches nothing |
 
 `ERFANA_TEST_BUILD=true` is a *build*-time variable, not a test-time one – see [Test build vs production build](#test-build-vs-production-build) above. Canonical table: [Testing overview § E2E environment variables](./README.md#e2eui-playwright-electron).

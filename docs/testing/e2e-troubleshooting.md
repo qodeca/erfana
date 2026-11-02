@@ -10,7 +10,7 @@ Common issues and solutions for Playwright E2E tests with Electron.
 
 ## Tests timeout on launch
 
-No dev server is involved: `npm run test:e2e` is `electron-vite build && playwright test --project=electron`, so it builds `out/` first and launches the built app. If a launch times out, make sure the build step succeeded (run `npx electron-vite build` on its own and read its output), and that no stale `out/` from a different branch is being launched – `npm run test:e2e:no-build` skips the build and is only safe right after a fresh one:
+No dev server is involved: `npm run test:e2e` is `npm run build:e2e && playwright test --project=electron`, so it builds `out/` first (in e2e mode, with the main-process test hooks) and launches the built app. If a launch times out, make sure the build step succeeded (run `npm run build:e2e` on its own and read its output), and that no stale `out/` from a different branch is being launched – `npm run test:e2e:no-build` skips the build and is only safe right after a fresh one:
 
 ```bash
 npx electron-vite build

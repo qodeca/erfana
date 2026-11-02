@@ -220,9 +220,23 @@ function assertSingleDompurify(): Plugin {
   }
 }
 
-export default defineConfig({
+/**
+ * The build mode that compiles the test hooks in: `electron-vite build --mode e2e`
+ * (`npm run build:e2e`). Every other mode inlines `__ERFANA_TEST_HOOKS__` as
+ * `false`, so `src/main/testHooks/loadTestHooks.ts` loses its dynamic import
+ * of the hooks and they never reach the output; `npm run check:no-test-hooks`
+ * proves it on a build (spec 025 solution design § 12, T3).
+ */
+export const TEST_HOOKS_BUILD_MODE = 'e2e'
+
+function testHooksDefine(mode: string): Record<string, string> {
+  return { __ERFANA_TEST_HOOKS__: JSON.stringify(mode === TEST_HOOKS_BUILD_MODE) }
+}
+
+export default defineConfig(({ mode }) => ({
   main: {
     plugins: [assertModulePathsConfinedFirst()],
+    define: testHooksDefine(mode),
     build: {
       rollupOptions: {
         output: {
@@ -303,11 +317,12 @@ export default defineConfig({
       }
     },
     define: {
-      __APP_VERSION__: JSON.stringify(appVersion)
+      __APP_VERSION__: JSON.stringify(appVersion),
+      ...testHooksDefine(mode)
     },
     optimizeDeps: {
       esbuildOptions: { plugins: [monacoOwnDompurifyEsbuild()] }
     },
     plugins: [monacoOwnDompurify(), react(), assertSingleDompurify()]
   }
-})
+}))

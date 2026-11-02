@@ -62,6 +62,7 @@ import { registerProcessCrashLogging } from './utils/processCrashLogging'
 import { writeCrashFallbackLine } from './utils/crashFallbackLog'
 import { isBenignShutdownTimerError } from './utils/isBenignShutdownTimerError'
 import { installDefaultSessionPermissions } from './services/session/defaultSessionPermissions'
+import { loadTestHooks } from './testHooks/loadTestHooks'
 import { registerAppWebContents } from './ipc/appWebContents'
 import {
   registerAppCrashLogging,
@@ -426,6 +427,7 @@ function showStartupProblems(win: BrowserWindow, problems: string[], detailsSave
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(async () => {
+  await loadTestHooks() // e2e builds only, before any timer on mainClock (spec 025 § 12)
   // Set application name (shows in macOS menu bar)
   app.setName('ERFANA')
 
