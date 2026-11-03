@@ -55807,6 +55807,17 @@
       "match": "const folded = canonical.replace(/[^A-Za-z0-9]/g, '-')"
     },
     {
+      "id": "user-guide-reference-browser-data-handling/08",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/browser-data-handling.md",
+      "quote": "and `~/.config/erfana` on Linux",
+      "status": "fixed",
+      "evidence": "source",
+      "source": "package.json:2",
+      "match": "\"name\": \"erfana\",",
+      "note": "said ~/.config/Erfana (and Erfana on macOS and Windows); package.json has no productName, so Electron names the user-data folder after \"name\" – the packaged 0.23.1 app.asar package.json has no productName either"
+    },
+    {
       "id": "user-guide-reference-terminal/b01",
       "audience": "user",
       "doc": "docs/user-guide/reference/terminal.md",

@@ -63,7 +63,7 @@ export const FORGET_PENDING_FILE = 'forget-pending'
  * Longest readable part of a folder name. Claude Code cuts at 200; Erfana cuts
  * shorter so the full name (plus hash and `-NN`) fits Linux eCryptfs's
  * 143-byte names, and – on Windows – so Chromium's deepest files stay under
- * `MAX_PATH` (260) below `%APPDATA%\Erfana\browser-profiles\<name>\chromium\`.
+ * `MAX_PATH` (260) below `%APPDATA%\erfana\browser-profiles\<name>\chromium\`.
  */
 export const NAME_PREFIX_MAX = Object.freeze({ posix: 128, win32: 40 })
 /** `<name>`, `<name>-2`, … `<name>-100`. */

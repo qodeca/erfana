@@ -23,7 +23,7 @@ A `file://` page you open from the address bar or with **Open in browser tab** g
 The browser keeps each project's data in two places:
 
 - **In the project, in `.erfana/browser/`:** Erfana's own files for the project – saved sign-ins, permission answers, exceptions, zoom levels and history – and the captures. That folder ignores itself in git.
-- **In Erfana's own data folder, in `browser-profiles/`:** the browser engine's data – cookies, local storage and cache. Erfana's data folder is `~/Library/Application Support/Erfana` on macOS, `%APPDATA%\Erfana` on Windows and `~/.config/Erfana` on Linux. Each project has its own folder there, named after the project's path the way Claude Code names its `~/.claude/projects/` folders – for example `-Users-you-Projects-shop` for `/Users/you/Projects/shop`. A `project.json` file in it names the project it belongs to.
+- **In Erfana's own data folder, in `browser-profiles/`:** the browser engine's data – cookies, local storage and cache. Erfana's data folder is `~/Library/Application Support/erfana` on macOS, `%APPDATA%\erfana` on Windows and `~/.config/erfana` on Linux. Each project has its own folder there, named after the project's path the way Claude Code names its `~/.claude/projects/` folders – for example `-Users-you-Projects-shop` for `/Users/you/Projects/shop`. A `project.json` file in it names the project it belongs to.
 
 The engine's data cannot live in the project: on macOS the browser engine is only allowed to write its cookie file inside Erfana's own data folder.
 

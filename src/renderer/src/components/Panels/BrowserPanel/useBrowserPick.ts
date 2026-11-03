@@ -263,7 +263,7 @@ export function useBrowserPick(options: UseBrowserPickOptions): BrowserPick {
           denyRuleOffered.add(projectPath)
           showInfoToast(
             "Keep your agent out of the browser profile",
-            "The browser profile holds this project's cookies and saved sign-ins. Add a deny rule for .erfana/browser/profile/ to your agent's settings – for Claude Code, Read(./.erfana/browser/profile/**) under permissions.deny."
+            "Erfana's browser files in the project hold its saved sign-ins, site permissions and certificate exceptions. Add a deny rule for .erfana/browser/profile/ to your agent's settings – for Claude Code, Read(./.erfana/browser/profile/**) under permissions.deny."
           )
         }
       })
