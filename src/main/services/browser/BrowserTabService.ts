@@ -22,13 +22,20 @@
  *   the preview's is); a project switch or close closes the old project's tabs
  *   in the `closeViews` stage of `BrowserProjectTeardown`. Nothing is stored,
  *   so nothing is restored (025-FR-006).
+ * - **Site requests** (025-FR-019, 025-FR-020): each tab is attached to the
+ *   `site` (`permissions/BrowserSite.ts`) before its first page loads; its
+ *   strip rows and download notices go to the owning window, and
+ *   {@link BrowserTabService.answerStrip} takes the answers back.
  */
 import type { Session, WebContentsView } from 'electron'
 import { BROWSER_TAB_EVENTS } from '../../../shared/ipc/browser-tab-channels'
 import {
+  NoticeEventSchema,
+  StripEventSchema,
   TabAddedEventSchema,
   TabStateEventSchema,
-  type CreateResponse
+  type CreateResponse,
+  type StripAnswer
 } from '../../../shared/ipc/browser-tab-schema'
 import type { RegistrableDomainResolver } from '../../../shared/browser/originFormat'
 import { isSamePath } from '../../utils/pathCompare'
@@ -38,6 +45,8 @@ import type { ProjectSessionSnapshot } from '../session/ProjectSession'
 import { BrowserProfileError } from './browserProfileGuards'
 import type { AppAddresses } from './browserNavigationPolicy'
 import { BrowserTab, type BrowserTabCdpHook, type TabHost } from './BrowserTab'
+import type { BrowserSite, TabSiteLink } from './permissions/BrowserSite'
+import type { AnswerResult } from './permissions/tabStrip'
 
 /** What `openForTab` hands back that a tab needs. */
 export interface TabProfile {
@@ -59,6 +68,8 @@ export interface BrowserTabServiceDeps {
   readonly appAddresses: () => AppAddresses
   readonly resolveDomain: RegistrableDomainResolver
   readonly attachCdp?: BrowserTabCdpHook
+  /** Permission prompts, notices and downloads; without it the session policy refuses them. */
+  readonly site?: Pick<BrowserSite, 'attachTab' | 'showDownload'>
 }
 
 /** Mints `browser-tab-<n>`, the id shape `BrowserTabIdSchema` accepts. */
@@ -67,6 +78,7 @@ const MAX_TAB_COUNTER = 999_999_999
 export class BrowserTabService {
   private readonly tabs = new Map<string, BrowserTab>()
   private readonly hostOf = new WeakMap<BrowserTab, TabHost>()
+  private readonly siteOf = new WeakMap<BrowserTab, TabSiteLink>()
   private counter = 0
 
   constructor(private readonly deps: BrowserTabServiceDeps) {}
@@ -123,6 +135,21 @@ export class BrowserTabService {
     return tab
   }
 
+  /**
+   * An answer to a strip row of `tabId` from `windowId` (`browser-tab:answerStrip`);
+   * `null` when the window does not own the tab.
+   */
+  answerStrip(windowId: number, tabId: string, requestId: string, answer: StripAnswer): AnswerResult | null {
+    const tab = this.tabOf(windowId, tabId)
+    if (tab === null) return null
+    return this.siteOf.get(tab)?.answerStrip(requestId, answer) ?? 'unknown'
+  }
+
+  /** **Show in folder** for a download announced to `windowId`. */
+  showDownload(windowId: number, downloadId: string): boolean {
+    return this.deps.site?.showDownload(windowId, downloadId) ?? false
+  }
+
   /** Every live tab, for the test hooks. */
   list(): readonly BrowserTab[] {
     return [...this.tabs.values()]
@@ -166,6 +193,12 @@ export class BrowserTabService {
     })
     this.tabs.set(tab.id, tab)
     this.hostOf.set(tab, host)
+    const site = this.deps.site?.attachTab(tab, {
+      strip: (event) => this.send(host, BROWSER_TAB_EVENTS.strip, StripEventSchema, event),
+      notice: (event) => this.send(host, BROWSER_TAB_EVENTS.notice, NoticeEventSchema, event),
+      parentWindow: () => (host.isDestroyed() ? null : host)
+    })
+    if (site !== undefined) this.siteOf.set(tab, site)
     return tab
   }
 
@@ -186,6 +219,8 @@ export class BrowserTabService {
 
   private forget(tab: BrowserTab): void {
     if (this.tabs.get(tab.id) === tab) this.tabs.delete(tab.id)
+    this.siteOf.get(tab)?.detach()
+    this.siteOf.delete(tab)
   }
 
   private sendState(tab: BrowserTab): void {

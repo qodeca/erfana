@@ -70,7 +70,7 @@ describe('permission table', () => {
     expect(granted).toEqual(['clipboard-sanitized-write', 'persistent-storage'])
   })
 
-  it('records the decisions later commits implement, and denies them for now', () => {
+  it('classes prompts and notices, and grants neither without the site hooks', () => {
     expect(permissionClass('media')).toBe('ask')
     expect(permissionClass('fullscreen')).toBe('allowWithNotice')
     for (const name of ['notifications', 'keyboardLock', 'openExternal', 'hid', 'serial', 'usb']) {
@@ -143,7 +143,7 @@ describe('hardenBrowserSession', () => {
     expect(callback).toHaveBeenCalledWith(...cancelArgs)
   })
 
-  it('cancels downloads until the downloads module exists', () => {
+  it('cancels downloads when hardened without the site hooks', () => {
     const preventDefault = vi.fn()
     fake.listeners.get('will-download')!({ preventDefault })
     expect(preventDefault).toHaveBeenCalled()
@@ -164,6 +164,47 @@ describe('hardenBrowserSession', () => {
     hardenBrowserSession(fake.asSession, OPTIONS)
     expect(fake.session.setPermissionRequestHandler).toHaveBeenCalledTimes(1)
     expect(fake.session.on.mock.calls.filter(([e]) => e === 'will-download')).toHaveLength(1)
+  })
+})
+
+describe('hardenBrowserSession with the site hooks (025-FR-019, 025-FR-020)', () => {
+  function hooks() {
+    return {
+      permissionRequest: vi.fn(),
+      permissionCheck: vi.fn(() => true),
+      displayMediaRequest: vi.fn(),
+      willDownload: vi.fn()
+    }
+  }
+
+  it('sends permission requests and checks, screen sharing and downloads to the site', () => {
+    const site = hooks()
+    const fake = fakeSession()
+    hardenBrowserSession(fake.asSession, { ...OPTIONS, site })
+    const contents = { id: 1 }
+    const callback = vi.fn()
+    const details = { requestingUrl: 'https://a.test/' }
+    ;(fake.handlers.request as (...a: unknown[]) => void)(contents, 'media', callback, details)
+    expect(site.permissionRequest).toHaveBeenCalledWith(contents, 'media', callback, details)
+    expect((fake.handlers.check as (...a: unknown[]) => boolean)(contents, 'geolocation', 'https://a.test', {})).toBe(true)
+    expect(site.permissionCheck).toHaveBeenCalledWith(contents, 'geolocation', 'https://a.test', {})
+    const request = { frame: null, securityOrigin: 'https://a.test' }
+    ;(fake.handlers.display as (...a: unknown[]) => void)(request, callback)
+    expect(site.displayMediaRequest).toHaveBeenCalledWith(request, callback)
+    const event = { preventDefault: vi.fn() }
+    const item = {}
+    fake.listeners.get('will-download')!(event, item, contents)
+    expect(site.willDownload).toHaveBeenCalledWith(event, item, contents)
+    expect(event.preventDefault).not.toHaveBeenCalled()
+  })
+
+  it('still refuses every device and chooser with the site hooks', () => {
+    const fake = fakeSession()
+    hardenBrowserSession(fake.asSession, { ...OPTIONS, site: hooks() })
+    expect((fake.handlers.device as () => boolean)()).toBe(false)
+    const preventDefault = vi.fn()
+    fake.listeners.get('select-usb-device')!({ preventDefault }, {}, vi.fn())
+    expect(preventDefault).toHaveBeenCalled()
   })
 })
 

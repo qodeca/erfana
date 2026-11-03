@@ -159,6 +159,28 @@ export default defineConfig({
         'src/main/services/browser/cdp/cdpLogCollector.ts': { lines: 98, functions: 98, branches: 95, statements: 98 },
         // measured 100/100/95.12/98.88
         'src/main/services/browser/cdp/browserHangProbe.ts': { lines: 98, functions: 98, branches: 93, statements: 96 },
+        // Built-in browser site permissions and downloads (spec 025 commits
+        // 12a–b, 025-FR-019, 025-FR-020, S-18, S-26): the strip's queue, input
+        // guard and gap, the per-pair saved decisions and their signed file,
+        // the per-tab broker, the session-to-tab routing, the download name
+        // and the save flow that deletes partial files. A gap here is an
+        // untested way for a page to get a permission or a file through.
+        // Pinned ~2 points under the value measured when they landed
+        // (2026-11-03), never above 98.
+        // measured 100/100/92.06/99.09
+        'src/main/services/browser/permissions/tabStrip.ts': { lines: 98, functions: 98, branches: 90, statements: 97 },
+        // measured 100/100/100/100
+        'src/main/services/browser/permissions/sitePermissions.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/permissions/tabPermissions.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 97.36/93.75/90/94.18
+        'src/main/services/browser/permissions/permissionStore.ts': { lines: 95, functions: 91, branches: 88, statements: 92 },
+        // measured 97.16/90.9/93.25/95.9
+        'src/main/services/browser/permissions/BrowserSite.ts': { lines: 95, functions: 88, branches: 91, statements: 93 },
+        // measured 100/100/78.57/94.73
+        'src/main/services/browser/downloads/downloadFileName.ts': { lines: 98, functions: 98, branches: 76, statements: 92 },
+        // measured 97.67/80/88.13/96
+        'src/main/services/browser/downloads/BrowserDownloads.ts': { lines: 95, functions: 78, branches: 86, statements: 94 },
         // Multi-page HTML preview (#124). These modules decide what the preview
         // BrowserView is allowed to load and where it may navigate — frame/scheme
         // gating, request filtering, URL normalisation, page and tab scope — plus

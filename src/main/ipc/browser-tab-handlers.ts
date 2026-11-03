@@ -4,8 +4,9 @@
  * The built-in browser's tab channels (spec 025, solution design § 8,
  * commit 7): `browser-tab:create`, `close`, `navigate`, `history` (Back,
  * Forward, Reload, Stop), `bounds` (send; carries visibility), `focusPage` and
- * `devTools`. The tab state goes back as the `browser-tab:state` event, to the
- * owning window only (`BrowserTabService`).
+ * `devTools`; `answerStrip` and `showDownload` (commit 12a–b, 025-FR-019,
+ * 025-FR-020). The tab state goes back as the `browser-tab:state` event, to
+ * the owning window only (`BrowserTabService`).
  *
  * Every handler is registered through `registry.ts` (identity, top-level
  * frame, renderer URL and the window kind's channel allow-list), checks the
@@ -18,6 +19,7 @@ import { BrowserWindow, type IpcMainEvent, type IpcMainInvokeEvent } from 'elect
 import { classifyAddressInput } from '../../shared/browser/addressInput'
 import { BROWSER_TAB_CHANNELS } from '../../shared/ipc/browser-tab-channels'
 import {
+  AnswerStripRequestSchema,
   BoundsRequestSchema,
   CloseRequestSchema,
   CreateRequestSchema,
@@ -25,6 +27,7 @@ import {
   FocusPageRequestSchema,
   HistoryRequestSchema,
   NavigateRequestSchema,
+  ShowDownloadRequestSchema,
   type CreateResponse,
   type NavigateResponse
 } from '../../shared/ipc/browser-tab-schema'
@@ -35,7 +38,7 @@ import { redactedLogError } from '../utils/redactUserInput'
 import { registerHandle, registerOn, unregisterHandle, unregisterOn } from './registry'
 import { isTrustedSender as defaultIsTrustedSender } from './senderValidation'
 
-type TabServiceSurface = Pick<BrowserTabService, 'create' | 'close' | 'tabOf'>
+type TabServiceSurface = Pick<BrowserTabService, 'create' | 'close' | 'tabOf' | 'answerStrip' | 'showDownload'>
 
 export interface BrowserTabHandlerDeps {
   readonly service: TabServiceSurface
@@ -52,7 +55,17 @@ interface Parser<T> {
 }
 
 /** Every channel this module registers, for tests and the unregister function. */
-export const BROWSER_TAB_HANDLED_CHANNELS = [C.create, C.close, C.navigate, C.history, C.bounds, C.focusPage, C.devTools] as const
+export const BROWSER_TAB_HANDLED_CHANNELS = [
+  C.create,
+  C.close,
+  C.navigate,
+  C.history,
+  C.bounds,
+  C.focusPage,
+  C.devTools,
+  C.answerStrip,
+  C.showDownload
+] as const
 
 /** Register the tab channels; returns the function that removes them. */
 export function registerBrowserTabHandlers(deps: BrowserTabHandlerDeps): () => void {
@@ -152,6 +165,26 @@ export function registerBrowserTabHandlers(deps: BrowserTabHandlerDeps): () => v
   registerHandle(C.devTools, (event, arg: unknown): void => {
     const target = acceptTab(C.devTools, event, DevToolsRequestSchema, arg)
     if (target !== null) guarded(C.devTools, undefined, () => target.tab.devTools(target.data.inspectAt))
+  })
+
+  // The owning window answers its own tab's row; main re-checks the input
+  // guard and that the answer is one the row offers (`TabStrip.answer`).
+  registerHandle(C.answerStrip, (event, arg: unknown): void => {
+    const accepted = accept(C.answerStrip, event, AnswerStripRequestSchema, arg)
+    if (accepted === null) return
+    const { tabId, requestId, answer } = accepted.data
+    guarded(C.answerStrip, undefined, () => {
+      service.answerStrip(accepted.host.id, tabId, requestId, answer)
+    })
+  })
+
+  registerHandle(C.showDownload, (event, arg: unknown): void => {
+    const accepted = accept(C.showDownload, event, ShowDownloadRequestSchema, arg)
+    if (accepted !== null) {
+      guarded(C.showDownload, undefined, () => {
+        service.showDownload(accepted.host.id, accepted.data.downloadId)
+      })
+    }
   })
 
   return () => {

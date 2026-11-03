@@ -185,3 +185,65 @@ describe('createFromPage (S2)', () => {
     expect(service.createFromPage(opener, 'https://b.test/', false)).toBeNull()
   })
 })
+
+describe('site requests (025-FR-019, 025-FR-020)', () => {
+  function withSite() {
+    const link = { answerStrip: vi.fn(() => 'accepted' as const), detach: vi.fn() }
+    const site = { attachTab: vi.fn(() => link), showDownload: vi.fn(() => true) }
+    service = make({ site })
+    return { site, link }
+  }
+
+  it('attaches each tab before its first load and sends its strip and notices to the owning window only', async () => {
+    const { site } = withSite()
+    const tabId = await open()
+    expect(site.attachTab).toHaveBeenCalledTimes(1)
+    const [tab, outlet] = site.attachTab.mock.calls[0] as unknown as [{ id: string }, {
+      strip(e: unknown): void
+      notice(e: unknown): void
+      parentWindow(): unknown
+    }]
+    expect(tab.id).toBe(tabId)
+    expect(views[0].contents.loadURL).not.toHaveBeenCalled()
+    a.send.mockClear()
+    outlet.strip({ tabId, op: 'withdraw', requestId: 'r1' })
+    outlet.notice({ tabId: null, kind: 'downloadDone', text: 'Downloaded a.pdf' })
+    outlet.strip({ tabId, op: 'nonsense' })
+    expect(a.send.mock.calls).toEqual([
+      [BROWSER_TAB_EVENTS.strip, { tabId, op: 'withdraw', requestId: 'r1' }],
+      [BROWSER_TAB_EVENTS.notice, { tabId: null, kind: 'downloadDone', text: 'Downloaded a.pdf' }]
+    ])
+    expect(b.send).not.toHaveBeenCalled()
+    expect(outlet.parentWindow()).toBe(a.host)
+    a.destroy()
+    expect(outlet.parentWindow()).toBeNull()
+  })
+
+  it('takes strip answers only from the window that owns the tab', async () => {
+    const { link } = withSite()
+    const tabId = await open()
+    expect(service.answerStrip(b.host.id, tabId, 'r1', 'allow')).toBeNull()
+    expect(link.answerStrip).not.toHaveBeenCalled()
+    expect(service.answerStrip(a.host.id, tabId, 'r1', 'allow')).toBe('accepted')
+    expect(link.answerStrip).toHaveBeenCalledWith('r1', 'allow')
+  })
+
+  it('detaches a tab from the site when it closes', async () => {
+    const { link } = withSite()
+    const tabId = await open()
+    service.close(a.host.id, tabId)
+    expect(link.detach).toHaveBeenCalledTimes(1)
+  })
+
+  it('passes Show in folder to the site with the sender window', () => {
+    const { site } = withSite()
+    expect(service.showDownload(a.host.id, 'dl1')).toBe(true)
+    expect(site.showDownload).toHaveBeenCalledWith(a.host.id, 'dl1')
+  })
+
+  it('works without a site: answers are unknown and Show in folder does nothing', async () => {
+    const tabId = await open()
+    expect(service.answerStrip(a.host.id, tabId, 'r1', 'allow')).toBe('unknown')
+    expect(service.showDownload(a.host.id, 'dl1')).toBe(false)
+  })
+})

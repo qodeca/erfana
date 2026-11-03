@@ -46,6 +46,8 @@ export const BROWSER_TAB_CHANNELS = {
   discardCaptureFiles: 'browser-tab:discardCaptureFiles',
   targetStatus: 'browser-tab:targetStatus',
   answerStrip: 'browser-tab:answerStrip',
+  /** **Show in folder** on a finished download's notice (025-FR-020). */
+  showDownload: 'browser-tab:showDownload',
   contextAction: 'browser-tab:contextAction',
   certificate: 'browser-tab:certificate',
   clearData: 'browser-tab:clearData',

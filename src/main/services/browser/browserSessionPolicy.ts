@@ -15,16 +15,20 @@
  *   every permission name Electron 44 can pass. The request and the check
  *   handler both answer from it; a name that is not in the table (a newer
  *   Electron) is denied. `allow` is limited to what 025-FR-019 allows without a
- *   prompt and without a notice. `ask` and `allowWithNotice` are denied until
- *   the prompt strip and the notices exist (`site/browserPermissions.ts`,
- *   commit 12a) – the class records the decision that commit will implement.
+ *   prompt and without a notice. `ask` (a prompt in the strip) and
+ *   `allowWithNotice` (fullscreen, pointer lock) go to the session's
+ *   {@link SessionSiteHooks} – `permissions/BrowserSite.ts`, commit 12a –
+ *   and are denied when the session was hardened without them.
  * - **Devices** – the device permission handler refuses every HID, serial and
  *   USB device; the HID, serial and USB choosers are cancelled before Electron
  *   can pick one. Bluetooth is per page (`select-bluetooth-device` is a
  *   `webContents` event): {@link hardenBrowserContents}. Bluetooth pairing needs
  *   no handler: with none set, Electron cancels it.
- * - **Screen sharing** – `getDisplayMedia` answers with no stream.
- * - **Downloads** – cancelled until `site/browserDownloads.ts` (commit 12b).
+ * - **Screen sharing** – `getDisplayMedia` goes to the site hooks (a prompt,
+ *   then the source chooser); with no hooks it answers with no stream.
+ * - **Downloads** – go to the site hooks (`downloads/BrowserDownloads.ts`,
+ *   commit 12b): ask first, save where the user chose; with no hooks every
+ *   download is cancelled.
  * - **User agent** – a Chrome user agent for the bundled Chromium version, with
  *   no Electron or Erfana token (025-FR-024). Client hints carry Chromium's own
  *   brands; the per-page overrides for workers and popups arrive with the CDP
@@ -32,7 +36,7 @@
  * - **Spell check** – off on Linux, where there is no OS checker and Chromium
  *   would download dictionaries (S-4); on elsewhere.
  */
-import type { Session } from 'electron'
+import type { DownloadItem, Session, Streams, WebContents, WebFrameMain } from 'electron'
 import { logger } from '../LoggingService'
 
 type PermissionRequestHandler = Exclude<Parameters<Session['setPermissionRequestHandler']>[0], null>
@@ -43,9 +47,10 @@ export type ElectronPermission = Parameters<PermissionRequestHandler>[1]
 /**
  * What 025-FR-019 decides for a permission:
  * - `allow` – granted without a prompt or a notice;
- * - `allowWithNotice` – granted with an Erfana notice in the strip (fullscreen,
- *   pointer lock); denied until the notice exists;
- * - `ask` – a prompt naming the origin; denied until the prompt exists;
+ * - `allowWithNotice` – granted to a browser tab with an Erfana notice in the
+ *   strip (fullscreen, pointer lock);
+ * - `ask` – a prompt naming the origin, answered from saved decisions when
+ *   there are any;
  * - `deny` – denied without a prompt.
  */
 export type PermissionClass = 'allow' | 'allowWithNotice' | 'ask' | 'deny'
@@ -115,7 +120,7 @@ export function permissionClass(permission: string): PermissionClass {
     : 'deny'
 }
 
-/** Whether `permission` is granted today: `allow` only. */
+/** Whether `permission` is granted with no prompt, no notice and no tab: `allow` only. */
 export function isPermissionGranted(permission: string): boolean {
   return permissionClass(permission) === 'allow'
 }
@@ -151,10 +156,36 @@ export type HardenableSession = Pick<
   | 'on'
 >
 
+/**
+ * Where a session's site requests are decided (`permissions/BrowserSite.ts`).
+ * Each handler answers through its callback exactly once.
+ */
+export interface SessionSiteHooks {
+  permissionRequest(
+    contents: WebContents,
+    permission: string,
+    callback: (granted: boolean) => void,
+    details: { mediaTypes?: ('video' | 'audio')[]; securityOrigin?: string; requestingUrl?: string }
+  ): void
+  permissionCheck(
+    contents: WebContents | null,
+    permission: string,
+    requestingOrigin: string,
+    details: { embeddingOrigin?: string; mediaType?: 'video' | 'audio' | 'unknown' }
+  ): boolean
+  displayMediaRequest(
+    request: { frame: WebFrameMain | null; securityOrigin: string },
+    callback: (streams: Streams | null) => void
+  ): void
+  willDownload(event: { preventDefault(): void }, item: DownloadItem, contents: WebContents): void
+}
+
 export interface HardenOptions {
   readonly platform: NodeJS.Platform
   /** `process.versions.chrome`. */
   readonly chromeVersion: string
+  /** The site requests' handler; without it, `ask` and `allowWithNotice` are denied and downloads cancelled. */
+  readonly site?: SessionSiteHooks
 }
 
 const hardened = new WeakSet<object>()
@@ -164,15 +195,26 @@ function logDenied(permission: string, path: 'request' | 'check'): void {
   logger.debug('Browser permission denied', { permission, path })
 }
 
-function installPermissionHandlers(session: HardenableSession): void {
-  session.setPermissionRequestHandler((_contents, permission, callback) => {
+function installPermissionHandlers(session: HardenableSession, site: SessionSiteHooks | undefined): void {
+  session.setPermissionRequestHandler((contents, permission, callback, details) => {
+    if (site !== undefined) {
+      site.permissionRequest(contents, permission, callback, details)
+      return
+    }
     const granted = isPermissionGranted(permission)
     if (!granted) logDenied(permission, 'request')
     callback(granted)
   })
-  session.setPermissionCheckHandler((_contents, permission) => isPermissionGranted(permission))
+  session.setPermissionCheckHandler((contents, permission, requestingOrigin, details) =>
+    site === undefined
+      ? isPermissionGranted(permission)
+      : site.permissionCheck(contents, permission, requestingOrigin, details)
+  )
   session.setDevicePermissionHandler(() => false)
-  session.setDisplayMediaRequestHandler((_request, callback) => callback(null), { useSystemPicker: false })
+  session.setDisplayMediaRequestHandler(
+    (request, callback) => (site === undefined ? callback(null) : site.displayMediaRequest(request, callback)),
+    { useSystemPicker: false }
+  )
 }
 
 function installChooserRefusals(session: HardenableSession): void {
@@ -197,10 +239,12 @@ function installChooserRefusals(session: HardenableSession): void {
  */
 export function hardenBrowserSession(session: HardenableSession, options: HardenOptions): void {
   if (hardened.has(session)) return
-  installPermissionHandlers(session)
+  installPermissionHandlers(session, options.site)
   installChooserRefusals(session)
-  session.on('will-download', (event) => {
-    event.preventDefault()
+  const site = options.site
+  session.on('will-download', (event, item, contents) => {
+    if (site === undefined) event.preventDefault()
+    else site.willDownload(event, item, contents)
   })
   session.setUserAgent(browserUserAgent(options.platform, options.chromeVersion))
   session.setSpellCheckerEnabled(options.platform !== 'linux')

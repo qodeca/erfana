@@ -31,7 +31,9 @@ const tab = {
 const service = {
   create: vi.fn(async () => ({ tabId: TAB })),
   close: vi.fn(),
-  tabOf: vi.fn((windowId: number, tabId: string) => (windowId === 3 && tabId === TAB ? tab : null))
+  tabOf: vi.fn((windowId: number, tabId: string) => (windowId === 3 && tabId === TAB ? tab : null)),
+  answerStrip: vi.fn(() => 'accepted'),
+  showDownload: vi.fn(() => true)
 }
 let trusted = true
 let windowFor: typeof host | null = host
@@ -54,7 +56,7 @@ beforeEach(() => {
 const invoke = (channel: string, arg: unknown): unknown => handles.get(channel)!(EVENT, arg)
 
 describe('registerBrowserTabHandlers', () => {
-  it('registers the commit-7 channels and removes them all', () => {
+  it('registers its channels and removes them all', () => {
     expect([...handles.keys(), ...ons.keys()].sort()).toEqual([...BROWSER_TAB_HANDLED_CHANNELS].sort())
     expect(ons.has('browser-tab:bounds')).toBe(true)
     // The unregister function is the return value of a fresh registration.
@@ -138,5 +140,35 @@ describe('registerBrowserTabHandlers', () => {
   it('drops a malformed bounds push', () => {
     ons.get('browser-tab:bounds')!(EVENT, { tabId: TAB, seq: -1 })
     expect(tab.applyBounds).not.toHaveBeenCalled()
+  })
+
+  it('025-AC-019 passes a strip answer with the sender\'s window; the service checks ownership and the guard', () => {
+    invoke('browser-tab:answerStrip', { tabId: TAB, requestId: 'r1', answer: 'allowOnce' })
+    expect(service.answerStrip).toHaveBeenCalledWith(3, TAB, 'r1', 'allowOnce')
+  })
+
+  it('refuses a strip answer from an untrusted sender or with fields that do not parse', () => {
+    trusted = false
+    invoke('browser-tab:answerStrip', { tabId: TAB, requestId: 'r1', answer: 'allow' })
+    trusted = true
+    invoke('browser-tab:answerStrip', { tabId: TAB, requestId: 'r 1', answer: 'allow' })
+    invoke('browser-tab:answerStrip', { tabId: TAB, requestId: 'r1', answer: 'grantEverything' })
+    invoke('browser-tab:answerStrip', { tabId: TAB, requestId: 'r1', answer: 'allow', origin: 'https://a.test' })
+    expect(service.answerStrip).not.toHaveBeenCalled()
+  })
+
+  it('025-AC-020 passes Show in folder with the sender\'s window, and logs instead of throwing', () => {
+    invoke('browser-tab:showDownload', { downloadId: 'dl1' })
+    expect(service.showDownload).toHaveBeenCalledWith(3, 'dl1')
+    invoke('browser-tab:showDownload', { downloadId: '../x' })
+    expect(service.showDownload).toHaveBeenCalledTimes(1)
+    service.showDownload.mockImplementationOnce(() => {
+      throw new Error('boom')
+    })
+    expect(() => invoke('browser-tab:showDownload', { downloadId: 'dl2' })).not.toThrow()
+    service.answerStrip.mockImplementationOnce(() => {
+      throw new Error('boom')
+    })
+    expect(() => invoke('browser-tab:answerStrip', { tabId: TAB, requestId: 'r1', answer: 'allow' })).not.toThrow()
   })
 })

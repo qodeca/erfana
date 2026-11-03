@@ -17,9 +17,11 @@ import {
   FindResultEventSchema,
   NavigateRequestSchema,
   NavigationSourceSchema,
+  NoticeEventSchema,
   OriginPartsSchema,
   PickEventSchema,
   RefineRequestSchema,
+  ShowDownloadRequestSchema,
   StripEventSchema,
   TabStateEventSchema,
   TargetStatusResponseSchema,
@@ -147,5 +149,30 @@ describe('browser-tab event schemas', () => {
     expect(StripEventSchema.safeParse({ tabId: TAB, op: 'held', count: 1 }).success).toBe(true)
     expect(FindResultEventSchema.safeParse({ tabId: TAB, active: 0, total: 0 }).success).toBe(true)
     expect(FindResultEventSchema.safeParse({ tabId: TAB, active: 4, total: 3 }).success).toBe(false)
+  })
+})
+
+describe('strip rows and download notices (025-FR-019, 025-FR-020)', () => {
+  const web = { kind: 'web', scheme: null, subdomain: '', registrableDomain: 'a.test', port: null, punycode: false }
+  const row = { requestId: 'r1', kind: 'permission', text: 'a.test wants to use your camera', answers: ['block', 'allow'], takesFocus: false }
+
+  it('accepts the origin line, the permissions, the waiting count, persistence and the shown time', () => {
+    const full = { ...row, requester: { origin: web, inside: null }, permissions: ['camera', 'microphone'], waiting: 1, remembered: 'session', shownAt: 500 }
+    expect(StripEventSchema.safeParse({ tabId: TAB, op: 'add', row: full }).success).toBe(true)
+    expect(StripEventSchema.safeParse({ tabId: TAB, op: 'add', row }).success).toBe(true)
+  })
+
+  it('refuses an empty or unknown permission list and a negative shown time', () => {
+    expect(StripEventSchema.safeParse({ tabId: TAB, op: 'add', row: { ...row, permissions: [] } }).success).toBe(false)
+    expect(StripEventSchema.safeParse({ tabId: TAB, op: 'add', row: { ...row, permissions: ['midi'] } }).success).toBe(false)
+    expect(StripEventSchema.safeParse({ tabId: TAB, op: 'add', row: { ...row, shownAt: -1 } }).success).toBe(false)
+  })
+
+  it('carries a download notice\'s file name, id and reason, and no tab id once the tab closed', () => {
+    const done = { tabId: null, kind: 'downloadDone', text: 'Downloaded a.pdf', download: { fileName: 'a.pdf', downloadId: 'dl1', reason: null } }
+    expect(NoticeEventSchema.safeParse(done).success).toBe(true)
+    expect(NoticeEventSchema.safeParse({ ...done, download: { ...done.download, reason: 'gone' } }).success).toBe(false)
+    expect(ShowDownloadRequestSchema.safeParse({ downloadId: 'dl1' }).success).toBe(true)
+    expect(ShowDownloadRequestSchema.safeParse({ downloadId: '../dl1' }).success).toBe(false)
   })
 })

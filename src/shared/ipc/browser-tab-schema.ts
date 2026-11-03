@@ -259,6 +259,9 @@ export const SuggestResponseSchema = z
   .object({ rows: z.array(z.object({ url: urlString }).strict()).max(BROWSER_SUGGEST_MAX_ROWS) })
   .strict()
 
+/** **Show in folder** on a finished download's notice; the id is the notice's, valid in the window it went to. */
+export const ShowDownloadRequestSchema = z.object({ downloadId: OpaqueIdSchema }).strict()
+
 export const PopupStripRequestSchema = z.object({}).strict()
 export const PopupAnswerRequestSchema = z
   .object({ requestId: OpaqueIdSchema, answer: StripAnswerSchema, fields: StripFieldsSchema.optional() })
@@ -275,6 +278,7 @@ export type WriteCaptureRequest = z.infer<typeof WriteCaptureRequestSchema>
 export type WriteCaptureResponse = z.infer<typeof WriteCaptureResponseSchema>
 export type TargetStatusResponse = z.infer<typeof TargetStatusResponseSchema>
 export type AnswerStripRequest = z.infer<typeof AnswerStripRequestSchema>
+export type StripAnswer = z.infer<typeof StripAnswerSchema>
 export type ClearDataRequest = z.infer<typeof ClearDataRequestSchema>
 
 // ── Events (main → the owning window) ────────────────────────────────────────
@@ -405,6 +409,9 @@ export const PickEventSchema = z.discriminatedUnion('kind', [
     .strict()
 ])
 
+/** The site permissions a prompt can name (025-FR-019). */
+export const SitePermissionSchema = z.enum(['camera', 'microphone', 'screen', 'location', 'notifications', 'clipboardRead'])
+
 /** A strip row (025-FR-054); its text is composed by main from fixed strings and formatted origins. */
 export const StripRowSchema = z
   .object({
@@ -423,7 +430,17 @@ export const StripRowSchema = z
     ]),
     text,
     answers: z.array(StripAnswerSchema).max(StripAnswerSchema.options.length),
-    takesFocus: z.boolean()
+    takesFocus: z.boolean(),
+    /** The origin line, from the engine: the asker, and the top page when a frame asks (025-FR-019). */
+    requester: z.object({ origin: OriginPartsSchema, inside: OriginPartsSchema.nullable() }).strict().optional(),
+    /** What a `permission` row asks for. */
+    permissions: z.array(SitePermissionSchema).min(1).max(SitePermissionSchema.options.length).optional(),
+    /** Requests of the same kind queued behind this row ("+1 waiting"). */
+    waiting: count.optional(),
+    /** Whether Allow and Block are kept in the profile, for this run only (no keyring, S-26), or never (screen sharing). */
+    remembered: z.enum(['saved', 'session', 'never']).optional(),
+    /** Main-clock ms when the row appeared or last changed; main ignores answers within the 500 ms input guard. */
+    shownAt: z.number().nonnegative().optional()
   })
   .strict()
 export const StripEventSchema = z.discriminatedUnion('op', [
@@ -448,7 +465,16 @@ export const NoticeEventSchema = z
   .object({
     tabId: BrowserTabIdSchema.nullable(),
     kind: z.enum(['downloadDone', 'downloadFailed', 'pageChanged', 'localAddressSeen', 'error']),
-    text
+    text,
+    /** A download notice's parts (025-FR-020): `downloadId` for **Show in folder** on `downloadDone`; `reason` on `downloadFailed`. */
+    download: z
+      .object({
+        fileName: text,
+        downloadId: OpaqueIdSchema.nullable(),
+        reason: z.enum(['interrupted', 'folderNotWritable', 'diskFull', 'refusedFolder']).nullable()
+      })
+      .strict()
+      .optional()
   })
   .strict()
 export const FindResultEventSchema = z
@@ -460,3 +486,6 @@ export type OriginPartsPayload = z.infer<typeof OriginPartsSchema>
 export type TabStateEvent = z.infer<typeof TabStateEventSchema>
 export type PickEvent = z.infer<typeof PickEventSchema>
 export type StripEvent = z.infer<typeof StripEventSchema>
+export type StripRow = z.infer<typeof StripRowSchema>
+export type NoticeEvent = z.infer<typeof NoticeEventSchema>
+export type SitePermission = z.infer<typeof SitePermissionSchema>
