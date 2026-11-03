@@ -42,6 +42,10 @@ export const BROWSER_TAB_CHANNELS = {
   pickMode: 'browser-tab:pickMode',
   refine: 'browser-tab:refine',
   closePick: 'browser-tab:closePick',
+  /** The held capture moved between the prompt-actions panel and the instruction dialog (commit 19). */
+  pickSurface: 'browser-tab:pickSurface',
+  /** The page as a still image, for a surface over the page area (ADR 0011, commit 19). */
+  still: 'browser-tab:still',
   writeCapture: 'browser-tab:writeCapture',
   discardCaptureFiles: 'browser-tab:discardCaptureFiles',
   targetStatus: 'browser-tab:targetStatus',

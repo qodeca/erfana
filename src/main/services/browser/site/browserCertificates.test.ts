@@ -98,7 +98,8 @@ describe('TabCertificates', () => {
     expect(await certError(URL_A, CERT_1, true)).toEqual([false])
     expect(certs.state()).toEqual({
       warning: { decisionId: 'decision1', host: 'selfsigned.test:8443', code: -202, shownAt: 0 },
-      sign: null
+      sign: null,
+      failedUrl: URL_A
     })
     expect(states).toHaveLength(1)
   })

@@ -250,6 +250,8 @@ const BROWSER_TAB_METHODS: Record<keyof BrowserTabBridge, true> = {
   pickMode: true,
   refine: true,
   closePick: true,
+  pickSurface: true,
+  still: true,
   writeCapture: true,
   discardCaptureFiles: true,
   targetStatus: true,

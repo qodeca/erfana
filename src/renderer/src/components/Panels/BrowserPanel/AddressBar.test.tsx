@@ -2,6 +2,11 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+const gateway = vi.hoisted(() => ({
+  suggest: vi.fn(async (_prefix: string): Promise<{ rows: Array<{ url: string }> }> => ({ rows: [] }))
+}))
+vi.mock('../../../services/browserTabGateway', () => ({ browserTabGateway: gateway }))
+
 import { AddressBar, type AddressBarProps } from './AddressBar'
 import { browserState } from './__test__/browserState'
 
@@ -17,7 +22,7 @@ function setup(
     ...patch
   }
   const { container } = render(<AddressBar {...props} />)
-  const field = screen.getByRole('textbox', { name: 'Address and search' }) as HTMLInputElement
+  const field = screen.getByRole('combobox', { name: 'Address and search' }) as HTMLInputElement
   return Object.assign(props, { field, container })
 }
 
@@ -84,7 +89,7 @@ describe('AddressBar', () => {
     fireEvent.change(field, { target: { value: '  localhost:5173  ' } })
     expect(onEdit).toHaveBeenCalled()
     await act(async () => fireEvent.keyDown(field, { key: 'Enter' }))
-    expect(onSubmit).toHaveBeenCalledWith('localhost:5173')
+    expect(onSubmit).toHaveBeenCalledWith('localhost:5173', 'address')
     expect(field).toHaveValue('https://www.example.test/docs')
   })
 
@@ -128,5 +133,46 @@ describe('AddressBar', () => {
     act(() => field.blur())
     expect(field).toHaveValue('half typed')
     expect(field.className).not.toContain('--rest')
+  })
+
+  describe('suggestions (025-FR-063)', () => {
+    it('lists history and search rows while typing, moves with the arrows and loads the row reached', async () => {
+      gateway.suggest.mockResolvedValueOnce({ rows: [{ url: 'https://docs.test/' }] })
+      const { field, onSubmit } = setup()
+      act(() => field.focus())
+      fireEvent.change(field, { target: { value: 'docs test' } })
+      const list = await screen.findByRole('listbox', { name: 'Suggestions' })
+      expect(field).toHaveAttribute('aria-expanded', 'true')
+      expect(field).toHaveAttribute('aria-controls', list.id)
+      expect(screen.getAllByRole('option').map(o => o.textContent)).toEqual(['https://docs.test/', 'Search DuckDuckGo for "docs test"'])
+      fireEvent.keyDown(field, { key: 'ArrowDown' })
+      expect(field).toHaveAttribute('aria-activedescendant', screen.getAllByRole('option')[0].id)
+      fireEvent.keyDown(field, { key: 'ArrowUp' })
+      expect(field).not.toHaveAttribute('aria-activedescendant')
+      fireEvent.keyDown(field, { key: 'ArrowUp' })
+      expect(screen.getAllByRole('option')[1]).toHaveAttribute('aria-selected', 'true')
+      fireEvent.keyDown(field, { key: 'ArrowDown' })
+      fireEvent.keyDown(field, { key: 'ArrowDown' })
+      await act(async () => fireEvent.keyDown(field, { key: 'Enter' }))
+      expect(onSubmit).toHaveBeenCalledWith('https://docs.test/', 'history')
+    })
+
+    it('closes the list on the first Esc and restores the address on the next, and loads a clicked search row', async () => {
+      gateway.suggest.mockResolvedValue({ rows: [] })
+      const { field, onSubmit, onEscape } = setup()
+      act(() => field.focus())
+      fireEvent.change(field, { target: { value: 'how to' } })
+      await screen.findByRole('listbox')
+      fireEvent.keyDown(field, { key: 'Escape' })
+      expect(screen.queryByRole('listbox')).toBeNull()
+      expect(field).toHaveValue('how to')
+      fireEvent.keyDown(field, { key: 'Escape' })
+      expect(onEscape).toHaveBeenCalled()
+      act(() => field.focus())
+      fireEvent.change(field, { target: { value: 'how to fix' } })
+      const search = await screen.findByRole('option', { name: 'Search DuckDuckGo for "how to fix"' })
+      await act(async () => fireEvent.click(search))
+      expect(onSubmit).toHaveBeenCalledWith('how to fix', 'address')
+    })
   })
 })

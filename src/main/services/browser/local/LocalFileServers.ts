@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Every served local folder of this process (spec 025, 025-FR-005 rule 1,
- * 025-FR-010; ADR 0012 option 4 – the per-folder loopback server, solution
- * design § 11 Q4: working assumption, owner decision pending). The whole
- * mechanism lives in `browser/local/`, so the owner can still swap it.
+ * 025-FR-010; ADR 0012, accepted 2026-11-03 – the per-folder loopback
+ * server, owner decision Q4 in solution design § 11). The whole mechanism
+ * lives in `browser/local/`.
  *
  * - **Open** ({@link LocalFileServers.open}): the file's real path decides
  *   the served folder – its parent. One server per project per folder,

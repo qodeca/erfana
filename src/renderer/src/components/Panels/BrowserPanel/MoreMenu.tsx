@@ -5,11 +5,12 @@
  * 025-FR-012, 025-FR-057; deck *More* and *More menu items*; owner decision
  * OD-22: always shown). A menu button over the shared {@link ContextMenu}
  * (Menu card, decided – its whole keyboard contract), opening under the
- * button. While it is open the native page is hidden by the native-view
- * guard (the menu registers as an occluder).
+ * button. It opens over the page's still image (`still`, ADR 0011, commit
+ * 19); while it is open the native page is hidden by the native-view guard
+ * (the menu registers as an occluder).
  *
  * Items: the Page width group (Full width, Phone width, Tablet width – the
- * pick row that will hold the width preset arrives with commit 19), Zoom in,
+ * width preset stays here; the pick row does not carry it yet), Zoom in,
  * Zoom out and Zoom: {n}% – reset, Find in page…, Open in system browser,
  * DevTools, then Clear browsing data… and Forget this project's browser
  * data….
@@ -21,6 +22,7 @@ import type { ZoomStep } from '../../../../../shared/browser/zoomSteps'
 import { ContextMenu, type ContextMenuItem } from '../../ContextMenu/ContextMenu'
 import { formatShortcut } from '../../../utils/shortcutLabel'
 import { canZoom, widthPresetItems } from './browserMenus.logic'
+import type { StillSurface } from './useStillSurface'
 
 /** What More's items do. */
 export interface MoreMenuActions {
@@ -88,6 +90,8 @@ export interface MoreMenuProps extends MoreMenuFacts {
   readonly actions: MoreMenuActions
   /** The button (the row's last control, for Shift+F6). */
   readonly buttonRef: React.RefObject<HTMLButtonElement>
+  /** Opens the menu over the page's still image; without it the menu opens at once. */
+  readonly still?: StillSurface
 }
 
 /**
@@ -96,12 +100,17 @@ export interface MoreMenuProps extends MoreMenuFacts {
  * @param props - {@link MoreMenuProps}
  * @returns The button, and the menu while open
  */
-export function MoreMenu({ actions, buttonRef, ...facts }: MoreMenuProps): JSX.Element {
+export function MoreMenu({ actions, buttonRef, still, ...facts }: MoreMenuProps): JSX.Element {
   const [at, setAt] = useState<{ x: number; y: number } | null>(null)
-  const open = (): void => {
+  const show = (): void => {
     const rect = buttonRef.current?.getBoundingClientRect()
     // ContextMenu opens 8px right of and below its anchor; anchor it on the button's bottom-left.
     setAt(rect === undefined ? { x: 0, y: 0 } : { x: rect.left - 8, y: rect.bottom - 8 })
+  }
+  const open = (): void => (still === undefined ? show() : still.open(show))
+  const close = (): void => {
+    setAt(null)
+    still?.close()
   }
   return (
     <>
@@ -113,7 +122,7 @@ export function MoreMenu({ actions, buttonRef, ...facts }: MoreMenuProps): JSX.E
         title="More actions"
         aria-haspopup="menu"
         aria-expanded={at !== null}
-        onClick={() => (at === null ? open() : setAt(null))}
+        onClick={() => (at === null ? open() : close())}
         onKeyDown={event => {
           if (event.key === 'ArrowDown' && at === null) {
             event.preventDefault()
@@ -124,7 +133,7 @@ export function MoreMenu({ actions, buttonRef, ...facts }: MoreMenuProps): JSX.E
         <Ellipsis size={16} strokeWidth={2} aria-hidden="true" />
       </button>
       {at !== null && (
-        <ContextMenu x={at.x} y={at.y} items={moreMenuItems(facts, actions)} ariaLabel="More" onClose={() => setAt(null)} />
+        <ContextMenu x={at.x} y={at.y} items={moreMenuItems(facts, actions)} ariaLabel="More" onClose={close} />
       )}
     </>
   )

@@ -1,0 +1,655 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * Pick and send (spec 025, commit 19): the pick row and its status slot, the
+ * target chooser, the pick frame, the page's still image, the prompt-actions
+ * panel, the instruction dialog, the send notice and the address
+ * suggestions.
+ *
+ * Built to docs/designs/browser/picking.html, prompt-actions.html and
+ * tab-and-toolbar.html (proposed) on the decided Focus card (one 2px ring,
+ * offset outward) and the proposed Element picker card (outline, frame, the
+ * lime top edge of a surface that answers the pick). The still image's
+ * outline is the picker card's two-tone ring, outline only – no fill (owner
+ * decision Q2). The banner's later clauses fold by the row's own width
+ * (container queries): the shortcut clause first, then "Esc to stop"; the
+ * first clause never drops (025-FR-065).
+ */
+
+/* ---------- pick row ---------- */
+
+.erf-brw-pick {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2) var(--space-6);
+  border-bottom: var(--border-width) solid var(--color-border-default);
+  background: var(--color-bg-primary);
+  container-type: inline-size;
+  user-select: none;
+}
+
+.erf-brw-pickbtn {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-3);
+  height: var(--btn-height-sm);
+  padding: 0 var(--space-4) 0 var(--space-3);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.erf-brw-pickbtn:hover {
+  background: var(--color-bg-hover-solid);
+  color: var(--color-white);
+}
+
+.erf-brw-pickbtn[aria-pressed='true'] {
+  border-color: var(--color-accent-secondary);
+  background: var(--color-bg-selected);
+  color: var(--color-white);
+}
+
+.erf-brw-pickbtn[aria-disabled='true'] > svg {
+  opacity: var(--opacity-disabled);
+}
+
+.erf-brw-pickbtn:focus-visible,
+.erf-brw-target:focus-visible,
+.erf-brw-notice__action:focus-visible,
+.erf-brw-actions button:focus-visible,
+.erf-brw-dialog__field:focus-visible,
+.erf-brw-banner__button:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+.erf-brw-status {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  min-width: 0;
+  margin-inline-start: var(--space-4);
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: var(--text-base);
+  white-space: nowrap;
+}
+
+.erf-brw-banner-line {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.erf-brw-banner-line__first {
+  flex: 0 0 auto;
+  color: var(--color-text-primary);
+}
+
+.erf-brw-banner-line__more {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.erf-brw-banner-line__more::before {
+  content: '· ';
+  color: var(--color-text-tertiary);
+}
+
+/* The fold order of 025-FR-065: the shortcut clause, then "Esc to stop". */
+@container (max-width: 520px) {
+  .erf-brw-banner-line__more--2 {
+    display: none;
+  }
+}
+
+@container (max-width: 380px) {
+  .erf-brw-banner-line__more--1 {
+    display: none;
+  }
+
+  .erf-brw-pickbtn__label {
+    display: none;
+  }
+
+  .erf-brw-status {
+    margin-inline-start: var(--space-2);
+  }
+}
+
+.erf-brw-chip {
+  flex: 0 0 auto;
+  margin-inline-start: var(--space-2);
+  padding: 0 var(--space-3);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+}
+
+.erf-brw-spacer {
+  flex: 1 1 0;
+  min-width: var(--space-2);
+}
+
+/* ---------- target chooser ---------- */
+
+/* The target never yields room to the status slot – the slot's clauses fold first (025-FR-061, 025-FR-065). */
+.erf-brw-target {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 40ch;
+  height: var(--btn-height-sm);
+  padding: 0 var(--space-3);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.erf-brw-target:hover {
+  background: var(--color-bg-hover-solid);
+}
+
+.erf-brw-target--panel {
+  border-color: var(--color-border-subtle);
+}
+
+.erf-brw-target__arrow {
+  color: var(--color-text-tertiary);
+}
+
+/* The name is cut from its end, never below 8 characters; the process never is (025-FR-061). */
+.erf-brw-target__name {
+  min-width: 8ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.erf-brw-target__proc {
+  flex: 0 0 auto;
+  color: var(--color-text-bright);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.erf-brw-target__warn {
+  flex: 0 0 auto;
+  color: var(--color-warning);
+}
+
+@container (max-width: 380px) {
+  .erf-brw-target__name {
+    min-width: 1ch;
+  }
+}
+
+/* ---------- send notice (status slot) ---------- */
+
+.erf-brw-notice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--color-text-primary);
+}
+
+.erf-brw-notice__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.erf-brw-notice__action {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--btn-height-sm);
+  padding: 0 var(--space-3);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  background: var(--color-btn-secondary-bg);
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.erf-brw-notice__action:hover {
+  background: var(--color-btn-secondary-hover);
+}
+
+/* Under 800px the actions keep their names but show icons only. */
+@container (max-width: 800px) {
+  .erf-brw-notice__label {
+    display: none;
+  }
+}
+
+/* ---------- pick frame (Element picker card) ---------- */
+
+.erf-brw-frame--pick {
+  border-color: var(--color-accent-secondary);
+  cursor: crosshair;
+}
+
+.erf-brw-frame--pick-away {
+  border-color: var(--color-accent-secondary);
+  border-style: dashed;
+}
+
+@media (forced-colors: active) {
+  .erf-brw-frame--pick {
+    border-color: Highlight;
+    border-style: dashed;
+  }
+
+  .erf-brw-frame--pick-away {
+    border-color: Highlight;
+    border-style: dotted;
+  }
+}
+
+/* ---------- still image ---------- */
+
+.erf-brw-frame__still {
+  position: absolute;
+  inset: var(--space-1);
+  overflow: hidden;
+  background: var(--color-bg-primary);
+}
+
+.erf-brw-still {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.erf-brw-still__page {
+  position: relative;
+  align-self: flex-start;
+}
+
+.erf-brw-still__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The picker card's two-tone ring: a 2px accent line with a 1px ink line on both sides; no fill (Q2). */
+.erf-brw-still__outline {
+  position: absolute;
+  box-sizing: border-box;
+  pointer-events: none;
+  border: var(--border-width-thick) solid var(--color-accent-primary);
+  outline: var(--border-width) solid var(--color-brand-black);
+  box-shadow: inset 0 0 0 var(--border-width) var(--color-brand-black);
+}
+
+@media (forced-colors: active) {
+  .erf-brw-still__outline {
+    border-color: Highlight;
+    outline-color: Canvas;
+  }
+}
+
+/* ---------- prompt-actions panel and instruction dialog ---------- */
+
+.erf-brw-actions {
+  position: absolute;
+  z-index: var(--z-popover);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: min(30rem, 100%);
+  padding: var(--space-4) var(--space-6) var(--space-6);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-lg);
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+}
+
+/* The Element picker card's lime top edge: this surface answers the pick. */
+.erf-brw-actions.erf-picker-owned {
+  border-top: var(--border-width-thick) solid var(--color-accent-secondary);
+}
+
+/* Under 400px of room: a sheet at the foot of the page area, over the still image (M-36). */
+.erf-brw-actions--sheet {
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: auto;
+}
+
+.erf-brw-actions__header,
+.erf-brw-dialog__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.erf-brw-actions__step,
+.erf-brw-actions__close {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: var(--btn-height-sm);
+  height: var(--btn-height-sm);
+  padding: 0;
+  border: none;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.erf-brw-actions__step:hover,
+.erf-brw-actions__close:hover,
+.erf-brw-actions__crumb:hover {
+  background: var(--color-bg-hover-solid);
+}
+
+.erf-brw-actions__step[aria-disabled='true'] > svg {
+  opacity: var(--opacity-disabled);
+}
+
+.erf-brw-actions__close {
+  margin-inline-start: auto;
+}
+
+.erf-brw-actions__path {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.erf-brw-actions__path > ol {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.erf-brw-actions__path li {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  white-space: nowrap;
+}
+
+/* The picked element's chip stays whole; the crumbs before it shrink to an ellipsis (025-FR-027). */
+.erf-brw-actions__path li:last-child {
+  flex: 0 0 auto;
+  max-width: 100%;
+}
+
+.erf-brw-actions__crumb {
+  height: var(--btn-height-sm);
+  padding: 0 var(--space-2);
+  border: none;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.erf-brw-actions__sep {
+  color: var(--color-text-tertiary);
+}
+
+.erf-brw-actions__chip {
+  overflow: hidden;
+  padding: 0 var(--space-2);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  color: var(--color-text-bright);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.erf-brw-actions__chip--changed {
+  border-color: var(--color-accent-secondary);
+}
+
+.erf-brw-actions__note,
+.erf-brw-actions__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.erf-brw-actions__buttons,
+.erf-brw-dialog__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.erf-brw-dialog__buttons {
+  justify-content: flex-end;
+}
+
+.erf-brw-actions__action {
+  height: var(--btn-height-md);
+  padding: 0 var(--space-6);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  background: var(--color-btn-secondary-bg);
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.erf-brw-actions__action:hover {
+  background: var(--color-btn-secondary-hover);
+}
+
+.erf-brw-actions__action--primary {
+  border-color: var(--color-accent-primary);
+  background: var(--color-btn-primary-bg);
+  color: var(--color-btn-primary-text);
+}
+
+.erf-brw-actions__action--primary:hover {
+  background: var(--color-btn-primary-hover);
+}
+
+.erf-brw-actions__action[aria-disabled='true'] {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+.erf-brw-actions__footer,
+.erf-brw-dialog__target {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.erf-brw-actions__hint,
+.erf-brw-dialog__hint {
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-base);
+}
+
+/* ---------- banner slot (guard, pre-warning, target chosen) ---------- */
+
+.erf-brw-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-left: var(--border-width-thick) solid var(--color-border-subtle);
+  background: var(--color-bg-secondary);
+}
+
+.erf-brw-banner--warning {
+  border-left-color: var(--color-warning);
+}
+
+.erf-brw-banner--error {
+  border-left-color: var(--color-error);
+}
+
+.erf-brw-banner__text {
+  flex: 1 1 20ch;
+  margin: 0;
+}
+
+.erf-brw-banner__button {
+  height: var(--btn-height-sm);
+  padding: 0 var(--space-6);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  background: var(--color-btn-secondary-bg);
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+/* ---------- instruction dialog ---------- */
+
+.erf-brw-dialog__back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--btn-height-sm);
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.erf-brw-dialog__back:hover {
+  background: var(--color-bg-hover-solid);
+}
+
+.erf-brw-dialog__title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
+}
+
+.erf-brw-dialog__label {
+  font-weight: var(--font-medium);
+}
+
+.erf-brw-dialog__field {
+  min-height: calc(var(--btn-height-md) * 3);
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  background: var(--color-bg-input);
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--text-base);
+  resize: vertical;
+}
+
+.erf-brw-dialog__field[aria-invalid='true'] {
+  border-color: var(--color-error);
+}
+
+.erf-brw-dialog__error {
+  margin: 0;
+  color: var(--color-error);
+}
+
+/* ---------- address suggestions ---------- */
+
+.erf-brw-address {
+  position: relative;
+}
+
+.erf-brw-suggest {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  left: 0;
+  z-index: var(--z-dropdown);
+  margin: 0;
+  padding: var(--space-2) 0;
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-lg);
+  list-style: none;
+}
+
+.erf-brw-suggest__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-2) var(--space-4);
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.erf-brw-suggest__row:hover,
+.erf-brw-suggest__row--active {
+  background: var(--color-bg-hover-solid);
+}
+
+.erf-brw-suggest__row--active {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--border-width-thick) * -1);
+}
+
+.erf-brw-suggest__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

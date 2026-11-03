@@ -10,7 +10,10 @@ const gateway = vi.hoisted(() => ({
   devTools: vi.fn(async () => undefined),
   suggest: vi.fn(async (): Promise<{ rows: Array<{ url: string }> }> => ({ rows: [] })),
   toolbarFocus: vi.fn(),
-  onForwardedKey: vi.fn(() => () => undefined)
+  onForwardedKey: vi.fn(() => () => undefined),
+  pickMode: vi.fn(async () => undefined),
+  closePick: vi.fn(async () => undefined),
+  targetStatus: vi.fn(async () => ({ kind: 'agent', process: 'claude', fresh: true }))
 }))
 const lifecycle = vi.hoisted(() => ({ ensureBrowserTab: vi.fn() }))
 const focusPage = vi.hoisted(() => vi.fn())
@@ -20,14 +23,16 @@ vi.mock('../../../services/browserTabGateway', () => ({ browserTabGateway: gatew
 vi.mock('../../../services/browser/browserTabLifecycle', () => lifecycle)
 vi.mock('./useBrowserBounds', () => ({ useBrowserBounds: () => ({ pushBounds: () => true }) }))
 vi.mock('./useBrowserPageFocus', () => ({ useBrowserPageFocus: () => focusPage }))
-vi.mock('../../../utils/toastHelpers', () => ({ showErrorToast: toast }))
+vi.mock('../../../utils/toastHelpers', () => ({ showErrorToast: toast, showInfoToast: vi.fn() }))
 vi.mock('../../../utils/platform', () => ({ isMacOS: () => true, isWindows: () => false }))
 vi.mock('../../../utils/logger', () => ({
-  logger: { warn: vi.fn(), debug: vi.fn(), error: vi.fn() }
+  logger: { warn: vi.fn(), debug: vi.fn(), error: vi.fn(), info: vi.fn() }
 }))
 
 import { BrowserPanel } from './BrowserPanel'
 import { useBrowserTabStore } from '../../../stores/useBrowserTabStore'
+import { useBrowserPickStore, type PickSummary } from '../../../stores/useBrowserPickStore'
+import { useBrowserStillStore } from '../../../stores/useBrowserStillStore'
 import type { BrowserPanelParams } from '../../../utils/openBrowserTab'
 import { browserState } from './__test__/browserState'
 import { BROWSER_TEST_IDS } from './browserTestIds'
@@ -69,6 +74,8 @@ beforeEach(() => {
     return 1
   })
   vi.stubGlobal('cancelAnimationFrame', vi.fn())
+  // jsdom draws no canvas: the still image's picture is not under test here.
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
 })
 
 afterEach(() => {
@@ -90,7 +97,7 @@ describe('BrowserPanel', () => {
     expect(lifecycle.ensureBrowserTab).toHaveBeenCalledWith(PANEL, undefined)
     host({ erfanaPage: 'empty', committedUrl: null, origin: null, title: '' })
     await act(async () => undefined)
-    expect(screen.getByRole('textbox', { name: 'Address and search' })).toHaveFocus()
+    expect(screen.getByRole('combobox', { name: 'Address and search' })).toHaveFocus()
     expect(screen.getByText(/Load your app, then click/)).toBeInTheDocument()
     expect(screen.getByTestId(BROWSER_TEST_IDS.PANEL)).toHaveAttribute('data-browser-tab-id', TAB)
   })
@@ -112,7 +119,7 @@ describe('BrowserPanel', () => {
     gateway.navigate.mockResolvedValue({ ok: true })
     renderPanel()
     host({ erfanaPage: 'empty', committedUrl: null })
-    const field = screen.getByRole('textbox', { name: 'Address and search' })
+    const field = screen.getByRole('combobox', { name: 'Address and search' })
     fireEvent.change(field, { target: { value: 'localhost:5173' } })
     await act(async () => fireEvent.keyDown(field, { key: 'Enter' }))
     expect(gateway.navigate).toHaveBeenCalledWith({
@@ -127,7 +134,7 @@ describe('BrowserPanel', () => {
     gateway.navigate.mockResolvedValue({ refused: 'scheme' })
     renderPanel()
     host()
-    const field = screen.getByRole('textbox', { name: 'Address and search' })
+    const field = screen.getByRole('combobox', { name: 'Address and search' })
     fireEvent.change(field, { target: { value: 'javascript:alert(1)' } })
     await act(async () => fireEvent.keyDown(field, { key: 'Enter' }))
     const alert = screen.getByRole('alert')
@@ -145,7 +152,7 @@ describe('BrowserPanel', () => {
     else gateway.navigate.mockResolvedValue(answer)
     renderPanel()
     host()
-    const field = screen.getByRole('textbox', { name: 'Address and search' })
+    const field = screen.getByRole('combobox', { name: 'Address and search' })
     fireEvent.change(field, { target: { value: 'example.test' } })
     await act(async () => fireEvent.keyDown(field, { key: 'Enter' }))
     expect(toast).toHaveBeenCalledWith("Couldn't open the address", message)
@@ -169,21 +176,26 @@ describe('BrowserPanel', () => {
     expect(gateway.history).toHaveBeenLastCalledWith(TAB, 'stop')
   })
 
-  it('returns focus to a live page on Esc in the field, and on F6 from the row', () => {
+  it('returns focus to a live page on Esc in the field, and on F6 through the pick row', () => {
     renderPanel()
     host()
-    const field = screen.getByRole('textbox', { name: 'Address and search' })
+    const field = screen.getByRole('combobox', { name: 'Address and search' })
     fireEvent.keyDown(field, { key: 'Escape' })
     expect(focusPage).toHaveBeenCalledTimes(1)
+    // The pick row is always reserved, so it is the next F6 zone (025-FR-047, ADR 0011 decision 5).
     fireEvent.keyDown(screen.getByRole('button', { name: 'Reload' }), { key: 'F6' })
+    const pickButton = screen.getByRole('button', { name: 'Pick element' })
+    expect(pickButton).toHaveFocus()
+    fireEvent.keyDown(pickButton, { key: 'F6' })
     expect(focusPage).toHaveBeenCalledTimes(2)
   })
 
   it('moves F6 into an Erfana page instead of the native page', async () => {
     renderPanel()
     host({ erfanaPage: 'crashed' })
-    act(() => screen.getByRole('textbox', { name: 'Address and search' }).focus())
-    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Address and search' }), { key: 'F6' })
+    act(() => screen.getByRole('combobox', { name: 'Address and search' }).focus())
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Address and search' }), { key: 'F6' })
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Pick element' }), { key: 'F6' })
     expect(screen.getByRole('button', { name: 'Reload', description: '' })).toBeDefined()
     expect(document.activeElement).toHaveTextContent('Reload')
     expect(focusPage).not.toHaveBeenCalled()
@@ -210,5 +222,86 @@ describe('BrowserPanel', () => {
     expect(
       screen.getByTestId(BROWSER_TEST_IDS.PAGE_PLACEHOLDER).parentElement?.className
     ).toContain('erf-brw-frame--focused')
+  })
+
+  it('reserves the pick row under the navigation row and toggles pick mode from it (025-FR-025)', () => {
+    renderPanel()
+    host()
+    const row = screen.getByTestId(BROWSER_TEST_IDS.PICK_ROW)
+    expect(row).toHaveAttribute('data-brw-zone', 'pick')
+    fireEvent.click(screen.getByRole('button', { name: 'Pick element' }))
+    expect(gateway.pickMode).toHaveBeenCalledWith(TAB, true)
+  })
+
+  it('draws the prompt-actions panel over the still image on a capture, and closes it on Esc', () => {
+    const summary: PickSummary = {
+      name: 'button.cta',
+      size: '176 × 32',
+      ancestors: ['html', 'button.cta'],
+      box: { x: 10, y: 20, width: 176, height: 32 },
+      atTop: false,
+      atStart: true,
+      gone: false,
+      changedAfterPick: false
+    }
+    renderPanel()
+    host()
+    act(() => {
+      useBrowserStillStore.getState().set(TAB, { image: { data: new Uint8Array(4), width: 1, height: 1 }, source: 'pick' })
+      useBrowserPickStore.getState().apply({ tabId: TAB, kind: 'mode', on: true })
+      useBrowserPickStore
+        .getState()
+        .apply({ tabId: TAB, kind: 'captured', captureId: 'a'.repeat(32), still: new Uint8Array(4), stillWidth: 1, stillHeight: 1, summary })
+    })
+    expect(screen.getByTestId(BROWSER_TEST_IDS.STILL)).toBeInTheDocument()
+    const panel = screen.getByTestId(BROWSER_TEST_IDS.PROMPT_ACTIONS)
+    const explain = screen.getByRole('button', { name: 'Explain' })
+    expect(explain).toHaveFocus()
+    // Focus into a menu in the portal (the panel's target menu) has not left the tab.
+    const portal = document.createElement('div')
+    portal.id = 'portal-root'
+    const item = document.createElement('button')
+    portal.appendChild(item)
+    document.body.appendChild(portal)
+    fireEvent.blur(explain, { relatedTarget: item })
+    expect(screen.getByTestId(BROWSER_TEST_IDS.PROMPT_ACTIONS)).toBeInTheDocument()
+    portal.remove()
+    fireEvent.keyDown(panel, { key: 'Escape' })
+    expect(gateway.closePick).toHaveBeenCalledWith({ tabId: TAB, captureId: 'a'.repeat(32), reason: 'esc' })
+    expect(screen.queryByTestId(BROWSER_TEST_IDS.PROMPT_ACTIONS)).toBeNull()
+    act(() => {
+      useBrowserPickStore.getState().forget(TAB)
+      useBrowserStillStore.getState().clear(TAB)
+    })
+  })
+
+  it('closes the panel when focus leaves the tab', () => {
+    const summary: PickSummary = {
+      name: 'a',
+      size: '1 × 1',
+      ancestors: ['html', 'a'],
+      box: { x: 0, y: 0, width: 1, height: 1 },
+      atTop: false,
+      atStart: true,
+      gone: false,
+      changedAfterPick: false
+    }
+    renderPanel()
+    host()
+    act(() => {
+      useBrowserStillStore.getState().set(TAB, { image: { data: new Uint8Array(4), width: 1, height: 1 }, source: 'pick' })
+      useBrowserPickStore
+        .getState()
+        .apply({ tabId: TAB, kind: 'captured', captureId: 'b'.repeat(32), still: new Uint8Array(4), stillWidth: 1, stillHeight: 1, summary })
+    })
+    const outside = document.createElement('button')
+    document.body.appendChild(outside)
+    fireEvent.blur(screen.getByRole('button', { name: 'Explain' }), { relatedTarget: outside })
+    expect(gateway.closePick).toHaveBeenCalledWith({ tabId: TAB, captureId: 'b'.repeat(32), reason: 'focusLeft' })
+    outside.remove()
+    act(() => {
+      useBrowserPickStore.getState().forget(TAB)
+      useBrowserStillStore.getState().clear(TAB)
+    })
   })
 })

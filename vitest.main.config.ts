@@ -299,6 +299,9 @@ export default defineConfig({
         'src/main/services/browser/cdp/cdpPickFunctions.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/main/ipc/browserTab/pick-handlers.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // The still image under Erfana's surfaces (spec 025 commit 19, ADR 0011).
+        // measured 100/100/100/100 (2026-11-03)
+        'src/main/services/browser/capture/surfaceStill.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/main/testHooks/browserPickHook.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // Built-in browser CDP session (spec 025 commit 9, 025-NFR-001 bullet 2,

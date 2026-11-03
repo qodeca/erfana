@@ -4,10 +4,9 @@ import { describe, expect, it } from 'vitest'
 import { allowedMethods, CdpRefusedError, checkCdpCommand, jsonEqual } from './cdpAllowList'
 import {
   CDP_PAGE_FUNCTIONS,
-  DEFAULT_HIGHLIGHT_PALETTE,
   ISOLATED_WORLD_NAME,
   OUTER_HTML_CUT,
-  pickHighlightConfig
+  pickOutlineParams
 } from './cdpPinned'
 
 function refusal(fn: () => unknown): CdpRefusedError {
@@ -51,7 +50,7 @@ describe('cdpAllowList – the pinned method lists (§ 5, 025-NFR-001)', () => {
       'Overlay.disable',
       'Overlay.enable',
       'Overlay.hideHighlight',
-      'Overlay.highlightNode',
+      'Overlay.highlightQuad',
       'Page.createIsolatedWorld',
       'Page.enable',
       'Page.getFrameTree',
@@ -98,6 +97,7 @@ describe('cdpAllowList – the pinned method lists (§ 5, 025-NFR-001)', () => {
     'Storage.getCookies',
     'Target.createTarget',
     'Overlay.setInspectMode',
+    'Overlay.highlightNode',
     'Browser.close',
     'runtime.enable',
     ''
@@ -105,7 +105,7 @@ describe('cdpAllowList – the pinned method lists (§ 5, 025-NFR-001)', () => {
     expect(refusal(() => checkCdpCommand('tab', method)).rule).toBe('not allowed for the tab kind')
   })
 
-  it.each(['DOM.enable', 'Overlay.highlightNode', 'Runtime.callFunctionOn', 'Debugger.pause', 'Page.createIsolatedWorld'])(
+  it.each(['DOM.enable', 'Overlay.highlightQuad', 'Runtime.callFunctionOn', 'Debugger.pause', 'Page.createIsolatedWorld'])(
     'refuses %s on the popup kind',
     method => {
       expect(refusal(() => checkCdpCommand('popup', method, {})).rule).toBe('not allowed for the popup kind')
@@ -211,18 +211,22 @@ describe('cdpAllowList – parameter pinning (S23)', () => {
     ).toThrow(CdpRefusedError)
   })
 
-  it('accepts the pick HighlightConfig and refuses any other flag or extra key', () => {
-    const config = pickHighlightConfig()
-    expect(checkCdpCommand('tab', 'Overlay.highlightNode', { highlightConfig: config, nodeId: 4 })).toBeTruthy()
-    const forced = pickHighlightConfig({ ...DEFAULT_HIGHLIGHT_PALETTE, contentColor: { r: 0, g: 120, b: 215, a: 0.3 } })
-    expect(checkCdpCommand('tab', 'Overlay.highlightNode', { highlightConfig: forced, backendNodeId: 9 })).toBeTruthy()
-    for (const highlightConfig of [
-      { ...config, showStyles: true },
-      { ...config, showRulers: true },
-      { ...config, contentColor: { r: 0, g: 0, b: 0, a: 2 } },
-      { ...config, contentColor: 'red' }
+  it('accepts only the outline-only highlight: no fill, one quad, an RGBA outline (Q2)', () => {
+    const square = [10, 10, 110, 10, 110, 40, 10, 40]
+    expect(checkCdpCommand('tab', 'Overlay.highlightQuad', pickOutlineParams(square))).toBeTruthy()
+    const forced = pickOutlineParams(square, { r: 0, g: 120, b: 215, a: 1 })
+    expect(checkCdpCommand('tab', 'Overlay.highlightQuad', forced)).toBeTruthy()
+    const outline = pickOutlineParams(square)
+    for (const params of [
+      { ...outline, color: { r: 160, g: 168, b: 255, a: 0.25 } },
+      { ...outline, color: undefined },
+      { ...outline, quad: [1, 2, 3] },
+      { ...outline, quad: [...square.slice(0, 7), Number.NaN] },
+      { ...outline, outlineColor: 'red' },
+      { ...outline, outlineColor: { r: 0, g: 0, b: 0, a: 2 } },
+      { ...outline, showInfo: true }
     ]) {
-      expect(() => checkCdpCommand('tab', 'Overlay.highlightNode', { highlightConfig, nodeId: 4 })).toThrow(CdpRefusedError)
+      expect(() => checkCdpCommand('tab', 'Overlay.highlightQuad', params)).toThrow(CdpRefusedError)
     }
   })
 

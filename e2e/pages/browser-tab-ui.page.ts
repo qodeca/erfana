@@ -42,7 +42,7 @@ export class BrowserPanelUi {
   }
 
   get addressBar(): Locator {
-    return this.root.getByRole('textbox', { name: 'Address and search' })
+    return this.root.getByRole('combobox', { name: 'Address and search' })
   }
 
   get navigation(): Locator {

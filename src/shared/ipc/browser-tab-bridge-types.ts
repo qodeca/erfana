@@ -43,7 +43,7 @@ import type {
   ZoomRequestSchema
 } from './browser-tab-schema'
 import type { ClearDataResponse, ForgetResponse } from './browser-tab-page-schema'
-import type { PickActionResponse } from './browser-tab-pick-schema'
+import type { PickActionResponse, PickSurfaceName, StillResponse } from './browser-tab-pick-schema'
 import type { NewTabCommandEvent, OpenExternalResponse, TabClosedEvent } from './browser-tab-chrome-schema'
 
 export type ClosePickRequest = z.infer<typeof ClosePickRequestSchema>
@@ -128,6 +128,13 @@ export interface BrowserTabBridge {
   refine(request: RefineRequest): Promise<PickActionResponse>
   /** The menu or dialog closed (`esc`, `cancel`, …) – or a send succeeded (`sent`): pick mode ends (025-FR-032). */
   closePick(request: ClosePickRequest): Promise<PickActionResponse>
+  /**
+   * The held capture's surface is now the panel (`menu`) or the instruction
+   * dialog: a navigation then closes the panel but keeps the dialog (025-FR-053).
+   */
+  pickSurface(tabId: string, captureId: string, surface: PickSurfaceName): Promise<PickActionResponse>
+  /** The page as a still image (raw BGRA), for a surface drawn over the page area; `{ error }` when none could be taken. */
+  still(tabId: string): Promise<StillResponse>
   /** The shell guard, then the capture files: `{ paths }`, `{ guard }` (no file written) or `{ error }` (025-FR-046, 025-FR-061). */
   writeCapture(request: WriteCaptureRequest): Promise<WriteCaptureResponse>
   /** The terminal write failed after the files were written: delete them; the capture stays held (025-FR-046). */

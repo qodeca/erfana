@@ -45,6 +45,9 @@ export class FakeContents extends EventEmitter {
   stop = vi.fn()
   reload = vi.fn()
   focus = vi.fn()
+  /** Whether the page holds keyboard focus. */
+  focused = false
+  isFocused = (): boolean => this.focused
   getURL = (): string => this.url
   isLoading = (): boolean => this.loading
   isDestroyed = (): boolean => this.destroyed
@@ -91,6 +94,8 @@ export interface FakeHost {
   addChildView: ReturnType<typeof vi.fn>
   removeChildView: ReturnType<typeof vi.fn>
   send: ReturnType<typeof vi.fn>
+  /** The window's own `webContents.focus`. */
+  focus: ReturnType<typeof vi.fn>
   destroy(): void
   zoom: number
 }
@@ -104,6 +109,7 @@ export function fakeHost(): FakeHost {
     addChildView: vi.fn(),
     removeChildView: vi.fn(),
     send: vi.fn(),
+    focus: vi.fn(),
     destroy: () => {
       destroyed = true
     }
@@ -113,7 +119,7 @@ export function fakeHost(): FakeHost {
     isDestroyed: () => destroyed,
     getContentBounds: () => ({ x: 0, y: 0, width: 1200, height: 800 }),
     contentView: { addChildView: fake.addChildView, removeChildView: fake.removeChildView },
-    webContents: { getZoomFactor: () => fake.zoom, send: fake.send, isDestroyed: () => destroyed }
+    webContents: { getZoomFactor: () => fake.zoom, send: fake.send, focus: fake.focus, isDestroyed: () => destroyed }
   } as unknown as TabHost
   return fake
 }

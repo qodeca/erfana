@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * One served folder: a static HTTP server on `127.0.0.1` and a port the
- * operating system picks (spec 025, 025-FR-005 rule 1; ADR 0012 option 4,
- * solution design § 11 Q4 – working assumption, owner decision pending).
+ * operating system picks (spec 025, 025-FR-005 rule 1; ADR 0012, accepted
+ * 2026-11-03 – the per-folder loopback server, owner decision Q4).
  *
  * Addresses are `http://127.0.0.1:<port>/<token>/<path>`. The port makes the
  * folder its own origin, so two folders never share storage; the token – 128

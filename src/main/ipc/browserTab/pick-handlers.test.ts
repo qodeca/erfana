@@ -34,7 +34,8 @@ const input = {
     return []
   })
 }
-const tab = { id: TAB }
+const stillImage = { toBitmap: () => Buffer.alloc(16, 255), getSize: () => ({ width: 2, height: 2 }) }
+const tab = { id: TAB, contents: { isDestroyed: () => false, capturePage: vi.fn(async () => stillImage) } }
 const pick = { capture: { id: CAPTURE } as { id: string } | null, refine: vi.fn(), close: vi.fn(() => true) }
 const tabs = { tabOf: vi.fn((w: number, id: string) => (w === 3 && id === TAB ? tab : null)), inputFor: vi.fn(() => input as unknown) }
 const picks = {
@@ -143,5 +144,25 @@ describe('registerBrowserTabPickHandlers', () => {
     expect(call('browser-tab:pickMode', event(), { tabId: TAB, on: true })).toEqual({ ok: false })
     vi.mocked(BrowserWindow.fromWebContents).mockReturnValueOnce({ id: 3, isDestroyed: () => false } as never)
     expect(call('browser-tab:pickMode', event(), { tabId: TAB, on: true })).toEqual({ ok: true })
+  })
+
+  it('pickSurface moves the held capture between the panel and the dialog, and refuses a stale capture', () => {
+    expect(call('browser-tab:pickSurface', event(), { tabId: TAB, captureId: CAPTURE, surface: 'dialog' })).toEqual({ ok: true })
+    expect(input.dispatch).toHaveBeenLastCalledWith({ type: 'dialogOpen' })
+    expect(call('browser-tab:pickSurface', event(), { tabId: TAB, captureId: CAPTURE, surface: 'menu' })).toEqual({ ok: true })
+    expect(input.dispatch).toHaveBeenLastCalledWith({ type: 'dialogBack' })
+    expect(call('browser-tab:pickSurface', event(), { tabId: TAB, captureId: 'b'.repeat(32), surface: 'menu' })).toEqual({ ok: false })
+    expect(call('browser-tab:pickSurface', event(), { tabId: TAB, captureId: CAPTURE, surface: 'sheet' })).toEqual({ ok: false })
+    tabs.inputFor.mockReturnValueOnce(null)
+    expect(call('browser-tab:pickSurface', event(), { tabId: TAB, captureId: CAPTURE, surface: 'menu' })).toEqual({ ok: false })
+  })
+
+  it('still answers the page as a bitmap, and an error for a refused request or a failed capture', async () => {
+    expect(await call('browser-tab:still', event(), { tabId: TAB })).toMatchObject({ width: 2, height: 2 })
+    expect(await call('browser-tab:still', event(false), { tabId: TAB })).toEqual({ error: 'Request refused' })
+    expect(await call('browser-tab:still', event(), { tabId: 'browser-tab-9' })).toEqual({ error: 'Request refused' })
+    tab.contents.capturePage.mockRejectedValueOnce(new Error('gone'))
+    expect(await call('browser-tab:still', event(), { tabId: TAB })).toEqual({ error: 'The page could not be captured' })
+    expect(logger.error).toHaveBeenCalled()
   })
 })

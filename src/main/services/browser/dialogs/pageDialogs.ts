@@ -2,13 +2,14 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Page dialogs – `alert`, `confirm`, `prompt` – in v1 (spec 025, 025-FR-058;
- * ADR 0011 decision 7 and its commit-8 probe; solution design § 11 Q6).
+ * ADR 0011 decision 7 and its commit-8 probe, ADR 0011 accepted 2026-11-03;
+ * owner decision Q6 in solution design § 11).
  *
  * The commit-8 probe showed that Electron always opens its own box for a
  * page's `alert` and `confirm`, even when a CDP client answers the dialog,
  * and that `prompt()` throws. Erfana's own dialog in the strip cannot
  * replace them without patching Electron, so v1 ships the native dialogs
- * (Q6, working assumption pending the owner's decision). What Erfana still
+ * (owner decision Q6, accepted with ADR 0011 on 2026-11-03). What Erfana still
  * does is make the hang probe aware of them: with the `Page` domain on, the
  * top target reports `Page.javascriptDialogOpening` and `…Closed`, and the
  * tab's CDP session suspends the probe while a dialog waits

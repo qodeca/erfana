@@ -162,7 +162,10 @@ export class BrowserTab {
       host: deps.host,
       view: deps.view,
       clip: deps.createClip?.() ?? null,
-      onShown: (shown) => this.cdp?.setVisible(shown),
+      onShown: (shown) => {
+        this.cdp?.setVisible(shown)
+        if (!shown) this.keepKeyboardInWindow()
+      },
       onPageMoved: () => this.deps.onPageMoved?.()
     })
     this.contents.setWindowOpenHandler(() => ({ action: 'deny' }))
@@ -252,6 +255,16 @@ export class BrowserTab {
     return this.viewFrame.push({ bounds, clip }, seq, visible)
   }
 
+  /**
+   * A page taken out of its window while it held keyboard focus would keep it
+   * where nothing can be seen: the surface Erfana draws over its still image
+   * (ADR 0011) – the prompt-actions panel, a menu – takes the keys instead.
+   */
+  private keepKeyboardInWindow(): void {
+    const host = this.deps.host
+    if (!this.contents.isDestroyed() && this.contents.isFocused() && !host.isDestroyed()) host.webContents.focus()
+  }
+
   /** Move keyboard focus into the page; only a shown page can take it. */
   focusPage(): void {
     if (this.viewFrame.isAttached() && !this.contents.isDestroyed()) this.contents.focus()
@@ -302,7 +315,10 @@ export class BrowserTab {
   /** What the toolbar and the editor tab show (`browser-tab:state`). */
   state(): TabStateEvent {
     const committed = this.shownAddress(this.committedUrl)
-    const pending = this.shownAddress(this.pendingUrl)
+    // A refused certificate load commits nothing and drops the pending address:
+    // the warning page names the address that failed, and so does the bar (025-FR-021).
+    const failed = this.certificate.warning === null ? null : (this.certificate.failedUrl ?? null)
+    const pending = this.shownAddress(failed ?? this.pendingUrl)
     const shown = pending ?? committed
     const history = this.contents.navigationHistory
     return {
@@ -310,7 +326,8 @@ export class BrowserTab {
       committedUrl: capUrl(committed),
       pendingUrl: capUrl(pending),
       origin: shown === null ? null : originParts(shown, this.deps.resolveDomain),
-      title: this.title,
+      // The last page's title is not this address's: the tab is named after the failed host.
+      title: failed === null ? this.title : '',
       canGoBack: history.canGoBack(),
       canGoForward: history.canGoForward(),
       loading: this.contents.isLoading(),

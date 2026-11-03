@@ -8,15 +8,17 @@
  * shared {@link ContextMenu}, named "Page actions", at the point the page was
  * clicked, with the link's host as a header line on a link menu (OD-12).
  *
- * The menu cannot draw over a live page (ADR 0011 decision 3): it registers as
- * an occluder, so the native-view guard takes the page off screen while it is
- * open – the page area shows Erfana's background meanwhile (the design's
- * still image is commit 19's, with the pick still image). Closing returns
- * focus to the page.
+ * The menu cannot draw over a live page (ADR 0011 decision 3): the window's
+ * event wiring (`browserTabEvents`) puts the page's still image up before the
+ * menu opens, and the menu registers as an occluder, so the native-view guard
+ * takes the page off screen while it is open and the page area shows its
+ * picture (commit 19). Closing lets the picture go and returns focus to the
+ * page.
  */
 import { useCallback } from 'react'
 import { useBrowserChromeStore } from '../../../stores/useBrowserChromeStore'
 import { browserTabGateway } from '../../../services/browserTabGateway'
+import { browserStill, CONTEXT_MENU_STILL_HOLDER } from '../../../services/browser/browserStill'
 import { isMacOS } from '../../../utils/platform'
 import { logger } from '../../../utils/logger'
 import { ContextMenu, type ContextMenuItem } from '../../ContextMenu/ContextMenu'
@@ -41,8 +43,9 @@ export function PageContextMenu({ tabId, pageOrigin, onClosed }: PageContextMenu
   const menu = useBrowserChromeStore(s => (tabId !== null && s.menu?.tabId === tabId ? s.menu : null))
   const close = useCallback(() => {
     useBrowserChromeStore.getState().closeMenu()
+    if (tabId !== null) browserStill.release(tabId, CONTEXT_MENU_STILL_HOLDER)
     onClosed()
-  }, [onClosed])
+  }, [tabId, onClosed])
   if (menu === null || tabId === null) return null
   const mac = isMacOS()
   const items: ContextMenuItem[] = pageMenuEntries(menu.items).map(entry =>

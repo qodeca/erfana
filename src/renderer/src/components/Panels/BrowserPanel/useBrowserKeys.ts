@@ -13,9 +13,14 @@
  *   app-window router consumes the browser keys instead of Erfana's menu
  *   (Ctrl/Cmd+R must reload the page, not Erfana).
  * - **F6, Shift+F6 and Esc in the toolbar** (reserved keys reach the
- *   renderer unchanged): F6 moves between the navigation row and the page;
- *   Esc on a navigation-row button returns focus to the page. The address
- *   bar handles its own Esc.
+ *   renderer unchanged): F6 and Shift+F6 move forward and back through the
+ *   navigation row, the pick row, the strip, the find row and the page
+ *   (025-FR-047, commit 19); from the page main forwards them, and Shift+F6
+ *   lands on the last control of the find row, else the strip, else the
+ *   pick row. With the prompt-actions panel open they close it first, like a
+ *   toolbar click (025-FR-049); with the dialog open they move nothing
+ *   (025-FR-050). Esc on a navigation-row or pick-row button returns focus
+ *   to the page. The address bar handles its own Esc.
  */
 import { useCallback, useEffect, useRef } from 'react'
 import type { DockviewApi, DockviewPanelApi } from 'dockview'
@@ -46,6 +51,31 @@ export interface UseBrowserKeysOptions {
   readonly focusLastTool: () => void
   /** Move focus into the page area: the live page, or an Erfana page's content. */
   readonly focusPageArea: () => void
+  /** The pick surface open over the page (commit 19). */
+  readonly pickSurface?: 'none' | 'panel' | 'dialog'
+  /** Close the prompt-actions panel without sending, as a toolbar click does. */
+  readonly closePanel?: () => void
+}
+
+/** The F6 zones after the navigation row, in order (025-FR-047); the page comes after the last. */
+const ZONE_SELECTORS = ['[data-brw-zone="pick"]', '[data-testid="browser-strip"]', '[data-testid="browser-find-row"]'] as const
+const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex="0"]'
+
+/** The zones of `root` that hold a control now, in F6 order: the navigation row first. */
+function liveZones(root: HTMLElement, nav: HTMLElement | null): HTMLElement[] {
+  return [nav, ...ZONE_SELECTORS.map(selector => root.querySelector<HTMLElement>(selector))].filter(
+    (zone): zone is HTMLElement => zone !== null && zone.querySelector(FOCUSABLE) !== null
+  )
+}
+
+/** Focus the first or the last control of `zone`; the navigation row starts at the address bar. */
+function focusZone(zone: HTMLElement, end: 'first' | 'last', focusAddress: () => void, nav: HTMLElement | null): void {
+  if (end === 'first' && zone === nav) {
+    focusAddress()
+    return
+  }
+  const controls = [...zone.querySelectorAll<HTMLElement>(FOCUSABLE)]
+  ;(end === 'first' ? controls[0] : controls[controls.length - 1])?.focus()
 }
 
 /** Handlers the panel root wires. */
@@ -77,7 +107,7 @@ export function useBrowserKeys(options: UseBrowserKeysOptions): BrowserKeyHandle
 
   const act = useCallback(
     (action: ForwardedKeyAction): void => {
-      const { tabId: tab, api, containerApi, focusAddress, focusLastTool } = latest.current
+      const { tabId: tab, api, containerApi, focusAddress, focusLastTool, rootRef } = latest.current
       if (tab === null) return
       const fail = (error: unknown): void =>
         logger.warn('Browser key action failed', {
@@ -88,8 +118,13 @@ export function useBrowserKeys(options: UseBrowserKeysOptions): BrowserKeyHandle
         case 'focusAddress':
         case 'focusNextZone':
           return focusAddress()
-        case 'focusPreviousZone':
-          return focusLastTool()
+        case 'focusPreviousZone': {
+          const nav = latest.current.navRef.current
+          const zones = rootRef.current === null ? [] : liveZones(rootRef.current, nav)
+          const last = zones[zones.length - 1]
+          // The navigation row's last visible control is More (always shown, OD-22).
+          return last === undefined || last === nav ? focusLastTool() : focusZone(last, 'last', focusAddress, nav)
+        }
         case 'reload':
           return void browserTabGateway.history(tab, 'reload').catch(fail)
         case 'back':
@@ -146,6 +181,41 @@ export function useBrowserKeys(options: UseBrowserKeysOptions): BrowserKeyHandle
     [rootRef, report]
   )
 
+  /** F6 (or Shift+F6) from `target`: the next (or previous) zone, the page after the last. */
+  const moveZone = useCallback(
+    (target: Node | null, back: boolean): void => {
+      const { pickSurface = 'none', closePanel, focusAddress, focusPageArea } = latest.current
+      const root = rootRef.current
+      if (root === null || pickSurface === 'dialog') return
+      const nav = navRef.current
+      const zones = liveZones(root, nav)
+      if (pickSurface === 'panel') {
+        // Closes like a toolbar click: F6 to Pick element, Shift+F6 to the strip's last control, else More (025-FR-049).
+        closePanel?.()
+        const pickZone = root.querySelector<HTMLElement>('[data-brw-zone="pick"]')
+        const strip = root.querySelector<HTMLElement>('[data-testid="browser-strip"]')
+        const into = back ? (strip !== null && strip.querySelector(FOCUSABLE) !== null ? strip : navRef.current) : pickZone
+        if (into === nav && back) latest.current.focusLastTool()
+        else if (into !== null) focusZone(into, back ? 'last' : 'first', focusAddress, nav)
+        return
+      }
+      const at = target === null ? -1 : zones.findIndex(zone => zone.contains(target))
+      if (at === -1 && back) {
+        // From the page area: the last zone's last control, as main's forwarded Shift+F6 does.
+        act('focusPreviousZone')
+        return
+      }
+      const next = at === -1 ? 0 : at + (back ? -1 : 1)
+      const zone = zones[next]
+      if (at !== -1 && zone === undefined) {
+        focusPageArea()
+        return
+      }
+      if (zone !== undefined) focusZone(zone, back ? 'last' : 'first', focusAddress, nav)
+    },
+    [latest, rootRef, navRef, act]
+  )
+
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLElement>) => {
       if (event.defaultPrevented || event.nativeEvent.isComposing) return
@@ -153,16 +223,16 @@ export function useBrowserKeys(options: UseBrowserKeysOptions): BrowserKeyHandle
       const inNav = target !== null && navRef.current?.contains(target) === true
       if (event.key === 'F6' && !event.altKey && !event.ctrlKey && !event.metaKey) {
         event.preventDefault()
-        if (inNav) latest.current.focusPageArea()
-        else latest.current.focusAddress()
+        moveZone(target, event.shiftKey)
         return
       }
-      if (event.key === 'Escape' && inNav && target instanceof HTMLButtonElement) {
+      const inPick = target instanceof Element && target.closest('[data-brw-zone="pick"]') !== null
+      if (event.key === 'Escape' && (inNav || inPick) && target instanceof HTMLButtonElement) {
         event.preventDefault()
         latest.current.focusPageArea()
       }
     },
-    [navRef, latest]
+    [navRef, latest, moveZone]
   )
 
   return { onKeyDown, onFocus, onBlur }

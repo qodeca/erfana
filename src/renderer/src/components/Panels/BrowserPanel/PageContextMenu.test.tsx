@@ -10,6 +10,8 @@ const { gateway, warn } = vi.hoisted(() => ({
 vi.mock('../../../services/browserTabGateway', () => ({ browserTabGateway: gateway }))
 vi.mock('../../../utils/logger', () => ({ logger: { warn, error: vi.fn(), info: vi.fn(), debug: vi.fn() } }))
 vi.mock('../../../utils/platform', () => ({ isMacOS: () => false, isWindows: () => true }))
+const still = vi.hoisted(() => ({ release: vi.fn() }))
+vi.mock('../../../services/browser/browserStill', () => ({ browserStill: still, CONTEXT_MENU_STILL_HOLDER: 'contextMenu' }))
 
 import { PageContextMenu } from './PageContextMenu'
 import { useBrowserChromeStore } from '../../../stores/useBrowserChromeStore'
@@ -72,5 +74,14 @@ describe('PageContextMenu', () => {
       await Promise.resolve()
     })
     expect(warn).toHaveBeenCalledWith('Browser page menu action failed', { error: 'stale' })
+  })
+
+  it('lets the still image go as it closes (ADR 0011)', () => {
+    const onClosed = vi.fn()
+    render(<PageContextMenu tabId={TAB} pageOrigin={() => null} onClosed={onClosed} />)
+    open()
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' })
+    expect(still.release).toHaveBeenCalledWith(TAB, 'contextMenu')
+    expect(onClosed).toHaveBeenCalledOnce()
   })
 })

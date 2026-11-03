@@ -54,6 +54,8 @@ export interface BrowserTabStoreState {
   readonly closing: ReadonlySet<string>
   /** Local addresses seen in this window's terminals this session, newest first. */
   readonly localAddresses: readonly string[]
+  /** Panels whose page area shows a still image over the page (ADR 0011, commit 19). */
+  readonly stillCovers: ReadonlySet<string>
   /** `tabId` is now hosted by `panelId`. */
   attach: (panelId: string, tabId: string) => void
   /** Apply main's state event; kept aside for a tab no panel hosts yet. */
@@ -65,13 +67,16 @@ export interface BrowserTabStoreState {
   removePanel: (panelId: string) => void
   /** Record a local address seen in a terminal (`localAddressSeen` notice). */
   addLocalAddress: (address: string) => void
+  /** The still image has painted over the page (`true`), or the page may come back (`false`). */
+  setStillCover: (panelId: string, covered: boolean) => void
   /** The tab hosted by `panelId`, or `null`. */
   tabOf: (panelId: string) => string | null
   /**
    * Whether Erfana's own DOM – not the page – fills the panel's page area: no
    * tab or no state yet, an Erfana page (empty, certificate, load error,
-   * crashed – ADR 0011 decision 5), or the editor tab is closing. Fails
-   * closed: an unknown panel counts as covered.
+   * crashed – ADR 0011 decision 5), a still image under an Erfana surface
+   * (ADR 0011 decision 3), or the editor tab is closing. Fails closed: an
+   * unknown panel counts as covered.
    */
   coversPage: (panelId: string) => boolean
 }
@@ -124,6 +129,7 @@ export const useBrowserTabStore = create<BrowserTabStoreState>((set, get) => ({
   unhosted: new Map(),
   closing: new Set(),
   localAddresses: [],
+  stillCovers: new Set(),
 
   attach: (panelId, tabId) =>
     set(state => {
@@ -203,7 +209,9 @@ export const useBrowserTabStore = create<BrowserTabStoreState>((set, get) => ({
       if (tabId !== undefined) byTab.delete(tabId)
       const closing = new Set(state.closing)
       closing.delete(panelId)
-      return { tabByPanel, byTab, closing }
+      const stillCovers = new Set(state.stillCovers)
+      stillCovers.delete(panelId)
+      return { tabByPanel, byTab, closing, stillCovers }
     }),
 
   addLocalAddress: address =>
@@ -214,11 +222,20 @@ export const useBrowserTabStore = create<BrowserTabStoreState>((set, get) => ({
       return { localAddresses: [trimmed, ...rest].slice(0, LOCAL_ADDRESS_LIMIT) }
     }),
 
+  setStillCover: (panelId, covered) =>
+    set(state => {
+      if (state.stillCovers.has(panelId) === covered) return state
+      const stillCovers = new Set(state.stillCovers)
+      if (covered) stillCovers.add(panelId)
+      else stillCovers.delete(panelId)
+      return { stillCovers }
+    }),
+
   tabOf: panelId => get().tabByPanel.get(panelId) ?? null,
 
   coversPage: panelId => {
-    const { closing, tabByPanel, byTab } = get()
-    if (closing.has(panelId)) return true
+    const { closing, tabByPanel, byTab, stillCovers } = get()
+    if (closing.has(panelId) || stillCovers.has(panelId)) return true
     const tabId = tabByPanel.get(panelId)
     const pageState = tabId === undefined ? null : (byTab.get(tabId)?.state ?? null)
     return pageState === null || pageState.erfanaPage !== null

@@ -16,8 +16,16 @@
  *   (025-FR-051). While an input method composes, Esc and Enter belong to it.
  * - **A refused address** shows as a field error under the navigation row
  *   (`errorId`); the panel clears it on the next edit.
+ * - **Suggestions** (025-FR-063, commit 19) list matches from the project's
+ *   address history while the user types, over the page's still image. The
+ *   field is a combobox: ↓ and ↑ move through the rows, Enter loads the row
+ *   reached (or the typed text when none is), and the first Esc closes the
+ *   list before the next restores the address.
  */
 import { forwardRef, useId, useState } from 'react'
+import { AddressSuggestions, suggestionId, useAddressSuggestions } from './AddressSuggestions'
+import type { SuggestionOption } from './addressSuggestions.logic'
+import type { StillSurface } from './useStillSurface'
 import { CircleAlert, File, TriangleAlert } from 'lucide-react'
 import type { BrowserTabState } from '../../../stores/useBrowserTabStore'
 import {
@@ -30,8 +38,11 @@ import {
 /** Props for {@link AddressBar}. */
 export interface AddressBarProps {
   readonly state: BrowserTabState | null
-  /** Enter with non-empty text (trimmed); resolves `true` once main started the load, which ends the draft. */
-  readonly onSubmit: (input: string) => Promise<boolean>
+  /**
+   * Enter with non-empty text (trimmed), or a chosen suggestion (`history`);
+   * resolves `true` once main started the load, which ends the draft.
+   */
+  readonly onSubmit: (input: string, source?: 'address' | 'history') => Promise<boolean>
   /** Esc: the address is restored; the panel returns focus to the page. */
   readonly onEscape: () => void
   /** The text changed: the panel clears a refusal. */
@@ -40,6 +51,8 @@ export interface AddressBarProps {
   readonly errorId: string | null
   /** The chips at the field's end (commit 18). */
   readonly children?: React.ReactNode
+  /** The page's still image under the suggestion list (commit 19). */
+  readonly suggestStill?: StillSurface
 }
 
 const BADGE_ICON = { size: 14, strokeWidth: 2, 'aria-hidden': true } as const
@@ -67,12 +80,17 @@ function DisplayText({ display }: { readonly display: AddressDisplay }): JSX.Ele
  * @returns The field with its badge
  */
 export const AddressBar = forwardRef<HTMLInputElement, AddressBarProps>(function AddressBar(
-  { state, onSubmit, onEscape, onEdit, errorId, children },
+  { state, onSubmit, onEscape, onEdit, errorId, children, suggestStill },
   ref
 ) {
   const [draft, setDraft] = useState<string | null>(null)
   const [focused, setFocused] = useState(false)
-  const badgeId = `erf-brw-badge-${useId().replace(/[^\w-]/g, '')}`
+  const [active, setActive] = useState(-1)
+  /** The text whose list Esc closed: the list stays shut until the text changes. */
+  const [dismissed, setDismissed] = useState<string | null>(null)
+  const uid = useId().replace(/[^\w-]/g, '')
+  const badgeId = `erf-brw-badge-${uid}`
+  const listId = `erf-brw-suggest-${uid}`
   const address = shownAddress(state) ?? ''
   const value = draft ?? address
   const badge = state === null ? null : securityBadge(state.security)
@@ -80,21 +98,51 @@ export const AddressBar = forwardRef<HTMLInputElement, AddressBarProps>(function
   const atRest = !focused && draft === null && display.kind !== 'empty'
   const describedBy =
     [badge === null ? null : badgeId, errorId].filter(id => id !== null).join(' ') || undefined
+  const typing = focused && draft !== null && draft !== address && draft !== dismissed ? draft : null
+  const options = useAddressSuggestions({ text: typing, still: suggestStill })
+  const listOpen = options.length > 0
+  const activeIndex = active < options.length ? active : -1
+
+  const submit = (input: string, source: 'address' | 'history'): void => {
+    void onSubmit(input, source).then(loaded => {
+      if (loaded) setDraft(null)
+    })
+  }
+  const choose = (option: SuggestionOption): void => {
+    setActive(-1)
+    if (option.kind === 'history') submit(option.url, 'history')
+    else submit(option.text, 'address')
+  }
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
     if (event.nativeEvent.isComposing) return
+    if (listOpen && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+      event.preventDefault()
+      const step = event.key === 'ArrowDown' ? 1 : -1
+      // The field's own text is the stop before the first row and after the last (-1).
+      const stops = options.length + 1
+      setActive(((activeIndex + 1 + step + stops) % stops) - 1)
+      return
+    }
     if (event.key === 'Enter') {
       event.preventDefault()
+      if (activeIndex >= 0) {
+        choose(options[activeIndex])
+        return
+      }
       const input = value.trim()
-      if (input === '') return
-      void onSubmit(input).then(loaded => {
-        if (loaded) setDraft(null)
-      })
+      if (input !== '') submit(input, 'address')
       return
     }
     if (event.key === 'Escape') {
       event.preventDefault()
       event.stopPropagation()
+      if (listOpen) {
+        // The first Esc closes the list only; the next restores the address.
+        setDismissed(draft)
+        setActive(-1)
+        return
+      }
       setDraft(null)
       onEscape()
     }
@@ -122,6 +170,11 @@ export const AddressBar = forwardRef<HTMLInputElement, AddressBarProps>(function
         <input
           ref={ref}
           type="text"
+          role="combobox"
+          aria-expanded={listOpen}
+          aria-controls={listOpen ? listId : undefined}
+          aria-autocomplete="list"
+          aria-activedescendant={activeIndex >= 0 ? suggestionId(listId, activeIndex) : undefined}
           className={`erf-brw-address__input${atRest ? ' erf-brw-address__input--rest' : ''}`}
           aria-label="Address and search"
           aria-describedby={describedBy}
@@ -132,6 +185,8 @@ export const AddressBar = forwardRef<HTMLInputElement, AddressBarProps>(function
           value={value}
           onChange={event => {
             setDraft(event.target.value)
+            setActive(-1)
+            setDismissed(null)
             onEdit()
           }}
           onFocus={event => {
@@ -140,6 +195,7 @@ export const AddressBar = forwardRef<HTMLInputElement, AddressBarProps>(function
           }}
           onBlur={() => {
             setFocused(false)
+            setActive(-1)
             // A draft that changes nothing is not kept: the address shows again.
             if (draft === address) setDraft(null)
           }}
@@ -152,6 +208,7 @@ export const AddressBar = forwardRef<HTMLInputElement, AddressBarProps>(function
         )}
       </div>
       {children}
+      <AddressSuggestions id={listId} options={options} active={activeIndex} onChoose={choose} />
     </div>
   )
 })

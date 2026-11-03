@@ -11,17 +11,20 @@
  * nothing can change between check and send.
  *
  * Beyond the § 5 table: `Runtime.disable`, `Log.disable` and `Network.disable`,
- * which the flood budget needs to turn a target's logs off (§ 5, S-14).
+ * which the flood budget needs to turn a target's logs off (§ 5, S-14). The
+ * live pick highlight is `Overlay.highlightQuad` with its fill pinned to none
+ * (ADR 0007 decision 6, owner decision Q2); `Overlay.highlightNode` – fill,
+ * band and engine label – is not on the list.
  */
 import {
   AUTO_ATTACH_PARAMS,
   CDP_OBJECT_GROUPS,
   CDP_PAGE_FUNCTIONS,
   HANG_PROBE_EVALUATE_PARAMS,
-  HIGHLIGHT_COLOUR_KEYS,
-  HIGHLIGHT_FLAGS,
   ISOLATED_WORLD_NAME,
-  NETWORK_ENABLE_PARAMS
+  NETWORK_ENABLE_PARAMS,
+  NO_FILL,
+  QUAD_LENGTH
 } from './cdpPinned'
 import { isRecord, type CdpParams } from './cdpTypes'
 
@@ -95,13 +98,11 @@ const rgba: Pred = v =>
   isRecord(v) &&
   shape({ r: int, g: int, b: int }, { a: v2 => typeof v2 === 'number' && v2 >= 0 && v2 <= 1 })(v) === null
 
-/** The fixed flags and an RGBA per colour key, nothing else (ADR 0007 decision 6). */
-const highlightConfig: Pred = v => {
-  if (!isRecord(v)) return false
-  const colours = Object.fromEntries(HIGHLIGHT_COLOUR_KEYS.map(k => [k, rgba]))
-  const flags = Object.fromEntries(Object.entries(HIGHLIGHT_FLAGS).map(([k, f]) => [k, is(f)]))
-  return shape({ ...flags, ...colours })(v) === null
-}
+/** No fill: the live highlight is an outline only (ADR 0007 decision 6, owner decision Q2). */
+const noFill: Pred = v => jsonEqual(v, NO_FILL)
+
+/** One quad: eight finite numbers. */
+const quad: Pred = v => Array.isArray(v) && v.length === QUAD_LENGTH && v.every(n => typeof n === 'number' && Number.isFinite(n))
 
 /** Primitive call arguments only: `{ value }` with a string, number, boolean or null. */
 const callArguments: Pred = v =>
@@ -180,7 +181,7 @@ const TAB_ONLY_RULES: Readonly<Record<string, ParamsCheck>> = {
   'CSS.getMatchedStylesForNode': shape({ nodeId: int }),
   'Overlay.enable': noParams,
   'Overlay.disable': noParams,
-  'Overlay.highlightNode': shape({ highlightConfig }, nodeRef),
+  'Overlay.highlightQuad': shape({ quad, color: noFill, outlineColor: rgba }),
   'Overlay.hideHighlight': noParams,
   'Emulation.setFocusEmulationEnabled': shape({ enabled: bool }),
   'Debugger.enable': noParams,

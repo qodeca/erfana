@@ -46,6 +46,12 @@ export interface TabCertificateState {
   readonly warning: CertificateWarning | null
   /** The address bar's warning sign: the page's host was proceeded, or a subresource failed. */
   readonly sign: 'proceeded' | 'subresourceFailed' | null
+  /**
+   * The address whose load failed, while the warning page is up. Main-side
+   * only: the tab shows it as the address and names the tab after its host,
+   * because a refused load commits nothing (025-FR-021).
+   */
+  readonly failedUrl?: string
 }
 
 /** What the handler needs of the tab. */
@@ -205,7 +211,7 @@ export class TabCertificates {
     let sign: TabCertificateState['sign'] = null
     if (this.subresourceFailed) sign = 'subresourceFailed'
     else if (this.committedHost !== null && this.proceededHosts.has(this.committedHost)) sign = 'proceeded'
-    return { warning, sign }
+    return w === null ? { warning, sign } : { warning, sign, failedUrl: w.url }
   }
 
   /** The tab closed: later errors are refused, nothing more is shown. */

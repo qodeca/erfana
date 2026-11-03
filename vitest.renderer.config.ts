@@ -159,6 +159,32 @@ export default defineConfig({
         'src/renderer/src/components/Panels/BrowserPanel/browserDataActions.ts': { lines: 98, functions: 98, branches: 89, statements: 98 },
         // measured 100/100/88/100
         'src/renderer/src/browserPopup/PopupStrip.tsx': { lines: 98, functions: 98, branches: 86, statements: 98 },
+        // Built-in browser, renderer side (spec 025, commit 19): pick and send – the pick
+        // row's words, the panel's placement, the suggestions' rows, the send, the
+        // target and its re-ask, the still image and the pick state. A regression
+        // here shows as a send to the wrong terminal, a guard banner that never
+        // shows, or a page left hidden behind a still image. Each floor ~2 points
+        // under the value measured when it landed (2026-11-03), never above 98.
+        // measured 100/100/100/100 (lines/functions/branches/statements)
+        'src/renderer/src/components/Panels/BrowserPanel/pickRow.logic.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/renderer/src/components/Panels/BrowserPanel/pickPanel.logic.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/renderer/src/components/Panels/BrowserPanel/addressSuggestions.logic.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/75/100/95.65 (the uncovered functions are the no-op defaults)
+        'src/renderer/src/components/Panels/BrowserPanel/browserSend.ts': { lines: 98, functions: 73, branches: 98, statements: 93 },
+        // measured 100/96.55/89.81/95.45
+        'src/renderer/src/components/Panels/BrowserPanel/useBrowserPick.ts': { lines: 98, functions: 94, branches: 87, statements: 93 },
+        // measured 100/100/94.44/100
+        'src/renderer/src/components/Panels/BrowserPanel/useBrowserTarget.ts': { lines: 98, functions: 98, branches: 92, statements: 98 },
+        // measured 100/100/100/100
+        'src/renderer/src/components/Panels/BrowserPanel/useStillSurface.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/91.3/98.85
+        'src/renderer/src/services/browser/browserStill.ts': { lines: 98, functions: 98, branches: 89, statements: 96 },
+        // measured 100/100/100/100
+        'src/renderer/src/stores/useBrowserPickStore.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/renderer/src/stores/useBrowserStillStore.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
       },
       exclude: [
         'node_modules/**',

@@ -28,6 +28,7 @@ import { navGroupDescription } from './browserPanel.logic'
 import { browserShortcut } from './browserShortcuts'
 import { MoreMenu, type MoreMenuActions } from './MoreMenu'
 import { sentenceHost } from './erfanaPageCopy'
+import type { StillSurface } from './useStillSurface'
 
 /** Props for {@link NavigationRow}. */
 export interface NavigationRowProps {
@@ -39,7 +40,7 @@ export interface NavigationRowProps {
   readonly onReload: () => void
   readonly onStop: () => void
   readonly onDevTools: () => void
-  readonly onSubmitAddress: (input: string) => Promise<boolean>
+  readonly onSubmitAddress: (input: string, source?: 'address' | 'history') => Promise<boolean>
   readonly onAddressEscape: () => void
   readonly onAddressEdit: () => void
   readonly errorId: string | null
@@ -48,6 +49,9 @@ export interface NavigationRowProps {
   readonly moreActions: MoreMenuActions
   /** The address bar's chips. */
   readonly chips?: React.ReactNode
+  /** The page's still image under More and under the address suggestions (commit 19). */
+  readonly moreStill?: StillSurface
+  readonly suggestStill?: StillSurface
 }
 
 const TOOL_ICON = { size: 16, strokeWidth: 2, 'aria-hidden': true } as const
@@ -174,6 +178,7 @@ export const NavigationRow = forwardRef<HTMLDivElement, NavigationRowProps>(
           onEscape={props.onAddressEscape}
           onEdit={props.onAddressEdit}
           errorId={errorId}
+          suggestStill={props.suggestStill}
         >
           {props.chips}
         </AddressBar>
@@ -204,6 +209,7 @@ export const NavigationRow = forwardRef<HTMLDivElement, NavigationRowProps>(
           widthPreset={state?.widthPreset ?? 'full'}
           live={live}
           devToolsOpen={devToolsOpen}
+          still={props.moreStill}
         />
       </div>
     )

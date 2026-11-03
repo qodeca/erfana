@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { createRef } from 'react'
 
 vi.mock('../../../utils/platform', () => ({ isMacOS: () => true, isWindows: () => false }))
@@ -88,5 +88,22 @@ describe('MoreMenu', () => {
     expect(screen.queryByRole('menu')).toBeNull()
     fireEvent.keyDown(button, { key: 'ArrowDown' })
     expect(screen.getByRole('menu', { name: 'More' })).toBeInTheDocument()
+  })
+})
+
+describe('MoreMenu over the still image (ADR 0011)', () => {
+  it('opens once the picture is up and lets it go on close', () => {
+    let show: () => void = () => undefined
+    const still = { open: vi.fn((fn: () => void) => (show = fn)), close: vi.fn() }
+    render(<MoreMenu {...facts()} actions={actions()} buttonRef={createRef()} still={still} />)
+    const button = screen.getByRole('button', { name: 'More' })
+    fireEvent.click(button)
+    expect(still.open).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('menu')).toBeNull()
+    act(() => show())
+    expect(screen.getByRole('menu', { name: 'More' })).toBeInTheDocument()
+    fireEvent.click(button)
+    expect(still.close).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('menu')).toBeNull()
   })
 })

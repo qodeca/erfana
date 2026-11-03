@@ -59,19 +59,6 @@ export const HANG_PROBE_EVALUATE_PARAMS = Object.freeze({ expression: '0', retur
 /** `Network.enable` with every body buffer at zero (ADR 0007 decision 2). */
 export const NETWORK_ENABLE_PARAMS = Object.freeze({ maxTotalBufferSize: 0, maxResourceBufferSize: 0, maxPostDataSize: 0 })
 
-/** The fixed flags of the pick `HighlightConfig` (ADR 0007 decision 6); colours vary (forced colours). */
-export const HIGHLIGHT_FLAGS = Object.freeze({
-  showInfo: true,
-  showStyles: false,
-  showAccessibilityInfo: false,
-  showExtensionLines: false
-})
-
-/** The colour keys a pick `HighlightConfig` carries, each an RGBA object. */
-export const HIGHLIGHT_COLOUR_KEYS = Object.freeze(['contentColor', 'paddingColor', 'marginColor', 'borderColor'] as const)
-
-export type HighlightColourKey = (typeof HIGHLIGHT_COLOUR_KEYS)[number]
-
 export interface Rgba {
   readonly r: number
   readonly g: number
@@ -79,21 +66,29 @@ export interface Rgba {
   readonly a: number
 }
 
-export type HighlightPalette = Readonly<Record<HighlightColourKey, Rgba>>
+/**
+ * The live pick outline's colour (ADR 0007 decision 6, owner decision Q2):
+ * `--color-accent-primary` (`--color-brand-violet`, #A0A8FF), opaque – the
+ * Element picker card's accent ring, as close as the engine's one-colour
+ * outline allows. The card's two-tone outline is drawn on the still image.
+ */
+export const PICK_OUTLINE_COLOUR: Rgba = Object.freeze({ r: 160, g: 168, b: 255, a: 1 })
+
+/** No fill: the live highlight is an outline only (Q2); `Overlay.highlightQuad`'s `color` is pinned to it. */
+export const NO_FILL: Rgba = Object.freeze({ r: 0, g: 0, b: 0, a: 0 })
+
+/** Numbers in one CDP quad: four corners, x then y. */
+export const QUAD_LENGTH = 8
 
 /**
- * The default palette: a low-alpha brand-violet fill (`--color-brand-violet`,
- * #A0A8FF) with an opaque contrasting band. Proposed until owner question Q2
- * is answered; the pick commit may add the forced-colours palette.
+ * The `Overlay.highlightQuad` parameters of the live pick outline: the
+ * element's border-box quad in its own target's viewport, no fill, and the
+ * outline colour. `outlineColor` is a parameter for a forced-colours system
+ * colour; nothing passes one yet.
  */
-export const DEFAULT_HIGHLIGHT_PALETTE: HighlightPalette = Object.freeze({
-  contentColor: Object.freeze({ r: 160, g: 168, b: 255, a: 0.25 }),
-  paddingColor: Object.freeze({ r: 20, g: 20, b: 20, a: 1 }),
-  marginColor: Object.freeze({ r: 20, g: 20, b: 20, a: 1 }),
-  borderColor: Object.freeze({ r: 160, g: 168, b: 255, a: 1 })
-})
-
-/** A pick `HighlightConfig`: the fixed flags plus `palette`. */
-export function pickHighlightConfig(palette: HighlightPalette = DEFAULT_HIGHLIGHT_PALETTE): Readonly<Record<string, unknown>> {
-  return Object.freeze({ ...HIGHLIGHT_FLAGS, ...palette })
+export function pickOutlineParams(
+  quad: readonly number[],
+  outlineColor: Rgba = PICK_OUTLINE_COLOUR
+): Readonly<{ quad: number[]; color: Rgba; outlineColor: Rgba }> {
+  return Object.freeze({ quad: [...quad], color: NO_FILL, outlineColor })
 }

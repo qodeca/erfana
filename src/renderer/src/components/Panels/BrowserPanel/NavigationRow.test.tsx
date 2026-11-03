@@ -109,7 +109,7 @@ describe('NavigationRow', () => {
     rerender(
       <NavigationRow {...p} state={browserState({ canGoBack: false, canGoForward: false })} />
     )
-    expect(screen.getByRole('textbox', { name: 'Address and search' })).toHaveFocus()
+    expect(screen.getByRole('combobox', { name: 'Address and search' })).toHaveFocus()
   })
 
   it('keeps Tab order Back, Forward, Reload, address bar, Open in system browser, DevTools, More', () => {

@@ -24,13 +24,18 @@ const inner = (id: number) => ({ sessionKey: 'S1', backendNodeId: id, frameId: '
 describe('pickElement', () => {
   it('describes a node for the label from CDP alone', async () => {
     const { reader } = setup()
-    expect(await describeForLabel(reader, top(4))).toEqual({ name: { tagName: 'button', id: 'save', classAttr: null }, width: 100, height: 30 })
+    expect(await describeForLabel(reader, top(4))).toEqual({
+      name: { tagName: 'button', id: 'save', classAttr: null },
+      width: 100,
+      height: 30,
+      border: [20, 20, 120, 20, 120, 50, 20, 50]
+    })
   })
 
   it('labels a node with no box at 0 × 0, and a gone node as null', async () => {
     const { page, reader } = setup()
     page.add({ id: 9, tag: 'div', parent: 2, attrs: { class: 'contents' } })
-    expect(await describeForLabel(reader, top(9))).toEqual({ name: { tagName: 'div', id: null, classAttr: 'contents' }, width: 0, height: 0 })
+    expect(await describeForLabel(reader, top(9))).toEqual({ name: { tagName: 'div', id: null, classAttr: 'contents' }, width: 0, height: 0, border: null })
     expect(await describeForLabel(reader, top(999))).toBeNull()
   })
 

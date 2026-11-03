@@ -32,7 +32,7 @@ import {
   ISOLATED_WORLD_NAME,
   OUTER_HTML_CUT,
   PICK_OBJECT_GROUP,
-  pickHighlightConfig
+  pickOutlineParams
 } from '../src/main/services/browser/cdp/cdpPinned'
 
 /** Where a probe view sits, in the window's content DIP; the probe pages are 820 × 600. */
@@ -485,7 +485,7 @@ test.describe('spec 025 engine probes: the CDP session', () => {
     }
   })
 
-  test('ADR 0007 decision 6: the Overlay highlight is in capturePage, and gone after hideHighlight', async ({
+  test('ADR 0007 decision 6: the outline-only highlight is in capturePage with no fill, and gone after hideHighlight', async ({
     appWithTestProject,
     windowWithTestProject: _window,
     browserServers
@@ -495,24 +495,30 @@ test.describe('spec 025 engine probes: the CDP session', () => {
     expect(await framesPainted(view, 3)).toBe('visible')
     await view.hook('probeEnablePick')
     await view.hook('probeCapture', 'before')
-    const highlight = await view.cdp('Overlay.highlightNode', { highlightConfig: pickHighlightConfig(), nodeId: await view.nodeId('#target') })
+    const model = await view.cdpOk<{ model: { border: number[] } }>('DOM.getBoxModel', { nodeId: await view.nodeId('#target') })
+    const highlight = await view.cdp('Overlay.highlightQuad', pickOutlineParams(model.model.border))
     expect(highlight.ok).toBe(true)
-    // #target is 300 × 200 at (100, 100); the margin band reaches a little outside it.
-    const rect = { x: 90, y: 90, width: 320, height: 220 }
+    // #target is 300 × 200 at (100, 100): the outline runs along its edge; inside it nothing changes (owner decision Q2).
+    const leftEdge = { x: 98, y: 110, width: 4, height: 180 }
+    const inside = { x: 120, y: 120, width: 260, height: 160 }
+    const around = { x: 90, y: 90, width: 320, height: 220 }
     let diff = { changed: 0, total: 0 }
     await expect
       .poll(async () => {
         await view.hook('probeCapture', 'highlighted')
-        diff = await view.hook('probeCaptureDiff', 'before', 'highlighted', rect)
+        diff = await view.hook('probeCaptureDiff', 'before', 'highlighted', leftEdge)
         return diff.changed / diff.total
-      }, { timeout: WAIT_MS, message: 'the highlight shows in the capture' })
-      .toBeGreaterThan(0.5)
-    note('highlighted', diff)
+      }, { timeout: WAIT_MS, message: 'the outline shows in the capture' })
+      .toBeGreaterThan(0.1)
+    note('outline edge', diff)
+    const fill = await view.hook<{ changed: number; total: number }>('probeCaptureDiff', 'before', 'highlighted', inside)
+    note('outline inside', fill)
+    expect(fill.changed, 'no fill inside the outline').toBe(0)
     expect((await view.cdp('Overlay.hideHighlight')).ok).toBe(true)
     await expect
       .poll(async () => {
         await view.hook('probeCapture', 'hidden')
-        diff = await view.hook('probeCaptureDiff', 'before', 'hidden', rect)
+        diff = await view.hook('probeCaptureDiff', 'before', 'hidden', around)
         return diff.changed
       }, { timeout: WAIT_MS, message: 'the highlight leaves the capture' })
       .toBe(0)

@@ -12,6 +12,11 @@
  * - `tabAdded` → a new editor tab hosting the tab the page opened;
  * - `strip`, `findResult`, `contextMenu` → the chrome store the panels draw
  *   from (commit 18);
+ * - `pick` → the pick store (commit 19); a confirmed pick's capture goes up
+ *   as the page area's still image, a failed one is a toast, and an ended
+ *   capture lets the still go (a page change's capture stays for the dialog);
+ * - `contextMenu` waits for the page's still image before it opens, so the
+ *   menu never draws over a blank page area (ADR 0011, commit 19);
  * - `tabClosed` → the editor tab goes (`browserTabClosedByMain`);
  * - `newTabCommand` → the app menu's **New browser tab**.
  *
@@ -22,7 +27,25 @@ import type { TabAddedEvent } from '../../../../shared/ipc/browser-tab-bridge-ty
 import { browserTabGateway } from '../browserTabGateway'
 import { useBrowserTabStore } from '../../stores/useBrowserTabStore'
 import { useBrowserChromeStore } from '../../stores/useBrowserChromeStore'
+import { useBrowserPickStore } from '../../stores/useBrowserPickStore'
+import { showErrorToast } from '../../utils/toastHelpers'
+import type { PickEvent } from '../../../../shared/ipc/browser-tab-schema'
 import { browserTabClosedByMain } from './browserTabLifecycle'
+import { browserStill, CONTEXT_MENU_STILL_HOLDER, PICK_STILL_HOLDER } from './browserStill'
+
+/** Mirror one pick event, and move the still image with the capture. */
+function applyPick(event: PickEvent): void {
+  useBrowserPickStore.getState().apply(event)
+  if (event.kind === 'captured') {
+    const image = { data: event.still, width: event.stillWidth, height: event.stillHeight }
+    void browserStill.showPick(event.tabId, PICK_STILL_HOLDER, image)
+  } else if (event.kind === 'captureFailed') {
+    // Deck *Toast – capture failed* (025-FR-046): no panel, pick mode stays on.
+    showErrorToast("Couldn't capture this element", `${event.reason}. Nothing was sent – pick it again.`)
+  } else if (event.kind === 'ended' && event.reason !== 'pageChanged') {
+    browserStill.release(event.tabId, PICK_STILL_HOLDER)
+  }
+}
 
 /** What the window does with a page-opened tab. */
 export interface BrowserTabEventDeps {
@@ -69,10 +92,17 @@ export function mountBrowserTabEvents(deps: BrowserTabEventDeps): () => void {
     browserTabGateway.onFindResult(event => {
       useBrowserChromeStore.getState().applyFind(event)
     }),
+    browserTabGateway.onPick(event => {
+      applyPick(event)
+    }),
     browserTabGateway.onContextMenu(event => {
-      useBrowserChromeStore.getState().openMenu(event)
+      // The menu opens over the page's picture, or over Erfana's background when none could be taken.
+      void browserStill.hold(event.tabId, CONTEXT_MENU_STILL_HOLDER).then(() => {
+        useBrowserChromeStore.getState().openMenu(event)
+      })
     }),
     browserTabGateway.onTabClosed(event => {
+      useBrowserPickStore.getState().forget(event.tabId)
       browserTabClosedByMain(event.tabId, deps.removePanel)
     }),
     browserTabGateway.onNewTabCommand(event => {

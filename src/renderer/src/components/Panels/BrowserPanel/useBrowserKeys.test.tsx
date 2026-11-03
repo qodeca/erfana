@@ -47,6 +47,57 @@ function makeGroup(): {
   return { api, panels }
 }
 
+/** A panel with every F6 zone: the navigation row, the pick row, the strip, a page-area control and the panel. */
+function ZonesHarness(
+  props: Overrides &
+    Pick<UseBrowserKeysOptions, 'pickSurface' | 'closePanel'> & { readonly pick?: boolean; readonly strip?: 'buttons' | 'empty' | 'none' }
+): JSX.Element {
+  const rootRef = useRef<HTMLDivElement>(null)
+  const navRef = useRef<HTMLDivElement>(null)
+  const keys = useBrowserKeys({
+    tabId: props.tabId === undefined ? 'browser-tab-1' : props.tabId,
+    panelId: 'browser-panel-1',
+    openFind,
+    api: makeGroup().api,
+    containerApi: {} as DockviewApi,
+    rootRef,
+    navRef,
+    focusAddress: props.focusAddress ?? vi.fn(),
+    focusLastTool: props.focusLastTool ?? vi.fn(),
+    focusPageArea: props.focusPageArea ?? vi.fn(),
+    pickSurface: props.pickSurface,
+    closePanel: props.closePanel
+  })
+  const strip = props.strip ?? 'buttons'
+  return (
+    <div ref={rootRef} onKeyDown={keys.onKeyDown}>
+      <div ref={navRef}>
+        <button type="button">Reload</button>
+      </div>
+      {props.pick !== false && (
+        <div data-brw-zone="pick">
+          <button type="button">Pick element</button>
+          <button type="button">Target</button>
+        </div>
+      )}
+      {strip !== 'none' && (
+        <div data-testid="browser-strip">
+          {strip === 'buttons' && (
+            <>
+              <button type="button">Allow</button>
+              <button type="button">Block</button>
+            </>
+          )}
+        </div>
+      )}
+      <button type="button">In page</button>
+      <div className="erf-brw-actions">
+        <button type="button">Explain</button>
+      </div>
+    </div>
+  )
+}
+
 function Harness(props: Overrides & { api: UseBrowserKeysOptions['api'] }): JSX.Element {
   const rootRef = useRef<HTMLDivElement>(null)
   const navRef = useRef<HTMLDivElement>(null)
@@ -165,21 +216,90 @@ describe('useBrowserKeys – toolbar focus and keys', () => {
   it('moves F6 between the navigation row and the page area, and Esc on a row button to the page', () => {
     const focusAddress = vi.fn()
     const focusPageArea = vi.fn()
+    const focusLastTool = vi.fn()
     render(
-      <Harness api={makeGroup().api} focusAddress={focusAddress} focusPageArea={focusPageArea} />
+      <Harness api={makeGroup().api} focusAddress={focusAddress} focusPageArea={focusPageArea} focusLastTool={focusLastTool} />
     )
     fireEvent.keyDown(screen.getByRole('button', { name: 'Reload' }), { key: 'F6' })
     expect(focusPageArea).toHaveBeenCalledOnce()
+    fireEvent.keyDown(screen.getByRole('button', { name: 'In page' }), { key: 'F6' })
+    expect(focusAddress).toHaveBeenCalledOnce()
+    // Shift+F6 from the page area: the last zone's last control – here the navigation row's, More (025-FR-047).
     fireEvent.keyDown(screen.getByRole('button', { name: 'In page' }), {
       key: 'F6',
       shiftKey: true
     })
-    expect(focusAddress).toHaveBeenCalledOnce()
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Reload' }), { key: 'Escape' })
+    expect(focusLastTool).toHaveBeenCalledOnce()
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Reload' }), { key: 'F6', shiftKey: true })
     expect(focusPageArea).toHaveBeenCalledTimes(2)
+    focusPageArea.mockClear()
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Reload' }), { key: 'Escape' })
+    expect(focusPageArea).toHaveBeenCalledTimes(1)
     // Esc in the field is the address bar's own; Ctrl+F6 is not F6.
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'field' }), { key: 'Escape' })
     fireEvent.keyDown(screen.getByRole('button', { name: 'Reload' }), { key: 'F6', ctrlKey: true })
+    expect(focusPageArea).toHaveBeenCalledTimes(1)
+  })
+
+  it('cycles F6 through the navigation row, the pick row and the strip, and Shift+F6 back (025-FR-047)', () => {
+    const focusAddress = vi.fn()
+    const focusPageArea = vi.fn()
+    render(<ZonesHarness focusAddress={focusAddress} focusPageArea={focusPageArea} />)
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Reload' }), { key: 'F6' })
+    expect(screen.getByRole('button', { name: 'Pick element' })).toHaveFocus()
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Pick element' }), { key: 'F6' })
+    expect(screen.getByRole('button', { name: 'Allow' })).toHaveFocus()
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Allow' }), { key: 'F6' })
+    expect(focusPageArea).toHaveBeenCalledOnce()
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Allow' }), { key: 'F6', shiftKey: true })
+    expect(screen.getByRole('button', { name: 'Target' })).toHaveFocus()
+    // From the page: Shift+F6 lands on the strip's last control; Esc on a pick-row button returns to the page.
+    fireEvent.keyDown(screen.getByRole('button', { name: 'In page' }), { key: 'F6', shiftKey: true })
+    expect(screen.getByRole('button', { name: 'Block' })).toHaveFocus()
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Target' }), { key: 'Escape' })
     expect(focusPageArea).toHaveBeenCalledTimes(2)
+  })
+
+  it('takes main\'s forwarded Shift+F6 to the last zone\'s last control', () => {
+    render(<ZonesHarness />)
+    act(() => forwarded.listener?.({ tabId: 'browser-tab-1', action: 'focusPreviousZone' }))
+    expect(screen.getByRole('button', { name: 'Block' })).toHaveFocus()
+  })
+
+  it('with the panel open and no strip controls, Shift+F6 lands on More; without a pick row F6 only closes', () => {
+    const closePanel = vi.fn()
+    const focusLastTool = vi.fn()
+    const { rerender } = render(<ZonesHarness pickSurface="panel" closePanel={closePanel} focusLastTool={focusLastTool} strip="empty" />)
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Explain' }), { key: 'F6', shiftKey: true })
+    expect(focusLastTool).toHaveBeenCalledOnce()
+    rerender(<ZonesHarness pickSurface="panel" closePanel={closePanel} focusLastTool={focusLastTool} strip="none" pick={false} />)
+    screen.getByRole('button', { name: 'Explain' }).focus()
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Explain' }), { key: 'F6' })
+    expect(closePanel).toHaveBeenCalledTimes(2)
+    expect(screen.getByRole('button', { name: 'Explain' })).toHaveFocus()
+  })
+
+  it('moves nothing on Shift+F6 from the page area before the tab exists', () => {
+    const focusLastTool = vi.fn()
+    render(<ZonesHarness tabId={null} focusLastTool={focusLastTool} />)
+    screen.getByRole('button', { name: 'In page' }).focus()
+    fireEvent.keyDown(screen.getByRole('button', { name: 'In page' }), { key: 'F6', shiftKey: true })
+    expect(focusLastTool).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'In page' })).toHaveFocus()
+  })
+
+  it('with the panel open F6 closes it and lands on Pick element; with the dialog open it moves nothing', () => {
+    const closePanel = vi.fn()
+    const { rerender } = render(<ZonesHarness pickSurface="panel" closePanel={closePanel} />)
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Explain' }), { key: 'F6' })
+    expect(closePanel).toHaveBeenCalledOnce()
+    expect(screen.getByRole('button', { name: 'Pick element' })).toHaveFocus()
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Explain' }), { key: 'F6', shiftKey: true })
+    expect(screen.getByRole('button', { name: 'Block' })).toHaveFocus()
+    rerender(<ZonesHarness pickSurface="dialog" closePanel={closePanel} />)
+    screen.getByRole('button', { name: 'Explain' }).focus()
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Explain' }), { key: 'F6' })
+    expect(closePanel).toHaveBeenCalledTimes(2)
+    expect(screen.getByRole('button', { name: 'Explain' })).toHaveFocus()
   })
 })

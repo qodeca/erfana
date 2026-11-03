@@ -18,6 +18,7 @@ import {
   TargetStatusRequestSchema,
   WriteCaptureRequestSchema
 } from '../shared/ipc/browser-tab-schema'
+import { PickSurfaceRequestSchema, StillRequestSchema } from '../shared/ipc/browser-tab-pick-schema'
 import { browserTabBridge } from './browserTabBridge'
 
 const invoke = vi.hoisted(() => vi.fn())
@@ -50,5 +51,16 @@ describe('browserTabBridge pick and send', () => {
     ])
     const schemas = [PickModeRequestSchema, RefineRequestSchema, ClosePickRequestSchema, WriteCaptureRequestSchema, DiscardCaptureFilesRequestSchema, TargetStatusRequestSchema]
     invoke.mock.calls.forEach(([, payload], i) => expect(schemas[i].safeParse(payload).success, String(invoke.mock.calls[i][0])).toBe(true))
+  })
+
+  it('sends the surface change and the still-image request in the payloads main validates', async () => {
+    await browserTabBridge.pickSurface(TAB, CAPTURE, 'dialog')
+    await browserTabBridge.still(TAB)
+    expect(invoke.mock.calls).toEqual([
+      [C.pickSurface, { tabId: TAB, captureId: CAPTURE, surface: 'dialog' }],
+      [C.still, { tabId: TAB }]
+    ])
+    expect(PickSurfaceRequestSchema.safeParse(invoke.mock.calls[0][1]).success).toBe(true)
+    expect(StillRequestSchema.safeParse(invoke.mock.calls[1][1]).success).toBe(true)
   })
 })

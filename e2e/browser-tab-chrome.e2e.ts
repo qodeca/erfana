@@ -192,6 +192,11 @@ test.describe('built-in browser tab chrome', () => {
     await expect(proceed).toBeVisible()
     await panel.root.getByText('More about this error').click()
     await expect(panel.root.getByText(/^ERR_CERT_\w+ \(-\d+\)$/)).toBeVisible()
+    // The failed address stays named: in the bar, in the editor tab and in the details.
+    await expect(panel.addressBar).toHaveValue(/selfsigned\.test/)
+    await expect(ui.editorTabs.first()).toContainText('selfsigned.test')
+    await expect(ui.editorTabs.first()).not.toContainText('New browser tab')
+    await expect(panel.root.locator('details').getByText(/selfsigned\.test/)).toBeVisible()
     await shot(windowWithTestProject, 'page-certificate')
 
     await expect(proceed).not.toHaveAttribute('aria-disabled', 'true', { timeout: WAIT_MS })

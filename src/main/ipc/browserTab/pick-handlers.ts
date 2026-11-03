@@ -7,8 +7,11 @@
  * ancestor path), `closePick` (the menu or dialog closed, or a send
  * succeeded), `writeCapture` (the shell guard, then the capture files),
  * `discardCaptureFiles` (the terminal write failed after the files were
- * written) and `targetStatus` (the toolbar's target). Pick events go back as
- * `browser-tab:pick`, to the owning window only.
+ * written) and `targetStatus` (the toolbar's target). Commit 19 adds
+ * `pickSurface` (the held capture moved between the panel and the dialog)
+ * and `still` (the page as a still image for a surface over the page area,
+ * ADR 0011). Pick events go back as `browser-tab:pick`, to the owning window
+ * only.
  *
  * As in `browser-tab-handlers.ts`: registered through `registry.ts`
  * (identity, top-level frame, renderer URL and the window kind's channel
@@ -30,7 +33,13 @@ import {
   type TargetStatusResponse,
   type WriteCaptureResponse
 } from '../../../shared/ipc/browser-tab-schema'
-import type { PickActionResponse } from '../../../shared/ipc/browser-tab-pick-schema'
+import {
+  PickSurfaceRequestSchema,
+  StillRequestSchema,
+  type PickActionResponse,
+  type StillResponse
+} from '../../../shared/ipc/browser-tab-pick-schema'
+import { takeSurfaceStill } from '../../services/browser/capture/surfaceStill'
 import type { BrowserTab } from '../../services/browser/BrowserTab'
 import type { BrowserTabService } from '../../services/browser/BrowserTabService'
 import type { BrowserPicks } from '../../services/browser/pick/BrowserPicks'
@@ -51,7 +60,16 @@ export interface BrowserTabPickHandlerDeps {
 const C = BROWSER_TAB_CHANNELS
 
 /** Every channel this module registers, for tests and the unregister function. */
-export const BROWSER_TAB_PICK_CHANNELS = [C.pickMode, C.refine, C.closePick, C.writeCapture, C.discardCaptureFiles, C.targetStatus] as const
+export const BROWSER_TAB_PICK_CHANNELS = [
+  C.pickMode,
+  C.refine,
+  C.closePick,
+  C.pickSurface,
+  C.still,
+  C.writeCapture,
+  C.discardCaptureFiles,
+  C.targetStatus
+] as const
 
 interface Parser<T> {
   safeParse(value: unknown): { success: true; data: T } | { success: false; error: { message: string } }
@@ -132,6 +150,29 @@ export function registerBrowserTabPickHandlers(deps: BrowserTabPickHandlerDeps):
     const accepted = acceptPick(C.closePick, event, ClosePickRequestSchema, arg)
     if (accepted === null) return NO
     return guarded(C.closePick, NO, () => ({ ok: accepted.pick.close(accepted.data.captureId, accepted.data.reason) }))
+  })
+
+  registerHandle(C.pickSurface, (event, arg: unknown): PickActionResponse => {
+    const accepted = acceptPick(C.pickSurface, event, PickSurfaceRequestSchema, arg)
+    if (accepted === null || accepted.pick.capture?.id !== accepted.data.captureId) return NO
+    return guarded(C.pickSurface, NO, () => {
+      const input = deps.tabs.inputFor(accepted.tab)
+      if (input === null) return NO
+      input.dispatch({ type: accepted.data.surface === 'dialog' ? 'dialogOpen' : 'dialogBack' })
+      return { ok: true }
+    })
+  })
+
+  registerHandle(C.still, async (event, arg: unknown): Promise<StillResponse> => {
+    const accepted = accept(C.still, event, StillRequestSchema, arg)
+    const tab = accepted === null ? null : deps.tabs.tabOf(accepted.windowId, accepted.data.tabId)
+    if (tab === null) return { error: REFUSED }
+    try {
+      return await takeSurfaceStill(tab.contents)
+    } catch (error) {
+      logger.error('Browser tab request failed', redactedLogError(error), { channel: C.still })
+      return { error: 'The page could not be captured' }
+    }
   })
 
   registerHandle(C.writeCapture, async (event, arg: unknown): Promise<WriteCaptureResponse> => {

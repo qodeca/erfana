@@ -279,6 +279,20 @@ describe('applyBounds (025-FR-007)', () => {
     expect(host.addChildView).toHaveBeenCalledTimes(2)
   })
 
+  it('hands keyboard focus to the window when a page that held it is hidden, and only then (ADR 0011)', () => {
+    tab.applyBounds(RECT, 1, true)
+    tab.applyBounds(RECT, 2, false)
+    expect(host.focus).not.toHaveBeenCalled()
+    tab.applyBounds(RECT, 3, true)
+    contents.focused = true
+    tab.applyBounds(RECT, 4, false)
+    expect(host.focus).toHaveBeenCalledOnce()
+    tab.applyBounds(RECT, 5, true)
+    host.destroy()
+    tab.applyBounds(RECT, 6, false)
+    expect(host.focus).toHaveBeenCalledOnce()
+  })
+
   it('detaches when the rectangle clamps to nothing, and ignores pushes once the window is gone', () => {
     tab.applyBounds(RECT, 1, true)
     tab.applyBounds({ x: 5000, y: 0, width: 10, height: 10 }, 2, true)
@@ -388,6 +402,24 @@ describe('certificate page and sign-in hooks (025-FR-021, 025-FR-022)', () => {
     tab.setCertificateState({ warning: null, sign: null })
     expect(tab.state().erfanaPage).toBe('empty')
     expect(tab.state()).not.toHaveProperty('certificate')
+  })
+
+  it('025-AC-021 names the failed address in the bar and the tab after its host while the warning is up', () => {
+    contents.commit('https://a.test/x')
+    contents.emit('page-title-updated', {}, 'Page A', true)
+    tab.setCertificateState({ warning: WARNING, sign: null, failedUrl: 'https://selfsigned.test/login' })
+    const state = tab.state()
+    expect(TabStateEventSchema.safeParse(state).success).toBe(true)
+    expect(state).toMatchObject({
+      committedUrl: 'https://a.test/x',
+      pendingUrl: 'https://selfsigned.test/login',
+      title: '',
+      origin: { kind: 'web', registrableDomain: 'selfsigned.test' },
+      erfanaPage: 'certificate'
+    })
+    // Back to safety: the committed page, its title and its address return.
+    tab.setCertificateState({ warning: null, sign: null })
+    expect(tab.state()).toMatchObject({ committedUrl: 'https://a.test/x', pendingUrl: null, title: 'Page A', erfanaPage: null })
   })
 
   it('025-AC-021 shows the warning sign for a proceeded host or a failed subresource', () => {

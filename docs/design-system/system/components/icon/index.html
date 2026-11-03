@@ -90,12 +90,12 @@
 <p class="ds-lede" id="decision">
   Every icon comes from the shared registry (<code>utils/iconRegistry.tsx</code>), takes a size <em>name</em> from
   the token scale and is drawn at one stroke weight. Bypassing the registry is the problem: today
-  <span data-claim="icon-registry-bypass" title="files importing the icon library directly instead of the registry">59</span> files import <code>lucide-react</code> directly, so each picks its own size
+  <span data-claim="icon-registry-bypass" title="files importing the icon library directly instead of the registry">64</span> files import <code>lucide-react</code> directly, so each picks its own size
   and stroke at the call site, and nothing can change them in one place.
 </p>
 
 <div class="ds-note">
-  <strong>The problem, counted.</strong> <span data-claim="icon-size-literals" title="icons sized with a literal size={N} instead of a token">167</span> icons are sized with a
+  <strong>The problem, counted.</strong> <span data-claim="icon-size-literals" title="icons sized with a literal size={N} instead of a token">178</span> icons are sized with a
   number typed at the call site – <code>size={14}</code>, <code>size={18}</code> – across
   <span data-claim="icon-size-distinct" title="distinct literal icon sizes">8</span> different values.
   <strong><span data-claim="icon-size-offscale" title="distinct literal icon sizes that are not on the 12/16/20/24/32 scale">3</span> of those exist nowhere in the token scale</strong>

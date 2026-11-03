@@ -24,5 +24,15 @@ export const BROWSER_TEST_IDS = {
   /** The address bar's chips. */
   CHIPS: 'browser-address-chips',
   /** A browser popup's origin strip (its own window). */
-  POPUP_STRIP: 'browser-popup-strip'
+  POPUP_STRIP: 'browser-popup-strip',
+  /** The pick row under the navigation row (commit 19). */
+  PICK_ROW: 'browser-pick-row',
+  /** The pick row's status slot. */
+  PICK_STATUS: 'browser-pick-status',
+  /** The page's still image in the page area. */
+  STILL: 'browser-still-image',
+  /** The prompt-actions panel (the picked-element card). */
+  PROMPT_ACTIONS: 'browser-prompt-actions',
+  /** The instruction dialog. */
+  INSTRUCTION_DIALOG: 'browser-instruction-dialog'
 } as const

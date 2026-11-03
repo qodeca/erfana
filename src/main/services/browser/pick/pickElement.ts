@@ -68,11 +68,15 @@ function attributeMap(raw: unknown): Map<string, string> {
   return map
 }
 
-/** The name and size the hover label shows, from CDP alone; null when the node is gone. */
+/**
+ * The name and size the hover label shows, and the border-box quad the live
+ * outline is drawn on (in the node's own target's viewport; null without a
+ * box), from CDP alone; null when the node is gone.
+ */
 export async function describeForLabel(
   reader: PickReader,
   node: PickNode
-): Promise<{ name: ElementNameInput; width: number; height: number } | null> {
+): Promise<{ name: ElementNameInput; width: number; height: number; border: number[] | null } | null> {
   try {
     const [described, model] = await Promise.all([
       reader.call('DOM.describeNode', { backendNodeId: node.backendNodeId }, node.sessionKey),
@@ -84,7 +88,8 @@ export async function describeForLabel(
     return {
       name: { tagName: stringField(desc, 'localName') || stringField(desc, 'nodeName'), id: attrs.get('id') ?? null, classAttr: attrs.get('class') ?? null },
       width: numberField(boxModel, 'width'),
-      height: numberField(boxModel, 'height')
+      height: numberField(boxModel, 'height'),
+      border: quadFrom(isRecord(boxModel) ? boxModel.border : undefined)?.flatMap(corner => [corner.x, corner.y]) ?? null
     }
   } catch {
     return null

@@ -190,7 +190,7 @@ describe('BrowserCdpSession – send goes through the allow-list (S23)', () => {
   it('refuses pick-only domains outside pick mode, but allows their disable', async () => {
     const { session } = attached()
     expect(() => session.send('DOM.getBoxModel', { nodeId: 1 })).toThrow('pick mode is off')
-    expect(() => session.send('Overlay.highlightNode', {})).toThrow('pick mode is off')
+    expect(() => session.send('Overlay.highlightQuad', {})).toThrow('pick mode is off')
     await expect(session.send('DOM.disable')).resolves.toEqual({})
   })
 

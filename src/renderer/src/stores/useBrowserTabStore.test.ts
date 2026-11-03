@@ -39,7 +39,8 @@ afterEach(() => {
     tabByPanel: new Map(),
     unhosted: new Map(),
     closing: new Set(),
-    localAddresses: []
+    localAddresses: [],
+    stillCovers: new Set()
   })
 })
 
@@ -124,6 +125,21 @@ describe('useBrowserTabStore', () => {
       expect(store().coversPage('browser-panel-1')).toBe(true)
       store().applyState(stateEvent('browser-tab-1', { erfanaPage: null }))
       expect(store().coversPage('browser-panel-1')).toBe(false)
+    })
+
+    it('covers a live page while a still image shows over it, and removal forgets the cover', () => {
+      store().attach('browser-panel-1', 'browser-tab-1')
+      store().applyState(stateEvent('browser-tab-1', { erfanaPage: null }))
+      store().setStillCover('browser-panel-1', true)
+      const covered = useBrowserTabStore.getState()
+      store().setStillCover('browser-panel-1', true)
+      expect(useBrowserTabStore.getState()).toBe(covered)
+      expect(store().coversPage('browser-panel-1')).toBe(true)
+      store().setStillCover('browser-panel-1', false)
+      expect(store().coversPage('browser-panel-1')).toBe(false)
+      store().setStillCover('browser-panel-1', true)
+      store().removePanel('browser-panel-1')
+      expect(store().stillCovers.size).toBe(0)
     })
 
     it('covers a closing panel, and removal forgets it', () => {

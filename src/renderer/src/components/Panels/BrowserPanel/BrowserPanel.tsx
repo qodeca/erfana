@@ -9,7 +9,9 @@
  * the navigation row (with More and the address chips), the find row, the
  * strip rows (the refused address first), and the page area whose
  * placeholder the view covers – or an Erfana page drawn there instead – plus
- * the page right-click menu and Clear browsing data (commit 18). Glue
+ * the page right-click menu and Clear browsing data (commit 18); the pick
+ * row, the page's still image under Erfana's surfaces, the prompt-actions
+ * panel and the instruction dialog (commit 19, `useBrowserPick`). Glue
  * only: the tab's lifetime is `browserTabLifecycle`, its state the browser tab
  * store, where the page sits `useBrowserBounds`, keys `useBrowserKeys`, focus
  * into the page `useBrowserPageFocus`, decisions `browserPanel.logic.ts`.
@@ -45,8 +47,18 @@ import { PageContextMenu } from './PageContextMenu'
 import { ClearDataDialog } from './ClearDataDialog'
 import type { MoreMenuActions } from './MoreMenu'
 import { forgetBrowserData, openInSystemBrowser } from './browserDataActions'
+import { PickRow } from './PickRow'
+import { PickSurface } from './PickSurface'
+import { TargetChooser } from './TargetChooser'
+import { useBrowserTarget } from './useBrowserTarget'
+import { useBrowserPick } from './useBrowserPick'
+import { useStillSurface } from './useStillSurface'
+import type { PickPlace } from './pickRow.logic'
+import { useBrowserStillStore } from '../../../stores/useBrowserStillStore'
+import { useProjectManagementContextSafe } from '../../../context/ProjectManagementContext'
 import './BrowserPanel.css'
 import './BrowserChrome.css'
+import './PickRow.css'
 
 const NO_ROWS: readonly ShownStripRow[] = []
 
@@ -90,6 +102,13 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
   const state = entry?.state ?? null
   const pageFocused = entry?.pageFocused ?? false
   const live = state !== null && state.erfanaPage === null
+  const still = useBrowserStillStore(s => (tabId === null ? null : (s.byTab.get(tabId) ?? null)))
+  const projectPath = useProjectManagementContextSafe()?.projectPath ?? null
+  const [toolbarFocused, setToolbarFocused] = useState(false)
+  const moreStill = useStillSurface(tabId, 'more')
+  const suggestStill = useStillSurface(tabId, 'suggestions')
+  const targetStill = useStillSurface(tabId, 'target')
+  const target = useBrowserTarget()
 
   const rootRef = useRef<HTMLDivElement>(null)
   const navRef = useRef<HTMLDivElement>(null)
@@ -97,6 +116,7 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
   const lastToolRef = useRef<HTMLButtonElement>(null)
   const placeholderRef = useRef<HTMLDivElement>(null)
   const pageAreaRef = useRef<HTMLDivElement>(null)
+  const pickRowRef = useRef<HTMLDivElement>(null)
   const [refused, setRefused] = useState<string | null>(null)
   const refusedId = `erf-brw-refused-${useId().replace(/[^\w-]/g, '')}`
 
@@ -129,6 +149,18 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
     pageAreaRef.current?.querySelector<HTMLElement>(ERFANA_PAGE_FOCUSABLE)?.focus()
   }, [live, focusPage])
 
+  const pick = useBrowserPick({ tabId, live, target, containerApi, projectPath, focusPage: focusPageArea })
+  const dialogOpen = pick.surface === 'dialog'
+
+  // While the dialog is open the rows above the page are inert (025-FR-050);
+  // with the panel open they stay live, and a press on them closes it (025-FR-049).
+  useEffect(() => {
+    const root = rootRef.current
+    if (root === null) return
+    const rows = [navRef.current, pickRowRef.current, root.querySelector<HTMLElement>(`[data-testid="${BROWSER_TEST_IDS.STRIP}"]`)]
+    for (const row of rows) if (row !== null) row.inert = dialogOpen
+  }, [dialogOpen])
+
   const openFind = useCallback(() => {
     if (live) setFindOpen(true)
   }, [live])
@@ -143,7 +175,9 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
     navRef,
     focusAddress,
     focusLastTool,
-    focusPageArea
+    focusPageArea,
+    pickSurface: pick.surface,
+    closePanel: () => pick.close('toolbar')
   })
 
   // A new empty tab opens with the address bar focused (025-FR-001), once it is drawn –
@@ -233,6 +267,39 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
     if (live) focusPage()
   }, [live, focusPage])
 
+  const place: PickPlace =
+    pick.surface === 'dialog'
+      ? toolbarFocused
+        ? 'dialog'
+        : 'outDialog'
+      : pick.surface === 'panel'
+        ? 'panel'
+        : pageFocused
+          ? 'page'
+          : toolbarFocused
+            ? 'toolbar'
+            : 'out'
+  const targetButton = (variant: 'row' | 'panel'): JSX.Element => (
+    <TargetChooser
+      target={target}
+      lastCapture={pick.lastCapture}
+      onChosen={pick.targetChosenAgain}
+      onShowTerminal={pick.showTerminal}
+      onOpenCapture={pick.openCapture}
+      variant={variant}
+      still={variant === 'row' ? targetStill : undefined}
+    />
+  )
+  const { surface, close: closePick } = pick
+  /** A press on the navigation row, the pick row or the strip closes the panel without sending (025-FR-049). */
+  const onRowPress = useCallback(
+    (event: React.PointerEvent) => {
+      if (surface !== 'panel' || !(event.target instanceof Element)) return
+      if (event.target.closest('.erf-brw-nav, .erf-brw-pick, .erf-site-prompts') !== null) closePick('toolbar')
+    },
+    [surface, closePick]
+  )
+
   return (
     <div
       ref={rootRef}
@@ -240,8 +307,22 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
       data-testid={BROWSER_TEST_IDS.PANEL}
       data-browser-tab-id={tabId ?? undefined}
       onKeyDown={keys.onKeyDown}
-      onFocus={keys.onFocus}
-      onBlur={keys.onBlur}
+      onFocus={() => {
+        setToolbarFocused(true)
+        keys.onFocus()
+      }}
+      onBlur={event => {
+        const next = event.relatedTarget
+        // A menu this tab opened (the panel's target menu) draws in the portal: focus there has not left the tab.
+        const intoPortal = next instanceof Element && next.closest('#portal-root') !== null
+        if (!intoPortal && (!(next instanceof Node) || rootRef.current?.contains(next) !== true)) {
+          setToolbarFocused(false)
+          // Focus left the tab: the panel closes and its capture goes; a dialog stays with its text (025-FR-014).
+          if (surface === 'panel') closePick('focusLeft')
+        }
+        keys.onBlur(event)
+      }}
+      onPointerDownCapture={onRowPress}
     >
       <NavigationRow
         ref={navRef}
@@ -258,7 +339,9 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
             logger.warn('Browser tab DevTools failed', { error: errorText(error) })
           })
         }}
-        onSubmitAddress={input => load(input, 'address')}
+        onSubmitAddress={(input, source = 'address') => load(input, source)}
+        moreStill={moreStill}
+        suggestStill={suggestStill}
         onAddressEscape={() => {
           setRefused(null)
           if (live) focusPage()
@@ -277,6 +360,20 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
           />
         }
       />
+      <PickRow
+        ref={pickRowRef}
+        tabId={tabId}
+        pick={pick.tab}
+        live={live}
+        place={place}
+        still={still !== null}
+        notice={pick.notice}
+        onToggle={pick.togglePick}
+        onShowTerminal={pick.showTerminal}
+        onOpenCapture={pick.openCapture}
+        onNoticeDone={pick.dismissNotice}
+        target={targetButton('row')}
+      />
       {findOpen && live && tabId !== null && <FindRow tabId={tabId} result={findResult} onClose={closeFind} />}
       <StripRows tabId={tabId} rows={rows} refused={refused} refusedId={refusedId} onEmpty={focusPageArea} />
       <PageArea
@@ -288,6 +385,15 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
         localAddresses={localAddresses}
         onOpen={url => void load(url, 'history')}
         mayTakeFocus={mayTakeFocus}
+        still={still}
+        outline={pick.tab.capture?.summary.box ?? null}
+        pickFrame={pick.tab.on || pick.surface !== 'none' ? (pageFocused || toolbarFocused ? 'on' : 'away') : null}
+        onStillPress={() => {
+          if (pick.surface === 'panel') pick.close('clickOutside')
+        }}
+        overlay={
+          <PickSurface pick={pick} image={still?.image ?? null} zoomPercent={state?.zoomPercent ?? 100} target={targetButton('panel')} />
+        }
       />
       <PageContextMenu tabId={tabId} pageOrigin={pageOrigin} onClosed={afterMenu} />
       {clearOpen && <ClearDataDialog onClose={() => setClearOpen(false)} />}
