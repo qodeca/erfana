@@ -13089,7 +13089,7 @@
       "quote": "allows it only in `src/main/ipc/registry.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "eslint.config.mjs:564",
+      "source": "eslint.config.mjs:565",
       "match": "`src/main/ipc/registry.ts` (exempt below)"
     },
     {
@@ -15022,7 +15022,7 @@
       "quote": "a lint error (`no-restricted-syntax` in `eslint.config.mjs`). The rule bans the",
       "status": "verified",
       "evidence": "source",
-      "source": "eslint.config.mjs:245",
+      "source": "eslint.config.mjs:246",
       "match": "'MemberExpression[property.name=/^executeJavaScript/]',"
     },
     {
@@ -21714,7 +21714,7 @@
       "quote": "ESLint's `max-lines` rule (`eslint.config.mjs`) holds every non-test",
       "status": "verified",
       "evidence": "source",
-      "source": "eslint.config.mjs:252",
+      "source": "eslint.config.mjs:253",
       "match": "// The max-lines ratchet (docs/technical-debt.md #26)"
     },
     {
@@ -22853,7 +22853,7 @@
       "quote": "a renderer-scoped ESLint `no-restricted-syntax` rule enforces this",
       "status": "verified",
       "evidence": "source",
-      "source": "eslint.config.mjs:163",
+      "source": "eslint.config.mjs:164",
       "match": "const RENDERER_RESTRICTED_SYNTAX = ["
     },
     {
@@ -47662,7 +47662,7 @@
       "quote": "in a sandboxed Electron `WebContentsView` overlaid on the panel",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/usePreviewViewportStore.ts:7",
+      "source": "src/renderer/src/stores/usePreviewViewportStore.ts:9",
       "match": "native `WebContentsView`"
     },
     {
@@ -50888,7 +50888,7 @@
       "quote": "an ESLint block scoped to `src/renderer/src/imageExport/**`",
       "status": "verified",
       "evidence": "source",
-      "source": "eslint.config.mjs:499",
+      "source": "eslint.config.mjs:500",
       "match": "files: ['src/renderer/src/imageExport/**/*.{ts,tsx}'],"
     },
     {
@@ -50898,7 +50898,7 @@
       "quote": "(type-only imports are exempt, being erased by the compiler)",
       "status": "verified",
       "evidence": "source",
-      "source": "eslint.config.mjs:554",
+      "source": "eslint.config.mjs:555",
       "match": "allowTypeImports: true,"
     },
     {
@@ -50908,7 +50908,7 @@
       "quote": "lives in the renderer-wide `no-restricted-syntax` block instead",
       "status": "verified",
       "evidence": "source",
-      "source": "eslint.config.mjs:212",
+      "source": "eslint.config.mjs:213",
       "match": "arguments.0.value=/^(object|embed|iframe|frame)$/i"
     },
     {
@@ -51223,7 +51223,7 @@
       "quote": "keeps `ipcMain` from being imported anywhere else in `src/main/`",
       "status": "verified",
       "evidence": "source",
-      "source": "eslint.config.mjs:590",
+      "source": "eslint.config.mjs:591",
       "match": "ignores: ['src/main/ipc/registry.ts', 'src/main/**/*.test.ts']"
     },
     {
@@ -51353,7 +51353,7 @@
       "quote": "ESLint syntax selectors refuse any other call site",
       "status": "verified",
       "evidence": "source",
-      "source": "eslint.config.mjs:653",
+      "source": "eslint.config.mjs:654",
       "match": "MemberExpression[property.name='openExternal'][object.name!='deps']"
     },
     {
@@ -51935,7 +51935,7 @@
       "quote": "ESLint `react/no-danger` is an error under `HtmlPreviewPanel/comments/`",
       "status": "verified",
       "evidence": "source",
-      "source": "eslint.config.mjs:854",
+      "source": "eslint.config.mjs:855",
       "match": "'react/no-danger': 'error'"
     },
     {
@@ -52716,7 +52716,7 @@
       "quote": "now lint-block `src/shared/**` from importing `src/main`, `src/renderer`, `src/preload` or `electron`",
       "status": "fixed",
       "evidence": "source",
-      "source": "eslint.config.mjs:446",
+      "source": "eslint.config.mjs:447",
       "match": "files: ['src/shared/**/*.ts'],",
       "note": "Said nothing lint-blocks src/shared from importing main, renderer or electron; the layer rules now do"
     },
@@ -52749,7 +52749,7 @@
       "quote": "which already carries the `ipcMain` rule and the layer patterns",
       "status": "fixed",
       "evidence": "source",
-      "source": "eslint.config.mjs:610",
+      "source": "eslint.config.mjs:611",
       "match": "patterns: MAIN_LAYER_PATTERNS",
       "note": "Said adding the block meant restructuring the config; the src/main block already holds the ipcMain rule and layer patterns, so the pattern can be added there"
     },

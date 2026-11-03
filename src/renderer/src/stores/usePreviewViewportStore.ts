@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Where each live HTML preview's native view sits on screen, in CSS pixels
- * (issue #74 follow-up).
+ * Where each native view sits on screen, in CSS pixels (issue #74 follow-up;
+ * spec 025, ADR 0011 decision 2): HTML preview views and built-in browser tab
+ * views, one rect per hosting panel id. Both kinds are composited above the
+ * DOM alike, so Erfana's chrome steers clear of either the same way.
  *
  * WHY THIS EXISTS. A previewed page runs in a native `WebContentsView` that the
  * OS composites ABOVE all sibling DOM. Erfana's own chrome therefore has to know
@@ -26,7 +28,7 @@
 
 import { create } from 'zustand'
 
-/** A native preview view's on-screen rectangle, in CSS pixels. */
+/** A native view's on-screen rectangle (preview or browser tab), in CSS pixels. */
 export interface PreviewRect {
   readonly left: number
   readonly top: number
@@ -89,7 +91,7 @@ export const usePreviewViewportStore = create<PreviewViewportState>((set) => ({
 }))
 
 /**
- * Every recorded preview rect.
+ * Every recorded native-view rect, of every kind.
  *
  * Reads the live store rather than taking a selector, so a caller that needs the
  * rects at a specific moment — computing a placement, say — gets the settled
@@ -97,7 +99,7 @@ export const usePreviewViewportStore = create<PreviewViewportState>((set) => ({
  *
  * @returns The rects, or a stable empty array.
  */
-export function readPreviewRects(): readonly PreviewRect[] {
+export function readNativeViewRects(): readonly PreviewRect[] {
   const { rects } = usePreviewViewportStore.getState()
   return rects.size === 0 ? NO_RECTS : [...rects.values()]
 }

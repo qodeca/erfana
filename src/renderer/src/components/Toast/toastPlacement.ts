@@ -111,7 +111,8 @@ function withinViewport(box: Box, viewport: { width: number; height: number }): 
  * with the project tree open), then rise above the preview's top edge.
  *
  * @param toast - The container's current rect, as measured.
- * @param previews - Rects of every VISIBLE native preview view.
+ * @param previews - Rects of every VISIBLE native view – HTML preview or
+ *   browser tab (`readNativeViewRects`); the rule is the same for both kinds.
  * @param viewport - The window's inner size.
  * @returns A `clear` placement with an offset to apply, or `blocked`.
  *

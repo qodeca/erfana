@@ -5,7 +5,7 @@ import { CheckCircle, XCircle, AlertCircle, Info, X } from 'lucide-react'
 import { useToast, Toast } from './ToastContext'
 import { TEST_IDS } from '../../constants/testids'
 import { useOccluder } from '../../hooks/useOccluder'
-import { readPreviewRects, usePreviewViewportStore } from '../../stores/usePreviewViewportStore'
+import { readNativeViewRects, usePreviewViewportStore } from '../../stores/usePreviewViewportStore'
 import { placeToastContainer, type ToastPlacement } from './toastPlacement'
 import { useToastDwellTimer } from './toastDwell'
 import './Toast.css'
@@ -92,7 +92,7 @@ export function ToastNotification() {
           width: rect.width,
           height: rect.height
         },
-        readPreviewRects(),
+        readNativeViewRects(),
         { width: window.innerWidth, height: window.innerHeight }
       )
     )

@@ -63,6 +63,7 @@ Renderer code never reads `window.api`: every bridge has a gateway, and only the
 | `docx` | `DocxBridge` (`docx-schema.ts`) | `documentExportBridge.ts` | `docxGateway` (`documentExportGateway.ts`) |
 | `imageExport` | `ImageExportBridge` (`image-export-schema.ts`) | `imageExportBridge.ts` (`imageExport.ts` is the hidden rasterize window's own preload) | `imageExportGateway` |
 | `browser` | `BrowserBridge` (`browser-schema.ts`) | `browserBridge.ts` | `browserGateway` |
+| `browserTab` | `BrowserTabBridge` (`browser-tab-bridge-types.ts`) | `browserTabBridge.ts` | `browserTabGateway` – page bounds go only through `services/browser/browserViewBounds`, whose visibility the overlay guard alone sets |
 | `markdownImage` | `MarkdownImageBridge` (`markdown-image-schema.ts`) | `markdownImageBridge.ts` | `markdownImageGateway` |
 | `preview` | `PreviewBridge` (`preview-bridge-types.ts`) | `previewBridge.ts` | `previewGateway` – `setVisibility` only from `services/preview/OverlayGuardService` (lint-enforced) |
 | `previewComments` | `PreviewCommentsBridge` (`preview-comment-schema.ts`) | `previewCommentsBridge.ts` | `previewCommentsGateway` (`previewGateway.ts`), wrapped for the comment UI by `services/preview/commentGateway.ts` |

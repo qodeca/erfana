@@ -135,6 +135,7 @@ const RENDERER_GATEWAY_FILES = [
   'src/renderer/src/services/documentExportGateway.ts',
   'src/renderer/src/services/imageExportGateway.ts',
   'src/renderer/src/services/browserGateway.ts',
+  'src/renderer/src/services/browserTabGateway.ts',
   'src/renderer/src/services/markdownImageGateway.ts',
   'src/renderer/src/services/previewGateway.ts',
   'src/renderer/src/services/claudeStatusGateway.ts',

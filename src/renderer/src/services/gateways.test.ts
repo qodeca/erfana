@@ -18,6 +18,7 @@ import type { QuitBridge } from '../../../shared/ipc/quit-schema'
 import type { SettingsBridge } from '../../../shared/ipc/settings-schema'
 import type { SystemBridge } from '../../../shared/ipc/system-schema'
 import type { BrowserBridge } from '../../../shared/ipc/browser-schema'
+import type { BrowserTabBridge } from '../../../shared/ipc/browser-tab-bridge-types'
 import type { CameraBridge } from '../../../shared/ipc/camera-schema'
 import type { DocxBridge } from '../../../shared/ipc/docx-schema'
 import type { ImageExportBridge } from '../../../shared/ipc/image-export-schema'
@@ -42,6 +43,7 @@ import { cameraGateway } from './cameraGateway'
 import { docxGateway, pdfGateway } from './documentExportGateway'
 import { imageExportGateway } from './imageExportGateway'
 import { browserGateway } from './browserGateway'
+import { browserTabGateway } from './browserTabGateway'
 import { markdownImageGateway } from './markdownImageGateway'
 import { previewGateway } from './previewGateway'
 import type { PreviewBridge } from '../../../shared/ipc/preview-bridge-types'
@@ -223,6 +225,17 @@ const PDF_METHODS: Record<keyof PdfBridge, true> = { exportToPdf: true }
 const DOCX_METHODS: Record<keyof DocxBridge, true> = { exportToDocx: true }
 const IMAGE_EXPORT_METHODS: Record<keyof ImageExportBridge, true> = { run: true }
 const BROWSER_METHODS: Record<keyof BrowserBridge, true> = { openFile: true }
+const BROWSER_TAB_METHODS: Record<keyof BrowserTabBridge, true> = {
+  create: true,
+  close: true,
+  navigate: true,
+  history: true,
+  setBounds: true,
+  focusPage: true,
+  devTools: true,
+  onState: true,
+  onTabAdded: true
+}
 const MARKDOWN_IMAGE_METHODS: Record<keyof MarkdownImageBridge, true> = { read: true }
 
 const PREVIEW_METHODS: Record<keyof PreviewBridge, true> = {
@@ -308,6 +321,7 @@ describe.each([
   ['docxGateway', 'docx', docxGateway, DOCX_METHODS],
   ['imageExportGateway', 'imageExport', imageExportGateway, IMAGE_EXPORT_METHODS],
   ['browserGateway', 'browser', browserGateway, BROWSER_METHODS],
+  ['browserTabGateway', 'browserTab', browserTabGateway, BROWSER_TAB_METHODS],
   ['markdownImageGateway', 'markdownImage', markdownImageGateway, MARKDOWN_IMAGE_METHODS],
   ['previewGateway', 'preview', previewGateway, PREVIEW_METHODS],
   ['claudeStatusGateway', 'claudeStatus', claudeStatusGateway, CLAUDE_STATUS_METHODS],
