@@ -5,8 +5,8 @@
  *
  * {@link PreviewChromeBand} lays its bar out as three parts: a LEADING slot,
  * the spacer and permission chip it owns, and a TRAILING slot. This file holds
- * what goes in those slots by default – Find leading; Open in default browser
- * and Export to PDF trailing –
+ * what goes in those slots by default – Find leading; Open in browser tab,
+ * Open in default browser and Export to PDF trailing –
  * so the band can take other content in either slot without restating these
  * buttons, and so a toolbar control can grow its own states without growing
  * the file that asks the reader to approve hosts.
@@ -18,7 +18,7 @@
  * @module HtmlPreviewPanel/components/PreviewToolbarTools
  * @see docs/design-system/system/components/permission-band/index.html - status="decided"
  */
-import { ExternalLink, FileDown, Search } from 'lucide-react'
+import { AppWindow, ExternalLink, FileDown, Search } from 'lucide-react'
 import { formatShortcut } from '../../../../utils/shortcutLabel'
 
 /** Props for {@link PreviewFindTool}. */
@@ -87,6 +87,13 @@ export interface PreviewToolbarToolsProps {
   readonly onOpenInBrowser?: () => void
   /** A request is in flight, from the press until main answers. */
   readonly openingInBrowser?: boolean
+  /**
+   * Open the page this tab shows NOW in a built-in browser tab (spec 025,
+   * 025-FR-010). Optional for the same reason as {@link PreviewFindToolProps.onFind}.
+   */
+  readonly onOpenInBrowserTab?: () => void
+  /** The previewed file's name, for that button's name and tooltip ("Open {file name} in a browser tab"). */
+  readonly previewFileName?: string
 }
 
 /** Props for {@link PreviewOpenInBrowserTool}. */
@@ -134,8 +141,39 @@ function PreviewOpenInBrowserTool({
 }
 
 /**
- * The band's default trailing tools: a rule, then Open in default browser, then
- * Export to PDF.
+ * **Open in browser tab** (spec 025, 025-FR-010; design
+ * `docs/designs/browser/tab-and-toolbar.html` § Opening a browser tab): lucide
+ * `app-window`, before Open in default browser. The browser tab shows the
+ * file as its `file://` address; the preview stays open.
+ *
+ * @param props - The action and the file's name
+ * @returns The button.
+ */
+function PreviewOpenInBrowserTabTool({
+  onOpen,
+  fileName
+}: {
+  readonly onOpen: () => void
+  readonly fileName: string
+}): React.JSX.Element {
+  const label = `Open ${fileName} in a browser tab`
+  return (
+    <button
+      type="button"
+      className="erf-band__tool"
+      aria-label={label}
+      title={label}
+      data-testid="preview-band-open-in-browser-tab"
+      onClick={onOpen}
+    >
+      <AppWindow size={16} strokeWidth={2} aria-hidden="true" />
+    </button>
+  )
+}
+
+/**
+ * The band's default trailing tools: a rule, then Open in browser tab, then
+ * Open in default browser, then Export to PDF.
  *
  * LAST and behind a rule – the same position, separator and button
  * `MarkdownToolbar` gives it, so the two previews in this app put the same
@@ -170,12 +208,17 @@ export function PreviewToolbarTools({
   onExportPdf,
   exportingPdf = false,
   onOpenInBrowser,
-  openingInBrowser = false
+  openingInBrowser = false,
+  onOpenInBrowserTab,
+  previewFileName = 'this page'
 }: PreviewToolbarToolsProps): React.JSX.Element | null {
-  if (onExportPdf === undefined && onOpenInBrowser === undefined) return null
+  if (onExportPdf === undefined && onOpenInBrowser === undefined && onOpenInBrowserTab === undefined) return null
   return (
     <>
       <span className="erf-band__separator" aria-hidden="true" />
+      {onOpenInBrowserTab !== undefined && (
+        <PreviewOpenInBrowserTabTool onOpen={onOpenInBrowserTab} fileName={previewFileName} />
+      )}
       {onOpenInBrowser !== undefined && (
         <PreviewOpenInBrowserTool onOpenInBrowser={onOpenInBrowser} busy={openingInBrowser} />
       )}

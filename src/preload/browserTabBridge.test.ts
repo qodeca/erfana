@@ -154,6 +154,7 @@ describe('browserTabBridge page features and the page menu', () => {
     await browserTabBridge.forget()
     await browserTabBridge.suggest('app')
     await browserTabBridge.contextAction(action)
+    await browserTabBridge.pageClipboard()
     expect(ipc.invoke.mock.calls).toEqual([
       [C.find, find],
       [C.stopFind, { tabId: TAB }],
@@ -162,7 +163,8 @@ describe('browserTabBridge page features and the page menu', () => {
       [C.clearData, { categories: ['cookies'] }],
       [C.forget, {}],
       [C.suggest, { prefix: 'app' }],
-      [C.contextAction, action]
+      [C.contextAction, action],
+      [C.pageClipboard, {}]
     ])
   })
 })

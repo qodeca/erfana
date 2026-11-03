@@ -64,7 +64,13 @@ export const ForgetResponseSchema = z.union([
   z.object({ error: text, path: text.nullable() }).strict()
 ])
 
+/** `pageClipboard` (025-FR-009, S-17): no payload – main reads the clipboard itself; the text never crosses IPC. */
+export const PageClipboardRequestSchema = z.object({}).strict()
+/** `pageClipboard` answer: whether a browser page wrote the text now on the clipboard. */
+export const PageClipboardResponseSchema = z.object({ pageWritten: z.boolean() }).strict()
+
 export type LoadErrorPage = z.infer<typeof LoadErrorPageSchema>
 export type ClearDataCategory = z.infer<typeof ClearDataCategorySchema>
 export type ClearDataResponse = z.infer<typeof ClearDataResponseSchema>
 export type ForgetResponse = z.infer<typeof ForgetResponseSchema>
+export type PageClipboardResponse = z.infer<typeof PageClipboardResponseSchema>

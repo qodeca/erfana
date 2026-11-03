@@ -73,6 +73,7 @@ exports[`preload surface > window.api.browserTab exposes the expected members 1`
   "onTabClosed",
   "openExternal",
   "openLocalFile",
+  "pageClipboard",
   "pickMode",
   "pickSurface",
   "refine",

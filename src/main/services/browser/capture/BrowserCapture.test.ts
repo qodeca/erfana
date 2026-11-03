@@ -37,6 +37,34 @@ describe('BrowserCapture', () => {
     expect(cap.summary(true).changedAfterPick).toBe(true)
   })
 
+  it('adds the element\'s text and confirmed source to the summary once they are read, per element', async () => {
+    const { cap } = capture({
+      facts: vi.fn(async (_e, index: number) => facts({ outerHtml: index === 3 ? '<span>Save <b>draft</b></span>' : '<div></div>' })),
+      hints: vi.fn(async (index: number) => hints(index === 3 ? { resolvedSource: { path: 'src/Save.tsx', line: 7 } } : {}))
+    })
+    expect(cap.summary()).not.toHaveProperty('text')
+    await Promise.all([cap.facts(), cap.hints()])
+    expect(cap.summary()).toMatchObject({ text: 'Save draft', source: 'src/Save.tsx:7' })
+    cap.move('parent')
+    expect(cap.summary()).not.toHaveProperty('text')
+    await Promise.all([cap.facts(), cap.hints()])
+    // An element with no text and an unconfirmed source carries neither.
+    expect(cap.summary()).not.toHaveProperty('text')
+    expect(cap.summary()).not.toHaveProperty('source')
+  })
+
+  it('leaves the details out when the facts read fails', async () => {
+    const { cap } = capture({ facts: vi.fn(async () => Promise.reject(new Error('gone'))) })
+    await cap.facts().catch(() => undefined)
+    expect(cap.summary()).not.toHaveProperty('text')
+  })
+
+  it('leaves the source out when the hints read fails', async () => {
+    const { cap } = capture({ hints: vi.fn(async () => Promise.reject(new Error('gone'))) })
+    await cap.hints().catch(() => undefined)
+    expect(cap.summary()).not.toHaveProperty('source')
+  })
+
   it('moves Up to the root and Down back to the start, refusing past either end (025-FR-027)', () => {
     const { cap } = capture()
     expect(cap.move('child')).toEqual({ refused: 'backAtStart' })

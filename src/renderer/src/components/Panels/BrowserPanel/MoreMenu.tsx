@@ -9,8 +9,9 @@
  * 19); while it is open the native page is hidden by the native-view guard
  * (the menu registers as an occluder).
  *
- * Items: the Page width group (Full width, Phone width, Tablet width – the
- * width preset stays here; the pick row does not carry it yet), Zoom in,
+ * Items: the Page width group (Full width, Phone width, Tablet width – kept
+ * here at every width, so the choice stays reachable when the pick row's
+ * width preset folds away), Zoom in,
  * Zoom out and Zoom: {n}% – reset, Find in page…, Open in system browser,
  * DevTools, then Clear browsing data… and Forget this project's browser
  * data….

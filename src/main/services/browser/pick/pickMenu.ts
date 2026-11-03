@@ -9,8 +9,9 @@
  *   capture snapshotted. A live page is first checked for the picked element
  *   still being in its document (a frozen page cannot change, and a page
  *   function on it would hang, ADR 0008). After the move the element's facts
- *   are read; a live box more than 1 px from the snapshot's sends the summary
- *   again with "changed after the pick".
+ *   and hints are read and the summary is sent again with the element's text
+ *   and source – marked "changed after the pick" when the live box is more
+ *   than 1 px from the snapshot's.
  * - {@link closeEvent}: which routing event a `closePick` reason is.
  */
 import type { PickSurface, RoutingEvent } from '../../../../shared/browser/routingState'
@@ -46,12 +47,12 @@ export async function refineHeld(capture: BrowserCapture, move: RefineMove, deps
   }
   deps.refined({ captureId: capture.id, summary: capture.summary() })
   try {
-    const facts = await capture.facts()
-    void capture.hints()
+    const [facts] = await Promise.all([capture.facts(), capture.hints()])
     if (!capture.isLatest(moved.generation) || !deps.isHeld(capture)) return
     const snapshot = capture.entry.boxInView
     const live = facts.boxInView
-    if (snapshot !== null && live !== null && boxChanged(snapshot, live)) deps.refined({ captureId: capture.id, summary: capture.summary(true) })
+    // Again with the element's text and source, and "changed after the pick" when its box moved.
+    deps.refined({ captureId: capture.id, summary: capture.summary(snapshot !== null && live !== null && boxChanged(snapshot, live)) })
   } catch {
     // The send reads them again; a failed refinement read only loses the change note.
   }

@@ -28,12 +28,14 @@ function setup(liveBox = { x: 20, y: 20, width: 100, height: 30 }) {
 }
 
 describe('refineHeld', () => {
-  it('moves along the snapshot chain and sends the new summary', async () => {
+  it('moves along the snapshot chain, sends the new summary at once, then again once the element is read', async () => {
     const { capture, deps } = setup()
     await refineHeld(capture, 'parent', deps)
     expect(capture.entry.name.tagName).toBe('button')
-    expect(deps.refined).toHaveBeenCalledTimes(1)
-    expect(deps.refined).toHaveBeenCalledWith({ captureId: 'cid', summary: expect.objectContaining({ changedAfterPick: false }) })
+    // First at the move (name, size, path); then with the text and source read for the panel – unchanged box.
+    expect(deps.refined).toHaveBeenCalledTimes(2)
+    expect(deps.refined.mock.calls[0][0]).toEqual({ captureId: 'cid', summary: expect.objectContaining({ changedAfterPick: false }) })
+    expect(deps.refined.mock.calls[1][0]).toEqual({ captureId: 'cid', summary: expect.objectContaining({ changedAfterPick: false }) })
   })
 
   it('notes a refused move', async () => {

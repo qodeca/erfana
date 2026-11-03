@@ -57,6 +57,19 @@ describe('PromptActionsPanel (025-FR-027, 025-FR-030)', () => {
     expect(screen.getByRole('button', { name: 'Parent element' })).not.toHaveAttribute('aria-disabled')
   })
 
+  it('shows the element\'s text and confirmed source once main has read them, and nothing before', () => {
+    const { rerender, props } = renderPanel()
+    expect(screen.queryByText('Text')).toBeNull()
+    expect(screen.queryByText('Source')).toBeNull()
+    const capture = { ...CAPTURE, summary: { ...SUMMARY, text: 'Save draft', source: 'src/Save.tsx:7' } }
+    rerender(<PromptActionsPanel {...props} capture={capture} />)
+    expect(screen.getByText('Text').nextElementSibling).toHaveTextContent('Save draft')
+    expect(screen.getByText('Source').nextElementSibling).toHaveTextContent('src/Save.tsx:7')
+    rerender(<PromptActionsPanel {...props} capture={{ ...CAPTURE, summary: { ...SUMMARY, source: 'src/A.tsx' } }} />)
+    expect(screen.queryByText('Text')).toBeNull()
+    expect(screen.getByText('Source').nextElementSibling).toHaveTextContent('src/A.tsx')
+  })
+
   it('sends Explain on a pointer press and opens a dialog action', () => {
     const { props } = renderPanel()
     press(screen.getByRole('button', { name: 'Explain' }))

@@ -42,7 +42,7 @@ import type {
   WidthPresetRequestSchema,
   ZoomRequestSchema
 } from './browser-tab-schema'
-import type { ClearDataResponse, ForgetResponse } from './browser-tab-page-schema'
+import type { ClearDataResponse, ForgetResponse, PageClipboardResponse } from './browser-tab-page-schema'
 import type { PickActionResponse, PickSurfaceName, StillResponse } from './browser-tab-pick-schema'
 import type { NewTabCommandEvent, OpenExternalResponse, TabClosedEvent } from './browser-tab-chrome-schema'
 
@@ -165,4 +165,6 @@ export interface BrowserTabBridge {
   onContextMenu(callback: (event: ContextMenuEvent) => void): () => void
   /** Run one item of the live menu `menuId`; main checks it is one the menu offered. */
   contextAction(request: ContextActionRequest): Promise<void>
+  /** Whether a browser page wrote the clipboard's text (025-FR-009, S-17); main reads the clipboard itself. */
+  pageClipboard(): Promise<PageClipboardResponse>
 }

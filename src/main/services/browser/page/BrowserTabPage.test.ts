@@ -123,8 +123,11 @@ describe('BrowserTabPage crash and hang', () => {
     clock.advance(500)
     expect(page.answerStrip('hungrow', 'reload')).toBe('accepted')
     expect(tab.contents.forcefullyCrashRenderer).toHaveBeenCalledTimes(1)
-    expect(tab.history).toHaveBeenCalledWith('reload')
+    // A reload sent while the hung process is still dying is lost with it: it waits for the process to go.
+    expect(tab.history).not.toHaveBeenCalledWith('reload')
     tab.contents.emit('render-process-gone', {}, { reason: 'killed', exitCode: 9 })
+    expect(tab.history).toHaveBeenCalledWith('reload')
+    expect(tab.history).toHaveBeenCalledTimes(1)
     expect(page.facts().crashed).toBe(false)
     tab.contents.emit('render-process-gone', {}, { reason: 'crashed', exitCode: 1 })
     expect(page.facts().crashed).toBe(true)

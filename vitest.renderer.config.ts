@@ -185,6 +185,25 @@ export default defineConfig({
         'src/renderer/src/stores/useBrowserPickStore.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/renderer/src/stores/useBrowserStillStore.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Built-in browser commit 20 (spec 025, 025-FR-009, 025-FR-010, S-17,
+        // 025-FR-023): terminal links, the paste and drop guard, opening a
+        // tab at an address or file, the width preset menu and Forget's
+        // dialog. Pinned ~2 points under the value measured when they landed
+        // (2026-11-03), never above 98.
+        // measured 100/100/100/100
+        'src/renderer/src/utils/terminalPasteGuard.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/renderer/src/hooks/useTerminalPasteGuard.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/renderer/src/components/Panels/TerminalPanel/terminalPasteGuardAddon.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 81.81/66.66/100/83.33 – the uncovered part is the app's default wiring (APP_DEPS)
+        'src/renderer/src/components/Panels/TerminalPanel/terminalLinks.ts': { lines: 79, functions: 64, branches: 98, statements: 81 },
+        // measured 100/100/100/100
+        'src/renderer/src/utils/openBrowserTabAt.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/renderer/src/components/Panels/BrowserPanel/WidthPresetMenu.tsx': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/renderer/src/components/Panels/BrowserPanel/ForgetDataDialog.tsx': { lines: 98, functions: 98, branches: 98, statements: 98 },
       },
       exclude: [
         'node_modules/**',

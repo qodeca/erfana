@@ -27,7 +27,6 @@ import type { IDockviewPanelProps } from 'dockview'
 import { DOCKVIEW_PANEL_VISIBLE, useDockviewValue } from '../../../hooks/useDockviewValue'
 import { useBrowserTabStore } from '../../../stores/useBrowserTabStore'
 import { useBrowserChromeStore, type ShownStripRow } from '../../../stores/useBrowserChromeStore'
-import { useOptionalDialog } from '../../Dialog/DialogContext'
 import { browserTabGateway } from '../../../services/browserTabGateway'
 import { ensureBrowserTab } from '../../../services/browser/browserTabLifecycle'
 import type { BrowserPanelParams } from '../../../utils/openBrowserTab'
@@ -46,10 +45,12 @@ import { AddressChips } from './AddressChips'
 import { PageContextMenu } from './PageContextMenu'
 import { ClearDataDialog } from './ClearDataDialog'
 import type { MoreMenuActions } from './MoreMenu'
-import { forgetBrowserData, openInSystemBrowser } from './browserDataActions'
+import { openInSystemBrowser } from './browserDataActions'
+import { ForgetDataDialog } from './ForgetDataDialog'
 import { PickRow } from './PickRow'
 import { PickSurface } from './PickSurface'
 import { TargetChooser } from './TargetChooser'
+import { WidthPresetMenu } from './WidthPresetMenu'
 import { useBrowserTarget } from './useBrowserTarget'
 import { useBrowserPick } from './useBrowserPick'
 import { useStillSurface } from './useStillSurface'
@@ -96,9 +97,9 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
   const localAddresses = useBrowserTabStore(s => s.localAddresses)
   const rows = useBrowserChromeStore(s => (tabId === null ? NO_ROWS : (s.rows.get(tabId) ?? NO_ROWS)))
   const findResult = useBrowserChromeStore(s => (tabId === null ? undefined : s.find.get(tabId)))
-  const dialog = useOptionalDialog()
   const [findOpen, setFindOpen] = useState(false)
   const [clearOpen, setClearOpen] = useState(false)
+  const [forgetOpen, setForgetOpen] = useState(false)
   const state = entry?.state ?? null
   const pageFocused = entry?.pageFocused ?? false
   const live = state !== null && state.erfanaPage === null
@@ -108,6 +109,7 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
   const moreStill = useStillSurface(tabId, 'more')
   const suggestStill = useStillSurface(tabId, 'suggestions')
   const targetStill = useStillSurface(tabId, 'target')
+  const widthStill = useStillSurface(tabId, 'width')
   const target = useBrowserTarget()
 
   const rootRef = useRef<HTMLDivElement>(null)
@@ -246,11 +248,9 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
         if (tabId !== null) browserTabGateway.devTools(tabId).catch(fail('Browser tab DevTools failed'))
       },
       clearData: () => setClearOpen(true),
-      forget: () => {
-        if (dialog !== undefined) void forgetBrowserData(dialog.showConfirm)
-      }
+      forget: () => setForgetOpen(true)
     }),
-    [tabId, dialog]
+    [tabId]
   )
 
   const popupBlocked = rows.some(shown => shown.row.kind === 'popupBlocked')
@@ -373,6 +373,9 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
         onOpenCapture={pick.openCapture}
         onNoticeDone={pick.dismissNotice}
         target={targetButton('row')}
+        widthPreset={
+          state !== null && <WidthPresetMenu preset={state.widthPreset} onChoose={moreActions.widthPreset} still={widthStill} />
+        }
       />
       {findOpen && live && tabId !== null && <FindRow tabId={tabId} result={findResult} onClose={closeFind} />}
       <StripRows tabId={tabId} rows={rows} refused={refused} refusedId={refusedId} onEmpty={focusPageArea} />
@@ -397,6 +400,7 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
       />
       <PageContextMenu tabId={tabId} pageOrigin={pageOrigin} onClosed={afterMenu} />
       {clearOpen && <ClearDataDialog onClose={() => setClearOpen(false)} />}
+      {forgetOpen && <ForgetDataDialog onClose={() => setForgetOpen(false)} />}
     </div>
   )
 }

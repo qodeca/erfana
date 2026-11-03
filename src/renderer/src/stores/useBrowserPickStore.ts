@@ -9,8 +9,10 @@
  * a capture. The still image itself lives in `useBrowserStillStore`.
  *
  * - **`captured`** holds the capture's id and summary; the panel opens on it.
- * - **`refined`** replaces the summary and stamps the change, so the panel
- *   marks the element chip as changed for 1 s (deck *Path – current*).
+ * - **`refined`** replaces the summary and, when the element moved, stamps
+ *   the change, so the panel marks the element chip as changed for 1 s (deck
+ *   *Path – current*). A `refined` for the same element – main adding its
+ *   text and source once read – stamps nothing.
  * - **`ended`** ends the capture. `pageChanged` – the page navigated while
  *   the panel or the dialog was open, and main kept the capture – keeps it,
  *   marked `afterNavigation`: the dialog may still send it, the panel closes
@@ -96,6 +98,11 @@ function ended(tab: BrowserPickTab, reason: PickEndReason): BrowserPickTab {
   }
 }
 
+/** Whether two summaries name the same element of the chain (its path and name). */
+function sameElement(a: PickSummary, b: PickSummary): boolean {
+  return a.name === b.name && a.ancestors.length === b.ancestors.length && a.ancestors.every((name, i) => name === b.ancestors[i])
+}
+
 function reduce(tab: BrowserPickTab, event: PickEvent, now: number): BrowserPickTab {
   switch (event.kind) {
     case 'mode':
@@ -115,9 +122,11 @@ function reduce(tab: BrowserPickTab, event: PickEvent, now: number): BrowserPick
       }
     case 'captureFailed':
       return { ...tab, capturing: false }
-    case 'refined':
+    case 'refined': {
       if (tab.capture?.captureId !== event.captureId) return tab
-      return { ...tab, capture: { ...tab.capture, summary: event.summary, changedAt: now } }
+      const moved = !sameElement(tab.capture.summary, event.summary)
+      return { ...tab, capture: { ...tab.capture, summary: event.summary, changedAt: moved ? now : tab.capture.changedAt } }
+    }
     case 'frozen':
       return tab.capture?.captureId === event.captureId ? { ...tab, frozen: true } : tab
     case 'ended':

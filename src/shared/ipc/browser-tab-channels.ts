@@ -56,7 +56,9 @@ export const BROWSER_TAB_CHANNELS = {
   certificate: 'browser-tab:certificate',
   clearData: 'browser-tab:clearData',
   forget: 'browser-tab:forget',
-  suggest: 'browser-tab:suggest'
+  suggest: 'browser-tab:suggest',
+  /** Whether a browser page wrote the clipboard's text: the terminal's paste guard (025-FR-009, S-17). */
+  pageClipboard: 'browser-tab:pageClipboard'
 } as const
 
 /** Requests from a popup window's renderer: the popup's strip only (ADR 0011 decision 9). */

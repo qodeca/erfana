@@ -39,6 +39,8 @@ export interface OpenBrowserTabOptions {
   readonly tabId?: string
   /** Open without activating it (a page asked for a background tab). */
   readonly background?: boolean
+  /** Focus the address bar of a new tab (default `true`); `false` for a tab opened at an address (`openBrowserTabAt`). */
+  readonly focusAddress?: boolean
 }
 
 let counter = 0
@@ -84,7 +86,7 @@ export function openBrowserTab(
   const activate = options.background !== true
   const params: BrowserPanelParams = {
     panelId,
-    ...(options.tabId === undefined ? { focusAddress: true } : { tabId: options.tabId })
+    ...(options.tabId === undefined ? { focusAddress: options.focusAddress !== false } : { tabId: options.tabId })
   }
   const panel = api.addPanel({
     id: panelId,

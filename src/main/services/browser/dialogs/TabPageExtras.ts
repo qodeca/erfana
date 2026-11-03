@@ -60,7 +60,7 @@ export interface TabPageExtrasSetup {
    * The menu actions that reach outside the tab: the external-open path, the
    * clipboard, and pick – which names the tab, because one setup serves every tab.
    */
-  readonly menuActions: Pick<MenuActions, 'openInSystemBrowser' | 'writeClipboardText'> & {
+  readonly menuActions: Pick<MenuActions, 'openInSystemBrowser' | 'writeClipboardText' | 'copied'> & {
     readonly pickAt?: (tabId: string, at: { x: number; y: number }) => void
   }
   readonly newRowId?: () => string
@@ -102,6 +102,7 @@ export class TabPageExtras {
       actions: {
         openInSystemBrowser: (url) => setup.menuActions.openInSystemBrowser(url),
         writeClipboardText: (text) => setup.menuActions.writeClipboardText(text),
+        copied: () => setup.menuActions.copied?.(),
         ...(setup.menuActions.pickAt === undefined ? {} : { pickAt: (at) => setup.menuActions.pickAt?.(tab.id, at) }),
         history: (step) => tab.history(step),
         inspect: (at) => tab.devTools(at),

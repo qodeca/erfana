@@ -127,6 +127,12 @@
     },
     "docs/user-guide/reference/windows-differences.md": {
       "diataxis": "reference"
+    },
+    "docs/user-guide/reference/built-in-browser.md": {
+      "diataxis": "reference"
+    },
+    "docs/user-guide/reference/browser-data-handling.md": {
+      "diataxis": "reference"
     }
   },
   "claims": [
@@ -2753,7 +2759,7 @@
       "quote": "Renderer-side only: the band's `APPROVE_UI_DEADLINE_MS` passed with no answer from `preview:approveHost`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewChromeBand.tsx:255",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewChromeBand.tsx:259",
       "match": "() => resolve({ ok: false, errorCode: ErrorCode.PREVIEW_APPROVE_TIMED_OUT }),"
     },
     {
@@ -4590,7 +4596,7 @@
       "quote": "- 500ms warm-up period ignored after terminal opens",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:104",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:107",
       "match": "const WARMUP_MS = 500"
     },
     {
@@ -4891,7 +4897,7 @@
       "quote": "- **Open in default browser** – hands the file to the system browser",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewToolbarTools.tsx:123",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewToolbarTools.tsx:130",
       "match": "aria-label=\"Open in default browser\""
     },
     {
@@ -5451,7 +5457,7 @@
       "quote": "are hex (`useXtermSession.ts:65`–`85`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:65",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:68",
       "match": "background: '#000000',"
     },
     {
@@ -5531,7 +5537,7 @@
       "quote": "`PreviewChromeBand.tsx:420`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewChromeBand.tsx:420",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewChromeBand.tsx:424",
       "match": "Only the first hosts are listed — this page asked for more."
     },
     {
@@ -7996,7 +8002,7 @@
       "quote": "<kbd>↑</kbd> / <kbd>↓</kbd>",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewChromeBand.tsx:291",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewChromeBand.tsx:295",
       "match": "if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return"
     },
     {
@@ -8006,7 +8012,7 @@
       "quote": "| A truncated host list (“Only the first hosts are listed …”)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewChromeBand.tsx:420",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewChromeBand.tsx:424",
       "match": "Only the first hosts are listed"
     },
     {
@@ -8589,7 +8595,7 @@
       "quote": "The placeholder's `img` role pre-paint (`HtmlPreviewPanel.tsx:454-463`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/HtmlPreviewPanel.tsx:456",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/HtmlPreviewPanel.tsx:459",
       "match": "role={isViewHidden ? 'img'"
     },
     {
@@ -8720,7 +8726,7 @@
       "quote": "`aria-label` and `title` \"Open in default browser\"",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewToolbarTools.tsx:123",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewToolbarTools.tsx:130",
       "match": "aria-label=\"Open in default browser\""
     },
     {
@@ -11080,7 +11086,7 @@
       "quote": "xterm.clear()  // TerminalPanel/hooks/useXtermSession.ts",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:561",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:566",
       "match": "const xterm = new Terminal({",
       "note": "Pointed at TerminalPanel.tsx; the xterm.js Terminal instance is created in TerminalPanel/hooks/useXtermSession.ts"
     },
@@ -14619,7 +14625,7 @@
       "quote": "xterm.js draws its text with the WebGL renderer, so the DOM holds no text to assert on",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:474",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:478",
       "match": "const { WebglAddon } = await import('@xterm/addon-webgl')",
       "note": "The examples asserted terminal output with toContainText and a 1 s waitForTimeout; output is read from xterm's buffer via TerminalPage."
     },
@@ -15537,7 +15543,7 @@
       "quote": "- **Font**: **Cascadia Mono**, 12px, bold support",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:60",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:63",
       "match": "fontFamily: \"'Cascadia Mono', 'SF Mono', 'Monaco', Consolas, 'Courier New', monospace\","
     },
     {
@@ -15547,7 +15553,7 @@
       "quote": "- **Theme**: High contrast – black background (`#000000`), white foreground (`#ffffff`), cyan cursor (`#4fc1ff`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:67",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:70",
       "match": "cursor: '#4fc1ff',"
     },
     {
@@ -15761,7 +15767,7 @@
       "quote": "- Clean screen and scrollback on mount (`\\x1b[2J\\x1b[3J\\x1b[H`, `CLEAR_SEQUENCE` in `useXtermSession.ts`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:96",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:99",
       "match": "const CLEAR_SEQUENCE = '\\x1b[2J\\x1b[3J\\x1b[H'",
       "note": "Gave the sequence as \\x1b[2J\\x1b[H; the code also clears scrollback with \\x1b[3J."
     },
@@ -15772,7 +15778,7 @@
       "quote": "A step that throws is logged (`Terminal teardown step failed`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:389",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:393",
       "match": "guarded('Terminal teardown step failed', run)"
     },
     {
@@ -15834,7 +15840,7 @@
       "quote": "| **WebLinksAddon** | Makes URLs clickable | Loaded automatically on creation |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:565",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:570",
       "match": "const webLinksAddon = new WebLinksAddon("
     },
     {
@@ -15934,7 +15940,7 @@
       "quote": "- Clears xterm screen and scrollback (`\\x1b[2J\\x1b[3J\\x1b[H`, `CLEAR_SEQUENCE`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:96",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:99",
       "match": "const CLEAR_SEQUENCE = '\\x1b[2J\\x1b[3J\\x1b[H'",
       "note": "Gave \\x1b[2J\\x1b[H; the renderer clear also wipes scrollback (\\x1b[3J), matching § 4 of the same page."
     },
@@ -16096,7 +16102,7 @@
       "quote": "**File**: `TerminalPanel/hooks/useXtermSession.ts` – the `webglAddon.onContextLoss` handler in `loadWebgl`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:478",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:482",
       "match": "webglAddon.onContextLoss(() => {",
       "note": "Pointed at TerminalPanel.tsx; the handler moved to useXtermSession.ts (loadWebgl)."
     },
@@ -16107,7 +16113,7 @@
       "quote": "1. First loss: Wait 100ms (GPU stabilization)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:100",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:103",
       "match": "const WEBGL_RECOVERY_DELAY_MS = 100"
     },
     {
@@ -16159,7 +16165,7 @@
       "quote": "#### 2. Terminal Configuration (`TerminalPanel/hooks/useXtermSession.ts`, the `XTERM_OPTIONS` passed to `new Terminal({...})`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:561",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:566",
       "match": "const xterm = new Terminal({ ...XTERM_OPTIONS",
       "note": "Pointed at an xterm init effect in TerminalPanel.tsx; the options now live in useXtermSession.ts."
     },
@@ -16170,7 +16176,7 @@
       "quote": "- `scrollOnUserInput: false` - Prevents auto-scroll when user types",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:89",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:92",
       "match": "scrollOnUserInput: false,"
     },
     {
@@ -16180,7 +16186,7 @@
       "quote": "- `smoothScrollDuration: 0` - Eliminates animation lag for instant response",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:91",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:94",
       "match": "smoothScrollDuration: 0,"
     },
     {
@@ -16253,7 +16259,7 @@
       "quote": "**Implementation** (`TerminalPanel/hooks/useXtermSession.ts`):",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:458",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:462",
       "match": "isElementVisible(current)",
       "note": "Pointed at TerminalPanel.tsx; the visibility check and WebGL load are in useXtermSession.ts."
     },
@@ -16264,7 +16270,7 @@
       "quote": "- Ignores shell warm-up noise for ~500ms after spawn",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:104",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:107",
       "match": "const WARMUP_MS = 500"
     },
     {
@@ -16327,7 +16333,7 @@
       "quote": "3. Large scrollback buffer (> 10,000 lines)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:87",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:90",
       "match": "scrollback: 10000,"
     },
     {
@@ -17924,7 +17930,7 @@
       "quote": "the comment buttons (**Comment mode**, **Comments** and **Show comment icons**, when comments are on",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/HtmlPreviewPanel.tsx:420",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/HtmlPreviewPanel.tsx:423",
       "match": "{comments.enabled && <CommentToolbarTools {...comments.toolbar} />}",
       "note": "The left-to-right toolbar list left out the three comment tools."
     },
@@ -25251,7 +25257,7 @@
       "quote": "so an inactive tab's placeholder – dockview keeps it mounted – is never in the tab order",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/HtmlPreviewPanel.tsx:460",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/HtmlPreviewPanel.tsx:463",
       "match": "tabIndex={pageEntry.enabled ? 0 : -1}"
     },
     {
@@ -25291,7 +25297,7 @@
       "quote": "the panel root's `onKeyDown` is not a `window` listener",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/HtmlPreviewPanel.tsx:361",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/HtmlPreviewPanel.tsx:362",
       "match": "onKeyDown={onRootKeyDown}"
     },
     {
@@ -26203,7 +26209,7 @@
       "quote": "Claude Code or any CLI agent in an xterm.js terminal",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:561",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:566",
       "match": "new Terminal({ ...XTERM_OPTIONS"
     },
     {
@@ -27109,7 +27115,7 @@
       "quote": "`useXtermSession` passes the result to the `Terminal` constructor",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:561",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:566",
       "match": "new Terminal({ ...XTERM_OPTIONS, screenReaderMode: optionsRef.current.screenReaderMode })"
     },
     {
@@ -29035,7 +29041,7 @@
       "quote": "Stopped preview with Reload | all | HtmlPreviewPanel/hooks/usePreviewPanelActions.ts",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/hooks/usePreviewPanelActions.ts:47",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/hooks/usePreviewPanelActions.ts:48",
       "match": "reload: 'Reload',",
       "note": "Source named PreviewFallback.tsx, which only draws the still frame; the stopped state and Reload are in usePreviewPanelActions.ts."
     },
@@ -31211,7 +31217,7 @@
       "quote": "HTML preview has its own **Export to PDF** button on its toolbar.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewToolbarTools.tsx:186",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewToolbarTools.tsx:229",
       "match": "aria-label=\"Export to PDF\"",
       "note": "Named the actual button label instead of a vague 'its own PDF export'."
     },
@@ -32189,7 +32195,7 @@
       "quote": "**Open in default browser** and **Export to PDF**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewToolbarTools.tsx:123",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewToolbarTools.tsx:130",
       "match": "aria-label=\"Open in default browser\"",
       "note": "Was 'browser opening'; now the exact label."
     },
@@ -32200,7 +32206,7 @@
       "quote": "and **Export to PDF**.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewToolbarTools.tsx:186",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewToolbarTools.tsx:229",
       "match": "aria-label=\"Export to PDF\"",
       "note": "Was 'PDF export'; now the exact label."
     },
@@ -32372,7 +32378,7 @@
       "quote": "If the preview stops running, select **Reload**.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/hooks/usePreviewPanelActions.ts:47",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/hooks/usePreviewPanelActions.ts:48",
       "match": "reload: 'Reload'",
       "note": "Reload was not bolded as a UI label."
     },
@@ -34805,7 +34811,7 @@
       "quote": "select **Export to PDF** in the HTML preview toolbar",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewToolbarTools.tsx:186",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewToolbarTools.tsx:229",
       "match": "aria-label=\"Export to PDF\""
     },
     {
@@ -35343,7 +35349,7 @@
       "quote": "**Open in default browser** opens the page outside Erfana",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewToolbarTools.tsx:123",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewToolbarTools.tsx:130",
       "match": "aria-label=\"Open in default browser\""
     },
     {
@@ -35353,7 +35359,7 @@
       "quote": "**Export to PDF** saves it",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewToolbarTools.tsx:186",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewToolbarTools.tsx:229",
       "match": "aria-label=\"Export to PDF\""
     },
     {
@@ -35505,7 +35511,7 @@
       "quote": "A stopped preview offers **Reload**.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/hooks/usePreviewPanelActions.ts:47",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/hooks/usePreviewPanelActions.ts:48",
       "match": "reload: 'Reload',"
     },
     {
@@ -35568,7 +35574,7 @@
       "quote": "**How to reach them:** the View menu, or **Export to PDF** in the toolbar.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewToolbarTools.tsx:187",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewToolbarTools.tsx:230",
       "match": "title=\"Export to PDF\"",
       "note": "Said 'View menu, preview toolbar, or the active preview tab'; the toolbar has no zoom controls and 'the active preview tab' is not an entry point. Removed text: 'View menu, preview toolbar, or the active preview tab'."
     },
@@ -37028,7 +37034,7 @@
       "quote": "Other keys go to the shell or program running in the terminal",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useTerminalClipboard.ts:128",
+      "source": "src/renderer/src/hooks/useTerminalClipboard.ts:131",
       "match": "if (shouldPassThrough(eventInfo, currentHasSelection)) {",
       "note": "Replaced an untraceable list of shell keys (Ctrl+D, Ctrl+L, Ctrl+A/E, Ctrl+U/K, history, completion), which is shell behaviour, not Erfana."
     },
@@ -37476,7 +37482,7 @@
       "quote": "in the terminal at the terminal cursor",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:515",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:519",
       "match": "terminalCursorAnchor(xterm), open)) return false"
     },
     {
@@ -40541,7 +40547,7 @@
       "quote": "to open it at the terminal cursor",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:515",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:519",
       "match": "routeTerminalMenuKey(event, () => terminalCursorAnchor(xterm), open)"
     },
     {
@@ -40591,7 +40597,7 @@
       "quote": "A change applies to open terminals at once.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:277",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:281",
       "match": "applyScreenReaderMode(xtermRef.current, screenReaderMode)"
     },
     {
@@ -40632,7 +40638,7 @@
       "quote": "The terminal draws its text as a picture",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:477",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:481",
       "match": "const webglAddon = new WebglAddon()",
       "note": "WebGL renderer draws to a canvas, so text is not in the DOM unless screenReaderMode is on (useXtermSession.ts:561)."
     },
@@ -41323,7 +41329,7 @@
       "quote": "**Reload** under **The preview stopped running.**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/hooks/usePreviewPanelActions.ts:45",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/hooks/usePreviewPanelActions.ts:46",
       "match": "failed: 'The preview stopped running.'",
       "note": "Named the stopped-preview banner by its exact text."
     },
@@ -41334,7 +41340,7 @@
       "quote": "A stopped preview offers **Reload**.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/hooks/usePreviewPanelActions.ts:47",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/hooks/usePreviewPanelActions.ts:48",
       "match": "reload: 'Reload'"
     },
     {
@@ -52636,7 +52642,7 @@
       "quote": "puts its controls in a `role=\"toolbar\"` with one tab stop each and no arrow-key navigation",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewChromeBand.tsx:335",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewChromeBand.tsx:339",
       "match": "role=\"toolbar\" aria-label=\"Preview\""
     },
     {
@@ -55249,6 +55255,556 @@
       "evidence": "source",
       "source": "src/main/services/screenshot/ScreenshotOverlayWindow.ts:334",
       "match": "registerAppWebContents(overlay.webContents, 'screenshotOverlay')"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/01",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "the **New browser tab** button after the last tab of an editor strip",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Tabs/NewBrowserTabButton.tsx:33",
+      "match": "aria-label={NEW_BROWSER_TAB_TITLE}"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/02",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "**File > New browser tab**, or <kbd>⌘T</kbd> / <kbd>Ctrl+T</kbd>",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/menu.ts:127",
+      "match": "label: 'New browser tab', // spec-fixed"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/03",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "**Open in browser tab** (the window icon in the toolbar)",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewToolbarTools.tsx:169",
+      "match": "<AppWindow size={16}"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/04",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "A plain click on a web link in the [terminal](terminal.md#web-links) opens it in a new browser tab",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/terminalLinks.ts:36",
+      "match": "source: 'terminalLink' })"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/05",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "An address with `http://`, `https://` or `file://` loads as written.",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/shared/browser/addressInput.ts:54",
+      "match": "if (RULE_1.test(input)) return { kind: 'load', url: input, rule: 1 }"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/06",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "Any other name with a dot, such as `github.com`, loads over `https://`.",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/shared/browser/addressInput.ts:67",
+      "match": "url: `https://${input}`, rule: 5"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/07",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "is searched with DuckDuckGo",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/shared/browser/addressInput.ts:13",
+      "match": "export const SEARCH_URL_PREFIX = 'https://duckduckgo.com/?q='"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/08",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "are refused with a message and are never searched",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/shared/browser/addressInput.ts:69",
+      "match": "if (RULE_6.test(input)) return { kind: 'refused', reason: 'scheme', rule: 6 }"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/09",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "A network path starting with `\\\\` or `//` is refused too.",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/shared/browser/addressInput.ts:70",
+      "match": "if (RULE_7.test(input)) return { kind: 'refused', reason: 'network-path', rule: 7 }"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/10",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "the **Address and search** field",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/AddressBar.tsx:179",
+      "match": "aria-label=\"Address and search\""
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/11",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "or <kbd>⌘L</kbd> / <kbd>Ctrl+L</kbd>",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/shared/browser/browserKeys.ts:142",
+      "match": "{ action: 'focusAddress', keys: ['l']"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/12",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "**Reload** becomes **Stop loading** while a page loads",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/NavigationRow.tsx:156",
+      "match": "aria-label=\"Stop loading\""
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/13",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "**Find in page…**, **Open in system browser**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/MoreMenu.tsx:81",
+      "match": "{ label: 'Open in system browser', action: actions.openInSystemBrowser"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/14",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "**Clear browsing data…** and **Forget this project's browser data…**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/MoreMenu.tsx:85",
+      "match": "{ label: \"Forget this project's browser data…\", action: actions.forget, danger: true }"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/15",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "**Pick element** in the **Pick and send** row under the address bar, or <kbd>⌘E</kbd> / <kbd>Ctrl+E</kbd>",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/browserShortcuts.ts:46",
+      "match": "return { label: formatShortcut('E', { mod: true }), aria: `${mod}+E` }"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/16",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "The row reads **Picking – click an element**.",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/pickRow.logic.ts:44",
+      "match": "if (label !== null) return { first: 'Picking – click an element', rest: [label] }"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/17",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "**Parent element** and **Child element** (or <kbd>↑</kbd> and <kbd>↓</kbd>) move the pick",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/PromptActionsPanel.tsx:183",
+      "match": "title=\"Parent element (↑)\""
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/18",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "The panel shows the element's text and, when the page names it, its source file and line.",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/browser/capture/pickDetails.ts:20",
+      "match": "export const PICK_TEXT_MAX_CHARS"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/19",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "**Explain** sends at once. **Ask…**, **Change…** and **Prompt…** open a box",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/PromptActionsPanel.tsx:68",
+      "match": "const ACTION_LABEL: Readonly<Record<SendAction, string>> = { explain: 'Explain', ask: 'Ask…', change: 'Change…', prompt: 'Prompt…' }"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/20",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "**Send** (or <kbd>⌘Enter</kbd> / <kbd>Ctrl+Enter</kbd>) sends it",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/InstructionDialog.tsx:207",
+      "match": "{busy ? 'Sending…' : 'Send'}"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/21",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "the element you sent flashes briefly with an outline on the live page",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/browser/pick/pickFlash.ts:20",
+      "match": "export const SENT_FLASH_MS"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/22",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "with **Choose terminal**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/PromptActionsPanel.tsx:294",
+      "match": "chooseTerminal: 'Choose terminal',"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/23",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "it asks whether to **Send anyway**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/pickRow.logic.ts:158",
+      "match": "it may not be your agent. Send anyway?"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/24",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "**Phone width (390px)**, **Tablet width (768px)** or **Full width**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/shared/browser/widthPresets.ts:27",
+      "match": "label: 'Phone width (390px)'"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/25",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "inside a fenced block",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/shared/browser/captureFiles.ts:71",
+      "match": "export const fenceOpen"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/26",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "camera and microphone also offer **Allow once**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/stripRows.logic.ts:71",
+      "match": "allowOnce: 'Allow once',"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/27",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "Erfana remembers your answer for this site in this project.",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/stripRows.logic.ts:163",
+      "match": ": 'Erfana remembers your answer for this site in this project.'"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/28",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "**Username**, **Password** and **Remember for this project**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/SignInBox.tsx:87",
+      "match": "<span>Username</span>"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/29",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "**No keyring – cookies and other site data on this computer are stored with weak protection**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/browser/site/keyringStrip.ts:29",
+      "match": "'No keyring – cookies and other site data on this computer are stored with weak protection"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/30",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "reads **No keyring – cannot store passwords safely**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/SignInBox.tsx:124",
+      "match": "'No keyring – cannot store passwords safely'"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/31",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "**Logins were reset because the keyring changed**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/browser/site/keyringStrip.ts:32",
+      "match": "export const KEYRING_RESET_TEXT"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/32",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "at most 5 per tab in a minute",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/browser/popups/popupActivation.ts:30",
+      "match": "export const MAX_OPENS_PER_MINUTE = 5"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/33",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "800 × 600 unless the page asks for a size",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/browser/popups/windowFeatures.ts:26",
+      "match": "export const POPUP_DEFAULT_CONTENT = Object.freeze({ width: 800, height: 600 })"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/34",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "**Pop-up blocked** with **Allow once** and **Always allow for this site**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/browser/popups/popupBlockedRow.ts:28",
+      "match": "export const POPUP_BLOCKED_TEXT = 'Pop-up blocked'"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/35",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "with **Back to safety** and **Proceed anyway**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/ErrorPages.tsx:186",
+      "match": "aria-label={`Proceed anyway to ${host}`}"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/36",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "remembers the choice for that host and certificate for 7 days",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/browser/site/certificateStore.ts:29",
+      "match": "export const CERTIFICATE_EXCEPTION_MS = 7 * 24 * 60 * 60 * 1000"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/37",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "**This page is not responding.** with **Wait** and **Reload**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/browser/page/hungNotice.ts:27",
+      "match": "export const HUNG_NOTICE_TEXT = 'This page is not responding.'"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/38",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "**Site permissions, certificate exceptions and pop-up exceptions**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/ClearDataDialog.tsx:27",
+      "match": "label: 'Site permissions, certificate exceptions and pop-up exceptions',"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/39",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "**Saved sign-in credentials** and **Captures**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/ClearDataDialog.tsx:30",
+      "match": "{ id: 'credentials', label: 'Saved sign-in credentials'"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/40",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "after you confirm with **Forget browser data**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/browserDataActions.ts:21",
+      "match": "confirmLabel: 'Forget browser data',"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/41",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "the button reads **Forgetting…** until it is done",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/ForgetDataDialog.tsx:77",
+      "match": "{busy ? 'Forgetting…' : FORGET_CONFIRM.confirmLabel}"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/42",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "| Back | <kbd>⌘[</kbd> | <kbd>Alt+←</kbd> |",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/browserShortcuts.ts:36",
+      "match": "return mac ? { label: '⌘[', aria: 'Meta+[' } : { label: 'Alt+←', aria: 'Alt+ArrowLeft' }"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/43",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "| Reload | <kbd>⌘R</kbd> | <kbd>Ctrl+R</kbd> or <kbd>F5</kbd> |",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/browserShortcuts.ts:40",
+      "match": "'Ctrl+R or F5'"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/44",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "| Next and previous area | <kbd>F6</kbd>",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/shared/browser/browserKeys.ts:187",
+      "match": "{ action: 'focusNextZone', keys: ['F6'], mod: false },"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/45",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "opens without storage, without module scripts",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/browser/local/localResponsePolicy.ts:65",
+      "match": "export const LOCAL_SANDBOX_POLICY = 'sandbox allow-scripts allow-forms allow-modals allow-downloads'"
+    },
+    {
+      "id": "user-guide-reference-browser-data-handling/01",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/browser-data-handling.md",
+      "quote": "That folder ignores itself in git.",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/browser/browserProfilePaths.ts:13",
+      "match": "export const BROWSER_GITIGNORE_CONTENT = '*'"
+    },
+    {
+      "id": "user-guide-reference-browser-data-handling/02",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/browser-data-handling.md",
+      "quote": "| `.erfana/browser/captures/` | The agent you send to, and its AI provider | Deleted after 7 days",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/shared/browser/captureFiles.ts:13",
+      "match": "export const CAPTURE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000"
+    },
+    {
+      "id": "user-guide-reference-browser-data-handling/03",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/browser-data-handling.md",
+      "quote": "| Cookies, local storage and cache | `.erfana/browser/profile/`",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/browser/browserProfilePaths.ts:14",
+      "match": "export const PROFILE_DIR_NAME = 'profile'"
+    },
+    {
+      "id": "user-guide-reference-browser-data-handling/04",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/browser-data-handling.md",
+      "quote": "| Searches typed in the address bar | Not stored by Erfana | DuckDuckGo |",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/shared/browser/addressInput.ts:13",
+      "match": "export const SEARCH_URL_PREFIX = 'https://duckduckgo.com/?q='"
+    },
+    {
+      "id": "user-guide-reference-browser-data-handling/05",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/browser-data-handling.md",
+      "quote": "Erfana's log file records its address with the query string",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/browser/page/loadFailureLog.ts:50",
+      "match": "logger.info('A browser tab page failed to load', { code, url: failedRequestUrl(url) })"
+    },
+    {
+      "id": "user-guide-reference-browser-data-handling/06",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/browser-data-handling.md",
+      "quote": "A failed search is logged without its text.",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/browser/page/loadFailureLog.ts:46",
+      "match": "logger.info('search load failed', { code })"
+    },
+    {
+      "id": "user-guide-reference-terminal/b01",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/terminal.md",
+      "quote": "A plain click on an `http` or `https` link in the terminal opens it in a new [browser tab]",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/terminalLinks.ts:36",
+      "match": "source: 'terminalLink' })"
+    },
+    {
+      "id": "user-guide-reference-terminal/b02",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/terminal.md",
+      "quote": "<kbd>⌘</kbd>-click / <kbd>Ctrl</kbd>-click opens it in your operating system's default browser instead",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/terminalLinks.ts:46",
+      "match": "return mac ? event.metaKey : event.ctrlKey"
+    },
+    {
+      "id": "user-guide-reference-terminal/b03",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/terminal.md",
+      "quote": "**Paste text a web page copied?**",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/utils/terminalPasteGuard.ts:83",
+      "match": "title: paste ? 'Paste text a web page copied?' : 'Drop text from outside Erfana?',"
+    },
+    {
+      "id": "user-guide-reference-terminal/b04",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/terminal.md",
+      "quote": "asks the same way (**Drop text from outside Erfana?**)",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/utils/terminalPasteGuard.ts:87",
+      "match": "confirmLabel: paste ? 'Paste' : 'Drop',"
     }
   ],
   "reviewed": {

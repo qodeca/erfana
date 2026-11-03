@@ -267,7 +267,8 @@ const BROWSER_TAB_METHODS: Record<keyof BrowserTabBridge, true> = {
   contextAction: true,
   openExternal: true,
   onTabClosed: true,
-  onNewTabCommand: true
+  onNewTabCommand: true,
+  pageClipboard: true
 }
 const MARKDOWN_IMAGE_METHODS: Record<keyof MarkdownImageBridge, true> = { read: true }
 

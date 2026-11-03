@@ -21,9 +21,11 @@
  * the panel opened (Z2), so the click that confirmed the pick cannot also
  * press an action.
  *
- * What main sends of the element is its name, size, ancestor path and box:
- * the panel shows those. The text and the resolved source (025-FR-037) stay
- * in the context file – the summary event does not carry them.
+ * What main sends of the element is its name, size, ancestor path and box,
+ * then – once read, a moment after the panel opens – its text and the source
+ * file and line Erfana confirmed in the project (025-FR-037, S-13): the panel
+ * shows those under the header. The text is the page's and is drawn as page
+ * text (mono, isolated), never next to an Erfana verb (Security rule 8).
  */
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
@@ -245,6 +247,7 @@ export function PromptActionsPanel(props: PromptActionsPanelProps): JSX.Element 
           {props.note}
         </p>
       )}
+      <ElementDetails text={summary.text} source={summary.source} />
       {(summary.changedAfterPick || props.frozen) && (
         <p className="erf-brw-actions__chips">
           {props.frozen && <span className="erf-brw-chip">Page paused</span>}
@@ -318,5 +321,30 @@ export function BannerSlot({ banner, buttonRef, onAction }: BannerSlotProps): JS
         </button>
       )}
     </div>
+  )
+}
+
+/** The picked element's text and confirmed source, when main has read them. */
+function ElementDetails({ text, source }: { readonly text?: string; readonly source?: string }): JSX.Element | null {
+  if (text === undefined && source === undefined) return null
+  return (
+    <dl className="erf-brw-actions__details">
+      {text !== undefined && (
+        <div className="erf-brw-actions__detail">
+          <dt>Text</dt>
+          <dd>
+            <code className="erf-brw-actions__page-text">{text}</code>
+          </dd>
+        </div>
+      )}
+      {source !== undefined && (
+        <div className="erf-brw-actions__detail">
+          <dt>Source</dt>
+          <dd>
+            <code className="erf-brw-actions__page-text">{source}</code>
+          </dd>
+        </div>
+      )}
+    </dl>
   )
 }

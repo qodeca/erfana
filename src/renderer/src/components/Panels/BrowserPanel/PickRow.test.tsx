@@ -65,6 +65,18 @@ describe('PickRow (025-FR-025, 025-FR-065)', () => {
     expect(screen.getByRole('button', { name: 'Target' })).toBeInTheDocument()
   })
 
+  it('puts the width preset between the spacer and the target, and says when picking or a notice folds it', () => {
+    const { rerender, props } = renderRow({ widthPreset: <button type="button">Page width: Full width</button> })
+    const row = screen.getByTestId(BROWSER_TEST_IDS.PICK_ROW)
+    const buttons = Array.from(row.querySelectorAll('button')).map(b => b.textContent)
+    expect(buttons.slice(-2)).toEqual(['Page width: Full width', 'Target'])
+    expect(row).not.toHaveAttribute('data-picking')
+    expect(row).not.toHaveAttribute('data-notice')
+    rerender(<PickRow {...props} pick={{ ...IDLE_PICK, on: true }} notice={{ text: 'Sent Explain to Terminal', contextPath: 'c.md' }} />)
+    expect(row).toHaveAttribute('data-picking', 'true')
+    expect(row).toHaveAttribute('data-notice', 'true')
+  })
+
   it('marks Pick element unavailable without a live page', () => {
     renderRow({ live: false })
     const button = screen.getByRole('button', { name: 'Pick element' })

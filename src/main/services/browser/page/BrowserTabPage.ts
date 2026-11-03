@@ -24,7 +24,8 @@
  *   page is hung; the notice row ({@link HungNotice}) shows and pick mode
  *   ends. **Wait** re-arms the probe; **Reload** ends the hung process
  *   (`forcefullyCrashRenderer`, as Electron documents for hung pages) and
- *   reloads – other tabs of the same site share that process and reload too.
+ *   reloads once `render-process-gone` says it ended – other tabs of the
+ *   same site share that process and end with it.
  * - **Find** (025-FR-008): `findInPage` and `stopFindInPage`; every
  *   `found-in-page` result goes out as `browser-tab:findResult`.
  * - **Zoom and width presets** (025-FR-008, 025-FR-012) are per site, so the
@@ -43,6 +44,7 @@ import { logger } from '../../LoggingService'
 import type { HangProbeEvent } from '../cdp/browserHangProbe'
 import type { AnswerResult } from '../permissions/tabStrip'
 import { HungNotice } from './hungNotice'
+import { logLoadFailure } from './loadFailureLog'
 import { loadErrorFor, type PageFacts } from './tabPageState'
 
 type Listener = (...args: unknown[]) => void
@@ -279,7 +281,8 @@ export class BrowserTabPage {
     if (this.deps.tab.state().erfanaPage === 'certificate') return
     const page = loadErrorFor(code, this.userStarted)
     if (page === null || url === '') return
-    logger.info('A browser tab page failed to load', { code })
+    // Logs the full URL – a recorded exception, docs/technical-debt.md entry 68 (025-FR-042).
+    logLoadFailure(code, url)
     this.failedUrl = url
     this.loadError = page
     this.deps.outlet.stateChanged()
@@ -291,7 +294,10 @@ export class BrowserTabPage {
     this.hung.hide()
     this.deps.outlet.endPick()
     if (this.killingForReload) {
+      // Reload once the hung process is gone: a reload sent while it is still
+      // dying is lost with it, and the tab stays blank (commit 20 e2e).
       this.killingForReload = false
+      this.deps.tab.history('reload')
       return
     }
     this.crashed = true
@@ -314,6 +320,5 @@ export class BrowserTabPage {
     if (contents.isDestroyed()) return
     this.killingForReload = true
     contents.forcefullyCrashRenderer()
-    this.deps.tab.history('reload')
   }
 }

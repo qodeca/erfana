@@ -5,7 +5,8 @@
  * § 8, commit 12h): `browser-tab:find`, `stopFind`, `zoom` and `widthPreset`
  * on one tab (025-FR-008, 025-FR-012); `clearData` and `forget` for the
  * sender's project (025-FR-023); `suggest` from its address history
- * (025-FR-063). Results go back as `browser-tab:findResult` and
+ * (025-FR-063); `pageClipboard` for the terminal's paste guard (025-FR-009,
+ * S-17). Results go back as `browser-tab:findResult` and
  * `browser-tab:state` events, to the owning window only (`BrowserTabService`).
  *
  * As in `browser-tab-handlers.ts`: registered through `registry.ts`
@@ -19,7 +20,13 @@
  */
 import { BrowserWindow, type IpcMainInvokeEvent } from 'electron'
 import { BROWSER_TAB_CHANNELS } from '../../../shared/ipc/browser-tab-channels'
-import type { ClearDataCategory, ClearDataResponse, ForgetResponse } from '../../../shared/ipc/browser-tab-page-schema'
+import {
+  PageClipboardRequestSchema,
+  type ClearDataCategory,
+  type ClearDataResponse,
+  type ForgetResponse,
+  type PageClipboardResponse
+} from '../../../shared/ipc/browser-tab-page-schema'
 import {
   ClearDataRequestSchema,
   FindRequestSchema,
@@ -32,6 +39,7 @@ import {
 import type { BrowserTabService } from '../../services/browser/BrowserTabService'
 import type { BrowserPages } from '../../services/browser/page/BrowserPages'
 import type { BrowserTabPage } from '../../services/browser/page/BrowserTabPage'
+import type { PageClipboardMarks } from '../../services/browser/site/pageClipboardMarks'
 import type { ProjectSessionSnapshot } from '../../services/session/ProjectSession'
 import { logger } from '../../services/LoggingService'
 import { redactedLogError } from '../../utils/redactUserInput'
@@ -41,6 +49,8 @@ import { isTrustedSender as defaultIsTrustedSender } from '../senderValidation'
 export interface BrowserTabPageHandlerDeps {
   readonly tabs: Pick<BrowserTabService, 'pageFor'>
   readonly pages: Pick<BrowserPages, 'clearData' | 'forget' | 'suggest'>
+  /** Which clipboard text a browser page wrote; without it every answer is "not page-written". */
+  readonly pageClipboard?: Pick<PageClipboardMarks, 'isPageWritten'>
   /** The project this process holds open. */
   readonly currentProject: () => Pick<ProjectSessionSnapshot, 'realRoot' | 'caseSensitive'> | null
   readonly isTrustedSender?: (event: IpcMainInvokeEvent) => boolean
@@ -51,7 +61,16 @@ export interface BrowserTabPageHandlerDeps {
 const C = BROWSER_TAB_CHANNELS
 
 /** Every channel this module registers, for tests and the unregister function. */
-export const BROWSER_TAB_PAGE_CHANNELS = [C.find, C.stopFind, C.zoom, C.widthPreset, C.clearData, C.forget, C.suggest] as const
+export const BROWSER_TAB_PAGE_CHANNELS = [
+  C.find,
+  C.stopFind,
+  C.zoom,
+  C.widthPreset,
+  C.clearData,
+  C.forget,
+  C.suggest,
+  C.pageClipboard
+] as const
 
 /** A zod schema's `safeParse`, as far as these handlers use it. */
 interface Parser<T> {
@@ -138,6 +157,18 @@ export function registerBrowserTabPageHandlers(deps: BrowserTabPageHandlerDeps):
     } catch (error) {
       logger.error('Browser tab request failed', redactedLogError(error), { channel: C.suggest })
       return { rows: [] }
+    }
+  })
+
+  // The paste guard asks before typing; a refused or failed check answers "page-written", so the
+  // terminal asks rather than types (S-17). Neither the text nor its digest is logged.
+  registerHandle(C.pageClipboard, async (event, arg: unknown): Promise<PageClipboardResponse> => {
+    if (accept(C.pageClipboard, event, PageClipboardRequestSchema, arg) === null) return { pageWritten: true }
+    try {
+      return { pageWritten: (await deps.pageClipboard?.isPageWritten()) ?? false }
+    } catch (error) {
+      logger.error('Browser tab request failed', redactedLogError(error), { channel: C.pageClipboard })
+      return { pageWritten: true }
     }
   })
 

@@ -41,6 +41,7 @@ import type { Point, PointerReport } from './pickGeometry'
 import { PickHighlight, type HighlightRecord } from './pickHighlight'
 import { PickHitTest } from './pickHitTest'
 import { closeEvent, refineHeld } from './pickMenu'
+import { centre, flashThenHide, sameNode } from './pickFlash'
 import { PickModeSwitch } from './pickModeSwitch'
 import { PickBench, type PickFaults } from './pickSupport'
 
@@ -106,6 +107,8 @@ export class BrowserTabPick {
   /** Up and Down before a confirm: the hovered element's chain and where the highlight is on it. */
   private preChain: { chain: Promise<ElementChain>; index: number | null; node: PickNode } | null = null
   private held: BrowserCapture | null = null
+  /** The element just sent: its outline flashes on the live page as pick mode ends (025-FR-060). */
+  private sentNode: PickNode | null = null
   private navigating = false
   private disposed = false
 
@@ -227,6 +230,7 @@ export class BrowserTabPick {
   private async start(): Promise<void> {
     if (this.active || this.disposed || !this.deps.cdp.attached) return
     this.active = true
+    this.sentNode = null
     this.reads.clearStyleSheets()
     await this.modeSwitch.on(() => this.active)
     if (this.lastPointer !== null) this.hover(this.lastPointer)
@@ -239,8 +243,9 @@ export class BrowserTabPick {
     this.lastViewPoint = null
     if (this.held !== null && !this.held.afterNavigation) this.release()
     await this.unfreeze()
-    await this.highlight.hide()
-    await this.modeSwitch.off()
+    const sent = this.sentNode
+    this.sentNode = null
+    if (!(await flashThenHide(this.highlight, sent, this.deps.clock, () => this.active))) await this.modeSwitch.off()
   }
 
   // ── Hover ───────────────────────────────────────────────────────────────
@@ -384,10 +389,10 @@ export class BrowserTabPick {
 
   /** Facts and hints after the menu shows; then the freeze of a second-Ctrl/Cmd+E pick (ADR 0008 decision 2). */
   private async afterMenu(capture: BrowserCapture, freeze: boolean): Promise<void> {
-    const reads: Array<Promise<unknown>> = [capture.facts().catch(() => undefined), capture.hints()]
     // Every element refinement can reach is read before the pause (ADR 0008 probe fallback).
-    if (freeze) reads.push(capture.prefetchAll())
-    await Promise.all(reads)
+    await Promise.all([capture.facts().catch(() => undefined), capture.hints(), ...(freeze ? [capture.prefetchAll()] : [])])
+    // The panel gets the element's text and confirmed source once read; the same element, so no "changed" mark.
+    if (this.held === capture) this.emit({ kind: 'refined', captureId: capture.id, summary: capture.summary() })
     if (!freeze || this.held !== capture || this.deps.routing.state().surface === 'none') return
     await this.freeze.freeze()
     if (this.held !== capture) {
@@ -461,6 +466,7 @@ export class BrowserTabPick {
   close(id: string, reason: ClosePickReason): boolean {
     if (this.held === null || this.held.id !== id) return false
     const event = closeEvent(reason, this.deps.routing.state().surface)
+    if (reason === 'sent' && !this.held.afterNavigation) this.sentNode = this.held.entry.node
     this.routing(event)
     // A capture the reducer no longer tracks (after a navigation, or a `sent`) is released here.
     if (this.held?.id === id && (reason === 'sent' || this.held.afterNavigation || this.deps.routing.state().surface === 'none')) {
@@ -490,11 +496,3 @@ export class BrowserTabPick {
 }
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
-
-function sameNode(a: PickNode, b: PickNode): boolean {
-  return a.sessionKey === b.sessionKey && a.backendNodeId === b.backendNodeId
-}
-
-function centre(box: { x: number; y: number; width: number; height: number } | null): Point {
-  return box === null ? { x: 0, y: 0 } : { x: box.x + box.width / 2, y: box.y + box.height / 2 }
-}

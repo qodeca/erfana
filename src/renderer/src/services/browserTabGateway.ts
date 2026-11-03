@@ -59,5 +59,16 @@ export const browserTabGateway: BrowserTabBridge = {
   forget: (...args) => bridge().forget(...args),
   suggest: (...args) => bridge().suggest(...args),
   onContextMenu: (...args) => bridge().onContextMenu(...args),
-  contextAction: (...args) => bridge().contextAction(...args)
+  contextAction: (...args) => bridge().contextAction(...args),
+  pageClipboard: (...args) => bridge().pageClipboard(...args)
+}
+
+/**
+ * Whether this window has the browser tab bridge – absent under unit tests
+ * that install none and in windows without browser tabs, where no page can
+ * have written anything (the terminal's paste guard asks here first).
+ */
+export function hasBrowserTabBridge(): boolean {
+  const api = (window as unknown as { api?: { browserTab?: unknown } }).api
+  return api?.browserTab != null
 }

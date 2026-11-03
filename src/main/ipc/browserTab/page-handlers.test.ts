@@ -128,3 +128,39 @@ describe('browser-tab page handlers', () => {
     expect(await invoke('browser-tab:suggest', { prefix: '' })).toEqual({ rows: [] })
   })
 })
+
+describe('browser-tab:pageClipboard (025-FR-009, S-17)', () => {
+  function withClipboard(isPageWritten: () => Promise<boolean>): void {
+    registerBrowserTabPageHandlers({
+      tabs: tabs as never,
+      pages: pages as never,
+      pageClipboard: { isPageWritten },
+      currentProject: () => project,
+      isTrustedSender: () => trusted,
+      resolveWindowId: () => windowId
+    })
+  }
+
+  it('answers whether a page wrote the clipboard text', async () => {
+    withClipboard(async () => true)
+    expect(await invoke('browser-tab:pageClipboard', {})).toEqual({ pageWritten: true })
+    withClipboard(async () => false)
+    expect(await invoke('browser-tab:pageClipboard', {})).toEqual({ pageWritten: false })
+  })
+
+  it('answers "page-written" when refused or failing, so the terminal asks instead of typing', async () => {
+    withClipboard(async () => false)
+    trusted = false
+    expect(await invoke('browser-tab:pageClipboard', {})).toEqual({ pageWritten: true })
+    trusted = true
+    expect(await invoke('browser-tab:pageClipboard', { text: 'smuggled' })).toEqual({ pageWritten: true })
+    withClipboard(async () => {
+      throw new Error('clipboard gone')
+    })
+    expect(await invoke('browser-tab:pageClipboard', {})).toEqual({ pageWritten: true })
+  })
+
+  it('answers "not page-written" without the marks (no browser runtime)', async () => {
+    expect(await invoke('browser-tab:pageClipboard', {})).toEqual({ pageWritten: false })
+  })
+})

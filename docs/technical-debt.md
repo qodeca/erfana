@@ -1136,9 +1136,9 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 
 **Limits that stay in force** (025-FR-064): no page titles, form data, console text, network bodies or typed search text; a failed search-fallback load is logged without a URL; local file paths go through `redactPath`.
 
-**Where the exception applies**: the sites that log a browser URL, each of which carries a comment pointing here. As of this entry no site in `src/main/services/browser/` does: the load-failure log (`page/BrowserTabPage.ts`, `loadFailed`) writes the error code only, and `browserSessionPolicy.ts` (`logDenied`) logs by name with no URL. `cdp/browserLogBuffer.ts` (`failedRequestUrl`) keeps path and query for the context file, not the log file. Add each new site to this entry when it is written.
+**Where the exception applies**: the sites that log a browser URL, each of which carries a comment pointing here. Today there is one: the load-failure log, `page/loadFailureLog.ts` (`logLoadFailure`), called from `page/BrowserTabPage.ts` (`loadFailed`). It writes the error code and the URL with userinfo and the fragment dropped (`failedRequestUrl`), and writes a failed search-fallback load as "search load failed" with no URL. A local file's load logs its served address (`http://127.0.0.1:<port>/<token>/…`), which holds the path below the opened folder but not the folder itself. `browserSessionPolicy.ts` (`logDenied`) logs by name with no URL, and `cdp/browserLogBuffer.ts` keeps path and query for the context file, not the log file. Add each new site to this entry when it is written.
 
-**Status**: Accepted. Open until the load-failure site logs the URL and carries the comment (025-AC-042).
+**Status**: Accepted. The load-failure site logs the URL and carries the comment (025-AC-042); `loadFailureLog.test.ts` pins the fields.
 
 This doc covers project-wide non-Windows technical debt. For phase-structured deferred items with promotion criteria + risk-if-forgotten:
 

@@ -554,7 +554,7 @@ The overlay windows have their own, tighter channel path: `screenshot:areaSelect
 
 ## External links
 
-`src/main/utils/openExternalSafe.ts` is the **only** module that calls `shell.openExternal`; ESLint syntax selectors refuse any other call site, including a destructured or aliased one. Clicks, middle-clicks, links in the terminal, the HTML preview's external links and pages that try to open a new window all go through it. Before anything opens, `parseExternalUrl` (`src/main/utils/externalUrl.ts`) requires:
+`src/main/utils/openExternalSafe.ts` is the **only** module that calls `shell.openExternal`; ESLint syntax selectors refuse any other call site, including a destructured or aliased one. Clicks, middle-clicks, links in the terminal opened with Cmd/Ctrl-click (a plain click opens an Erfana browser tab, spec 025), the HTML preview's external links and pages that try to open a new window all go through it. Before anything opens, `parseExternalUrl` (`src/main/utils/externalUrl.ts`) requires:
 
 - a string of at most 2,048 characters that parses with `new URL()`;
 - a protocol in `EXTERNAL_PROTOCOLS` (`src/shared/linkProtocolPolicy.ts`): `http:`, `https:`, `mailto:` and `tel:` only – so `file:` and `ftp:` links no longer open;

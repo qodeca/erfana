@@ -56,6 +56,16 @@ describe('useBrowserPickStore', () => {
     expect(tab().frozen).toBe(true)
   })
 
+  it('takes the element\'s text and source without marking the chip as changed', () => {
+    store().apply(captured)
+    store().apply({ tabId: TAB, kind: 'refined', captureId: CAPTURE, summary: { ...SUMMARY, text: 'Save', source: 'src/A.tsx:3' } }, 500)
+    expect(tab().capture).toMatchObject({ summary: { text: 'Save', source: 'src/A.tsx:3' }, changedAt: null })
+    store().apply({ tabId: TAB, kind: 'refined', captureId: CAPTURE, summary: { ...SUMMARY, ancestors: [...SUMMARY.ancestors, 'em'] } }, 900)
+    expect(tab().capture?.changedAt).toBe(900)
+    store().apply({ tabId: TAB, kind: 'refined', captureId: CAPTURE, summary: { ...SUMMARY, ancestors: [...SUMMARY.ancestors, 'em'], text: 'x' } }, 1300)
+    expect(tab().capture?.changedAt).toBe(900)
+  })
+
   it('ends a capture, but keeps a page change\'s capture for the dialog (025-FR-053)', () => {
     store().apply(captured)
     store().apply({ tabId: TAB, kind: 'ended', reason: 'pageChanged' })

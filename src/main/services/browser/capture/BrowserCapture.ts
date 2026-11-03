@@ -24,6 +24,7 @@ import type { Box } from '../pick/pickGeometry'
 import type { CaptureElement, CaptureMoment } from './captureRender'
 import type { ElementFacts } from './captureFacts'
 import type { SourceHints } from './sourceHints'
+import { elementText, sourceLine } from './pickDetails'
 
 export type PickSummary = Extract<PickEvent, { kind: 'captured' }>['summary']
 
@@ -46,6 +47,9 @@ export class BrowserCapture {
   readonly firstIndex: number
   private readonly factsByIndex = new Map<number, Promise<ElementFacts>>()
   private readonly hintsByIndex = new Map<number, Promise<SourceHints>>()
+  /** The text and source line of each entry whose facts or hints have arrived, for {@link summary}. */
+  private readonly textByIndex = new Map<number, string | null>()
+  private readonly sourceByIndex = new Map<number, string | null>()
   private moveGeneration = 0
   private goneFlag = false
   /** The page froze after the hints (a second-Ctrl/Cmd+E pick). */
@@ -91,8 +95,16 @@ export class BrowserCapture {
       atTop: this.goneFlag || this.current === 0,
       atStart: this.goneFlag || this.current === this.firstIndex,
       gone: this.goneFlag,
-      changedAfterPick
+      changedAfterPick,
+      ...this.details()
     }
+  }
+
+  /** The element's text and confirmed source, once read (`pickDetails.ts`); nothing before. */
+  private details(): { text?: string; source?: string } {
+    const text = this.textByIndex.get(this.current) ?? null
+    const source = this.sourceByIndex.get(this.current) ?? null
+    return { ...(text === null ? {} : { text }), ...(source === null ? {} : { source }) }
   }
 
   /** The page removed the picked element: no move works any more; the capture stays (025-FR-027). */
@@ -131,7 +143,7 @@ export class BrowserCapture {
     if (facts === undefined) {
       facts = this.reader.facts(this.chain.entries[index], index)
       // A failed read is retried at the next ask, not cached.
-      facts.catch(() => this.factsByIndex.delete(index))
+      facts.then((f) => this.textByIndex.set(index, elementText(f.outerHtml)), () => this.factsByIndex.delete(index))
       this.factsByIndex.set(index, facts)
     }
     return facts
@@ -142,6 +154,7 @@ export class BrowserCapture {
     let hints = this.hintsByIndex.get(index)
     if (hints === undefined) {
       hints = this.reader.hints(index)
+      hints.then((h) => this.sourceByIndex.set(index, sourceLine(h)), () => undefined)
       this.hintsByIndex.set(index, hints)
     }
     return hints

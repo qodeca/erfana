@@ -44,6 +44,9 @@ import { terminalGateway } from '../../../../services/terminalGateway'
 import { claudeStatusGateway } from '../../../../services/claudeStatusGateway'
 import { hasBridgeMethod } from '../../../../services/bridgePresence'
 import { createTerminalLinkHandler, ensureTerminalFontLoaded } from '../terminalPanel.logic'
+import { openTerminalLink, warnTerminalLinkNotOpened } from '../terminalLinks'
+import { TerminalPasteGuardAddon } from '../terminalPasteGuardAddon'
+import { useTerminalPasteGuard } from '../../../../hooks/useTerminalPasteGuard'
 import { routeTerminalMenuKey, terminalCursorAnchor } from '../terminalMenuKey'
 import { isKeyboardMenuEcho } from '../../../ContextMenu/contextMenuKey'
 
@@ -232,6 +235,7 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
     optionsRef.current = options
   })
 
+  const pasteGuard = useTerminalPasteGuard() // stable; S-17 for xterm's own paste and drop paths
   const [terminalId, setTerminalId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const terminalIdRef = useRef<string | null>(null)
@@ -516,6 +520,7 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
       return handlers.keyEventHandler(event)
     })
     xterm.attachCustomWheelEventHandler(handlers.wheelEventHandler)
+    xterm.loadAddon(new TerminalPasteGuardAddon(pasteGuard))
 
     if (!xterm.element) return
     // On xterm.element, not the container: xterm captures the event
@@ -561,13 +566,8 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
       const xterm = new Terminal({ ...XTERM_OPTIONS, screenReaderMode: optionsRef.current.screenReaderMode })
       started = xterm
       const fitAddon = new FitAddon()
-      // Links go through the checked IPC path, never the addon's default window.open
-      const webLinksAddon = new WebLinksAddon(
-        createTerminalLinkHandler(
-          (url) => window.electron.shell.openExternal(url),
-          (err) => logger.warn('Terminal link not opened', { error: err instanceof Error ? err.message : String(err) })
-        )
-      )
+      // A click opens a browser tab, Ctrl/Cmd-click the checked IPC path – never the addon's window.open (025-FR-009)
+      const webLinksAddon = new WebLinksAddon(createTerminalLinkHandler(openTerminalLink, warnTerminalLinkNotOpened))
       xterm.loadAddon(fitAddon)
       xterm.loadAddon(webLinksAddon)
 

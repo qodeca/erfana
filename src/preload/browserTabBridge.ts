@@ -56,5 +56,6 @@ export const browserTabBridge: BrowserTabBridge = {
   forget: () => ipcRenderer.invoke(C.forget, {}),
   suggest: (prefix) => ipcRenderer.invoke(C.suggest, { prefix }),
   onContextMenu: (callback) => subscribe(BROWSER_TAB_EVENTS.contextMenu, callback),
-  contextAction: (request) => ipcRenderer.invoke(C.contextAction, request)
+  contextAction: (request) => ipcRenderer.invoke(C.contextAction, request),
+  pageClipboard: () => ipcRenderer.invoke(C.pageClipboard, {})
 }

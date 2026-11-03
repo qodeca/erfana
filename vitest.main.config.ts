@@ -673,6 +673,18 @@ export default defineConfig({
         'src/main/services/preview/PreviewRequestKindLedger.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 93.9/100/94.73/93.9
         'src/main/services/preview/previewPathResolve.ts': { lines: 91, functions: 98, branches: 92, statements: 91 },
+        // Built-in browser commit 20 (spec 025, S-17, 025-FR-042, 025-FR-053,
+        // 025-FR-060): page-clipboard marks, the load-failure log, the pick's
+        // text and source, and the post-send flash. Pinned ~2 points under the
+        // value measured when they landed (2026-11-03), never above 98.
+        // measured 100/96.15/100/100 – the queue's catch runs only if an operation rejects, which none does today
+        'src/main/services/browser/site/pageClipboardMarks.ts': { lines: 98, functions: 94, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/page/loadFailureLog.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/capture/pickDetails.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/pick/pickFlash.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
       },
       exclude: [
         'node_modules/**',

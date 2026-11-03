@@ -3,8 +3,9 @@
 /**
  * The browser tab's actions that leave the tab (spec 025, 025-FR-023,
  * 025-FR-057; deck *Clear browsing data and Forget*, *Other toasts*):
- * **Forget this project's browser data** behind its confirmation, and **Open
- * in system browser**. Each reports its outcome as a toast; neither throws.
+ * **Forget this project's browser data** (its words, and the request – the
+ * confirmation with its busy state is `ForgetDataDialog`), and **Open in
+ * system browser**. Each reports its outcome as a toast; neither throws.
  */
 import type { ForgetResponse } from '../../../../../shared/ipc/browser-tab-page-schema'
 import type { ConfirmDialogConfig } from '../../Dialog/types'
@@ -52,6 +53,15 @@ export function reportForget(response: ForgetResponse): void {
  */
 export async function forgetBrowserData(confirm: (config: Omit<ConfirmDialogConfig, 'id'>) => Promise<boolean>): Promise<void> {
   if (!(await confirm(FORGET_CONFIRM))) return
+  await forgetNow()
+}
+
+/**
+ * Forget the project's browser data now (the user already confirmed, in
+ * `ForgetDataDialog`, which shows "Forgetting…" until this settles) and
+ * report the outcome as a toast. Never rejects.
+ */
+export async function forgetNow(): Promise<void> {
   try {
     reportForget(await browserTabGateway.forget())
   } catch (error) {

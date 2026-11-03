@@ -144,6 +144,22 @@ describe('TabPageExtras', () => {
     expect(menuActions.writeClipboardText).toHaveBeenCalledWith('https://app.test/a')
   })
 
+  it('S-17 Copy tells the shared menu actions before the page copies, then copies', async () => {
+    const { contents, extras, outlet, menuActions } = setup()
+    const order: string[] = []
+    const copied = vi.fn(async () => {
+      order.push('copied')
+    })
+    Object.assign(menuActions, { copied })
+    contents.copy.mockImplementation(() => order.push('copy'))
+    const params = { x: 1, y: 2, linkURL: '', srcURL: '', mediaType: 'none', selectionText: 'rm -rf ~', isEditable: false }
+    contents.emit('context-menu', {}, params)
+    const menu = (outlet.contextMenu as ReturnType<typeof vi.fn>).mock.calls[0]![0] as { menuId: string; items: string[] }
+    expect(menu.items).toContain('copy')
+    expect(extras.contextAction(menu.menuId, 'copy')).toBe('accepted')
+    await vi.waitFor(() => expect(order).toEqual(['copied', 'copy']))
+  })
+
   it('Pick this element is offered only when pick is wired, and picks in this tab at the menu point', () => {
     const params = { x: 7, y: 9, linkURL: '', srcURL: '', mediaType: 'none', selectionText: '', isEditable: false }
     const plain = setup()

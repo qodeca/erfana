@@ -59,6 +59,28 @@ describe('PreviewToolbarTools', () => {
     expect(children[2]).toBe(screen.getByTestId(EXPORT))
   })
 
+  it('025-AC-010 puts Open in browser tab before Open in default browser, named after the file', async () => {
+    const onOpenInBrowserTab = vi.fn()
+    const { container } = render(
+      <PreviewToolbarTools onOpenInBrowser={vi.fn()} onOpenInBrowserTab={onOpenInBrowserTab} previewFileName="index.html" />
+    )
+    const children = Array.from(container.children)
+    const tab = screen.getByTestId('preview-band-open-in-browser-tab')
+    expect(children[1]).toBe(tab)
+    expect(children[2]).toBe(screen.getByTestId(OPEN))
+    expect(tab).toHaveAccessibleName('Open index.html in a browser tab')
+    expect(tab).toHaveAttribute('title', 'Open index.html in a browser tab')
+    expect(tab).toHaveClass('erf-band__tool')
+    await userEvent.click(tab)
+    expect(onOpenInBrowserTab).toHaveBeenCalledTimes(1)
+  })
+
+  it('draws Open in browser tab alone behind the rule, with a generic name when no file name is given', () => {
+    const { container } = render(<PreviewToolbarTools onOpenInBrowserTab={vi.fn()} />)
+    expect(container.querySelector('.erf-band__separator')).not.toBeNull()
+    expect(screen.getByTestId('preview-band-open-in-browser-tab')).toHaveAccessibleName('Open this page in a browser tab')
+  })
+
   it('names and titles the button "Open in default browser"', () => {
     render(<PreviewToolbarTools onOpenInBrowser={vi.fn()} />)
 

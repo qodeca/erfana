@@ -76,6 +76,7 @@ import { browserWebPreferencesFor } from './browserWebPreferences'
 import { installBrowserPicks, registerPickSession } from './pick/pickAppSetup'
 import type { BrowserPicks } from './pick/BrowserPicks'
 import type { TargetTerminals } from './capture/BrowserTargetStatus'
+import { PageClipboardMarks, watchPageClipboard } from './site/pageClipboardMarks'
 
 /**
  * Chromium's per-disk-cache maximum: 512 MB (025-FR-015; ADR 0009 decision 9).
@@ -138,6 +139,8 @@ export interface BrowserRuntime {
   readonly pages: BrowserPages
   /** Page-opened tabs, popup windows, the popup blocker and pop-up exceptions (commit 12e). */
   readonly popups: BrowserPopups
+  /** Which clipboard text a browser page wrote, for the terminal's paste guard (S-17, commit 20). */
+  readonly pageClipboard: PageClipboardMarks
   /** Pick mode, captures, the shell guard and capture expiry (commits 14–15). */
   readonly picks: BrowserPicks
 }
@@ -247,6 +250,12 @@ export function installBrowserAfterReady(deps: BrowserAfterReadyDeps): BrowserRu
     clock: mainClock
   })
   const appAddresses = currentAppAddresses()
+  const pageClipboard = new PageClipboardMarks(clipboard, mainClock)
+  watchPageClipboard(
+    { on: (event: string, listener: (...args: never[]) => void) => app.on(event as 'browser-window-blur', listener as () => void) },
+    pageClipboard,
+    (contents) => browserSessionRegistry.isRegisteredView(contents as unknown as WebContents)
+  )
   const localFiles = new LocalFileServers({ now: () => mainClock.now(), appAddresses: () => appAddresses })
   const popups = createBrowserPopups(appAddresses, localFiles, (tabId) => tabs.list().find((t) => t.id === tabId)?.windowId ?? null)
   const pickSetup = installBrowserPicks({
@@ -296,6 +305,7 @@ export function installBrowserAfterReady(deps: BrowserAfterReadyDeps): BrowserRu
       menuActions: {
         openInSystemBrowser: (url) => openExternalSafeDetached(url),
         writeClipboardText: (text) => clipboard.writeText(text),
+        copied: () => pageClipboard.expectWrite(),
         pickAt: (tabId, at) => pickSetup.picks.pickAt(tabId, at)
       }
     },
@@ -309,6 +319,7 @@ export function installBrowserAfterReady(deps: BrowserAfterReadyDeps): BrowserRu
   ;(deps.registerPageHandlers ?? registerBrowserTabPageHandlers)({
     tabs,
     pages,
+    pageClipboard,
     currentProject: () => deps.projectSession.current()
   })
   ;(deps.registerPopupHandlers ?? registerBrowserTabPopupHandlers)({ tabs, popups, resolveDomain: pinnedRegistrableDomain })
@@ -322,7 +333,7 @@ export function installBrowserAfterReady(deps: BrowserAfterReadyDeps): BrowserRu
   profiles.runPendingDeletes().catch((error: unknown) => {
     logger.warn('Browser pending deletes could not run', { error: redactedLogError(error)?.message ?? String(error) })
   })
-  runtime = { profiles, teardown, tabs, appAddresses, site, localFiles, pages, popups, picks: pickSetup.picks }
+  runtime = { profiles, teardown, tabs, appAddresses, site, localFiles, pages, popups, pageClipboard, picks: pickSetup.picks }
   return runtime
 }
 

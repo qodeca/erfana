@@ -66,6 +66,12 @@ export interface MenuActions {
   /** The checked external-open path. */
   openInSystemBrowser(url: string): void
   writeClipboardText(text: string): void
+  /**
+   * **Copy** is about to run in the page: what it puts on the clipboard is page-written (S-17,
+   * `site/pageClipboardMarks.ts`). A returned promise holds the copy until the clipboard's
+   * before-state is read.
+   */
+  copied?(): Promise<void> | void
   /** **Pick this element** at the point; without it the item is not offered. */
   pickAt?(at: { x: number; y: number }): void
 }
@@ -141,8 +147,12 @@ export class TabContextMenu {
       case 'forward':
       case 'reload':
         return actions.history(action)
-      case 'copy':
-        return contents.copy()
+      case 'copy': {
+        const before = actions.copied?.()
+        if (before === undefined) return contents.copy()
+        void before.catch(() => undefined).then(() => contents.copy())
+        return
+      }
       case 'paste':
         return contents.paste()
       case 'selectAll':

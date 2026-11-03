@@ -17,6 +17,9 @@ vi.mock('electron', () => ({
     decryptString: vi.fn()
   },
   shell: { openExternal: vi.fn() },
+  // S-17's page-clipboard marks read the clipboard's text (async in Electron 44).
+  clipboard: { readText: vi.fn(async () => '') },
+  app: { on: vi.fn() },
   WebContentsView: vi.fn()
 }))
 vi.mock('../LoggingService', () => ({ logger: mockLogger }))

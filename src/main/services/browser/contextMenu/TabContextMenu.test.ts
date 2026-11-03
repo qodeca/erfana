@@ -39,6 +39,7 @@ function setup(options: { blocked?: boolean; pick?: boolean } = {}) {
     openInNewTab: vi.fn(),
     openInSystemBrowser: vi.fn(),
     writeClipboardText: vi.fn(),
+    copied: vi.fn(),
     ...(options.pick ? { pickAt: vi.fn() } : {})
   }
   const menu = new TabContextMenu({
@@ -114,6 +115,9 @@ describe('TabContextMenu', () => {
     expect(actions.history.mock.calls).toEqual([['back'], ['forward'], ['reload']])
     act({ selectionText: 'words' }, 'copy')
     expect(contents.copy).toHaveBeenCalled()
+    // S-17: the page's copy is recorded before it runs, so the terminal's paste guard knows the text is the page's
+    expect(actions.copied).toHaveBeenCalled()
+    expect(actions.copied.mock.invocationCallOrder[0]).toBeLessThan(contents.copy.mock.invocationCallOrder[0])
     act({ isEditable: true }, 'paste')
     expect(contents.paste).toHaveBeenCalled()
     act({}, 'selectAll')
@@ -151,5 +155,25 @@ describe('TabContextMenu', () => {
     gone.contents.destroyed = true
     gone.menu.detach()
     expect(gone.contents.listenerCount('context-menu')).toBe(1)
+  })
+
+  it('S-17 holds a page-menu Copy until the clipboard before-state is read', async () => {
+    const { actions, contents, menu, open } = setup()
+    let release: () => void = () => undefined
+    actions.copied.mockReturnValueOnce(new Promise<void>((resolve) => (release = resolve)))
+    expect(menu.act(open({ selectionText: 'words' }).menuId, 'copy')).toBe('accepted')
+    await Promise.resolve()
+    expect(contents.copy).not.toHaveBeenCalled()
+    release()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(contents.copy).toHaveBeenCalledTimes(1)
+  })
+
+  it('S-17 still copies when reading the clipboard before-state fails', async () => {
+    const { actions, contents, menu, open } = setup()
+    actions.copied.mockReturnValueOnce(Promise.reject(new Error('clipboard')))
+    expect(menu.act(open({ selectionText: 'words' }).menuId, 'copy')).toBe('accepted')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(contents.copy).toHaveBeenCalledTimes(1)
   })
 })

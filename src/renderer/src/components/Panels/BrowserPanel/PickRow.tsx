@@ -5,7 +5,8 @@
  * 025-FR-065; design § Anatomy zone 3 and § Pick row, deck *Pick banner,
  * label and notes*, *Send notice*; ADR 0011 decision 5: always reserved;
  * commit 19). Under the navigation row, in the order **Pick element**, the
- * status slot, a spacer and the target chooser.
+ * status slot, a spacer, the width preset (commit 20, `WidthPresetMenu`) and
+ * the target chooser.
  *
  * - **Pick element** toggles pick mode (`aria-pressed`); on an empty tab or
  *   an Erfana page it is `aria-disabled` and its press shows "Load a page to
@@ -46,6 +47,8 @@ export interface PickRowProps {
   readonly onNoticeDone: () => void
   /** The target chooser. */
   readonly target: React.ReactNode
+  /** The width preset menu button; folds by CSS (`PickRow.css`). */
+  readonly widthPreset?: React.ReactNode
 }
 
 /** The send notice, with its 5 s that pause while the pointer or focus is on it. */
@@ -124,7 +127,16 @@ export const PickRow = forwardRef<HTMLDivElement, PickRowProps>(function PickRow
       : 'Load a page to pick an element'
 
   return (
-    <div ref={ref} className="erf-brw-pick" role="group" aria-label="Pick and send" data-brw-zone="pick" data-testid={BROWSER_TEST_IDS.PICK_ROW}>
+    <div
+      ref={ref}
+      className="erf-brw-pick"
+      role="group"
+      aria-label="Pick and send"
+      data-brw-zone="pick"
+      data-picking={pick.on ? 'true' : undefined}
+      data-notice={notice !== null ? 'true' : undefined}
+      data-testid={BROWSER_TEST_IDS.PICK_ROW}
+    >
       <button
         type="button"
         className="erf-brw-pickbtn"
@@ -161,6 +173,7 @@ export const PickRow = forwardRef<HTMLDivElement, PickRowProps>(function PickRow
         ) : null}
       </span>
       <span className="erf-brw-spacer" />
+      {props.widthPreset}
       {props.target}
     </div>
   )

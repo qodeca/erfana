@@ -146,6 +146,59 @@
 /* ---------- target chooser ---------- */
 
 /* The target never yields room to the status slot – the slot's clauses fold first (025-FR-061, 025-FR-065). */
+/* ---------- width preset (deck *Width presets*; § Tiers "Width preset") ---------- */
+
+.erf-brw-width {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--btn-height-sm);
+  padding: 0 var(--space-3);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--text-base);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.erf-brw-width:hover {
+  background: var(--color-bg-hover-solid);
+}
+
+.erf-brw-width:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+/* Icon only while picking or while the send notice shows; the name keeps the preset. */
+.erf-brw-pick[data-picking='true'] .erf-brw-width__label,
+.erf-brw-pick[data-notice='true'] .erf-brw-width__label {
+  display: none;
+}
+
+@container (max-width: 700px) {
+  .erf-brw-width__label {
+    display: none;
+  }
+}
+
+/* Out of room it is the first pick-row control to fold; More keeps *Page width*. */
+@container (max-width: 520px) {
+  .erf-brw-pick[data-picking='true'] .erf-brw-width {
+    display: none;
+  }
+}
+
+@container (max-width: 800px) {
+  .erf-brw-pick[data-notice='true'] .erf-brw-width {
+    display: none;
+  }
+}
+
 .erf-brw-target {
   display: inline-flex;
   flex: 0 0 auto;
@@ -447,6 +500,40 @@
 
 .erf-brw-actions__chip--changed {
   border-color: var(--color-accent-secondary);
+}
+
+/* The element's text and confirmed source (page text: mono, isolated, one line each). */
+.erf-brw-actions__details {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.erf-brw-actions__detail {
+  display: flex;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.erf-brw-actions__detail dt {
+  flex: none;
+  color: var(--color-text-secondary);
+}
+
+.erf-brw-actions__detail dd {
+  min-width: 0;
+  margin: 0;
+}
+
+.erf-brw-actions__page-text {
+  display: block;
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  unicode-bidi: isolate;
 }
 
 .erf-brw-actions__note,

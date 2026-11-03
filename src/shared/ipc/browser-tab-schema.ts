@@ -370,7 +370,11 @@ const PickSummarySchema = z
     atTop: z.boolean(),
     atStart: z.boolean(),
     gone: z.boolean(),
-    changedAfterPick: z.boolean()
+    changedAfterPick: z.boolean(),
+    /** The element's visible text, page-written (`capture/pickDetails.ts`); absent until read. */
+    text: z.string().max(200).optional(),
+    /** `path:line` of the source confirmed inside the project (025-FR-037, S-13); absent when not confirmed. */
+    source: z.string().max(600).optional()
   })
   .strict()
 const pickBase = { tabId: BrowserTabIdSchema }
@@ -478,12 +482,8 @@ export const NoticeEventSchema = z
   })
   .strict()
 /** `boundsApplied`: the applied push's `seq` and whether the page is now shown. */
-export const BoundsAppliedEventSchema = z
-  .object({ tabId: BrowserTabIdSchema, seq: z.number().int().nonnegative(), visible: z.boolean() })
-  .strict()
-export const FindResultEventSchema = z
-  .object({ tabId: BrowserTabIdSchema, active: count, total: count })
-  .strict()
+export const BoundsAppliedEventSchema = z.object({ tabId: BrowserTabIdSchema, seq: z.number().int().nonnegative(), visible: z.boolean() }).strict()
+export const FindResultEventSchema = z.object({ tabId: BrowserTabIdSchema, active: count, total: count }).strict()
   .refine(r => r.active <= r.total, 'active match beyond total')
 
 export type OriginPartsPayload = z.infer<typeof OriginPartsSchema>
