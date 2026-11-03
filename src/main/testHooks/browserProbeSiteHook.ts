@@ -18,8 +18,14 @@ import { readFile } from 'node:fs/promises'
 import { extname, join, normalize, sep } from 'node:path'
 import type { Session } from 'electron'
 import type { BrowserRuntime } from '../services/browser/browserAppSetup'
-import { BROWSER_LOCAL_SCHEME } from '../services/browser/browserLocalScheme'
+import type { BROWSER_LOCAL_SCHEME } from '../services/browser/browserLocalScheme'
 import type { BrowserTab } from '../services/browser/BrowserTab'
+
+/**
+ * The scheme as a same-file literal, so `previewSchemeScope.test.ts` can resolve
+ * this handler's scheme; the type keeps it equal to the real constant.
+ */
+const LOCAL_SCHEME: typeof BROWSER_LOCAL_SCHEME = 'erfana-local'
 
 /** Records kept per list; a probe that floods them is broken. */
 const RECORD_CAP = 2_000
@@ -101,8 +107,8 @@ export function createBrowserProbeSiteHook(
     probeServeLocalScheme: (rootDir) => {
       const root = normalize(rootDir)
       const ses = sessionForProbes()
-      if (ses.protocol.isProtocolHandled(BROWSER_LOCAL_SCHEME)) ses.protocol.unhandle(BROWSER_LOCAL_SCHEME)
-      ses.protocol.handle(BROWSER_LOCAL_SCHEME, async (request) => {
+      if (ses.protocol.isProtocolHandled(LOCAL_SCHEME)) ses.protocol.unhandle(LOCAL_SCHEME)
+      ses.protocol.handle(LOCAL_SCHEME, async (request) => {
         const header = (name: string): string | null => request.headers.get(name)
         push(localRequests, {
           url: request.url,
