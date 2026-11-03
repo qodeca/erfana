@@ -16,12 +16,19 @@ vi.mock('electron', () => ({
     encryptString: vi.fn(),
     decryptString: vi.fn()
   },
-  shell: { openExternal: vi.fn() }
+  shell: { openExternal: vi.fn() },
+  WebContentsView: vi.fn()
 }))
 vi.mock('../LoggingService', () => ({ logger: mockLogger }))
+vi.mock('@electron-toolkit/utils', () => ({ is: { dev: false } }))
+vi.mock('../../ipc/senderValidation', () => ({ RENDERER_FILE_URL: 'file:///app/out/renderer/index.html' }))
+vi.mock('../../ipc/browser-tab-handlers', () => ({ registerBrowserTabHandlers: vi.fn() }))
 
 import {
   BROWSER_DISK_CACHE_BYTES,
+  closeBrowserWindow,
+  currentAppAddresses,
+  flushBrowserProfiles,
   getBrowserRuntime,
   installBrowserAfterReady,
   installBrowserBeforeReady
@@ -73,11 +80,14 @@ describe('browserAppSetup', () => {
     const handle = vi.fn()
     const projectSession = new ProjectSessionStore()
     const onChange = vi.spyOn(projectSession, 'onChange')
+    const registerTabHandlers = vi.fn()
     const runtime = installBrowserAfterReady({
       defaultSession: { protocol: { handle } } as never,
       projectSession,
-      lockService: { checkLock: vi.fn(), acquireLock: vi.fn() }
+      lockService: { checkLock: vi.fn(), acquireLock: vi.fn() },
+      registerTabHandlers
     })
+    expect(registerTabHandlers).toHaveBeenCalledWith({ service: runtime.tabs })
     expect(handle).toHaveBeenCalledWith('erfana-local', expect.any(Function))
     const response = (handle.mock.calls[0][1] as (r: Request) => Response)(new Request('erfana-local://h/x'))
     expect(response.status).toBe(403)
@@ -86,5 +96,50 @@ describe('browserAppSetup', () => {
     // No browser session is created until a tab asks for one
     expect(fromPath).not.toHaveBeenCalled()
     await expect(runtime.profiles.openForTab()).rejects.toMatchObject({ code: 'no-project' })
+  })
+
+  it('closes a closing window\'s tabs, and closes the old project\'s tabs when the project changes', async () => {
+    const projectSession = new ProjectSessionStore()
+    const runtime = installBrowserAfterReady({
+      defaultSession: { protocol: { handle: vi.fn() } } as never,
+      projectSession,
+      lockService: { checkLock: vi.fn(), acquireLock: vi.fn() },
+      registerTabHandlers: vi.fn()
+    })
+    const closeWindow = vi.spyOn(runtime.tabs, 'closeWindow')
+    closeBrowserWindow(7)
+    expect(closeWindow).toHaveBeenCalledWith(7)
+    closeWindow.mockImplementation(() => {
+      throw new Error('boom')
+    })
+    expect(() => closeBrowserWindow(8)).not.toThrow()
+    expect(mockLogger.warn).toHaveBeenCalledWith('Browser teardown on window close failed', expect.objectContaining({ windowId: 8 }))
+
+    const closeProject = vi.spyOn(runtime.tabs, 'closeProject')
+    await runtime.teardown.run('/projects/a')
+    expect(closeProject).toHaveBeenCalledWith('/projects/a')
+  })
+
+  it('names the renderer entry and the resources folder as app addresses, and no dev server outside development', () => {
+    expect(currentAppAddresses()).toEqual({
+      rendererEntry: 'file:///app/out/renderer/index.html',
+      resourcesDir: process.resourcesPath,
+      devServerOrigin: null
+    })
+  })
+
+  it('flushes the cookies and storage of every profile opened in this run, and never rejects', async () => {
+    const runtime = installBrowserAfterReady({
+      defaultSession: { protocol: { handle: vi.fn() } } as never,
+      projectSession: new ProjectSessionStore(),
+      lockService: { checkLock: vi.fn(), acquireLock: vi.fn() },
+      registerTabHandlers: vi.fn()
+    })
+    const flushStore = vi.fn(async () => Promise.reject(new Error('gone')))
+    const flushStorageData = vi.fn()
+    vi.spyOn(runtime.profiles, 'openSessions').mockResolvedValue([{ cookies: { flushStore }, flushStorageData }])
+    await expect(flushBrowserProfiles()).resolves.toBeUndefined()
+    expect(flushStore).toHaveBeenCalledTimes(1)
+    expect(flushStorageData).toHaveBeenCalledTimes(1)
   })
 })

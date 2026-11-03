@@ -18,6 +18,8 @@
  * {@link createTestHooks}.
  */
 import { installClockTestHook, type ClockTestHook } from './clockHook'
+import { createBrowserTestHook, type BrowserTestHook } from './browserHook'
+import { getBrowserRuntime } from '../services/browser/browserAppSetup'
 
 /** The string `scripts/check-no-test-hooks.mjs` looks for in a production build. */
 export const TEST_HOOK_SENTINEL = 'ERFANA_BROWSER_TEST_HOOK_SENTINEL'
@@ -28,6 +30,8 @@ export const TEST_HOOKS_GLOBAL_KEY = '__erfanaTestHooks'
 /** Every hook, by name. */
 export interface TestHooks {
   readonly clock: ClockTestHook
+  /** Built-in browser: tabs, the input harness, reads (spec 025 § 12, T2). */
+  readonly browser: BrowserTestHook
 }
 
 /** What `globalThis.__erfanaTestHooks` holds. */
@@ -38,10 +42,12 @@ export interface InstalledTestHooks extends TestHooks {
 /** What building the hooks needs from the app; tests pass their own. */
 export interface TestHookDependencies {
   readonly installClock: () => ClockTestHook
+  readonly createBrowser: () => BrowserTestHook
 }
 
 const defaultDependencies: TestHookDependencies = {
-  installClock: () => installClockTestHook()
+  installClock: () => installClockTestHook(),
+  createBrowser: () => createBrowserTestHook(getBrowserRuntime)
 }
 
 /** Builds every hook. */
@@ -50,7 +56,8 @@ export function createTestHooks(
 ): InstalledTestHooks {
   return Object.freeze({
     sentinel: TEST_HOOK_SENTINEL,
-    clock: deps.installClock()
+    clock: deps.installClock(),
+    browser: deps.createBrowser()
   })
 }
 

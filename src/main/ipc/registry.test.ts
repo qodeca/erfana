@@ -81,6 +81,7 @@ import {
   unregisterOn
 } from './registry'
 import { createAppSender, createFakeWebContents, type FakeWebContents } from './__test-helpers__/appSender'
+import { registerAppWebContents, type AppWindowKind } from './appWebContents'
 
 /** Same derivation `senderValidation.ts` uses for the production trust pin. */
 const RENDERER_FILE_URL = pathToFileURL(join(__dirname, '../renderer/index.html')).href
@@ -159,6 +160,42 @@ describe('registerHandle', () => {
     registerHandle('c', listener)
     expect(() => handlers.get('c')!(make())).toThrow(/Untrusted sender/)
     expect(listener).not.toHaveBeenCalled()
+  })
+})
+
+/** A registered window of `kind` whose top-level frame is at the renderer entry. */
+function kindEvent(kind: AppWindowKind): IpcMainInvokeEvent & IpcMainEvent {
+  const sender = createFakeWebContents()
+  registerAppWebContents(sender, kind)
+  return event({ url: `${RENDERER_FILE_URL}#/route`, parent: null }, sender)
+}
+
+describe('per-window-kind channel allow-list (spec 025 § 8, S7, A16)', () => {
+  it.each([
+    ['browserPopup', 'terminal:create'],
+    ['browserPopup', 'browser-tab:create'],
+    ['screenshotOverlay', 'terminal:create'],
+    ['main', 'browser-tab:popupStrip']
+  ] as const)('refuses a %s window on %s, for invoke and send', (kind, channel) => {
+    const handler = vi.fn()
+    const listener = vi.fn()
+    registerHandle(channel, handler)
+    registerOn(channel, listener)
+    expect(() => handlers.get(channel)!(kindEvent(kind))).toThrow(/Untrusted sender/)
+    send(channel, kindEvent(kind))
+    expect(handler).not.toHaveBeenCalled()
+    expect(listener).not.toHaveBeenCalled()
+    expect(mockLogger.warn).toHaveBeenCalledWith('Rejected IPC from untrusted sender', expect.objectContaining({ channel }))
+  })
+
+  it.each([
+    ['browserPopup', 'browser-tab:popupAnswer'],
+    ['screenshotOverlay', 'logging:log'],
+    ['main', 'browser-tab:create']
+  ] as const)('lets a %s window use %s', (kind, channel) => {
+    const handler = vi.fn(() => 'ok')
+    registerHandle(channel, handler)
+    expect(handlers.get(channel)!(kindEvent(kind))).toBe('ok')
   })
 })
 

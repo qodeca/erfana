@@ -34,7 +34,8 @@ const identity = vi.hoisted(() => ({
 }))
 vi.mock('./senderValidation', async (importOriginal) => {
   const real = await importOriginal<typeof import('./senderValidation')>()
-  identity.register = (await import('./appWebContents')).registerAppWebContents as (wc: unknown) => void
+  const { registerAppWebContents } = await import('./appWebContents')
+  identity.register = (wc: unknown) => registerAppWebContents(wc as Parameters<typeof registerAppWebContents>[0], 'main')
   return { ...real, isTrustedAppSender: () => true }
 })
 

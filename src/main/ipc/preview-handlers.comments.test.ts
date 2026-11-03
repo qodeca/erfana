@@ -43,7 +43,7 @@ vi.mock('electron', () => ({
 vi.mock('@electron-toolkit/utils', () => ({ is: { dev: false } }))
 vi.mock('./senderValidation', async importOriginal => {
   const real = await importOriginal<typeof import('./senderValidation')>()
-  return { ...real, isTrustedAppSender: (event: Parameters<typeof real.isTrustedAppSender>[0]) => appGate.passThrough || real.isTrustedAppSender(event) }
+  return { ...real, isTrustedAppSender: (...args: Parameters<typeof real.isTrustedAppSender>) => appGate.passThrough || real.isTrustedAppSender(...args) }
 })
 vi.mock('./preview/buildPreviewGraph', () => ({ buildPreviewGraph: vi.fn() }))
 vi.mock('./preview/lifecycle-handlers', () => ({ registerPreviewLifecycleHandlers: vi.fn(() => () => {}) }))

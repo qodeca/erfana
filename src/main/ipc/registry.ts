@@ -45,7 +45,9 @@
  * A URL only says what a frame loaded; a browser tab that loaded the renderer
  * entry file would carry the same URL, but it is not a registered window, so
  * it is refused. The URL check stays as an extra condition, so a registered
- * window that navigated away is refused too.
+ * window that navigated away is refused too. Last, the channel must be on the
+ * allow-list of the sender's window kind (`channelAllowList.ts`, spec 025 § 8):
+ * a browser popup host reaches only the `browser-tab:popup*` channels.
  *
  * @see src/main/ipc/senderValidation.ts — the predicate
  * @see src/main/ipc/appWebContents.ts — the identity set
@@ -121,7 +123,7 @@ function rejected(channel: string, event: IpcMainEvent | IpcMainInvokeEvent): vo
  */
 export function registerHandle(channel: string, listener: InvokeListener): void {
   ipcMain.handle(channel, (event: IpcMainInvokeEvent, ...args) => {
-    if (!isTrustedAppSender(event)) {
+    if (!isTrustedAppSender(event, channel)) {
       rejected(channel, event)
       throw new Error(`Untrusted sender for IPC channel "${channel}"`)
     }
@@ -139,7 +141,7 @@ export function registerHandle(channel: string, listener: InvokeListener): void 
  */
 export function registerHandleOnce(channel: string, listener: InvokeListener): void {
   ipcMain.handle(channel, (event: IpcMainInvokeEvent, ...args) => {
-    if (!isTrustedAppSender(event)) {
+    if (!isTrustedAppSender(event, channel)) {
       rejected(channel, event)
       throw new Error(`Untrusted sender for IPC channel "${channel}"`)
     }
@@ -160,7 +162,7 @@ export function registerHandleOnce(channel: string, listener: InvokeListener): v
  */
 export function registerOn(channel: string, listener: SendListener): void {
   const wrapper = (event: IpcMainEvent, ...args: unknown[]): void => {
-    if (!isTrustedAppSender(event)) {
+    if (!isTrustedAppSender(event, channel)) {
       rejected(channel, event)
       return
     }
@@ -179,7 +181,7 @@ export function registerOn(channel: string, listener: SendListener): void {
  */
 export function registerOnce(channel: string, listener: SendListener): void {
   const wrapper = (event: IpcMainEvent, ...args: unknown[]): void => {
-    if (!isTrustedAppSender(event)) {
+    if (!isTrustedAppSender(event, channel)) {
       rejected(channel, event)
       return
     }

@@ -3,6 +3,7 @@
 exports[`preload surface > window.api has the expected top-level groups 1`] = `
 [
   "browser",
+  "browserTab",
   "camera",
   "claudeStatus",
   "clipboard",
@@ -38,6 +39,20 @@ exports[`preload surface > window.api has the expected top-level groups 1`] = `
 exports[`preload surface > window.api.browser exposes the expected members 1`] = `
 [
   "openFile",
+]
+`;
+
+exports[`preload surface > window.api.browserTab exposes the expected members 1`] = `
+[
+  "close",
+  "create",
+  "devTools",
+  "focusPage",
+  "history",
+  "navigate",
+  "onState",
+  "onTabAdded",
+  "setBounds",
 ]
 `;
 

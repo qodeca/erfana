@@ -4,7 +4,8 @@ import type { IpcMainEvent, IpcMainInvokeEvent } from 'electron'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
 import { is } from '@electron-toolkit/utils'
-import { isAppWebContents, type AppWebContentsLike } from './appWebContents'
+import { appWebContentsKind, isAppWebContents, type AppWebContentsLike } from './appWebContents'
+import { isChannelAllowedForKind } from './channelAllowList'
 
 /**
  * Canonical `file://` URL of the bundled renderer entry point.
@@ -108,7 +109,7 @@ export function isTrustedSender(event: IpcMainEvent | IpcMainInvokeEvent): boole
 
 /**
  * Route-tolerant variant of {@link isTrustedSender}, used by the process-wide
- * IPC sender gate ({@link file://./registry.ts}).
+ * IPC sender gate ({@link file://./registry.ts}) for one `channel`.
  *
  * Same identity and top-level-frame requirement, with one deliberate
  * difference: **fragment and query are ignored.** The screenshot overlay windows
@@ -119,12 +120,19 @@ export function isTrustedSender(event: IpcMainEvent | IpcMainInvokeEvent): boole
  * those messages. The overlays are registered app windows, so they pass the
  * identity check too.
  *
+ * On top of identity and URL, `channel` must be on the allow-list of the
+ * sender's window kind (`channelAllowList.ts`; spec 025 § 8, S7, A16): an
+ * overlay may send only what it uses, a browser popup host only the
+ * `browser-tab:popup*` channels.
+ *
  * The stricter {@link isTrustedSender} stays in place inside the handlers that
  * already call it, so this is defence in depth, not a relaxation of any
  * existing gate.
  */
-export function isTrustedAppSender(event: IpcMainEvent | IpcMainInvokeEvent): boolean {
-  return isTrustedEvent(event, 'route')
+export function isTrustedAppSender(event: IpcMainEvent | IpcMainInvokeEvent, channel: string): boolean {
+  if (!isTrustedEvent(event, 'route')) return false
+  const kind = appWebContentsKind(event.sender as AppWebContentsLike | undefined)
+  return kind !== null && isChannelAllowedForKind(kind, channel)
 }
 
 /**

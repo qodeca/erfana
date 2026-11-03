@@ -66,9 +66,9 @@ const outerIdentity = vi.hoisted(() => ({
 // the way through so this channel's own gate can be driven directly.
 vi.mock('./registry', async importOriginal => {
   const actual = await importOriginal<typeof import('./registry')>()
-  outerIdentity.register = (await import('./appWebContents')).registerAppWebContents as (
-    wc: unknown
-  ) => void
+  const { registerAppWebContents } = await import('./appWebContents')
+  outerIdentity.register = (wc: unknown) =>
+    registerAppWebContents(wc as Parameters<typeof registerAppWebContents>[0], 'main')
   return {
     ...actual,
     registerHandle: (channel: string, listener: Listener) => {

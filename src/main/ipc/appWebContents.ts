@@ -17,9 +17,21 @@
  *
  * Register a window here only when its renderer is Erfana's own UI and talks
  * to the global `ipcMain`. Hidden helper windows that load user content (PDF
- * export, the image-export harness) and the preview page views are NOT
- * registered: they must never pass the app gate.
+ * export, the image-export harness), the preview page views and the browser
+ * page views are NOT registered: they must never pass the app gate.
+ *
+ * WINDOW KINDS (spec 025, solution design § 8, panel findings S7 and A16).
+ * Each id is recorded with the kind of window it belongs to, and the IPC
+ * registry checks every channel against that kind's allow-list
+ * (`channelAllowList.ts`): a browser popup host may reach only the
+ * `browser-tab:popup*` channels, the screenshot overlay only what it uses.
+ * The kind is fixed by the code that created the window; nothing a renderer
+ * sends can change it.
  */
+
+/** The kinds of Erfana window whose renderer may use global IPC. */
+export const APP_WINDOW_KINDS = ['main', 'screenshotOverlay', 'browserPopup'] as const
+export type AppWindowKind = (typeof APP_WINDOW_KINDS)[number]
 
 /**
  * The part of `Electron.WebContents` this module touches. Structural so the
@@ -31,26 +43,28 @@ export interface AppWebContentsLike {
   once(event: 'destroyed', listener: () => void): unknown
 }
 
-/** Ids of live Erfana window `webContents`. */
-const appWebContentsIds = new Set<number>()
+/** Ids of live Erfana window `webContents`, each with its window kind. */
+const appWebContentsKinds = new Map<number, AppWindowKind>()
 
 /**
- * Add a window's `webContents` to the trusted set. The id is dropped again on
- * the `webContents` 'destroyed' event, so a closed window stops being trusted
- * without the caller having to remember to unregister it.
+ * Add a window's `webContents` to the trusted set as a window of `kind`. The
+ * id is dropped again on the `webContents` 'destroyed' event, so a closed
+ * window stops being trusted without the caller having to remember to
+ * unregister it.
  *
  * Registering the same `webContents` twice is a no-op (one listener, one
- * entry). A `webContents` that is already destroyed is not added.
+ * entry, the first kind kept – a kind never changes after creation). A
+ * `webContents` that is already destroyed is not added.
  */
-export function registerAppWebContents(webContents: AppWebContentsLike): void {
+export function registerAppWebContents(webContents: AppWebContentsLike, kind: AppWindowKind): void {
   if (webContents.isDestroyed()) return
   // Read once: the id must be the one removed later, whatever happens to the
   // object by the time 'destroyed' fires.
   const id = webContents.id
-  if (appWebContentsIds.has(id)) return
-  appWebContentsIds.add(id)
+  if (appWebContentsKinds.has(id)) return
+  appWebContentsKinds.set(id, kind)
   webContents.once('destroyed', () => {
-    appWebContentsIds.delete(id)
+    appWebContentsKinds.delete(id)
   })
 }
 
@@ -61,8 +75,20 @@ export function registerAppWebContents(webContents: AppWebContentsLike): void {
 export function isAppWebContents(
   webContents: Pick<AppWebContentsLike, 'id' | 'isDestroyed'> | null | undefined
 ): boolean {
-  if (!webContents) return false
+  return appWebContentsKind(webContents) !== null
+}
+
+/**
+ * The window kind of one of Erfana's own live windows, or `null` for anything
+ * else – a missing, destroyed or never-registered `webContents`.
+ */
+export function appWebContentsKind(
+  webContents: Pick<AppWebContentsLike, 'id' | 'isDestroyed'> | null | undefined
+): AppWindowKind | null {
+  if (!webContents) return null
   // Membership first: an unregistered object is refused without calling into
   // it, so a malformed sender is a refusal rather than a TypeError.
-  return appWebContentsIds.has(webContents.id) && !webContents.isDestroyed()
+  const kind = appWebContentsKinds.get(webContents.id)
+  if (kind === undefined) return null
+  return webContents.isDestroyed() ? null : kind
 }

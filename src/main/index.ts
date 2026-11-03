@@ -34,7 +34,7 @@ import { registerBrowserHandlers } from './ipc/browser-handlers'
 import { registerMarkdownImageHandlers } from './ipc/markdown-image-handlers'
 import { registerClaudeStatusHandlers } from './ipc/claude-status-handlers'
 import { registerPreviewHandlers } from './ipc/preview-handlers'
-import { installBrowserAfterReady, installBrowserBeforeReady } from './services/browser/browserAppSetup'
+import { closeBrowserWindow, flushBrowserProfiles, installBrowserAfterReady, installBrowserBeforeReady } from './services/browser/browserAppSetup'
 import { importToolStatusService, killActiveLibreOfficeProbes } from './services/import'
 import { FORCE_CRASH_ARG, LOGS_DIR_RELATIVE, TEST_HOOKS_ARG } from '../shared/constants'
 import { createApplicationMenu, setPreviewZoomHandler } from './menu'
@@ -225,7 +225,7 @@ function createWindow(): BrowserWindow {
     }
   })
 
-  registerAppWebContents(mainWindow.webContents) // IPC gates trust it by identity (025-NFR-001)
+  registerAppWebContents(mainWindow.webContents, 'main') // IPC gates trust it by identity and kind (025-NFR-001)
   // Log renderer hangs for this window (log-only — see rendererCrashHandlers).
   registerWindowResponsiveness(mainWindow)
 
@@ -306,14 +306,13 @@ function createWindow(): BrowserWindow {
   // CRITICAL: Must also clear project state so new window can re-open the same project
   const webContentsId = mainWindow.webContents.id
 
-  // Previews belong to a WINDOW, so they are reaped when the window goes — the
-  // same rule watchers, terminals and git already follow below. Without this the
-  // only teardown was the app-level disposer at `before-quit`, which runs AFTER
-  // `mainWindowRef.destroy()`: every view was detached from a dead window and
-  // logged a teardown warning on each clean exit, and a second window's views
-  // would simply have leaked.
+  // Previews and browser tabs belong to a WINDOW, so they are reaped when the window
+  // goes — as watchers, terminals and git are below. Left to the `before-quit`
+  // disposer, which runs AFTER `mainWindowRef.destroy()`, every view was detached
+  // from a dead window, and a second window's views would have leaked.
   const previewWindowId = mainWindow.id
   mainWindow.on('closed', () => {
+    closeBrowserWindow(previewWindowId) // spec 025: a tab belongs to its window
     void previewHandlers?.closeWindow(previewWindowId).catch((error) => {
       logger.warn('Preview teardown on window close failed', {
         windowId: previewWindowId,
@@ -774,8 +773,8 @@ app.on('before-quit', (event): Promise<void> | undefined => {
               previewHandlers ? previewHandlers.dispose() : Promise.resolve(),
               gitWatcherService.dispose(),
               gitStatusService.dispose(),
-              // Abort an in-flight model download so its temp file is removed now.
-              whisperModelManager.dispose()
+              flushBrowserProfiles(), // spec 025: cookies reach disk before app.exit
+              whisperModelManager.dispose() // aborts an in-flight download; its temp file goes now
             ])
           },
           SHUTDOWN_TIMEOUT_MS

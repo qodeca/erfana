@@ -62,7 +62,7 @@ export function createFakeWebContents(id: number = nextId++): FakeWebContents {
 /** A fake `webContents` registered as one of Erfana's own windows. */
 export function createAppSender(): FakeWebContents {
   const fake = createFakeWebContents()
-  registerAppWebContents(fake)
+  registerAppWebContents(fake, 'main')
   return fake
 }
 
@@ -73,5 +73,5 @@ export function createAppSender(): FakeWebContents {
  */
 export async function registerInCurrentModule(fake: FakeWebContents): Promise<void> {
   const { registerAppWebContents: register } = await import('../appWebContents')
-  register(fake)
+  register(fake, 'main')
 }

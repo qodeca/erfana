@@ -20,15 +20,17 @@
  * 5. guards `profile`, `profile/Erfana`, `captures`; writes a fresh marker;
  * 6. asks cloud sync to ignore the folder (S30, best effort);
  * 7. creates the session with `session.fromPath(<canonical>/.erfana/browser/profile)`
- *    and records it in the browser session registry.
+ *    and records it in the browser session registry;
+ * 8. hardens it (`browserSessionPolicy.hardenBrowserSession`): deny-by-default
+ *    permission, device, chooser, display-media and download handlers, the
+ *    user agent and spell check – before the tab that asked can load a page.
  *
  * Every later tab re-runs steps 3 and 5 only (a deleted `.gitignore` is
  * written again before the page loads). The session is never destroyed while
  * the app runs (Electron cannot), so it is kept per canonical path.
  *
- * Session hardening (`browserSessionPolicy`, commit 6), the `erfana-local`
- * handler (commit 11) and the trust store and keyring canary (commit 10) run
- * after step 7 once they exist, before any page loads.
+ * The `erfana-local` handler (commit 11) and the trust store and keyring
+ * canary (commit 10) run after step 8 once they exist, before any page loads.
  */
 import { join } from 'node:path'
 import type { Clock } from '../../../shared/clock'
@@ -97,6 +99,8 @@ export interface BrowserProfileServiceDeps {
   readonly fromPath: (path: string) => ProfileSession
   /** Records the session as a browser session (`browserSessionRegistry`). */
   readonly registerSession: (session: ProfileSession) => void
+  /** Deny-by-default session policy (`browserSessionPolicy.hardenBrowserSession`); runs before any page loads. */
+  readonly hardenSession: (session: ProfileSession) => void
   readonly signer: PurposeSigner
   readonly storageBackend: () => StorageBackend
   readonly isTrackedByGit: (canonical: string) => Promise<boolean>
@@ -136,6 +140,12 @@ export class BrowserProfileService {
       this.profiles.delete(canonical)
       throw error
     }
+  }
+
+  /** The sessions of every profile opened in this run (a failed open is left out). */
+  async openSessions(): Promise<ProfileSession[]> {
+    const settled = await Promise.allSettled(this.profiles.values())
+    return settled.flatMap((result) => (result.status === 'fulfilled' ? [result.value.session] : []))
   }
 
   /**
@@ -206,6 +216,7 @@ export class BrowserProfileService {
     await this.deps.markIgnoredBySync(join(canonical, ...BROWSER_DIR_SEGMENTS))
     const session = this.deps.fromPath(join(canonical, ...BROWSER_DIR_SEGMENTS, PROFILE_DIR_NAME))
     this.deps.registerSession(session)
+    this.deps.hardenSession(session)
     const backend = this.deps.storageBackend()
     const trust: TrustPersistence = this.deps.signer.hasKey() ? 'signed' : 'memory'
     logger.info('Browser profile ready', { project: redactPath(canonical), backend, trust, setAside: setAside !== null })

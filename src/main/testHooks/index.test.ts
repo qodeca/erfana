@@ -7,7 +7,12 @@
  * script's own test.
  */
 import { describe, expect, it, vi } from 'vitest'
+
+// The default dependencies load the browser hook, which imports Electron; these tests pass their own.
+vi.mock('./browserHook', () => ({ createBrowserTestHook: vi.fn() }))
+vi.mock('../services/browser/browserAppSetup', () => ({ getBrowserRuntime: vi.fn() }))
 import type { ClockTestHook } from './clockHook'
+import type { BrowserTestHook } from './browserHook'
 import {
   TEST_HOOKS_GLOBAL_KEY,
   TEST_HOOK_SENTINEL,
@@ -22,8 +27,10 @@ const clockHook: ClockTestHook = {
   advance: async () => {}
 }
 
+const browserHook = {} as BrowserTestHook
+
 function deps(): TestHookDependencies {
-  return { installClock: vi.fn(() => clockHook) }
+  return { installClock: vi.fn(() => clockHook), createBrowser: vi.fn(() => browserHook) }
 }
 
 describe('test hooks', () => {
@@ -35,7 +42,9 @@ describe('test hooks', () => {
     const dependencies = deps()
     const hooks = createTestHooks(dependencies)
     expect(hooks.clock).toBe(clockHook)
+    expect(hooks.browser).toBe(browserHook)
     expect(dependencies.installClock).toHaveBeenCalledTimes(1)
+    expect(dependencies.createBrowser).toHaveBeenCalledTimes(1)
     expect(Object.isFrozen(hooks)).toBe(true)
   })
 

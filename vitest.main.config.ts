@@ -117,6 +117,28 @@ export default defineConfig({
         'src/main/services/browser/browserProfileDeletes.ts': { lines: 94, functions: 98, branches: 83, statements: 94 },
         // measured 100/100/100/100
         'src/main/services/browser/BrowserProfileService.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Built-in browser tabs and their gates (spec 025 commits 6–7, 025-NFR-001,
+        // 025-FR-005, 025-FR-019, S2, S7, A4, A16): the per-window-kind channel
+        // allow-list, the deny-by-default session policy, the pinned view settings,
+        // the navigation sources, the app-address request filter, the tab, the tab
+        // service and its IPC handlers. Pinned ~2 points under the value measured
+        // when they landed (2026-11-03), never above 98.
+        // measured 100/100/100/100
+        'src/main/ipc/channelAllowList.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/94.73/94.44/98.66 (lines/functions/branches/statements)
+        'src/main/ipc/browser-tab-handlers.ts': { lines: 98, functions: 92, branches: 92, statements: 96 },
+        // measured 100/100/100/100
+        'src/main/services/browser/browserSessionPolicy.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/browserWebPreferences.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/browserNavigationPolicy.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/browserAppRequestFilter.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 99.32/100/97.95/98.85
+        'src/main/services/browser/BrowserTab.ts': { lines: 97, functions: 98, branches: 95, statements: 96 },
+        // measured 96.87/100/92.5/96.05
+        'src/main/services/browser/BrowserTabService.ts': { lines: 94, functions: 98, branches: 90, statements: 94 },
         // Built-in browser CDP session (spec 025 commit 9, 025-NFR-001 bullet 2,
         // 025-FR-038, 025-FR-056, S6, S23): the only sendCommand caller, the
         // method allow-list and its pinned parameters, the flood budget, the log

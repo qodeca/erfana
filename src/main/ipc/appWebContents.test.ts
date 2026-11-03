@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest'
 
-import { isAppWebContents, registerAppWebContents } from './appWebContents'
+import { appWebContentsKind, isAppWebContents, registerAppWebContents } from './appWebContents'
 import { createAppSender, createFakeWebContents } from './__test-helpers__/appSender'
 
 describe('appWebContents', () => {
@@ -45,7 +45,7 @@ describe('appWebContents', () => {
   it('does not register a webContents that is already destroyed', () => {
     const wc = createFakeWebContents()
     wc.destroy()
-    registerAppWebContents(wc)
+    registerAppWebContents(wc, 'main')
     expect(isAppWebContents({ id: wc.id, isDestroyed: () => false })).toBe(false)
   })
 
@@ -60,10 +60,12 @@ describe('appWebContents', () => {
         return wc.once(event, listener)
       }
     }
-    registerAppWebContents(counting)
-    registerAppWebContents(counting)
+    registerAppWebContents(counting, 'main')
+    registerAppWebContents(counting, 'browserPopup')
     expect(listeners).toBe(1)
     expect(isAppWebContents(wc)).toBe(true)
+    // The first kind is kept: a kind never changes after creation.
+    expect(appWebContentsKind(wc)).toBe('main')
     wc.destroy()
     expect(isAppWebContents(wc)).toBe(false)
   })
@@ -74,5 +76,23 @@ describe('appWebContents', () => {
     a.destroy()
     expect(isAppWebContents(a)).toBe(false)
     expect(isAppWebContents(b)).toBe(true)
+  })
+
+  describe('window kinds (spec 025 § 8, S7, A16)', () => {
+    it.each(['main', 'screenshotOverlay', 'browserPopup'] as const)('records the kind %s', (kind) => {
+      const wc = createFakeWebContents()
+      registerAppWebContents(wc, kind)
+      expect(appWebContentsKind(wc)).toBe(kind)
+    })
+
+    it('has no kind for an unregistered, missing or destroyed webContents', () => {
+      expect(appWebContentsKind(createFakeWebContents())).toBeNull()
+      expect(appWebContentsKind(undefined)).toBeNull()
+      expect(appWebContentsKind(null)).toBeNull()
+      const wc = createAppSender()
+      expect(appWebContentsKind({ id: wc.id, isDestroyed: () => true })).toBeNull()
+      wc.destroy()
+      expect(appWebContentsKind(wc)).toBeNull()
+    })
   })
 })

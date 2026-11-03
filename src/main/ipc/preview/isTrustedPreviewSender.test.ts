@@ -49,7 +49,7 @@ async function load(): Promise<
   const mod = await import('./isTrustedPreviewSender')
   const { registerAppWebContents } = await import('../appWebContents')
   appSender = createFakeWebContents()
-  registerAppWebContents(appSender)
+  registerAppWebContents(appSender, 'main')
   return mod.isTrustedPreviewSender
 }
 

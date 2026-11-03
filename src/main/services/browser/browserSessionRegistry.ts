@@ -21,8 +21,15 @@
  * there. Should Electron ever emit the event later, the id registered after
  * the constructor returns is already in the set when it arrives.
  *
- * Unused until the BrowserTab commit (solution design § 13, commit 7): no
- * browser session exists before then, so every `webContents` gets the baseline.
+ * DEVTOOLS FRONT ENDS. Chromium creates a DevTools window's own `webContents`
+ * in the browser context of the page it inspects, so it turns up here in the
+ * browser session, unregistered – and would be refused and closed the moment
+ * it opened. A tab arms {@link BrowserSessionRegistry.expectDevTools} just
+ * before it opens DevTools; one front end (`webContents` type `remote`) in
+ * that session is then accepted with the baseline (it navigates nowhere and
+ * opens no window), and is never a registered view. A page cannot make a
+ * `remote` `webContents`: every window open of a tab is denied or created by
+ * Erfana through `createView`.
  */
 import { logger } from '../LoggingService'
 
@@ -33,7 +40,17 @@ export interface BrowserViewContents {
   isDestroyed(): boolean
   once(event: 'destroyed', listener: () => void): unknown
   close(): void
+  /** Read only to recognise a DevTools front end (type `remote`). */
+  getType?(): string
 }
+
+/**
+ * The type Electron gives a `webContents` it did not create itself – the
+ * DevTools front end. Its URL is still empty when `web-contents-created` fires
+ * (measured on Electron 44: type `remote`, URL `''`), so the type is what
+ * identifies it.
+ */
+const DEVTOOLS_CONTENTS_TYPE = 'remote'
 
 /** What `web-contents-created` should do with a new `webContents`. */
 export type CreatedWebContentsVerdict =
@@ -59,6 +76,9 @@ export class BrowserSessionRegistry implements CreatedWebContentsGate {
   private readonly sessions = new WeakSet<object>()
   private readonly viewIds = new Set<number>()
   private slot: CreationSlot | null = null
+  /** Per session: DevTools front ends a tab has asked for and not yet seen. */
+  private readonly devToolsExpected = new Map<object, number>()
+  private readonly devToolsIds = new Set<number>()
 
   /** Record `session` as a browser session. Idempotent. */
   registerSession(session: object): void {
@@ -108,6 +128,29 @@ export class BrowserSessionRegistry implements CreatedWebContentsGate {
     return this.viewIds.has(contents.id) && !contents.isDestroyed()
   }
 
+  /**
+   * Expect one DevTools front end in `session` (a tab is about to open
+   * DevTools). Returns the function that withdraws the expectation if it was
+   * not used – call it once DevTools opened or the tab closed.
+   */
+  expectDevTools(session: object): () => void {
+    this.devToolsExpected.set(session, (this.devToolsExpected.get(session) ?? 0) + 1)
+    let withdrawn = false
+    return () => {
+      if (withdrawn) return
+      withdrawn = true
+      const left = (this.devToolsExpected.get(session) ?? 0) - 1
+      if (left > 0) this.devToolsExpected.set(session, left)
+      else this.devToolsExpected.delete(session)
+    }
+  }
+
+  /** True when `contents` is a live DevTools front end accepted by {@link expectDevTools}. */
+  isDevToolsFrontEnd(contents: Pick<BrowserViewContents, 'id' | 'isDestroyed'> | null | undefined): boolean {
+    if (!contents) return false
+    return this.devToolsIds.has(contents.id) && !contents.isDestroyed()
+  }
+
   classify(contents: BrowserViewContents): CreatedWebContentsVerdict {
     if (this.viewIds.has(contents.id)) return 'exempt'
     if (!this.isBrowserSession(contents.session)) return 'baseline'
@@ -117,7 +160,24 @@ export class BrowserSessionRegistry implements CreatedWebContentsGate {
       this.registerId(contents)
       return 'exempt'
     }
+    if (this.takeDevToolsExpectation(contents)) return 'baseline'
     return 'refused'
+  }
+
+  /** Accept `contents` as an expected DevTools front end, using up one expectation. */
+  private takeDevToolsExpectation(contents: BrowserViewContents): boolean {
+    const expected = this.devToolsExpected.get(contents.session) ?? 0
+    if (expected === 0 || contents.isDestroyed()) return false
+    if (contents.getType?.() !== DEVTOOLS_CONTENTS_TYPE) return false
+    if (expected === 1) this.devToolsExpected.delete(contents.session)
+    else this.devToolsExpected.set(contents.session, expected - 1)
+    const id = contents.id
+    this.devToolsIds.add(id)
+    contents.once('destroyed', () => {
+      this.devToolsIds.delete(id)
+    })
+    logger.info('Accepted a DevTools front end in a browser session', { webContentsId: id })
+    return true
   }
 
   /**

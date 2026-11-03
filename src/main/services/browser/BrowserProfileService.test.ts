@@ -71,6 +71,7 @@ function makeService(overrides: Partial<BrowserProfileServiceDeps> = {}): Browse
       return { path }
     }),
     registerSession: vi.fn(),
+    hardenSession: vi.fn(),
     signer: fakeSigner(true),
     storageBackend: () => 'keychain',
     isTrackedByGit: vi.fn(async () => tracked),
@@ -126,6 +127,47 @@ describe('BrowserProfileService.openForTab – first tab', () => {
     expect(profile.projectRoot).toBe(project)
     expect(fromPathCalls).toEqual([join(project, '.erfana', 'browser', 'profile')])
     expect(deps.registerSession).toHaveBeenCalledWith(profile.session)
+  })
+
+  it('lists the sessions opened in this run, leaving out a failed open', async () => {
+    const service = makeService()
+    expect(await service.openSessions()).toEqual([])
+    const profile = await service.openForTab()
+    expect(await service.openSessions()).toEqual([profile.session])
+  })
+
+  it('leaves out an open that fails while the list is being read', async () => {
+    let rejectLock: ((error: Error) => void) | undefined
+    const service = makeService({
+      lockService: {
+        checkLock: vi.fn(
+          () =>
+            new Promise<never>((_resolve, reject) => {
+              rejectLock = reject
+            })
+        ),
+        acquireLock: vi.fn()
+      }
+    })
+    const opening = service.openForTab()
+    await vi.waitFor(() => expect(rejectLock).toBeTypeOf('function'))
+    const sessions = service.openSessions()
+    rejectLock?.(new Error('lock read failed'))
+    await expect(opening).rejects.toThrow('lock read failed')
+    expect(await sessions).toEqual([])
+  })
+
+  it('hardens the session once, right after registering it and before openForTab returns', async () => {
+    const order: string[] = []
+    const service = makeService({
+      registerSession: vi.fn(() => order.push('register')),
+      hardenSession: vi.fn(() => order.push('harden'))
+    })
+    const profile = await service.openForTab()
+    expect(order).toEqual(['register', 'harden'])
+    expect(deps.hardenSession).toHaveBeenCalledWith(profile.session)
+    await service.openForTab()
+    expect(deps.hardenSession).toHaveBeenCalledTimes(1)
   })
 
   it('creates the profile and captures folders and a signed marker with a home copy', async () => {

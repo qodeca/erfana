@@ -331,7 +331,7 @@ export class AreaSelectOverlay {
     // (`logging:log`), so it joins the identity set the IPC gates check (spec
     // 025, 025-NFR-001). It still fails the exact-URL handler gates: it loads
     // the renderer entry with a route hash.
-    registerAppWebContents(overlay.webContents)
+    registerAppWebContents(overlay.webContents, 'screenshotOverlay')
     overlay.setAlwaysOnTop(true, 'screen-saver')
     overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
 

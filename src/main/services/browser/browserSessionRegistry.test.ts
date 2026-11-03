@@ -17,6 +17,7 @@ interface FakeContents extends BrowserViewContents {
   setWindowOpenHandler: Mock<(handler: unknown) => void>
   on: Mock<(event: string, listener: unknown) => void>
   getURL(): string
+  getType?(): string
   close: Mock<() => void>
   destroy(): void
 }
@@ -229,6 +230,59 @@ describe('BrowserSessionRegistry', () => {
       expect(registry.classify(view)).toBe('exempt')
       view.destroy()
       expect(registry.isRegisteredView(view)).toBe(false)
+    })
+  })
+
+  describe('DevTools front ends (FR-013, open note in § 3.1)', () => {
+    function devTools(session: object = browserSession): FakeContents {
+      const contents = fakeContents(session)
+      contents.getType = () => 'remote'
+      return contents
+    }
+
+    it('refuses a DevTools front end nobody asked for', async () => {
+      const contents = devTools()
+      expect(registry.classify(contents)).toBe('refused')
+      expect(registry.isDevToolsFrontEnd(contents)).toBe(false)
+    })
+
+    it('accepts one expected DevTools front end with the baseline, never as a registered view', () => {
+      registry.expectDevTools(browserSession)
+      const first = devTools()
+      expect(registry.classify(first)).toBe('baseline')
+      expect(registry.isDevToolsFrontEnd(first)).toBe(true)
+      expect(registry.isRegisteredView(first)).toBe(false)
+      // The expectation is used up: a second front end is refused.
+      expect(registry.classify(devTools())).toBe('refused')
+      first.destroy()
+      expect(registry.isDevToolsFrontEnd(first)).toBe(false)
+      expect(registry.isDevToolsFrontEnd(null)).toBe(false)
+    })
+
+    it('refuses a page that is not a DevTools front end even while one is expected', () => {
+      registry.expectDevTools(browserSession)
+      expect(registry.classify(fakeContents(browserSession))).toBe('refused')
+      const page = fakeContents(browserSession)
+      page.getType = () => 'browserView'
+      expect(registry.classify(page)).toBe('refused')
+      const gone = devTools()
+      gone.destroy()
+      expect(registry.classify(gone)).toBe('refused')
+    })
+
+    it('counts expectations per session, and a withdrawn one is gone (twice is harmless)', () => {
+      const other = { name: 'other' }
+      registry.registerSession(other)
+      registry.expectDevTools(browserSession)
+      const withdraw = registry.expectDevTools(browserSession)
+      expect(registry.classify(devTools(other))).toBe('refused')
+      withdraw()
+      withdraw()
+      expect(registry.classify(devTools())).toBe('baseline')
+      expect(registry.classify(devTools())).toBe('refused')
+      const last = registry.expectDevTools(browserSession)
+      last()
+      expect(registry.classify(devTools())).toBe('refused')
     })
   })
 
