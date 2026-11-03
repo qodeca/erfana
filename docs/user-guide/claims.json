@@ -55413,7 +55413,7 @@
       "quote": "The row reads **Picking – click an element**.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/BrowserPanel/pickRow.logic.ts:69",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/pickRow.logic.ts:79",
       "match": "if (label !== null) return { first: 'Picking – click an element', rest: [label] }"
     },
     {
@@ -55483,7 +55483,7 @@
       "quote": "it asks whether to **Send anyway**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/BrowserPanel/pickRow.logic.ts:183",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/pickRow.logic.ts:193",
       "match": "it may not be your agent. Send anyway?"
     },
     {

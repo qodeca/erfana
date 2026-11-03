@@ -204,7 +204,7 @@ describe('createFromPage (S2)', () => {
 
 describe('site requests (025-FR-019, 025-FR-020)', () => {
   function withSite() {
-    const link = { answerStrip: vi.fn(() => 'accepted' as const), answerCertificate: vi.fn(() => 'accepted' as const), detach: vi.fn() }
+    const link = { answerStrip: vi.fn(() => 'accepted' as const), answerCertificate: vi.fn(() => 'accepted' as const), holdRequests: vi.fn(), detach: vi.fn() }
     const site = { attachTab: vi.fn(() => link), showDownload: vi.fn(() => true) }
     service = make({ site })
     return { site, link }
@@ -312,6 +312,30 @@ describe('input routing (025-FR-014, 025-FR-047 to 025-FR-052)', () => {
         return v.view
       })
     })
+  })
+
+  it('holds the tab\'s site requests while a pick menu or dialog is open, and lets them in when it closes (S-28)', async () => {
+    const link = { answerStrip: vi.fn(() => 'accepted' as const), answerCertificate: vi.fn(() => 'accepted' as const), holdRequests: vi.fn(), detach: vi.fn() }
+    const input: TabInputSetup = { platform: 'darwin', clock: { now: () => 0 }, macAppKeys }
+    service = make({
+      input,
+      site: { attachTab: vi.fn(() => link), showDownload: vi.fn(() => true) },
+      createView: vi.fn((session) => {
+        const v = fakeView(session)
+        Object.assign(v.contents, { isFocused: () => false, setIgnoreMenuShortcuts: vi.fn(), executeJavaScriptInIsolatedWorld: vi.fn(async () => undefined) })
+        views.push(v)
+        return v.view
+      })
+    })
+    await open()
+    const routing = service.inputFor(service.list()[0]!)!
+    routing.dispatch({ type: 'pageLoaded', loaded: true })
+    routing.dispatch({ type: 'contextMenuPick' })
+    expect(link.holdRequests).not.toHaveBeenCalled()
+    routing.dispatch({ type: 'captureReady' })
+    expect(link.holdRequests.mock.calls).toEqual([[true]])
+    routing.dispatch({ type: 'menuClose', reason: 'esc' })
+    expect(link.holdRequests.mock.calls).toEqual([[true], [false]])
   })
 
   it('025-AC-014 gives each tab its routers before the first load and sends forwarded keys and page focus to the owning window only', async () => {

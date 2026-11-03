@@ -22,6 +22,26 @@ describe('PickFrames', () => {
     expect(frames.frameTargets().map((t) => t.sessionKey)).toEqual(['', 'S1'])
   })
 
+  it('tells whether a frame is still there: its target attached and the frame in its tree (025-FR-029)', async () => {
+    const { page, frames } = setup()
+    page.addFrame({ frameId: 'sub', parentId: 'top', session: '', origin: 'https://app.test' })
+    expect(await frames.frameAlive('', 'top')).toBe(true)
+    expect(await frames.frameAlive('', 'sub')).toBe(true)
+    expect(await frames.frameAlive('S1', 'F1')).toBe(true)
+    page.frames.splice(page.frames.findIndex((f) => f.frameId === 'sub'), 1)
+    expect(await frames.frameAlive('', 'sub')).toBe(false)
+    expect(await frames.frameAlive('gone', 'F9')).toBe(false)
+  })
+
+  it('counts a frame as alive when it cannot tell: no frame id, or a tree that cannot be read', async () => {
+    const { page, frames } = setup()
+    expect(await frames.frameAlive('', '')).toBe(true)
+    page.cdp.handle('Page.getFrameTree', () => {
+      throw new Error('busy')
+    })
+    expect(await frames.frameAlive('', 'anything')).toBe(true)
+  })
+
   it('ignores protocol events other than a target attach, and stops listening on dispose', () => {
     const { page, frames } = setup()
     page.cdp.emit('protocolEvent', { target: page.cdp.targets[0], method: 'Page.frameNavigated', params: { sessionId: 'X' } })

@@ -279,6 +279,10 @@ export default defineConfig({
         'src/main/services/browser/pick/pickCdp.ts': { lines: 98, functions: 98, branches: 88, statements: 98 },
         // measured 98.48/100/83.58/96.25
         'src/main/services/browser/pick/pickElement.ts': { lines: 96, functions: 98, branches: 81, statements: 94 },
+        // measured 98.03/100/85.71/95.52
+        'src/main/services/browser/pick/pickEmbedHost.ts': { lines: 96, functions: 98, branches: 83, statements: 93 },
+        // measured 100/100/100/100
+        'src/main/services/browser/pick/pickFrameGone.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/91.42/98.85
         'src/main/services/browser/pick/pickFrames.ts': { lines: 98, functions: 98, branches: 89, statements: 96 },
         // measured 100/93.33/100/98

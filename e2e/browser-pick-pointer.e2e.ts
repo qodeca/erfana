@@ -191,7 +191,7 @@ test.describe('025-AC-083 pick and prompt with the pointer alone', () => {
     await trap.expectNoKeys()
   })
 
-  test('toward a shell, a click on Choose terminal answers the warning and the menu stays open with the pick', async ({
+  test('toward a shell, a click on Choose terminal opens the terminal menu, a click on a terminal there answers the warning, and the menu stays open with the pick', async ({
     appWithTestProject,
     windowWithTestProject,
     browserServers,
@@ -213,9 +213,16 @@ test.describe('025-AC-083 pick and prompt with the pointer alone', () => {
     await pressAndSlideOff(windowWithTestProject, choose, banner.locator('.erf-brw-banner__text'))
     await expect(banner).toContainText('not an agent')
     await expect(flow.actions).toBeVisible()
+    // Choose terminal opens the terminal menu (025-FR-061, 025-AC-077); a click on a terminal there sets the target.
     await choose.click()
-    await expect(banner).toContainText('No agent is running in Terminal')
+    const menu = flow.panel.menu('Target terminal')
+    await expect(menu).toBeVisible()
     await expect(flow.actions).toBeVisible()
+    await menu.getByRole('menuitem', { name: /^Terminal · \S+/ }).first().click()
+    await expect(menu).toHaveCount(0)
+    await expect(flow.actions).toBeVisible()
+    // The chosen terminal still runs only a shell, so the banner says so again (as in 025-AC-077); nothing was sent.
+    await expect(banner).toContainText('No agent is running in Terminal')
     expect((await flow.state()).capture).toEqual(capture)
     expect(await captureFiles(testProject.path)).toEqual([])
     await trap.expectNoKeys()

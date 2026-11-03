@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
   NOTE_TEXT,
   guardBanner,
+  heldRequestsText,
   noteDuration,
   pickBanner,
   pickPlace,
@@ -127,5 +128,15 @@ describe('guardBanner (025-FR-061)', () => {
       text: 'Sends to → Terminal · claude – send again when ready.',
       action: null
     })
+  })
+})
+
+describe('heldRequestsText (025-FR-054, S-28)', () => {
+  it('names one request, then many; none, a negative or a non-number count shows nothing', () => {
+    expect(heldRequestsText(1)).toBe('1 site request waiting')
+    expect(heldRequestsText(2)).toBe('2 site requests waiting')
+    expect(heldRequestsText(0)).toBeNull()
+    expect(heldRequestsText(-1)).toBeNull()
+    expect(heldRequestsText(Number.NaN)).toBeNull()
   })
 })

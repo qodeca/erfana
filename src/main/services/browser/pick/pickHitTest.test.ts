@@ -23,6 +23,15 @@ describe('PickHitTest', () => {
     expect(await hitTest.atViewPoint({ x: 35, y: 30 })).toEqual({ node: { sessionKey: '', backendNodeId: 5, frameId: 'top' }, viewPoint: { x: 35, y: 30 } })
   })
 
+  it('a point inside an <embed> PDF picks the embed, not the document inside it (025-FR-029, S-2)', async () => {
+    const { page, hitTest } = setup()
+    page.addFrame({ frameId: 'PDF', parentId: 'top', session: '', origin: 'https://app.test' })
+    page
+      .add({ id: 7, tag: 'embed', parent: 2, attrs: { id: 'pdf' }, box: [500, 300, 100, 80], contentFrameId: 'PDF' })
+      .add({ id: 8, tag: 'body', frameId: 'PDF', box: [505, 305, 90, 70] })
+    expect(await hitTest.atViewPoint({ x: 550, y: 340 })).toEqual({ node: { sessionKey: '', backendNodeId: 7, frameId: 'top' }, viewPoint: { x: 550, y: 340 } })
+  })
+
   it("descends into a cross-site frame through its owner's content quad (ADR 0007 decision 4)", async () => {
     const { hitTest } = setup()
     const hit = await hitTest.atViewPoint({ x: 415, y: 115 })

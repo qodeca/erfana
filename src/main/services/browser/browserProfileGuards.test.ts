@@ -73,6 +73,23 @@ describe('ensureBrowserFolder (025-FR-016)', () => {
     expect(await readFile(join(browserDir, '.gitignore'), 'utf8')).toBe('*')
   })
 
+  it('two first set-ups at once both succeed: the one that loses the create checks what the other wrote (025-FR-053)', async () => {
+    const runs = await Promise.allSettled([ensureBrowserFolder(project), ensureBrowserFolder(project), ensureBrowserFolder(project)])
+    expect(runs.map((r) => r.status)).toEqual(['fulfilled', 'fulfilled', 'fulfilled'])
+    const browserDir = join(project, '.erfana', 'browser')
+    expect(await readdir(browserDir)).toEqual(['.gitignore'])
+    expect(await readFile(join(browserDir, '.gitignore'), 'utf8')).toBe('*')
+  })
+
+  itPosix('a .gitignore name taken by a link after the check is still refused, not followed', async () => {
+    // Planted where the exclusive create runs: the retry sees a link and refuses, as for any existing level.
+    await mkdir(join(project, '.erfana', 'browser'), { recursive: true })
+    await writeFile(join(outside, 'target'), 'outside')
+    await symlink(join(outside, 'target'), join(project, '.erfana', 'browser', '.gitignore'))
+    await expectRefusal(ensureBrowserFolder(project), 'link', '.erfana/browser/.gitignore')
+    expect(await readFile(join(outside, 'target'), 'utf8')).toBe('outside')
+  })
+
   it("025-AC-016 never touches the project's own .gitignore", async () => {
     const own = 'node_modules\n# keep\n'
     await writeFile(join(project, '.gitignore'), own)

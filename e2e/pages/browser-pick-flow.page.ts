@@ -563,6 +563,35 @@ export class PickFlow {
     }, id)
   }
 
+  /**
+   * Record every `method` command Erfana's debugger session sends to this tab
+   * from now on, with its session (`''` the top document) and params. Erfana's
+   * session is the only caller of the tab's `debugger.sendCommand` (a unit
+   * test pins that), so the record is Erfana's own state at the protocol level.
+   */
+  async watchCommands(method: string): Promise<void> {
+    const id = (await this.panel.hookTab()).webContentsId
+    await this.app.evaluate(({ webContents }, { contentsId, name }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- a test-only record on main's globalThis
+      const g = globalThis as any
+      g.__pickCommands ??= {}
+      const log: Array<{ session: string; params: unknown }> = (g.__pickCommands[`${contentsId}|${name}`] = [])
+      const dbg = webContents.fromId(contentsId)!.debugger
+      const send = dbg.sendCommand.bind(dbg)
+      dbg.sendCommand = (m: string, params?: object, sessionId?: string) => {
+        if (m === name) log.push({ session: sessionId ?? '', params })
+        return send(m, params, sessionId)
+      }
+    }, { contentsId: id, name: method })
+  }
+
+  /** The `method` commands {@link watchCommands} recorded, in order. */
+  async commands(method: string): Promise<Array<{ session: string; params: unknown }>> {
+    const id = (await this.panel.hookTab()).webContentsId
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- a test-only record on main's globalThis
+    return this.app.evaluate((_e, key) => [...((globalThis as any).__pickCommands?.[key] ?? [])], `${id}|${method}`)
+  }
+
   /** The events {@link watchPauses} recorded. */
   async pauses(): Promise<Array<{ method: string; session: string }>> {
     const id = (await this.panel.hookTab()).webContentsId

@@ -14,6 +14,16 @@
 import type { TargetStatusResponse } from '../../../../../shared/ipc/browser-tab-schema'
 import type { StatusNote } from '../../../stores/useBrowserPickStore'
 
+/**
+ * The pick row's chip for site requests held while the menu or dialog is
+ * open (025-FR-054, S-28): "1 site request waiting", "2 site requests
+ * waiting"; null when none waits.
+ */
+export function heldRequestsText(count: number): string | null {
+  if (!Number.isFinite(count) || count < 1) return null
+  return count === 1 ? '1 site request waiting' : `${count} site requests waiting`
+}
+
 /** Where keyboard focus is, as the banner names it (025-FR-065's table). */
 export type PickPlace = 'page' | 'toolbar' | 'panel' | 'dialog' | 'out' | 'outPanelClosed' | 'outDialog'
 

@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The held capture while the pick menu or dialog is open (spec 025,
- * 025-FR-027, 025-FR-030; solution design § 6.1). Kept out of
+ * Refinement and the held capture while the pick menu or dialog is open
+ * (spec 025, 025-FR-027, 025-FR-030; solution design § 6.1). Kept out of
  * `BrowserTabPick.ts`.
+ *
+ * - {@link liveStep}: one Up or Down before a confirm, on the hovered
+ *   element's chain of the live page.
  *
  * - {@link refineHeld}: Up and Down in the menu move along the chain the
  *   capture snapshotted. A live page is first checked for the picked element
@@ -18,13 +21,36 @@ import type { PickSurface, RoutingEvent } from '../../../../shared/browser/routi
 import type { PickEvent } from '../../../../shared/ipc/browser-tab-schema'
 import type { ClosePickReason } from '../../../../shared/ipc/browser-tab-pick-schema'
 import type { BrowserCapture, RefineMove } from '../capture/BrowserCapture'
-import type { PickReader } from './pickCdp'
-import { readChain } from './pickElement'
+import type { PickNode, PickReader } from './pickCdp'
+import { readChain, type ElementChain } from './pickElement'
 import type { PickFrames } from './pickFrames'
 import { boxChanged } from './pickGeometry'
 
 type RefinedEvent = Extract<PickEvent, { kind: 'refined' }>
 type NoteEvent = Extract<PickEvent, { kind: 'note' }>
+
+/**
+ * One Up (`parent`) or Down (`child`) step before a confirm (025-FR-027),
+ * from `index` on the hovered element's `chain` (`null`: at the hovered
+ * element; a `null` chain could not be read). Answers the element to outline
+ * and the new index (`null` again back at the hovered element), or the note
+ * the step shows instead.
+ */
+export function liveStep(
+  chain: ElementChain | null,
+  index: number | null,
+  move: 'parent' | 'child'
+): { readonly node: PickNode; readonly index: number | null } | { readonly note: 'elementGone' | 'topOfPage' | 'backAtStart' } {
+  if (chain === null) return { note: 'elementGone' }
+  const last = chain.entries.length - 1
+  const at = index ?? last
+  const next = move === 'parent' ? at - 1 : at + 1
+  if (next < 0) return { note: 'topOfPage' }
+  if (next > last) return { note: 'backAtStart' }
+  const node = chain.entries[next].node
+  if (node === null) return { note: 'elementGone' }
+  return { node, index: next === last ? null : next }
+}
 
 export interface RefineHeldDeps {
   readonly reader: PickReader

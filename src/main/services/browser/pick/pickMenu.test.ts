@@ -5,7 +5,7 @@ import { BrowserCapture } from '../capture/BrowserCapture'
 import { chain, entry, facts, hints, moment } from '../capture/__test-helpers__/captureFixtures'
 import { PickReader } from './pickCdp'
 import { PickFrames } from './pickFrames'
-import { closeEvent, refineHeld, type RefineHeldDeps } from './pickMenu'
+import { closeEvent, liveStep, refineHeld, type RefineHeldDeps } from './pickMenu'
 import { samplePage } from './__test-helpers__/samplePage'
 
 const top = (id: number) => ({ sessionKey: '', backendNodeId: id, frameId: 'top' })
@@ -112,5 +112,26 @@ describe('closeEvent', () => {
     expect(closeEvent('esc', 'menu')).toEqual({ type: 'menuClose', reason: 'esc' })
     expect(closeEvent('clickOutside', 'menu')).toEqual({ type: 'menuClose', reason: 'esc' })
     expect(closeEvent('toolbar', 'menu')).toEqual({ type: 'menuClose', reason: 'toolbarClick' })
+  })
+})
+
+describe('liveStep (025-FR-027, before a confirm)', () => {
+  const walk = chain([entry('html', { node: top(1) }), entry('div', { node: top(3) }), entry('span', { node: top(5) })])
+
+  it('Up from the hovered element goes to its parent, Down comes back to it (index null again)', () => {
+    expect(liveStep(walk, null, 'parent')).toEqual({ node: top(3), index: 1 })
+    expect(liveStep(walk, 1, 'child')).toEqual({ node: top(5), index: null })
+    expect(liveStep(walk, 1, 'parent')).toEqual({ node: top(1), index: 0 })
+  })
+
+  it('names the ends: Up at the root, Down at the hovered element', () => {
+    expect(liveStep(walk, 0, 'parent')).toEqual({ note: 'topOfPage' })
+    expect(liveStep(walk, null, 'child')).toEqual({ note: 'backAtStart' })
+  })
+
+  it('an unreadable chain, or a step onto an element that went, says the element is gone', () => {
+    expect(liveStep(null, null, 'parent')).toEqual({ note: 'elementGone' })
+    const holed = chain([entry('html', { node: null }), entry('span', { node: top(5) })])
+    expect(liveStep(holed, null, 'parent')).toEqual({ note: 'elementGone' })
   })
 })

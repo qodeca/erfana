@@ -30,7 +30,8 @@
  * - **Site requests** (025-FR-019, 025-FR-020): each tab is attached to the
  *   `site` (`permissions/BrowserSite.ts`) before its first page loads; its
  *   strip rows and download notices go to the owning window, and
- *   {@link BrowserTabService.answerStrip} takes the answers back.
+ *   {@link BrowserTabService.answerStrip} takes the answers back. While a
+ *   pick menu or dialog is open the tab's input holds them (S-28).
  * - **Input** (025-FR-014, 025-FR-047 to 025-FR-052, ADR 0011 decisions
  *   11–16): each tab gets its key and mouse routers (`input/BrowserTabInput.ts`)
  *   before its first page loads; forwarded keys, page focus and pick-mode
@@ -436,7 +437,7 @@ export class BrowserTabService {
   private attachInput(tab: BrowserTab, host: TabHost): BrowserTabInput | null {
     const setup = this.deps.input
     if (setup === undefined) return null
-    const input = newTabInput(tab, host, setup, (step) => this.pageOf.get(tab)?.zoom(step))
+    const input = newTabInput(tab, host, setup, (step) => this.pageOf.get(tab)?.zoom(step), (open) => this.siteOf.get(tab)?.holdRequests(open))
     this.inputOf.set(tab, input)
     if (!this.windowKeys.has(host.id) && !host.webContents.isDestroyed()) {
       this.windowKeys.set(host.id, new AppWindowBrowserKeys(host.webContents, setup.platform))

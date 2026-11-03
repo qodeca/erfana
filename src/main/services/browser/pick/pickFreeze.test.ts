@@ -43,6 +43,30 @@ describe('PickFreeze (ADR 0008)', () => {
     expect(cdp.calls('Debugger.pause')).toHaveLength(2)
   })
 
+  it('sends a pause again once the enable answered, when the pause overtook it and was refused (the top document)', async () => {
+    let refused = 0
+    cdp.handle('Debugger.pause', (_params, sessionKey) => {
+      if (sessionKey === '' && refused++ === 0) throw new Error('Debugger agent is not enabled')
+      return {}
+    })
+    const freeze = new PickFreeze(cdp, new PickReader(cdp), audio(), onExternalResume)
+    await freeze.freeze()
+    expect(cdp.calls('Debugger.pause').map((c) => c.sessionKey)).toEqual(['', 'S1', ''])
+    const top = cdp.sent.filter((c) => c.sessionKey === '').map((c) => c.method)
+    expect(top).toEqual(['Debugger.enable', 'Debugger.pause', 'Debugger.pause'])
+  })
+
+  it('does not send the pause again once the page is being unfrozen', async () => {
+    cdp.handle('Debugger.pause', () => {
+      throw new Error('Debugger agent is not enabled')
+    })
+    const freeze = new PickFreeze(cdp, new PickReader(cdp), audio(), onExternalResume)
+    const freezing = freeze.freeze()
+    await freeze.unfreeze()
+    await freezing
+    expect(cdp.calls('Debugger.pause')).toHaveLength(2)
+  })
+
   it('pauses a frame that attaches while frozen, but no worker', async () => {
     const freeze = new PickFreeze(cdp, new PickReader(cdp), audio(), onExternalResume)
     await freeze.freeze()

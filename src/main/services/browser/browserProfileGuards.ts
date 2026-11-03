@@ -233,16 +233,24 @@ export async function readFileNoFollow(
  * `.erfana/browser/.gitignore` holds exactly `*` (spec change S-20): created
  * exclusively when missing; any other content is replaced whole by a fresh
  * file renamed over it (a rename replaces a link planted in between, it never
- * writes through one).
+ * writes through one). A create that loses a race (two first writes at once,
+ * 025-FR-053) checks whatever is there now, once, like an existing file – as
+ * the folder levels do.
  */
-async function ensureGitignore(canonical: string): Promise<void> {
+async function ensureGitignore(canonical: string, afterLostRace = false): Promise<void> {
   const segments = [...BROWSER_DIR_SEGMENTS, BROWSER_GITIGNORE_NAME]
   const current = await readFileNoFollow(canonical, segments, 64 * 1024).catch((error: unknown) => {
     throw asWriteFailure(error, segments, 'Reading the file')
   })
   if (current === BROWSER_GITIGNORE_CONTENT) return
   if (current === null && !(await checkExistingLevel(canonical, segments, 'file'))) {
-    await createFileExclusive(canonical, segments, BROWSER_GITIGNORE_CONTENT)
+    try {
+      await createFileExclusive(canonical, segments, BROWSER_GITIGNORE_CONTENT)
+    } catch (error) {
+      const code = errnoCode(error instanceof BrowserProfileError ? error.cause : error)
+      if (code !== 'EEXIST' || afterLostRace) throw error
+      await ensureGitignore(canonical, true)
+    }
     return
   }
   // Present with other content (or too large to read): replace it whole

@@ -6,7 +6,7 @@
  * probe results; spec change S-33).
  *
  * `Debugger.enable` then `Debugger.pause` on every frame target (workers keep
- * running); a frame that attaches while frozen is paused before its
+ * running), the pause sent again when it overtook the enable; a frame that attaches while frozen is paused before its
  * `Runtime.runIfWaitingForDebugger`, which the session sends on a later task.
  * The hang probe is suspended (`frozen`) and the audio muted while frozen.
  * Unfreeze: `Debugger.resume`, then `Debugger.disable` – which also drops a
@@ -104,13 +104,25 @@ export class PickFreeze {
     for (const off of this.unsubscribe.splice(0)) off()
   }
 
+  /**
+   * `Debugger.enable` then `Debugger.pause`, sent back to back so that on a
+   * new frame both go out before the session's resume. Chromium delivers
+   * `Debugger.pause` on its interrupt path, ahead of commands still queued
+   * for the page's main thread, so it can overtake the enable and be refused
+   * ("Debugger agent is not enabled") – the top document then never paused.
+   * A refused pause is therefore sent again once the enable has answered, as
+   * long as the page is still meant to be frozen.
+   */
   private pauseTarget(sessionKey: string): Promise<void> {
-    // Sent back to back, never awaiting each: on a new frame both go out before the session's resume.
     const enable = this.reader.call('Debugger.enable', undefined, sessionKey)
-    const pause = this.reader.call('Debugger.pause', undefined, sessionKey)
-    return Promise.all([enable, pause]).then(
-      () => undefined,
-      (error: unknown) => logger.debug('Browser pick: a frame could not be paused', { error: String(error) })
+    const paused = this.reader.call('Debugger.pause', undefined, sessionKey).then(
+      () => true,
+      () => false
     )
+    return enable
+      .then(async () => {
+        if (!(await paused) && this.frozen && !this.resuming) await this.reader.call('Debugger.pause', undefined, sessionKey)
+      })
+      .catch((error: unknown) => logger.debug('Browser pick: a frame could not be paused', { error: String(error) }))
   }
 }

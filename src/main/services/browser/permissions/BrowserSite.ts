@@ -74,6 +74,8 @@ export interface TabSiteLink {
   answerStrip(requestId: string, answer: StripAnswer, fields?: StripFields): AnswerResult
   /** `browser-tab:certificate`: **Proceed anyway** or **Back to safety** on the warning page. */
   answerCertificate(decisionId: string, proceed: boolean): CertificateAnswerResult
+  /** A pick menu or dialog opened (`true`) or closed: new site requests wait (025-FR-054, S-28). */
+  holdRequests(held: boolean): void
   /** The tab closed: its prompts are withdrawn (denied). */
   detach(): void
 }
@@ -177,6 +179,7 @@ export class BrowserSite implements SessionSiteHooks {
     return {
       answerStrip: (requestId, answer, fields) => (entry.open ? strip.answer(requestId, answer, fields) : 'unknown'),
       answerCertificate: (decisionId, proceed) => (entry.open ? entry.security.answerCertificate(decisionId, proceed) : 'unknown'),
+      holdRequests: (held) => strip.hold(held),
       detach: () => this.detach(contents.id)
     }
   }

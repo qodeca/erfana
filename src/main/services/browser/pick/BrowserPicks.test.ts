@@ -177,6 +177,46 @@ describe('BrowserPicks', () => {
       expect(s.picks.bench.read('send')).toHaveLength(1)
     })
 
+    it('two tabs writing at the same moment each write their own capture (025-FR-053)', async () => {
+      const s = setup()
+      // Two tabs of one project on one BrowserPicks; the second's pointer rests on the button, not the label.
+      const tabOf = (id: string): { tab: BrowserTab; contents: FakePickContents; cdp: ReturnType<typeof samplePage>['cdp'] } => {
+        const contents = new FakePickContents()
+        return { tab: { ...s.tab, id, contents } as unknown as BrowserTab, contents, cdp: samplePage({ crossSite: false }).cdp }
+      }
+      const one = tabOf('tab-a')
+      const two = tabOf('tab-b')
+      const picks = new BrowserPicks({ clock: s.clock, encodePng, terminals: () => terminals(), sessionOf: (c) => (c === one.contents ? one.cdp : two.cdp) })
+      const confirm = async (t: ReturnType<typeof tabOf>, x: number, y: number): Promise<{ pick: BrowserTabPick; id: string }> => {
+        const routing = input()
+        const pick = picks.attach(t.tab, s.host, routing, () => undefined)!
+        routing.dispatch({ type: 'pickButton' })
+        await settle()
+        t.contents.mouse('mouseMove', x, y)
+        await settle()
+        routing.dispatch({ type: 'enter', now: s.clock.now() })
+        await settle()
+        return { pick, id: pick.capture!.id }
+      }
+      const a = await confirm(one, 35, 30)
+      const b = await confirm(two, 100, 45)
+      expect(b.id).not.toBe(a.id)
+      const [answerA, answerB] = await Promise.all([
+        picks.writeCapture(one.tab, a.pick, OWNER, { captureId: a.id, terminalId: 'terminal-1' }),
+        picks.writeCapture(two.tab, b.pick, OWNER, { captureId: b.id, terminalId: 'terminal-1' })
+      ])
+      if (!('paths' in answerA) || !('paths' in answerB)) throw new Error(JSON.stringify([answerA, answerB]))
+      expect(answerA.paths.context).not.toBe(answerB.paths.context)
+      const textA = await readFile(path.join(root, answerA.paths.context), 'utf8')
+      const textB = await readFile(path.join(root, answerB.paths.context), 'utf8')
+      // Each file's selector chain and box are its own tab's pick.
+      expect(textA).toMatch(/### Selector chain\n\n- span#label\n/)
+      expect(textA).toContain('Element box (top-level viewport, CSS px): x 30, y 25, width 40, height 20')
+      expect(textB).toMatch(/### Selector chain\n\n- button#save\n/)
+      expect(textB).toContain('Element box (top-level viewport, CSS px): x 20, y 20, width 100, height 30')
+      expect((await readdir(path.join(root, ...CAPTURES_REL.split('/')))).length).toBe(6)
+    })
+
     it('joins a second submit to the write in flight (each confirmation writes once)', async () => {
       const s = setup()
       const id = await held(s)

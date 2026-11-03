@@ -108,6 +108,8 @@ export interface BrowserTabInputDeps {
   readonly refine?: (move: 'parent' | 'child') => void
   /** Reducer effects this module does not perform itself. */
   readonly onEffect?: (effect: RoutingEffect) => void
+  /** A pick menu or dialog opened (`true`) or the last one closed (`false`): site requests wait meanwhile (S-28). */
+  readonly onSurface?: (open: boolean) => void
 }
 
 /** The tab's pick pipeline (commit 14), attached after the routers exist (`pick/BrowserPicks.ts`). */
@@ -181,8 +183,10 @@ export class BrowserTabInput implements ToolbarKeyTarget {
   dispatch(event: RoutingEvent): readonly RoutingEffect[] {
     if (this.disposed) return []
     const { state, effects } = reduceRouting(this.routing, event)
+    const wasOpen = this.routing.surface !== 'none'
     this.routing = state
     for (const effect of effects) this.perform(effect)
+    if (wasOpen !== (state.surface !== 'none')) this.deps.onSurface?.(!wasOpen)
     return effects
   }
 

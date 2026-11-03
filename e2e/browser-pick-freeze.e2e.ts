@@ -38,10 +38,10 @@ async function openHoverMenu(flow: PickFlow): Promise<void> {
   await flow.move(item.x + item.width / 2, item.y + item.height / 2)
 }
 
-// Titled without the ID: whether the page really stops is in browser-pick-freeze-pause.e2e.ts (an open finding);
-// "no focus emulation remains" cannot be read in this lane (see the last test of this block); the same-site popup
-// is recorded only. So 025-AC-028 is not proven whole here.
-test.describe('hover-only element and the freeze (025-AC-028)', () => {
+// 025-AC-028 with browser-pick-freeze-pause.e2e.ts, which proves the engine's pause, the DevTools resume and the
+// same-site popup record (S-25). "No focus emulation remains" is read from Erfana's own session at the protocol:
+// document.hasFocus() cannot show it in this lane (the control test at the end of this block).
+test.describe('025-AC-028 hover-only element and the freeze', () => {
   test('the second Ctrl/Cmd+E picks a hover-menu item: the menu stays open and the still shows it, the page is held and muted while the menu or dialog is open, and a click while held is never delivered', async ({
     appWithTestProject,
     windowWithTestProject,
@@ -131,12 +131,51 @@ test.describe('hover-only element and the freeze (025-AC-028)', () => {
     expect(log.filter((t) => t === 'blur' || t === 'visibilitychange' || t === 'menu-close' || t === 'item-click')).toEqual([])
   })
 
+  test('after pick mode ends no focus emulation remains: every document Erfana turned it on for, top and cross-origin frame, is turned off again', async ({
+    appWithTestProject,
+    windowWithTestProject,
+    browserServers
+  }) => {
+    // document.hasFocus() cannot show it in this lane (the control below): Playwright's own session keeps focus
+    // emulation on, and Chromium keeps it per DevTools session. So the check is Erfana's own session, at the protocol.
+    const METHOD = 'Emulation.setFocusEmulationEnabled'
+    const flow = await PickFlow.open(appWithTestProject, windowWithTestProject)
+    const terminal = new AgentTerminal(windowWithTestProject, flow)
+    await terminal.open()
+    await flow.load(browserServers.sites.static.url('/hover-menu.html'))
+    await expect.poll(async () => flow.frameEval<string>('other.test', 'document.readyState').catch(() => ''), { timeout: WAIT_MS }).toBe('complete')
+    await flow.watchCommands(METHOD)
+    /** The last value Erfana sent per document session. */
+    const lastBySession = async (): Promise<Map<string, boolean>> => {
+      const out = new Map<string, boolean>()
+      for (const c of await flow.commands(METHOD)) out.set(c.session, (c.params as { enabled: boolean }).enabled)
+      return out
+    }
+
+    // The click route: Pick element, hover the menu open, click the item, close the menu, leave pick mode.
+    await flow.focusErfana()
+    await flow.pickButton.click()
+    await flow.waitForActive(true)
+    await expect.poll(async () => [...(await lastBySession()).values()], { timeout: WAIT_MS }).toEqual([true, true])
+    const sessions = [...(await lastBySession()).keys()]
+    expect(sessions, 'the top document and the cross-origin frame').toContain('')
+    await openHoverMenu(flow)
+    await flow.pickByClick('#item-reports', 'a#item-reports ')
+    await windowWithTestProject.keyboard.press('Escape')
+    await expect(flow.actions).toHaveCount(0, { timeout: WAIT_MS })
+    await flow.pickButton.click()
+    await flow.waitForActive(false)
+    await terminal.terminal.focus()
+
+    await expect.poll(async () => Object.fromEntries(await lastBySession()), { timeout: WAIT_MS }).toEqual(Object.fromEntries(sessions.map((k) => [k, false])))
+  })
+
   test('the lane cannot read leftover focus emulation: document.hasFocus() is already true with the terminal focused before any pick', async ({
     appWithTestProject,
     windowWithTestProject,
     browserServers
   }) => {
-    // A control that documents why the focus-emulation clause of 025-AC-028 is not asserted here (manual lane).
+    // A control that documents why the focus-emulation clause of 025-AC-028 is read at the protocol, not by hasFocus().
     const flow = await PickFlow.open(appWithTestProject, windowWithTestProject)
     const terminal = new AgentTerminal(windowWithTestProject, flow)
     await terminal.open()
@@ -147,8 +186,9 @@ test.describe('hover-only element and the freeze (025-AC-028)', () => {
 })
 
 
-// Titled without the ID: "two browser tabs send at the same time" is not proven here – showing one tab hides
-// (and releases) the other, and the suite has no split-view helper to show both at once.
+// Titled without the ID: "two browser tabs send at the same time" cannot be walked in the UI – the editor area never
+// splits (dockview drag is off by design) and hiding a tab discards its capture (025-FR-052), so one window never has
+// two captures held at once. The property is proven in main: BrowserPicks.test.ts writes two tabs' captures at once.
 test.describe('the capture is taken at the pick (025-AC-067)', () => {
   test('picked by click in state 2, then advanced and removed under the Change dialog: the screenshot and HTML show state 2 and the console has only entries from before the pick', async ({
     appWithTestProject,

@@ -182,6 +182,26 @@ export class PickFrames {
     }
   }
 
+  /**
+   * Whether `frameId` is still a frame of `sessionKey` – false once its
+   * target detached or the frame left the session's tree (025-FR-029: a
+   * removed frame ends the highlight). An empty `frameId` (unknown) and a
+   * tree that cannot be read count as alive, so nothing is ended on a guess.
+   */
+  async frameAlive(sessionKey: string, frameId: string): Promise<boolean> {
+    if (!this.frameTargets().some((t) => t.sessionKey === sessionKey)) return false
+    if (frameId === '') return true
+    let raw: unknown
+    try {
+      raw = await this.reader.call('Page.getFrameTree', undefined, sessionKey)
+    } catch {
+      return true
+    }
+    const frames: PickFrame[] = []
+    flattenTree(isRecord(raw) ? raw.frameTree : undefined, sessionKey, frames)
+    return frames.length === 0 || frames.some((f) => f.frameId === frameId)
+  }
+
   /** The frames from the top page down to `frameId`, top first; just the frame when the chain breaks. */
   async frameChain(frameId: string): Promise<PickFrame[]> {
     return chainFrames(await this.allFrames(), frameId)

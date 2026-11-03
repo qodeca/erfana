@@ -9,7 +9,8 @@
  *
  * - **On and off**: the engine side is `pickModeSwitch.ts`.
  * - **Hover**: each move is hit-tested (`pickHitTest.ts`), one in flight, the
- *   latest wins; the engine outlines the element and its label goes out (`highlight`).
+ *   latest wins; the engine outlines the element and its label goes out (`highlight`);
+ *   a frame that goes ends it (`pickFrameGone.ts`).
  * - **Up and Down before a confirm** walk the hovered element's chain on the
  *   live page; a move of the mouse to another element starts over from it.
  * - **Confirm** ({@link BrowserTabPick.startCapture}, `capture/` modules):
@@ -36,11 +37,12 @@ import { PickReader, type PickCdp, type PickNode } from './pickCdp'
 import { CaptureFailure, PickCaptureReads } from './pickCaptureReads'
 import { readChain, type ElementChain } from './pickElement'
 import { PickFrames } from './pickFrames'
+import { watchFrameGone } from './pickFrameGone'
 import { PickFreeze, type FreezeAudio } from './pickFreeze'
 import type { Point, PointerReport } from './pickGeometry'
 import { PickHighlight, type HighlightRecord } from './pickHighlight'
 import { PickHitTest } from './pickHitTest'
-import { closeEvent, refineHeld } from './pickMenu'
+import { closeEvent, liveStep, refineHeld } from './pickMenu'
 import { centre, flashThenHide, sameNode } from './pickFlash'
 import { PickModeSwitch } from './pickModeSwitch'
 import { PickBench, type PickFaults } from './pickSupport'
@@ -136,6 +138,7 @@ export class BrowserTabPick {
         if (this.active && target.type === 'iframe') this.modeSwitch.focusEmulation(target.sessionKey, true)
       }),
       deps.cdp.on('targetDetached', (target) => this.reader.forgetSession(target.sessionKey)),
+      watchFrameGone(deps.cdp, this.frames, () => (this.active && this.held === null ? this.highlight.record : null), () => this.endHighlight()),
       deps.cdp.on('detached', () => this.routing({ type: 'endSilently' }))
     )
     this.listen('before-mouse-event', (_event: unknown, mouse: PointerReport & { type: string; button?: string }) => this.onMouse(mouse))
@@ -286,13 +289,7 @@ export class BrowserTabPick {
   private async hoverOnce(report: PointerReport, startedAt: number): Promise<void> {
     const hit = await this.pointerHit(report)
     if (!this.active || this.held !== null) return
-    if (hit === null) {
-      if (this.highlight.record !== null) await this.highlight.hide()
-      this.preChain = null
-      this.routing({ type: 'hover', element: false })
-      this.emit({ kind: 'highlight', label: null })
-      return
-    }
+    if (hit === null) return this.endHighlight()
     this.lastViewPoint = hit.viewPoint
     // Skipped only while it shows: after a capture hid it, the same element is outlined again.
     const same = this.highlight.record !== null && this.preChain !== null && this.preChain.index === null && sameNode(this.preChain.node, hit.node)
@@ -307,6 +304,14 @@ export class BrowserTabPick {
     this.deps.bench?.record('highlight', this.deps.clock.now() - startedAt)
   }
 
+  /** The highlight ends: nothing under the pointer, or its frame went (025-FR-029, `pickFrameGone.ts`). */
+  private async endHighlight(): Promise<void> {
+    if (this.highlight.record !== null) await this.highlight.hide()
+    this.preChain = null
+    this.routing({ type: 'hover', element: false })
+    this.emit({ kind: 'highlight', label: null })
+  }
+
   private async pointerHit(report: PointerReport): Promise<{ node: PickNode; viewPoint: Point } | null> {
     const origin = this.deps.viewOrigin() ?? { x: 0, y: 0 }
     const zoom = this.deps.contents.isDestroyed() ? 1 : this.deps.contents.getZoomFactor()
@@ -315,26 +320,11 @@ export class BrowserTabPick {
 
   private async refineLive(move: 'parent' | 'child'): Promise<void> {
     const pre = this.preChain
-    if (pre === null || !this.active) {
-      this.note('moveTheMouse')
-      return
-    }
-    let chain: ElementChain
-    try {
-      chain = await pre.chain
-    } catch {
-      this.note('elementGone')
-      return
-    }
-    const last = chain.entries.length - 1
-    const at = pre.index ?? last
-    const next = move === 'parent' ? at - 1 : at + 1
-    if (next < 0) return this.note('topOfPage')
-    if (next > last) return this.note('backAtStart')
-    const node = chain.entries[next].node
-    if (node === null) return this.note('elementGone')
-    pre.index = next === last ? null : next
-    const record = await this.highlight.show(node)
+    if (pre === null || !this.active) return this.note('moveTheMouse')
+    const step = liveStep(await pre.chain.catch(() => null), pre.index, move)
+    if ('note' in step) return this.note(step.note)
+    pre.index = step.index
+    const record = await this.highlight.show(step.node)
     if (record !== null) this.emit({ kind: 'highlight', label: record.label })
   }
 

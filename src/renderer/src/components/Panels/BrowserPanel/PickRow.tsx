@@ -14,8 +14,8 @@
  * - **The status slot** shows, in order of priority: the send notice (5 s,
  *   paused under the pointer or keyboard focus), a note (4 s or 2 s), the
  *   banner for where keyboard focus is – its later clauses fold first as the
- *   row narrows – and the "Page paused" or "Still image" chip. A polite live
- *   region says it.
+ *   row narrows – and the "Page paused" or "Still image" chip, then the
+ *   "1 site request waiting" chip (S-28). A polite live region says it.
  * - **The target chooser** opens over the page's still image.
  *
  * The row is an F6 zone (`data-brw-zone="pick"`).
@@ -24,7 +24,7 @@ import { forwardRef, useEffect, useRef, useState } from 'react'
 import { FileText, SquareMousePointer, SquareTerminal } from 'lucide-react'
 import { useBrowserPickStore, type BrowserPickTab } from '../../../stores/useBrowserPickStore'
 import { browserShortcut } from './browserShortcuts'
-import { NOTE_TEXT, noteDuration, pickBanner, type PickPlace } from './pickRow.logic'
+import { heldRequestsText, NOTE_TEXT, noteDuration, pickBanner, type PickPlace } from './pickRow.logic'
 import type { SendNotice as SendNoticeFacts } from './useBrowserPick'
 import { BROWSER_TEST_IDS } from './browserTestIds'
 
@@ -40,6 +40,8 @@ export interface PickRowProps {
   readonly place: PickPlace
   /** The page area shows a still image (panel or dialog open, page not paused). */
   readonly still: boolean
+  /** Site requests held while the menu or dialog is open (S-28); 0 when none. */
+  readonly heldRequests?: number
   readonly notice: SendNoticeFacts | null
   readonly onToggle: () => void
   readonly onShowTerminal: () => void
@@ -129,6 +131,7 @@ export const PickRow = forwardRef<HTMLDivElement, PickRowProps>(function PickRow
   const banner = pick.on || pick.capture !== null ? pickBanner(place, shortcut.label, pick.label) : null
   const note = pick.note === null ? null : NOTE_TEXT[pick.note]
   const chip = pick.capture === null ? null : pick.frozen ? 'Page paused' : props.still ? 'Still image' : null
+  const held = heldRequestsText(props.heldRequests ?? 0)
   const tooltip = pick.on
     ? `Stop picking\n${shortcut.label} starts picking, then picks what is under the mouse`
     : live
@@ -176,6 +179,7 @@ export const PickRow = forwardRef<HTMLDivElement, PickRowProps>(function PickRow
               ))
             )}
             {chip !== null && <span className="erf-brw-chip">{chip}</span>}
+            {held !== null && <span className="erf-brw-chip">{held}</span>}
           </span>
         ) : note !== null ? (
           <span className="erf-brw-banner-line">{note}</span>

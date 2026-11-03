@@ -27,7 +27,8 @@ export function newTabInput(
   tab: Pick<BrowserTab, 'id' | 'contents'>,
   host: TabHost,
   setup: TabInputSetup,
-  zoom: (step: 'in' | 'out' | 'reset') => void
+  zoom: (step: 'in' | 'out' | 'reset') => void,
+  onSurface?: (open: boolean) => void
 ): BrowserTabInput {
   const tabId = tab.id
   return new BrowserTabInput({
@@ -37,6 +38,7 @@ export function newTabInput(
     clock: setup.clock,
     macAppKeys: setup.macAppKeys(host),
     zoom,
+    onSurface,
     events: {
       forwardedKey: (action) => sendTabEvent(host, BROWSER_TAB_EVENTS.forwardedKey, ForwardedKeyEventSchema, { tabId, action }),
       pageFocus: (pageFocused) => sendTabEvent(host, BROWSER_TAB_EVENTS.focus, FocusEventSchema, { tabId, pageFocused }),

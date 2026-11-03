@@ -226,3 +226,75 @@ describe('TabStrip sign-in rows (025-FR-022)', () => {
     expect(strip.pendingCount('signIn')).toBe(1)
   })
 })
+
+describe('TabStrip hold while a pick menu or dialog is open (025-FR-054, S-28)', () => {
+  const held = (): number[] => events.flatMap((e) => (e.op === 'held' ? [e.count] : []))
+
+  it('a request that arrives while held does not change the strip, counts as waiting, and enters on release', () => {
+    strip.hold(true)
+    const { id } = ask()
+    expect(ops()).toEqual(['held:'])
+    expect(held()).toEqual([1])
+    ask(DOWNLOAD)
+    expect(held()).toEqual([1, 2])
+    expect(events.every((e) => StripEventSchema.safeParse(e).success)).toBe(true)
+    strip.hold(false)
+    expect(held()).toEqual([1, 2, 0])
+    expect(ops().slice(3)).toEqual([`add:${id}`, 'add:row2'])
+    // The input guard runs from the release, not from the arrival.
+    expect(events.at(-2)).toMatchObject({ op: 'add', row: { shownAt: 1000 } })
+  })
+
+  it('leaves a row shown before the hold as it is: no waiting-count change and no next request until release', () => {
+    const first = ask()
+    strip.hold(true)
+    ask()
+    expect(ops()).toEqual(['add:row1', 'held:'])
+    // Answered while held: the next waits for the release, not just the gap.
+    clock.advance(STRIP_INPUT_GUARD_MS)
+    expect(strip.answer(first.id, 'allow')).toBe('accepted')
+    clock.advance(STRIP_QUEUE_GAP_MS)
+    expect(ops()).toEqual(['add:row1', 'held:', 'withdraw:row1'])
+    strip.hold(false)
+    expect(ops()).toEqual(['add:row1', 'held:', 'withdraw:row1', 'held:', 'add:row2'])
+  })
+
+  it('a shown row gets its new waiting count on release', () => {
+    ask()
+    strip.hold(true)
+    ask()
+    strip.hold(false)
+    expect(events.at(-1)).toMatchObject({ op: 'change', row: { requestId: 'row1', waiting: 1 } })
+  })
+
+  it('a held request its owner removes, or a withdraw, takes it out of the count', () => {
+    strip.hold(true)
+    const { id } = ask()
+    const second = ask()
+    strip.remove(id)
+    expect(held()).toEqual([1, 2, 1])
+    strip.withdrawAll()
+    expect(held()).toEqual([1, 2, 1, 0])
+    expect(second.outcomes).toEqual([{ withdrawn: true }])
+    strip.hold(false)
+    expect(ops().filter((o) => o.startsWith('add'))).toEqual([])
+  })
+
+  it('a notice that arrives while held shows on release with its full time', () => {
+    strip.hold(true)
+    strip.notice('fullscreen', 'a.test is now full screen', undefined)
+    expect(events).toEqual([])
+    strip.hold(false)
+    expect(events).toEqual([expect.objectContaining({ op: 'add', row: expect.objectContaining({ kind: 'fullscreen' }) })])
+    clock.advance(STRIP_NOTICE_MS)
+    expect(events.at(-1)).toMatchObject({ op: 'withdraw' })
+  })
+
+  it('is idempotent, and a release with nothing held sends nothing', () => {
+    strip.hold(false)
+    strip.hold(true)
+    strip.hold(true)
+    strip.hold(false)
+    expect(events).toEqual([])
+  })
+})

@@ -8,7 +8,8 @@
  * hit, through same-process frames and shadow roots. When it lands on the
  * owner of an out-of-process frame, the point is mapped into that frame
  * through the owner's content quad and the test goes on in the frame's own
- * session – so transformed and nested cross-site frames work.
+ * session – so transformed and nested cross-site frames work. A hit inside
+ * an `<embed>` or `<object>` document picks the host (`pickEmbedHost.ts`).
  *
  * Where the point comes from (`pointerCandidates` in `pickGeometry.ts`):
  * - the top document's widget, or `sendInputEvent`: a view point;
@@ -33,6 +34,7 @@ import {
   type PointerReport
 } from './pickGeometry'
 import { stringField, TOP_SESSION, type PickNode, type PickReader } from './pickCdp'
+import { PickEmbedHost } from './pickEmbedHost'
 import type { PickFrames } from './pickFrames'
 
 /** What a hit test found: the node, and the pick point in the top-level viewport (CSS px). */
@@ -47,10 +49,14 @@ const MAX_DESCENT = 16
 const FRAME_OWNER_TAGS = new Set(['IFRAME', 'FRAME'])
 
 export class PickHitTest {
+  private readonly embedHost: PickEmbedHost
+
   constructor(
     private readonly reader: PickReader,
     private readonly frames: PickFrames
-  ) {}
+  ) {
+    this.embedHost = new PickEmbedHost(reader, frames)
+  }
 
   /**
    * The element under `viewPoint` (top-level viewport, CSS px), or null when
@@ -151,6 +157,9 @@ export class PickHitTest {
     const backendNodeId = isRecord(located) ? located.backendNodeId : undefined
     if (typeof backendNodeId !== 'number') return null
     const node: PickNode = { sessionKey, backendNodeId, frameId: stringField(located, 'frameId') }
+    // Inside an <embed> or <object> (a PDF): the host element is picked (S-2).
+    const host = await this.embedHost.hostOf(node)
+    if (host !== null) return { node: host, contentFrameId: null }
     let described: unknown
     try {
       described = await this.reader.call('DOM.describeNode', { backendNodeId }, sessionKey)

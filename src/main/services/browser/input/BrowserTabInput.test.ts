@@ -273,6 +273,26 @@ describe('pick mode keys', () => {
   })
 })
 
+describe('menu and dialog open and close (S-28)', () => {
+  it('reports once when a pick menu opens and once when the last surface closes, not on moves between them', () => {
+    const onSurface = vi.fn<(open: boolean) => void>()
+    contents = new FakeInputContents()
+    input = make('darwin', { onSurface })
+    loadAndFocus()
+    startPick()
+    input.dispatch({ type: 'hover', element: true })
+    contents.press(keyDown('e', ['meta']))
+    expect(onSurface).not.toHaveBeenCalled()
+    input.dispatch({ type: 'captureReady' })
+    expect(onSurface.mock.calls).toEqual([[true]])
+    input.dispatch({ type: 'dialogOpen' })
+    input.dispatch({ type: 'dialogBack' })
+    expect(onSurface.mock.calls).toEqual([[true]])
+    input.dispatch({ type: 'menuClose', reason: 'esc' })
+    expect(onSurface.mock.calls).toEqual([[true], [false]])
+  })
+})
+
 describe('focus and the first-click rule', () => {
   it('tells the window when the page gains and loses focus', () => {
     contents.emit('focus')

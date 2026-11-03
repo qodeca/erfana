@@ -99,6 +99,7 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
   const localAddresses = useBrowserTabStore(s => s.localAddresses)
   const rows = useBrowserChromeStore(s => (tabId === null ? NO_ROWS : (s.rows.get(tabId) ?? NO_ROWS)))
   const findResult = useBrowserChromeStore(s => (tabId === null ? undefined : s.find.get(tabId)))
+  const heldRequests = useBrowserChromeStore(s => (tabId === null ? 0 : (s.held.get(tabId) ?? 0)))
   const [findOpen, setFindOpen] = useState(false)
   const [clearOpen, setClearOpen] = useState(false)
   const [forgetOpen, setForgetOpen] = useState(false)
@@ -390,6 +391,7 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
         live={live}
         place={place}
         still={still !== null}
+        heldRequests={heldRequests}
         notice={pick.notice}
         onToggle={pick.togglePick}
         onShowTerminal={pick.showTerminal}

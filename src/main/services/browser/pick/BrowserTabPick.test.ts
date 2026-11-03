@@ -74,6 +74,39 @@ describe('BrowserTabPick', () => {
     })
   })
 
+  describe('a frame that goes while it holds the highlight (025-FR-029)', () => {
+    it('ends the highlight and its label with no pointer move; pick mode stays on', async () => {
+      await hovering(h, 415, 115)
+      expect(h.pick.highlight.record?.node.sessionKey).toBe('S1')
+      const frame = h.page.cdp.targets.find((t) => t.sessionKey === 'S1')!
+      h.page.cdp.targets = h.page.cdp.targets.filter((t) => t !== frame)
+      h.page.cdp.emit('targetDetached', frame)
+      await settle()
+      expect(h.pick.highlight.record).toBeNull()
+      expect(h.events.at(-1)).toMatchObject({ kind: 'highlight', label: null })
+      expect(h.routing.dispatched.at(-1)).toEqual({ type: 'hover', element: false })
+      expect(h.pick.isActive).toBe(true)
+    })
+
+    it('keeps the highlight when another frame went, or the frame only changed process', async () => {
+      await hovering(h)
+      const before = h.pick.highlight.record
+      h.page.cdp.emit('protocolEvent', { target: h.page.cdp.targets[0], method: 'Page.frameDetached', params: { frameId: 'other', reason: 'remove' } })
+      h.page.cdp.emit('protocolEvent', { target: h.page.cdp.targets[0], method: 'Page.frameDetached', params: { frameId: 'top', reason: 'swap' } })
+      await settle()
+      expect(h.pick.highlight.record).toBe(before)
+    })
+
+    it('leaves a held capture alone', async () => {
+      await confirmed(h)
+      const count = h.events.length
+      h.page.cdp.targets = h.page.cdp.targets.filter((t) => t.sessionKey !== 'S1')
+      h.page.cdp.emit('protocolEvent', { target: h.page.cdp.targets[0], method: 'Page.frameDetached', params: { frameId: 'F1', reason: 'remove' } })
+      await settle()
+      expect(h.events.slice(count).filter((e) => e.kind === 'highlight')).toEqual([])
+    })
+  })
+
   describe('hover (025-FR-026)', () => {
     it('outlines the element under the pointer and sends its exact label', async () => {
       await hovering(h)

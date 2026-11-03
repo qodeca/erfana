@@ -19,7 +19,7 @@ import { promises as fs } from 'node:fs'
 import * as path from 'node:path'
 import type { Locator, Page } from '@playwright/test'
 import { test, expect } from './fixtures/browserHarness'
-import { AgentTerminal, IS_MAC, PickFlow, PICK_WAIT_MS as WAIT_MS } from './pages/browser-pick-flow.page'
+import { AgentTerminal, IS_MAC, near, PickFlow, PICK_WAIT_MS as WAIT_MS } from './pages/browser-pick-flow.page'
 import type { Box } from './pages/browser-pick.page'
 
 const MENU_BANNER = 'Picking – Esc or click outside closes the panel'
@@ -597,8 +597,7 @@ test.describe('025-AC-031 dialog rules per action', () => {
   })
 })
 
-// Titled without the ID: the waiting-request chip of S-28 is missing (the gap test below), so 025-AC-073 is not proven whole.
-test.describe('menu and dialog stay out of the page\'s document (025-AC-073)', () => {
+test.describe('025-AC-073 menu and dialog stay out of the page\'s document', () => {
   test('with the menu and then the Change dialog open the page finds no Erfana element, records no mutation and gets none of the typed keys', async ({
     appWithTestProject,
     windowWithTestProject,
@@ -623,17 +622,30 @@ test.describe('menu and dialog stay out of the page\'s document (025-AC-073)', (
     windowWithTestProject,
     browserServers
   }) => {
+    const MOVER_RED: [number, number, number] = [198, 40, 40] // #c62828, the fixture's moving square
+    const TRAVEL_PX = 400 // the fixture's translateX range
     const flow = await picking(appWithTestProject, windowWithTestProject, browserServers.sites.static.url('/animation.html'))
-    await flow.pickByClick('h1', 'h1 ')
+    const mover = await flow.rect('#mover')
+    // The button's label, under the square: its menu leaves the square's band in view, so the band shows the still alone.
+    await flow.pickByClick('#target-button span', 'span ')
     await expect(flow.still).toBeVisible()
     const area = (await flow.panel.placeholder.boundingBox())!
-    const clip = { x: area.x, y: area.y, width: area.width, height: Math.min(area.height, 400) }
-    const first = await windowWithTestProject.screenshot({ clip })
+    const band = { x: area.x, y: area.y + mover.y, width: Math.min(area.width, mover.x + mover.width + TRAVEL_PX), height: mover.height }
+    const panel = (await flow.actions.boundingBox())!
+    const MARGIN = 32 // the panel's shadow
+    const apart = panel.y - MARGIN >= band.y + band.height || panel.y + panel.height + MARGIN <= band.y
+    expect(apart, 'the menu leaves the moving square\'s band in view').toBe(true)
+    // The still shows the square somewhere along its band.
+    const paint = await flow.windowPaint()
+    const row = band.y + band.height / 2
+    const xs = Array.from({ length: Math.floor(band.width / 4) }, (_, i) => band.x + i * 4)
+    expect(xs.some((x) => near(paint(x, row), MOVER_RED, 16)), 'the square is on the still').toBe(true)
+    const first = await windowWithTestProject.screenshot({ clip: band })
     const t0 = await flow.eval<number>('document.getAnimations()[0].currentTime')
     // The page's animation runs on (not paused: a click pick), well past one frame.
     await (await flow.panel.page()).waitFor(`document.getAnimations()[0].currentTime > ${t0} + 500`, 'the animation moved on')
-    const second = await windowWithTestProject.screenshot({ clip })
-    expect(second.equals(first), 'the tab shows the same still image').toBe(true)
+    const second = await windowWithTestProject.screenshot({ clip: band })
+    expect(second.equals(first), 'the tab shows the same still image where the square moves').toBe(true)
   })
 
   test('control: with no menu open the same location request enters the strip', async ({ appWithTestProject, windowWithTestProject, browserServers }) => {
@@ -649,10 +661,6 @@ test.describe('menu and dialog stay out of the page\'s document (025-AC-073)', (
     windowWithTestProject,
     browserServers
   }) => {
-    test.fail(
-      true,
-      'Product gap (S-28, 025-FR-054): there is no "1 site request waiting" chip in the pick row, and site requests are not held while the menu or dialog is open (no such text anywhere in src/).'
-    )
     const url = browserServers.sites.static.url('/permissions.html', { host: 'geo.test', secure: true })
     const flow = await PickFlow.open(appWithTestProject, windowWithTestProject)
     await flow.trustTestCa(browserServers.tls.caPem)
@@ -667,5 +675,30 @@ test.describe('menu and dialog stay out of the page\'s document (025-AC-073)', (
     await windowWithTestProject.keyboard.press('Escape')
     await expect(flow.actions).toHaveCount(0, { timeout: WAIT_MS })
     await expect(flow.panel.stripRow('permission')).toBeVisible({ timeout: WAIT_MS })
+    await expect(flow.ui.row).not.toContainText('site request waiting')
+  })
+
+  test('a permission request while the Change dialog is open waits the same way and enters the strip after Cancel', async ({
+    appWithTestProject,
+    windowWithTestProject,
+    browserServers
+  }) => {
+    const url = browserServers.sites.static.url('/permissions.html', { host: 'geo.test', secure: true })
+    const flow = await PickFlow.open(appWithTestProject, windowWithTestProject)
+    await flow.trustTestCa(browserServers.tls.caPem)
+    await flow.load(url)
+    await flow.pickButton.click()
+    const rows = flow.panel.root.locator('[data-strip-kind]')
+    await expect(rows).toHaveCount(0)
+    await flow.pickByClick('h1', 'h1 ')
+    await flow.action('Change').click()
+    await expect(flow.dialog).toBeVisible()
+    await flow.eval(`document.getElementById('request-geolocation').click(); 0`)
+    await expect(flow.ui.row).toContainText('1 site request waiting', { timeout: WAIT_MS })
+    await expect(rows).toHaveCount(0)
+    await flow.dialogCancel.click()
+    await expect(flow.dialog).toHaveCount(0, { timeout: WAIT_MS })
+    await expect(flow.panel.stripRow('permission')).toBeVisible({ timeout: WAIT_MS })
+    await expect(flow.ui.row).not.toContainText('site request waiting')
   })
 })

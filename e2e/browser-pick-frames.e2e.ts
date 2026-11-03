@@ -100,9 +100,7 @@ function expectNear(actual: Box, expected: Box, what: string): void {
   }
 }
 
-// Titled without the ID: two parts are product gaps, each a test.fail below – the <embed> PDF's content is
-// picked instead of its host, and a removed frame's highlight stays until the pointer moves.
-test.describe('picks inside frames (025-AC-029)', () => {
+test.describe('025-AC-029 picks inside frames', () => {
   test('a button in each frame kind: the outline matches it in top-level CSS px, Up and Down work, the send completes and the context file lists the frame chain with each origin (null for the sandboxed frame)', async ({
     appWithTestProject,
     windowWithTestProject,
@@ -183,14 +181,11 @@ test.describe('picks inside frames (025-AC-029)', () => {
   })
 
   test('a frame removed while it holds the highlight ends the highlight with no pointer move', async ({ appWithTestProject, windowWithTestProject, browserServers }) => {
-    // Known product gap (025-FR-029 "a frame that is removed while it holds the highlight ends the highlight"): main's
-    // pick engine has no frame-detach handling (BrowserTabPick / PickFrames listen only to Target.attachedToTarget), so
-    // the highlight and its status-slot label stay on the removed frame's button until the pointer moves.
-    test.fail()
     const flow = await PickFlow.open(appWithTestProject, windowWithTestProject)
     await flow.load(browserServers.sites.static.url('/frames.html'))
     await removeHighlightedFrame(flow)
-    await expect.poll(() => flow.highlightLabel(), { timeout: WAIT_MS }).not.toMatch(/^button#frame-button /)
+    // No pointer move after the removal: main's highlight record (the outline and its label) ends on its own.
+    await expect.poll(() => flow.highlightLabel(), { timeout: WAIT_MS }).toBeNull()
     expect((await flow.state()).active).toBe(true)
   })
 
@@ -204,10 +199,7 @@ test.describe('picks inside frames (025-AC-029)', () => {
   }
 
   test('an <embed> PDF is picked as its host element, not the content inside', async ({ appWithTestProject, windowWithTestProject, browserServers }) => {
-    // Known product gap (025-FR-029, S-2): in this build the <embed> loads the PDF as a child document, and the hit
-    // test (DOM.getNodeForLocation) goes into it: the pick lands on that document's body (224 × 104 inside the
-    // 240 × 120 host), not on the embed. The engine has no host rule for <embed>/<object> (pickHitTest.ts).
-    test.fail()
+    // The <embed> loads the PDF as a child document that the hit test goes into; the host is picked instead (S-2).
     const flow = await PickFlow.open(appWithTestProject, windowWithTestProject)
     await flow.load(browserServers.sites.static.url('/elements.html'))
     await hoverHost(flow, `Object.assign(document.createElement('embed'), { id: 'pdf', type: 'application/pdf', src: '/sample.pdf' })`, '#pdf', /^embed#pdf /)

@@ -103,6 +103,16 @@ describe('PickRow (025-FR-025, 025-FR-065)', () => {
     expect(status()).toHaveTextContent('Still image')
   })
 
+  it('shows the waiting site requests beside the still chip while the menu or dialog is open (S-28)', () => {
+    const { rerender, props } = renderRow({ pick: HELD, place: 'panel', still: true })
+    expect(status()).not.toHaveTextContent('waiting')
+    rerender(<PickRow {...props} pick={HELD} place="panel" still heldRequests={1} />)
+    expect(status()).toHaveTextContent('Still image')
+    expect(status()).toHaveTextContent('1 site request waiting')
+    rerender(<PickRow {...props} pick={HELD} place="dialog" still heldRequests={3} />)
+    expect(status()).toHaveTextContent('3 site requests waiting')
+  })
+
   it('shows a note for its time, then clears it in the store', () => {
     act(() => useBrowserPickStore.getState().showNote(TAB, 'loadAPage'))
     const pick = useBrowserPickStore.getState().byTab.get(TAB) ?? IDLE_PICK

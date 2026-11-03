@@ -65,7 +65,7 @@ beforeEach(() => {
   other = fakeHost()
   site = {
     answer: vi.fn(() => 'accepted'),
-    attachTab: vi.fn(() => ({ answerStrip: site.answer, answerCertificate: vi.fn(), detach: vi.fn() })),
+    attachTab: vi.fn(() => ({ answerStrip: site.answer, answerCertificate: vi.fn(), holdRequests: vi.fn(), detach: vi.fn() })),
     showDownload: vi.fn()
   }
   pages = {

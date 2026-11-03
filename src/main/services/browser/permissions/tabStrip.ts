@@ -23,6 +23,13 @@
  *   focus is the renderer's alone: main cannot see focus.
  * - **Notices** (`fullscreen`, `pointerLock`) have no answers and go after
  *   {@link STRIP_NOTICE_MS}; a second notice of the same kind restarts it.
+ * - **Held** (025-FR-054, S-28). While a pick menu or dialog is open
+ *   ({@link TabStrip.hold}), the strip does not change: a new prompt queues
+ *   without a row or a waiting-count change, a queue does not advance, and a
+ *   notice waits; the count of prompts that arrived goes out as `held` (the
+ *   pick row's "1 site request waiting"). The release lets them in through
+ *   the usual queue, gap and input guard, so the page area never shifts
+ *   under the still image.
  * - **Withdrawn.** {@link TabStrip.withdrawAll} – the page navigated or
  *   crashed, the tab closed – takes every row away; each pending request is
  *   settled `withdrawn`, which its owner treats as denied.
@@ -102,6 +109,11 @@ export class TabStrip {
   private readonly lanes = new Map<PromptKind, Lane>()
   private readonly notices = new Map<NoticeKind, ShownNotice>()
   private disposed = false
+  private holding = false
+  /** Prompts that arrived while held and are still pending. */
+  private readonly heldIds = new Set<string>()
+  /** Notices that arrived while held; the latest of each kind shows on release. */
+  private readonly heldNotices = new Map<NoticeKind, { text: string; requester: StripRow['requester'] }>()
 
   constructor(private readonly deps: TabStripDeps) {}
 
@@ -117,7 +129,10 @@ export class TabStrip {
     }
     const lane = this.lane(spec.kind)
     lane.queue.push({ id, spec, settle, shownAt: null })
-    if (lane.shown === null) this.pump(spec.kind)
+    if (this.holding) {
+      this.heldIds.add(id)
+      this.emitHeld()
+    } else if (lane.shown === null) this.pump(spec.kind)
     else this.emitRow('change', lane.shown, lane)
     return id
   }
@@ -128,6 +143,7 @@ export class TabStrip {
    * kind waits out the gap.
    */
   remove(id: string): void {
+    if (this.heldIds.delete(id)) this.emitHeld()
     for (const [kind, lane] of this.lanes) {
       if (lane.shown?.id === id) {
         this.takeShown(kind, lane)
@@ -136,7 +152,7 @@ export class TabStrip {
       const index = lane.queue.findIndex((p) => p.id === id)
       if (index >= 0) {
         lane.queue.splice(index, 1)
-        if (lane.shown !== null) this.emitRow('change', lane.shown, lane)
+        if (lane.shown !== null && !this.holding) this.emitRow('change', lane.shown, lane)
         return
       }
     }
@@ -166,6 +182,10 @@ export class TabStrip {
   /** Show a notice for {@link STRIP_NOTICE_MS}; a second one of the same kind replaces it and restarts the time. */
   notice(kind: NoticeKind, text: string, requester: StripRow['requester']): void {
     if (this.disposed) return
+    if (this.holding) {
+      this.heldNotices.set(kind, { text, requester })
+      return
+    }
     const existing = this.notices.get(kind)
     const id = existing?.id ?? (this.deps.newId ?? randomRowId)()
     if (existing !== undefined) this.deps.clock.clearTimeout(existing.timer)
@@ -180,6 +200,27 @@ export class TabStrip {
     }, STRIP_NOTICE_MS)
   }
 
+  /**
+   * Hold the strip while a pick menu or dialog is open (`true`), or let what
+   * arrived in (`false`): shown rows get their new waiting count, empty
+   * kinds show their next request, and held notices show. Idempotent.
+   */
+  hold(on: boolean): void {
+    if (on === this.holding || this.disposed) return
+    this.holding = on
+    if (on) return
+    const hadHeld = this.heldIds.size > 0
+    this.heldIds.clear()
+    if (hadHeld) this.emitHeld()
+    for (const [kind, lane] of this.lanes) {
+      if (lane.shown === null) this.pump(kind)
+      else if (hadHeld) this.emitRow('change', lane.shown, lane)
+    }
+    const notices = [...this.heldNotices]
+    this.heldNotices.clear()
+    for (const [kind, notice] of notices) this.notice(kind, notice.text, notice.requester)
+  }
+
   /** How many prompts of `kind` are shown or queued. */
   pendingCount(kind: PromptKind): number {
     const lane = this.lanes.get(kind)
@@ -192,6 +233,11 @@ export class TabStrip {
    */
   withdrawAll(): void {
     const settled: Pending[] = []
+    this.heldNotices.clear()
+    if (this.heldIds.size > 0) {
+      this.heldIds.clear()
+      this.emitHeld()
+    }
     for (const lane of this.lanes.values()) {
       this.deps.clock.clearTimeout(lane.gap)
       lane.gap = undefined
@@ -240,7 +286,7 @@ export class TabStrip {
 
   private pump(kind: PromptKind): void {
     const lane = this.lane(kind)
-    if (this.disposed || lane.shown !== null || lane.gap !== undefined) return
+    if (this.disposed || this.holding || lane.shown !== null || lane.gap !== undefined) return
     const next = lane.queue.shift()
     if (next === undefined) return
     next.shownAt = this.deps.clock.now()
@@ -257,6 +303,11 @@ export class TabStrip {
       shownAt: pending.shownAt ?? this.deps.clock.now()
     }
     this.emit({ tabId: this.deps.tabId, op, row })
+  }
+
+  /** The pick row's "N site requests waiting" count. */
+  private emitHeld(): void {
+    this.emit({ tabId: this.deps.tabId, op: 'held', count: this.heldIds.size })
   }
 
   private emit(event: StripEvent): void {
