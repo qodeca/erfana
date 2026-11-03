@@ -208,7 +208,7 @@
       "quote": "27 *-handlers.ts modules + registry.ts (registerHandle gate)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/registry.ts:122",
+      "source": "src/main/ipc/registry.ts:124",
       "match": "export function registerHandle(channel: string"
     },
     {
@@ -547,7 +547,7 @@
       "quote": "| `previewComments` | `PreviewCommentsBridge` (`preview-comment-schema.ts`) |",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/preload/index.ts:149",
+      "source": "src/preload/index.ts:156",
       "match": "previewComments: previewCommentsBridge",
       "note": "The window.api.previewComments bridge was missing from the gateway table"
     },
@@ -589,7 +589,7 @@
       "quote": "(`registerHandle` / `registerHandleOnce` / `registerOn` / `registerOnce`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/registry.ts:140",
+      "source": "src/main/ipc/registry.ts:142",
       "match": "export function registerHandleOnce("
     },
     {
@@ -599,7 +599,7 @@
       "quote": "(`isTrustedAppSender`, `src/main/ipc/senderValidation.ts`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/senderValidation.ts:126",
+      "source": "src/main/ipc/senderValidation.ts:132",
       "match": "export function isTrustedAppSender("
     },
     {
@@ -2241,7 +2241,7 @@
       "quote": "Fire-and-forget at app startup (`src/main/index.ts`, `importToolStatusService.getStatus()`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:590",
+      "source": "src/main/index.ts:589",
       "match": "importToolStatusService.getStatus().catch((error) => {"
     },
     {
@@ -3084,7 +3084,7 @@
       "quote": "Tags: `[crash] startup-settings-init`, `[crash] startup-logging-init`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:465",
+      "source": "src/main/index.ts:464",
       "match": "writeCrashFallbackLine('[crash] startup-settings-init', error)"
     },
     {
@@ -4600,7 +4600,7 @@
       "quote": "| Main process | `src/main/index.ts` (before-quit event) |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:711",
+      "source": "src/main/index.ts:710",
       "match": "app.on('before-quit',"
     },
     {
@@ -6048,8 +6048,8 @@
       "quote": "whose `isTrustedAppSender` refuses every frame of a preview page, its main frame included",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/registry.ts:124",
-      "match": "if (!isTrustedAppSender(event)) {"
+      "source": "src/main/ipc/registry.ts:126",
+      "match": "if (!isTrustedAppSender(event, channel)) {"
     },
     {
       "id": "docs-adrs-0005-sub-frame-preload-one-receive-channel/08",
@@ -6188,7 +6188,7 @@
       "quote": "dropdown for 22 diagram types",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/prompts/registry.test.ts:344",
+      "source": "src/renderer/src/prompts/registry.test.ts:349",
       "match": "expect(prompt?.dropdownOptions?.length).toBe(22)"
     },
     {
@@ -6591,12 +6591,12 @@
       "id": "docs-prompts-README/02",
       "audience": "developer",
       "doc": "docs/prompts/README.md",
-      "quote": "├── templates/       # Template markdown files (14 templates)",
+      "quote": "├── templates/       # Template markdown files (18 templates)",
       "status": "verified",
       "evidence": "source",
       "source": "src/renderer/src/prompts/registry.test.ts:16",
-      "match": "it('should load all 14 templates",
-      "note": "Unit test asserts the registry loads exactly 14 templates."
+      "match": "it('should load all 18 templates",
+      "note": "Unit test asserts the registry loads exactly 18 templates."
     },
     {
       "id": "docs-prompts-README/03",
@@ -6673,11 +6673,11 @@
       "id": "docs-prompts-README/10",
       "audience": "developer",
       "doc": "docs/prompts/README.md",
-      "quote": "`panelUtils.executePromptTemplate` calls it once before `promptRenderer.render`",
+      "quote": "`panelUtils.executePromptTemplate` calls it once, through `withPromptFooter` (`browserCaptureFooter.ts`), before `promptRenderer.render`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/utils/panelUtils.ts:248",
-      "match": "withApplyFooter(config.template, !!config.mutatesDocument),"
+      "source": "src/renderer/src/utils/panelUtils.ts:323",
+      "match": "withPromptFooter(config.template, config),"
     },
     {
       "id": "docs-prompts-README/11",
@@ -6696,7 +6696,7 @@
       "quote": "the prompt is pasted and Enter is pressed after 200 ms",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:159",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:169",
       "match": "await new Promise(resolve => setTimeout(resolve, 200))"
     },
     {
@@ -6733,11 +6733,11 @@
       "id": "docs-prompts-template-syntax/01",
       "audience": "developer",
       "doc": "docs/prompts/template-syntax.md",
-      "quote": "| `area` | enum | ✅ | `markdown-preview`, `code-editor`, `global`, `diagram-viewer` |",
+      "quote": "| `area` | enum | ✅ | `markdown-preview`, `code-editor`, `global`, `diagram-viewer`, `browser` |",
       "status": "verified",
       "evidence": "source",
       "source": "src/renderer/src/prompts/schema.ts:33",
-      "match": "area: z.enum(['markdown-preview', 'code-editor', 'global', 'diagram-viewer']),"
+      "match": "area: z.enum(['markdown-preview', 'code-editor', 'global', 'diagram-viewer', 'browser']),"
     },
     {
       "id": "docs-prompts-template-syntax/02",
@@ -6887,7 +6887,7 @@
       "quote": "Some shipped templates name icons outside this list (`layout-grid`, `bug`, `file-import`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/prompts/registry.test.ts:284",
+      "source": "src/renderer/src/prompts/registry.test.ts:289",
       "match": "expect(iconMap['visualize']).toBe('layout-grid')",
       "note": "Added: three shipped templates use icon names that fall back to sparkles."
     },
@@ -6898,7 +6898,7 @@
       "quote": "followed by a fixed 200ms delay before Enter",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:159",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:169",
       "match": "await new Promise(resolve => setTimeout(resolve, 200))"
     },
     {
@@ -6908,7 +6908,7 @@
       "quote": "(multi-line text as one bracketed paste)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:136",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:146",
       "match": "? `\\x1b[200~${text.replace(/\\r?\\n/g, '\\r')}\\x1b[201~`"
     },
     {
@@ -6918,7 +6918,7 @@
       "quote": "4. Sends Enter key (`\\r`) to execute the command",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:162",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:172",
       "match": "const enterResult = await terminalOps.write(terminalId, '\\r')"
     },
     {
@@ -6950,7 +6950,7 @@
       "quote": "the default store passes `terminalGateway`, which forwards to `window.api.terminal`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:196",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:241",
       "match": "_defaultStore = createTerminalStore(terminalGateway)",
       "note": "Said the default store passes window.api.terminal directly."
     },
@@ -6981,7 +6981,7 @@
       "quote": "Wraps multi-line text in bracketed paste mode",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:136",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:146",
       "match": "? `\\x1b[200~${text.replace(/\\r?\\n/g, '\\r')}\\x1b[201~`"
     },
     {
@@ -7001,7 +7001,7 @@
       "quote": "Looks up the template in `PROMPT_REGISTRY`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/utils/panelUtils.ts:217",
+      "source": "src/renderer/src/utils/panelUtils.ts:291",
       "match": "const config = PROMPT_REGISTRY[promptId]"
     },
     {
@@ -7073,7 +7073,7 @@
       "quote": "the default store passes `terminalGateway`, which forwards to `window.api.terminal`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:196",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:241",
       "match": "_defaultStore = createTerminalStore(terminalGateway)",
       "note": "Said the default store passes window.api.terminal directly."
     },
@@ -7084,7 +7084,7 @@
       "quote": "get().markUserInput(terminalId)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:150",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:160",
       "match": "get().markUserInput(terminalId)",
       "note": "The sendToTerminal excerpt left out the recent-input marking after a successful write."
     },
@@ -7369,7 +7369,7 @@
       "quote": "| `src/main/index.ts` | import + call `registerClipboardHandlers()` |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:532",
+      "source": "src/main/index.ts:531",
       "match": "registerClipboardHandlers()"
     },
     {
@@ -8599,7 +8599,7 @@
       "quote": "`isTrustedSender` lives in `src/main/ipc/senderValidation.ts`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/ipc/senderValidation.ts:105",
+      "source": "src/main/ipc/senderValidation.ts:106",
       "match": "export function isTrustedSender(",
       "note": "No status line; the page read as a live plan (e.g. a planned src/main/ipc/isTrustedSender.ts and e2e/*.spec.ts names). Added a shipped status note saying §7–§8 are the plan."
     },
@@ -8741,7 +8741,7 @@
       "quote": "Registered in `src/main/index.ts` as `registerBrowserHandlers()`, next to `registerImageExportHandlers()`.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/index.ts:535",
+      "source": "src/main/index.ts:534",
       "match": "registerBrowserHandlers()",
       "note": "Cited index.ts :417; registration is now at :534–536. Named the call instead."
     },
@@ -8919,7 +8919,7 @@
       "quote": "- Exposes `window.api.graph.*` via contextBridge",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/index.ts:242",
+      "source": "src/preload/index.ts:249",
       "match": "contextBridge.exposeInMainWorld('api', api)",
       "note": "The window.api bridge exists; the graph namespace is a proposal"
     },
@@ -8972,7 +8972,7 @@
       "quote": "**Preload:** `src/preload/index.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/index.ts:242",
+      "source": "src/preload/index.ts:249",
       "match": "contextBridge.exposeInMainWorld('api', api)"
     },
     {
@@ -9504,7 +9504,7 @@
       "quote": "**File:** `src/main/index.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:423",
+      "source": "src/main/index.ts:422",
       "match": "app.whenReady()"
     },
     {
@@ -9670,11 +9670,11 @@
       "id": "docs-future-source-grounding-strategy/05",
       "audience": "developer",
       "doc": "docs/future/source-grounding/strategy.md",
-      "quote": "accepts only the `area` values `markdown-preview`, `code-editor`, `global` and `diagram-viewer`",
+      "quote": "accepts only the `area` values `markdown-preview`, `code-editor`, `global`, `diagram-viewer` and `browser`",
       "status": "fixed",
       "evidence": "source",
       "source": "src/renderer/src/prompts/schema.ts:33",
-      "match": "area: z.enum(['markdown-preview', 'code-editor', 'global', 'diagram-viewer'])",
+      "match": "area: z.enum(['markdown-preview', 'code-editor', 'global', 'diagram-viewer', 'browser'])",
       "note": "Proposed templates use area: document / subArea: audit, which the current schema rejects; added a note"
     },
     {
@@ -10039,7 +10039,7 @@
       "quote": "contextBridge.exposeInMainWorld('api', api)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/index.ts:242",
+      "source": "src/preload/index.ts:249",
       "match": "contextBridge.exposeInMainWorld('api', api)"
     },
     {
@@ -10049,7 +10049,7 @@
       "quote": "and `window.electron` carries only `shell`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/index.ts:218",
+      "source": "src/preload/index.ts:225",
       "match": "shell: {"
     },
     {
@@ -10279,7 +10279,7 @@
       "quote": "`registerHandle` / `registerHandleOnce` / `registerOn` / `registerOnce`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/registry.ts:122",
+      "source": "src/main/ipc/registry.ts:124",
       "match": "export function registerHandle(channel: string, listener: InvokeListener): void {"
     },
     {
@@ -10289,7 +10289,7 @@
       "quote": "`event.senderFrame` exists and `frame.parent === null`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/senderValidation.ts:84",
+      "source": "src/main/ipc/senderValidation.ts:85",
       "match": "if (!frame || frame.parent !== null) return false"
     },
     {
@@ -10299,7 +10299,7 @@
       "quote": "`pathToFileURL(join(__dirname, '../renderer/index.html'))`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/senderValidation.ts:18",
+      "source": "src/main/ipc/senderValidation.ts:19",
       "match": "export const RENDERER_FILE_URL = pathToFileURL(join(__dirname, '../renderer/index.html')).href"
     },
     {
@@ -10690,8 +10690,8 @@
       "quote": "sandboxed renderers with a validated IPC layer",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/registry.ts:124",
-      "match": "if (!isTrustedAppSender(event)) {"
+      "source": "src/main/ipc/registry.ts:126",
+      "match": "if (!isTrustedAppSender(event, channel)) {"
     },
     {
       "id": "docs-about/03",
@@ -11231,7 +11231,7 @@
       "quote": "Open DevTools in app with F12 (development builds only)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:450",
+      "source": "src/main/index.ts:449",
       "match": "optimizer.watchWindowShortcuts(window)"
     },
     {
@@ -11251,7 +11251,7 @@
       "quote": "A message box titled \"Erfana started with problems\"",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:407",
+      "source": "src/main/index.ts:406",
       "match": "title: 'Erfana started with problems',"
     },
     {
@@ -11261,7 +11261,7 @@
       "quote": "the lines tagged `[crash] startup-settings-init` and `[crash] startup-logging-init`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:465",
+      "source": "src/main/index.ts:464",
       "match": "writeCrashFallbackLine('[crash] startup-settings-init', error)"
     },
     {
@@ -13119,7 +13119,7 @@
       "quote": "import { registerHandle } from './registry'",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/registry.ts:122",
+      "source": "src/main/ipc/registry.ts:124",
       "match": "export function registerHandle(channel: string, listener: InvokeListener): void {"
     },
     {
@@ -13129,7 +13129,7 @@
       "quote": "Use `registerOn` for fire-and-forget `send` channels",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/registry.ts:161",
+      "source": "src/main/ipc/registry.ts:163",
       "match": "export function registerOn(channel: string, listener: SendListener): void {"
     },
     {
@@ -13139,7 +13139,7 @@
       "quote": "import { isTrustedSender } from './senderValidation'",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/senderValidation.ts:105",
+      "source": "src/main/ipc/senderValidation.ts:106",
       "match": "export function isTrustedSender("
     },
     {
@@ -13149,7 +13149,7 @@
       "quote": "in `src/main/index.ts`, beside the others (`registerBrowserHandlers()` is there)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:535",
+      "source": "src/main/index.ts:534",
       "match": "registerBrowserHandlers()"
     },
     {
@@ -13159,7 +13159,7 @@
       "quote": "`Api = typeof api` is exported from there",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/index.ts:210",
+      "source": "src/preload/index.ts:217",
       "match": "export type Api = typeof api"
     },
     {
@@ -13376,11 +13376,11 @@
       "id": "development-tasks/30",
       "audience": "developer",
       "doc": "docs/development-tasks.md",
-      "quote": "- `area` (required): one of `markdown-preview`, `code-editor`, `global`, `diagram-viewer`",
+      "quote": "- `area` (required): one of `markdown-preview`, `code-editor`, `global`, `diagram-viewer`, `browser`",
       "status": "verified",
       "evidence": "source",
       "source": "src/renderer/src/prompts/schema.ts:33",
-      "match": "area: z.enum(['markdown-preview', 'code-editor', 'global', 'diagram-viewer']),"
+      "match": "area: z.enum(['markdown-preview', 'code-editor', 'global', 'diagram-viewer', 'browser']),"
     },
     {
       "id": "development-tasks/31",
@@ -13426,11 +13426,11 @@
       "id": "development-tasks/35",
       "audience": "developer",
       "doc": "docs/development-tasks.md",
-      "quote": "(`panelUtils.executePromptTemplate` → `withApplyFooter` from `prompts/applyFooter.ts`)",
+      "quote": "(`panelUtils.executePromptTemplate` → `withPromptFooter` from `prompts/browserCaptureFooter.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/utils/panelUtils.ts:248",
-      "match": "withApplyFooter(config.template, !!config.mutatesDocument),"
+      "source": "src/renderer/src/utils/panelUtils.ts:323",
+      "match": "withPromptFooter(config.template, config),"
     },
     {
       "id": "development-tasks/36",
@@ -13469,7 +13469,7 @@
       "quote": "const allIds = getAllPromptIds()  // e.g. ['editor-explain', 'editor-modify', 'mermaid-bug-report', …]",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/prompts/registry.ts:104",
+      "source": "src/renderer/src/prompts/registry.ts:105",
       "match": "export function getAllPromptIds(): string[] {"
     },
     {
@@ -13479,7 +13479,7 @@
       "quote": "**Implementation**: `panelUtils.ts:executePromptTemplate()`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/utils/panelUtils.ts:209",
+      "source": "src/renderer/src/utils/panelUtils.ts:283",
       "match": "export async function executePromptTemplate("
     },
     {
@@ -13744,7 +13744,7 @@
       "quote": "the preload re-exposes it as `window.__ERFANA_FORCE_CRASH__`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/index.ts:244",
+      "source": "src/preload/index.ts:251",
       "match": "contextBridge.exposeInMainWorld('__ERFANA_FORCE_CRASH__', true)"
     },
     {
@@ -15782,7 +15782,7 @@
       "quote": "send the Enter key 200 ms after the text",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:159",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:169",
       "match": "await new Promise(resolve => setTimeout(resolve, 200))"
     },
     {
@@ -15802,7 +15802,7 @@
       "quote": "Multi-line terminal prompt writes are wrapped in **bracketed paste mode** escape sequences",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:136",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:146",
       "match": "? `\\x1b[200~${text.replace(/\\r?\\n/g, '\\r')}\\x1b[201~`",
       "note": "Said all prompt writes are wrapped; only text containing a line break is wrapped."
     },
@@ -15813,7 +15813,7 @@
       "quote": "into the terminal (in bracketed-paste mode when it spans lines) and presses Enter automatically",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:134",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:144",
       "match": "const isMultiLine = /[\\r\\n]/.test(text)",
       "note": "Same: bracketed paste applies to multi-line text only."
     },
@@ -21835,8 +21835,8 @@
       "quote": "`senderValidation.ts` also exports `isTrustedAppSender`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/senderValidation.ts:126",
-      "match": "export function isTrustedAppSender(event: IpcMainEvent | IpcMainInvokeEvent): boolean {"
+      "source": "src/main/ipc/senderValidation.ts:132",
+      "match": "export function isTrustedAppSender(event: IpcMainEvent | IpcMainInvokeEvent, channel: string): boolean {"
     },
     {
       "id": "docs-technical-debt/43",
@@ -22222,7 +22222,7 @@
       "quote": "`markActivity` records at most one timestamp per 250 ms per terminal",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:11",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:12",
       "match": "export const ACTIVITY_THROTTLE_MS = 250"
     },
     {
@@ -22773,7 +22773,7 @@
       "quote": "`getPlatform` in `src/preload/index.ts` — already exposed",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/index.ts:193",
+      "source": "src/preload/index.ts:200",
       "match": "getPlatform: (): NodeJS.Platform => process.platform"
     },
     {
@@ -23198,7 +23198,7 @@
       "quote": "`api.utils.getArch()` preload helper",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/index.ts:205",
+      "source": "src/preload/index.ts:212",
       "match": "getArch: (): NodeJS.Architecture => process.arch"
     },
     {
@@ -23268,7 +23268,7 @@
       "quote": "`main/index.ts:612-643` (dock menu and jump list carry only \"New Window\")",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:632",
+      "source": "src/main/index.ts:631",
       "match": "title: 'New Window',"
     },
     {
@@ -23298,7 +23298,7 @@
       "quote": "`src/main/index.ts:613-624` — macOS dock menu (`app.dock.setMenu`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:621",
+      "source": "src/main/index.ts:620",
       "match": "app.dock?.setMenu(dockMenu)"
     },
     {
@@ -23308,7 +23308,7 @@
       "quote": "`src/main/index.ts:626-643` — Windows jumplist (`app.setJumpList`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:626",
+      "source": "src/main/index.ts:625",
       "match": "app.setJumpList(["
     },
     {
@@ -24217,7 +24217,7 @@
       "quote": "| `src/main/index.test.ts:610` (`Window Title Configuration",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.test.ts:621",
+      "source": "src/main/index.test.ts:623",
       "match": "should set title to \"ERFANA v{version}\" in production mode"
     },
     {
@@ -24495,7 +24495,7 @@
       "quote": "├── preload/            # Context bridge API (exposes safe APIs to renderer)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/index.ts:241",
+      "source": "src/preload/index.ts:248",
       "match": "contextBridge.exposeInMainWorld('electron', electron)"
     },
     {
@@ -25148,7 +25148,7 @@
       "quote": "`optimizer.watchWindowShortcuts` from `@electron-toolkit/utils`, attached to every window in `src/main/index.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:450",
+      "source": "src/main/index.ts:449",
       "match": "optimizer.watchWindowShortcuts(window)",
       "note": "The call sits inside app.on('browser-window-created') (line 450), so every window gets it. Observed while checking: the same helper, called without options, also swallows Cmd/Ctrl+Minus and Cmd/Ctrl+Shift+Equal on the app window in every build (its zoom option defaults to false); not stated on this page."
     },
@@ -25351,7 +25351,7 @@
       "quote": "In a packaged build the same helper binds no `F12` and blocks `Cmd/Ctrl+R`",
       "status": "verified",
       "evidence": "app",
-      "source": "src/main/index.ts:447",
+      "source": "src/main/index.ts:446",
       "match": "ignore CommandOrControl + R in production",
       "test": "e2e/guide-tasks/claims-user-0.guide.ts",
       "note": "Behaviour lives in @electron-toolkit/utils (not in src). Real-app test: unpackaged, F12 toggles DevTools (helper attached); then the test flips the loaded helper's is.dev (= !app.isPackaged) to false and sends native key input – F12 is not prevented and DevTools stays closed, Cmd/Ctrl+R is prevented and the page does not reload. The packaged branch is reached by that flip, not by a packaged build."
@@ -26010,7 +26010,7 @@
       "quote": "├── shared/                # Code shared across processes (incl. IPC schemas)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/index.ts:28",
+      "source": "src/preload/index.ts:29",
       "match": "from '../shared/ipc/file-schema'"
     },
     {
@@ -26030,7 +26030,7 @@
       "quote": "Service (main) → Handler (ipc) → Preload → Renderer",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/registry.ts:123",
+      "source": "src/main/ipc/registry.ts:125",
       "match": "ipcMain.handle(channel, (event: IpcMainInvokeEvent, ...args) => {"
     },
     {
@@ -26390,8 +26390,8 @@
       "quote": "exposes IPC through `contextBridge` with a sender check on every global channel",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/ipc/registry.ts:124",
-      "match": "if (!isTrustedAppSender(event)) {",
+      "source": "src/main/ipc/registry.ts:126",
+      "match": "if (!isTrustedAppSender(event, channel)) {",
       "note": "Claimed 'input validation on every channel'; older pdf:/docx: handlers do not schema-validate payloads – what every global channel gets is the sender check in registry.ts. preload: src/preload/index.ts:234."
     },
     {
@@ -26508,7 +26508,7 @@
       "quote": "exposes IPC through `contextBridge`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/index.ts:242",
+      "source": "src/preload/index.ts:249",
       "match": "contextBridge.exposeInMainWorld('api', api)"
     },
     {
@@ -28202,7 +28202,7 @@
       "quote": "| APP-09 | Dock menu New Window | M | M/index.ts",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:621",
+      "source": "src/main/index.ts:620",
       "match": "app.dock?.setMenu(dockMenu)"
     },
     {
@@ -28212,7 +28212,7 @@
       "quote": "| APP-10 | Jump-list New Window | W | M/index.ts",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:632",
+      "source": "src/main/index.ts:631",
       "match": "title: 'New Window',"
     },
     {
@@ -30775,7 +30775,7 @@
       "quote": "Erfana then pastes the prompt into the terminal and presses Enter for you.",
       "status": "fixed",
       "evidence": "app",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:157",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:167",
       "match": "if (autoExecute) {",
       "test": "e2e/context-menu-explain.e2e.ts",
       "note": "Clarified that templates run with autoExecute: true, so Enter is sent automatically."
@@ -33307,7 +33307,7 @@
       "quote": "Read the prompt in the terminal before accepting an edit.",
       "status": "fixed",
       "evidence": "app",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:157",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:167",
       "match": "if (autoExecute) {",
       "test": "e2e/context-menu-explain.e2e.ts",
       "note": "Entry previously cited a template frontmatter line; the behaviour (prompt sent then submitted, agent asks to accept edits) is proven by sendToTerminal pressing Enter when autoExecute is set. Page line extended to say Erfana presses Enter."
@@ -33319,7 +33319,7 @@
       "quote": "Erfana pastes the prompt into the active terminal and presses Enter for you.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:162",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:172",
       "match": "terminalOps.write(terminalId, '\\r')",
       "note": "Added: every template sets autoExecute: true, so the prompt is submitted, not just typed."
     },
@@ -33330,7 +33330,7 @@
       "quote": "open a project and start the agent that should receive the prompt",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:123",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:133",
       "match": "if (!terminalId) {",
       "note": "Prompts go to the active terminal only; with none, nothing is sent."
     },
@@ -33537,7 +33537,7 @@
       "quote": "On macOS, the Erfana Dock menu also offers **New Window**.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:615",
+      "source": "src/main/index.ts:614",
       "match": "label: 'New Window'"
     },
     {
@@ -33547,7 +33547,7 @@
       "quote": "On Windows, select **New Window** from Erfana's taskbar jump list.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:632",
+      "source": "src/main/index.ts:631",
       "match": "title: 'New Window'"
     },
     {
@@ -33557,7 +33557,7 @@
       "quote": "Both routes open a separate Erfana instance, like **File > New Window**.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:635",
+      "source": "src/main/index.ts:634",
       "match": "args: '--new-window'"
     },
     {
@@ -33655,7 +33655,7 @@
       "quote": "Quitting from the app menu, or with **File > Exit** on Windows, closes Erfana without a confirmation.",
       "status": "fixed",
       "evidence": "app",
-      "source": "src/main/index.ts:716",
+      "source": "src/main/index.ts:715",
       "match": "if (!quitGuard.handleBeforeQuit(event)) return",
       "test": "e2e/quit-shutdown.e2e.ts",
       "note": "Page implied quitting from the app menu shows the confirmation. before-quit is always prevented and runs the shutdown to app.exit(0); quit:requested is sent only from the window close handler (index.ts:248), so a menu quit never asks."
@@ -33688,7 +33688,7 @@
       "quote": "Both routes open a separate Erfana instance",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:617",
+      "source": "src/main/index.ts:616",
       "match": "spawnNewInstance()"
     },
     {
@@ -33861,7 +33861,7 @@
       "quote": "to send a fix prompt to the terminal",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/utils/panelUtils.ts:253",
+      "source": "src/renderer/src/utils/panelUtils.ts:328",
       "match": "const targetPanel = 'terminal' as const"
     },
     {
@@ -35065,7 +35065,7 @@
       "quote": "If the settings file cannot be read at start-up, Erfana opens with default settings, says so",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:467",
+      "source": "src/main/index.ts:466",
       "match": "Your saved settings could not be loaded, so default settings are in use."
     },
     {
@@ -40147,7 +40147,7 @@
       "quote": "The global file is read when Erfana starts",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:463",
+      "source": "src/main/index.ts:462",
       "match": "await globalSettingsService.initialize()"
     },
     {
@@ -41842,7 +41842,7 @@
       "quote": "The Erfana taskbar jump list also has **New Window**, which opens a separate instance.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:632",
+      "source": "src/main/index.ts:631",
       "match": "title: 'New Window',"
     },
     {
@@ -44545,7 +44545,7 @@
       "quote": "registered through `registry.ts` (never `ipcMain` directly)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:508",
+      "source": "src/main/index.ts:507",
       "match": "`src/main/ipc/registry.ts`, and an ESLint rule stops `ipcMain` being"
     },
     {
@@ -44565,7 +44565,7 @@
       "quote": "3. Register handler in `src/main/index.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:511",
+      "source": "src/main/index.ts:510",
       "match": "registerFileHandlers()"
     },
     {
@@ -45105,7 +45105,7 @@
       "quote": "(register via `registerClipboardHandlers()` at startup)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:532",
+      "source": "src/main/index.ts:531",
       "match": "registerClipboardHandlers()"
     },
     {
@@ -47019,7 +47019,7 @@
       "quote": "bracketed paste mode for safe multi-line input",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:136",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:146",
       "match": "\\x1b[200~"
     },
     {
@@ -47149,8 +47149,8 @@
       "quote": "(`panelUtils.executePromptTemplate`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/utils/panelUtils.ts:248",
-      "match": "withApplyFooter(config.template, !!config.mutatesDocument)"
+      "source": "src/renderer/src/utils/panelUtils.ts:323",
+      "match": "withPromptFooter(config.template, config)"
     },
     {
       "id": "docs-features-README/t36",
@@ -50494,7 +50494,7 @@
       "quote": "exposes `window.__ERFANA_FORCE_CRASH__ = true` **only when present**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/index.ts:244",
+      "source": "src/preload/index.ts:251",
       "match": "contextBridge.exposeInMainWorld('__ERFANA_FORCE_CRASH__', true)"
     },
     {
@@ -50738,7 +50738,7 @@
       "quote": "contextBridge.exposeInMainWorld('electron', electron) // `shell` only",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/index.ts:241",
+      "source": "src/preload/index.ts:248",
       "match": "contextBridge.exposeInMainWorld('electron', electron)"
     },
     {
@@ -51213,7 +51213,7 @@
       "quote": "an untrusted `send` is dropped and logged",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/registry.ts:109",
+      "source": "src/main/ipc/registry.ts:111",
       "match": "logger.warn('Rejected IPC from untrusted sender'"
     },
     {
@@ -51233,7 +51233,7 @@
       "quote": "except that it ignores the URL's fragment and query",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/senderValidation.ts:60",
+      "source": "src/main/ipc/senderValidation.ts:61",
       "match": "url.hash = ''"
     },
     {
@@ -52315,7 +52315,7 @@
       "quote": "uniqueness validation, the full template migration and the slugify removal remain open",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/prompts/registry.ts:77",
+      "source": "src/renderer/src/prompts/registry.ts:78",
       "match": "acc[parsed.id] = config"
     },
     {
@@ -54594,7 +54594,7 @@
       "quote": "`window.api.utils.getPlatform()` preload bridge (`getPlatform` in `src/preload/index.ts`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/preload/index.ts:193",
+      "source": "src/preload/index.ts:200",
       "match": "getPlatform: (): NodeJS.Platform => process.platform,"
     },
     {
@@ -55237,7 +55237,7 @@
       "quote": "`event.sender` is a `webContents` registered in",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/senderValidation.ts:80",
+      "source": "src/main/ipc/senderValidation.ts:81",
       "match": "if (!isAppWebContents(event.sender as AppWebContentsLike | undefined)) return false"
     },
     {
@@ -55248,7 +55248,7 @@
       "status": "verified",
       "evidence": "source",
       "source": "src/main/services/screenshot/ScreenshotOverlayWindow.ts:334",
-      "match": "registerAppWebContents(overlay.webContents)"
+      "match": "registerAppWebContents(overlay.webContents, 'screenshotOverlay')"
     }
   ],
   "reviewed": {
