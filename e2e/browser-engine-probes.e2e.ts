@@ -205,7 +205,7 @@ test.describe('spec 025 engine probes: input and frames', () => {
     windowWithTestProject: _window,
     browserServers
   }) => {
-    // No CDP session on this view: with one, cross-site frames never load (the KNOWN DEFECT probe below).
+    // No CDP session on this view, so the measured coordinates come from Electron alone.
     const view = await ProbeView.open(appWithTestProject, { withoutCdp: true })
     const url = browserServers.sites.static.url('/probes/frames.html')
     await view.load(url)
@@ -557,15 +557,14 @@ test.describe('spec 025 engine probes: the CDP session', () => {
     })
   })
 
-  test('KNOWN DEFECT: with the tab-kind CDP session attached, a page with cross-site frames finishes loading', async ({
+  test('ADR 0007 decision 1: with the tab-kind CDP session attached, a page with cross-site frames finishes loading', async ({
     browserTabs,
     browserServers
   }) => {
-    // Observed in commit 8: the session auto-attaches with waitForDebuggerOnStart and
-    // the cross-site frames stay uncommitted, so the tab loads for ever. A view
-    // without the session loads the same page. Expected to fail until cdp/ is fixed;
-    // it then passes, and `test.fail` turns that into a failure that asks for this line to go.
-    test.fail(true, 'spec 025 commit 8 finding: BrowserCdpSession blocks cross-site frames')
+    // Commit 8 found the cross-site frames never committed: Electron emits
+    // Target.attachedToTarget from inside Chromium's navigation throttle, and a
+    // runIfWaitingForDebugger sent from that call stack was lost. The session now
+    // resumes on a later task (RESUME_DELAY_MS); this guards against a regression.
     const page = await browserTabs.open()
     const url = browserServers.sites.static.url('/probes/frames.html')
     await browserTabs.navigate(page.tabId, url)

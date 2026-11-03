@@ -17,11 +17,14 @@ export interface CdpTargetInfo {
 }
 
 /**
- * Why the debugger went away. Electron reports the reason "target closed" for
- * both a closed view and DevTools taking over (inferred from Electron's
- * source), so the cause is read from the view's state at the event.
+ * Why the debugger went away. A closing view detaches with reason "target
+ * closed" while its `webContents` is not yet destroyed (commit-8 probe), so
+ * that reason with DevTools closed, or a destroyed view, is `viewClosed`.
+ * There is no DevTools cause: opening or closing DevTools does not detach the
+ * session (commit-8 probe, Electron 44.9.3), so a "target closed" while
+ * DevTools is open, or any other reason, is `other`.
  */
-export type CdpDetachCause = 'devtools' | 'viewClosed' | 'other'
+export type CdpDetachCause = 'viewClosed' | 'other'
 
 export interface CdpDetachInfo {
   readonly cause: CdpDetachCause

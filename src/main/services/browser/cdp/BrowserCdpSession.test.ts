@@ -9,7 +9,14 @@ const { mockLogger } = vi.hoisted(() => ({
 vi.mock('../../LoggingService', () => ({ logger: mockLogger }))
 
 import { createManualClock, type TestClock } from '../../../../shared/clock'
-import { BrowserCdpSession, CONSOLE_RELEASE_DELAY_MS, TOP_TARGET, type BrowserCdpSessionOptions } from './BrowserCdpSession'
+import {
+  BrowserCdpSession,
+  CONSOLE_RELEASE_DELAY_MS,
+  RESUME_DELAY_MS,
+  TARGET_CLOSED_REASON,
+  TOP_TARGET,
+  type BrowserCdpSessionOptions
+} from './BrowserCdpSession'
 import { CdpRefusedError } from './cdpAllowList'
 import { FLOOD_MAX_EVENTS } from './cdpFloodBudget'
 import { HANG_PROBE_INTERVAL_VISIBLE_MS, HANG_THRESHOLD_MS } from './browserHangProbe'
@@ -30,36 +37,42 @@ function attached(options: Partial<BrowserCdpSessionOptions> = {}): Harness {
   return { session, contents, clock }
 }
 
-function attachChild(contents: FakeContents, sessionId: string, type: string, targetId = sessionId, parent = ''): void {
+function attachChild(
+  contents: FakeContents,
+  sessionId: string,
+  type: string,
+  targetId = sessionId,
+  parent = '',
+  waitingForDebugger = true
+): void {
   contents.debugger.emit(
     'Target.attachedToTarget',
-    { sessionId, targetInfo: { targetId, type, url: `https://${targetId.toLowerCase()}.test/` }, waitingForDebugger: true },
+    { sessionId, targetInfo: { targetId, type, url: `https://${targetId.toLowerCase()}.test/` }, waitingForDebugger },
     parent
   )
 }
+
+const NETWORK_ENABLE = { maxTotalBufferSize: 0, maxResourceBufferSize: 0, maxPostDataSize: 0 }
 
 beforeEach(() => {
   vi.clearAllMocks()
 })
 
 describe('BrowserCdpSession – attach and child targets (ADR 0007 decision 1, P6)', () => {
-  it('attaches and turns on auto-attach, Runtime and Log on the top target, no Network by default', () => {
+  it('attaches and turns on auto-attach, Runtime, Log and Network (zero buffers) on the top target by default', () => {
     const { contents } = attached()
     expect(contents.debugger.attached).toBe(true)
     expect(contents.debugger.sent).toEqual([
       { method: 'Target.setAutoAttach', params: { autoAttach: true, waitForDebuggerOnStart: true, flatten: true }, sessionId: undefined },
       { method: 'Runtime.enable', params: {}, sessionId: undefined },
-      { method: 'Log.enable', params: {}, sessionId: undefined }
+      { method: 'Log.enable', params: {}, sessionId: undefined },
+      { method: 'Network.enable', params: NETWORK_ENABLE, sessionId: undefined }
     ])
   })
 
-  it('turns on Network with zero buffers behind the failed-request switch', () => {
-    const { contents } = attached({ failedRequestSource: 'network' })
-    expect(contents.debugger.sent.at(-1)).toEqual({
-      method: 'Network.enable',
-      params: { maxTotalBufferSize: 0, maxResourceBufferSize: 0, maxPostDataSize: 0 },
-      sessionId: undefined
-    })
+  it('leaves Network off with the log failed-request source', () => {
+    const { contents } = attached({ failedRequestSource: 'log' })
+    expect(contents.debugger.methods()).toEqual(['Target.setAutoAttach', 'Runtime.enable', 'Log.enable'])
   })
 
   it('refuses a second attach, a destroyed view, and passes on Electron’s refusal', () => {
@@ -78,20 +91,42 @@ describe('BrowserCdpSession – attach and child targets (ADR 0007 decision 1, P
     expect(held.listenerCount + held.debugger.listenerCount).toBe(0)
   })
 
-  it('sends a new child’s enables without awaiting each, then runIfWaitingForDebugger', () => {
-    const { session, contents } = attached()
+  it('sends a new child’s enables without awaiting each, then runIfWaitingForDebugger on a later task', async () => {
+    const { session, contents, clock } = attached()
     contents.debugger.reply = () => new Promise(() => undefined)
     const seenAtEvent: string[][] = []
     session.on('targetAttached', () => seenAtEvent.push(contents.debugger.methods('S1')))
     attachChild(contents, 'S1', 'iframe', 'F1')
-    expect(contents.debugger.methods('S1')).toEqual([
-      'Target.setAutoAttach',
-      'Runtime.enable',
-      'Log.enable',
-      'Runtime.runIfWaitingForDebugger'
-    ])
+    const enables = ['Target.setAutoAttach', 'Runtime.enable', 'Log.enable', 'Network.enable']
+    // Not from the attach event's stack, nor from a microtask: Electron emits the event
+    // from inside Chromium's navigation throttle, and a resume there is lost (commit-8 probe).
+    expect(contents.debugger.methods('S1')).toEqual(enables)
+    await flush()
+    expect(contents.debugger.methods('S1')).toEqual(enables)
+    clock.advance(RESUME_DELAY_MS)
+    expect(contents.debugger.methods('S1')).toEqual([...enables, 'Runtime.runIfWaitingForDebugger'])
     // The event fires before the run, so the freeze can queue its pause first.
-    expect(seenAtEvent).toEqual([['Target.setAutoAttach', 'Runtime.enable', 'Log.enable']])
+    expect(seenAtEvent).toEqual([enables])
+  })
+
+  it('does not resume a child that is not waiting, or one that went before its resume', () => {
+    const { contents, clock } = attached()
+    attachChild(contents, 'S1', 'worker', 'W1', '', false)
+    attachChild(contents, 'S2', 'iframe', 'F2')
+    attachChild(contents, 'S3', 'iframe', 'F3', 'S2')
+    contents.debugger.emit('Target.detachedFromTarget', { sessionId: 'S2' })
+    expect(clock.pendingTimers()).toBe(1) // the hang probe's only
+    clock.advance(RESUME_DELAY_MS)
+    expect(contents.debugger.methods()).not.toContain('Runtime.runIfWaitingForDebugger')
+  })
+
+  it('drops pending resumes when the debugger detaches', () => {
+    const { session, contents, clock } = attached()
+    attachChild(contents, 'S1', 'iframe')
+    session.detach()
+    contents.debugger.clearSent()
+    clock.advance(RESUME_DELAY_MS)
+    expect(contents.debugger.sent).toEqual([])
   })
 
   it('tracks frames, workers and service workers, nested children included', () => {
@@ -211,17 +246,21 @@ describe('BrowserCdpSession – pick domains on demand (A12)', () => {
 
 describe('BrowserCdpSession – detach (Q5, S-9)', () => {
   it.each([
-    ['devtools', (c: FakeContents) => (c.devToolsOpened = true)],
-    ['viewClosed', (c: FakeContents) => (c.destroyed = true)],
-    ['other', () => undefined]
-  ] as const)('records and announces a %s detach', (cause, arrange) => {
+    // A closing view: "target closed" while not yet destroyed (commit-8 probe).
+    ['viewClosed', TARGET_CLOSED_REASON, () => undefined],
+    ['viewClosed', TARGET_CLOSED_REASON, (c: FakeContents) => (c.destroyed = true)],
+    ['viewClosed', 'Render process gone.', (c: FakeContents) => (c.destroyed = true)],
+    // DevTools does not detach the session, so "target closed" with it open is unexplained.
+    ['other', TARGET_CLOSED_REASON, (c: FakeContents) => (c.devToolsOpened = true)],
+    ['other', 'Render process gone.', () => undefined]
+  ] as const)('records and announces a %s detach for reason "%s"', (cause, reason, arrange) => {
     const { session, contents } = attached()
     const events: unknown[] = []
     session.on('detached', e => events.push(e))
     arrange(contents)
-    contents.debugger.emitDetach('target closed')
-    expect(events).toEqual([{ cause, reason: 'target closed' }])
-    expect(session.lastDetach).toEqual({ cause, reason: 'target closed' })
+    contents.debugger.emitDetach(reason)
+    expect(events).toEqual([{ cause, reason }])
+    expect(session.lastDetach).toEqual({ cause, reason })
     expect(session.attached).toBe(false)
     expect(session.attachedTargets()).toEqual([])
     expect(contents.listenerCount + contents.debugger.listenerCount).toBe(0)
@@ -260,7 +299,7 @@ describe('BrowserCdpSession – detach (Q5, S-9)', () => {
 
 describe('BrowserCdpSession – logs (025-FR-038)', () => {
   it('025-AC-038 snapshots console entries and failed requests, and a new top document clears them', () => {
-    const { session, contents } = attached()
+    const { session, contents } = attached({ failedRequestSource: 'log' })
     contents.emitDidNavigate('https://app.test/')
     contents.debugger.emit('Runtime.executionContextCreated', defaultContext(1, 'MAIN', 'https://app.test'))
     contents.debugger.emit('Runtime.consoleAPICalled', consoleCall('error', 'boom'))
@@ -276,7 +315,7 @@ describe('BrowserCdpSession – logs (025-FR-038)', () => {
   })
 
   it('025-AC-038 keeps a worker’s failed request after the worker ends, drops a detached frame’s entries', () => {
-    const { session, contents } = attached()
+    const { session, contents } = attached({ failedRequestSource: 'log' })
     attachChild(contents, 'S1', 'iframe', 'F1')
     attachChild(contents, 'S2', 'worker', 'W1')
     contents.debugger.emit('Log.entryAdded', { entry: { source: 'javascript', level: 'error', text: 'frame error' } }, 'S1')
@@ -295,6 +334,7 @@ describe('BrowserCdpSession – logs (025-FR-038)', () => {
   it('releases console objects once per burst per target (P7)', () => {
     const { contents, clock } = attached()
     attachChild(contents, 'S1', 'iframe')
+    clock.advance(RESUME_DELAY_MS)
     contents.debugger.clearSent()
     for (let i = 0; i < 5; i++) contents.debugger.emit('Runtime.consoleAPICalled', consoleCall('log', 'x'))
     contents.debugger.emit('Runtime.consoleAPICalled', consoleCall('error', 'y'), 'S1')
@@ -341,8 +381,9 @@ describe('BrowserCdpSession – flood budget (S6, S-14)', () => {
   }
 
   it('turns a child target’s logs off at the 201st event in a second and notes "logs truncated"', () => {
-    const { session, contents } = attached()
+    const { session, contents, clock } = attached()
     attachChild(contents, 'S1', 'iframe', 'F1')
+    clock.advance(RESUME_DELAY_MS)
     const truncated: string[] = []
     session.on('logsTruncated', t => truncated.push(t.sessionKey))
     contents.debugger.clearSent()
@@ -351,7 +392,7 @@ describe('BrowserCdpSession – flood budget (S6, S-14)', () => {
     expect(contents.debugger.methods('S1')).toEqual([])
     expect(session.logSnapshot().truncated).toBe(false)
     flood(contents, 'S1', 1)
-    expect(contents.debugger.methods('S1')).toEqual(['Runtime.disable', 'Log.disable'])
+    expect(contents.debugger.methods('S1')).toEqual(['Runtime.disable', 'Log.disable', 'Network.disable'])
     expect(truncated).toEqual(['S1'])
     expect(session.logSnapshot().truncated).toBe(true)
     flood(contents, 'S1', 50)
@@ -360,18 +401,19 @@ describe('BrowserCdpSession – flood budget (S6, S-14)', () => {
   })
 
   it('still handles target events from a flooded target', () => {
-    const { session, contents } = attached()
+    const { session, contents, clock } = attached()
     flood(contents, TOP_TARGET)
     attachChild(contents, 'S1', 'iframe')
+    clock.advance(RESUME_DELAY_MS)
     expect(session.attachedTargets().map(t => t.sessionKey)).toContain('S1')
     expect(contents.debugger.methods('S1')).toContain('Runtime.runIfWaitingForDebugger')
   })
 
-  it('turns Network off too when the switch has it on', () => {
-    const { contents } = attached({ failedRequestSource: 'network' })
+  it('leaves Network alone with the log source', () => {
+    const { contents } = attached({ failedRequestSource: 'log' })
     contents.debugger.clearSent()
     flood(contents, TOP_TARGET)
-    expect(contents.debugger.methods(TOP_TARGET)).toEqual(['Runtime.disable', 'Log.disable', 'Network.disable'])
+    expect(contents.debugger.methods(TOP_TARGET)).toEqual(['Runtime.disable', 'Log.disable'])
   })
 
   it('re-enables the top target’s logs at the next top-level navigation and clears the stale note', () => {
@@ -381,7 +423,7 @@ describe('BrowserCdpSession – flood budget (S6, S-14)', () => {
     contents.emitDidFrameNavigate('https://sub.test/', true)
     expect(contents.debugger.sent).toEqual([])
     contents.emitDidNavigate('https://next.test/')
-    expect(contents.debugger.methods(TOP_TARGET)).toEqual(['Runtime.enable', 'Log.enable'])
+    expect(contents.debugger.methods(TOP_TARGET)).toEqual(['Runtime.enable', 'Log.enable', 'Network.enable'])
     expect(session.logSnapshot()).toEqual({ console: [], failedRequests: [], truncated: false })
     contents.debugger.emit('Log.entryAdded', { entry: { source: 'javascript', level: 'warning', text: 'again' } })
     expect(session.logSnapshot().console).toMatchObject([{ message: 'again', frameOrigin: 'https://next.test' }])
@@ -398,12 +440,13 @@ describe('BrowserCdpSession – flood budget (S6, S-14)', () => {
   })
 
   it('re-enables a flooded child target at a sub-frame navigation', () => {
-    const { contents } = attached()
+    const { contents, clock } = attached()
     attachChild(contents, 'S1', 'iframe')
+    clock.advance(RESUME_DELAY_MS)
     flood(contents, 'S1')
     contents.debugger.clearSent()
     contents.emitDidFrameNavigate('https://s1.test/next', false)
-    expect(contents.debugger.methods('S1')).toEqual(['Runtime.enable', 'Log.enable'])
+    expect(contents.debugger.methods('S1')).toEqual(['Runtime.enable', 'Log.enable', 'Network.enable'])
     expect(contents.debugger.methods(TOP_TARGET)).toEqual([])
   })
 })
@@ -441,6 +484,7 @@ describe('BrowserCdpSession – hang probe (025-FR-056)', () => {
     const { session, contents, clock } = attached()
     session.hangProbe.setVisible(true)
     attachChild(contents, 'S1', 'iframe')
+    clock.advance(RESUME_DELAY_MS)
     contents.debugger.emit('Page.javascriptDialogOpening', { type: 'alert' }, 'S1')
     contents.debugger.clearSent()
     clock.advance(HANG_PROBE_INTERVAL_VISIBLE_MS)

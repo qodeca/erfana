@@ -12,11 +12,13 @@
  * What it does:
  * - Attaches, then `Target.setAutoAttach` with the fixed flattened options.
  *   Each child target (frame, worker, service worker) gets its enables sent
- *   without awaiting each, then `Runtime.runIfWaitingForDebugger` (P6). The
- *   `targetAttached` event fires before the run, so a caller (the freeze)
- *   can queue its own commands ahead of it.
- * - `Runtime` and `Log` on every target while browsing; `Network` only with
- *   `failedRequestSource: 'network'` (the commit-8 probe decides, P1);
+ *   without awaiting each, then `Runtime.runIfWaitingForDebugger` (P6) on a
+ *   later task – see {@link RESUME_DELAY_MS} for why it must not go out from
+ *   inside the attach event. The `targetAttached` event fires before the
+ *   run, so a caller (the freeze) can queue its own commands ahead of it.
+ * - `Runtime`, `Log` and `Network` on every target while browsing; failed
+ *   requests come from `Network` by default, as only it sees a dedicated
+ *   worker's (commit-8 probe, P1); `failedRequestSource: 'log'` stays;
  *   `DOM`, `CSS` and `Overlay` only between {@link enablePickDomains} and
  *   {@link disablePickDomains} (A12). `Page` is never turned on here: dialogs
  *   own it (ADR 0011), and its dialog events, when on, feed the hang probe.
@@ -24,8 +26,9 @@
  *   until the next navigation, and the log snapshot says "logs truncated".
  * - Console objects released after each console call is copied (P7).
  * - The hang probe on the top target (025-FR-056).
- * - A debugger detach it did not ask for (DevTools taking over, the view
- *   closing) is recorded and announced as `detached` (Q5, S-9).
+ * - A debugger detach it did not ask for (the view closing, or anything
+ *   else) is recorded and announced as `detached` (Q5, S-9). Opening DevTools
+ *   does not detach it (commit-8 probe, Electron 44.9.3).
  *
  * New documents: the top target's `Runtime.executionContextsCleared` clears
  * every frame's logs; a frame's new default context clears that frame's. A
@@ -77,10 +80,19 @@ export const TOP_TARGET = ''
 /** Delay before a target's console objects are released, so a burst of calls costs one release. */
 export const CONSOLE_RELEASE_DELAY_MS = 250
 
+/**
+ * Delay before a waiting child is resumed: a new task, never the attach
+ * event's call stack. Electron emits `Target.attachedToTarget` synchronously
+ * from inside Chromium's navigation throttle, before it defers; a resume sent
+ * there (or from a microtask) clears the throttle without resuming it, and
+ * the cross-site frame never commits (commit-8 probe, Electron 44.9.3).
+ */
+export const RESUME_DELAY_MS = 0
+
 export interface BrowserCdpSessionOptions {
   readonly kind: CdpSessionKind
   readonly clock?: Clock
-  /** Where failed requests come from until the commit-8 probe decides (default `log`). */
+  /** Where failed requests come from (default `network`: only it sees a worker's, commit-8 probe). */
   readonly failedRequestSource?: FailedRequestSource
 }
 
@@ -89,12 +101,23 @@ interface TargetRecord extends CdpTargetInfo {
   readonly budget: CdpFloodBudget
   logsOff: boolean
   release: TimerHandle | undefined
+  resume: TimerHandle | undefined
 }
 
 const LOG_DOMAINS = ['Runtime.', 'Log.', 'Network.']
 const isLogEvent = (method: string): boolean => LOG_DOMAINS.some(d => method.startsWith(d))
 const isFrameTarget = (t: TargetRecord): boolean => t.sessionKey === TOP_TARGET || t.type === 'iframe'
 const str = (v: unknown): string => (typeof v === 'string' ? v : '')
+
+/** Electron's detach reason when the page goes away (`Debugger::AgentHostClosed`). */
+export const TARGET_CLOSED_REASON = 'target closed'
+
+/** A closing view detaches with "target closed" before `isDestroyed()` turns true (commit-8 probe). */
+function detachCause(contents: CdpWebContents, reason: string): CdpDetachCause {
+  if (contents.isDestroyed()) return 'viewClosed'
+  if (reason === TARGET_CLOSED_REASON && !contents.isDevToolsOpened()) return 'viewClosed'
+  return 'other'
+}
 
 function originOf(url: string): string {
   try {
@@ -121,7 +144,7 @@ export class BrowserCdpSession {
   constructor(options: BrowserCdpSessionOptions) {
     this.kind = options.kind
     this.clock = options.clock ?? mainClock
-    this.source = options.failedRequestSource ?? 'log'
+    this.source = options.failedRequestSource ?? 'network'
     this.buffer = new BrowserLogBuffer(this.clock)
     this.collector = new CdpLogCollector(this.buffer, this.source)
     this.probe = new BrowserHangProbe({
@@ -297,7 +320,8 @@ export class BrowserCdpSession {
       parentKey,
       budget: new CdpFloodBudget(this.clock),
       logsOff: false,
-      release: undefined
+      release: undefined,
+      resume: undefined
     }
     this.targets.set(sessionKey, record)
     return record
@@ -364,7 +388,15 @@ export class BrowserCdpSession {
     this.startTarget(child)
     if (this.pickActive && isFrameTarget(child)) this.enablePickOn(child)
     this.hub.emit('targetAttached', this.info(child))
-    if (params.waitingForDebugger === true) this.fire('Runtime.runIfWaitingForDebugger', sessionKey)
+    if (params.waitingForDebugger === true) this.scheduleResume(child)
+  }
+
+  /** Resumes a waiting child on a later task ({@link RESUME_DELAY_MS}); its removal clears the timer. */
+  private scheduleResume(target: TargetRecord): void {
+    target.resume = this.clock.setTimeout(() => {
+      target.resume = undefined
+      this.fire('Runtime.runIfWaitingForDebugger', target.sessionKey)
+    }, RESUME_DELAY_MS)
   }
 
   private childDetached(params: unknown): void {
@@ -380,13 +412,20 @@ export class BrowserCdpSession {
       if (child.parentKey === target.sessionKey) this.removeTarget(child)
     }
     this.targets.delete(target.sessionKey)
-    this.clock.clearTimeout(target.release)
+    this.clearTimers(target)
     this.collector.forgetTarget(target.sessionKey)
     // A frame target goes when its frame is removed or gets a cross-site
     // document: its entries go with it. A worker's stay – its failed requests
     // count for the tab after it ends (025-FR-038).
     if (target.type === 'iframe') this.buffer.clearFrame(target.targetId)
     this.hub.emit('targetDetached', this.info(target))
+  }
+
+  private clearTimers(target: TargetRecord): void {
+    this.clock.clearTimeout(target.release)
+    this.clock.clearTimeout(target.resume)
+    target.release = undefined
+    target.resume = undefined
   }
 
   private floodTripped(target: TargetRecord): void {
@@ -434,9 +473,7 @@ export class BrowserCdpSession {
   private readonly onDetach: CdpDetachListener = (_event, reason) => {
     const contents = this.contents
     if (!contents) return
-    let cause: CdpDetachCause = 'other'
-    if (contents.isDestroyed()) cause = 'viewClosed'
-    else if (contents.isDevToolsOpened()) cause = 'devtools'
+    const cause = detachCause(contents, reason)
     this.teardown()
     this.lastDetachInfo = { cause, reason }
     logger.info('Browser CDP: debugger detached', { cause, reason })
@@ -451,7 +488,7 @@ export class BrowserCdpSession {
     contents.debugger.removeListener('detach', this.onDetach)
     contents.removeListener('did-navigate', this.onDidNavigate)
     contents.removeListener('did-frame-navigate', this.onDidFrameNavigate)
-    for (const target of this.targets.values()) this.clock.clearTimeout(target.release)
+    for (const target of this.targets.values()) this.clearTimers(target)
     this.targets.clear()
     this.collector.reset()
     this.pickActive = false

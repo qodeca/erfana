@@ -8,8 +8,10 @@
  *   `warning`; `Runtime.exceptionThrown` (uncaught exceptions and unhandled
  *   rejections, error); `Log.entryAdded` errors and warnings from any source
  *   but `network` and `violation`.
- * - Failed requests, by the source the commit-8 probe picks:
- *   - `log` (default): `Log.entryAdded` with source `network` and level
+ * - Failed requests, by the source the session picks (`BrowserCdpSession`
+ *   defaults to `network`: the commit-8 probe found only it reports a
+ *   dedicated worker's failed request):
+ *   - `log`: `Log.entryAdded` with source `network` and level
  *     `error`; the status is read from the engine's message
  *     (`status of 500`, `net::ERR_…`); `net::ERR_ABORTED` (cancelled) skipped.
  *   - `network`: a request-id map, bounded at {@link MAX_TRACKED_REQUESTS}
