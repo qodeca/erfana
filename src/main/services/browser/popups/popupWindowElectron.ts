@@ -24,6 +24,7 @@ import { logger } from '../../LoggingService'
 import { BrowserCdpSession } from '../cdp/BrowserCdpSession'
 import { electronPrintsSecurityWarnings } from '../cdp/cdpLogCollector'
 import { enablePageDialogEvents } from '../dialogs/pageDialogs'
+import { adoptedBrowserViewOptions } from '../browserWebPreferences'
 import type { PopupWindowFactory } from './BrowserPopups'
 import type { PopupCdpLink, PopupContents, PopupHost, PopupPageView } from './BrowserPopupWindow'
 import { POPUP_DEFAULT_CONTENT, type Size } from './windowFeatures'
@@ -101,7 +102,9 @@ export function electronPopupWindows(windowIdOf: (tabId: string) => number | nul
           webSecurity: true
         }
       }) as unknown as PopupHost,
-    createView: (contents) => new WebContentsView({ webContents: contents as unknown as WebContents }) as unknown as PopupPageView,
+    // The popup's frozen settings are given again: a view built around an existing page resets them.
+    createView: (contents) =>
+      new WebContentsView(adoptedBrowserViewOptions(contents as unknown as WebContents, process.platform)) as unknown as PopupPageView,
     registerHost: (host) => registerAppWebContents(host.webContents, 'browserPopup'),
     loadHost: loadPopupHost,
     attachCdp: attachPopupCdp

@@ -141,7 +141,25 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
   }, [panelId, adoptTabId, api])
 
   useBrowserBounds({ panelId, tabId, placeholderRef, isVisible })
-  const focusPage = useBrowserPageFocus({ panelId, tabId, erfanaPage: state?.erfanaPage ?? null })
+  // The page view taking keyboard focus does not blur Erfana's document, so the address field
+  // would keep DOM focus – and hide its formatted, fitted display – until a click elsewhere.
+  // It lets go once the page has focus: after Enter or Esc sent it there, or a click on the page.
+  // The blur is focus moving into the page, not leaving the tab: the root's blur handler must not close
+  // an open prompt-actions panel for it (that would drop the held capture).
+  const releasingAddressRef = useRef(false)
+  const releaseAddress = useCallback(() => {
+    if (document.activeElement !== addressRef.current) return
+    releasingAddressRef.current = true
+    try {
+      addressRef.current?.blur()
+    } finally {
+      releasingAddressRef.current = false
+    }
+  }, [])
+  const focusPage = useBrowserPageFocus({ panelId, tabId, erfanaPage: state?.erfanaPage ?? null, onFocused: releaseAddress })
+  useEffect(() => {
+    if (pageFocused) releaseAddress()
+  }, [pageFocused, releaseAddress])
 
   const focusAddress = useCallback(() => {
     addressRef.current?.focus()
@@ -338,8 +356,8 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
         if (!intoPortal && (!(next instanceof Node) || rootRef.current?.contains(next) !== true)) {
           setToolbarFocused(false)
           // Focus left the tab: the panel closes and its capture goes; a dialog stays with its text (025-FR-014).
-          // The banner then says why the panel went (025-FR-065).
-          if (surface === 'panel') {
+          // The banner then says why the panel went (025-FR-065). Focus that went into the page has not left it.
+          if (surface === 'panel' && !releasingAddressRef.current) {
             closePick('focusLeft')
             setPanelClosedOnLeave(true)
           }

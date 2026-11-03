@@ -17,17 +17,26 @@
  * - **More** is always shown (OD-22) and is the row's last control.
  * - The address bar's chips (zoom, pop-up blocked, in use) sit at its end.
  *
- * The fold order of § States › Tiers is not built yet: at narrow widths the
- * address field shrinks and every tool stays on the row.
+ * - **Fold steps 3–7** (design § States › Tiers): when the address field
+ *   cannot show the scheme, the registrable domain and the port even with the
+ *   path and every subdomain label gone, the zoom chip, Open in system
+ *   browser and DevTools go into More, then Forward and Reload, then the
+ *   field's margins shrink, the badge word goes to its icon, and Back goes
+ *   last (`useNavFold`, `navFold.logic.ts`). A folded tool's keys keep
+ *   working, and More lists the navigation tools it took. A tool that folds
+ *   while focused hands focus to More.
  */
-import { forwardRef, useEffect, useId, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useId, useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight, RotateCw, CodeXml, ExternalLink, X } from 'lucide-react'
 import type { BrowserTabState } from '../../../stores/useBrowserTabStore'
 import { AddressBar } from './AddressBar'
-import { navGroupDescription } from './browserPanel.logic'
+import { addressDisplay, navGroupDescription } from './browserPanel.logic'
+import { foldedNavItems, isFolded, navFoldAttribute, parseFoldStep } from './navFold.logic'
+import { useNavFold } from './useNavFold'
 import { browserShortcut } from './browserShortcuts'
 import { MoreMenu, type MoreMenuActions } from './MoreMenu'
 import { sentenceHost } from './erfanaPageCopy'
+import { formatShortcut } from '../../../utils/shortcutLabel'
 import type { StillSurface } from './useStillSurface'
 
 /** Props for {@link NavigationRow}. */
@@ -77,6 +86,30 @@ export const NavigationRow = forwardRef<HTMLDivElement, NavigationRowProps>(
     const backRef = useRef<HTMLButtonElement>(null)
     const forwardRef_ = useRef<HTMLButtonElement>(null)
     const focusedRef = useRef<NavTool>(null)
+    const [row, setRow] = useState<HTMLDivElement | null>(null)
+    const setRowRef = useCallback(
+      (element: HTMLDivElement | null) => {
+        setRow(element)
+        if (typeof ref === 'function') ref(element)
+        else if (ref !== null) ref.current = element
+      },
+      [ref]
+    )
+    const display = addressDisplay(state)
+    const fold = useNavFold(row, display.kind === 'web' ? display.parts : null)
+    /** The row's control that last took focus, until focus moves to another element. */
+    const lastFocusedRef = useRef<HTMLElement | null>(null)
+
+    // A tool that folds while focused hands focus to More (the browser drops it to the body).
+    useEffect(() => {
+      const last = lastFocusedRef.current
+      const step = parseFoldStep(last?.closest('[data-fold-step]')?.getAttribute('data-fold-step'))
+      if (last === null || step === null || !isFolded(step, fold)) return
+      const active = document.activeElement
+      if (active !== null && active !== document.body && active !== last) return
+      lastFocusedRef.current = null
+      lastToolRef.current?.focus()
+    }, [fold, lastToolRef])
 
     // A focused Back or Forward that disables itself hands focus on (design § Where focus lands).
     useEffect(() => {
@@ -89,9 +122,12 @@ export const NavigationRow = forwardRef<HTMLDivElement, NavigationRowProps>(
       if (!lost || (active !== null && active !== document.body && active !== self)) return
       const other = focusedRef.current === 'back' ? forwardRef_.current : backRef.current
       focusedRef.current = null
-      if (other !== null && !other.disabled) other.focus()
+      // A tool folded into More (Forward from step 4) cannot take focus either.
+      const otherStep = parseFoldStep(other?.getAttribute('data-fold-step'))
+      const otherFolded = otherStep !== null && isFolded(otherStep, fold)
+      if (other !== null && !other.disabled && !otherFolded) other.focus()
       else addressRef.current?.focus()
-    }, [canGoBack, canGoForward, addressRef])
+    }, [canGoBack, canGoForward, addressRef, fold])
 
     const back = browserShortcut('back')
     const forward = browserShortcut('forward')
@@ -110,11 +146,17 @@ export const NavigationRow = forwardRef<HTMLDivElement, NavigationRowProps>(
 
     return (
       <div
-        ref={ref}
+        ref={setRowRef}
         className="erf-brw-nav"
         role="group"
         aria-label="Navigation"
         aria-describedby={description === null ? undefined : descriptionId}
+        data-fold={navFoldAttribute(fold)}
+        onFocus={event => (lastFocusedRef.current = event.target)}
+        onBlur={event => {
+          // A blur because the control was hidden keeps it, for the handoff above.
+          if (event.relatedTarget !== null) lastFocusedRef.current = null
+        }}
       >
         {description !== null && (
           <span id={descriptionId} className="erf-brw-hidden">
@@ -125,6 +167,7 @@ export const NavigationRow = forwardRef<HTMLDivElement, NavigationRowProps>(
           ref={backRef}
           type="button"
           className="erf-brw-tool"
+          data-fold-step="7"
           aria-label="Back"
           aria-keyshortcuts={back.aria}
           title={canGoBack ? `Back (${back.label})` : 'Back – no earlier page'}
@@ -139,6 +182,7 @@ export const NavigationRow = forwardRef<HTMLDivElement, NavigationRowProps>(
           ref={forwardRef_}
           type="button"
           className="erf-brw-tool"
+          data-fold-step="4"
           aria-label="Forward"
           aria-keyshortcuts={forward.aria}
           title={canGoForward ? `Forward (${forward.label})` : 'Forward – no later page'}
@@ -153,6 +197,7 @@ export const NavigationRow = forwardRef<HTMLDivElement, NavigationRowProps>(
           <button
             type="button"
             className="erf-brw-tool"
+            data-fold-step="4"
             aria-label="Stop loading"
             title="Stop loading"
             onClick={props.onStop}
@@ -163,6 +208,7 @@ export const NavigationRow = forwardRef<HTMLDivElement, NavigationRowProps>(
           <button
             type="button"
             className="erf-brw-tool"
+            data-fold-step="4"
             aria-label="Reload"
             aria-keyshortcuts={reload.aria}
             title={`Reload (${reload.label})`}
@@ -185,6 +231,7 @@ export const NavigationRow = forwardRef<HTMLDivElement, NavigationRowProps>(
         <button
           type="button"
           className="erf-brw-tool"
+          data-fold-step="3"
           aria-label={systemName}
           title={systemTitle}
           aria-disabled={opening || !live ? true : undefined}
@@ -195,6 +242,7 @@ export const NavigationRow = forwardRef<HTMLDivElement, NavigationRowProps>(
         <button
           type="button"
           className="erf-brw-tool"
+          data-fold-step="3"
           aria-label={devToolsName}
           aria-keyshortcuts={devTools.aria}
           title={`${devToolsName} (${devTools.label})`}
@@ -210,6 +258,17 @@ export const NavigationRow = forwardRef<HTMLDivElement, NavigationRowProps>(
           live={live}
           devToolsOpen={devToolsOpen}
           still={props.moreStill}
+          navItems={foldedNavItems({
+            count: fold,
+            canGoBack,
+            canGoForward,
+            loading,
+            keys: { back: back.label, forward: forward.label, reload: formatShortcut('R', { mod: true }) },
+            onBack: props.onBack,
+            onForward: props.onForward,
+            onReload: props.onReload,
+            onStop: props.onStop
+          })}
         />
       </div>
     )

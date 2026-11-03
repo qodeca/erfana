@@ -148,7 +148,7 @@
 
 /* ---------- target chooser ---------- */
 
-/* The target never yields room to the status slot – the slot's clauses fold first (025-FR-061, 025-FR-065). */
+/* The target never yields room to the status slot – the slot's clauses fold first (025-FR-061, 025-FR-065) – until 380px (below). */
 /* ---------- width preset (deck *Width presets*; § Tiers "Width preset") ---------- */
 
 .erf-brw-width {
@@ -252,9 +252,24 @@
   color: var(--color-warning);
 }
 
+/*
+ * Below 380px the banner's first clause keeps its room (025-FR-065: it never
+ * truncates) and the target yields instead: its name may shrink below 8
+ * characters, down to "…", the full name kept in its accessible name and the
+ * target menu; the process is never cut (design § Pick row at the narrowest
+ * widths, Target chooser).
+ */
 @container (max-width: 380px) {
+  .erf-brw-target {
+    flex-shrink: 1;
+  }
+
   .erf-brw-target__name {
     min-width: 1ch;
+  }
+
+  .erf-brw-pick[data-picking='true'] .erf-brw-status {
+    flex-shrink: 0;
   }
 }
 

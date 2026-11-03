@@ -71,6 +71,14 @@ describe('AddressBar', () => {
     expect(screen.getByText(word)).toBeInTheDocument()
   })
 
+  it('gives the badge its tooltip on the whole segment and marks its word as fold step 6', () => {
+    setup({ state: browserState({ security: 'file' }) })
+    const word = screen.getByText('File')
+    expect(word).toHaveAttribute('data-fold-step', '6')
+    expect(word.parentElement).toHaveAttribute('title')
+    expect(word).not.toHaveAttribute('title')
+  })
+
   it('shows a non-web address as its scheme', () => {
     setup({ state: browserState({ origin: { kind: 'nonWeb', scheme: 'about' } }) })
     expect(document.querySelector('.erf-brw-address__display')).toHaveTextContent('about:')

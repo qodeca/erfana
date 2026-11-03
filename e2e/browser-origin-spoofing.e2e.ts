@@ -94,13 +94,13 @@ async function loadPage(panel: BrowserPanelUi, url: string): Promise<void> {
 }
 
 /**
- * Leave the address bar at rest: Esc restores the address, and the field
- * loses focus as when the user clicks elsewhere in Erfana (the page view
- * taking focus does not blur Erfana's document). The resting display shows.
+ * Leave the address bar at rest: Esc restores the address and hands focus to
+ * the page, and the field lets go of focus with it, so the resting display
+ * shows with no click elsewhere.
  */
 async function atRest(panel: BrowserPanelUi): Promise<void> {
   await panel.addressBar.press('Escape')
-  await panel.addressBar.blur()
+  await expect(panel.addressBar).not.toBeFocused({ timeout: WAIT_MS })
   await expect(panel.addressDisplay).toBeVisible({ timeout: WAIT_MS })
 }
 
@@ -160,10 +160,6 @@ test.describe('origin spoofing – attacker pass (issue #448)', () => {
       windowWithTestProject,
       browserServers
     }) => {
-      test.fail(
-        width < 1280,
-        'Product gap: fold steps 3–7 of design § States › Tiers (tools and Back into More, the badge word to its icon) are not built (NavigationRow.tsx header), so at 400 and 360 px the field keeps only a few characters and even "http://…" plus the port overflows it. The formatter fit (F1) is in; the room is a toolbar change for the owner.'
-      )
       const ui = new BrowserTabUiPage(appWithTestProject, windowWithTestProject)
       const panel = await ui.openWithButton()
       await ui.setPanelWidth(panel, width)
@@ -175,6 +171,10 @@ test.describe('origin spoofing – attacker pass (issue #448)', () => {
       await expect(panel.addressDisplay).toContainText(/^http:\/\/….*evil\.test:\d+/)
       const port = panel.addressParts.filter({ hasText: /^:\d+$/ })
       await expect.poll(() => insideHorizontally(port, panel.addressDisplay), { timeout: WAIT_MS }).toBe(true)
+      // More stays whole on the row at every width (§ States › Tiers, OD-22); the tools that folded are not on it.
+      await expect.poll(() => insideHorizontally(panel.tool('More'), panel.navigation), { timeout: WAIT_MS }).toBe(true)
+      if (width < 1280) await expect(panel.tool('DevTools')).toBeHidden()
+      else await expect(panel.tool('DevTools')).toBeVisible()
     })
   }
 

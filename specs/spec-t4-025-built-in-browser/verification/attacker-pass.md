@@ -32,5 +32,5 @@ Downloads: `iso`, `img`, `vhd`, `vhdx` (disk images Windows mounts on a double-c
 
 ## Open
 
-1. **Fold steps 3–7 at narrow widths** (F1 at 400 and 360 px): owner call between building the fold order of design § States › Tiers in `NavigationRow`, or another way to give the field room. Until then the 400 and 360 px tests are marked as an expected failure.
+1. ~~**Fold steps 3–7 at narrow widths**~~ – built (2026-11-03): `NavigationRow` takes the fold order of design § States › Tiers by measurement (`useNavFold`, `navFold.logic.ts`), so at 400 and 360 px the scheme, `evil.test` and the port fit; the expected-failure marks are gone and the F1 tests also check that More stays whole on the row.
 2. **Design rule 2 allows user info in the focused bar** ("only the focused, editable bar shows it", R2-M9); F7 removes it there too, as Chrome does. The design text needs the owner's update.

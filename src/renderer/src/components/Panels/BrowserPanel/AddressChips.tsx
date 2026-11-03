@@ -104,6 +104,7 @@ export function AddressChips({ state, popupBlocked, addressRef, onResetZoom, onS
           ref={zoomRef}
           type="button"
           className="erf-brw-chip"
+          data-fold-step="3"
           aria-label={`${zoom}% zoom, reset to 100%`}
           aria-keyshortcuts={reset.aria}
           title={`Reset zoom to 100% (${reset.label})`}

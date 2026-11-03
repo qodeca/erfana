@@ -337,7 +337,7 @@ async function firstClauseFit(flow: PickFlow): Promise<{ clipped: boolean; lines
   }))
 }
 
-// Titled without the ID: at a 360px tab the first clause is cut (the gap test below), so 025-AC-081 is not proven whole.
+// At a 360px tab the target yields its room below 380px (PickRow.css), so the first clause shows whole there too (the test below).
 test.describe('pick banner, frame and paused chip (025-AC-081)', () => {
   test('pick mode shows the frame, a crosshair over the top document only and the banner; at 400px the shortcut clause folds and at 360px "Esc to stop" too; the tooltip names both uses', async ({
     appWithTestProject,
@@ -366,10 +366,6 @@ test.describe('pick banner, frame and paused chip (025-AC-081)', () => {
   })
 
   test('at a 360px tab the first clause shows whole, neither clipped nor wrapped', async ({ appWithTestProject, windowWithTestProject, browserServers }) => {
-    test.fail(
-      true,
-      'Product gap: at a 360px tab the target button (flex 0 0 auto, "never yields room", PickRow.css) leaves the status slot ~14px short, and the slot hides its overflow, so "Picking – click an element" is cut. Which control yields is a design call.'
-    )
     const flow = await PickFlow.open(appWithTestProject, windowWithTestProject)
     await flow.load(browserServers.sites.static.url('/elements.html'), { pointer: false })
     await flow.pickButton.click()

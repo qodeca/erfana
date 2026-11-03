@@ -18,12 +18,18 @@ const gateway = vi.hoisted(() => ({
 }))
 const lifecycle = vi.hoisted(() => ({ ensureBrowserTab: vi.fn() }))
 const focusPage = vi.hoisted(() => vi.fn())
+const pageFocusOptions = vi.hoisted(() => ({ onFocused: undefined as undefined | (() => void) }))
 const toast = vi.hoisted(() => vi.fn())
 
 vi.mock('../../../services/browserTabGateway', () => ({ browserTabGateway: gateway }))
 vi.mock('../../../services/browser/browserTabLifecycle', () => lifecycle)
 vi.mock('./useBrowserBounds', () => ({ useBrowserBounds: () => ({ pushBounds: () => true }) }))
-vi.mock('./useBrowserPageFocus', () => ({ useBrowserPageFocus: () => focusPage }))
+vi.mock('./useBrowserPageFocus', () => ({
+  useBrowserPageFocus: (options: { onFocused?: () => void }) => {
+    pageFocusOptions.onFocused = options.onFocused
+    return focusPage
+  }
+}))
 vi.mock('../../../utils/toastHelpers', () => ({ showErrorToast: toast, showInfoToast: vi.fn() }))
 vi.mock('../../../utils/platform', () => ({ isMacOS: () => true, isWindows: () => false }))
 vi.mock('../../../utils/logger', () => ({
@@ -110,6 +116,34 @@ describe('BrowserPanel', () => {
     expect(screen.getByRole('combobox', { name: 'Address and search' })).toHaveFocus()
     expect(screen.getByText(/Load your app, then click/)).toBeInTheDocument()
     expect(screen.getByTestId(BROWSER_TEST_IDS.PANEL)).toHaveAttribute('data-browser-tab-id', TAB)
+  })
+
+  it('lets go of the address field once the page has focus, so its formatted display shows', async () => {
+    renderPanel()
+    host()
+    await act(async () => undefined)
+    const field = screen.getByRole('combobox', { name: 'Address and search' })
+    act(() => field.focus())
+    expect(field).toHaveFocus()
+    act(() => useBrowserTabStore.getState().setPageFocused(TAB, true))
+    expect(field).not.toHaveFocus()
+    expect(document.querySelector('.erf-brw-address__display')).not.toBeNull()
+
+    // Main reporting the focus it was asked for (after Enter or Esc) releases the field too.
+    act(() => useBrowserTabStore.getState().setPageFocused(TAB, false))
+    act(() => field.focus())
+    act(() => pageFocusOptions.onFocused?.())
+    expect(field).not.toHaveFocus()
+  })
+
+  it('keeps focus on a toolbar control other than the address field when the page is focused', async () => {
+    renderPanel()
+    host()
+    await act(async () => undefined)
+    const more = screen.getByRole('button', { name: 'More' })
+    act(() => more.focus())
+    act(() => useBrowserTabStore.getState().setPageFocused(TAB, true))
+    expect(more).toHaveFocus()
   })
 
   it('adopts a page-opened tab', () => {
@@ -279,6 +313,37 @@ describe('BrowserPanel', () => {
     fireEvent.keyDown(panel, { key: 'Escape' })
     expect(gateway.closePick).toHaveBeenCalledWith({ tabId: TAB, captureId: 'a'.repeat(32), reason: 'esc' })
     expect(screen.queryByTestId(BROWSER_TEST_IDS.PROMPT_ACTIONS)).toBeNull()
+    act(() => {
+      useBrowserPickStore.getState().forget(TAB)
+      useBrowserStillStore.getState().clear(TAB)
+    })
+  })
+
+  it('keeps the panel open when the address field lets go because the page took focus', () => {
+    const summary: PickSummary = {
+      name: 'a',
+      size: '1 × 1',
+      ancestors: ['html', 'a'],
+      box: { x: 0, y: 0, width: 1, height: 1 },
+      atTop: false,
+      atStart: true,
+      gone: false,
+      changedAfterPick: false
+    }
+    renderPanel()
+    host()
+    act(() => {
+      useBrowserStillStore.getState().set(TAB, { image: { data: new Uint8Array(4), width: 1, height: 1 }, source: 'pick' })
+      useBrowserPickStore
+        .getState()
+        .apply({ tabId: TAB, kind: 'captured', captureId: 'd'.repeat(32), still: new Uint8Array(4), stillWidth: 1, stillHeight: 1, summary })
+    })
+    const field = screen.getByRole('combobox', { name: 'Address and search' })
+    act(() => field.focus())
+    act(() => pageFocusOptions.onFocused?.())
+    expect(field).not.toHaveFocus()
+    expect(gateway.closePick).not.toHaveBeenCalled()
+    expect(screen.getByTestId(BROWSER_TEST_IDS.PROMPT_ACTIONS)).toBeInTheDocument()
     act(() => {
       useBrowserPickStore.getState().forget(TAB)
       useBrowserStillStore.getState().clear(TAB)

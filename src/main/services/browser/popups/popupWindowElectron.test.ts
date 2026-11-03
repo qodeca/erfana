@@ -34,6 +34,7 @@ vi.mock('../../LoggingService', () => ({ logger: { debug: vi.fn(), info: vi.fn()
 
 import { electronPopupWindows, POPUP_HOST_ROUTE, POPUP_STRIP_HEIGHT_PX } from './popupWindowElectron'
 import { electronPrintsSecurityWarnings } from '../cdp/cdpLogCollector'
+import { browserWebPreferencesFor } from '../browserWebPreferences'
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -62,11 +63,12 @@ describe('electronPopupWindows', () => {
     expect(windows.originMinWidth).toBe(0)
   })
 
-  it('adopts the popup page into a view and registers the host as a browserPopup window', () => {
+  it('adopts the popup page into a view with the frozen settings again, and registers the host as a browserPopup window', () => {
     const windows = electronPopupWindows(() => null)
     const page = { id: 1 }
     windows.createView(page as never)
-    expect(WebContentsView).toHaveBeenCalledWith({ webContents: page })
+    // A view around an existing page resets its settings to Electron's defaults unless they are given (safeDialogs).
+    expect(WebContentsView).toHaveBeenCalledWith({ webContents: page, webPreferences: { ...browserWebPreferencesFor(process.platform) } })
     const host = { webContents: { id: 9 } }
     windows.registerHost(host as never)
     expect(registerAppWebContents).toHaveBeenCalledWith(host.webContents, 'browserPopup')

@@ -478,7 +478,9 @@ const UNREPORTED_KEYS = [
 
 test.describe('built-in browser hostile pages: view settings', () => {
   // Not titled 025-AC-046: eight keys of the literal are not readable from a live view (UNREPORTED_KEYS).
-  test('hostile isolation: a browser tab and its popup report BROWSER_WEB_PREFERENCES for every key Electron reads back, and no preload', async ({
+  // A popup and a target=_blank tab are page-opened: Electron wraps their webContents in a view, which
+  // resets every setting unless the frozen ones are given again (adoptedBrowserViewOptions).
+  test('hostile isolation: a browser tab, its popup and a target=_blank tab report BROWSER_WEB_PREFERENCES for every key Electron reads back, and no preload', async ({
     browserTabs,
     browserServers
   }) => {
@@ -486,8 +488,25 @@ test.describe('built-in browser hostile pages: view settings', () => {
     const page = await hostile.open(hostile.url('/popup-escape.html'))
     await page.clickSelector('#open-popups')
     await expect.poll(async () => (await hostile.popups()).length, { timeout: 15_000 }).toBe(1)
+    await page.eval(`(() => {
+      const a = document.createElement('a')
+      a.id = 'e2e-blank'
+      a.target = '_blank'
+      a.href = '/popup-escape.html?via=blank'
+      a.textContent = 'new tab'
+      a.style.cssText = 'position:fixed;left:8px;top:8px;width:96px;height:32px;z-index:2147483647'
+      document.body.appendChild(a)
+      return true
+    })()`)
+    await page.clickSelector('#e2e-blank')
+    await expect.poll(async () => (await browserTabs.tabs()).some((t) => t.url.includes('via=blank')), { timeout: 15_000 }).toBe(true)
     const expected: Record<string, unknown> = { ...browserWebPreferencesFor(process.platform) }
-    const ids = [(await browserTabs.tabs())[0]!.webContentsId, (await hostile.popups())[0]!.pageWebContentsId]
+    const tabs = await browserTabs.tabs()
+    const ids = [
+      tabs.find((t) => !t.url.includes('via=blank'))!.webContentsId,
+      (await hostile.popups())[0]!.pageWebContentsId,
+      tabs.find((t) => t.url.includes('via=blank'))!.webContentsId
+    ]
 
     for (const id of ids) {
       const seen = await browserTabs.app.evaluate(({ webContents }, contentsId) => {

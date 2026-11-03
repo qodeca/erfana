@@ -87,6 +87,28 @@
   outline-offset: var(--space-1);
 }
 
+/*
+ * Fold steps 3–7 (design § States › Tiers; NavigationRow, useNavFold): the
+ * row lists the steps taken in `data-fold`. A folded part leaves the flow
+ * and is hidden – not focusable, not in the accessibility tree – but stays
+ * measurable, so the row knows the room it would give back.
+ */
+.erf-brw-nav[data-fold~='3'] [data-fold-step='3'],
+.erf-brw-nav[data-fold~='4'] [data-fold-step='4'],
+.erf-brw-nav[data-fold~='6'] [data-fold-step='6'],
+.erf-brw-nav[data-fold~='7'] [data-fold-step='7'] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Step 5: the address bar's margins shrink to --space-2. */
+.erf-brw-nav[data-fold~='5'] .erf-brw-address {
+  margin-inline: var(--space-2);
+}
+
 /* ---------- address bar (Origin field card, proposed) ---------- */
 
 .erf-brw-address {

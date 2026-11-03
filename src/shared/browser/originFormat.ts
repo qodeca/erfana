@@ -214,6 +214,21 @@ export function fitOriginParts(parts: WebOriginParts, maxChars: number): FittedO
   return { scheme, subdomain: '', registrableDomain: `…${tail}`, port }
 }
 
+/**
+ * The origin with fold steps 1 and 2 exhausted (design § States › Tiers): no
+ * path, every subdomain label removed behind `….`, and the scheme, the whole
+ * registrable domain and the port kept. When even this does not fit, the
+ * toolbar folds its tools (steps 3–7) before the domain is cut (step 8).
+ */
+export function minimalFittedOrigin(parts: WebOriginParts): FittedOrigin {
+  return {
+    scheme: parts.scheme === null ? '' : `${parts.scheme}://`,
+    subdomain: parts.subdomain === '' ? '' : SUBDOMAIN_ELISION,
+    registrableDomain: parts.registrableDomain,
+    port: parts.port === null ? '' : `:${parts.port}`
+  }
+}
+
 /** {@link fitOriginParts} as one string. */
 export function fitOrigin(parts: WebOriginParts, maxChars: number): string {
   return fittedText(fitOriginParts(parts, maxChars))

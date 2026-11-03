@@ -142,6 +142,11 @@ export default defineConfig({
         'src/renderer/src/components/Panels/BrowserPanel/useBrowserKeys.ts': { lines: 98, functions: 98, branches: 92, statements: 96 },
         // measured 100/100/95/100
         'src/renderer/src/components/Panels/BrowserPanel/useBrowserPageFocus.ts': { lines: 98, functions: 98, branches: 93, statements: 98 },
+        // Toolbar fold steps 3–7 (design § States › Tiers): a regression shows as a tool folding
+        // too early or too late, or the row flipping between steps. measured 100/100/100/100
+        'src/renderer/src/components/Panels/BrowserPanel/navFold.logic.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 98.39/95/84.62 (lines/functions/branches; statements not split out by lcov)
+        'src/renderer/src/components/Panels/BrowserPanel/useNavFold.ts': { lines: 96, functions: 93, branches: 82, statements: 94 },
         // Built-in browser, renderer side (spec 025, commit 18): the strip rows and their
         // input guard, the Erfana pages' words, the menus and the data actions. A
         // regression here shows as an answer sent inside the guard, a wrong sentence on

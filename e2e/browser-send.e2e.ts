@@ -13,6 +13,7 @@
  */
 import { promises as fs } from 'node:fs'
 import * as path from 'node:path'
+import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures/browserHarness'
 import { BrowserSendUi, CAPTURES_REL, maskCaptureRefs, PASTE_END, PASTE_START, SEND_WAIT_MS, type StubAgent } from './pages/browser-send.page'
 
@@ -21,6 +22,27 @@ const IS_POSIX = process.platform !== 'win32'
 const MOD = process.platform === 'darwin' ? 'meta' : 'control'
 
 /** The golden rendering of one template, with capture names masked; line breaks as typed (`\r`). */
+/** Attempts {@link pauseClockNow} makes before it gives up; each one fails only when the read went stale. */
+const PAUSE_ATTEMPTS = 20
+
+/**
+ * Pause the page clock about now. Playwright pauses only at a future time, and
+ * the clock runs in real time until then: on a busy machine the page's
+ * `Date.now()` read is already past when the pause arrives ("Cannot
+ * fast-forward to the past"), so the pause is asked again, from a fresh read,
+ * until it lands.
+ */
+async function pauseClockNow(window: Page): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await window.clock.pauseAt((await window.evaluate(() => Date.now())) + 1)
+      return
+    } catch (error) {
+      if (attempt >= PAUSE_ATTEMPTS || !String(error).includes('fast-forward to the past')) throw error
+    }
+  }
+}
+
 async function golden(id: string): Promise<string> {
   return (await fs.readFile(path.join(GOLDEN_DIR, `prompt-${id}.golden.txt`), 'utf8')).replace(/\r?\n/g, '\r').replace(/\r$/, '')
 }
@@ -290,7 +312,7 @@ test.describe('025-AC-070 the send notice and the terminal reveal', () => {
       await send.pickElement('#save-label', 'span#save-label ')
       await send.parkPointer()
       await expect(send.pick.action('Explain')).toBeFocused()
-      await window.clock.pauseAt((await window.evaluate(() => Date.now())) + 1)
+      await pauseClockNow(window)
       await window.keyboard.press('Enter')
       // The paste and its Enter are a renderer timer apart: step it, then stop. No step runs after the
       // send settled, so the notice's timer starts at the clock time it is read at below.

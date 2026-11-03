@@ -53,7 +53,7 @@ import { isBrowserFolderTrackedByGit } from './browserProfileGit'
 import { markIgnoredBySync } from './browserSyncIgnore'
 import type { PurposeSigner } from './browserProfileMarker'
 import { hardenBrowserSession } from './browserSessionPolicy'
-import { buildBrowserWebPreferences } from './browserWebPreferences'
+import { adoptedBrowserViewOptions, buildBrowserWebPreferences } from './browserWebPreferences'
 import { installAppRequestFilter } from './browserAppRequestFilter'
 import type { AppAddresses } from './browserNavigationPolicy'
 import { BrowserTabService, type TabCdpLink, type TabInputSetup } from './BrowserTabService'
@@ -210,14 +210,17 @@ function noticeLocalAddress(webContentsId: number, address: string): void {
 /**
  * Build a browser page view in `session`, registered before its constructor
  * returns; with `adopt`, around a page-opened `webContents` Chromium created
- * with the frozen settings (registered by `expectPageWindow`).
+ * with the frozen settings (registered by `expectPageWindow`), given those
+ * settings again because the view would reset them (`adoptedBrowserViewOptions`).
  */
 function createBrowserView(session: Session, adopt?: WebContents): WebContentsView {
   return browserSessionRegistry.createView(
     session,
     () =>
       new WebContentsView(
-        adopt === undefined ? { webPreferences: buildBrowserWebPreferences(session, process.platform) } : { webContents: adopt }
+        adopt === undefined
+          ? { webPreferences: buildBrowserWebPreferences(session, process.platform) }
+          : adoptedBrowserViewOptions(adopt, process.platform)
       ),
     (view) => view.webContents
   )

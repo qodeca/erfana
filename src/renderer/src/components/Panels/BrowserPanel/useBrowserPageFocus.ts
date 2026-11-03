@@ -14,6 +14,11 @@
  * load leaves the empty page – waits for main's report that the page is
  * shown, and is dropped if an Erfana page (a load error) takes the area
  * instead or the panel unmounts.
+ *
+ * Main moving keyboard focus into the page view does not blur Erfana's own
+ * document, so whatever toolbar control asked keeps DOM focus. `onFocused`
+ * runs once main has focused the page, for the panel to let go of it (the
+ * address field shows its formatted display only at rest).
  */
 import { useCallback, useEffect, useRef } from 'react'
 import { browserTabGateway } from '../../../services/browserTabGateway'
@@ -27,16 +32,21 @@ export interface UseBrowserPageFocusOptions {
   readonly tabId: string | null
   /** The Erfana page in the page area (`state.erfanaPage`); any but `empty` drops a waiting request. */
   readonly erfanaPage: string | null
+  /** Runs once main has focused the page on this hook's request. */
+  readonly onFocused?: () => void
 }
 
-async function focusFromToolbar(tabId: string): Promise<void> {
+/** Asks main to focus the page; resolves `true` once it did, `false` (logged) when it failed. */
+async function focusFromToolbar(tabId: string): Promise<boolean> {
   try {
     await browserTabGateway.focusOrigin(tabId, 'toolbar')
     await browserTabGateway.focusPage(tabId)
+    return true
   } catch (error) {
     logger.warn('Browser tab page could not take focus', {
       error: error instanceof Error ? error.message : String(error)
     })
+    return false
   }
 }
 
@@ -57,15 +67,24 @@ export function useBrowserPageFocus(
 ): (waitForShow?: boolean) => void {
   const { panelId, tabId, erfanaPage } = options
   const waitingRef = useRef(false)
+  const onFocusedRef = useRef(options.onFocused)
+  useEffect(() => {
+    onFocusedRef.current = options.onFocused
+  })
+  const request = useCallback((tab: string) => {
+    void focusFromToolbar(tab).then(focused => {
+      if (focused) onFocusedRef.current?.()
+    })
+  }, [])
 
   useEffect(() => {
     if (tabId === null) return
     return browserViewBounds.onVisibilityApplied((shownTab, visible) => {
       if (shownTab !== tabId || !visible || !waitingRef.current) return
       waitingRef.current = false
-      void focusFromToolbar(tabId)
+      request(tabId)
     })
-  }, [tabId])
+  }, [tabId, request])
 
   // An Erfana page took the area that a waiting request was for.
   useEffect(() => {
@@ -77,11 +96,11 @@ export function useBrowserPageFocus(
       if (tabId === null) return
       if (getOverlayGuard().visiblePanelId() === panelId && erfanaPage === null) {
         waitingRef.current = false
-        void focusFromToolbar(tabId)
+        request(tabId)
         return
       }
       waitingRef.current = waitForShow
     },
-    [panelId, tabId, erfanaPage]
+    [panelId, tabId, erfanaPage, request]
   )
 }

@@ -91,6 +91,27 @@ describe('MoreMenu', () => {
   })
 })
 
+describe('MoreMenu with folded navigation tools', () => {
+  it('lists them first, then a separator, then its own items', () => {
+    const back = vi.fn()
+    render(
+      <MoreMenu
+        {...facts()}
+        actions={actions()}
+        buttonRef={createRef<HTMLButtonElement>()}
+        navItems={[{ label: 'Back', action: back }]}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    const items = screen.getAllByRole('menuitem')
+    expect(items[0]).toHaveTextContent('Back')
+    expect(items[1]).toHaveTextContent('Full width')
+    expect(screen.getAllByRole('separator').length).toBeGreaterThan(0)
+    fireEvent.click(items[0])
+    expect(back).toHaveBeenCalledOnce()
+  })
+})
+
 describe('MoreMenu over the still image (ADR 0011)', () => {
   it('opens once the picture is up and lets it go on close', () => {
     let show: () => void = () => undefined

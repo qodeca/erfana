@@ -94,4 +94,33 @@ describe('useBrowserPageFocus', () => {
     await act(async () => result.current())
     expect(logger.warn).toHaveBeenCalled()
   })
+
+  it('calls onFocused once main focused the page, also for a waiting request', async () => {
+    guard.visible = PANEL
+    const onFocused = vi.fn()
+    const { result, rerender } = renderHook(
+      (props: { page: string | null }) =>
+        useBrowserPageFocus({ panelId: PANEL, tabId: TAB, erfanaPage: props.page, onFocused }),
+      { initialProps: { page: null as string | null } }
+    )
+    await act(async () => result.current())
+    expect(onFocused).toHaveBeenCalledTimes(1)
+    rerender({ page: 'empty' })
+    act(() => result.current(true))
+    expect(onFocused).toHaveBeenCalledTimes(1)
+    await act(async () => applied.listener?.(TAB, true))
+    expect(onFocused).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not call onFocused when main refused the focus', async () => {
+    guard.visible = PANEL
+    const onFocused = vi.fn()
+    gateway.focusPage.mockRejectedValueOnce(new Error('gone'))
+    const { result } = renderHook(() =>
+      useBrowserPageFocus({ panelId: PANEL, tabId: TAB, erfanaPage: null, onFocused })
+    )
+    await act(async () => result.current())
+    expect(logger.warn).toHaveBeenCalled()
+    expect(onFocused).not.toHaveBeenCalled()
+  })
 })

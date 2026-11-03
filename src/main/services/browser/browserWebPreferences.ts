@@ -58,3 +58,28 @@ export function browserWebPreferencesFor(
 export function buildBrowserWebPreferences(session: Session, platform: NodeJS.Platform): WebPreferences {
   return { ...browserWebPreferencesFor(platform), session }
 }
+
+/**
+ * The `WebContentsView` options around a page-opened `webContents` (a
+ * `window.open` popup, or a `target=_blank` page Erfana adopts as a tab).
+ *
+ * Electron applies a view's `webPreferences` to an existing `webContents` it
+ * wraps (`WebContents::CreateFromWebPreferences` → `SetFromDictionary`), and
+ * that call **resets every key to Electron's default first**. A view built
+ * with `{ webContents }` alone therefore throws away the frozen settings the
+ * window-open handler gave the page: `safeDialogs` falls back to `false`,
+ * `autoplayPolicy` to `no-user-gesture-required` and
+ * `disableHtmlFullscreenWindowResize` to `false`. Passing the pinned literal
+ * again keeps them. The session is not given: an existing `webContents` keeps
+ * its own (the opener's).
+ *
+ * @param contents - The page-opened `webContents`
+ * @param platform - The OS (spell check is off on Linux, S-4)
+ * @returns The options for `new WebContentsView(…)`
+ */
+export function adoptedBrowserViewOptions<T>(
+  contents: T,
+  platform: NodeJS.Platform
+): { webContents: T; webPreferences: WebPreferences } {
+  return { webContents: contents, webPreferences: { ...browserWebPreferencesFor(platform) } }
+}

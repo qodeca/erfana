@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
   fitOrigin,
   fitOriginParts,
+  minimalFittedOrigin,
   fitOriginToWidth,
   formatOrigin,
   originParts,
@@ -169,3 +170,19 @@ describe('fitOriginParts and fitOriginToWidth (F1)', () => {
     expect(fitted.registrableDomain).toBe('例え.jp')
   })
 })
+
+describe('minimalFittedOrigin (fold steps 1 and 2 exhausted)', () => {
+  it('keeps the scheme, the whole registrable domain and the port behind the subdomain ellipsis', () => {
+    expect(minimalFittedOrigin(web('http://a.b.c.evil.test:8080/x/y'))).toEqual({
+      scheme: 'http://',
+      subdomain: '….',
+      registrableDomain: 'evil.test',
+      port: ':8080'
+    })
+  })
+
+  it('adds no ellipsis without subdomains, and no scheme or port for https on the default port', () => {
+    expect(minimalFittedOrigin(web('https://evil.test/path'))).toEqual({ scheme: '', subdomain: '', registrableDomain: 'evil.test', port: '' })
+  })
+})
+

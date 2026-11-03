@@ -14,7 +14,8 @@
  * width preset folds away), Zoom in,
  * Zoom out and Zoom: {n}% – reset, Find in page…, Open in system browser,
  * DevTools, then Clear browsing data… and Forget this project's browser
- * data….
+ * data…. While the navigation row has folded tools into More (design
+ * § States › Tiers, steps 4 and 7), they lead the menu (`navItems`).
  */
 import { useState } from 'react'
 import { Check, Ellipsis } from 'lucide-react'
@@ -93,6 +94,8 @@ export interface MoreMenuProps extends MoreMenuFacts {
   readonly buttonRef: React.RefObject<HTMLButtonElement>
   /** Opens the menu over the page's still image; without it the menu opens at once. */
   readonly still?: StillSurface
+  /** The navigation tools folded off the row, listed first (`foldedNavItems`). */
+  readonly navItems?: readonly ContextMenuItem[]
 }
 
 /**
@@ -101,7 +104,7 @@ export interface MoreMenuProps extends MoreMenuFacts {
  * @param props - {@link MoreMenuProps}
  * @returns The button, and the menu while open
  */
-export function MoreMenu({ actions, buttonRef, still, ...facts }: MoreMenuProps): JSX.Element {
+export function MoreMenu({ actions, buttonRef, still, navItems = [], ...facts }: MoreMenuProps): JSX.Element {
   const [at, setAt] = useState<{ x: number; y: number } | null>(null)
   const show = (): void => {
     const rect = buttonRef.current?.getBoundingClientRect()
@@ -134,7 +137,7 @@ export function MoreMenu({ actions, buttonRef, still, ...facts }: MoreMenuProps)
         <Ellipsis size={16} strokeWidth={2} aria-hidden="true" />
       </button>
       {at !== null && (
-        <ContextMenu x={at.x} y={at.y} items={moreMenuItems(facts, actions)} ariaLabel="More" onClose={close} />
+        <ContextMenu x={at.x} y={at.y} items={navItems.length === 0 ? moreMenuItems(facts, actions) : [...navItems, SEPARATOR, ...moreMenuItems(facts, actions)]} ariaLabel="More" onClose={close} />
       )}
     </>
   )

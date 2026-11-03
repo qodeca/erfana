@@ -168,12 +168,14 @@ export const AddressBar = forwardRef<HTMLInputElement, AddressBarProps>(function
       {badge !== null && (
         <span
           className={`erf-brw-address__badge erf-brw-address__badge--${badge.tone}`}
+          title={badge.description}
           aria-hidden="true"
         >
           {badge.icon === 'circle-alert' && <CircleAlert {...BADGE_ICON} />}
           {badge.icon === 'triangle-alert' && <TriangleAlert {...BADGE_ICON} />}
           {badge.icon === 'file' && <File {...BADGE_ICON} />}
-          <span title={badge.description}>{badge.word}</span>
+          {/* Fold step 6 collapses the word to the icon; the description stays the field's. */}
+          <span data-fold-step="6">{badge.word}</span>
         </span>
       )}
       {badge !== null && (

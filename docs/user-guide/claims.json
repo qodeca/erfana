@@ -55353,7 +55353,7 @@
       "quote": "the **Address and search** field",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/BrowserPanel/AddressBar.tsx:194",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/AddressBar.tsx:196",
       "match": "aria-label=\"Address and search\""
     },
     {
@@ -55373,7 +55373,7 @@
       "quote": "**Reload** becomes **Stop loading** while a page loads",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/BrowserPanel/NavigationRow.tsx:156",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/NavigationRow.tsx:201",
       "match": "aria-label=\"Stop loading\""
     },
     {
@@ -55383,7 +55383,7 @@
       "quote": "**Find in page…**, **Open in system browser**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/BrowserPanel/MoreMenu.tsx:81",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/MoreMenu.tsx:82",
       "match": "{ label: 'Open in system browser', action: actions.openInSystemBrowser"
     },
     {
@@ -55393,7 +55393,7 @@
       "quote": "**Clear browsing data…** and **Forget this project's browser data…**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/BrowserPanel/MoreMenu.tsx:85",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/MoreMenu.tsx:86",
       "match": "{ label: \"Forget this project's browser data…\", action: actions.forget, danger: true }"
     },
     {

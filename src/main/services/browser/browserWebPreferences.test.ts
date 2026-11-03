@@ -7,6 +7,7 @@ import type { Session } from 'electron'
 import {
   BROWSER_WEB_PREFERENCES,
   BROWSER_WEB_PREFERENCES_LINUX,
+  adoptedBrowserViewOptions,
   buildBrowserWebPreferences
 } from './browserWebPreferences'
 
@@ -62,5 +63,23 @@ describe('BROWSER_WEB_PREFERENCES', () => {
       expect('enableBlinkFeatures' in built).toBe(false)
       expect('additionalArguments' in built).toBe(false)
     }
+  })
+})
+
+describe('adoptedBrowserViewOptions', () => {
+  const CONTENTS = { id: 7 }
+
+  it.each(['darwin', 'win32'] as const)('wraps a page-opened webContents with the whole literal again, and no session, on %s', (platform) => {
+    const options = adoptedBrowserViewOptions(CONTENTS, platform)
+    expect(options.webContents).toBe(CONTENTS)
+    expect(options.webPreferences).toEqual(EXPECTED)
+    expect('session' in options.webPreferences).toBe(false)
+  })
+
+  it('gives the Linux literal on Linux, as a fresh copy each time', () => {
+    const first = adoptedBrowserViewOptions(CONTENTS, 'linux')
+    expect(first.webPreferences).toEqual({ ...EXPECTED, spellcheck: false })
+    expect(first.webPreferences).not.toBe(BROWSER_WEB_PREFERENCES_LINUX)
+    expect(adoptedBrowserViewOptions(CONTENTS, 'linux').webPreferences).not.toBe(first.webPreferences)
   })
 })
