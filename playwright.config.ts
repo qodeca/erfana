@@ -74,13 +74,20 @@ export default defineConfig({
       // (browser-isolation.yml). A subset of the `electron` project, so a bare
       // `playwright test` runs these twice – every script names its project.
       // Files and titles together pick the suite: every test of
-      // browser-tab-isolation.e2e.ts carries 025-AC-046 or 025-AC-068, and
-      // browser-local-files.e2e.ts adds its hostile local folder test.
+      // browser-tab-isolation.e2e.ts carries 025-AC-046 or 025-AC-068, every
+      // test of browser-hostile-pages.e2e.ts and browser-hostile-terminal.e2e.ts
+      // carries 025-AC-046 or "hostile", and browser-local-files.e2e.ts adds
+      // its hostile local folder test.
       // Retries 0, also on CI: a hostile page that gets through once and not
       // on the retry is an attack that worked, not a flake.
       // Run: npm run test:e2e:browser-isolation
       name: 'browser-isolation',
-      testMatch: ['**/browser-tab-isolation.e2e.ts', '**/browser-local-files.e2e.ts'],
+      testMatch: [
+        '**/browser-tab-isolation.e2e.ts',
+        '**/browser-hostile-pages.e2e.ts',
+        '**/browser-hostile-terminal.e2e.ts',
+        '**/browser-local-files.e2e.ts'
+      ],
       grep: /025-AC-046|025-AC-068|hostile/,
       retries: 0,
     },

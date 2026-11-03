@@ -13687,7 +13687,7 @@
       "quote": "four projects in `playwright.config.ts`: `electron` functional, `transcription` env-gated, `bench` env-gated benchmarks, `visual` regression",
       "status": "verified",
       "evidence": "source",
-      "source": "playwright.config.ts:107",
+      "source": "playwright.config.ts:114",
       "match": "name: 'bench',"
     },
     {
@@ -13780,7 +13780,7 @@
       "quote": "Without it the project is `grepInvert`-ed to nothing",
       "status": "verified",
       "evidence": "source",
-      "source": "playwright.config.ts:99",
+      "source": "playwright.config.ts:106",
       "match": "grepInvert: process.env.ERFANA_E2E_TRANSCRIPTION === '1' ? undefined : /./,"
     },
     {
@@ -13881,7 +13881,7 @@
       "quote": "- `maxDiffPixelRatio: 0.01`, `retries: 0`",
       "status": "verified",
       "evidence": "source",
-      "source": "playwright.config.ts:134",
+      "source": "playwright.config.ts:141",
       "match": "maxDiffPixelRatio: 0.01,"
     },
     {
@@ -14793,7 +14793,7 @@
       "quote": "`playwright.config.ts` in the project root configures six Playwright projects:",
       "status": "fixed",
       "evidence": "source",
-      "source": "playwright.config.ts:127",
+      "source": "playwright.config.ts:134",
       "match": "name: 'visual',",
       "note": "Told the reader to create playwright.config.ts, which already exists."
     },
@@ -14834,7 +14834,7 @@
       "quote": "`snapshotPathTemplate: '{snapshotDir}/{arg}-{platform}{ext}'`",
       "status": "verified",
       "evidence": "source",
-      "source": "playwright.config.ts:131",
+      "source": "playwright.config.ts:138",
       "match": "snapshotPathTemplate: '{snapshotDir}/{arg}-{platform}{ext}',"
     },
     {
@@ -14844,7 +14844,7 @@
       "quote": "`animations: 'disabled'`",
       "status": "verified",
       "evidence": "source",
-      "source": "playwright.config.ts:135",
+      "source": "playwright.config.ts:142",
       "match": "animations: 'disabled',"
     },
     {
@@ -14946,7 +14946,7 @@
       "quote": "| `ERFANA_E2E_BENCH=1` | Enables the `bench` Playwright project",
       "status": "fixed",
       "evidence": "source",
-      "source": "playwright.config.ts:111",
+      "source": "playwright.config.ts:118",
       "match": "grepInvert: process.env.ERFANA_E2E_BENCH === '1' ? undefined : /./,",
       "note": "Variable missing from the table."
     },
@@ -15048,7 +15048,7 @@
       "quote": "| `transcription` | `**/audio-transcription*.e2e.ts` |",
       "status": "verified",
       "evidence": "source",
-      "source": "playwright.config.ts:98",
+      "source": "playwright.config.ts:105",
       "match": "testMatch: '**/audio-transcription*.e2e.ts',"
     },
     {
@@ -54457,7 +54457,7 @@
       "quote": "All six baselines are generated and committed",
       "status": "verified",
       "evidence": "source",
-      "source": "playwright.config.ts:131",
+      "source": "playwright.config.ts:138",
       "match": "snapshotPathTemplate: '{snapshotDir}/{arg}-{platform}{ext}'"
     },
     {

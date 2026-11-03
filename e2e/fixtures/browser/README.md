@@ -123,7 +123,7 @@ Each page loads `canary.js` and runs its attacks through `__canary.attempt(name,
 | `forge-pick.html` | Forge pick events: synthetic Ctrl/Cmd+E, Enter, Up, Esc, clicks and pick-shaped messages (`__forge.run()` repeats) |
 | `terminal.html` | Open or write to the terminal (`ERFANA-HOSTILE-TERMINAL-7f3a`) |
 | `file-read-page.html`, `file-read-frame.html`, `file-read-sw.html`, `unc.html` | Read local files from the page, a frame, a service worker (open over HTTPS) and a UNC path; `?path=` adds the test's canary file, `?host=` the SMB listener |
-| `file-confined/` | Opened by `file://`: sibling and outside reads, images in and outside the folder, a service worker; `a/` and `b/storage.html` for cross-folder `localStorage` |
+| `file-confined/` | Opened by `file://`: sibling and outside reads, images in and outside the folder, a service worker; `a/` and `b/storage.html` for cross-folder `localStorage`. Only the opened file's folder is served, so `site/index.html` loads `canary.js` from its own folder – the test copies the tree into its project with `canary.js` beside it |
 | `renderer-entry.html` | Load the renderer entry (`?entry=`) and the dev-server origin (`?dev=`) |
 | `drag-file.html` | Drag a file, a `DownloadURL` and shell text into the terminal |
 | `custom-scheme.html` | Open `erfana:`, `erfana-preview:`, `vscode:` and other schemes |
