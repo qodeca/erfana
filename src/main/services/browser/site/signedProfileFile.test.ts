@@ -24,6 +24,7 @@ const SEGMENTS = profileErfanaSegments('list.json')
 let root: string
 let path: string
 let generation: number | undefined
+let epoch: string
 let generations: ProfileGenerations & { next: ReturnType<typeof vi.fn> }
 
 function listFile(overrides: Partial<SignedListFile<string>> = {}): SignedListFile<string> {
@@ -46,8 +47,10 @@ beforeEach(() => {
   root = tempProject('erfana-signed-')
   path = join(root, ...SEGMENTS)
   generation = undefined
+  epoch = 'a'.repeat(32)
   generations = {
     current: async () => generation,
+    epoch: async () => (generation === undefined ? undefined : epoch),
     next: vi.fn(async () => {
       generation = (generation ?? 0) + 1
       return generation
@@ -66,6 +69,21 @@ describe('signed list file', () => {
     generation = 2
     expect(await readSignedList(listFile())).toEqual([])
     expect(logger.warn).toHaveBeenCalledWith('Browser test list: file is not the latest one written (replayed), ignored')
+  })
+
+  it('refuses a file signed under an earlier epoch, at the same generation (the home record re-created, S3)', async () => {
+    await writeSignedList(listFile(), ['a'])
+    expect(await readSignedList(listFile())).toEqual(['a'])
+    epoch = 'b'.repeat(32)
+    expect(await readSignedList(listFile())).toEqual([])
+    expect(logger.warn).toHaveBeenCalledWith('Browser test list: file not signed by this account, ignored', expect.any(Object))
+  })
+
+  it('writes nothing when the home record goes between taking the generation and reading the epoch', async () => {
+    generations.next.mockImplementationOnce(async () => 1)
+    await writeSignedList(listFile(), ['a'])
+    expect(existsSync(path)).toBe(false)
+    expect(logger.warn).toHaveBeenCalledWith('Browser test list: file not written, kept in memory', expect.any(Object))
   })
 
   it('takes no generation and writes nothing without a signing key', async () => {

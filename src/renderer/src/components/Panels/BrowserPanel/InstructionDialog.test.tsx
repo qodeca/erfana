@@ -30,7 +30,8 @@ function renderDialog(overrides: Partial<InstructionDialogProps> = {}) {
 describe('InstructionDialog (025-FR-031)', () => {
   it('titles each action, focuses the field and passes typing on', () => {
     const { props, rerender } = renderDialog()
-    expect(screen.getByRole('dialog', { name: 'Ask about this element' })).toHaveAttribute('aria-modal', 'true')
+    // Not modal: nothing traps Tab and the terminal stays reachable (design § Instruction dialog, M-46).
+    expect(screen.getByRole('dialog', { name: 'Ask about this element' })).toHaveAttribute('aria-modal', 'false')
     const field = screen.getByRole('textbox', { name: 'Your question' })
     expect(field).toHaveFocus()
     fireEvent.change(field, { target: { value: 'why?' } })
@@ -45,7 +46,10 @@ describe('InstructionDialog (025-FR-031)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
     expect(props.onSend).not.toHaveBeenCalled()
     const field = screen.getByRole('textbox', { name: 'Your prompt' })
-    expect(screen.getByRole('alert')).toHaveTextContent('Type your prompt before sending.')
+    const alert = screen.getByRole('alert')
+    expect(alert).toHaveTextContent('Type your prompt before sending.')
+    // The Form card's error contract: red edge, icon, message.
+    expect(alert.querySelector('svg[aria-hidden="true"]')).not.toBeNull()
     expect(field).toHaveAttribute('aria-invalid', 'true')
     expect(field).toHaveAccessibleDescription(/Type your prompt before sending\./)
     fireEvent.change(field, { target: { value: 'go' } })

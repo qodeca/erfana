@@ -9,12 +9,13 @@
  * cap and the `webContents` baseline with the browser view exemption.
  * After ready: `erfana-local` refused in Erfana's own session, the profile
  * service (which hardens each browser session it creates), the tab service
- * and its `browser-tab:*` handlers, the project-switch teardown (the old
- * project's tabs close in its `closeViews` stage) and the deletes left by the
- * last run. A closing window's tabs close through {@link closeBrowserWindow},
- * called where the window's previews are torn down. Each tab also gets the
- * popup policy, the leave-page prompt and the right-click menu (commits
- * 12e–g); popup windows close with the tab that opened them.
+ * and its `browser-tab:*` handlers, the staged teardown and the deletes left
+ * by the last run. The teardown runs for a project switch or close and, through
+ * {@link closeBrowserWindow} (called where the window's previews are torn
+ * down), for a closing window: pick mode ends, capture writes finish, then the
+ * tabs close in its `closeViews` stage (`browserProjectTeardown.ts`). Each tab
+ * also gets the popup policy, the leave-page prompt and the right-click menu;
+ * popup windows close with the tab that opened them.
  */
 import { homedir, tmpdir } from 'node:os'
 import { is } from '@electron-toolkit/utils'
@@ -78,6 +79,7 @@ import { installBrowserPicks, registerPickSession } from './pick/pickAppSetup'
 import type { BrowserPicks } from './pick/BrowserPicks'
 import type { TargetTerminals } from './capture/BrowserTargetStatus'
 import { PageClipboardMarks, watchPageClipboard } from './site/pageClipboardMarks'
+import { MEDIA_CAPTURE_UNOBSERVED } from './site/mediaInUse'
 
 /**
  * Chromium's per-disk-cache maximum: 512 MB (025-FR-015; ADR 0009 decision 9).
@@ -109,9 +111,9 @@ export interface BrowserAfterReadyDeps {
   readonly lockService: Pick<IProjectLockService, 'checkLock' | 'acquireLock'>
   /** Registers the `browser-tab:*` handlers; a test seam. */
   readonly registerTabHandlers?: typeof registerBrowserTabHandlers
-  /** Registers the page-feature `browser-tab:*` handlers (commit 12h); a test seam. */
+  /** Registers the page-feature `browser-tab:*` handlers; a test seam. */
   readonly registerPageHandlers?: typeof registerBrowserTabPageHandlers
-  /** Registers `browser-tab:contextAction` and the popup channels (commits 12e, 12g); a test seam. */
+  /** Registers `browser-tab:contextAction` and the popup channels; a test seam. */
   readonly registerPopupHandlers?: typeof registerBrowserTabPopupHandlers
   /**
    * The terminals' output (`TerminalService`'s `data` and `exit` events), for
@@ -132,17 +134,17 @@ export interface BrowserRuntime {
   readonly tabs: BrowserTabService
   /** Erfana's own addresses, refused to every tab (025-FR-005 rule 3). */
   readonly appAddresses: AppAddresses
-  /** Site requests, certificates and sign-ins of every tab (commits 12a–d). */
+  /** Site requests, certificates and sign-ins of every tab. */
   readonly site: BrowserSite
-  /** Served local folders (commit 11, ADR 0012 option 4). */
+  /** Served local folders (ADR 0012 option 4). */
   readonly localFiles: LocalFileServers
-  /** Load errors, crash and hang notices, find, zoom, presets, Clear, Forget and history (commit 12h). */
+  /** Load errors, crash and hang notices, find, zoom, presets, Clear, Forget and history. */
   readonly pages: BrowserPages
-  /** Page-opened tabs, popup windows, the popup blocker and pop-up exceptions (commit 12e). */
+  /** Page-opened tabs, popup windows, the popup blocker and pop-up exceptions. */
   readonly popups: BrowserPopups
-  /** Which clipboard text a browser page wrote, for the terminal's paste guard (S-17, commit 20). */
+  /** Which clipboard text a browser page wrote, for the terminal's paste guard (S-17). */
   readonly pageClipboard: PageClipboardMarks
-  /** Pick mode, captures, the shell guard and capture expiry (commits 14–15). */
+  /** Pick mode, captures, the shell guard and capture expiry. */
   readonly picks: BrowserPicks
 }
 
@@ -262,13 +264,15 @@ export function installBrowserAfterReady(deps: BrowserAfterReadyDeps): BrowserRu
     pageClipboard,
     (contents) => browserSessionRegistry.isRegisteredView(contents as unknown as WebContents)
   )
-  const localFiles = new LocalFileServers({ now: () => mainClock.now(), appAddresses: () => appAddresses })
+  const localFiles = new LocalFileServers({ now: () => mainClock.now(), appAddresses: () => appAddresses, userFolders: userFolderPaths })
   const popups = createBrowserPopups(appAddresses, localFiles, (tabId) => tabs.list().find((t) => t.id === tabId)?.windowId ?? null)
+  const teardown = new BrowserProjectTeardown()
   const pickSetup = installBrowserPicks({
     clock: mainClock,
     tabs: () => tabs,
     projectSession: deps.projectSession,
-    terminals: () => terminalTargets(deps.terminalOutput)
+    terminals: () => terminalTargets(deps.terminalOutput),
+    teardown
   })
   const pages = new BrowserPages({
     clock: mainClock,
@@ -285,7 +289,8 @@ export function installBrowserAfterReady(deps: BrowserAfterReadyDeps): BrowserRu
     openProfile: () => profiles.openForTab(),
     deleteBrowserData: (rel) => profiles.deleteBrowserData(rel),
     closeProject: (projectRoot) => tabs.closeProject(projectRoot),
-    noticeToRenderer: noticeLocalAddress
+    noticeToRenderer: noticeLocalAddress,
+    displayAddress: (url) => localFiles.displayAddress(url)
   })
   const tabs = new BrowserTabService({
     openProfile: () => profiles.openForTab(),
@@ -319,7 +324,9 @@ export function installBrowserAfterReady(deps: BrowserAfterReadyDeps): BrowserRu
       clock: mainClock,
       take: () => profiles.takeKeyringNotices(),
       dismissWeak: () => profiles.dismissWeakProtectionNotice()
-    }
+    },
+    // 025-FR-019's in-use chips have no producer yet: Electron 44 does not report a capture's end (site/mediaInUse.ts).
+    mediaInUse: () => MEDIA_CAPTURE_UNOBSERVED
   })
   ;(deps.registerTabHandlers ?? registerBrowserTabHandlers)({ service: tabs, openInSystemBrowser: (url) => openExternalSafe(url) })
   ;(deps.registerPageHandlers ?? registerBrowserTabPageHandlers)({
@@ -331,10 +338,9 @@ export function installBrowserAfterReady(deps: BrowserAfterReadyDeps): BrowserRu
   ;(deps.registerPopupHandlers ?? registerBrowserTabPopupHandlers)({ tabs, popups, resolveDomain: pinnedRegistrableDomain })
   deps.terminalOutput?.on('data', (event) => pages.terminalOutput(event.webContentsId, event.terminalId, event.data))
   deps.terminalOutput?.on('exit', (event) => pages.terminalGone(event.terminalId))
-  const teardown = new BrowserProjectTeardown()
-  teardown.onStage('closeViews', (projectRoot) => tabs.closeProject(projectRoot))
-  teardown.onStage('closeViews', (projectRoot) => localFiles.closeProject(projectRoot))
-  teardown.onStage('closeViews', () => pages.projectChanged())
+  teardown.onStage('closeViews', (scope) => (scope.kind === 'window' ? closeWindowTabs(tabs, scope.windowId) : tabs.closeProject(scope.projectRoot)))
+  teardown.onStage('closeViews', (scope) => (scope.kind === 'project' ? localFiles.closeProject(scope.projectRoot) : undefined))
+  teardown.onStage('closeViews', (scope) => (scope.kind === 'project' ? pages.projectChanged() : undefined))
   teardown.attach(deps.projectSession)
   profiles.runPendingDeletes().catch((error: unknown) => {
     logger.warn('Browser pending deletes could not run', { error: redactedLogError(error)?.message ?? String(error) })
@@ -344,7 +350,7 @@ export function installBrowserAfterReady(deps: BrowserAfterReadyDeps): BrowserRu
 }
 
 /**
- * Page-opened tabs and popup windows (commit 12e): the popup blocker on the
+ * Page-opened tabs and popup windows: the popup blocker on the
  * app clock, pop-up exceptions signed per project, page-opened `webContents`
  * expected by the session registry and given the frozen settings.
  */
@@ -367,7 +373,21 @@ function createBrowserPopups(
   })
 }
 
-/** Key and mouse routing for every tab (commit 13): the platform, the app clock and the macOS app keys. */
+/** The OS user folders never served whole to a local page (`local/LocalFileServers.ts`). */
+const USER_FOLDER_NAMES = ['home', 'desktop', 'documents', 'downloads', 'pictures', 'videos', 'music'] as const
+
+/** The user folders' paths on this machine; a name the platform does not know is left out. */
+function userFolderPaths(): string[] {
+  return USER_FOLDER_NAMES.flatMap((name) => {
+    try {
+      return [app.getPath(name)]
+    } catch {
+      return []
+    }
+  })
+}
+
+/** Key and mouse routing for every tab: the platform, the app clock and the macOS app keys. */
 function tabInputSetup(): TabInputSetup {
   return {
     platform: process.platform,
@@ -382,12 +402,12 @@ function tabInputSetup(): TabInputSetup {
 }
 
 /**
- * The process-wide site hooks (commits 12a–d): permission prompts, screen
+ * The process-wide site hooks: permission prompts, screen
  * sharing, downloads, certificate errors and HTTP sign-in of every browser
  * session, routed to the owning tab. Saved sign-ins are encrypted with
  * `safeStorage`, and kept in memory only on Linux `basic_text`.
- * The screen source chooser joins with the UI (commit 18); until then screen
- * sharing is refused.
+ * No screen source chooser is passed, so screen sharing is refused (the
+ * screen approval is on the spec 025 owner queue).
  */
 function createBrowserSite(): BrowserSite {
   return new BrowserSite({
@@ -443,11 +463,21 @@ export async function disposeBrowserForQuit(): Promise<void> {
   ])
 }
 
-/** Close the browser tabs of a window that closed. Never throws (it runs in a window event). */
-export function closeBrowserWindow(windowId: number): void {
+/** The window-close `closeViews` step: close the window's tabs, logging a failure as the window's. */
+function closeWindowTabs(tabs: BrowserTabService, windowId: number): void {
   try {
-    runtime?.tabs.closeWindow(windowId)
+    tabs.closeWindow(windowId)
   } catch (error) {
     logger.warn('Browser teardown on window close failed', { windowId, error: redactedLogError(error)?.message ?? String(error) })
   }
+}
+
+/**
+ * Tear down the browser work of a window that closed, through the same staged
+ * sequence as a project switch (ADR 0009 decision 14): end pick mode, let
+ * capture writes finish, close the window's tabs. Never throws or rejects (it
+ * runs in a window event).
+ */
+export function closeBrowserWindow(windowId: number): Promise<void> {
+  return runtime?.teardown.runForWindow(windowId) ?? Promise.resolve()
 }

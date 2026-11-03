@@ -146,6 +146,14 @@ export default defineConfig({
         'src/main/services/browser/BrowserTab.ts': { lines: 97, functions: 98, branches: 95, statements: 96 },
         // measured 96.87/100/92.5/96.05
         'src/main/services/browser/BrowserTabService.ts': { lines: 94, functions: 98, branches: 90, statements: 94 },
+        // measured 100/100/100/100
+        'src/main/services/browser/tabFeatureRegistry.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/95.65/100
+        'src/main/services/browser/tabFeatureAttach.ts': { lines: 98, functions: 98, branches: 93, statements: 98 },
+        // measured 95/100/100/96
+        'src/main/services/browser/tabNavigationGuard.ts': { lines: 93, functions: 98, branches: 98, statements: 94 },
+        // measured 100/100/100/100
+        'src/main/services/browser/site/mediaInUse.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // Built-in browser, main side (spec 025, commit 18): the keyring notices as strip
         // rows, the one place tab events are parsed and sent, and the tab's input wiring.
         // measured 100/100/100/100 each
@@ -276,6 +284,8 @@ export default defineConfig({
         'src/main/services/browser/pick/BrowserPicks.ts': { lines: 95, functions: 94, branches: 92, statements: 96 },
         // measured 96.88/87.93/80.57/92.02
         'src/main/services/browser/pick/BrowserTabPick.ts': { lines: 94, functions: 85, branches: 78, statements: 90 },
+        // measured 100/85/81.57/92
+        'src/main/services/browser/pick/pickHover.ts': { lines: 98, functions: 83, branches: 79, statements: 90 },
         // measured 100/100/88.88/100
         'src/main/services/browser/pick/pickAppSetup.ts': { lines: 98, functions: 98, branches: 86, statements: 98 },
         // measured 100/92.85/100/98
@@ -308,6 +318,8 @@ export default defineConfig({
         'src/main/services/browser/cdp/cdpPickFunctions.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/main/ipc/browserTab/pick-handlers.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/ipc/browserTab/tabRequestGate.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // The still image under Erfana's surfaces (spec 025 commit 19, ADR 0011).
         // measured 100/100/100/100 (2026-11-03)
         'src/main/services/browser/capture/surfaceStill.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
@@ -327,6 +339,8 @@ export default defineConfig({
         'src/main/services/browser/cdp/cdpPinned.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/main/services/browser/cdp/cdpFloodBudget.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/94.44/97.5
+        'src/main/services/browser/cdp/cdpTargetLogs.ts': { lines: 98, functions: 98, branches: 92, statements: 95 },
         // measured 100/100/100/100
         'src/main/services/browser/cdp/browserLogBuffer.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/97.1/100
@@ -441,6 +455,10 @@ export default defineConfig({
         // (2026-11-03, macOS, on the shared browser suites alone).
         // measured 100/100/100/100
         'src/shared/ipc/browser-tab-schema.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/shared/ipc/browser-tab-base-schema.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/shared/ipc/browser-tab-state-schema.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/shared/ipc/browser-tab-channels.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100 (certificate page and sign-in row parts, commits 12c–d)

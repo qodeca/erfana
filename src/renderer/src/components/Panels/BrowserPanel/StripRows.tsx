@@ -10,7 +10,11 @@
  *   as a group – never a granting button – with that row's input guard
  *   re-armed; with no row left, to the page area.
  * - **Announcements**: each arriving row is said once in this tab's polite
- *   region (deck *Announce – prompt arrives*).
+ *   region (deck *Announce – prompt arrives*). Every other announcement ends
+ *   in a no-break space, so a row whose words match the last one still
+ *   changes the region and is said again.
+ * - **Answers** resolve with whether main took them, so a row waiting on its
+ *   answer (the sign-in box) can recover when main refused it or the call failed.
  */
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { useLatestRef } from '../../../hooks/useLatestRef'
@@ -22,6 +26,8 @@ import { arrivalAnnouncement, sortStripRows } from './stripRows.logic'
 import { StripRow, type StripFields } from './StripRow'
 import { BROWSER_TEST_IDS } from './browserTestIds'
 import './StripRows.css'
+
+const NO_BREAK_SPACE = '\u00a0'
 
 /** Props for {@link StripRows}. */
 export interface StripRowsProps {
@@ -43,7 +49,7 @@ export interface StripRowsProps {
  */
 export function StripRows({ tabId, rows, refused, refusedId, onEmpty }: StripRowsProps): JSX.Element | null {
   const sorted = sortStripRows(rows)
-  const [announcement, setAnnouncement] = useState('')
+  const [announcement, setAnnouncement] = useState({ text: '', count: 0 })
   const [seen, setSeen] = useState<ReadonlySet<string>>(new Set())
   const containerRef = useRef<HTMLDivElement>(null)
   const sortedRef = useLatestRef(sorted)
@@ -55,7 +61,9 @@ export function StripRows({ tabId, rows, refused, refusedId, onEmpty }: StripRow
   const fresh = sorted.find(shown => !seen.has(shown.row.requestId))
   if (fresh !== undefined) {
     setSeen(new Set([...seen, ...sorted.map(shown => shown.row.requestId)]))
-    setAnnouncement(arrivalAnnouncement(fresh.row))
+    // The same words again would leave the live region unchanged, and unsaid.
+    const count = announcement.count + 1
+    setAnnouncement({ text: `${arrivalAnnouncement(fresh.row)}${count % 2 === 0 ? NO_BREAK_SPACE : ''}`, count })
   }
 
   const onLeaving = useCallback(
@@ -82,14 +90,17 @@ export function StripRows({ tabId, rows, refused, refusedId, onEmpty }: StripRow
     containerRef.current?.querySelector<HTMLElement>(`[data-request-id="${id}"]`)?.focus()
   })
 
+  /** Send an answer; resolves with whether main took it, never rejects. */
   const answer = useCallback(
-    (requestId: string, given: StripAnswer, fields?: StripFields) => {
-      if (tabId === null) return
-      browserTabGateway
-        .answerStrip({ tabId, requestId, answer: given, ...(fields === undefined ? {} : { fields }) })
-        .catch((error: unknown) => {
+    (requestId: string, given: StripAnswer, fields?: StripFields): Promise<boolean> => {
+      if (tabId === null) return Promise.resolve(false)
+      return browserTabGateway.answerStrip({ tabId, requestId, answer: given, ...(fields === undefined ? {} : { fields }) }).then(
+        (result) => result === 'accepted',
+        (error: unknown) => {
           logger.warn('Browser strip answer failed', { error: error instanceof Error ? error.message : String(error) })
-        })
+          return false
+        }
+      )
     },
     [tabId]
   )
@@ -97,7 +108,7 @@ export function StripRows({ tabId, rows, refused, refusedId, onEmpty }: StripRow
   return (
     <>
       <span className="erf-brw-hidden" aria-live="polite" data-testid={BROWSER_TEST_IDS.STRIP_ANNOUNCER}>
-        {announcement}
+        {announcement.text}
       </span>
       {(refused !== null || sorted.length > 0) && (
         <div ref={containerRef} className="erf-site-prompts" data-testid={BROWSER_TEST_IDS.STRIP}>

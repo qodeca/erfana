@@ -5,6 +5,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const logger = vi.hoisted(() => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }))
 vi.mock('../../LoggingService', () => ({ logger }))
 
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { isSearchLoad, logLoadFailure } from './loadFailureLog'
 
 describe('isSearchLoad', () => {
@@ -37,6 +40,22 @@ describe('logLoadFailure (025-FR-042, 025-AC-042)', () => {
     logLoadFailure(-105, 'https://duckduckgo.com/?q=my+secret+search')
     expect(logger.info).toHaveBeenCalledWith('search load failed', { code: -105 })
     expect(JSON.stringify(logger.info.mock.calls)).not.toContain('secret')
+  })
+
+  it('logs a served local file by its redacted path, never its loopback address or folder (ADR 0012 decision 9)', () => {
+    const served = 'http://127.0.0.1:41234/0123456789abcdef0123456789abcdef/report.html'
+    const file = pathToFileURL(join(tmpdir(), 'Clients', 'Acme', 'report.html')).href
+    logLoadFailure(-6, served, (url) => (url === served ? file : null))
+    expect(logger.info).toHaveBeenCalledWith('A browser tab local file failed to load', { code: -6, file: '[redacted]/report.html' })
+    expect(JSON.stringify(logger.info.mock.calls)).not.toMatch(/127\.0\.0\.1|0123456789abcdef|Acme|Clients/)
+    logLoadFailure(-6, 'https://app.test/x', () => null)
+    expect(logger.info).toHaveBeenLastCalledWith('A browser tab page failed to load', { code: -6, url: 'https://app.test/x' })
+  })
+
+  it('logs a placeholder when the local address cannot be read back as a path', () => {
+    logLoadFailure(-6, 'http://127.0.0.1:1/t/x.html', () => 'file://remote-host/share/x.html')
+    expect(logger.info).toHaveBeenCalledWith('A browser tab local file failed to load', { code: -6, file: expect.any(String) })
+    expect(JSON.stringify(logger.info.mock.calls)).not.toContain('127.0.0.1')
   })
 
   it('keeps an unparseable address as text, cut to its bound', () => {

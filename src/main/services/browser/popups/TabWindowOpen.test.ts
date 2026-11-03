@@ -212,6 +212,20 @@ describe('TabWindowOpen', () => {
     expect(open.answerStrip('nope', 'allowOnce')).toBeNull()
   })
 
+  it('dispose releases one popup\'s tracker at once, once; detach releases the rest', () => {
+    const { open, opener } = setup()
+    const popupPage = new FakeOpener()
+    const { dispose } = open.handlerFor(popupPage, true)
+    expect(open.trackerCount).toBe(2)
+    dispose()
+    dispose()
+    expect(open.trackerCount).toBe(1)
+    expect(popupPage.listenerCount('before-mouse-event')).toBe(0)
+    expect(opener.listenerCount('before-mouse-event')).toBe(1)
+    open.detach()
+    expect(open.trackerCount).toBe(0)
+  })
+
   it('a popup handler tracks presses at once', () => {
     const { open } = setup()
     const popupPage = new FakeOpener()

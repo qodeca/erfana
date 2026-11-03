@@ -14,7 +14,9 @@
  * next chunk (at most {@link CARRY_MAX_CHARS}).
  *
  * Nothing is stored: the list lasts for this run and resets when the project
- * changes. At most {@link MAX_LOCAL_ADDRESSES} are kept, first seen first.
+ * changes. At most {@link MAX_LOCAL_ADDRESSES} are kept, first seen first;
+ * once that many are kept, output is no longer scanned, and a chunk that
+ * names neither host is not stripped or parsed (it runs on every PTY chunk).
  */
 
 export const MAX_LOCAL_ADDRESSES = 20
@@ -27,12 +29,15 @@ const MAX_ADDRESS_CHARS = 2000
 // eslint-disable-next-line no-control-regex -- terminal escape sequences are control characters by definition
 const ESCAPES = /\u001b\[[0-9;?]*[ -/]*[@-~]|\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)|\u001b[@-Z\\-_]/g
 const ADDRESS = /\bhttps?:\/\/(?:localhost|127\.0\.0\.1)(?::\d{1,5})?(?:[/?#][^\s"'<>`]*)?/gi
+/** A cheap first look: text without either host name holds no address, so it is not stripped and parsed. */
+const MAY_HOLD_ADDRESS = /localhost|127\.0\.0\.1/i
 /** Characters that end a sentence or close a bracket rather than end an address. */
 const TRAILING = /[.,;:!?)\]}]+$/
 
 /** The local addresses in `text`, in order, normalised by the URL parser. */
 export function findLocalAddresses(text: string): string[] {
   const found: string[] = []
+  if (!MAY_HOLD_ADDRESS.test(text)) return found
   for (const match of text.replace(ESCAPES, '').matchAll(ADDRESS)) {
     const candidate = match[0].replace(TRAILING, '')
     let parsed: URL
@@ -55,9 +60,11 @@ export class TerminalLocalAddresses {
   /**
    * Scan one chunk of `terminalId`'s output.
    *
-   * @returns the addresses seen for the first time, in order
+   * @returns the addresses seen for the first time, in order; nothing,
+   *   without scanning, once {@link MAX_LOCAL_ADDRESSES} are kept
    */
   scan(terminalId: string, chunk: string): string[] {
+    if (this.seen.size >= MAX_LOCAL_ADDRESSES) return []
     const text = (this.carry.get(terminalId) ?? '') + chunk
     const lastBreak = Math.max(text.lastIndexOf('\n'), text.lastIndexOf('\r'))
     const complete = lastBreak < 0 ? '' : text.slice(0, lastBreak + 1)

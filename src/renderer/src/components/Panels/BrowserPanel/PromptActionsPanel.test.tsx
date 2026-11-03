@@ -49,12 +49,25 @@ describe('PromptActionsPanel (025-FR-027, 025-FR-030)', () => {
 
   it('names the element, cuts the path from its start, and focuses Explain', () => {
     renderPanel()
-    expect(screen.getByRole('dialog', { name: 'button.cta · 176 × 32' })).toHaveAttribute('aria-modal', 'false')
+    expect(screen.getByRole('dialog', { name: 'Actions for button.cta, 176 by 32' })).toHaveAttribute('aria-modal', 'false')
     const path = screen.getByRole('navigation', { name: 'Element path' })
     expect(path).toHaveTextContent('…body›main›section›div›button.cta · 176 × 32')
     expect(screen.getByRole('button', { name: 'Explain' })).toHaveFocus()
     expect(screen.getByRole('button', { name: 'Child element' })).toHaveAttribute('aria-disabled', 'true')
     expect(screen.getByRole('button', { name: 'Parent element' })).not.toHaveAttribute('aria-disabled')
+  })
+
+  it('is named "Actions for {tag}, {size spoken}" and described by the target and the key hint (deck *Panel*)', () => {
+    renderPanel()
+    const panel = screen.getByRole('dialog', { name: 'Actions for button.cta, 176 by 32' })
+    expect(panel).toHaveAccessibleDescription('Target ↑ ↓ parent and child · Tab next action · Esc closes the panel')
+  })
+
+  it('draws all four actions in the secondary look – Explain is not the filled primary (design § Prompt-actions panel)', () => {
+    renderPanel()
+    for (const name of ['Explain', 'Ask', 'Change', 'Prompt']) {
+      expect(screen.getByRole('button', { name })).not.toHaveClass('erf-brw-actions__action--primary')
+    }
   })
 
   it('shows the element\'s text and confirmed source once main has read them, and nothing before', () => {
@@ -134,10 +147,15 @@ describe('PromptActionsPanel (025-FR-027, 025-FR-030)', () => {
   it('marks busy actions, the note, the paused page and a changed page', () => {
     renderPanel({ busy: 'explain', note: 'Top of the page', frozen: true, capture: { ...CAPTURE, summary: { ...SUMMARY, changedAfterPick: true } } })
     expect(screen.getByRole('button', { name: 'Explain' })).toHaveTextContent('Sending…')
-    expect(screen.getByRole('button', { name: 'Ask' })).toHaveAttribute('aria-disabled', 'true')
+    const ask = screen.getByRole('button', { name: 'Ask' })
+    expect(ask).toHaveAttribute('aria-disabled', 'true')
+    // The dim is on the label span, never the button, so a focused one keeps a full ring (Permission band card).
+    expect(ask.firstElementChild?.tagName).toBe('SPAN')
+    expect(ask.firstElementChild).toHaveTextContent('Ask…')
     expect(screen.getByRole('status')).toHaveTextContent('Top of the page')
-    expect(screen.getByText('Page paused')).toBeInTheDocument()
-    expect(screen.getByText('The page changed after the pick')).toBeInTheDocument()
+    // Static tags, not the interactive address chip (no hover, no pointer).
+    expect(screen.getByText('Page paused')).toHaveClass('erf-brw-tag')
+    expect(screen.getByText('The page changed after the pick')).toHaveClass('erf-brw-tag')
   })
 
   it('marks the chip as changed for a second after a refinement', () => {

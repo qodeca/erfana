@@ -20,6 +20,7 @@ import { widthPreset } from '../../../../../shared/browser/widthPresets'
 import { ContextMenu, type ContextMenuItem } from '../../ContextMenu/ContextMenu'
 import type { StillSurface } from './useStillSurface'
 import { widthPresetItems } from './browserMenus.logic'
+import { tooltipProps } from './ToolbarTooltip'
 
 const ICONS = { full: Monitor, phone: Smartphone, tablet: Tablet } as const
 
@@ -40,8 +41,9 @@ export interface WidthPresetMenuProps {
 export function widthMenuItems(preset: WidthPresetId, onChoose: (id: WidthPresetId) => void): ContextMenuItem[] {
   return widthPresetItems().map(item => ({
     label: item.label,
-    // The shared menu has no radio items: the current choice carries the check, as in More.
+    // Radio choices: the check shows the current one, `checked` says it to assistive tech (as in More).
     icon: item.id === preset ? <Check size={14} strokeWidth={2} /> : <span className="erf-brw-more__blank" />,
+    checked: item.id === preset,
     action: () => onChoose(item.id),
     ...(item.reason === undefined ? {} : { reason: item.reason })
   }))
@@ -75,7 +77,7 @@ export function WidthPresetMenu({ preset, onChoose, still }: WidthPresetMenuProp
         type="button"
         className="erf-brw-width"
         aria-label={`Page width: ${label}`}
-        title="Page width"
+        {...tooltipProps('Page width')}
         aria-haspopup="menu"
         aria-expanded={at !== null}
         onClick={() => (at === null ? open() : close())}

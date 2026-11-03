@@ -359,6 +359,14 @@ keyboard. The ratio under each frame is the ring against what it actually touche
         picker</a> card and <a href="../../../designs/browser/picking.html">Picking</a>. No <code>src/</code> site yet.</td>
     </tr>
     <tr>
+      <td>Built-in browser address chips (zoom, pop-up blocked)</td>
+      <td>Offset 2px outward, inset inside a scroller, or the inner-gap form over a transparent border.</td>
+      <td>Inset by 2px over the chip's visible 1px edge. The chips sit inside the address field, whose own ring is
+        drawn outward around the whole field, so an outward chip ring would meet or double that ring (M-32); the
+        inner-gap form needs a transparent border, and these chips draw a visible one.
+        See <code>BrowserChrome.css</code> (spec 025).</td>
+    </tr>
+    <tr>
       <td>Comment pins</td>
       <td>Every control is reachable with Tab.</td>
       <td>Out of the Tab order in both previews: a page can carry hundreds, and the comments drawer is the

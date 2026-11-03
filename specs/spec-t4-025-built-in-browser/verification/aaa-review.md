@@ -41,3 +41,17 @@ Scores are added after this rubric is committed, one row per lens, with a link t
 
 | Lens | Score | Critical | High | Medium | Low | Report |
 |---|---|---|---|---|---|---|
+
+### Round 1 – 2026-11-04, against `873a9e4a`
+
+| Lens | Score | Critical | High | Medium | Low | Report |
+|---|---|---|---|---|---|---|
+| Code | 8 | 0 | 0 | 1 | 7 | [reviews/code.md](reviews/code.md) |
+| Security | 8 | 0 | 0 | 1 | 5 | [reviews/security.md](reviews/security.md) |
+| Architecture | 7 | 0 | 0 | 5 | 3 | [reviews/architecture.md](reviews/architecture.md) |
+| UX | 7 | 0 | 0 | 4 | 6 | [reviews/ux.md](reviews/ux.md) |
+| UI | 6 | 0 | 2 | 6 | 5 | [reviews/ui.md](reviews/ui.md) |
+| Performance | 7 | 0 | 1 | 3 | 4 | [reviews/performance.md](reviews/performance.md) |
+| Test | 8 | 0 | 0 | 2 | 3 | [reviews/test.md](reviews/test.md) |
+
+Four lenses are under 8. Every finding goes to a fix round; each lens is then reviewed again by a fresh agent of the same type, against the new HEAD.

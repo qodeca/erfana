@@ -15,6 +15,10 @@
  * - **Fail closed.** A missing or malformed home record reads as empty: every
  *   existing signed file of the project is then refused, and the next write
  *   starts the kind again at 1.
+ * - **Epoch.** Each record carries a random epoch, made when the record is
+ *   (re)created and signed into every file with the generation. Deleting the
+ *   record restarts the counters at 1, but under a new epoch, so an old
+ *   generation-1 file put back still does not verify (security review S3).
  * - **Serialised per record.** Every read and write of one home file runs in
  *   order, across all the stores of the project, so {@link
  *   ProfileGenerations.next} is monotonic under concurrent writes.
@@ -23,6 +27,7 @@
  *   and the store keeps working from memory until its next write.
  * - Never logs a path.
  */
+import { randomBytes } from 'node:crypto'
 import { mkdir, readFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { z } from 'zod'
@@ -39,15 +44,24 @@ const KIND_PATTERN = /^[a-z][a-z0-9-]{0,63}$/
 const MARKER_SUFFIX = '.json'
 const GENERATIONS_SUFFIX = '.generations.json'
 
+const EPOCH_PATTERN = /^[0-9a-f]{32}$/
+
 const RecordSchema = z
   .object({
     version: z.literal(RECORD_VERSION),
     project: z.string().min(1),
+    epoch: z.string().regex(EPOCH_PATTERN),
     generations: z.record(z.string().regex(KIND_PATTERN), z.number().int().positive().max(Number.MAX_SAFE_INTEGER))
   })
   .strict()
 
 type Generations = Record<string, number>
+
+/** A readable record's contents; a missing or malformed record has no epoch. */
+interface RecordState {
+  readonly epoch: string | null
+  readonly generations: Generations
+}
 
 /** The current generation of each signed file kind of one project. */
 export interface ProfileGenerations {
@@ -62,6 +76,11 @@ export interface ProfileGenerations {
    *   than missing) or written
    */
   next(kind: string): Promise<number>
+  /**
+   * The record's epoch, signed into every file with its generation; `undefined`
+   * before the first write (or when the record is unreadable). Never rejects.
+   */
+  epoch(): Promise<string | undefined>
 }
 
 /** `~/.erfana/browser-profiles/<sha-256 hex of the canonical path>.generations.json`. */
@@ -94,7 +113,7 @@ export function profileGenerations(homeDir: string, canonical: string): ProfileG
     current: (kind) =>
       serialised(path, async () => {
         try {
-          return (await readRecord(path, canonical))[kind]
+          return (await readRecord(path, canonical)).generations[kind]
         } catch (error) {
           logger.warn('Browser profile generations: home record unreadable, no generation', {
             error: redactedLogError(error)?.message ?? String(error)
@@ -105,40 +124,51 @@ export function profileGenerations(homeDir: string, canonical: string): ProfileG
     next: (kind) => {
       if (!KIND_PATTERN.test(kind)) return Promise.reject(new TypeError('Not a profile file kind'))
       return serialised(path, async () => {
-        const generations = await readRecord(path, canonical)
+        const { epoch, generations } = await readRecord(path, canonical)
         const generation = (generations[kind] ?? 0) + 1
         await mkdir(dirname(path), { recursive: true, mode: 0o700 })
         await atomicWriteJSON(path, {
           version: RECORD_VERSION,
           project: canonical,
+          // A new record gets a new epoch: files signed under the last one never verify again.
+          epoch: epoch ?? randomBytes(16).toString('hex'),
           generations: { ...generations, [kind]: generation }
         })
         return generation
       })
-    }
+    },
+    epoch: () =>
+      serialised(path, async () => {
+        try {
+          return (await readRecord(path, canonical)).epoch ?? undefined
+        } catch {
+          // `current` logs an unreadable record; the reader asks it too.
+          return undefined
+        }
+      })
   }
 }
 
 /**
- * The recorded generations; `{}` when the record is missing, malformed, too
- * large or names another project.
+ * The recorded epoch and generations; no epoch and `{}` when the record is
+ * missing, malformed, too large or names another project.
  *
  * @throws the file-system error of any other failed read
  */
-async function readRecord(path: string, canonical: string): Promise<Generations> {
+async function readRecord(path: string, canonical: string): Promise<RecordState> {
   let text: string
   try {
     text = await readFile(path, 'utf8')
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return {}
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { epoch: null, generations: {} }
     throw error
   }
   const record = parseRecord(text)
   if (record === null || record.project !== canonical) {
     logger.warn('Browser profile generations: home record malformed, treated as empty')
-    return {}
+    return { epoch: null, generations: {} }
   }
-  return record.generations
+  return { epoch: record.epoch, generations: record.generations }
 }
 
 function parseRecord(text: string): z.infer<typeof RecordSchema> | null {

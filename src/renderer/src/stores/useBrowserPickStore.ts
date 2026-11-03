@@ -52,6 +52,13 @@ export interface BrowserPickTab {
   readonly frozen: boolean
 }
 
+/**
+ * A tab's pick state without the hover label: what the panel subscribes to,
+ * so a hover crossing the page does not re-render it (the pick row reads the
+ * label alone).
+ */
+export type PickTabView = Omit<BrowserPickTab, 'label'>
+
 export const IDLE_PICK: BrowserPickTab = Object.freeze({
   on: false,
   label: null,

@@ -47,8 +47,9 @@ describe('EmptyTabPage', () => {
       screen.getByText('Type an address such as localhost:5173 in the address bar.')
     ).toBeInTheDocument()
     const hint = screen.getByText(/Load your app, then click/)
+    // A full sentence takes its full stop on screen (OD-9, CF-2).
     expect(hint).toHaveTextContent(
-      'Load your app, then click Pick element (Ctrl+E) to pick an element'
+      /^Load your app, then click Pick element \(Ctrl\+E\) to pick an element\.$/
     )
     expect(hint.querySelector('strong')).toHaveTextContent('Pick element')
   })

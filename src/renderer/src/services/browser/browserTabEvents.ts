@@ -18,7 +18,8 @@
  *   capture lets the still go (a page change's capture stays for the dialog);
  * - `contextMenu` waits for the page's still image before it opens, so the
  *   menu never draws over a blank page area (ADR 0011, commit 19);
- * - `tabClosed` → the editor tab goes (`browserTabClosedByMain`);
+ * - `tabClosed` → the editor tab goes (`browserTabClosedByMain`), with the
+ *   tab's pick state, every still holder and its still image;
  * - `newTabCommand` → the app menu's **New browser tab**.
  *
  * Forwarded keys are per panel (`useBrowserKeys`): acting on them needs the
@@ -106,6 +107,8 @@ export function mountBrowserTabEvents(deps: BrowserTabEventDeps): () => void {
     }),
     browserTabGateway.onTabClosed(event => {
       useBrowserPickStore.getState().forget(event.tabId)
+      // Every still holder goes with the tab: the panel may unmount before its own release runs.
+      browserStill.forget(event.tabId)
       browserTabClosedByMain(event.tabId, deps.removePanel)
     }),
     browserTabGateway.onNewTabCommand(event => {

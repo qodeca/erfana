@@ -107,6 +107,42 @@ export function isStrictDescendant(parentPath: string, childPath: string): boole
 }
 
 /**
+ * Join a relative path onto a root in the platform's native separator – the
+ * one helper for "this project-relative path under that project root"
+ * (spec 025 code review: never a hand-built join).
+ *
+ * On Windows both `\\` and `/` separate segments and the result uses `\\`;
+ * on macOS and Linux only `/` does, because `\\` is a legal filename
+ * character there. The root keeps its own form (drive, UNC prefix, POSIX
+ * `/`) – only its trailing separators go; the relative part's leading,
+ * doubled and trailing separators are dropped. Nothing is resolved: `..`
+ * and `.` stay as written.
+ *
+ * Display/parse-only — not for security confinement.
+ *
+ * @param root - Absolute root, in its native separators
+ * @param relative - Path under `root`; empty returns `root` unchanged
+ * @param platform - Whose separator rule applies; defaults to the renderer's own
+ * @returns The joined path
+ *
+ * @example
+ * ```ts
+ * joinPath('/proj', '.erfana/browser/c.md', 'darwin')          // '/proj/.erfana/browser/c.md'
+ * joinPath('C:\\proj\\', '.erfana/browser/c.md', 'win32')   // 'C:\\proj\\.erfana\\browser\\c.md'
+ * joinPath('\\\\srv\\share', 'a\\b.md', 'win32')          // '\\\\srv\\share\\a\\b.md'
+ * ```
+ */
+export function joinPath(root: string, relative: string, platform: NodeJS.Platform = getRendererPlatform()): string {
+  const windows = isWindows(platform)
+  const separators = windows ? /[\\/]+/ : /\/+/
+  const segments = relative.split(separators).filter(segment => segment !== '')
+  if (segments.length === 0) return root
+  const sep = windows ? '\\' : '/'
+  const head = root.replace(windows ? /[\\/]+$/ : /\/+$/, '')
+  return `${head}${sep}${segments.join(sep)}`
+}
+
+/**
  * Whether two paths name the same file, as far as the renderer can tell
  * without touching the disk (issue #124, part 3 §3.4).
  *

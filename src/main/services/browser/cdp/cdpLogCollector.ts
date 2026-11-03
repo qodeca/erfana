@@ -91,7 +91,7 @@ interface TrackedRequest {
 const str = (v: unknown): string => (typeof v === 'string' ? v : '')
 
 /** Text of one console argument (a CDP `RemoteObject`). */
-function argumentText(arg: unknown): string {
+export function argumentText(arg: unknown): string {
   if (!isRecord(arg)) return ''
   if (arg.type === 'string' && typeof arg.value === 'string') return arg.value
   if (arg.value !== undefined && arg.value !== null && typeof arg.value !== 'object') return String(arg.value)

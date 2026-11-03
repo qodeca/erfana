@@ -55,6 +55,19 @@ describe('ContextMenu', () => {
     expect(menuItems).toHaveLength(3)
   })
 
+  it('renders a choice item as menuitemradio with aria-checked, and leaves plain items as menuitem', () => {
+    const items: ContextMenuItem[] = [
+      { label: 'Full width', action: vi.fn(), checked: true },
+      { label: 'Phone width', action: vi.fn(), checked: false },
+      { label: 'Zoom in', action: vi.fn() }
+    ]
+    renderMenu({ items })
+    expect(screen.getByRole('menuitemradio', { name: 'Full width' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('menuitemradio', { name: 'Phone width' })).toHaveAttribute('aria-checked', 'false')
+    const plain = screen.getByRole('menuitem', { name: 'Zoom in' })
+    expect(plain).not.toHaveAttribute('aria-checked')
+  })
+
   it('separators have role="separator"', () => {
     const items: ContextMenuItem[] = [
       { label: 'Copy', action: vi.fn() },

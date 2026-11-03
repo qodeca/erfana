@@ -8,11 +8,10 @@
  * on and off, a confirm, a close. This module does the engine work:
  *
  * - **On and off**: the engine side is `pickModeSwitch.ts`.
- * - **Hover**: each move is hit-tested (`pickHitTest.ts`), one in flight, the
- *   latest wins; the engine outlines the element and its label goes out (`highlight`);
- *   a frame that goes ends it (`pickFrameGone.ts`).
- * - **Up and Down before a confirm** walk the hovered element's chain on the
- *   live page; a move of the mouse to another element starts over from it.
+ * - **Hover** and **Up and Down before a confirm** (`pickHover.ts`): each
+ *   move is hit-tested, the latest wins, and the engine outlines the element;
+ *   its chain is read only for an Up or Down or once the pointer rests on
+ *   it; a frame that goes ends the highlight (`pickFrameGone.ts`).
  * - **Confirm** ({@link BrowserTabPick.startCapture}, `capture/` modules):
  *   re-hit-test at the click, hide the highlight, take the screenshot (one
  *   retry when the first comes back empty), snapshot the chain, hold the
@@ -35,15 +34,16 @@ import { BrowserCapture, type RefineMove } from '../capture/BrowserCapture'
 import { downscaleBitmap } from '../capture/captureImage'
 import { PickReader, type PickCdp, type PickNode } from './pickCdp'
 import { CaptureFailure, PickCaptureReads } from './pickCaptureReads'
-import { readChain, type ElementChain } from './pickElement'
+import { readChain } from './pickElement'
 import { PickFrames } from './pickFrames'
 import { watchFrameGone } from './pickFrameGone'
 import { PickFreeze, type FreezeAudio } from './pickFreeze'
 import type { Point, PointerReport } from './pickGeometry'
 import { PickHighlight, type HighlightRecord } from './pickHighlight'
 import { PickHitTest } from './pickHitTest'
-import { closeEvent, liveStep, refineHeld } from './pickMenu'
-import { centre, flashThenHide, sameNode } from './pickFlash'
+import { PickHover } from './pickHover'
+import { closeEvent, refineHeld } from './pickMenu'
+import { centre, flashThenHide } from './pickFlash'
 import { PickModeSwitch } from './pickModeSwitch'
 import { PickBench, type PickFaults } from './pickSupport'
 
@@ -92,7 +92,7 @@ export class BrowserTabPick {
   readonly reader: PickReader
   readonly frames: PickFrames
   readonly highlight: PickHighlight
-  private readonly hitTest: PickHitTest
+  private readonly hovering: PickHover
   private readonly freeze: PickFreeze
   private readonly reads: PickCaptureReads
   private readonly modeSwitch: PickModeSwitch
@@ -100,14 +100,9 @@ export class BrowserTabPick {
   private readonly listeners: Array<[string, Listener]> = []
   private active = false
   private lastPointer: PointerReport | null = null
-  private lastViewPoint: Point | null = null
   private clickPointer: PointerReport | null = null
   /** The element **Pick this element** hit, for the confirm the reducer queues next (025-FR-057). */
   private menuTarget: { node: PickNode; viewPoint: Point } | null = null
-  private hoverBusy = false
-  private hoverQueued: PointerReport | null = null
-  /** Up and Down before a confirm: the hovered element's chain and where the highlight is on it. */
-  private preChain: { chain: Promise<ElementChain>; index: number | null; node: PickNode } | null = null
   private held: BrowserCapture | null = null
   /** The element just sent: its outline flashes on the live page as pick mode ends (025-FR-060). */
   private sentNode: PickNode | null = null
@@ -118,7 +113,19 @@ export class BrowserTabPick {
     this.reader = new PickReader(deps.cdp)
     this.frames = new PickFrames(deps.cdp, this.reader)
     this.highlight = new PickHighlight(this.reader, this.frames, () => deps.faults?.highlightColour() ?? null)
-    this.hitTest = new PickHitTest(this.reader, this.frames)
+    this.hovering = new PickHover({
+      reader: this.reader,
+      frames: this.frames,
+      highlight: this.highlight,
+      hitTest: new PickHitTest(this.reader, this.frames),
+      clock: deps.clock,
+      bench: deps.bench,
+      viewOrigin: deps.viewOrigin,
+      zoom: () => (deps.contents.isDestroyed() ? 1 : deps.contents.getZoomFactor()),
+      canHover: () => this.active && this.held === null,
+      routing: (event) => this.routing(event),
+      emit: (event) => this.emit(event)
+    })
     this.freeze = new PickFreeze(deps.cdp, this.reader, deps.contents, () => this.externalResume())
     this.modeSwitch = new PickModeSwitch(deps.cdp, this.reader, this.frames, deps.contents)
     this.reads = new PickCaptureReads({
@@ -138,7 +145,7 @@ export class BrowserTabPick {
         if (this.active && target.type === 'iframe') this.modeSwitch.focusEmulation(target.sessionKey, true)
       }),
       deps.cdp.on('targetDetached', (target) => this.reader.forgetSession(target.sessionKey)),
-      watchFrameGone(deps.cdp, this.frames, () => (this.active && this.held === null ? this.highlight.record : null), () => this.endHighlight()),
+      watchFrameGone(deps.cdp, this.frames, () => (this.active && this.held === null ? this.highlight.record : null), () => this.hovering.end()),
       deps.cdp.on('detached', () => this.routing({ type: 'endSilently' }))
     )
     this.listen('before-mouse-event', (_event: unknown, mouse: PointerReport & { type: string; button?: string }) => this.onMouse(mouse))
@@ -192,7 +199,7 @@ export class BrowserTabPick {
   /** Up or Down (and their Alt aliases) in pick mode or in the menu (025-FR-027). */
   refine(move: RefineMove): void {
     if (this.held !== null) void this.refineHeld(move)
-    else if (move === 'parent' || move === 'child') void this.refineLive(move)
+    else if (move === 'parent' || move === 'child') void (this.active ? this.hovering.refine(move) : this.note('moveTheMouse'))
   }
 
   /**
@@ -206,7 +213,7 @@ export class BrowserTabPick {
     const wasActive = this.active
     if (!wasActive) await this.start()
     const zoom = this.deps.contents.getZoomFactor() || 1
-    const hit = await this.hitTest.atViewPoint({ x: at.x / zoom, y: at.y / zoom }).catch(() => null)
+    const hit = await this.hovering.atViewPoint({ x: at.x / zoom, y: at.y / zoom })
     if (hit === null || this.disposed) return void (wasActive || (await this.stop()))
     this.menuTarget = { node: hit.node, viewPoint: hit.viewPoint }
     this.routing({ type: 'contextMenuPick' })
@@ -214,6 +221,18 @@ export class BrowserTabPick {
     queueMicrotask(() => {
       this.menuTarget = null
     })
+  }
+
+  /**
+   * Teardown stage `endPick` (ADR 0009 decision 14): pick mode ends without
+   * sending, and the held capture goes – even one an open dialog kept across
+   * a navigation – so a capture write still running deletes its files.
+   */
+  async end(): Promise<void> {
+    if (this.disposed) return
+    this.routing({ type: 'endSilently' })
+    this.release()
+    await this.unfreeze()
   }
 
   /** Remove every listener, release the capture, unfreeze. The tab is closing. */
@@ -238,14 +257,13 @@ export class BrowserTabPick {
     this.sentNode = null
     this.reads.clearStyleSheets()
     await this.modeSwitch.on(() => this.active)
-    if (this.lastPointer !== null) this.hover(this.lastPointer)
+    if (this.lastPointer !== null) this.hovering.move(this.lastPointer)
   }
 
   private async stop(): Promise<void> {
     if (!this.active) return
     this.active = false
-    this.preChain = null
-    this.lastViewPoint = null
+    this.hovering.reset()
     if (this.held !== null && !this.held.afterNavigation) this.release()
     await this.unfreeze()
     const sent = this.sentNode
@@ -258,7 +276,7 @@ export class BrowserTabPick {
   private onMouse(mouse: PointerReport & { type: string; button?: string }): void {
     if (mouse.type === 'mouseMove' || mouse.type === 'mouseEnter') {
       this.lastPointer = mouse
-      if (this.active && this.held === null && this.deps.routing.state().surface === 'none') this.hover(mouse)
+      if (this.active && this.held === null && this.deps.routing.state().surface === 'none') this.hovering.move(mouse)
       return
     }
     if (mouse.type === 'mouseDown' && (mouse.button ?? 'left') === 'left') {
@@ -269,63 +287,6 @@ export class BrowserTabPick {
         this.clickPointer = null
       })
     }
-  }
-
-  private hover(report: PointerReport): void {
-    if (this.hoverBusy) {
-      this.hoverQueued = report
-      return
-    }
-    this.hoverBusy = true
-    const startedAt = this.deps.clock.now()
-    void this.hoverOnce(report, startedAt).finally(() => {
-      this.hoverBusy = false
-      const next = this.hoverQueued
-      this.hoverQueued = null
-      if (next !== null && this.active && this.held === null) this.hover(next)
-    })
-  }
-
-  private async hoverOnce(report: PointerReport, startedAt: number): Promise<void> {
-    const hit = await this.pointerHit(report)
-    if (!this.active || this.held !== null) return
-    if (hit === null) return this.endHighlight()
-    this.lastViewPoint = hit.viewPoint
-    // Skipped only while it shows: after a capture hid it, the same element is outlined again.
-    const same = this.highlight.record !== null && this.preChain !== null && this.preChain.index === null && sameNode(this.preChain.node, hit.node)
-    if (same) return
-    this.preChain = null
-    const record = await this.highlight.show(hit.node)
-    if (record === null || !this.active) return
-    this.preChain = { chain: readChain(this.reader, this.frames, hit.node), index: null, node: hit.node }
-    this.preChain.chain.catch(() => undefined)
-    this.routing({ type: 'hover', element: true })
-    this.emit({ kind: 'highlight', label: record.label })
-    this.deps.bench?.record('highlight', this.deps.clock.now() - startedAt)
-  }
-
-  /** The highlight ends: nothing under the pointer, or its frame went (025-FR-029, `pickFrameGone.ts`). */
-  private async endHighlight(): Promise<void> {
-    if (this.highlight.record !== null) await this.highlight.hide()
-    this.preChain = null
-    this.routing({ type: 'hover', element: false })
-    this.emit({ kind: 'highlight', label: null })
-  }
-
-  private async pointerHit(report: PointerReport): Promise<{ node: PickNode; viewPoint: Point } | null> {
-    const origin = this.deps.viewOrigin() ?? { x: 0, y: 0 }
-    const zoom = this.deps.contents.isDestroyed() ? 1 : this.deps.contents.getZoomFactor()
-    return this.hitTest.atPointer(report, origin, zoom || 1).catch(() => null)
-  }
-
-  private async refineLive(move: 'parent' | 'child'): Promise<void> {
-    const pre = this.preChain
-    if (pre === null || !this.active) return this.note('moveTheMouse')
-    const step = liveStep(await pre.chain.catch(() => null), pre.index, move)
-    if ('note' in step) return this.note(step.note)
-    pre.index = step.index
-    const record = await this.highlight.show(step.node)
-    if (record !== null) this.emit({ kind: 'highlight', label: record.label })
   }
 
   // ── Confirm and the held capture ──────────────────────────────────────
@@ -398,10 +359,10 @@ export class BrowserTabPick {
 
   /** The node to capture: re-hit-tested at a click, else the highlighted (or refined) element. */
   private async confirmTarget(click: PointerReport | null): Promise<{ node: PickNode; viewPoint: Point } | null> {
-    if (click !== null) return this.pointerHit(click)
+    if (click !== null) return this.hovering.hit(click)
     const record: HighlightRecord | null = this.highlight.record
     if (record === null) return null
-    const point = this.lastViewPoint ?? centre(record.box)
+    const point = this.hovering.lastViewPoint ?? centre(record.box)
     return { node: record.node, viewPoint: point }
   }
 
@@ -420,7 +381,7 @@ export class BrowserTabPick {
   private onNavigated(): void {
     this.reader.reset()
     this.highlight.forget()
-    this.preChain = null
+    this.hovering.forget()
     const state = this.deps.routing.state()
     if (!state.pick && this.held === null) return
     if (this.held !== null) this.held.afterNavigation = true // An open dialog may still send it; pick mode's end must not release it.

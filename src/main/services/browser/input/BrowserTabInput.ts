@@ -28,10 +28,10 @@
  * The page view ignores the application menu's shortcuts while focused, so
  * Erfana's app shortcuts never fire from a page (025-FR-047).
  *
- * Reducer effects this commit does not perform – capture start and discard,
- * unfreeze, the page-changed notice, toolbar focus targets – go to
- * {@link BrowserTabInputDeps.onEffect}; the pick pipeline (commit 14) and the
- * renderer (commit 19) take them.
+ * Reducer effects this module does not perform itself – capture start and
+ * discard, unfreeze, the page-changed notice, toolbar focus targets – go to
+ * {@link BrowserTabInputDeps.onEffect} and to the attached pick pipeline
+ * (`pick/BrowserTabPick.ts`), which perform them.
  */
 import type { Clock } from '../../../../shared/clock'
 import {
@@ -104,7 +104,7 @@ export interface BrowserTabInputDeps {
   readonly focusPanelKeys?: (input: BrowserKeyInput) => boolean
   /** Zoom the page (025-FR-008); the zoom keys do nothing without it. */
   readonly zoom?: (step: 'in' | 'out' | 'reset') => void
-  /** Up, Down and their Alt aliases in pick mode (025-FR-027, commit 14). */
+  /** Up, Down and their Alt aliases in pick mode (025-FR-027). */
   readonly refine?: (move: 'parent' | 'child') => void
   /** Reducer effects this module does not perform itself. */
   readonly onEffect?: (effect: RoutingEffect) => void
@@ -118,7 +118,7 @@ export interface BrowserTabInputDeps {
   readonly focusWindow?: () => void
 }
 
-/** The tab's pick pipeline (commit 14), attached after the routers exist (`pick/BrowserPicks.ts`). */
+/** The tab's pick pipeline, attached after the routers exist (`pick/BrowserPicks.ts`). */
 export interface TabInputPick {
   /** Pick mode went on or off. */
   mode(on: boolean): void
@@ -205,9 +205,10 @@ export class BrowserTabInput implements ToolbarKeyTarget {
   reportToolbarFocus(focused: boolean): void {
     this.toolbarFocused = focused
     if (focused) {
-      if (this.routing.focus === 'toolbar') return
+      // A closing tab's page is gone: Electron throws on a destroyed webContents, and there is nothing to route.
+      if (this.routing.focus === 'toolbar' || this.deps.contents.isDestroyed()) return
       // The page still holds the OS keyboard: move it to the window; the page's blur then routes to the toolbar.
-      if (!this.deps.contents.isDestroyed() && this.deps.contents.isFocused()) this.deps.focusWindow?.()
+      if (this.deps.contents.isFocused()) this.deps.focusWindow?.()
       if (!this.deps.contents.isFocused()) this.dispatch({ type: 'focusToolbar' })
       return
     }

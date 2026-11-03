@@ -53,7 +53,8 @@
   align-items: center;
   justify-content: center;
   width: var(--btn-height-md);
-  height: var(--space-14);
+  /* The handoff's size until --toolbar-tool-height lands. */
+  height: var(--input-height-sm);
   padding: 0;
   border: none;
   border-radius: var(--border-radius);
@@ -156,7 +157,7 @@
   color: var(--color-error);
 }
 .erf-brw-address__badge--neutral {
-  color: var(--color-text-secondary);
+  color: var(--color-text-tertiary);
 }
 
 .erf-brw-address__field {
@@ -406,7 +407,7 @@
   gap: var(--space-2) var(--space-6);
 }
 
-/* Text-style and quieter than Back to safety; the guard's blocked look wins over hover. */
+/* Text-style and quieter than Back to safety; the guard's blocked look wins over hover and dims, never brightens. */
 .erf-brw-page__text-action {
   padding: 0;
   border: none;
@@ -422,9 +423,15 @@
   color: var(--color-text-primary);
 }
 
-.erf-brw-page__text-action[aria-disabled='true'] {
-  color: var(--color-text-tertiary);
+.erf-brw-page__text-action[aria-disabled='true'],
+.erf-brw-page__text-action[aria-disabled='true']:hover {
+  color: var(--color-text-secondary);
   cursor: not-allowed;
+}
+
+/* The dim lives on the label, never on the button, so the focus ring keeps its strength (Permission band card). */
+.erf-brw-page__text-action[aria-disabled='true'] > span {
+  opacity: var(--opacity-disabled);
 }
 
 .erf-brw-page__text-action:focus-visible,

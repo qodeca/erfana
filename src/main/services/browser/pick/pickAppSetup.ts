@@ -12,6 +12,8 @@
  *   the owning window only, checked against `PickEventSchema`.
  * - The `browser-tab:` pick channels are registered, and capture expiry
  *   follows the open project (025-FR-039).
+ * - Pick mode ends and capture writes finish in the teardown's `endPick` and
+ *   `abortCaptureWrites` stages, before the views close (ADR 0009 decision 14).
  */
 import { BrowserWindow, nativeImage, type WebContents } from 'electron'
 import type { Clock } from '../../../../shared/clock'
@@ -21,6 +23,7 @@ import { registerBrowserTabPickHandlers } from '../../../ipc/browserTab/pick-han
 import { logger } from '../../LoggingService'
 import type { ProjectSession } from '../../session/ProjectSession'
 import type { BrowserTab } from '../BrowserTab'
+import type { BrowserProjectTeardown } from '../browserProjectTeardown'
 import type { BrowserTabService } from '../BrowserTabService'
 import type { TargetTerminals } from '../capture/BrowserTargetStatus'
 import type { Bitmap } from '../capture/captureImage'
@@ -59,6 +62,8 @@ export interface BrowserPicksSetupDeps {
   readonly tabs: () => Pick<BrowserTabService, 'inputFor' | 'tabOf'>
   readonly projectSession: Pick<ProjectSession, 'onChange' | 'current'>
   readonly terminals: () => TargetTerminals | null
+  /** The project-switch and window-close teardown; the pick stages register on it. */
+  readonly teardown: Pick<BrowserProjectTeardown, 'onStage'>
   /** A test seam. */
   readonly registerHandlers?: typeof registerBrowserTabPickHandlers
 }
@@ -89,6 +94,7 @@ export function installBrowserPicks(deps: BrowserPicksSetupDeps): BrowserPicksSe
     inputFor: (tab) => deps.tabs().inputFor(tab)
   }
   ;(deps.registerHandlers ?? registerBrowserTabPickHandlers)({ tabs, picks })
+  picks.registerTeardown(deps.teardown)
   const expiry = new CaptureExpiry(picks.store, deps.clock)
   expiry.attach(deps.projectSession)
   return {

@@ -7,8 +7,9 @@
  *
  * - {@link describeForLabel}: the hover label from CDP alone (`describeNode`
  *   and `getBoxModel`, no page function), fast enough for every move.
- * - {@link readChain}: at confirm, the element's ancestors from the top
- *   page's root element down to the element – crossing shadow roots to their
+ * - {@link readChain}: at confirm, and before one for the first Up or Down
+ *   or once the pointer rests on an element (`pickHover.ts`), the element's
+ *   ancestors from the top page's root element down to it – crossing shadow roots to their
  *   hosts and each frame's root to its `<iframe>` in the parent document, as
  *   Up does – with each entry's name, source attributes and box, the
  *   selector chain and the frame chain. Every entry gets a node handle, so

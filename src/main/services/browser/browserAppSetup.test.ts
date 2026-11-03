@@ -118,17 +118,24 @@ describe('browserAppSetup', () => {
       registerTabHandlers: vi.fn()
     })
     const closeWindow = vi.spyOn(runtime.tabs, 'closeWindow')
-    closeBrowserWindow(7)
+    const endPicks = vi.spyOn(runtime.picks, 'endPicks')
+    const abortWrites = vi.spyOn(runtime.picks, 'abortCaptureWrites')
+    await closeBrowserWindow(7)
     expect(closeWindow).toHaveBeenCalledWith(7)
+    // A closing window runs the same staged sequence as a project switch (ADR 0009 decision 14).
+    expect(endPicks.mock.invocationCallOrder[0]).toBeLessThan(abortWrites.mock.invocationCallOrder[0]!)
+    expect(abortWrites.mock.invocationCallOrder[0]).toBeLessThan(closeWindow.mock.invocationCallOrder[0]!)
     closeWindow.mockImplementation(() => {
       throw new Error('boom')
     })
-    expect(() => closeBrowserWindow(8)).not.toThrow()
+    await expect(closeBrowserWindow(8)).resolves.toBeUndefined()
     expect(mockLogger.warn).toHaveBeenCalledWith('Browser teardown on window close failed', expect.objectContaining({ windowId: 8 }))
 
     const closeProject = vi.spyOn(runtime.tabs, 'closeProject')
     const closeLocal = vi.spyOn(runtime.localFiles, 'closeProject')
+    closeWindow.mockClear()
     await runtime.teardown.run('/projects/a')
+    expect(closeWindow).not.toHaveBeenCalled()
     expect(closeProject).toHaveBeenCalledWith('/projects/a')
     // The project's served local folders close in the same stage, after its tabs.
     expect(closeLocal).toHaveBeenCalledWith('/projects/a')

@@ -213,6 +213,10 @@ export default defineConfig({
         'src/renderer/src/components/Panels/BrowserPanel/WidthPresetMenu.tsx': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/renderer/src/components/Panels/BrowserPanel/ForgetDataDialog.tsx': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 99.05/100/90.69/97.61 – the uncovered branch is the engine without :focus-visible
+        'src/renderer/src/components/Panels/BrowserPanel/ToolbarTooltip.tsx': { lines: 98, functions: 98, branches: 88, statements: 95 },
+        // measured 100/100/100/100
+        'src/renderer/src/components/Panels/BrowserPanel/PickAnnouncer.tsx': { lines: 98, functions: 98, branches: 98, statements: 98 },
       },
       exclude: [
         'node_modules/**',

@@ -7,7 +7,7 @@ const { mockLogger } = vi.hoisted(() => ({
 }))
 vi.mock('../LoggingService', () => ({ logger: mockLogger }))
 
-import { BrowserProjectTeardown, leavesProject } from './browserProjectTeardown'
+import { BrowserProjectTeardown, leavesProject, tabInScope, type TeardownScope } from './browserProjectTeardown'
 import { ProjectSessionStore, type ProjectSessionSnapshot } from '../session/ProjectSession'
 
 const snap = (realRoot: string, caseSensitive = true): Omit<ProjectSessionSnapshot, 'generation'> => ({
@@ -16,6 +16,9 @@ const snap = (realRoot: string, caseSensitive = true): Omit<ProjectSessionSnapsh
   caseSensitive,
   ownerWebContentsId: 1
 })
+
+/** A scope as the old string root the steps used to get: the project root, or `window:<id>`. */
+const at = (scope: TeardownScope): string => (scope.kind === 'project' ? scope.projectRoot : `window:${scope.windowId}`)
 
 describe('BrowserProjectTeardown (ADR 0009 decision 14, A10)', () => {
   let teardown: BrowserProjectTeardown
@@ -29,12 +32,12 @@ describe('BrowserProjectTeardown (ADR 0009 decision 14, A10)', () => {
 
   function recordAll(): void {
     // Registered in reverse to show the stage, not the registration, decides the order
-    teardown.onStage('closeViews', (root) => void order.push(`closeViews:${root}`))
-    teardown.onStage('abortCaptureWrites', async (root) => {
+    teardown.onStage('closeViews', (scope) => void order.push(`closeViews:${at(scope)}`))
+    teardown.onStage('abortCaptureWrites', async (scope) => {
       await Promise.resolve()
-      order.push(`abortCaptureWrites:${root}`)
+      order.push(`abortCaptureWrites:${at(scope)}`)
     })
-    teardown.onStage('endPick', (root) => void order.push(`endPick:${root}`))
+    teardown.onStage('endPick', (scope) => void order.push(`endPick:${at(scope)}`))
   }
 
   it('ends pick, then aborts capture writes, then closes views', async () => {
@@ -55,6 +58,25 @@ describe('BrowserProjectTeardown (ADR 0009 decision 14, A10)', () => {
     expect(order).toEqual(['closeViews'])
   })
 
+  it('runs the same three stages, in the same order, for a closing window', async () => {
+    recordAll()
+    await teardown.runForWindow(7)
+    expect(order).toEqual(['endPick:window:7', 'abortCaptureWrites:window:7', 'closeViews:window:7'])
+  })
+
+  it('queues a window teardown behind a project teardown already running', async () => {
+    recordAll()
+    await Promise.all([teardown.run('/old'), teardown.runForWindow(3)])
+    expect(order).toEqual([
+      'endPick:/old',
+      'abortCaptureWrites:/old',
+      'closeViews:/old',
+      'endPick:window:3',
+      'abortCaptureWrites:window:3',
+      'closeViews:window:3'
+    ])
+  })
+
   it('logs a failing step and still runs the rest', async () => {
     teardown.onStage('endPick', () => {
       throw new Error('pick gone')
@@ -68,10 +90,10 @@ describe('BrowserProjectTeardown (ADR 0009 decision 14, A10)', () => {
   })
 
   it('runs teardowns one at a time, in order', async () => {
-    teardown.onStage('endPick', async (root) => {
-      order.push(`start:${root}`)
+    teardown.onStage('endPick', async (scope) => {
+      order.push(`start:${at(scope)}`)
       await Promise.resolve()
-      order.push(`end:${root}`)
+      order.push(`end:${at(scope)}`)
     })
     await Promise.all([teardown.run('/a'), teardown.run('/b')])
     expect(order).toEqual(['start:/a', 'end:/a', 'start:/b', 'end:/b'])
@@ -105,6 +127,17 @@ describe('BrowserProjectTeardown (ADR 0009 decision 14, A10)', () => {
       store.commit(null)
       await teardown.run('/flush')
       expect(order.filter((e) => e.startsWith('endPick'))).toEqual(['endPick:/flush'])
+    })
+  })
+
+  describe('tabInScope', () => {
+    const tab = { projectRoot: '/Projects/A', caseSensitive: false, windowId: 4 }
+    it('matches a project by path, with the tab\'s case rule, and a window by id', () => {
+      expect(tabInScope({ kind: 'project', projectRoot: '/projects/a' }, tab)).toBe(true)
+      expect(tabInScope({ kind: 'project', projectRoot: '/projects/a' }, { ...tab, caseSensitive: true })).toBe(false)
+      expect(tabInScope({ kind: 'project', projectRoot: '/projects/b' }, tab)).toBe(false)
+      expect(tabInScope({ kind: 'window', windowId: 4 }, tab)).toBe(true)
+      expect(tabInScope({ kind: 'window', windowId: 5 }, tab)).toBe(false)
     })
   })
 

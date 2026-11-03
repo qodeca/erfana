@@ -25,12 +25,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { DockviewApi } from 'dockview'
 import type { ClosePickReason, RefineMoveRequest } from '../../../../../shared/ipc/browser-tab-pick-schema'
-import { IDLE_PICK, useBrowserPickStore, type BrowserPickTab } from '../../../stores/useBrowserPickStore'
+import { useShallow } from 'zustand/react/shallow'
+import { IDLE_PICK, useBrowserPickStore, type BrowserPickTab, type PickTabView } from '../../../stores/useBrowserPickStore'
 import { useActivityBarStore } from '../../../stores/useActivityBarStore'
 import { browserTabGateway } from '../../../services/browserTabGateway'
 import { browserStill, PICK_STILL_HOLDER } from '../../../services/browser/browserStill'
 import { executePromptTemplate } from '../../../utils/panelUtils'
 import { openFileInPanel } from '../../../utils/openFileInPanel'
+import { joinPath } from '../../../utils/fileUtils'
 import { showErrorToast, showInfoToast } from '../../../utils/toastHelpers'
 import { logger } from '../../../utils/logger'
 import { ACTION_NAMES, sendCapture, type SendAction } from './browserSend'
@@ -65,7 +67,8 @@ export interface UseBrowserPickOptions {
 
 /** What the panel draws and wires. */
 export interface BrowserPick {
-  readonly tab: BrowserPickTab
+  /** The tab's pick state without the hover label (the pick row reads that alone). */
+  readonly tab: PickTabView
   /** `panel` or `dialog` while a capture is held, else `none`. */
   readonly surface: 'none' | 'panel' | 'dialog'
   readonly dialogAction: DialogAction | null
@@ -90,14 +93,20 @@ export interface BrowserPick {
   readonly dismissNotice: () => void
 }
 
-function warn(what: string): (error: unknown) => void {
-  return error => logger.warn(what, { error: error instanceof Error ? error.message : String(error) })
+/** `tab` without its hover label: a hover changes nothing the panel draws. */
+function withoutLabel(tab: BrowserPickTab): PickTabView {
+  return {
+    on: tab.on,
+    note: tab.note,
+    noteSeq: tab.noteSeq,
+    capturing: tab.capturing,
+    capture: tab.capture,
+    frozen: tab.frozen
+  }
 }
 
-/** `relative` under `root`, with `root`'s own separator (main answers project-relative paths). */
-function underProject(root: string, relative: string): string {
-  const sep = root.includes('\\') && !root.includes('/') ? '\\' : '/'
-  return `${root.replace(/[\\/]+$/, '')}${sep}${relative.replace(/[\\/]/g, sep)}`
+function warn(what: string): (error: unknown) => void {
+  return error => logger.warn(what, { error: error instanceof Error ? error.message : String(error) })
 }
 
 function showTerminalPanel(): void {
@@ -113,7 +122,8 @@ function showTerminalPanel(): void {
  */
 export function useBrowserPick(options: UseBrowserPickOptions): BrowserPick {
   const { tabId, live, target, containerApi, projectPath, focusPage, openTargetMenu, startTerminal } = options
-  const tab = useBrowserPickStore(s => (tabId === null ? IDLE_PICK : (s.byTab.get(tabId) ?? IDLE_PICK)))
+  // Shallow-compared without the label, so each hovered element does not re-render the whole panel (performance review).
+  const tab = useBrowserPickStore(useShallow(s => withoutLabel(tabId === null ? IDLE_PICK : (s.byTab.get(tabId) ?? IDLE_PICK))))
   const capture = tab.capture
   const captureId = capture?.captureId ?? null
   const [dialog, setDialog] = useState<{ captureId: string; action: DialogAction } | null>(null)
@@ -155,6 +165,10 @@ export function useBrowserPick(options: UseBrowserPickOptions): BrowserPick {
     },
     [tabId, captureId, drop, focusPage]
   )
+
+  // Like every close but a hidden tab's, the page change's ends the typed instruction (state adjusted
+  // during render, React's pattern for state derived from a change).
+  if (afterNavigation && dialogAction === null && captureId !== null && draft !== '') setDraftText('')
 
   // A page change: the panel closes with a note and main lets the capture go; the dialog stays (025-FR-053).
   useEffect(() => {
@@ -302,7 +316,8 @@ export function useBrowserPick(options: UseBrowserPickOptions): BrowserPick {
   const openCapture = useCallback(
     (contextPath: string) => {
       if (projectPath === null) return
-      if (openFileInPanel(containerApi, underProject(projectPath, contextPath)) === undefined) {
+      // Main answers the capture's path relative to the project.
+      if (openFileInPanel(containerApi, joinPath(projectPath, contextPath)) === undefined) {
         showErrorToast("Couldn't open the capture", 'The editor is not ready.')
       }
     },

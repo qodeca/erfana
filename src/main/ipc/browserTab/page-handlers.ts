@@ -9,16 +9,13 @@
  * S-17). Results go back as `browser-tab:findResult` and
  * `browser-tab:state` events, to the owning window only (`BrowserTabService`).
  *
- * As in `browser-tab-handlers.ts`: registered through `registry.ts`
- * (identity, top-level frame, renderer URL and the window kind's channel
- * allow-list), the exact-URL {@link isTrustedSender} checked again, the
- * payload parsed with its strict zod schema, the window resolved from the
- * sender – never from the payload – and never a throw: a refusal is an
+ * As in `browser-tab-handlers.ts`: registered through `registry.ts`, then
+ * the identity gate (`tabRequestGate.ts`), and never a throw: a refusal is an
  * `{ error }` answer, or nothing for a request with no answer. The project
  * of `clearData`, `forget` and `suggest` is the one this process holds open:
  * one project per Erfana window process.
  */
-import { BrowserWindow, type IpcMainInvokeEvent } from 'electron'
+import type { IpcMainInvokeEvent } from 'electron'
 import { BROWSER_TAB_CHANNELS } from '../../../shared/ipc/browser-tab-channels'
 import {
   PageClipboardRequestSchema,
@@ -45,6 +42,7 @@ import { logger } from '../../services/LoggingService'
 import { redactedLogError } from '../../utils/redactUserInput'
 import { registerHandle, unregisterHandle } from '../registry'
 import { isTrustedSender as defaultIsTrustedSender } from '../senderValidation'
+import { createTabGate, resolveWindowId as defaultResolveWindowId, type Parser } from './tabRequestGate'
 
 export interface BrowserTabPageHandlerDeps {
   readonly tabs: Pick<BrowserTabService, 'pageFor'>
@@ -72,46 +70,22 @@ export const BROWSER_TAB_PAGE_CHANNELS = [
   C.pageClipboard
 ] as const
 
-/** A zod schema's `safeParse`, as far as these handlers use it. */
-interface Parser<T> {
-  safeParse(value: unknown): { success: true; data: T } | { success: false; error: { message: string } }
-}
-
 const REFUSED = 'Request refused'
 
 /** Register the page channels; returns the function that removes them. */
 export function registerBrowserTabPageHandlers(deps: BrowserTabPageHandlerDeps): () => void {
-  const isTrusted = deps.isTrustedSender ?? defaultIsTrustedSender
-  const resolveWindowId =
-    deps.resolveWindowId ??
-    ((event) => {
-      const window = BrowserWindow.fromWebContents(event.sender)
-      return window === null || window.isDestroyed() ? null : window.id
-    })
-
-  /** The parsed payload and the sender's window id, when the sender is trusted and the payload parses. */
-  function accept<T>(channel: string, event: IpcMainInvokeEvent, schema: Parser<T>, arg: unknown): { windowId: number; data: T } | null {
-    if (!isTrusted(event)) {
-      logger.warn('Rejected a browser tab request from an untrusted sender', { channel })
-      return null
-    }
-    const parsed = schema.safeParse(arg)
-    if (!parsed.success) {
-      logger.warn('Rejected a browser tab request with an invalid payload', { channel, error: parsed.error.message })
-      return null
-    }
-    const windowId = resolveWindowId(event)
-    return windowId === null ? null : { windowId, data: parsed.data }
-  }
+  const { accept, acceptTab } = createTabGate<IpcMainInvokeEvent, number, BrowserTabPage>({
+    isTrusted: deps.isTrustedSender ?? defaultIsTrustedSender,
+    resolveWindow: deps.resolveWindowId ?? defaultResolveWindowId,
+    tabOf: (windowId, tabId) => deps.tabs.pageFor(windowId, tabId)
+  })
 
   /** Run `act` on the named tab's page features when the sender's window owns the tab; never throws. */
   function onPage<T extends { tabId: string }>(channel: string, schema: Parser<T>, act: (page: BrowserTabPage, data: T) => void) {
     return (event: IpcMainInvokeEvent, arg: unknown): void => {
-      const accepted = accept(channel, event, schema, arg)
-      if (accepted === null) return
       try {
-        const page = deps.tabs.pageFor(accepted.windowId, accepted.data.tabId)
-        if (page !== null) act(page, accepted.data)
+        const accepted = acceptTab(channel, event, schema, arg)
+        if (accepted !== null) act(accepted.tab, accepted.data)
       } catch (error) {
         logger.error('Browser tab request failed', redactedLogError(error), { channel })
       }

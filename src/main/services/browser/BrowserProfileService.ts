@@ -38,8 +38,8 @@
  * 10. checks the keyring (`browserKeyringState`, 025-FR-018): the canary and
  *    the recorded backend decide the notices of the project's first tab.
  *
- * The `erfana-local` handler (commit 11) and the trust store join them after
- * step 10 once they exist, before any page loads.
+ * Local files are served by loopback folder servers (ADR 0012 option 4), not
+ * by an `erfana-local` handler on the session.
  */
 import { join } from 'node:path'
 import type { Clock } from '../../../shared/clock'

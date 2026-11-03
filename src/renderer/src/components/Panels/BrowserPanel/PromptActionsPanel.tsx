@@ -34,7 +34,7 @@ import type { RefineMoveRequest } from '../../../../../shared/ipc/browser-tab-pi
 import type { HeldCapture } from '../../../stores/useBrowserPickStore'
 import { ACTION_NAMES, type SendAction } from './browserSend'
 import { cutPath } from './pickPanel.logic'
-import type { TargetBanner } from './pickRow.logic'
+import { spokenSize, type TargetBanner } from './pickRow.logic'
 import { BROWSER_TEST_IDS } from './browserTestIds'
 
 /** How long the element chip shows as changed after a move. */
@@ -71,6 +71,17 @@ const ACTION_DESC: Readonly<Record<SendAction, string>> = {
   ask: 'Ask the agent a question about this element',
   change: 'Ask the agent to change the code behind this element',
   prompt: 'Write your own prompt about this element'
+}
+
+/**
+ * The panel's accessible name (deck *Panel*): "Actions for {tag}, {size spoken}".
+ *
+ * @param name - The element's name ("span#save-label")
+ * @param size - Main's `{w} × {h}`
+ * @returns The name
+ */
+export function panelName(name: string, size: string): string {
+  return `Actions for ${name}, ${spokenSize(size)}`
 }
 
 /**
@@ -164,12 +175,15 @@ export function PromptActionsPanel(props: PromptActionsPanelProps): JSX.Element 
   const crumbs = summary.ancestors.slice(0, -1)
   const path = cutPath(crumbs, PATH_CRUMBS)
   const titleId = `erf-brw-actions-${capture.captureId}`
+  const nameId = `${titleId}-name`
+  const footerId = `${titleId}-footer`
   return (
     <div
       ref={rootRef}
       role="dialog"
       aria-modal="false"
-      aria-labelledby={titleId}
+      aria-labelledby={nameId}
+      aria-describedby={footerId}
       className={`erf-brw-actions erf-picker-owned${props.sheet ? ' erf-brw-actions--sheet' : ''}`}
       style={props.style}
       data-testid={BROWSER_TEST_IDS.PROMPT_ACTIONS}
@@ -178,6 +192,9 @@ export function PromptActionsPanel(props: PromptActionsPanelProps): JSX.Element 
         pressRef.current = event.timeStamp
       }}
     >
+      <span id={nameId} className="erf-brw-hidden">
+        {panelName(summary.name, summary.size)}
+      </span>
       <div className="erf-brw-actions__header">
         <button
           type="button"
@@ -254,8 +271,8 @@ export function PromptActionsPanel(props: PromptActionsPanelProps): JSX.Element 
       <ElementDetails text={summary.text} source={summary.source} />
       {(summary.changedAfterPick || props.frozen) && (
         <p className="erf-brw-actions__chips">
-          {props.frozen && <span className="erf-brw-chip">Page paused</span>}
-          {summary.changedAfterPick && <span className="erf-brw-chip">The page changed after the pick</span>}
+          {props.frozen && <span className="erf-brw-tag">Page paused</span>}
+          {summary.changedAfterPick && <span className="erf-brw-tag">The page changed after the pick</span>}
         </p>
       )}
       {banner !== null && (
@@ -268,18 +285,18 @@ export function PromptActionsPanel(props: PromptActionsPanelProps): JSX.Element 
             type="button"
             data-tab-stop=""
             data-action={action}
-            className={`erf-brw-actions__action${action === 'explain' ? ' erf-brw-actions__action--primary' : ''}`}
+            className="erf-brw-actions__action"
             aria-label={ACTION_NAMES[action]}
             aria-description={ACTION_DESC[action]}
             aria-disabled={busy !== null && busy !== action ? true : undefined}
             aria-busy={busy === action ? true : undefined}
             onClick={event => onClickAction(event, action)}
           >
-            {busy === action ? 'Sending…' : ACTION_LABEL[action]}
+            <span>{busy === action ? 'Sending…' : ACTION_LABEL[action]}</span>
           </button>
         ))}
       </div>
-      <div className="erf-brw-actions__footer">
+      <div id={footerId} className="erf-brw-actions__footer">
         {props.target}
         <span className="erf-brw-actions__hint">↑ ↓ parent and child · Tab next action · Esc closes the panel</span>
       </div>

@@ -4286,7 +4286,7 @@
       "quote": "- Portal rendering (#portal-root)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:153",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:160",
       "match": "const portalRoot = document.getElementById('portal-root')"
     },
     {
@@ -4296,7 +4296,7 @@
       "quote": "- Shortcut hints are exposed as `aria-keyshortcuts` (`⌘C` → `Meta+C`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:419",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:427",
       "match": "aria-keyshortcuts={toAriaKeyShortcuts(item.shortcut)}"
     },
     {
@@ -8769,7 +8769,7 @@
       "quote": "`FileContextMenuStrategy` shows it for `isHtmlFile(name)` (`fileUtils.ts`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/utils/fileUtils.ts:226",
+      "source": "src/renderer/src/utils/fileUtils.ts:262",
       "match": "export function isHtmlFile(fileName: string): boolean",
       "note": "Cited fileUtils.ts:207; isHtmlFile is at :226. Line number dropped."
     },
@@ -16476,7 +16476,7 @@
       "quote": "Menu dismisses on Escape, Tab, click outside, or action execution",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:115",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:122",
       "match": "Escape and Tab close and return focus",
       "note": "Tab also closes the menu."
     },
@@ -25063,7 +25063,7 @@
       "quote": "focus moves to the first item on open, roving tabindex",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:412",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:420",
       "match": "tabIndex={index === current ? 0 : -1}"
     },
     {
@@ -25073,7 +25073,7 @@
       "quote": "and Escape or Tab close it and return focus to the opener (#90)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:351",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:358",
       "match": "case 'Tab':"
     },
     {
@@ -25347,7 +25347,7 @@
       "quote": "Home / End, Enter / Space, typeahead",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:339",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:346",
       "match": "case 'Home':"
     },
     {
@@ -30047,7 +30047,7 @@
       "quote": "| Open and use any right-click menu | menus |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:352",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:359",
       "match": "// A menu is modal to the keyboard while open: Tab closes it rather",
       "test": "e2e/context-menu-keyboard.e2e.ts"
     },
@@ -34168,7 +34168,7 @@
       "quote": "[preview HTML](how-to/preview-an-html-page.md)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/utils/fileUtils.ts:228",
+      "source": "src/renderer/src/utils/fileUtils.ts:264",
       "match": "return lower.endsWith('.html') || lower.endsWith('.htm')",
       "note": "HTML files are detected for the HTML preview panel (HtmlPreviewPanel)."
     },
@@ -37226,7 +37226,7 @@
       "quote": "| Move to the previous or next item; first or last item |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:340",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:347",
       "match": "next = firstItem(items)"
     },
     {
@@ -37236,7 +37236,7 @@
       "quote": "| Choose the focused item | <kbd>Enter</kbd> or <kbd>Space</kbd> | Same |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:349",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:356",
       "match": "if (current >= 0) handleItemClick(items[current])"
     },
     {
@@ -37246,7 +37246,7 @@
       "quote": "| Jump to an item by name | Type its first letters | Same |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:360",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:367",
       "match": "next = findByTypeahead(event.key)"
     },
     {
@@ -37256,7 +37256,7 @@
       "quote": "| Close the menu | <kbd>Esc</kbd> or <kbd>Tab</kbd> | Same |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:351",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:358",
       "match": "case 'Tab':"
     },
     {
@@ -37266,7 +37266,7 @@
       "quote": "A menu opens with focus on its first item",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:108",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:115",
       "match": "* - Focus moves to the first item when the menu opens."
     },
     {
@@ -37276,7 +37276,7 @@
       "quote": "Greyed-out items can be reached but do nothing.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:112",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:119",
       "match": "*   disabled items are NOT, so they stay discoverable (`aria-disabled` only)."
     },
     {
@@ -37472,7 +37472,7 @@
       "quote": "closing it puts focus back where it was. Greyed-out",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:115",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:122",
       "match": "Escape and Tab close and return focus to whatever had it at open."
     },
     {
@@ -38157,7 +38157,7 @@
       "quote": "then use the arrow keys and <kbd>Enter</kbd>",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:333",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:340",
       "match": "case 'ArrowDown':",
       "test": "e2e/context-menu-keyboard.e2e.ts"
     },
@@ -55373,7 +55373,7 @@
       "quote": "**Reload** becomes **Stop loading** while a page loads",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/BrowserPanel/NavigationRow.tsx:201",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/NavigationRow.tsx:202",
       "match": "aria-label=\"Stop loading\""
     },
     {
@@ -55383,7 +55383,7 @@
       "quote": "**Find in page…**, **Open in system browser**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/BrowserPanel/MoreMenu.tsx:82",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/MoreMenu.tsx:84",
       "match": "{ label: 'Open in system browser', action: actions.openInSystemBrowser"
     },
     {
@@ -55393,7 +55393,7 @@
       "quote": "**Clear browsing data…** and **Forget this project's browser data…**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/BrowserPanel/MoreMenu.tsx:86",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/MoreMenu.tsx:88",
       "match": "{ label: \"Forget this project's browser data…\", action: actions.forget, danger: true }"
     },
     {
@@ -55423,7 +55423,7 @@
       "quote": "**Parent element** and **Child element** (or <kbd>↑</kbd> and <kbd>↓</kbd>) move the pick",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/BrowserPanel/PromptActionsPanel.tsx:187",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/PromptActionsPanel.tsx:204",
       "match": "title=\"Parent element (↑)\""
     },
     {
@@ -55453,7 +55453,7 @@
       "quote": "**Send** (or <kbd>⌘Enter</kbd> / <kbd>Ctrl+Enter</kbd>) sends it",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/BrowserPanel/InstructionDialog.tsx:207",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/InstructionDialog.tsx:210",
       "match": "{busy ? 'Sending…' : 'Send'}"
     },
     {
@@ -55473,7 +55473,7 @@
       "quote": "with **Choose terminal**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/BrowserPanel/PromptActionsPanel.tsx:298",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/PromptActionsPanel.tsx:315",
       "match": "chooseTerminal: 'Choose terminal',"
     },
     {
@@ -55553,7 +55553,7 @@
       "quote": "reads **No keyring – cannot store passwords safely**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/BrowserPanel/SignInBox.tsx:124",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/SignInBox.tsx:126",
       "match": "'No keyring – cannot store passwords safely'"
     },
     {
@@ -55783,7 +55783,7 @@
       "quote": "Erfana's log file records its address with the query string",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/browser/page/loadFailureLog.ts:50",
+      "source": "src/main/services/browser/page/loadFailureLog.ts:73",
       "match": "logger.info('A browser tab page failed to load', { code, url: failedRequestUrl(url) })"
     },
     {
@@ -55793,7 +55793,7 @@
       "quote": "A failed search is logged without its text.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/browser/page/loadFailureLog.ts:46",
+      "source": "src/main/services/browser/page/loadFailureLog.ts:64",
       "match": "logger.info('search load failed', { code })"
     },
     {

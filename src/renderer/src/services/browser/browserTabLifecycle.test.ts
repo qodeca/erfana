@@ -23,6 +23,8 @@ import {
 } from './browserTabLifecycle'
 import { useBrowserChromeStore } from '../../stores/useBrowserChromeStore'
 import { useBrowserTabStore } from '../../stores/useBrowserTabStore'
+import { useBrowserStillStore } from '../../stores/useBrowserStillStore'
+import { browserStill, PICK_STILL_HOLDER } from './browserStill'
 import { logger } from '../../utils/logger'
 
 const store = useBrowserTabStore.getState
@@ -103,6 +105,16 @@ describe('closeBrowserTab', () => {
     // The editor tab is already gone: Erfana's close, which never asks (S-31).
     expect(gateway.close).toHaveBeenCalledWith('browser-tab-1', false)
     expect(store().tabOf('browser-panel-1')).toBeNull()
+  })
+
+  it('releases every still holder and drops the tab\'s still image (perf review: no leaked bitmap)', async () => {
+    await ensureBrowserTab('browser-panel-1')
+    useBrowserStillStore.getState().set('browser-tab-1', { image: { data: new Uint8Array(4), width: 1, height: 1 }, source: 'pick' })
+    void browserStill.showPick('browser-tab-1', PICK_STILL_HOLDER, { data: new Uint8Array(4), width: 1, height: 1 })
+    expect(browserStill.holds('browser-tab-1', PICK_STILL_HOLDER)).toBe(true)
+    closeBrowserTab('browser-panel-1')
+    expect(browserStill.holds('browser-tab-1', PICK_STILL_HOLDER)).toBe(false)
+    expect(useBrowserStillStore.getState().byTab.has('browser-tab-1')).toBe(false)
   })
 
   it('ignores a panel that hosts nothing', () => {

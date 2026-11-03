@@ -24,7 +24,7 @@ import { BROWSER_TAB_CHANNELS } from '../../shared/ipc/browser-tab-channels'
 const TAB = 'browser-tab-1'
 const host = { id: 3, isDestroyed: () => false }
 let committedUrl: string | null = 'https://www.example.test/docs'
-const tab = { windowId: 3, state: () => ({ committedUrl }) }
+const tab = { windowId: 3, pageAddress: () => committedUrl }
 const service = {
   close: vi.fn((): boolean => true),
   tabOf: vi.fn((windowId: number, tabId: string) => (windowId === 3 && tabId === TAB ? tab : null))

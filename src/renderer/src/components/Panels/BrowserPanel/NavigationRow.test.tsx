@@ -56,18 +56,14 @@ describe('NavigationRow', () => {
     expect(group).toHaveAccessibleDescription('No earlier or later page')
     expect(screen.getByRole('button', { name: 'Back' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Forward' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Back' })).toHaveAttribute(
-      'title',
-      'Back – no earlier page'
-    )
+    // Toolbar tooltips are the control's description and `data-tip`, never a native title (025-AC-065).
+    expect(screen.getByRole('button', { name: 'Back' })).toHaveAttribute('data-tip', 'Back – no earlier page')
+    expect(screen.getByRole('button', { name: 'Back' })).not.toHaveAttribute('title')
     expect(screen.getByRole('button', { name: 'Reload' })).toHaveAttribute(
       'aria-keyshortcuts',
       'Meta+R'
     )
-    expect(screen.getByRole('button', { name: 'DevTools' })).toHaveAttribute(
-      'title',
-      'DevTools (F12)'
-    )
+    expect(screen.getByRole('button', { name: 'DevTools' })).toHaveAccessibleDescription('DevTools (F12)')
   })
 
   it('runs Back, Forward, Reload and DevTools, and shows Stop while loading', () => {
@@ -76,7 +72,7 @@ describe('NavigationRow', () => {
     expect(screen.getByRole('group', { name: 'Navigation' })).not.toHaveAttribute(
       'aria-describedby'
     )
-    expect(screen.getByRole('button', { name: 'Back' })).toHaveAttribute('title', 'Back (⌘[)')
+    expect(screen.getByRole('button', { name: 'Back' })).toHaveAccessibleDescription('Back (⌘[)')
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
     fireEvent.click(screen.getByRole('button', { name: 'Forward' }))
     fireEvent.click(screen.getByRole('button', { name: 'Reload' }))
@@ -92,10 +88,7 @@ describe('NavigationRow', () => {
     expect(stop).not.toHaveAttribute('aria-keyshortcuts')
     fireEvent.click(stop)
     expect(p.onStop).toHaveBeenCalledOnce()
-    expect(screen.getByRole('button', { name: 'Show DevTools' })).toHaveAttribute(
-      'title',
-      'Show DevTools (F12)'
-    )
+    expect(screen.getByRole('button', { name: 'Show DevTools' })).toHaveAccessibleDescription('Show DevTools (F12)')
   })
 
   it('hands focus from Back to Forward when Back disables itself', () => {

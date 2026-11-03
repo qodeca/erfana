@@ -25,6 +25,7 @@ import { ContextMenu, type ContextMenuItem } from '../../ContextMenu/ContextMenu
 import { formatShortcut } from '../../../utils/shortcutLabel'
 import { canZoom, widthPresetItems } from './browserMenus.logic'
 import type { StillSurface } from './useStillSurface'
+import { tooltipProps } from './ToolbarTooltip'
 
 /** What More's items do. */
 export interface MoreMenuActions {
@@ -61,6 +62,7 @@ export function moreMenuItems(facts: MoreMenuFacts, actions: MoreMenuActions): C
   const widths: ContextMenuItem[] = widthPresetItems().map(preset => ({
     label: preset.label,
     icon: preset.id === facts.widthPreset ? <Check {...ICON} /> : <span className="erf-brw-more__blank" />,
+    checked: preset.id === facts.widthPreset,
     action: () => actions.widthPreset(preset.id),
     ...(preset.reason === undefined ? {} : { reason: preset.reason })
   }))
@@ -123,7 +125,7 @@ export function MoreMenu({ actions, buttonRef, still, navItems = [], ...facts }:
         type="button"
         className="erf-brw-tool erf-brw-tool--more"
         aria-label="More"
-        title="More actions"
+        {...tooltipProps('More actions')}
         aria-haspopup="menu"
         aria-expanded={at !== null}
         onClick={() => (at === null ? open() : close())}

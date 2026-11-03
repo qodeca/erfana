@@ -15,11 +15,13 @@
  * - "Sends to" carries the target button (OD-18); the banner slot shows a
  *   guard after a refused send, and "The page reloaded – …" when the page
  *   navigated while the dialog was open – Send then uses the held capture.
- * - The rows above are `inert` meanwhile (the panel does that): the dialog
- *   is modal within the browser tab.
+ * - The rows above are `inert` meanwhile (the panel does that), but the
+ *   dialog traps nothing: the terminal and the rest of Erfana stay reachable,
+ *   so it is `aria-modal="false"` – a dialog never claims a modality it does
+ *   not enforce (design § Instruction dialog, M-46; Dialog/CLAUDE.md).
  */
 import { useEffect, useId, useRef, useState } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, CircleX } from 'lucide-react'
 import { formatShortcut } from '../../../utils/shortcutLabel'
 import type { SendAction } from './browserSend'
 import { BannerSlot } from './PromptActionsPanel'
@@ -142,7 +144,7 @@ export function InstructionDialog({
     <div
       ref={dialogRef}
       role="dialog"
-      aria-modal="true"
+      aria-modal="false"
       aria-labelledby={titleId}
       className={`erf-brw-actions erf-brw-dialog erf-picker-owned${sheet ? ' erf-brw-actions--sheet' : ''}`}
       style={style}
@@ -157,7 +159,7 @@ export function InstructionDialog({
         <h2 id={titleId} className="erf-brw-dialog__title">
           {copy.title}
         </h2>
-        {frozen && <span className="erf-brw-chip">Page paused</span>}
+        {frozen && <span className="erf-brw-tag">Page paused</span>}
       </div>
       {pageReloaded && (
         <p className="erf-brw-banner erf-brw-banner--info erf-brw-banner__text" role="status">
@@ -184,7 +186,8 @@ export function InstructionDialog({
       />
       {invalid && (
         <p id={errorId} className="erf-brw-dialog__error" role="alert">
-          {copy.empty}
+          <CircleX size={12} strokeWidth={2} aria-hidden="true" />
+          <span>{copy.empty}</span>
         </p>
       )}
       <p id={hintId} className="erf-brw-dialog__hint">

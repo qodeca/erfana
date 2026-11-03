@@ -19,6 +19,7 @@ import type { BrowserTabState } from '../../../stores/useBrowserTabStore'
 import { sentenceHost } from './erfanaPageCopy'
 import { BROWSER_TEST_IDS } from './browserTestIds'
 import { browserShortcut } from './browserShortcuts'
+import { tooltipProps } from './ToolbarTooltip'
 
 /** Props for {@link AddressChips}. */
 export interface AddressChipsProps {
@@ -107,7 +108,7 @@ export function AddressChips({ state, popupBlocked, addressRef, onResetZoom, onS
           data-fold-step="3"
           aria-label={`${zoom}% zoom, reset to 100%`}
           aria-keyshortcuts={reset.aria}
-          title={`Reset zoom to 100% (${reset.label})`}
+          {...tooltipProps(`Reset zoom to 100% (${reset.label})`)}
           onClick={onResetZoom}
         >
           {zoom}%
@@ -119,7 +120,7 @@ export function AddressChips({ state, popupBlocked, addressRef, onResetZoom, onS
           type="button"
           className="erf-brw-chip erf-brw-chip--warning"
           aria-label="Pop-up blocked, show options"
-          title="Pop-up blocked"
+          {...tooltipProps('Pop-up blocked')}
           onClick={onShowPopupRow}
         >
           <SquareArrowOutUpRight {...ICON} />

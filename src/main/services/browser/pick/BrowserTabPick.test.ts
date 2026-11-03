@@ -7,6 +7,8 @@ vi.mock('../../LoggingService', () => ({ logger: { debug: vi.fn(), info: vi.fn()
 import { CROSSHAIR_CSS } from './pickModeSwitch'
 import { STILL_MAX_EDGE_PX } from './BrowserTabPick'
 import { pickHarness, settle, type PickHarness } from './__test-helpers__/pickHarness'
+import { CHAIN_REST_MS } from './pickHover'
+import { PICK_CHAIN } from '../cdp/cdpPickFunctions'
 
 /** Pick mode on, the pointer over the label, its highlight shown. */
 async function hovering(h: PickHarness, x = 35, y = 30): Promise<void> {
@@ -181,6 +183,38 @@ describe('BrowserTabPick', () => {
       h.pick.refine('parent')
       await settle()
       expect(h.events.at(-1)).toMatchObject({ kind: 'note', note: 'elementGone' })
+    })
+
+    it('reads the chain only once the pointer rests on an element, never for one it only crossed', async () => {
+      const chainReads = (): number =>
+        h.page.cdp.calls('Runtime.callFunctionOn').filter((c) => (c.params as { functionDeclaration?: string }).functionDeclaration === PICK_CHAIN.source).length
+      await hovering(h)
+      expect(chainReads()).toBe(0)
+      h.clock.advance(CHAIN_REST_MS - 1)
+      h.contents.mouse('mouseMove', 100, 45) // onto the button before the label's rest ended
+      await settle()
+      h.clock.advance(CHAIN_REST_MS - 1)
+      await settle()
+      expect(chainReads()).toBe(0)
+      h.clock.advance(1)
+      await settle()
+      expect(chainReads()).toBe(1)
+      // Up then walks the chain already read.
+      h.pick.refine('parent')
+      await settle()
+      expect(chainReads()).toBe(1)
+      expect(h.pick.highlight.record?.label).toMatch(/^div#outer /)
+    })
+
+    it('reads the chain at the first Up when the pointer has not rested yet, and drops the rest timer', async () => {
+      await hovering(h)
+      h.pick.refine('parent')
+      await settle()
+      expect(h.pick.highlight.record?.label).toMatch(/^button#save /)
+      const sent = h.page.cdp.sent.length
+      h.clock.advance(CHAIN_REST_MS)
+      await settle()
+      expect(h.page.cdp.sent.length).toBe(sent)
     })
 
     it('moving onto the same element keeps the refined highlight', async () => {

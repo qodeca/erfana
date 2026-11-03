@@ -12,15 +12,15 @@
  * `https` only, through the checked external-open path). The tab state goes back as the `browser-tab:state` event, to
  * the owning window only (`BrowserTabService`).
  *
- * Every handler is registered through `registry.ts` (identity, top-level
- * frame, renderer URL and the window kind's channel allow-list), checks the
- * exact-URL {@link isTrustedSender} again, parses its payload with the strict
- * zod schema, resolves the window from the sender – never from the payload –
- * and never throws: a refusal is an `{ error }` answer, or nothing for a
- * request with no answer.
+ * Every handler is registered through `registry.ts` and runs the identity
+ * gate (`browserTab/tabRequestGate.ts`): the exact-URL sender check again,
+ * the strict zod schema, the window from the sender – never from the payload
+ * – and the tab owned by that window. It never throws: a refusal is an
+ * `{ error }` answer, or nothing for a request with no answer.
  */
 import { fileURLToPath } from 'node:url'
 import { BrowserWindow, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
+import { createTabGate, guarded } from './browserTab/tabRequestGate'
 import { classifyAddressInput } from '../../shared/browser/addressInput'
 import { BROWSER_TAB_CHANNELS, BROWSER_TAB_EVENTS, type BrowserTabChannel } from '../../shared/ipc/browser-tab-channels'
 import {
@@ -39,6 +39,7 @@ import {
   OpenLocalFileRequestSchema,
   ShowDownloadRequestSchema,
   ToolbarFocusRequestSchema,
+  type AnswerStripResponse,
   type CreateResponse,
   type NavigateResponse
 } from '../../shared/ipc/browser-tab-schema'
@@ -94,11 +95,6 @@ const C = BROWSER_TAB_CHANNELS
  */
 export const SYSTEM_BROWSER_CHANNEL: BrowserTabChannel = 'browser-tab:openExternal'
 
-/** A zod schema's `safeParse`, as far as these handlers use it. */
-interface Parser<T> {
-  safeParse(value: unknown): { success: true; data: T } | { success: false; error: { message: string } }
-}
-
 /** Every channel this module registers, for tests and the unregister function. */
 export const BROWSER_TAB_HANDLED_CHANNELS = [
   C.create,
@@ -133,55 +129,20 @@ export function registerBrowserTabHandlers(deps: BrowserTabHandlerDeps): () => v
   const resolveWindow =
     deps.resolveWindow ?? ((event) => BrowserWindow.fromWebContents(event.sender) as TabHost | null)
   const { service } = deps
-
-  /** The sender's window when the sender is trusted and the payload parses. */
-  function accept<T>(
-    channel: string,
-    event: IpcMainInvokeEvent | IpcMainEvent,
-    schema: Parser<T>,
-    arg: unknown
-  ): { host: TabHost; data: T } | null {
-    if (!isTrusted(event)) {
-      logger.warn('Rejected a browser tab request from an untrusted sender', { channel })
-      return null
-    }
-    const parsed = schema.safeParse(arg)
-    if (!parsed.success) {
-      logger.warn('Rejected a browser tab request with an invalid payload', { channel, error: parsed.error.message })
-      return null
-    }
-    const host = resolveWindow(event)
-    return host === null || host.isDestroyed() ? null : { host, data: parsed.data }
-  }
-
-  /** The named tab when the request is acceptable and the window owns the tab. */
-  function acceptTab<T extends { tabId: string }>(
-    channel: string,
-    event: IpcMainInvokeEvent | IpcMainEvent,
-    schema: Parser<T>,
-    arg: unknown
-  ): { tab: BrowserTab; data: T } | null {
-    const accepted = accept(channel, event, schema, arg)
-    if (accepted === null) return null
-    const tab = service.tabOf(accepted.host.id, accepted.data.tabId)
-    return tab === null ? null : { tab, data: accepted.data }
-  }
-
-  /** Run `act`, logging instead of throwing. */
-  function guarded<R>(channel: string, fallback: R, act: () => R): R {
-    try {
-      return act()
-    } catch (error) {
-      logger.error('Browser tab request failed', redactedLogError(error), { channel })
-      return fallback
-    }
-  }
+  const { accept, acceptTab } = createTabGate<IpcMainInvokeEvent | IpcMainEvent, TabHost, BrowserTab>({
+    isTrusted,
+    resolveWindow: (event) => {
+      const host = resolveWindow(event)
+      return host === null || host.isDestroyed() ? null : host
+    },
+    tabOf: (host, tabId) => service.tabOf(host.id, tabId)
+  })
 
   registerHandle(C.create, async (event, arg: unknown): Promise<CreateResponse> => {
     const accepted = accept(C.create, event, CreateRequestSchema, arg)
     if (accepted === null) return { error: 'Request refused' }
     try {
-      return await service.create(accepted.host, accepted.data.panelId)
+      return await service.create(accepted.window, accepted.data.panelId)
     } catch (error) {
       logger.error('Browser tab request failed', redactedLogError(error), { channel: C.create })
       return { error: 'The browser tab could not open' }
@@ -193,13 +154,14 @@ export function registerBrowserTabHandlers(deps: BrowserTabHandlerDeps): () => v
     const accepted = accept(C.close, event, CloseRequestSchema, arg)
     if (accepted === null) return false
     const { tabId, byUser } = accepted.data
-    return guarded(C.close, false, () => service.close(accepted.host.id, tabId, byUser ?? true))
+    return guarded(C.close, false, () => service.close(accepted.window.id, tabId, byUser ?? true))
   })
 
   registerHandle(SYSTEM_BROWSER_CHANNEL, async (event, arg: unknown): Promise<OpenExternalResponse> => {
     const target = acceptTab(SYSTEM_BROWSER_CHANNEL, event, OpenExternalRequestSchema, arg)
     if (target === null || deps.openInSystemBrowser === undefined) return { error: 'Request refused' }
-    const url = systemBrowserUrl(target.data.url ?? target.tab.state().committedUrl)
+    // The page's own address, not the bar's (capped at 8192 characters, 025-FR-057).
+    const url = systemBrowserUrl(target.data.url ?? target.tab.pageAddress())
     if (url === null) return { error: 'Only http and https addresses open in your system browser' }
     try {
       await deps.openInSystemBrowser(url)
@@ -259,14 +221,14 @@ export function registerBrowserTabHandlers(deps: BrowserTabHandlerDeps): () => v
     const accepted = accept(C.focusOrigin, event, FocusOriginRequestSchema, arg)
     if (accepted === null) return
     const { tabId, from } = accepted.data
-    guarded(C.focusOrigin, undefined, () => service.focusOrigin(accepted.host.id, tabId, from))
+    guarded(C.focusOrigin, undefined, () => service.focusOrigin(accepted.window.id, tabId, from))
   })
 
   const onToolbarFocus = (event: IpcMainEvent, arg: unknown): void => {
     const accepted = accept(C.toolbarFocus, event, ToolbarFocusRequestSchema, arg)
     if (accepted === null) return
     const { tabId, focused } = accepted.data
-    guarded(C.toolbarFocus, undefined, () => service.toolbarFocus(accepted.host.id, tabId, focused))
+    guarded(C.toolbarFocus, undefined, () => service.toolbarFocus(accepted.window.id, tabId, focused))
   }
   registerOn(C.toolbarFocus, onToolbarFocus)
 
@@ -276,15 +238,14 @@ export function registerBrowserTabHandlers(deps: BrowserTabHandlerDeps): () => v
   })
 
   // The owning window answers its own tab's row; main re-checks the input
-  // guard and that the answer is one the row offers (`TabStrip.answer`).
-  registerHandle(C.answerStrip, (event, arg: unknown): void => {
+  // guard and that the answer is one the row offers (`TabStrip.answer`). The
+  // result goes back, so a row that was not answered (the sign-in box) recovers.
+  registerHandle(C.answerStrip, (event, arg: unknown): AnswerStripResponse => {
     const accepted = accept(C.answerStrip, event, AnswerStripRequestSchema, arg)
-    if (accepted === null) return
+    if (accepted === null) return 'unknown'
     // `fields` (a sign-in box's user name and password) go to the row's owner only, never to a log.
     const { tabId, requestId, answer, fields } = accepted.data
-    guarded(C.answerStrip, undefined, () => {
-      service.answerStrip(accepted.host.id, tabId, requestId, answer, fields)
-    })
+    return guarded<AnswerStripResponse>(C.answerStrip, 'unknown', () => service.answerStrip(accepted.window.id, tabId, requestId, answer, fields) ?? 'unknown')
   })
 
   // **Proceed anyway** or **Back to safety** on the owning window's tab;
@@ -294,7 +255,7 @@ export function registerBrowserTabHandlers(deps: BrowserTabHandlerDeps): () => v
     if (accepted === null) return
     const { tabId, decisionId, proceed } = accepted.data
     guarded(C.certificate, undefined, () => {
-      service.answerCertificate(accepted.host.id, tabId, decisionId, proceed)
+      service.answerCertificate(accepted.window.id, tabId, decisionId, proceed)
     })
   })
 
@@ -302,7 +263,7 @@ export function registerBrowserTabHandlers(deps: BrowserTabHandlerDeps): () => v
     const accepted = accept(C.showDownload, event, ShowDownloadRequestSchema, arg)
     if (accepted !== null) {
       guarded(C.showDownload, undefined, () => {
-        service.showDownload(accepted.host.id, accepted.data.downloadId)
+        service.showDownload(accepted.window.id, accepted.data.downloadId)
       })
     }
   })

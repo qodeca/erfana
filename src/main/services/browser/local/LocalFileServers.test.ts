@@ -6,7 +6,7 @@
  * per folder, the arms, the request gate, the address shown and when servers
  * close. Files are real; servers are fakes except where a test says so.
  */
-import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -42,6 +42,8 @@ beforeAll(async () => {
 afterAll(async () => {
   await rm(base, { recursive: true, force: true })
 })
+
+const itPosix = process.platform === 'win32' ? it.skip : it
 
 let port = 40_000
 
@@ -157,6 +159,27 @@ describe('open', () => {
     expect(asked).toEqual([join(project, 'site')])
   })
 
+  it('refuses a user folder itself as the served folder (home, Downloads, …), not the folders below it (security review S1)', async () => {
+    const users = new LocalFileServers({
+      now: () => now,
+      appAddresses: () => app,
+      createServer: fakeServer,
+      refusesFolder: () => false,
+      // `site` stands for Downloads; a folder that does not exist is compared as named.
+      userFolders: () => [join(base, 'no-such-folder'), join(project, 'site')]
+    })
+    expect(await users.open(request('site/index.html'))).toEqual({ ok: false, reason: 'local-file' })
+    expect((await users.open(request('other/index.html'))).ok).toBe(true)
+    expect(started).toHaveLength(1)
+  })
+
+  itPosix('compares a user folder by its real path, so a link to it is refused too', async () => {
+    const link = join(base, 'downloads-link')
+    await symlink(join(project, 'site'), link).catch(() => undefined)
+    const users = new LocalFileServers({ now: () => now, appAddresses: () => app, createServer: fakeServer, refusesFolder: () => false, userFolders: () => [link] })
+    expect(await users.open(request('site/index.html'))).toEqual({ ok: false, reason: 'local-file' })
+  })
+
   it('refuses when the server cannot start, and starts one next time', async () => {
     failStart = true
     expect(await servers.open(request('site/index.html'))).toEqual({ ok: false, reason: 'local-file' })
@@ -170,6 +193,14 @@ describe('open', () => {
     }
     expect(servers.size).toBe(MAX_LOCAL_SERVERS)
     expect(await servers.open(request('other/index.html'))).toEqual({ ok: false, reason: 'local-file' })
+  })
+
+  it(`counts servers still starting against the ${MAX_LOCAL_SERVERS}-folder cap`, async () => {
+    const opens = Array.from({ length: MAX_LOCAL_SERVERS + 3 }, (_, i) => servers.open({ ...request('site/index.html'), projectRoot: join(base, `q${i}`) }))
+    const answers = await Promise.all(opens)
+    expect(answers.filter((a) => !a.ok)).toHaveLength(3)
+    expect(servers.size).toBe(MAX_LOCAL_SERVERS)
+    expect(started).toHaveLength(MAX_LOCAL_SERVERS)
   })
 })
 

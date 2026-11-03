@@ -119,10 +119,12 @@ export function ClearDataDialog({ onClose }: ClearDataDialogProps): JSX.Element 
               type="checkbox"
               checked={ticked[kind.id]}
               disabled={busy}
+              // Named by the label text alone: the description wrapped in the same label is its description, never part of its name.
+              aria-labelledby={`${base}-${kind.id}-label`}
               aria-describedby={`${base}-${kind.id}`}
               onChange={event => setTicked(prev => ({ ...prev, [kind.id]: event.target.checked }))}
             />
-            <span>{kind.label}</span>
+            <span id={`${base}-${kind.id}-label`}>{kind.label}</span>
             <span id={`${base}-${kind.id}`} className="erf-brw-clear__desc">
               {kind.description}
             </span>

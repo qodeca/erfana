@@ -11,7 +11,7 @@ vi.mock('../../../services/browserTabGateway', () => ({ browserTabGateway: gatew
 vi.mock('../../../utils/toastHelpers', () => toast)
 vi.mock('../../../utils/logger', () => ({ logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() } }))
 
-import { ClearDataDialog, reportClearData } from './ClearDataDialog'
+import { CLEAR_DATA_KINDS, ClearDataDialog, reportClearData } from './ClearDataDialog'
 
 let portalRoot: HTMLDivElement
 beforeEach(() => {
@@ -49,6 +49,16 @@ describe('ClearDataDialog', () => {
     expect(screen.getByRole('button', { name: 'Clear' })).toHaveAccessibleDescription('Tick at least one kind of data.')
     fireEvent.click(screen.getByRole('button', { name: 'Clear' }))
     expect(gateway.clearData).not.toHaveBeenCalled()
+  })
+
+  it('names each checkbox by its label only; the wrapped note is its description, not repeated in the name', () => {
+    render(<ClearDataDialog onClose={vi.fn()} />)
+    const boxes = screen.getAllByRole('checkbox')
+    expect(boxes).toHaveLength(CLEAR_DATA_KINDS.length)
+    CLEAR_DATA_KINDS.forEach((kind, index) => {
+      expect(boxes[index]).toHaveAccessibleName(kind.label)
+      expect(boxes[index]).toHaveAccessibleDescription(kind.description)
+    })
   })
 
   it('clears what is ticked, shows Clearing…, reports and closes', async () => {

@@ -193,6 +193,12 @@ describe('writePlainList', () => {
     expect(readFileSync(join(path, 'keep.txt'), 'utf8')).toBe('keep')
   })
 
+  it('resolves, logs and writes nothing when an entry fails its schema (it never rejects)', async () => {
+    await expect(writePlainList(file, [{ url: '' }])).resolves.toBeUndefined()
+    expect(logger.warn).toHaveBeenCalledWith('Test list: file not written, kept in memory', expect.objectContaining({ error: expect.any(String) }))
+    expect(folderNames()).toEqual([])
+  })
+
   it('logs and resolves when the folder is missing', async () => {
     rmSync(join(root, 'profile'), { recursive: true })
     await expect(writePlainList(file, [{ url: 'http://a.test/' }])).resolves.toBeUndefined()

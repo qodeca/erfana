@@ -7,9 +7,10 @@
  * the history wherever a key exists, is signed (`site/signedProfileFile.ts`).
  *
  * A file is `{ version, entries }`. It is untrusted input like a signed one:
- * a file that is too large, does not parse or does not match its schema – a
- * signed file included – is ignored, logged (event only) and replaced by the
- * next write. Read without following a link, replaced by a rename of a fresh
+ * a file that does not parse or does not match its schema – a signed file
+ * included – is ignored, logged (event only) and replaced by the next write.
+ * A file over `maxBytes` is ignored without a log line, as a missing one is
+ * (`readFileNoFollow` answers both the same way), and is replaced the same. Read without following a link, replaced by a rename of a fresh
  * exclusive temp file, so a link planted at the name is never written
  * through.
  */
@@ -45,8 +46,8 @@ export async function readPlainList<T>(file: PlainListFile<T>): Promise<T[]> {
     return []
   }
   if (text === null) return []
-  const schema = z.object({ version: z.literal(PLAIN_VERSION), entries: z.array(file.entry).max(file.maxEntries) }).strict()
   try {
+    const schema = z.object({ version: z.literal(PLAIN_VERSION), entries: z.array(file.entry).max(file.maxEntries) }).strict()
     const result = schema.safeParse(JSON.parse(text))
     if (result.success) return result.data.entries
   } catch {
@@ -60,8 +61,9 @@ export async function readPlainList<T>(file: PlainListFile<T>): Promise<T[]> {
 export async function writePlainList<T>(file: PlainListFile<T>, entries: readonly T[]): Promise<void> {
   const name = file.segments[file.segments.length - 1]
   const temp = [...file.segments.slice(0, -1), `${name}.${randomUUID()}.tmp`]
-  const data = JSON.stringify({ version: PLAIN_VERSION, entries: entries.map((e) => file.entry.parse(e)) })
   try {
+    // Inside the try: an entry that fails its schema is a failed write, not a rejection.
+    const data = JSON.stringify({ version: PLAIN_VERSION, entries: entries.map((e) => file.entry.parse(e)) })
     await createFileExclusive(file.canonical, temp, data)
     try {
       await rename(join(file.canonical, ...temp), join(file.canonical, ...file.segments))

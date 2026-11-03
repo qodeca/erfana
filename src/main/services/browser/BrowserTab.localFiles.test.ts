@@ -37,6 +37,7 @@ function make(withLocal = true): BrowserTab {
     caseSensitive: true,
     appAddresses: () => APP,
     resolveDomain: (h) => h,
+    mediaInUse: () => ({ camera: false, microphone: false, screen: false }),
     expectDevTools: vi.fn(() => () => undefined),
     onStateChange: vi.fn(),
     onDestroyed: vi.fn(),
@@ -64,6 +65,8 @@ describe('navigateLocal', () => {
     const state = tab.state()
     expect(state).toMatchObject({ pendingUrl: null, committedUrl: 'file:///p/site/index.html', security: 'file', origin: { kind: 'file' } })
     expect(TabStateEventSchema.safeParse(state).success).toBe(true)
+    // Open in system browser never gets the loopback address: a served file is file://, which it refuses.
+    expect(tab.pageAddress()).toBe('file:///p/site/index.html')
   })
 
   it('arms the committed local address on Reload, and the target entry on Back and Forward', () => {

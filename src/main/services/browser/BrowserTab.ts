@@ -11,51 +11,41 @@
  *
  * - **Window open: deny all** (A4). The registered id skips the app-wide
  *   baseline, so the tab sets its own handler; the service replaces it in the
- *   same tick with the popup policy (`popups/TabWindowOpen.ts`, commit 12e).
+ *   same tick with the popup policy (`popups/TabWindowOpen.ts`).
  * - **Leave-page prompt** (025-FR-058): every load the user starts arms
  *   {@link BrowserTabDeps.armLeave} with a way to repeat it first.
  * - **Navigation policy** (S2). What the user starts goes through
  *   {@link BrowserTab.navigate} and {@link BrowserTab.history}; what the page
- *   starts – a link, a script, a form, a redirect, a frame – is checked here
- *   under the `page` source and cancelled when its scheme is not allowed.
+ *   starts – a link, a script, a form, a redirect, a frame – is checked by
+ *   `tabNavigationGuard.ts` under the `page` source and cancelled when not allowed.
  * - **Pending and committed address** (025-FR-002). A pending address exists
  *   only for a navigation the user started; it goes when the document
  *   commits, when the page starts its own navigation, and on abort, an error,
  *   a load that ends without a commit (HTTP 204, a download) and Stop (S21).
  * - **Hidden tabs keep their page** (025-FR-007, ADR 0011 decision 3): a
  *   hidden tab's view is detached from the window, never destroyed.
- * - **DevTools** (025-FR-013) open in a detached window and close with the
- *   tab. Chromium creates the DevTools front end in this tab's session, so the
- *   tab tells the session registry to expect it first (it would otherwise be
- *   refused and closed as an unregistered browser-session `webContents`).
+ * - **DevTools** (025-FR-013) open detached and close with the tab; the
+ *   session registry is told to expect the front end Chromium creates in this
+ *   tab's session, which it would otherwise close as unregistered.
+ * - **Local files** (025-FR-005 rule 1, ADR 0012 option 4) load from their
+ *   served folder ({@link BrowserTab.navigateLocal}); every load the user
+ *   starts – the open, Reload, Back, Forward – arms its exact address, so only
+ *   those get the folder's origin; the bar shows `file://<path>`. A tab the
+ *   page opened never loads a local file (S-7).
  *
- * - **Local files** (025-FR-005 rule 1, ADR 0012 option 4): a local file
- *   loads from its served folder's loopback address
- *   ({@link BrowserTab.navigateLocal}). The tab arms that exact address for
- *   every load the user starts – the open itself, Reload, Back, Forward – so
- *   only those get the folder's origin; the bar shows `file://<path>`. A tab
- *   the page opened never loads a local file (S-7).
- *
- * The tab-kind CDP session (`cdp/BrowserCdpSession.ts`) attaches here, before
- * the first load, through {@link BrowserTabCdpHook}; the tab never touches the
- * debugger itself.
+ * The tab-kind CDP session (`cdp/BrowserCdpSession.ts`) attaches before the
+ * first load through {@link BrowserTabCdpHook}; the tab never touches the debugger.
  */
 import type { BrowserWindow, Session, WebContents, WebContentsView } from 'electron'
-import type { NavigationSource, TabStateEvent } from '../../../shared/ipc/browser-tab-schema'
+import type { NavigationSource, TabMediaInUse, TabStateEvent } from '../../../shared/ipc/browser-tab-schema'
 import { BROWSER_URL_MAX_CHARS } from '../../../shared/ipc/browser-tab-schema'
 import { originParts, withoutUserInfo, type RegistrableDomainResolver } from '../../../shared/browser/originFormat'
 import { sanitizePageText } from '../../../shared/browser/pageText'
 import { logger } from '../LoggingService'
 import type { RectLike } from '../preview/previewBoundsClamp'
 import { TabViewFrame, type ClipView } from './page/TabViewFrame'
-import {
-  checkNavigation,
-  isUserStarted,
-  securityStateOf,
-  type AppAddresses,
-  type FrameKind,
-  type NavigationRefusal
-} from './browserNavigationPolicy'
+import { checkNavigation, isUserStarted, securityStateOf, type AppAddresses, type NavigationRefusal } from './browserNavigationPolicy'
+import { guardPageNavigation } from './tabNavigationGuard'
 import { hardenBrowserContents } from './browserSessionPolicy'
 import type { TabCertificateState } from './site/browserCertificates'
 
@@ -119,6 +109,8 @@ export interface BrowserTabDeps {
   readonly createClip?: () => ClipView
   /** Told before each load the user starts, with a way to repeat it (`dialogs/leavePage.ts`). */
   readonly armLeave?: (repeat: () => void) => void
+  /** The page's camera, microphone and screen capture now (025-FR-019); required, so no state ships a placeholder. */
+  readonly mediaInUse: () => TabMediaInUse
 }
 
 /** A `navigate` answer: started, or refused by 025-FR-005. */
@@ -172,7 +164,7 @@ export class BrowserTab {
     })
     this.contents.setWindowOpenHandler(() => ({ action: 'deny' }))
     hardenBrowserContents(this.contents)
-    this.listenForPageNavigation()
+    guardPageNavigation(this.contents, { appAddresses: deps.appAddresses, local: deps.local, committedUrl: () => this.committedUrl })
     this.listenForLoadState()
     this.listenForDevTools()
     this.contents.once('destroyed', () => this.handleDestroyed())
@@ -336,11 +328,17 @@ export class BrowserTab {
       zoomPercent: 100,
       widthPreset: this.viewFrame.widthPreset,
       security: this.certificate.warning !== null ? 'warningUp' : (this.certificate.sign ?? securityStateOf(shown)),
-      inUse: { camera: false, microphone: false, screen: false },
+      inUse: this.deps.mediaInUse(),
       erfanaPage: this.erfanaPage(),
       ...(this.certificate.warning === null ? {} : { certificate: this.certificate.warning }),
       devToolsOpen: this.contents.isDevToolsOpened()
     }
+  }
+
+  /** The committed address whole – not capped like {@link state}'s – without user info; `file://` for a served file (**Open in system browser**). */
+  pageAddress(): string | null {
+    const shown = this.shownAddress(this.committedUrl)
+    return shown === null ? null : withoutUserInfo(shown)
   }
 
   /** Close DevTools, take the view out of its window and destroy the page. */
@@ -376,48 +374,6 @@ export class BrowserTab {
       const code = (error as { errno?: unknown } | null)?.errno
       if (code !== ERR_ABORTED) logger.debug('Browser tab load ended without a commit', { errno: String(code) })
     })
-  }
-
-  private listenForPageNavigation(): void {
-    const contents = this.contents
-    contents.on('will-navigate', (details) => {
-      this.refuseUnlessAllowed(details, details.url, 'main')
-    })
-    contents.on('will-frame-navigate', (details) => {
-      if (!details.isMainFrame) this.refuseUnlessAllowed(details, details.url, 'frame')
-    })
-    contents.on('will-redirect', (details) => {
-      this.refuseUnlessAllowed(details, details.url, details.isMainFrame ? 'main' : 'frame')
-    })
-  }
-
-  private refuseUnlessAllowed(event: { preventDefault(): void }, url: string, frame: FrameKind): void {
-    const verdict = checkNavigation(url, 'page', frame, this.deps.appAddresses(), this.pageOrigin())
-    if (verdict.allowed && !this.refusesLocalNavigation(url, frame)) return
-    if (verdict.allowed) {
-      // Refused here, the page stays; the session filter would refuse the load too, but leave an error page.
-      event.preventDefault()
-      logger.warn('Refused a page navigation to a served local folder', { frame })
-      return
-    }
-    event.preventDefault()
-    logger.warn('Refused a page navigation in a browser tab', { frame, reason: verdict.reason })
-  }
-
-  /** A page may reach a served folder only from a page of that folder (S-7). */
-  private refusesLocalNavigation(url: string, frame: FrameKind): boolean {
-    const local = this.deps.local
-    if (local === undefined || !local.isLocalAddress(url)) return false
-    return !local.allowsRequest({ url, resourceType: frame === 'main' ? 'mainFrame' : 'subFrame', topUrl: this.committedUrl })
-  }
-
-  private pageOrigin(): string | null {
-    if (this.committedUrl === null) return null
-    try {
-      return new URL(this.committedUrl).origin
-    } catch {
-      return null
-    }
   }
 
   private listenForLoadState(): void {

@@ -9,48 +9,50 @@
  * certificate decision) – never a project path or a window; main resolves
  * the project from the sender's window. A request's `source` can never be
  * `page`: page-started navigations and tabs are created in main (§ 3.4).
+ * The caps and ids are in `browser-tab-base-schema.ts`, the tab state in
+ * `browser-tab-state-schema.ts`; both are re-exported here.
  * @see src/shared/ipc/browser-tab-channels.ts for the channel names
  */
 import { z } from 'zod'
 import { TerminalIdSchema } from './terminal-schema'
 import { PanelIdSchema } from './preview-schema'
-import { CertificateWarningSchema, SignInRowSchema } from './browser-tab-site-schema'
-import { LoadErrorPageSchema } from './browser-tab-page-schema'
+import { SignInRowSchema } from './browser-tab-site-schema'
+import {
+  BROWSER_PATH_MAX_CHARS,
+  BROWSER_STILL_MAX_BYTES,
+  BROWSER_SUGGEST_MAX_ROWS,
+  BROWSER_TEXT_MAX_CHARS,
+  BROWSER_MAX_PX,
+  BROWSER_URL_MAX_CHARS,
+  BROWSER_FIND_MAX_CHARS,
+  BrowserRectSchema,
+  BrowserTabIdSchema,
+  bytes,
+  CaptureIdSchema,
+  count,
+  OpaqueIdSchema,
+  px,
+  text,
+  urlString
+} from './browser-tab-base-schema'
+import { OriginPartsSchema } from './browser-tab-state-schema'
 
-/** Longest address or typed input accepted, in UTF-16 code units (Chromium's display cap is 2 MB; this is the bar's). */
-export const BROWSER_URL_MAX_CHARS = 8192
-/** Longest find text. */
-export const BROWSER_FIND_MAX_CHARS = 1000
-/** Longest local file path. */
-export const BROWSER_PATH_MAX_CHARS = 32_767
-/** Longest page title sent to the renderer (already cleaned in main, design § 3.5). */
-export const BROWSER_TITLE_MAX_CHARS = 200
-/** Largest site icon sent to the renderer: a PNG of at most 32 px (design § 3.5). */
-export const BROWSER_ICON_MAX_BYTES = 64 * 1024
-/** Largest still image sent to the renderer (a downscaled raw bitmap, design § 6.1). */
-export const BROWSER_STILL_MAX_BYTES = 64 * 1024 * 1024
-/** Longest display text of a strip row, notice or label. */
-export const BROWSER_TEXT_MAX_CHARS = 2000
-/** Most history suggestions per answer (025-FR-063 keeps 100 addresses). */
-export const BROWSER_SUGGEST_MAX_ROWS = 100
-/** Largest pixel coordinate or size accepted. */
-const BROWSER_MAX_PX = 100_000
-
-/** A tab id: `browser-tab-<counter>`, assigned by main. */
-export const BrowserTabIdSchema = z.string().regex(/^browser-tab-\d{1,9}$/, 'Invalid browser tab id')
-/** A capture id: 128 random bits as lower-case hex, minted by main at confirm. */
-export const CaptureIdSchema = z.string().regex(/^[0-9a-f]{32}$/, 'Invalid capture id')
-/** An opaque main-minted id for a strip request, a context menu or a certificate decision. */
-export const OpaqueIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, 'Invalid id')
-
-const urlString = z.string().min(1).max(BROWSER_URL_MAX_CHARS)
-const text = z.string().max(BROWSER_TEXT_MAX_CHARS)
-const px = z.number().min(-BROWSER_MAX_PX).max(BROWSER_MAX_PX)
-const size = z.number().min(0).max(BROWSER_MAX_PX)
-const count = z.number().int().min(0).max(1_000_000)
-
-export const BrowserRectSchema = z.object({ x: px, y: px, width: size, height: size }).strict()
-export type BrowserRect = z.infer<typeof BrowserRectSchema>
+export {
+  BROWSER_FIND_MAX_CHARS,
+  BROWSER_ICON_MAX_BYTES,
+  BROWSER_PATH_MAX_CHARS,
+  BROWSER_STILL_MAX_BYTES,
+  BROWSER_SUGGEST_MAX_ROWS,
+  BROWSER_TEXT_MAX_CHARS,
+  BROWSER_TITLE_MAX_CHARS,
+  BROWSER_URL_MAX_CHARS,
+  BrowserRectSchema,
+  BrowserTabIdSchema,
+  CaptureIdSchema,
+  OpaqueIdSchema,
+  type BrowserRect
+} from './browser-tab-base-schema'
+export * from './browser-tab-state-schema'
 
 /**
  * Every navigation source (design § 3.4). `page` is set only in main, for a
@@ -211,6 +213,11 @@ export const AnswerStripRequestSchema = z
     fields: StripFieldsSchema.optional()
   })
   .strict()
+/**
+ * Main's answer to `answerStrip`: `accepted`, or why not – inside the input
+ * guard, not an answer the row offers, or no such row (also a refused request).
+ */
+export const AnswerStripResponseSchema = z.enum(['accepted', 'guarded', 'invalid', 'unknown'])
 /** The page right-click menu's items (025-FR-057). */
 export const ContextActionSchema = z.enum([
   'back',
@@ -274,70 +281,13 @@ export type WriteCaptureRequest = z.infer<typeof WriteCaptureRequestSchema>
 export type WriteCaptureResponse = z.infer<typeof WriteCaptureResponseSchema>
 export type TargetStatusResponse = z.infer<typeof TargetStatusResponseSchema>
 export type AnswerStripRequest = z.infer<typeof AnswerStripRequestSchema>
+export type AnswerStripResponse = z.infer<typeof AnswerStripResponseSchema>
 export type StripAnswer = z.infer<typeof StripAnswerSchema>
 export type ClearDataRequest = z.infer<typeof ClearDataRequestSchema>
 export type FocusOrigin = z.infer<typeof FocusOriginRequestSchema>['from']
 
 // ── Events (main → the owning window) ────────────────────────────────────────
 
-const bytes = (max: number): z.ZodType<Uint8Array> =>
-  z.instanceof(Uint8Array).refine(b => b.byteLength <= max, `At most ${max} bytes`)
-
-/**
- * The address split for display by main's formatter (`originFormat.ts`), so the
- * renderer never needs the public-suffix list (design OD-1).
- */
-export const OriginPartsSchema = z.discriminatedUnion('kind', [
-  z
-    .object({
-      kind: z.literal('web'),
-      scheme: z.literal('http').nullable(),
-      subdomain: text,
-      registrableDomain: text,
-      port: z.string().regex(/^\d{1,5}$/).nullable(),
-      punycode: z.boolean()
-    })
-    .strict(),
-  z.object({ kind: z.literal('file') }).strict(),
-  z.object({ kind: z.literal('nonWeb'), scheme: z.string().max(64) }).strict()
-])
-
-/** The address bar's badge state (design § Address bar). */
-export const SecurityStateSchema = z.enum([
-  'secure',
-  'local',
-  'file',
-  'notSecureHttp',
-  'warningUp',
-  'proceeded',
-  'subresourceFailed'
-])
-/** Erfana's own pages, drawn in DOM in the page area (ADR 0011 decision 5). */
-export const ErfanaPageSchema = z.enum(['empty', 'certificate', 'loadError', 'crashed'])
-
-/** `state`: what the toolbar and the editor tab show. `icon` is absent when unchanged. */
-export const TabStateEventSchema = z
-  .object({
-    tabId: BrowserTabIdSchema,
-    committedUrl: urlString.nullable(),
-    /** Shown only for a navigation the user started (025-FR-002). */
-    pendingUrl: urlString.nullable(),
-    origin: OriginPartsSchema.nullable(),
-    title: z.string().max(BROWSER_TITLE_MAX_CHARS),
-    icon: bytes(BROWSER_ICON_MAX_BYTES).nullable().optional(),
-    canGoBack: z.boolean(),
-    canGoForward: z.boolean(),
-    loading: z.boolean(),
-    zoomPercent: z.number().int().min(25).max(500),
-    widthPreset: z.enum(['phone', 'tablet', 'full']),
-    security: SecurityStateSchema,
-    inUse: z.object({ camera: z.boolean(), microphone: z.boolean(), screen: z.boolean() }).strict(),
-    erfanaPage: ErfanaPageSchema.nullable(),
-    certificate: CertificateWarningSchema.optional(), // the warning page's parts, with `erfanaPage: 'certificate'` (025-FR-021)
-    loadError: LoadErrorPageSchema.optional(), // the load-error page's parts, with `erfanaPage: 'loadError'` (025-FR-059)
-    devToolsOpen: z.boolean()
-  })
-  .strict()
 export const FocusEventSchema = z.object({ tabId: BrowserTabIdSchema, pageFocused: z.boolean() }).strict()
 
 /** Keys main handled from page focus and hands to the renderer as named actions (ADR 0011 decision 14). */
@@ -486,8 +436,6 @@ export const BoundsAppliedEventSchema = z.object({ tabId: BrowserTabIdSchema, se
 export const FindResultEventSchema = z.object({ tabId: BrowserTabIdSchema, active: count, total: count }).strict()
   .refine(r => r.active <= r.total, 'active match beyond total')
 
-export type OriginPartsPayload = z.infer<typeof OriginPartsSchema>
-export type TabStateEvent = z.infer<typeof TabStateEventSchema>
 export type PickEvent = z.infer<typeof PickEventSchema>
 export type StripEvent = z.infer<typeof StripEventSchema>
 export type StripRow = z.infer<typeof StripRowSchema>

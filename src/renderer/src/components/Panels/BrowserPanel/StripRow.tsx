@@ -46,7 +46,8 @@ export interface StripRowProps {
   readonly row: StripRowPayload
   /** `performance.now()` when the row appeared or changed; focus restored to the row re-arms the guard. */
   readonly since: number
-  readonly onAnswer: (answer: StripAnswer, fields?: StripFields) => void
+  /** Send the answer; resolves with whether main took it, never rejects. */
+  readonly onAnswer: (answer: StripAnswer, fields?: StripFields) => Promise<boolean>
   /** The row is about to go while it holds focus. */
   readonly onLeavingWithFocus: () => void
 }
@@ -116,8 +117,15 @@ export function StripRow({ row, since: shownSince, onAnswer, onLeavingWithFocus 
   const answer = (given: StripAnswer, fields?: StripFields): void => {
     // A press that began before the row appeared or changed never counts (OD-6).
     if (guarded || busy || pressStartRef.current < since) return
-    if (row.kind === 'signIn' && given === 'signIn') setBusy(true)
-    onAnswer(given, fields)
+    if (row.kind !== 'signIn' || given !== 'signIn') {
+      void onAnswer(given, fields)
+      return
+    }
+    // "Signing in…" until main's answer: a refused or failed one gives the box back (an accepted one replaces the row).
+    setBusy(true)
+    void onAnswer(given, fields).then((accepted) => {
+      if (!accepted) setBusy(false)
+    })
   }
   const onPointerDown = (event: PointerEvent): void => {
     pressStartRef.current = event.timeStamp

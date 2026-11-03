@@ -16,7 +16,8 @@ import type { TargetTerminals } from '../capture/BrowserTargetStatus'
 import type { Bitmap } from '../capture/captureImage'
 import { CAPTURES_REL } from '../capture/CaptureStore'
 import type { TabInputPick } from '../input/BrowserTabInput'
-import { BrowserPicks, SEND_READ_TIMEOUT_MS, type TabPickInput } from './BrowserPicks'
+import { BrowserPicks, SEND_READ_TIMEOUT_MS, TEARDOWN_WRITE_WAIT_MS, type TabPickInput } from './BrowserPicks'
+import { BrowserProjectTeardown } from '../browserProjectTeardown'
 import type { BrowserTabPick } from './BrowserTabPick'
 import { FakePickContents, settle } from './__test-helpers__/pickHarness'
 import { samplePage } from './__test-helpers__/samplePage'
@@ -65,13 +66,15 @@ describe('BrowserPicks', () => {
     await rm(root, { recursive: true, force: true })
   })
 
-  function setup(over: { terminals?: TargetTerminals | null; register?: boolean } = {}) {
+  function setup(over: { terminals?: TargetTerminals | null } = {}) {
     const page = samplePage({ crossSite: false })
     const contents = new FakePickContents()
     const tab = {
       id: 'tab-1',
       contents,
       projectRoot: root,
+      caseSensitive: true,
+      windowId: 1,
       viewFrame: { placement: () => ({ view: { x: 10, y: 20 } }), widthPreset: 'full' }
     } as unknown as BrowserTab
     const host = { isDestroyed: () => false, getContentBounds: () => ({ x: 100, y: 200, width: 800, height: 600 }) } as unknown as TabHost
@@ -80,9 +83,8 @@ describe('BrowserPicks', () => {
       clock,
       encodePng,
       terminals: over.terminals === null ? undefined : () => over.terminals ?? terminals(),
-      sessionOf: over.register === true ? undefined : () => page.cdp
+      sessionOf: (c) => (c === contents ? page.cdp : null)
     })
-    if (over.register === true) picks.registerSession(contents, page.cdp)
     const routing = input()
     const events: PickEvent[] = []
     const pick = picks.attach(tab, host, routing, (e) => events.push(e))!
@@ -114,9 +116,12 @@ describe('BrowserPicks', () => {
       expect(s.events.some((e) => e.kind === 'note')).toBe(true)
     })
 
-    it('uses a session recorded with registerSession', async () => {
-      const s = setup({ register: true })
-      expect(s.pick).not.toBeNull()
+    it('takes the tab\'s CDP session from sessionOf, by the tab\'s page', () => {
+      const s = setup()
+      const sessionOf = vi.fn(() => null)
+      const picks = new BrowserPicks({ clock: s.clock, encodePng, sessionOf })
+      expect(picks.attach(s.tab, s.host, input(), () => undefined)).toBeNull()
+      expect(sessionOf).toHaveBeenCalledWith(s.contents)
     })
 
     it('attaches nothing without routing or a CDP session', () => {
@@ -316,6 +321,91 @@ describe('BrowserPicks', () => {
       const write = (s.picks as unknown as { write: (t: BrowserTab, p: BrowserTabPick, id: string) => Promise<unknown> }).write.bind(s.picks)
       s.pick.release()
       expect(await write(s.tab, s.pick, id)).toEqual({ error: 'The capture is no longer held – pick the element again' })
+    })
+  })
+
+  describe('teardown stages (ADR 0009 decision 14)', () => {
+    const capturesDir = (): string => path.join(root, ...CAPTURES_REL.split('/'))
+    const filesNow = async (): Promise<string[]> => readdir(capturesDir()).catch(() => [])
+
+    /** A held capture whose write waits on `gate` while reading the element. */
+    async function writing(s: ReturnType<typeof setup>): Promise<{ answer: Promise<unknown>; open: () => void }> {
+      const id = await held(s)
+      const capture = s.pick.capture!
+      const element = capture.element.bind(capture)
+      let open!: () => void
+      const gate = new Promise<void>((resolve) => (open = resolve))
+      const reading = vi.spyOn(capture, 'element').mockImplementation(async () => {
+        await gate
+        return element()
+      })
+      const answer = s.picks.writeCapture(s.tab, s.pick, OWNER, { captureId: id, terminalId: 'terminal-1' })
+      // The write is in flight once it reads the element.
+      await vi.waitFor(() => expect(reading).toHaveBeenCalled())
+      return { answer, open }
+    }
+
+    it('ends pick mode, then lets the write finish and delete its files, then closes the views', async () => {
+      const s = setup()
+      const { answer, open } = await writing(s)
+      expect(s.pick.isActive).toBe(true)
+      const teardown = new BrowserProjectTeardown()
+      const seen: string[] = []
+      teardown.onStage('closeViews', async () => {
+        seen.push(`closeViews active=${s.pick.isActive} held=${s.pick.capture !== null} files=${(await filesNow()).length}`)
+      })
+      s.picks.registerTeardown(teardown)
+      // Runs after BrowserPicks' own endPick step: the write resumes only once pick mode has ended.
+      teardown.onStage('endPick', () => {
+        seen.push(`endPick active=${s.pick.isActive} held=${s.pick.capture !== null}`)
+        open()
+      })
+      await teardown.run(root)
+      expect(seen).toEqual(['endPick active=false held=false', 'closeViews active=false held=false files=0'])
+      expect(await answer).toEqual({ error: 'The pick ended before the capture was saved' })
+      expect(s.events.at(-1)).not.toMatchObject({ kind: 'captured' })
+    })
+
+    it('leaves the tabs of another window or project alone', async () => {
+      const s = setup()
+      const id = await held(s)
+      const teardown = new BrowserProjectTeardown()
+      s.picks.registerTeardown(teardown)
+      await teardown.runForWindow(2)
+      await teardown.run(path.join(root, 'elsewhere'))
+      expect(s.pick.isActive).toBe(true)
+      expect(s.pick.capture?.id).toBe(id)
+      await teardown.runForWindow(1)
+      expect(s.pick.isActive).toBe(false)
+      expect(s.pick.capture).toBeNull()
+    })
+
+    it('stops waiting for a stuck write after the bound and closes the views anyway', async () => {
+      const s = setup()
+      await writing(s)
+      const teardown = new BrowserProjectTeardown()
+      const closed = vi.fn()
+      s.picks.registerTeardown(teardown)
+      teardown.onStage('closeViews', closed)
+      const run = teardown.run(root)
+      await settle()
+      expect(closed).not.toHaveBeenCalled()
+      // Advanced until the bound's timer, set once the stage starts waiting, has fired.
+      await vi.waitFor(() => {
+        s.clock.advance(TEARDOWN_WRITE_WAIT_MS)
+        expect(closed).toHaveBeenCalledTimes(1)
+      })
+      await run
+      expect(logger.warn).toHaveBeenCalledWith('Browser teardown: a capture write is still running; it deletes its files when it ends')
+    })
+
+    it('unregisters both stages', async () => {
+      const s = setup()
+      await held(s)
+      const teardown = new BrowserProjectTeardown()
+      s.picks.registerTeardown(teardown)()
+      await teardown.run(root)
+      expect(s.pick.capture).not.toBeNull()
     })
   })
 

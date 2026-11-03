@@ -11,8 +11,12 @@
  *   shared by the tabs that opened a file there (so the folder keeps one
  *   origin); started on first use, at most {@link MAX_LOCAL_SERVERS} at once.
  *   Refused: a missing file or a folder, a file inside a dot-folder (below
- *   the project root when inside it, anywhere otherwise), a volume root or a
- *   system folder as the served folder, and Erfana's own files.
+ *   the project root when inside it, anywhere otherwise), a volume root, a
+ *   system folder or one of the user's own folders (the home folder itself,
+ *   Downloads, Desktop, Documents, …) as the served folder, and Erfana's own
+ *   files. The opened page has its folder's origin, so it can read the
+ *   folder's images, style sheets, scripts and media (a canvas is not
+ *   tainted by them): a whole user folder is never handed to one page.
  * - **Arm** ({@link LocalFileServers.arm}): `BrowserTab` arms the exact
  *   address of a load the user started (the bar, **Open in browser tab**,
  *   Reload, Back, Forward); the server serves that document, once, with the
@@ -83,6 +87,12 @@ export interface LocalFileServersDeps {
    * `/private` on macOS and Linux). A test seam.
    */
   readonly refusesFolder?: (folder: string) => boolean
+  /**
+   * The user's own folders, each refused as a served folder itself (not the
+   * folders below it): `app.getPath('home' | 'downloads' | 'desktop' |
+   * 'documents' | …)` in the app. Compared by real path.
+   */
+  readonly userFolders?: () => readonly string[]
 }
 
 function defaultRefusesFolder(folder: string): boolean {
@@ -122,6 +132,8 @@ function insideDotFolder(realFile: string, projectRoot: string, caseSensitive: b
 export class LocalFileServers {
   private readonly entries = new Map<string, Entry>()
   private readonly starting = new Map<string, Promise<Entry | null>>()
+  /** Servers starting now: they count against {@link MAX_LOCAL_SERVERS} before they are entries. */
+  private pendingStarts = 0
   private readonly arms = new Map<string, number>()
 
   constructor(private readonly deps: LocalFileServersDeps) {}
@@ -140,6 +152,7 @@ export class LocalFileServers {
     const folder = dirname(realFile)
     if (
       (this.deps.refusesFolder ?? defaultRefusesFolder)(folder) ||
+      (await this.isUserFolder(folder)) ||
       insideDotFolder(realFile, request.projectRoot, request.caseSensitive) ||
       basename(realFile).startsWith('.')
     ) {
@@ -214,6 +227,17 @@ export class LocalFileServers {
     this.arms.clear()
   }
 
+  /** Whether `folder` (a real path) is one of the user's own folders. */
+  private async isUserFolder(folder: string): Promise<boolean> {
+    const caseSensitive = process.platform === 'linux'
+    for (const candidate of this.deps.userFolders?.() ?? []) {
+      // A user folder that does not exist (an unset XDG folder) is compared as named.
+      const real = await realpath(candidate).catch(() => candidate)
+      if (isSamePath(folder, real, caseSensitive)) return true
+    }
+    return false
+  }
+
   /** How many folders are served now. */
   get size(): number {
     return this.entries.size
@@ -233,7 +257,7 @@ export class LocalFileServers {
   }
 
   private async startEntry(request: LocalOpenRequest, folder: string): Promise<Entry | null> {
-    if (this.entries.size >= MAX_LOCAL_SERVERS) {
+    if (this.entries.size + this.pendingStarts >= MAX_LOCAL_SERVERS) {
       logger.warn('Refused to serve another local folder: too many are served', { max: MAX_LOCAL_SERVERS })
       return null
     }
@@ -243,11 +267,14 @@ export class LocalFileServers {
       refusesTarget: (realPath) => this.isAppFile(realPath)
     }
     const server = this.deps.createServer?.(options) ?? new LocalFolderServer(options)
+    this.pendingStarts += 1
     try {
       await server.start()
     } catch (error) {
       logger.error('A local folder could not be served', redactedLogError(error))
       return null
+    } finally {
+      this.pendingStarts -= 1
     }
     const entry: Entry = {
       server,

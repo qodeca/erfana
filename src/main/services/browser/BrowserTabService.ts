@@ -16,17 +16,20 @@
  * - **Page-opened tabs** are made here, in main, under the `page` source
  *   ({@link BrowserTabService.createFromPage}), and announced with
  *   `browser-tab:tabAdded`; they never round-trip through the renderer's
- *   create path (S2). Called by the popup policy (`popups/TabWindowOpen.ts`,
- *   commit 12e), which hands over the `webContents` Chromium created, and for
+ *   create path (S2). Called by the popup policy (`popups/TabWindowOpen.ts`),
+ *   which hands over the `webContents` Chromium created, and for
  *   **Open link in new tab** under the `contextMenuLink` source.
  * - **Window open, leave-page prompt, right-click menu** (025-FR-011,
  *   025-FR-057, 025-FR-058): attached per tab as `dialogs/TabPageExtras.ts`;
  *   a close the user asks for ({@link BrowserTabService.close}) lets the page
  *   ask to stay, Erfana's own closes never do (S-31).
- * - **Teardown.** A closing window closes its tabs (`closeWindow`, wired where
- *   the preview's is); a project switch or close closes the old project's tabs
- *   in the `closeViews` stage of `BrowserProjectTeardown`. Nothing is stored,
- *   so nothing is restored (025-FR-006).
+ * - **Teardown.** A closing window ({@link BrowserTabService.closeWindow}) and
+ *   a project switch or close ({@link BrowserTabService.closeProject}) close
+ *   their tabs in the `closeViews` stage of `BrowserProjectTeardown`. Nothing
+ *   is stored, so nothing is restored (025-FR-006).
+ * - **Per-tab features** (`tabFeatureRegistry.ts`, `tabFeatureAttach.ts`):
+ *   each tab's input, site, page and extras attach in one fixed order, to
+ *   one feature list that answers strip rows and detaches them all.
  * - **Site requests** (025-FR-019, 025-FR-020): each tab is attached to the
  *   `site` (`permissions/BrowserSite.ts`) before its first page loads; its
  *   strip rows and download notices go to the owning window, and
@@ -43,20 +46,14 @@
  *   the tab; a closing tab releases the folders it held.
  */
 import type { Session, WebContents, WebContentsView } from 'electron'
-import { BROWSER_TAB_EVENTS } from '../../../shared/ipc/browser-tab-channels'
 import {
-  FindResultEventSchema,
-  ContextMenuEventSchema,
-  NoticeEventSchema,
-  StripEventSchema,
-  TabAddedEventSchema,
-  TabStateEventSchema,
   type ContextActionRequestSchema,
   type CreateResponse,
   type FocusOrigin,
   type NavigateResponse,
   type NavigationSource,
   type StripAnswer,
+  type TabMediaInUse,
   type TabStateEvent
 } from '../../../shared/ipc/browser-tab-schema'
 import type { RegistrableDomainResolver } from '../../../shared/browser/originFormat'
@@ -69,22 +66,22 @@ import { BrowserProfileError } from './browserProfileGuards'
 import { isAppAddress, LOCAL_FILE_SOURCES, type AppAddresses } from './browserNavigationPolicy'
 import { BrowserTab, type BrowserTabCdpHook, type BrowserTabCdpLink, type TabHost, type TabLocalFiles } from './BrowserTab'
 import type { LocalFileServers } from './local/LocalFileServers'
-import type { BrowserSite, TabSiteLink } from './permissions/BrowserSite'
+import type { BrowserSite } from './permissions/BrowserSite'
 import type { AnswerResult, StripFields } from './permissions/tabStrip'
 import type { CertificateAnswerResult } from './site/browserCertificates'
 import { AppWindowBrowserKeys } from './input/appWindowBrowserKeys'
 import type { BrowserTabInput } from './input/BrowserTabInput'
-import { newTabInput, type TabInputSetup } from './input/tabInputFactory'
+import type { TabInputSetup } from './input/tabInputFactory'
 import type { BrowserPages } from './page/BrowserPages'
 import type { BrowserTabPage, PageHangSource } from './page/BrowserTabPage'
 import { decorateTabState } from './page/tabPageState'
 import type { ClipView } from './page/TabViewFrame'
-import { TabPageExtras, type TabPageExtrasSetup } from './dialogs/TabPageExtras'
+import type { TabPageExtrasSetup } from './dialogs/TabPageExtras'
 import type { ContextActionResult } from './contextMenu/TabContextMenu'
 import type { z } from 'zod'
-import { TabClosedEventSchema } from '../../../shared/ipc/browser-tab-chrome-schema'
 import { KeyringStrip, type KeyringStripSetup } from './site/keyringStrip'
-import { sendTabEvent } from './tabEventSend'
+import { TabFeatureList, tabOutlet } from './tabFeatureRegistry'
+import { attachTabFeatures, type TabEntry } from './tabFeatureAttach'
 
 /** A tab's CDP link, with the hang probe's events for the page features when the session has them. */
 export type TabCdpLink = BrowserTabCdpLink & Partial<PageHangSource>
@@ -111,7 +108,7 @@ export interface BrowserTabServiceDeps {
   readonly appAddresses: () => AppAddresses
   readonly resolveDomain: RegistrableDomainResolver
   readonly attachCdp?: (...args: Parameters<BrowserTabCdpHook>) => TabCdpLink | null
-  /** Load errors, crash and hang notices, find, zoom, width presets and history (commit 12h); without it none of them. */
+  /** Load errors, crash and hang notices, find, zoom, width presets and history; without it none of them. */
   readonly pages?: Pick<BrowserPages, 'attachTab' | 'detachTab'>
   /** The page view's clipping parent for width presets (ADR 0011 decision 6). */
   readonly createClip?: () => ClipView
@@ -121,10 +118,16 @@ export interface BrowserTabServiceDeps {
   readonly input?: TabInputSetup
   /** Served local folders; without them every local file is refused. */
   readonly local?: TabLocalFiles & Pick<LocalFileServers, 'open' | 'releaseTab'>
-  /** Window open, the leave-page prompt and the right-click menu (commits 12e–g); without it window opens are denied. */
+  /** Window open, the leave-page prompt and the right-click menu; without it window opens are denied. */
   readonly extras?: TabPageExtrasSetup
   /** The keyring notices of the project's first tab in this run (025-FR-018); without it none show. */
   readonly keyring?: KeyringStripSetup
+  /**
+   * The page's camera, microphone and screen capture now, for the address
+   * bar's in-use chips (025-FR-019). Required, so a tab never ships a
+   * placeholder: `browserAppSetup.ts` names what the app passes and why.
+   */
+  readonly mediaInUse: (tab: BrowserTab) => TabMediaInUse
 }
 
 /** The sources a local file opens from (`LOCAL_FILE_SOURCES`). */
@@ -144,12 +147,7 @@ const MAX_TAB_COUNTER = 999_999_999
 
 export class BrowserTabService {
   private readonly tabs = new Map<string, BrowserTab>()
-  private readonly hostOf = new WeakMap<BrowserTab, TabHost>()
-  private readonly siteOf = new WeakMap<BrowserTab, TabSiteLink>()
-  private readonly inputOf = new WeakMap<BrowserTab, BrowserTabInput>()
-  private readonly pageOf = new WeakMap<BrowserTab, BrowserTabPage>()
-  private readonly extrasOf = new WeakMap<BrowserTab, TabPageExtras>()
-  private readonly keyringOf = new WeakMap<BrowserTab, KeyringStrip>()
+  private readonly entries = new WeakMap<BrowserTab, TabEntry>()
   private readonly windowKeys = new Map<number, AppWindowBrowserKeys>()
   private counter = 0
 
@@ -172,9 +170,10 @@ export class BrowserTabService {
     const tab = this.openTab(host, panelId, profile, project.caseSensitive)
     // The empty tab's first state: no address, Back and Forward disabled.
     this.sendState(tab)
-    if (this.deps.keyring !== undefined) {
-      const keyring = new KeyringStrip(tab.id, (e) => sendTabEvent(host, BROWSER_TAB_EVENTS.strip, StripEventSchema, e), this.deps.keyring)
-      this.keyringOf.set(tab, keyring)
+    const entry = this.entries.get(tab)
+    if (this.deps.keyring !== undefined && entry !== undefined) {
+      const keyring = new KeyringStrip(tab.id, (e) => entry.outlet.strip(e), this.deps.keyring)
+      entry.features.add({ name: 'keyring', answerStrip: (id, answer) => keyring.answer(id, answer), detach: () => keyring.detach() })
       void keyring.start()
     }
     return { tabId: tab.id }
@@ -190,7 +189,7 @@ export class BrowserTabService {
   createFromPage(openerTabId: string, url: string, background: boolean, adopt: WebContents | null = null): string | null {
     const opener = this.tabs.get(openerTabId)
     if (opener === undefined || opener.contents.isDestroyed()) return null
-    const host = this.hostOf.get(opener)
+    const host = this.entries.get(opener)?.outlet.host
     if (host === undefined || host.isDestroyed()) return null
     const profile: TabProfile = { projectRoot: opener.projectRoot, session: opener.contents.session }
     const tab = this.openTab(host, null, profile, opener.caseSensitive, adopt ?? undefined)
@@ -198,7 +197,7 @@ export class BrowserTabService {
       this.closeTab(tab)
       return null
     }
-    sendTabEvent(host, BROWSER_TAB_EVENTS.tabAdded, TabAddedEventSchema, { tabId: tab.id, openerTabId, background })
+    this.entries.get(tab)?.outlet.tabAdded({ tabId: tab.id, openerTabId, background })
     return tab.id
   }
 
@@ -252,13 +251,7 @@ export class BrowserTabService {
   ): AnswerResult | null {
     const tab = this.tabOf(windowId, tabId)
     if (tab === null) return null
-    const own =
-      this.pageOf.get(tab)?.answerStrip(requestId, answer) ??
-      this.extrasOf.get(tab)?.answerStrip(requestId, answer) ??
-      this.keyringOf.get(tab)?.answer(requestId, answer) ??
-      null
-    if (own !== null) return own
-    return this.siteOf.get(tab)?.answerStrip(requestId, answer, fields) ?? 'unknown'
+    return this.entries.get(tab)?.features.answerStrip(requestId, answer, fields) ?? 'unknown'
   }
 
   /**
@@ -268,20 +261,20 @@ export class BrowserTabService {
   answerCertificate(windowId: number, tabId: string, decisionId: string, proceed: boolean): CertificateAnswerResult | null {
     const tab = this.tabOf(windowId, tabId)
     if (tab === null) return null
-    return this.siteOf.get(tab)?.answerCertificate(decisionId, proceed) ?? 'unknown'
+    return this.entries.get(tab)?.site?.answerCertificate(decisionId, proceed) ?? 'unknown'
   }
 
   /** Where keyboard focus comes from as it moves into `tabId`'s page (first-click rule). */
   focusOrigin(windowId: number, tabId: string, from: FocusOrigin): void {
     const tab = this.tabOf(windowId, tabId)
-    if (tab !== null) this.inputOf.get(tab)?.reportFocusOrigin(from)
+    if (tab !== null) this.inputFor(tab)?.reportFocusOrigin(from)
   }
 
   /** Whether `tabId`'s toolbar has keyboard focus; points the window's browser keys at it. */
   toolbarFocus(windowId: number, tabId: string, focused: boolean): void {
     const tab = this.tabOf(windowId, tabId)
-    const input = tab === null ? undefined : this.inputOf.get(tab)
-    if (input === undefined) return
+    const input = tab === null ? null : this.inputFor(tab)
+    if (input === null) return
     input.reportToolbarFocus(focused)
     const keys = this.windowKeys.get(windowId)
     if (focused) keys?.setTarget(input)
@@ -291,12 +284,12 @@ export class BrowserTabService {
   /** The page features of `tabId` if it belongs to `windowId` (find, zoom, width preset); `null` otherwise. */
   pageFor(windowId: number, tabId: string): BrowserTabPage | null {
     const tab = this.tabOf(windowId, tabId)
-    return tab === null ? null : (this.pageOf.get(tab) ?? null)
+    return tab === null ? null : (this.entries.get(tab)?.page ?? null)
   }
 
   /** The input routing of `tab`, for the test hooks; `null` without routing. */
   inputFor(tab: BrowserTab): BrowserTabInput | null {
-    return this.inputOf.get(tab) ?? null
+    return this.entries.get(tab)?.input ?? null
   }
 
   /** **Show in folder** for a download announced to `windowId`. */
@@ -311,17 +304,17 @@ export class BrowserTabService {
 
   /** **Open link in new tab** from `opener`'s menu: a user-started load under `contextMenuLink`. */
   private openLinkTab(opener: BrowserTab, url: string): void {
-    const host = this.hostOf.get(opener)
+    const host = this.entries.get(opener)?.outlet.host
     if (host === undefined || host.isDestroyed()) return
     const tab = this.openTab(host, null, { projectRoot: opener.projectRoot, session: opener.contents.session }, opener.caseSensitive)
     if ('refused' in tab.navigate(url, 'contextMenuLink')) return this.closeTab(tab)
-    sendTabEvent(host, BROWSER_TAB_EVENTS.tabAdded, TabAddedEventSchema, { tabId: tab.id, openerTabId: opener.id, background: false })
+    this.entries.get(tab)?.outlet.tabAdded({ tabId: tab.id, openerTabId: opener.id, background: false })
   }
 
   /** `browser-tab:contextAction` on `tabId` from `windowId`; `null` when the window does not own the tab. */
   contextAction(windowId: number, tabId: string, request: Omit<z.infer<typeof ContextActionRequestSchema>, 'tabId'>): ContextActionResult | null {
     const tab = this.tabOf(windowId, tabId)
-    return tab === null ? null : (this.extrasOf.get(tab)?.contextAction(request.menuId, request.action) ?? 'unknown')
+    return tab === null ? null : (this.entries.get(tab)?.extras?.contextAction(request.menuId, request.action) ?? 'unknown')
   }
 
   /**
@@ -332,8 +325,8 @@ export class BrowserTabService {
   close(windowId: number, tabId: string, byUser = true): boolean {
     const tab = this.tabOf(windowId, tabId)
     if (tab === null) return false
-    const extras = this.extrasOf.get(tab)
-    if (extras === undefined || !byUser) this.closeTab(tab)
+    const extras = this.entries.get(tab)?.extras ?? null
+    if (extras === null || !byUser) this.closeTab(tab)
     else extras.closeByUser()
     return true
   }
@@ -356,7 +349,7 @@ export class BrowserTabService {
     const session = profile.session as Session
     this.deps.prepareSession(session)
     const view = this.deps.createView(session, ...(adopt === undefined ? [] : [adopt]))
-    let input: BrowserTabInput | null = null
+    const entry: TabEntry = { outlet: tabOutlet(host), features: new TabFeatureList(), input: null, site: null, page: null, extras: null }
     // The CDP link is made while the tab's constructor runs; the page features take its hang events.
     const cdp: { link: TabCdpLink | null } = { link: null }
     const attachCdp = this.deps.attachCdp
@@ -373,76 +366,23 @@ export class BrowserTabService {
       attachCdp: attachCdp === undefined ? undefined : (contents) => (cdp.link = attachCdp(contents)),
       onStateChange: (changed) => this.sendState(changed),
       onDestroyed: (gone) => this.forget(gone),
-      onPageMoved: () => input?.recordRowShift(),
+      onPageMoved: () => entry.input?.recordRowShift(),
+      mediaInUse: () => this.deps.mediaInUse(tab),
       local: this.deps.local,
       createClip: this.deps.createClip,
-      armLeave: (repeat) => this.extrasOf.get(tab)?.arm(repeat)
+      armLeave: (repeat) => entry.extras?.arm(repeat)
     })
     this.tabs.set(tab.id, tab)
-    this.hostOf.set(tab, host)
-    input = this.attachInput(tab, host)
-    const site = this.deps.site?.attachTab(tab, {
-      strip: (event) => sendTabEvent(host, BROWSER_TAB_EVENTS.strip, StripEventSchema, event),
-      notice: (event) => sendTabEvent(host, BROWSER_TAB_EVENTS.notice, NoticeEventSchema, event),
-      parentWindow: () => (host.isDestroyed() ? null : host)
+    this.entries.set(tab, entry)
+    attachTabFeatures(tab, entry, this.deps, {
+      windowKeys: this.windowKeys,
+      hang: cdp.link,
+      sendState: () => this.sendState(tab),
+      openTab: (url, background, adopt) => this.createFromPage(tab.id, url, background, adopt) !== null,
+      openLink: (url) => this.openLinkTab(tab, url),
+      forceClose: () => this.closeTab(tab)
     })
-    if (site !== undefined) this.siteOf.set(tab, site)
-    this.attachPage(tab, host, cdp.link)
-    this.attachExtras(tab, host)
     return tab
-  }
-
-  /** Window open, leave-page prompt and right-click menu, after the input routers (`dialogs/TabPageExtras.ts`). */
-  private attachExtras(tab: BrowserTab, host: TabHost): void {
-    const setup = this.deps.extras
-    if (setup === undefined) return
-    const extras = new TabPageExtras(
-      tab,
-      {
-        strip: (event) => sendTabEvent(host, BROWSER_TAB_EVENTS.strip, StripEventSchema, event),
-        contextMenu: (event) => sendTabEvent(host, BROWSER_TAB_EVENTS.contextMenu, ContextMenuEventSchema, event),
-        openTab: (url, background, adopt) => this.createFromPage(tab.id, url, background, adopt) !== null,
-        openLink: (url) => this.openLinkTab(tab, url),
-        forceClose: () => this.closeTab(tab),
-        blocked: () => {
-          const routing = this.inputOf.get(tab)?.state()
-          return routing !== undefined && (routing.pick || routing.surface !== 'none')
-        }
-      },
-      setup
-    )
-    this.extrasOf.set(tab, extras)
-  }
-
-  /** The tab's page features (`page/BrowserTabPage.ts`), before its first page loads. */
-  private attachPage(tab: BrowserTab, host: TabHost, cdp: TabCdpLink | null): void {
-    const pages = this.deps.pages
-    if (pages === undefined) return
-    const { onHang, waitHang } = cdp ?? {}
-    const hang = onHang === undefined || waitHang === undefined ? null : { onHang, waitHang }
-    const page = pages.attachTab(
-      tab,
-      {
-        strip: (event) => sendTabEvent(host, BROWSER_TAB_EVENTS.strip, StripEventSchema, event),
-        findResult: (event) => sendTabEvent(host, BROWSER_TAB_EVENTS.findResult, FindResultEventSchema, event),
-        stateChanged: () => this.sendState(tab),
-        endPick: () => this.inputOf.get(tab)?.dispatch({ type: 'endSilently' })
-      },
-      hang
-    )
-    this.pageOf.set(tab, page)
-  }
-
-  /** The tab's key and mouse routers, before its first page loads; `null` without routing. */
-  private attachInput(tab: BrowserTab, host: TabHost): BrowserTabInput | null {
-    const setup = this.deps.input
-    if (setup === undefined) return null
-    const input = newTabInput(tab, host, setup, (step) => this.pageOf.get(tab)?.zoom(step), (open) => this.siteOf.get(tab)?.holdRequests(open))
-    this.inputOf.set(tab, input)
-    if (!this.windowKeys.has(host.id) && !host.webContents.isDestroyed()) {
-      this.windowKeys.set(host.id, new AppWindowBrowserKeys(host.webContents, setup.platform))
-    }
-    return input
   }
 
   private nextId(): string {
@@ -461,38 +401,24 @@ export class BrowserTabService {
   }
 
   private forget(tab: BrowserTab): void {
+    const entry = this.entries.get(tab)
     if (this.tabs.get(tab.id) === tab) {
       this.tabs.delete(tab.id)
-      // The owning window removes the editor tab only now (commit 18).
-      const host = this.hostOf.get(tab)
-      if (host !== undefined) sendTabEvent(host, BROWSER_TAB_EVENTS.tabClosed, TabClosedEventSchema, { tabId: tab.id })
+      // The owning window removes the editor tab only now.
+      entry?.outlet.tabClosed({ tabId: tab.id })
     }
-    this.keyringOf.get(tab)?.detach()
-    this.keyringOf.delete(tab)
     this.deps.local?.releaseTab(tab.id)
-    this.siteOf.get(tab)?.detach()
-    this.siteOf.delete(tab)
-    const page = this.pageOf.get(tab)
-    if (page !== undefined) this.deps.pages?.detachTab(page)
-    this.pageOf.delete(tab)
-    this.extrasOf.get(tab)?.detach()
-    this.extrasOf.delete(tab)
-    const input = this.inputOf.get(tab)
-    if (input !== undefined) {
-      this.windowKeys.get(tab.windowId)?.clearTarget(input)
-      input.dispose()
-      this.inputOf.delete(tab)
-    }
+    entry?.features.detachAll()
+    this.entries.delete(tab)
   }
 
   /** `tab`'s state with its page features applied (load error, crash, zoom) – what the window gets. */
   stateOf(tab: BrowserTab): TabStateEvent {
-    const page = this.pageOf.get(tab)
-    return page === undefined ? tab.state() : decorateTabState(tab.state(), page.facts(), this.deps.resolveDomain)
+    const page = this.entries.get(tab)?.page ?? null
+    return page === null ? tab.state() : decorateTabState(tab.state(), page.facts(), this.deps.resolveDomain)
   }
 
   private sendState(tab: BrowserTab): void {
-    const host = this.hostOf.get(tab)
-    if (host !== undefined) sendTabEvent(host, BROWSER_TAB_EVENTS.state, TabStateEventSchema, this.stateOf(tab))
+    this.entries.get(tab)?.outlet.state(this.stateOf(tab))
   }
 }

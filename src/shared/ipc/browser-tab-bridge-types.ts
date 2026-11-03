@@ -12,6 +12,7 @@
 import type { z } from 'zod'
 import type {
   AnswerStripRequest,
+  AnswerStripResponse,
   BoundsAppliedEvent,
   BoundsRequest,
   CertificateRequestSchema,
@@ -98,8 +99,8 @@ export interface BrowserTabBridge {
   devTools(tabId: string, inspectAt?: DevToolsInspectPoint): Promise<void>
   onState(callback: (state: TabStateEvent) => void): () => void
   onTabAdded(callback: (event: TabAddedEvent) => void): () => void
-  /** Answer a strip row (permission prompt, several-downloads prompt) – 025-FR-019, 025-FR-020. */
-  answerStrip(request: AnswerStripRequest): Promise<void>
+  /** Answer a strip row (permission prompt, several-downloads prompt) – 025-FR-019, 025-FR-020; resolves with whether main took it. */
+  answerStrip(request: AnswerStripRequest): Promise<AnswerStripResponse>
   /** **Proceed anyway** (`proceed: true`) or **Back to safety** on the certificate page (025-FR-021). */
   certificate(request: CertificateRequest): Promise<void>
   /** **Show in folder** for a finished download, by the id its notice carried. */

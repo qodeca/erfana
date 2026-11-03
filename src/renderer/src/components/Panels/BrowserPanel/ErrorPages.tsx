@@ -190,7 +190,7 @@ export function CertificatePage({ tabId, state, mayTakeFocus }: ErfanaPageProps)
           onKeyDown={markPress}
           onClick={proceed}
         >
-          Proceed anyway
+          <span>Proceed anyway</span>
         </button>
         <p id={cautionId} className="erf-brw-page__caution">
           {copy.caution}

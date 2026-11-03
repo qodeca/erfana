@@ -21,6 +21,16 @@ import { ChevronDown, TriangleAlert } from 'lucide-react'
 import { ContextMenu, type ContextMenuItem } from '../../ContextMenu/ContextMenu'
 import type { BrowserTarget } from './useBrowserTarget'
 import type { StillSurface } from './useStillSurface'
+import { tooltipProps } from './ToolbarTooltip'
+
+/**
+ * The row button's text is a toolbar tooltip (`ToolbarTooltip`, drawn in the
+ * pick row's band); the panel's and the dialog's button sit outside the
+ * toolbar rows, so they keep the plain `title`.
+ */
+function targetTip(variant: 'row' | 'panel', text: string): { readonly title: string } | ReturnType<typeof tooltipProps> {
+  return variant === 'row' ? tooltipProps(text) : { title: text }
+}
 
 /** Props for {@link TargetChooser}. */
 export interface TargetChooserProps {
@@ -116,7 +126,7 @@ export function TargetChooser(props: TargetChooserProps): JSX.Element {
         aria-label={view.name}
         aria-haspopup="menu"
         aria-expanded={at !== null}
-        title={target.terminalName === null ? 'Open a terminal and start your agent there' : 'Picked elements are sent to this terminal'}
+        {...targetTip(variant, target.terminalName === null ? 'Open a terminal and start your agent there' : 'Picked elements are sent to this terminal')}
         onClick={() => (at === null ? open() : close())}
       >
         {arrow !== null && (

@@ -14,6 +14,7 @@ vi.mock('../../LoggingService', () => ({ logger: { debug: vi.fn(), info: vi.fn()
 import { createManualClock } from '../../../../shared/clock'
 import type { StripEvent } from '../../../../shared/ipc/browser-tab-schema'
 import { tempHome, tempProject, testSigner } from '../site/__test-helpers__/siteFakes'
+import { ActivationTracker } from './popupActivation'
 import { BrowserPopups, type BrowserPopupsDeps } from './BrowserPopups'
 import type { PopupHost } from './BrowserPopupWindow'
 
@@ -152,6 +153,20 @@ describe('BrowserPopups', () => {
     expect(outlet.openTab).toHaveBeenCalledWith('http://app.test/child.html', false, tabBound)
     page.close()
     expect(popups.list()).toEqual([])
+  })
+
+  it('releases a popup\'s activation tracker when the popup closes, not when its tab does', () => {
+    const unlisten = vi.spyOn(ActivationTracker.prototype, 'unlisten')
+    const { openPopup, link } = setup()
+    const page = new FakePage()
+    openPopup(page)
+    unlisten.mockClear()
+    page.close()
+    expect(unlisten).toHaveBeenCalledTimes(1)
+    link.detach()
+    // Only the tab page's own tracker is left for the tab's detach.
+    expect(unlisten).toHaveBeenCalledTimes(2)
+    unlisten.mockRestore()
   })
 
   it('a popup that cannot be built closes its webContents', () => {

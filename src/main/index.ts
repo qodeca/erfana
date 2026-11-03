@@ -312,7 +312,7 @@ function createWindow(): BrowserWindow {
   // from a dead window, and a second window's views would have leaked.
   const previewWindowId = mainWindow.id
   mainWindow.on('closed', () => {
-    closeBrowserWindow(previewWindowId) // spec 025: a tab belongs to its window
+    void closeBrowserWindow(previewWindowId) // spec 025: a tab belongs to its window
     void previewHandlers?.closeWindow(previewWindowId).catch((error) => {
       logger.warn('Preview teardown on window close failed', {
         windowId: previewWindowId,

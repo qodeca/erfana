@@ -15,6 +15,7 @@ vi.mock('../../../ipc/browserTab/pick-handlers', () => ({ registerBrowserTabPick
 import { createManualClock } from '../../../../shared/clock'
 import { BROWSER_TAB_EVENTS } from '../../../../shared/ipc/browser-tab-channels'
 import type { BrowserTab } from '../BrowserTab'
+import { BrowserProjectTeardown } from '../browserProjectTeardown'
 import { encodePng, installBrowserPicks, registerPickSession } from './pickAppSetup'
 import { FakePickCdp } from './__test-helpers__/fakePickCdp'
 
@@ -36,7 +37,7 @@ describe('pickAppSetup', () => {
     const registerHandlers = vi.fn()
     const service = { tabOf: vi.fn(() => null), inputFor: vi.fn(() => null) }
     const projectSession = session()
-    const setup = installBrowserPicks({ clock: createManualClock(), tabs: () => service as never, projectSession: projectSession as never, terminals: () => null, registerHandlers })
+    const setup = installBrowserPicks({ clock: createManualClock(), tabs: () => service as never, projectSession: projectSession as never, terminals: () => null, teardown: new BrowserProjectTeardown(), registerHandlers })
     const { tabs, picks } = registerHandlers.mock.calls[0][0]
     expect(picks).toBe(setup.picks)
     tabs.tabOf(1, 'browser-tab-1')
@@ -59,6 +60,7 @@ describe('pickAppSetup', () => {
       tabs: () => ({ tabOf: () => null, inputFor: () => input }) as never,
       projectSession: session() as never,
       terminals: () => null,
+      teardown: new BrowserProjectTeardown(),
       registerHandlers: vi.fn()
     })
     const features = { attachTab: vi.fn(() => 'page'), detachTab: vi.fn() }
@@ -86,6 +88,13 @@ describe('pickAppSetup', () => {
     expect(features.detachTab).toHaveBeenCalledWith('page')
   })
 
+  it('registers the endPick and abortCaptureWrites stages on the teardown', () => {
+    const teardown = new BrowserProjectTeardown()
+    const onStage = vi.spyOn(teardown, 'onStage')
+    installBrowserPicks({ clock: createManualClock(), tabs: () => ({}) as never, projectSession: session() as never, terminals: () => null, teardown, registerHandlers: vi.fn() })
+    expect(onStage.mock.calls.map(([stage]) => stage)).toEqual(['endPick', 'abortCaptureWrites'])
+  })
+
   it('attaches no pipeline for a tab whose window is gone', () => {
     fromId.mockReturnValue({ isDestroyed: () => true })
     const input = { state: vi.fn(), dispatch: vi.fn(), attachPick: vi.fn() }
@@ -94,6 +103,7 @@ describe('pickAppSetup', () => {
       tabs: () => ({ tabOf: () => null, inputFor: () => input }) as never,
       projectSession: session() as never,
       terminals: () => null,
+      teardown: new BrowserProjectTeardown(),
       registerHandlers: vi.fn()
     })
     setup.withPicks({ attachTab: () => 'page', detachTab: () => undefined }).attachTab({ id: 'browser-tab-2', windowId: 4 } as unknown as BrowserTab, null, null)

@@ -116,10 +116,12 @@ export function SignInBox(props: SignInBoxProps): JSX.Element {
           type="checkbox"
           checked={!noKeyring && remember}
           disabled={noKeyring}
+          // Named by the label text alone; the wrapped description stays its description, not part of its name.
+          aria-labelledby={`${base}-remember-label`}
           aria-describedby={`${base}-remember`}
           onChange={e => setRemember(e.target.checked)}
         />
-        <span>Remember for this project</span>
+        <span id={`${base}-remember-label`}>Remember for this project</span>
         <span id={`${base}-remember`} className="erf-site-prompt__desc">
           {noKeyring ? 'No keyring – cannot store passwords safely' : "Saved encrypted in this project's browser data"}
         </span>

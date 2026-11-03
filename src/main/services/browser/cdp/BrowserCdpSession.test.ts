@@ -435,6 +435,24 @@ describe('BrowserCdpSession – flood budget (S6, S-14)', () => {
     expect(contents.debugger.methods(TOP_TARGET)).toEqual([])
   })
 
+  it('keeps logs on through a page load of 400 requests in one second, and still records a later console error', () => {
+    const { session, contents } = attached()
+    contents.debugger.clearSent()
+    for (let i = 0; i < 400; i++) {
+      const url = `http://localhost:5173/src/m${i}.ts`
+      contents.debugger.emit('Network.requestWillBeSent', { requestId: `r${i}`, request: { url } })
+      contents.debugger.emit('Network.requestWillBeSentExtraInfo', { requestId: `r${i}`, headers: {} })
+      contents.debugger.emit('Network.responseReceived', { requestId: `r${i}`, response: { url, status: 200 } })
+      contents.debugger.emit('Network.responseReceivedExtraInfo', { requestId: `r${i}`, headers: {} })
+      contents.debugger.emit('Network.dataReceived', { requestId: `r${i}`, dataLength: 4096 })
+      contents.debugger.emit('Network.loadingFinished', { requestId: `r${i}` })
+    }
+    contents.debugger.emit('Runtime.consoleAPICalled', consoleCall('error', 'after load'))
+    expect(contents.debugger.methods(TOP_TARGET)).not.toContain('Runtime.disable')
+    expect(session.logSnapshot().truncated).toBe(false)
+    expect(session.logSnapshot().console.at(-1)?.message).toBe('after load')
+  })
+
   it('still handles target events from a flooded target', () => {
     const { session, contents, clock } = attached()
     flood(contents, TOP_TARGET)

@@ -5,7 +5,7 @@ import { act, cleanup, createEvent, fireEvent, render, screen } from '@testing-l
 import type { StripRow as StripRowPayload } from '../../../../../shared/ipc/browser-tab-schema'
 
 const { gateway, warn } = vi.hoisted(() => ({
-  gateway: { answerStrip: vi.fn(async () => ({ ok: true })) },
+  gateway: { answerStrip: vi.fn(async (): Promise<string> => 'accepted') },
   warn: vi.fn()
 }))
 vi.mock('../../../services/browserTabGateway', () => ({ browserTabGateway: gateway }))
@@ -191,6 +191,50 @@ describe('StripRows', () => {
     fireEvent.submit(submit.closest('form') as HTMLFormElement)
     expect(gateway.answerStrip).toHaveBeenCalledWith({ tabId: TAB, requestId: 's', answer: 'signIn', fields: { username: 'ada', remember: true } })
     expect(screen.getByRole('button', { name: 'Signing in…' })).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it.each([
+    ['guarded', () => gateway.answerStrip.mockResolvedValueOnce('guarded')],
+    ['unknown', () => gateway.answerStrip.mockResolvedValueOnce('unknown')],
+    ['a failed call', () => gateway.answerStrip.mockRejectedValueOnce(new Error('gone'))]
+  ])('sign-in: gives the box back when main answers %s', async (_name, arrange) => {
+    const signIn = row('s', { kind: 'signIn', text: 'Sign in', answers: ['signIn', 'cancel'], signIn: { username: 'ada', savedPassword: false, insecure: false, rejected: null, remember: 'available' } })
+    render(<StripRows tabId={TAB} rows={[{ row: signIn, since: now }]} refused={null} refusedId="r" onEmpty={vi.fn()} />)
+    pass(STRIP_INPUT_GUARD_MS)
+    arrange()
+    const submit = screen.getByRole('button', { name: 'Sign in' })
+    pointerDownAt(submit, now)
+    fireEvent.submit(submit.closest('form') as HTMLFormElement)
+    expect(screen.getByRole('button', { name: 'Signing in…' })).toHaveAttribute('aria-disabled', 'true')
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(screen.getByRole('button', { name: 'Sign in' })).not.toHaveAttribute('aria-disabled')
+  })
+
+  it('sign-in: stays "Signing in…" once main accepted the answer', async () => {
+    const signIn = row('s', { kind: 'signIn', text: 'Sign in', answers: ['signIn', 'cancel'], signIn: { username: 'ada', savedPassword: false, insecure: false, rejected: null, remember: 'available' } })
+    render(<StripRows tabId={TAB} rows={[{ row: signIn, since: now }]} refused={null} refusedId="r" onEmpty={vi.fn()} />)
+    pass(STRIP_INPUT_GUARD_MS)
+    const submit = screen.getByRole('button', { name: 'Sign in' })
+    pointerDownAt(submit, now)
+    fireEvent.submit(submit.closest('form') as HTMLFormElement)
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(screen.getByRole('button', { name: 'Signing in…' })).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('announces a row again when it arrives with the same words as the last one', () => {
+    const { rerender } = render(<StripRows tabId={TAB} rows={[{ row: row('p1'), since: now }]} refused={null} refusedId="r" onEmpty={vi.fn()} />)
+    const first = screen.getByTestId('browser-strip-announcer').textContent
+    rerender(<StripRows tabId={TAB} rows={[]} refused={null} refusedId="r" onEmpty={vi.fn()} />)
+    rerender(<StripRows tabId={TAB} rows={[{ row: row('p2'), since: now }]} refused={null} refusedId="r" onEmpty={vi.fn()} />)
+    const second = screen.getByTestId('browser-strip-announcer').textContent
+    expect(second).not.toBe(first)
+    expect(second?.trim()).toBe(first?.trim())
+    rerender(<StripRows tabId={TAB} rows={[{ row: row('p3'), since: now }]} refused={null} refusedId="r" onEmpty={vi.fn()} />)
+    expect(screen.getByTestId('browser-strip-announcer').textContent).toBe(first)
   })
 
   it('sign-in without a keyring: Remember disabled with its reason; typed password sent; Cancel answers', () => {

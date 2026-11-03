@@ -73,7 +73,7 @@ export function EmptyTabPage({ localAddresses, onOpen }: EmptyTabPageProps): JSX
       )}
       <p className="erf-brw-page__hint">
         Load your app, then click <strong>Pick element</strong> ({browserShortcut('pick').label}) to
-        pick an element
+        pick an element.
       </p>
     </div>
   )

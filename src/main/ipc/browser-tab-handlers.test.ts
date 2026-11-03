@@ -209,6 +209,19 @@ describe('registerBrowserTabHandlers', () => {
     expect(service.answerStrip).toHaveBeenCalledWith(3, TAB, 'r1', 'allowOnce', undefined)
   })
 
+  it('answers with what the service did, and unknown for a refused, unowned or failed request', () => {
+    expect(invoke('browser-tab:answerStrip', { tabId: TAB, requestId: 'r1', answer: 'signIn' })).toBe('accepted')
+    service.answerStrip.mockReturnValueOnce('guarded')
+    expect(invoke('browser-tab:answerStrip', { tabId: TAB, requestId: 'r1', answer: 'signIn' })).toBe('guarded')
+    service.answerStrip.mockReturnValueOnce(null as never)
+    expect(invoke('browser-tab:answerStrip', { tabId: TAB, requestId: 'r1', answer: 'signIn' })).toBe('unknown')
+    service.answerStrip.mockImplementationOnce(() => {
+      throw new Error('boom')
+    })
+    expect(invoke('browser-tab:answerStrip', { tabId: TAB, requestId: 'r1', answer: 'signIn' })).toBe('unknown')
+    expect(invoke('browser-tab:answerStrip', { tabId: TAB, requestId: 'r 1', answer: 'signIn' })).toBe('unknown')
+  })
+
   it('025-AC-022 passes a sign-in answer\'s fields to the service', () => {
     const fields = { username: 'staging', password: 'pw', remember: true }
     invoke('browser-tab:answerStrip', { tabId: TAB, requestId: 'r1', answer: 'signIn', fields })

@@ -4,10 +4,11 @@
  * The `erfana-local:` scheme – the only way a built-in browser tab loads a
  * local file (spec 025, ADR 0012).
  *
- * Commit 4 of the solution design registers the scheme as privileged and makes
- * it dead everywhere it must never work: Erfana's own session answers every
- * `erfana-local:` request with 403. The real handler goes on browser sessions
- * only, through `ses.protocol.handle`, when local files land (commit 11).
+ * The scheme is registered as privileged (`appSchemes.ts`) and made dead
+ * where it must never work: Erfana's own session answers every
+ * `erfana-local:` request with 403. Local files load from loopback folder
+ * servers instead (ADR 0012 option 4, `local/LocalFileServers.ts`), so no
+ * session gets a real handler.
  */
 import type { Session } from 'electron'
 import { logger } from '../LoggingService'

@@ -13,15 +13,12 @@
  * ADR 0011). Pick events go back as `browser-tab:pick`, to the owning window
  * only.
  *
- * As in `browser-tab-handlers.ts`: registered through `registry.ts`
- * (identity, top-level frame, renderer URL and the window kind's channel
- * allow-list), the exact-URL {@link isTrustedSender} checked again, the
- * payload parsed with its strict zod schema, the window resolved from the
- * sender – never from the payload – and never a throw. A terminal is checked
+ * As in `browser-tab-handlers.ts`: registered through `registry.ts`, then
+ * the identity gate (`tabRequestGate.ts`), and never a throw. A terminal is checked
  * against the sender's own `webContents`: a window can only target its own
  * terminals (025-FR-061).
  */
-import { BrowserWindow, type IpcMainInvokeEvent } from 'electron'
+import type { IpcMainInvokeEvent } from 'electron'
 import { BROWSER_TAB_CHANNELS } from '../../../shared/ipc/browser-tab-channels'
 import {
   ClosePickRequestSchema,
@@ -48,6 +45,7 @@ import { logger } from '../../services/LoggingService'
 import { redactedLogError } from '../../utils/redactUserInput'
 import { registerHandle, unregisterHandle } from '../registry'
 import { isTrustedSender as defaultIsTrustedSender } from '../senderValidation'
+import { createTabGate, guarded, resolveWindowId as defaultResolveWindowId, type Parser } from './tabRequestGate'
 
 export interface BrowserTabPickHandlerDeps {
   readonly tabs: Pick<BrowserTabService, 'tabOf' | 'inputFor'>
@@ -71,36 +69,16 @@ export const BROWSER_TAB_PICK_CHANNELS = [
   C.targetStatus
 ] as const
 
-interface Parser<T> {
-  safeParse(value: unknown): { success: true; data: T } | { success: false; error: { message: string } }
-}
-
 const REFUSED = 'Request refused'
 const NO: PickActionResponse = { ok: false }
 
 /** Register the pick channels; returns the function that removes them. */
 export function registerBrowserTabPickHandlers(deps: BrowserTabPickHandlerDeps): () => void {
-  const isTrusted = deps.isTrustedSender ?? defaultIsTrustedSender
-  const resolveWindowId =
-    deps.resolveWindowId ??
-    ((event) => {
-      const window = BrowserWindow.fromWebContents(event.sender)
-      return window === null || window.isDestroyed() ? null : window.id
-    })
-
-  function accept<T>(channel: string, event: IpcMainInvokeEvent, schema: Parser<T>, arg: unknown): { windowId: number; data: T } | null {
-    if (!isTrusted(event)) {
-      logger.warn('Rejected a browser tab request from an untrusted sender', { channel })
-      return null
-    }
-    const parsed = schema.safeParse(arg)
-    if (!parsed.success) {
-      logger.warn('Rejected a browser tab request with an invalid payload', { channel, error: parsed.error.message })
-      return null
-    }
-    const windowId = resolveWindowId(event)
-    return windowId === null ? null : { windowId, data: parsed.data }
-  }
+  const { accept, acceptTab } = createTabGate<IpcMainInvokeEvent, number, BrowserTab>({
+    isTrusted: deps.isTrustedSender ?? defaultIsTrustedSender,
+    resolveWindow: deps.resolveWindowId ?? defaultResolveWindowId,
+    tabOf: (windowId, tabId) => deps.tabs.tabOf(windowId, tabId)
+  })
 
   /** The tab and its pick pipeline when the sender's window owns the tab. */
   function acceptPick<T extends { tabId: string }>(
@@ -109,20 +87,9 @@ export function registerBrowserTabPickHandlers(deps: BrowserTabPickHandlerDeps):
     schema: Parser<T>,
     arg: unknown
   ): { tab: BrowserTab; pick: BrowserTabPick; data: T } | null {
-    const accepted = accept(channel, event, schema, arg)
-    if (accepted === null) return null
-    const tab = deps.tabs.tabOf(accepted.windowId, accepted.data.tabId)
-    const pick = tab === null ? null : deps.picks.forTab(tab)
-    return tab === null || pick === null ? null : { tab, pick, data: accepted.data }
-  }
-
-  function guarded<R>(channel: string, fallback: R, act: () => R): R {
-    try {
-      return act()
-    } catch (error) {
-      logger.error('Browser tab request failed', redactedLogError(error), { channel })
-      return fallback
-    }
+    const accepted = acceptTab(channel, event, schema, arg)
+    const pick = accepted === null ? null : deps.picks.forTab(accepted.tab)
+    return accepted === null || pick === null ? null : { tab: accepted.tab, pick, data: accepted.data }
   }
 
   registerHandle(C.pickMode, (event, arg: unknown): PickActionResponse => {
@@ -164,8 +131,7 @@ export function registerBrowserTabPickHandlers(deps: BrowserTabPickHandlerDeps):
   })
 
   registerHandle(C.still, async (event, arg: unknown): Promise<StillResponse> => {
-    const accepted = accept(C.still, event, StillRequestSchema, arg)
-    const tab = accepted === null ? null : deps.tabs.tabOf(accepted.windowId, accepted.data.tabId)
+    const tab = acceptTab(C.still, event, StillRequestSchema, arg)?.tab ?? null
     if (tab === null) return { error: REFUSED }
     try {
       return await takeSurfaceStill(tab.contents)

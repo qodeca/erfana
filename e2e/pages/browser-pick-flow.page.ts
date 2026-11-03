@@ -215,7 +215,7 @@ export class PickFlow {
 
   /** The "Page paused" / "Still image" chip in the status slot. */
   get statusChip(): Locator {
-    return this.status.locator('.erf-brw-chip')
+    return this.status.locator('.erf-brw-tag')
   }
 
   /** The pick row's width in CSS px. */

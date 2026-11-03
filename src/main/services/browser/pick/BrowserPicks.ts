@@ -18,6 +18,9 @@
  *   the files were written – they go, the capture stays.
  * - {@link BrowserPicks.targetStatus}: the toolbar's target status.
  * - Capture expiry follows the open project (`CaptureExpiry`).
+ * - Teardown (ADR 0009 decision 14): {@link BrowserPicks.endPicks} and
+ *   {@link BrowserPicks.abortCaptureWrites} are the `endPick` and
+ *   `abortCaptureWrites` stages, registered by `pickAppSetup.ts`.
  */
 import { randomBytes } from 'node:crypto'
 import type { Clock } from '../../../../shared/clock'
@@ -26,6 +29,7 @@ import { widthPreset as presetOf } from '../../../../shared/browser/widthPresets
 import type { PickEvent, TargetStatusResponse, WriteCaptureResponse } from '../../../../shared/ipc/browser-tab-schema'
 import { logger } from '../../LoggingService'
 import type { BrowserTab, TabHost } from '../BrowserTab'
+import { tabInScope, type BrowserProjectTeardown } from '../browserProjectTeardown'
 import { outlineColour } from '../capture/accentColour'
 import { guardOf, targetStatus, targetStatusAtSend, targetStatusResponse, type TargetTerminals } from '../capture/BrowserTargetStatus'
 import type { Bitmap } from '../capture/captureImage'
@@ -39,6 +43,13 @@ import { PickBench, PickFaults } from './pickSupport'
 /** Longest a send waits for the facts and hints before writing what it has. */
 export const SEND_READ_TIMEOUT_MS = 10_000
 
+/**
+ * Longest a teardown waits for a capture write before closing the views. A
+ * write still running after it deletes its own files when it ends, as its
+ * capture is gone; the wait only keeps a stuck disk from holding the teardown.
+ */
+export const TEARDOWN_WRITE_WAIT_MS = 2_000
+
 export interface BrowserPicksDeps {
   readonly clock: Clock
   /** PNG encoding of a BGRA bitmap (Electron's `nativeImage` in the app). */
@@ -46,7 +57,7 @@ export interface BrowserPicksDeps {
   /** The terminal service's guard surface; without it every target reads as no terminal. */
   readonly terminals?: () => TargetTerminals | null
   readonly store?: CaptureStore
-  /** The tab-kind CDP session of a page `webContents`, when recorded outside {@link BrowserPicks.registerSession}. */
+  /** The tab-kind CDP session of a page `webContents` (`pickAppSetup.registerPickSession`). */
   readonly sessionOf?: (contents: object) => PickCdp | null
 }
 
@@ -63,8 +74,9 @@ export class BrowserPicks {
   readonly faults = new PickFaults()
   readonly bench = new PickBench()
   readonly store: CaptureStore
-  private readonly sessions = new WeakMap<object, PickCdp>()
   private readonly byTab = new Map<string, { tab: BrowserTab; pick: BrowserTabPick }>()
+  /** Capture writes in flight, for {@link abortCaptureWrites}. */
+  private readonly writes = new Set<{ readonly tab: BrowserTab; readonly done: Promise<unknown> }>()
 
   constructor(private readonly deps: BrowserPicksDeps) {
     this.store = deps.store ?? new CaptureStore(() => () => this.faults.writeFault())
@@ -97,11 +109,6 @@ export class BrowserPicks {
     pick.dispose()
   }
 
-  /** Record the tab-kind CDP session of a page `webContents` (`browserAppSetup.attachTabCdp`). */
-  registerSession(contents: object, cdp: PickCdp): void {
-    this.sessions.set(contents, cdp)
-  }
-
   /**
    * Give `tab` its pick pipeline, wired to its routing (`BrowserTabInput`):
    * pick mode, Up and Down and the capture effects. Pick events go to `send`
@@ -109,7 +116,7 @@ export class BrowserPicks {
    */
   attach(tab: BrowserTab, host: TabHost, input: TabPickInput | null, send: (event: PickEvent) => void): BrowserTabPick | null {
     if (input === null || this.byTab.has(tab.id)) return null
-    const pick = this.attachTab(tab, host, this.sessions.get(tab.contents) ?? this.deps.sessionOf?.(tab.contents) ?? null, input, { pick: send })
+    const pick = this.attachTab(tab, host, this.deps.sessionOf?.(tab.contents) ?? null, input, { pick: send })
     if (pick === null) return null
     input.attachPick({ mode: (on) => pick.setMode(on), refine: (move) => pick.refine(move), onEffect: (effect) => pick.onEffect(effect) })
     this.byTab.set(tab.id, { tab, pick })
@@ -138,6 +145,37 @@ export class BrowserPicks {
     entry.pick.dispose()
   }
 
+  /** Register {@link endPicks} and {@link abortCaptureWrites} as their teardown stages; returns the unregister function. */
+  registerTeardown(teardown: Pick<BrowserProjectTeardown, 'onStage'>): () => void {
+    const offs = [
+      teardown.onStage('endPick', (scope) => this.endPicks((tab) => tabInScope(scope, tab))),
+      teardown.onStage('abortCaptureWrites', (scope) => this.abortCaptureWrites((tab) => tabInScope(scope, tab)))
+    ]
+    return () => offs.forEach((off) => off())
+  }
+
+  /** Teardown stage `endPick`: end pick mode without sending on every tab `within` selects. Never rejects. */
+  async endPicks(within: (tab: BrowserTab) => boolean): Promise<void> {
+    const ends = [...this.byTab.values()]
+      .filter((entry) => within(entry.tab))
+      .map((entry) => entry.pick.end().catch((error: unknown) => logger.warn('Browser teardown: pick mode did not end cleanly', { error: String(error) })))
+    await Promise.all(ends)
+  }
+
+  /**
+   * Teardown stage `abortCaptureWrites`: wait, at most
+   * {@link TEARDOWN_WRITE_WAIT_MS}, for the capture writes of the tabs
+   * `within` selects. `endPicks` dropped their captures, so each write
+   * deletes the files it wrote as it ends (025-FR-053). Never rejects.
+   */
+  async abortCaptureWrites(within: (tab: BrowserTab) => boolean): Promise<void> {
+    const writes = [...this.writes].filter((write) => within(write.tab)).map((write) => write.done)
+    if (writes.length === 0) return
+    await withTimeout(this.deps.clock, Promise.allSettled(writes), TEARDOWN_WRITE_WAIT_MS).catch(() =>
+      logger.warn('Browser teardown: a capture write is still running; it deletes its files when it ends')
+    )
+  }
+
   /** The toolbar's status of `terminalId` for the window whose renderer is `ownerWebContentsId`. */
   targetStatus(ownerWebContentsId: number, terminalId: string): TargetStatusResponse {
     const terminals = this.deps.terminals?.() ?? null
@@ -158,11 +196,14 @@ export class BrowserPicks {
     if (capture.writing !== null) return (await capture.writing) as WriteCaptureResponse
     const startedAt = this.deps.clock.now()
     const writing = this.write(tab, pick, input.captureId)
+    const tracked = { tab, done: writing }
     capture.writing = writing
+    this.writes.add(tracked)
     try {
       return await writing
     } finally {
       capture.writing = null
+      this.writes.delete(tracked)
       this.bench.record('send', this.deps.clock.now() - startedAt)
     }
   }

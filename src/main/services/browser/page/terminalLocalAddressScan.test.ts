@@ -5,7 +5,7 @@
  * only, escape sequences removed, sentence punctuation dropped, chunks
  * joined, each address once.
  */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { findLocalAddresses, MAX_LOCAL_ADDRESSES, TerminalLocalAddresses } from './terminalLocalAddressScan'
 
 describe('findLocalAddresses', () => {
@@ -59,5 +59,24 @@ describe('TerminalLocalAddresses', () => {
     const seen = new TerminalLocalAddresses()
     const lines = Array.from({ length: MAX_LOCAL_ADDRESSES + 5 }, (_, i) => `http://localhost:${3000 + i}/`).join('\n')
     expect(seen.scan('t1', `${lines}\n`)).toHaveLength(MAX_LOCAL_ADDRESSES)
+  })
+
+  it('stops scanning once full, and does not strip or parse a chunk that names neither host', () => {
+    const matchAll = vi.spyOn(String.prototype, 'matchAll')
+    try {
+      const seen = new TerminalLocalAddresses()
+      seen.scan('t1', 'compiling 412 modules\nhttp://example.test/ ready\n')
+      expect(matchAll).not.toHaveBeenCalled()
+      expect(seen.scan('t1', 'at HTTP://LOCALHOST:5173/\n')).toEqual(['http://localhost:5173/'])
+      expect(matchAll).toHaveBeenCalledTimes(1)
+      const lines = Array.from({ length: MAX_LOCAL_ADDRESSES }, (_, i) => `http://localhost:${3000 + i}/`).join('\n')
+      seen.scan('t1', `${lines}\n`)
+      matchAll.mockClear()
+      expect(seen.scan('t1', 'http://localhost:9999/\n')).toEqual([])
+      expect(matchAll).not.toHaveBeenCalled()
+      expect(seen.list()).toHaveLength(MAX_LOCAL_ADDRESSES)
+    } finally {
+      matchAll.mockRestore()
+    }
   })
 })

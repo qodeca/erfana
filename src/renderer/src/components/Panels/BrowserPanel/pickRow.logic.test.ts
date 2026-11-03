@@ -7,8 +7,11 @@ import {
   heldRequestsText,
   noteDuration,
   pickBanner,
+  pickAnnouncement,
   pickPlace,
   preWarning,
+  spokenSize,
+  type PickAnnounceFacts,
   targetChosen,
   targetView,
   type PickPlace
@@ -138,5 +141,62 @@ describe('heldRequestsText (025-FR-054, S-28)', () => {
     expect(heldRequestsText(0)).toBeNull()
     expect(heldRequestsText(-1)).toBeNull()
     expect(heldRequestsText(Number.NaN)).toBeNull()
+  })
+})
+
+describe('pickAnnouncement (design § Announcements, M-45)', () => {
+  const idle: PickAnnounceFacts = {
+    on: false,
+    frozen: false,
+    captureId: null,
+    changedAt: null,
+    name: null,
+    size: null,
+    note: null,
+    noteSeq: 0,
+    sent: null
+  }
+  const held: PickAnnounceFacts = { ...idle, on: true, captureId: 'c1', name: 'button.cta', size: '176 × 32' }
+
+  it('says pick mode on and off', () => {
+    expect(pickAnnouncement(idle, { ...idle, on: true })).toBe('Picking. Esc to stop.')
+    expect(pickAnnouncement({ ...idle, on: true }, idle)).toBe('Picking stopped.')
+  })
+
+  it('says each refinement with the size spoken, and nothing for the first capture or a same-element refresh', () => {
+    expect(pickAnnouncement({ ...idle, on: true }, held)).toBeNull()
+    expect(pickAnnouncement(held, { ...held, changedAt: 5, name: 'div.card', size: '320 × 200' })).toBe('Picked div.card, 320 by 200.')
+    expect(pickAnnouncement({ ...held, changedAt: 5 }, { ...held, changedAt: 5 })).toBeNull()
+  })
+
+  it('says a refinement end note as a sentence, but not other notes', () => {
+    expect(pickAnnouncement(held, { ...held, note: 'topOfPage', noteSeq: 1 })).toBe('Top of the page.')
+    expect(pickAnnouncement(held, { ...held, note: 'backAtStart', noteSeq: 1 })).toBe('Back at the element you started from.')
+    expect(pickAnnouncement(held, { ...held, note: 'pageMoved', noteSeq: 1 })).toBeNull()
+    expect(pickAnnouncement({ ...idle, on: true }, { ...idle, on: true, note: 'topOfPage', noteSeq: 1 })).toBeNull()
+  })
+
+  it('says "Page paused." once, when the held capture freezes', () => {
+    expect(pickAnnouncement(held, { ...held, frozen: true })).toBe('Page paused.')
+    expect(pickAnnouncement({ ...held, frozen: true }, { ...held, frozen: true })).toBeNull()
+  })
+
+  it('says the send with the fallback named, instead of "Picking stopped." when the send ends pick mode', () => {
+    const sent = { ...idle, sent: 'Sent Explain to Terminal' }
+    const expected = 'Sent Explain to Terminal. Show terminal and Open capture are also in the target menu.'
+    expect(pickAnnouncement(held, sent)).toBe(expected)
+    expect(pickAnnouncement({ ...sent, on: true }, sent)).toBeNull()
+    expect(pickAnnouncement(sent, idle)).toBeNull()
+  })
+
+  it('never speaks about the hover label: it is not one of the facts', () => {
+    expect(Object.keys(idle)).not.toContain('label')
+  })
+})
+
+describe('spokenSize', () => {
+  it('reads the × as "by"', () => {
+    expect(spokenSize('101 × 18')).toBe('101 by 18')
+    expect(spokenSize('7×9')).toBe('7 by 9')
   })
 })

@@ -15,18 +15,27 @@
  *   paused under the pointer or keyboard focus), a note (4 s or 2 s), the
  *   banner for where keyboard focus is – its later clauses fold first as the
  *   row narrows – and the "Page paused" or "Still image" chip, then the
- *   "1 site request waiting" chip (S-28). A polite live region says it.
+ *   "1 site request waiting" chip (S-28). The slot has no live role: the
+ *   tab's hidden polite region (`PickAnnouncer`) says what the design lists,
+ *   never the hover label (M-45). The hover label is read here from the
+ *   store, so a hover moving across the page re-renders this row only.
  * - **The target chooser** opens over the page's still image.
+ * - While the panel or the dialog is open (`surface`), the row marks
+ *   `data-surface`: the width preset leaves and the target folds, so the
+ *   banner's first clause never clips (025-FR-065, `PickRow.css`).
+ * - **Tooltips** of both toolbar rows draw inside this row's band
+ *   (`ToolbarTooltip`); while one shows, the send notice's 5 s pause.
  *
  * The row is an F6 zone (`data-brw-zone="pick"`).
  */
 import { forwardRef, useEffect, useRef, useState } from 'react'
 import { FileText, SquareMousePointer, SquareTerminal } from 'lucide-react'
-import { useBrowserPickStore, type BrowserPickTab } from '../../../stores/useBrowserPickStore'
+import { useBrowserPickStore, type PickTabView } from '../../../stores/useBrowserPickStore'
 import { browserShortcut } from './browserShortcuts'
 import { heldRequestsText, NOTE_TEXT, noteDuration, pickBanner, type PickPlace } from './pickRow.logic'
 import type { SendNotice as SendNoticeFacts } from './useBrowserPick'
 import { BROWSER_TEST_IDS } from './browserTestIds'
+import { tooltipProps } from './ToolbarTooltip'
 
 /** How long the send notice shows (025-FR-060). */
 export const SEND_NOTICE_MS = 5000
@@ -34,7 +43,8 @@ export const SEND_NOTICE_MS = 5000
 /** Props for {@link PickRow}. */
 export interface PickRowProps {
   readonly tabId: string | null
-  readonly pick: BrowserPickTab
+  /** The tab's pick state, without the hover label – this row reads that itself. */
+  readonly pick: PickTabView
   /** A web page is shown: pick mode may start. */
   readonly live: boolean
   readonly place: PickPlace
@@ -51,6 +61,12 @@ export interface PickRowProps {
   readonly target: React.ReactNode
   /** The width preset menu button; folds by CSS (`PickRow.css`). */
   readonly widthPreset?: React.ReactNode
+  /** The prompt-actions panel or the instruction dialog is open over the page. */
+  readonly surface?: 'none' | 'panel' | 'dialog'
+  /** The toolbar tooltip bubble, drawn in this row's band. */
+  readonly tooltip?: React.ReactNode
+  /** A toolbar tooltip shows: the send notice's timer pauses under it. */
+  readonly tooltipOpen?: boolean
 }
 
 /** The send notice, with its 5 s that pause while the pointer or focus is on it. */
@@ -58,16 +74,19 @@ function SendNoticeSlot({
   notice,
   onShowTerminal,
   onOpenCapture,
-  onDone
+  onDone,
+  held
 }: {
   readonly notice: SendNoticeFacts
   readonly onShowTerminal: () => void
   readonly onOpenCapture: (contextPath: string) => void
   readonly onDone: () => void
+  /** A toolbar tooltip shows in the band (design R2-H5: the 5 s pause under it). */
+  readonly held: boolean
 }): JSX.Element {
   const [hovered, setHovered] = useState(false)
   const [focused, setFocused] = useState(false)
-  const paused = hovered || focused
+  const paused = hovered || focused || held
   // A pause stops the clock; after it only the time left runs (025-FR-060). A new notice starts afresh.
   const remainingRef = useRef(SEND_NOTICE_MS)
   useEffect(() => {
@@ -119,6 +138,8 @@ function SendNoticeSlot({
 export const PickRow = forwardRef<HTMLDivElement, PickRowProps>(function PickRow(props, ref) {
   const { tabId, pick, live, place, notice } = props
   const shortcut = browserShortcut('pick')
+  // Read here, not in the panel: each hovered element re-renders this row alone (performance review).
+  const label = useBrowserPickStore(s => (tabId === null ? null : (s.byTab.get(tabId)?.label ?? null)))
 
   // A note replaces the banner's later clauses for its time, then goes (a newer note restarts it).
   useEffect(() => {
@@ -128,7 +149,7 @@ export const PickRow = forwardRef<HTMLDivElement, PickRowProps>(function PickRow
     return () => clearTimeout(timer)
   }, [pick.note, pick.noteSeq, tabId])
 
-  const banner = pick.on || pick.capture !== null ? pickBanner(place, shortcut.label, pick.label) : null
+  const banner = pick.on || pick.capture !== null ? pickBanner(place, shortcut.label, label) : null
   const note = pick.note === null ? null : NOTE_TEXT[pick.note]
   const chip = pick.capture === null ? null : pick.frozen ? 'Page paused' : props.still ? 'Still image' : null
   const held = heldRequestsText(props.heldRequests ?? 0)
@@ -147,6 +168,7 @@ export const PickRow = forwardRef<HTMLDivElement, PickRowProps>(function PickRow
       data-brw-zone="pick"
       data-picking={pick.on ? 'true' : undefined}
       data-notice={notice !== null ? 'true' : undefined}
+      data-surface={props.surface === undefined || props.surface === 'none' ? undefined : props.surface}
       data-testid={BROWSER_TEST_IDS.PICK_ROW}
     >
       <button
@@ -155,15 +177,21 @@ export const PickRow = forwardRef<HTMLDivElement, PickRowProps>(function PickRow
         aria-pressed={pick.on}
         aria-disabled={live ? undefined : true}
         aria-keyshortcuts={shortcut.aria}
-        title={tooltip}
+        {...tooltipProps(tooltip)}
         onClick={props.onToggle}
       >
         <SquareMousePointer size={16} strokeWidth={2} aria-hidden="true" />
         <span className="erf-brw-pickbtn__label">Pick element</span>
       </button>
-      <span className="erf-brw-status" aria-live="polite" data-testid={BROWSER_TEST_IDS.PICK_STATUS}>
+      <span className="erf-brw-status" data-testid={BROWSER_TEST_IDS.PICK_STATUS}>
         {notice !== null ? (
-          <SendNoticeSlot notice={notice} onShowTerminal={props.onShowTerminal} onOpenCapture={props.onOpenCapture} onDone={props.onNoticeDone} />
+          <SendNoticeSlot
+            notice={notice}
+            onShowTerminal={props.onShowTerminal}
+            onOpenCapture={props.onOpenCapture}
+            onDone={props.onNoticeDone}
+            held={props.tooltipOpen === true}
+          />
         ) : pick.capturing ? (
           <span className="erf-brw-banner-line">Capturing…</span>
         ) : banner !== null ? (
@@ -178,8 +206,8 @@ export const PickRow = forwardRef<HTMLDivElement, PickRowProps>(function PickRow
                 </span>
               ))
             )}
-            {chip !== null && <span className="erf-brw-chip">{chip}</span>}
-            {held !== null && <span className="erf-brw-chip">{held}</span>}
+            {chip !== null && <span className="erf-brw-tag">{chip}</span>}
+            {held !== null && <span className="erf-brw-tag">{held}</span>}
           </span>
         ) : note !== null ? (
           <span className="erf-brw-banner-line">{note}</span>
@@ -188,6 +216,7 @@ export const PickRow = forwardRef<HTMLDivElement, PickRowProps>(function PickRow
       <span className="erf-brw-spacer" />
       {props.widthPreset}
       {props.target}
+      {props.tooltip}
     </div>
   )
 })

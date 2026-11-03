@@ -42,6 +42,30 @@ function setup(over: Partial<BrowserStillDeps> = {}) {
 }
 
 describe('browserStill', () => {
+  it('forget drops every holder and the picture at once, and throws away a capture still in flight', async () => {
+    const pending = deferred<StillResponse>()
+    const { still, deps, log } = setup({ capture: vi.fn(() => pending.promise) })
+    expect(await still.showPick(TAB, 'pick', BITMAP)).toBe(true)
+    const late = still.hold(TAB, 'more')
+    still.forget(TAB)
+    expect(still.holds(TAB, 'pick')).toBe(false)
+    expect(still.holds(TAB, 'more')).toBe(false)
+    expect(log.at(-1)).toBe('image:none')
+    // No return to wait for: the tab is gone.
+    expect(deps.whenShown).not.toHaveBeenCalled()
+    pending.resolve(OK)
+    expect(await late).toBe(false)
+    expect(log.at(-1)).toBe('image:none')
+  })
+
+  it('forget cancels a pending return and drops the picture without waiting for it', async () => {
+    const { still, log } = setup()
+    await still.hold(TAB, 'more')
+    still.release(TAB, 'more')
+    still.forget(TAB)
+    expect(log.slice(-2)).toEqual(['cancelReturn', 'image:none'])
+  })
+
   it('shows the picture, waits two frames, then covers the page; returns it before dropping the picture', async () => {
     const { still, log, pageBack } = setup()
     expect(await still.hold(TAB, 'more')).toBe(true)

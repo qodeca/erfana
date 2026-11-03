@@ -15,7 +15,7 @@
  * until it is logged, and only then asserts nothing came before it.
  * Condition-based waits only.
  */
-import type { ElectronApplication, Page } from '@playwright/test'
+import type { ElectronApplication, Locator, Page } from '@playwright/test'
 import { test, expect } from './fixtures/browserHarness'
 import type { BrowserPagePage } from './pages/browser-page.page'
 import { PAGE_AREA, type BrowserTabPage } from './pages/browser-tab.page'
@@ -24,6 +24,7 @@ import { MonacoPage } from './pages/monaco.page'
 import { EditorPanelPage } from './pages/editor-panel.page'
 import { ProjectTreePage } from './pages/project-tree.page'
 import { BrowserSendUi } from './pages/browser-send.page'
+import { BROWSER_TEST_IDS } from '../src/renderer/src/components/Panels/BrowserPanel/browserTestIds'
 
 type Modifier = 'shift' | 'control' | 'alt' | 'meta'
 
@@ -434,6 +435,76 @@ test.describe('built-in browser key routing in the tab (renderer and main)', () 
     }
 
     expect(await page.eval<string[]>(`window.__fixture.log.filter(e => e.type === 'keydown').map(e => e.detail)`)).toEqual([])
+  })
+
+  test('025-AC-065 a toolbar tooltip shown by keyboard focus takes the first Esc alone and the second Esc returns to the page; one shown by hover goes with the Esc that ends pick mode', async ({
+    appWithTestProject,
+    windowWithTestProject,
+    browserServers,
+    testProject
+  }) => {
+    const send = await BrowserSendUi.open(appWithTestProject, windowWithTestProject, testProject.path)
+    const { panel, pick } = send
+    await send.load(browserServers.sites.static.url('/events.html'))
+    const page = await panel.page()
+    const keyboard = windowWithTestProject.keyboard
+    // One bubble, drawn inside the pick row's band for both toolbar rows (design R2-H5).
+    const tooltip = pick.row.getByTestId(BROWSER_TEST_IDS.TOOLBAR_TOOLTIP)
+    const focusPage = async (): Promise<void> => {
+      await page.clickSelector('#text')
+      await expect.poll(() => send.routingFocus(), { timeout: WAIT_MS }).toBe('page')
+    }
+    const pressed = (): Promise<string | null> => pick.pickButton.getAttribute('aria-pressed')
+    /** Esc once: only the tooltip goes. Esc again: focus returns to the page; pick mode is unchanged. */
+    const twoPressEsc = async (control: Locator, wantPressed: string): Promise<void> => {
+      await expect(control).toBeFocused()
+      await expect(tooltip).toBeVisible({ timeout: WAIT_MS })
+      await keyboard.press('Escape')
+      await expect(tooltip).toHaveCount(0)
+      await expect(control).toBeFocused()
+      expect(await pressed()).toBe(wantPressed)
+      expect(await send.routingFocus()).toBe('toolbar')
+      await keyboard.press('Escape')
+      await expect.poll(() => send.routingFocus(), { timeout: WAIT_MS }).toBe('page')
+      expect(await pressed()).toBe(wantPressed)
+    }
+
+    // Reload, reached by Tab (Shift+Tab back from the address bar).
+    await focusPage()
+    await page.key('l', [MOD])
+    await expect(panel.addressBar).toBeFocused()
+    await keyboard.press('Shift+Tab')
+    const reload = panel.tool('Reload')
+    await expect(tooltip).toContainText('Reload (')
+    await twoPressEsc(reload, 'false')
+
+    // Pick element with pick mode off, then on.
+    for (const on of [false, true]) {
+      await focusPage()
+      if (on) {
+        await page.key('e', [MOD])
+        await expect(pick.pickButton).toHaveAttribute('aria-pressed', 'true')
+      }
+      await page.key('F6')
+      await expect(panel.addressBar).toBeFocused()
+      await keyboard.press('F6')
+      await expect(tooltip).toContainText(on ? 'Stop picking' : 'Pick element (')
+      await twoPressEsc(pick.pickButton, String(on))
+    }
+
+    // The pick row's last control, the target chooser, by Shift+F6 from the page: the same two presses.
+    await focusPage()
+    await page.key('F6', ['shift'])
+    await expect(tooltip).toContainText(/Picked elements are sent to this terminal|Open a terminal and start your agent there/)
+    await twoPressEsc(pick.target, 'true')
+
+    // Hover only, page focus, pick mode on: the page's Esc ends pick mode and the tooltip goes in the same press.
+    await focusPage()
+    await pick.pickButton.hover()
+    await expect(tooltip).toContainText('Stop picking', { timeout: WAIT_MS })
+    await page.key('Escape')
+    await expect(pick.pickButton).toHaveAttribute('aria-pressed', 'false')
+    await expect(tooltip).toHaveCount(0)
   })
 
   test('025-AC-071 from page focus, Ctrl/Cmd+L then Tab leaves the browser tab after its last toolbar control; Ctrl+Tab selects the next editor tab', async ({

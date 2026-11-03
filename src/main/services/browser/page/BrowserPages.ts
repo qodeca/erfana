@@ -69,6 +69,8 @@ export interface BrowserPagesDeps {
   readonly noticeToRenderer?: (webContentsId: number, address: string) => void
   /** Mints strip row ids; random by default. */
   readonly newRowId?: () => string
+  /** `LocalFileServers.displayAddress`, so a local page's load failure logs a redacted path (ADR 0012 decision 9). */
+  readonly displayAddress?: (url: string) => string | null
   /** The clearing step timeout; a test seam. */
   readonly clearStepTimeoutMs?: number
 }
@@ -102,6 +104,7 @@ export class BrowserPages {
       hang,
       clock: this.deps.clock,
       newRowId: this.deps.newRowId,
+      displayAddress: this.deps.displayAddress,
       site: { committed: (page) => this.committed(page), zoom: (page, step) => this.zoom(page, step) }
     }
     const page = new BrowserTabPage(deps)

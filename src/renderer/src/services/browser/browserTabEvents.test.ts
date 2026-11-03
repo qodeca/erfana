@@ -32,7 +32,8 @@ vi.mock('./browserTabLifecycle', () => lifecycle)
 const still = vi.hoisted(() => ({
   hold: vi.fn(async () => true),
   showPick: vi.fn(async () => true),
-  release: vi.fn()
+  release: vi.fn(),
+  forget: vi.fn()
 }))
 vi.mock('./browserStill', () => ({ browserStill: still, PICK_STILL_HOLDER: 'pick', CONTEXT_MENU_STILL_HOLDER: 'contextMenu' }))
 const toasts = vi.hoisted(() => ({ showErrorToast: vi.fn() }))
@@ -144,6 +145,8 @@ describe('mountBrowserTabEvents', () => {
     )
     emit('tabClosed', { tabId: 'browser-tab-1' })
     expect(useBrowserPickStore.getState().byTab.has('browser-tab-1')).toBe(false)
+    // Every still holder and the picture go with the tab, even when the panel unmounts before its release runs.
+    expect(still.forget).toHaveBeenCalledWith('browser-tab-1')
   })
 
   it('every callback returns nothing, so the context bridge never clones a panel', () => {

@@ -132,14 +132,27 @@ export class TabWindowOpen {
    * The handler for `contents` (the tab's page, or one of its popups), with
    * its own activation tracker. `track` starts counting presses at once; a
    * tab passes `false` and calls {@link startTracking} after its input
-   * routers attached, so a press they drop is not counted.
+   * routers attached, so a press they drop is not counted. `dispose`
+   * releases the tracker when `contents` goes before the tab (a popup that
+   * closed); {@link detach} releases every one left.
    */
-  handlerFor(contents: OpenerContents, track: boolean): { handler: WindowOpenHandler; startTracking: () => void } {
+  handlerFor(contents: OpenerContents, track: boolean): { handler: WindowOpenHandler; startTracking: () => void; dispose: () => void } {
     const tracker = new ActivationTracker(this.deps.clock)
     this.trackers.push(tracker)
     const startTracking = (): void => tracker.listen(contents)
     if (track) startTracking()
-    return { handler: (details) => this.decide(details, contents, tracker), startTracking }
+    const dispose = (): void => {
+      const at = this.trackers.indexOf(tracker)
+      if (at < 0) return
+      this.trackers.splice(at, 1)
+      tracker.unlisten()
+    }
+    return { handler: (details) => this.decide(details, contents, tracker), startTracking, dispose }
+  }
+
+  /** How many activation trackers the tab holds (the tab's page and each open popup). */
+  get trackerCount(): number {
+    return this.trackers.length
   }
 
   /** A strip answer; `null` when `requestId` is not the "Pop-up blocked" row. */

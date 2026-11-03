@@ -27,6 +27,7 @@ import { browserViewBounds } from './browserViewBounds'
 import { useBrowserTabStore } from '../../stores/useBrowserTabStore'
 import { useBrowserChromeStore } from '../../stores/useBrowserChromeStore'
 import { logger } from '../../utils/logger'
+import { browserStill } from './browserStill'
 
 /** What opening a panel's tab came to. */
 export type EnsureTabResult = { readonly tabId: string } | { readonly error: string }
@@ -108,6 +109,8 @@ export function closeBrowserTab(panelId: string): void {
   if (tabId !== null) {
     browserViewBounds.unregister(tabId)
     useBrowserChromeStore.getState().dropTab(tabId)
+    // Its still image and every holder go too, whatever the panel's effects managed before unmounting.
+    browserStill.forget(tabId)
     if (!closedInMain.delete(tabId)) {
       browserTabGateway.close(tabId, false).catch((error: unknown) => {
         logger.error('Browser tab could not be closed', error instanceof Error ? error : undefined)

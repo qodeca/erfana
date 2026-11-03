@@ -23,6 +23,7 @@ describe('widthMenuItems (025-FR-012)', () => {
     expect(items.map(i => i.reason)).toEqual([undefined, 'Width only – touch and mobile mode are in DevTools', 'Width only – touch and mobile mode are in DevTools'])
     items[2].action()
     expect(choose).toHaveBeenCalledWith('tablet')
+    expect(items.map(i => i.checked)).toEqual([false, true, false])
   })
 })
 
@@ -36,7 +37,9 @@ describe('WidthPresetMenu', () => {
     expect(button).toHaveTextContent('Tablet width (768px)')
     fireEvent.click(button)
     expect(button).toHaveAttribute('aria-expanded', 'true')
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Full width' }))
+    // The current choice is exposed, not only drawn (menuitemradio, aria-checked).
+    expect(screen.getByRole('menuitemradio', { name: /^Tablet width/ })).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Full width' }))
     expect(choose).toHaveBeenCalledWith('full')
     expect(screen.queryByRole('menu')).toBeNull()
   })

@@ -32,19 +32,39 @@ export interface StillImageProps {
   readonly zoomPercent: number
 }
 
+/** Whether this machine stores a 32-bit word low byte first (every platform Electron ships on does). */
+const LITTLE_ENDIAN = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1
+
 /**
  * A copy of `bgra` with red and blue swapped – the order `ImageData` takes.
+ * A trailing partial pixel stays zero.
  *
- * @param bgra - Main's bitmap bytes
+ * Up to 33 MB arrive per still, converted before the first paint, so the swap
+ * is one pass over 32-bit words on the copy's own aligned buffer rather than
+ * four byte writes per pixel (performance review, spec 025); a big-endian
+ * machine takes the byte loop.
+ *
+ * @param bgra - Main's bitmap bytes (any byte offset)
  * @returns RGBA bytes
  */
 export function bgraToRgba(bgra: Uint8Array): Uint8ClampedArray<ArrayBuffer> {
+  const whole = bgra.length - (bgra.length % 4)
   const rgba = new Uint8ClampedArray(new ArrayBuffer(bgra.length))
-  for (let i = 0; i + 3 < bgra.length; i += 4) {
-    rgba[i] = bgra[i + 2]
-    rgba[i + 1] = bgra[i + 1]
-    rgba[i + 2] = bgra[i]
-    rgba[i + 3] = bgra[i + 3]
+  if (!LITTLE_ENDIAN) {
+    for (let i = 0; i < whole; i += 4) {
+      rgba[i] = bgra[i + 2]
+      rgba[i + 1] = bgra[i + 1]
+      rgba[i + 2] = bgra[i]
+      rgba[i + 3] = bgra[i + 3]
+    }
+    return rgba
+  }
+  rgba.set(bgra.subarray(0, whole))
+  // Little-endian bytes B G R A read as the word 0xAARRGGBB: keep A and G, swap the R and B bytes.
+  const words = new Uint32Array(rgba.buffer, 0, whole / 4)
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i]
+    words[i] = (word & 0xff00ff00) | ((word >>> 16) & 0xff) | ((word & 0xff) << 16)
   }
   return rgba
 }

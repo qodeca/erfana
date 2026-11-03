@@ -7,8 +7,9 @@
  *
  * A file is `{ version, generation, entries, hmac }`. The HMAC (purpose-bound,
  * `utils/lockHmac.ts`) covers the version, the **kind** (the purpose), the
- * **generation**, the project's canonical path and the entries, so a file
- * copied in from another project, or one of another kind renamed, does not
+ * **generation**, the home record's **epoch**, the project's canonical path
+ * and the entries, so a file copied in from another project, one of another
+ * kind renamed, or one signed before the home record was re-created does not
  * verify.
  *
  * - **No replay.** The generation must equal the kind's current one in the
@@ -36,8 +37,8 @@ import type { PurposeSigner } from '../browserProfileMarker'
 import type { ProfileGenerations } from '../profileGenerations'
 import { BROWSER_DIR_SEGMENTS, PROFILE_DIR_NAME, PROFILE_ERFANA_DIR_NAME } from '../browserProfilePaths'
 
-/** 2 added the generation; a version 1 file is ignored. */
-const FILE_VERSION = 2
+/** 2 added the generation, 3 the epoch; an older file is ignored. */
+const FILE_VERSION = 3
 
 /** `.erfana/browser/profile/Erfana/<name>` as segments below the project root. */
 export function profileErfanaSegments(name: string): readonly string[] {
@@ -60,9 +61,9 @@ export interface SignedListFile<T> {
   readonly label: string
 }
 
-/** The signed bytes: the entries as the schema outputs them, with the kind, the generation and the project. */
-function signedBody<T>(file: SignedListFile<T>, generation: number, entries: readonly T[]): string {
-  return JSON.stringify({ version: FILE_VERSION, kind: file.purpose, generation, project: file.canonical, entries })
+/** The signed bytes: the entries as the schema outputs them, with the kind, the generation, the epoch and the project. */
+function signedBody<T>(file: SignedListFile<T>, generation: number, epoch: string, entries: readonly T[]): string {
+  return JSON.stringify({ version: FILE_VERSION, kind: file.purpose, generation, epoch, project: file.canonical, entries })
 }
 
 /**
@@ -95,14 +96,15 @@ export async function readSignedList<T>(file: SignedListFile<T>): Promise<T[]> {
     logger.warn(`${file.label}: file malformed, ignored`)
     return []
   }
-  const verdict = file.signer.verify(file.purpose, signedBody(file, parsed.generation, parsed.entries), parsed.hmac)
-  if (verdict !== 'valid') {
-    logger.warn(`${file.label}: file not signed by this account, ignored`, { verdict })
+  const current = await file.generations.current(file.purpose)
+  const epoch = await file.generations.epoch()
+  if (current === undefined || epoch === undefined) {
+    logger.warn(`${file.label}: no generation recorded for this project, file ignored`)
     return []
   }
-  const current = await file.generations.current(file.purpose)
-  if (current === undefined) {
-    logger.warn(`${file.label}: no generation recorded for this project, file ignored`)
+  const verdict = file.signer.verify(file.purpose, signedBody(file, parsed.generation, epoch, parsed.entries), parsed.hmac)
+  if (verdict !== 'valid') {
+    logger.warn(`${file.label}: file not signed by this account, ignored`, { verdict })
     return []
   }
   if (parsed.generation !== current) {
@@ -123,7 +125,9 @@ export async function writeSignedList<T>(file: SignedListFile<T>, entries: reado
   const normalized = entries.map((e) => file.entry.parse(e))
   try {
     const generation = await file.generations.next(file.purpose)
-    const hmac = file.signer.sign(file.purpose, signedBody(file, generation, normalized))
+    const epoch = await file.generations.epoch()
+    if (epoch === undefined) throw new Error('The home generation record went while the file was written')
+    const hmac = file.signer.sign(file.purpose, signedBody(file, generation, epoch, normalized))
     if (hmac === undefined) return
     const data = JSON.stringify({ version: FILE_VERSION, generation, entries: normalized, hmac })
     await replaceFile(file.canonical, file.segments, data)

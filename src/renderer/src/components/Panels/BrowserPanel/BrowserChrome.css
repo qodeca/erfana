@@ -38,10 +38,11 @@
   background: var(--color-bg-hover-solid);
 }
 
-/* The inner-gap ring of the Focus card: inside the chip, so it never meets the field's edge. */
+/* deviates: docs/design-system/system/foundations/focus.html – chip sits inside the field's ring.
+   The ring is inset by --space-1 over the chip's visible 1px edge, so it never meets the
+   address field's own outward ring (M-32); the card's inner-gap form needs a transparent edge. */
 .erf-brw-chip:focus-visible {
   outline: var(--border-width-thick) solid var(--color-border-focus);
-  /* Inset: the chip sits inside the address field's own ring. */
   outline-offset: calc(var(--space-1) * -1);
 }
 

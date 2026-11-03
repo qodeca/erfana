@@ -48,7 +48,8 @@ describe('PickRow (025-FR-025, 025-FR-065)', () => {
   })
   afterEach(() => {
     vi.useRealTimers()
-    useBrowserPickStore.getState().forget(TAB)
+    // The row reads the hover label from the store, so it hears this while still mounted.
+    act(() => useBrowserPickStore.getState().forget(TAB))
   })
 
   it('is an F6 zone with Pick element, an empty status and the target', () => {
@@ -57,8 +58,12 @@ describe('PickRow (025-FR-025, 025-FR-065)', () => {
     const button = screen.getByRole('button', { name: 'Pick element' })
     expect(button).toHaveAttribute('aria-pressed', 'false')
     expect(button).toHaveAttribute('aria-keyshortcuts', 'Meta+E')
-    expect(button.title).toContain('press ⌘E again to pick what is under the mouse')
-    expect(status()).toHaveAttribute('aria-live', 'polite')
+    // The tooltip's text is the button's description (shown on focus and hover by ToolbarTooltip), never a native title.
+    expect(button).not.toHaveAttribute('title')
+    expect(button.dataset.tip).toContain('press ⌘E again to pick what is under the mouse')
+    expect(button).toHaveAccessibleDescription(/press ⌘E again to pick what is under the mouse/)
+    // The visible slot has no live role: the tab's hidden region speaks (M-45).
+    expect(status()).not.toHaveAttribute('aria-live')
     expect(status()).toBeEmptyDOMElement()
     fireEvent.click(button)
     expect(props.onToggle).toHaveBeenCalledOnce()
@@ -77,18 +82,42 @@ describe('PickRow (025-FR-025, 025-FR-065)', () => {
     expect(row).toHaveAttribute('data-notice', 'true')
   })
 
+  it('marks data-surface while the panel or the dialog is open, so the width preset and target fold by CSS', () => {
+    const { rerender, props } = renderRow({ pick: HELD, place: 'panel' })
+    const row = screen.getByTestId(BROWSER_TEST_IDS.PICK_ROW)
+    expect(row).not.toHaveAttribute('data-surface')
+    rerender(<PickRow {...props} surface="panel" />)
+    expect(row).toHaveAttribute('data-surface', 'panel')
+    rerender(<PickRow {...props} surface="dialog" />)
+    expect(row).toHaveAttribute('data-surface', 'dialog')
+    rerender(<PickRow {...props} surface="none" />)
+    expect(row).not.toHaveAttribute('data-surface')
+  })
+
+  it('draws the toolbar tooltip in its band, and holds the send notice while one shows', () => {
+    const notice = { text: 'Sent Explain to Terminal', contextPath: 'c.md' }
+    const { rerender, props } = renderRow({ notice, tooltip: <span role="tooltip">Reload (⌘R)</span>, tooltipOpen: true })
+    expect(screen.getByTestId(BROWSER_TEST_IDS.PICK_ROW)).toContainElement(screen.getByRole('tooltip'))
+    act(() => vi.advanceTimersByTime(SEND_NOTICE_MS * 2))
+    expect(props.onNoticeDone).not.toHaveBeenCalled()
+    rerender(<PickRow {...props} tooltip={null} tooltipOpen={false} />)
+    act(() => vi.advanceTimersByTime(SEND_NOTICE_MS))
+    expect(props.onNoticeDone).toHaveBeenCalledOnce()
+  })
+
   it('marks Pick element unavailable without a live page', () => {
     renderRow({ live: false })
     const button = screen.getByRole('button', { name: 'Pick element' })
     expect(button).toHaveAttribute('aria-disabled', 'true')
-    expect(button.title).toBe('Load a page to pick an element')
+    expect(button.dataset.tip).toBe('Load a page to pick an element')
   })
 
   it('shows the banner for where focus is, and the hover label in place of its later clauses', () => {
     const { rerender, props } = renderRow({ pick: { ...IDLE_PICK, on: true } })
     expect(screen.getByRole('button', { name: 'Pick element' })).toHaveAttribute('aria-pressed', 'true')
     expect(status()).toHaveTextContent('Picking – click an elementEsc to stop⌘E picks under the mouse')
-    rerender(<PickRow {...props} pick={{ ...IDLE_PICK, on: true, label: 'a.link' }} />)
+    // The hover label comes from the store, read by the row itself (performance review).
+    act(() => useBrowserPickStore.getState().apply({ tabId: TAB, kind: 'highlight', label: 'a.link' }))
     expect(status()).toHaveTextContent('Picking – click an elementa.link')
     rerender(<PickRow {...props} pick={{ ...IDLE_PICK, on: true }} place="toolbar" />)
     expect(status()).toHaveTextContent('Picking – Esc returns to the page')
@@ -101,6 +130,8 @@ describe('PickRow (025-FR-025, 025-FR-065)', () => {
     expect(status()).toHaveTextContent('Page paused')
     rerender(<PickRow {...props} pick={HELD} place="panel" still />)
     expect(status()).toHaveTextContent('Still image')
+    // A static tag, never the interactive address chip.
+    expect(screen.getByText('Still image')).toHaveClass('erf-brw-tag')
   })
 
   it('shows the waiting site requests beside the still chip while the menu or dialog is open (S-28)', () => {

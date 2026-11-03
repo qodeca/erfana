@@ -15,7 +15,7 @@
  *   renderer may use only the `browser-tab:popup*` channels. It reserves
  *   {@link BrowserPopupWindowDeps.stripHeight} above the page for the popup's
  *   origin strip and prompt rows, so the requested content size is the
- *   page's. The host loads the strip's renderer (`loadHost`, commit 18) and
+ *   page's. The host loads the strip's renderer (`loadHost`) and
  *   is told `browser-tab:popupChanged` after each commit.
  * - **Size and position** (`windowFeatures.ts`): the requested content size,
  *   clamped; every requested position ignored, so the popup opens where the
@@ -75,7 +75,7 @@ export interface PopupHost {
     readonly id: number
     isDestroyed(): boolean
     once(event: 'destroyed', listener: () => void): unknown
-    /** Tells the host's strip renderer that the committed address changed (commit 18). */
+    /** Tells the host's strip renderer that the committed address changed. */
     send?(channel: string, payload: unknown): void
   }
   readonly contentView: { addChildView(view: never): void }
@@ -111,9 +111,9 @@ export interface BrowserPopupWindowDeps {
   readonly features: Pick<WindowFeatures, 'width' | 'height'>
   /** The screen's work area the popup opens on. */
   readonly workArea: () => Size
-  /** The strip above the page: 0 until the popup's renderer exists (commit 18). */
+  /** The height reserved above the page for the popup's strip (`popupWindowElectron.ts`). */
   readonly stripHeight: number
-  /** The width the origin strip needs (badge word, registrable domain, port); 0 until commit 18 measures it. */
+  /** The width the origin strip needs (badge word, registrable domain, port). */
   readonly originMinWidth: number
   readonly resolveDomain: RegistrableDomainResolver
   readonly appAddresses: () => AppAddresses
@@ -125,7 +125,7 @@ export interface BrowserPopupWindowDeps {
   readonly createView: (contents: PopupContents) => PopupPageView
   /** Register the host's renderer as an Erfana window of kind `browserPopup`. */
   readonly registerHost: (host: PopupHost) => void
-  /** Load the origin strip's renderer into the host (commit 18); without it the strip area stays empty. */
+  /** Load the origin strip's renderer into the host; without it the strip area stays empty. */
   readonly loadHost?: (host: PopupHost) => void
   /** The window-open handler of the popup's own page (025-FR-011: a popup's opens follow the same rules). */
   readonly windowOpenHandler: (contents: PopupContents) => unknown

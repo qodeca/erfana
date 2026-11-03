@@ -24,8 +24,10 @@
  *   `DOM`, `CSS` and `Overlay` only between {@link enablePickDomains} and
  *   {@link disablePickDomains} (A12). `Page` is never turned on here: dialogs
  *   own it (ADR 0011), and its dialog events, when on, feed the hang probe.
- * - Flood budget per target (S6): over it, that target's log domains go off
- *   until the next navigation, and the log snapshot says "logs truncated".
+ * - Flood budget per target (S6, `cdpFloodBudget.ts`): only the events the
+ *   collector reads count, log and network events each against their own
+ *   limit; over either, that target's log domains go off until the next
+ *   navigation (`cdpTargetLogs.ts`), and the log snapshot says "logs truncated".
  * - Console objects released after each console call is copied (P7).
  * - The hang probe on the top target (025-FR-056).
  * - A debugger detach it did not ask for (the view closing, or anything
@@ -38,15 +40,15 @@
  * view's `did-navigate` (top) and `did-frame-navigate` (sub-frames, coarse:
  * any sub-frame navigation re-arms every flooded child target) re-enable it.
  */
-import type { Clock, TimerHandle } from '../../../../shared/clock'
+import type { Clock } from '../../../../shared/clock'
 import { mainClock } from '../../../utils/mainClock'
 import { logger } from '../../LoggingService'
 import { BrowserHangProbe } from './browserHangProbe'
 import { BrowserLogBuffer, type LogSnapshot } from './browserLogBuffer'
-import { CdpFloodBudget, eventPayloadSize } from './cdpFloodBudget'
 import { CdpLogCollector, type FailedRequestSource, type LogScope } from './cdpLogCollector'
 import { CdpRefusedError, checkCdpCommand, PICK_ONLY_DOMAINS, type CdpSessionKind } from './cdpAllowList'
-import { AUTO_ATTACH_PARAMS, CONSOLE_OBJECT_GROUP, HANG_PROBE_EVALUATE_PARAMS, NETWORK_ENABLE_PARAMS } from './cdpPinned'
+import { AUTO_ATTACH_PARAMS, HANG_PROBE_EVALUATE_PARAMS } from './cdpPinned'
+import { CdpTargetLogs, detachCause, isFrameTarget, newTargetRecord, originOf, TOP_TARGET, type TargetRecord } from './cdpTargetLogs'
 import {
   isRecord,
   type CdpDetachListener,
@@ -57,19 +59,14 @@ import {
 } from './cdpTypes'
 import { EventHub } from './eventHub'
 import { currentBrowserUserAgentOverride, userAgentOverrideMethod, type BrowserUserAgentOverride } from '../site/browserUserAgent'
-import type { BrowserCdpSessionEvents, CdpDetachCause, CdpDetachInfo, CdpTargetInfo, HangProbeControl } from './cdpSessionTypes'
+import type { BrowserCdpSessionEvents, CdpDetachInfo, CdpTargetInfo, HangProbeControl } from './cdpSessionTypes'
 
 export type { BrowserCdpSessionEvents, CdpDetachCause, CdpDetachInfo, CdpProtocolEvent, CdpTargetInfo, HangProbeControl } from './cdpSessionTypes'
 export type { HangProbeEvent } from './browserHangProbe'
 export type { LogSnapshot, LoggedConsoleEntry, LoggedFailedRequest } from './browserLogBuffer'
 export type { CdpSessionKind } from './cdpAllowList'
 export { CdpRefusedError } from './cdpAllowList'
-
-/** The top target's session key (Electron's root session has no id). */
-export const TOP_TARGET = ''
-
-/** Delay before a target's console objects are released, so a burst of calls costs one release. */
-export const CONSOLE_RELEASE_DELAY_MS = 250
+export { CONSOLE_RELEASE_DELAY_MS, TARGET_CLOSED_REASON, TOP_TARGET } from './cdpTargetLogs'
 
 /**
  * Delay before a waiting child is resumed: a new task, never the attach
@@ -91,36 +88,9 @@ export interface BrowserCdpSessionOptions {
   readonly dropElectronSecurityWarnings?: boolean
 }
 
-interface TargetRecord extends CdpTargetInfo {
-  readonly parentKey: string | null
-  readonly budget: CdpFloodBudget
-  logsOff: boolean
-  release: TimerHandle | undefined
-  resume: TimerHandle | undefined
-}
-
 const LOG_DOMAINS = ['Runtime.', 'Log.', 'Network.']
 const isLogEvent = (method: string): boolean => LOG_DOMAINS.some(d => method.startsWith(d))
-const isFrameTarget = (t: TargetRecord): boolean => t.sessionKey === TOP_TARGET || t.type === 'iframe'
 const str = (v: unknown): string => (typeof v === 'string' ? v : '')
-
-/** Electron's detach reason when the page goes away (`Debugger::AgentHostClosed`). */
-export const TARGET_CLOSED_REASON = 'target closed'
-
-/** A closing view detaches with "target closed" before `isDestroyed()` turns true (commit-8 probe). */
-function detachCause(contents: CdpWebContents, reason: string): CdpDetachCause {
-  if (contents.isDestroyed()) return 'viewClosed'
-  if (reason === TARGET_CLOSED_REASON && !contents.isDevToolsOpened()) return 'viewClosed'
-  return 'other'
-}
-
-function originOf(url: string): string {
-  try {
-    return new URL(url).origin
-  } catch {
-    return ''
-  }
-}
 
 export class BrowserCdpSession {
   readonly kind: CdpSessionKind
@@ -131,6 +101,7 @@ export class BrowserCdpSession {
   private readonly buffer: BrowserLogBuffer
   private readonly collector: CdpLogCollector
   private readonly probe: BrowserHangProbe
+  private readonly logs: CdpTargetLogs
   private readonly targets = new Map<string, TargetRecord>()
   private contents: CdpWebContents | null = null
   private topUrl = ''
@@ -150,6 +121,15 @@ export class BrowserCdpSession {
       onEvent: event => this.hub.emit('hang', event)
     })
     this.probe.suspend('detached')
+    this.logs = new CdpTargetLogs({
+      clock: this.clock,
+      source: this.source,
+      buffer: this.buffer,
+      fire: (method, sessionKey, params) => this.fire(method, sessionKey, params),
+      isCurrent: (target) => this.targets.get(target.sessionKey) === target,
+      rootFrameKey: (target) => this.scope(target).rootFrameKey,
+      onTruncated: (target) => this.hub.emit('logsTruncated', this.info(target))
+    })
   }
 
   get attached(): boolean {
@@ -309,17 +289,7 @@ export class BrowserCdpSession {
   }
 
   private addTarget(sessionKey: string, targetId: string, type: string, url: string, parentKey: string | null): TargetRecord {
-    const record: TargetRecord = {
-      sessionKey,
-      targetId,
-      type,
-      url,
-      parentKey,
-      budget: new CdpFloodBudget(this.clock),
-      logsOff: false,
-      release: undefined,
-      resume: undefined
-    }
+    const record = newTargetRecord(this.clock, { sessionKey, targetId, type, url }, parentKey)
     this.targets.set(sessionKey, record)
     return record
   }
@@ -328,19 +298,7 @@ export class BrowserCdpSession {
   private startTarget(target: TargetRecord): void {
     if (this.userAgent !== null) this.fire(userAgentOverrideMethod(target.type), target.sessionKey, this.userAgent)
     this.fire('Target.setAutoAttach', target.sessionKey, AUTO_ATTACH_PARAMS)
-    this.enableLogs(target)
-  }
-
-  private enableLogs(target: TargetRecord): void {
-    this.fire('Runtime.enable', target.sessionKey)
-    this.fire('Log.enable', target.sessionKey)
-    if (this.source === 'network') this.fire('Network.enable', target.sessionKey, NETWORK_ENABLE_PARAMS)
-  }
-
-  private disableLogs(target: TargetRecord): void {
-    this.fire('Runtime.disable', target.sessionKey)
-    this.fire('Log.disable', target.sessionKey)
-    if (this.source === 'network') this.fire('Network.disable', target.sessionKey)
+    this.logs.enable(target)
   }
 
   private info(target: TargetRecord): CdpTargetInfo {
@@ -359,14 +317,14 @@ export class BrowserCdpSession {
   private readonly onMessage: CdpMessageListener = (_event, method, params, sessionId) => {
     const target = this.targets.get(sessionId ?? TOP_TARGET)
     if (!target) return
-    if (target.budget.count(eventPayloadSize(params))) this.floodTripped(target)
+    if (target.budget.count(method, params)) this.logs.tripped(target)
     if (!isLogEvent(method)) {
       this.protocolEvent(target, method, params)
       return
     }
     if (target.logsOff) return
     if (method === 'Runtime.executionContextsCleared' && target.sessionKey === TOP_TARGET) this.buffer.clearAll()
-    if (this.collector.handle(this.scope(target), method, params)) this.scheduleRelease(target)
+    if (this.collector.handle(this.scope(target), method, params)) this.logs.scheduleRelease(target)
   }
 
   private protocolEvent(target: TargetRecord, method: string, params: unknown): void {
@@ -426,31 +384,6 @@ export class BrowserCdpSession {
     target.resume = undefined
   }
 
-  private floodTripped(target: TargetRecord): void {
-    target.logsOff = true
-    this.buffer.markTruncated(this.scope(target).rootFrameKey)
-    this.disableLogs(target)
-    logger.warn('Browser CDP: flood budget exceeded, logs off until navigation', { targetType: target.type })
-    this.hub.emit('logsTruncated', this.info(target))
-  }
-
-  private rearm(target: TargetRecord): void {
-    target.budget.reset()
-    if (!target.logsOff) return
-    target.logsOff = false
-    this.enableLogs(target)
-  }
-
-  private scheduleRelease(target: TargetRecord): void {
-    if (target.release !== undefined) return
-    target.release = this.clock.setTimeout(() => {
-      target.release = undefined
-      if (this.targets.get(target.sessionKey) !== target) return
-      this.fire('Runtime.releaseObjectGroup', target.sessionKey, { objectGroup: CONSOLE_OBJECT_GROUP })
-      this.fire('Runtime.discardConsoleEntries', target.sessionKey)
-    }, CONSOLE_RELEASE_DELAY_MS)
-  }
-
   private readonly onDidNavigate: DidNavigateListener = (_event, url) => {
     this.topUrl = url
     const top = this.targets.get(TOP_TARGET)
@@ -458,13 +391,13 @@ export class BrowserCdpSession {
     // With its logs on, the top target's executionContextsCleared already
     // cleared the frames, in order with the new document's first entries.
     if (top.logsOff) this.buffer.clearAll()
-    this.rearm(top)
+    this.logs.rearm(top)
   }
 
   private readonly onDidFrameNavigate: DidFrameNavigateListener = (_event, _url, _code, _text, isMainFrame) => {
     if (isMainFrame) return
     for (const target of this.targets.values()) {
-      if (target.sessionKey !== TOP_TARGET && target.logsOff) this.rearm(target)
+      if (target.sessionKey !== TOP_TARGET && target.logsOff) this.logs.rearm(target)
     }
   }
 

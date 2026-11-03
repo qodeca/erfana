@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import type { IDockviewPanelProps } from 'dockview'
 
 const gateway = vi.hoisted(() => ({
@@ -43,6 +43,7 @@ import { useBrowserStillStore } from '../../../stores/useBrowserStillStore'
 import type { BrowserPanelParams } from '../../../utils/openBrowserTab'
 import { browserState } from './__test__/browserState'
 import { BROWSER_TEST_IDS } from './browserTestIds'
+import { TOOLTIP_HOVER_DELAY_MS } from './ToolbarTooltip'
 
 const PANEL = 'browser-panel-1'
 const TAB = 'browser-tab-1'
@@ -240,9 +241,67 @@ describe('BrowserPanel', () => {
     act(() => screen.getByRole('combobox', { name: 'Address and search' }).focus())
     fireEvent.keyDown(screen.getByRole('combobox', { name: 'Address and search' }), { key: 'F6' })
     fireEvent.keyDown(screen.getByRole('button', { name: 'Pick element' }), { key: 'F6' })
-    expect(screen.getByRole('button', { name: 'Reload', description: '' })).toBeDefined()
-    expect(document.activeElement).toHaveTextContent('Reload')
+    // The crash page's own Reload, not the navigation row's (whose tooltip text is its description).
+    const erfanaPage = document.querySelector<HTMLElement>('.erf-brw-frame__erfana')
+    expect(erfanaPage).not.toBeNull()
+    const pageReload = within(erfanaPage as HTMLElement).getByRole('button', { name: 'Reload' })
+    expect(pageReload).not.toHaveAttribute('data-tip')
+    expect(document.activeElement).toBe(pageReload)
     expect(focusPage).not.toHaveBeenCalled()
+  })
+
+  it('wraps F6 to the address bar from the last zone on a first-run empty tab, where the page has nothing to focus', async () => {
+    gateway.suggest.mockResolvedValue({ rows: [] })
+    renderPanel()
+    host({ erfanaPage: 'empty', committedUrl: null })
+    await act(async () => undefined)
+    const address = screen.getByRole('combobox', { name: 'Address and search' })
+    act(() => address.focus())
+    fireEvent.keyDown(address, { key: 'F6' })
+    const pickButton = screen.getByRole('button', { name: 'Pick element' })
+    expect(pickButton).toHaveFocus()
+    fireEvent.keyDown(pickButton, { key: 'F6' })
+    expect(address).toHaveFocus()
+    expect(focusPage).not.toHaveBeenCalled()
+  })
+
+  it('025-AC-065 the first Esc on a focused toolbar control only hides its tooltip; the second returns focus to the page', () => {
+    renderPanel()
+    host()
+    const reload = screen.getByRole('button', { name: 'Reload' })
+    act(() => reload.focus())
+    const tooltip = screen.getByRole('tooltip')
+    expect(tooltip).toHaveTextContent('Reload (⌘R)')
+    // Drawn inside the pick row's band (design R2-H5).
+    expect(screen.getByTestId(BROWSER_TEST_IDS.PICK_ROW)).toContainElement(tooltip)
+    fireEvent.keyDown(reload, { key: 'Escape' })
+    expect(screen.queryByRole('tooltip')).toBeNull()
+    expect(reload).toHaveFocus()
+    expect(focusPage).not.toHaveBeenCalled()
+    fireEvent.keyDown(reload, { key: 'Escape' })
+    expect(focusPage).toHaveBeenCalled()
+  })
+
+  it('025-AC-065 a hover-only tooltip on Pick element hides when the page\'s Esc ends pick mode', async () => {
+    renderPanel()
+    host()
+    act(() => useBrowserPickStore.getState().apply({ tabId: TAB, kind: 'mode', on: true }))
+    fireEvent.pointerOver(screen.getByRole('button', { name: 'Pick element' }))
+    await act(async () => new Promise(resolve => setTimeout(resolve, TOOLTIP_HOVER_DELAY_MS + 20)))
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Stop picking')
+    act(() => useBrowserPickStore.getState().apply({ tabId: TAB, kind: 'mode', on: false }))
+    expect(screen.queryByRole('tooltip')).toBeNull()
+    act(() => useBrowserPickStore.getState().forget(TAB))
+  })
+
+  it('has one hidden polite region for pick and send, and the visible status slot is not live (M-45)', () => {
+    renderPanel()
+    host()
+    expect(screen.getByTestId(BROWSER_TEST_IDS.PICK_ANNOUNCER)).toHaveAttribute('aria-live', 'polite')
+    expect(screen.getByTestId(BROWSER_TEST_IDS.PICK_STATUS)).not.toHaveAttribute('aria-live')
+    act(() => useBrowserPickStore.getState().apply({ tabId: TAB, kind: 'mode', on: true }))
+    expect(screen.getByTestId(BROWSER_TEST_IDS.PICK_ANNOUNCER)).toHaveTextContent('Picking. Esc to stop.')
+    act(() => useBrowserPickStore.getState().forget(TAB))
   })
 
   it('loads an empty-tab row as a history navigation', async () => {

@@ -35,6 +35,7 @@ function make() {
     caseSensitive: true,
     appAddresses: () => APP,
     resolveDomain: (h) => h,
+    mediaInUse: () => ({ camera: false, microphone: false, screen: false }),
     expectDevTools: vi.fn(() => () => undefined),
     onStateChange: vi.fn(),
     onDestroyed: vi.fn(),

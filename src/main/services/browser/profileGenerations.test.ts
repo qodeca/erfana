@@ -56,9 +56,31 @@ describe('profileGenerations', () => {
   it('next increments from 1, persists before resolving, and survives a new instance', async () => {
     const generations = profileGenerations(home, PROJECT)
     expect(await generations.next(TRUST)).toBe(1)
-    expect(JSON.parse(readFileSync(record, 'utf8'))).toEqual({ version: 1, project: PROJECT, generations: { [TRUST]: 1 } })
+    expect(JSON.parse(readFileSync(record, 'utf8'))).toEqual({ version: 1, project: PROJECT, epoch: expect.stringMatching(/^[0-9a-f]{32}$/), generations: { [TRUST]: 1 } })
     expect(await generations.next(TRUST)).toBe(2)
     expect(await profileGenerations(home, PROJECT).current(TRUST)).toBe(2)
+  })
+
+  it('makes an epoch with the record, keeps it across writes, and makes a new one when the record is re-created (S3)', async () => {
+    const generations = profileGenerations(home, PROJECT)
+    expect(await generations.epoch()).toBeUndefined()
+    await generations.next(TRUST)
+    const first = await generations.epoch()
+    expect(first).toMatch(/^[0-9a-f]{32}$/)
+    await generations.next(PERMISSIONS)
+    expect(await profileGenerations(home, PROJECT).epoch()).toBe(first)
+    rmSync(record)
+    expect(await generations.next(TRUST)).toBe(1)
+    const second = await generations.epoch()
+    expect(second).toMatch(/^[0-9a-f]{32}$/)
+    expect(second).not.toBe(first)
+  })
+
+  it('treats a record without an epoch as malformed', async () => {
+    mkdirSync(dirname(record), { recursive: true })
+    writeFileSync(record, JSON.stringify({ version: 1, project: PROJECT, generations: { [TRUST]: 4 } }))
+    expect(await profileGenerations(home, PROJECT).current(TRUST)).toBeUndefined()
+    expect(await profileGenerations(home, PROJECT).epoch()).toBeUndefined()
   })
 
   it('counts each kind and each project on its own', async () => {

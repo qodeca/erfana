@@ -49,6 +49,19 @@ describe('moreMenuItems', () => {
     ])
   })
 
+  it('marks the current page width as the checked radio choice, and only the widths are choices', () => {
+    const items = moreMenuItems(facts({ widthPreset: 'tablet' }), actions()).filter(i => i.separator !== true)
+    expect(items.slice(0, 3).map(i => i.checked)).toEqual([false, false, true])
+    expect(items.slice(3).every(i => i.checked === undefined)).toBe(true)
+  })
+
+  it('exposes the current width to assistive tech when open (menuitemradio, aria-checked)', () => {
+    render(<MoreMenu actions={actions()} buttonRef={createRef()} {...facts({ widthPreset: 'phone' })} />)
+    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    expect(screen.getByRole('menuitemradio', { name: /^Phone width/ })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('menuitemradio', { name: 'Full width' })).toHaveAttribute('aria-checked', 'false')
+  })
+
   it('blocks page items without a page, the zoom ends and reset at 100%, each with its reason', () => {
     const none = moreMenuItems(facts({ live: false }), actions())
     const by = (label: string): (typeof none)[number] | undefined => none.find(i => i.label === label)
@@ -103,9 +116,11 @@ describe('MoreMenu with folded navigation tools', () => {
       />
     )
     fireEvent.click(screen.getByRole('button', { name: 'More' }))
-    const items = screen.getAllByRole('menuitem')
+    // Every item in menu order: plain items and the width choices (menuitemradio).
+    const items = [...screen.getByRole('menu').querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemradio"]')]
     expect(items[0]).toHaveTextContent('Back')
     expect(items[1]).toHaveTextContent('Full width')
+    expect(items[1]).toHaveAttribute('role', 'menuitemradio')
     expect(screen.getAllByRole('separator').length).toBeGreaterThan(0)
     fireEvent.click(items[0])
     expect(back).toHaveBeenCalledOnce()

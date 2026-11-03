@@ -29,6 +29,10 @@ export const BROWSER_TEST_IDS = {
   PICK_ROW: 'browser-pick-row',
   /** The pick row's status slot. */
   PICK_STATUS: 'browser-pick-status',
+  /** The tab's hidden polite region for pick and send (design § Announcements, M-45). */
+  PICK_ANNOUNCER: 'browser-pick-announcer',
+  /** The toolbar tooltip, drawn inside the pick row's band (025-AC-065). */
+  TOOLBAR_TOOLTIP: 'browser-toolbar-tooltip',
   /** The page's still image in the page area. */
   STILL: 'browser-still-image',
   /** The prompt-actions panel (the picked-element card). */

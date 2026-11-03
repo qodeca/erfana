@@ -5,6 +5,7 @@
  * rule 1; ADR 0012 decision 8), on a real temporary folder.
  */
 import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
+import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -83,6 +84,13 @@ describe('openConfinedFile', () => {
     if (!canLink) return
     expect((await opened(['link-out.txt'])).ok).toBe(false)
   })
+
+  it.runIf(process.platform !== 'win32')('refuses a named pipe before opening it, so no file thread blocks on it (security review S2)', async () => {
+    execFileSync('mkfifo', [join(root, 'pipe.mp4')])
+    const started = Date.now()
+    expect(await opened(['pipe.mp4'])).toEqual({ ok: false, status: 404 })
+    expect(Date.now() - started).toBeLessThan(2000)
+  }, 3000)
 
   it('refuses a folder link that leads out of the folder', async () => {
     if (!canLink) return

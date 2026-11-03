@@ -136,7 +136,7 @@ export function checkNavigation(
 
 const LOOPBACK_HOST = /^(?:localhost|[^.]+\.localhost|127(?:\.\d{1,3}){3}|\[::1\])$/i
 
-/** The address bar's badge for `url` until certificates are tracked (commit 12c). */
+/** The address bar's badge from `url` alone; a tab's certificate state overrides it (`BrowserTab.state`). */
 export function securityStateOf(url: string | null): 'secure' | 'local' | 'file' | 'notSecureHttp' {
   const parsed = url === null ? null : parse(url)
   if (parsed === null) return 'local'

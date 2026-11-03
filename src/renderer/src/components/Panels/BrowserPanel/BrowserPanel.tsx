@@ -48,6 +48,8 @@ import type { MoreMenuActions } from './MoreMenu'
 import { openInSystemBrowser } from './browserDataActions'
 import { ForgetDataDialog } from './ForgetDataDialog'
 import { PickRow } from './PickRow'
+import { PickAnnouncer } from './PickAnnouncer'
+import { ToolbarTooltipBubble, useToolbarTooltip } from './ToolbarTooltip'
 import { PickSurface } from './PickSurface'
 import { TargetChooser, type TargetChooserHandle } from './TargetChooser'
 import { WidthPresetMenu } from './WidthPresetMenu'
@@ -171,8 +173,11 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
       focusPage()
       return
     }
-    pageAreaRef.current?.querySelector<HTMLElement>(ERFANA_PAGE_FOCUSABLE)?.focus()
-  }, [live, focusPage])
+    const target = pageAreaRef.current?.querySelector<HTMLElement>(ERFANA_PAGE_FOCUSABLE)
+    // A first-run empty tab has nothing to focus: F6 wraps to the address bar, so the cycle never stops (025-FR-047).
+    if (target === null || target === undefined) focusAddress()
+    else target.focus()
+  }, [live, focusPage, focusAddress])
 
   // The panel's and the dialog's target button, so the banner's Choose terminal opens its menu (025-FR-061).
   const panelTargetRef = useRef<TargetChooserHandle>(null)
@@ -209,6 +214,16 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
   const openFind = useCallback(() => {
     if (live) setFindOpen(true)
   }, [live])
+
+  // Toolbar tooltips: on hover and keyboard focus, drawn in the pick row's band, two-press Esc (025-AC-065).
+  const tooltipRows = useMemo(() => [navRef, pickRowRef], [])
+  const tooltip = useToolbarTooltip({ rows: tooltipRows, band: pickRowRef, scope: rootRef, enabled: !dialogOpen })
+  // An Esc the page took ended pick mode: a hover-only tooltip goes with that press (025-AC-065).
+  const pickOn = pick.tab.on
+  const { dismissHover } = tooltip
+  useEffect(() => {
+    dismissHover()
+  }, [pickOn, dismissHover])
 
   const keys = useBrowserKeys({
     tabId,
@@ -419,7 +434,11 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
         widthPreset={
           state !== null && <WidthPresetMenu preset={state.widthPreset} onChoose={moreActions.widthPreset} still={widthStill} />
         }
+        surface={pick.surface}
+        tooltip={<ToolbarTooltipBubble view={tooltip.view} />}
+        tooltipOpen={tooltip.view !== null}
       />
+      <PickAnnouncer tabId={tabId} sent={pick.notice?.text ?? null} />
       {findOpen && live && tabId !== null && <FindRow tabId={tabId} result={findResult} onClose={closeFind} />}
       <StripRows tabId={tabId} rows={rows} refused={refused} refusedId={refusedId} onEmpty={focusPageArea} />
       <PageArea

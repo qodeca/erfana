@@ -197,3 +197,65 @@ export function guardBanner(kind: 'shell' | 'wrapper' | 'unknown' | 'noTerminal'
 export function targetChosen(view: TargetView): TargetBanner {
   return { kind: 'targetChosen', text: `Sends to ${view.text} – send again when ready.`, action: null }
 }
+
+/** What the tab's hidden polite region speaks about (design § Announcements, M-45). Hover labels are not in it. */
+export interface PickAnnounceFacts {
+  readonly on: boolean
+  readonly frozen: boolean
+  readonly captureId: string | null
+  /** The held capture's last refinement stamp (`HeldCapture.changedAt`). */
+  readonly changedAt: number | null
+  /** The held element's name and `{w} × {h}` size, for *Announce – refined*. */
+  readonly name: string | null
+  readonly size: string | null
+  readonly note: StatusNote | null
+  readonly noteSeq: number
+  /** The send notice's sentence ("Sent Explain to Terminal"), while it shows. */
+  readonly sent: string | null
+}
+
+/** The refinement end notes the region repeats as a sentence (§ Announcements, *Refinement*). */
+const SPOKEN_NOTES: ReadonlySet<StatusNote> = new Set<StatusNote>(['topOfPage', 'backAtStart'])
+
+/**
+ * A size as a screen reader says it: "101 × 18" → "101 by 18".
+ *
+ * @param size - Main's `{w} × {h}`
+ * @returns The spoken size
+ */
+export function spokenSize(size: string): string {
+  return size.replace(/\s*×\s*/, ' by ')
+}
+
+/**
+ * What the tab's polite region says as the pick state moves from `prev` to
+ * `next`, or `null` for nothing (design § Announcements: *Pick mode on*,
+ * *off*, *Announce – refined* and its end notes, *Page paused* once,
+ * *Announce – sent*). The send outranks the pick mode ending with it.
+ *
+ * @param prev - The facts last spoken about
+ * @param next - The facts now
+ * @returns The sentence, with its full stop (OD-9), or `null`
+ *
+ * @example
+ * ```ts
+ * pickAnnouncement({ ...idle }, { ...idle, on: true }) // 'Picking. Esc to stop.'
+ * ```
+ */
+export function pickAnnouncement(prev: PickAnnounceFacts, next: PickAnnounceFacts): string | null {
+  if (next.sent !== null && next.sent !== prev.sent) {
+    return `${next.sent}. Show terminal and Open capture are also in the target menu.`
+  }
+  const sameCapture = next.captureId !== null && next.captureId === prev.captureId
+  if (sameCapture && next.note !== null && next.noteSeq !== prev.noteSeq && SPOKEN_NOTES.has(next.note)) {
+    return `${NOTE_TEXT[next.note]}.`
+  }
+  if (sameCapture && next.changedAt !== null && next.changedAt !== prev.changedAt && next.name !== null && next.size !== null) {
+    return `Picked ${next.name}, ${spokenSize(next.size)}.`
+  }
+  if (sameCapture && next.frozen && !prev.frozen) return 'Page paused.'
+  if (next.on && !prev.on) return 'Picking. Esc to stop.'
+  // A send ends pick mode too; its own sentence is said instead.
+  if (!next.on && prev.on && next.sent === null) return 'Picking stopped.'
+  return null
+}

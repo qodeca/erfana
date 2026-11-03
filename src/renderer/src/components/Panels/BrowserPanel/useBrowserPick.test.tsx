@@ -84,6 +84,22 @@ describe('useBrowserPick', () => {
     useBrowserPickStore.getState().forget(TAB)
   })
 
+  it('does not re-render the panel for a hover: the hover label is left out of what it subscribes to (performance review)', () => {
+    let renders = 0
+    const { result } = renderHook(() => {
+      renders++
+      return useBrowserPick({ tabId: TAB, live: true, target: makeTarget(), containerApi: {} as DockviewApi, projectPath: '/p', focusPage: vi.fn(), openTargetMenu: vi.fn(), startTerminal: vi.fn() })
+    })
+    act(() => useBrowserPickStore.getState().apply({ tabId: TAB, kind: 'mode', on: true }))
+    const before = renders
+    const tab = result.current.tab
+    act(() => useBrowserPickStore.getState().apply({ tabId: TAB, kind: 'highlight', label: 'a.link · 40 × 12' }))
+    act(() => useBrowserPickStore.getState().apply({ tabId: TAB, kind: 'highlight', label: 'div.card · 320 × 200' }))
+    expect(renders).toBe(before)
+    expect(result.current.tab).toBe(tab)
+    expect(result.current.tab).not.toHaveProperty('label')
+  })
+
   it('refuses Pick element without a live page with the load-a-page note', () => {
     const { result } = setup({ live: false })
     act(() => result.current.togglePick())
@@ -172,6 +188,20 @@ describe('useBrowserPick', () => {
     act(() => useBrowserPickStore.getState().apply({ tabId: TAB, kind: 'ended', reason: 'pageChanged' }))
     expect(result.current.surface).toBe('dialog')
     expect(gateway.closePick).not.toHaveBeenCalled()
+  })
+
+  it('drops the typed text when a page change closes the panel the dialog went back to (025-FR-052, 025-FR-053)', () => {
+    const { result } = setup()
+    capture()
+    act(() => result.current.openDialog('ask'))
+    act(() => result.current.setDraft('why is this blue?'))
+    act(() => result.current.back())
+    expect(result.current.surface).toBe('panel')
+    act(() => useBrowserPickStore.getState().apply({ tabId: TAB, kind: 'ended', reason: 'pageChanged' }))
+    expect(result.current.surface).toBe('none')
+    capture()
+    act(() => result.current.openDialog('ask'))
+    expect(result.current.draft).toBe('')
   })
 
   it('sends, shows the notice and the deny-rule offer once per project', async () => {
@@ -278,14 +308,25 @@ describe('useBrowserPick', () => {
     expect(toasts.showErrorToast).toHaveBeenCalledWith("Couldn't open the capture", 'The editor is not ready.')
   })
 
-  it('joins a Windows project root with its own separator, and does nothing without a project', () => {
+  it('joins a Windows project root with \\ through joinPath – a UNC root too – and does nothing without a project', () => {
     files.openFileInPanel.mockReturnValue({})
-    const { result, rerender, options } = setup({ projectPath: 'C:\\work\\site' })
-    act(() => result.current.openCapture('.erfana/browser/captures/c.md'))
-    expect(files.openFileInPanel).toHaveBeenCalledWith({}, 'C:\\work\\site\\.erfana\\browser\\captures\\c.md')
-    rerender({ ...options, projectPath: null })
-    act(() => result.current.openCapture('x.md'))
-    expect(files.openFileInPanel).toHaveBeenCalledOnce()
+    // The separator is the platform's, never guessed from the root (code review, spec 025).
+    const host = window as unknown as { api?: unknown }
+    const saved = host.api
+    host.api = { utils: { getPlatform: () => 'win32' } }
+    try {
+      const { result, rerender, options } = setup({ projectPath: 'C:\\work\\site' })
+      act(() => result.current.openCapture('.erfana/browser/captures/c.md'))
+      expect(files.openFileInPanel).toHaveBeenCalledWith({}, 'C:\\work\\site\\.erfana\\browser\\captures\\c.md')
+      rerender({ ...options, projectPath: '\\\\srv\\share/site' })
+      act(() => result.current.openCapture('.erfana/browser/captures/c.md'))
+      expect(files.openFileInPanel).toHaveBeenLastCalledWith({}, '\\\\srv\\share/site\\.erfana\\browser\\captures\\c.md')
+      rerender({ ...options, projectPath: null })
+      act(() => result.current.openCapture('x.md'))
+      expect(files.openFileInPanel).toHaveBeenCalledTimes(2)
+    } finally {
+      host.api = saved
+    }
   })
 
   it('shows the terminal without moving focus, and does nothing without a tab', () => {

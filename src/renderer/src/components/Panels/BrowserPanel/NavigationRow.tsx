@@ -38,6 +38,7 @@ import { MoreMenu, type MoreMenuActions } from './MoreMenu'
 import { sentenceHost } from './erfanaPageCopy'
 import { formatShortcut } from '../../../utils/shortcutLabel'
 import type { StillSurface } from './useStillSurface'
+import { tooltipProps } from './ToolbarTooltip'
 
 /** Props for {@link NavigationRow}. */
 export interface NavigationRowProps {
@@ -170,7 +171,7 @@ export const NavigationRow = forwardRef<HTMLDivElement, NavigationRowProps>(
           data-fold-step="7"
           aria-label="Back"
           aria-keyshortcuts={back.aria}
-          title={canGoBack ? `Back (${back.label})` : 'Back – no earlier page'}
+          {...tooltipProps(canGoBack ? `Back (${back.label})` : 'Back – no earlier page')}
           disabled={!canGoBack}
           onFocus={() => (focusedRef.current = 'back')}
           onBlur={() => (focusedRef.current = canGoBack ? null : focusedRef.current)}
@@ -185,7 +186,7 @@ export const NavigationRow = forwardRef<HTMLDivElement, NavigationRowProps>(
           data-fold-step="4"
           aria-label="Forward"
           aria-keyshortcuts={forward.aria}
-          title={canGoForward ? `Forward (${forward.label})` : 'Forward – no later page'}
+          {...tooltipProps(canGoForward ? `Forward (${forward.label})` : 'Forward – no later page')}
           disabled={!canGoForward}
           onFocus={() => (focusedRef.current = 'forward')}
           onBlur={() => (focusedRef.current = canGoForward ? null : focusedRef.current)}
@@ -199,7 +200,7 @@ export const NavigationRow = forwardRef<HTMLDivElement, NavigationRowProps>(
             className="erf-brw-tool"
             data-fold-step="4"
             aria-label="Stop loading"
-            title="Stop loading"
+            {...tooltipProps('Stop loading')}
             onClick={props.onStop}
           >
             <X {...TOOL_ICON} />
@@ -211,7 +212,7 @@ export const NavigationRow = forwardRef<HTMLDivElement, NavigationRowProps>(
             data-fold-step="4"
             aria-label="Reload"
             aria-keyshortcuts={reload.aria}
-            title={`Reload (${reload.label})`}
+            {...tooltipProps(`Reload (${reload.label})`)}
             onClick={props.onReload}
           >
             <RotateCw {...TOOL_ICON} />
@@ -233,7 +234,7 @@ export const NavigationRow = forwardRef<HTMLDivElement, NavigationRowProps>(
           className="erf-brw-tool"
           data-fold-step="3"
           aria-label={systemName}
-          title={systemTitle}
+          {...tooltipProps(systemTitle)}
           aria-disabled={opening || !live ? true : undefined}
           onClick={openExternal}
         >
@@ -245,7 +246,7 @@ export const NavigationRow = forwardRef<HTMLDivElement, NavigationRowProps>(
           data-fold-step="3"
           aria-label={devToolsName}
           aria-keyshortcuts={devTools.aria}
-          title={`${devToolsName} (${devTools.label})`}
+          {...tooltipProps(`${devToolsName} (${devTools.label})`)}
           onClick={props.onDevTools}
         >
           <CodeXml {...TOOL_ICON} />

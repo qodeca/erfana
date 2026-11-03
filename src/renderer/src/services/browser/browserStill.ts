@@ -77,6 +77,12 @@ export interface BrowserStill {
   release: (tabId: string, holder: string) => void
   /** Whether `holder` holds `tabId`'s picture. */
   holds: (tabId: string, holder: string) => boolean
+  /**
+   * The tab is gone: every holder lets go, a capture in flight is thrown away
+   * and the picture is dropped at once – no return to wait for. A panel that
+   * unmounted before its own release ran must not keep a full-size bitmap.
+   */
+  forget: (tabId: string) => void
 }
 
 interface TabHold {
@@ -167,7 +173,19 @@ export function createBrowserStill(deps: BrowserStillDeps): BrowserStill {
       })
     },
 
-    holds: (tabId, holder) => tabs.get(tabId)?.holders.has(holder) ?? false
+    holds: (tabId, holder) => tabs.get(tabId)?.holders.has(holder) ?? false,
+
+    forget: tabId => {
+      const hold = tabs.get(tabId)
+      tabs.delete(tabId)
+      if (hold !== undefined) {
+        hold.holders.clear()
+        hold.generation++
+        hold.cancelReturn?.()
+        hold.cancelReturn = null
+      }
+      deps.setImage(tabId, null, 'page')
+    }
   }
 }
 

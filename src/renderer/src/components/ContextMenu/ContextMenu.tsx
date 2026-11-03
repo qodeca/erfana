@@ -48,6 +48,13 @@ export interface ContextMenuItem {
    * typeahead never matches it.
    */
   reason?: string
+  /**
+   * Makes the item one choice of a set (`menuitemradio`) and says whether it
+   * is the current one (`aria-checked`). Leave it out for a plain item. The
+   * visible check stays the caller's `icon`; this carries the state to
+   * assistive tech, which ignores the icon.
+   */
+  checked?: boolean
 }
 
 interface ContextMenuProps {
@@ -408,7 +415,8 @@ export function ContextMenu({ x, y, items, onClose, containerTestId, ariaLabel, 
               itemRefs.current[index] = node
             }}
             className={`context-menu-item ${item.danger ? 'danger' : ''} ${item.disabled ? 'disabled' : ''}${item.reason ? ' context-menu-item--described' : ''}`}
-            role="menuitem"
+            role={item.checked === undefined ? 'menuitem' : 'menuitemradio'}
+            aria-checked={item.checked}
             tabIndex={index === current ? 0 : -1}
             aria-disabled={item.disabled || undefined}
             aria-labelledby={item.reason ? `${idBase}-${index}-label` : undefined}

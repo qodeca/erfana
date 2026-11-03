@@ -151,6 +151,8 @@ export class BrowserPopups {
     const windows = this.deps.windows
     // The host's id is read once: a destroyed webContents cannot be asked for it.
     let hostId: number | null = null
+    // The popup's own activation tracker goes with the popup, not with the tab that opened it.
+    let releaseTracker: () => void = () => undefined
     try {
       const popup = new BrowserPopupWindow({
         openerTabId: tabId,
@@ -168,14 +170,20 @@ export class BrowserPopups {
         registerHost: windows.registerHost,
         loadHost: windows.loadHost,
         attachCdp: windows.attachCdp,
-        windowOpenHandler: (contents) => open.handlerFor(contents as unknown as OpenerContents, true).handler,
+        windowOpenHandler: (contents) => {
+          const { handler, dispose } = open.handlerFor(contents as unknown as OpenerContents, true)
+          releaseTracker = dispose
+          return handler
+        },
         onClosed: (gone) => {
+          releaseTracker()
           if (hostId !== null && this.popupsByHost.get(hostId) === gone) this.popupsByHost.delete(hostId)
         }
       })
       hostId = popup.host.webContents.id
       this.popupsByHost.set(hostId, popup)
     } catch (error) {
+      releaseTracker()
       logger.error('A popup window could not open', error instanceof Error ? error : undefined)
       if (!request.contents.isDestroyed()) request.contents.close({ waitForBeforeUnload: false })
     }

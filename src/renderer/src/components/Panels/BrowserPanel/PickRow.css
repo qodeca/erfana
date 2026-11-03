@@ -19,6 +19,7 @@
 /* ---------- pick row ---------- */
 
 .erf-brw-pick {
+  position: relative;
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -62,6 +63,15 @@
   opacity: var(--opacity-disabled);
 }
 
+/* Forced colours override the border and the fill, so pressed takes the system's full Highlight (design § Cross-cutting cases). */
+@media (forced-colors: active) {
+  .erf-brw-pickbtn[aria-pressed='true'] {
+    background: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+}
+
 .erf-brw-pickbtn:focus-visible,
 .erf-brw-target:focus-visible,
 .erf-brw-notice__action:focus-visible,
@@ -79,7 +89,7 @@
   min-width: 0;
   margin-inline-start: var(--space-4);
   overflow: hidden;
-  color: var(--color-text-secondary);
+  color: var(--color-text-tertiary);
   font-size: var(--text-base);
   white-space: nowrap;
 }
@@ -102,7 +112,8 @@
 }
 
 .erf-brw-banner-line__more::before {
-  content: '· ';
+  content: '·';
+  margin-inline-end: var(--space-2);
   color: var(--color-text-tertiary);
 }
 
@@ -130,20 +141,81 @@
   }
 }
 
-.erf-brw-chip {
+/*
+ * The static neutral tag ("Page paused", "Still image", "The page changed
+ * after the pick"): text, never a control – no hover, no pointer. The
+ * interactive address chip is `.erf-brw-chip` in BrowserChrome.css.
+ */
+.erf-brw-tag {
   flex: 0 0 auto;
-  margin-inline-start: var(--space-2);
   padding: 0 var(--space-3);
   border: var(--border-width) solid var(--color-border-subtle);
   border-radius: var(--border-radius);
   color: var(--color-text-primary);
   font-size: var(--text-sm);
   line-height: var(--leading-snug);
+  white-space: nowrap;
+  cursor: default;
 }
 
 .erf-brw-spacer {
   flex: 1 1 0;
   min-width: var(--space-2);
+}
+
+/* ---------- toolbar tooltip (ToolbarTooltip.tsx; design R2-H5, proposed Tooltip card) ---------- */
+
+/*
+ * Drawn inside this band for both toolbar rows: the panel clips above the
+ * navigation row and the native page paints over everything below this
+ * row. Left and width come from the script (after the banner's first
+ * clause, before the focused control); one line, cut with an ellipsis – the
+ * full text stays in the control's description. Opaque, so the status text
+ * under it is hidden while it shows.
+ */
+.erf-brw-tip {
+  position: absolute;
+  inset-block: var(--space-1);
+  z-index: var(--z-tooltip);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: 0 var(--space-4);
+  overflow: hidden;
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  background: var(--color-gray-800);
+  box-shadow: var(--shadow-md);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  white-space: nowrap;
+}
+
+.erf-brw-tip__line {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.erf-brw-tip__line:first-child {
+  flex: 0 0 auto;
+  max-width: 100%;
+}
+
+/* A second line follows on the same line behind a CSS-drawn separator (VS-21). */
+.erf-brw-tip__line + .erf-brw-tip__line::before {
+  content: '·';
+  margin-inline-end: var(--space-2);
+  color: var(--color-text-tertiary);
+}
+
+@media (forced-colors: active) {
+  .erf-brw-tip {
+    border-color: CanvasText;
+  }
 }
 
 /* ---------- target chooser ---------- */
@@ -273,6 +345,31 @@
   }
 }
 
+/*
+ * While the panel or the dialog is open (`data-surface`), the banner's first
+ * clause and its "Still image" / "Page paused" chip keep their room
+ * (025-FR-065, M-03): the width preset leaves the row (More keeps Page
+ * width), the target yields to its arrow and process under 800px, and under
+ * 660px it leaves too – the panel footer and the dialog's target line carry
+ * the same menu button (design § Pick row, TR-20). 660px is the panel's
+ * clause, its chip, Pick element and the folded target side by side.
+ */
+.erf-brw-pick[data-surface] .erf-brw-width {
+  display: none;
+}
+
+@container (max-width: 800px) {
+  .erf-brw-pick[data-surface] .erf-brw-target__name:has(+ .erf-brw-target__proc) {
+    display: none;
+  }
+}
+
+@container (max-width: 660px) {
+  .erf-brw-pick[data-surface] .erf-brw-target {
+    display: none;
+  }
+}
+
 /* ---------- send notice (status slot) ---------- */
 
 .erf-brw-notice {
@@ -286,6 +383,11 @@
 .erf-brw-notice__text {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* The actions sit --space-6 after the sentence (VS-18): the row's --space-2 gap plus --space-4. */
+.erf-brw-notice__text + .erf-brw-notice__action {
+  margin-inline-start: var(--space-4);
 }
 
 .erf-brw-notice__action {
@@ -391,7 +493,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  width: min(30rem, 100%);
+  width: min(var(--comments-window-max-width), 100%);
   padding: var(--space-4) var(--space-6) var(--space-6);
   border: var(--border-width) solid var(--color-border-subtle);
   border-radius: var(--border-radius);
@@ -489,7 +591,7 @@
   border: none;
   border-radius: var(--border-radius);
   background: transparent;
-  color: var(--color-text-secondary);
+  color: var(--color-text-tertiary);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   cursor: pointer;
@@ -536,7 +638,7 @@
 
 .erf-brw-actions__detail dt {
   flex: none;
-  color: var(--color-text-secondary);
+  color: var(--color-text-tertiary);
 }
 
 .erf-brw-actions__detail dd {
@@ -560,7 +662,7 @@
   flex-wrap: wrap;
   gap: var(--space-2);
   margin: 0;
-  color: var(--color-text-secondary);
+  color: var(--color-text-tertiary);
 }
 
 .erf-brw-actions__buttons,
@@ -601,8 +703,12 @@
 }
 
 .erf-brw-actions__action[aria-disabled='true'] {
-  opacity: var(--opacity-disabled);
   cursor: not-allowed;
+}
+
+/* The dim lives on the label, never on the button, so a focused one keeps a full-strength ring (Permission band card). */
+.erf-brw-actions__action[aria-disabled='true'] > span {
+  opacity: var(--opacity-disabled);
 }
 
 .erf-brw-actions__footer,
@@ -630,16 +736,16 @@
   gap: var(--space-3);
   margin: 0;
   padding: var(--space-3) var(--space-4);
-  border-left: var(--border-width-thick) solid var(--color-border-subtle);
+  border-inline-start: var(--border-width-thick) solid var(--color-border-subtle);
   background: var(--color-bg-secondary);
 }
 
 .erf-brw-banner--warning {
-  border-left-color: var(--color-warning);
+  border-inline-start-color: var(--color-warning);
 }
 
 .erf-brw-banner--error {
-  border-left-color: var(--color-error);
+  border-inline-start-color: var(--color-error);
 }
 
 .erf-brw-banner__text {
@@ -657,6 +763,10 @@
   font-family: inherit;
   font-size: var(--text-base);
   cursor: pointer;
+}
+
+.erf-brw-banner__button:hover {
+  background: var(--color-btn-secondary-hover);
 }
 
 /* ---------- instruction dialog ---------- */
@@ -693,7 +803,7 @@
 .erf-brw-dialog__field {
   min-height: calc(var(--btn-height-md) * 3);
   padding: var(--space-3) var(--space-4);
-  border: var(--border-width) solid var(--color-border-subtle);
+  border: var(--border-width) solid var(--color-border-input);
   border-radius: var(--border-radius);
   background: var(--color-bg-input);
   color: var(--color-text-primary);
@@ -702,13 +812,29 @@
   resize: vertical;
 }
 
+/* The Form card (decided): the boundary is --color-border-input, gray-500 on hover. */
+.erf-brw-dialog__field:hover {
+  border-color: var(--color-gray-500);
+}
+
 .erf-brw-dialog__field[aria-invalid='true'] {
   border-color: var(--color-error);
 }
 
+/* The Form card's error contract: red edge, icon, message. */
 .erf-brw-dialog__error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
   margin: 0;
   color: var(--color-error);
+}
+
+.erf-brw-dialog__error > svg {
+  flex: 0 0 auto;
+  width: var(--icon-size-xs);
+  height: var(--icon-size-xs);
+  margin-block-start: var(--space-1);
 }
 
 /* ---------- address suggestions ---------- */

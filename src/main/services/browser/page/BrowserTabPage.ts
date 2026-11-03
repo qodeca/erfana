@@ -115,6 +115,8 @@ export interface BrowserTabPageDeps {
   readonly hang: PageHangSource | null
   /** Mints strip row ids; random by default. */
   readonly newRowId?: () => string
+  /** The `file://` address of a served local address, else null (`LocalFileServers.displayAddress`), for the load-failure log. */
+  readonly displayAddress?: (url: string) => string | null
 }
 
 /** `did-fail-load`'s arguments after the event. */
@@ -282,7 +284,7 @@ export class BrowserTabPage {
     const page = loadErrorFor(code, this.userStarted)
     if (page === null || url === '') return
     // Logs the full URL – a recorded exception, docs/technical-debt.md entry 68 (025-FR-042).
-    logLoadFailure(code, url)
+    logLoadFailure(code, url, this.deps.displayAddress)
     this.failedUrl = url
     this.loadError = page
     this.deps.outlet.stateChanged()
@@ -295,7 +297,7 @@ export class BrowserTabPage {
     this.deps.outlet.endPick()
     if (this.killingForReload) {
       // Reload once the hung process is gone: a reload sent while it is still
-      // dying is lost with it, and the tab stays blank (commit 20 e2e).
+      // dying is lost with it, and the tab stays blank (seen in e2e).
       this.killingForReload = false
       this.deps.tab.history('reload')
       return

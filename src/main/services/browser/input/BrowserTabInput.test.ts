@@ -357,6 +357,15 @@ describe('focus and the first-click rule', () => {
     expect(input.state().firstClickOnlyFocuses).toBe(false)
   })
 
+  it('ignores a toolbar focus report for a page already destroyed, without touching it', () => {
+    contents.destroyed = true
+    contents.isFocused = () => {
+      throw new Error('Object has been destroyed')
+    }
+    expect(() => input.reportToolbarFocus(true)).not.toThrow()
+    expect(input.state().focus).not.toBe('toolbar')
+  })
+
   it('moves between toolbar and out as the renderer reports', () => {
     input.reportToolbarFocus(true)
     expect(input.state().focus).toBe('toolbar')
