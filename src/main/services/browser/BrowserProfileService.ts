@@ -29,8 +29,11 @@
  * written again before the page loads). The session is never destroyed while
  * the app runs (Electron cannot), so it is kept per canonical path.
  *
- * The `erfana-local` handler (commit 11) and the trust store and keyring
- * canary (commit 10) run after step 8 once they exist, before any page loads.
+ * 9. checks the keyring (`browserKeyringState`, 025-FR-018): the canary and
+ *    the recorded backend decide the notices of the project's first tab.
+ *
+ * The `erfana-local` handler (commit 11) and the trust store join them after
+ * step 9 once they exist, before any page loads.
  */
 import { join } from 'node:path'
 import type { Clock } from '../../../shared/clock'
@@ -49,6 +52,13 @@ import {
 import { verifyProfileMarker, writeProfileMarker, type PurposeSigner } from './browserProfileMarker'
 import { deleteUnderBrowser, runPendingDeletes, setProfileAside, type DeleteOutcome } from './browserProfileDeletes'
 import { BROWSER_DIR_SEGMENTS, PROFILE_DIR_NAME } from './browserProfilePaths'
+import {
+  NO_KEYRING_NOTICES,
+  assessKeyring,
+  dismissWeakProtectionNotice,
+  type KeyringCrypto,
+  type KeyringNotices
+} from './browserKeyringState'
 
 /** `safeStorage`'s backend: macOS and Windows have one each; Linux reports its own. */
 export type StorageBackend =
@@ -90,6 +100,8 @@ export interface BrowserProfile {
   readonly trust: TrustPersistence
   /** Name of the folder a distrusted profile was moved to this run, for a notice; null otherwise. */
   readonly setAside: string | null
+  /** The keyring notices found when this run created the session (025-FR-018). */
+  readonly keyring: KeyringNotices
 }
 
 export interface BrowserProfileServiceDeps {
@@ -102,6 +114,8 @@ export interface BrowserProfileServiceDeps {
   /** Deny-by-default session policy (`browserSessionPolicy.hardenBrowserSession`); runs before any page loads. */
   readonly hardenSession: (session: ProfileSession) => void
   readonly signer: PurposeSigner
+  /** `safeStorage`'s string encryption, for the keyring canary. */
+  readonly keyringCrypto: KeyringCrypto
   readonly storageBackend: () => StorageBackend
   readonly isTrackedByGit: (canonical: string) => Promise<boolean>
   readonly markIgnoredBySync: (browserDir: string) => Promise<void>
@@ -113,6 +127,8 @@ export interface BrowserProfileServiceDeps {
 export class BrowserProfileService {
   /** Keyed by canonical path; a rejected open is removed so the next tab retries. */
   private readonly profiles = new Map<string, Promise<BrowserProfile>>()
+  /** Canonical paths whose keyring notices a tab has already taken this run. */
+  private readonly keyringNoticesTaken = new Set<string>()
 
   constructor(private readonly deps: BrowserProfileServiceDeps) {}
 
@@ -140,6 +156,30 @@ export class BrowserProfileService {
       this.profiles.delete(canonical)
       throw error
     }
+  }
+
+  /**
+   * The keyring notices for the open project's first tab of this run, once:
+   * every later call returns none (025-FR-018 – the weak-protection notice
+   * shows on the first tab after each start until dismissed; the reset notice
+   * shows once). Returns none while the project's profile is not open.
+   */
+  async takeKeyringNotices(): Promise<KeyringNotices> {
+    const canonical = await this.openProjectCanonical()
+    const profile = this.profiles.get(canonical)
+    if (profile === undefined || this.keyringNoticesTaken.has(canonical)) return NO_KEYRING_NOTICES
+    this.keyringNoticesTaken.add(canonical)
+    return (await profile).keyring
+  }
+
+  /**
+   * The user dismissed the weak-protection notice: it does not show again in
+   * the open project.
+   *
+   * @throws BrowserProfileError
+   */
+  async dismissWeakProtectionNotice(): Promise<void> {
+    await dismissWeakProtectionNotice(await this.openProjectCanonical())
   }
 
   /** The sessions of every profile opened in this run (a failed open is left out). */
@@ -218,9 +258,10 @@ export class BrowserProfileService {
     this.deps.registerSession(session)
     this.deps.hardenSession(session)
     const backend = this.deps.storageBackend()
+    const keyring = await assessKeyring(canonical, backend, this.deps.keyringCrypto)
     const trust: TrustPersistence = this.deps.signer.hasKey() ? 'signed' : 'memory'
     logger.info('Browser profile ready', { project: redactPath(canonical), backend, trust, setAside: setAside !== null })
-    return { projectRoot: canonical, session, backend, trust, setAside }
+    return { projectRoot: canonical, session, backend, trust, setAside, keyring }
   }
 
   private profileExists(canonical: string): Promise<boolean> {

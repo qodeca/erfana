@@ -147,6 +147,7 @@ export function installBrowserAfterReady(deps: BrowserAfterReadyDeps): BrowserRu
     hardenSession: (ses) =>
       hardenBrowserSession(ses as Session, { platform: process.platform, chromeVersion: process.versions.chrome }),
     signer: lockHmacSigner,
+    keyringCrypto: safeStorage,
     storageBackend: () => storageBackendFor(process.platform, () => safeStorage.getSelectedStorageBackend()),
     isTrackedByGit: (canonical) => isBrowserFolderTrackedByGit(canonical),
     markIgnoredBySync: (dir) => markIgnoredBySync(dir),

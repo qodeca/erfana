@@ -54,6 +54,17 @@ let acquireResult: LockResult
 let tracked: boolean
 let deps: BrowserProfileServiceDeps
 
+/** A keyed fake of `safeStorage`: a canary written under one key fails to decrypt under another. */
+function fakeKeyringCrypto(key: number): BrowserProfileServiceDeps['keyringCrypto'] {
+  return {
+    encryptString: (text) => Buffer.from([key, ...Buffer.from(text, 'utf8')]),
+    decryptString: (buf) => {
+      if (buf[0] !== key) throw new Error('Error while decrypting the ciphertext provided')
+      return buf.subarray(1).toString('utf8')
+    }
+  }
+}
+
 const browserDir = (): string => join(project, '.erfana', 'browser')
 const markerFile = (): string => join(browserDir(), 'profile', 'Erfana', 'marker.json')
 
@@ -73,6 +84,7 @@ function makeService(overrides: Partial<BrowserProfileServiceDeps> = {}): Browse
     registerSession: vi.fn(),
     hardenSession: vi.fn(),
     signer: fakeSigner(true),
+    keyringCrypto: fakeKeyringCrypto(1),
     storageBackend: () => 'keychain',
     isTrackedByGit: vi.fn(async () => tracked),
     markIgnoredBySync: vi.fn(async () => undefined),
@@ -423,6 +435,45 @@ describe('per safeStorage backend (ADR 0009 decision 7, A13)', () => {
     await makeService({ signer: fakeSigner(true) }).openForTab()
     const profile = await makeService({ storageBackend: () => 'basic_text', signer: fakeSigner(false) }).openForTab()
     expect(profile.setAside).toBeNull()
+  })
+})
+
+describe('keyring notices (025-FR-018)', () => {
+  it('a keyring backend shows no notice, and a changed key shows the reset notice to the first tab only', async () => {
+    const first = makeService()
+    await first.openForTab()
+    expect(await first.takeKeyringNotices()).toEqual({ weakProtection: false, keyringReset: false })
+
+    const changed = makeService({ keyringCrypto: fakeKeyringCrypto(2) })
+    await changed.openForTab()
+    expect(await changed.takeKeyringNotices()).toEqual({ weakProtection: false, keyringReset: true })
+    await changed.openForTab()
+    expect(await changed.takeKeyringNotices()).toEqual({ weakProtection: false, keyringReset: false })
+  })
+
+  it('basic_text: the weak-protection notice shows on the first tab of each run until dismissed', async () => {
+    const run = async (): Promise<BrowserProfileService> => {
+      const service = makeService({ storageBackend: () => 'basic_text', signer: fakeSigner(false) })
+      await service.openForTab()
+      return service
+    }
+    const one = await run()
+    expect((await one.takeKeyringNotices()).weakProtection).toBe(true)
+    expect((await one.takeKeyringNotices()).weakProtection).toBe(false)
+    const two = await run()
+    expect((await two.takeKeyringNotices()).weakProtection).toBe(true)
+    await two.dismissWeakProtectionNotice()
+    const three = await run()
+    expect((await three.takeKeyringNotices()).weakProtection).toBe(false)
+  })
+
+  it('takes no notices while the project has no open profile', async () => {
+    expect(await makeService().takeKeyringNotices()).toEqual({ weakProtection: false, keyringReset: false })
+  })
+
+  it('the profile carries what the keyring check found', async () => {
+    const profile = await makeService({ storageBackend: () => 'basic_text', signer: fakeSigner(false) }).openForTab()
+    expect(profile.keyring).toEqual({ weakProtection: true, keyringReset: false })
   })
 })
 
