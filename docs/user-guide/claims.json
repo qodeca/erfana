@@ -2157,7 +2157,7 @@
       "quote": "LiteParse (pinned at 2.15.1; this was read from 2.14.7)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:65",
+      "source": "package.json:66",
       "match": "\"@llamaindex/liteparse\": \"2.15.1\","
     },
     {
@@ -2348,7 +2348,7 @@
       "quote": "Uses the `@turbodocx/html-to-docx` npm package",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:68",
+      "source": "package.json:69",
       "match": "\"@turbodocx/html-to-docx\": \"^1.23.1\","
     },
     {
@@ -4216,7 +4216,7 @@
       "quote": "**Tech**: xterm.js v6.0.0, node-pty v1.0.0, WebglAddon, FitAddon, WebLinksAddon",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:113",
+      "source": "package.json:114",
       "match": "\"@xterm/xterm\": \"^6.0.0\","
     },
     {
@@ -8279,7 +8279,7 @@
       "quote": "It was not in `package.json` then; it is a direct",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:149",
+      "source": "package.json:150",
       "match": "\"tesseract.js\": \"^7.0.0\"",
       "note": "Said tesseract.js is not in package.json; it is now a devDependency."
     },
@@ -8424,7 +8424,7 @@
       "quote": "uses chokidar, which is now 5.0.0",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:70",
+      "source": "package.json:71",
       "match": "\"chokidar\": \"5.0.0\"",
       "note": "Body pins chokidar 3.6.0; package.json has 5.0.0. Recorded in the \"Changed since\" line."
     },
@@ -8915,7 +8915,7 @@
       "quote": "- Zustand stores for settings/state",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:84",
+      "source": "package.json:85",
       "match": "\"zustand\": \"^5.0.15\""
     },
     {
@@ -8946,7 +8946,7 @@
       "quote": "4. **better-sqlite3 Packaging**: Requires careful electron-vite configuration",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:119",
+      "source": "package.json:120",
       "match": "\"electron-vite\": \"^5.0.0\"",
       "note": "electron-vite is the build tool; better-sqlite3 is not yet a dependency (proposal)"
     },
@@ -9203,7 +9203,7 @@
       "quote": "the app moved to Electron 44 and chokidar 5.0.0 (`package.json`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:116",
+      "source": "package.json:117",
       "match": "\"electron\": \"^44.9.0\"",
       "note": "Page said the libuv abort \"is not live in the shipped app\" for Electron 39 and called chokidar 3.6.0 \"today's\"; both are now stale – status line added"
     },
@@ -9214,7 +9214,7 @@
       "quote": "the Electron 39 and chokidar 3.6.0 figures below describe the build tested on that date",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:70",
+      "source": "package.json:71",
       "match": "\"chokidar\": \"5.0.0\"",
       "note": "chokidar is 5.0.0 now, not 3.6.0"
     },
@@ -9794,7 +9794,7 @@
       "quote": "LiteParse (shipped in erfana's import system)",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:65",
+      "source": "package.json:66",
       "match": "\"@llamaindex/liteparse\": \"2.15.1\"",
       "note": "Said LiteParse was planned; it ships as LiteParseConverter"
     },
@@ -9805,7 +9805,7 @@
       "quote": "Last Updated**: October 2026 (Electron 44)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:116",
+      "source": "package.json:117",
       "match": "\"electron\": \"^44.9.0\""
     },
     {
@@ -10085,7 +10085,7 @@
       "quote": "The `dompurify` override in `package.json` (`^3.4.17`)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:162",
+      "source": "package.json:163",
       "match": "\"dompurify\": \"^3.4.17\""
     },
     {
@@ -10235,7 +10235,7 @@
       "quote": "**Current**: 26.18.0 (`package.json` devDependency, exact pin)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:117",
+      "source": "package.json:118",
       "match": "\"electron-builder\": \"26.18.0\""
     },
     {
@@ -10245,7 +10245,7 @@
       "quote": "Full support for Electron 44.x (`^44.9.0` in `package.json`, 44.9.3 in the lockfile)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:116",
+      "source": "package.json:117",
       "match": "\"electron\": \"^44.9.0\""
     },
     {
@@ -10465,7 +10465,7 @@
       "quote": "| `lodash`, `lodash-es` | **exact** `4.18.1` |",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:161",
+      "source": "package.json:162",
       "match": "\"lodash-es\": \"4.18.1\""
     },
     {
@@ -10475,7 +10475,7 @@
       "quote": "| `chokidar` | **exact** `5.0.0` |",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:159",
+      "source": "package.json:160",
       "match": "\"chokidar\": \"5.0.0\""
     },
     {
@@ -12160,7 +12160,7 @@
       "quote": "`jsdom: ^25.0.1` in `devDependencies`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:126",
+      "source": "package.json:127",
       "match": "\"jsdom\": \"^25.0.1\","
     },
     {
@@ -12201,7 +12201,7 @@
       "quote": "`@llamaindex/liteparse` is pinned exactly (`2.15.1`)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:65",
+      "source": "package.json:66",
       "match": "\"@llamaindex/liteparse\": \"2.15.1\","
     },
     {
@@ -12211,7 +12211,7 @@
       "quote": "\"overrides\":    { \"chokidar\": \"5.0.0\" }",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:159",
+      "source": "package.json:160",
       "match": "\"chokidar\": \"5.0.0\""
     },
     {
@@ -12221,7 +12221,7 @@
       "quote": "\"overrides\": { \"lodash\": \"4.18.1\", \"lodash-es\": \"4.18.1\" }",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:161",
+      "source": "package.json:162",
       "match": "\"lodash-es\": \"4.18.1\""
     },
     {
@@ -12231,7 +12231,7 @@
       "quote": "`dompurify` is floored at `^3.4.17`, forced through the tree.",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:162",
+      "source": "package.json:163",
       "match": "\"dompurify\": \"^3.4.17\""
     },
     {
@@ -12261,7 +12261,7 @@
       "quote": "\"electron-builder\": \"26.18.0\"",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:117",
+      "source": "package.json:118",
       "match": "\"electron-builder\": \"26.18.0\","
     },
     {
@@ -12271,7 +12271,7 @@
       "quote": "(`electron: ^44.9.0` in `package.json`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:116",
+      "source": "package.json:117",
       "match": "\"electron\": \"^44.9.0\","
     },
     {
@@ -12814,7 +12814,7 @@
       "quote": "`package.json` declares `typescript: ^6.0.3`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:150",
+      "source": "package.json:151",
       "match": "\"typescript\": \"^6.0.3\","
     },
     {
@@ -13687,7 +13687,7 @@
       "quote": "four projects in `playwright.config.ts`: `electron` functional, `transcription` env-gated, `bench` env-gated benchmarks, `visual` regression",
       "status": "verified",
       "evidence": "source",
-      "source": "playwright.config.ts:91",
+      "source": "playwright.config.ts:107",
       "match": "name: 'bench',"
     },
     {
@@ -13780,7 +13780,7 @@
       "quote": "Without it the project is `grepInvert`-ed to nothing",
       "status": "verified",
       "evidence": "source",
-      "source": "playwright.config.ts:83",
+      "source": "playwright.config.ts:99",
       "match": "grepInvert: process.env.ERFANA_E2E_TRANSCRIPTION === '1' ? undefined : /./,"
     },
     {
@@ -13830,8 +13830,8 @@
       "quote": "Both the `darwin` and the `win32` set are committed for all six states",
       "status": "verified",
       "evidence": "app",
-      "source": "e2e/visual-regression.e2e.ts:72",
-      "match": "function assertBaselineExists(screenshotName: string, testInfo: import('@playwright/test').TestInfo): void {",
+      "source": "e2e/utils/visual-baseline.ts:24",
+      "match": "export function assertBaselineExists(screenshotName: string, testInfo: TestInfo): void {",
       "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
     {
@@ -13861,7 +13861,7 @@
       "quote": "`clip: PAGE_CLIP`, a 1280x800 rectangle",
       "status": "verified",
       "evidence": "source",
-      "source": "e2e/visual-regression.e2e.ts:147",
+      "source": "e2e/visual-regression.e2e.ts:122",
       "match": "const PAGE_CLIP = { x: 0, y: 0, width: 1280, height: 800 } as const"
     },
     {
@@ -13881,7 +13881,7 @@
       "quote": "- `maxDiffPixelRatio: 0.01`, `retries: 0`",
       "status": "verified",
       "evidence": "source",
-      "source": "playwright.config.ts:115",
+      "source": "playwright.config.ts:134",
       "match": "maxDiffPixelRatio: 0.01,"
     },
     {
@@ -13922,7 +13922,7 @@
       "quote": "`npm run test:e2e:headed` for a visible window",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:59",
+      "source": "package.json:60",
       "match": "\"test:e2e:headed\": \"npm run build:e2e && playwright test --project=electron --headed\","
     },
     {
@@ -14305,7 +14305,7 @@
       "quote": "const projectPath = path.join(tmpParent, 'visual-project')   // deterministic leaf",
       "status": "verified",
       "evidence": "source",
-      "source": "e2e/fixtures/index.ts:572",
+      "source": "e2e/fixtures/index.ts:591",
       "match": "const projectPath = path.join(tmpParent, 'visual-project')"
     },
     {
@@ -14315,7 +14315,7 @@
       "quote": "now both mask `TERMINAL_INSTANCE` (xterm canvas only)",
       "status": "verified",
       "evidence": "source",
-      "source": "e2e/visual-regression.e2e.ts:186",
+      "source": "e2e/visual-regression.e2e.ts:161",
       "match": "byTestId(page, TEST_IDS.TERMINAL_INSTANCE),"
     },
     {
@@ -14790,10 +14790,10 @@
       "id": "testing-e2e-testing/03",
       "audience": "developer",
       "doc": "docs/testing/e2e-testing.md",
-      "quote": "`playwright.config.ts` in the project root configures four Playwright projects:",
+      "quote": "`playwright.config.ts` in the project root configures six Playwright projects:",
       "status": "fixed",
       "evidence": "source",
-      "source": "playwright.config.ts:108",
+      "source": "playwright.config.ts:127",
       "match": "name: 'visual',",
       "note": "Told the reader to create playwright.config.ts, which already exists."
     },
@@ -14834,7 +14834,7 @@
       "quote": "`snapshotPathTemplate: '{snapshotDir}/{arg}-{platform}{ext}'`",
       "status": "verified",
       "evidence": "source",
-      "source": "playwright.config.ts:112",
+      "source": "playwright.config.ts:131",
       "match": "snapshotPathTemplate: '{snapshotDir}/{arg}-{platform}{ext}',"
     },
     {
@@ -14844,7 +14844,7 @@
       "quote": "`animations: 'disabled'`",
       "status": "verified",
       "evidence": "source",
-      "source": "playwright.config.ts:116",
+      "source": "playwright.config.ts:135",
       "match": "animations: 'disabled',"
     },
     {
@@ -14946,7 +14946,7 @@
       "quote": "| `ERFANA_E2E_BENCH=1` | Enables the `bench` Playwright project",
       "status": "fixed",
       "evidence": "source",
-      "source": "playwright.config.ts:95",
+      "source": "playwright.config.ts:111",
       "match": "grepInvert: process.env.ERFANA_E2E_BENCH === '1' ? undefined : /./,",
       "note": "Variable missing from the table."
     },
@@ -15048,7 +15048,7 @@
       "quote": "| `transcription` | `**/audio-transcription*.e2e.ts` |",
       "status": "verified",
       "evidence": "source",
-      "source": "playwright.config.ts:82",
+      "source": "playwright.config.ts:98",
       "match": "testMatch: '**/audio-transcription*.e2e.ts',"
     },
     {
@@ -15189,7 +15189,7 @@
       "quote": "- **xterm.js v6.0.0** - Modern terminal emulator for web",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:113",
+      "source": "package.json:114",
       "match": "\"@xterm/xterm\": \"^6.0.0\""
     },
     {
@@ -15199,7 +15199,7 @@
       "quote": "(`^1.0.0` in `package.json`, 1.1.0 in the lock file)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:79",
+      "source": "package.json:80",
       "match": "\"node-pty\": \"^1.0.0\""
     },
     {
@@ -16092,7 +16092,7 @@
       "quote": "The app now runs Electron 44 (Chromium 152)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:116",
+      "source": "package.json:117",
       "match": "\"electron\": \"^44.9.0\""
     },
     {
@@ -16617,7 +16617,7 @@
       "quote": "`DocxService.ts` - DOCX generation via `@turbodocx/html-to-docx`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:68",
+      "source": "package.json:69",
       "match": "\"@turbodocx/html-to-docx\": \"^1.23.1\""
     },
     {
@@ -17169,7 +17169,7 @@
       "quote": "and filters nothing, so any type the bundled Mermaid version (`mermaid` `^12.2.0` in",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:129",
+      "source": "package.json:130",
       "match": "\"mermaid\": \"^12.2.0\",",
       "note": "Version now traced to package.json instead of an untraceable keyword list."
     },
@@ -17526,7 +17526,7 @@
       "quote": "remark-gfm for GitHub features",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:142",
+      "source": "package.json:143",
       "match": "\"remark-gfm\": \"^4.0.1\","
     },
     {
@@ -17536,7 +17536,7 @@
       "quote": "rehype-raw for HTML parsing",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:139",
+      "source": "package.json:140",
       "match": "\"rehype-raw\": \"^7.0.0\","
     },
     {
@@ -17546,7 +17546,7 @@
       "quote": "rehype-sanitize for security",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:140",
+      "source": "package.json:141",
       "match": "\"rehype-sanitize\": \"^6.0.0\","
     },
     {
@@ -17556,7 +17556,7 @@
       "quote": "react-markdown for AST generation",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:138",
+      "source": "package.json:139",
       "match": "\"react-markdown\": \"^10.1.0\","
     },
     {
@@ -19491,7 +19491,7 @@
       "quote": "Chokidar is pinned to exact `5.0.0`.",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:70",
+      "source": "package.json:71",
       "match": "\"chokidar\": \"5.0.0\","
     },
     {
@@ -20775,7 +20775,7 @@
       "quote": "`@tanstack/react-virtual` draws only the rows on screen",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:96",
+      "source": "package.json:97",
       "match": "\"@tanstack/react-virtual\": \"3.14.21\","
     },
     {
@@ -21189,7 +21189,7 @@
       "quote": "(the suite has 6 today; the sixth has not been tried on CI)",
       "status": "fixed",
       "evidence": "source",
-      "source": "e2e/visual-regression.e2e.ts:280",
+      "source": "e2e/visual-regression.e2e.ts:255",
       "match": "imageViewerVisualTest('(f) narrow panel toolbar'",
       "note": "The visual suite now has 6 tests (a)–(f); the page said 5 as if current"
     },
@@ -21200,8 +21200,8 @@
       "quote": "npm run test:e2e:visual                   # Visual regression suite",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:60",
-      "match": "\"test:e2e:visual\": \"electron-vite build && playwright test --project=visual\""
+      "source": "package.json:61",
+      "match": "\"test:e2e:visual\": \"electron-vite build --mode e2e && playwright test --project=visual\""
     },
     {
       "id": "docs-known-issues/38",
@@ -21210,8 +21210,8 @@
       "quote": "npm run test:e2e:update-screenshots       # Update visual baselines",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:61",
-      "match": "\"test:e2e:update-screenshots\": \"electron-vite build && playwright test --project=visual --update-snapshots\""
+      "source": "package.json:62",
+      "match": "\"test:e2e:update-screenshots\": \"electron-vite build --mode e2e && playwright test --project=visual --update-snapshots\""
     },
     {
       "id": "docs-known-issues/39",
@@ -21421,7 +21421,7 @@
       "quote": "Neither the functional `electron` suite nor the 6 visual screenshot tests (`e2e/visual-regression.e2e.ts`) run on CI",
       "status": "fixed",
       "evidence": "source",
-      "source": "e2e/visual-regression.e2e.ts:280",
+      "source": "e2e/visual-regression.e2e.ts:255",
       "match": "imageViewerVisualTest('(f) narrow panel toolbar'",
       "note": "Was 5 visual tests; the suite has 6"
     },
@@ -21432,7 +21432,7 @@
       "quote": "each of which calls `await window.waitForLoadState('domcontentloaded')` immediately after `firstWindow()`",
       "status": "verified",
       "evidence": "source",
-      "source": "e2e/fixtures/index.ts:556",
+      "source": "e2e/fixtures/index.ts:575",
       "match": "await window.waitForLoadState('domcontentloaded')"
     },
     {
@@ -21567,7 +21567,7 @@
       "quote": "currently at `^4.3.1`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:77",
+      "source": "package.json:78",
       "match": "\"js-yaml\": \"^4.3.1\""
     },
     {
@@ -21935,7 +21935,7 @@
       "quote": "`package.json` now pins `vitest` and `@vitest/coverage-v8` at `^5.0.5`",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:154",
+      "source": "package.json:155",
       "match": "\"vitest\": \"^5.0.5\"",
       "note": "The major vitest upgrade the advisory needed has landed"
     },
@@ -21957,7 +21957,7 @@
       "quote": "`package.json` now pins 26.18.0",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:117",
+      "source": "package.json:118",
       "match": "\"electron-builder\": \"26.18.0\"",
       "note": "Said package.json pins 26.16.1"
     },
@@ -24240,10 +24240,10 @@
       "id": "docs-windows-known-flakes/17",
       "audience": "developer",
       "doc": "docs/windows/known-flakes.md",
-      "quote": "Established in: `e2e/visual-regression.e2e.ts:77` (platform-suffixed baseline path)",
+      "quote": "Established in: `e2e/utils/visual-baseline.ts:29` (platform-suffixed baseline path, shared by both visual specs)",
       "status": "verified",
       "evidence": "source",
-      "source": "e2e/visual-regression.e2e.ts:77",
+      "source": "e2e/utils/visual-baseline.ts:29",
       "match": "${nameWithoutExt}-${process.platform}.png"
     },
     {
@@ -25585,8 +25585,8 @@
       "quote": "npm run test:e2e:visual            # Visual regression baselines",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:60",
-      "match": "\"test:e2e:visual\": \"electron-vite build && playwright test --project=visual\"",
+      "source": "package.json:61",
+      "match": "\"test:e2e:visual\": \"electron-vite build --mode e2e && playwright test --project=visual\"",
       "note": "Ledger source line number was wrong (package.json had shifted); repointed to the exact line."
     },
     {
@@ -25596,7 +25596,7 @@
       "quote": "npm run test:e2e:update-screenshots # Refresh visual baselines",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:61",
+      "source": "package.json:62",
       "match": "playwright test --project=visual --update-snapshots",
       "note": "Ledger source line number was wrong (package.json had shifted); repointed to the exact line."
     },
@@ -25774,7 +25774,7 @@
       "quote": "├── stores/            # Zustand state",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:84",
+      "source": "package.json:85",
       "match": "\"zustand\": \"^5.0.15\"",
       "note": "Ledger source line number was wrong (package.json had shifted); repointed to the exact line."
     },
@@ -27985,7 +27985,7 @@
       "quote": "electron-store v11+ is ES Module only",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:72",
+      "source": "package.json:73",
       "match": "\"electron-store\": \"^11.0.2\""
     },
     {
@@ -34438,7 +34438,7 @@
       "quote": "Monaco's built-in editing commands work, such as multiple cursors, undo and redo, and line operations",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:130",
+      "source": "package.json:131",
       "match": "\"monaco-editor\": \"^0.55.1\"",
       "note": "Specific Monaco default shortcuts (F1 palette, Alt+Up/Down, Cmd+D, Alt+click) are Monaco built-ins not defined in Erfana source; removed and kept a general statement."
     },
@@ -36918,7 +36918,7 @@
       "quote": "| Undo; redo; toggle comment |",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:130",
+      "source": "package.json:131",
       "match": "\"monaco-editor\": \"^0.55.1\"",
       "test": "e2e/editor-outside-change.e2e.ts",
       "note": "Monaco built-in keys; source moved from an updateOptions call that does not bind them to the monaco-editor dependency."
@@ -36930,7 +36930,7 @@
       "quote": "| Move line; select next match; add cursor |",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:130",
+      "source": "package.json:131",
       "match": "\"monaco-editor\": \"^0.55.1\"",
       "note": "Monaco built-in keys; source moved from an updateOptions call that does not bind them to the monaco-editor dependency."
     },
@@ -36941,7 +36941,7 @@
       "quote": "| Command palette | <kbd>F1</kbd> | <kbd>F1</kbd> |",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:130",
+      "source": "package.json:131",
       "match": "\"monaco-editor\": \"^0.55.1\"",
       "note": "Monaco built-in key; source moved from an e2e page object (not src) to the monaco-editor dependency."
     },
@@ -43249,7 +43249,7 @@
       "quote": "are built into the Monaco editor component, not defined by Erfana",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:130",
+      "source": "package.json:131",
       "match": "\"monaco-editor\": \"^0.55.1\"",
       "note": "Added: these keys are Monaco defaults, with no binding in Erfana src (cross-page note); proven by the monaco-editor dependency."
     },
@@ -45182,7 +45182,7 @@
       "quote": "Document import converter for 50+ formats via `@llamaindex/liteparse` with local OCR.",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:65",
+      "source": "package.json:66",
       "match": "\"@llamaindex/liteparse\": \"2.15.1\""
     },
     {
@@ -45763,7 +45763,7 @@
       "quote": "Erfana has no full-text index, vector store or MCP server today",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:63",
+      "source": "package.json:64",
       "match": "\"dependencies\": {",
       "note": "Added a status note: the gap table's 'What's specified' rows read as current state. package.json dependencies carry no SQLite, sqlite-vec, ONNX or MCP SDK package, and search_notes appears in no spec (spec 004 names erfana_graph_search)"
     },
@@ -46455,7 +46455,7 @@
       "quote": "`@llamaindex/liteparse` is pinned exactly (`2.15.1`).",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:65",
+      "source": "package.json:66",
       "match": "\"@llamaindex/liteparse\": \"2.15.1\""
     },
     {
@@ -46475,7 +46475,7 @@
       "quote": "`sharp` and `tesseract.js`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:149",
+      "source": "package.json:150",
       "match": "\"tesseract.js\": \"^7.0.0\","
     },
     {
@@ -46495,7 +46495,7 @@
       "quote": "\"dependencies\": { \"chokidar\": \"5.0.0\" },",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:70",
+      "source": "package.json:71",
       "match": "\"chokidar\": \"5.0.0\","
     },
     {
@@ -46505,7 +46505,7 @@
       "quote": "\"overrides\":    { \"chokidar\": \"5.0.0\" }",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:159",
+      "source": "package.json:160",
       "match": "\"chokidar\": \"5.0.0\","
     },
     {
@@ -46535,7 +46535,7 @@
       "quote": "\"overrides\": { \"lodash\": \"4.18.1\", \"lodash-es\": \"4.18.1\" }",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:161",
+      "source": "package.json:162",
       "match": "\"lodash-es\": \"4.18.1\","
     },
     {
@@ -46545,7 +46545,7 @@
       "quote": "`dompurify` is floored at `^3.4.17`, forced through the tree.",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:162",
+      "source": "package.json:163",
       "match": "\"dompurify\": \"^3.4.17\""
     },
     {
@@ -51188,7 +51188,7 @@
       "quote": "`canvas` is no longer in the lockfile, so this chain no longer resolves today",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:126",
+      "source": "package.json:127",
       "match": "\"jsdom\": \"^25.0.1\"",
       "note": "Presented the jsdom → canvas → aproba chain as current; canvas is absent from package-lock.json, so it is now marked as the 26.0.0 record"
     },
@@ -51519,7 +51519,7 @@
       "quote": "now extracts with `yauzl` 3.4.0 directly",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:82",
+      "source": "package.json:83",
       "match": "\"yauzl\""
     },
     {
@@ -51529,7 +51529,7 @@
       "quote": "`sharp` stays a `devDependency` for the documentation-capture scripts only",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:146",
+      "source": "package.json:147",
       "match": "\"sharp\": \"^0.35.4\""
     },
     {
@@ -51539,7 +51539,7 @@
       "quote": "| `dompurify` | `^3.4.17` |",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:162",
+      "source": "package.json:163",
       "match": "\"dompurify\": \"^3.4.17\""
     },
     {
@@ -53901,7 +53901,7 @@
       "quote": "const tmpParent = await fs.promises.mkdtemp(path.join(E2E_TEMP_DIR, 'visual-'))",
       "status": "fixed",
       "evidence": "source",
-      "source": "e2e/fixtures/index.ts:570",
+      "source": "e2e/fixtures/index.ts:589",
       "match": "const tmpParent = await fs.promises.mkdtemp(path.join(E2E_TEMP_DIR, 'visual-'))",
       "note": "Snippet used e2eTempDir; the fixture uses E2E_TEMP_DIR."
     },
@@ -54446,7 +54446,7 @@
       "quote": "Item 5 is still open; item 6 was not in v0.13.0 and landed later, on 2026-09-04",
       "status": "fixed",
       "evidence": "source",
-      "source": "e2e/visual-regression.e2e.ts:298",
+      "source": "e2e/visual-regression.e2e.ts:273",
       "match": "toHaveScreenshot('image-viewer-toolbar-narrow.png')",
       "note": "Said items 5 and 6 remain unreleased; item 6 (win32 baselines) is committed under e2e/screenshots, so only item 5 is open"
     },
@@ -54457,7 +54457,7 @@
       "quote": "All six baselines are generated and committed",
       "status": "verified",
       "evidence": "source",
-      "source": "playwright.config.ts:112",
+      "source": "playwright.config.ts:131",
       "match": "snapshotPathTemplate: '{snapshotDir}/{arg}-{platform}{ext}'"
     },
     {

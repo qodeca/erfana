@@ -69,6 +69,22 @@ export default defineConfig({
       testIgnore: ['**/visual-regression*', '**/audio-transcription*'],
     },
     {
+      // The built-in browser's hostile-page suite (spec 025, 025-NFR-001,
+      // 025-AC-046, 025-AC-068): what the `Browser isolation` CI job runs
+      // (browser-isolation.yml). A subset of the `electron` project, so a bare
+      // `playwright test` runs these twice – every script names its project.
+      // Files and titles together pick the suite: every test of
+      // browser-tab-isolation.e2e.ts carries 025-AC-046 or 025-AC-068, and
+      // browser-local-files.e2e.ts adds its hostile local folder test.
+      // Retries 0, also on CI: a hostile page that gets through once and not
+      // on the retry is an attack that worked, not a flake.
+      // Run: npm run test:e2e:browser-isolation
+      name: 'browser-isolation',
+      testMatch: ['**/browser-tab-isolation.e2e.ts', '**/browser-local-files.e2e.ts'],
+      grep: /025-AC-046|025-AC-068|hostile/,
+      retries: 0,
+    },
+    {
       // Env-gated project for capabilities that make real (paid) external
       // API calls. Audio transcription uses the OpenAI API; running it
       // unconditionally would charge on every PR. Gate on a project-level
@@ -105,8 +121,11 @@ export default defineConfig({
       retries: 0,
     },
     {
+      // Every visual spec: visual-regression.e2e.ts (the app's core states) and
+      // visual-regression.browser.e2e.ts (the built-in browser's surfaces). The
+      // electron project ignores the same files (`**/visual-regression*`).
       name: 'visual',
-      testMatch: '**/visual-regression.e2e.ts',
+      testMatch: '**/visual-regression*.e2e.ts',
       retries: 0, // Visual diffs must be investigated, not retried (spec 019-FR-003)
       snapshotDir: './e2e/screenshots',
       snapshotPathTemplate: '{snapshotDir}/{arg}-{platform}{ext}',

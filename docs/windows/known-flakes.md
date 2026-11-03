@@ -360,7 +360,7 @@ expect(elapsed).toBeLessThan(BUDGET_MS)
 Move NFR regression signal to a fake-timer integration test (`*.pipeline.test.ts`)
 where Defender noise can't invalidate the budget.
 
-Established in: `e2e/visual-regression.e2e.ts:77` (platform-suffixed baseline path),
+Established in: `e2e/utils/visual-baseline.ts:29` (platform-suffixed baseline path, shared by both visual specs),
 `e2e/directory-watcher.e2e.ts:42,61` (`retries: 0` + the per-platform budget constant; post-#172).
 
 **Backing-array pattern O(n²) under stress → offset-based deque**

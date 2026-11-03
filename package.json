@@ -56,9 +56,10 @@
     "test:e2e": "npm run build:e2e && playwright test --project=electron",
     "test:e2e:no-build": "playwright test --project=electron",
     "test:e2e:linux": "bash scripts/e2e-linux.sh",
+    "test:e2e:browser-isolation": "npm run build:e2e && playwright test --project=browser-isolation",
     "test:e2e:headed": "npm run build:e2e && playwright test --project=electron --headed",
-    "test:e2e:visual": "electron-vite build && playwright test --project=visual",
-    "test:e2e:update-screenshots": "electron-vite build && playwright test --project=visual --update-snapshots"
+    "test:e2e:visual": "electron-vite build --mode e2e && playwright test --project=visual",
+    "test:e2e:update-screenshots": "electron-vite build --mode e2e && playwright test --project=visual --update-snapshots"
   },
   "dependencies": {
     "@electron-toolkit/utils": "^3.0.0",

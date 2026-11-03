@@ -39,11 +39,14 @@ npm run test:e2e
 # Run with visible window
 npm run test:e2e:headed
 
-# Visual regression tests
+# Visual regression tests (builds in e2e mode too: the built-in browser cases drive the test hooks)
 npm run test:e2e:visual
 
 # Update visual baselines
 npm run test:e2e:update-screenshots
+
+# The built-in browser's hostile-page suite – what the `Browser isolation` CI job runs
+npm run test:e2e:browser-isolation
 ```
 
 ### Test build vs production build
@@ -138,13 +141,15 @@ One test helper was changed for the container, safely for macOS and Windows too:
 
 ## Playwright configuration
 
-`playwright.config.ts` in the project root configures four Playwright projects:
+`playwright.config.ts` in the project root configures six Playwright projects:
 
 | Project | Test match | Retries | Purpose |
 |---------|-----------|---------|---------|
 | `electron` | `**/*.e2e.ts` (ignores `visual-regression*` and `audio-transcription*`) | 2 on CI, 0 locally | Functional E2E tests |
 | `transcription` | `**/audio-transcription*.e2e.ts` | 2 on CI, 0 locally | Env-gated: runs only with `ERFANA_E2E_TRANSCRIPTION=1` (real, paid OpenAI calls) |
-| `visual` | `**/visual-regression.e2e.ts` | 0 | Screenshot comparison (diffs must be investigated) |
+| `browser-isolation` | `**/browser-tab-isolation.e2e.ts` and `**/browser-local-files.e2e.ts`, titles matching `025-AC-046`, `025-AC-068` or `hostile` | 0, also on CI | The built-in browser's hostile-page suite (spec 025, 025-NFR-001) – a subset of `electron`, run alone by the `Browser isolation` CI job ([ci.md](../ci.md#browser-isolation-browser-isolationyml)). No retries: a hostile page that gets through once is an attack that worked |
+| `visual` | `**/visual-regression*.e2e.ts` | 0 | Screenshot comparison (diffs must be investigated) |
+| `guide` | `**/guide-tasks/*.guide.ts` | 0 | Guide task runs: each spec follows one `docs/user-guide` how-to page step by step |
 | `bench` | `**/*.bench.ts` | 0 | Env-gated: runs only with `ERFANA_E2E_BENCH=1`. Records performance numbers rather than asserting behaviour – see [docs/performance/](../performance/) (e.g. the [preview typing benchmark](../performance/2026-10-21-deferred-preview.md)) |
 
 Visual project settings: `snapshotDir: './e2e/screenshots'`, `snapshotPathTemplate: '{snapshotDir}/{arg}-{platform}{ext}'`, `maxDiffPixelRatio: 0.01`, `animations: 'disabled'`.
@@ -161,6 +166,28 @@ a clip change is finished when every platform has been visited. The two element-
 size. A missing baseline is not skipped — `assertBaselineExists` throws, and `playwright.config.ts` sets
 `updateSnapshots: 'none'`, so the auto-write-on-first-run path stays closed. Generate a new platform's set with
 `npm run test:e2e:update-screenshots` and commit it.
+
+**Built-in browser surfaces** (`e2e/visual-regression.browser.e2e.ts`, issue #448): seven element-level or clipped captures – the toolbar
+(navigation row + pick row, clipped to the two rows), the pick panel and outline over the page's still image (the whole browser panel), the
+prompt-actions panel, the instruction dialog, and the certificate, load-error and crashed pages (the whole panel). The page itself is a
+native view and never appears in a window screenshot; the still image is a canvas in Erfana's DOM, so it does. Three things keep them
+deterministic, and each is needed:
+
+- **The target terminal runs the stub agent (`cat`).** With the bare shell the row, panel and dialog name the host's login shell and the panel adds a
+  shell-guard banner that wraps by that name. The agent is started from a first tab and the tab under test opened after it, because a tab reads its
+  target as it opens.
+- **Ports are pinned in the drawn text.** The fixture servers listen on OS-assigned ports; `pinPortText()` replaces the port number in the panel's
+  text nodes with `54321` right before the capture and fails if it is still drawn. Fields are not touched (React writes a controlled value back on
+  its next render), so every capture is taken with the address bar at rest.
+- **Renderer storage is wiped before each launch** (`visualResetRendererStorage`). `userDataDir` is worker-scoped, and without the wipe a panel size an
+  earlier test persisted changed the browser panel's width by 20–30 px depending on test order.
+
+The two visual option fixtures on `visualTest` (`e2e/fixtures/index.ts`) default to the old behaviour, so the six core baselines launch exactly as before:
+`visualExtraLaunchArgs` (extra Chromium switches for both visual apps; the browser cases pass `BROWSER_CHROMIUM_ARGS`) and `visualResetRendererStorage`.
+Both visual specs share `assertBaselineExists` from `e2e/utils/visual-baseline.ts`. **Only the darwin set of the browser baselines exists** (generated
+2026-11-03): until a Windows host runs `npm run test:e2e:update-screenshots -- missing e2e/visual-regression.browser.e2e.ts` and commits the seven
+`*-win32.png` files, the visual suite on Windows fails those seven cases with "Missing visual baseline". The `missing` mode writes only absent baselines, so
+the run cannot rewrite an existing one.
 
 See `playwright.config.ts` for the full configuration.
 
@@ -196,6 +223,15 @@ Located in `e2e/pages/`:
 | `html-preview.focus.ts` | Keyboard focus into a previewed page and back (#124, QG-8 U1 and QG-11a H1) – plain functions taking the `ElectronApplication`, like `html-preview.native.ts`: `bandChip()`, `bringAppToFront()` (makes Erfana the OS key window and **fails** when the OS will not, naming the locked screen or inactive session as the cause), `focusState()` (native focus read main-side with `webContents.isFocused()` for the preview and its host window – `document.activeElement` cannot tell), `pressKeyInPage()` (real input through `webContents.sendInputEvent`; Playwright's `page.keyboard` drives the host and never reaches the page), and `recordHostFocusTrail()` / `hostFocusTrail()` (the order of host `focus()` calls and forwarded shortcuts, observable without OS focus) |
 | `html-preview.comments.ts` | HTML Preview comments (P3, P4; docs/designs/comments/html-preview-comments.md §12.4) – plain functions taking the `ElectronApplication`: `commentLoads()` and `commentUnavailable()` read the main-side e2e hook `globalThis.__erfanaE2eComments` (installed only in an unpackaged build with `ERFANA_E2E_TEST_HOOKS=1`, which the fixtures set), never the page's markup; `newestLoad()` / `namesFile()` / `waitForCommentLoad()` pick a file's load; `DOM_TOKENS_EXPR` reads the `data-erfana-el` tokens left in the live DOM – none since P4, the preload strips them. **Comment stub (P4)**, standing in for main's comment handlers until P5: `armCommentStub()` / `commentStubRecord()` record the picks and anchor reports the page's frames send on `webContents.ipc`, `sendCommentState()` sends one frame a `preview-page:commentState`, `enterStubCommentMode()` turns the mode on and waits for the overlay (`OVERLAY_HOSTS_EXPR`, which also proves the host's shadow root is closed), `OVERLAY_HOST_EXPR` / `OVERLAY_HOST_OPEN_EXPR` name the host and read whether it is in the top layer (for a page that fights it), `overlayReportedUnavailable()` reads whether a frame said `overlay: 'unavailable'`, `clickAt()` / `pickAt()` are a frame-aware trusted click and the pick it sent, and `accentPixelsNear()` counts the pin colour in `capturePage()` pixels at an element's top-right corner – the closed shadow root's only outside view |
 | `html-preview.comments-ui.ts` | HTML Preview comments – the reviewer's journeys (P7), shared by the four P7 specs (`html-preview-comments{,.frames,.safety,.perf}.e2e.ts`) on top of `html-preview.comments.ts`: `elementBox()` / `waitForBox()` (an element's box through same-project frames), trusted input `mouseAt()` / `clickPin()` / `pressInPage()`, pixel reads `pinCoverage()` / `accentInStill()` (the overlay is in a closed shadow root), the `CommentChrome` class (toolbar tools, drawer, menu and window of one preview tab), the disk oracle `singleBlockInsert()`, and `setGlobalSetting()` / `resetCommentSettings()` to put the identity back in `afterEach` |
+| `BrowserTabPage` (`browser-tab.page.ts`) | Built-in browser tabs driven through the preload bridge `window.api.browserTab`, as the renderer drives them (spec 025) – `installRecorder()` (records every `browser-tab:state` event), `create()`, `open()` (a tab shown in `PAGE_AREA`), `page(tabId)`, `navigate()`, `openLocalFile()`, `history()`, `devTools()`, `close()`, `show()` / `hide()` / `moveTo()`, `lastState()` / `waitForState()`; main-side facts through the test hooks – `tabs()`, `browserSessionContents()`. The `browserTabs` fixture of `browserHarness.ts` |
+| `BrowserPagePage` (`browser-page.page.ts`) | The page inside one browser tab, read and driven through the main-process test hooks (`browserHook`) – `url()`, `waitFor(code)`, `waitForLoaded()`, `waitForInputReady()`, input through main-side `webContents.sendInputEvent` in page CSS px (`click()`, `clickSelector()`, `type()`, `key()`, `wheel()`, `fill()`), `startInputProbe()` / `inputProbeCounts()`, `cookies()`, `canary()` (a hostile page's report). Also exports `browserHook()` and `testHook()`, the `app.evaluate` calls into the hooks. Playwright's own page mouse is never used for a browser tab |
+| `BrowserTabUiPage`, `BrowserPanelUi` (`browser-tab-ui.page.ts`) | The browser's renderer UI driven through Erfana's DOM by role and name (commits 17–18). `BrowserTabUiPage`: `newTabButton`, `panels`, `editorTabs`, `visiblePanel()`, `openWithButton()`, `openFromAppMenu()`, `closeAll()`. `BrowserPanelUi` (one panel): `tabId()`, `addressBar`, `navigation`, `button()` / `tool()`, `placeholder`, `refused`, `strip` / `stripRow()` / `answerRow()` (waits out the input guard), `chips`, `findRow` / `findField` / `findCount`, `pageHeading` (the load-error, certificate and crashed pages), `menu()`, `chooseMore()`, `load()`, `waitForState()`, `page()`, `hookTab()`, `waitForAttached()` |
+| `PickDriver` (`browser-pick.page.ts`) | Pick and send below the UI (commits 14–15): calls the bridge (`mode()`, `refine()`, `close()`, `write()`, `discard()`, `targetStatus()`) and reads main through the `pick` hook (`highlight()`, `state()`, `events()` / `waitForEvent()`); pointer and keys through main-side input (`rect()`, `move()`, `key()`, `hover()`, `waitForLabel()`). Also `mainHook()`, `openPicker()`, `expectBoxNear()`, `PICK_WAIT_MS` |
+| `BrowserPickUi` (`browser-pick-ui.page.ts`) | The pick row, the prompt-actions panel and the instruction dialog over the still image (commit 19), by role and name – `row`, `pickButton`, `status`, `target`, `still`, `actions`, `dialog`, `action(name)`, `driver()`, `confirm()` (hover, Return, wait for the panel) |
+| `PickFlow`, `AgentTerminal`, `NoKeyTrap` (`browser-pick-flow.page.ts`) | The whole pick-and-send flow of one tab as a user drives it, on top of `BrowserPickUi` and `PickDriver`. `PickFlow`: `open()`, `load()`, the panel's header and dialog controls (`parentButton`, `childButton`, `path` / `crumb()` / `chip`, `closeButton`, `panelNote`, `panelTarget`, `dialogField` / `dialogSend` / `dialogCancel` / `dialogBack`, `showTerminal`, `openCapture`, `frame`, `statusChip`), the status slot as read (`statusText()`, `expectStatus()`, `recordStatus()` / `statusLog()` / `shownFor()`), main's state (`state()`, `highlightLabel()`, `waitForActive()`, `waitForFrozen()`, `routing()`, `waitForPageFocus()`, `focusErfana()`, `passClickWindows()` on the test clock), raw page input (`input()`, `move()`, `click()`, `key()`, `keyWithRepeats()`, `pickKey()`), `hover()`, `pickByClick()`, `pickByShortcut()`, `setTabWidth()`, `trustTestCa()`, paint reads (`livePaint()`, `windowPaint()`) and CDP watches. `AgentTerminal`: the app's terminal with `cat` in front, a stub agent (`open()`, `start()`, `text()`, `count()`). `NoKeyTrap`: the no-key trap of 025-AC-083 (`arm()`, `expectNoKeys()`). Plus capture-file readers (`capturesDir()`, `contextFiles()`, `newCapture()`, `captureBox()`, `readPng()`) |
+| `BrowserSendUi`, `StubAgent` (`browser-send.page.ts`) | Pick and send end to end with a terminal running a program the test chose. `BrowserSendUi`: `open()`, `startStubAgent()` (the recording `fixtures/browser/stub-agent.cjs`) / `startStubAs()` / `stopStub()` / `startShell()` / `run()`, `waitForTarget()`, `load()`, `pickElement()` / `pickAt()`, `explainAndRead()`, `openDialog()`, the send notice and banner, toast recording (`recordToasts()`, `errorToasts()`, `infoToasts()`), `routingFocus()`, `windowKey()`, `advanceMainClock()`, `pickState()`, `fault()` / `failNextTerminalPaste()`, `captureFiles()` / `waitForCaptureCount()`. `StubAgent`: `received()`, `waitForSubmitted()`, `reset()`. Also `maskCaptureRefs()` |
+| `DownloadsDriver` (`browser-downloads.page.ts`) | Downloads from a browser tab (025-AC-020): the save dialog stubbed and its options recorded (`answerSaveDialog()`, `dialogCalls()`, `dialogPaths()`, `waitForDialogCount()`), the notices (`recordNotices()`, `notices()`, `waitForNotice()`, `doneToast()`, `failedToast()`), **Show in folder** replaced by a recorder (`recordShowInFolder()`, `shownInFolder()`, `showInFolderButton()`), and what is left on disk (`downloadsDir()`, `leftovers()`, `waitForNoLeftovers()`) |
+| `BrowserProfileFolder` (`browser-profile.page.ts`) | The project's `.erfana/browser/` folder read and planted from the test side (025-AC-016, 025-AC-069) – `at()`, `exists()`, `gitignore()`, `birthTimes()`, `setAsideFolders()`, `createFolder()`, `plantLink()`, `gitStatusUnderBrowser()`; plus `entriesOf()`, `refusalToast()` / `waitForRefusal()` (the refused-tab toast) and `REFUSED_TAB_TITLE` |
 | `html-preview-bounds.harness.ts` (in `e2e/`) | Not a page object: the shared harness of the two bounds specs (#124, part 1) – a `bounds` fixture (`BoundsHarness`: the native view read main-side in DIP against its placeholder in CSS px, the layout moves the specs share, `sashNear(x)`), `LogTrail` (the drop-reason lines a test produced) and the seeded page. "Settled" means two reads 100 ms apart agree |
 
 > `ImageViewerPage` is **not** exposed as a composed fixture – the specs that use it construct it directly (the export specs go through `openImage()` in `e2e/utils/image-export-helpers.ts`, which is the same thing plus the export budget), because one of them needs its own launch environment. Three conventions in it are worth copying. Panel locators are scoped **inside** `[data-testid="image-viewer-panel"]`, so the full-screen portal (which renders the same test ids into `#portal-root`) can never satisfy a panel assertion — the deliberate exceptions are the `fullScreen*` locators, which scope to the overlay instead, and `exportStatus()`, which is looked up on the page because the panel-owned live region is rendered into whichever surface is on top and must resolve to exactly one element either way. Freshness is asserted on the **decoded** bytes via a `data-marker` attribute embedded in the SVG, not by diffing two multi-kilobyte data URLs — a failing assertion then names which version is on screen instead of dumping base64. And busy is `aria-disabled`, never `disabled`, so `clickExport()` arms a `MutationObserver` before the click rather than polling: a stubbed save dialog can settle inside one poll interval, so the busy transition has to be recorded, not sampled.
@@ -244,6 +280,8 @@ Additional fixtures for tests that need a project directory, settings, or an ope
 | `appWithTestProject` | Test | Launches Electron with **no** project argument, then opens `testProject` over IPC (`window.api.file.openProjectByPath`). The main process does not parse a project path from argv, so the older argv form silently fell back to electron-store's last-opened project |
 | `windowWithTestProject` | Test | First window page from `appWithTestProject` |
 | `localServer` | Test | Ephemeral loopback HTTP server (`http://127.0.0.1:<port>`) serving a probe script and recording every request; closed on teardown. Composed in `e2e/fixtures/localServer.ts`, not in `fixtures/index.ts` — import `test` from there to use it |
+| `browserServers` | Worker | The built-in browser's fixture servers (spec 025): every sample app of `04-acceptance.md` § Test fixtures over HTTP and HTTPS on OS-assigned ports, the expired / mismatch / self-signed certificate servers, held responses and the request log. Composed in `e2e/fixtures/browser/serve.ts` (also exports `startBrowserFixtureServers()` and `BROWSER_CHROMIUM_ARGS`, the sealed-network `--host-resolver-rules`); what each app holds is in `e2e/fixtures/browser/README.md` |
+| `browserTabs` | Test | A `BrowserTabPage` on `appWithTestProject` / `windowWithTestProject`, its state recorder installed. Composed in `e2e/fixtures/browserHarness.ts`, whose `test` also sets `extraLaunchArgs` to `BROWSER_CHROMIUM_ARGS` and adds `browserServers`; the file also exports `launchBrowserApp()` (a launch of the spec's own, for a restart) |
 
 Configure via option fixtures with `test.use()`:
 
@@ -689,6 +727,9 @@ All 76 specs in `e2e/` (`ls e2e/*.e2e.ts | wc -l`, counted 2026-11-01). The thre
 - `tree-keyboard.e2e.ts` – #87 / #88 / #89 and [33]: the tree is one Tab stop operated by arrows, Home / End, Enter, type-ahead and Shift+F10, shows the focus ring, mounts only a screenful of rows for a big folder, and still supports drag-and-drop with auto-scroll
 - `visual-regression.e2e.ts` – Visual regression for 6 UI states (welcome, editor, terminal, settings, confirm dialog, image viewer toolbar in a narrow
   panel). State (f) uses its own extended test object so the image fixtures it seeds do not change the project tree in states (a)–(e)
+- `visual-regression.browser.e2e.ts` – #448: visual regression for the built-in browser's Erfana surfaces – the toolbar, the pick panel over the still
+  image, the prompt-actions panel, the instruction dialog and the certificate, load-error and crashed pages (`visual` project; see
+  [Playwright configuration](#playwright-configuration) for what keeps them deterministic)
 
 > **Why the PDF geometry tolerance is one CSS pixel (#73).** Chromium's `printToPDF` quantizes a CSS `@page` size onto a 1/300 in grid, and for any
 > dimension where `px % 8 === 6` the produced MediaBox comes back **0.54 pt larger** than requested. The gate's tolerance was originally 0.5 pt — tighter

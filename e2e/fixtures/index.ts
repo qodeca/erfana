@@ -507,6 +507,21 @@ type VisualTestFixtures = {
   visualAppWithProject: ElectronApplication
   /** Window from visual app with project, ready for screenshot capture. */
   visualWindowWithProject: Page
+  /**
+   * Extra Chromium switches for both visual apps, appended after the defaults.
+   * Empty by default, so the existing baselines launch exactly as before; the
+   * built-in browser visuals pass the sealed-network switches
+   * (`BROWSER_CHROMIUM_ARGS`) through it.
+   */
+  visualExtraLaunchArgs: string[]
+  /**
+   * Wipe the renderer's persisted web storage before the visual app with a
+   * project launches (see `resetRendererStorageDirs`). Off by default, so the
+   * existing baselines launch exactly as before. `userDataDir` is worker-scoped,
+   * so without it a panel size or divider one test persisted shapes the next
+   * test's layout, and an element shot's size depends on test order.
+   */
+  visualResetRendererStorage: boolean
 }
 
 const VISUAL_TEST_SEED_FILES: Record<string, string> = {
@@ -543,8 +558,12 @@ export const visualTest = base.extend<VisualTestFixtures, WorkerFixtures>({
     { scope: 'worker' }
   ],
 
-  visualApp: async ({ userDataDir, homeDir }, use) => {
+  visualExtraLaunchArgs: [[], { option: true }],
+  visualResetRendererStorage: [false, { option: true }],
+
+  visualApp: async ({ userDataDir, homeDir, visualExtraLaunchArgs }, use) => {
     const opts = buildVisualLaunchOptions(userDataDir, undefined, homeDir)
+    opts.args.push(...visualExtraLaunchArgs)
     const app = await electron.launch(opts)
     await resizeBrowserWindow(app, VISUAL_CONTENT_SIZE.width, VISUAL_CONTENT_SIZE.height)
     await use(app)
@@ -582,8 +601,13 @@ export const visualTest = base.extend<VisualTestFixtures, WorkerFixtures>({
 
   // `visualTestProject` is a dependency only for teardown order: the app closes
   // before its project folder is removed (see appWithTestProject).
-  visualAppWithProject: async ({ userDataDir, homeDir, visualTestProject: _visualTestProject }, use) => {
+  visualAppWithProject: async (
+    { userDataDir, homeDir, visualExtraLaunchArgs, visualResetRendererStorage, visualTestProject: _visualTestProject },
+    use
+  ) => {
+    if (visualResetRendererStorage) await resetRendererStorageDirs(userDataDir)
     const opts = buildVisualLaunchOptions(userDataDir, undefined, homeDir)
+    opts.args.push(...visualExtraLaunchArgs)
     const app = await electron.launch(opts)
     await resizeBrowserWindow(app, VISUAL_CONTENT_SIZE.width, VISUAL_CONTENT_SIZE.height)
     await use(app)
