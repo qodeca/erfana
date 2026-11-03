@@ -45,19 +45,25 @@ exports[`preload surface > window.api.browser exposes the expected members 1`] =
 exports[`preload surface > window.api.browserTab exposes the expected members 1`] = `
 [
   "answerStrip",
+  "certificate",
   "close",
   "create",
   "devTools",
+  "focusOrigin",
   "focusPage",
   "history",
   "navigate",
   "onBoundsApplied",
+  "onFocus",
+  "onForwardedKey",
   "onNotice",
+  "onPick",
   "onState",
   "onStrip",
   "onTabAdded",
   "setBounds",
   "showDownload",
+  "toolbarFocus",
 ]
 `;
 

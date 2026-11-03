@@ -3,7 +3,7 @@
 /**
  * Browser tabs per window (spec 025, 025-FR-001, 006, 007, 015; § 3.1, S2, A10).
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 
 vi.mock('electron', () => ({}))
 vi.mock('../LoggingService', () => ({ logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
@@ -13,6 +13,10 @@ import { BrowserTabIdSchema } from '../../../shared/ipc/browser-tab-schema'
 import { BrowserProfileError } from './browserProfileGuards'
 import { BrowserTabService, type BrowserTabServiceDeps } from './BrowserTabService'
 import { fakeHost, fakeView, type FakeHost, type FakeView } from './__test-helpers__/fakeBrowserView'
+import { EventEmitter } from 'node:events'
+import { keyDown } from './input/__test-helpers__/fakeInputContents'
+import type { TabInputSetup } from './BrowserTabService'
+import type { TabHost } from './BrowserTab'
 
 const SESSION = { name: 'browser' }
 let views: FakeView[]
@@ -188,7 +192,7 @@ describe('createFromPage (S2)', () => {
 
 describe('site requests (025-FR-019, 025-FR-020)', () => {
   function withSite() {
-    const link = { answerStrip: vi.fn(() => 'accepted' as const), detach: vi.fn() }
+    const link = { answerStrip: vi.fn(() => 'accepted' as const), answerCertificate: vi.fn(() => 'accepted' as const), detach: vi.fn() }
     const site = { attachTab: vi.fn(() => link), showDownload: vi.fn(() => true) }
     service = make({ site })
     return { site, link }
@@ -225,7 +229,24 @@ describe('site requests (025-FR-019, 025-FR-020)', () => {
     expect(service.answerStrip(b.host.id, tabId, 'r1', 'allow')).toBeNull()
     expect(link.answerStrip).not.toHaveBeenCalled()
     expect(service.answerStrip(a.host.id, tabId, 'r1', 'allow')).toBe('accepted')
-    expect(link.answerStrip).toHaveBeenCalledWith('r1', 'allow')
+    expect(link.answerStrip).toHaveBeenCalledWith('r1', 'allow', undefined)
+    const fields = { username: 'u', password: 'p', remember: true }
+    service.answerStrip(a.host.id, tabId, 'r2', 'signIn', fields)
+    expect(link.answerStrip).toHaveBeenLastCalledWith('r2', 'signIn', fields)
+  })
+
+  it('025-AC-021 takes certificate decisions only from the window that owns the tab', async () => {
+    const { link } = withSite()
+    const tabId = await open()
+    expect(service.answerCertificate(b.host.id, tabId, 'd1', true)).toBeNull()
+    expect(link.answerCertificate).not.toHaveBeenCalled()
+    expect(service.answerCertificate(a.host.id, tabId, 'd1', true)).toBe('accepted')
+    expect(link.answerCertificate).toHaveBeenCalledWith('d1', true)
+  })
+
+  it('answers unknown for a certificate decision when no site is wired', async () => {
+    const tabId = await open()
+    expect(service.answerCertificate(a.host.id, tabId, 'd1', false)).toBe('unknown')
   })
 
   it('detaches a tab from the site when it closes', async () => {
@@ -245,5 +266,115 @@ describe('site requests (025-FR-019, 025-FR-020)', () => {
     const tabId = await open()
     expect(service.answerStrip(a.host.id, tabId, 'r1', 'allow')).toBe('unknown')
     expect(service.showDownload(a.host.id, 'dl1')).toBe(false)
+  })
+})
+
+describe('input routing (025-FR-014, 025-FR-047 to 025-FR-052)', () => {
+  /** A fired key, as `before-input-event` delivers it; returns whether it was prevented. */
+  function fire(target: EventEmitter, input: ReturnType<typeof keyDown>): boolean {
+    let prevented = false
+    target.emit('before-input-event', { preventDefault: () => (prevented = true) }, input)
+    return prevented
+  }
+
+  let windowContents: EventEmitter
+  let macAppKeys: Mock<TabInputSetup['macAppKeys']>
+
+  beforeEach(() => {
+    windowContents = Object.assign(new EventEmitter(), { send: a.send, isDestroyed: () => false })
+    ;(a.host as { webContents: unknown }).webContents = Object.assign(windowContents, {
+      getZoomFactor: () => 1
+    })
+    macAppKeys = vi.fn((_host: TabHost) => ({ quit: vi.fn(), hide: vi.fn(), hideOthers: vi.fn(), minimize: vi.fn() }))
+    const input: TabInputSetup = { platform: 'darwin', clock: { now: () => 0 }, macAppKeys }
+    service = make({
+      input,
+      createView: vi.fn((session) => {
+        const v = fakeView(session)
+        Object.assign(v.contents, {
+          isFocused: () => false,
+          setIgnoreMenuShortcuts: vi.fn(),
+          executeJavaScriptInIsolatedWorld: vi.fn(async () => undefined)
+        })
+        views.push(v)
+        return v.view
+      })
+    })
+  })
+
+  it('025-AC-014 gives each tab its routers before the first load and sends forwarded keys and page focus to the owning window only', async () => {
+    const tabId = await open()
+    const contents = views[0]!.contents
+    expect(macAppKeys).toHaveBeenCalledWith(a.host)
+    expect(service.inputFor(service.list()[0]!)).not.toBeNull()
+    contents.emit('focus')
+    expect(fire(contents, keyDown('l', ['meta']))).toBe(true)
+    expect(a.send).toHaveBeenCalledWith(BROWSER_TAB_EVENTS.focus, { tabId, pageFocused: true })
+    expect(a.send).toHaveBeenCalledWith(BROWSER_TAB_EVENTS.forwardedKey, { tabId, action: 'focusAddress' })
+    contents.emit('did-navigate', {}, 'https://a.test/')
+    fire(contents, keyDown('e', ['meta']))
+    expect(a.send).toHaveBeenCalledWith(BROWSER_TAB_EVENTS.pick, { tabId, kind: 'mode', on: true })
+    expect(b.send).not.toHaveBeenCalled()
+  })
+
+  it('025-AC-065 points the window\'s browser keys at the tab whose toolbar has focus, for its own window only', async () => {
+    const tabId = await open()
+    expect(fire(windowContents, keyDown('r', ['meta']))).toBe(false)
+    service.toolbarFocus(b.host.id, tabId, true)
+    expect(fire(windowContents, keyDown('r', ['meta']))).toBe(false)
+    service.toolbarFocus(a.host.id, tabId, true)
+    expect(fire(windowContents, keyDown('r', ['meta']))).toBe(true)
+    expect(a.send).toHaveBeenCalledWith(BROWSER_TAB_EVENTS.forwardedKey, { tabId, action: 'reload' })
+    service.toolbarFocus(a.host.id, tabId, false)
+    expect(fire(windowContents, keyDown('t', ['meta']))).toBe(false)
+    expect(service.inputFor(service.list()[0]!)!.state().focus).toBe('out')
+  })
+
+  it('025-AC-062 passes where focus came from to the tab\'s input', async () => {
+    const tabId = await open()
+    const contents = views[0]!.contents
+    contents.emit('did-navigate', {}, 'https://a.test/')
+    contents.emit('focus')
+    fire(contents, keyDown('e', ['meta']))
+    contents.emit('blur')
+    service.focusOrigin(b.host.id, tabId, 'outside')
+    service.focusOrigin(a.host.id, tabId, 'toolbar')
+    contents.emit('focus')
+    expect(service.inputFor(service.list()[0]!)!.state().firstClickOnlyFocuses).toBe(false)
+  })
+
+  it('records a row shift for the click guard when the shown page moves', async () => {
+    await open()
+    const tab = service.list()[0]!
+    const contents = views[0]!.contents
+    contents.emit('before-mouse-event', { preventDefault: vi.fn() }, { type: 'mouseMove' })
+    tab.applyBounds({ x: 0, y: 40, width: 400, height: 300 }, 1, true)
+    tab.applyBounds({ x: 0, y: 80, width: 400, height: 260 }, 2, true)
+    expect(service.inputFor(tab)!.state().clickGuardUntil).toBeGreaterThan(0)
+  })
+
+  it('removes the routers when a tab closes and the window listener when its window closes', async () => {
+    const tabId = await open()
+    const contents = views[0]!.contents
+    service.toolbarFocus(a.host.id, tabId, true)
+    service.close(a.host.id, tabId)
+    expect(contents.listenerCount('before-input-event')).toBe(0)
+    expect(fire(windowContents, keyDown('r', ['meta']))).toBe(false)
+    service.toolbarFocus(a.host.id, tabId, true)
+    service.closeWindow(a.host.id)
+    expect(windowContents.listenerCount('before-input-event')).toBe(0)
+  })
+
+  it('opens a tab without a window listener when the window is already going', async () => {
+    windowContents = Object.assign(windowContents, { isDestroyed: () => true })
+    await open()
+    expect(windowContents.listenerCount('before-input-event')).toBe(0)
+  })
+
+  it('has no routers without the input setup', async () => {
+    service = make()
+    await open()
+    expect(service.inputFor(service.list()[0]!)).toBeNull()
+    expect(() => service.toolbarFocus(a.host.id, service.list()[0]!.id, true)).not.toThrow()
   })
 })

@@ -20,6 +20,7 @@ import {
   app,
   BrowserWindow,
   dialog,
+  Menu,
   safeStorage,
   session as electronSession,
   shell,
@@ -51,10 +52,12 @@ import { hardenBrowserSession } from './browserSessionPolicy'
 import { buildBrowserWebPreferences } from './browserWebPreferences'
 import { installAppRequestFilter } from './browserAppRequestFilter'
 import type { AppAddresses } from './browserNavigationPolicy'
-import { BrowserTabService } from './BrowserTabService'
+import { BrowserTabService, type TabInputSetup } from './BrowserTabService'
 import type { BrowserTabCdpLink } from './BrowserTab'
 import { BrowserCdpSession } from './cdp/BrowserCdpSession'
 import { BrowserSite } from './permissions/BrowserSite'
+import { installSiteRequestHooks } from './site/siteRequestHooks'
+import { electronMacAppKeys } from './input/macAppRoles'
 
 /**
  * Chromium's per-disk-cache maximum: 512 MB (025-FR-015; ADR 0009 decision 9).
@@ -94,6 +97,8 @@ export interface BrowserRuntime {
   readonly tabs: BrowserTabService
   /** Erfana's own addresses, refused to every tab (025-FR-005 rule 3). */
   readonly appAddresses: AppAddresses
+  /** Site requests, certificates and sign-ins of every tab (commits 12a–d). */
+  readonly site: BrowserSite
 }
 
 /** Erfana's own addresses in this build: the renderer entry, the resources folder, the dev server. */
@@ -166,13 +171,17 @@ export function installBrowserAfterReady(deps: BrowserAfterReadyDeps): BrowserRu
   const tabs = new BrowserTabService({
     openProfile: () => profiles.openForTab(),
     currentProject: () => deps.projectSession.current(),
-    prepareSession: (ses) => installAppRequestFilter(ses, () => appAddresses),
+    prepareSession: (ses) => {
+      installAppRequestFilter(ses, () => appAddresses)
+      installSiteRequestHooks(ses, site)
+    },
     createView: createBrowserView,
     expectDevTools: (ses) => browserSessionRegistry.expectDevTools(ses),
     appAddresses: () => appAddresses,
     resolveDomain: pinnedRegistrableDomain,
     attachCdp: attachTabCdp,
-    site
+    site,
+    input: tabInputSetup()
   })
   ;(deps.registerTabHandlers ?? registerBrowserTabHandlers)({ service: tabs })
   const teardown = new BrowserProjectTeardown()
@@ -181,13 +190,29 @@ export function installBrowserAfterReady(deps: BrowserAfterReadyDeps): BrowserRu
   profiles.runPendingDeletes().catch((error: unknown) => {
     logger.warn('Browser pending deletes could not run', { error: redactedLogError(error)?.message ?? String(error) })
   })
-  runtime = { profiles, teardown, tabs, appAddresses }
+  runtime = { profiles, teardown, tabs, appAddresses, site }
   return runtime
 }
 
+/** Key and mouse routing for every tab (commit 13): the platform, the app clock and the macOS app keys. */
+function tabInputSetup(): TabInputSetup {
+  return {
+    platform: process.platform,
+    clock: mainClock,
+    macAppKeys: (host) =>
+      electronMacAppKeys({
+        app,
+        sendActionToFirstResponder: (action) => Menu.sendActionToFirstResponder(action),
+        window: () => BrowserWindow.fromId(host.id)
+      })
+  }
+}
+
 /**
- * The process-wide site hooks (commits 12a–b): permission prompts, screen
- * sharing and downloads of every browser session, routed to the owning tab.
+ * The process-wide site hooks (commits 12a–d): permission prompts, screen
+ * sharing, downloads, certificate errors and HTTP sign-in of every browser
+ * session, routed to the owning tab. Saved sign-ins are encrypted with
+ * `safeStorage`, and kept in memory only on Linux `basic_text`.
  * The screen source chooser joins with the UI (commit 18); until then screen
  * sharing is refused.
  */
@@ -195,6 +220,8 @@ function createBrowserSite(): BrowserSite {
   return new BrowserSite({
     clock: mainClock,
     signer: lockHmacSigner,
+    credentialCrypto: safeStorage,
+    storageBackend: () => storageBackendFor(process.platform, () => safeStorage.getSelectedStorageBackend()),
     resolveDomain: pinnedRegistrableDomain,
     fromFrame: (frame) => electronWebContents.fromFrame(frame),
     downloads: {

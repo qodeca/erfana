@@ -19,6 +19,8 @@
  */
 import { installClockTestHook, type ClockTestHook } from './clockHook'
 import { createBrowserTestHook, type BrowserTestHook } from './browserHook'
+import { createBrowserInputTestHook, type BrowserInputTestHook } from './browserInputHook'
+import { createBrowserSiteTestHook, type BrowserSiteTestHook } from './browserSiteHook'
 import { getBrowserRuntime } from '../services/browser/browserAppSetup'
 
 /** The string `scripts/check-no-test-hooks.mjs` looks for in a production build. */
@@ -32,6 +34,10 @@ export interface TestHooks {
   readonly clock: ClockTestHook
   /** Built-in browser: tabs, the input harness, reads (spec 025 § 12, T2). */
   readonly browser: BrowserTestHook
+  /** Built-in browser key and mouse routing (spec 025 commit 13). */
+  readonly browserInput: BrowserInputTestHook
+  /** Built-in browser site behaviour: the test CA (spec 025 commits 12c–d, probe 10c). */
+  readonly site: BrowserSiteTestHook
 }
 
 /** What `globalThis.__erfanaTestHooks` holds. */
@@ -43,11 +49,14 @@ export interface InstalledTestHooks extends TestHooks {
 export interface TestHookDependencies {
   readonly installClock: () => ClockTestHook
   readonly createBrowser: () => BrowserTestHook
+  readonly createBrowserInput?: () => BrowserInputTestHook
+  readonly createSite?: () => BrowserSiteTestHook
 }
 
 const defaultDependencies: TestHookDependencies = {
   installClock: () => installClockTestHook(),
-  createBrowser: () => createBrowserTestHook(getBrowserRuntime)
+  createBrowser: () => createBrowserTestHook(getBrowserRuntime),
+  createBrowserInput: () => createBrowserInputTestHook(getBrowserRuntime)
 }
 
 /** Builds every hook. */
@@ -57,7 +66,9 @@ export function createTestHooks(
   return Object.freeze({
     sentinel: TEST_HOOK_SENTINEL,
     clock: deps.installClock(),
-    browser: deps.createBrowser()
+    browser: deps.createBrowser(),
+    browserInput: (deps.createBrowserInput ?? (() => createBrowserInputTestHook(getBrowserRuntime)))(),
+    site: (deps.createSite ?? (() => createBrowserSiteTestHook(getBrowserRuntime)))()
   })
 }
 

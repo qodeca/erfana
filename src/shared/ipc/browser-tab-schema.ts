@@ -2,21 +2,19 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Built-in browser IPC payload schemas (spec 025, solution design § 8 and
- * § 3.4; naming contract "IPC payload schemas").
- *
+ * § 3.4; naming contract "IPC payload schemas"). zod v4.
  * Every object is `.strict()`, every string and list is capped and every
  * number bounded (zod 4's `z.number()` already refuses `NaN` and `±Infinity`).
  * Requests name main-minted ids (tab, capture, strip request, menu,
  * certificate decision) – never a project path or a window; main resolves
  * the project from the sender's window. A request's `source` can never be
  * `page`: page-started navigations and tabs are created in main (§ 3.4).
- *
- * zod v4.
  * @see src/shared/ipc/browser-tab-channels.ts for the channel names
  */
 import { z } from 'zod'
 import { TerminalIdSchema } from './terminal-schema'
 import { PanelIdSchema } from './preview-schema'
+import { CertificateWarningSchema, SignInRowSchema } from './browser-tab-site-schema'
 
 /** Longest address or typed input accepted, in UTF-16 code units (Chromium's display cap is 2 MB; this is the bar's). */
 export const BROWSER_URL_MAX_CHARS = 8192
@@ -280,6 +278,7 @@ export type TargetStatusResponse = z.infer<typeof TargetStatusResponseSchema>
 export type AnswerStripRequest = z.infer<typeof AnswerStripRequestSchema>
 export type StripAnswer = z.infer<typeof StripAnswerSchema>
 export type ClearDataRequest = z.infer<typeof ClearDataRequestSchema>
+export type FocusOrigin = z.infer<typeof FocusOriginRequestSchema>['from']
 
 // ── Events (main → the owning window) ────────────────────────────────────────
 
@@ -336,6 +335,7 @@ export const TabStateEventSchema = z
     security: SecurityStateSchema,
     inUse: z.object({ camera: z.boolean(), microphone: z.boolean(), screen: z.boolean() }).strict(),
     erfanaPage: ErfanaPageSchema.nullable(),
+    certificate: CertificateWarningSchema.optional(), // the warning page's parts, with `erfanaPage: 'certificate'` (025-FR-021)
     devToolsOpen: z.boolean()
   })
   .strict()
@@ -439,6 +439,7 @@ export const StripRowSchema = z
     waiting: count.optional(),
     /** Whether Allow and Block are kept in the profile, for this run only (no keyring, S-26), or never (screen sharing). */
     remembered: z.enum(['saved', 'session', 'never']).optional(),
+    signIn: SignInRowSchema.optional(), // a `signIn` row's pre-fill, notices and Remember state (025-FR-022)
     /** Main-clock ms when the row appeared or last changed; main ignores answers within the 500 ms input guard. */
     shownAt: z.number().nonnegative().optional()
   })
@@ -493,4 +494,7 @@ export type StripEvent = z.infer<typeof StripEventSchema>
 export type StripRow = z.infer<typeof StripRowSchema>
 export type NoticeEvent = z.infer<typeof NoticeEventSchema>
 export type BoundsAppliedEvent = z.infer<typeof BoundsAppliedEventSchema>
+export type FocusEvent = z.infer<typeof FocusEventSchema>
+export type ForwardedKeyAction = z.infer<typeof ForwardedKeyActionSchema>
+export type ForwardedKeyEvent = z.infer<typeof ForwardedKeyEventSchema>
 export type SitePermission = z.infer<typeof SitePermissionSchema>

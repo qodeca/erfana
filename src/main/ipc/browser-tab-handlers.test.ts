@@ -33,7 +33,10 @@ const service = {
   close: vi.fn(),
   tabOf: vi.fn((windowId: number, tabId: string) => (windowId === 3 && tabId === TAB ? tab : null)),
   answerStrip: vi.fn(() => 'accepted'),
-  showDownload: vi.fn(() => true)
+  answerCertificate: vi.fn(() => 'accepted'),
+  showDownload: vi.fn(() => true),
+  focusOrigin: vi.fn(),
+  toolbarFocus: vi.fn()
 }
 let trusted = true
 let windowFor: typeof host | null = host
@@ -177,7 +180,31 @@ describe('registerBrowserTabHandlers', () => {
 
   it('025-AC-019 passes a strip answer with the sender\'s window; the service checks ownership and the guard', () => {
     invoke('browser-tab:answerStrip', { tabId: TAB, requestId: 'r1', answer: 'allowOnce' })
-    expect(service.answerStrip).toHaveBeenCalledWith(3, TAB, 'r1', 'allowOnce')
+    expect(service.answerStrip).toHaveBeenCalledWith(3, TAB, 'r1', 'allowOnce', undefined)
+  })
+
+  it('025-AC-022 passes a sign-in answer\'s fields to the service', () => {
+    const fields = { username: 'staging', password: 'pw', remember: true }
+    invoke('browser-tab:answerStrip', { tabId: TAB, requestId: 'r1', answer: 'signIn', fields })
+    expect(service.answerStrip).toHaveBeenCalledWith(3, TAB, 'r1', 'signIn', fields)
+    invoke('browser-tab:answerStrip', { tabId: TAB, requestId: 'r1', answer: 'signIn', fields: { username: 'x', token: 'y' } })
+    expect(service.answerStrip).toHaveBeenCalledTimes(1)
+  })
+
+  it('025-AC-021 passes Proceed anyway and Back to safety with the sender\'s window, refusing bad payloads', () => {
+    invoke('browser-tab:certificate', { tabId: TAB, decisionId: 'd1', proceed: true })
+    expect(service.answerCertificate).toHaveBeenCalledWith(3, TAB, 'd1', true)
+    trusted = false
+    invoke('browser-tab:certificate', { tabId: TAB, decisionId: 'd1', proceed: false })
+    trusted = true
+    invoke('browser-tab:certificate', { tabId: TAB, decisionId: 'd 1', proceed: true })
+    invoke('browser-tab:certificate', { tabId: TAB, decisionId: 'd1', proceed: 'yes' })
+    invoke('browser-tab:certificate', { tabId: TAB, decisionId: 'd1', proceed: true, host: 'a.test' })
+    expect(service.answerCertificate).toHaveBeenCalledTimes(1)
+    service.answerCertificate.mockImplementationOnce(() => {
+      throw new Error('boom')
+    })
+    expect(() => invoke('browser-tab:certificate', { tabId: TAB, decisionId: 'd2', proceed: false })).not.toThrow()
   })
 
   it('refuses a strip answer from an untrusted sender or with fields that do not parse', () => {
@@ -203,5 +230,27 @@ describe('registerBrowserTabHandlers', () => {
       throw new Error('boom')
     })
     expect(() => invoke('browser-tab:answerStrip', { tabId: TAB, requestId: 'r1', answer: 'allow' })).not.toThrow()
+  })
+
+  it('passes where focus came from and toolbar focus with the sender\'s window', () => {
+    invoke('browser-tab:focusOrigin', { tabId: TAB, from: 'toolbar' })
+    expect(service.focusOrigin).toHaveBeenCalledWith(3, TAB, 'toolbar')
+    ons.get('browser-tab:toolbarFocus')!(EVENT, { tabId: TAB, focused: true })
+    expect(service.toolbarFocus).toHaveBeenCalledWith(3, TAB, true)
+  })
+
+  it('refuses a focus report from an untrusted sender or with fields that do not parse, and logs instead of throwing', () => {
+    trusted = false
+    invoke('browser-tab:focusOrigin', { tabId: TAB, from: 'outside' })
+    ons.get('browser-tab:toolbarFocus')!(EVENT, { tabId: TAB, focused: true })
+    trusted = true
+    invoke('browser-tab:focusOrigin', { tabId: TAB, from: 'page' })
+    ons.get('browser-tab:toolbarFocus')!(EVENT, { tabId: TAB, focused: 'yes' })
+    expect(service.focusOrigin).not.toHaveBeenCalled()
+    expect(service.toolbarFocus).not.toHaveBeenCalled()
+    service.toolbarFocus.mockImplementationOnce(() => {
+      throw new Error('boom')
+    })
+    expect(() => ons.get('browser-tab:toolbarFocus')!(EVENT, { tabId: TAB, focused: false })).not.toThrow()
   })
 })

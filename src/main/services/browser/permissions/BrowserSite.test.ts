@@ -294,3 +294,40 @@ describe('BrowserSite downloads', () => {
     expect(site.showDownload(7, 'unknown')).toBe(false)
   })
 })
+
+describe('BrowserSite certificates and sign-in (025-FR-021, 025-FR-022)', () => {
+  it('025-AC-021 shows the certificate decision through the tab and takes its answer while the tab is open', async () => {
+    const results: boolean[] = []
+    contents.emit('certificate-error', { preventDefault: vi.fn() }, PAGE, 'net::ERR_CERT_AUTHORITY_INVALID', { data: 'x' }, (t: boolean) => results.push(t), true)
+    await flush()
+    expect(results).toEqual([false])
+    expect(link.answerCertificate('row1', false)).toBe('accepted')
+    link.detach()
+    expect(link.answerCertificate('row1', false)).toBe('unknown')
+  })
+
+  it('025-AC-022 passes a sign-in answer\'s fields to the box, and a finished request to the tab', async () => {
+    const calls: unknown[] = []
+    contents.emit(
+      'login',
+      { preventDefault: vi.fn() },
+      { url: 'https://garden.test/basic', firstAuthAttempt: true, isRequestForNavigation: false },
+      { isProxy: false, scheme: 'basic', host: 'garden.test', port: 443, realm: 'R' },
+      (...a: unknown[]) => calls.push(a)
+    )
+    await flush()
+    const row = strip.find((e) => e.op === 'add')
+    if (row?.op !== 'add') throw new Error('no row')
+    expect(row.row).toMatchObject({ kind: 'signIn', remembered: 'session', signIn: { remember: 'noKeyring' } })
+    clock.advance(STRIP_INPUT_GUARD_MS)
+    expect(link.answerStrip(row.row.requestId, 'signIn', { username: 'u', password: 'p' })).toBe('accepted')
+    expect(calls).toEqual([['u', 'p']])
+    site.requestCompleted(contents.id, 'https://garden.test/basic', 200)
+    site.requestCompleted(999_999, 'https://garden.test/basic', 200)
+  })
+
+  it('025-AC-023 clears certificate exceptions and saved sign-ins per project without throwing', async () => {
+    await expect(site.clearCertificates('/project')).resolves.toBeUndefined()
+    await expect(site.clearCredentials('/project')).resolves.toBeUndefined()
+  })
+})

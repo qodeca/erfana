@@ -28,8 +28,14 @@ export const browserTabGateway: BrowserTabBridge = {
   onState: (...args) => bridge().onState(...args),
   onTabAdded: (...args) => bridge().onTabAdded(...args),
   answerStrip: (...args) => bridge().answerStrip(...args),
+  certificate: (...args) => bridge().certificate(...args),
   showDownload: (...args) => bridge().showDownload(...args),
   onStrip: (...args) => bridge().onStrip(...args),
   onNotice: (...args) => bridge().onNotice(...args),
-  onBoundsApplied: (...args) => bridge().onBoundsApplied(...args)
+  onBoundsApplied: (...args) => bridge().onBoundsApplied(...args),
+  focusOrigin: (...args) => bridge().focusOrigin(...args),
+  toolbarFocus: (...args) => bridge().toolbarFocus(...args),
+  onFocus: (...args) => bridge().onFocus(...args),
+  onForwardedKey: (...args) => bridge().onForwardedKey(...args),
+  onPick: (...args) => bridge().onPick(...args)
 }

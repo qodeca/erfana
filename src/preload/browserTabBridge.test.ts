@@ -12,12 +12,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { BROWSER_TAB_CHANNELS as C, BROWSER_TAB_EVENTS as E } from '../shared/ipc/browser-tab-channels'
 import {
+  CertificateRequestSchema,
   CloseRequestSchema,
   CreateRequestSchema,
   DevToolsRequestSchema,
+  FocusOriginRequestSchema,
   FocusPageRequestSchema,
   HistoryRequestSchema,
-  ShowDownloadRequestSchema
+  ShowDownloadRequestSchema,
+  ToolbarFocusRequestSchema
 } from '../shared/ipc/browser-tab-schema'
 import { browserTabBridge } from './browserTabBridge'
 
@@ -98,6 +101,13 @@ describe('browserTabBridge requests', () => {
     expect(ShowDownloadRequestSchema.safeParse({ downloadId: 'dl-1' }).success).toBe(true)
   })
 
+  it('sends a certificate page decision on its own channel', async () => {
+    const decision = { tabId: TAB, decisionId: 'd-1', proceed: true }
+    await browserTabBridge.certificate(decision)
+    expect(ipc.invoke).toHaveBeenCalledWith(C.certificate, decision)
+    expect(CertificateRequestSchema.safeParse(decision).success).toBe(true)
+  })
+
   it('passes a navigate request through unchanged', async () => {
     const request = { tabId: TAB, input: 'example.test', source: 'address' } as unknown as Parameters<
       typeof browserTabBridge.navigate
@@ -112,6 +122,15 @@ describe('browserTabBridge requests', () => {
     expect(ipc.send).toHaveBeenCalledWith(C.bounds, request)
     expect(ipc.invoke).not.toHaveBeenCalled()
   })
+
+  it('sends where focus came from through invoke and toolbar focus fire-and-forget', async () => {
+    await browserTabBridge.focusOrigin(TAB, 'toolbar')
+    expect(browserTabBridge.toolbarFocus(TAB, true)).toBeUndefined()
+    expect(ipc.invoke.mock.calls).toEqual([[C.focusOrigin, { tabId: TAB, from: 'toolbar' }]])
+    expect(ipc.send.mock.calls).toEqual([[C.toolbarFocus, { tabId: TAB, focused: true }]])
+    expect(FocusOriginRequestSchema.safeParse(ipc.invoke.mock.calls[0]![1]).success).toBe(true)
+    expect(ToolbarFocusRequestSchema.safeParse(ipc.send.mock.calls[0]![1]).success).toBe(true)
+  })
 })
 
 describe('browserTabBridge events', () => {
@@ -120,7 +139,10 @@ describe('browserTabBridge events', () => {
     ['onTabAdded', E.tabAdded],
     ['onStrip', E.strip],
     ['onNotice', E.notice],
-    ['onBoundsApplied', E.boundsApplied]
+    ['onBoundsApplied', E.boundsApplied],
+    ['onFocus', E.focus],
+    ['onForwardedKey', E.forwardedKey],
+    ['onPick', E.pick]
   ] as const)('%s delivers events until unsubscribed', (member, channel) => {
     const callback = vi.fn()
     const unsubscribe = browserTabBridge[member](callback)

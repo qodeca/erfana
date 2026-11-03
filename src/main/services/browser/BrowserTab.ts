@@ -47,6 +47,7 @@ import {
   type NavigationRefusal
 } from './browserNavigationPolicy'
 import { hardenBrowserContents } from './browserSessionPolicy'
+import type { TabCertificateState } from './site/browserCertificates'
 
 /** Chromium's net error for a navigation that was cancelled (Stop, or replaced). */
 const ERR_ABORTED = -3
@@ -86,6 +87,11 @@ export interface BrowserTabDeps {
   /** Told once when the page's `webContents` is gone, whoever closed it. */
   readonly onDestroyed: (tab: BrowserTab) => void
   readonly attachCdp?: BrowserTabCdpHook
+  /**
+   * Told when a shown page's top edge moved – a row above it appeared or
+   * went – for the click guard (025-FR-047, `input/BrowserTabInput.ts`).
+   */
+  readonly onPageMoved?: () => void
 }
 
 /** A `navigate` answer: started, or refused by 025-FR-005. */
@@ -111,9 +117,13 @@ export class BrowserTab {
   private title = ''
   private attached = false
   private lastBoundsSeq = -1
+  /** The shown page's top edge in DIP, or `null` while detached. */
+  private shownTop: number | null = null
   private withdrawDevTools: (() => void) | null = null
   private cdp: BrowserTabCdpLink | null = null
   private closed = false
+  /** The certificate warning page and the address bar's warning sign (025-FR-021, `site/browserCertificates.ts`). */
+  private certificate: TabCertificateState = { warning: null, sign: null }
 
   constructor(deps: BrowserTabDeps) {
     this.deps = deps
@@ -196,6 +206,9 @@ export class BrowserTab {
       return false
     }
     this.deps.view.setBounds(dip)
+    const movedFrom = this.shownTop
+    this.shownTop = dip.y
+    if (movedFrom !== null && movedFrom !== dip.y) this.deps.onPageMoved?.()
     if (!this.attached) {
       host.contentView.addChildView(this.deps.view)
       this.attached = true
@@ -230,6 +243,27 @@ export class BrowserTab {
     return this.attached
   }
 
+  /** Show the certificate warning page or the warning sign, or neither (`site/browserCertificates.ts`). */
+  setCertificateState(state: TabCertificateState): void {
+    this.certificate = state
+    this.changed()
+  }
+
+  /** Whether a navigation the user started is pending: a sign-in box for it takes focus (025-FR-022). */
+  hasPendingUserNavigation(): boolean {
+    return this.pendingUrl !== null
+  }
+
+  /** **Proceed anyway**: load `url` again as a user-started reload (025-FR-021). */
+  reloadAt(url: string): void {
+    this.navigate(url, 'reload')
+  }
+
+  /** **Back to safety** over the failed load's history entry (025-FR-021). */
+  goBack(): void {
+    this.history('back')
+  }
+
   /** What the toolbar and the editor tab show (`browser-tab:state`). */
   state(): TabStateEvent {
     const shown = this.pendingUrl ?? this.committedUrl
@@ -245,9 +279,10 @@ export class BrowserTab {
       loading: this.contents.isLoading(),
       zoomPercent: 100,
       widthPreset: 'full',
-      security: securityStateOf(shown),
+      security: this.certificate.warning !== null ? 'warningUp' : (this.certificate.sign ?? securityStateOf(shown)),
       inUse: { camera: false, microphone: false, screen: false },
-      erfanaPage: this.committedUrl === null && this.pendingUrl === null ? 'empty' : null,
+      erfanaPage: this.erfanaPage(),
+      ...(this.certificate.warning === null ? {} : { certificate: this.certificate.warning }),
       devToolsOpen: this.contents.isDevToolsOpened()
     }
   }
@@ -353,6 +388,11 @@ export class BrowserTab {
     this.withdrawDevTools = null
   }
 
+  private erfanaPage(): TabStateEvent['erfanaPage'] {
+    if (this.certificate.warning !== null) return 'certificate'
+    return this.committedUrl === null && this.pendingUrl === null ? 'empty' : null
+  }
+
   private setPending(url: string | null, alwaysEmit = false): void {
     if (this.pendingUrl === url && !alwaysEmit) return
     this.pendingUrl = url
@@ -360,6 +400,7 @@ export class BrowserTab {
   }
 
   private detach(): void {
+    this.shownTop = null
     if (!this.attached) return
     this.attached = false
     this.cdp?.setVisible(false)

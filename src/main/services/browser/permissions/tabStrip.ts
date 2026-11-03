@@ -8,7 +8,7 @@
  * it and tells the owning window through `browser-tab:strip` events (`add`,
  * `change`, `withdraw`); the renderer draws the rows.
  *
- * - **Prompts** (`permission`, `download`) need an answer. Each kind shows one
+ * - **Prompts** (`permission`, `download`, `signIn`) need an answer. Each kind shows one
  *   request at a time; later ones queue behind it and the row carries how
  *   many wait ("+1 waiting"). Two requests at once queue one after the other.
  * - **The gap.** When a prompt row goes – answered, or removed by its owner –
@@ -32,7 +32,8 @@
  */
 import { randomUUID } from 'node:crypto'
 import type { Clock, TimerHandle } from '../../../../shared/clock'
-import type { StripAnswer, StripEvent, StripRow } from '../../../../shared/ipc/browser-tab-schema'
+import type { z } from 'zod'
+import type { StripAnswer, StripEvent, StripFieldsSchema, StripRow } from '../../../../shared/ipc/browser-tab-schema'
 import { logger } from '../../LoggingService'
 
 /** An answer within this many ms of the row appearing or changing is ignored (025-FR-019). */
@@ -43,17 +44,25 @@ export const STRIP_QUEUE_GAP_MS = 300
 export const STRIP_NOTICE_MS = 4000
 
 /** Row kinds that queue and wait for an answer. */
-export type PromptKind = 'permission' | 'download'
+export type PromptKind = 'permission' | 'download' | 'signIn'
 /** Row kinds that show for a while and need no answer. */
 export type NoticeKind = 'fullscreen' | 'pointerLock'
 
-/** A prompt row as its owner describes it; the strip adds the id, the waiting count and the time. */
+/**
+ * A prompt row as its owner describes it; the strip adds the id, the waiting
+ * count and the time. `takesFocus` defaults to false (only a sign-in box after
+ * a user-started navigation takes focus, 025-FR-022).
+ */
 export type PromptSpec = Omit<StripRow, 'requestId' | 'kind' | 'waiting' | 'shownAt' | 'takesFocus'> & {
   readonly kind: PromptKind
+  readonly takesFocus?: boolean
 }
 
-/** How a prompt ended: answered, or withdrawn without an answer. */
-export type PromptOutcome = { readonly answer: StripAnswer } | { readonly withdrawn: true }
+/** The fields a row's answer may carry (a sign-in box's user name and password). Never logged. */
+export type StripFields = z.infer<typeof StripFieldsSchema>
+
+/** How a prompt ended: answered (with the row's fields, if any), or withdrawn without an answer. */
+export type PromptOutcome = { readonly answer: StripAnswer; readonly fields?: StripFields } | { readonly withdrawn: true }
 
 /** What {@link TabStrip.answer} did with an answer. */
 export type AnswerResult = 'accepted' | 'guarded' | 'unknown' | 'invalid'
@@ -136,9 +145,9 @@ export class TabStrip {
   /**
    * An answer from the renderer. Only the shown row of a kind can be
    * answered, only with one of its own answers, and only once the input
-   * guard has passed on main's clock.
+   * guard has passed on main's clock. `fields` go to the row's owner only.
    */
-  answer(id: string, answer: StripAnswer): AnswerResult {
+  answer(id: string, answer: StripAnswer, fields?: StripFields): AnswerResult {
     for (const [kind, lane] of this.lanes) {
       const shown = lane.shown
       if (shown === null || shown.id !== id) continue
@@ -148,7 +157,7 @@ export class TabStrip {
         return 'guarded'
       }
       this.takeShown(kind, lane)
-      safeSettle(shown.settle, { answer })
+      safeSettle(shown.settle, fields === undefined ? { answer } : { answer, fields })
       return 'accepted'
     }
     return this.notices.size > 0 && [...this.notices.values()].some((n) => n.id === id) ? 'invalid' : 'unknown'
@@ -243,7 +252,7 @@ export class TabStrip {
     const row: StripRow = {
       ...pending.spec,
       requestId: pending.id,
-      takesFocus: false,
+      takesFocus: pending.spec.takesFocus ?? false,
       waiting: lane.queue.length,
       shownAt: pending.shownAt ?? this.deps.clock.now()
     }

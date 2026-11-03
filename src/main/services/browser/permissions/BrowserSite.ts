@@ -31,6 +31,9 @@
  * - screen sharing is asked for like a permission and never saved; once
  *   allowed, the source chooser (`chooseScreenSource`) picks the stream.
  *   With no chooser wired, screen sharing is refused without a prompt.
+ *
+ * Certificate errors and HTTP sign-in (025-FR-021, 025-FR-022) are attached
+ * per tab too, by `site/siteSecurity.ts`; sign-in boxes share the tab's strip.
  */
 import type { Streams, WebContents, WebFrameMain } from 'electron'
 import type { Clock } from '../../../../shared/clock'
@@ -43,10 +46,13 @@ import { BrowserDownloads, type BrowserDownloadsDeps, type DownloadItemLike, typ
 import { BrowserPermissionStore } from './permissionStore'
 import { lockNoticeText, requestingOrigin, siteOrigin, sitePermissionsFor, type PermissionRequestDetails } from './sitePermissions'
 import { TabPermissions, type OriginDisplay, type PermissionAsk } from './tabPermissions'
-import { TabStrip, type AnswerResult } from './tabStrip'
+import { TabStrip, type AnswerResult, type StripFields } from './tabStrip'
+import { SiteSecurity, type SecurityTabRef, type TabSecurityLink } from '../site/siteSecurity'
+import type { CredentialCrypto } from '../site/credentialStore'
+import type { CertificateAnswerResult } from '../site/browserCertificates'
 
-/** What the site needs of a tab. */
-export interface SiteTabRef {
+/** What the site needs of a tab; the optional parts of {@link SecurityTabRef} are `BrowserTab`'s. */
+export interface SiteTabRef extends Omit<SecurityTabRef, 'contents' | 'projectRoot'> {
   readonly id: string
   readonly windowId: number
   /** The project's canonical root: the permission store is per project. */
@@ -65,7 +71,9 @@ export interface TabSiteOutlet {
 /** What the tab service holds for an attached tab. */
 export interface TabSiteLink {
   /** `browser-tab:answerStrip`, after the handler checked the sender owns the tab. */
-  answerStrip(requestId: string, answer: StripAnswer): AnswerResult
+  answerStrip(requestId: string, answer: StripAnswer, fields?: StripFields): AnswerResult
+  /** `browser-tab:certificate`: **Proceed anyway** or **Back to safety** on the warning page. */
+  answerCertificate(decisionId: string, proceed: boolean): CertificateAnswerResult
   /** The tab closed: its prompts are withdrawn (denied). */
   detach(): void
 }
@@ -81,6 +89,10 @@ export interface BrowserSiteDeps {
   readonly chooseScreenSource?: (tabId: string, request: { securityOrigin: string }) => Promise<Streams | null>
   /** Mints strip row ids; random by default. */
   readonly newRowId?: () => string
+  /** `safeStorage`, which encrypts saved sign-ins; without it they are never saved. */
+  readonly credentialCrypto?: CredentialCrypto
+  /** `safeStorage`'s backend name (`basic_text`: no keyring, sign-ins in memory only). */
+  readonly storageBackend?: () => string
 }
 
 interface AttachedTab {
@@ -89,6 +101,7 @@ interface AttachedTab {
   readonly load: DownloadLoad
   readonly downloadTab: DownloadTab
   readonly ready: Promise<TabPermissions>
+  readonly security: TabSecurityLink
   permissions: TabPermissions | null
   open: boolean
   readonly unlisten: () => void
@@ -99,6 +112,7 @@ export class BrowserSite implements SessionSiteHooks {
   private readonly stores = new Map<string, Promise<BrowserPermissionStore>>()
   private readonly downloads: BrowserDownloads
   private readonly display: OriginDisplay
+  private readonly security: SiteSecurity
 
   constructor(private readonly deps: BrowserSiteDeps) {
     this.downloads = new BrowserDownloads(deps.downloads)
@@ -106,6 +120,14 @@ export class BrowserSite implements SessionSiteHooks {
       text: (origin) => formatOrigin(origin, deps.resolveDomain) ?? origin,
       parts: (origin) => originParts(origin, deps.resolveDomain)
     }
+    this.security = new SiteSecurity({
+      clock: deps.clock,
+      signer: deps.signer,
+      credentialCrypto: deps.credentialCrypto,
+      storageBackend: deps.storageBackend,
+      display: this.display,
+      newId: deps.newRowId
+    })
   }
 
   /** Attach a new tab, before its first page loads. */
@@ -125,6 +147,7 @@ export class BrowserSite implements SessionSiteHooks {
       load,
       permissions: null,
       open: true,
+      security: this.security.attachTab(ref, strip),
       ready: this.storeFor(ref.projectRoot).then((store) => {
         const permissions = new TabPermissions({ strip, store, display: this.display })
         entry.permissions = permissions
@@ -149,7 +172,8 @@ export class BrowserSite implements SessionSiteHooks {
     }
     this.tabs.set(contents.id, entry)
     return {
-      answerStrip: (requestId, answer) => (entry.open ? strip.answer(requestId, answer) : 'unknown'),
+      answerStrip: (requestId, answer, fields) => (entry.open ? strip.answer(requestId, answer, fields) : 'unknown'),
+      answerCertificate: (decisionId, proceed) => (entry.open ? entry.security.answerCertificate(decisionId, proceed) : 'unknown'),
       detach: () => this.detach(contents.id)
     }
   }
@@ -244,6 +268,21 @@ export class BrowserSite implements SessionSiteHooks {
     return this.downloads.showInFolder(windowId, downloadId)
   }
 
+  /** A request of a tab's page ended (`site/siteRequestHooks.ts`): a remembered sign-in waits for this. */
+  requestCompleted(contentsId: number, url: string, statusCode: number | null): void {
+    this.tabs.get(contentsId)?.security.requestCompleted(url, statusCode)
+  }
+
+  /** Forget the certificate exceptions of the project at `projectRoot` (025-FR-021, 025-FR-023). Never rejects. */
+  clearCertificates(projectRoot: string): Promise<void> {
+    return this.security.clearCertificates(projectRoot)
+  }
+
+  /** Forget the saved sign-ins of the project at `projectRoot` (025-FR-022, 025-FR-023). Never rejects. */
+  clearCredentials(projectRoot: string): Promise<void> {
+    return this.security.clearCredentials(projectRoot)
+  }
+
   /** Forget the saved permissions of the project at `projectRoot` (025-FR-023). Never rejects. */
   async clearPermissions(projectRoot: string): Promise<void> {
     const store = this.stores.get(projectRoot)
@@ -286,6 +325,7 @@ export class BrowserSite implements SessionSiteHooks {
     this.tabs.delete(contentsId)
     tab.open = false
     tab.unlisten()
+    tab.security.detach()
     tab.strip.dispose()
   }
 }

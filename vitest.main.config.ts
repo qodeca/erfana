@@ -181,6 +181,48 @@ export default defineConfig({
         'src/main/services/browser/downloads/downloadFileName.ts': { lines: 98, functions: 98, branches: 76, statements: 92 },
         // measured 97.67/80/88.13/96
         'src/main/services/browser/downloads/BrowserDownloads.ts': { lines: 95, functions: 78, branches: 86, statements: 94 },
+        // Built-in browser certificates, sign-in and private network (spec 025
+        // commits 12c–d, 025-FR-021, 025-FR-022, S-16, S-26): the warning page
+        // and its guard, the 7-day exceptions, saved sign-ins encrypted and
+        // signed, the auto-send rules, the address classifier and the
+        // public-to-local refusal. A gap here is an untested way to trust a
+        // forged certificate or send a password where it should not go.
+        // Pinned ~2 points under the value measured when they landed
+        // (2026-11-03), never above 98.
+        // measured 100/100/98.7/100
+        'src/main/services/browser/site/addressClass.ts': { lines: 98, functions: 98, branches: 96, statements: 98 },
+        // measured 100/100/97.67/97.67
+        'src/main/services/browser/site/browserAuth.ts': { lines: 98, functions: 98, branches: 95, statements: 95 },
+        // measured 98.7/100/97.95/97.72
+        'src/main/services/browser/site/browserCertificates.ts': { lines: 96, functions: 98, branches: 95, statements: 95 },
+        // measured 100/100/96.55/100
+        'src/main/services/browser/site/browserPrivateNetwork.ts': { lines: 98, functions: 98, branches: 94, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/site/certificateStore.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/site/credentialStore.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 94.44/87.5/87.5/90.24
+        'src/main/services/browser/site/signedProfileFile.ts': { lines: 92, functions: 85, branches: 85, statements: 88 },
+        // measured 90.9/79.16/92.85/92
+        'src/main/services/browser/site/siteSecurity.ts': { lines: 88, functions: 77, branches: 90, statements: 90 },
+        // measured 100/100/100/100
+        'src/main/services/browser/site/siteRequestHooks.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Built-in browser key and mouse routing (spec 025 commit 13,
+        // 025-FR-014, 025-FR-047 to 025-FR-052, ADR 0011 decisions 11–16):
+        // what reaches a page, what Erfana takes, the click guard and the
+        // first-click rule. A gap here is a key or click that leaks to the
+        // page or an app shortcut that fires from it. Pinned ~2 points under
+        // the value measured when they landed (2026-11-03), never above 98.
+        // measured 100/100/100/100
+        'src/main/services/browser/input/browserKeyRouter.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/input/browserMouseRouter.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/input/appWindowBrowserKeys.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/input/macAppRoles.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/input/BrowserTabInput.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // Multi-page HTML preview (#124). These modules decide what the preview
         // BrowserView is allowed to load and where it may navigate — frame/scheme
         // gating, request filtering, URL normalisation, page and tab scope — plus
@@ -223,6 +265,8 @@ export default defineConfig({
         'src/shared/ipc/browser-tab-schema.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/shared/ipc/browser-tab-channels.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100 (certificate page and sign-in row parts, commits 12c–d)
+        'src/shared/ipc/browser-tab-site-schema.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/98.11/100
         'src/shared/browser/contextFile.ts': { lines: 98, functions: 98, branches: 96, statements: 98 },
         // measured 100/100/100/100

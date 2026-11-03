@@ -26,17 +26,28 @@
  *   `site` (`permissions/BrowserSite.ts`) before its first page loads; its
  *   strip rows and download notices go to the owning window, and
  *   {@link BrowserTabService.answerStrip} takes the answers back.
+ * - **Input** (025-FR-014, 025-FR-047 to 025-FR-052, ADR 0011 decisions
+ *   11–16): each tab gets its key and mouse routers (`input/BrowserTabInput.ts`)
+ *   before its first page loads; forwarded keys, page focus and pick-mode
+ *   changes go to the owning window. Each window gets one listener for the
+ *   browser keys while a tab's toolbar has focus (`input/appWindowBrowserKeys.ts`),
+ *   which {@link BrowserTabService.toolbarFocus} points at that tab.
  */
 import type { Session, WebContentsView } from 'electron'
 import { BROWSER_TAB_EVENTS } from '../../../shared/ipc/browser-tab-channels'
 import {
+  FocusEventSchema,
+  ForwardedKeyEventSchema,
   NoticeEventSchema,
+  PickEventSchema,
   StripEventSchema,
   TabAddedEventSchema,
   TabStateEventSchema,
   type CreateResponse,
+  type FocusOrigin,
   type StripAnswer
 } from '../../../shared/ipc/browser-tab-schema'
+import type { Clock } from '../../../shared/clock'
 import type { RegistrableDomainResolver } from '../../../shared/browser/originFormat'
 import { isSamePath } from '../../utils/pathCompare'
 import { redactedLogError } from '../../utils/redactUserInput'
@@ -46,7 +57,20 @@ import { BrowserProfileError } from './browserProfileGuards'
 import type { AppAddresses } from './browserNavigationPolicy'
 import { BrowserTab, type BrowserTabCdpHook, type TabHost } from './BrowserTab'
 import type { BrowserSite, TabSiteLink } from './permissions/BrowserSite'
-import type { AnswerResult } from './permissions/tabStrip'
+import type { AnswerResult, StripFields } from './permissions/tabStrip'
+import type { CertificateAnswerResult } from './site/browserCertificates'
+import { AppWindowBrowserKeys } from './input/appWindowBrowserKeys'
+import { BrowserTabInput } from './input/BrowserTabInput'
+import type { MacAppKeyTargets } from './input/macAppRoles'
+
+/** What each tab's input routing needs (`input/BrowserTabInput.ts`). */
+export interface TabInputSetup {
+  /** `process.platform`. */
+  readonly platform: string
+  readonly clock: Pick<Clock, 'now'>
+  /** Where the macOS application keys act for a tab in `host`. */
+  readonly macAppKeys: (host: TabHost) => MacAppKeyTargets
+}
 
 /** What `openForTab` hands back that a tab needs. */
 export interface TabProfile {
@@ -70,6 +94,8 @@ export interface BrowserTabServiceDeps {
   readonly attachCdp?: BrowserTabCdpHook
   /** Permission prompts, notices and downloads; without it the session policy refuses them. */
   readonly site?: Pick<BrowserSite, 'attachTab' | 'showDownload'>
+  /** Key and mouse routing; without it a tab's page receives every key and click. */
+  readonly input?: TabInputSetup
 }
 
 /** Mints `browser-tab-<n>`, the id shape `BrowserTabIdSchema` accepts. */
@@ -79,6 +105,8 @@ export class BrowserTabService {
   private readonly tabs = new Map<string, BrowserTab>()
   private readonly hostOf = new WeakMap<BrowserTab, TabHost>()
   private readonly siteOf = new WeakMap<BrowserTab, TabSiteLink>()
+  private readonly inputOf = new WeakMap<BrowserTab, BrowserTabInput>()
+  private readonly windowKeys = new Map<number, AppWindowBrowserKeys>()
   private counter = 0
 
   constructor(private readonly deps: BrowserTabServiceDeps) {}
@@ -139,10 +167,48 @@ export class BrowserTabService {
    * An answer to a strip row of `tabId` from `windowId` (`browser-tab:answerStrip`);
    * `null` when the window does not own the tab.
    */
-  answerStrip(windowId: number, tabId: string, requestId: string, answer: StripAnswer): AnswerResult | null {
+  answerStrip(
+    windowId: number,
+    tabId: string,
+    requestId: string,
+    answer: StripAnswer,
+    fields?: StripFields
+  ): AnswerResult | null {
     const tab = this.tabOf(windowId, tabId)
     if (tab === null) return null
-    return this.siteOf.get(tab)?.answerStrip(requestId, answer) ?? 'unknown'
+    return this.siteOf.get(tab)?.answerStrip(requestId, answer, fields) ?? 'unknown'
+  }
+
+  /**
+   * **Proceed anyway** or **Back to safety** on `tabId`'s certificate page from
+   * `windowId` (`browser-tab:certificate`); `null` when the window does not own the tab.
+   */
+  answerCertificate(windowId: number, tabId: string, decisionId: string, proceed: boolean): CertificateAnswerResult | null {
+    const tab = this.tabOf(windowId, tabId)
+    if (tab === null) return null
+    return this.siteOf.get(tab)?.answerCertificate(decisionId, proceed) ?? 'unknown'
+  }
+
+  /** Where keyboard focus comes from as it moves into `tabId`'s page (first-click rule). */
+  focusOrigin(windowId: number, tabId: string, from: FocusOrigin): void {
+    const tab = this.tabOf(windowId, tabId)
+    if (tab !== null) this.inputOf.get(tab)?.reportFocusOrigin(from)
+  }
+
+  /** Whether `tabId`'s toolbar has keyboard focus; points the window's browser keys at it. */
+  toolbarFocus(windowId: number, tabId: string, focused: boolean): void {
+    const tab = this.tabOf(windowId, tabId)
+    const input = tab === null ? undefined : this.inputOf.get(tab)
+    if (input === undefined) return
+    input.reportToolbarFocus(focused)
+    const keys = this.windowKeys.get(windowId)
+    if (focused) keys?.setTarget(input)
+    else keys?.clearTarget(input)
+  }
+
+  /** The input routing of `tab`, for the test hooks; `null` without routing. */
+  inputFor(tab: BrowserTab): BrowserTabInput | null {
+    return this.inputOf.get(tab) ?? null
   }
 
   /** **Show in folder** for a download announced to `windowId`. */
@@ -164,6 +230,8 @@ export class BrowserTabService {
   /** Close every tab of a window that is closing. */
   closeWindow(windowId: number): void {
     for (const tab of this.list()) if (tab.windowId === windowId) this.closeTab(tab)
+    this.windowKeys.get(windowId)?.dispose()
+    this.windowKeys.delete(windowId)
   }
 
   /** Close every tab of the project at `projectRoot` (teardown stage `closeViews`). */
@@ -177,6 +245,7 @@ export class BrowserTabService {
     const session = profile.session as Session
     this.deps.prepareSession(session)
     const view = this.deps.createView(session)
+    let input: BrowserTabInput | null = null
     const tab = new BrowserTab({
       id: this.nextId(),
       panelId,
@@ -189,10 +258,12 @@ export class BrowserTabService {
       expectDevTools: this.deps.expectDevTools,
       attachCdp: this.deps.attachCdp,
       onStateChange: (changed) => this.sendState(changed),
-      onDestroyed: (gone) => this.forget(gone)
+      onDestroyed: (gone) => this.forget(gone),
+      onPageMoved: () => input?.recordRowShift()
     })
     this.tabs.set(tab.id, tab)
     this.hostOf.set(tab, host)
+    input = this.attachInput(tab, host)
     const site = this.deps.site?.attachTab(tab, {
       strip: (event) => this.send(host, BROWSER_TAB_EVENTS.strip, StripEventSchema, event),
       notice: (event) => this.send(host, BROWSER_TAB_EVENTS.notice, NoticeEventSchema, event),
@@ -200,6 +271,30 @@ export class BrowserTabService {
     })
     if (site !== undefined) this.siteOf.set(tab, site)
     return tab
+  }
+
+  /** The tab's key and mouse routers, before its first page loads; `null` without routing. */
+  private attachInput(tab: BrowserTab, host: TabHost): BrowserTabInput | null {
+    const setup = this.deps.input
+    if (setup === undefined) return null
+    const tabId = tab.id
+    const input = new BrowserTabInput({
+      tabId,
+      contents: tab.contents,
+      platform: setup.platform,
+      clock: setup.clock,
+      macAppKeys: setup.macAppKeys(host),
+      events: {
+        forwardedKey: (action) => this.send(host, BROWSER_TAB_EVENTS.forwardedKey, ForwardedKeyEventSchema, { tabId, action }),
+        pageFocus: (pageFocused) => this.send(host, BROWSER_TAB_EVENTS.focus, FocusEventSchema, { tabId, pageFocused }),
+        pick: (event) => this.send(host, BROWSER_TAB_EVENTS.pick, PickEventSchema, event)
+      }
+    })
+    this.inputOf.set(tab, input)
+    if (!this.windowKeys.has(host.id) && !host.webContents.isDestroyed()) {
+      this.windowKeys.set(host.id, new AppWindowBrowserKeys(host.webContents, setup.platform))
+    }
+    return input
   }
 
   private nextId(): string {
@@ -221,6 +316,12 @@ export class BrowserTabService {
     if (this.tabs.get(tab.id) === tab) this.tabs.delete(tab.id)
     this.siteOf.get(tab)?.detach()
     this.siteOf.delete(tab)
+    const input = this.inputOf.get(tab)
+    if (input !== undefined) {
+      this.windowKeys.get(tab.windowId)?.clearTarget(input)
+      input.dispose()
+      this.inputOf.delete(tab)
+    }
   }
 
   private sendState(tab: BrowserTab): void {

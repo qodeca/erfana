@@ -5,7 +5,8 @@
  * commit 7): `browser-tab:create`, `close`, `navigate`, `history` (Back,
  * Forward, Reload, Stop), `bounds` (send; carries visibility), `focusPage` and
  * `devTools`; `answerStrip` and `showDownload` (commit 12a–b, 025-FR-019,
- * 025-FR-020). The tab state goes back as the `browser-tab:state` event, to
+ * 025-FR-020), `certificate` (commit 12c, 025-FR-021); `focusOrigin` and `toolbarFocus` (send) for the key and mouse
+ * routers (commit 13, ADR 0011 decisions 13 and 16). The tab state goes back as the `browser-tab:state` event, to
  * the owning window only (`BrowserTabService`).
  *
  * Every handler is registered through `registry.ts` (identity, top-level
@@ -22,13 +23,16 @@ import {
   AnswerStripRequestSchema,
   BoundsAppliedEventSchema,
   BoundsRequestSchema,
+  CertificateRequestSchema,
   CloseRequestSchema,
   CreateRequestSchema,
   DevToolsRequestSchema,
+  FocusOriginRequestSchema,
   FocusPageRequestSchema,
   HistoryRequestSchema,
   NavigateRequestSchema,
   ShowDownloadRequestSchema,
+  ToolbarFocusRequestSchema,
   type CreateResponse,
   type NavigateResponse
 } from '../../shared/ipc/browser-tab-schema'
@@ -39,7 +43,17 @@ import { redactedLogError } from '../utils/redactUserInput'
 import { registerHandle, registerOn, unregisterHandle, unregisterOn } from './registry'
 import { isTrustedSender as defaultIsTrustedSender } from './senderValidation'
 
-type TabServiceSurface = Pick<BrowserTabService, 'create' | 'close' | 'tabOf' | 'answerStrip' | 'showDownload'>
+type TabServiceSurface = Pick<
+  BrowserTabService,
+  | 'create'
+  | 'close'
+  | 'tabOf'
+  | 'answerStrip'
+  | 'answerCertificate'
+  | 'showDownload'
+  | 'focusOrigin'
+  | 'toolbarFocus'
+>
 
 export interface BrowserTabHandlerDeps {
   readonly service: TabServiceSurface
@@ -63,9 +77,12 @@ export const BROWSER_TAB_HANDLED_CHANNELS = [
   C.history,
   C.bounds,
   C.focusPage,
+  C.focusOrigin,
+  C.toolbarFocus,
   C.devTools,
   C.answerStrip,
-  C.showDownload
+  C.showDownload,
+  C.certificate
 ] as const
 
 /** Register the tab channels; returns the function that removes them. */
@@ -167,6 +184,21 @@ export function registerBrowserTabHandlers(deps: BrowserTabHandlerDeps): () => v
     if (target !== null) guarded(C.focusPage, undefined, () => target.tab.focusPage())
   })
 
+  registerHandle(C.focusOrigin, (event, arg: unknown): void => {
+    const accepted = accept(C.focusOrigin, event, FocusOriginRequestSchema, arg)
+    if (accepted === null) return
+    const { tabId, from } = accepted.data
+    guarded(C.focusOrigin, undefined, () => service.focusOrigin(accepted.host.id, tabId, from))
+  })
+
+  const onToolbarFocus = (event: IpcMainEvent, arg: unknown): void => {
+    const accepted = accept(C.toolbarFocus, event, ToolbarFocusRequestSchema, arg)
+    if (accepted === null) return
+    const { tabId, focused } = accepted.data
+    guarded(C.toolbarFocus, undefined, () => service.toolbarFocus(accepted.host.id, tabId, focused))
+  }
+  registerOn(C.toolbarFocus, onToolbarFocus)
+
   registerHandle(C.devTools, (event, arg: unknown): void => {
     const target = acceptTab(C.devTools, event, DevToolsRequestSchema, arg)
     if (target !== null) guarded(C.devTools, undefined, () => target.tab.devTools(target.data.inspectAt))
@@ -177,9 +209,21 @@ export function registerBrowserTabHandlers(deps: BrowserTabHandlerDeps): () => v
   registerHandle(C.answerStrip, (event, arg: unknown): void => {
     const accepted = accept(C.answerStrip, event, AnswerStripRequestSchema, arg)
     if (accepted === null) return
-    const { tabId, requestId, answer } = accepted.data
+    // `fields` (a sign-in box's user name and password) go to the row's owner only, never to a log.
+    const { tabId, requestId, answer, fields } = accepted.data
     guarded(C.answerStrip, undefined, () => {
-      service.answerStrip(accepted.host.id, tabId, requestId, answer)
+      service.answerStrip(accepted.host.id, tabId, requestId, answer, fields)
+    })
+  })
+
+  // **Proceed anyway** or **Back to safety** on the owning window's tab;
+  // main re-checks the 500 ms input guard (`site/browserCertificates.ts`).
+  registerHandle(C.certificate, (event, arg: unknown): void => {
+    const accepted = accept(C.certificate, event, CertificateRequestSchema, arg)
+    if (accepted === null) return
+    const { tabId, decisionId, proceed } = accepted.data
+    guarded(C.certificate, undefined, () => {
+      service.answerCertificate(accepted.host.id, tabId, decisionId, proceed)
     })
   })
 
@@ -195,6 +239,7 @@ export function registerBrowserTabHandlers(deps: BrowserTabHandlerDeps): () => v
   return () => {
     for (const channel of BROWSER_TAB_HANDLED_CHANNELS) {
       if (channel === C.bounds) unregisterOn(channel, onBounds)
+      else if (channel === C.toolbarFocus) unregisterOn(channel, onToolbarFocus)
       else unregisterHandle(channel)
     }
   }

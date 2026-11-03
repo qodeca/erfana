@@ -106,6 +106,12 @@ export class BrowserTabPage {
     return this.setBounds(tabId, false)
   }
 
+  /** Show the tab's page at `bounds`, as when a row above the page appears or goes (window CSS px). */
+  moveTo(tabId: string, bounds: { x: number; y: number; width: number; height: number }): Promise<unknown> {
+    this.seq += 1
+    return this.call('setBounds', { tabId, bounds: { ...bounds }, seq: this.seq, ack: false, visible: true, clip: { ...bounds } })
+  }
+
   /** The newest state event the window received for `tabId`, or `null`. */
   async lastState(tabId: string): Promise<TabState | null> {
     return this.window.evaluate((id) => (window as unknown as Recorder).__browserTabStates?.[id] ?? null, tabId)

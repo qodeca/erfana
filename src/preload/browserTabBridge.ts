@@ -25,8 +25,14 @@ export const browserTabBridge: BrowserTabBridge = {
   onState: (callback) => subscribe(BROWSER_TAB_EVENTS.state, callback),
   onTabAdded: (callback) => subscribe(BROWSER_TAB_EVENTS.tabAdded, callback),
   answerStrip: (request) => ipcRenderer.invoke(C.answerStrip, request),
+  certificate: (request) => ipcRenderer.invoke(C.certificate, request),
   showDownload: (downloadId) => ipcRenderer.invoke(C.showDownload, { downloadId }),
   onStrip: (callback) => subscribe(BROWSER_TAB_EVENTS.strip, callback),
   onNotice: (callback) => subscribe(BROWSER_TAB_EVENTS.notice, callback),
-  onBoundsApplied: (callback) => subscribe(BROWSER_TAB_EVENTS.boundsApplied, callback)
+  onBoundsApplied: (callback) => subscribe(BROWSER_TAB_EVENTS.boundsApplied, callback),
+  focusOrigin: (tabId, from) => ipcRenderer.invoke(C.focusOrigin, { tabId, from }),
+  toolbarFocus: (tabId, focused) => ipcRenderer.send(C.toolbarFocus, { tabId, focused }),
+  onFocus: (callback) => subscribe(BROWSER_TAB_EVENTS.focus, callback),
+  onForwardedKey: (callback) => subscribe(BROWSER_TAB_EVENTS.forwardedKey, callback),
+  onPick: (callback) => subscribe(BROWSER_TAB_EVENTS.pick, callback)
 }

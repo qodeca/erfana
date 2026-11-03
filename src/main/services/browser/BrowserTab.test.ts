@@ -297,6 +297,23 @@ describe('applyBounds (025-FR-007)', () => {
     expect(tab.applyBounds(RECT, 4, true)).toBeNull()
   })
 
+  it('025-AC-061 reports a shown page whose top edge moved (a row above it appeared or went), and nothing else', () => {
+    const onPageMoved = vi.fn()
+    const moving = make({ onPageMoved })
+    moving.applyBounds(RECT, 1, true)
+    moving.applyBounds({ ...RECT, width: 280 }, 2, true)
+    expect(onPageMoved).not.toHaveBeenCalled()
+    moving.applyBounds({ ...RECT, y: 60, height: 160 }, 3, true)
+    expect(onPageMoved).toHaveBeenCalledTimes(1)
+    // Shown again after being hidden: a fresh placement, not a shift.
+    moving.applyBounds(RECT, 4, false)
+    moving.applyBounds(RECT, 5, true)
+    expect(onPageMoved).toHaveBeenCalledTimes(1)
+    // Without the hook a move is harmless.
+    tab.applyBounds(RECT, 1, true)
+    expect(() => tab.applyBounds({ ...RECT, y: 60 }, 2, true)).not.toThrow()
+  })
+
   it('focuses the page only while it is shown', () => {
     tab.focusPage()
     expect(contents.focus).not.toHaveBeenCalled()
@@ -355,5 +372,42 @@ describe('destruction', () => {
     expect(onStateChange).not.toHaveBeenCalled()
     tab.close()
     expect(contents.close).not.toHaveBeenCalled()
+  })
+})
+
+describe('certificate page and sign-in hooks (025-FR-021, 025-FR-022)', () => {
+  const WARNING = { decisionId: 'd1', host: 'selfsigned.test', code: -202, shownAt: 5 }
+
+  it('025-AC-021 shows the certificate page with its parts and the warning-up badge, then the page again', () => {
+    onStateChange.mockClear()
+    tab.setCertificateState({ warning: WARNING, sign: null })
+    expect(onStateChange).toHaveBeenCalledTimes(1)
+    const state = tab.state()
+    expect(TabStateEventSchema.safeParse(state).success).toBe(true)
+    expect(state).toMatchObject({ erfanaPage: 'certificate', security: 'warningUp', certificate: WARNING })
+    tab.setCertificateState({ warning: null, sign: null })
+    expect(tab.state().erfanaPage).toBe('empty')
+    expect(tab.state()).not.toHaveProperty('certificate')
+  })
+
+  it('025-AC-021 shows the warning sign for a proceeded host or a failed subresource', () => {
+    contents.commit('https://selfsigned.test/')
+    tab.setCertificateState({ warning: null, sign: 'proceeded' })
+    expect(tab.state()).toMatchObject({ security: 'proceeded', erfanaPage: null })
+    tab.setCertificateState({ warning: null, sign: 'subresourceFailed' })
+    expect(tab.state().security).toBe('subresourceFailed')
+    tab.setCertificateState({ warning: null, sign: null })
+    expect(tab.state().security).toBe('secure')
+  })
+
+  it('reports a pending user navigation, reloads after Proceed anyway and goes back for Back to safety', () => {
+    expect(tab.hasPendingUserNavigation()).toBe(false)
+    tab.reloadAt('https://selfsigned.test/page')
+    expect(contents.loadURL).toHaveBeenCalledWith('https://selfsigned.test/page')
+    expect(tab.hasPendingUserNavigation()).toBe(true)
+    contents.commit('https://a.test/')
+    contents.commit('https://b.test/')
+    tab.goBack()
+    expect(contents.navigationHistory.goBack).toHaveBeenCalledTimes(1)
   })
 })

@@ -199,3 +199,30 @@ describe('TabStrip notices', () => {
     expect(ops()).toEqual(['add:row1', 'change:row1', 'withdraw:row1'])
   })
 })
+
+describe('TabStrip sign-in rows (025-FR-022)', () => {
+  const SIGN_IN: PromptSpec = {
+    kind: 'signIn',
+    text: 'Sign in to a.test',
+    answers: ['signIn', 'cancel'],
+    signIn: { username: '', savedPassword: false, insecure: false, rejected: null, remember: 'available' }
+  }
+
+  it('025-AC-022 takes focus only when its owner asks, and hands the answer\'s fields to the owner only', () => {
+    const { id, outcomes } = ask({ ...SIGN_IN, takesFocus: true })
+    expect(events[0]).toMatchObject({ op: 'add', row: { kind: 'signIn', takesFocus: true } })
+    expect(StripEventSchema.safeParse(events[0]).success).toBe(true)
+    clock.advance(STRIP_INPUT_GUARD_MS)
+    const fields = { username: 'u', password: 'p', remember: true }
+    expect(strip.answer(id, 'signIn', fields)).toBe('accepted')
+    expect(outcomes).toEqual([{ answer: 'signIn', fields }])
+    expect(JSON.stringify(events)).not.toContain('"p"')
+  })
+
+  it('queues sign-in boxes in their own lane, apart from permission prompts', () => {
+    ask(SIGN_IN)
+    ask(PERMISSION)
+    expect(events.filter((e) => e.op === 'add').map((e) => (e.op === 'add' ? e.row.kind : ''))).toEqual(['signIn', 'permission'])
+    expect(strip.pendingCount('signIn')).toBe(1)
+  })
+})
