@@ -1132,6 +1132,8 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 - `DANGEROUS_FUNCTIONS_JS_CHECK` in `src/main/services/browser/pick/pickModeSwitch.ts`: `insertCSS` with the constant `CROSSHAIR_CSS` at the user origin; no page or user text reaches it.
 - `OPEN_EXTERNAL_JS_CHECK` in the renderer (`services/browserTabGateway.ts`, `components/Panels/BrowserPanel/browserDataActions.ts`) and the preload test: these call the browser tab bridge's `openExternal`, whose main handler checks the sender and allows only `http` and `https` before `openExternalSafe` (`src/main/ipc/browser-tab-handlers.ts`). `components/Panels/TerminalPanel/terminalLinks.ts` (Ctrl/Cmd-click on a terminal link) uses the existing `shell.openExternal` bridge and its `shell:openExternal` handler.
 
+**Re-run 2026-11-04** (after the focus fix, commit ca75e26b): 1 high, 26 medium, 3 low – the same findings as the 2026-11-03 run, no new site.
+
 **Re-run**: at every release that touches windows, sessions or `webPreferences`.
 
 ### 68. Browser URLs are logged in full, an exception to `redactUserInput` (spec 025, 025-FR-042, 2026-11)
