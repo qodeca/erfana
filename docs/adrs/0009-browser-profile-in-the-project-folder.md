@@ -28,6 +28,8 @@ Facts: `session.fromPath` gives a persistent session per absolute path ([Electro
 13. **No tabs restored**: no tab list is stored anywhere (025-FR-006).
 14. **Project switch in a window** (`ProjectService` session change): end pick mode, abort a capture write and delete its partial files, then close the old project's browser views – in that order – before the new project opens.
 
+Implementation note (decision 6): the generation counters sit in their own file next to the marker's home copy, `~/.erfana/browser-profiles/<hash>.generations.json` (`profileGenerations.ts`), and `permissions.json` is signed the same way as `trust.json` and `credentials.json`.
+
 ## Consequences
 
 - Planted or replayed trust files grant nothing; a cloned profile never runs; reading cookies, storage and cache stays possible for same-user processes, as accepted.

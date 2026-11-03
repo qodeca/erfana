@@ -220,6 +220,7 @@ function createBrowserSite(): BrowserSite {
   return new BrowserSite({
     clock: mainClock,
     signer: lockHmacSigner,
+    homeDir: homedir(),
     credentialCrypto: safeStorage,
     storageBackend: () => storageBackendFor(process.platform, () => safeStorage.getSelectedStorageBackend()),
     resolveDomain: pinnedRegistrableDomain,

@@ -19,6 +19,7 @@
 import { z } from 'zod'
 import type { Clock } from '../../../../shared/clock'
 import type { PurposeSigner } from '../browserProfileMarker'
+import { profileGenerations } from '../profileGenerations'
 import { profileErfanaSegments, readSignedList, SerialWriter, writeSignedList, type SignedListFile } from './signedProfileFile'
 
 export const TRUST_FILE_NAME = 'trust.json'
@@ -51,13 +52,22 @@ export class BrowserCertificateStore {
     readonly persistence: 'saved' | 'session'
   ) {}
 
-  /** The store of the project at `canonical`. Never rejects. */
-  static async open(canonical: string, signer: PurposeSigner, clock: Pick<Clock, 'now'>): Promise<BrowserCertificateStore> {
+  /**
+   * The store of the project at `canonical`; `homeDir` holds its generation
+   * record (ADR 0009 decision 6). Never rejects.
+   */
+  static async open(
+    canonical: string,
+    homeDir: string,
+    signer: PurposeSigner,
+    clock: Pick<Clock, 'now'>
+  ): Promise<BrowserCertificateStore> {
     const file: SignedListFile<CertificateException> = {
       canonical,
       segments: TRUST_SEGMENTS,
       purpose: TRUST_PURPOSE,
       signer,
+      generations: profileGenerations(homeDir, canonical),
       entry: ExceptionSchema,
       maxEntries: MAX_CERTIFICATE_EXCEPTIONS,
       maxBytes: 256 * 1024,

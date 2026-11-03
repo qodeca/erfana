@@ -15,7 +15,7 @@ import type { StripEvent, StripRow } from '../../../../shared/ipc/browser-tab-sc
 import { STRIP_INPUT_GUARD_MS, STRIP_QUEUE_GAP_MS, TabStrip, type StripFields } from '../permissions/tabStrip'
 import { TabAuth, type AuthChallenge } from './browserAuth'
 import { BrowserCredentialStore, type CredentialKey } from './credentialStore'
-import { tempProject, testCrypto, testSigner } from './__test-helpers__/siteFakes'
+import { tempHome, tempProject, testCrypto, testSigner } from './__test-helpers__/siteFakes'
 
 const BASIC = 'https://staging.test/basic'
 const CHALLENGE: AuthChallenge = { isProxy: false, scheme: 'basic', host: 'staging.test', port: 443, realm: 'Staging' }
@@ -27,6 +27,7 @@ let events: StripEvent[]
 let strip: TabStrip
 let store: BrowserCredentialStore
 let root: string
+let home: string
 let topUrl: string
 let pendingUser: boolean
 let auth: TabAuth
@@ -39,8 +40,8 @@ const flush = async (): Promise<void> => {
 async function setup(persistence: 'saved' | 'session'): Promise<void> {
   store =
     persistence === 'saved'
-      ? await BrowserCredentialStore.open(root, { signer: testSigner('k'), crypto: testCrypto(), backend: 'keychain' })
-      : await BrowserCredentialStore.open(root, { signer: testSigner('k'), crypto: testCrypto(), backend: 'basic_text' })
+      ? await BrowserCredentialStore.open(root, { homeDir: home, signer: testSigner('k'), crypto: testCrypto(), backend: 'keychain' })
+      : await BrowserCredentialStore.open(root, { homeDir: home, signer: testSigner('k'), crypto: testCrypto(), backend: 'basic_text' })
   auth = new TabAuth({
     tab: { contents: { getURL: () => topUrl }, hasPendingUserNavigation: () => pendingUser },
     strip,
@@ -54,6 +55,7 @@ async function setup(persistence: 'saved' | 'session'): Promise<void> {
 
 beforeEach(async () => {
   root = tempProject('erfana-auth-')
+  home = tempHome()
   clock = createManualClock(0)
   events = []
   rows = 0
@@ -65,6 +67,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   rmSync(root, { recursive: true, force: true })
+  rmSync(home, { recursive: true, force: true })
 })
 
 interface Login {

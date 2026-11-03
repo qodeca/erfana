@@ -57,7 +57,7 @@ const flush = async (): Promise<void> => {
 
 beforeEach(async () => {
   clock = createManualClock(0)
-  store = await BrowserCertificateStore.open('/project', testSigner(null), clock)
+  store = await BrowserCertificateStore.open('/project', '/unused-home', testSigner(null), clock)
   states = []
   ids = 0
   const t = {

@@ -38,6 +38,7 @@ function make(overrides: Partial<BrowserSiteDeps> = {}): void {
   deps = {
     clock,
     signer: MEMORY_ONLY,
+    homeDir: staging,
     resolveDomain: (h) => h,
     downloads: {
       downloadsDir: () => staging,

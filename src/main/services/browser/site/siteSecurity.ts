@@ -37,6 +37,8 @@ export interface SecurityTabRef {
 export interface SiteSecurityDeps {
   readonly clock: Pick<Clock, 'now'>
   readonly signer: PurposeSigner
+  /** The user's home folder, which holds each project's generation record (ADR 0009 decision 6). */
+  readonly homeDir: string
   /** `safeStorage`; without it sign-ins are never saved. */
   readonly credentialCrypto?: CredentialCrypto
   /** `safeStorage`'s backend name (`basic_text` = no keyring). */
@@ -161,7 +163,7 @@ export class SiteSecurity {
   private certificateStore(projectRoot: string): Promise<BrowserCertificateStore> {
     let store = this.certificateStores.get(projectRoot)
     if (store === undefined) {
-      store = BrowserCertificateStore.open(projectRoot, this.deps.signer, this.deps.clock)
+      store = BrowserCertificateStore.open(projectRoot, this.deps.homeDir, this.deps.signer, this.deps.clock)
       this.certificateStores.set(projectRoot, store)
     }
     return store
@@ -179,6 +181,7 @@ export class SiteSecurity {
         logger.warn('Browser sign-ins: the key store backend could not be read', { error: String(error) })
       }
       store = BrowserCredentialStore.open(projectRoot, {
+        homeDir: this.deps.homeDir,
         signer: this.deps.signer,
         crypto: this.deps.credentialCrypto ?? NO_CRYPTO,
         backend

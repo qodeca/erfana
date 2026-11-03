@@ -17,12 +17,13 @@ import { FakeContents } from '../__test-helpers__/fakeBrowserView'
 import { STRIP_INPUT_GUARD_MS, TabStrip } from '../permissions/tabStrip'
 import { CERTIFICATE_INPUT_GUARD_MS, type TabCertificateState } from './browserCertificates'
 import { SiteSecurity, type SecurityTabRef } from './siteSecurity'
-import { tempProject, testCrypto, testSigner } from './__test-helpers__/siteFakes'
+import { tempHome, tempProject, testCrypto, testSigner } from './__test-helpers__/siteFakes'
 
 const PAGE = 'https://selfsigned.test/'
 const display = { text: (o: string) => new URL(o).host, parts: () => null }
 
 let root: string
+let home: string
 let clock: TestClock
 let events: StripEvent[]
 let strip: TabStrip
@@ -38,6 +39,7 @@ const flush = async (): Promise<void> => {
 
 beforeEach(() => {
   root = tempProject('erfana-sec-')
+  home = tempHome()
   clock = createManualClock(0)
   events = []
   states = []
@@ -54,6 +56,7 @@ beforeEach(() => {
   security = new SiteSecurity({
     clock,
     signer: testSigner('k'),
+    homeDir: home,
     credentialCrypto: testCrypto(),
     storageBackend: () => 'keychain',
     display,
@@ -63,6 +66,7 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(root, { recursive: true, force: true })
+  rmSync(home, { recursive: true, force: true })
 })
 
 function certificateError(target: FakeContents, isMainFrame = true): boolean[] {
@@ -167,8 +171,8 @@ describe('SiteSecurity', () => {
   })
 
   it('keeps sign-ins in memory only when the backend cannot be read or no key store is given', async () => {
-    const throwing = new SiteSecurity({ clock, signer: testSigner('k'), credentialCrypto: testCrypto(), storageBackend: () => { throw new Error('dbus') }, display })
-    const bare = new SiteSecurity({ clock, signer: testSigner('k'), display })
+    const throwing = new SiteSecurity({ clock, signer: testSigner('k'), homeDir: home, credentialCrypto: testCrypto(), storageBackend: () => { throw new Error('dbus') }, display })
+    const bare = new SiteSecurity({ clock, signer: testSigner('k'), homeDir: home, display })
     for (const s of [throwing, bare]) {
       const c = new FakeContents()
       s.attachTab({ projectRoot: root, contents: c as never }, strip)

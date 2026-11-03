@@ -113,6 +113,9 @@ export default defineConfig({
         'src/main/services/browser/browserProfileGuards.ts': { lines: 91, functions: 93, branches: 81, statements: 90 },
         // measured 97.43/100/93.33/97.72
         'src/main/services/browser/browserProfileMarker.ts': { lines: 95, functions: 98, branches: 91, statements: 95 },
+        // The generation record that refuses a replayed signed file (ADR 0009
+        // decision 6). measured 100/100/95/100
+        'src/main/services/browser/profileGenerations.ts': { lines: 98, functions: 98, branches: 93, statements: 98 },
         // measured 96.05/100/85.71/96.77
         'src/main/services/browser/browserProfileDeletes.ts': { lines: 94, functions: 98, branches: 83, statements: 94 },
         // measured 100/100/100/100

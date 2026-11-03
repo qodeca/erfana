@@ -81,6 +81,8 @@ export interface TabSiteLink {
 export interface BrowserSiteDeps {
   readonly clock: Clock
   readonly signer: PurposeSigner
+  /** The user's home folder, which holds each project's generation record (ADR 0009 decision 6). */
+  readonly homeDir: string
   readonly resolveDomain: RegistrableDomainResolver
   readonly downloads: BrowserDownloadsDeps
   /** `webContents.fromFrame`: the page a screen-sharing request's frame belongs to. */
@@ -123,6 +125,7 @@ export class BrowserSite implements SessionSiteHooks {
     this.security = new SiteSecurity({
       clock: deps.clock,
       signer: deps.signer,
+      homeDir: deps.homeDir,
       credentialCrypto: deps.credentialCrypto,
       storageBackend: deps.storageBackend,
       display: this.display,
@@ -304,7 +307,7 @@ export class BrowserSite implements SessionSiteHooks {
   private storeFor(projectRoot: string): Promise<BrowserPermissionStore> {
     let store = this.stores.get(projectRoot)
     if (store === undefined) {
-      store = BrowserPermissionStore.open(projectRoot, this.deps.signer)
+      store = BrowserPermissionStore.open(projectRoot, this.deps.homeDir, this.deps.signer)
       this.stores.set(projectRoot, store)
     }
     return store

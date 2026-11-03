@@ -2,8 +2,9 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Fakes for the site suites: an HMAC signer with or without a key, a
- * reversible stand-in for `safeStorage`, and a project root that holds
- * `.erfana/browser/profile/Erfana/`.
+ * reversible stand-in for `safeStorage`, a project root that holds
+ * `.erfana/browser/profile/Erfana/`, and a home folder for the generation
+ * records.
  */
 import { createHmac } from 'node:crypto'
 import { mkdirSync, mkdtempSync, realpathSync } from 'node:fs'
@@ -47,4 +48,9 @@ export function tempProject(prefix: string): string {
   const root = realpathSync.native(mkdtempSync(join(tmpdir(), prefix)))
   mkdirSync(join(root, ...profileErfanaSegments('x').slice(0, -1)), { recursive: true })
   return root
+}
+
+/** A temp home folder, where the stores keep each project's generation record. */
+export function tempHome(prefix = 'erfana-home-'): string {
+  return realpathSync.native(mkdtempSync(join(tmpdir(), prefix)))
 }

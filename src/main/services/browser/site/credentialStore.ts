@@ -24,6 +24,7 @@
  */
 import { z } from 'zod'
 import type { PurposeSigner } from '../browserProfileMarker'
+import { profileGenerations } from '../profileGenerations'
 import { profileErfanaSegments, readSignedList, SerialWriter, writeSignedList, type SignedListFile } from './signedProfileFile'
 import { logger } from '../../LoggingService'
 
@@ -73,6 +74,8 @@ function keyText(key: CredentialKey): string {
 }
 
 export interface CredentialStoreOptions {
+  /** Holds the project's generation record (ADR 0009 decision 6). */
+  readonly homeDir: string
   readonly signer: PurposeSigner
   readonly crypto: CredentialCrypto
   /** `safeStorage`'s backend name; `basic_text` means no OS key store. */
@@ -99,6 +102,7 @@ export class BrowserCredentialStore {
       segments: CREDENTIALS_SEGMENTS,
       purpose: CREDENTIALS_PURPOSE,
       signer: options.signer,
+      generations: profileGenerations(options.homeDir, canonical),
       entry: EntrySchema,
       maxEntries: MAX_SAVED_CREDENTIALS,
       maxBytes: 1024 * 1024,

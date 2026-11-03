@@ -11,26 +11,30 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../../LoggingService', () => ({ logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 
+import { homeGenerationsPath } from '../profileGenerations'
 import { BrowserCredentialStore, CREDENTIALS_SEGMENTS, MAX_SAVED_CREDENTIALS, type CredentialKey } from './credentialStore'
-import { tempProject, testCrypto, testSigner } from './__test-helpers__/siteFakes'
+import { tempHome, tempProject, testCrypto, testSigner } from './__test-helpers__/siteFakes'
 
 const KEY: CredentialKey = { scheme: 'https', host: 'staging.test', port: 443, realm: 'Staging' }
 const SECRET = { username: 'staging-user', password: 'p4ss-w0rd-secret' }
 
 let root: string
+let home: string
 let file: string
 
 beforeEach(() => {
   root = tempProject('erfana-cred-')
+  home = tempHome()
   file = join(root, ...CREDENTIALS_SEGMENTS)
 })
 
 afterEach(() => {
   rmSync(root, { recursive: true, force: true })
+  rmSync(home, { recursive: true, force: true })
 })
 
 const open = (options: Partial<Parameters<typeof BrowserCredentialStore.open>[1]> = {}): Promise<BrowserCredentialStore> =>
-  BrowserCredentialStore.open(root, { signer: testSigner('k'), crypto: testCrypto(), backend: 'keychain', ...options })
+  BrowserCredentialStore.open(root, { homeDir: home, signer: testSigner('k'), crypto: testCrypto(), backend: 'keychain', ...options })
 
 describe('BrowserCredentialStore', () => {
   it('025-AC-022 keeps a remembered sign-in across a restart, never in plain text in the file', async () => {
@@ -73,6 +77,23 @@ describe('BrowserCredentialStore', () => {
     await (await open()).set(KEY, SECRET)
     expect((await open({ backend: 'basic_text' })).size()).toBe(0)
     expect((await open({ signer: testSigner('other') })).size()).toBe(0)
+  })
+
+  it('ADR 0009 decision 6 refuses an older signed file put back (a forgotten sign-in restored)', async () => {
+    const store = await open()
+    await store.set(KEY, SECRET)
+    const older = readFileSync(file)
+    await store.clear()
+    writeFileSync(file, older)
+    expect((await open()).get(KEY)).toBeUndefined()
+  })
+
+  it('refuses an existing file when the home generation record is missing, and takes none without a key store', async () => {
+    await (await open()).set(KEY, SECRET)
+    rmSync(homeGenerationsPath(home, root))
+    expect((await open()).size()).toBe(0)
+    await (await open({ backend: 'basic_text' })).set(KEY, SECRET)
+    expect(existsSync(homeGenerationsPath(home, root))).toBe(false)
   })
 
   it('drops an entry that no longer decrypts (the keyring changed)', async () => {

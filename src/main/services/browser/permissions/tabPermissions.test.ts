@@ -32,7 +32,7 @@ beforeEach(async () => {
   events = []
   let n = 0
   strip = new TabStrip({ tabId: 'browser-tab-1', clock, emit: (e) => events.push(e), newId: () => `r${++n}` })
-  store = await BrowserPermissionStore.open('/unused', MEMORY_ONLY)
+  store = await BrowserPermissionStore.open('/unused', '/unused-home', MEMORY_ONLY)
   tab = new TabPermissions({
     strip,
     store,
