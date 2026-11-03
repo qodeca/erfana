@@ -16,7 +16,8 @@
  *    answer holds for the rest of that page load. Block, or a prompt
  *    withdrawn by navigation or tab close, cancels it.
  * 3. **The save dialog** opens in the OS Downloads folder with the sanitised
- *    name. Cancel cancels the download. A folder inside a `.erfana` folder is
+ *    name; for a file that can run programs it carries a warning (title and
+ *    message, S-18). Cancel cancels the download. A folder inside a `.erfana` folder is
  *    refused (S-18): the agent and the profile live there.
  * 4. **Done.** The staged file is moved to the chosen path (renamed, or
  *    copied across volumes) and a notice names it, with **Show in folder**.
@@ -34,9 +35,15 @@ import { copyFile, rename, rm, unlink } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { NoticeEvent, StripRow } from '../../../../shared/ipc/browser-tab-schema'
+import {
+  downloadDoneTitle,
+  downloadFailedText,
+  EXECUTABLE_WARNING_TITLE,
+  executableWarningMessage
+} from '../../../../shared/browser/downloadNotice'
 import { logger } from '../../LoggingService'
 import type { TabStrip } from '../permissions/tabStrip'
-import { sanitizeDownloadName } from './downloadFileName'
+import { isExecutableDownload, sanitizeDownloadName } from './downloadFileName'
 
 /** The fixed sentence of the several-files prompt (025-FR-020). */
 export const SEVERAL_FILES_TEXT = 'This site wants to download several files.'
@@ -46,11 +53,11 @@ const STAGING_PREFIX = 'erfana-download-'
 
 export type DownloadFailure = NonNullable<NonNullable<NoticeEvent['download']>['reason']>
 
-const FAILURE_TEXT: Readonly<Record<DownloadFailure, string>> = {
-  interrupted: 'The download was interrupted.',
-  folderNotWritable: 'Erfana can’t write to that folder.',
-  diskFull: 'The disk is full.',
-  refusedFolder: 'Erfana doesn’t save downloads inside a .erfana folder.'
+/** What the save dialog shows: the start path, and for a file that can run programs a warning. */
+export interface SaveDialogRequest {
+  readonly defaultPath: string
+  readonly title?: string
+  readonly message?: string
 }
 
 /** The part of Electron's `DownloadItem` used here. */
@@ -93,12 +100,18 @@ export interface BrowserDownloadsDeps {
   /** Where private staging folders are made (the OS temp folder). */
   readonly stagingRoot: () => string
   /** The OS save dialog; the chosen path, or `null` when cancelled. */
-  readonly showSaveDialog: (parent: unknown, defaultPath: string) => Promise<string | null>
+  readonly showSaveDialog: (parent: unknown, request: SaveDialogRequest) => Promise<string | null>
   readonly showItemInFolder: (path: string) => void
   readonly newId?: () => string
 }
 
 type DoneState = 'completed' | 'cancelled' | 'interrupted'
+
+/** The save dialog for `name` at `defaultPath`; a file that can run programs gets the warning (S-18). */
+export function saveDialogRequest(defaultPath: string, name: string): SaveDialogRequest {
+  if (!isExecutableDownload(name)) return { defaultPath }
+  return { defaultPath, title: EXECUTABLE_WARNING_TITLE, message: executableWarningMessage(name) }
+}
 
 /** Whether `path` lies inside a folder named `.erfana` (any case). */
 export function isInsideErfanaFolder(path: string): boolean {
@@ -218,7 +231,7 @@ export class BrowserDownloads {
   private async askTarget(tab: DownloadTab, name: string): Promise<string | 'refused' | null> {
     let chosen: string | null
     try {
-      chosen = await this.deps.showSaveDialog(tab.parentWindow(), join(this.deps.downloadsDir(), name))
+      chosen = await this.deps.showSaveDialog(tab.parentWindow(), saveDialogRequest(join(this.deps.downloadsDir(), name), name))
     } catch (error) {
       logger.warn('The download save dialog failed', { error: String((error as Error).message) })
       return null
@@ -256,18 +269,17 @@ export class BrowserDownloads {
     tab.notice({
       tabId: tab.isOpen() ? tab.tabId : null,
       kind: 'downloadDone',
-      text: `Downloaded ${fileName}`,
+      text: downloadDoneTitle(fileName),
       download: { fileName, downloadId, reason: null }
     })
   }
 
   private notifyFailed(tab: DownloadTab, fileName: string, reason: DownloadFailure): void {
     logger.warn('A browser download failed', { reason })
-    const tail = reason === 'refusedFolder' ? '' : ' The partial file was deleted.'
     tab.notice({
       tabId: tab.isOpen() ? tab.tabId : null,
       kind: 'downloadFailed',
-      text: `Couldn’t download ${fileName}. ${FAILURE_TEXT[reason]}${tail}`,
+      text: downloadFailedText(fileName, reason),
       download: { fileName, downloadId: null, reason }
     })
   }

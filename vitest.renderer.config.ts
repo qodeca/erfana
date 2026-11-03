@@ -128,6 +128,8 @@ export default defineConfig({
         'src/renderer/src/services/browser/browserTabLifecycle.ts': { lines: 98, functions: 98, branches: 86, statements: 98 },
         // measured 100/100/100/100
         'src/renderer/src/services/browser/browserTabEvents.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Download notices as toasts with Show in folder (025-FR-020). measured 100/100/91.66/100
+        'src/renderer/src/services/browser/browserDownloadNotices.ts': { lines: 98, functions: 98, branches: 89, statements: 98 },
         // measured 100/100/100/100
         'src/renderer/src/utils/openBrowserTab.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/95.58/100

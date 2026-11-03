@@ -18,6 +18,7 @@ import {
   type BrowserCdpSessionOptions
 } from './BrowserCdpSession'
 import { CdpRefusedError } from './cdpAllowList'
+import { currentBrowserUserAgentOverride } from '../site/browserUserAgent'
 import { FLOOD_MAX_EVENTS } from './cdpFloodBudget'
 import { HANG_PROBE_INTERVAL_VISIBLE_MS, HANG_THRESHOLD_MS } from './browserHangProbe'
 import type { CdpWebContents } from './cdpTypes'
@@ -53,6 +54,7 @@ function attachChild(
 }
 
 const NETWORK_ENABLE = { maxTotalBufferSize: 0, maxResourceBufferSize: 0, maxPostDataSize: 0 }
+const UA_OVERRIDE = currentBrowserUserAgentOverride()
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -63,6 +65,7 @@ describe('BrowserCdpSession – attach and child targets (ADR 0007 decision 1, P
     const { contents } = attached()
     expect(contents.debugger.attached).toBe(true)
     expect(contents.debugger.sent).toEqual([
+      { method: 'Emulation.setUserAgentOverride', params: UA_OVERRIDE, sessionId: undefined },
       { method: 'Target.setAutoAttach', params: { autoAttach: true, waitForDebuggerOnStart: true, flatten: true }, sessionId: undefined },
       { method: 'Runtime.enable', params: {}, sessionId: undefined },
       { method: 'Log.enable', params: {}, sessionId: undefined },
@@ -72,7 +75,39 @@ describe('BrowserCdpSession – attach and child targets (ADR 0007 decision 1, P
 
   it('leaves Network off with the log failed-request source', () => {
     const { contents } = attached({ failedRequestSource: 'log' })
-    expect(contents.debugger.methods()).toEqual(['Target.setAutoAttach', 'Runtime.enable', 'Log.enable'])
+    expect(contents.debugger.methods()).toEqual(['Emulation.setUserAgentOverride', 'Target.setAutoAttach', 'Runtime.enable', 'Log.enable'])
+  })
+
+  it('025-FR-024 gives every target the browser identity before it runs: Emulation on frames, Network on workers', () => {
+    const { contents, clock } = attached()
+    attachChild(contents, 'S1', 'iframe', 'F1')
+    attachChild(contents, 'S2', 'worker', 'W2')
+    attachChild(contents, 'S3', 'service_worker', 'W3')
+    clock.advance(RESUME_DELAY_MS)
+    expect(contents.debugger.sent.find(c => c.sessionId === 'S1')).toEqual({
+      method: 'Emulation.setUserAgentOverride',
+      params: UA_OVERRIDE,
+      sessionId: 'S1'
+    })
+    for (const worker of ['S2', 'S3']) {
+      const methods = contents.debugger.methods(worker)
+      expect(methods[0]).toBe('Network.setUserAgentOverride')
+      expect(methods).not.toContain('Emulation.setUserAgentOverride')
+      expect(methods.indexOf('Network.setUserAgentOverride')).toBeLessThan(methods.indexOf('Runtime.runIfWaitingForDebugger'))
+    }
+  })
+
+  it('025-FR-024 a popup-kind session sends the identity too', () => {
+    const contents = new FakeContents()
+    new BrowserCdpSession({ kind: 'popup', clock: createManualClock(0) }).attach(contents)
+    expect(contents.debugger.sent[0]).toEqual({ method: 'Emulation.setUserAgentOverride', params: UA_OVERRIDE, sessionId: undefined })
+  })
+
+  it('sends no identity with userAgent null', () => {
+    const { contents } = attached({ userAgent: null })
+    attachChild(contents, 'S1', 'worker', 'W1')
+    expect(contents.debugger.methods().filter(m => m.endsWith('setUserAgentOverride'))).toEqual([])
+    expect(contents.debugger.methods('S1')).not.toContain('Network.setUserAgentOverride')
   })
 
   it('refuses a second attach, a destroyed view, and passes on Electron’s refusal', () => {
@@ -97,7 +132,7 @@ describe('BrowserCdpSession – attach and child targets (ADR 0007 decision 1, P
     const seenAtEvent: string[][] = []
     session.on('targetAttached', () => seenAtEvent.push(contents.debugger.methods('S1')))
     attachChild(contents, 'S1', 'iframe', 'F1')
-    const enables = ['Target.setAutoAttach', 'Runtime.enable', 'Log.enable', 'Network.enable']
+    const enables = ['Emulation.setUserAgentOverride', 'Target.setAutoAttach', 'Runtime.enable', 'Log.enable', 'Network.enable']
     // Not from the attach event's stack, nor from a microtask: Electron emits the event
     // from inside Chromium's navigation throttle, and a resume there is lost (commit-8 probe).
     expect(contents.debugger.methods('S1')).toEqual(enables)

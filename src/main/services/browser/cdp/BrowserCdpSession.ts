@@ -10,6 +10,8 @@
  * the session's kind (`cdpAllowList.ts`) before anything is sent.
  *
  * What it does:
+ * - The browser identity (025-FR-024, `site/browserUserAgent.ts`) goes to every
+ *   target first: a waiting child has it before it runs, the top before its first load.
  * - Attaches, then `Target.setAutoAttach` with the fixed flattened options.
  *   Each child target (frame, worker, service worker) gets its enables sent
  *   without awaiting each, then `Runtime.runIfWaitingForDebugger` (P6) on a
@@ -44,12 +46,7 @@ import { BrowserLogBuffer, type LogSnapshot } from './browserLogBuffer'
 import { CdpFloodBudget, eventPayloadSize } from './cdpFloodBudget'
 import { CdpLogCollector, type FailedRequestSource, type LogScope } from './cdpLogCollector'
 import { CdpRefusedError, checkCdpCommand, PICK_ONLY_DOMAINS, type CdpSessionKind } from './cdpAllowList'
-import {
-  AUTO_ATTACH_PARAMS,
-  CONSOLE_OBJECT_GROUP,
-  HANG_PROBE_EVALUATE_PARAMS,
-  NETWORK_ENABLE_PARAMS
-} from './cdpPinned'
+import { AUTO_ATTACH_PARAMS, CONSOLE_OBJECT_GROUP, HANG_PROBE_EVALUATE_PARAMS, NETWORK_ENABLE_PARAMS } from './cdpPinned'
 import {
   isRecord,
   type CdpDetachListener,
@@ -59,16 +56,10 @@ import {
   type DidNavigateListener
 } from './cdpTypes'
 import { EventHub } from './eventHub'
+import { currentBrowserUserAgentOverride, userAgentOverrideMethod, type BrowserUserAgentOverride } from '../site/browserUserAgent'
 import type { BrowserCdpSessionEvents, CdpDetachCause, CdpDetachInfo, CdpTargetInfo, HangProbeControl } from './cdpSessionTypes'
 
-export type {
-  BrowserCdpSessionEvents,
-  CdpDetachCause,
-  CdpDetachInfo,
-  CdpProtocolEvent,
-  CdpTargetInfo,
-  HangProbeControl
-} from './cdpSessionTypes'
+export type { BrowserCdpSessionEvents, CdpDetachCause, CdpDetachInfo, CdpProtocolEvent, CdpTargetInfo, HangProbeControl } from './cdpSessionTypes'
 export type { HangProbeEvent } from './browserHangProbe'
 export type { LogSnapshot, LoggedConsoleEntry, LoggedFailedRequest } from './browserLogBuffer'
 export type { CdpSessionKind } from './cdpAllowList'
@@ -94,6 +85,8 @@ export interface BrowserCdpSessionOptions {
   readonly clock?: Clock
   /** Where failed requests come from (default `network`: only it sees a worker's, commit-8 probe). */
   readonly failedRequestSource?: FailedRequestSource
+  /** The identity every target gets before it runs (025-FR-024; default: this process's); `null` sends none. */
+  readonly userAgent?: BrowserUserAgentOverride | null
 }
 
 interface TargetRecord extends CdpTargetInfo {
@@ -131,6 +124,7 @@ export class BrowserCdpSession {
   readonly kind: CdpSessionKind
   private readonly clock: Clock
   private readonly source: FailedRequestSource
+  private readonly userAgent: BrowserUserAgentOverride | null
   private readonly hub = new EventHub<BrowserCdpSessionEvents>('Browser CDP')
   private readonly buffer: BrowserLogBuffer
   private readonly collector: CdpLogCollector
@@ -145,6 +139,7 @@ export class BrowserCdpSession {
     this.kind = options.kind
     this.clock = options.clock ?? mainClock
     this.source = options.failedRequestSource ?? 'network'
+    this.userAgent = options.userAgent === undefined ? currentBrowserUserAgentOverride() : options.userAgent
     this.buffer = new BrowserLogBuffer(this.clock)
     this.collector = new CdpLogCollector(this.buffer, this.source)
     this.probe = new BrowserHangProbe({
@@ -327,8 +322,9 @@ export class BrowserCdpSession {
     return record
   }
 
-  /** Auto-attach and the log domains, each sent without awaiting the last. */
+  /** The browser identity, auto-attach and the log domains, each sent without awaiting the last. */
   private startTarget(target: TargetRecord): void {
+    if (this.userAgent !== null) this.fire(userAgentOverrideMethod(target.type), target.sessionKey, this.userAgent)
     this.fire('Target.setAutoAttach', target.sessionKey, AUTO_ATTACH_PARAMS)
     this.enableLogs(target)
   }

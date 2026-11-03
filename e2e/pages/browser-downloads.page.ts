@@ -6,9 +6,12 @@
  * left on disk.
  *
  * - **Save dialog.** Stubbed with `stubDialog` (electron-playwright-helpers),
- *   then wrapped so each call's `defaultPath` is recorded – the dialog's start
- *   folder and offered name are part of what the test checks.
- * - **Notices.** `browser-tab:notice` events recorded in Erfana's window.
+ *   then wrapped so each call's options are recorded – the dialog's start
+ *   folder, offered name and executable-type warning are part of what the
+ *   test checks.
+ * - **Notices.** `browser-tab:notice` events recorded in Erfana's window, and
+ *   the toasts the window draws from them ({@link DownloadsDriver.doneToast},
+ *   {@link DownloadsDriver.failedToast}).
  * - **Show in folder.** `shell.showItemInFolder` replaced main-side by a
  *   recorder, so no Finder or Explorer window opens.
  * - **Leftovers.** Downloads are received into `erfana-download-*` folders in
@@ -20,8 +23,9 @@
  */
 import { promises as fs } from 'node:fs'
 import * as path from 'node:path'
-import { expect, type ElectronApplication, type Page } from '@playwright/test'
+import { expect, type ElectronApplication, type Locator, type Page } from '@playwright/test'
 import { stubDialog } from 'electron-playwright-helpers'
+import { TEST_IDS } from '../../src/renderer/src/constants/testids'
 
 const WAIT_MS = 15_000
 
@@ -37,8 +41,15 @@ interface Recorder {
   api: { browserTab: Record<string, (...args: unknown[]) => unknown> }
 }
 
+/** What one save dialog was opened with. */
+export interface SaveDialogCall {
+  defaultPath: string
+  title: string | null
+  message: string | null
+}
+
 interface MainStore {
-  __e2eSaveDialogPaths?: string[]
+  __e2eSaveDialogCalls?: SaveDialogCall[]
   __e2eShownInFolder?: string[]
 }
 
@@ -75,25 +86,30 @@ export class DownloadsDriver {
 
   /**
    * The next save dialog answers Cancel (`null`) or Save to `filePath`, and
-   * its `defaultPath` is recorded. Call before each expected dialog.
+   * its options are recorded. Call before each expected dialog.
    */
   async answerSaveDialog(filePath: string | null): Promise<void> {
     await stubDialog(this.app, 'showSaveDialog', filePath === null ? { canceled: true, filePath: '' } : { canceled: false, filePath })
     await this.app.evaluate(({ dialog }) => {
       const store = globalThis as MainStore
-      store.__e2eSaveDialogPaths ??= []
+      store.__e2eSaveDialogCalls ??= []
       const stubbed = dialog.showSaveDialog.bind(dialog)
       dialog.showSaveDialog = ((...args: unknown[]) => {
-        const options = (args.length > 1 ? args[1] : args[0]) as { defaultPath?: string }
-        store.__e2eSaveDialogPaths!.push(options.defaultPath ?? '')
+        const options = (args.length > 1 ? args[1] : args[0]) as { defaultPath?: string; title?: string; message?: string }
+        store.__e2eSaveDialogCalls!.push({ defaultPath: options.defaultPath ?? '', title: options.title ?? null, message: options.message ?? null })
         return (stubbed as (...a: unknown[]) => unknown)(...args)
       }) as typeof dialog.showSaveDialog
     })
   }
 
+  /** The options of every save dialog opened so far. */
+  dialogCalls(): Promise<SaveDialogCall[]> {
+    return this.app.evaluate(() => (globalThis as MainStore).__e2eSaveDialogCalls ?? [])
+  }
+
   /** The `defaultPath` of every save dialog opened so far. */
-  dialogPaths(): Promise<string[]> {
-    return this.app.evaluate(() => (globalThis as MainStore).__e2eSaveDialogPaths ?? [])
+  async dialogPaths(): Promise<string[]> {
+    return (await this.dialogCalls()).map((call) => call.defaultPath)
   }
 
   async waitForDialogCount(count: number): Promise<string[]> {
@@ -116,9 +132,19 @@ export class DownloadsDriver {
     return this.app.evaluate(() => (globalThis as MainStore).__e2eShownInFolder ?? [])
   }
 
-  /** **Show in folder** for a finished download, as the notice's button calls it. */
-  showDownload(downloadId: string): Promise<unknown> {
-    return this.window.evaluate((id) => (window as unknown as Recorder).api.browserTab['showDownload']!(id), downloadId)
+  /** The window's success toast for the finished download `fileName`. */
+  doneToast(fileName: string): Locator {
+    return this.window.getByTestId(`${TEST_IDS.TOAST}-success`).filter({ hasText: `Downloaded ${fileName}` })
+  }
+
+  /** The window's error toast for the failed download `fileName`. */
+  failedToast(fileName: string): Locator {
+    return this.window.getByTestId(`${TEST_IDS.TOAST}-error`).filter({ hasText: `Couldn’t download ${fileName}` })
+  }
+
+  /** The **Show in folder** button of a finished download's toast. */
+  showInFolderButton(fileName: string): Locator {
+    return this.doneToast(fileName).getByRole('button', { name: 'Show in folder', exact: true })
   }
 
   /**

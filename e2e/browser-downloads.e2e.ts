@@ -11,11 +11,11 @@
  * them (`browser-tab:notice`); the several-files question is answered in the
  * browser panel's strip, as a user answers it.
  *
- * NOT TITLED 025-AC-020: two parts of the criterion cannot pass yet – the
- * executable-type warning in the save dialog is not implemented (the dialog
- * gets only `defaultPath`), and the renderer draws no download notice (main
- * sends `downloadDone` / `downloadFailed`; `browserTabEvents.ts` handles only
- * `localAddressSeen`). Once both exist, title one test `025-AC-020 …`.
+ * Every part of 025-AC-020 is shown here: the executable-type warning is
+ * read from the stubbed save dialog's options, and the notices are read both
+ * as main sends them and as the toasts the window draws. One part is
+ * platform-bound: the AC drives the unwritable folder through a test hook,
+ * and on macOS and Linux `chmod` makes one; Windows skips that test (see it).
  *
  * Two facts about the environment: Chromium already replaces path parts,
  * bidi and invisible characters with `_` before Erfana sees a name, so the
@@ -37,7 +37,7 @@ const BYTES = 4096
 /** A token unique to this test run, safe in a file name and a hold key. */
 const tokenOf = (label: string): string => `${label}-${test.info().workerIndex}-${test.info().repeatEachIndex}-${Date.now()}`
 
-test.describe('025-FR-020 downloads ask first (main side of 025-AC-020)', () => {
+test.describe('025-AC-020 downloads ask first', () => {
   let out = ''
   let downloads: DownloadsDriver
 
@@ -76,7 +76,10 @@ test.describe('025-FR-020 downloads ask first (main side of 025-AC-020)', () => 
     await page.clickSelector('#e2e-download')
   }
 
-  test('the save dialog opens in the Downloads folder with a sanitised name; Cancel leaves no file', async ({ browserTabs, browserServers }) => {
+  test('025-AC-020 the save dialog opens in the Downloads folder with a sanitised name and an executable warning; Cancel leaves no file', async ({
+    browserTabs,
+    browserServers
+  }) => {
     const page = await openDownloadsPage(browserTabs, browserServers.sites.static.url('/downloads.html'))
     const downloadsDir = await downloads.downloadsDir()
     const token = tokenOf('cancel')
@@ -91,6 +94,10 @@ test.describe('025-FR-020 downloads ask first (main side of 025-AC-020)', () => 
     expect(name).toContain(token)
     expect(name).not.toMatch(/[\\/<>:|?*\u200B\u202E]/)
     expect(name.endsWith('txt.exe')).toBe(true)
+    // An executable type carries a warning: the title (Windows, Linux) and the message (macOS) name the risk and the file.
+    const [call] = await downloads.dialogCalls()
+    expect(call!.title).toBe('This file can run programs on your computer')
+    expect(call!.message).toBe(`${name} can run programs on your computer. Save it only if you trust the site it came from.`)
 
     // Cancel: no target was chosen, so the only place a file could be is staging – emptied – and no notice comes.
     // (The real ~/Downloads is never listed: macOS privacy protection would stall the read on a prompt.)
@@ -98,7 +105,7 @@ test.describe('025-FR-020 downloads ask first (main side of 025-AC-020)', () => 
     expect((await downloads.notices()).filter((n) => n.download.fileName.includes(token))).toEqual([])
   })
 
-  test('Save writes the file, and the notice names it with Show in folder', async ({ browserTabs, browserServers }) => {
+  test('025-AC-020 Save writes the file, and the notice names it with Show in folder', async ({ browserTabs, browserServers }) => {
     const page = await openDownloadsPage(browserTabs, browserServers.sites.static.url('/downloads.html'))
     const token = tokenOf('saved')
     const name = `report-${token}.txt`
@@ -112,12 +119,19 @@ test.describe('025-FR-020 downloads ask first (main side of 025-AC-020)', () => 
     expect((await fs.stat(target)).size).toBe(BYTES)
     await downloads.waitForNoLeftovers(token)
 
+    // A file that cannot run programs gets the plain dialog.
+    const [call] = await downloads.dialogCalls()
+    expect(call).toEqual({ defaultPath: path.join(await downloads.downloadsDir(), name), title: null, message: null })
+
+    // The window's toast names the file; its Show in folder reveals the saved file and closes the toast.
     expect(notice.download.downloadId).not.toBeNull()
-    await downloads.showDownload(notice.download.downloadId!)
+    await expect(downloads.doneToast(name)).toBeVisible()
+    await downloads.showInFolderButton(name).click()
     await expect.poll(() => downloads.shownInFolder()).toEqual([target])
+    await expect(downloads.doneToast(name)).toHaveCount(0)
   })
 
-  test('a save target under .erfana is refused with a notice, and nothing is written there (S-18)', async ({
+  test('025-AC-020 a save target under .erfana is refused with a notice, and nothing is written there (S-18)', async ({
     browserTabs,
     browserServers,
     testProject
@@ -133,11 +147,12 @@ test.describe('025-FR-020 downloads ask first (main side of 025-AC-020)', () => 
     expect(notice.download.reason).toBe('refusedFolder')
     expect(notice.text).toContain(name)
     expect(notice.text).toContain('inside a .erfana folder')
+    await expect(downloads.failedToast(name)).toContainText('Erfana doesn’t save downloads inside a .erfana folder')
     await downloads.waitForNoLeftovers(token)
     await expect(fs.access(target)).rejects.toThrow()
   })
 
-  test('the server drops the connection halfway: the error notice names the file and the reason, and neither the file nor a partial file remains', async ({
+  test('025-AC-020 the server drops the connection halfway: the error notice names the file and the reason, and neither the file nor a partial file remains', async ({
     browserTabs,
     browserServers
   }) => {
@@ -151,11 +166,12 @@ test.describe('025-FR-020 downloads ask first (main side of 025-AC-020)', () => 
     const notice = await downloads.waitForNotice('downloadFailed', name)
     expect(notice.download.reason).toBe('interrupted')
     expect(notice.text).toBe(`Couldn’t download ${name}. The download was interrupted. The partial file was deleted.`)
+    await expect(downloads.failedToast(name)).toContainText('The download was interrupted. The partial file was deleted.')
     await downloads.waitForNoLeftovers(token)
     expect(await fs.readdir(out)).toEqual([])
   })
 
-  test('the chosen folder cannot be written: the error notice names the file and the reason, and neither the file nor a partial file remains', async ({
+  test('025-AC-020 the chosen folder cannot be written: the error notice names the file and the reason, and neither the file nor a partial file remains', async ({
     browserTabs,
     browserServers
   }) => {
@@ -172,11 +188,12 @@ test.describe('025-FR-020 downloads ask first (main side of 025-AC-020)', () => 
     const notice = await downloads.waitForNotice('downloadFailed', name)
     expect(notice.download.reason).toBe('folderNotWritable')
     expect(notice.text).toBe(`Couldn’t download ${name}. Erfana can’t write to that folder. The partial file was deleted.`)
+    await expect(downloads.failedToast(name)).toContainText('Erfana can’t write to that folder. The partial file was deleted.')
     await downloads.waitForNoLeftovers(token)
     expect(await fs.readdir(out)).toEqual([])
   })
 
-  test('a download continues when its tab closes', async ({ browserTabs, browserServers }) => {
+  test('025-AC-020 a download continues when its tab closes', async ({ browserTabs, browserServers }) => {
     const { held } = browserServers
     const page = await openDownloadsPage(browserTabs, browserServers.sites.static.url('/downloads.html'))
     const token = tokenOf('held')
@@ -195,11 +212,12 @@ test.describe('025-FR-020 downloads ask first (main side of 025-AC-020)', () => 
 
     const notice = await downloads.waitForNotice('downloadDone', name)
     expect(notice.tabId).toBeNull()
+    await expect(downloads.doneToast(name)).toBeVisible()
     expect((await fs.stat(target)).size).toBe(BYTES)
     await downloads.waitForNoLeftovers(token)
   })
 
-  test('a second download without a user action asks "This site wants to download several files" with Allow and Block; Block starts nothing', async ({
+  test('025-AC-020 a second download without a user action asks "This site wants to download several files" with Allow and Block; Block starts nothing', async ({
     appWithTestProject,
     windowWithTestProject,
     browserServers

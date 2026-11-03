@@ -372,6 +372,10 @@ export default defineConfig({
         'src/main/services/browser/site/siteSecurity.ts': { lines: 88, functions: 77, branches: 90, statements: 90 },
         // measured 100/100/100/100
         'src/main/services/browser/site/siteRequestHooks.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // The browser identity (025-FR-024): one Chromium user agent and client-hint set
+        // for every page, popup and worker; a gap here is an untested way to leak an
+        // Electron or Erfana token. measured 100/100/97.22/100 (2026-11-03)
+        'src/main/services/browser/site/browserUserAgent.ts': { lines: 98, functions: 98, branches: 95, statements: 98 },
         // Built-in browser key and mouse routing (spec 025 commit 13,
         // 025-FR-014, 025-FR-047 to 025-FR-052, ADR 0011 decisions 11–16):
         // what reaches a page, what Erfana takes, the click guard and the
@@ -434,6 +438,8 @@ export default defineConfig({
         'src/shared/ipc/browser-tab-site-schema.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/98.11/100
         'src/shared/browser/contextFile.ts': { lines: 98, functions: 98, branches: 96, statements: 98 },
+        // measured 100/100/100/100 (download notice and executable-warning words, 025-FR-020)
+        'src/shared/browser/downloadNotice.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/shared/browser/pageText.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/90.9/100

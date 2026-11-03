@@ -8,6 +8,7 @@ import {
   OUTER_HTML_CUT,
   pickOutlineParams
 } from './cdpPinned'
+import { currentBrowserUserAgentOverride } from '../site/browserUserAgent'
 
 function refusal(fn: () => unknown): CdpRefusedError {
   try {
@@ -236,6 +237,23 @@ describe('cdpAllowList – parameter pinning (S23)', () => {
     expect(() =>
       checkCdpCommand('tab', 'Network.enable', { maxTotalBufferSize: 1, maxResourceBufferSize: 0, maxPostDataSize: 0 })
     ).toThrow(CdpRefusedError)
+  })
+
+  it.each([
+    ['tab', 'Emulation.setUserAgentOverride'],
+    ['tab', 'Network.setUserAgentOverride'],
+    ['popup', 'Emulation.setUserAgentOverride'],
+    ['popup', 'Network.setUserAgentOverride']
+  ] as const)('025-FR-024 pins %s %s to the browser identity and nothing else', (kind, method) => {
+    const identity = currentBrowserUserAgentOverride()
+    expect(checkCdpCommand(kind, method, identity)).toEqual(identity)
+    const leaky = { ...identity, userAgent: `${identity.userAgent} Electron/44.9.3` }
+    const noHints = { userAgent: identity.userAgent }
+    const extraKey = { ...identity, acceptLanguage: 'de' }
+    const otherBrands = { ...identity, userAgentMetadata: { ...identity.userAgentMetadata, brands: [{ brand: 'Electron', version: '44' }] } }
+    for (const params of [leaky, noHints, extraKey, otherBrands, {}]) {
+      expect(refusal(() => checkCdpCommand(kind, method, params)).rule).toBe('pinned parameters')
+    }
   })
 
   it('only names Erfana-known object groups when releasing', () => {

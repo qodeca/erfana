@@ -395,8 +395,8 @@ function createBrowserSite(): BrowserSite {
     downloads: {
       downloadsDir: () => app.getPath('downloads'),
       stagingRoot: () => tmpdir(),
-      showSaveDialog: async (parent, defaultPath) => {
-        const options = { defaultPath }
+      showSaveDialog: async (parent, request) => {
+        const options = { ...request }
         const result =
           parent instanceof BrowserWindow
             ? await dialog.showSaveDialog(parent, options)

@@ -223,10 +223,12 @@ test.describe('built-in browser tab', () => {
 })
 
 /*
- * 025-FR-024 user agent. NOT TITLED 025-AC-024: the criterion needs the page,
- * a worker and a popup, and only the page passes. The worker and popup tests
- * are `test.fail()` – they run with the full assertions and turn red once the
- * product is fixed; then drop `test.fail()` and title one test `025-AC-024 …`.
+ * 025-FR-024 user agent. NOT TITLED 025-AC-024: the criterion asks for a
+ * `Sec-CH-UA` header on a worker's own request, and Chromium sends none there –
+ * Google Chrome 156 neither (probe 2026-11-03: a dedicated worker's `fetch`
+ * from a page that itself sends `Sec-CH-UA` carries no `sec-ch-ua`). The page
+ * and the popup pass in full; the worker test is `test.fail()` with the full
+ * assertions until the owner rewords the criterion, then title the AC.
  */
 test.describe('025-FR-024 the user agent and client hints (part of 025-AC-024)', () => {
   test('on a page: navigator.userAgent, userAgentData brands and Sec-CH-UA carry the Chromium version and no Electron or Erfana token', async ({
@@ -242,7 +244,7 @@ test.describe('025-FR-024 the user agent and client hints (part of 025-AC-024)',
   })
 
   test('in a dedicated worker: the same, read inside the worker and from its own request', async ({ browserTabs, browserServers }) => {
-    test.fail(true, 'Product gap (2026-11-03): a dedicated worker\'s requests carry no Sec-CH-UA header; its navigator is correct')
+    test.fail(true, 'Spec gap (2026-11-03): Chromium, Google Chrome included, sends no Sec-CH-UA on a dedicated worker\'s requests; its navigator is correct')
     const { page, major } = await secureTab(browserTabs, browserServers)
     const url = browserServers.sites.static.url('/plain.html', { secure: true })
     await browserTabs.navigate(page.tabId, url)
@@ -255,7 +257,6 @@ test.describe('025-FR-024 the user agent and client hints (part of 025-AC-024)',
   })
 
   test('in a popup (window.open, opener kept): the same, on its navigation, its navigator and its own request', async ({ browserTabs, browserServers }) => {
-    test.fail(true, 'Product bug (2026-11-03): a popup presents Electron\'s default user agent ("… ERFANA/<version> … Electron/<version> …") on its first navigation and in navigator.userAgent')
     const app = browserTabs.app
     const { page, major } = await secureTab(browserTabs, browserServers)
     const url = browserServers.sites.static.url(`/popups.html?popup=${encodeURIComponent('/__headers')}`, { secure: true })

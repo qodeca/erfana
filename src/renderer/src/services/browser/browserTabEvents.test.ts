@@ -97,6 +97,15 @@ describe('mountBrowserTabEvents', () => {
     emit('notice', { tabId: null, kind: 'localAddressSeen', text: 'http://localhost:5173/' })
     emit('notice', { tabId: null, kind: 'downloadDone', text: 'file.zip' })
     expect(useBrowserTabStore.getState().localAddresses).toEqual(['http://localhost:5173/'])
+    // A download notice becomes a toast (025-FR-020, browserDownloadNotices.ts).
+    emit('notice', {
+      tabId: null,
+      kind: 'downloadFailed',
+      text: 'Couldn’t download file.zip. The disk is full. The partial file was deleted.',
+      download: { fileName: 'file.zip', downloadId: null, reason: 'diskFull' }
+    })
+    expect(toasts.showErrorToast).toHaveBeenCalledWith('Couldn’t download file.zip', 'The disk is full. The partial file was deleted.')
+    expect(useBrowserTabStore.getState().localAddresses).toEqual(['http://localhost:5173/'])
 
     const added = { tabId: 'browser-tab-2', openerTabId: 'browser-tab-1', background: true }
     emit('tabAdded', added)

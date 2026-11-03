@@ -16,7 +16,9 @@
 # of every group, and the npm block runs daily. Dependabot allows only one
 # block per ecosystem, directory and target branch, so Electron cannot get a
 # daily block of its own; the grouped PRs are refreshed daily as a result.
-# scripts/dependabot-electron.test.mjs guards this.
+# The owner decided on 2026-11-03 to keep that daily cadence for the whole
+# npm block rather than split Electron out by another route.
+# scripts/dependabot-electron.test.mjs guards this (025-AC-041).
 
 version: 2
 updates:

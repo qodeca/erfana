@@ -30,14 +30,17 @@
  *   commit 12b): ask first, save where the user chose; with no hooks every
  *   download is cancelled.
  * - **User agent** – a Chrome user agent for the bundled Chromium version, with
- *   no Electron or Erfana token (025-FR-024). Client hints carry Chromium's own
- *   brands; the per-page overrides for workers and popups arrive with the CDP
- *   session (`site/browserUserAgent.ts`).
+ *   no Electron or Erfana token (025-FR-024), for the tabs Erfana loads. The
+ *   same identity with its client hints reaches every target – popups and
+ *   workers included – through the CDP session (`site/browserUserAgent.ts`).
  * - **Spell check** – off on Linux, where there is no OS checker and Chromium
  *   would download dictionaries (S-4); on elsewhere.
  */
 import type { DownloadItem, Session, Streams, WebContents, WebFrameMain } from 'electron'
 import { logger } from '../LoggingService'
+import { browserUserAgent } from './site/browserUserAgent'
+
+export { browserUserAgent } from './site/browserUserAgent'
 
 type PermissionRequestHandler = Exclude<Parameters<Session['setPermissionRequestHandler']>[0], null>
 
@@ -123,25 +126,6 @@ export function permissionClass(permission: string): PermissionClass {
 /** Whether `permission` is granted with no prompt, no notice and no tab: `allow` only. */
 export function isPermissionGranted(permission: string): boolean {
   return permissionClass(permission) === 'allow'
-}
-
-/** The Chrome platform token of the reduced user agent Chrome itself sends. */
-function platformToken(platform: NodeJS.Platform): string {
-  if (platform === 'darwin') return 'Macintosh; Intel Mac OS X 10_15_7'
-  if (platform === 'win32') return 'Windows NT 10.0; Win64; x64'
-  return 'X11; Linux x86_64'
-}
-
-/**
- * The user agent of a Chrome of the bundled Chromium's major version, in
- * Chrome's reduced form (minor, build and patch are `0`), with no Electron or
- * Erfana token (025-FR-024).
- *
- * @param chromeVersion `process.versions.chrome`
- */
-export function browserUserAgent(platform: NodeJS.Platform, chromeVersion: string): string {
-  const major = /^\d+/.exec(chromeVersion)?.[0] ?? '0'
-  return `Mozilla/5.0 (${platformToken(platform)}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${major}.0.0.0 Safari/537.36`
 }
 
 /** The part of an Electron `Session` the hardening touches. */

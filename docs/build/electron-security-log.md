@@ -9,6 +9,8 @@ Erfana's built-in browser (spec 025) opens any web site, so the Chromium inside 
 - **Owner**: the project owner.
 - **Supported major**: Erfana stays on an Electron major version that Electron still supports.
 - **Review**: the log is reviewed at each Erfana release (025-AC-047, checked after the first release that ships the browser).
+- **Cadence decision (2026-11-03)**: the owner kept the daily schedule for the whole npm block. Dependabot allows one block per ecosystem, directory and target branch, so Electron cannot have a daily block of its own; it stays out of both groups, and the grouped minor and patch pull requests are refreshed daily too. `scripts/dependabot-electron.test.mjs` (025-AC-041) fails if `electron` joins a group or the block leaves `daily`.
+- **Baseline**: the browser is built on Electron 44.9.3 (Chromium 152.0.7977.167, `package.json` range `^44.9.0`). The first log row is the first Electron security release after the browser ships.
 
 ## How to add a row
 

@@ -493,6 +493,70 @@ Comments in a preview the renderer draws itself (the Markdown preview first), se
 |---------|---------|
 | `browser:openFile` | Open one `.html` / `.htm` project file in the default browser. Its own domain on purpose: not `shell:openExternal` (whose allow-list must stay web-only) and not `preview:` (the project tree uses it too, even with HTML execution off). `isTrustedSender` runs before the payload is read; the request is `{ filePath }` (strict, at most `MAX_BROWSER_OPEN_PATH_LENGTH` = 4096) – a file path, never an address. `BrowserLaunchService` then runs the project and real-path checks (see [security.md § HTML preview](security.md#html-preview)) and launches the real path it checked. Answers `{ success: true, usedFallback }` (`true` when no default browser was found and the file went to the system's `.html` app) or `{ success: false, errorCode, error }` with one of the six `OPEN_IN_BROWSER_*` codes and its `ERROR_MESSAGES` text; no raw error crosses IPC |
 
+### Built-in browser (`browser-tab-handlers.ts`, `browserTab/*-handlers.ts`, constants in `browser-tab-channels.ts`) (spec 025)
+
+Prefix `browser-tab:` (the older `browser:` domain above is "Open in default browser" and unrelated). Every request goes through `registry.ts` (identity, top-level frame, renderer URL and the window kind's channel allow-list), is checked again with `isTrustedSender`, parses its payload with a strict zod schema, and resolves the window from the sender, never from the payload. A tab belongs to the window that created it: a request naming another window's tab is refused, and events go only to the owning window. Page views have no preload and reach none of these channels. `invoke` unless marked *send*; a refusal is an `{ error }` or `ok: false` answer, never a throw. Payload shapes: `browser-tab-schema.ts` and the split-out `browser-tab-chrome-schema.ts`, `browser-tab-page-schema.ts`, `browser-tab-pick-schema.ts`, `browser-tab-popup-schema.ts` and `browser-tab-site-schema.ts`.
+
+| Channel | Purpose |
+|---------|---------|
+| `browser-tab:create` | Create the main-side tab for a browser panel (`{ panelId }`); answers `{ tabId }` or `{ error }` (`browser-tab-handlers.ts`) |
+| `browser-tab:close` | Close a tab; `byUser: false` when the editor tab is already gone, so no leave-page prompt (S-31) |
+| `browser-tab:navigate` | Load `{ input, source }` from the address bar, history or a user-clicked link; main re-runs the address classifier and answers `{ ok }` or `{ refused }` with the 025-FR-005 rule (`scheme`, `network-path`, `app-entry`, `local-file`) |
+| `browser-tab:openLocalFile` | **Open in browser tab** for a project file (025-FR-010), served from its folder's loopback server (ADR 0012) |
+| `browser-tab:history` | Back, Forward, Reload or Stop |
+| `browser-tab:bounds` | *send* – the page area's rectangle and visibility; main drops a `seq` at or below the last applied and answers an `ack` push with `boundsApplied` |
+| `browser-tab:focusPage` | Move keyboard focus into the page |
+| `browser-tab:focusOrigin` | Where focus came from as it enters the page, for the first-click rule (ADR 0011 decision 16) |
+| `browser-tab:toolbarFocus` | *send* – whether the tab's toolbar holds focus, for `appWindowBrowserKeys` |
+| `browser-tab:find` | Find in page (`text`, direction, next) (`browserTab/page-handlers.ts`) |
+| `browser-tab:stopFind` | End find in page |
+| `browser-tab:zoom` | Zoom in, out or reset; stored per site in the signed `zoom.json` |
+| `browser-tab:widthPreset` | Phone, tablet or full width (025-FR-012) |
+| `browser-tab:devTools` | Open DevTools for the tab, optionally inspecting a point |
+| `browser-tab:openExternal` | **Open in system browser** for the current address or a context-menu link; `http` and `https` only, re-checked on the `openExternalSafe` path (025-FR-057) |
+| `browser-tab:pickMode` | Turn pick mode on or off (025-FR-025) (`browserTab/pick-handlers.ts`) |
+| `browser-tab:refine` | Move the pick to the parent, a child or an ancestor of the held capture |
+| `browser-tab:closePick` | End the pick for a reason; `sent` ends pick mode, unfreezes the page and releases the capture (025-FR-032) |
+| `browser-tab:pickSurface` | The held capture moved between the prompt-actions panel and the instruction dialog |
+| `browser-tab:still` | The page as a still image (raw BGRA, capped) for an Erfana surface over the page area (ADR 0011) |
+| `browser-tab:writeCapture` | Write the capture's context file and screenshot after the target-terminal guard (025-FR-033, 025-FR-061); `sendAnyway` answers a wrapper or unknown banner only |
+| `browser-tab:discardCaptureFiles` | Delete a capture's files that were written but not sent |
+| `browser-tab:targetStatus` | What runs in front in a terminal: `agent`, `shell`, `wrapper` or `unknown`, read main-side |
+| `browser-tab:answerStrip` | Answer a strip row (permission, sign-in box, page dialog, several downloads, …) with optional fields (`browser-tab-handlers.ts`) |
+| `browser-tab:showDownload` | **Show in folder** for a finished download, by the notice's `downloadId`; valid only from the window the notice went to – the path never crosses IPC (025-FR-020) |
+| `browser-tab:contextAction` | Run an item of the page's right-click menu by `menuId` (025-FR-057) (`browserTab/popup-handlers.ts`) |
+| `browser-tab:certificate` | **Proceed anyway** or **Back to safety** on the certificate page, by `decisionId`; main enforces the 500 ms input guard too (025-FR-021) |
+| `browser-tab:clearData` | **Clear browsing data** for the sender's project, by category; answers the kinds that failed or timed out (025-FR-023) (`browserTab/page-handlers.ts`) |
+| `browser-tab:forget` | **Forget this project's browser data**: delete `.erfana/browser/`; `pending` on Windows until the next start |
+| `browser-tab:suggest` | Address-bar suggestions from the project's history for a prefix (025-FR-063) |
+| `browser-tab:pageClipboard` | No payload: whether a browser page wrote the text now on the clipboard, for the terminal's paste guard; the text never crosses IPC (025-FR-009, S-17) |
+
+Requests from a popup window's own strip renderer (window kind `browserPopup`, which may use only these three; the popup is identified by its sender, `browserTab/popup-handlers.ts`):
+
+| Channel | Purpose |
+|---------|---------|
+| `browser-tab:popupStrip` | The popup's committed address and origin for its read-only strip |
+| `browser-tab:popupAnswer` | Answer a row in the popup's strip |
+| `browser-tab:popupClose` | Close the popup |
+
+Events (main → renderer), to the owning window only:
+
+| Channel | Purpose |
+|---------|---------|
+| `browser-tab:state` | What the toolbar and editor tab show: address, title, icon (only on change), loading, history, certificate and load-error pages |
+| `browser-tab:focus` | Whether the page holds keyboard focus |
+| `browser-tab:forwardedKey` | A key main handled from page focus, handed over as a named action (ADR 0011 decision 14) |
+| `browser-tab:pick` | Pick-mode changes, the highlighted element and a confirmed capture with its still image |
+| `browser-tab:strip` | Add, update or remove a strip row; text composed by main from fixed strings and formatted origins |
+| `browser-tab:tabAdded` | A tab the page opened, created main-side under the `page` source (§ 3.4) |
+| `browser-tab:contextMenu` | Open the page's right-click menu with its items and link origin |
+| `browser-tab:notice` | A notice: `downloadDone` (toast with **Show in folder**) and `downloadFailed` (error toast), `localAddressSeen` (the empty tab's local addresses), `pageChanged`, `error`; download notices still come after their tab closed, with `tabId: null` |
+| `browser-tab:boundsApplied` | Main's answer to a `bounds` push sent with `ack`: the `seq` and whether the page is shown (native-view guard) |
+| `browser-tab:findResult` | Active match and total for find in page |
+| `browser-tab:tabClosed` | A tab main held is gone (user, page, Forget or teardown) |
+| `browser-tab:newTabCommand` | The app menu's **New browser tab**, to the focused main window only |
+| `browser-tab:popupChanged` | To a popup's own host renderer: its committed address changed, so the strip re-reads it |
+
 ### Project lock (`project-lock-handlers.ts`)
 
 | Channel | Purpose |
@@ -560,6 +624,7 @@ To keep IPC payloads consistent across processes, shared zod schemas live at `sr
 - Claude Code status schemas — the per-`terminalId` `ClaudeStatusSnapshot` contract consumed by `useClaudeStatusStore` and the register/nudge payloads (see `src/shared/ipc/claude-status-schema.ts`); channel constants in `src/shared/ipc/claude-status-channels.ts` (#216)
 - HTML preview schemas — the open/close/find/export and host-approval payloads plus the push-event shapes (see `src/shared/ipc/preview-schema.ts`), the versioned per-project allowlist contract (`src/shared/ipc/preview-settings-schema.ts`), and the `htmlPreview.enabled` global switch (`src/shared/ipc/global-settings-schema.ts`); channel constants in `src/shared/ipc/preview-channels.ts` (#74). Since #124 the same-tab navigation and resize-hold shapes live in `src/shared/ipc/preview-navigation-schema.ts` and the bridge contract in `src/shared/ipc/preview-bridge-types.ts`, because `preview-schema.ts` is at its size cap
 - Open in default browser schemas — the strict `{ filePath }` request and the `success`-discriminated response, whose failure branch carries one of the six `OPEN_IN_BROWSER_*` codes (see `src/shared/ipc/browser-schema.ts`); channel constant in `src/shared/ipc/browser-channels.ts` (#124)
+- Built-in browser schemas — every `browser-tab:` request, answer and event (spec 025): `browser-tab-schema.ts`, with parts split out by size into `browser-tab-chrome-schema.ts` (tab closed, new-tab command, **Open in system browser** answer, popup change), `browser-tab-page-schema.ts` (load-error page, **Clear browsing data**, **Forget**, page clipboard), `browser-tab-pick-schema.ts` (pick answers, capture surface, still image), `browser-tab-popup-schema.ts` (popup strip) and `browser-tab-site-schema.ts` (certificate page, sign-in box); bridge contract in `browser-tab-bridge-types.ts` and `browser-popup-bridge-types.ts`; channel constants in `src/shared/ipc/browser-tab-channels.ts`
 - System schemas – OS-integration actions with no payload, so there is nothing for Zod to validate and sender-frame gating is the sole guard. `system:openScreenRecordingSettings` opens the macOS Screen Recording privacy pane and is the **only** one of the two that is platform-gated (it no-ops off `darwin`). `system:relaunchApp` restarts the app on every platform; the macOS Screen Recording grant is merely the reason the flow exists, since macOS applies a fresh grant only to a newly-launched process. Channel constants in `src/shared/ipc/system-channels.ts`; both handlers are sender-gated main-side in `src/main/ipc/system-handlers.ts` via `isTrustedSender` (see [security.md § Sender-frame gating](./security.md#sender-frame-gating))
 
 Recommended:

@@ -8,7 +8,8 @@
  *   tabs read;
  * - `notice` of kind `localAddressSeen` → the empty tab's local addresses
  *   (025-FR-063), heard from the start so an address printed before the
- *   first browser tab opens is listed too;
+ *   first browser tab opens is listed too; `downloadDone` and
+ *   `downloadFailed` → toasts (`browserDownloadNotices.ts`, 025-FR-020);
  * - `tabAdded` → a new editor tab hosting the tab the page opened;
  * - `strip`, `findResult`, `contextMenu` → the chrome store the panels draw
  *   from (commit 18);
@@ -31,6 +32,7 @@ import { useBrowserPickStore } from '../../stores/useBrowserPickStore'
 import { showErrorToast } from '../../utils/toastHelpers'
 import type { PickEvent } from '../../../../shared/ipc/browser-tab-schema'
 import { browserTabClosedByMain } from './browserTabLifecycle'
+import { showDownloadNotice } from './browserDownloadNotices'
 import { browserStill, CONTEXT_MENU_STILL_HOLDER, PICK_STILL_HOLDER } from './browserStill'
 
 /** Mirror one pick event, and move the still image with the capture. */
@@ -82,6 +84,7 @@ export function mountBrowserTabEvents(deps: BrowserTabEventDeps): () => void {
     }),
     browserTabGateway.onNotice(event => {
       if (event.kind === 'localAddressSeen') store().addLocalAddress(event.text)
+      else showDownloadNotice(event)
     }),
     browserTabGateway.onTabAdded(event => {
       deps.openPageTab(event)

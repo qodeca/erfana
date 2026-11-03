@@ -27,6 +27,7 @@ import {
   QUAD_LENGTH
 } from './cdpPinned'
 import { isRecord, type CdpParams } from './cdpTypes'
+import { currentBrowserUserAgentOverride } from '../site/browserUserAgent'
 
 export type CdpSessionKind = 'tab' | 'popup'
 
@@ -135,7 +136,9 @@ const callFunctionOn: ParamsCheck = params => {
 /** `DOM.getDocument` depth 0 or 1 only – never -1 (ADR 0007 decision 3). */
 const shallowDepth: Pred = v => v === 0 || v === 1
 
-const userAgentOverride = shape({ userAgent: nonEmptyStr }, { acceptLanguage: str, platform: str })
+/** Exactly this process's browser identity (025-FR-024, `site/browserUserAgent.ts`): nothing else can be presented. */
+const userAgentOverride: ParamsCheck = params =>
+  jsonEqual(params, currentBrowserUserAgentOverride()) ? null : 'pinned parameters'
 
 /** Rules shared by both kinds. */
 const SHARED_RULES: Readonly<Record<string, ParamsCheck>> = {

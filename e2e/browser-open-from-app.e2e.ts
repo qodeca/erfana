@@ -25,9 +25,15 @@ const SCREENSHOT_DIR = path.join(__dirname, '..', 'test-results', 'browser-tab-u
 const WAIT_MS = 15_000
 const PREVIEW_FILE = 'site/page.html'
 
+/**
+ * Save the window for the visual check. `animations: 'disabled'` runs every
+ * finite CSS animation to its end first: a dialog that has just opened is
+ * still at the first frame of its fade-in (opacity 0), which Playwright already
+ * counts as visible, so without it the picture showed no dialog at all.
+ */
 async function shot(window: Page, name: string): Promise<void> {
   fs.mkdirSync(SCREENSHOT_DIR, { recursive: true })
-  await window.screenshot({ path: path.join(SCREENSHOT_DIR, `${name}.png`) })
+  await window.screenshot({ path: path.join(SCREENSHOT_DIR, `${name}.png`), animations: 'disabled' })
 }
 
 /** Record what `shell.openExternal` is asked to open, instead of opening it. */

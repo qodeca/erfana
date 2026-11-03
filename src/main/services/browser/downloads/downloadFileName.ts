@@ -20,6 +20,8 @@
  * - **Length.** At most {@link DOWNLOAD_NAME_MAX_CHARS}; a long name is cut in
  *   its stem, so the extension survives.
  * - An empty result is {@link DOWNLOAD_FALLBACK_NAME}.
+ *
+ * {@link isExecutableDownload} tells the save dialog to warn (S-18).
  */
 import { sanitizePageText } from '../../../../shared/browser/pageText'
 import { cutAtCodeUnits } from '../../../../shared/browser/textCut'
@@ -49,4 +51,26 @@ function cutKeepingExtension(name: string): string {
   const extension = dot > 0 && name.length - dot <= MAX_EXTENSION_CHARS ? name.slice(dot) : ''
   const stem = cutAtCodeUnits(name, DOWNLOAD_NAME_MAX_CHARS - extension.length).replace(/[\s.]+$/, '')
   return `${stem === '' ? DOWNLOAD_FALLBACK_NAME : stem}${extension}`
+}
+
+/**
+ * Extensions of files that run, install or open as a program when opened on
+ * Windows, macOS or Linux: executables, installers, scripts the OS runs on a
+ * double-click, shortcuts and disk images that carry apps (S-18).
+ */
+export const EXECUTABLE_EXTENSIONS: ReadonlySet<string> = new Set([
+  // Windows
+  'exe', 'com', 'scr', 'pif', 'cpl', 'msi', 'msix', 'msixbundle', 'msp', 'appx', 'appxbundle', 'application',
+  'bat', 'cmd', 'ps1', 'psm1', 'vbs', 'vbe', 'js', 'jse', 'wsf', 'wsh', 'hta', 'lnk', 'url', 'scf', 'reg', 'inf',
+  'dll', 'sys', 'msc', 'gadget', 'appref-ms',
+  // macOS
+  'app', 'dmg', 'pkg', 'mpkg', 'command', 'tool', 'workflow', 'terminal', 'scpt', 'applescript', 'osax',
+  // Linux and cross-platform
+  'sh', 'run', 'bin', 'appimage', 'deb', 'rpm', 'desktop', 'jar', 'py', 'pl', 'rb'
+])
+
+/** Whether `name` (already sanitised) has an extension in {@link EXECUTABLE_EXTENSIONS}, any case. */
+export function isExecutableDownload(name: string): boolean {
+  const dot = name.lastIndexOf('.')
+  return dot >= 0 && EXECUTABLE_EXTENSIONS.has(name.slice(dot + 1).toLowerCase())
 }

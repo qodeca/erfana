@@ -41,7 +41,8 @@ import {
   failureOf,
   isInsideErfanaFolder,
   type DownloadItemLike,
-  type DownloadTab
+  type DownloadTab,
+  type SaveDialogRequest
 } from './BrowserDownloads'
 
 class FakeItem extends EventEmitter implements DownloadItemLike {
@@ -100,7 +101,7 @@ let strip: TabStrip
 let stripEvents: StripEvent[]
 let notices: NoticeEvent[]
 let dialogAnswer: (defaultPath: string) => Promise<string | null>
-let showSaveDialog: Mock<(parent: unknown, defaultPath: string) => Promise<string | null>>
+let showSaveDialog: Mock<(parent: unknown, request: SaveDialogRequest) => Promise<string | null>>
 let showItemInFolder: Mock<(path: string) => void>
 let downloads: BrowserDownloads
 let tab: DownloadTab
@@ -120,7 +121,7 @@ beforeEach(() => {
   notices = []
   strip = new TabStrip({ tabId: 'browser-tab-1', clock, emit: (e) => stripEvents.push(e), newId: () => 'row1' })
   dialogAnswer = async (defaultPath) => defaultPath
-  showSaveDialog = vi.fn((_parent: unknown, defaultPath: string) => dialogAnswer(defaultPath))
+  showSaveDialog = vi.fn((_parent: unknown, request: SaveDialogRequest) => dialogAnswer(request.defaultPath))
   showItemInFolder = vi.fn<(path: string) => void>()
   let n = 0
   downloads = new BrowserDownloads({
@@ -160,7 +161,11 @@ describe('BrowserDownloads', () => {
     expect(item.savePath.startsWith(join(stagingRoot, 'erfana-download-'))).toBe(true)
     expect(item.savePath.endsWith('eviltxt.exe')).toBe(true)
     await vi.waitFor(() => expect(showSaveDialog).toHaveBeenCalled())
-    expect(showSaveDialog).toHaveBeenCalledWith(WINDOW, join(downloadsDir, 'eviltxt.exe'))
+    expect(showSaveDialog).toHaveBeenCalledWith(WINDOW, {
+      defaultPath: join(downloadsDir, 'eviltxt.exe'),
+      title: 'This file can run programs on your computer',
+      message: 'eviltxt.exe can run programs on your computer. Save it only if you trust the site it came from.'
+    })
     item.receive()
     item.end('completed')
     await vi.waitFor(() => expect(readdirSync(stagingRoot)).toEqual([]))
@@ -170,6 +175,15 @@ describe('BrowserDownloads', () => {
     ])
     expect(NoticeEventSchema.safeParse(notices[0]).success).toBe(true)
     expect(readdirSync(stagingRoot)).toEqual([])
+  })
+
+  it('025-AC-020 a file that cannot run programs gets the plain dialog, with no warning', async () => {
+    const item = new FakeItem('report.pdf')
+    start(item)
+    await vi.waitFor(() => expect(showSaveDialog).toHaveBeenCalled())
+    expect(showSaveDialog).toHaveBeenCalledWith(WINDOW, { defaultPath: join(downloadsDir, 'report.pdf') })
+    item.end('cancelled')
+    await vi.waitFor(() => expect(readdirSync(stagingRoot)).toEqual([]))
   })
 
   it('025-AC-020 Show in folder works only from the window the download was announced to', async () => {

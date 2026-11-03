@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /** The name a download is offered under (spec 025, 025-FR-020, S-18). */
 import { describe, expect, it } from 'vitest'
-import { DOWNLOAD_FALLBACK_NAME, DOWNLOAD_NAME_MAX_CHARS, sanitizeDownloadName } from './downloadFileName'
+import { DOWNLOAD_FALLBACK_NAME, DOWNLOAD_NAME_MAX_CHARS, isExecutableDownload, sanitizeDownloadName } from './downloadFileName'
 
 describe('sanitizeDownloadName', () => {
   it.each([
@@ -47,4 +47,20 @@ describe('sanitizeDownloadName', () => {
     expect(name).not.toMatch(/[\ud800-\udbff]$/)
     expect(sanitizeDownloadName(`${'a'.repeat(300)}.${'b'.repeat(30)}`)).toHaveLength(DOWNLOAD_NAME_MAX_CHARS)
   })
+})
+
+describe('isExecutableDownload (S-18)', () => {
+  it.each(['setup.exe', 'SETUP.EXE', 'install.msi', 'run.bat', 'a.ps1', 'App.dmg', 'tool.pkg', 'go.command', 'x.sh', 'x.AppImage', 'x.deb', 'lib.jar', 'eviltxt.exe'])(
+    'warns for %s',
+    (name) => {
+      expect(isExecutableDownload(name)).toBe(true)
+    }
+  )
+
+  it.each(['report.pdf', 'photo.png', 'notes.txt', 'exe', 'archive.zip', 'page.html', 'data.json', 'readme', 'file.exe.txt'])(
+    'does not warn for %s',
+    (name) => {
+      expect(isExecutableDownload(name)).toBe(false)
+    }
+  )
 })

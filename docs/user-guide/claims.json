@@ -11327,7 +11327,7 @@
       "quote": "weekly npm, GitHub Actions and Docker (the `e2e/docker` base images) updates",
       "status": "fixed",
       "evidence": "source",
-      "source": ".github/dependabot.yml:102",
+      "source": ".github/dependabot.yml:104",
       "match": "package-ecosystem: \"docker\"",
       "note": "Docker ecosystem for e2e/docker was missing"
     },
@@ -11338,7 +11338,7 @@
       "quote": "Pre-1.0 packages (`async-mutex`, the `@xterm/addon-*` packages",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/dependabot.yml:43",
+      "source": ".github/dependabot.yml:45",
       "match": "- \"async-mutex\""
     },
     {
@@ -11348,7 +11348,7 @@
       "quote": "`chokidar` (exact 5.0.0) and the other `overrides` pins",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/dependabot.yml:78",
+      "source": ".github/dependabot.yml:80",
       "match": "- dependency-name: \"chokidar\""
     },
     {
@@ -15149,7 +15149,7 @@
       "quote": "| `github_actions` | #000000 | GitHub Actions updates (applied by Dependabot) |",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/dependabot.yml:88",
+      "source": ".github/dependabot.yml:90",
       "match": "labels: [\"github_actions\"]"
     },
     {
@@ -15159,7 +15159,7 @@
       "quote": "| `docker` | #21ceff | Docker image updates (applied by Dependabot) |",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/dependabot.yml:106",
+      "source": ".github/dependabot.yml:108",
       "match": "labels: [\"docker\"]"
     },
     {
@@ -15169,7 +15169,7 @@
       "quote": "| `javascript` | #168700 | JavaScript code changes (applied by Dependabot) |",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/dependabot.yml:27",
+      "source": ".github/dependabot.yml:29",
       "match": "labels: [\"javascript\"]"
     },
     {
@@ -46525,7 +46525,7 @@
       "quote": "Dependabot ignores chokidar, so bump it by hand.",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/dependabot.yml:78",
+      "source": ".github/dependabot.yml:80",
       "match": "- dependency-name: \"chokidar\""
     },
     {
