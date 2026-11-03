@@ -1,0 +1,732 @@
+{
+  "spec_id": 26,
+  "slug": "open-preview-limits",
+  "tier": "T4",
+  "version": "0.6.0",
+  "created": "2026-11-03T22:16:16.000Z",
+  "updated": "2026-11-03T22:48:04.000Z",
+  "application": {
+    "name": "Open preview limits for agent output",
+    "domain": null,
+    "tech_stack": [
+      "Electron",
+      "React",
+      "TypeScript",
+      "Playwright"
+    ]
+  },
+  "scope": {
+    "type": "feature",
+    "name": "Open preview limits for agent output"
+  },
+  "components": {
+    "requirements": true,
+    "architecture": false,
+    "solution": false,
+    "design": false,
+    "ux": false
+  },
+  "sections": [
+    {
+      "id": "01",
+      "file": "requirements/01-overview.md",
+      "title": "Overview",
+      "exists": true,
+      "word_count": 974,
+      "last_updated": "2026-11-03T22:39:59.000Z",
+      "validation_score": null
+    },
+    {
+      "id": "02",
+      "file": "requirements/02-requirements.md",
+      "title": "Requirements",
+      "exists": true,
+      "word_count": 4498,
+      "last_updated": "2026-11-03T22:48:04.000Z",
+      "validation_score": null
+    },
+    {
+      "id": "03",
+      "file": "requirements/03-use-cases.md",
+      "title": "Use cases",
+      "exists": true,
+      "word_count": 1638,
+      "last_updated": "2026-11-03T22:48:04.000Z",
+      "validation_score": null
+    },
+    {
+      "id": "04",
+      "file": "requirements/04-acceptance.md",
+      "title": "Acceptance criteria",
+      "exists": true,
+      "word_count": 3569,
+      "last_updated": "2026-11-03T22:48:04.000Z",
+      "validation_score": null
+    },
+    {
+      "id": "05",
+      "file": "requirements/05-notes.md",
+      "title": "Notes",
+      "exists": true,
+      "word_count": 1632,
+      "last_updated": "2026-11-03T22:45:13.000Z",
+      "validation_score": null
+    }
+  ],
+  "requirements_index": {
+    "026-AC-001": {
+      "section": "04",
+      "line": 52,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-002": {
+      "section": "04",
+      "line": 64,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-003": {
+      "section": "04",
+      "line": 76,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-004": {
+      "section": "04",
+      "line": 88,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-005": {
+      "section": "04",
+      "line": 100,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-006": {
+      "section": "04",
+      "line": 112,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-007": {
+      "section": "04",
+      "line": 124,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-008": {
+      "section": "04",
+      "line": 136,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-009": {
+      "section": "04",
+      "line": 148,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-010": {
+      "section": "04",
+      "line": 160,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-011": {
+      "section": "04",
+      "line": 172,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-012": {
+      "section": "04",
+      "line": 184,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-013": {
+      "section": "04",
+      "line": 196,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-014": {
+      "section": "04",
+      "line": 208,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-015": {
+      "section": "04",
+      "line": 220,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-016": {
+      "section": "04",
+      "line": 232,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-017": {
+      "section": "04",
+      "line": 244,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-018": {
+      "section": "04",
+      "line": 256,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-019": {
+      "section": "04",
+      "line": 268,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-020": {
+      "section": "04",
+      "line": 280,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-021": {
+      "section": "04",
+      "line": 292,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-022": {
+      "section": "04",
+      "line": 304,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-023": {
+      "section": "04",
+      "line": 316,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-024": {
+      "section": "04",
+      "line": 328,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-025": {
+      "section": "04",
+      "line": 340,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-026": {
+      "section": "04",
+      "line": 352,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-027": {
+      "section": "04",
+      "line": 364,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-028": {
+      "section": "04",
+      "line": 376,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-029": {
+      "section": "04",
+      "line": 388,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-030": {
+      "section": "04",
+      "line": 400,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-031": {
+      "section": "04",
+      "line": 412,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-032": {
+      "section": "04",
+      "line": 424,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-033": {
+      "section": "04",
+      "line": 436,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-034": {
+      "section": "04",
+      "line": 448,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-035": {
+      "section": "04",
+      "line": 460,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-036": {
+      "section": "04",
+      "line": 472,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-037": {
+      "section": "04",
+      "line": 484,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-038": {
+      "section": "04",
+      "line": 497,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-AC-039": {
+      "section": "04",
+      "line": 509,
+      "status": "active",
+      "created": "2026-11-03T22:32:04.000Z"
+    },
+    "026-AC-040": {
+      "section": "04",
+      "line": 521,
+      "status": "active",
+      "created": "2026-11-03T22:36:09.000Z"
+    },
+    "026-CA-001": {
+      "section": "05",
+      "line": 7,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-CA-002": {
+      "section": "05",
+      "line": 8,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-CA-003": {
+      "section": "05",
+      "line": 9,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-CA-004": {
+      "section": "05",
+      "line": 10,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-CA-005": {
+      "section": "05",
+      "line": 72,
+      "status": "active",
+      "created": "2026-11-03T22:32:04.000Z"
+    },
+    "026-CA-006": {
+      "section": "05",
+      "line": 73,
+      "status": "active",
+      "created": "2026-11-03T22:32:04.000Z"
+    },
+    "026-CA-007": {
+      "section": "05",
+      "line": 74,
+      "status": "active",
+      "created": "2026-11-03T22:32:04.000Z"
+    },
+    "026-CA-008": {
+      "section": "05",
+      "line": 75,
+      "status": "active",
+      "created": "2026-11-03T22:32:04.000Z"
+    },
+    "026-CA-009": {
+      "section": "05",
+      "line": 76,
+      "status": "active",
+      "created": "2026-11-03T22:32:04.000Z"
+    },
+    "026-FR-001": {
+      "section": "02",
+      "line": 50,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-002": {
+      "section": "02",
+      "line": 56,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-003": {
+      "section": "02",
+      "line": 62,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-004": {
+      "section": "02",
+      "line": 78,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-005": {
+      "section": "02",
+      "line": 96,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-006": {
+      "section": "02",
+      "line": 102,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Should"
+    },
+    "026-FR-007": {
+      "section": "02",
+      "line": 108,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-008": {
+      "section": "02",
+      "line": 114,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-009": {
+      "section": "02",
+      "line": 120,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-010": {
+      "section": "02",
+      "line": 126,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-011": {
+      "section": "02",
+      "line": 132,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-012": {
+      "section": "02",
+      "line": 138,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-013": {
+      "section": "02",
+      "line": 144,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-014": {
+      "section": "02",
+      "line": 150,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-015": {
+      "section": "02",
+      "line": 156,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-016": {
+      "section": "02",
+      "line": 162,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-017": {
+      "section": "02",
+      "line": 168,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-018": {
+      "section": "02",
+      "line": 174,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-019": {
+      "section": "02",
+      "line": 180,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-020": {
+      "section": "02",
+      "line": 186,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-021": {
+      "section": "02",
+      "line": 192,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-022": {
+      "section": "02",
+      "line": 198,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-023": {
+      "section": "02",
+      "line": 204,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-024": {
+      "section": "02",
+      "line": 210,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-025": {
+      "section": "02",
+      "line": 216,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-026": {
+      "section": "02",
+      "line": 222,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-027": {
+      "section": "02",
+      "line": 228,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-028": {
+      "section": "02",
+      "line": 234,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-029": {
+      "section": "02",
+      "line": 240,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z",
+      "priority": "Must"
+    },
+    "026-FR-030": {
+      "section": "02",
+      "line": 255,
+      "status": "active",
+      "created": "2026-11-03T22:36:09.000Z",
+      "priority": "Must"
+    },
+    "026-NFR-001": {
+      "section": "02",
+      "line": 276,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-NFR-002": {
+      "section": "02",
+      "line": 288,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-NFR-003": {
+      "section": "02",
+      "line": 300,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-NFR-004": {
+      "section": "02",
+      "line": 312,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-UC-001": {
+      "section": "03",
+      "line": 18,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-UC-002": {
+      "section": "03",
+      "line": 50,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-UC-003": {
+      "section": "03",
+      "line": 87,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-UC-004": {
+      "section": "03",
+      "line": 121,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-UC-005": {
+      "section": "03",
+      "line": 151,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-UC-006": {
+      "section": "03",
+      "line": 181,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-UC-007": {
+      "section": "03",
+      "line": 212,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    },
+    "026-UC-008": {
+      "section": "03",
+      "line": 243,
+      "status": "active",
+      "created": "2026-11-03T22:16:16.000Z"
+    }
+  },
+  "requirement_sequences": {
+    "FR": 30,
+    "NFR": 4,
+    "UC": 8,
+    "AC": 40,
+    "CA": 9
+  },
+  "cross_references": [],
+  "id_migrations": [],
+  "statistics": {
+    "total_sections": 5,
+    "total_requirements": 34,
+    "total_use_cases": 8,
+    "total_stakeholders": 2,
+    "total_words": 12311,
+    "deprecated_count": 0,
+    "word_count_method": "whitespace-separated tokens per file (Python str.split()), markdown and table syntax included"
+  },
+  "validation": {
+    "overall_score": null,
+    "passed": null,
+    "last_validated": null,
+    "threshold": 80
+  },
+  "tags": [
+    "html-preview",
+    "security",
+    "sandbox",
+    "agent-output",
+    "project-tree"
+  ],
+  "related_specs": [
+    25
+  ],
+  "change_history": [
+    {
+      "date": "2026-11-03T22:16:16.000Z",
+      "operation": "INIT",
+      "target": "manifest",
+      "description": "Spec created from the 2026-11-03 grill-me review of every preview restriction (D1–D42); owner approved tier T4 and the 29 FR / 4 NFR draft.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-11-03T22:32:04.000Z",
+      "operation": "UPDATE",
+      "target": "requirements",
+      "description": "Applied spec-validator findings (owner-approved): D44 links to block-listed HTML ask Preview or Source (FR-003, FR-005, FR-012, AC-004, AC-007); D45 outside secrets-folder HTML shows the secrets message then the folder confirm (FR-005, new AC-039); D43 recorded (CA-009 reworded); FR-021 untestable sentence removed; R16 scope line narrowed; FR-016 label precedence; FR-019 label named; NFR-004 metric matched to native dialogs; FR-012/FR-014 behaviour spelled out; use-case-free FRs stated; Chromium claim marked unconfirmed; CA-005–009 indexed; registry created time aligned.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-11-03T22:36:09.000Z",
+      "operation": "UPDATE",
+      "target": "requirements",
+      "description": "Applied second spec-validator round (owner-approved): FR-021 line at 15 GiB reported memory with boundary cases (AC-024); NFR-001/AC-033 path checks in the required Unit tests job, Windows-only forms also in Windows checks, plus one manual run per platform; backslash form Windows-only (FR-004, AC-006); temp-root fixture note; FR-001 and overview: .git previews after the FR-005 message; FR-013 other types and block-listed links (AC-016); FR-005/FR-008 default button, Cancel and Escape; FR-008 not-found toast (AC-011); FR-029 split, new FR-030 + AC-040; UC-006 A2/A3, UC-003 traces; FR-026 no-migration note + extend-mode case (AC-029); permission band defined; NFR-002 wording; D1–D45; acceptance list put in ID order.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-11-03T22:39:59.000Z",
+      "operation": "UPDATE",
+      "target": "requirements",
+      "description": "Applied third spec-validator round (owner-approved, all 11): FR-030/AC-040 keep valid block-list promises; UC-007 error flows E1–E3; AC-006 malformed-path cases; AC-027 SVG frame and live-limit cases; AC-010 two-window step; FR-001 exception wording; FR trace column and Traces-to lines rebuilt from the use cases; overview scope names other outside files; AC-032 document matrix; AC-024 real hardware as manual spot check; UC-006 priority Medium.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-11-03T22:45:13.000Z",
+      "operation": "UPDATE",
+      "target": "requirements",
+      "description": "Applied fourth spec-validator round (owner-approved, all 14): FR-007/AC-009 ~/ and relative paths; FR-029 holds the document matrix, AC-032 points to it; FR-008 wide-folder wording; FR-016 label for un-normalisable paths; FR-003 block list matched relative to the serving root, FR-005 on the full path (AC-005 case); FR-006/AC-008 UDP, TCP and TLS; FR-026 extend and replace modes; FR-028 only node_modules/.git watchers stop, notice content (AC-031); FR-030 searched places, history exclusions, minimum terms (AC-040); FR-010/AC-013 named folders and moments, logs excluded; D18/D35 wording; FR-001 duplicate sentence removed; AC-022 scheme-only check; NFR-002 end event.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-11-03T22:48:04.000Z",
+      "operation": "UPDATE",
+      "target": "requirements",
+      "description": "Applied fifth spec-validator round (owner-approved, all 10; owner chose no sixth round): FR-004 case-insensitive match on every platform and volume, NTFS streams Windows-only, decode once and refuse leftover % escapes (AC-006, AC-033); UC-005 platform qualifiers; FR-012 block-listed links excluded from the no-message clause; FR-001 wording; FR-005 counts the file name (.env.html, AC-007); FR-006 shall; AC-008 9 combinations; AC-040 per-hit verdict list confirmed by a second person. Rounds 1–5 all passed from round 2 on; this version was not re-checked.",
+      "by": "claude-code"
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 {
   "sequence": {
-    "current": 25,
-    "next": 26
+    "current": 26,
+    "next": 27
   },
   "registry": [
     {
@@ -430,12 +430,37 @@
         "e2e_test_designs": [],
         "issues": []
       }
+    },
+    {
+      "id": 26,
+      "tier": "T4",
+      "slug": "open-preview-limits",
+      "name": "Open preview limits for agent output",
+      "status": "active",
+      "scope": "feature",
+      "description": "Opens the previews to agent output: every project .html previews (dot, gitignored, build folders, .git), pages read all project files except a secret block list hardened against known bypasses, outside HTML (scratchpad, worktrees) previews after an in-memory per-folder confirm with its own in-memory web allowlist, outside Markdown and images open directly, web frames via the allowlist, WebRTC blocked (Should), 10/5 live previews by memory, on/off setting removed, live SVG, and the #254 tree and watcher changes; one release, independent security review.",
+      "created": "2026-11-03T22:16:16.000Z",
+      "path": "spec-t4-026-open-preview-limits",
+      "last_modified": "2026-11-03T22:48:04.000Z",
+      "sections_count": 5,
+      "requirements_count": 34,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "ux": [],
+        "e2e_test_designs": [],
+        "issues": [
+          "#254"
+        ]
+      }
     }
   ],
   "metadata": {
     "schema_version": "3.0.0",
     "created": "2025-12-22T00:00:00.000Z",
-    "last_updated": "2026-11-01T18:24:20.000Z",
-    "version": 28
+    "last_updated": "2026-11-03T22:48:04.000Z",
+    "version": 35
   }
 }
