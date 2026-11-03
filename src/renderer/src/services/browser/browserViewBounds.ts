@@ -22,8 +22,8 @@
  * ONE SEQUENCE. Every push takes the next number of one counter, so the newest
  * push wins in main whichever writer sent it (main drops `seq` ≤ the last
  * applied). Guard pushes ask for an `ack`, so main's confirmation can end the
- * splitter hold; until main answers acks, {@link BrowserViewBounds.reportApplied}
- * has no production caller (see the commit 16 report).
+ * splitter hold. The production instance hears main's answers
+ * (`browser-tab:boundsApplied`) while a tab is registered and someone listens.
  *
  * Pure: the sender is injected. {@link browserViewBounds} is the production
  * instance, wired to `browserTabGateway.setBounds`.
@@ -85,6 +85,8 @@ interface ViewEntry {
  * Builds a bounds owner around a sender.
  *
  * @param send - Delivers one `browser-tab:bounds` push to main
+ * @param subscribeApplied - Hears main's `ack` answers; subscribed while
+ *   {@link BrowserViewBounds.onVisibilityApplied} has a listener
  * @returns The bounds owner
  *
  * @example
@@ -95,10 +97,27 @@ interface ViewEntry {
  * views.setVisibility('browser-tab-1', true) // → { visible: true, seq: 0, … }
  * ```
  */
-export function createBrowserViewBounds(send: (request: BoundsRequest) => void): BrowserViewBounds {
+export function createBrowserViewBounds(
+  send: (request: BoundsRequest) => void,
+  subscribeApplied?: (report: (tabId: string, visible: boolean) => void) => () => void
+): BrowserViewBounds {
+  let upstream: (() => void) | undefined
   const entries = new Map<string, ViewEntry>()
   const listeners = new Set<() => void>()
   const appliedListeners = new Set<(tabId: string, visible: boolean) => void>()
+  /** Hear main's answers only while a tab is registered and someone listens. */
+  const syncUpstream = (): void => {
+    const wanted = subscribeApplied !== undefined && entries.size > 0 && appliedListeners.size > 0
+    if (wanted && upstream === undefined) upstream = subscribeApplied(reportApplied)
+    if (!wanted && upstream !== undefined) {
+      upstream()
+      upstream = undefined
+    }
+  }
+  const reportApplied = (tabId: string, visible: boolean): void => {
+    if (!entries.has(tabId)) return
+    for (const listener of [...appliedListeners]) listener(tabId, visible)
+  }
   let nextSeq = 0
 
   const notify = (): void => {
@@ -123,11 +142,13 @@ export function createBrowserViewBounds(send: (request: BoundsRequest) => void):
       // A re-host under a new panel keeps the placement and the guard's wish
       // out: the new panel measures afresh and the guard decides afresh.
       entries.set(tabId, { panelId, placement: null, wanted: false })
+      syncUpstream()
       notify()
     },
 
     unregister: (tabId) => {
       if (!entries.delete(tabId)) return
+      syncUpstream()
       notify()
     },
 
@@ -161,21 +182,21 @@ export function createBrowserViewBounds(send: (request: BoundsRequest) => void):
       }
     },
 
-    reportApplied: (tabId, visible) => {
-      if (!entries.has(tabId)) return
-      for (const listener of [...appliedListeners]) listener(tabId, visible)
-    },
+    reportApplied,
 
     onVisibilityApplied: (listener) => {
       appliedListeners.add(listener)
+      syncUpstream()
       return () => {
         appliedListeners.delete(listener)
+        syncUpstream()
       }
     }
   }
 }
 
 /** The production bounds owner, sending through the browser tab gateway. */
-export const browserViewBounds: BrowserViewBounds = createBrowserViewBounds((request) =>
-  browserTabGateway.setBounds(request)
+export const browserViewBounds: BrowserViewBounds = createBrowserViewBounds(
+  (request) => browserTabGateway.setBounds(request),
+  (report) => browserTabGateway.onBoundsApplied((event) => report(event.tabId, event.visible))
 )

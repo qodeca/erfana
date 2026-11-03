@@ -288,6 +288,15 @@ describe('applyBounds (025-FR-007)', () => {
     expect(host.addChildView).toHaveBeenCalledTimes(1)
   })
 
+  it('answers what it did: shown, hidden, or null for a dropped push (the ack answer)', () => {
+    expect(tab.applyBounds(RECT, 1, true)).toBe(true)
+    expect(tab.applyBounds(RECT, 1, false)).toBeNull()
+    expect(tab.applyBounds(RECT, 2, false)).toBe(false)
+    expect(tab.applyBounds({ x: 5000, y: 0, width: 10, height: 10 }, 3, true)).toBe(false)
+    host.destroy()
+    expect(tab.applyBounds(RECT, 4, true)).toBeNull()
+  })
+
   it('focuses the page only while it is shown', () => {
     tab.focusPage()
     expect(contents.focus).not.toHaveBeenCalled()

@@ -26,5 +26,10 @@ export const browserTabGateway: BrowserTabBridge = {
   focusPage: (...args) => bridge().focusPage(...args),
   devTools: (...args) => bridge().devTools(...args),
   onState: (...args) => bridge().onState(...args),
-  onTabAdded: (...args) => bridge().onTabAdded(...args)
+  onTabAdded: (...args) => bridge().onTabAdded(...args),
+  answerStrip: (...args) => bridge().answerStrip(...args),
+  showDownload: (...args) => bridge().showDownload(...args),
+  onStrip: (...args) => bridge().onStrip(...args),
+  onNotice: (...args) => bridge().onNotice(...args),
+  onBoundsApplied: (...args) => bridge().onBoundsApplied(...args)
 }

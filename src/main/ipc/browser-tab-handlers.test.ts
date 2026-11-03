@@ -24,7 +24,7 @@ const host = { id: 3, isDestroyed: () => false }
 const tab = {
   navigate: vi.fn(() => ({ ok: true })),
   history: vi.fn(),
-  applyBounds: vi.fn(),
+  applyBounds: vi.fn((): boolean | null => true),
   focusPage: vi.fn(),
   devTools: vi.fn()
 }
@@ -37,7 +37,7 @@ const service = {
 }
 let trusted = true
 let windowFor: typeof host | null = host
-const EVENT = {} as never
+const EVENT = { sender: { send: vi.fn(), isDestroyed: () => false } } as never
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -135,6 +135,39 @@ describe('registerBrowserTabHandlers', () => {
       throw new Error('boom')
     })
     expect(invoke('browser-tab:navigate', { tabId: TAB, input: 'a.test', source: 'address' })).toEqual({ error: 'The address could not be opened' })
+  })
+
+  it('answers a bounds push that asks for an ack with boundsApplied, to the sender only', () => {
+    const rect = { x: 0, y: 0, width: 10, height: 10 }
+    const sender = { send: vi.fn(), isDestroyed: () => false }
+    const event = { sender } as never
+    const push = (seq: number, ack: boolean): void => {
+      ons.get('browser-tab:bounds')!(event, { tabId: TAB, bounds: rect, seq, ack, visible: true, clip: rect })
+    }
+
+    tab.applyBounds.mockReturnValueOnce(true)
+    push(5, true)
+    expect(sender.send).toHaveBeenCalledExactlyOnceWith('browser-tab:boundsApplied', { tabId: TAB, seq: 5, visible: true })
+
+    tab.applyBounds.mockReturnValueOnce(true)
+    push(6, false)
+    tab.applyBounds.mockReturnValueOnce(null)
+    push(7, true)
+    expect(sender.send).toHaveBeenCalledTimes(1)
+  })
+
+  it('sends no ack to a sender that is gone, and none when the tab throws', () => {
+    const rect = { x: 0, y: 0, width: 10, height: 10 }
+    const sender = { send: vi.fn(), isDestroyed: () => true }
+    tab.applyBounds.mockReturnValueOnce(false)
+    ons.get('browser-tab:bounds')!({ sender } as never, { tabId: TAB, bounds: rect, seq: 8, ack: true, visible: false, clip: rect })
+    const live = { send: vi.fn(), isDestroyed: () => false }
+    tab.applyBounds.mockImplementationOnce(() => {
+      throw new Error('boom')
+    })
+    ons.get('browser-tab:bounds')!({ sender: live } as never, { tabId: TAB, bounds: rect, seq: 9, ack: true, visible: true, clip: rect })
+    expect(sender.send).not.toHaveBeenCalled()
+    expect(live.send).not.toHaveBeenCalled()
   })
 
   it('drops a malformed bounds push', () => {

@@ -23,5 +23,10 @@ export const browserTabBridge: BrowserTabBridge = {
   devTools: (tabId, inspectAt) =>
     ipcRenderer.invoke(C.devTools, inspectAt === undefined ? { tabId } : { tabId, inspectAt }),
   onState: (callback) => subscribe(BROWSER_TAB_EVENTS.state, callback),
-  onTabAdded: (callback) => subscribe(BROWSER_TAB_EVENTS.tabAdded, callback)
+  onTabAdded: (callback) => subscribe(BROWSER_TAB_EVENTS.tabAdded, callback),
+  answerStrip: (request) => ipcRenderer.invoke(C.answerStrip, request),
+  showDownload: (downloadId) => ipcRenderer.invoke(C.showDownload, { downloadId }),
+  onStrip: (callback) => subscribe(BROWSER_TAB_EVENTS.strip, callback),
+  onNotice: (callback) => subscribe(BROWSER_TAB_EVENTS.notice, callback),
+  onBoundsApplied: (callback) => subscribe(BROWSER_TAB_EVENTS.boundsApplied, callback)
 }

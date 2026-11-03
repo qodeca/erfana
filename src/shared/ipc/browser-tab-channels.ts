@@ -73,6 +73,8 @@ export const BROWSER_TAB_EVENTS = {
   tabAdded: 'browser-tab:tabAdded',
   contextMenu: 'browser-tab:contextMenu',
   notice: 'browser-tab:notice',
+  /** Main's answer to a `bounds` push that asked for an `ack`: what it did with the view (commit 16). */
+  boundsApplied: 'browser-tab:boundsApplied',
   findResult: 'browser-tab:findResult'
 } as const
 

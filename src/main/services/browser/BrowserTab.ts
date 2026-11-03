@@ -180,17 +180,20 @@ export class BrowserTab {
    * Place or hide the page (the renderer's `bounds` push). A push older than
    * the last applied one is dropped. Hidden – or a rectangle that clamps to
    * nothing – detaches the view: the page keeps running, unseen (025-FR-007).
+   *
+   * @returns whether the page is shown after the push, or null when the push
+   *   was dropped (stale, closed tab, gone window) – the `ack` answer
    */
-  applyBounds(bounds: RectLike, seq: number, visible: boolean): void {
-    if (this.closed || seq <= this.lastBoundsSeq) return
+  applyBounds(bounds: RectLike, seq: number, visible: boolean): boolean | null {
+    if (this.closed || seq <= this.lastBoundsSeq) return null
     this.lastBoundsSeq = seq
     const host = this.deps.host
-    if (host.isDestroyed()) return
+    if (host.isDestroyed()) return null
     const content = host.getContentBounds()
     const dip = visible ? clampAndZoomBounds(bounds, content, host.webContents.getZoomFactor()) : null
     if (dip === null) {
       this.detach()
-      return
+      return false
     }
     this.deps.view.setBounds(dip)
     if (!this.attached) {
@@ -198,8 +201,7 @@ export class BrowserTab {
       this.attached = true
       this.cdp?.setVisible(true)
     }
-    // TODO(spec 025 commit 16): answer `ack` once the native-view guard needs
-    // the repaint confirmation (`previewLiveBounds.confirmRepaint`'s pattern).
+    return true
   }
 
   /** Move keyboard focus into the page; only a shown page can take it. */

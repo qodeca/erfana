@@ -16,7 +16,8 @@ import {
   CreateRequestSchema,
   DevToolsRequestSchema,
   FocusPageRequestSchema,
-  HistoryRequestSchema
+  HistoryRequestSchema,
+  ShowDownloadRequestSchema
 } from '../shared/ipc/browser-tab-schema'
 import { browserTabBridge } from './browserTabBridge'
 
@@ -84,6 +85,19 @@ describe('browserTabBridge requests', () => {
     expect(DevToolsRequestSchema.safeParse(inspect).success).toBe(true)
   })
 
+  it('sends strip answers and Show in folder on their own channels', async () => {
+    const answer = { tabId: TAB, requestId: 'row-1', answer: 'allow' } as unknown as Parameters<
+      typeof browserTabBridge.answerStrip
+    >[0]
+    await browserTabBridge.answerStrip(answer)
+    await browserTabBridge.showDownload('dl-1')
+    expect(ipc.invoke.mock.calls).toEqual([
+      [C.answerStrip, answer],
+      [C.showDownload, { downloadId: 'dl-1' }]
+    ])
+    expect(ShowDownloadRequestSchema.safeParse({ downloadId: 'dl-1' }).success).toBe(true)
+  })
+
   it('passes a navigate request through unchanged', async () => {
     const request = { tabId: TAB, input: 'example.test', source: 'address' } as unknown as Parameters<
       typeof browserTabBridge.navigate
@@ -103,7 +117,10 @@ describe('browserTabBridge requests', () => {
 describe('browserTabBridge events', () => {
   it.each([
     ['onState', E.state],
-    ['onTabAdded', E.tabAdded]
+    ['onTabAdded', E.tabAdded],
+    ['onStrip', E.strip],
+    ['onNotice', E.notice],
+    ['onBoundsApplied', E.boundsApplied]
   ] as const)('%s delivers events until unsubscribed', (member, channel) => {
     const callback = vi.fn()
     const unsubscribe = browserTabBridge[member](callback)

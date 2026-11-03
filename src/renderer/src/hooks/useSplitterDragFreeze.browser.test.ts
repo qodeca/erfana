@@ -73,7 +73,7 @@ beforeEach(() => {
     configurable: true,
     value: {
       preview: { setVisibility: vi.fn(), onVisibilityApplied: () => () => {} },
-      browserTab: { setBounds }
+      browserTab: { setBounds, onBoundsApplied: () => () => undefined }
     }
   })
   sash = document.createElement('div')

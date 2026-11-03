@@ -174,6 +174,49 @@ describe('browserViewBounds – applied reports', () => {
   })
 })
 
+describe('browserViewBounds – main’s ack answers', () => {
+  it('hears main only while a tab is registered and someone listens, and passes the answers on', () => {
+    let report: ((tabId: string, visible: boolean) => void) | undefined
+    const stop = vi.fn()
+    const subscribeApplied = vi.fn((r: (tabId: string, visible: boolean) => void) => {
+      report = r
+      return stop
+    })
+    const views = createBrowserViewBounds(() => undefined, subscribeApplied)
+    views.register(TAB, 'browser-panel-1')
+    expect(subscribeApplied).not.toHaveBeenCalled()
+
+    const first = vi.fn()
+    const second = vi.fn()
+    const offFirst = views.onVisibilityApplied(first)
+    const offSecond = views.onVisibilityApplied(second)
+    expect(subscribeApplied).toHaveBeenCalledTimes(1)
+    report?.(TAB, true)
+    expect(first).toHaveBeenCalledWith(TAB, true)
+    expect(second).toHaveBeenCalledWith(TAB, true)
+
+    offFirst()
+    expect(stop).not.toHaveBeenCalled()
+    offSecond()
+    expect(stop).toHaveBeenCalledTimes(1)
+    const offThird = views.onVisibilityApplied(vi.fn())
+    expect(subscribeApplied).toHaveBeenCalledTimes(2)
+    views.unregister(TAB)
+    expect(stop).toHaveBeenCalledTimes(2)
+    offThird()
+    expect(subscribeApplied).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not hear main while no tab is registered, even with a listener', () => {
+    const subscribeApplied = vi.fn(() => () => undefined)
+    const views = createBrowserViewBounds(() => undefined, subscribeApplied)
+    views.onVisibilityApplied(vi.fn())
+    expect(subscribeApplied).not.toHaveBeenCalled()
+    views.register(TAB, 'browser-panel-1')
+    expect(subscribeApplied).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('browserViewBounds – production instance', () => {
   afterEach(() => {
     browserViewBounds.unregister(TAB)

@@ -477,6 +477,10 @@ export const NoticeEventSchema = z
       .optional()
   })
   .strict()
+/** `boundsApplied`: the applied push's `seq` and whether the page is now shown. */
+export const BoundsAppliedEventSchema = z
+  .object({ tabId: BrowserTabIdSchema, seq: z.number().int().nonnegative(), visible: z.boolean() })
+  .strict()
 export const FindResultEventSchema = z
   .object({ tabId: BrowserTabIdSchema, active: count, total: count })
   .strict()
@@ -488,4 +492,5 @@ export type PickEvent = z.infer<typeof PickEventSchema>
 export type StripEvent = z.infer<typeof StripEventSchema>
 export type StripRow = z.infer<typeof StripRowSchema>
 export type NoticeEvent = z.infer<typeof NoticeEventSchema>
+export type BoundsAppliedEvent = z.infer<typeof BoundsAppliedEventSchema>
 export type SitePermission = z.infer<typeof SitePermissionSchema>

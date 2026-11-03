@@ -17,9 +17,10 @@
  */
 import { BrowserWindow, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
 import { classifyAddressInput } from '../../shared/browser/addressInput'
-import { BROWSER_TAB_CHANNELS } from '../../shared/ipc/browser-tab-channels'
+import { BROWSER_TAB_CHANNELS, BROWSER_TAB_EVENTS } from '../../shared/ipc/browser-tab-channels'
 import {
   AnswerStripRequestSchema,
+  BoundsAppliedEventSchema,
   BoundsRequestSchema,
   CloseRequestSchema,
   CreateRequestSchema,
@@ -152,8 +153,12 @@ export function registerBrowserTabHandlers(deps: BrowserTabHandlerDeps): () => v
   const onBounds = (event: IpcMainEvent, arg: unknown): void => {
     const target = acceptTab(C.bounds, event, BoundsRequestSchema, arg)
     if (target === null) return
-    const { bounds, seq, visible } = target.data
-    guarded(C.bounds, undefined, () => target.tab.applyBounds(bounds, seq, visible))
+    const { tabId, bounds, seq, visible, ack } = target.data
+    const shown = guarded(C.bounds, null, () => target.tab.applyBounds(bounds, seq, visible))
+    // The answer goes to the sender, which acceptTab checked owns the tab
+    if (ack && shown !== null && !event.sender.isDestroyed()) {
+      event.sender.send(BROWSER_TAB_EVENTS.boundsApplied, BoundsAppliedEventSchema.parse({ tabId, seq, visible: shown }))
+    }
   }
   registerOn(C.bounds, onBounds)
 

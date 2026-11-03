@@ -11,12 +11,16 @@
  */
 import type { z } from 'zod'
 import type {
+  AnswerStripRequest,
+  BoundsAppliedEvent,
   BoundsRequest,
   CreateResponse,
   DevToolsRequestSchema,
   HistoryRequestSchema,
   NavigateRequest,
   NavigateResponse,
+  NoticeEvent,
+  StripEvent,
   TabAddedEventSchema,
   TabStateEvent
 } from './browser-tab-schema'
@@ -40,4 +44,12 @@ export interface BrowserTabBridge {
   devTools(tabId: string, inspectAt?: DevToolsInspectPoint): Promise<void>
   onState(callback: (state: TabStateEvent) => void): () => void
   onTabAdded(callback: (event: TabAddedEvent) => void): () => void
+  /** Answer a strip row (permission prompt, several-downloads prompt) – 025-FR-019, 025-FR-020. */
+  answerStrip(request: AnswerStripRequest): Promise<void>
+  /** **Show in folder** for a finished download, by the id its notice carried. */
+  showDownload(downloadId: string): Promise<void>
+  onStrip(callback: (event: StripEvent) => void): () => void
+  onNotice(callback: (event: NoticeEvent) => void): () => void
+  /** Main's answer to a `setBounds` push sent with `ack: true` (the native-view guard). */
+  onBoundsApplied(callback: (event: BoundsAppliedEvent) => void): () => void
 }

@@ -189,7 +189,7 @@ describe('native-view guard – production wiring of browser views', () => {
       configurable: true,
       value: {
         preview: { setVisibility: vi.fn(), onVisibilityApplied: () => () => {} },
-        browserTab: { setBounds }
+        browserTab: { setBounds, onBoundsApplied: () => () => undefined }
       }
     })
     useOverlayOccluderStore.getState().reset()

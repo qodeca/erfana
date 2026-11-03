@@ -234,7 +234,12 @@ const BROWSER_TAB_METHODS: Record<keyof BrowserTabBridge, true> = {
   focusPage: true,
   devTools: true,
   onState: true,
-  onTabAdded: true
+  onTabAdded: true,
+  answerStrip: true,
+  showDownload: true,
+  onStrip: true,
+  onNotice: true,
+  onBoundsApplied: true
 }
 const MARKDOWN_IMAGE_METHODS: Record<keyof MarkdownImageBridge, true> = { read: true }
 

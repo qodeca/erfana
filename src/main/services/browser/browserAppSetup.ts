@@ -14,11 +14,16 @@
  * last run. A closing window's tabs close through {@link closeBrowserWindow},
  * called where the window's previews are torn down.
  */
-import { homedir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { is } from '@electron-toolkit/utils'
 import {
+  app,
+  BrowserWindow,
+  dialog,
   safeStorage,
   session as electronSession,
+  shell,
+  webContents as electronWebContents,
   WebContentsView,
   type App,
   type Session,
@@ -49,6 +54,7 @@ import type { AppAddresses } from './browserNavigationPolicy'
 import { BrowserTabService } from './BrowserTabService'
 import type { BrowserTabCdpLink } from './BrowserTab'
 import { BrowserCdpSession } from './cdp/BrowserCdpSession'
+import { BrowserSite } from './permissions/BrowserSite'
 
 /**
  * Chromium's per-disk-cache maximum: 512 MB (025-FR-015; ADR 0009 decision 9).
@@ -139,13 +145,14 @@ export function getBrowserRuntime(): BrowserRuntime | null {
 /** Run once, after `app.whenReady()`. */
 export function installBrowserAfterReady(deps: BrowserAfterReadyDeps): BrowserRuntime {
   refuseLocalScheme(deps.defaultSession)
+  const site = createBrowserSite()
   const profiles = new BrowserProfileService({
     projectSession: deps.projectSession,
     lockService: deps.lockService,
     fromPath: (path) => electronSession.fromPath(path),
     registerSession: (ses) => browserSessionRegistry.registerSession(ses),
     hardenSession: (ses) =>
-      hardenBrowserSession(ses as Session, { platform: process.platform, chromeVersion: process.versions.chrome }),
+      hardenBrowserSession(ses as Session, { platform: process.platform, chromeVersion: process.versions.chrome, site }),
     signer: lockHmacSigner,
     keyringCrypto: safeStorage,
     storageBackend: () => storageBackendFor(process.platform, () => safeStorage.getSelectedStorageBackend()),
@@ -164,7 +171,8 @@ export function installBrowserAfterReady(deps: BrowserAfterReadyDeps): BrowserRu
     expectDevTools: (ses) => browserSessionRegistry.expectDevTools(ses),
     appAddresses: () => appAddresses,
     resolveDomain: pinnedRegistrableDomain,
-    attachCdp: attachTabCdp
+    attachCdp: attachTabCdp,
+    site
   })
   ;(deps.registerTabHandlers ?? registerBrowserTabHandlers)({ service: tabs })
   const teardown = new BrowserProjectTeardown()
@@ -175,6 +183,34 @@ export function installBrowserAfterReady(deps: BrowserAfterReadyDeps): BrowserRu
   })
   runtime = { profiles, teardown, tabs, appAddresses }
   return runtime
+}
+
+/**
+ * The process-wide site hooks (commits 12a–b): permission prompts, screen
+ * sharing and downloads of every browser session, routed to the owning tab.
+ * The screen source chooser joins with the UI (commit 18); until then screen
+ * sharing is refused.
+ */
+function createBrowserSite(): BrowserSite {
+  return new BrowserSite({
+    clock: mainClock,
+    signer: lockHmacSigner,
+    resolveDomain: pinnedRegistrableDomain,
+    fromFrame: (frame) => electronWebContents.fromFrame(frame),
+    downloads: {
+      downloadsDir: () => app.getPath('downloads'),
+      stagingRoot: () => tmpdir(),
+      showSaveDialog: async (parent, defaultPath) => {
+        const options = { defaultPath }
+        const result =
+          parent instanceof BrowserWindow
+            ? await dialog.showSaveDialog(parent, options)
+            : await dialog.showSaveDialog(options)
+        return result.canceled ? null : (result.filePath ?? null)
+      },
+      showItemInFolder: (path) => shell.showItemInFolder(path)
+    }
+  })
 }
 
 /**
