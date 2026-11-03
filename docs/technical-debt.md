@@ -1126,6 +1126,12 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 - `CERTIFICATE_VERIFY_PROC_JS_CHECK`, `CERTIFICATE_ERROR_EVENT_JS_CHECK`, `DANGEROUS_FUNCTIONS_JS_CHECK` (`insertCSS`): test hooks only (`src/main/testHooks/`), compiled out of production builds (`npm run check:no-test-hooks`).
 - `CSP_GLOBAL_CHECK` (low): `style-src 'unsafe-inline'` in the app and image-export entries is pre-existing; the local-file server's sandbox CSP is a constant the scanner cannot parse (`LOCAL_SANDBOX_POLICY` in `localResponsePolicy.ts`).
 
+**Re-run 2026-11-03** (after the browser UI, commit b95ca4fc): 1 high, 26 medium, 3 low. The high finding is the same `ImageRasterizeWindow.ts` false positive above. The new medium findings, all reviewed with no change:
+
+- `AUXCLICK_JS_CHECK` and `PRELOAD_JS_CHECK` on the popup host window (`src/main/services/browser/popups/popupWindowElectron.ts`): the host window loads only Erfana's own popup strip page, with `sandbox`, `contextIsolation` and `webSecurity` on, `nodeIntegration` off, and a bundled local preload (`browserPopup.js`, which exposes `browserPopupApi` only). The site's page runs in a separate `WebContentsView` with the browser tab's `browserWebPreferences.ts` and no preload; middle-click opens go through the window-open handler (`popups/TabWindowOpen.ts`).
+- `DANGEROUS_FUNCTIONS_JS_CHECK` in `src/main/services/browser/pick/pickModeSwitch.ts`: `insertCSS` with the constant `CROSSHAIR_CSS` at the user origin; no page or user text reaches it.
+- `OPEN_EXTERNAL_JS_CHECK` in the renderer (`services/browserTabGateway.ts`, `components/Panels/BrowserPanel/browserDataActions.ts`) and the preload test: these call the browser tab bridge's `openExternal`, whose main handler checks the sender and allows only `http` and `https` before `openExternalSafe` (`src/main/ipc/browser-tab-handlers.ts`). `components/Panels/TerminalPanel/terminalLinks.ts` (Ctrl/Cmd-click on a terminal link) uses the existing `shell.openExternal` bridge and its `shell:openExternal` handler.
+
 **Re-run**: at every release that touches windows, sessions or `webPreferences`.
 
 ### 68. Browser URLs are logged in full, an exception to `redactUserInput` (spec 025, 025-FR-042, 2026-11)
