@@ -13,7 +13,7 @@
     "src/main/services/PdfService.ts": 891,
     "src/main/services/ProjectLockService.ts": 906,
     "src/main/services/ProjectService.ts": 685,
-    "src/main/services/TerminalService.ts": 1434,
+    "src/main/services/TerminalService.ts": 1433,
     "src/main/services/WhisperModelManager.ts": 1114,
     "src/main/services/claudeStatus/ClaudeStatusService.ts": 724,
     "src/main/services/claudeStatus/modelId.ts": 619,

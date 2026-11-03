@@ -188,6 +188,34 @@ describe('BrowserPicks', () => {
       expect((await readdir(path.join(root, ...CAPTURES_REL.split('/')))).length).toBe(3)
     })
 
+    it('guards with the send-time foreground read, which may wait for a Windows snapshot (design Q8)', async () => {
+      const s = setup({
+        terminals: { ...terminals('agent'), getForeground: () => ({ kind: 'unknown', fresh: false }), getForegroundAtSend: async () => ({ kind: 'program', name: 'pwsh.exe' }) }
+      })
+      const id = await held(s)
+      expect(await s.picks.writeCapture(s.tab, s.pick, OWNER, { captureId: id, terminalId: 'terminal-1' })).toEqual({ guard: { kind: 'shell', process: 'pwsh' } })
+      expect(await readdir(root)).toEqual([])
+    })
+
+    it('writes nothing when the capture went while the send-time read waited', async () => {
+      let pick: BrowserTabPick | null = null
+      const s = setup({
+        terminals: {
+          ...terminals('agent'),
+          getForegroundAtSend: async () => {
+            pick?.dispose() // the tab closed meanwhile
+            return { kind: 'program', name: 'claude' }
+          }
+        }
+      })
+      pick = s.pick
+      const id = await held(s)
+      expect(await s.picks.writeCapture(s.tab, s.pick, OWNER, { captureId: id, terminalId: 'terminal-1' })).toEqual({
+        error: 'The capture is no longer held – pick the element again'
+      })
+      expect(await readdir(root)).toEqual([])
+    })
+
     it('answers an error for a capture no longer held', async () => {
       const s = setup()
       expect(await s.picks.writeCapture(s.tab, s.pick, OWNER, { captureId: 'x'.repeat(32), terminalId: 'terminal-1' })).toEqual({

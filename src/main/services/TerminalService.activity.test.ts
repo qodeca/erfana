@@ -134,6 +134,46 @@ describe('TerminalService owner and activity', () => {
     })
   })
 
+  // The Windows read goes through the shared process snapshot, covered with an
+  // injected snapshot in terminalForegroundRead.test.ts; it is not driven from
+  // here, where it would start a real PowerShell on a Windows runner.
+  describe('getForeground (025-FR-061)', () => {
+    it('reads null for an unknown terminal', async () => {
+      const service = await loadService()
+      expect(service.getForeground('terminal-999')).toBeNull()
+      await expect(service.getForegroundAtSend('terminal-999')).resolves.toBeNull()
+    })
+
+    it('reads the shell, and after typed input the program in front by name', async () => {
+      const service = await loadService()
+      const id = await createTerminal(service, 1)
+      expect(service.getForeground(id)).toEqual({ kind: 'shell', name: 'zsh' })
+      service.write(id, 'claude\r')
+      spawned[0].process = 'claude'
+      expect(service.getForeground(id)).toEqual({ kind: 'program', name: 'claude' })
+      await expect(service.getForegroundAtSend(id)).resolves.toEqual({ kind: 'program', name: 'claude' })
+    })
+
+    it('reads a start-up helper in front of a new terminal as the shell until the first typed input', async () => {
+      const service = await loadService()
+      const id = await createTerminal(service, 1)
+      spawned[0].process = 'path_helper'
+      expect(service.getForeground(id)).toEqual({ kind: 'shell', name: 'zsh' })
+      // xterm's own reply to a terminal query is not typed input
+      service.write(id, '\x1b[?1;2c')
+      expect(service.getForeground(id)).toEqual({ kind: 'shell', name: 'zsh' })
+      service.write(id, 'x')
+      expect(service.getForeground(id)).toEqual({ kind: 'program', name: 'path_helper' })
+    })
+
+    it('reads unknown when the pty names nothing', async () => {
+      const service = await loadService()
+      const id = await createTerminal(service, 1)
+      spawned[0].process = undefined
+      expect(service.getForeground(id)).toEqual({ kind: 'unknown', fresh: true })
+    })
+  })
+
   describe('events name their owner', () => {
     it('carries the owner on data, exit and clear', async () => {
       const service = await loadService()

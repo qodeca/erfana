@@ -7,6 +7,7 @@ import {
   normaliseExecutable,
   SHELL_NAMES,
   targetStatus,
+  targetStatusAtSend,
   targetStatusResponse,
   type TargetTerminals
 } from './BrowserTargetStatus'
@@ -41,15 +42,70 @@ describe('BrowserTargetStatus', () => {
   })
 
   it('uses the foreground name when the service gives one', () => {
-    expect(targetStatus(terminals({ foregroundName: () => '/usr/bin/ssh' }), OWNER, 't')).toEqual({ kind: 'wrapper', process: 'ssh' })
-    expect(targetStatus(terminals({ foregroundName: () => '-zsh' }), OWNER, 't')).toEqual({ kind: 'shell', process: 'zsh' })
-    expect(targetStatus(terminals({ foregroundName: () => 'claude' }), OWNER, 't')).toEqual({ kind: 'agent', process: 'claude' })
+    const program = (name: string): Partial<TargetTerminals> => ({ getForeground: () => ({ kind: 'program', name }) })
+    expect(targetStatus(terminals(program('/usr/bin/ssh')), OWNER, 't')).toEqual({ kind: 'wrapper', process: 'ssh' })
+    expect(targetStatus(terminals(program('-zsh')), OWNER, 't')).toEqual({ kind: 'shell', process: 'zsh' })
+    expect(targetStatus(terminals(program('claude')), OWNER, 't')).toEqual({ kind: 'agent', process: 'claude' })
+    expect(targetStatus(terminals(program('nu.exe')), OWNER, 't')).toEqual({ kind: 'shell', process: 'nu' })
+  })
+
+  it('reads the terminal\'s own shell as shell, even a shell outside the 025-FR-061 list', () => {
+    expect(targetStatus(terminals({ getForeground: () => ({ kind: 'shell', name: 'elvish' }) }), OWNER, 't')).toEqual({ kind: 'shell', process: 'elvish' })
+  })
+
+  it('answers unknown for an unreadable foreground, keeping whether the read was current', () => {
+    expect(targetStatus(terminals({ getForeground: () => ({ kind: 'unknown', fresh: false }) }), OWNER, 't')).toEqual({ kind: 'unknown', process: null, fresh: false })
+    expect(targetStatus(terminals({ getForeground: () => ({ kind: 'program', name: '  ' }) }), OWNER, 't')).toEqual({ kind: 'unknown', process: null })
+    expect(targetStatusResponse({ kind: 'unknown', process: null, fresh: false })).toEqual({ kind: 'unknown', process: null, fresh: false })
+  })
+
+  it('answers noTerminal when the service no longer knows the terminal', () => {
+    expect(targetStatus(terminals({ getForeground: () => null }), OWNER, 't')).toEqual({ kind: 'noTerminal' })
   })
 
   it('falls back to the activity: busy is agent, idle is shell, unknowable is unknown (Windows)', () => {
-    expect(targetStatus(terminals({ foregroundName: () => null }), OWNER, 't')).toEqual({ kind: 'agent', process: null })
+    expect(targetStatus(terminals({ getForeground: () => { throw new Error('pty gone') } }), OWNER, 't')).toEqual({ kind: 'agent', process: null })
     expect(targetStatus(terminals({ getActivity: () => ({ busy: false, known: true }) }), OWNER, 't')).toEqual({ kind: 'shell', process: null })
     expect(targetStatus(terminals({ getActivity: () => ({ busy: false, known: false }) }), OWNER, 't')).toEqual({ kind: 'unknown', process: null })
+  })
+
+  describe('at send', () => {
+    it('uses the send-time read, which may wait for a new snapshot', async () => {
+      const t = terminals({
+        getForeground: () => ({ kind: 'unknown', fresh: false }),
+        getForegroundAtSend: async () => ({ kind: 'program', name: 'claude.exe' })
+      })
+      await expect(targetStatusAtSend(t, OWNER, 't')).resolves.toEqual({ kind: 'agent', process: 'claude' })
+    })
+
+    it('uses the display read when the service has no send-time read', async () => {
+      const t = terminals({ getForeground: () => ({ kind: 'shell', name: 'zsh' }) })
+      await expect(targetStatusAtSend(t, OWNER, 't')).resolves.toEqual({ kind: 'shell', process: 'zsh' })
+    })
+
+    it('answers noTerminal for another window\'s terminal without reading it', async () => {
+      let reads = 0
+      const t = terminals({ getOwner: () => 99, getForegroundAtSend: async () => (reads++, { kind: 'program', name: 'claude' }) })
+      await expect(targetStatusAtSend(t, OWNER, 't')).resolves.toEqual({ kind: 'noTerminal' })
+      expect(reads).toBe(0)
+    })
+
+    it('answers noTerminal when the terminal closed while the read waited', async () => {
+      let owner: number | undefined = OWNER
+      const t = terminals({
+        getOwner: () => owner,
+        getForegroundAtSend: async () => {
+          owner = undefined
+          return { kind: 'program', name: 'claude' }
+        }
+      })
+      await expect(targetStatusAtSend(t, OWNER, 't')).resolves.toEqual({ kind: 'noTerminal' })
+    })
+
+    it('falls back to the activity when the send-time read rejects', async () => {
+      const t = terminals({ getForegroundAtSend: () => Promise.reject(new Error('boom')), getActivity: () => ({ busy: false, known: true }) })
+      await expect(targetStatusAtSend(t, OWNER, 't')).resolves.toEqual({ kind: 'shell', process: null })
+    })
   })
 
   it('guards: a shell and a missing terminal always refuse; a wrapper and unknown refuse unless Send anyway (S-23); an agent passes', () => {

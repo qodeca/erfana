@@ -185,9 +185,14 @@ function attachTabCdp(contents: WebContents): TabCdpLink | null {
 
 /** The terminal service's guard surface (025-FR-061), when the terminals passed in carry it. */
 function terminalTargets(terminals: (TerminalOutputSource & Partial<TargetTerminals>) | undefined): TargetTerminals | null {
-  const { getOwner, getActivity } = terminals ?? {}
+  const { getOwner, getActivity, getForeground, getForegroundAtSend } = terminals ?? {}
   if (getOwner === undefined || getActivity === undefined) return null
-  return { getOwner: (id) => getOwner.call(terminals, id), getActivity: (id) => getActivity.call(terminals, id) }
+  return {
+    getOwner: (id) => getOwner.call(terminals, id),
+    getActivity: (id) => getActivity.call(terminals, id),
+    ...(getForeground === undefined ? {} : { getForeground: (id: string) => getForeground.call(terminals, id) }),
+    ...(getForegroundAtSend === undefined ? {} : { getForegroundAtSend: (id: string) => getForegroundAtSend.call(terminals, id) })
+  }
 }
 
 /** A `localAddressSeen` notice to the window whose renderer is `webContentsId` (025-FR-063). */

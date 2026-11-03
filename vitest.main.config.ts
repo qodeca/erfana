@@ -251,6 +251,16 @@ export default defineConfig({
         'src/main/services/browser/capture/captureRender.ts': { lines: 98, functions: 98, branches: 86, statements: 98 },
         // measured 100/100/98.78/100
         'src/main/services/browser/capture/sourceHints.ts': { lines: 98, functions: 98, branches: 96, statements: 98 },
+        // The terminal foreground the shell guard reads (025-FR-061; design
+        // § 9.4, Q8) and the Windows process snapshot it shares with the
+        // Claude-status detector. A gap here is a bare shell read as an agent,
+        // which types a prompt into the shell. Measured 2026-11-03 on their own
+        // suites; processSnapshot's missing function is the real `execFile`
+        // default, which a unit test must not spawn.
+        // measured 100/100/94.44/100
+        'src/main/services/terminalForegroundRead.ts': { lines: 98, functions: 98, branches: 92, statements: 98 },
+        // measured 98.3/84.61/95.83/97.18
+        'src/main/services/process/processSnapshot.ts': { lines: 96, functions: 82, branches: 93, statements: 95 },
         // measured 97.5/96.29/94.33/98.01
         'src/main/services/browser/pick/BrowserPicks.ts': { lines: 95, functions: 94, branches: 92, statements: 96 },
         // measured 96.88/87.93/80.57/92.02

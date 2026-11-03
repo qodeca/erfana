@@ -982,7 +982,7 @@
       "quote": "**Constructor DI seam**: `new TerminalService(fsExists?)` — defaults to `fs.existsSync`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:302",
+      "source": "src/main/services/TerminalService.ts:307",
       "match": "fsExists: (p: string) => boolean = existsSync"
     },
     {
@@ -992,7 +992,7 @@
       "quote": "A Windows cwd over 260 chars (`isWindowsLongPath`) is refused",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:444",
+      "source": "src/main/services/TerminalService.ts:449",
       "match": "if (isWindowsLongPath(cwd)) {"
     },
     {
@@ -1002,7 +1002,7 @@
       "quote": "bounded by `TERMINAL_EXIT_WAIT_MS` (1.5 s)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:138",
+      "source": "src/main/services/TerminalService.ts:141",
       "match": "TERMINAL_EXIT_WAIT_MS = 1_500"
     },
     {
@@ -1012,7 +1012,7 @@
       "quote": "#### `getActivity(terminalId: string): { busy: boolean; known: boolean } | null`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:1080",
+      "source": "src/main/services/TerminalService.ts:1079",
       "match": "getActivity(terminalId: string): { busy: boolean; known: boolean } | null"
     },
     {
@@ -1022,7 +1022,7 @@
       "quote": "#### `getTerminalInfo(terminalId: string): { id: string; cwd: string; title: string } | null`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:1049",
+      "source": "src/main/services/TerminalService.ts:1056",
       "match": "getTerminalInfo(terminalId: string)"
     },
     {
@@ -2913,7 +2913,7 @@
       "quote": "`write()`: Suppress EPIPE, emit exit event, clean up terminal",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:886",
+      "source": "src/main/services/TerminalService.ts:893",
       "match": "logger.info(`ℹ️ Terminal ${terminalId} PTY closed (terminal likely exited)`)"
     },
     {
@@ -2923,7 +2923,7 @@
       "quote": "`killTerminal()`: Suppress EPIPE and ESRCH (process not found); the entry is dropped and the call answers `true`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:1032",
+      "source": "src/main/services/TerminalService.ts:1039",
       "match": "logger.info(`ℹ️ Terminal ${terminalId} process already terminated`)"
     },
     {
@@ -2933,7 +2933,7 @@
       "quote": "end shells through `ptyKillQuietly()`, which suppresses EPIPE and ESRCH",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:1265",
+      "source": "src/main/services/TerminalService.ts:1264",
       "match": "private ptyKillQuietly(terminal: TerminalInstance): void {"
     },
     {
@@ -2943,7 +2943,7 @@
       "quote": "`dispose()` then waits up to `TERMINAL_EXIT_WAIT_MS` (1.5 s)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:138",
+      "source": "src/main/services/TerminalService.ts:141",
       "match": "export const TERMINAL_EXIT_WAIT_MS = 1_500"
     },
     {
@@ -2953,7 +2953,7 @@
       "quote": "this.emit('exit', { terminalId, exitCode: 0, webContentsId: terminal.webContentsId })",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:891",
+      "source": "src/main/services/TerminalService.ts:898",
       "match": "this.emit('exit', { terminalId, exitCode: 0, webContentsId: terminal.webContentsId })"
     },
     {
@@ -6351,7 +6351,7 @@
       "quote": "strips `CLAUDECODE` / `CLAUDE_CODE_*` from spawned terminals",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:355",
+      "source": "src/main/services/TerminalService.ts:360",
       "match": "/^CLAUDECODE$/,"
     },
     {
@@ -6991,7 +6991,7 @@
       "quote": "│  - write(terminalId, data): boolean",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:863",
+      "source": "src/main/services/TerminalService.ts:869",
       "match": "write(terminalId: string, data: string): boolean {"
     },
     {
@@ -7116,7 +7116,7 @@
       "quote": "| EPIPE (terminal closed) | Return `false` |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:885",
+      "source": "src/main/services/TerminalService.ts:892",
       "match": "if (code === 'EPIPE') {"
     },
     {
@@ -8306,7 +8306,7 @@
       "quote": "`CLAUDE_CODE_*`, keeps `ANTHROPIC_*`, and sets `PROMPT` / `PS1` to `'%n %~ $ '`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:523",
+      "source": "src/main/services/TerminalService.ts:528",
       "match": "PS1: '%n %~ $ '"
     },
     {
@@ -8316,7 +8316,7 @@
       "quote": "`cleanEnvironment()` in `src/main/services/TerminalService.ts` strips `CLAUDECODE`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:355",
+      "source": "src/main/services/TerminalService.ts:360",
       "match": "/^CLAUDECODE$/"
     },
     {
@@ -9239,7 +9239,7 @@
       "quote": "Erfana strips `CLAUDE_CODE_OAUTH_TOKEN`, as `TerminalService.cleanEnvironment` does",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:356",
+      "source": "src/main/services/TerminalService.ts:361",
       "match": "/^CLAUDE_CODE_/"
     },
     {
@@ -11040,7 +11040,7 @@
       "quote": "Local function inside `TerminalService.createTerminal` that parses PTY output",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:610",
+      "source": "src/main/services/TerminalService.ts:616",
       "match": "const markerDetector = (data: string) => {"
     },
     {
@@ -13754,7 +13754,7 @@
       "quote": "See `TerminalService.createTerminal()` and [known issues]",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:496",
+      "source": "src/main/services/TerminalService.ts:501",
       "match": "process.env.ERFANA_E2E_FAST_SHELL === '1'"
     },
     {
@@ -15527,7 +15527,7 @@
       "quote": "- **Native Shell**: Spawns real PTY process (zsh on macOS, bash on Linux",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:1369",
+      "source": "src/main/services/TerminalService.ts:1368",
       "match": "return process.env.SHELL || '/bin/zsh'"
     },
     {
@@ -15557,7 +15557,7 @@
       "quote": "- `PS1='%n %~ $ '` - Traditional zsh prompt",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:523",
+      "source": "src/main/services/TerminalService.ts:528",
       "match": "PS1: '%n %~ $ ',"
     },
     {
@@ -15567,7 +15567,7 @@
       "quote": "(not set for cmd.exe, which reads `PROMPT` too and would show the codes literally)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:522",
+      "source": "src/main/services/TerminalService.ts:527",
       "match": "...(shellKind === 'cmd' ? {} : { PROMPT: '%n %~ $ ' }),"
     },
     {
@@ -15577,7 +15577,7 @@
       "quote": "- `SHELL_SESSIONS_DISABLE='1'` - Disables macOS \"Restored session\" messages",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:525",
+      "source": "src/main/services/TerminalService.ts:530",
       "match": "SHELL_SESSIONS_DISABLE: '1'"
     },
     {
@@ -15587,7 +15587,7 @@
       "quote": "- `COLORTERM='truecolor'` - True color support",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:517",
+      "source": "src/main/services/TerminalService.ts:522",
       "match": "COLORTERM: 'truecolor',"
     },
     {
@@ -15597,7 +15597,7 @@
       "quote": "whose last step is `exec -l \"$SHELL\" -i` (login interactive shell)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:498",
+      "source": "src/main/services/TerminalService.ts:503",
       "match": ": `exec -l \"$SHELL\" -i`",
       "note": "Said the shell is started with `-l`; it is started with `-c <bootstrap>` and the bootstrap execs a login interactive $SHELL."
     },
@@ -15618,7 +15618,7 @@
       "quote": "the terminal shows whatever the shell printed after 10 seconds instead of staying blank",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:163",
+      "source": "src/main/services/TerminalService.ts:166",
       "match": "const MARKER_TIMEOUT_MS = 10_000"
     },
     {
@@ -15628,7 +15628,7 @@
       "quote": "**File**: `src/main/services/TerminalService.ts` (about 1,400 lines as of v0.22.0",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:1434",
+      "source": "src/main/services/TerminalService.ts:1433",
       "match": "export const terminalService = new TerminalService()"
     },
     {
@@ -15638,7 +15638,7 @@
       "quote": "getActivity(terminalId: string): { busy: boolean; known: boolean } | null  // known: false on Windows",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:1080",
+      "source": "src/main/services/TerminalService.ts:1079",
       "match": "getActivity(terminalId: string): { busy: boolean; known: boolean } | null {"
     },
     {
@@ -15844,7 +15844,7 @@
       "quote": "shell -c 'cd '\\''/target/path'\\''; pwd; echo __ERFANA_PWD_MARKER_...; exec -l \"$SHELL\" -i'",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:498",
+      "source": "src/main/services/TerminalService.ts:503",
       "match": ": `exec -l \"$SHELL\" -i`"
     },
     {
@@ -15864,7 +15864,7 @@
       "quote": "the POSIX bootstrap's final step changes from `exec -l \"$SHELL\" -i` to `exec /bin/sh -i`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:497",
+      "source": "src/main/services/TerminalService.ts:502",
       "match": "? 'exec /bin/sh -i'"
     },
     {
@@ -15884,7 +15884,7 @@
       "quote": "`TerminalService` arms a 10 s timer at spawn.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:163",
+      "source": "src/main/services/TerminalService.ts:166",
       "match": "const MARKER_TIMEOUT_MS = 10_000"
     },
     {
@@ -15894,7 +15894,7 @@
       "quote": "- `CLAUDECODE`, `CLAUDE_CODE_*` – Claude Code session markers.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:356",
+      "source": "src/main/services/TerminalService.ts:361",
       "match": "/^CLAUDE_CODE_/"
     },
     {
@@ -15904,7 +15904,7 @@
       "quote": "- `COLORTERM` – removed, then set explicitly to `truecolor`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:346",
+      "source": "src/main/services/TerminalService.ts:351",
       "match": "/^COLORTERM$/, // Will be set explicitly in spawn options"
     },
     {
@@ -15914,7 +15914,7 @@
       "quote": "- `VITE_*` — Vite build tool variables",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:344",
+      "source": "src/main/services/TerminalService.ts:349",
       "match": "/^VITE_/,"
     },
     {
@@ -15924,7 +15924,7 @@
       "quote": "(\"This folder's path is longer than Windows allows for a terminal (260 characters). Move the project to a shorter path.\")",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:53",
+      "source": "src/main/services/TerminalService.ts:54",
       "match": "This folder's path is longer than Windows allows for a terminal (260 characters)."
     },
     {
@@ -15945,7 +15945,7 @@
       "quote": "| `hasReceivedMarker` | Bootstrap completed — marker detected |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:114",
+      "source": "src/main/services/TerminalService.ts:115",
       "match": "hasReceivedMarker: boolean // Track if marker was detected"
     },
     {
@@ -15955,7 +15955,7 @@
       "quote": "| `isClearing` | Clear operation in flight |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:101",
+      "source": "src/main/services/TerminalService.ts:102",
       "match": "isClearing: boolean // Track clearing phase"
     },
     {
@@ -15965,7 +15965,7 @@
       "quote": "(renderer confirmation or the 3 s / 10 s fallback)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:680",
+      "source": "src/main/services/TerminalService.ts:686",
       "match": "}, 3000)"
     },
     {
@@ -15975,7 +15975,7 @@
       "quote": "2. `%ProgramFiles%\\PowerShell\\7\\pwsh.exe` — PowerShell 7+ native install",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:1398",
+      "source": "src/main/services/TerminalService.ts:1397",
       "match": "`${programFiles}\\\\PowerShell\\\\7\\\\pwsh.exe`,"
     },
     {
@@ -15985,7 +15985,7 @@
       "quote": "4. `<%SystemRoot%>\\System32\\WindowsPowerShell\\v1.0\\powershell.exe` — Windows PowerShell 5.1",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:1407",
+      "source": "src/main/services/TerminalService.ts:1406",
       "match": "System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe"
     },
     {
@@ -16025,7 +16025,7 @@
       "quote": "  private readonly fsExists: (p: string) => boolean = existsSync",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:302",
+      "source": "src/main/services/TerminalService.ts:307",
       "match": "private readonly fsExists: (p: string) => boolean = existsSync"
     },
     {
@@ -20903,7 +20903,7 @@
       "quote": "(\"This folder's path is longer than Windows allows for a terminal…\")",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:53",
+      "source": "src/main/services/TerminalService.ts:54",
       "match": "This folder's path is longer than Windows allows for a terminal (260 characters)"
     },
     {
@@ -21244,7 +21244,7 @@
       "quote": "the POSIX bootstrap in `TerminalService` (`src/main/services/TerminalService.ts`) execs into `/bin/sh -i`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:497",
+      "source": "src/main/services/TerminalService.ts:502",
       "match": "? 'exec /bin/sh -i'"
     },
     {
@@ -22579,7 +22579,7 @@
       "quote": "No longer dead code: since v0.19.0 `TerminalService` calls it to refuse a terminal cwd over 260 chars",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:444",
+      "source": "src/main/services/TerminalService.ts:449",
       "match": "if (isWindowsLongPath(cwd)) {",
       "note": "row implied isWindowsLongPath was still unused; TerminalService now calls it"
     },
@@ -22612,7 +22612,7 @@
       "quote": "`resolveWindowsShell()` now lives at `:1386`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:1386",
+      "source": "src/main/services/TerminalService.ts:1385",
       "match": "resolveWindowsShell(): string {",
       "note": "said :641-646"
     },
@@ -22743,7 +22743,7 @@
       "quote": "`TerminalService.ts:1386` (`resolveWindowsShell`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:1386",
+      "source": "src/main/services/TerminalService.ts:1385",
       "match": "resolveWindowsShell(): string {"
     },
     {
@@ -22903,7 +22903,7 @@
       "quote": "with `ERFANA_DIAG_SKIP_TREE_KILL=1` (diagnostics only, logged as `Tree kill skipped`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:1224",
+      "source": "src/main/services/TerminalService.ts:1223",
       "match": "Tree kill skipped: ${SKIP_TREE_KILL_ENV}=1 (diagnostics only)"
     },
     {
@@ -22923,7 +22923,7 @@
       "quote": "the shells we pass (`TerminalService.getLiveShells()`: pid plus spawn time",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:1112",
+      "source": "src/main/services/TerminalService.ts:1111",
       "match": "getLiveShells(): LiveShell[] {"
     },
     {
@@ -22933,7 +22933,7 @@
       "quote": "`TerminalService.beginShutdown()` runs at the quit moment",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:1144",
+      "source": "src/main/services/TerminalService.ts:1143",
       "match": "beginShutdown(): void {"
     },
     {
@@ -23063,7 +23063,7 @@
       "quote": "The marker triggers the same handshake (`markerDetector` in `TerminalService.ts`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:610",
+      "source": "src/main/services/TerminalService.ts:616",
       "match": "const markerDetector = (data: string) =>",
       "note": "said TerminalService.ts:292-332, which no longer holds the handshake"
     },
@@ -23096,7 +23096,7 @@
       "quote": "since v0.19.0 `TerminalService` uses it to refuse a terminal cwd over 260 chars",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:444",
+      "source": "src/main/services/TerminalService.ts:449",
       "match": "if (isWindowsLongPath(cwd)) {",
       "note": "said it was dead code"
     },
@@ -23128,7 +23128,7 @@
       "quote": "Since v0.19.0 a cwd over 260 chars is refused the same way",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:444",
+      "source": "src/main/services/TerminalService.ts:449",
       "match": "if (isWindowsLongPath(cwd)) {"
     },
     {
@@ -23138,7 +23138,7 @@
       "quote": "`validateWindowsCwd` rejects cwds containing any of",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:452",
+      "source": "src/main/services/TerminalService.ts:457",
       "match": "validateWindowsCwd(cwd)"
     },
     {
@@ -26161,7 +26161,7 @@
       "quote": "a clean top-level `claude` session (or any CLI agent) in the integrated terminal",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:355",
+      "source": "src/main/services/TerminalService.ts:360",
       "match": "/^CLAUDECODE$/,"
     },
     {
@@ -26421,7 +26421,7 @@
       "quote": "it simply runs the `claude` CLI like any other terminal program",
       "status": "verified",
       "evidence": "app",
-      "source": "src/main/services/TerminalService.ts:355",
+      "source": "src/main/services/TerminalService.ts:360",
       "match": "/^CLAUDECODE$/,",
       "test": "e2e/guide-tasks/run-an-agent.guide.ts",
       "note": "The guide task types `claude` at the shell prompt in the integrated terminal and the real Claude Code CLI starts and edits a file; Erfana never launches claude itself."
@@ -26433,7 +26433,7 @@
       "quote": "Erfana hosts the agent; it has no AI of its own.",
       "status": "verified",
       "evidence": "app",
-      "source": "src/main/services/TerminalService.ts:531",
+      "source": "src/main/services/TerminalService.ts:536",
       "match": "const ptyProcess = pty.spawn(shell, shellArgs, {",
       "test": "e2e/guide-tasks/run-an-agent.guide.ts",
       "note": "Product rule (CLAUDE.md: Erfana hosts the agent, never claim built-in AI). Shown in the real app by run-an-agent.guide.ts: the agent is a separate CLI the user starts in the terminal."
@@ -29180,7 +29180,7 @@
       "quote": "Clean agent environment: Claude Code runs as a top-level session",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:355",
+      "source": "src/main/services/TerminalService.ts:360",
       "match": "/^CLAUDECODE$/,"
     },
     {
@@ -30393,7 +30393,7 @@
       "quote": "Built-in terminal running your shell and any CLI agent",
       "status": "verified",
       "evidence": "app",
-      "source": "src/main/services/TerminalService.ts:498",
+      "source": "src/main/services/TerminalService.ts:503",
       "match": "exec -l \"$SHELL\" -i",
       "test": "e2e/guide-tasks/claims-user-1.guide.ts",
       "note": "Real-app test: ps in the terminal reports the login shell named by SHELL, and an interactive stand-in CLI program reads input and writes a file. The real Claude Code run is in e2e/guide-tasks/run-an-agent.guide.ts."
@@ -30405,8 +30405,8 @@
       "quote": "or (macOS) a program runs",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:1083",
-      "match": "if (osPlatform() === 'win32') return { busy: false, known: false }"
+      "source": "src/main/services/terminalForegroundRead.ts:106",
+      "match": "if (this.platform() === 'win32') return { busy: false, known: false }"
     },
     {
       "id": "user-guide-feature-inventory/225",
@@ -30637,7 +30637,7 @@
       "quote": "Erfana hosts the agent in its terminal; it does not provide an agent account or model.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:531",
+      "source": "src/main/services/TerminalService.ts:536",
       "match": "const ptyProcess = pty.spawn(shell, shellArgs, {",
       "note": "The terminal spawns the user's shell; the agent is whatever CLI the user runs there."
     },
@@ -34087,7 +34087,7 @@
       "quote": "Erfana is a Markdown workspace that hosts CLI agents in its terminal",
       "status": "verified",
       "evidence": "app",
-      "source": "src/main/services/TerminalService.ts:531",
+      "source": "src/main/services/TerminalService.ts:536",
       "match": "pty.spawn(shell, shellArgs, {",
       "test": "e2e/terminal-prompt-detection.e2e.ts",
       "note": "The terminal spawns the user's own shell; any CLI agent runs inside it. No-built-in-AI is a product rule, not provable by a single line."
@@ -34341,7 +34341,7 @@
       "quote": "On Windows, the meter follows the folder the terminal started in, not a later `cd`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/process/WinClaudeProcessDetector.ts:137",
+      "source": "src/main/services/claudeStatus/process/WinClaudeProcessDetector.ts:89",
       "match": "Windows v1 never resolves the matched process's live cwd",
       "note": "Added the cause: Windows falls back to the panel's spawn cwd."
     },
@@ -35178,7 +35178,7 @@
       "quote": "Logs never record the text of terminal output.",
       "status": "fixed",
       "evidence": "app",
-      "source": "src/main/services/TerminalService.ts:730",
+      "source": "src/main/services/TerminalService.ts:736",
       "match": "length=${data.length}",
       "note": "In the real app at Trace level no terminal-output size line was written (steady-state output is not logged at all), so the size half was dropped; the test proves the output text never reaches the log files.",
       "test": "e2e/guide-tasks/claims-user-2.guide.ts"
@@ -40338,7 +40338,7 @@
       "quote": "on macOS – while any program other than the shell is running",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:1087",
+      "source": "src/main/services/terminalForegroundRead.ts:109",
       "match": "isForegroundBusy(foreground, terminal.shellNames)"
     },
     {
@@ -40348,8 +40348,8 @@
       "quote": "On Windows Erfana cannot see which program is running",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:1083",
-      "match": "if (osPlatform() === 'win32') return { busy: false, known: false }"
+      "source": "src/main/services/terminalForegroundRead.ts:106",
+      "match": "if (this.platform() === 'win32') return { busy: false, known: false }"
     },
     {
       "id": "user-guide-reference-terminal/21",
@@ -41269,7 +41269,7 @@
       "quote": "for example a project path longer than Windows allows (260 characters)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:53",
+      "source": "src/main/services/TerminalService.ts:54",
       "match": "longer than Windows allows for a terminal (260 characters)",
       "note": "Vague \"a path Windows cannot start a shell in\"; named the 260-character limit the message gives."
     },
@@ -41280,7 +41280,7 @@
       "quote": "move the project to a shorter path, as the message says",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:53",
+      "source": "src/main/services/TerminalService.ts:54",
       "match": "Move the project to a shorter path.",
       "note": "Said opening another project restarts the terminal there; the message itself tells the user to move the project to a shorter path."
     },
@@ -42006,8 +42006,8 @@
       "quote": "Windows does not tell Erfana which program is running",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:1083",
-      "match": "if (osPlatform() === 'win32') return { busy: false, known: false }"
+      "source": "src/main/services/terminalForegroundRead.ts:106",
+      "match": "if (this.platform() === 'win32') return { busy: false, known: false }"
     },
     {
       "id": "user-guide-reference-windows-differences/24",
@@ -42646,7 +42646,7 @@
       "quote": "Erfana also removes `CLAUDE_CODE_*` variables it inherited from its own launch environment",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:356",
+      "source": "src/main/services/TerminalService.ts:361",
       "match": "/^CLAUDE_CODE_/",
       "note": "New: env filtering for spawned terminals."
     },
@@ -43459,7 +43459,7 @@
       "quote": "On Windows the terminal also refuses a project path that contains",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:452",
+      "source": "src/main/services/TerminalService.ts:457",
       "match": "const validation = validateWindowsCwd(cwd)"
     },
     {
@@ -44955,7 +44955,7 @@
       "quote": "// Create terminal – returns { terminalId, shellKind }, or { error } on failure (never null)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:383",
+      "source": "src/main/services/TerminalService.ts:388",
       "match": "): Promise<TerminalCreateResult> {"
     },
     {
@@ -46319,7 +46319,7 @@
       "quote": "`TerminalService` arms a 10 s timer at spawn.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:163",
+      "source": "src/main/services/TerminalService.ts:166",
       "match": "const MARKER_TIMEOUT_MS = 10_000"
     },
     {
@@ -47602,7 +47602,7 @@
       "quote": "(keeping `ANTHROPIC_*`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:353",
+      "source": "src/main/services/TerminalService.ts:358",
       "match": "ANTHROPIC_* (e.g. API keys) are left"
     },
     {
@@ -51453,7 +51453,7 @@
       "quote": "Terminal output is logged by size only",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:730",
+      "source": "src/main/services/TerminalService.ts:736",
       "match": "length=${data.length}"
     },
     {
@@ -54554,7 +54554,7 @@
       "quote": "a shell whose start never reports in shows its output after 10 s",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:163",
+      "source": "src/main/services/TerminalService.ts:166",
       "match": "const MARKER_TIMEOUT_MS = 10_000"
     },
     {
@@ -54685,7 +54685,7 @@
       "quote": "`<%SystemRoot%>\\System32\\WindowsPowerShell\\v1.0\\powershell.exe`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/TerminalService.ts:1407",
+      "source": "src/main/services/TerminalService.ts:1406",
       "match": "System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe"
     },
     {

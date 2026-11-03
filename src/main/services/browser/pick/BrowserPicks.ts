@@ -27,7 +27,7 @@ import type { PickEvent, TargetStatusResponse, WriteCaptureResponse } from '../.
 import { logger } from '../../LoggingService'
 import type { BrowserTab, TabHost } from '../BrowserTab'
 import { outlineColour } from '../capture/accentColour'
-import { guardOf, targetStatus, targetStatusResponse, type TargetTerminals } from '../capture/BrowserTargetStatus'
+import { guardOf, targetStatus, targetStatusAtSend, targetStatusResponse, type TargetTerminals } from '../capture/BrowserTargetStatus'
 import type { Bitmap } from '../capture/captureImage'
 import { renderCapture } from '../capture/captureRender'
 import { CaptureStore, CaptureWriteError } from '../capture/CaptureStore'
@@ -150,9 +150,11 @@ export class BrowserPicks {
     const capture = pick.capture
     if (capture === null || capture.id !== input.captureId) return { error: 'The capture is no longer held – pick the element again' }
     const terminals = this.deps.terminals?.() ?? null
-    const verdict = terminals === null ? ({ kind: 'noTerminal' } as const) : targetStatus(terminals, ownerWebContentsId, input.terminalId)
+    const verdict = terminals === null ? ({ kind: 'noTerminal' } as const) : await targetStatusAtSend(terminals, ownerWebContentsId, input.terminalId)
     const guard = guardOf(verdict, input.sendAnyway === true)
     if (guard !== null) return { guard }
+    // The read may wait for a Windows process snapshot; the capture may have gone meanwhile.
+    if (pick.capture !== capture) return { error: 'The capture is no longer held – pick the element again' }
     if (capture.writing !== null) return (await capture.writing) as WriteCaptureResponse
     const startedAt = this.deps.clock.now()
     const writing = this.write(tab, pick, input.captureId)

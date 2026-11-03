@@ -14,13 +14,18 @@
  * - Anything else → `agent`, including a dev server (the documented limit).
  * - No such terminal (or another window's) → the guard's `noTerminal`.
  *
- * Where the name comes from: {@link TargetTerminals.foregroundName} when the
- * terminal service gives it; otherwise its `getActivity` – whether a program
- * other than the terminal's own shell is in front – which tells shell from
- * not-shell but not the name. Windows (no foreground name from node-pty)
- * gives `unknown` until the shared process snapshot of § 9.4 lands.
+ * Where the foreground comes from: {@link TargetTerminals.getForeground}
+ * (`TerminalService`, `terminalForegroundRead.ts`) – the terminal's own shell,
+ * another program by name, or unknown; on Windows read from the shared process
+ * snapshot, up to 10 s old for display, refreshed at send within 3 s
+ * ({@link targetStatusAtSend}; design Q8). A display read with no current
+ * snapshot answers `unknown` with `fresh: false`. Without that method, or when
+ * it throws, the guard falls back to `getActivity` – whether a program other
+ * than the shell is in front – which tells shell from not-shell but not the
+ * name.
  */
 import type { TargetStatusResponse } from '../../../../shared/ipc/browser-tab-schema'
+import type { ForegroundRead } from '../../terminalForegroundRead'
 
 /** The shells of 025-FR-061. */
 export const SHELL_NAMES: ReadonlySet<string> = new Set([
@@ -36,15 +41,17 @@ export interface TargetTerminals {
   getOwner(terminalId: string): number | undefined
   /** Whether a program other than the shell is in front; `known: false` when the platform cannot say. */
   getActivity(terminalId: string): { busy: boolean; known: boolean } | null
-  /** The foreground executable's name, when the service can read it. */
-  foregroundName?(terminalId: string): string | null
+  /** The foreground for display, never waiting; null for an unknown id. */
+  getForeground?(terminalId: string): ForegroundRead | null
+  /** The foreground at send, after a bounded refresh where the platform needs one; null for an unknown id. */
+  getForegroundAtSend?(terminalId: string): Promise<ForegroundRead | null>
 }
 
 export type TargetKind = TargetStatusResponse['kind']
 
 export type TargetVerdict =
   | { readonly kind: 'noTerminal' }
-  | { readonly kind: TargetKind; readonly process: string | null }
+  | { readonly kind: TargetKind; readonly process: string | null; readonly fresh?: boolean }
 
 /** The executable name as 025-FR-061 compares it. */
 export function normaliseExecutable(name: string): string {
@@ -61,11 +68,44 @@ export function classifyForeground(name: string): TargetKind {
   return 'agent'
 }
 
-/** The status of `terminalId` for the window whose renderer is `ownerWebContentsId`. */
+/** The status of `terminalId` for the window whose renderer is `ownerWebContentsId`, for display: never waits. */
 export function targetStatus(terminals: TargetTerminals, ownerWebContentsId: number, terminalId: string): TargetVerdict {
   if (terminals.getOwner(terminalId) !== ownerWebContentsId) return { kind: 'noTerminal' }
-  const name = terminals.foregroundName?.(terminalId) ?? null
-  if (name !== null && normaliseExecutable(name) !== '') return { kind: classifyForeground(name), process: normaliseExecutable(name) }
+  let read: ForegroundRead | null | undefined
+  try {
+    read = terminals.getForeground?.(terminalId)
+  } catch {
+    read = undefined
+  }
+  return verdictOf(terminals, terminalId, read)
+}
+
+/** The status at send (the guard of `writeCapture`): a stale Windows snapshot is refreshed first, bounded by the terminal service. */
+export async function targetStatusAtSend(terminals: TargetTerminals, ownerWebContentsId: number, terminalId: string): Promise<TargetVerdict> {
+  if (terminals.getForegroundAtSend === undefined) return targetStatus(terminals, ownerWebContentsId, terminalId)
+  if (terminals.getOwner(terminalId) !== ownerWebContentsId) return { kind: 'noTerminal' }
+  let read: ForegroundRead | null | undefined
+  try {
+    read = await terminals.getForegroundAtSend(terminalId)
+  } catch {
+    read = undefined
+  }
+  // The terminal may have closed, or changed hands, while the read waited.
+  if (terminals.getOwner(terminalId) !== ownerWebContentsId) return { kind: 'noTerminal' }
+  return verdictOf(terminals, terminalId, read)
+}
+
+/** The verdict for a foreground read; `undefined` (no read, or it failed) falls back to the activity. */
+function verdictOf(terminals: TargetTerminals, terminalId: string, read: ForegroundRead | null | undefined): TargetVerdict {
+  if (read === null) return { kind: 'noTerminal' }
+  if (read === undefined) return activityVerdict(terminals, terminalId)
+  if (read.kind === 'unknown') return { kind: 'unknown', process: null, fresh: read.fresh }
+  const process = normaliseExecutable(read.name)
+  if (process === '') return { kind: 'unknown', process: null }
+  return { kind: read.kind === 'shell' ? 'shell' : classifyForeground(process), process }
+}
+
+function activityVerdict(terminals: TargetTerminals, terminalId: string): TargetVerdict {
   const activity = terminals.getActivity(terminalId)
   if (activity === null) return { kind: 'noTerminal' }
   if (!activity.known) return { kind: 'unknown', process: null }
@@ -83,5 +123,5 @@ export function guardOf(verdict: TargetVerdict, sendAnyway: boolean): { kind: 's
 /** The `targetStatus` answer; `noTerminal` reads as `unknown` with no process. */
 export function targetStatusResponse(verdict: TargetVerdict): TargetStatusResponse {
   if (verdict.kind === 'noTerminal') return { kind: 'unknown', process: null, fresh: true }
-  return { kind: verdict.kind, process: verdict.process, fresh: true }
+  return { kind: verdict.kind, process: verdict.process, fresh: verdict.fresh ?? true }
 }

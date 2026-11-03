@@ -21,7 +21,8 @@ import {
   validateWindowsCwd
 } from './WindowsTerminalBootstrap'
 import { isWindowsLongPath } from './watcher/PlatformConfig'
-import { isForegroundBusy, shellProcessNames } from './terminalForeground'
+import { shellProcessNames } from './terminalForeground'
+import { TerminalForegroundReader, type ForegroundRead } from './terminalForegroundRead'
 import { killProcessTrees } from './terminalTreeKill'
 import type { LiveShell } from './conptyHostReaper'
 import {
@@ -119,6 +120,8 @@ interface TerminalInstance {
   webContentsId: number // Track owning webContents for cleanup on window close
   shellKind: ShellKind // Quoting flavour resolved at create time (#164)
   shellNames: ReadonlySet<string> // Names the idle shell shows as; see terminalForeground.ts
+  spawnedAtMs: number // When node-pty returned; opens the start-up window of terminalForegroundRead.ts
+  inputSeen?: boolean // Set by the first typed write (not an escape sequence); closes that start-up window
   exited: Promise<void> // Settles when node-pty reports the shell exit (#214)
   hasExited?: boolean // Set when node-pty reports the exit; the shell's pid may be reused after that (#296)
   killRequested?: boolean // A pty kill is under way or done; cleared again if it throws (#296)
@@ -292,6 +295,8 @@ export class TerminalService extends EventEmitter {
   private shuttingDown = false
   /** Whether {@link SKIP_TREE_KILL_ENV} is honoured; off unless the app says so (#305). */
   private diagnosticsAllowed = false
+  /** Foreground reads for `getActivity` and the browser send guard (025-FR-061). */
+  private readonly foreground = new TerminalForegroundReader((id) => this.terminals.get(id))
 
   /**
    * @param fsExists - injected for `resolveWindowsShell()` testability;
@@ -581,6 +586,7 @@ export class TerminalService extends EventEmitter {
         // Sentinel value -1 means "no owner" - terminals with -1 won't be cleaned up
         // during window destruction (used in tests and manual terminal creation)
         webContentsId: webContentsId ?? -1,
+        spawnedAtMs: spawnStartedAtMs,
         shellKind,
         shellNames: shellProcessNames(
           shell,
@@ -867,6 +873,7 @@ export class TerminalService extends EventEmitter {
       logger.error(`❌ Terminal ${terminalId} not found`)
       return false
     }
+    if (!data.startsWith('\x1b')) terminal.inputSeen = true // xterm's own replies are escape sequences
 
     // cmd.exe is still waiting in `pause`: a typed key would be swallowed by it
     if (terminal.cmdPauseHold) {
@@ -1068,27 +1075,19 @@ export class TerminalService extends EventEmitter {
     return this.terminals.get(terminalId)?.webContentsId
   }
 
-  /**
-   * Whether a program other than the shell is in the terminal's foreground.
-   *
-   * node-pty names the foreground process on macOS and Linux. On Windows
-   * `IPty.process` is the shell's own name for the life of the terminal, so the
-   * answer is not available there (`known: false`).
-   *
-   * @returns `null` for an unknown id
-   */
+  /** Whether a program other than the shell is in front; `known: false` on Windows. `null` for an unknown id. */
   getActivity(terminalId: string): { busy: boolean; known: boolean } | null {
-    const terminal = this.terminals.get(terminalId)
-    if (!terminal) return null
-    if (osPlatform() === 'win32') return { busy: false, known: false }
-    try {
-      const foreground = terminal.ptyProcess.process
-      if (typeof foreground !== 'string') return { busy: false, known: false }
-      return { busy: isForegroundBusy(foreground, terminal.shellNames), known: true }
-    } catch {
-      // The process may have exited between the lookup and the read
-      return { busy: false, known: false }
-    }
+    return this.foreground.activity(terminalId)
+  }
+
+  /** The terminal's foreground for display (025-FR-061); never waits. `null` for an unknown id. */
+  getForeground(terminalId: string): ForegroundRead | null {
+    return this.foreground.read(terminalId)
+  }
+
+  /** The terminal's foreground at send; on Windows waits at most 3 s for a new snapshot. Never rejects. */
+  getForegroundAtSend(terminalId: string): Promise<ForegroundRead | null> {
+    return this.foreground.readAtSend(terminalId)
   }
 
   /**
