@@ -20,7 +20,13 @@ export const PopupStripResponseSchema = z
     committedUrl: z.string().min(1).max(BROWSER_URL_MAX_CHARS).nullable(),
     origin: OriginPartsSchema.nullable(),
     /** The address bar's badge state for the committed address. */
-    security: z.enum(['secure', 'local', 'file', 'notSecureHttp'])
+    security: z.enum(['secure', 'local', 'file', 'notSecureHttp']),
+    /**
+     * Who opened the popup, through the origin formatter: the opening frame's
+     * origin, or "a page". Shown while the popup has no web address – before
+     * its first commit, or a document its opener wrote (S-22).
+     */
+    openedBy: z.string().min(1).max(BROWSER_URL_MAX_CHARS)
   })
   .strict()
 

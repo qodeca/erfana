@@ -443,3 +443,16 @@ describe('certificate page and sign-in hooks (025-FR-021, 025-FR-022)', () => {
     expect(contents.navigationHistory.goBack).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('user info (attacker pass F7, issue #448)', () => {
+  it('never sends user info to the renderer, pending or committed, and still loads the full address', () => {
+    expect(tab.navigate('https://accounts.example.com:pw@evil.test/login', 'address')).toEqual({ ok: true })
+    expect(contents.loadURL).toHaveBeenCalledWith('https://accounts.example.com:pw@evil.test/login')
+    expect(tab.state()).toMatchObject({ pendingUrl: 'https://evil.test/login', committedUrl: null })
+    contents.commit('https://u@evil.test/login')
+    const state = tab.state()
+    expect(state.committedUrl).toBe('https://evil.test/login')
+    expect(JSON.stringify(state)).not.toContain('@')
+    expect(state.origin).toMatchObject({ kind: 'web', registrableDomain: 'evil.test' })
+  })
+})

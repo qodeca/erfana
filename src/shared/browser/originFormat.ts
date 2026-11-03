@@ -51,6 +51,10 @@ const TITLE_SEPARATOR = ' – '
 
 const IPV4 = /^\d{1,3}(?:\.\d{1,3}){3}$/
 
+function withoutTrailingDot(host: string): string {
+  return host.endsWith('.') ? host.slice(0, -1) : host
+}
+
 function isIpOrSingleLabel(host: string): boolean {
   return host.startsWith('[') || IPV4.test(host) || !host.includes('.')
 }
@@ -66,14 +70,19 @@ export function originParts(url: string, resolve: RegistrableDomainResolver): Or
   const scheme = parsed.protocol.slice(0, -1)
   if (scheme === 'file') return { kind: 'file' }
   if (scheme !== 'http' && scheme !== 'https') return { kind: 'nonWeb', scheme }
-  const asciiHost = parsed.hostname
+  // A fully-qualified host (`evil.github.io.`) is split without its trailing
+  // dot: the resolver drops it too, and a kept dot would move the emphasis one
+  // label to the right (`evil.` dimmed, `github.io.` bright).
+  const asciiHost = withoutTrailingDot(parsed.hostname)
   const port = parsed.port === '' ? null : parsed.port
   const base = { kind: 'web', scheme: scheme === 'http' ? 'http' : null, port } as const
   if (isIpOrSingleLabel(asciiHost)) {
     return { ...base, subdomain: '', registrableDomain: asciiHost, punycode: false }
   }
-  const asciiDomain = resolve(asciiHost) ?? asciiHost
-  const shown = displayHost(asciiHost, asciiDomain)
+  const resolved = resolve(asciiHost)
+  const asciiDomain = resolved ?? asciiHost
+  // An unknown registrable domain (`null`) makes the imitation check look at every label.
+  const shown = displayHost(asciiHost, resolved)
   const punycode = shown === asciiHost && asciiHost.split('.').some(l => l.startsWith('xn--'))
   const domainLabels = asciiDomain.split('.').length
   const labels = shown.split('.')
@@ -140,38 +149,116 @@ export function popupWindowTitle(
 ): string {
   const parts = committedUrl === null ? null : originParts(committedUrl, resolve)
   if (parts?.kind === 'web') return `${hostText(parts)}${TITLE_SEPARATOR}Erfana`
-  const opener = formatOrigin(openerUrl, resolve) ?? 'a page'
-  return `about:blank${TITLE_SEPARATOR}opened by ${opener}`
+  return popupBlankText(popupOpenerName(openerUrl, resolve))
+}
+
+/**
+ * Who opened a popup, as its title and strip name it: the formatted origin of
+ * the opening frame, or "a page" when it has none (an opaque `"null"` origin).
+ */
+export function popupOpenerName(openerUrl: string, resolve: RegistrableDomainResolver): string {
+  return formatOrigin(openerUrl, resolve) ?? 'a page'
+}
+
+/** "about:blank – opened by {opener}": a popup with no committed web address (S-22). */
+export function popupBlankText(openerName: string): string {
+  return `about:blank${TITLE_SEPARATOR}opened by ${openerName}`
 }
 
 /** The ellipsis that stands for removed subdomain labels: "…" plus the dot. */
 export const SUBDOMAIN_ELISION = '….'
 
+/** A fitted origin, one display string per part; an absent part is `''`. */
+export interface FittedOrigin {
+  /** `'http://'` or `''`. */
+  readonly scheme: string
+  /** Kept subdomain labels, led by `….` when labels were removed, or `''`. */
+  readonly subdomain: string
+  /** The registrable domain; led by "…" only after the last-resort start cut. */
+  readonly registrableDomain: string
+  /** `':8080'` or `''`. */
+  readonly port: string
+}
+
+const charCount = (text: string): number => [...text].length
+
+/** The fitted origin as one string. */
+export function fittedText(fitted: FittedOrigin): string {
+  return `${fitted.scheme}${fitted.subdomain}${fitted.registrableDomain}${fitted.port}`
+}
+
 /**
- * The formatted origin fitted to `maxChars` characters (design § States ›
- * Tiers, step 8): whole subdomain labels are removed from the front behind
- * `….`; only when the scheme, registrable domain and port still do not fit is
- * the domain cut from its start behind "…", so its end, the TLD and the port
- * stay. The scheme is kept at every width. The formatter writes the "…"
- * itself; callers never use CSS `direction` (bidi would reorder a digit-led
- * domain).
+ * The formatted origin fitted to `maxChars` characters, split into its parts
+ * (design § States › Tiers, step 8): whole subdomain labels are removed from
+ * the front behind `….`; only when the scheme, registrable domain and port
+ * still do not fit is the domain cut from its start behind "…", so its end,
+ * the TLD and the port stay. The scheme is kept at every width. The formatter
+ * writes the "…" itself; callers never use CSS `direction` (bidi would
+ * reorder a digit-led domain).
  */
-export function fitOrigin(parts: WebOriginParts, maxChars: number): string {
-  const full = originText(parts)
-  if ([...full].length <= maxChars) return full
+export function fitOriginParts(parts: WebOriginParts, maxChars: number): FittedOrigin {
   const scheme = parts.scheme === null ? '' : `${parts.scheme}://`
   const port = parts.port === null ? '' : `:${parts.port}`
+  const whole = { scheme, subdomain: parts.subdomain, registrableDomain: parts.registrableDomain, port }
+  if (charCount(fittedText(whole)) <= maxChars) return whole
   const labels = parts.subdomain === '' ? [] : parts.subdomain.slice(0, -1).split('.')
   for (let drop = 1; drop <= labels.length; drop++) {
     const kept = labels.slice(drop)
-    const sub = kept.length === 0 ? SUBDOMAIN_ELISION : `${SUBDOMAIN_ELISION}${kept.join('.')}.`
-    const text = `${scheme}${sub}${parts.registrableDomain}${port}`
-    if ([...text].length <= maxChars) return text
+    const subdomain = kept.length === 0 ? SUBDOMAIN_ELISION : `${SUBDOMAIN_ELISION}${kept.join('.')}.`
+    const fitted = { ...whole, subdomain }
+    if (charCount(fittedText(fitted)) <= maxChars) return fitted
   }
-  const room = maxChars - [...scheme].length - [...port].length - 1
+  const room = maxChars - charCount(scheme) - charCount(port) - 1
   const domain = [...parts.registrableDomain]
   const tail = room > 0 ? domain.slice(Math.max(domain.length - room, 0)).join('') : ''
-  return `${scheme}…${tail}${port}`
+  return { scheme, subdomain: '', registrableDomain: `…${tail}`, port }
+}
+
+/** {@link fitOriginParts} as one string. */
+export function fitOrigin(parts: WebOriginParts, maxChars: number): string {
+  return fittedText(fitOriginParts(parts, maxChars))
+}
+
+/**
+ * The longest fitting of `parts` whose drawn width, by `measure`, is at most
+ * `widthPx` – for a surface that knows its width in pixels rather than in
+ * characters (the address bar, the popup strip, the editor-tab label). A
+ * non-positive or non-finite width (not laid out yet) gives the whole origin.
+ *
+ * @param measure - The drawn width of a string in the surface's font, in px
+ */
+export function fitOriginToWidth(
+  parts: WebOriginParts,
+  widthPx: number,
+  measure: (text: string) => number
+): FittedOrigin {
+  const whole = fitOriginParts(parts, Number.POSITIVE_INFINITY)
+  if (!Number.isFinite(widthPx) || widthPx <= 0) return whole
+  for (let max = charCount(fittedText(whole)); max > 0; max--) {
+    const fitted = fitOriginParts(parts, max)
+    if (measure(fittedText(fitted)) <= widthPx) return fitted
+  }
+  return fitOriginParts(parts, 0)
+}
+
+/**
+ * `url` without its user info (`user:password@`): what Erfana sends to its
+ * own renderer as an address, so no surface – the bar at rest or while
+ * edited, the tooltip, a row – can show a host-like name before the real host
+ * (`https://accounts.example.com@evil.test/`). A string that does not parse,
+ * or has no user info, comes back unchanged.
+ */
+export function withoutUserInfo(url: string): string {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return url
+  }
+  if (parsed.username === '' && parsed.password === '') return url
+  parsed.username = ''
+  parsed.password = ''
+  return parsed.href
 }
 
 function safeDecode(text: string): string {

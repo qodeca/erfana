@@ -134,6 +134,8 @@ export default defineConfig({
         'src/renderer/src/utils/openBrowserTab.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/95.58/100
         'src/renderer/src/components/Panels/BrowserPanel/browserPanel.logic.ts': { lines: 98, functions: 98, branches: 93, statements: 98 },
+        // The origin fitted to its box (attacker pass F1, issue #448). measured 96.87/84.61/85/92.5
+        'src/renderer/src/components/Panels/BrowserPanel/useOriginFit.ts': { lines: 94, functions: 82, branches: 83, statements: 90 },
         // measured 100/100/91.89/97.01
         'src/renderer/src/components/Panels/BrowserPanel/useBrowserBounds.ts': { lines: 98, functions: 98, branches: 89, statements: 95 },
         // measured 100/100/94.73/98.46

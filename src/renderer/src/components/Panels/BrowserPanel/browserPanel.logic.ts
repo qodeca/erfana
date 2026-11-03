@@ -19,6 +19,7 @@ import type {
   NavigateResponse,
   OriginPartsPayload
 } from '../../../../../shared/ipc/browser-tab-schema'
+import { sanitizePageText } from '../../../../../shared/browser/pageText'
 import type { BrowserTabState } from '../../../stores/useBrowserTabStore'
 import { NEW_BROWSER_TAB_TITLE } from '../../../utils/openBrowserTab'
 import { getBasename } from '../../../utils/fileUtils'
@@ -29,11 +30,15 @@ export function shownAddress(state: BrowserTabState | null): string | null {
   return state.pendingUrl ?? state.committedUrl
 }
 
-/** The last path segment of a `file:` URL, decoded; `''` when there is none. */
+/**
+ * The last path segment of a `file:` URL, decoded and cleaned of control,
+ * bidi and invisible characters (a file named `evil\u202Elmth.exe` must not
+ * draw as `evilexe.htm…`); `''` when there is none.
+ */
 function fileName(url: string): string {
   try {
     // A URL path always uses `/`; getBasename also accepts it.
-    return getBasename(decodeURIComponent(new URL(url).pathname))
+    return sanitizePageText(getBasename(decodeURIComponent(new URL(url).pathname)))
   } catch {
     return ''
   }
@@ -57,6 +62,18 @@ export function tabLabel(state: BrowserTabState | null): string {
   if (state === null || state.erfanaPage === 'empty') return NEW_BROWSER_TAB_TITLE
   if (state.title !== '') return state.title
   return originLabel(state.origin, shownAddress(state)) ?? NEW_BROWSER_TAB_TITLE
+}
+
+/**
+ * The origin the editor-tab label shows while the page has no title – the
+ * host alone, with no scheme or port – for the tab to fit to its width
+ * (design § States › Tiers, step 8: a long host is cut from its start, never
+ * clipped at its end). `null` when the label is not a web host.
+ */
+export function tabLabelOrigin(state: BrowserTabState | null): WebOriginParts | null {
+  if (state === null || state.erfanaPage === 'empty' || state.title !== '') return null
+  const origin = state.origin
+  return origin?.kind === 'web' ? { ...origin, scheme: null, port: null } : null
 }
 
 function originLabel(origin: OriginPartsPayload | null, address: string | null): string | null {

@@ -3,11 +3,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   fitOrigin,
+  fitOriginParts,
+  fitOriginToWidth,
   formatOrigin,
   originParts,
   originText,
   popupWindowTitle,
   tabTitleFallback,
+  withoutUserInfo,
   type WebOriginParts
 } from './originFormat'
 import { pinnedRegistrableDomain as psl } from './publicSuffixList'
@@ -97,5 +100,72 @@ describe('fitOrigin (design § States › Tiers, step 8)', () => {
   it('cuts the registrable domain from its start only as a last resort, keeping the TLD and port', () => {
     expect(fitOrigin(parts, 20)).toBe('http://…e.co.uk:8080')
     expect(fitOrigin(parts, 13)).toBe('http://…:8080')
+  })
+})
+
+describe('attacker pass (spec 025 issue #448 DoD § 4)', () => {
+  it('F2: a trailing dot does not move the registrable domain one label right', () => {
+    expect(web('https://evil.github.io./')).toMatchObject({ subdomain: '', registrableDomain: 'evil.github.io' })
+    expect(web('https://accounts.google.com.evil.test./')).toMatchObject({
+      subdomain: 'accounts.google.com.',
+      registrableDomain: 'evil.test'
+    })
+    expect(web('http://localhost.:3000/')).toMatchObject({ registrableDomain: 'localhost', port: '3000' })
+  })
+
+  it('F2: fitting a trailing-dot host keeps its registrable domain', () => {
+    expect(fitOrigin(web('https://accounts.google.com.evil.test./'), 12)).toBe('….evil.test')
+  })
+
+  it('F6: without a public-suffix list, a look-alike behind www is shown in punycode', () => {
+    const p = originParts('https://www.gıthub.com/', () => null)
+    expect(p).toMatchObject({ kind: 'web', punycode: true })
+    expect(p?.kind === 'web' && p.registrableDomain).toMatch(/^www\.xn--/)
+  })
+
+  it('F7: drops user info from an address, and leaves other text alone', () => {
+    expect(withoutUserInfo('https://accounts.example.com@evil.test/a?b#c')).toBe('https://evil.test/a?b#c')
+    expect(withoutUserInfo('https://u:p@evil.test:8443/')).toBe('https://evil.test:8443/')
+    expect(withoutUserInfo('https://evil.test/@x')).toBe('https://evil.test/@x')
+    expect(withoutUserInfo('not a url')).toBe('not a url')
+    expect(withoutUserInfo('mailto:a@b.c')).toBe('mailto:a@b.c')
+  })
+})
+
+describe('fitOriginParts and fitOriginToWidth (F1)', () => {
+  const long = web('http://accounts.google.com.secure-login.verify.evil.test:8080/')
+  /** One px per character, as a monospace font draws ASCII. */
+  const mono = (text: string): number => [...text].length
+
+  it('splits the fitted origin into its parts', () => {
+    expect(fitOriginParts(long, 34)).toEqual({
+      scheme: 'http://',
+      subdomain: '….verify.',
+      registrableDomain: 'evil.test',
+      port: ':8080'
+    })
+    expect(fitOriginParts(long, 10)).toEqual({ scheme: 'http://', subdomain: '', registrableDomain: '…', port: ':8080' })
+  })
+
+  it('fits to a width in px: 0 labels, 1 label and many labels removed', () => {
+    const whole = fitOriginToWidth(long, 1000, mono)
+    expect(whole.subdomain).toBe('accounts.google.com.secure-login.verify.')
+    expect(fitOriginToWidth(long, 34, mono).subdomain).toBe('….verify.')
+    expect(fitOriginToWidth(long, 25, mono)).toMatchObject({ subdomain: '….', registrableDomain: 'evil.test' })
+    expect(fitOriginToWidth(long, 1, mono).registrableDomain).toBe('…')
+  })
+
+  it('gives the whole origin before layout (width 0 or not finite)', () => {
+    expect(fitOriginToWidth(long, 0, mono).subdomain).toBe('accounts.google.com.secure-login.verify.')
+    expect(fitOriginToWidth(long, Number.NaN, mono).registrableDomain).toBe('evil.test')
+  })
+
+  it('measures wide characters with the given measure, not by count', () => {
+    const wide = web('https://例え.例え.例え.jp/')
+    const twoPerHan = (text: string): number =>
+      [...text].reduce((n, ch) => n + (/\p{Script=Han}|\p{Script=Hiragana}/u.test(ch) ? 2 : 1), 0)
+    const fitted = fitOriginToWidth(wide, 9, twoPerHan)
+    expect(twoPerHan(`${fitted.subdomain}${fitted.registrableDomain}`)).toBeLessThanOrEqual(9)
+    expect(fitted.registrableDomain).toBe('例え.jp')
   })
 })

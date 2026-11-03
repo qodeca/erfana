@@ -8,8 +8,13 @@
  *
  * - **Read-only address**, through main's formatter (Security rule 2): the
  *   committed address only, never page text; focusable so it can be
- *   selected and copied. Before the first commit it says the popup is
- *   loading.
+ *   selected and copied. At rest the origin is fitted to the field's width
+ *   (`useOriginFit`), so a long host never pushes its registrable domain out
+ *   of view; focused, the field holds the whole address for copying.
+ * - **No web address yet** – before the first commit, at `about:blank`, or a
+ *   document its opener wrote with no navigation – it reads "about:blank –
+ *   opened by {origin}", naming the frame that opened it, as the OS title does
+ *   (S-22). "Loading…" shows only until main first answers.
  * - **The badge** for remote `http` and local files, as the address bar.
  * - Asked again on every `browser-tab:popupChanged`.
  * - **Ctrl/Cmd+W** closes the popup (025-FR-014). The host has no platform
@@ -22,18 +27,27 @@ import { useEffect, useState } from 'react'
 import { CircleAlert, File } from 'lucide-react'
 import type { BrowserPopupBridge } from '../../../shared/ipc/browser-popup-bridge-types'
 import type { PopupStripResponse } from '../../../shared/ipc/browser-tab-popup-schema'
-import { originText } from '../../../shared/browser/originFormat'
+import { fittedText, originText, popupBlankText, type FittedOrigin } from '../../../shared/browser/originFormat'
 import { securityBadge, pathOf } from '../components/Panels/BrowserPanel/browserPanel.logic'
+import { useOriginFit } from '../components/Panels/BrowserPanel/useOriginFit'
 import { BROWSER_TEST_IDS } from '../components/Panels/BrowserPanel/browserTestIds'
 import './PopupStrip.css'
 
-/** What the strip shows for `strip`: the formatted address, or a waiting line. */
-export function popupAddress(strip: PopupStripResponse | null): string {
-  if (strip === null || strip.committedUrl === null) return 'Loading…'
+const BLANK = 'about:blank'
+
+/**
+ * What the strip shows for `strip`: the formatted address – its origin
+ * `fitted` when given – "about:blank – opened by {origin}" while the popup has
+ * no address of its own, or a waiting line before main answers.
+ */
+export function popupAddress(strip: PopupStripResponse | null, fitted: FittedOrigin | null = null): string {
+  if (strip === null) return 'Loading…'
+  const committed = strip.committedUrl
+  if (committed === null || committed === BLANK) return popupBlankText(strip.openedBy)
   const origin = strip.origin
-  if (origin?.kind === 'web') return `${originText(origin)}${pathOf(strip.committedUrl)}`
+  if (origin?.kind === 'web') return `${fitted === null ? originText(origin) : fittedText(fitted)}${pathOf(committed)}`
   if (origin?.kind === 'nonWeb') return `${origin.scheme}:`
-  return strip.committedUrl
+  return committed
 }
 
 /** Props for {@link PopupStrip}. */
@@ -83,8 +97,12 @@ export function PopupStrip({ api }: PopupStripProps): JSX.Element {
     return () => window.removeEventListener('keydown', onKey)
   }, [api])
 
+  const [field, setField] = useState<HTMLInputElement | null>(null)
+  const [focused, setFocused] = useState(false)
+  const webOrigin = strip?.origin?.kind === 'web' ? strip.origin : null
+  const fitted = useOriginFit(field, webOrigin)
   const badge = strip === null ? null : securityBadge(strip.security)
-  const address = popupAddress(strip)
+  const address = popupAddress(strip, focused ? null : fitted)
   return (
     <div className="erf-popup-strip" data-testid={BROWSER_TEST_IDS.POPUP_STRIP}>
       {badge !== null && (
@@ -94,12 +112,15 @@ export function PopupStrip({ api }: PopupStripProps): JSX.Element {
         </span>
       )}
       <input
+        ref={setField}
         className="erf-popup-strip__address"
         aria-label="Pop-up window address"
         aria-description={badge?.description}
         readOnly
         value={address}
         spellCheck={false}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
       />
     </div>
   )

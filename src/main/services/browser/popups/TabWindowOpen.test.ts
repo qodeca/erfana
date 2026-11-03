@@ -220,3 +220,26 @@ describe('TabWindowOpen', () => {
     expect(handler(details()).action).toBe('allow')
   })
 })
+
+describe('the popup names the frame that opened it (attacker pass F4, issue #448)', () => {
+  it('names the opening frame’s origin, not the top page, and falls back to the page address', () => {
+    const { deps, handler, opener } = setup()
+    opener.press()
+    const fromFrame = handler(details({ features: 'width=500', disposition: 'new-window' })) as { createWindow: (o: object) => WebContents }
+    const popup = created({ origin: 'https://ads.other.test' })
+    fromFrame.createWindow({ webContents: popup })
+    expect(deps.openPopup).toHaveBeenLastCalledWith(expect.objectContaining({ openerUrl: 'https://ads.other.test' }))
+
+    opener.press()
+    const opaque = handler(details({ features: 'width=500', disposition: 'new-window' })) as { createWindow: (o: object) => WebContents }
+    opaque.createWindow({ webContents: created({ origin: 'null' }) })
+    expect(deps.openPopup).toHaveBeenLastCalledWith(expect.objectContaining({ openerUrl: 'null' }))
+
+    opener.press()
+    const disposed = handler(details({ features: 'width=500', disposition: 'new-window' })) as { createWindow: (o: object) => WebContents }
+    const gone = created({})
+    Object.defineProperty(gone, 'opener', { get: () => ({ get origin(): string { throw new Error('Render frame was disposed') } }) })
+    disposed.createWindow({ webContents: gone })
+    expect(deps.openPopup).toHaveBeenLastCalledWith(expect.objectContaining({ openerUrl: PAGE }))
+  })
+})

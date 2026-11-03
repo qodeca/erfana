@@ -55,7 +55,25 @@ export interface OpenerContents extends ActivationContents {
 export interface PopupRequest {
   readonly contents: WebContents
   readonly features: WindowFeatures
+  /**
+   * Who opened it, named in the popup's title and strip until its first
+   * commit: the origin of the frame that called `window.open` (a frame
+   * inside the page names itself, not the top page), or the page's address
+   * when Chromium gives no frame. `"null"` for an opaque-origin frame.
+   */
   readonly openerUrl: string
+}
+
+/** The origin of the frame that opened `created`, else the opener page's address. */
+function openingOrigin(created: WebContents, opener: OpenerContents): string {
+  let origin: unknown
+  try {
+    origin = created.opener?.origin
+  } catch {
+    // A frame already disposed throws on access; the page's address still names the opener.
+    origin = null
+  }
+  return typeof origin === 'string' && origin !== '' ? origin : opener.getURL()
 }
 
 export interface TabWindowOpenDeps {
@@ -179,7 +197,7 @@ export class TabWindowOpen {
       if (!this.deps.openTab(url, background, created)) created.close({ waitForBeforeUnload: false })
       return created
     }
-    this.deps.openPopup({ contents: created, features, openerUrl: opener.getURL() })
+    this.deps.openPopup({ contents: created, features, openerUrl: openingOrigin(created, opener) })
     return created
   }
 

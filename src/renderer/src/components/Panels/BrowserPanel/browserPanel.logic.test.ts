@@ -7,9 +7,11 @@ import {
   navGroupDescription,
   pathOf,
   refusedMessage,
+  rowAddress,
   securityBadge,
   shownAddress,
   tabLabel,
+  tabLabelOrigin,
   tabTooltip
 } from './browserPanel.logic'
 
@@ -163,5 +165,32 @@ describe('navGroupDescription', () => {
     [true, true, null]
   ])('back %s forward %s → %s', (back, forward, text) => {
     expect(navGroupDescription(back, forward)).toBe(text)
+  })
+})
+
+describe('attacker pass (issue #448)', () => {
+  it('F5: a local file name with a bidi override or control character is cleaned in the tab label', () => {
+    const file = (name: string): BrowserTabState =>
+      state({ committedUrl: `file:///p/site/${name}`, origin: { kind: 'file' } })
+    expect(tabLabel(file('evil%E2%80%AElmth.exe'))).toBe('evillmth.exe')
+    expect(tabLabel(file('a%E2%81%A7b%00c.html'))).toBe('ab c.html')
+    expect(tabLabel(file('%E2%80%AE'))).toBe('Local file')
+  })
+
+  it('F6: a history row shows a look-alike behind www in punycode', () => {
+    expect(rowAddress('https://www.xn--gthub-n4a.com/login')).toBe('www.xn--gthub-n4a.com/login')
+    expect(rowAddress('https://www.bücher.de/')).toBe('www.bücher.de')
+  })
+
+  it('tabLabelOrigin gives the host alone while the label is the host, else null', () => {
+    expect(tabLabelOrigin(state({ origin: { ...WEB, scheme: 'http', port: '8080' } }))).toEqual({
+      ...WEB,
+      scheme: null,
+      port: null
+    })
+    expect(tabLabelOrigin(state({ title: 'Docs' }))).toBeNull()
+    expect(tabLabelOrigin(state({ erfanaPage: 'empty' }))).toBeNull()
+    expect(tabLabelOrigin(state({ origin: { kind: 'file' } }))).toBeNull()
+    expect(tabLabelOrigin(null)).toBeNull()
   })
 })

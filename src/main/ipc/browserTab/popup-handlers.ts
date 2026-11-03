@@ -21,7 +21,7 @@
  * Never a throw: a refusal is a `null` answer or nothing.
  */
 import { BrowserWindow, type IpcMainInvokeEvent } from 'electron'
-import { originParts, type RegistrableDomainResolver } from '../../../shared/browser/originFormat'
+import { originParts, popupOpenerName, withoutUserInfo, type RegistrableDomainResolver } from '../../../shared/browser/originFormat'
 import { BROWSER_TAB_CHANNELS, BROWSER_TAB_POPUP_CHANNELS } from '../../../shared/ipc/browser-tab-channels'
 import { PopupStripResponseSchema, type PopupStripResponse } from '../../../shared/ipc/browser-tab-popup-schema'
 import {
@@ -93,11 +93,12 @@ export function registerBrowserTabPopupHandlers(deps: BrowserTabPopupHandlerDeps
   registerHandle(P.popupStrip, (event, arg: unknown): PopupStripResponse | null => {
     const popup = popupOf(P.popupStrip, event, PopupStripRequestSchema, arg)
     if (popup === null) return null
-    const committedUrl = popup.committed
+    const committedUrl = popup.committed === null ? null : withoutUserInfo(popup.committed)
     const answer = {
       committedUrl,
       origin: committedUrl === null ? null : originParts(committedUrl, deps.resolveDomain),
-      security: securityStateOf(committedUrl)
+      security: securityStateOf(committedUrl),
+      openedBy: popupOpenerName(popup.openerUrl, deps.resolveDomain)
     }
     return PopupStripResponseSchema.safeParse(answer).success ? answer : null
   })

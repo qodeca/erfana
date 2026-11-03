@@ -104,7 +104,7 @@ export interface PopupHostOptions {
 export interface BrowserPopupWindowDeps {
   /** The tab whose page (or popup) opened this one; the popup closes with it. */
   readonly openerTabId: string
-  /** The opener page's address, named in the title until the first commit. */
+  /** The opening frame's origin (or the opener page's address), named in the title and strip until a web commit. */
   readonly openerUrl: string
   /** The `webContents` Chromium created for the popup (registered, opener kept). */
   readonly contents: PopupContents
@@ -174,6 +174,11 @@ export class BrowserPopupWindow {
   /** The committed address, or `null` before the first commit. */
   get committed(): string | null {
     return this.committedUrl
+  }
+
+  /** Who opened the popup: the opening frame's origin, or the opener page's address (`TabWindowOpen.ts`). */
+  get openerUrl(): string {
+    return this.deps.openerUrl
   }
 
   /** The work area the popup's size was clamped to. */

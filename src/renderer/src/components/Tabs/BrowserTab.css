@@ -70,6 +70,26 @@ img.erf-brw-tab__icon {
   color: var(--color-white);
 }
 
+/*
+ * A long host label (025-FR-004, fold step 8): the whole host stays in the
+ * layout, hidden, so the tab keeps the width it gives; the host fitted to that
+ * width – subdomain labels removed from the front – is drawn over it.
+ */
+.erf-brw-tab__label:has(.erf-brw-tab__fitted) {
+  position: relative;
+}
+
+.erf-brw-tab__sizer {
+  visibility: hidden;
+}
+
+.erf-brw-tab__fitted {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
 .erf-brw-tab__sr {
   position: absolute;
   width: 1px;

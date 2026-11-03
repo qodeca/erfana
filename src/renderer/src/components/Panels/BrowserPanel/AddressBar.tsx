@@ -23,6 +23,8 @@
  *   list before the next restores the address.
  */
 import { forwardRef, useId, useState } from 'react'
+import { fitOriginParts, type FittedOrigin } from '../../../../../shared/browser/originFormat'
+import { useOriginFit } from './useOriginFit'
 import { AddressSuggestions, suggestionId, useAddressSuggestions } from './AddressSuggestions'
 import type { SuggestionOption } from './addressSuggestions.logic'
 import type { StillSurface } from './useStillSurface'
@@ -57,17 +59,28 @@ export interface AddressBarProps {
 
 const BADGE_ICON = { size: 14, strokeWidth: 2, 'aria-hidden': true } as const
 
-function DisplayText({ display }: { readonly display: AddressDisplay }): JSX.Element | null {
+/**
+ * The resting display. A web origin is drawn fitted to the field's width
+ * (`useOriginFit`): subdomain labels leave from the front, so a long host can
+ * never push its registrable domain out of view; the path takes what is left.
+ */
+function DisplayText({
+  display,
+  fitted
+}: {
+  readonly display: AddressDisplay
+  readonly fitted: FittedOrigin | null
+}): JSX.Element | null {
   if (display.kind === 'empty') return null
   if (display.kind === 'text') return <span className="erf-brw-address__path">{display.text}</span>
-  const { parts, path } = display
+  const shown = fitted ?? fitOriginParts(display.parts, Number.POSITIVE_INFINITY)
   return (
     <>
-      {parts.scheme !== null && <span className="erf-brw-address__dim">{parts.scheme}://</span>}
-      {parts.subdomain !== '' && <span className="erf-brw-address__dim">{parts.subdomain}</span>}
-      <span className="erf-brw-address__domain">{parts.registrableDomain}</span>
-      {parts.port !== null && <span className="erf-brw-address__dim">:{parts.port}</span>}
-      {path !== '' && <span className="erf-brw-address__path">{path}</span>}
+      {shown.scheme !== '' && <span className="erf-brw-address__dim">{shown.scheme}</span>}
+      {shown.subdomain !== '' && <span className="erf-brw-address__dim">{shown.subdomain}</span>}
+      <span className="erf-brw-address__domain">{shown.registrableDomain}</span>
+      {shown.port !== '' && <span className="erf-brw-address__dim">{shown.port}</span>}
+      {display.path !== '' && <span className="erf-brw-address__path">{display.path}</span>}
     </>
   )
 }
@@ -96,6 +109,8 @@ export const AddressBar = forwardRef<HTMLInputElement, AddressBarProps>(function
   const badge = state === null ? null : securityBadge(state.security)
   const display = addressDisplay(state)
   const atRest = !focused && draft === null && display.kind !== 'empty'
+  const [displayBox, setDisplayBox] = useState<HTMLSpanElement | null>(null)
+  const fitted = useOriginFit(displayBox, display.kind === 'web' ? display.parts : null)
   const describedBy =
     [badge === null ? null : badgeId, errorId].filter(id => id !== null).join(' ') || undefined
   const typing = focused && draft !== null && draft !== address && draft !== dismissed ? draft : null
@@ -202,8 +217,8 @@ export const AddressBar = forwardRef<HTMLInputElement, AddressBarProps>(function
           onKeyDown={onKeyDown}
         />
         {atRest && (
-          <span className="erf-brw-address__display" aria-hidden="true">
-            <DisplayText display={display} />
+          <span ref={setDisplayBox} className="erf-brw-address__display" aria-hidden="true">
+            <DisplayText display={display} fitted={fitted} />
           </span>
         )}
       </div>

@@ -16,7 +16,7 @@
  * - **Zoom** (025-FR-008): the level the page shows, in whole percent within
  *   the zoom steps' range.
  */
-import { originParts, type RegistrableDomainResolver } from '../../../../shared/browser/originFormat'
+import { originParts, withoutUserInfo, type RegistrableDomainResolver } from '../../../../shared/browser/originFormat'
 import { showsLoadErrorPage } from '../../../../shared/browser/netErrorMessages'
 import { ZOOM_MAX_PERCENT, ZOOM_MIN_PERCENT } from '../../../../shared/browser/zoomSteps'
 import type { LoadErrorPage } from '../../../../shared/ipc/browser-tab-page-schema'
@@ -65,7 +65,8 @@ export function decorateTabState(
   if (state.erfanaPage === 'certificate') return zoomed
   if (facts.crashed) return { ...zoomed, erfanaPage: 'crashed' }
   if (facts.loadError === null || facts.failedUrl === null) return zoomed
-  const url = facts.failedUrl.slice(0, BROWSER_URL_MAX_CHARS)
+  // The load-error page names the failed address as the bar does: without user info.
+  const url = withoutUserInfo(facts.failedUrl).slice(0, BROWSER_URL_MAX_CHARS)
   return {
     ...zoomed,
     committedUrl: url,

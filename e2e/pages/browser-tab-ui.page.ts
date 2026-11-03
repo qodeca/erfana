@@ -49,6 +49,21 @@ export class BrowserPanelUi {
     return this.root.getByRole('group', { name: 'Navigation' })
   }
 
+  /** The address bar's resting display (drawn over the input while it is not edited). */
+  get addressDisplay(): Locator {
+    return this.root.locator('.erf-brw-address__display')
+  }
+
+  /** The registrable domain in the resting display. */
+  get addressDomain(): Locator {
+    return this.addressDisplay.locator('.erf-brw-address__domain')
+  }
+
+  /** The parts of the resting display, in DOM order (scheme, subdomain, domain, port, path). */
+  get addressParts(): Locator {
+    return this.addressDisplay.locator(':scope > span')
+  }
+
   button(name: string): Locator {
     return this.navigation.getByRole('button', { name, exact: true })
   }
@@ -216,6 +231,58 @@ export class BrowserTabUiPage {
     const panel = this.visiblePanel()
     await panel.tabId()
     return panel
+  }
+
+  /**
+   * Resize Erfana's window until `panel` is `width` CSS px wide. When the
+   * editor area stops shrinking at the other panels' minimum sizes, the panel
+   * itself is held to `width`.
+   */
+  async setPanelWidth(panel: BrowserPanelUi, width: number): Promise<void> {
+    const panelWidth = async (): Promise<number> => (await panel.root.boundingBox())?.width ?? 0
+    const delta = Math.round((await panelWidth()) - width)
+    if (delta !== 0) {
+      await this.app.evaluate(({ BrowserWindow }, d) => {
+        const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed() && w.isVisible())
+        if (win === undefined) throw new Error('No visible window')
+        win.setMinimumSize(200, 200)
+        const [w, h] = win.getContentSize()
+        win.setContentSize(w - d, h)
+      }, delta)
+      // Until the layout settles: two reads in a row agree.
+      let last = -1
+      await expect
+        .poll(
+          async () => {
+            const now = await panelWidth()
+            const settled = now === last
+            last = now
+            return settled
+          },
+          { timeout: UI_WAIT_MS, intervals: [100, 200, 300] }
+        )
+        .toBe(true)
+    }
+    if (Math.abs((await panelWidth()) - width) > 1) {
+      await panel.root.evaluate((el, w) => {
+        const root = el as HTMLElement
+        root.style.width = `${w}px`
+        root.style.flex = '0 0 auto'
+      }, width)
+    }
+    await expect.poll(panelWidth, { timeout: UI_WAIT_MS }).toBeCloseTo(width, 0)
+  }
+
+  /** The newest popup window's host page (its origin strip), once one is open. */
+  async popupHost(count = 1): Promise<Page> {
+    const hosts = (): Page[] => this.app.windows().filter(w => w.url().includes('#browser-popup'))
+    await expect.poll(() => hosts().length, { timeout: UI_WAIT_MS }).toBeGreaterThanOrEqual(count)
+    return hosts()[count - 1]!
+  }
+
+  /** The read-only address field of a popup's origin strip. */
+  popupAddress(host: Page): Locator {
+    return host.getByRole('textbox', { name: 'Pop-up window address' })
   }
 
   /** The browser editor tab whose panel hosts `tabId`. */

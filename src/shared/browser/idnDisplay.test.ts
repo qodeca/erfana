@@ -57,3 +57,28 @@ describe('displayHost (S9)', () => {
     expect(displayHost('xn--ls8h.example.com', 'example.com')).toBe('xn--ls8h.example.com') // an emoji label
   })
 })
+
+describe('displayHost – attacker pass (spec 025 issue #448 DoD § 4)', () => {
+  it('F3: shows labels in scripts outside the UTS #39 Recommended set in punycode', () => {
+    const lisu = 'ꓖꓳꓳꓖꓡꓰ.com' // Lisu letters drawn as G O O G L E
+    expect(shown(lisu)).toBe(ascii(lisu))
+    expect(shown(lisu)).toMatch(/^xn--/)
+    const cherokee = 'ᏀᎾᎾᏀᏞᎬ.com' // Cherokee letters drawn as G O O G L E
+    expect(shown(cherokee)).toMatch(/^xn--/)
+    const syllabics = 'ᑭᗩᑭᗩᒪ.com' // Canadian Syllabics drawn as P A P A L
+    expect(shown(syllabics)).toMatch(/^xn--/)
+    expect(displayHost(ascii(lisu), null)).toMatch(/^xn--/)
+  })
+
+  it('F3: still shows single-script labels in Recommended scripts in Unicode', () => {
+    expect(shown('ไทย.com')).toBe('ไทย.com')
+    expect(shown('उदाहरण.com')).toBe('उदाहरण.com')
+    expect(shown('ექსპერიმენტი.com')).toBe('ექსპერიმენტი.com')
+  })
+
+  it('F6: with no registrable domain known, checks every label for imitation', () => {
+    const host = ascii('www.gıthub.com')
+    expect(displayHost(host, null)).toBe(host)
+    expect(displayHost(ascii('bücher.example.com'), null)).toBe('bücher.example.com')
+  })
+})

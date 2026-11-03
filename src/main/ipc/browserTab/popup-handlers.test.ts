@@ -22,7 +22,7 @@ import { BrowserWindow } from 'electron'
 import { BROWSER_TAB_POPUP_HANDLED_CHANNELS, registerBrowserTabPopupHandlers } from './popup-handlers'
 
 const POPUP_HOST = 501
-const popup = { committed: 'https://staging.test/child.html' as string | null, close: vi.fn() }
+const popup = { committed: 'https://staging.test/child.html' as string | null, openerUrl: 'https://app.test', close: vi.fn() }
 const popups = { popupByHost: vi.fn((id: number) => (id === POPUP_HOST ? popup : null)) }
 const tabs = { contextAction: vi.fn(() => 'accepted' as const) }
 const MENU = { tabId: 'browser-tab-1', menuId: 'abc', action: 'reload' }
@@ -81,10 +81,11 @@ describe('registerBrowserTabPopupHandlers', () => {
     expect(call('browser-tab:popupStrip', event(POPUP_HOST), {})).toEqual({
       committedUrl: 'https://staging.test/child.html',
       origin: expect.objectContaining({ kind: 'web' }),
-      security: 'secure'
+      security: 'secure',
+      openedBy: 'app.test'
     })
     popup.committed = null
-    expect(call('browser-tab:popupStrip', event(POPUP_HOST), {})).toEqual({ committedUrl: null, origin: null, security: 'local' })
+    expect(call('browser-tab:popupStrip', event(POPUP_HOST), {})).toEqual({ committedUrl: null, origin: null, security: 'local', openedBy: 'app.test' })
   })
 
   it('popup channels refuse a sender that is not a popup and a bad payload', () => {
@@ -104,5 +105,16 @@ describe('registerBrowserTabPopupHandlers', () => {
   it('popupStrip answers null when the address does not fit the schema', () => {
     popup.committed = `https://staging.test/${'a'.repeat(9000)}`
     expect(call('browser-tab:popupStrip', event(POPUP_HOST), {})).toBeNull()
+  })
+})
+
+describe('popupStrip – attacker pass (F4, F7; issue #448)', () => {
+  it('drops user info from the committed address and names an opaque opener "a page"', () => {
+    popup.committed = 'https://accounts.example.com@evil.test/x'
+    popup.openerUrl = 'null'
+    const answer = call('browser-tab:popupStrip', event(POPUP_HOST), {}) as { committedUrl: string; openedBy: string }
+    expect(answer.committedUrl).toBe('https://evil.test/x')
+    expect(answer.openedBy).toBe('a page')
+    popup.openerUrl = 'https://app.test'
   })
 })

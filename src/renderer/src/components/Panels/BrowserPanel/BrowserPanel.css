@@ -181,12 +181,22 @@
   pointer-events: none;
 }
 
+/*
+ * Each part is a flex item and its own bidi isolate, so a right-to-left label
+ * cannot pull a neighbouring part (a port, a digit-led path) across it.
+ */
+.erf-brw-address__dim,
+.erf-brw-address__domain,
+.erf-brw-address__path {
+  unicode-bidi: isolate;
+}
+
 .erf-brw-address__dim {
   flex: 0 0 auto;
   color: var(--color-text-tertiary);
 }
 
-/* The registrable domain: brightest, never wrapped, never cut (Security rule 2). */
+/* The registrable domain: brightest, never wrapped, cut only from its start by the formatter (Security rule 2, fold step 8). */
 .erf-brw-address__domain {
   flex: 0 0 auto;
   color: var(--color-text-emphasis);

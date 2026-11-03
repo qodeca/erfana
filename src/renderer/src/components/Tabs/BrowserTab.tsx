@@ -6,7 +6,9 @@
  * Tabs card, proposed).
  *
  * - **Label**: the page title; while none is known, the formatted host with
- *   no path; "New browser tab" for an empty tab. For a load the page started,
+ *   no path, fitted to the tab's width (a long host loses subdomain labels
+ *   from the front, never its registrable domain); "New browser tab" for an
+ *   empty tab. For a load the page started,
  *   main keeps the committed page's title until the new document commits, so
  *   the label never names a page the tab has not reached.
  * - **The title is page text**: it sits in `<bdi dir="auto">`, so a
@@ -19,7 +21,7 @@
  *   preview tab has. Closing asks main first (the page may ask to stay,
  *   025-FR-058); the editor tab goes when main reports the tab closed.
  */
-import { useCallback, useRef, useState, type MouseEvent } from 'react'
+import { useCallback, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { Globe, LoaderCircle, X } from 'lucide-react'
 import type { IDockviewPanelHeaderProps } from 'dockview'
 import { ContextMenu } from '../ContextMenu/ContextMenu'
@@ -29,7 +31,9 @@ import { useTabMenuKey } from './useTabMenuKey'
 import { useBrowserTabStore } from '../../stores/useBrowserTabStore'
 import { requestBrowserPanelClose } from '../../services/browser/browserTabLifecycle'
 import type { BrowserPanelParams } from '../../utils/openBrowserTab'
-import { tabLabel, tabTooltip } from '../Panels/BrowserPanel/browserPanel.logic'
+import { fittedText } from '../../../../shared/browser/originFormat'
+import { tabLabel, tabLabelOrigin, tabTooltip } from '../Panels/BrowserPanel/browserPanel.logic'
+import { useOriginFit } from '../Panels/BrowserPanel/useOriginFit'
 import { browserShortcut } from '../Panels/BrowserPanel/browserShortcuts'
 import { BROWSER_TEST_IDS } from '../Panels/BrowserPanel/browserTestIds'
 import './BrowserTab.css'
@@ -52,6 +56,13 @@ export function BrowserTab(props: IDockviewPanelHeaderProps<BrowserPanelParams>)
   const state = entry?.state ?? null
   const label = tabLabel(state)
   const loading = state?.loading === true
+  // A host label is fitted to the tab: subdomain labels go from the front, so
+  // the registrable domain never sits past the tab's clipped end.
+  const labelOrigin = useMemo(() => tabLabelOrigin(state), [state])
+  const [labelBox, setLabelBox] = useState<HTMLSpanElement | null>(null)
+  const fittedLabel = useOriginFit(labelBox, labelOrigin)
+  const shortLabel = fittedLabel === null ? null : fittedText(fittedLabel)
+  const fitted = shortLabel !== null && shortLabel !== label ? shortLabel : null
 
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -112,8 +123,16 @@ export function BrowserTab(props: IDockviewPanelHeaderProps<BrowserPanelParams>)
             <LoaderCircle {...ICON} />
           </span>
         )}
-        <span className="erf-brw-tab__label">
-          <bdi dir="auto">{label}</bdi>
+        <span ref={setLabelBox} className="erf-brw-tab__label">
+          {/* A fitted host is drawn over the whole one, which stays (hidden) to size the tab: sized by the short text, the tab would shrink and cut again. */}
+          <bdi dir="auto" className={fitted === null ? undefined : 'erf-brw-tab__sizer'}>
+            {label}
+          </bdi>
+          {fitted !== null && (
+            <bdi dir="auto" className="erf-brw-tab__fitted">
+              {fitted}
+            </bdi>
+          )}
           {loading && <span className="erf-brw-tab__sr">, loading</span>}
         </span>
         <button

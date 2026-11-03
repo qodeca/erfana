@@ -229,3 +229,13 @@ describe('BrowserPopupWindow', () => {
     expect(send).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('who opened the popup (attacker pass F4, issue #448)', () => {
+  it('names the opening frame in the title until a web commit, and exposes it for the strip', () => {
+    const { host, page, popup } = setup({ openerUrl: 'https://ads.other.test' })
+    expect(host.title).toBe('about:blank – opened by ads.other.test')
+    expect(popup.openerUrl).toBe('https://ads.other.test')
+    page.emit('did-navigate', {}, 'about:blank')
+    expect(host.title).toBe('about:blank – opened by ads.other.test')
+  })
+})

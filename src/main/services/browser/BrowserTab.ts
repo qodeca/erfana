@@ -43,7 +43,7 @@
 import type { BrowserWindow, Session, WebContents, WebContentsView } from 'electron'
 import type { NavigationSource, TabStateEvent } from '../../../shared/ipc/browser-tab-schema'
 import { BROWSER_URL_MAX_CHARS } from '../../../shared/ipc/browser-tab-schema'
-import { originParts, type RegistrableDomainResolver } from '../../../shared/browser/originFormat'
+import { originParts, withoutUserInfo, type RegistrableDomainResolver } from '../../../shared/browser/originFormat'
 import { sanitizePageText } from '../../../shared/browser/pageText'
 import { logger } from '../LoggingService'
 import type { RectLike } from '../preview/previewBoundsClamp'
@@ -126,9 +126,11 @@ export type NavigateResult = { readonly ok: true } | { readonly refused: Navigat
 
 export type HistoryStep = 'back' | 'forward' | 'reload' | 'stop'
 
+/** An address for the renderer: no user info (no `accounts.example.com@` before the host, even while edited), capped. */
 function capUrl(url: string | null): string | null {
   if (url === null || url === '') return null
-  return url.length > BROWSER_URL_MAX_CHARS ? url.slice(0, BROWSER_URL_MAX_CHARS) : url
+  const shown = withoutUserInfo(url)
+  return shown.length > BROWSER_URL_MAX_CHARS ? shown.slice(0, BROWSER_URL_MAX_CHARS) : shown
 }
 
 export class BrowserTab {

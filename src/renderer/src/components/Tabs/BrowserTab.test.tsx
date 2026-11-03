@@ -17,6 +17,7 @@ import { NewBrowserTabButton } from './NewBrowserTabButton'
 import { useBrowserTabStore } from '../../stores/useBrowserTabStore'
 import type { BrowserPanelParams } from '../../utils/openBrowserTab'
 import { browserState } from '../Panels/BrowserPanel/__test__/browserState'
+import { fakeOriginLayout } from '../Panels/BrowserPanel/__test__/originFitLayout'
 
 const project = vi.hoisted(() => ({ path: '/proj' as string | null }))
 vi.mock('../../context/ProjectManagementContext', () => ({
@@ -107,5 +108,26 @@ describe('NewBrowserTabButton', () => {
     project.path = null
     render(<NewBrowserTabButton {...({ containerApi: {} } as unknown as IDockviewHeaderActionsProps)} />)
     expect(screen.queryByRole('button', { name: 'New browser tab' })).not.toBeInTheDocument()
+  })
+})
+
+describe('BrowserTab – a long host as the label (attacker pass F1, issue #448)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('fits the host to the tab, keeping the registrable domain, and keeps the full name for Close', () => {
+    fakeOriginLayout(8 * 14)
+    renderTab()
+    host({
+      title: '',
+      committedUrl: 'https://accounts.google.com.secure-login.evil.test/',
+      origin: { kind: 'web', scheme: null, subdomain: 'accounts.google.com.secure-login.', registrableDomain: 'evil.test', port: null, punycode: false }
+    })
+    expect(document.querySelector('.erf-brw-tab__fitted')).toHaveTextContent(/^….evil\.test$/)
+    // The whole host stays, hidden, to size the tab.
+    expect(document.querySelector('.erf-brw-tab__sizer')).toHaveTextContent('accounts.google.com.secure-login.evil.test')
+    expect(screen.getByRole('button', { name: 'Close accounts.google.com.secure-login.evil.test' })).toBeInTheDocument()
   })
 })

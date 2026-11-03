@@ -100,3 +100,14 @@ describe('clampZoomPercent', () => {
     expect(clampZoomPercent(Number.NaN)).toBe(100)
   })
 })
+
+describe('the load-error page address (attacker pass F7, issue #448)', () => {
+  it('names the failed address without user info', () => {
+    const state = decorateTabState(
+      baseState(),
+      { ...NO_PAGE_FACTS, failedUrl: 'http://accounts.example.com:pw@evil.test:4100/', loadError: { code: -102, focus: 'reload' } },
+      resolve
+    )
+    expect(state.committedUrl).toBe('http://evil.test:4100/')
+  })
+})

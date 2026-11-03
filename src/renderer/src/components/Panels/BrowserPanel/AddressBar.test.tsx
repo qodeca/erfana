@@ -9,6 +9,7 @@ vi.mock('../../../services/browserTabGateway', () => ({ browserTabGateway: gatew
 
 import { AddressBar, type AddressBarProps } from './AddressBar'
 import { browserState } from './__test__/browserState'
+import { fakeOriginLayout } from './__test__/originFitLayout'
 
 function setup(
   patch: Partial<AddressBarProps> = {}
@@ -174,5 +175,35 @@ describe('AddressBar', () => {
       await act(async () => fireEvent.click(search))
       expect(onSubmit).toHaveBeenCalledWith('how to fix', 'address')
     })
+  })
+})
+
+describe('AddressBar – a long host (attacker pass F1, issue #448)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('keeps the registrable domain in view: subdomain labels leave from the front, the input keeps the address', () => {
+    fakeOriginLayout(8 * 31)
+    const url = 'http://accounts.google.com.secure-login.verify.evil.test:8080/login'
+    const { field } = setup({
+      state: browserState({
+        committedUrl: url,
+        origin: {
+          kind: 'web',
+          scheme: 'http',
+          subdomain: 'accounts.google.com.secure-login.verify.',
+          registrableDomain: 'evil.test',
+          port: '8080',
+          punycode: false
+        },
+        security: 'notSecureHttp'
+      })
+    })
+    expect(field).toHaveValue(url)
+    expect(document.querySelector('.erf-brw-address__domain')).toHaveTextContent(/^evil\.test$/)
+    const display = document.querySelector('.erf-brw-address__display')
+    expect(display).toHaveTextContent('http://….verify.evil.test:8080/login')
   })
 })

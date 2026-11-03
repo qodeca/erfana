@@ -63,6 +63,8 @@ export const EXECUTABLE_EXTENSIONS: ReadonlySet<string> = new Set([
   'exe', 'com', 'scr', 'pif', 'cpl', 'msi', 'msix', 'msixbundle', 'msp', 'appx', 'appxbundle', 'application',
   'bat', 'cmd', 'ps1', 'psm1', 'vbs', 'vbe', 'js', 'jse', 'wsf', 'wsh', 'hta', 'lnk', 'url', 'scf', 'reg', 'inf',
   'dll', 'sys', 'msc', 'gadget', 'appref-ms',
+  // Windows: mounted on a double-click and run from (disk images), or run by the shell or Office
+  'iso', 'img', 'vhd', 'vhdx', 'chm', 'cab', 'xll', 'library-ms',
   // macOS
   'app', 'dmg', 'pkg', 'mpkg', 'command', 'tool', 'workflow', 'terminal', 'scpt', 'applescript', 'osax',
   // Linux and cross-platform

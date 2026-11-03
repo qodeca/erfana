@@ -64,3 +64,12 @@ describe('isExecutableDownload (S-18)', () => {
     }
   )
 })
+
+describe('isExecutableDownload – attacker pass (issue #448)', () => {
+  it.each(['win.iso', 'disk.IMG', 'vm.vhd', 'vm.vhdx', 'help.chm', 'pack.cab', 'addin.xll', 'search.library-ms'])(
+    'warns for the disk image or shell-run type %s',
+    (name) => {
+      expect(isExecutableDownload(name)).toBe(true)
+    }
+  )
+})
