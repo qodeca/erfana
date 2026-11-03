@@ -1,8 +1,8 @@
 # ADR 0010: Turn on the `EnableCookieEncryption` fuse
 
-- **Status**: proposed – supersedes the decision in `scripts/fuses.js` (the `EnableCookieEncryption` comment, lines 705–709) and [`docs/spikes/2026-10-22-asar-integrity.md`](../spikes/2026-10-22-asar-integrity.md) § Cookie encryption; revised 2026-11-02 after the expert panel (test lanes)
-- **Date**: 2026-11-02
-- **Deciders**: Marcin Obel (owner, pending), Claude Code
+- **Status**: accepted (owner decision, 2026-11-03) – supersedes the decision in `scripts/fuses.js` (the `EnableCookieEncryption` comment, lines 705–709) and [`docs/spikes/2026-10-22-asar-integrity.md`](../spikes/2026-10-22-asar-integrity.md) § Cookie encryption; revised 2026-11-02 after the expert panel (test lanes)
+- **Date**: 2026-11-03
+- **Deciders**: Marcin Obel (owner), Claude Code
 - **Related**: [spec 025](../../specs/spec-t4-025-built-in-browser/requirements/02-requirements.md) 025-FR-015, 025-FR-017, 025-FR-018, 025-NFR-007, 025-NFR-010 · 025-CA-005 · [ADR 0009](./0009-browser-profile-in-the-project-folder.md)
 
 ## Context

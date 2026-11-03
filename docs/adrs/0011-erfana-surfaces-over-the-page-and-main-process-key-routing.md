@@ -1,8 +1,8 @@
 # ADR 0011: Erfana surfaces around and over the page view, and key routing in the main process
 
-- **Status**: proposed – revised 2026-11-02 after the expert panel; acceptance waits for the engine-probe commit (solution design § 13, commit 8)
-- **Date**: 2026-11-02
-- **Deciders**: Marcin Obel (owner, pending), Claude Code
+- **Status**: accepted (owner decision, 2026-11-03) – revised 2026-11-02 after the expert panel; decision 7 amended 2026-11-03 for the engine-probe results of commit 8 (native page dialogs in v1, owner decision Q6)
+- **Date**: 2026-11-03
+- **Deciders**: Marcin Obel (owner), Claude Code
 - **Related**: [spec 025](../../specs/spec-t4-025-built-in-browser/requirements/02-requirements.md) 025-FR-011, 025-FR-012, 025-FR-014, 025-FR-019, 025-FR-030, 025-FR-031, 025-FR-047 to 025-FR-054, 025-FR-057, 025-FR-058, 025-FR-065 · [design note](../designs/browser/README.md) § Anatomy, § Key-routing states made visible · [Layering card](../design-system/system/foundations/layering.html) · [ADR 0007](./0007-pick-overlay-engine-drawn-through-cdp.md) · [ADR 0008](./0008-freeze-with-debugger-pause-after-capture.md) · [solution design](../../specs/spec-t4-025-built-in-browser/architecture/001-solution-design.md) § 4, § 7
 
 ## Context
@@ -24,7 +24,7 @@ While the page has focus, keys go to the page's process; 025-FR-047 to 025-FR-05
 4. **Strip rows push the view in one step**; main records each shift for the click guard. **While a pick menu or dialog is open, new site requests are held** and the pick row shows a "1 site request waiting" chip; they enter the strip when the menu or dialog closes (spec change S-28), so the page area never shifts under the still image.
 5. **The pick row is always reserved**; Erfana pages (empty tab, certificate, load-error, crashed) are DOM in the page area with the view detached.
 6. **Width presets wider than the panel**: the view sits inside a parent `View` whose bounds are the page area, which clips it; the view is offset by Erfana's horizontal scroll position and the Erfana scrollbar is DOM under the area. An e2e test checks that no page pixel is drawn outside the panel.
-7. **Page dialogs** via CDP `Page.javascriptDialogOpening` / `Page.handleJavaScriptDialog`; `beforeunload` via `will-prevent-unload` (Leave repeats the action with a one-shot `preventDefault`). Quitting Erfana does not ask (spec clarification S-31). Commit 8 probes whether Electron still shows its own box; owner question Q6 if it does. `window.print` and the media-capture end signal are probed in commit 8 too (spec change S-32 if no route exists).
+7. **Page dialogs – native in v1 (owner decision Q6, 2026-11-03).** The commit-8 probe showed Electron always opens its own box for `alert` and `confirm`, even when a CDP client answers the dialog through `Page.handleJavaScriptDialog`, and that `prompt()` throws with no event. Replacing the native dialogs would need a patched Electron, which adds a fork to the 14-day security duty (025-NFR-002). So v1 ships the native dialogs (spec change S-10, accepted). Erfana still turns `Page` on to learn that a dialog is open, so the hang probe is suspended and a page blocked on a dialog is never reported as "not responding"; `safeDialogs: true` gives the native box a "prevent more dialogs" checkbox (`src/main/services/browser/dialogs/pageDialogs.ts`). `beforeunload` goes through `will-prevent-unload` (Leave repeats the action with a one-shot `preventDefault`). Quitting Erfana does not ask (spec change S-31). `window.print` and the media-capture end signal have no route (spec change S-32, accepted).
 8. **Full screen fills the page area**: `disableHtmlFullscreenWindowResize: true` in the view settings (spec change S-3). Not reachable in pick mode.
 9. **Popups** are Erfana windows of their own **kind** (`browserPopup`), loading a separate renderer entry with a minimal preload; the IPC registry checks each channel against the allow-list of the sender's window kind (`main`, `screenshotOverlay`, `browserPopup`), so a popup host can reach only the `browser-tab:popup*` channels. The page view is created through `setWindowOpenHandler`'s `createWindow` (keeps `window.opener`) and has its own popup-kind CDP session. All page-requested `left`/`top` are ignored and `content-bounds-updated` is prevented and re-clamped (spec change S-22). The window gets a dark `backgroundColor`, shows on first paint, and grows by the strip's height so the requested content size is the page's.
 10. **Focus rules.** While the dialog is open, the tab's other zones are `inert`; while the menu is open they stay live and a click there closes it. Strip rows do not take focus on arrival, with the two exceptions the design note fixes: the sign-in box after a navigation the user started, and the leave-page prompt (focus on **Stay**) because it answers the user's own action; page dialogs take focus only when their tab is active and focus is already in the page.
@@ -61,7 +61,7 @@ While the page has focus, keys go to the page's process; 025-FR-047 to 025-FR-05
 
 ## Probe results (commit 8, 2026-11-03)
 
-Electron 44.9.3, macOS 27.2 (Darwin 27.2.0, arm64), `e2e/browser-engine-probes.e2e.ts`, 5 runs each, all consistent. Playwright is attached as a second CDP client to every page in these runs. Recorded for the owner's acceptance decision; the decision text above is unchanged. Linux and Windows are not yet probed.
+Electron 44.9.3, macOS 27.2 (Darwin 27.2.0, arm64), `e2e/browser-engine-probes.e2e.ts`, 5 runs each, all consistent. Playwright is attached as a second CDP client to every page in these runs. Recorded for the owner's acceptance decision. On 2026-11-03 the owner accepted this ADR and decision 7 was amended to match (native dialogs, Q6). Linux and Windows are not yet probed.
 
 | Probe | Result | Bears on |
 |---|---|---|

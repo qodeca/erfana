@@ -6,7 +6,7 @@ sequence: 1
 
 # 001-solution-design
 
-**Date:** 2026-11 | **Status:** Proposed, revision 2 (2026-11-02) – revised after the six-panel review in `.local/panel/design-025-adr/` (not committed). ADRs 0007 to 0012 stay `proposed`; 0007, 0008, 0011 and 0012 are accepted only after the engine-probe commit (§ 13, commit 8). § 11 lists the owner's questions; § 16 records every panel finding.
+**Date:** 2026-11 | **Status:** Accepted by the owner on 2026-11-03 (revision 2 of 2026-11-02, revised after the six-panel review in `.local/panel/design-025-adr/`, not committed). ADRs 0007 to 0012 are accepted (2026-11-03), 0007, 0008, 0011 and 0012 after the engine-probe commit (§ 13, commit 8) and amended for its results. The spec changes of § 10 are applied to the spec; § 11 records the owner's answers; § 16 records every panel finding.
 
 The build plan for spec 025 (built-in browser with element prompts), v0.12.0: modules and paths, ownership of every native view and session, the CDP allow-list, key and mouse routing, the capture pipeline with its budget, the test infrastructure and CI lanes, the commit order, and maps from every requirement and acceptance criterion to modules and commits.
 
@@ -71,7 +71,7 @@ Tabs belong to their window; `BrowserTabService` refuses a call naming another w
 1. `browserProfileGuards.ensureProfileFolders` (ADR 0009 decision 2) and the marker check (decision 3).
 2. `session.fromPath(<canonical>/.erfana/browser/profile)` in the lock-holding process.
 3. `browserSessionPolicy.harden`: deny-by-default permission request, check, device and display-media handlers, `select-*-device` denial, `will-download`, user agent, spell check – before any page loads.
-4. `erfana-local` handler, `file:` → 403, `webRequest.onBeforeRequest` refusals (ADR 0012).
+4. Local files (ADR 0012, option 4, `local/`): the per-folder loopback servers are started on demand by `LocalFileServers`; `file:` is refused by `webRequest.onBeforeRequest` (`browserAppRequestFilter.ts`), which also gates every request to a served folder by the requesting tab's top-level page; `erfana-local` stays registered and answers 403 outside browser sessions.
 5. Trust store load (signed; memory-only on `basic_text`), keyring canary.
 
 ### 3.4 Navigation and tab sources
@@ -87,7 +87,7 @@ Tabs belong to their window; `BrowserTabService` refuses a call naming another w
 | `contextMenuLink` | **Open link in new tab** | `http`, `https` | Yes |
 | `page` | Page script, link, form, redirect, `window.open`, `_blank` | `http`, `https`; `about:blank`, own-origin `blob:`, `data:` for frames only | **Never** |
 
-Page-opened tabs are created by `BrowserTabService.createFromPage` in main under the `page` policy and announced to the renderer (`browser-tab:tabAdded`); they never round-trip through the renderer's create path. Page-started navigations or tabs to `erfana-local` are refused (S-7). The pending address reverts on abort, HTTP 204, a download and Stop; `did-navigate-in-page` updates the committed address without ending pick mode.
+Page-opened tabs are created by `BrowserTabService.createFromPage` in main under the `page` policy and announced to the renderer (`browser-tab:tabAdded`); they never round-trip through the renderer's create path. Local pages (S-7, ADR 0012): a **page-opened tab or popup** to a served folder is refused; a navigation that a local page starts **in its own tab** (a link) is allowed and served sandboxed (opaque origin, no storage), because the request gate asks only whether the requesting tab's top-level page is on the same server (`LocalFileServers.allowsRequest`, `localResponsePolicy.ts`). This resolves the earlier wording that refused every page-started navigation to a local address. The pending address reverts on abort, HTTP 204, a download and Stop; `did-navigate-in-page` updates the committed address without ending pick mode.
 
 ### 3.5 Site behaviour modules (`src/main/services/browser/site/`, new)
 
@@ -96,7 +96,7 @@ Page-opened tabs are created by `BrowserTabService.createFromPage` in main under
 | `browserPermissions.ts` | Electron permission names enumerated by a test (unknown fails closed); notifications denied (S-19); clipboard writes recorded for S-17 | 025-FR-019 |
 | `browserDownloads.ts` | Names stripped of bidi and invisible characters; executable types warned; saving under `.erfana/` refused; OS quarantine kept (probe on packaged builds) (S-18) | 025-FR-020 |
 | `browserCertificates.ts` | Exceptions signed in `trust.json`; test CA trusted in test builds by `--ignore-certificate-errors-spki-list` (probe 10c) or a test-build verify proc | 025-FR-021 |
-| `browserAuth.ts` | Auto-send to loopback and RFC 1918 only when the top-level page is itself local or private; sign-in box only for the main frame and same-origin frames (S-16) | 025-FR-022 |
+| `browserAuth.ts` | Auto-send to loopback and RFC 1918 only when the top-level page is itself local or private; sign-in box for the main frame and any frame, cross-origin included, with the asking frame's host named first and no focus taken (S-16 narrowed by the owner, 2026-11-03) | 025-FR-022 |
 | `browserPrivateNetwork.ts` | A public top-level page's requests to loopback or private addresses are refused (S-16) | 025-FR-005 |
 | `browserWindowOpen.ts` | Deny-all from commit 7; then: link and middle-click (`foreground-tab`, `background-tab`) → tab; `new-window` disposition or opener-keeping `window.open` → popup (S-30); activation = a press the page received, per frame of the last hit test, within 5 s, one open per press; 5 per minute | 025-FR-011 |
 | `browserDialogs.ts` | CDP dialogs; `will-prevent-unload`; no prompt on quit (S-31) | 025-FR-058 |
@@ -106,11 +106,11 @@ Page-opened tabs are created by `BrowserTabService.createFromPage` in main under
 
 ## 4. Pick mode
 
-ADR 0007 decides the overlay; ADR 0011 the surfaces. In short: focus emulation on; `DOM`, `CSS`, `Overlay` enabled; mouse router blocks press, release, context menu and drag start and hit-tests moves from `globalX`/`globalY`; engine highlight with label; the exact label echoed in the status slot (Q1). Confirm by click (re-hit-test at release), Enter or the second Ctrl/Cmd+E (confirms the highlighted node; re-hit-test only after a row shift – S-29), or **Pick this element**. While a capture is in flight the pick row shows "Capturing…" and further presses are dropped; one capture per confirm (screen change). Every exit of 025-FR-065 calls `BrowserTab.endPick(reason)`, which also turns focus emulation off and disables `DOM`, `CSS`, `Overlay`.
+ADR 0007 decides the overlay; ADR 0011 the surfaces. In short: focus emulation on; `DOM`, `CSS`, `Overlay` enabled; mouse router blocks press, release, context menu and drag start and hit-tests moves from `globalX`/`globalY`; outline-only engine highlight (Q2, decided 2026-11-03); the exact label shown in the status slot (Q1). Confirm by click (re-hit-test at release), Enter or the second Ctrl/Cmd+E (confirms the highlighted node; re-hit-test only after a row shift – S-29), or **Pick this element**. While a capture is in flight the pick row shows "Capturing…" and further presses are dropped; one capture per confirm (screen change). Every exit of 025-FR-065 calls `BrowserTab.endPick(reason)`, which also turns focus emulation off and disables `DOM`, `CSS`, `Overlay`.
 
 **Refinement on the still image** (X5): at confirm, the boxes of the picked element's ancestor chain (to the root, across frames) and of its first-hovered descendant path are snapshotted with the screenshot. Up, Down, the stepper and the path draw from that snapshot; the facts of the new element are read live; when its live box differs from the snapshot by more than 1 px, the panel and the context file note "the page changed after the pick" (S-34).
 
-Facts are read as in revision 1 (DOM and CSS methods per owning session), except outer HTML, which is cut in the page by a fixed isolated-world function (ADR 0007 decision 3). **Resolved source** (025-FR-037) is added only for files with a UI source extension (`.tsx`, `.jsx`, `.ts`, `.js`, `.vue`, `.svelte`, `.astro`, `.html`, `.css`, `.scss`, `.less`, `.mdx`), never under a dot-folder, `node_modules`, a git-ignored path, agent configuration (`CLAUDE.md`, `AGENTS.md`, `.claude/`), package manifests, lockfiles or CI files, and is labelled "reported by the page, confirmed to exist" (S-13).
+Facts are read as in revision 1 (DOM and CSS methods per owning session), except outer HTML, which is cut in the page by a fixed isolated-world function (ADR 0007 decision 3). Everything a refinement can reach is read **before** a freeze, and no page function runs while the page is frozen (ADR 0008 decision 3, the fallback). The hit test starts in the frame whose box begins at the event's global origin and maps the local point through the frame's quad, so transformed frames work (ADR 0007 decision 4). **Resolved source** (025-FR-037) is added only for files with a UI source extension (`.tsx`, `.jsx`, `.ts`, `.js`, `.vue`, `.svelte`, `.astro`, `.html`, `.css`, `.scss`, `.less`, `.mdx`), never under a dot-folder, `node_modules`, a git-ignored path, agent configuration (`CLAUDE.md`, `AGENTS.md`, `.claude/`), package manifests, lockfiles or CI files, and is labelled "reported by the page, confirmed to exist" (S-13).
 
 ## 5. CDP allow-list
 
@@ -121,11 +121,11 @@ Facts are read as in revision 1 (DOM and CSS methods per owning session), except
 | Target | `setAutoAttach` | same | `{ autoAttach: true, waitForDebuggerOnStart: true, flatten: true }` |
 | Runtime | `enable`, `runIfWaitingForDebugger`, `evaluate`, `callFunctionOn`, `releaseObjectGroup`, `discardConsoleEntries` | same, without `callFunctionOn` | `evaluate`: expression `'0'` only; `callFunctionOn`: two fixed function sources (React lookup, outer-HTML cut), `userGesture: false`, `awaitPromise: false`, `throwOnSideEffect: true` |
 | Log | `enable` | same | – |
-| Network | `enable` (only if the commit-8 probe needs it), `setUserAgentOverride` | same | buffers 0 |
+| Network | `enable` (needed: the commit-8 probe showed only `Network` reports a dedicated worker's failed request), `setUserAgentOverride` | same | buffers 0 |
 | Page | `enable`, `getFrameTree`, `getLayoutMetrics`, `createIsolatedWorld`, `handleJavaScriptDialog` | `enable`, `handleJavaScriptDialog` | isolated world name fixed |
 | DOM (pick mode only) | `enable`, `disable`, `getDocument` (depth ≤ 1), `getNodeForLocation`, `describeNode`, `getBoxModel`, `getContentQuads`, `resolveNode`, `querySelectorAll`, `getFrameOwner` | – | – |
 | CSS (pick mode only) | `enable`, `disable`, `getComputedStyleForNode`, `getMatchedStylesForNode` | – | – |
-| Overlay (pick mode only) | `enable`, `disable`, `highlightNode`, `hideHighlight` | – | fixed `HighlightConfig` |
+| Overlay (pick mode only) | `enable`, `disable`, `highlightQuad` / `highlightRect` (outline only, Q2), `hideHighlight` | – | fixed outline colours, no fill |
 | Emulation | `setFocusEmulationEnabled`, `setUserAgentOverride` | `setUserAgentOverride` | – |
 | Debugger | `enable`, `pause`, `resume`, `disable` | – | – |
 
@@ -201,7 +201,7 @@ Preload: `src/preload/browserTabBridge.ts` (new) in `src/preload/index.ts`, type
 
 `src/renderer/src/components/Panels/BrowserPanel/` – `BrowserPanel.tsx` (boundary keyed by project path), `NavigationRow`, `AddressBar`, `PickRow`, `FindRow`, `StripRows`, `PageArea`, `PromptActionsPanel`, `InstructionDialog`, `SendNotice`, `TargetChooser`, `PageContextMenu`, `ErfanaPages/*`, `ClearDataDialog`, `useBrowserBounds`, `useBrowserKeys`, `useBrowserSend`; `src/renderer/src/components/Tabs/BrowserTab.tsx` (title in `<bdi dir="auto">`, a fixed browser-kind mark); `src/renderer/src/stores/useBrowserTabStore.ts`; `src/renderer/src/browserPopup/` (popup entry); `src/shared/browser/originFormat.ts`, `elementLabel.ts`; the four templates and `browserCaptureFooter.ts`. **Open capture** opens the context file as source text in an editor tab with the preview off (panel finding S11), so page markup in it is never rendered.
 
-**Must change**: `OverlayGuardService.ts` → native-view guard; `useOccluder.ts`, `toastPlacement.ts`, `usePreviewViewportStore.ts` (`readNativeViewRects`); `EditorAreaSplitPanel.tsx`; `Tabs/index.ts`; command palette; `src/main/menu.ts`; `PreviewToolbarTools.tsx`, `usePreviewPanelActions.ts`; `terminalPanel.logic.ts`, `useXtermSession.ts`.
+**Must change**: `OverlayGuardService.ts` → native-view guard; `useOccluder.ts`, `toastPlacement.ts`, `usePreviewViewportStore.ts` (`readNativeViewRects`); `EditorAreaSplitPanel.tsx`; `Tabs/index.ts`; the **+** button after the last tab (the app has no command palette); `src/main/menu.ts`; `PreviewToolbarTools.tsx`, `usePreviewPanelActions.ts`; `terminalPanel.logic.ts`, `useXtermSession.ts`.
 
 ### 9.2 Terminal links
 
@@ -213,9 +213,25 @@ Four templates, `autoExecute: true`, `mutatesDocument: false`, `browserCapture: 
 
 ### 9.4 Target terminal and shell guard (in main)
 
-`src/main/services/browser/BrowserTargetStatus.ts` (new), used by `targetStatus` and by `writeCapture`: window ownership of `terminalId` checked; macOS and Linux from `IPty.process`; Windows from one `Win32_Process` snapshot (`ProcessId`, `ParentProcessId`, `Name` only) **shared with the Claude-status detector** through `src/main/services/process/processSnapshot.ts` (new; **must change** `WinClaudeProcessDetector.ts` to use it), one query in flight, snapshots up to 10 s old accepted for display; at send a stale snapshot triggers a fresh one, bounded by 3 s, else `unknown`. Classes: shell list of 025-FR-061 → `shell` (blocked, **Choose terminal**); `ssh`, `sudo`, `tmux`, `screen` → `wrapper`, and `unknown` → banner with **Send anyway** (S-23); anything else → agent. Names normalised with `normaliseProcessName` (leading `-` stripped).
+`src/main/services/browser/capture/BrowserTargetStatus.ts` (new), used by `targetStatus` and by `writeCapture`: window ownership of `terminalId` checked; macOS and Linux from `IPty.process`; Windows from one `Win32_Process` snapshot **shared with the Claude-status detector** through `src/main/services/process/processSnapshot.ts` (new; **must change** `WinClaudeProcessDetector.ts` to use it), one query in flight, snapshots up to 10 s old accepted for display; at send a stale snapshot triggers a fresh one, bounded by 3 s, else `unknown`. The foreground itself is read in `src/main/services/terminalForegroundRead.ts`.
+
+Two notes (decided 2026-11-03):
+
+- **Start-up window.** The login shell's start-up files run short helpers in front of the shell (the macOS case: `path_helper`, `brew shellenv`, prompt tools). Until the terminal's first typed input (a write that does not start with ESC) or 10 s after spawn, whichever comes first, any program in front reads as the shell (`START_UP_WINDOW_MS` in `terminalForegroundRead.ts`; the code applies it on every platform).
+- **The shared Windows query is wider than `Name` only.** `processSnapshot.ts` projects `ProcessId`, `ParentProcessId`, `Name`, `CommandLine` and a start time (`StartMs`): the Claude-status detector needs the last two, the guard the first three. The rows are held in memory only and never logged. Classes: shell list of 025-FR-061 → `shell` (blocked, **Choose terminal**); `ssh`, `sudo`, `tmux`, `screen` → `wrapper`, and `unknown` → banner with **Send anyway** (S-23); anything else → agent. Names normalised with `normaliseProcessName` (leading `-` stripped).
 
 ## 10. Spec changes needed
+
+**Applied 2026-11-03.** The owner accepted all 35 changes S-1 to S-35 and they are written into `requirements/02-requirements.md` and `requirements/04-acceptance.md`, each tagged "(S-n)" in the text it changes. Several were settled differently by the owner's answers; the table keeps the original wording and these notes say what applied:
+
+- **S-1** – applied as outline-only (Q2): no engine label next to the element; the exact label is in the status slot (Q1).
+- **S-7** – applied; the earlier § 3.4 wording that refused every page-started navigation to a local address is resolved to what the code does (a link in the same tab opens sandboxed; page-opened tabs and popups are refused).
+- **S-6, S-7** – the committed address is the loopback address `http://127.0.0.1:<port>/<token>/…` (Q4), not `erfana-local:`.
+- **S-9** – not needed: DevTools does not detach the session (Q5); pick stays available with DevTools open.
+- **S-10** – applied: native `alert`, `confirm` and `prompt` in v1 (Q6).
+- **S-11** – applied as probed: the crosshair shows over the top document only.
+- **S-16** – narrowed: the sign-in box also shows for a cross-origin frame (frame host named first, no focus); the rule "saved `http` sign-ins only for local or private hosts" is in 025-FR-005 rule 5 and 025-FR-022.
+- **S-19** – applied; its acceptance step uses geolocation, not notifications, for the Allow-then-restart check (025-AC-019).
 
 | # | Requirement | Change |
 |---|---|---|
@@ -255,9 +271,11 @@ Four templates, `autoExecute: true`, `mutatesDocument: false`, `browserCapture: 
 | S-34 | 025-FR-027, 025-FR-033, 025-FR-053 | Refinement draws from boxes snapshotted at the pick; note "the page changed after the pick" when a live box differs by more than 1 px |
 | S-35 | 025-NFR-005 | Worst-case fixture: 1920 × 1080 CSS px at DPR 2 |
 
-025-FR-053's React-while-frozen clause resolves to "allowed" if the commit-8 probe passes (ADR 0008 decision 3).
+025-FR-053's React-while-frozen clause resolved (2026-11-03) to "not allowed": the commit-8 probe failed, so ADR 0008 decision 3 uses its fallback and no page function runs while frozen.
 
 ## 11. Owner questions
+
+**All eleven questions were decided by the owner on 2026-11-03.** The table keeps the question and the recommendation; the decisions follow it.
 
 | # | Question | Recommended answer and why |
 |---|---|---|
@@ -272,6 +290,22 @@ Four templates, `autoExecute: true`, `mutatesDocument: false`, `browserCapture: 
 | Q9 | Make the new `Browser isolation` job a required check | **Yes** – 025-NFR-001 says every PR; the job is fast and has no path filter. The sharded browser e2e stays advisory |
 | Q10 | Registrable domain and lookalikes (design OD-1, S9) | **A pinned, bundled Public Suffix List with its private section, updated with each Electron update**, plus UTS-39 mixed-script checks and a skeleton check against a short list of top domains |
 | Q11 | Accept ADRs 0007, 0008, 0011, 0012 after the commit-8 probes, and 0009, 0010 now | Your call |
+
+**Decisions (owner, 2026-11-03).**
+
+| # | Decided | Applied in |
+|---|---|---|
+| Q1 | Recommended answer, as far as Q2 allows: the exact label echoed in the status slot. With an outline-only highlight (Q2) the engine label next to the element is not drawn | ADR 0007 decision 7; 025-FR-026 |
+| Q2 | **Outline-only** pick highlight (`highlightQuad` / `highlightRect`); the decided Focus card is **not** changed. The two-tone outline stays on the still image | ADR 0007 decision 6; 025-FR-026 |
+| Q3 | Recommended: signed trust files | ADR 0009 decision 6 |
+| Q4 | Recommended: per-folder loopback server (the `Sec-Fetch-Dest` spike failed) | ADR 0012; 025-FR-005 rule 1 |
+| Q5 | Pick stays available with DevTools open (the probe: no detach) | ADR 0007 decision 11; 025-FR-013 |
+| Q6 | Native page dialogs in v1 | ADR 0011 decision 7; 025-FR-058 |
+| Q7 | Recommended: moving Erfana's window off `file://` is a separate follow-up | ADR 0012 decision 11 |
+| Q8 | Recommended: shared Windows snapshot, at most 10 s old, a fresh read at send within 3 s | § 9.4; 025-FR-061 |
+| Q9 | The `Browser isolation` job becomes a required check **after the merge**; the owner sets it in GitHub | § 12 lanes; 04-acceptance Definition of done |
+| Q10 | Recommended: pinned, bundled Public Suffix List with its private section, UTS-39 checks and a skeleton check | § 13 commit 3 |
+| Q11 | ADRs 0007 to 0012 accepted | `docs/adrs/README.md` |
 
 ## 12. Test infrastructure and CI lanes
 
@@ -288,7 +322,7 @@ Four templates, `autoExecute: true`, `mutatesDocument: false`, `browserCapture: 
 | Lane | Workflow (new unless marked) | Runs | Status |
 |---|---|---|---|
 | Unit | `checks.yml` (existing) | Every unit test of the feature | Required (existing `Unit tests`, `Coverage`) |
-| Browser isolation | `browser-isolation.yml` | Hostile-page suite only, Linux Xvfb, no `paths-ignore`, every PR and push, target < 10 min | Advisory until Q9 |
+| Browser isolation | `browser-isolation.yml` | Hostile-page suite only, Linux Xvfb, no `paths-ignore`, every PR and push, target < 10 min | Required after the merge (Q9, 2026-11-03; the owner sets it in GitHub) |
 | Browser e2e | `e2e-browser.yml` | Full browser suite, 4 shards; focus-sensitive suites with one worker and one Xvfb per worker; cached image with `gnome-keyring` and `libsecret` | Advisory |
 | Changed-test repeat | in `e2e-browser.yml` | `--only-changed --repeat-each=20 --retries=0 --fail-on-flaky-tests`, 60 min cap | Advisory |
 | Nightly | `e2e-browser-nightly.yml` | Full suite × 3, probes, Linux packaged-dir build with fuses (ADR 0010) | Advisory |
@@ -312,7 +346,7 @@ Each commit passes the local pre-push list of `CLAUDE.md`. Commits 1–15 are ma
 | 8 | **Engine probes** (permanent regression tests, T25): global mouse coordinates in OOPIFs; inspect mode swallows hover; DevTools coexistence; idle-page pause + `callFunctionOn` ≤ 100 ms; `Sec-Fetch-Dest` on `erfana-local`; native dialog suppression; `window.print`; capture end signal; `Log` network entries; overlay in screenshot; off-screen visibility; still-image drop delay; crosshair `insertCSS`; Tab out of the page; test CA SPKI | Results recorded in ADRs 0007, 0008, 0011, 0012 before acceptance |
 | 9 | `BrowserCdpSession`, allow-lists, flood budget, log buffer, hang probe | 025-AC-038; hang part of 025-AC-072 |
 | 10 | ADR 0010 fuse, keyring canary and notices | 025-AC-017, 018, 052, 079 (packaged lanes) |
-| 11 | Local files per the commit-8 outcome (ADR 0012 or loopback server) | 025-AC-005, 010 (main part); hostile local folder incl. popup and new-tab reads |
+| 11 | Local files: the per-folder loopback server (ADR 0012, option 4 – the commit-8 spike failed) | 025-AC-005, 010 (main part); hostile local folder incl. popup and new-tab reads |
 | 12a–h | Site behaviour, main side: permissions; downloads; certificates (10c probe of the test CA); auth and private network; window open, popups (popup kind, popup CDP session); dialogs; context menu; load error, crash, find, zoom, width presets (clipping parent), Clear and Forget, history | 025-AC-008, 011, 012, 019–024, 072, 074–076, 078 (main parts) |
 | 13 | Key and mouse routers, `appWindowBrowserKeys`, macOS roles | 025-AC-014, 061–066, 071 (main parts) |
 | 14 | Pick main side: hit test, highlight, refinement snapshot, capture pipeline with stage budget, freeze | 025-AC-025–029, 033–035, 037, 067; bench hooks for 025-AC-049, 050 |

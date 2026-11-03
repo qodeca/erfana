@@ -1,8 +1,8 @@
 # ADR 0008: Freeze with `Debugger.pause`, after the capture and the source hints
 
-- **Status**: proposed – revised 2026-11-02 after the expert panel; acceptance waits for the engine-probe commit (solution design § 13, commit 8)
-- **Date**: 2026-11-02
-- **Deciders**: Marcin Obel (owner, pending), Claude Code
+- **Status**: accepted (owner decision, 2026-11-03) – revised 2026-11-02 after the expert panel; decision 3 amended 2026-11-03 for the engine-probe results of commit 8 (it uses its fallback)
+- **Date**: 2026-11-03
+- **Deciders**: Marcin Obel (owner), Claude Code
 - **Related**: [spec 025](../../specs/spec-t4-025-built-in-browser/requirements/02-requirements.md) 025-FR-013, 025-FR-028, 025-FR-053, 025-FR-056, 025-FR-065 · [ADR 0007](./0007-pick-overlay-engine-drawn-through-cdp.md) · [ADR 0011](./0011-erfana-surfaces-over-the-page-and-main-process-key-routing.md) · [solution design](../../specs/spec-t4-025-built-in-browser/architecture/001-solution-design.md) § 6
 
 ## Context
@@ -11,7 +11,7 @@ A pick by the second Ctrl/Cmd+E keeps hover-only content as it is while Erfana's
 
 | Mechanism | Stops | Main-world calls while stopped | Page can tell |
 |---|---|---|---|
-| `Debugger.pause` | All JS in the target's isolate, before the next statement | Expected yes, as in DevTools while paused – **to prove** on an idle page (commit 8) | No |
+| `Debugger.pause` | All JS in the target's isolate, before the next statement | Not on an idle page: the first call pauses inside itself (commit-8 probe); only after `Debugger.paused` has arrived | No |
 | `Emulation.setScriptExecutionDisabled` | New script runs; queued timers undocumented | Unreliable | Yes |
 | `Page.setWebLifecycleState('frozen')` (experimental) | Freezable task queues | No (queued, inferred) | Yes – `freeze` event; page marked hidden (inferred) |
 
@@ -19,7 +19,7 @@ A pick by the second Ctrl/Cmd+E keeps hover-only content as it is while Erfana's
 
 1. **`Debugger.pause` on every frame target** of the view; workers keep running. `Debugger` is enabled only at the freeze and disabled at the unfreeze, so page `debugger;` statements never stop browsing; no `Overlay.setPausedInDebuggerMessage` is sent.
 2. **Order** at a second-Ctrl/Cmd+E pick: confirm the highlighted node (re-hit-test only after a row shift – spec change S-29); hide the highlight and take the screenshot; show the menu over the still image (solution design § 6.1 stage budget); run the source hints for ≤ 750 ms; then `Debugger.enable` + `Debugger.pause` on every frame target. "Page paused" appears when every target has acknowledged.
-3. **Main-world calls while frozen – proved first.** Commit 8's probe pauses an idle page and a timer page, then runs the React-lookup `callFunctionOn` and expects an answer within 100 ms. If it hangs (a pending pause breaking Erfana's own call), the fallback order is: (a) run the lookup with `Debugger.evaluateOnCallFrame` when a `Debugger.paused` event has arrived; (b) otherwise resume, run the lookup, re-pause; (c) otherwise attributes only and "source not found" for refinements while frozen (025-FR-053's own fallback). Every call uses `throwOnSideEffect: true`, so a page getter that writes state aborts the lookup.
+3. **No page function runs while frozen (the fallback, decided 2026-11-03).** Commit 8's probe paused an idle page and then ran `Runtime.callFunctionOn`: it **hangs** in both worlds, because Erfana's call is the first script to run and pauses inside itself (`Debugger.paused` arrives with it). The fallback therefore applies: the capture reads everything it may need – the facts of every element that Up and Down can reach, and the source hints – **before** `Debugger.pause`, and Erfana calls no page function until the unfreeze. While frozen, a refined element's hints come from its source attributes only and the React lookup reports "source not found" (025-FR-053's own fallback; its clause "unless ADR 0008's freeze mechanism allows main-world calls while frozen" resolves to "not allowed"). Once a `Debugger.paused` event has arrived, a further call answers in under 1 ms (probe), but Erfana does not rely on that. Every page function uses `throwOnSideEffect: true`, so a page getter that writes state aborts the lookup. Code: `src/main/services/browser/pick/pickFreeze.ts`, `cdp/cdpPickFunctions.ts`.
 4. **Unfreeze** on every exit of 025-FR-065: `Debugger.resume`, then `Debugger.disable`, errors from vanished targets ignored.
 5. **DevTools resume** – a `Debugger.resumed` that Erfana did not cause ends the menu or dialog without sending (025-FR-013). If DevTools is open while frozen, its Sources panel jumps to the paused location; accepted and noted in the user guide.
 6. **Input while frozen** is dropped twice: the view is off-screen behind the still image (ADR 0011) and both input routers `preventDefault` for a frozen view, including the matching key-up and release.
@@ -48,7 +48,7 @@ A pick by the second Ctrl/Cmd+E keeps hover-only content as it is while Erfana's
 
 ## Probe results (commit 8, 2026-11-03)
 
-Electron 44.9.3, macOS 27.2 (Darwin 27.2.0, arm64), `e2e/browser-engine-probes.e2e.ts`, 5 runs each, all consistent. Playwright is attached as a second CDP client to every page in these runs. Recorded for the owner's acceptance decision; the decision text above is unchanged.
+Electron 44.9.3, macOS 27.2 (Darwin 27.2.0, arm64), `e2e/browser-engine-probes.e2e.ts`, 5 runs each, all consistent. Playwright is attached as a second CDP client to every page in these runs. Recorded for the owner's acceptance decision. On 2026-11-03 the owner accepted this ADR and decision 3 was amended to use its fallback.
 
 | Probe | Result | Bears on |
 |---|---|---|

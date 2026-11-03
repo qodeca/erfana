@@ -9,7 +9,7 @@
 | 025-CA-003 | React source data exists only in dev builds and relies on unstable internals | Hints may break on a React update | Quiet fallback (025-FR-037) |
 | 025-CA-004 | The browser engine updates only with Erfana releases | Unpatched engine if releases lag | 14-day release duty (025-NFR-002, 025-FR-041) |
 | 025-CA-005 | Turning cookie encryption on is one-way, applies to the whole app, and keeps the key outside the project | Every user pays a start-up cost; a profile copied to another machine or account starts signed out; dev and unpackaged runs do not encrypt | ADR 0010; 025-NFR-010 budget; packaged test lane; user-guide note (025-FR-017) |
-| 025-CA-009 | Erfana keeps the `GrantFileProtocolExtraPrivileges` fuse on because its window loads from `file://` | Raw `file://` pages could read the disk | Local files confined (025-FR-005, rule 1), decided in ADR 0012 before any local file loads |
+| 025-CA-009 | Erfana keeps the `GrantFileProtocolExtraPrivileges` fuse on because its window loads from `file://` | Raw `file://` pages could read the disk | Local files confined (025-FR-005, rule 1) by a per-folder loopback server, decided in ADR 0012 (accepted 2026-11-03) before any local file loads |
 
 ### 025-CA-001: Google sign-in in embedded browsers
 
@@ -79,7 +79,7 @@
 
 **Impact:** Without confinement, an HTML file from a cloned repository could read files such as SSH keys and send them out.
 
-**Mitigation:** No browser tab loads a local file until the confinement of 025-FR-005 rule 1 holds; ADR 0012 chooses the mechanism (a browser-session protocol handler for `file:`, a dedicated local scheme, or turning the fuse off after the app window moves to a custom protocol).
+**Mitigation:** No browser tab loads a local file until the confinement of 025-FR-005 rule 1 holds. ADR 0012 (accepted 2026-11-03) chose a static server per opened folder on `127.0.0.1`, after the commit-8 spike showed a custom scheme gets no fetch metadata; the fuse stays on and the app window keeps loading from `file://`.
 
 **Traces to:** 025-FR-005, 025-NFR-001
 
@@ -175,7 +175,7 @@ The design note's Additions table (`docs/designs/browser/README.md` § Additions
 
 ## Required decisions before implementation
 
-These decide whether requirements can be met, so each needs an accepted ADR before the code it governs merges. The owner chose to build without a spike first (2026-11-01).
+These decide whether requirements can be met, so each needs an accepted ADR before the code it governs merges. The owner chose to build without a spike first (2026-11-01). All six ADRs were accepted by the owner on 2026-11-03, 0007, 0008, 0011 and 0012 after the engine-probe commit and amended for its results.
 
 | ADR | Decision | Governs |
 |---|---|---|
@@ -184,7 +184,7 @@ These decide whether requirements can be met, so each needs an accepted ADR befo
 | 0009 | The profile and every trust decision live in the project folder (owner decision, 2026-11-01) and the guards that protect it | 025-FR-015, 025-FR-016 |
 | 0010 | Turning on `EnableCookieEncryption` (supersedes `scripts/fuses.js` lines 705–709) | 025-FR-017, 025-NFR-010 |
 | 0011 | Erfana surfaces over the page view (still image, Erfana-owned layer, top strip) and main-process key routing | 025-FR-054, 025-FR-030, 025-FR-031 |
-| 0012 | Local-file confinement mechanism | 025-FR-005 |
+| 0012 | Local-file confinement mechanism (decided: per-folder loopback server) | 025-FR-005 |
 
 Whether the context-file prompt templates share the existing apply-to-document footer or need a web variant is left to the solution design.
 

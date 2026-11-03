@@ -42,12 +42,12 @@ ADRs are **not** retrofitted for every historical choice — only for decisions 
 | [0004](./0004-per-spawn-toctou-rehash.md) | Per-spawn re-hash for TOCTOU close (5-tuple spawn log) | accepted | 2026-04-23 |
 | [0005](./0005-sub-frame-preload-one-receive-channel.md) | Sub-frame preload with one receive channel (HTML Preview comments) | accepted | 2026-10-26 |
 | [0006](./0006-overlay-core-in-the-sealed-preload.md) | Overlay core in the sealed preload (amends 0005 decision 6) | accepted | 2026-10-29 |
-| [0007](./0007-pick-overlay-engine-drawn-through-cdp.md) | Pick overlay drawn by the engine through the DevTools protocol (browser, spec 025) | proposed | 2026-11-02 |
-| [0008](./0008-freeze-with-debugger-pause-after-capture.md) | Freeze with `Debugger.pause`, after the capture and the source hints | proposed | 2026-11-02 |
-| [0009](./0009-browser-profile-in-the-project-folder.md) | The browser profile and its trust decisions live in the project folder | proposed | 2026-11-02 |
-| [0010](./0010-turn-on-cookie-encryption.md) | Turn on the `EnableCookieEncryption` fuse | proposed | 2026-11-02 |
-| [0011](./0011-erfana-surfaces-over-the-page-and-main-process-key-routing.md) | Erfana surfaces around and over the page view, and key routing in the main process | proposed | 2026-11-02 |
-| [0012](./0012-local-files-through-a-dedicated-scheme.md) | Local files open through a dedicated `erfana-local:` scheme | proposed | 2026-11-02 |
+| [0007](./0007-pick-overlay-engine-drawn-through-cdp.md) | Pick overlay drawn by the engine through the DevTools protocol (browser, spec 025) | accepted | 2026-11-03 |
+| [0008](./0008-freeze-with-debugger-pause-after-capture.md) | Freeze with `Debugger.pause`, after the capture and the source hints | accepted | 2026-11-03 |
+| [0009](./0009-browser-profile-in-the-project-folder.md) | The browser profile and its trust decisions live in the project folder | accepted | 2026-11-03 |
+| [0010](./0010-turn-on-cookie-encryption.md) | Turn on the `EnableCookieEncryption` fuse | accepted | 2026-11-03 |
+| [0011](./0011-erfana-surfaces-over-the-page-and-main-process-key-routing.md) | Erfana surfaces around and over the page view, and key routing in the main process | accepted | 2026-11-03 |
+| [0012](./0012-local-files-through-a-dedicated-scheme.md) | Local files open through a per-folder loopback server (file name keeps the first plan's `erfana-local:` title) | accepted | 2026-11-03 |
 
 ## When to write an ADR
 
