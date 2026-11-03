@@ -13,3 +13,5 @@ Add a row only when its evidence file exists and really proves the acceptance cr
 | ID | Lane | Result | Evidence |
 |---|---|---|---|
 | 025-AC-040 | review | Pass, 2026-11-03: no setting, flag, environment variable or hidden control turns the browser off | `specs/spec-t4-025-built-in-browser/verification/review-025-AC-040.md` |
+| 025-AC-042 | review | Pass, 2026-11-03: a failed load logs its full URL with the query string, the exception is technical-debt entry 68, and the one URL-logging site carries the comment | `specs/spec-t4-025-built-in-browser/verification/review-025-AC-042.md` |
+| 025-AC-044 | review | Pass, 2026-11-03, after a user-guide fix in this review: the browser page and the Data handling page carry every listed item, and the checked claims match the code | `specs/spec-t4-025-built-in-browser/verification/review-025-AC-044.md` |

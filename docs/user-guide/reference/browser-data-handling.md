@@ -40,7 +40,7 @@ Your agent keeps its own transcripts of what you send, and its AI provider keeps
 - **Page content can carry hidden instructions.** Text, markup and pictures from a page reach your agent. A page can hide text that tries to steer the agent (prompt injection). Erfana marks page text as data, but this is most dangerous when the agent runs without permission checks. Keep the agent's checks on, and deny it the browser profile – for Claude Code, add `"Read(./.erfana/browser/profile/**)"` to `permissions.deny` in the project's `.claude/settings.json`.
 - **Captures send what the page shows, as it is.** Form values typed on the page, including passwords and card numbers, go to the agent's AI provider with the capture.
 - **Logs record full browser URLs.** When a page fails to load, Erfana's log file records its address with the query string, for support. A failed search is logged without its text. Page titles, form data and console text are never logged.
-- **Only cookies are encrypted on disk.** Local storage, cache and the rest are plain files. On Windows any program running as you can read the cookies too.
+- **Only cookies and saved sign-ins are encrypted on disk.** Local storage, cache and the rest are plain files. On Windows any program running as you can read the cookies too.
 - **The project folder holds the whole profile.** Saved sign-ins, permissions and certificate exceptions are in `.erfana/browser/`, so your agent, project scripts, cloud sync, archives and Docker build contexts can read or copy them.
 - **`git clean -fdx` deletes the browser profile and captures**, because git ignores the folder.
 - **Google sign-in may not work** in a browser tab.

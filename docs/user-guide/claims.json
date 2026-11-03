@@ -55707,6 +55707,36 @@
       "match": "export const LOCAL_SANDBOX_POLICY = 'sandbox allow-scripts allow-forms allow-modals allow-downloads'"
     },
     {
+      "id": "user-guide-reference-built-in-browser/46",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "Starting pick mode keeps hover content open, whether you start it with **Pick element** or with <kbd>⌘E</kbd> / <kbd>Ctrl+E</kbd>",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/browser/pick/pickModeSwitch.ts:47",
+      "match": "for (const t of this.frames.frameTargets()) this.focusEmulation(t.sessionKey, true)"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/47",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "any program that is not a shell counts as an agent, even a dev server, and Erfana does not notice an agent that is busy or waiting on a permission question",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/browser/capture/BrowserTargetStatus.ts:68",
+      "match": "return 'agent'"
+    },
+    {
+      "id": "user-guide-reference-built-in-browser/48",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/built-in-browser.md",
+      "quote": "The presets set the width only: they do not turn on touch input or a mobile user agent",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/shared/browser/widthPresets.ts:22",
+      "match": "readonly width: number | null"
+    },
+    {
       "id": "user-guide-reference-browser-data-handling/01",
       "audience": "user",
       "doc": "docs/user-guide/reference/browser-data-handling.md",

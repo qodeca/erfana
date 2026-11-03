@@ -55,7 +55,9 @@ Zoom steps from 25% to 500% and is kept per site in the project, as in Chrome. *
 
 After a send, the element you sent flashes briefly with an outline on the live page.
 
-The target button at the end of the row names the terminal that receives the send. When no agent seems to run there, Erfana stops before sending: **No agent is running in** that terminal shows with **Choose terminal**, and with no terminal open, **Open terminal**. When Erfana sees another program or cannot tell, it asks whether to **Send anyway**. The **Page width** button in the same row sets the page to **Phone width (390px)**, **Tablet width (768px)** or **Full width**, so you can pick in that layout.
+Starting pick mode keeps hover content open, whether you start it with **Pick element** or with <kbd>⌘E</kbd> / <kbd>Ctrl+E</kbd>: a menu or tooltip the pointer is over stays shown, so you can hover it open and click the item to pick it.
+
+The target button at the end of the row names the terminal that receives the send. When no agent seems to run there, Erfana stops before sending: **No agent is running in** that terminal shows with **Choose terminal**, and with no terminal open, **Open terminal**. When Erfana sees another program or cannot tell, it asks whether to **Send anyway**. The check looks only at which program runs in front in the terminal: any program that is not a shell counts as an agent, even a dev server, and Erfana does not notice an agent that is busy or waiting on a permission question – keep the target on the terminal where your agent waits for input. The **Page width** button in the same row sets the page to **Phone width (390px)**, **Tablet width (768px)** or **Full width**, so you can pick in that layout. The presets set the width only: they do not turn on touch input or a mobile user agent – use device mode in **DevTools** for that.
 
 The text of a page goes to the agent as data, inside a fenced block, never as part of your instruction. A page can still carry hidden instructions – see [browser data handling](browser-data-handling.md#risks).
 
