@@ -1,0 +1,366 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * BrowserPanel – a built-in browser tab (spec 025, commit 17).
+ *
+ * Built to docs/designs/browser/tab-and-toolbar.html and page-states.html
+ * (proposed) on the decided Focus card (one 2px ring, offset 2px outward) and
+ * the proposed Toolbar, Buttons and Origin field cards. The rows copy the
+ * HTML preview bar's fill and height (Toolbar card departure); tools sit
+ * --space-2 apart so an outward ring never lands on a neighbour (M-37).
+ * No row animates its height: the native view below would jump.
+ */
+
+.erf-brw {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--color-bg-primary);
+  font-family: var(--font-sans);
+}
+
+.erf-brw-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- navigation row ---------- */
+
+.erf-brw-nav {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-6);
+  border-bottom: var(--border-width) solid var(--color-border-default);
+  background: var(--color-bg-primary);
+  user-select: none;
+}
+
+.erf-brw-tool {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: var(--btn-height-md);
+  height: var(--space-14);
+  padding: 0;
+  border: none;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.erf-brw-tool:hover {
+  background: var(--color-bg-hover-solid);
+  color: var(--color-white);
+}
+
+.erf-brw-tool:active {
+  background: var(--color-bg-selected);
+}
+
+/* Native disabled: dim the icon, never the button (Permission band card). */
+.erf-brw-tool:disabled {
+  background: transparent;
+  color: var(--color-text-primary);
+  cursor: default;
+}
+
+.erf-brw-tool:disabled > * {
+  opacity: var(--opacity-disabled);
+}
+
+.erf-brw-tool:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+/* ---------- address bar (Origin field card, proposed) ---------- */
+
+.erf-brw-address {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  height: var(--input-height-sm);
+  margin-inline: var(--space-4);
+  padding-inline: var(--space-4);
+  border: var(--border-width) solid var(--color-border-input);
+  border-radius: var(--border-radius);
+  background: var(--color-bg-input);
+  cursor: text;
+}
+
+.erf-brw-address:hover {
+  border-color: var(--color-gray-500);
+}
+
+/* The ring belongs to the text field, outward (Focus card). */
+.erf-brw-address:has(.erf-brw-address__input:focus-visible) {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+.erf-brw-address--invalid {
+  border-color: var(--color-error);
+}
+
+.erf-brw-address__badge {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.erf-brw-address__badge--warning {
+  color: var(--color-warning);
+}
+.erf-brw-address__badge--error {
+  color: var(--color-error);
+}
+.erf-brw-address__badge--neutral {
+  color: var(--color-text-secondary);
+}
+
+.erf-brw-address__field {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  min-width: 0;
+  height: 100%;
+}
+
+.erf-brw-address__input {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.erf-brw-address__input::placeholder {
+  color: var(--color-text-placeholder);
+  font-family: var(--font-sans);
+}
+
+/* At rest the formatted display draws the address; the input keeps it for selection. */
+.erf-brw-address__input--rest {
+  color: transparent;
+}
+
+.erf-brw-address__display {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.erf-brw-address__dim {
+  flex: 0 0 auto;
+  color: var(--color-text-tertiary);
+}
+
+/* The registrable domain: brightest, never wrapped, never cut (Security rule 2). */
+.erf-brw-address__domain {
+  flex: 0 0 auto;
+  color: var(--color-text-emphasis);
+}
+
+/* The path is quiet and loses its end first. */
+.erf-brw-address__path {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-tertiary);
+  text-overflow: ellipsis;
+}
+
+/* ---------- refused address (first strip row) ---------- */
+
+.erf-brw-refused {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: var(--space-3) var(--space-6);
+  border-bottom: var(--border-width) solid var(--color-border-default);
+  border-inline-start: var(--border-width-thick) solid var(--color-error);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+}
+
+/* ---------- page area and frame ---------- */
+
+.erf-brw-frame {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--space-1);
+  border: var(--border-width-thick) solid transparent;
+}
+
+/* Page focus (key state Browse): the violet ring in the gutter outside the page. */
+.erf-brw-frame--focused {
+  border-color: var(--color-border-focus);
+}
+
+.erf-brw-frame__view {
+  width: 100%;
+  height: 100%;
+  background: var(--color-bg-primary);
+}
+
+.erf-brw-frame__erfana {
+  position: absolute;
+  inset: var(--space-1);
+  overflow: auto;
+  background: var(--color-bg-primary);
+}
+
+@media (forced-colors: active) {
+  .erf-brw-frame--focused {
+    border-color: Highlight;
+  }
+}
+
+/* ---------- Erfana pages (States card, proposed) ---------- */
+
+.erf-brw-page {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-6);
+  max-width: 72ch;
+  padding: var(--space-16) var(--space-12);
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+}
+
+.erf-brw-page__title {
+  margin: 0;
+  color: var(--color-text-emphasis);
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+}
+
+.erf-brw-page__title:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+.erf-brw-page__body,
+.erf-brw-page__hint {
+  margin: 0;
+  line-height: var(--leading-normal);
+}
+
+.erf-brw-page__hint {
+  color: var(--color-text-secondary);
+}
+
+.erf-brw-page__code {
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.erf-brw-page__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.erf-brw-page__heading {
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+}
+
+.erf-brw-page__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.erf-brw-page__row {
+  min-height: var(--btn-height-sm);
+  max-width: 100%;
+  padding: var(--space-1) var(--space-4);
+  overflow: hidden;
+  border: none;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.erf-brw-page__row:hover {
+  background: var(--color-bg-hover-solid);
+}
+
+.erf-brw-page__row:focus-visible,
+.erf-brw-page__action:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+.erf-brw-page__action {
+  height: var(--btn-height-md);
+  padding: 0 var(--space-8);
+  border: var(--border-width) solid var(--color-border-default);
+  border-radius: var(--border-radius);
+  background: var(--color-btn-secondary-bg);
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.erf-brw-page__action:hover {
+  background: var(--color-btn-secondary-hover);
+}
+
+.erf-brw-page__action--primary {
+  border-color: transparent;
+  background: var(--color-btn-primary-bg);
+  color: var(--color-btn-primary-text);
+}
+
+.erf-brw-page__action--primary:hover {
+  background: var(--color-btn-primary-hover);
+}

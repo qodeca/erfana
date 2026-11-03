@@ -22,6 +22,7 @@ import { DRAG_FREEZE_LOG_MESSAGE, DRAG_FREEZE_LOG_REASON } from '../services/pre
 import { useOverlayOccluderStore } from '../stores/useOverlayOccluderStore'
 import { usePreviewCollapsedStore } from '../stores/usePreviewCollapsedStore'
 import { usePreviewStore } from '../stores/usePreviewStore'
+import { useBrowserTabStore } from '../stores/useBrowserTabStore'
 
 const log = vi.hoisted(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }))
 vi.mock('../utils/logger', () => ({ logger: log }))
@@ -84,7 +85,24 @@ beforeEach(() => {
   usePreviewStore.getState().reset()
   useOverlayOccluderStore.getState().reset()
   usePreviewCollapsedStore.setState({ collapsed: new Set() })
-  // One browser tab, placed and active: the guard shows it.
+  // One browser tab showing a live page, placed and active: the guard shows it.
+  useBrowserTabStore.getState().attach(PANEL, TAB)
+  useBrowserTabStore.getState().applyState({
+    tabId: TAB,
+    committedUrl: 'https://a.test/',
+    pendingUrl: null,
+    origin: null,
+    title: '',
+    canGoBack: false,
+    canGoForward: false,
+    loading: false,
+    zoomPercent: 100,
+    widthPreset: 'full',
+    security: 'secure',
+    inUse: { camera: false, microphone: false, screen: false },
+    erfanaPage: null,
+    devToolsOpen: false
+  })
   browserViewBounds.register(TAB, PANEL)
   browserViewBounds.place(TAB, PLACEMENT)
   getOverlayGuard().sync(PANEL)
@@ -93,6 +111,7 @@ beforeEach(() => {
 afterEach(() => {
   resetOverlayGuard()
   browserViewBounds.unregister(TAB)
+  useBrowserTabStore.setState({ byTab: new Map(), tabByPanel: new Map(), unhosted: new Map(), closing: new Set() })
   sash.remove()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()

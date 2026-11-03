@@ -22,8 +22,9 @@ import type { BrowserViewBounds } from '../browser/browserViewBounds'
  * Why one panel's page must stay hidden: a chrome-gate reason from the
  * preview's permission band, `'collapsed'` while the page area is clipped away
  * by a collapsed ancestor (issue #124 C2), or `'covered'` while the preview's
- * comments drawer is a full-width sheet over it. A browser view uses only
- * `'collapsed'`.
+ * comments drawer is a full-width sheet over it. A browser view uses
+ * `'collapsed'` and `'covered'` – the latter while Erfana's own DOM fills its
+ * page area (an Erfana page, or the editor tab closing; ADR 0011 decision 5).
  */
 export type NativeViewGate = PreviewChromeGateReason | 'collapsed' | 'covered'
 
@@ -95,9 +96,11 @@ export interface NativeViewKind {
   subscribeVisibilityApplied?: (listener: (viewId: string, visible: boolean) => void) => () => void
 }
 
-/** The gate reads a browser view takes: its panel's collapsed flag only. */
+/** The gate reads a browser view takes: its panel's collapsed flag, and whether Erfana's DOM covers its page area. */
 export interface BrowserViewGateSource {
   isCollapsed: (panelId: string) => boolean
+  /** Erfana's own DOM fills the page area (`useBrowserTabStore.coversPage`); absent means never. */
+  isCovered?: (panelId: string) => boolean
   subscribe: (listener: () => void) => () => void
 }
 
@@ -108,14 +111,17 @@ export interface BrowserViewGateSource {
  * logs nothing per visibility change for browser views.
  *
  * @param views - The bounds owner (the one `browser-tab:bounds` sender)
- * @param gate - The collapsed-flag reads
+ * @param gate - The collapsed-flag and covered reads
  * @returns The kind the guard drives
  */
 export function createBrowserViewKind(views: BrowserViewBounds, gate: BrowserViewGateSource): NativeViewKind {
   return {
     liveViews: () => views.views().map((view) => ({ viewId: view.tabId, panelId: view.panelId })),
     subscribe: (listener) => views.subscribe(listener),
-    getGate: (panelId) => (gate.isCollapsed(panelId) ? 'collapsed' : null),
+    getGate: (panelId) => {
+      if (gate.isCollapsed(panelId)) return 'collapsed'
+      return gate.isCovered?.(panelId) === true ? 'covered' : null
+    },
     subscribeGate: (listener) => gate.subscribe(listener),
     setVisibility: (tabId, visible) => views.setVisibility(tabId, visible),
     subscribeVisibilityApplied: (listener) => views.onVisibilityApplied(listener)

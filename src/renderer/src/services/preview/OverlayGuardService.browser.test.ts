@@ -13,6 +13,7 @@ import type { BoundsRequest } from '../../../../shared/ipc/browser-tab-schema'
 import { useOverlayOccluderStore } from '../../stores/useOverlayOccluderStore'
 import { usePreviewCollapsedStore } from '../../stores/usePreviewCollapsedStore'
 import { usePreviewStore } from '../../stores/usePreviewStore'
+import { useBrowserTabStore } from '../../stores/useBrowserTabStore'
 import { browserViewBounds, createBrowserViewBounds } from '../browser/browserViewBounds'
 import { createBrowserViewKind } from './nativeViewKinds'
 import { createOverlayGuard, getOverlayGuard, resetOverlayGuard } from './OverlayGuardService'
@@ -193,6 +194,9 @@ describe('native-view guard – production wiring of browser views', () => {
       }
     })
     useOverlayOccluderStore.getState().reset()
+    // A hosted tab showing a live page: no Erfana page covers the page area.
+    useBrowserTabStore.getState().attach(PANEL, TAB)
+    useBrowserTabStore.getState().applyState(liveState(null))
     browserViewBounds.register(TAB, PANEL)
     browserViewBounds.place(TAB, PLACEMENT)
     getOverlayGuard().sync(PANEL)
@@ -204,6 +208,36 @@ describe('native-view guard – production wiring of browser views', () => {
     useOverlayOccluderStore.getState().reset()
     usePreviewCollapsedStore.setState({ collapsed: new Set() })
     usePreviewStore.setState({ panels: new Map() })
+    useBrowserTabStore.setState({ byTab: new Map(), tabByPanel: new Map(), unhosted: new Map(), closing: new Set() })
+  })
+
+  function liveState(erfanaPage: 'empty' | 'loadError' | null): Parameters<ReturnType<typeof useBrowserTabStore.getState>['applyState']>[0] {
+    return {
+      tabId: TAB,
+      committedUrl: erfanaPage === 'empty' ? null : 'https://a.test/',
+      pendingUrl: null,
+      origin: null,
+      title: '',
+      canGoBack: false,
+      canGoForward: false,
+      loading: false,
+      zoomPercent: 100,
+      widthPreset: 'full',
+      security: 'secure',
+      inUse: { camera: false, microphone: false, screen: false },
+      erfanaPage,
+      devToolsOpen: false
+    }
+  }
+
+  it('hides the page while an Erfana page covers the page area, and while the editor tab closes', () => {
+    expect(lastVisible()).toBe(true)
+    useBrowserTabStore.getState().applyState(liveState('loadError'))
+    expect(lastVisible()).toBe(false)
+    useBrowserTabStore.getState().applyState(liveState(null))
+    expect(lastVisible()).toBe(true)
+    useBrowserTabStore.getState().markClosing(PANEL)
+    expect(lastVisible()).toBe(false)
   })
 
   const lastVisible = (): boolean | undefined => (setBounds.mock.lastCall?.[0] as BoundsRequest | undefined)?.visible

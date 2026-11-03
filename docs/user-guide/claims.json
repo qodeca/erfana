@@ -4871,7 +4871,7 @@
       "quote": "Registered in `DockLayout/components/EditorAreaSplitPanel.tsx` as the `htmlPreview` component (tab component `htmlPreviewTab`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:188",
+      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:230",
       "match": "htmlPreview: HtmlPreviewPanelWithBoundary,"
     },
     {
@@ -13209,7 +13209,7 @@
       "quote": "<PanelErrorBoundary key={props.params?.panelId || props.api.id} resetKey={props.params?.filePath ?? null} …>",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:77",
+      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:88",
       "match": "resetKey={props.params?.filePath ?? null}"
     },
     {
@@ -13219,7 +13219,7 @@
       "quote": "2. Register in `editorComponents` inside `EditorAreaSplitPanel`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:185",
+      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:227",
       "match": "const editorComponents = {"
     },
     {
@@ -14556,7 +14556,7 @@
       "quote": "- Protected tabs non-draggable",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:137",
+      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:177",
       "match": "welcomePanel.group.locked = true"
     },
     {
@@ -20779,7 +20779,7 @@
       "quote": "`editor` – `MarkdownEditorPanel` (Monaco + preview), id prefix `editor-`; `imageViewer`, id prefix `image-`; `htmlPreview`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:188",
+      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:230",
       "match": "htmlPreview: HtmlPreviewPanelWithBoundary,"
     },
     {
@@ -40288,7 +40288,7 @@
       "quote": "Opening a file restores the editor layout.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:160",
+      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:202",
       "match": "setTerminalExpanded(false)"
     },
     {
@@ -47099,7 +47099,7 @@
       "quote": "auto-restores on file open",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:159",
+      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:201",
       "match": "exits terminal-expand"
     },
     {

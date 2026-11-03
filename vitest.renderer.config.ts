@@ -118,6 +118,26 @@ export default defineConfig({
         'src/renderer/src/hooks/useCommentDirtyGuard.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/renderer/src/hooks/useUnsavedSourcesFeed.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Built-in browser, renderer side (spec 025, commit 17): the tab lifetime, the
+        // page's placement and the keys that route into it. A regression here shows
+        // as a page left on screen over the wrong tab or a key acting on the wrong
+        // tab. Each floor ~2 points under the value measured when it landed.
+        // measured 100/100/97.91/100 (lines/functions/branches/statements)
+        'src/renderer/src/stores/useBrowserTabStore.ts': { lines: 98, functions: 98, branches: 95, statements: 98 },
+        // measured 100/100/88.88/100
+        'src/renderer/src/services/browser/browserTabLifecycle.ts': { lines: 98, functions: 98, branches: 86, statements: 98 },
+        // measured 100/100/100/100
+        'src/renderer/src/services/browser/browserTabEvents.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/renderer/src/utils/openBrowserTab.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/95.58/100
+        'src/renderer/src/components/Panels/BrowserPanel/browserPanel.logic.ts': { lines: 98, functions: 98, branches: 93, statements: 98 },
+        // measured 100/100/91.89/97.01
+        'src/renderer/src/components/Panels/BrowserPanel/useBrowserBounds.ts': { lines: 98, functions: 98, branches: 89, statements: 95 },
+        // measured 100/100/94.73/98.46
+        'src/renderer/src/components/Panels/BrowserPanel/useBrowserKeys.ts': { lines: 98, functions: 98, branches: 92, statements: 96 },
+        // measured 100/100/95/100
+        'src/renderer/src/components/Panels/BrowserPanel/useBrowserPageFocus.ts': { lines: 98, functions: 98, branches: 93, statements: 98 },
       },
       exclude: [
         'node_modules/**',

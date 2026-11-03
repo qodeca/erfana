@@ -29,7 +29,7 @@ describe('createBrowserViewKind', () => {
     clip: { x: 0, y: 0, width: 100, height: 100 }
   }
 
-  function make(collapsed = new Set<string>()): {
+  function make(collapsed = new Set<string>(), covered?: Set<string>): {
     kind: ReturnType<typeof createBrowserViewKind>
     views: ReturnType<typeof createBrowserViewBounds>
     sent: BoundsRequest[]
@@ -40,6 +40,7 @@ describe('createBrowserViewKind', () => {
     const gateListeners = new Set<() => void>()
     const kind = createBrowserViewKind(views, {
       isCollapsed: (panelId) => collapsed.has(panelId),
+      ...(covered === undefined ? {} : { isCovered: (panelId: string) => covered.has(panelId) }),
       subscribe: (listener) => {
         gateListeners.add(listener)
         return () => gateListeners.delete(listener)
@@ -58,6 +59,13 @@ describe('createBrowserViewKind', () => {
     const { kind } = make(new Set(['browser-panel-1']))
     expect(kind.getGate('browser-panel-1')).toBe('collapsed')
     expect(kind.getGate('browser-panel-2')).toBeNull()
+  })
+
+  it('gates a covered panel, collapsed first', () => {
+    const { kind } = make(new Set(['browser-panel-1']), new Set(['browser-panel-1', 'browser-panel-2']))
+    expect(kind.getGate('browser-panel-1')).toBe('collapsed')
+    expect(kind.getGate('browser-panel-2')).toBe('covered')
+    expect(kind.getGate('browser-panel-3')).toBeNull()
   })
 
   it('sends its visibility through the bounds owner', () => {

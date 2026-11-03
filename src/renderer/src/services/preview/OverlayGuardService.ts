@@ -68,6 +68,7 @@ import { usePreviewCollapsedStore } from '../../stores/usePreviewCollapsedStore'
 import { usePreviewCoveredStore } from '../../stores/usePreviewCoveredStore'
 import { logger } from '../../utils/logger'
 import { browserViewBounds } from '../browser/browserViewBounds'
+import { useBrowserTabStore } from '../../stores/useBrowserTabStore'
 import { previewGateway } from '../previewGateway'
 import {
   createBrowserViewKind,
@@ -474,10 +475,15 @@ export function getOverlayGuard(): IOverlayGuard {
       ),
     otherKinds: [
       // A browser panel's collapsed flag is written by its own bounds hook,
-      // keyed by its own panel id, so it never meets a preview's flag.
+      // keyed by its own panel id, so it never meets a preview's flag; its
+      // page is covered while Erfana's DOM fills the page area.
       createBrowserViewKind(browserViewBounds, {
         isCollapsed: (panelId) => usePreviewCollapsedStore.getState().isCollapsed(panelId),
-        subscribe: (listener) => usePreviewCollapsedStore.subscribe(listener)
+        isCovered: (panelId) => useBrowserTabStore.getState().coversPage(panelId),
+        subscribe: (listener) => {
+          const off = [usePreviewCollapsedStore.subscribe(listener), useBrowserTabStore.subscribe(listener)]
+          return () => off.forEach((unsubscribe) => unsubscribe())
+        }
       })
     ]
   })
