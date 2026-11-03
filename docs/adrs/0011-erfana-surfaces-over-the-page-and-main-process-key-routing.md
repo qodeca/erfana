@@ -58,3 +58,18 @@ While the page has focus, keys go to the page's process; 025-FR-047 to 025-FR-05
 - [Electron – webContents](https://www.electronjs.org/docs/latest/api/web-contents), [webPreferences](https://www.electronjs.org/docs/latest/api/structures/web-preferences)
 - `src/renderer/src/services/preview/OverlayGuardService.ts`, `src/renderer/src/hooks/useOccluder.ts`, `src/renderer/src/components/Toast/toastPlacement.ts`, `src/renderer/src/stores/usePreviewViewportStore.ts`
 - `src/main/services/preview/previewInputForward.ts`, `previewLiveBounds.ts`, `previewResizeHold.ts`, `PreviewStillFrameCache.ts`
+
+## Probe results (commit 8, 2026-11-03)
+
+Electron 44.9.3, macOS 27.2 (Darwin 27.2.0, arm64), `e2e/browser-engine-probes.e2e.ts`, 5 runs each, all consistent. Playwright is attached as a second CDP client to every page in these runs. Recorded for the owner's acceptance decision; the decision text above is unchanged. Linux and Windows are not yet probed.
+
+| Probe | Result | Bears on |
+|---|---|---|
+| View moved off-screen with `setBounds` | Stays `visible`, keeps painting (10 frames), no `visibilitychange` | Decision 3 confirmed on macOS |
+| View detached with `removeChildView` | **Also stays `visible` and keeps painting**, no `visibilitychange` | Decision 3's "hidden tabs cost no compositing" is not shown; a detached tab still runs animation frames |
+| Still-image drop delay (re-attach → second animation frame, 25 samples) | 4–35 ms, worst 35 ms | Decision 3: two frames ≈ 35 ms worst case on this machine; rAF is a proxy for "presented" |
+| Overlay highlight in `capturePage` | Present; gone after `hideHighlight` | Hide before every still image |
+| Page dialogs with `Page.enable` | `alert`/`confirm` raise `Page.javascriptDialogOpening` with `hasBrowserHandler: true`; `handleJavaScriptDialog` answers the page, **but Electron also opens its own box** (macOS `sheet-begin` on the window, no `sheet-end` after the CDP answer). `prompt()` throws, with no event | Decision 7 cannot replace native dialogs: owner question Q6 applies |
+| `window.print()` | Blocks the page's script; no `webContents` event, no sheet on the window | S-32: no route for Erfana; the hang probe must not report it as a hang |
+| Camera capture stop (fake device, granted) | No `webContents` event at start or stop | S-32: no end signal; the in-use indicator ends at navigation or tab close |
+| Tab from the last focusable element | Wraps to the first element **inside the page** (`blur`, window `blur`/`focus`, then focus on the first); focus never leaves the view | Decision 14: F6 is the only route out |

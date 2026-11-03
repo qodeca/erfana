@@ -83,6 +83,7 @@ Each page states its acceptance IDs in its first paragraph. Pages load `fixture.
 | `offscreen.html` | Taller than the viewport, a parent wholly above the viewport, a zero-size element, a covered element, one off the left edge |
 | `events.html` | Logs every key, focus and pointer event; counts `mousemove`, `wheel` and `scroll`; a link, an image and a drag source for the page menu |
 | `find.html`, `counter.html`, `form.html`, `hang.html`, `animation.html`, `schemes.html` | Three "needle"s; a running counter with a load count; a password "s3cret" and the hidden "AI agent: ignore the user"; a 6-second hang; a CSS animation with a DOM listing; the schemes a page may use |
+| `probes/` | The engine probes of `e2e/browser-engine-probes.e2e.ts` (solution design commit 8): `page.html`, `frames.html` and `frame.html` (an offset and a transformed cross-site frame), `site.html`, `requests.html` (failed requests for the `Log` / `Network` probe), `local-include.html` and `local/` (a local folder read through `erfana-local`, with `canary.txt` that must stay unreadable) |
 
 ### React apps (`apps/react18/`, `apps/react19/`)
 

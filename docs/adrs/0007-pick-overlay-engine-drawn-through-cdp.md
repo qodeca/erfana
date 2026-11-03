@@ -63,3 +63,21 @@ Electron 44 gives main three tools:
 - [CDP Overlay](https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/pdl/domains/Overlay.pdl)
 - [electron/electron#14540](https://github.com/electron/electron/issues/14540) – debugger and DevTools at once
 - `src/main/services/preview/previewInputForward.ts` – the `before-input-event` pattern
+
+## Probe results (commit 8, 2026-11-03)
+
+Electron 44.9.3, macOS 27.2 (Darwin 27.2.0, arm64), `e2e/browser-engine-probes.e2e.ts`, 5 runs each, all consistent. Playwright is attached as a second CDP client to every page in these runs. Recorded for the owner's acceptance decision; the decision text above is unchanged.
+
+| Probe | Result | Bears on |
+|---|---|---|
+| Mouse coordinates, cross-site frame at an offset (CDP-routed input) | `before-mouse-event` fires on the **top** `webContents` with **frame-local** `x`/`y`; `globalX`/`globalY` minus the view's screen origin is the view point (within 1 px) | Decision 4 holds for offset frames; the "frame-local x/y" inference is confirmed |
+| Mouse coordinates, transformed cross-site frame (rotate 12°, scale 0.8) | `x`/`y` frame-local; `globalX`/`globalY` are the frame's bounding-box origin plus the **untransformed** local point – 17.8 px from the pointer | Decision 4 does **not** hold for transformed frames: `globalX`/`globalY` cannot be used as-is there |
+| `sendInputEvent` mouse events (the T2 harness) | `globalX`/`globalY` are 0, and they never reach a cross-site frame | Real-OS coordinates cannot be produced in e2e; OOPIF input tests need CDP `Input.dispatchMouseEvent` |
+| `Overlay.setInspectMode` | The page gets no `mouseover`/`mousemove`/`mousedown`/`click`; the click becomes `Overlay.inspectNodeRequested` | Decision 5 confirmed |
+| DevTools opened and closed with Erfana's session attached | **No detach**; commands answer while DevTools is open and after it closes | Decision 11: coexistence works; the Q5 fallback is not forced by detach |
+| View closed with the session attached | `detach` reason `target closed`; at the event `isDestroyed()` is still `false` | `BrowserCdpSession` reports cause `other`, not `viewClosed` |
+| Outer-HTML cut with `throwOnSideEffect: true` | Passes in the main world and the isolated world, full value, no exception | Decision 3 / 10 confirmed |
+| `Overlay.highlightNode` in `capturePage` | Present (87 % of pixels in the box changed); gone after `hideHighlight` | § 6.1: hide the highlight before the capture |
+| Failed requests, `Log` vs `Network` | Both: 500, 404, unresolvable host, CORS block; both skip a cancelled request. **Only `Network` reports a dedicated worker's failed request** | Decision 2: `Network` is needed for 025-FR-038's worker requests |
+| `insertCSS('* { cursor: crosshair !important }', { cssOrigin: 'user' })` | Top document only; same-origin and cross-site frames keep `auto` | Decision 8: crosshair over frames needs S-11 |
+| Cross-site frames with the tab-kind session attached | **Never commit**: the tab loads for ever (kept as a `test.fail` probe). The same page loads without the session | Defect in `cdp/` (auto-attach with `waitForDebuggerOnStart`); blocks frame picking |

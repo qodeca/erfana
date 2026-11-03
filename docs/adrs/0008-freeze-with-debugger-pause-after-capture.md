@@ -45,3 +45,15 @@ A pick by the second Ctrl/Cmd+E keeps hover-only content as it is while Erfana's
 - [CDP Page](https://raw.githubusercontent.com/ChromeDevTools/devtools-protocol/master/pdl/domains/Page.pdl) – `setWebLifecycleState` experimental
 - [Page Lifecycle API](https://developer.chrome.com/blog/page-lifecycle-api)
 - `src/main/services/preview/PreviewStillFrameCache.ts` – empty-first-capture retry
+
+## Probe results (commit 8, 2026-11-03)
+
+Electron 44.9.3, macOS 27.2 (Darwin 27.2.0, arm64), `e2e/browser-engine-probes.e2e.ts`, 5 runs each, all consistent. Playwright is attached as a second CDP client to every page in these runs. Recorded for the owner's acceptance decision; the decision text above is unchanged.
+
+| Probe | Result | Bears on |
+|---|---|---|
+| Idle page, `Debugger.pause` pending, then `Runtime.callFunctionOn` | **Hangs in either world** (main and isolated): Erfana's call is the first script to run and pauses inside itself; `Debugger.paused` arrives with it | Decision 3: "a pending pause on an idle page" is not enough – the first lookup triggers the pause |
+| Same page once `Debugger.paused` has arrived | A further `callFunctionOn` answers in 0.3–0.4 ms | Decision 3's 100 ms budget holds once actually paused |
+| Timer page, after `Debugger.paused` | Main world 0.4–0.5 ms, isolated world 0.2–0.3 ms | Decision 3 holds |
+| Outer-HTML cut with `throwOnSideEffect: true` | Passes, main and isolated world | Decision 3's "every call uses `throwOnSideEffect`" is workable for this read |
+| `window.print` (see ADR 0011) | Blocks the page; the hang probe's `Runtime.evaluate('0')` gets no answer | Decision 8: a print in progress reads as a hang |

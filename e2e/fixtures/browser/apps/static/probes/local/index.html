@@ -1,0 +1,53 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Probe local folder</title>
+<link rel="stylesheet" href="style.css">
+<script src="script.js"></script>
+<script type="module" src="module.mjs"></script>
+</head>
+<body>
+<!--
+  Engine probe (spec 025 commit 8, ADR 0012 decision 1): served as
+  erfana-local://<folder>/ by a test-only handler that records Sec-Fetch-Dest,
+  Sec-Fetch-Site, Sec-Fetch-Mode and Origin per request. Loads one of each
+  subresource kind and tries each script read; window.__probe.attempts holds
+  how each read ended.
+-->
+<p class="probe-font">local folder</p>
+<img src="image.svg" alt="">
+<iframe src="frame.html" title="local frame"></iframe>
+<script>
+  var probe = { attempts: {}, done: false }
+  window.__probe = probe
+  function settle(name, promise) {
+    return promise.then(function (v) { probe.attempts[name] = 'ok ' + v }, function (e) { probe.attempts[name] = 'failed ' + (e && e.name) })
+  }
+  var xhr = new Promise(function (resolve, reject) {
+    var request = new XMLHttpRequest()
+    request.open('GET', 'canary.txt?via=xhr')
+    request.onload = function () { resolve(request.status) }
+    request.onerror = function () { reject(new Error('xhr')) }
+    request.send()
+  })
+  var worker = new Promise(function (resolve, reject) {
+    try {
+      var w = new Worker('worker.js')
+      w.onmessage = function (event) { resolve(event.data) }
+      w.onerror = function () { reject(new Error('worker')) }
+    } catch (error) { reject(error) }
+  })
+  var sw = 'serviceWorker' in navigator ? navigator.serviceWorker.register('worker.js?as=sw').then(function () { return 'registered' }) : Promise.reject(new Error('no serviceWorker'))
+  Promise.all([
+    settle('fetch', fetch('canary.txt?via=fetch').then(function (r) { return r.status })),
+    settle('xhr', xhr),
+    settle('worker', worker),
+    settle('serviceWorker', sw),
+    settle('font', document.fonts.load('16px probe-font').then(function (faces) { return faces.length }))
+  ]).then(function () { probe.done = true })
+</script>
+</body>
+</html>

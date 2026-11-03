@@ -1,0 +1,47 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Probe site behaviour</title>
+</head>
+<body>
+<!--
+  Engine probes (spec 025 commit 8): page dialogs, window.print and the end of
+  a camera capture. Each action starts on a task of its own, so the test's
+  script returns before a dialog or the print call blocks the page; results
+  land in window.__probe.results as { name, value }.
+-->
+<ol id="log"></ol>
+<script>
+  var probe = { results: [], stream: null }
+  window.__probe = probe
+  function result(name, value) { probe.results.push({ name: name, value: value === undefined ? null : value }) }
+  probe.later = function (name, fn) {
+    setTimeout(function () {
+      try { result(name, fn()) } catch (error) { result(name, 'threw ' + (error && error.name)) }
+    })
+    return 0
+  }
+  probe.alert = function () { return probe.later('alert', function () { return alert('probe alert') }) }
+  probe.confirm = function () { return probe.later('confirm', function () { return confirm('probe confirm') }) }
+  probe.prompt = function () { return probe.later('prompt', function () { return prompt('probe prompt', 'default') }) }
+  probe.print = function () { return probe.later('print', function () { window.print(); return 'returned' }) }
+  window.addEventListener('beforeprint', function () { result('beforeprint') })
+  window.addEventListener('afterprint', function () { result('afterprint') })
+  probe.startCamera = function () {
+    navigator.mediaDevices.getUserMedia({ video: true, audio: false }).then(function (stream) {
+      probe.stream = stream
+      result('camera', 'live ' + stream.getVideoTracks().length)
+    }, function (error) { result('camera', 'refused ' + error.name) })
+    return 0
+  }
+  probe.stopCamera = function () {
+    if (probe.stream) probe.stream.getTracks().forEach(function (t) { t.stop() })
+    result('camera-stopped', probe.stream ? probe.stream.getVideoTracks()[0].readyState : 'none')
+    return 0
+  }
+</script>
+</body>
+</html>

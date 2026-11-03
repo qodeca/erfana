@@ -20,6 +20,8 @@
  *   of the browser session's request filter for that one load.
  * - **Dev-server origin.** A test names a fixture origin as the app's dev
  *   server, so the refusal of rule 3 can be shown without a dev server.
+ * - **Engine probes** (commit 8, T25): the `probe…` hooks of
+ *   `browserProbeHook.ts`, merged into this object.
  *
  * Never touches a `webContents`' debugger (only `cdp/` may).
  */
@@ -30,6 +32,7 @@ import type { TabStateEvent } from '../../shared/ipc/browser-tab-schema'
 import type { BrowserRuntime } from '../services/browser/browserAppSetup'
 import type { BrowserTab } from '../services/browser/BrowserTab'
 import { browserSessionRegistry } from '../services/browser/browserSessionRegistry'
+import { createBrowserProbeHook, type BrowserProbeHook } from './browserProbeHook'
 
 /** Longest a page script may run before the hook gives up. */
 const EXEC_CAP_MS = 5_000
@@ -60,7 +63,7 @@ export interface InputProbeCounts {
 
 export type KeyModifier = 'shift' | 'control' | 'alt' | 'meta'
 
-export interface BrowserTestHook {
+export interface BrowserTestHook extends BrowserProbeHook {
   tabs(): HookTab[]
   state(tabId: string): TabStateEvent
   exec(tabId: string, code: string): Promise<unknown>
@@ -252,6 +255,7 @@ export function createBrowserTestHook(getRuntime: () => BrowserRuntime | null): 
     closeIpcProbeView: () => {
       if (probeView !== null && !probeView.webContents.isDestroyed()) probeView.webContents.close()
       probeView = null
-    }
+    },
+    ...createBrowserProbeHook(getRuntime)
   }
 }

@@ -1,0 +1,25 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Probe local include</title>
+</head>
+<body>
+<!--
+  Engine probe (spec 025 commit 8, ADR 0012 decision 7): a web page that
+  includes a file of an erfana-local folder and tries to read one; the
+  test-only handler records the fetch metadata it gets.
+-->
+<img id="included" src="erfana-local://probe-folder/image.svg?via=web-image" alt="">
+<script>
+  var probe = { attempts: {}, done: false }
+  window.__probe = probe
+  fetch('erfana-local://probe-folder/canary.txt?via=web-fetch').then(
+    function (r) { probe.attempts.fetch = 'ok ' + r.status },
+    function (e) { probe.attempts.fetch = 'failed ' + e.name }
+  ).then(function () { probe.done = true })
+</script>
+</body>
+</html>

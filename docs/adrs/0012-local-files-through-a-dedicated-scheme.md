@@ -49,3 +49,17 @@ A static server in main bound to `127.0.0.1` on a random port per opened folder,
 
 - [Electron – fuses](https://www.electronjs.org/docs/latest/tutorial/fuses), [protocol](https://www.electronjs.org/docs/latest/api/protocol)
 - `src/main/services/preview/previewScheme.ts`, `PreviewProtocolHandler.ts`, `previewPathResolve.ts`
+
+## Probe results (commit 8, 2026-11-03)
+
+Electron 44.9.3, macOS 27.2 (Darwin 27.2.0, arm64), `e2e/browser-engine-probes.e2e.ts`, 5 runs each, all consistent. Playwright is attached as a second CDP client to every page in these runs. The production handler arrives with commit 11, so a **test-only** handler on a probe session (scheme registered as in decision 2: `standard`, `secure`) served a fixture folder and recorded each request's headers. Recorded for the owner's acceptance decision; the decision text above is unchanged.
+
+| Probe | Result | Bears on |
+|---|---|---|
+| `Sec-Fetch-Dest`, `-Site`, `-Mode` on every request (document, style, classic and module script, image, frame, XHR, worker, font, an include from an `http` page) | **Absent on all of them**. `Origin` only on the module script and the font | Decision 6 cannot be built: the spike fails. Per this ADR, option 4 (loopback server) replaces it – owner question Q4 |
+| `fetch` of a same-folder file | Fails (`TypeError`) | No `supportFetchAPI` blocks `fetch` |
+| `XMLHttpRequest` of a same-folder file | **Succeeds (200)** | Leaving out `supportFetchAPI` does **not** block XHR |
+| Service worker registration | Fails (`TypeError`) | As intended |
+| Dedicated worker, classic and module script | Run | As intended |
+| Font from the same folder | Request reached the handler in CORS mode; outcome not tested (no font file in the fixture) | Open |
+| `<img>` of an `erfana-local` file from an `http` page | Request reaches the handler, with no fetch metadata to refuse it by | Decision 7's `Sec-Fetch-Site` check is not possible either |
