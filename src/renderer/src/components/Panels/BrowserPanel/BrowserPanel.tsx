@@ -49,14 +49,16 @@ import { openInSystemBrowser } from './browserDataActions'
 import { ForgetDataDialog } from './ForgetDataDialog'
 import { PickRow } from './PickRow'
 import { PickSurface } from './PickSurface'
-import { TargetChooser } from './TargetChooser'
+import { TargetChooser, type TargetChooserHandle } from './TargetChooser'
 import { WidthPresetMenu } from './WidthPresetMenu'
 import { useBrowserTarget } from './useBrowserTarget'
 import { useBrowserPick } from './useBrowserPick'
 import { useStillSurface } from './useStillSurface'
-import type { PickPlace } from './pickRow.logic'
+import { pickPlace } from './pickRow.logic'
 import { useBrowserStillStore } from '../../../stores/useBrowserStillStore'
 import { useProjectManagementContextSafe } from '../../../context/ProjectManagementContext'
+import { useTerminalPortalOptional } from '../../../context/TerminalPortalContext'
+import { useStartIfGone } from '../TerminalPanel/hooks/useStartIfGone'
 import './BrowserPanel.css'
 import './BrowserChrome.css'
 import './PickRow.css'
@@ -106,6 +108,8 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
   const still = useBrowserStillStore(s => (tabId === null ? null : (s.byTab.get(tabId) ?? null)))
   const projectPath = useProjectManagementContextSafe()?.projectPath ?? null
   const [toolbarFocused, setToolbarFocused] = useState(false)
+  /** Focus left the tab with the panel open, which closed it; until focus comes back (025-FR-065). */
+  const [panelClosedOnLeave, setPanelClosedOnLeave] = useState(false)
   const moreStill = useStillSurface(tabId, 'more')
   const suggestStill = useStillSurface(tabId, 'suggestions')
   const targetStill = useStillSurface(tabId, 'target')
@@ -151,7 +155,27 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
     pageAreaRef.current?.querySelector<HTMLElement>(ERFANA_PAGE_FOCUSABLE)?.focus()
   }, [live, focusPage])
 
-  const pick = useBrowserPick({ tabId, live, target, containerApi, projectPath, focusPage: focusPageArea })
+  // The panel's and the dialog's target button, so the banner's Choose terminal opens its menu (025-FR-061).
+  const panelTargetRef = useRef<TargetChooserHandle>(null)
+  const openTargetMenu = useCallback(() => panelTargetRef.current?.openMenu(), [])
+  const terminalPortal = useTerminalPortalOptional()
+  // Open terminal: a new terminal once the target's shell has exited; with none at all, showing the panel starts one.
+  const startIfGone = useStartIfGone(
+    target.terminalId,
+    useCallback(async () => {
+      // `terminalControls` is a getter over a ref: read at the press, never from a render.
+      await terminalPortal?.terminalControls?.restart()
+    }, [terminalPortal])
+  )
+  const startTerminal = useCallback(() => {
+    startIfGone().catch((error: unknown) => {
+      logger.warn('Browser Open terminal failed', { error: errorText(error) })
+    })
+  }, [startIfGone])
+  const pick = useBrowserPick({ tabId, live, target, containerApi, projectPath, focusPage: focusPageArea, openTargetMenu, startTerminal })
+  // The "panel closed when you left" banner lasts until focus is back in the tab or pick mode ends
+  // (state adjusted during render, React's pattern for state derived from a change).
+  if (panelClosedOnLeave && (pageFocused || toolbarFocused || !pick.tab.on)) setPanelClosedOnLeave(false)
   const dialogOpen = pick.surface === 'dialog'
 
   // While the dialog is open the rows above the page are inert (025-FR-050);
@@ -267,18 +291,7 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
     if (live) focusPage()
   }, [live, focusPage])
 
-  const place: PickPlace =
-    pick.surface === 'dialog'
-      ? toolbarFocused
-        ? 'dialog'
-        : 'outDialog'
-      : pick.surface === 'panel'
-        ? 'panel'
-        : pageFocused
-          ? 'page'
-          : toolbarFocused
-            ? 'toolbar'
-            : 'out'
+  const place = pickPlace({ surface: pick.surface, pageFocused, toolbarFocused, panelClosedOnLeave })
   const targetButton = (variant: 'row' | 'panel'): JSX.Element => (
     <TargetChooser
       target={target}
@@ -288,6 +301,7 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
       onOpenCapture={pick.openCapture}
       variant={variant}
       still={variant === 'row' ? targetStill : undefined}
+      handleRef={variant === 'panel' ? panelTargetRef : undefined}
     />
   )
   const { surface, close: closePick } = pick
@@ -323,7 +337,11 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
         if (!intoPortal && (!(next instanceof Node) || rootRef.current?.contains(next) !== true)) {
           setToolbarFocused(false)
           // Focus left the tab: the panel closes and its capture goes; a dialog stays with its text (025-FR-014).
-          if (surface === 'panel') closePick('focusLeft')
+          // The banner then says why the panel went (025-FR-065).
+          if (surface === 'panel') {
+            closePick('focusLeft')
+            setPanelClosedOnLeave(true)
+          }
         }
         keys.onBlur(event)
       }}

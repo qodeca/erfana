@@ -49,7 +49,21 @@ export interface BrowserInputTestHook {
   clickNow(tabId: string, x: number, y: number): GuardedClick
   /** Run `code` in the page with a user gesture (for `requestFullscreen`). */
   execWithGesture(tabId: string, code: string): Promise<unknown>
+  /**
+   * One left-button event to the page at page CSS px (`x`, `y`), with the
+   * click count the operating system would give it (2 for the second press of
+   * a double-click): a press and its release can be sent apart (025-AC-063).
+   */
+  pageMouse(tabId: string, type: MouseButtonEvent, x: number, y: number, clickCount: number): void
+  /**
+   * The same to Erfana's own window at its CSS px (`x`, `y`) – where a press
+   * or a release lands once the page is covered by its still image.
+   */
+  windowMouse(tabId: string, type: MouseButtonEvent, x: number, y: number, clickCount: number): void
 }
+
+/** A left-button event a test sends on its own. */
+export type MouseButtonEvent = 'mouseDown' | 'mouseUp'
 
 function requireRuntime(getRuntime: () => BrowserRuntime | null): BrowserRuntime {
   const runtime = getRuntime()
@@ -108,6 +122,20 @@ export function createBrowserInputTestHook(getRuntime: () => BrowserRuntime | nu
       contents.sendInputEvent({ type: 'mouseDown', ...at, button: 'left', clickCount: 1 })
       contents.sendInputEvent({ type: 'mouseUp', ...at, button: 'left', clickCount: 1 })
       return { sentAt, guardUntil }
+    },
+    pageMouse: (tabId, type, x, y, clickCount) => {
+      const contents = tab(tabId).contents
+      const zoom = contents.getZoomFactor()
+      const at = { x: Math.round(x * zoom), y: Math.round(y * zoom) }
+      contents.sendInputEvent({ type: 'mouseMove', ...at })
+      contents.sendInputEvent({ type, ...at, button: 'left', clickCount })
+    },
+    windowMouse: (tabId, type, x, y, clickCount) => {
+      const contents = windowContents(tab(tabId))
+      if (contents === null) throw new Error(`The window of ${tabId} is gone`)
+      const at = { x: Math.round(x), y: Math.round(y) }
+      contents.sendInputEvent({ type: 'mouseMove', ...at })
+      contents.sendInputEvent({ type, ...at, button: 'left', clickCount })
     },
     execWithGesture: (tabId, code) => {
       let timer: ReturnType<typeof setTimeout> | undefined

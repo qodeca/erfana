@@ -3,11 +3,12 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { OUTLINE_COLOUR, OUTLINE_TOKEN, outlineColour } from './accentColour'
+import { mainDesignTokenDefines, resolveTokenHex } from '../../../../../electron.vite.design-tokens'
+import { hexToRgb, OUTLINE_COLOUR, OUTLINE_TOKEN, outlineColour } from './accentColour'
 
 const TOKENS_CSS = readFileSync(join(__dirname, '../../../../renderer/src/styles/design-tokens.css'), 'utf8')
 
-/** A token's `#rrggbb` value in design-tokens.css, following `var()` chains. */
+/** A token's `#rrggbb` value in design-tokens.css, following `var()` chains – read here on its own, not through the build helper. */
 function tokenHex(name: string, depth = 0): string {
   if (depth > 8) throw new Error(`${name}: var() chain too deep`)
   const match = new RegExp(`${name.replace(/[-]/g, '\\-')}\\s*:\\s*([^;]+);`).exec(TOKENS_CSS)
@@ -20,9 +21,39 @@ function tokenHex(name: string, depth = 0): string {
 const hex = ({ r, g, b }: { r: number; g: number; b: number }): string => `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`
 
 describe('accentColour', () => {
-  it('025-AC-034 the outline colour is the --color-accent-primary token of the real design tokens', () => {
+  it('025-AC-034 the outline colour is the --color-accent-primary token of the real design tokens, as the build inlines it', () => {
     expect(OUTLINE_TOKEN).toBe('--color-accent-primary')
     expect(hex(OUTLINE_COLOUR)).toBe(tokenHex(OUTLINE_TOKEN).toLowerCase())
+    expect(__ERFANA_ACCENT_PRIMARY__).toBe(tokenHex(OUTLINE_TOKEN).toLowerCase())
     expect(outlineColour()).toBe(OUTLINE_COLOUR)
+  })
+
+  it('reads #rrggbb in either case and refuses anything else', () => {
+    expect(hexToRgb('#A0a8ff')).toEqual({ r: 0xa0, g: 0xa8, b: 0xff })
+    expect(hexToRgb('#000000')).toEqual({ r: 0, g: 0, b: 0 })
+    for (const bad of ['', 'a0a8ff', '#abc', '#a0a8ffff', '#gggggg', 'rgb(1, 2, 3)']) expect(() => hexToRgb(bad)).toThrow(/Not a #rrggbb colour/)
+  })
+})
+
+describe('electron.vite.design-tokens (the build-time resolution)', () => {
+  const css = `:root {\n  --a: #ABCDEF; /* base */\n  --b: var(--a);\n  --c: var( --b );\n  --mix: color-mix(in srgb, var(--a) 35%, transparent);\n  --loop: var(--loop);\n  --x-a: #111111;\n}`
+
+  it('follows var() chains to a lower-case hex, and never takes another token whose name contains it', () => {
+    expect(resolveTokenHex(css, '--c')).toBe('#abcdef')
+    expect(resolveTokenHex(css, '--a')).toBe('#abcdef')
+    expect(resolveTokenHex(':root{--a-b: #222222; x--a: #444444; --a: #333333;}', '--a')).toBe('#333333')
+  })
+
+  it('fails the build on a missing token, a non-hex value and a loop', () => {
+    expect(() => resolveTokenHex(css, '--missing')).toThrow(/not declared/)
+    expect(() => resolveTokenHex(css, '--mix')).toThrow(/not a #rrggbb colour/)
+    expect(() => resolveTokenHex(css, '--loop')).toThrow(/deeper than/)
+  })
+
+  it('defines __ERFANA_ACCENT_PRIMARY__ from the real stylesheet', () => {
+    expect(mainDesignTokenDefines()).toEqual({ __ERFANA_ACCENT_PRIMARY__: JSON.stringify(tokenHex(OUTLINE_TOKEN).toLowerCase()) })
+    expect(mainDesignTokenDefines(':root { --color-brand-x: #010203; --color-accent-primary: var(--color-brand-x); }')).toEqual({
+      __ERFANA_ACCENT_PRIMARY__: '"#010203"'
+    })
   })
 })

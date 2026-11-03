@@ -113,11 +113,14 @@
   }
 }
 
-@container (max-width: 380px) {
+/* The row's own content box: a 400px tab is 376px here and keeps "Esc to stop"; a 360px tab (336px) folds it. */
+@container (max-width: 360px) {
   .erf-brw-banner-line__more--1 {
     display: none;
   }
+}
 
+@container (max-width: 380px) {
   .erf-brw-pickbtn__label {
     display: none;
   }

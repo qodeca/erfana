@@ -22,6 +22,7 @@
 import path from 'node:path'
 import type { TestProjectInlineConfiguration } from 'vitest/config'
 import { maxWorkers } from './vitest.workers'
+import { mainDesignTokenDefines } from './electron.vite.design-tokens'
 
 type ProjectTestOptions = NonNullable<TestProjectInlineConfiguration['test']>
 
@@ -42,7 +43,8 @@ function mainProcessProject(test: ProjectTestOptions): TestProjectInlineConfigur
     // Mirror the main build's `define` (electron.vite.config.ts) for a non-e2e
     // build: the test hooks are compiled out. A test of the e2e path stubs the
     // global with `vi.stubGlobal('__ERFANA_TEST_HOOKS__', true)`.
-    define: { __ERFANA_TEST_HOOKS__: 'false' },
+    // …and its design-token values, resolved from design-tokens.css the same way.
+    define: { __ERFANA_TEST_HOOKS__: 'false', ...mainDesignTokenDefines() },
     resolve: {
       alias: {
         '@main': path.resolve(__dirname, 'src/main'),

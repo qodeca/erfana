@@ -11,8 +11,9 @@
  * - Computed styles and the layout chain: the pinned style read.
  * - Matched rules: `CSS.getMatchedStylesForNode`, for an element in its
  *   frame target's own document and outside shadow roots (the selector finds
- *   its node id); otherwise, or when the CSS domain returns none, `null` –
- *   the context file then notes "matched rules not available". Stylesheet
+ *   its node id); otherwise, or when the CSS domain gives no answer, `null` –
+ *   the context file then notes "matched rules not available". An answer
+ *   with only user-agent rules is an empty list, not `null`. Stylesheet
  *   URLs come from the `CSS.styleSheetAdded` events the caller records.
  * - Covered by: what a click at the centre of the element's box would hit,
  *   when that is neither the element, one of its ancestors nor one of its
@@ -120,8 +121,10 @@ async function matchedRules(ctx: FactsContext, node: PickNode, chain: ElementCha
     const ids = isRecord(found) && Array.isArray(found.nodeIds) ? found.nodeIds : []
     if (ids.length !== 1 || typeof ids[0] !== 'number') return null
     const raw = await ctx.reader.call('CSS.getMatchedStylesForNode', { nodeId: ids[0] }, node.sessionKey)
-    const rules = parseMatchedRules(raw, ctx.styleSheets)
-    return rules.length === 0 ? null : rules
+    // An answer is "available" even with no author rule (an element styled by the user agent only):
+    // the list is then empty, not missing, so the context file says "none" without the note.
+    if (!isRecord(raw) || !Array.isArray(raw.matchedCSSRules)) return null
+    return parseMatchedRules(raw, ctx.styleSheets)
   })
 }
 

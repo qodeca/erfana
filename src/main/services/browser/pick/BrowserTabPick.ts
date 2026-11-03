@@ -115,7 +115,7 @@ export class BrowserTabPick {
   constructor(private readonly deps: BrowserTabPickDeps) {
     this.reader = new PickReader(deps.cdp)
     this.frames = new PickFrames(deps.cdp, this.reader)
-    this.highlight = new PickHighlight(this.reader, this.frames)
+    this.highlight = new PickHighlight(this.reader, this.frames, () => deps.faults?.highlightColour() ?? null)
     this.hitTest = new PickHitTest(this.reader, this.frames)
     this.freeze = new PickFreeze(deps.cdp, this.reader, deps.contents, () => this.externalResume())
     this.modeSwitch = new PickModeSwitch(deps.cdp, this.reader, this.frames, deps.contents)
@@ -195,14 +195,16 @@ export class BrowserTabPick {
   /**
    * **Pick this element** from the page's context menu at `at` (page view
    * px, zoom included): hit-test there, then let the routing pick at once
-   * (`contextMenuPick`, 025-FR-057). Nothing happens when the point hits
-   * nothing or the routing refuses (a menu or dialog already open).
+   * (`contextMenuPick`, 025-FR-057). Pick mode goes on first (the session refuses DOM while it is off); over
+   * nothing it goes back off. The routing may refuse (a menu or dialog open).
    */
   async pickAt(at: Point): Promise<void> {
     if (this.disposed || !this.deps.cdp.attached || this.deps.contents.isDestroyed()) return
+    const wasActive = this.active
+    if (!wasActive) await this.start()
     const zoom = this.deps.contents.getZoomFactor() || 1
     const hit = await this.hitTest.atViewPoint({ x: at.x / zoom, y: at.y / zoom }).catch(() => null)
-    if (hit === null || this.disposed) return
+    if (hit === null || this.disposed) return void (wasActive || (await this.stop()))
     this.menuTarget = { node: hit.node, viewPoint: hit.viewPoint }
     this.routing({ type: 'contextMenuPick' })
     // Only the confirm this dispatch queued (one microtask, `onEffect`) may use it.

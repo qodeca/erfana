@@ -36,6 +36,15 @@ describe('placePanel (025-FR-030)', () => {
     expect(placePanel({ x: 0, y: 0, width: 800, height: 600 }, PANEL, AREA)).toEqual({ kind: 'at', left: 0, top: 400, side: 'inside' })
     expect(placePanel({ x: 0, y: 0, width: 800, height: 600 }, { width: 900, height: 700 }, AREA)).toEqual({ kind: 'at', left: 0, top: 0, side: 'inside' })
   })
+
+  it('keeps the panel inside the area when the outline lies wholly outside it (an off-screen pick, 025-FR-035)', () => {
+    // Wholly above: "below" has room on paper, at a negative top.
+    expect(placePanel({ x: 10, y: -1919, width: 100, height: 60 }, PANEL, AREA)).toEqual({ kind: 'at', left: 10, top: 0, side: 'below' })
+    // Wholly below: "above", pulled up to the area's bottom.
+    expect(placePanel({ x: 10, y: 2000, width: 100, height: 60 }, PANEL, AREA)).toEqual({ kind: 'at', left: 10, top: 400, side: 'above' })
+    // Wholly left of the area.
+    expect(placePanel({ x: -900, y: 100, width: 100, height: 500 }, PANEL, AREA)).toMatchObject({ left: 0 })
+  })
 })
 
 describe('cutPath (025-FR-027)', () => {

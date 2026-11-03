@@ -104,10 +104,11 @@ describe('PromptActionsPanel (025-FR-027, 025-FR-030)', () => {
     expect(props.onClose).toHaveBeenCalledTimes(2)
   })
 
-  it('cycles Tab through the actions, the banner button, the target and ×, and wraps', () => {
+  it('cycles Tab through the actions, the banner button and the target, and wraps to the first action; × is not a Tab stop (025-FR-030)', () => {
     renderPanel({ banner: { kind: 'sendAnyway', text: 'Terminal is running npx – it may not be your agent. Send anyway?', action: 'sendAnyway' } })
     const panel = screen.getByRole('dialog')
-    const order = ['Explain', 'Ask', 'Change', 'Prompt', 'Send anyway', 'Target', 'Close – nothing is sent']
+    expect(screen.getByRole('button', { name: 'Close – nothing is sent' })).toHaveAttribute('tabindex', '-1')
+    const order = ['Explain', 'Ask', 'Change', 'Prompt', 'Send anyway', 'Target']
     const at = (name: string) => screen.getByRole('button', { name })
     expect(at('Explain')).toHaveFocus()
     for (const name of [...order.slice(1), order[0]]) {
@@ -115,10 +116,10 @@ describe('PromptActionsPanel (025-FR-027, 025-FR-030)', () => {
       expect(at(name)).toHaveFocus()
     }
     fireEvent.keyDown(panel, { key: 'Tab', shiftKey: true })
-    expect(at('Close – nothing is sent')).toHaveFocus()
+    expect(at('Target')).toHaveFocus()
     // Ctrl+Tab is the editor tabs' key: the panel leaves it alone.
     expect(fireEvent.keyDown(panel, { key: 'Tab', ctrlKey: true })).toBe(true)
-    expect(at('Close – nothing is sent')).toHaveFocus()
+    expect(at('Target')).toHaveFocus()
   })
 
   it('shows a guard as an alert, focuses its button and passes its answer on', () => {

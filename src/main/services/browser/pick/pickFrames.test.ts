@@ -45,6 +45,42 @@ describe('PickFrames', () => {
     expect((await frames.frameChain('F1')).map((f) => f.frameId)).toEqual(['top', 'F1'])
   })
 
+  it("gives a srcdoc frame its parent's origin, but keeps null when its own iframe is sandboxed without allow-same-origin (025-FR-029)", async () => {
+    const { page, frames } = setup()
+    // The engine reports `://` for every srcdoc frame, sandboxed or not.
+    const srcdoc = (frameId: string, id: number, attrs: Record<string, string>) => {
+      page.add({ id, tag: 'iframe', parent: 2, attrs, box: [0, 300 + id, 100, 50], contentFrameId: frameId })
+      page.addFrame({ frameId, parentId: 'top', session: '', origin: '://', url: 'about:srcdoc' })
+    }
+    srcdoc('plain', 40, { id: 'plain' })
+    srcdoc('locked', 41, { id: 'locked', sandbox: '' })
+    srcdoc('opened', 42, { id: 'opened', sandbox: 'allow-scripts allow-same-origin' })
+    srcdoc('child-of-locked', 43, { id: 'child' })
+    page.frames[page.frames.length - 1] = { frameId: 'child-of-locked', parentId: 'locked', session: '', origin: '://', url: 'about:srcdoc' }
+    // A srcdoc frame whose owner the engine cannot find keeps null.
+    page.addFrame({ frameId: 'ownerless', parentId: 'top', session: '', origin: '://', url: 'about:srcdoc' })
+    const origins = Object.fromEntries((await frames.allFrames()).map((f) => [f.frameId, f.origin]))
+    expect(origins).toMatchObject({
+      top: 'https://app.test',
+      F1: 'https://other.test',
+      plain: 'https://app.test',
+      locked: 'null',
+      opened: 'https://app.test',
+      'child-of-locked': 'null',
+      ownerless: 'null'
+    })
+  })
+
+  it('records null for an out-of-process sandboxed frame the engine reports with its URL origin, and for its child (025-FR-029)', async () => {
+    const { page, frames } = setup()
+    page.add({ id: 50, tag: 'iframe', parent: 2, attrs: { id: 'sandboxed', sandbox: 'allow-scripts' }, box: [0, 300, 100, 50], contentFrameId: 'SB' })
+    page.addFrameTarget('S9', 'SB', 'top', '', { width: 100, height: 50 }, 'https://app.test')
+    // A plain child frame of the sandboxed one, in its session: the flags inherit.
+    page.addFrame({ frameId: 'SB-child', parentId: 'SB', session: 'S9', origin: 'https://app.test', url: 'https://app.test/child' })
+    const origins = Object.fromEntries((await frames.allFrames()).map((f) => [f.frameId, f.origin]))
+    expect(origins).toMatchObject({ top: 'https://app.test', F1: 'https://other.test', SB: 'null', 'SB-child': 'null' })
+  })
+
   it('leaves out the frames of a target that cannot answer', async () => {
     const { page, frames } = setup()
     page.cdp.handle('Page.getFrameTree', (_p, key) => {

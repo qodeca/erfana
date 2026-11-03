@@ -10,12 +10,13 @@
  * name and in the menu.
  *
  * The menu lists the terminal with its foreground (a shell says "No agent
- * running"), then **Show terminal** and **Open last capture**. It draws over
+ * running"), then **Show terminal** and **Open last capture**. The banner's
+ * **Choose terminal** opens the same menu (`handleRef`). It draws over
  * the page area, so the pick row's button opens it over the page's still
  * image (`still`); inside the panel and the dialog the still image is already
  * up.
  */
-import { useState, useRef } from 'react'
+import { useImperativeHandle, useState, useRef } from 'react'
 import { ChevronDown, TriangleAlert } from 'lucide-react'
 import { ContextMenu, type ContextMenuItem } from '../../ContextMenu/ContextMenu'
 import type { BrowserTarget } from './useBrowserTarget'
@@ -35,6 +36,14 @@ export interface TargetChooserProps {
   /** Opens the menu over the page's still image (the pick row's button). */
   readonly still?: StillSurface
   readonly buttonRef?: React.RefObject<HTMLButtonElement>
+  /** Opens the menu from elsewhere – the banner's **Choose terminal** (025-FR-061). */
+  readonly handleRef?: React.Ref<TargetChooserHandle>
+}
+
+/** What {@link TargetChooserProps.handleRef} gives. */
+export interface TargetChooserHandle {
+  /** Open the target menu at the target button, as a click on it does. */
+  openMenu: () => void
 }
 
 const SEPARATOR: ContextMenuItem = { label: '', action: () => undefined, separator: true }
@@ -94,6 +103,7 @@ export function TargetChooser(props: TargetChooserProps): JSX.Element {
     setAt(null)
     still?.close()
   }
+  useImperativeHandle(props.handleRef, () => ({ openMenu: open }))
   const { view } = target
   const [arrow, rest] = view.text.startsWith('→ ') ? ['→', view.text.slice(2)] : [null, view.text]
   const [name, process] = rest.includes(' · ') ? [rest.slice(0, rest.indexOf(' · ')), rest.slice(rest.indexOf(' · ') + 3)] : [rest, null]

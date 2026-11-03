@@ -81,6 +81,7 @@ Each page states its acceptance IDs in its first paragraph. Pages load `fixture.
 | `console.html`, `console-worker.js` | `runSequence()`: 3 warnings, 25 errors, 1 warning, a 500 and an `*.invalid` request; an uncaught exception, an unhandled rejection, 404, CORS-blocked, 21 failed, worker and cancelled requests; a cross-origin frame error |
 | `long-text.html` | Elements whose `outerHTML` is exactly 20,000, 20,001 and 50,000 characters, and one with an emoji across the 20,000 cut |
 | `offscreen.html` | Taller than the viewport, a parent wholly above the viewport, a zero-size element, a covered element, one off the left edge |
+| `sample.pdf` | A one-page PDF served as `application/pdf`, for an `<embed>` host pick (025-AC-029) |
 | `events.html` | Logs every key, focus and pointer event; counts `mousemove`, `wheel` and `scroll`; a link, an image and a drag source for the page menu |
 | `profile-sw.js` | A service worker that answers `/__sw-probe` itself – an untrusted profile set aside must never run it again (025-AC-016) |
 | `ua-worker.js` | A dedicated worker that posts its user agent, client-hint brands and the headers of its own request (025-FR-024) |

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+import { act, createRef } from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { TargetChooser, targetMenuItems } from './TargetChooser'
+import { TargetChooser, targetMenuItems, type TargetChooserHandle } from './TargetChooser'
 import { targetView, type TargetStatus } from './pickRow.logic'
 import type { BrowserTarget } from './useBrowserTarget'
 
@@ -66,6 +67,21 @@ describe('TargetChooser', () => {
     expect(button).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByRole('menu', { name: 'Target terminal' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('menuitem', { name: 'Terminal · claude' }))
+    expect(onChosen).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
+
+  it('opens its menu from the handle, as Choose terminal does, and a choice there is the terminal chosen', () => {
+    const onChosen = vi.fn()
+    const handle = createRef<TargetChooserHandle>()
+    const t = target('Terminal', { kind: 'shell', process: 'zsh' })
+    render(<TargetChooser target={t} lastCapture={null} {...actions} onChosen={onChosen} variant="panel" handleRef={handle} />)
+    expect(screen.queryByRole('menu')).toBeNull()
+    act(() => handle.current?.openMenu())
+    expect(t.refresh).toHaveBeenCalledOnce()
+    expect(screen.getByRole('button', { name: /target terminal/ })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('menu', { name: 'Target terminal' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('menuitem', { name: /Terminal · zsh/ }))
     expect(onChosen).toHaveBeenCalledOnce()
     expect(screen.queryByRole('menu')).toBeNull()
   })

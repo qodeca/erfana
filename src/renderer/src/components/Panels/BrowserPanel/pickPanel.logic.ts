@@ -64,6 +64,13 @@ const clamp = (value: number, min: number, max: number): number => Math.max(min,
  */
 export function placePanel(anchor: BrowserRect, panel: Size, area: Size): PanelPlacement {
   if (area.width < SHEET_BELOW_PX) return { kind: 'sheet' }
+  const placed = placeBeside(anchor, panel, area)
+  // Kept inside the area. This moves the panel only when the outline lies wholly outside the area (an off-screen pick,
+  // 025-FR-035), so it never makes the panel cover the outline.
+  return { ...placed, left: clamp(placed.left, 0, area.width - panel.width), top: clamp(placed.top, 0, area.height - panel.height) }
+}
+
+function placeBeside(anchor: BrowserRect, panel: Size, area: Size): Extract<PanelPlacement, { kind: 'at' }> {
   const bottom = anchor.y + anchor.height
   const right = anchor.x + anchor.width
   const left = clamp(anchor.x, 0, area.width - panel.width)

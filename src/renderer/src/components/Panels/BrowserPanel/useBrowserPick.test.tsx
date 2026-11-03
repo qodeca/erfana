@@ -61,6 +61,8 @@ function setup(overrides: Partial<UseBrowserPickOptions> = {}) {
     containerApi: {} as DockviewApi,
     projectPath: `/projects/p${++project}`,
     focusPage,
+    openTargetMenu: vi.fn(),
+    startTerminal: vi.fn(),
     ...overrides
   }
   const view = renderHook((props: UseBrowserPickOptions) => useBrowserPick(props), { initialProps: options })
@@ -244,13 +246,21 @@ describe('useBrowserPick', () => {
     expect(result.current).toMatchObject({ surface: 'dialog', draft: 'Make it blue' })
   })
 
-  it('answers the banner buttons: open the terminal, choose it again', () => {
+  it('answers the banner buttons: Open terminal shows the panel and starts a new terminal, Choose terminal opens the terminal menu, a choice there rewrites the banner', () => {
     const target = makeTarget({ kind: 'shell', process: 'zsh' })
     const { result, rerender, options } = setup({ target })
     capture()
     act(() => result.current.bannerAction('openTerminal'))
     expect(activity.setActivePanel).toHaveBeenCalledWith('terminal', 'right')
+    expect(options.startTerminal).toHaveBeenCalledOnce()
+    expect(options.openTargetMenu).not.toHaveBeenCalled()
+    expect(result.current.surface).toBe('panel')
     act(() => result.current.bannerAction('chooseTerminal'))
+    expect(options.openTargetMenu).toHaveBeenCalledOnce()
+    expect(options.startTerminal).toHaveBeenCalledOnce()
+    // The menu is open, nothing chosen yet: the pre-warning stays.
+    expect(result.current.banner).toMatchObject({ kind: 'preWarnShell' })
+    act(() => result.current.targetChosenAgain())
     expect(result.current.banner).toMatchObject({ kind: 'guardShell' })
     const agent = makeTarget()
     rerender({ ...options, target: agent })

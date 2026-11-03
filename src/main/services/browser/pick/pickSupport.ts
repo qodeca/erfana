@@ -5,8 +5,11 @@
  * 025-AC-034, 025-AC-037, 025-AC-049, 025-AC-050, 025-AC-060).
  *
  * - {@link PickFaults}: failures a test hook can force – an empty or failed
- *   screenshot, a slow or throwing hint lookup, a failed file write. Inert
- *   unless a hook arms them; production code only asks.
+ *   screenshot, a slow or throwing hint lookup, a failed file write – and a
+ *   unique test colour for the live pick outline, so a screenshot test can
+ *   tell a leaked live outline from the drawn one (both are the accent
+ *   otherwise; 025-AC-034). Inert unless a hook arms them; production code
+ *   only asks.
  * - {@link PickBench}: stage timings (hover to highlight, confirm to menu,
  *   send), kept as the last {@link BENCH_SAMPLES} samples per stage for the
  *   bench lane's hooks. Measured on the injected clock.
@@ -36,7 +39,16 @@ export class PickBench {
   }
 }
 
+/** A colour as `Overlay.highlightQuad` takes it (0–255 channels, alpha 0–1). */
+export interface FaultRgba {
+  readonly r: number
+  readonly g: number
+  readonly b: number
+  readonly a: number
+}
+
 export class PickFaults {
+  private highlightOutline: FaultRgba | null = null
   private emptyCaptures = 0
   private failedCaptures = 0
   private hintsDelay: Promise<void> | null = null
@@ -64,7 +76,18 @@ export class PickFaults {
     this.writeFailures = count
   }
 
+  /** The live pick outline is drawn in `colour` (a unique test colour), or the accent again with `null`. */
+  setHighlightColour(colour: FaultRgba | null): void {
+    this.highlightOutline = colour === null ? null : Object.freeze({ ...colour })
+  }
+
+  /** The live outline's test colour, or `null` for the product colour. */
+  highlightColour(): FaultRgba | null {
+    return this.highlightOutline
+  }
+
   reset(): void {
+    this.highlightOutline = null
     this.emptyCaptures = 0
     this.failedCaptures = 0
     this.hintsDelay = null

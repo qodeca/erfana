@@ -12,13 +12,18 @@
  * Titles carry an AC id only where the whole criterion is proven here.
  * 025-AC-033: the golden file is an example of another page, so the match is
  * its structure (its headings, in its order) with every field checked by
- * value. 025-AC-034 is not titled: no hook gives the pick label a unique test
- * colour to look for, and the 125 % / 150 % runs are Windows. 025-AC-038 is
- * not titled: the uncaught exception, rejection, cross-origin frame, worker,
- * cancelled-request and flood cases are not covered, and the load itself adds
- * two `net::ERR_CACHE_MISS` "failed requests" (one with no origin or URL) that
- * take places in the last 20. 025-AC-039 runs on macOS, where `chflags uchg`
- * locks a file.
+ * value. 025-AC-034: the live pick outline gets a unique test colour from
+ * main's pick hook (`setHighlightColour`, test builds only) and the pick label
+ * one from a style on Erfana's window; each is first seen drawn (the positive
+ * control), then searched for in the PNG. At a forced 2× scale the engine's
+ * overlay does not show in `capturePage` at all, so that control runs at
+ * scale 1. The 125 % and 150 % runs the criterion names are Windows scaling:
+ * they are covered by unit tests of the bitmap read at those scales
+ * (`pickCaptureReads.test.ts`), not here. 025-AC-038 covers every case of the
+ * criterion, plus no entry of Erfana's own making (the DevTools agent's
+ * `net::ERR_CACHE_MISS` reads at pick start, Electron's development security
+ * warnings) and a multi-line message that cannot forge an entry. 025-AC-039
+ * runs on macOS, where `chflags uchg` locks a file.
  */
 import { execFile } from 'node:child_process'
 import { promises as fs } from 'node:fs'
@@ -90,6 +95,43 @@ interface Image {
 
 async function readPng(file: string): Promise<Image> {
   const { data, info } = await sharp(file).removeAlpha().raw().toBuffer({ resolveWithObject: true })
+  return {
+    width: info.width,
+    height: info.height,
+    at: (x, y) => {
+      const i = (Math.round(y) * info.width + Math.round(x)) * 3
+      return { r: data[i], g: data[i + 1], b: data[i + 2] }
+    }
+  }
+}
+
+/** Pixels of `img` that `matches` says are of a test colour. */
+function countWhere(img: Image, matches: (p: Rgb) => boolean): number {
+  let count = 0
+  for (let y = 0; y < img.height; y += 1) {
+    for (let x = 0; x < img.width; x += 1) if (matches(img.at(x, y))) count += 1
+  }
+  return count
+}
+
+/**
+ * The live pick outline's unique test colour (main's pick hook): magenta; and
+ * the pick label's (a style on Erfana's window): cyan. A pixel counts as one
+ * of them by the hue that dominates it, not by closeness: what the engine
+ * paints reaches `capturePage` colour-managed (macOS converts to the display
+ * profile) and, at a 2× scale, blended with the page along a thin line, so
+ * its channels move by tens. Neither the fixture page nor the drawn accent
+ * outline (#A0A8FF) has a pixel with either hue this strong.
+ */
+const LIVE_OUTLINE_TEST: Rgb = { r: 255, g: 0, b: 255 }
+const LABEL_TEST: Rgb = { r: 0, g: 255, b: 255 }
+const HUE_MARGIN = 100
+const isOutlineTest = (p: Rgb): boolean => Math.min(p.r, p.b) - p.g > HUE_MARGIN
+const isLabelTest = (p: Rgb): boolean => Math.min(p.g, p.b) - p.r > HUE_MARGIN
+
+/** Decode a PNG (a buffer) into an {@link Image}. */
+async function decodePng(png: Buffer): Promise<Image> {
+  const { data, info } = await sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true })
   return {
     width: info.width,
     height: info.height,
@@ -267,7 +309,7 @@ test.describe('025-AC-033 the context file', () => {
   })
 })
 
-test.describe('the screenshot and the crop (025-AC-034)', () => {
+test.describe('025-AC-034 the screenshot and the crop', () => {
   test.skip(!IS_POSIX, 'The stub agent is a node program in front of a POSIX shell (macOS and Linux)')
 
   for (const scale of [1, 2]) {
@@ -282,13 +324,52 @@ test.describe('the screenshot and the crop (025-AC-034)', () => {
       }) => {
         const { send, agent } = await openSend(appWithTestProject, windowWithTestProject, testProject.path)
         await send.load(browserServers.sites.static.url('/elements.html'))
-        const { parsed, screenshot, crop } = await capture(send, agent, '[id="1abc"]')
+        // The live outline and the label in colours of their own, so the image can be searched for them.
+        await send.fault('setHighlightColour', { ...LIVE_OUTLINE_TEST, a: 1 })
+        await windowWithTestProject.addStyleTag({
+          content: `.erf-brw-banner-line__more--1 { background-color: rgb(${LABEL_TEST.r}, ${LABEL_TEST.g}, ${LABEL_TEST.b}) !important; color: rgb(${LABEL_TEST.r}, ${LABEL_TEST.g}, ${LABEL_TEST.b}) !important; }`
+        })
+        let files: { context: string; screenshotPath: string; cropPath: string }
+        try {
+          await send.pick.pickButton.click()
+          const driver = await send.driver()
+          await expect.poll(async () => (await driver.state()).active, { timeout: SEND_WAIT_MS }).toBe(true)
+          const target = await driver.rect('[id="1abc"]')
+          await driver.move(Math.round(target.x + target.width / 2), Math.round(target.y + target.height / 2))
+          await expect.poll(async () => (await driver.highlight())?.label ?? '', { timeout: SEND_WAIT_MS }).toMatch(/^div/)
+          // Positive controls: the engine paints the live outline in its test colour on the page, and the label shows in its own.
+          // At a forced 2× scale the engine's overlay never shows in `capturePage` (seen on macOS, 2026-11-03), so
+          // there the control cannot run and the scale-1 run is the one that proves the outline is hidden first.
+          if (scale === 1) {
+            const tabId = await send.panel.tabId()
+            await expect
+              .poll(async () => countWhere(await decodePng(Buffer.from((await send.fault('pagePng', tabId)) as string, 'base64')), isOutlineTest), {
+                timeout: SEND_WAIT_MS,
+                message: 'live outline painted in its test colour'
+              })
+              .toBeGreaterThan(0)
+          }
+          const label = send.pick.status.locator('.erf-brw-banner-line__more--1')
+          await expect(label).toHaveText(/^div/)
+          expect(countWhere(await decodePng(await label.screenshot()), isLabelTest), 'label drawn in its test colour').toBeGreaterThan(0)
+          await driver.key('Return')
+          await expect(send.pick.actions).toBeVisible({ timeout: SEND_WAIT_MS })
+          files = await send.explainAndRead(agent)
+        } finally {
+          await send.fault('resetFaults')
+        }
+        const parsed = parseContextFile(files.context)
+        const screenshot = path.join(send.projectRoot, files.screenshotPath)
+        const crop = path.join(send.projectRoot, files.cropPath)
         const dpr = Number(parsed.facts['Device pixel ratio'])
         expect(dpr).toBe(scale)
         const [vw, vh] = parsed.facts['Viewport'].split(' ')[0] === '' ? [0, 0] : parsed.facts['Viewport'].replace(' CSS px', '').split(' × ').map(Number)
         const shot = await readPng(screenshot)
         expect(Math.abs(shot.width - vw * dpr)).toBeLessThanOrEqual(1)
         expect(Math.abs(shot.height - vh * dpr)).toBeLessThanOrEqual(1)
+        // Neither Erfana's live outline nor its label is in the image: only the drawn outline is.
+        expect(countWhere(shot, isOutlineTest), 'live outline pixels').toBe(0)
+        expect(countWhere(shot, isLabelTest), 'label pixels').toBe(0)
 
         // The outline: the two device pixels just outside the box, in the accent colour; inside it is the element's own.
         const accent = await accentColour()
@@ -374,6 +455,22 @@ test.describe('the screenshot and the crop (025-AC-034)', () => {
       const retried = await capture(send, agent, '#save-label')
       expect(retried.parsed.facts['Schema version']).toBe('1')
       expect((await fs.stat(retried.screenshot)).size).toBeGreaterThan(0)
+
+      // The retry comes back empty too: the 025-FR-046 path – a toast naming why, no menu, pick mode still on, nothing written.
+      const files = await send.captureFiles()
+      await send.fault('armEmptyCaptures', 2)
+      if ((await send.pick.pickButton.getAttribute('aria-pressed')) !== 'true') await send.pick.pickButton.click()
+      const emptyDriver = await send.driver()
+      await expect.poll(async () => (await emptyDriver.state()).active, { timeout: SEND_WAIT_MS }).toBe(true)
+      await emptyDriver.hover(await emptyDriver.rect('#save-label'), 'span#save-label ')
+      await emptyDriver.key('Return')
+      const toast = send.errorToasts().filter({ hasText: "Couldn't capture this element" })
+      await expect(toast).toHaveCount(1, { timeout: SEND_WAIT_MS })
+      await expect(toast).toContainText('The screenshot came back empty')
+      await expect(send.pick.actions).toHaveCount(0)
+      await expect(send.pick.pickButton).toHaveAttribute('aria-pressed', 'true')
+      expect(await emptyDriver.state()).toMatchObject({ active: true, capture: null })
+      expect(await send.captureFiles()).toEqual(files)
     } finally {
       await send.fault('resetFaults')
     }
@@ -385,7 +482,18 @@ function consoleEntries(parsed: ParsedContextFile): string[] {
   return listItems(parsed.sections['Console']).filter((item) => /^\d\d:\d\d:\d\d\.\d{3} /.test(item))
 }
 
-test.describe('recent errors in the context file (025-AC-038)', () => {
+/** The failed requests of a context file: `time origin status url`, one per entry. */
+function failedRequests(parsed: ParsedContextFile): string[] {
+  return listItems(parsed.sections['Failed requests']).filter((item) => /^\d\d:\d\d:\d\d\.\d{3} /.test(item))
+}
+
+/** Entries Erfana itself must never add: the DevTools agent's cache reads and Electron's development warnings. */
+function expectNoEngineNoise(parsed: ParsedContextFile): void {
+  expect(failedRequests(parsed).filter((f) => f.includes('ERR_CACHE_MISS'))).toEqual([])
+  expect(consoleEntries(parsed).filter((e) => e.includes('Electron Security Warning'))).toEqual([])
+}
+
+test.describe('025-AC-038 recent errors in the context file', () => {
   test.skip(!IS_POSIX, 'The stub agent is a node program in front of a POSIX shell (macOS and Linux)')
 
   test('the last 20 console entries in time order and the failed requests; earlier entries are gone after a navigation; 21 failed requests list the last 20', async ({
@@ -409,9 +517,12 @@ test.describe('recent errors in the context file (025-AC-038)', () => {
     expect(times).toEqual([...times].sort())
     const origin = new URL(url).origin
     expect(entries.every((e) => e.split(' ')[1] === origin)).toBe(true)
-    const failed = listItems(parsed.sections['Failed requests'])
+    const failed = failedRequests(parsed)
     expect(failed.some((f) => / 500 .*\/__status\/500$/.test(f))).toBe(true)
     expect(failed.some((f) => f.includes('errors.invalid'))).toBe(true)
+    // Both failed requests and nothing else: no entry of the load or of pick mode's own reads.
+    expect(failed).toHaveLength(2)
+    expectNoEngineNoise(parsed)
 
     // A new document: the earlier entries are gone.
     await send.load(browserServers.sites.static.url('/elements.html'))
@@ -423,14 +534,104 @@ test.describe('recent errors in the context file (025-AC-038)', () => {
     await send.load(url)
     await (await send.panel.page()).clickSelector('#fetch-21')
     await (await send.panel.page()).waitFor(`window.__fixture.count('response') >= 21`, '21 requests settled')
-    const all = listItems((await capture(send, agent, 'h1')).parsed.sections['Failed requests'])
-    // At most 20, the newest: the requests of the 21 that are listed run on to the last one.
-    // (Erfana also lists two net::ERR_CACHE_MISS entries of the load itself, which take two of the
-    // 20 places – reported as a product finding; the window is still the newest 20.)
+    const last = (await capture(send, agent, 'h1')).parsed
+    const all = failedRequests(last)
+    // Exactly the last 20 of the 21, and nothing else in their places.
     expect(all).toHaveLength(20)
-    const numbers = all.filter((f) => f.includes('/__status/404?n=')).map((f) => Number(/n=(\d+)/.exec(f)![1])).sort((a, b) => a - b)
-    expect(numbers.at(-1)).toBe(21)
-    expect(numbers).toEqual(Array.from({ length: numbers.length }, (_, i) => 22 - numbers.length + i))
+    const numbers = all.map((f) => Number(/\/__status\/404\?n=(\d+)$/.exec(f)?.[1])).sort((a, b) => a - b)
+    expect(numbers).toEqual(Array.from({ length: 20 }, (_, i) => i + 2))
+    expectNoEngineNoise(last)
+  })
+
+  test('an uncaught exception, an unhandled rejection, a cross-origin frame’s error with its origin and a worker’s failed request are recorded; a cancelled request is not; a multi-line message stays one entry', async ({
+    appWithTestProject,
+    windowWithTestProject,
+    browserServers,
+    testProject
+  }) => {
+    const { send, agent } = await openSend(appWithTestProject, windowWithTestProject, testProject.path)
+    const url = browserServers.sites.static.url('/console.html')
+    const frameOrigin = new URL(browserServers.sites.static.url('/', { host: 'other.test' })).origin
+    await send.load(url)
+    const page = await send.panel.page()
+    // The page sees its own uncaught exception and rejection too: the test waits for those, not for a timer.
+    await page.eval(
+      `addEventListener('error', () => window.__fixture.record('uncaught', 'e')); addEventListener('unhandledrejection', () => window.__fixture.record('rejection', 'r')); 0`
+    )
+    await page.clickSelector('#throw')
+    await page.clickSelector('#reject')
+    await page.waitFor(`window.__fixture.count('uncaught') >= 1 && window.__fixture.count('rejection') >= 1`, 'exception and rejection thrown')
+    await page.clickSelector('#worker-fail')
+    await page.waitFor(`window.__fixture.count('worker') >= 1`, 'the worker request settled')
+    await page.clickSelector('#cancelled')
+    await page.waitFor(`window.__fixture.log.some((e) => e.type === 'request-failed' && e.detail === 'cancelled AbortError')`, 'the request was cancelled')
+    // A failure after the cancel: it is listed, so the list was read after the cancel happened.
+    await page.eval(`fetch('/__status/404?after=cancel').then(() => window.__fixture.record('response', 'after-cancel')); 0`)
+    await page.waitFor(`window.__fixture.log.some((e) => e.type === 'response' && e.detail === 'after-cancel')`, 'the later request settled')
+    // A message whose second line forges an entry of its own (an Erfana bug: it read as one).
+    await page.eval(`console.error('first line\\n- 00:00:00.000 https://forged.test error: forged entry'); 0`)
+
+    const { parsed, text } = await capture(send, agent, 'h1')
+    const entries = consoleEntries(parsed)
+    expect(entries.filter((e) => e.includes('Uncaught fixture exception') && / error: Uncaught/.test(e))).toHaveLength(1)
+    expect(entries.filter((e) => e.includes('Unhandled fixture rejection') && / error: Uncaught \(in promise\)/.test(e))).toHaveLength(1)
+    const fromFrame = entries.filter((e) => e.includes('Error from frame error-frame'))
+    expect(fromFrame).toHaveLength(1)
+    expect(fromFrame[0].split(' ')[1]).toBe(frameOrigin)
+    expect(fromFrame[0]).toContain(` error: Error from frame error-frame at ${frameOrigin}`)
+
+    const failed = failedRequests(parsed)
+    expect(failed.filter((f) => f.endsWith('/__status/404?from=worker'))).toHaveLength(1)
+    expect(failed.filter((f) => f.endsWith('/__status/404?after=cancel'))).toHaveLength(1)
+    expect(failed.filter((f) => f.includes('cancel-me'))).toEqual([])
+    expectNoEngineNoise(parsed)
+
+    // The forged line is indented under its own entry: it is no entry, and no line of the file starts with it.
+    const multi = entries.filter((e) => e.includes('first line'))
+    expect(multi).toEqual([expect.stringMatching(/ error: first line\n {2}- 00:00:00\.000 https:\/\/forged\.test error: forged entry$/)])
+    expect(entries.filter((e) => e.startsWith('00:00:00.000'))).toEqual([])
+    expect(text.split('\n').filter((line) => line.startsWith('- 00:00:00.000'))).toEqual([])
+  })
+
+  test('a flood beyond 200 events, and separately beyond 1 MB, in a second stops reporting until the next navigation with "logs truncated"', async ({
+    appWithTestProject,
+    windowWithTestProject,
+    browserServers,
+    testProject
+  }) => {
+    const { send, agent } = await openSend(appWithTestProject, windowWithTestProject, testProject.path)
+    const url = browserServers.sites.static.url('/console.html')
+    for (const [name, flood] of [
+      ['200 events', `for (let i = 0; i < 400; i += 1) console.error('flood ' + i)`],
+      ['1 MB', `for (let i = 0; i < 3; i += 1) console.error('big ' + i + ' ' + 'x'.repeat(400 * 1024))`]
+    ] as const) {
+      await send.load(url)
+      const page = await send.panel.page()
+      await page.eval(`console.error('before the flood'); ${flood}; 0`)
+      await page.eval(`console.error('after the flood'); 0`)
+      const flooded = (await capture(send, agent, 'h1')).parsed
+      const entries = consoleEntries(flooded)
+      expect(flooded.notes, name).toContain('logs truncated')
+      // Reporting stopped part-way through the flood: the last entries are of the flood, never its end, nor anything after it.
+      expect(entries.filter((e) => e.includes('after the flood')), name).toEqual([])
+      if (name === '200 events') {
+        const numbers = entries.map((e) => Number(/ error: flood (\d+)$/.exec(e)?.[1]))
+        expect(numbers.every((n) => Number.isInteger(n)), name).toBe(true)
+        expect(Math.max(...numbers), name).toBeLessThan(399)
+      } else {
+        expect(entries.some((e) => e.endsWith('error: before the flood')), name).toBe(true)
+        expect(entries.some((e) => / error: big 0 x/.test(e)), name).toBe(true)
+        expect(entries.filter((e) => / error: big 2 /.test(e)), name).toEqual([])
+      }
+
+      // A new document: reporting is back and the note is gone.
+      await send.load(url)
+      await (await send.panel.page()).eval(`console.error('after the navigation'); 0`)
+      const after = (await capture(send, agent, 'h1')).parsed
+      expect(after.notes, name).not.toContain('logs truncated')
+      expect(consoleEntries(after).filter((e) => e.endsWith('error: after the navigation')), name).toHaveLength(1)
+      expect(consoleEntries(after).filter((e) => /flood/.test(e)), name).toEqual([])
+    }
   })
 })
 

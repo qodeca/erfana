@@ -15,7 +15,7 @@
  * page's still image is drawn here (`StillImage`) and the surface – the
  * prompt-actions panel or the instruction dialog – over it (`overlay`). A
  * press on the still image outside the surface is `onStillPress` (the panel
- * closes, 025-FR-049). In pick mode the frame turns lime – solid, or dashed
+ * closes, 025-FR-049), except the later presses of a double-click. In pick mode the frame turns lime – solid, or dashed
  * while keyboard focus is outside the tab (025-FR-065).
  */
 import type { BrowserTabState } from '../../../stores/useBrowserTabStore'
@@ -127,9 +127,20 @@ export function PageArea({
       {live && still !== null && (
         <div
           className="erf-brw-frame__still"
-          onPointerDown={event => {
+          onMouseDown={event => {
+            // The second press of the double-click that confirmed a pick lands here once the still covers
+            // the page: the system counts it (`detail` 2 and up, within its double-click interval) and it is
+            // ignored, so a double-click does not pick and discard (025-FR-049). A pointer event carries no count.
+            // Its default is prevented too: focus stays in the menu, or leaving the tab would close it.
+            if (event.detail > 1) {
+              event.preventDefault()
+              return
+            }
+            // React bubbles a portal's events through its React parents: a press in a menu the surface opened
+            // (the target chooser, drawn in the portal root) is not a press on the still image (025-FR-030).
+            const inDom = event.target instanceof Node && event.currentTarget.contains(event.target)
             const onSurface = event.target instanceof Element && event.target.closest('.erf-brw-actions') !== null
-            if (!onSurface) onStillPress?.()
+            if (inDom && !onSurface) onStillPress?.()
           }}
         >
           <StillImage image={still.image} outline={still.source === 'pick' ? outline : null} zoomPercent={state?.zoomPercent ?? 100} />

@@ -11,8 +11,11 @@
  *   announced it, so nothing else in `cdp/` has to expose it.
  * - **Frame chain** (025-FR-029): `Page.getFrameTree` of each frame target,
  *   joined across sessions through each out-of-process root's `parentId`;
- *   each frame's origin as the engine reports it (`null` for a sandboxed
- *   frame without `allow-same-origin`).
+ *   each frame's origin: `null` for a sandboxed frame without
+ *   `allow-same-origin` (read from its owner's `sandbox` attribute – the
+ *   engine reports the URL's origin for an out-of-process one), a `srcdoc`
+ *   frame's parent's origin (the engine reports `://`), otherwise the
+ *   engine's `securityOrigin`.
  * - **The owner `<iframe>`** of a frame (Up crosses from a frame's root to
  *   it, 025-FR-027): `DOM.getFrameOwner` in the session that holds the
  *   parent frame.
@@ -117,7 +120,66 @@ export class PickFrames {
         return out
       })
     )
-    return lists.flat()
+    return this.settleOrigins(lists.flat())
+  }
+
+  /**
+   * Correct two engine reports, top frame first (HTML origin rules):
+   * - a frame whose own `<iframe>` is sandboxed without `allow-same-origin`,
+   *   or whose parent is such a frame (sandbox flags inherit), is `null` –
+   *   the engine reports the URL's origin for an out-of-process one;
+   * - an `about:srcdoc` frame, which the engine reports as `://`, has its
+   *   parent's origin.
+   * A frame whose owner cannot be read keeps the engine's report.
+   */
+  private async settleOrigins(frames: PickFrame[]): Promise<PickFrame[]> {
+    const byId = new Map(frames.map((f) => [f.frameId, f]))
+    const opaque = new Map<string, Promise<boolean>>()
+    const ownRead = new Map<string, Promise<boolean | null>>()
+    const ownSandbox = (frame: PickFrame): Promise<boolean | null> => {
+      let known = ownRead.get(frame.frameId)
+      if (known === undefined) {
+        known = this.ownSandboxIsOpaque(frame, frames)
+        ownRead.set(frame.frameId, known)
+      }
+      return known
+    }
+    // `depth` stops a parent loop in a malformed tree, as chainFrames does.
+    const isOpaque = (frame: PickFrame, depth: number): Promise<boolean> => {
+      let known = opaque.get(frame.frameId)
+      if (known === undefined) {
+        const parent = frame.parentId === null || depth >= MAX_FRAME_DEPTH ? undefined : byId.get(frame.parentId)
+        known =
+          parent === undefined ? Promise.resolve(false) : Promise.all([isOpaque(parent, depth + 1), ownSandbox(frame)]).then(([a, b]) => a || b === true)
+        opaque.set(frame.frameId, known)
+      }
+      return known
+    }
+    const settle = async (frame: PickFrame, depth: number): Promise<PickFrame> => {
+      if (await isOpaque(frame, depth)) return frame.origin === 'null' ? frame : { ...frame, origin: 'null' }
+      const parent = frame.parentId === null || depth >= MAX_FRAME_DEPTH ? undefined : byId.get(frame.parentId)
+      if (frame.url !== 'about:srcdoc' || frame.origin !== 'null' || parent === undefined) return frame
+      // Only an owner read as not sandboxed lets it take the parent's origin.
+      if ((await ownSandbox(frame)) !== false) return frame
+      return { ...frame, origin: (await settle(parent, depth + 1)).origin }
+    }
+    return Promise.all(frames.map((f) => settle(f, 0)))
+  }
+
+  /** Whether the frame's own owner element carries `sandbox` without `allow-same-origin`; null when it cannot be read. */
+  private async ownSandboxIsOpaque(frame: PickFrame, frames: readonly PickFrame[]): Promise<boolean | null> {
+    try {
+      const owner = await this.ownerOf(frame, frames)
+      if (owner === null) return null
+      const raw = await this.reader.call('DOM.describeNode', { backendNodeId: owner.backendNodeId }, owner.sessionKey)
+      const attrs = isRecord(raw) && isRecord(raw.node) && Array.isArray(raw.node.attributes) ? raw.node.attributes : []
+      for (let i = 0; i + 1 < attrs.length; i += 2) {
+        if (attrs[i] === 'sandbox') return !str(attrs[i + 1]).split(/\s+/).includes('allow-same-origin')
+      }
+      return false
+    } catch {
+      return null
+    }
   }
 
   /** The frames from the top page down to `frameId`, top first; just the frame when the chain breaks. */

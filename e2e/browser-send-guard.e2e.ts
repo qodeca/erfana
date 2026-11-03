@@ -5,14 +5,23 @@
  * 025-FR-061, S-23): no terminal, a bare shell, a wrapper (`ssh`, `sudo`,
  * `tmux`, `screen`) and an agent in front of the target terminal.
  *
- * No title carries 025-AC-077: parts of it cannot be proven on this build
- * (one terminal panel, so no other terminal to choose; **Choose terminal**
- * does not open the terminal menu; the target name "Terminal" is never longer
- * than 8 characters, so its cut cannot show; `nu.exe` is Windows only; the
- * app opens a terminal at start, so "no terminal open" is reached through a
- * terminal whose shell exited, where **Open terminal** shows the panel but
- * starts no new terminal; an unreadable foreground and the 400 px toolbar are
- * not set up). These tests prove the rest.
+ * No title carries 025-AC-077. Erfana has one terminal – the terminal panel's
+ * single session, named "Terminal" as its panel header names it – so the parts
+ * that need a second terminal cannot be built or proven on this build:
+ * choosing another terminal in the toolbar's chooser and the next send going
+ * there, the same from the dialog's and the menu's chooser at 400 px, and a
+ * terminal name longer than 8 characters being cut (the design's "Terminal 1"
+ * naming, CF-16, is an open owner question). An unreadable foreground is not
+ * set up here. `nu.exe` is Windows only; it and the unknown foreground are
+ * unit-tested in `src/main/services/browser/capture/BrowserTargetStatus.test.ts`,
+ * the 10-second start-up window in `src/main/services/terminalForegroundRead.test.ts`. The app
+ * opens a terminal at start, so "no terminal open" is reached through a
+ * terminal whose shell exited. These tests prove the rest: the refusal with
+ * no terminal and with a bare shell (nothing typed or written, no toast, focus
+ * on the banner's button, the dialog kept with its text), **Open terminal**
+ * starting a new terminal, **Choose terminal** opening the terminal menu where
+ * a click sets the target, the wrappers' **Send anyway**, and one bracketed
+ * paste and Enter to an agent.
  *
  * The wrappers are stand-ins: links named `ssh`, `sudo`, … to node running the
  * stub agent, so the foreground reads by that name. Condition-based waits only.
@@ -49,13 +58,26 @@ test.describe('built-in browser send, the shell guard', () => {
     expect(await send.captureFiles()).toEqual([])
     expect(await send.toastLog()).toEqual([])
 
-    // Open terminal shows the terminal panel; the dialog stays with its text.
+    // Open terminal shows the terminal panel and starts a new terminal there; the dialog stays with its text.
     await send.terminal.close()
     await open.click()
     await expect(send.terminalInstance).toBeVisible({ timeout: SEND_WAIT_MS })
     await expect(send.pick.dialog).toBeVisible()
     await expect(send.dialogField).toHaveValue('label cut off')
+    // The new terminal runs a shell: the dialog's target reads it, and the next send meets the shell guard, not "no terminal".
+    await expect(send.pick.dialog.getByRole('button', { name: /target terminal/ })).toHaveAccessibleName(/^Terminal · \S+, target terminal, no agent running$/, {
+      timeout: SEND_WAIT_MS
+    })
+    await send.dialogSend.click()
+    await expect(send.pick.dialog.getByRole('alert').locator('.erf-brw-banner__text')).toHaveText(
+      /^No agent is running in Terminal – start your agent there, then send again\.$/
+    )
+    await expect(send.dialogField).toHaveValue('label cut off')
     expect(await send.captureFiles()).toEqual([])
+    expect(await send.toastLog()).toEqual([])
+    // And it takes input: the exited shell never could.
+    await send.run('echo ERFANA_$((40+2))')
+    await send.terminal.waitForOutputLine('ERFANA_42')
   })
 
   test('with a bare shell in front, Change and Explain type nothing and show Choose terminal with focus on it', async ({
@@ -74,8 +96,20 @@ test.describe('built-in browser send, the shell guard', () => {
     await send.openDialog('Change', 'label cut off')
     await send.dialogSend.click()
     await expect(send.pick.dialog.getByRole('alert').locator('.erf-brw-banner__text')).toHaveText(refusal)
-    await expect(send.pick.dialog.getByRole('button', { name: 'Choose terminal', exact: true })).toBeFocused()
+    const choose = send.pick.dialog.getByRole('button', { name: 'Choose terminal', exact: true })
+    await expect(choose).toBeFocused()
     await expect(send.dialogField).toHaveValue('label cut off')
+
+    // Choose terminal opens the terminal menu; a click on the terminal there sets it as the target, the dialog keeps its text.
+    await choose.click()
+    const menu = send.panel.menu('Target terminal')
+    await expect(menu).toBeVisible()
+    await menu.getByRole('menuitem', { name: /^Terminal · \S+/ }).first().click()
+    await expect(menu).toHaveCount(0)
+    await expect(send.pick.dialog).toBeVisible()
+    await expect(send.dialogField).toHaveValue('label cut off')
+    // The chosen terminal still runs only a shell, so the banner says so again.
+    await expect(send.pick.dialog.getByRole('alert').locator('.erf-brw-banner__text')).toHaveText(refusal)
     await send.pick.dialog.getByRole('button', { name: 'Back to actions' }).click()
 
     // Explain from the menu: the banner's button takes focus in the menu.

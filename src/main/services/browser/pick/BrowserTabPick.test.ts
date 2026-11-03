@@ -339,6 +339,25 @@ describe('BrowserTabPick', () => {
       expect(h.state().surface).toBe('menu')
     })
 
+    it('works with pick mode off, where the session refuses the DOM domain until pick mode turns it on', async () => {
+      h.page.cdp.gatePickDomains = true
+      expect(h.pick.isActive).toBe(false)
+      await h.pick.pickAt({ x: 25, y: 22 })
+      await settle()
+      expect(h.pick.isActive).toBe(true)
+      expect(h.pick.capture?.entry.name.id).toBe('save')
+      expect(h.state().surface).toBe('menu')
+    })
+
+    it('turns pick mode back off when the point hits nothing and pick mode was off', async () => {
+      h.page.cdp.gatePickDomains = true
+      await h.pick.pickAt({ x: 5000, y: 5000 })
+      await settle()
+      expect(h.pick.isActive).toBe(false)
+      expect(h.pick.capture).toBeNull()
+      expect(h.page.cdp.disabled).toBe(h.page.cdp.enabled)
+    })
+
     it('does nothing over nothing, on a detached session, or after dispose', async () => {
       await h.pick.pickAt({ x: 5000, y: 5000 })
       h.page.cdp.attached = false

@@ -83,6 +83,16 @@ describe('readElementFacts (025-FR-033, 025-FR-035)', () => {
     expect((await readElementFacts(ctx, top(10))).matchedRules).toBeNull()
   })
 
+  it('gives an empty list, not null, when the CSS domain answers with user-agent rules only; null when it answers without a rule list', async () => {
+    const { page, ctx } = setup()
+    page.matchedStyles = { matchedCSSRules: [rule('user-agent')] }
+    expect((await readElementFacts(ctx, top(4))).matchedRules).toEqual([])
+    page.matchedStyles = { matchedCSSRules: [] }
+    expect((await readElementFacts(ctx, top(4))).matchedRules).toEqual([])
+    page.matchedStyles = {}
+    expect((await readElementFacts(ctx, top(4))).matchedRules).toBeNull()
+  })
+
   it('gives no matched rules for an element in a same-process child frame', async () => {
     const { page, ctx } = setup()
     page.addFrame({ frameId: 'child', parentId: 'top', session: '', origin: 'https://app.test' })

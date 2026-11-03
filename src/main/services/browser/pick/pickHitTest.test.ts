@@ -31,6 +31,25 @@ describe('PickHitTest', () => {
     expect(hitTest && (await hitTest.atViewPoint({ x: 600, y: 200 }))?.node.backendNodeId).toBe(101)
   })
 
+  it('adds each session\'s scroll offset: getNodeForLocation takes document coordinates, the point is in the viewport', async () => {
+    const { page, hitTest } = setup()
+    page.scrolls.set('', { x: 0, y: 1919 })
+    expect((await hitTest.atViewPoint({ x: 35, y: 30 }))?.node.backendNodeId).toBe(5)
+    expect(page.cdp.calls('DOM.getNodeForLocation').at(-1)?.params).toMatchObject({ x: 35, y: 1949 })
+    // A scrolled cross-site frame: its own offset, added in its own session.
+    page.scrolls.set('S1', { x: 3, y: 200 })
+    expect((await hitTest.atViewPoint({ x: 415, y: 115 }))?.node.backendNodeId).toBe(102)
+    expect(page.cdp.calls('DOM.getNodeForLocation').at(-1)).toMatchObject({ sessionKey: 'S1', params: { x: 18, y: 215 } })
+  })
+
+  it('uses no offset when the layout metrics cannot be read', async () => {
+    const { page, hitTest } = setup()
+    page.cdp.handle('Page.getLayoutMetrics', () => {
+      throw new Error('gone')
+    })
+    expect((await hitTest.atViewPoint({ x: 35, y: 30 }))?.node.backendNodeId).toBe(5)
+  })
+
   it('stops at the owner element when its frame is not laid out yet', async () => {
     const { page, hitTest } = setup()
     page.viewports.delete('S1')

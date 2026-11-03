@@ -18,7 +18,7 @@
  * the overlay is in the image) – {@link PickHighlight.hide}.
  */
 import { elementLabel } from '../../../../shared/browser/elementLabel'
-import { pickOutlineParams } from '../cdp/cdpPinned'
+import { pickOutlineParams, type Rgba } from '../cdp/cdpPinned'
 import type { Box } from './pickGeometry'
 import type { PickNode, PickReader } from './pickCdp'
 import { boxInView, describeForLabel } from './pickElement'
@@ -38,9 +38,14 @@ export class PickHighlight {
   /** Generation of the latest request; an older one that finishes later is dropped. */
   private generation = 0
 
+  /**
+   * @param testColour - The live outline's colour when a test hook set one
+   *   (`PickFaults.highlightColour`); `null` draws the product colour
+   */
   constructor(
     private readonly reader: PickReader,
-    private readonly frames: PickFrames
+    private readonly frames: PickFrames,
+    private readonly testColour: () => Rgba | null = () => null
   ) {}
 
   /** What the highlight shows now, or null. */
@@ -60,7 +65,8 @@ export class PickHighlight {
     if (this.shownOn !== null && this.shownOn !== node.sessionKey) this.hideOn(this.shownOn)
     this.shownOn = node.sessionKey
     if (label.border !== null) {
-      await this.reader.call('Overlay.highlightQuad', pickOutlineParams(label.border), node.sessionKey).catch(() => undefined)
+      const params = pickOutlineParams(label.border, this.testColour() ?? undefined)
+      await this.reader.call('Overlay.highlightQuad', params, node.sessionKey).catch(() => undefined)
     } else {
       // No box to outline: what was outlined before must not stay up beside the new label.
       await this.reader.call('Overlay.hideHighlight', undefined, node.sessionKey).catch(() => undefined)

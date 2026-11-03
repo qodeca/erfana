@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { createManualClock } from '../../../../shared/clock'
 import { BrowserLogBuffer } from './browserLogBuffer'
-import { CdpLogCollector, MAX_TRACKED_REQUESTS, statusFromLogText, type FailedRequestSource, type LogScope } from './cdpLogCollector'
+import { CdpLogCollector, ELECTRON_SECURITY_WARNING_PREFIX, electronPrintsSecurityWarnings, MAX_TRACKED_REQUESTS, statusFromLogText, type FailedRequestSource, type LogScope } from './cdpLogCollector'
 import { consoleCall, defaultContext } from './__test-helpers__/fakeCdp'
 
 const TOP: LogScope = { sessionKey: '', rootFrameKey: 'top', rootOrigin: () => 'https://app.test' }
@@ -113,6 +113,45 @@ describe('CdpLogCollector – console (025-FR-038)', () => {
   })
 })
 
+describe('CdpLogCollector – Electron’s development security warnings', () => {
+  const securityWarning = {
+    type: 'warning',
+    executionContextId: 1,
+    args: [
+      { type: 'string', value: `${ELECTRON_SECURITY_WARNING_PREFIX}Insecure Content-Security-Policy)` },
+      { type: 'string', value: 'font-weight: bold;' },
+      { type: 'string', value: 'This renderer process has either no Content Security Policy set…' }
+    ]
+  }
+
+  it('drops them when asked (an unpackaged run), and only them', () => {
+    const buffer = new BrowserLogBuffer(createManualClock(0))
+    const collector = new CdpLogCollector(buffer, 'network', { dropElectronSecurityWarnings: true })
+    collector.handle(TOP, 'Runtime.executionContextCreated', defaultContext(1, 'MAIN', 'https://app.test'))
+    expect(collector.handle(TOP, 'Runtime.consoleAPICalled', securityWarning)).toBe(true)
+    collector.handle(TOP, 'Runtime.consoleAPICalled', { ...securityWarning, type: 'error' })
+    collector.handle(TOP, 'Runtime.consoleAPICalled', consoleCall('warning', 'Electron Security Warning (not the prefix)'))
+    expect(buffer.snapshot().console.map(e => [e.level, e.message.slice(0, 30)])).toEqual([
+      ['error', '%cElectron Security Warning (I'],
+      ['warning', 'Electron Security Warning (not']
+    ])
+  })
+
+  it('follows Electron’s own rule for when it prints them', () => {
+    expect(electronPrintsSecurityWarnings(false, {})).toBe(true)
+    expect(electronPrintsSecurityWarnings(true, {})).toBe(false)
+    expect(electronPrintsSecurityWarnings(false, { ELECTRON_DISABLE_SECURITY_WARNINGS: '1' })).toBe(false)
+    expect(electronPrintsSecurityWarnings(true, { ELECTRON_ENABLE_SECURITY_WARNINGS: '1' })).toBe(true)
+    expect(electronPrintsSecurityWarnings(false, { ELECTRON_ENABLE_SECURITY_WARNINGS: '1', ELECTRON_DISABLE_SECURITY_WARNINGS: '1' })).toBe(true)
+  })
+
+  it('keeps them by default (a packaged app, where Electron never prints them)', () => {
+    const { collector, buffer } = setup('network')
+    collector.handle(TOP, 'Runtime.consoleAPICalled', securityWarning)
+    expect(buffer.snapshot().console).toHaveLength(1)
+  })
+})
+
 describe('CdpLogCollector – failed requests from Log (default source)', () => {
   it('025-AC-038 records a 500 and a name-resolution failure, and skips a cancelled request', () => {
     const { collector, buffer } = setup('log')
@@ -194,6 +233,20 @@ describe('CdpLogCollector – failed requests from Network (switch)', () => {
       ['blocked:mixed-content', 'http://a.test/'],
       ['cors:MissingAllowOriginHeader', 'https://b.test/'],
       ['404', 'https://c.test/end']
+    ])
+  })
+
+  it('skips the DevTools agent’s cache-only reads (an unannounced net::ERR_CACHE_MISS); a page request that misses the cache still counts', () => {
+    const { collector, buffer } = setup('network')
+    // CSS.enable at pick start: the agent re-reads the document and style sheets from the cache, unannounced.
+    send(collector, TOP, 'Network.loadingFailed', { requestId: 'agent-1', errorText: 'net::ERR_CACHE_MISS' })
+    send(collector, CHILD, 'Network.loadingFailed', { requestId: 'agent-2', errorText: 'net::ERR_CACHE_MISS', type: 'Document' })
+    send(collector, TOP, 'Network.requestWillBeSent', { requestId: 'page', request: { url: 'https://app.test/only-cached' } })
+    send(collector, TOP, 'Network.loadingFailed', { requestId: 'page', errorText: 'net::ERR_CACHE_MISS' })
+    send(collector, TOP, 'Network.loadingFailed', { requestId: 'evicted', errorText: 'net::ERR_FAILED' })
+    expect(buffer.snapshot().failedRequests.map(r => [r.status, r.url])).toEqual([
+      ['net::ERR_CACHE_MISS', 'https://app.test/only-cached'],
+      ['net::ERR_FAILED', '']
     ])
   })
 

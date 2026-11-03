@@ -63,6 +63,7 @@ import { registerBrowserTabPopupHandlers } from '../../ipc/browserTab/popup-hand
 import { BROWSER_TAB_EVENTS } from '../../../shared/ipc/browser-tab-channels'
 import { NoticeEventSchema } from '../../../shared/ipc/browser-tab-schema'
 import { BrowserCdpSession } from './cdp/BrowserCdpSession'
+import { electronPrintsSecurityWarnings } from './cdp/cdpLogCollector'
 import { BrowserSite } from './permissions/BrowserSite'
 import { installSiteRequestHooks } from './site/siteRequestHooks'
 import { electronMacAppKeys } from './input/macAppRoles'
@@ -168,7 +169,7 @@ export function currentAppAddresses(): AppAddresses {
  * one rather than without a page.
  */
 function attachTabCdp(contents: WebContents): TabCdpLink | null {
-  const cdp = new BrowserCdpSession({ kind: 'tab' })
+  const cdp = new BrowserCdpSession({ kind: 'tab', dropElectronSecurityWarnings: electronPrintsSecurityWarnings(!is.dev, process.env) })
   try {
     cdp.attach(contents)
   } catch (error) {

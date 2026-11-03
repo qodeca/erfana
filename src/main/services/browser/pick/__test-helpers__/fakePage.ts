@@ -46,6 +46,12 @@ export class FakePage {
   readonly nodes = new Map<number, FakeNode>()
   readonly frames: FakeFrame[] = [{ frameId: 'top', parentId: null, session: '', origin: 'https://app.test', url: 'https://app.test/' }]
   readonly viewports = new Map<string, { width: number; height: number }>([['', { width: 800, height: 600 }]])
+  /**
+   * Each session's document scroll offset (none: 0, 0). Node boxes are in the
+   * viewport, as `getContentQuads` answers; `getNodeForLocation` takes
+   * document coordinates, as the engine does.
+   */
+  readonly scrolls = new Map<string, { x: number; y: number }>()
   /** What the React lookup answers, by node id; absent nodes answer null. */
   readonly react = new Map<number, unknown>()
   /** Node ids whose page-function reads throw (a page that broke a prototype, or the node went). */
@@ -108,8 +114,9 @@ export class FakePage {
   private install(): void {
     const c = this.cdp
     c.handle('DOM.getNodeForLocation', (p, session) => {
-      const x = p.x as number
-      const y = p.y as number
+      const scroll = this.scrolls.get(session) ?? { x: 0, y: 0 }
+      const x = (p.x as number) - scroll.x
+      const y = (p.y as number) - scroll.y
       let best: FakeNode | null = null
       for (const n of this.nodes.values()) {
         if (n.session !== session || n.box === undefined) continue
@@ -144,7 +151,8 @@ export class FakePage {
     })
     c.handle('Page.getLayoutMetrics', (_p, session) => {
       const v = this.viewports.get(session)
-      return v === undefined ? {} : { cssLayoutViewport: { clientWidth: v.width, clientHeight: v.height } }
+      const scroll = this.scrolls.get(session) ?? { x: 0, y: 0 }
+      return v === undefined ? {} : { cssLayoutViewport: { clientWidth: v.width, clientHeight: v.height, pageX: scroll.x, pageY: scroll.y } }
     })
     c.handle('DOM.getFrameOwner', (p) => {
       const owner = [...this.nodes.values()].find((n) => n.contentFrameId === p.frameId)

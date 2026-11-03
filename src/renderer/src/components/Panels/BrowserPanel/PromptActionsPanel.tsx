@@ -73,10 +73,13 @@ const ACTION_DESC: Readonly<Record<SendAction, string>> = {
   prompt: 'Write your own prompt about this element'
 }
 
-/** The Tab cycle's groups, in order (025-FR-030): actions, banner button, target, ×. */
-const TAB_GROUPS = ['.erf-brw-actions__buttons button', '.erf-brw-banner__button', '.erf-brw-actions__footer button', '.erf-brw-actions__close']
+/**
+ * The Tab cycle's groups, in order (025-FR-030): actions, banner button, target – which wraps to the first
+ * action. × is a header control like Parent, Child and the path: not in the cycle (Esc or a click closes).
+ */
+const TAB_GROUPS = ['.erf-brw-actions__buttons button', '.erf-brw-banner__button', '.erf-brw-actions__footer button']
 
-/** The Tab stops inside `root`, in cycle order – not DOM order, where × comes first. */
+/** The Tab stops inside `root`, in cycle order. */
 function tabStops(root: HTMLElement): HTMLElement[] {
   return TAB_GROUPS.flatMap(selector => [...root.querySelectorAll<HTMLElement>(selector)]).filter(el => !el.hasAttribute('disabled'))
 }
@@ -234,7 +237,7 @@ export function PromptActionsPanel(props: PromptActionsPanelProps): JSX.Element 
         </nav>
         <button
           type="button"
-          data-tab-stop=""
+          tabIndex={-1}
           className="erf-brw-actions__close"
           aria-label="Close – nothing is sent"
           title="Close – nothing is sent"

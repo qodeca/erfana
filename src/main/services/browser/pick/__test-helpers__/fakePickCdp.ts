@@ -7,6 +7,7 @@
  * Protocol events, target attach and detach are emitted by the test.
  */
 import type { LogSnapshot } from '../../cdp/browserLogBuffer'
+import { PICK_ONLY_DOMAINS } from '../../cdp/cdpAllowList'
 import type { BrowserCdpSessionEvents, CdpTargetInfo, HangProbeControl } from '../../cdp/cdpSessionTypes'
 import type { PickCdp } from '../pickCdp'
 
@@ -35,6 +36,12 @@ export class FakePickCdp implements PickCdp {
   }
   enabled = 0
   disabled = 0
+  /**
+   * Refuse DOM, CSS and Overlay commands (synchronously) while the pick
+   * domains are off, as `BrowserCdpSession.send` does. Off by default, so
+   * tests of a single module need not turn pick mode on.
+   */
+  gatePickDomains = false
   enableError: Error | null = null
   private readonly handlers = new Map<string, PickHandler>()
   private readonly listeners = new Map<string, Set<Listener>>()
@@ -47,6 +54,10 @@ export class FakePickCdp implements PickCdp {
 
   send(method: string, params?: unknown, sessionKey = ''): Promise<unknown> {
     this.sent.push({ method, params, sessionKey })
+    const domain = method.slice(0, method.indexOf('.'))
+    if (this.gatePickDomains && PICK_ONLY_DOMAINS.includes(domain) && !method.endsWith('.disable') && this.enabled <= this.disabled) {
+      throw new Error(`CDP refused ${method}: pick mode is off`)
+    }
     const handler = this.handlers.get(method)
     if (handler === undefined) return Promise.resolve({})
     return Promise.resolve().then(() => handler((params ?? {}) as Record<string, unknown>, sessionKey))

@@ -14,6 +14,8 @@
 import { test, expect } from './fixtures/browserHarness'
 import { BrowserTabUiPage } from './pages/browser-tab-ui.page'
 import { BrowserSendUi, SEND_WAIT_MS, type StubAgent } from './pages/browser-send.page'
+import { mainHook, type Box } from './pages/browser-pick.page'
+import type { ElectronApplication, Locator } from '@playwright/test'
 
 type Modifier = 'shift' | 'control' | 'alt' | 'meta'
 
@@ -285,12 +287,52 @@ test.describe('025-AC-064 keys with the instruction dialog open', () => {
   })
 })
 
-/*
- * 025-AC-063 is not in these titles: its double-click, its press-before-the-menu,
- * its strip-prompt Shift+F6 and its 400 px runs are not proven here. These
- * tests prove the rest of it.
+/** One left-button event to the page (`pageMouse`) or to Erfana's window (`windowMouse`), sent main-side. */
+async function mouse(send: BrowserSendUi, where: 'pageMouse' | 'windowMouse', type: 'mouseDown' | 'mouseUp', at: { x: number; y: number }, clickCount = 1): Promise<void> {
+  await mainHook(send.app, 'browserInput', where, await send.panel.tabId(), type, at.x, at.y, clickCount)
+}
+
+const centre = (box: Box): { x: number; y: number } => ({ x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2) })
+
+/**
+ * **Pick element** at any width: below 380 px its visible label folds away and
+ * its accessible name falls back to its tooltip, so it is found by its class.
  */
-test.describe('keys with the prompt-actions menu open', () => {
+const pickToggle = (send: BrowserSendUi): Locator => send.pick.row.locator('.erf-brw-pickbtn')
+
+/** {@link BrowserSendUi.pickElement} at any width: pick mode on, hover `selector`, Return, the panel open. */
+async function pickAtAnyWidth(send: BrowserSendUi, selector: string, labelPrefix: string): Promise<void> {
+  if ((await pickToggle(send).getAttribute('aria-pressed')) !== 'true') await pickToggle(send).click()
+  await expect(pickToggle(send)).toHaveAttribute('aria-pressed', 'true')
+  await send.pick.confirm(selector, labelPrefix)
+}
+
+/** Resize Erfana's window until the browser panel is `width` CSS px wide (the sidebars keep theirs). */
+async function setPanelWidth(app: ElectronApplication, panel: Locator, width: number): Promise<void> {
+  await expect(async () => {
+    const box = await panel.boundingBox()
+    if (box === null) throw new Error('The browser panel is not drawn')
+    const delta = Math.round(box.width - width)
+    if (delta !== 0) {
+      await app.evaluate(({ BrowserWindow }, d) => {
+        const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed() && w.isVisible())
+        if (win === undefined) throw new Error('No visible window')
+        const [w, h] = win.getContentSize()
+        win.setContentSize(w - d, h)
+      }, delta)
+    }
+    expect(Math.abs(((await panel.boundingBox())?.width ?? 0) - width)).toBeLessThanOrEqual(1)
+  }).toPass({ timeout: SEND_WAIT_MS })
+}
+
+/*
+ * 025-AC-063: every key, the clicks outside the menu, the double-click, a press
+ * that began before the menu opened, a press released off its action, and
+ * Shift+F6 with and without a strip prompt at 1280 px and at 400 px. Pointer
+ * input to the page, and a press or release that lands on Erfana's window,
+ * go main-side through `sendInputEvent` (S-27).
+ */
+test.describe('025-AC-063 keys and clicks with the prompt-actions menu open', () => {
   test.skip(process.platform === 'win32', 'The stub agent is a node program in front of a POSIX shell (macOS and Linux)')
 
   test('Tab, Shift+Tab and Space are Erfana’s; a, Ctrl/Cmd+E, Ctrl/Cmd+F and a zoom key do nothing; Alt+Up moves to the parent; the page logs none', async ({
@@ -408,22 +450,152 @@ test.describe('keys with the prompt-actions menu open', () => {
     expect(await send.captureFiles()).toEqual([])
   })
 
-  test('F6 closes the menu with focus on Pick element; Shift+F6 closes it with focus on More', async ({ appWithTestProject, windowWithTestProject, browserServers, testProject }) => {
+  for (const width of [1280, 400]) {
+    test(`at ${width} px, F6 closes the menu with focus on Pick element; Shift+F6 closes it with focus on More, the last visible control of the navigation row`, async ({
+      appWithTestProject,
+      windowWithTestProject,
+      browserServers,
+      testProject
+    }) => {
+      const send = await BrowserSendUi.open(appWithTestProject, windowWithTestProject, testProject.path)
+      const agent = await send.startStubAgent(test.info().outputPath('agent-input.bin'))
+      await send.load(browserServers.sites.static.url('/elements.html'))
+      await setPanelWidth(appWithTestProject, send.panel.root, width)
+      // More is the last navigation control drawn at this width.
+      const drawn = send.panel.root.locator('.erf-brw-nav button:visible')
+      await expect(drawn.last()).toHaveAccessibleName('More')
+      for (const [modifiers, focused] of [
+        [[], pickToggle(send)],
+        [['shift'], send.panel.tool('More')]
+      ] as const) {
+        await pickAtAnyWidth(send, '#save-label', 'span#save-label ')
+        await expect(send.pick.action('Explain')).toBeFocused()
+        // F6 is not a browser key: it reaches the renderer on any focus path.
+        await windowWithTestProject.keyboard.press(modifiers.length === 0 ? 'F6' : 'Shift+F6')
+        await expect(send.pick.actions).toHaveCount(0)
+        await expect(focused).toBeFocused()
+      }
+      expect(await agent.received()).toBe('')
+      expect(await send.captureFiles()).toEqual([])
+    })
+  }
+
+  test('with a strip prompt showing, Shift+F6 closes the menu with nothing sent and focus on the last control of the strip', async ({
+    appWithTestProject,
+    windowWithTestProject,
+    browserServers,
+    testProject
+  }) => {
+    const send = await BrowserSendUi.open(appWithTestProject, windowWithTestProject, testProject.path)
+    const agent = await send.startStubAgent(test.info().outputPath('agent-input.bin'))
+    await send.load(browserServers.sites.static.url('/popups.html'))
+    await pickAtAnyWidth(send, 'h1', 'h1 ')
+    // The page opens pop-ups with the menu open (no user activation): the strip prompt shows above the page.
+    await (await send.panel.page()).eval('window.__fixture.openMany(6)')
+    const row = send.panel.stripRow('popupBlocked')
+    await expect(row).toBeVisible({ timeout: SEND_WAIT_MS })
+    await expect(send.pick.actions).toBeVisible()
+    await expect(send.pick.action('Explain')).toBeFocused()
+    await windowWithTestProject.keyboard.press('Shift+F6')
+    await expect(send.pick.actions).toHaveCount(0)
+    await expect(row.getByRole('button').last()).toBeFocused()
+    expect(await agent.received()).toBe('')
+    expect(await send.captureFiles()).toEqual([])
+  })
+
+  test('a double-click in pick mode: the first click confirms the pick, the menu stays open and the second click – on the page or on its still image – is ignored', async ({
+    appWithTestProject,
+    windowWithTestProject,
+    browserServers,
+    testProject
+  }) => {
     const send = await BrowserSendUi.open(appWithTestProject, windowWithTestProject, testProject.path)
     const agent = await send.startStubAgent(test.info().outputPath('agent-input.bin'))
     await send.load(browserServers.sites.static.url('/elements.html'))
-    for (const [modifiers, focused] of [
-      [[], send.pick.pickButton],
-      [['shift'], send.panel.tool('More')]
-    ] as const) {
-      await send.pickElement('#save-label', 'span#save-label ')
-      await expect(send.pick.action('Explain')).toBeFocused()
-      // F6 is not a browser key: it reaches the renderer on any focus path.
-      await windowWithTestProject.keyboard.press(modifiers.length === 0 ? 'F6' : 'Shift+F6')
-      await expect(send.pick.actions).toHaveCount(0)
-      await expect(focused).toBeFocused()
-    }
+    await pickToggle(send).click()
+    const driver = await send.driver()
+    await expect.poll(async () => (await driver.state()).active, { timeout: SEND_WAIT_MS }).toBe(true)
+    const box = await driver.rect('#save-label')
+    await driver.hover(box, 'span#save-label ')
+    const at = centre(box)
+
+    // A double-click as the system sends it: the second press carries click count 2 and lands on the page.
+    await mouse(send, 'pageMouse', 'mouseDown', at, 1)
+    await mouse(send, 'pageMouse', 'mouseUp', at, 1)
+    await mouse(send, 'pageMouse', 'mouseDown', at, 2)
+    await mouse(send, 'pageMouse', 'mouseUp', at, 2)
+    await expect(send.pick.actions).toBeVisible({ timeout: SEND_WAIT_MS })
+    await expect(send.pick.action('Explain')).toBeFocused()
+    const first = (await send.pickState()).capture
+    expect(first).not.toBeNull()
+
+    // The second press of a double-click that lands once the still image covers the page: on Erfana's window.
+    const still = await send.pick.still.boundingBox()
+    if (still === null) throw new Error('The still image is not drawn')
+    const onStill = { x: still.x + at.x, y: still.y + at.y }
+    await mouse(send, 'windowMouse', 'mouseDown', onStill, 2)
+    await mouse(send, 'windowMouse', 'mouseUp', onStill, 2)
+
+    // Sentinel: Alt+Up after the clicks is handled by the same menu, on the same capture.
+    await send.windowKey('Up', ['alt'])
+    await expect(send.pick.actions.getByRole('navigation', { name: 'Element path' })).toContainText('button#save-button · ')
+    await expect(send.pick.actions).toBeVisible()
+    expect(await send.pickState()).toMatchObject({ active: true, capture: { id: first!.id } })
     expect(await agent.received()).toBe('')
     expect(await send.captureFiles()).toEqual([])
+
+    // The positive control: a single click on the still image, outside the menu, closes it.
+    await send.pick.still.click({ position: { x: 5, y: 5 } })
+    await expect(send.pick.actions).toHaveCount(0)
+    expect(await send.pickState()).toMatchObject({ active: true, capture: null })
+  })
+
+  test('a press that began on the page before the menu opened runs no action when released over it; a press on an action released off it runs nothing', async ({
+    appWithTestProject,
+    windowWithTestProject,
+    browserServers,
+    testProject
+  }) => {
+    const send = await BrowserSendUi.open(appWithTestProject, windowWithTestProject, testProject.path)
+    const agent = await send.startStubAgent(test.info().outputPath('agent-input.bin'))
+    await send.load(browserServers.sites.static.url('/elements.html'))
+    await pickToggle(send).click()
+    const driver = await send.driver()
+    await expect.poll(async () => (await driver.state()).active, { timeout: SEND_WAIT_MS }).toBe(true)
+    const box = await driver.rect('#save-label')
+    await driver.hover(box, 'span#save-label ')
+
+    // The press on the page confirms the pick; the menu opens under the held button.
+    await mouse(send, 'pageMouse', 'mouseDown', centre(box))
+    await expect(send.pick.actions).toBeVisible({ timeout: SEND_WAIT_MS })
+    const explain = send.pick.action('Explain')
+    const over = await explain.boundingBox()
+    if (over === null) throw new Error('Explain is not drawn')
+    // The release lands on Erfana's window, over Explain.
+    await mouse(send, 'windowMouse', 'mouseUp', centre(over))
+    // Sentinel: Tab after the release is the menu's, so the release was handled before it.
+    await send.windowKey('Tab')
+    await expect(send.pick.action('Ask')).toBeFocused()
+    await expect(send.pick.actions).toBeVisible()
+    expect(await agent.received()).toBe('')
+    expect(await send.captureFiles()).toEqual([])
+
+    // A press on Explain released off it, on Ask: nothing runs.
+    const window = windowWithTestProject
+    await explain.hover()
+    await window.mouse.down()
+    const ask = await send.pick.action('Ask').boundingBox()
+    if (ask === null) throw new Error('Ask is not drawn')
+    await window.mouse.move(ask.x + ask.width / 2, ask.y + ask.height / 2, { steps: 4 })
+    await window.mouse.up()
+    await send.windowKey('Tab', ['shift'])
+    await expect(send.pick.actions).toBeVisible()
+    await expect(send.pick.dialog).toHaveCount(0)
+    expect(await agent.received()).toBe('')
+    expect(await send.captureFiles()).toEqual([])
+
+    // The positive control: a whole click on Explain sends.
+    await explain.click()
+    expect(await agent.waitForSubmitted()).toContain('Explain the element the user picked')
   })
 })

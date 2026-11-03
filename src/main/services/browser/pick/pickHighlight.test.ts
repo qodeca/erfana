@@ -35,6 +35,24 @@ describe('PickHighlight', () => {
     expect(Object.keys(call.params as object).sort()).toEqual(['color', 'outlineColor', 'quad'])
   })
 
+  it('025-AC-034 draws the live outline in a test colour while a hook sets one, and in the accent otherwise', async () => {
+    let colour: { r: number; g: number; b: number; a: number } | null = { r: 0, g: 200, b: 100, a: 1 }
+    let highlight: PickHighlight | undefined
+    const page = samplePage({
+      beforeFrames: (p) => {
+        const reader = new PickReader(p.cdp)
+        highlight = new PickHighlight(reader, new PickFrames(p.cdp, reader), () => colour)
+      }
+    })
+    await highlight!.show(top(4))
+    colour = null
+    await highlight!.show(top(5))
+    expect(page.cdp.calls('Overlay.highlightQuad').map((c) => (c.params as { outlineColor: unknown }).outlineColor)).toEqual([
+      { r: 0, g: 200, b: 100, a: 1 },
+      PICK_OUTLINE_COLOUR
+    ])
+  })
+
   it('drops an older request that finishes after a newer one', async () => {
     const { highlight } = setup()
     const [older, newer] = await Promise.all([highlight.show(top(4)), highlight.show(top(5))])

@@ -33,6 +33,7 @@ vi.mock('../cdp/BrowserCdpSession', () => ({ BrowserCdpSession: CdpSession }))
 vi.mock('../../LoggingService', () => ({ logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 
 import { electronPopupWindows, POPUP_HOST_ROUTE, POPUP_STRIP_HEIGHT_PX } from './popupWindowElectron'
+import { electronPrintsSecurityWarnings } from '../cdp/cdpLogCollector'
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -83,7 +84,8 @@ describe('electronPopupWindows', () => {
   it('attaches a popup-kind CDP session with the probe on and dialog events, or none when refused', () => {
     const windows = electronPopupWindows(() => null)
     const link = windows.attachCdp!({ id: 1 } as never)
-    expect(CdpSession).toHaveBeenCalledWith({ kind: 'popup' })
+    // A packaged run (is.dev false): Electron prints no security warnings, so none are dropped.
+    expect(CdpSession).toHaveBeenCalledWith({ kind: 'popup', dropElectronSecurityWarnings: electronPrintsSecurityWarnings(true, process.env) })
     expect(cdp.hangProbe.setVisible).toHaveBeenCalledWith(true)
     expect(cdp.send).toHaveBeenCalledWith('Page.enable')
     link!.detach()

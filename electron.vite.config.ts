@@ -6,6 +6,7 @@ import { defineConfig } from 'electron-vite'
 import type { Plugin, Rollup } from 'vite'
 import react from '@vitejs/plugin-react'
 import { monacoOwnDompurify, monacoOwnDompurifyEsbuild } from './electron.vite.monaco-dompurify'
+import { mainDesignTokenDefines } from './electron.vite.design-tokens'
 
 // App version is read from package.json at build time and inlined into the
 // renderer as `__APP_VERSION__` (no runtime IPC). Used by the window title.
@@ -236,7 +237,8 @@ function testHooksDefine(mode: string): Record<string, string> {
 export default defineConfig(({ mode }) => ({
   main: {
     plugins: [assertModulePathsConfinedFirst()],
-    define: testHooksDefine(mode),
+    // The screenshot outline's accent, resolved from design-tokens.css here (025-FR-034).
+    define: { ...testHooksDefine(mode), ...mainDesignTokenDefines() },
     build: {
       rollupOptions: {
         output: {

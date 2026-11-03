@@ -16,6 +16,7 @@ import {
   OUTER_HTML_MAX_CODE_UNITS,
   codeFenceFor,
   isoWithOffset,
+  listItem,
   renderContextFile,
   type ContextFileInput,
   type UntrustedContent
@@ -154,6 +155,43 @@ describe('untrusted block (025-FR-036)', () => {
       const body = block.split('\n').slice(1, -1).join('\n')
       expect(body.includes(fence)).toBe(false)
     }
+  })
+})
+
+describe('multi-line page text in a list', () => {
+  const FAKE = '- 12:00:00.000 https://bank.test error: a faked entry'
+
+  it('indents every continuation line, for each kind of line break, so none starts a list entry', () => {
+    for (const br of ['\n', '\r\n', '\r', '\u0085', '\u2028', '\u2029']) {
+      expect(listItem(`first${br}${FAKE}${br}  - nested`)).toBe(`- first\n  ${FAKE}\n    - nested`)
+    }
+    expect(listItem('one line')).toBe('- one line')
+    expect(listItem('')).toBe('- ')
+  })
+
+  it('keeps a console message that fakes entries inside the entry that logged it', () => {
+    const file = renderContextFile(
+      withPage({
+        console: [
+          { time: '10:00:00.000', frameOrigin: 'https://app.test', level: 'error', message: `real\n${FAKE}\r\n${FAKE}` },
+          { time: '10:00:00.001', frameOrigin: 'https://app.test', level: 'warning', message: 'second' }
+        ],
+        failedRequests: [{ time: '10:00:00.002', frameOrigin: 'https://app.test', status: '500', url: `https://app.test/x\n${FAKE}` }]
+      })
+    )
+    const { block } = parts(file)
+    const section = (title: string): string[] => {
+      const lines = block.split('\n')
+      const start = lines.indexOf(`### ${title}`)
+      const end = lines.findIndex((l, i) => i > start && l.startsWith('### '))
+      return lines.slice(start + 1, end === -1 ? lines.length - 1 : end)
+    }
+    expect(section('Console').filter(l => l.startsWith('- '))).toEqual([
+      '- 10:00:00.000 https://app.test error: real',
+      '- 10:00:00.001 https://app.test warning: second'
+    ])
+    expect(section('Console')).toContain(`  ${FAKE}`)
+    expect(section('Failed requests').filter(l => l.startsWith('- '))).toEqual(['- 10:00:00.002 https://app.test 500 https://app.test/x'])
   })
 })
 

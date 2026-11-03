@@ -17,7 +17,13 @@
  *   - `network`: a request-id map, bounded at {@link MAX_TRACKED_REQUESTS}
  *     (oldest dropped), filled by `requestWillBeSent`, dropped at
  *     `loadingFinished` / `loadingFailed`; HTTP status ≥ 400 and
- *     non-cancelled `loadingFailed` are failures.
+ *     non-cancelled `loadingFailed` are failures. A `net::ERR_CACHE_MISS`
+ *     for a request the page never announced is skipped: it is the
+ *     DevTools agent's own cache-only read of the page's resources, which
+ *     `CSS.enable` starts when pick mode turns on – not a page request.
+ * - Electron's development "Electron Security Warning" lines are skipped when
+ *   the session asks for it ({@link CdpLogCollectorOptions}): only the stock
+ *   Electron binary (an unpackaged run) prints them into every page.
  *
  * A frame's default execution context being created is its new document: the
  * frame's entries are cleared, except when `Runtime.enable` replays a context
@@ -29,6 +35,35 @@ import { isRecord } from './cdpTypes'
 export type FailedRequestSource = 'log' | 'network'
 
 export const MAX_TRACKED_REQUESTS = 500
+
+/** The engine's error for a cache-only read that found nothing (the DevTools agent's resource reads). */
+export const CACHE_MISS_ERROR = 'net::ERR_CACHE_MISS'
+
+/** How Electron's development security warnings start their first console argument. */
+export const ELECTRON_SECURITY_WARNING_PREFIX = '%cElectron Security Warning ('
+
+/**
+ * Whether Electron prints its security warnings into pages here, by its own
+ * rule: the stock binary (an unpackaged run) unless
+ * `ELECTRON_DISABLE_SECURITY_WARNINGS` is set, or anywhere when
+ * `ELECTRON_ENABLE_SECURITY_WARNINGS` is set (it wins).
+ */
+export function electronPrintsSecurityWarnings(isPackaged: boolean, env: Readonly<Record<string, string | undefined>>): boolean {
+  if (env.ELECTRON_ENABLE_SECURITY_WARNINGS) return true
+  return !isPackaged && !env.ELECTRON_DISABLE_SECURITY_WARNINGS
+}
+
+export interface CdpLogCollectorOptions {
+  /**
+   * Skip Electron's own "Electron Security Warning" console lines. Electron
+   * prints them into every page only when it runs as the stock binary
+   * (`MacOS/Electron`, `electron`, `electron.exe`) – a development run – or
+   * when `ELECTRON_ENABLE_SECURITY_WARNINGS` is set; they say nothing about
+   * the page. Off in a packaged app, where no page can use the prefix to hide
+   * its own warnings.
+   */
+  readonly dropElectronSecurityWarnings?: boolean
+}
 
 /** The target an event came from, as the collector needs it. */
 export interface LogScope {
@@ -79,10 +114,15 @@ export class CdpLogCollector {
   private readonly frameOrigins = new Map<string, string>()
   private readonly requests = new Map<string, TrackedRequest>()
 
+  private readonly dropSecurityWarnings: boolean
+
   constructor(
     private readonly buffer: BrowserLogBuffer,
-    private readonly source: FailedRequestSource
-  ) {}
+    private readonly source: FailedRequestSource,
+    options: CdpLogCollectorOptions = {}
+  ) {
+    this.dropSecurityWarnings = options.dropElectronSecurityWarnings === true
+  }
 
   /**
    * Handles one event.
@@ -166,6 +206,7 @@ export class CdpLogCollector {
     const level = params.type === 'error' || params.type === 'assert' ? 'error' : params.type === 'warning' ? 'warning' : null
     if (!level) return
     const args = Array.isArray(params.args) ? params.args : []
+    if (this.dropSecurityWarnings && level === 'warning' && argumentText(args[0]).startsWith(ELECTRON_SECURITY_WARNING_PREFIX)) return
     const { frameKey, origin } = this.where(scope, params.executionContextId)
     this.buffer.addConsole(frameKey, origin, level, args.map(argumentText).join(' '))
   }
@@ -242,6 +283,7 @@ export class CdpLogCollector {
     const request = this.requests.get(key)
     this.requests.delete(key)
     if (params.canceled === true || request?.recorded) return
+    if (request === undefined && params.errorText === CACHE_MISS_ERROR) return
     const cors = isRecord(params.corsErrorStatus) ? str(params.corsErrorStatus.corsError) : ''
     const blocked = str(params.blockedReason)
     const status = blocked ? `blocked:${blocked}` : cors ? `cors:${cors}` : str(params.errorText) || 'failed'

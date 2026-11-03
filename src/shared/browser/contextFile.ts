@@ -220,9 +220,25 @@ function factsPart(input: ContextFileInput, notes: readonly CaptureNote[]): stri
   return lines
 }
 
+/** Every line break a viewer or an agent may read as one: CRLF, CR, LF, NEL, LS and PS. */
+const LINE_BREAK = /\r\n|[\n\r\u0085\u2028\u2029]/
+
+/** How a list item's continuation lines start (Markdown list continuation). */
+export const CONTINUATION_INDENT = '  '
+
+/**
+ * One list item of page text: `- ` and its first line, then every further line
+ * indented by {@link CONTINUATION_INDENT}, so no line of page text starts at
+ * the left edge and passes for an entry of its own – a console message holding
+ * "\n- 12:00:00.000 …" stays inside the entry that logged it.
+ */
+export function listItem(text: string): string {
+  return `- ${text.split(LINE_BREAK).join(`\n${CONTINUATION_INDENT}`)}`
+}
+
 /** A list section of page text; `- none` when empty. */
 function section(title: string, items: readonly string[]): string[] {
-  return [`### ${title}`, '', ...(items.length === 0 ? ['- none'] : items.map(i => `- ${i}`)), '']
+  return [`### ${title}`, '', ...(items.length === 0 ? ['- none'] : items.map(listItem)), '']
 }
 
 function untrustedBody(page: UntrustedContent, html: string): string {

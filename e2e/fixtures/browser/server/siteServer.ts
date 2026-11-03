@@ -76,6 +76,7 @@ const CONTENT_TYPES: Readonly<Record<string, string>> = {
   '.map': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
+  '.pdf': 'application/pdf',
   '.txt': 'text/plain; charset=utf-8',
   '.tsx': 'text/plain; charset=utf-8',
   '.ts': 'text/plain; charset=utf-8'

@@ -7,7 +7,7 @@ vi.mock('../../LoggingService', () => ({ logger: { debug: vi.fn(), info: vi.fn()
 import { realClock } from '../../../../shared/clock'
 import { REACT_LOOKUP } from '../cdp/cdpPickFunctions'
 import { PickReader } from './pickCdp'
-import { CaptureFailure, fallbackFacts, PickCaptureReads, toBitmap, type CapturedImage } from './pickCaptureReads'
+import { bitmapWidth, CaptureFailure, fallbackFacts, PickCaptureReads, toBitmap, type CapturedImage } from './pickCaptureReads'
 import { readChain } from './pickElement'
 import { PickFrames } from './pickFrames'
 import { PickFaults } from './pickSupport'
@@ -42,6 +42,47 @@ describe('toBitmap', () => {
     expect(toBitmap(image(10, 5, 2))).toMatchObject({ width: 20, height: 10 })
     expect(toBitmap(image(10, 5, 1)).data.length).toBe(200)
     expect(toBitmap({ toBitmap: () => Buffer.alloc(0), getSize: () => ({ width: 0, height: 0 }) })).toMatchObject({ width: 0, height: 0 })
+  })
+
+  /** An image whose DIP size is `width` × `height` and whose bitmap is `pixelWidth` × `pixelHeight`, as at a fractional scale. */
+  function scaled(width: number, height: number, pixelWidth: number, pixelHeight: number, factors?: number[]): CapturedImage {
+    const data = Buffer.alloc(pixelWidth * pixelHeight * 4, 255)
+    return { toBitmap: () => data, getSize: () => ({ width, height }), ...(factors === undefined ? {} : { getScaleFactors: () => factors }) }
+  }
+
+  it('025-AC-034 reads a 125 % and a 150 % Windows capture at its exact pixel size, within 1 px of the viewport × the scale', () => {
+    // Sizes where a width taken from the mean scale alone is one pixel off, which shears every row.
+    for (const [scale, width, height] of [
+      [1.25, 249, 150],
+      [1.25, 1001, 601],
+      [1.25, 1280, 720],
+      [1.5, 1001, 601],
+      [1.5, 385, 50],
+      [1.5, 1366, 705]
+    ]) {
+      for (const round of [Math.round, Math.ceil, Math.floor]) {
+        const [pw, ph] = [round(width * scale), round(height * scale)]
+        for (const factors of [[scale], undefined]) {
+          const bitmap = toBitmap(scaled(width, height, pw, ph, factors))
+          if (factors !== undefined) expect([bitmap.width, bitmap.height], `${scale} ${width}×${height}`).toEqual([pw, ph])
+          expect(Math.abs(bitmap.width - width * scale)).toBeLessThanOrEqual(1)
+          expect(Math.abs(bitmap.height - height * scale)).toBeLessThanOrEqual(1)
+          expect(bitmap.data.length).toBe(bitmap.width * bitmap.height * 4)
+        }
+      }
+    }
+  })
+
+  it('takes the pixel size as given when the image reports it at scale 1, and a stray scale factor does not override the bitmap', () => {
+    expect(toBitmap(scaled(1252, 752, 1252, 752, [1]))).toMatchObject({ width: 1252, height: 752 })
+    expect(toBitmap(scaled(100, 50, 200, 100, [1]))).toMatchObject({ width: 200, height: 100 })
+  })
+
+  it('picks the width that divides the pixel count, nearest the scaled size', () => {
+    expect(bitmapWidth(311 * 188, 249, 150, 1.25)).toBe(311)
+    expect(bitmapWidth(312 * 188, 249, 150, 1.25)).toBe(312)
+    // No width near the scaled size divides the count (a short buffer): the scaled width stands.
+    expect(bitmapWidth(7919, 100, 50, 1.5)).toBe(150)
   })
 })
 

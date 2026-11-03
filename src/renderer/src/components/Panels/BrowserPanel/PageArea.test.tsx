@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { createRef } from 'react'
+import { createPortal } from 'react-dom'
 
 vi.mock('./StillImage', () => ({
   StillImage: ({ outline }: { outline: unknown }) => <p data-testid="still">{outline === null ? 'no outline' : 'outline'}</p>
@@ -82,10 +83,37 @@ describe('PageArea', () => {
       onStillPress
     })
     expect(screen.getByTestId('still')).toHaveTextContent('outline')
-    fireEvent.pointerDown(screen.getByRole('button', { name: 'Explain' }))
+    fireEvent.mouseDown(screen.getByRole('button', { name: 'Explain' }))
     expect(onStillPress).not.toHaveBeenCalled()
-    fireEvent.pointerDown(screen.getByTestId('still'))
+    // The later presses of a double-click (the system's click count) are not presses outside (025-FR-049).
+    // …and keep focus where it is (their default is prevented).
+    expect(fireEvent.mouseDown(screen.getByTestId('still'), { detail: 2 })).toBe(false)
+    expect(fireEvent.mouseDown(screen.getByTestId('still'), { detail: 3 })).toBe(false)
+    expect(onStillPress).not.toHaveBeenCalled()
+    fireEvent.mouseDown(screen.getByTestId('still'), { detail: 1 })
     expect(onStillPress).toHaveBeenCalledOnce()
+  })
+
+  it('does not count a press in a portal menu the surface opened as a press on the still (025-FR-030)', () => {
+    const onStillPress = vi.fn()
+    const image = { data: new Uint8Array(4), width: 1, height: 1 }
+    const portalRoot = document.createElement('div')
+    document.body.appendChild(portalRoot)
+    renderArea({
+      state: browserState(),
+      still: { image, source: 'pick' },
+      outline: { x: 0, y: 0, width: 1, height: 1 },
+      // The target chooser's menu: a React child of the surface, drawn in the portal root.
+      overlay: (
+        <div className="erf-brw-actions">
+          {createPortal(<div role="menuitem">Terminal · cat</div>, portalRoot)}
+        </div>
+      ),
+      onStillPress
+    })
+    fireEvent.pointerDown(screen.getByRole('menuitem', { name: 'Terminal · cat' }))
+    expect(onStillPress).not.toHaveBeenCalled()
+    portalRoot.remove()
   })
 
   it('outlines nothing on a menu still, and draws no still over an Erfana page', () => {

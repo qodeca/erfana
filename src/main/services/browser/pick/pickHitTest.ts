@@ -120,13 +120,29 @@ export class PickHitTest {
     return null
   }
 
-  /** One `getNodeForLocation` and, for a frame owner, the frame it holds. */
+  /** The session's document scroll offset in CSS px (0, 0 when it cannot be read). */
+  private async scrollOffset(sessionKey: string): Promise<Point> {
+    try {
+      const metrics = await this.reader.call('Page.getLayoutMetrics', undefined, sessionKey)
+      const viewport = isRecord(metrics) && isRecord(metrics.cssLayoutViewport) ? metrics.cssLayoutViewport : {}
+      return { x: typeof viewport.pageX === 'number' ? viewport.pageX : 0, y: typeof viewport.pageY === 'number' ? viewport.pageY : 0 }
+    } catch {
+      return { x: 0, y: 0 }
+    }
+  }
+
+  /**
+   * One `getNodeForLocation` and, for a frame owner, the frame it holds.
+   * `point` is in the session's viewport; the command takes document
+   * coordinates, so the session's scroll offset is added first.
+   */
   private async locate(sessionKey: string, point: Point): Promise<{ node: PickNode; contentFrameId: string | null } | null> {
+    const scroll = await this.scrollOffset(sessionKey)
     let located: unknown
     try {
       located = await this.reader.call(
         'DOM.getNodeForLocation',
-        { x: Math.round(point.x), y: Math.round(point.y), ignorePointerEventsNone: false, includeUserAgentShadowDOM: false },
+        { x: Math.round(point.x + scroll.x), y: Math.round(point.y + scroll.y), ignorePointerEventsNone: false, includeUserAgentShadowDOM: false },
         sessionKey
       )
     } catch {

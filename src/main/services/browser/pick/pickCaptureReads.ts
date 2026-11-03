@@ -37,6 +37,8 @@ export class CaptureFailure extends Error {}
 export interface CapturedImage {
   toBitmap(): Buffer
   getSize(): { width: number; height: number }
+  /** Electron's `NativeImage.getScaleFactors()`: the scales its representations are kept at. */
+  getScaleFactors?(): number[]
 }
 
 export interface PickCaptureReadsDeps {
@@ -129,13 +131,41 @@ export class PickCaptureReads {
   }
 }
 
+/**
+ * The pixel width of a bitmap of `pixels` pixels whose size in DIPs is
+ * `width` × `height`, at about `scale` device pixels per DIP. At a fractional
+ * scale (Windows 125 %, 150 %) the pixel size is the DIP size times the scale
+ * rounded either way, so the width is the one near `width × scale` that
+ * divides the pixel count, with the height nearest `height × scale`; a width
+ * off by one would shear every row (025-AC-034).
+ */
+export function bitmapWidth(pixels: number, width: number, height: number, scale: number): number {
+  let best: number | null = null
+  let bestError = Number.POSITIVE_INFINITY
+  // `width` may be the pixel width divided by the scale and cut down, so the pixel width can reach (width + 1) × scale.
+  for (let w = Math.max(1, Math.floor(width * scale) - 1); w <= Math.ceil((width + 1) * scale) + 1; w++) {
+    if (pixels % w !== 0) continue
+    const error = Math.abs(w - width * scale) + Math.abs(pixels / w - height * scale)
+    if (error < bestError) {
+      best = w
+      bestError = error
+    }
+  }
+  return best ?? Math.round(width * scale)
+}
+
 /** A captured image as a raw BGRA bitmap at its largest scale factor. */
 export function toBitmap(image: CapturedImage): Bitmap {
   const data = image.toBitmap()
   const size = image.getSize()
-  const factor = size.width > 0 && size.height > 0 ? Math.sqrt(data.length / 4 / (size.width * size.height)) : 1
-  const width = Math.round(size.width * factor)
-  const height = width > 0 ? Math.floor(data.length / 4 / width) : 0
+  const pixels = Math.floor(data.length / 4)
+  if (!(size.width > 0 && size.height > 0) || pixels === 0) return { data: new Uint8Array(data.buffer, data.byteOffset, 0), width: 0, height: 0 }
+  const known = Math.max(0, ...(image.getScaleFactors?.() ?? []).filter((f) => Number.isFinite(f) && f > 0))
+  // Without a known scale (or with a representation the size is not of), the bitmap's own size says it.
+  const measured = Math.sqrt(pixels / (size.width * size.height))
+  const scale = known > 0 && Math.abs(known - measured) < 0.5 ? known : measured
+  const width = bitmapWidth(pixels, size.width, size.height, scale)
+  const height = Math.floor(pixels / width)
   return { data: new Uint8Array(data.buffer, data.byteOffset, width * height * 4), width, height }
 }
 

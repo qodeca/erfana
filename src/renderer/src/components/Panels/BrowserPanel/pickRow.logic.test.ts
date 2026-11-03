@@ -6,11 +6,32 @@ import {
   guardBanner,
   noteDuration,
   pickBanner,
+  pickPlace,
   preWarning,
   targetChosen,
   targetView,
   type PickPlace
 } from './pickRow.logic'
+
+describe('pickPlace (025-FR-065)', () => {
+  const base = { surface: 'none' as const, pageFocused: false, toolbarFocused: false, panelClosedOnLeave: false }
+
+  it('names the panel or dialog first, then the page, then the toolbar', () => {
+    expect(pickPlace({ ...base, surface: 'panel', pageFocused: true })).toBe('panel')
+    expect(pickPlace({ ...base, surface: 'dialog', toolbarFocused: true })).toBe('dialog')
+    expect(pickPlace({ ...base, surface: 'dialog' })).toBe('outDialog')
+    expect(pickPlace({ ...base, pageFocused: true, toolbarFocused: true })).toBe('page')
+    expect(pickPlace({ ...base, toolbarFocused: true })).toBe('toolbar')
+    expect(pickPlace(base)).toBe('out')
+  })
+
+  it('says the panel closed when focus left with it open, until focus is back in the tab', () => {
+    expect(pickPlace({ ...base, panelClosedOnLeave: true })).toBe('outPanelClosed')
+    expect(pickBanner(pickPlace({ ...base, panelClosedOnLeave: true }), '⌘E', null).first).toBe('Picking – the panel closed when you left; pick again')
+    expect(pickPlace({ ...base, panelClosedOnLeave: true, pageFocused: true })).toBe('page')
+    expect(pickPlace({ ...base, panelClosedOnLeave: true, toolbarFocused: true })).toBe('toolbar')
+  })
+})
 
 describe('pickBanner (025-FR-065)', () => {
   it('names the click, Esc and the pick key on the page, and lets the hover label replace the later clauses', () => {

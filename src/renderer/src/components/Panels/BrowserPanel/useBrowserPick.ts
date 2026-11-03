@@ -57,6 +57,10 @@ export interface UseBrowserPickOptions {
   readonly projectPath: string | null
   /** Return keyboard focus to the page. */
   readonly focusPage: () => void
+  /** Open the target menu of the panel or the dialog (**Choose terminal**, 025-FR-061). */
+  readonly openTargetMenu: () => void
+  /** Start a new terminal when the target's shell has exited (**Open terminal**, 025-FR-061). */
+  readonly startTerminal: () => void
 }
 
 /** What the panel draws and wires. */
@@ -108,7 +112,7 @@ function showTerminalPanel(): void {
  * @returns {@link BrowserPick}
  */
 export function useBrowserPick(options: UseBrowserPickOptions): BrowserPick {
-  const { tabId, live, target, containerApi, projectPath, focusPage } = options
+  const { tabId, live, target, containerApi, projectPath, focusPage, openTargetMenu, startTerminal } = options
   const tab = useBrowserPickStore(s => (tabId === null ? IDLE_PICK : (s.byTab.get(tabId) ?? IDLE_PICK)))
   const capture = tab.capture
   const captureId = capture?.captureId ?? null
@@ -279,17 +283,20 @@ export function useBrowserPick(options: UseBrowserPickOptions): BrowserPick {
   const bannerAction = useCallback(
     (action: NonNullable<TargetBanner['action']>) => {
       if (action === 'openTerminal') {
-        // Opens the terminal panel, which starts a terminal; the panel or dialog stays (025-FR-061).
+        // A new terminal in the terminal panel: showing the panel starts one when it has none, and one
+        // whose shell exited is started again; the panel or dialog stays, focus stays here (025-FR-061).
         showTerminalPanel()
+        startTerminal()
         return
       }
       if (action === 'chooseTerminal') {
-        targetChosenAgain()
+        // The terminal menu; choosing a terminal there rewrites the banner (`targetChosenAgain`).
+        openTargetMenu()
         return
       }
       sendWith(dialogAction ?? 'explain', true)
     },
-    [targetChosenAgain, sendWith, dialogAction]
+    [openTargetMenu, startTerminal, sendWith, dialogAction]
   )
 
   const openCapture = useCallback(

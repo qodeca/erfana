@@ -22,6 +22,7 @@ import { registerAppWebContents } from '../../../ipc/appWebContents'
 import { redactedLogError } from '../../../utils/redactUserInput'
 import { logger } from '../../LoggingService'
 import { BrowserCdpSession } from '../cdp/BrowserCdpSession'
+import { electronPrintsSecurityWarnings } from '../cdp/cdpLogCollector'
 import { enablePageDialogEvents } from '../dialogs/pageDialogs'
 import type { PopupWindowFactory } from './BrowserPopups'
 import type { PopupCdpLink, PopupContents, PopupHost, PopupPageView } from './BrowserPopupWindow'
@@ -58,7 +59,7 @@ function loadPopupHost(host: PopupHost): void {
 
 /** Attach a popup-kind CDP session; a refused attach leaves the popup without one. */
 function attachPopupCdp(contents: PopupContents): PopupCdpLink | null {
-  const cdp = new BrowserCdpSession({ kind: 'popup' })
+  const cdp = new BrowserCdpSession({ kind: 'popup', dropElectronSecurityWarnings: electronPrintsSecurityWarnings(!is.dev, process.env) })
   try {
     cdp.attach(contents as unknown as WebContents)
   } catch (error) {

@@ -10,7 +10,7 @@ import { PickBench, PickFaults } from '../services/browser/pick/pickSupport'
 import { createBrowserPickTestHook } from './browserPickHook'
 
 function runtime() {
-  const tab = { id: 'browser-tab-1' }
+  const tab = { id: 'browser-tab-1', contents: { capturePage: vi.fn(async () => ({ toPNG: () => Buffer.from('png bytes') })) } }
   const capture = {
     id: 'c'.repeat(32),
     index: 2,
@@ -64,6 +64,20 @@ describe('createBrowserPickTestHook', () => {
     expect(picks.faults.takeEmptyCapture()).toBe(true)
     hook.resetFaults()
     expect(picks.faults.takeCaptureFailure()).toBe(false)
+  })
+
+  it('025-AC-034 sets and clears the live outline test colour, and gives the page as painted now', async () => {
+    const { rt, picks } = runtime()
+    const hook = createBrowserPickTestHook(() => rt)
+    hook.setHighlightColour({ r: 255, g: 0, b: 255, a: 1 })
+    expect(picks.faults.highlightColour()).toEqual({ r: 255, g: 0, b: 255, a: 1 })
+    hook.setHighlightColour(null)
+    expect(picks.faults.highlightColour()).toBeNull()
+    hook.setHighlightColour({ r: 1, g: 2, b: 3, a: 1 })
+    hook.resetFaults()
+    expect(picks.faults.highlightColour()).toBeNull()
+    expect(await hook.pagePng('browser-tab-1')).toBe(Buffer.from('png bytes').toString('base64'))
+    await expect(hook.pagePng('browser-tab-9')).rejects.toThrow('No browser tab browser-tab-9')
   })
 
   it('runs the expiry sweep on the main clock and reads and clears the bench', async () => {

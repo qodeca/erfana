@@ -224,6 +224,21 @@ describe('useBrowserKeys – toolbar focus and keys', () => {
     ])
   })
 
+  it('keeps toolbar focus while focus is in a menu the tab drew in the portal root (025-FR-030)', () => {
+    const portalRoot = document.createElement('div')
+    portalRoot.id = 'portal-root'
+    const item = document.createElement('div')
+    item.tabIndex = -1
+    item.setAttribute('role', 'menuitem')
+    portalRoot.appendChild(item)
+    document.body.appendChild(portalRoot)
+    render(<Harness api={makeGroup().api} />)
+    act(() => screen.getByRole('button', { name: 'Reload' }).focus())
+    act(() => item.focus())
+    expect(gateway.toolbarFocus.mock.calls).toEqual([['browser-tab-1', true]])
+    portalRoot.remove()
+  })
+
   it('ends a reported toolbar focus on unmount', () => {
     const { unmount } = render(<Harness api={makeGroup().api} />)
     act(() => screen.getByRole('button', { name: 'Reload' }).focus())

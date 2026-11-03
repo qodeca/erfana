@@ -8053,7 +8053,7 @@
       "quote": "the `main` project (today in `vitest.main.projects.ts`, `MAIN_INCLUDE`) includes every `src/main/**/*.test.{ts,tsx}`",
       "status": "fixed",
       "evidence": "source",
-      "source": "vitest.main.projects.ts:29",
+      "source": "vitest.main.projects.ts:30",
       "match": "const MAIN_INCLUDE = ['src/main/**/*.test.{ts,tsx}'",
       "note": "Said vitest.main.ts includes every src/main test; that file no longer exists – the include is MAIN_INCLUDE in vitest.main.projects.ts."
     },
@@ -8957,7 +8957,7 @@
       "quote": "none of the graph-engine files named on this page exist in `src/` on `develop`",
       "status": "fixed",
       "evidence": "source",
-      "source": "electron.vite.config.ts:247",
+      "source": "electron.vite.config.ts:249",
       "match": "index: resolve('src/main/index.ts')",
       "note": "Page had no status banner and read as a shipped plan; checked with test -e that GraphDatabaseService.ts, schema.sql, IndexingService.ts, SearchService.ts, graph-handlers.ts are absent"
     },
@@ -8988,7 +8988,7 @@
       "quote": "none of the graph-engine files named on this page exist in `src/` on `develop`",
       "status": "fixed",
       "evidence": "source",
-      "source": "electron.vite.config.ts:247",
+      "source": "electron.vite.config.ts:249",
       "match": "index: resolve('src/main/index.ts')",
       "note": "Page had no status banner; RelatedSidebar.tsx, GlobalSearch.tsx, GraphEngineService.ts, MCPServerService.ts are absent"
     },
@@ -8999,7 +8999,7 @@
       "quote": "none of the graph-engine files named on this page exist in `src/` on `develop`",
       "status": "fixed",
       "evidence": "source",
-      "source": "electron.vite.config.ts:247",
+      "source": "electron.vite.config.ts:249",
       "match": "index: resolve('src/main/index.ts')",
       "note": "Page had no status banner; embedder.worker.ts, EmbeddingService.ts are absent"
     },
@@ -9010,7 +9010,7 @@
       "quote": "none of the graph-engine files named on this page exist in `src/` on `develop`",
       "status": "fixed",
       "evidence": "source",
-      "source": "electron.vite.config.ts:247",
+      "source": "electron.vite.config.ts:249",
       "match": "index: resolve('src/main/index.ts')",
       "note": "Page had no status banner; EntityService.ts, GraphService.ts, GraphPanel.tsx are absent"
     },
@@ -9101,7 +9101,7 @@
       "quote": "`src/main/bootstrap/confineModulePaths.cjs` narrows module search paths",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:136",
+      "source": "electron.vite.config.ts:137",
       "match": "readFileSync(resolve('src/main/bootstrap/confineModulePaths.cjs')"
     },
     {
@@ -9141,7 +9141,7 @@
       "quote": "Moved to `generateBundle`, documented as a text-order check",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:156",
+      "source": "electron.vite.config.ts:157",
       "match": "generateBundle(_options, bundle): void {"
     },
     {
@@ -9426,7 +9426,7 @@
       "quote": "plus its own bundle entry (`electron.vite.config.ts:176`)",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:248",
+      "source": "electron.vite.config.ts:250",
       "match": "'git-status.worker': resolve('src/main/services/workers/git-status.worker.ts'),"
     },
     {
@@ -9436,7 +9436,7 @@
       "quote": "Add `services/preview/comments/commentParseWorker.ts` and its adapter",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:250",
+      "source": "electron.vite.config.ts:252",
       "match": "'comment-parse.worker': resolve('src/main/services/workers/comment-parse.worker.ts'),",
       "note": "Proposal from the spike; shipped since"
     },
@@ -11672,7 +11672,7 @@
       "quote": "`main-perf` takes exactly those files, with `fileParallelism: false` (one worker) and `sequence.groupOrder: 1`",
       "status": "verified",
       "evidence": "source",
-      "source": "vitest.main.projects.ts:80",
+      "source": "vitest.main.projects.ts:82",
       "match": "sequence: { groupOrder: 1 },"
     },
     {
@@ -11682,7 +11682,7 @@
       "quote": "`commentFileJobs.perf.test.ts`, `commentParse.perf.test.ts`, `commentAnchoring.perf.test.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "vitest.main.projects.ts:33",
+      "source": "vitest.main.projects.ts:34",
       "match": "export const PERF_TEST_PATTERN = '**/*.perf.test.*'"
     },
     {
@@ -11722,7 +11722,7 @@
       "quote": "`electron.vite.config.ts` registers an `assertSelfContainedPreloads()` plugin on the preload config",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:267",
+      "source": "electron.vite.config.ts:269",
       "match": "plugins: [assertSelfContainedPreloads()],"
     },
     {
@@ -11936,7 +11936,7 @@
       "quote": "Main process, five entries: `index`",
       "status": "fixed",
       "evidence": "source",
-      "source": "electron.vite.config.ts:250",
+      "source": "electron.vite.config.ts:252",
       "match": "'comment-parse.worker': resolve(",
       "note": "listed three main entries; comment-parse and preview-link-scan workers were missing"
     },
@@ -11947,7 +11947,7 @@
       "quote": "`preview-link-scan.worker` (~9 kB)",
       "status": "fixed",
       "evidence": "source",
-      "source": "electron.vite.config.ts:252",
+      "source": "electron.vite.config.ts:254",
       "match": "'preview-link-scan.worker': resolve(",
       "note": "entry was missing"
     },
@@ -11958,7 +11958,7 @@
       "quote": "Preload, four entries: ~38 kB `out/preload/index.js`",
       "status": "fixed",
       "evidence": "source",
-      "source": "electron.vite.config.ts:288",
+      "source": "electron.vite.config.ts:290",
       "match": "previewPage: resolve('src/preload/previewPage.ts')",
       "note": "sizes re-measured; previewPage now ~80 kB"
     },
@@ -11969,7 +11969,7 @@
       "quote": "`imageExport.html` is the hidden rasterize harness for image export",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:313",
+      "source": "electron.vite.config.ts:315",
       "match": "imageExport: resolve('src/renderer/imageExport.html')"
     },
     {
@@ -12110,7 +12110,7 @@
       "quote": "the `erfana:main-module-paths-confined` build check (in `generateBundle`)",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:150",
+      "source": "electron.vite.config.ts:151",
       "match": "name: 'erfana:main-module-paths-confined',"
     },
     {
@@ -12251,7 +12251,7 @@
       "quote": "// Do not set externalizeDeps: false here.",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:260",
+      "source": "electron.vite.config.ts:262",
       "match": "// Do not set externalizeDeps: false here."
     },
     {
@@ -12518,7 +12518,7 @@
       "quote": "previewPage: resolve('src/preload/previewPage.ts')",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:288",
+      "source": "electron.vite.config.ts:290",
       "match": "previewPage: resolve('src/preload/previewPage.ts')"
     },
     {
@@ -12528,7 +12528,7 @@
       "quote": "    externalizeDeps: false,  // Bundle all dependencies for sandbox compatibility",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:275",
+      "source": "electron.vite.config.ts:277",
       "match": "externalizeDeps: false,"
     },
     {
@@ -12559,7 +12559,7 @@
       "quote": "`out/preload/previewPage.js`: ~80 kB bundled",
       "status": "fixed",
       "evidence": "source",
-      "source": "electron.vite.config.ts:288",
+      "source": "electron.vite.config.ts:290",
       "match": "previewPage: resolve('src/preload/previewPage.ts')",
       "note": "previewPage bundle was missing from the size list; sizes re-measured"
     },
@@ -12792,7 +12792,7 @@
       "quote": "All four entries must be present.",
       "status": "fixed",
       "evidence": "source",
-      "source": "electron.vite.config.ts:284",
+      "source": "electron.vite.config.ts:286",
       "match": "imageExport: resolve('src/preload/imageExport.ts'),",
       "note": "said two preload entries"
     },
@@ -12803,7 +12803,7 @@
       "quote": "`main` + `main-perf` 514 (`src/main` 432 · `src/shared` 56 · `scripts` 26) · renderer 387 · preload 38",
       "status": "fixed",
       "evidence": "source",
-      "source": "vitest.main.projects.ts:29",
+      "source": "vitest.main.projects.ts:30",
       "match": "const MAIN_INCLUDE = ['src/main/**/*.test.{ts,tsx}'",
       "note": "test-file counts re-counted 2026-10-29 (were 2026-10-25 figures)"
     },
@@ -13556,7 +13556,7 @@
       "quote": "Runner: Vitest projects (`main`, `main-perf`, `preload`, `renderer`)",
       "status": "verified",
       "evidence": "source",
-      "source": "vitest.main.projects.ts:74",
+      "source": "vitest.main.projects.ts:76",
       "match": "name: 'main-perf',"
     },
     {
@@ -21679,7 +21679,7 @@
       "quote": "introduced exactly that map, `{ index, imageExport }`",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:313",
+      "source": "electron.vite.config.ts:315",
       "match": "imageExport: resolve('src/renderer/imageExport.html')"
     },
     {
@@ -25534,7 +25534,7 @@
       "quote": "src/main + src/shared + scripts (main-perf last)",
       "status": "verified",
       "evidence": "source",
-      "source": "vitest.main.projects.ts:29",
+      "source": "vitest.main.projects.ts:30",
       "match": "const MAIN_INCLUDE = ['src/main/**/*.test.{ts,tsx}', 'src/shared/**/*.test.{ts,tsx}', 'scripts/**/*.test.{js,mjs,ts}']"
     },
     {
@@ -46485,7 +46485,7 @@
       "quote": "// externalizeDeps defaults to true for main process (electron-vite convention).",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:257",
+      "source": "electron.vite.config.ts:259",
       "match": "// externalizeDeps defaults to true for main process (electron-vite convention)."
     },
     {
@@ -50630,7 +50630,7 @@
       "quote": "(main process, the git-status, comment-parse and preview-link-scan workers, and the DOCX utility process)",
       "status": "fixed",
       "evidence": "source",
-      "source": "electron.vite.config.ts:244",
+      "source": "electron.vite.config.ts:246",
       "match": "intro: confineModulePathsIntro",
       "note": "Listed three bundles; the intro is set on the main build output, whose inputs are five entries (index, git-status, comment-parse and preview-link-scan workers, docx-convert process, electron.vite.config.ts:175-182), and all five built files carry the marker. The source comment in confineModulePaths.cjs:31-35 still says three."
     },
@@ -50641,7 +50641,7 @@
       "quote": "Scope: this covers code in the five bundles that carry the intro;",
       "status": "fixed",
       "evidence": "source",
-      "source": "electron.vite.config.ts:252",
+      "source": "electron.vite.config.ts:254",
       "match": "'preview-link-scan.worker': resolve('src/main/services/preview/previewLinkScanWorker.ts'),",
       "note": "Was 'three bundles'; five main-process entries get the intro."
     },
@@ -50652,7 +50652,7 @@
       "quote": "for code in the five bundles that carry the intro",
       "status": "fixed",
       "evidence": "source",
-      "source": "electron.vite.config.ts:250",
+      "source": "electron.vite.config.ts:252",
       "match": "'comment-parse.worker': resolve('src/main/services/workers/comment-parse.worker.ts'),",
       "note": "Was 'three bundles'; five main-process entries get the intro."
     },
@@ -50683,7 +50683,7 @@
       "quote": "A build check fails if the confinement text does not come before a bundle's first dependency `require`.",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:166",
+      "source": "electron.vite.config.ts:167",
       "match": "dependency require (src/main/bootstrap/confineModulePaths.cjs). Relaxing this check is not a fix."
     },
     {
@@ -50864,7 +50864,7 @@
       "quote": "`assertSingleDompurify` in `electron.vite.config.ts` fails the renderer build",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:189",
+      "source": "electron.vite.config.ts:190",
       "match": "function assertSingleDompurify(): Plugin {"
     },
     {
@@ -50874,7 +50874,7 @@
       "quote": "or one older than 3.4.17",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:178",
+      "source": "electron.vite.config.ts:179",
       "match": "const MIN_DOMPURIFY = [3, 4, 17]"
     },
     {
@@ -51549,7 +51549,7 @@
       "quote": "the renderer build fails on an older or second copy",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:191",
+      "source": "electron.vite.config.ts:192",
       "match": "name: 'erfana:single-dompurify'"
     },
     {
@@ -55413,7 +55413,7 @@
       "quote": "The row reads **Picking – click an element**.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/BrowserPanel/pickRow.logic.ts:44",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/pickRow.logic.ts:69",
       "match": "if (label !== null) return { first: 'Picking – click an element', rest: [label] }"
     },
     {
@@ -55423,7 +55423,7 @@
       "quote": "**Parent element** and **Child element** (or <kbd>↑</kbd> and <kbd>↓</kbd>) move the pick",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/BrowserPanel/PromptActionsPanel.tsx:184",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/PromptActionsPanel.tsx:187",
       "match": "title=\"Parent element (↑)\""
     },
     {
@@ -55473,7 +55473,7 @@
       "quote": "with **Choose terminal**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/BrowserPanel/PromptActionsPanel.tsx:295",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/PromptActionsPanel.tsx:298",
       "match": "chooseTerminal: 'Choose terminal',"
     },
     {
@@ -55483,7 +55483,7 @@
       "quote": "it asks whether to **Send anyway**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/BrowserPanel/pickRow.logic.ts:158",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/pickRow.logic.ts:183",
       "match": "it may not be your agent. Send anyway?"
     },
     {

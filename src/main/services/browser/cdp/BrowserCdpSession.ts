@@ -87,6 +87,8 @@ export interface BrowserCdpSessionOptions {
   readonly failedRequestSource?: FailedRequestSource
   /** The identity every target gets before it runs (025-FR-024; default: this process's); `null` sends none. */
   readonly userAgent?: BrowserUserAgentOverride | null
+  /** Leave Electron's development security warnings out of the logs (`electronPrintsSecurityWarnings`; default off). */
+  readonly dropElectronSecurityWarnings?: boolean
 }
 
 interface TargetRecord extends CdpTargetInfo {
@@ -141,7 +143,7 @@ export class BrowserCdpSession {
     this.source = options.failedRequestSource ?? 'network'
     this.userAgent = options.userAgent === undefined ? currentBrowserUserAgentOverride() : options.userAgent
     this.buffer = new BrowserLogBuffer(this.clock)
-    this.collector = new CdpLogCollector(this.buffer, this.source)
+    this.collector = new CdpLogCollector(this.buffer, this.source, { dropElectronSecurityWarnings: options.dropElectronSecurityWarnings === true })
     this.probe = new BrowserHangProbe({
       clock: this.clock,
       evaluate: () => this.send('Runtime.evaluate', HANG_PROBE_EVALUATE_PARAMS),

@@ -179,6 +179,9 @@ export function useBrowserKeys(options: UseBrowserKeysOptions): BrowserKeyHandle
     (event: React.FocusEvent<HTMLElement>) => {
       const next = event.relatedTarget
       if (next instanceof Node && rootRef.current?.contains(next)) return
+      // A menu this tab opened (the panel's target menu) draws in the portal: focus there has not left the
+      // tab, and main must not close the open pick panel as if it had (025-FR-030).
+      if (next instanceof Element && next.closest('#portal-root') !== null) return
       report(null, false)
     },
     [rootRef, report]

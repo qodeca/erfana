@@ -19,6 +19,31 @@ export type PickPlace = 'page' | 'toolbar' | 'panel' | 'dialog' | 'out' | 'outPa
 
 export type { StatusNote }
 
+/** What decides where the banner says keyboard focus is. */
+export interface PickPlaceInput {
+  readonly surface: 'none' | 'panel' | 'dialog'
+  readonly pageFocused: boolean
+  /** Focus is in the tab's own controls (toolbar, panel, dialog). */
+  readonly toolbarFocused: boolean
+  /** Focus left the tab while the panel was open, which closed it (025-FR-065). */
+  readonly panelClosedOnLeave: boolean
+}
+
+/**
+ * Where keyboard focus is, as the banner names it (025-FR-065's table).
+ *
+ * @param input - {@link PickPlaceInput}
+ * @returns The place
+ */
+export function pickPlace(input: PickPlaceInput): PickPlace {
+  const { surface, pageFocused, toolbarFocused, panelClosedOnLeave } = input
+  if (surface === 'dialog') return toolbarFocused ? 'dialog' : 'outDialog'
+  if (surface === 'panel') return 'panel'
+  if (pageFocused) return 'page'
+  if (toolbarFocused) return 'toolbar'
+  return panelClosedOnLeave ? 'outPanelClosed' : 'out'
+}
+
 /** The banner: a first clause that never drops, then clauses that fold as room runs out. */
 export interface PickBanner {
   readonly first: string
