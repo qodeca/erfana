@@ -20,6 +20,9 @@ const bridge = (): BrowserTabBridge => (window as unknown as { api: { browserTab
 export const browserTabGateway: BrowserTabBridge = {
   create: (...args) => bridge().create(...args),
   close: (...args) => bridge().close(...args),
+  onTabClosed: (...args) => bridge().onTabClosed(...args),
+  onNewTabCommand: (...args) => bridge().onNewTabCommand(...args),
+  openExternal: (...args) => bridge().openExternal(...args),
   navigate: (...args) => bridge().navigate(...args),
   openLocalFile: (...args) => bridge().openLocalFile(...args),
   history: (...args) => bridge().history(...args),

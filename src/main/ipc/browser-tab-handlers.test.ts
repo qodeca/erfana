@@ -151,7 +151,7 @@ describe('registerBrowserTabHandlers', () => {
     expect(tab.history).toHaveBeenCalledWith('stop')
     expect(tab.focusPage).toHaveBeenCalled()
     expect(tab.devTools).toHaveBeenCalledWith({ x: 1, y: 2 })
-    expect(service.close).toHaveBeenCalledWith(3, TAB)
+    expect(service.close).toHaveBeenCalledWith(3, TAB, true)
     expect(tab.applyBounds).toHaveBeenCalledWith(rect, 4, false, rect)
   })
 

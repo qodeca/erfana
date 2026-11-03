@@ -16,8 +16,8 @@
  *   make the tab read as an editor tab. With no site icon the mark stands
  *   alone (the design's generic icon).
  * - Close, middle-click close and the shared tab context menu, as the
- *   preview tab has. Closing removes the panel; `EditorAreaSplitPanel`
- *   closes main's tab then.
+ *   preview tab has. Closing asks main first (the page may ask to stay,
+ *   025-FR-058); the editor tab goes when main reports the tab closed.
  */
 import { useCallback, useRef, useState, type MouseEvent } from 'react'
 import { Globe, LoaderCircle, X } from 'lucide-react'
@@ -27,6 +27,7 @@ import { isKeyboardMenuEcho } from '../ContextMenu/contextMenuKey'
 import { useTabContextMenu } from './useTabContextMenu'
 import { useTabMenuKey } from './useTabMenuKey'
 import { useBrowserTabStore } from '../../stores/useBrowserTabStore'
+import { requestBrowserPanelClose } from '../../services/browser/browserTabLifecycle'
 import type { BrowserPanelParams } from '../../utils/openBrowserTab'
 import { tabLabel, tabTooltip } from '../Panels/BrowserPanel/browserPanel.logic'
 import { browserShortcut } from '../Panels/BrowserPanel/browserShortcuts'
@@ -60,9 +61,9 @@ export function BrowserTab(props: IDockviewPanelHeaderProps<BrowserPanelParams>)
   const handleClose = useCallback(
     (event?: MouseEvent) => {
       event?.stopPropagation()
-      api.close()
+      requestBrowserPanelClose(panelId, () => api.close())
     },
-    [api]
+    [api, panelId]
   )
 
   const handleAuxClick = useCallback(

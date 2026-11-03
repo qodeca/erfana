@@ -22,6 +22,8 @@ describe('browserShortcut', () => {
     expect(browserShortcut('close')).toEqual({ label: '⌘W', aria: 'Meta+W' })
     expect(browserShortcut('pick')).toEqual({ label: '⌘E', aria: 'Meta+E' })
     expect(browserShortcut('devTools')).toEqual({ label: 'F12', aria: 'F12' })
+    expect(browserShortcut('zoomReset')).toEqual({ label: '⌘0', aria: 'Meta+0' })
+    expect(browserShortcut('find')).toEqual({ label: '⌘F', aria: 'Meta+F' })
   })
 
   it('names the Windows and Linux keys', () => {
@@ -30,5 +32,7 @@ describe('browserShortcut', () => {
     expect(browserShortcut('forward')).toEqual({ label: 'Alt+→', aria: 'Alt+ArrowRight' })
     expect(browserShortcut('reload')).toEqual({ label: 'Ctrl+R or F5', aria: 'Control+R' })
     expect(browserShortcut('pick')).toEqual({ label: 'Ctrl+E', aria: 'Control+E' })
+    expect(browserShortcut('zoomReset')).toEqual({ label: 'Ctrl+0', aria: 'Control+0' })
+    expect(browserShortcut('find')).toEqual({ label: 'Ctrl+F', aria: 'Control+F' })
   })
 })

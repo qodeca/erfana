@@ -15,6 +15,7 @@ import {
   CertificateRequestSchema,
   CloseRequestSchema,
   CreateRequestSchema,
+  OpenExternalRequestSchema,
   DevToolsRequestSchema,
   FocusOriginRequestSchema,
   FocusPageRequestSchema,
@@ -177,7 +178,9 @@ describe('browserTabBridge events', () => {
     ['onForwardedKey', E.forwardedKey],
     ['onPick', E.pick],
     ['onFindResult', E.findResult],
-    ['onContextMenu', E.contextMenu]
+    ['onContextMenu', E.contextMenu],
+    ['onTabClosed', E.tabClosed],
+    ['onNewTabCommand', E.newTabCommand]
   ] as const)('%s delivers events until unsubscribed', (member, channel) => {
     const callback = vi.fn()
     const unsubscribe = browserTabBridge[member](callback)
@@ -187,5 +190,21 @@ describe('browserTabBridge events', () => {
     ipc.emit(channel, { tabId: TAB })
     expect(callback).toHaveBeenCalledTimes(1)
     expect(ipc.removeListener).toHaveBeenCalledWith(channel, expect.any(Function))
+  })
+})
+
+describe('browserTabBridge commit 18 requests', () => {
+  it('close carries byUser only when given; openExternal carries url only when given', async () => {
+    ipc.invoke.mockResolvedValue(true)
+    expect(await browserTabBridge.close(TAB, false)).toBe(true)
+    await browserTabBridge.openExternal(TAB)
+    await browserTabBridge.openExternal(TAB, 'https://a.test/')
+    expect(ipc.invoke.mock.calls).toEqual([
+      [C.close, { tabId: TAB, byUser: false }],
+      [C.openExternal, { tabId: TAB }],
+      [C.openExternal, { tabId: TAB, url: 'https://a.test/' }]
+    ])
+    expect(CloseRequestSchema.safeParse(ipc.invoke.mock.calls[0]![1]).success).toBe(true)
+    expect(OpenExternalRequestSchema.safeParse(ipc.invoke.mock.calls[2]![1]).success).toBe(true)
   })
 })

@@ -75,7 +75,16 @@ export const BROWSER_TAB_EVENTS = {
   notice: 'browser-tab:notice',
   /** Main's answer to a `bounds` push that asked for an `ack`: what it did with the view (commit 16). */
   boundsApplied: 'browser-tab:boundsApplied',
-  findResult: 'browser-tab:findResult'
+  findResult: 'browser-tab:findResult',
+  /** A tab main held is gone (closed by the user, the page, Forget or a teardown) – commit 18. */
+  tabClosed: 'browser-tab:tabClosed',
+  /** The app menu's **New browser tab** (025-FR-001), to the focused main window only – commit 18. */
+  newTabCommand: 'browser-tab:newTabCommand'
+} as const
+
+/** Main → a popup's own host renderer: its committed address changed (commit 18). */
+export const BROWSER_TAB_POPUP_EVENTS = {
+  popupChanged: 'browser-tab:popupChanged'
 } as const
 
 export type BrowserTabChannel = (typeof BROWSER_TAB_CHANNELS)[keyof typeof BROWSER_TAB_CHANNELS]

@@ -63,6 +63,12 @@ interface ContextMenuProps {
   containerTestId?: string
   /** The menu's accessible name (Menu card: "Element" for a page element's menu) */
   ariaLabel?: string
+  /**
+   * A first line that is not an item (the browser's link menu names the
+   * link's host, spec 025 OD-12): never focusable, never an arrow stop or a
+   * typeahead match; it describes the menu.
+   */
+  header?: string
 }
 
 /** Typed characters within this many ms extend one typeahead search. */
@@ -131,7 +137,7 @@ function lastItem(items: ContextMenuItem[]): number {
  * )}
  * ```
  */
-export function ContextMenu({ x, y, items, onClose, containerTestId, ariaLabel }: ContextMenuProps) {
+export function ContextMenu({ x, y, items, onClose, containerTestId, ariaLabel, header }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
   // Stamped on mount by the click-outside effect below, on the events' own clock; 0 until then.
   const openTimeRef = useRef<number>(0)
@@ -369,6 +375,7 @@ export function ContextMenu({ x, y, items, onClose, containerTestId, ariaLabel }
       className="context-menu"
       role="menu"
       aria-label={ariaLabel}
+      aria-describedby={header === undefined ? undefined : `${idBase}-header`}
       // Focusable only so an EMPTY menu can still hold focus; with items the
       // roving stop is always an item.
       tabIndex={-1}
@@ -381,6 +388,11 @@ export function ContextMenu({ x, y, items, onClose, containerTestId, ariaLabel }
         opacity: 0
       }}
     >
+      {header !== undefined && (
+        <div id={`${idBase}-header`} className="context-menu-header" role="presentation">
+          {header}
+        </div>
+      )}
       {items.map((item, index) =>
         item.separator ? (
           <div

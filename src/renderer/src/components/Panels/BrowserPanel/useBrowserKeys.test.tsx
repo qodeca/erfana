@@ -22,6 +22,11 @@ const openBrowserTab = vi.hoisted(() => vi.fn())
 vi.mock('../../../services/browserTabGateway', () => ({ browserTabGateway: gateway }))
 vi.mock('../../../utils/openBrowserTab', () => ({ openBrowserTab }))
 vi.mock('../../../utils/logger', () => ({ logger: { warn: vi.fn(), debug: vi.fn() } }))
+const lifecycle = vi.hoisted(() => ({
+  requestBrowserPanelClose: vi.fn((_panelId: string, removePanel: () => void) => removePanel())
+}))
+vi.mock('../../../services/browser/browserTabLifecycle', () => lifecycle)
+const openFind = vi.hoisted(() => vi.fn())
 
 import { useBrowserKeys, type UseBrowserKeysOptions } from './useBrowserKeys'
 import { logger } from '../../../utils/logger'
@@ -47,6 +52,8 @@ function Harness(props: Overrides & { api: UseBrowserKeysOptions['api'] }): JSX.
   const navRef = useRef<HTMLDivElement>(null)
   const keys = useBrowserKeys({
     tabId: props.tabId === undefined ? 'browser-tab-1' : props.tabId,
+    panelId: 'browser-panel-1',
+    openFind,
     api: props.api,
     containerApi: {} as DockviewApi,
     rootRef,
@@ -100,6 +107,8 @@ describe('useBrowserKeys – forwarded keys', () => {
     send('devTools')
     expect(gateway.devTools).toHaveBeenCalledWith('browser-tab-1')
     send('closeTab')
+    // The user's close asks main first (025-FR-058); the lifecycle removes the editor tab.
+    expect(lifecycle.requestBrowserPanelClose).toHaveBeenCalledWith('browser-panel-1', expect.any(Function))
     expect(api.close).toHaveBeenCalledOnce()
     send('newTab')
     expect(openBrowserTab).toHaveBeenCalledOnce()
@@ -108,8 +117,9 @@ describe('useBrowserKeys – forwarded keys', () => {
     send('previousEditorTab')
     expect(panels[2].api.setActive).toHaveBeenCalled()
     send('find')
+    expect(openFind).toHaveBeenCalledOnce()
     send('focusPanel')
-    expect(logger.debug).toHaveBeenCalledTimes(2)
+    expect(logger.debug).toHaveBeenCalledTimes(1)
   })
 
   it('logs a failed action, and does not switch tabs in a group of one', async () => {

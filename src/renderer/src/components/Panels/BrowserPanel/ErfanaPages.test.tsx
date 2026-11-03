@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, createEvent, fireEvent, render, screen } from '@testing-library/react'
 
 const gateway = vi.hoisted(() => ({
   suggest: vi.fn(),
@@ -85,10 +85,13 @@ describe('LoadErrorPage', () => {
     const state = browserState({
       erfanaPage: 'loadError',
       loadError: { code: -102, focus: 'reload' },
-      committedUrl: 'http://localhost:9/'
+      committedUrl: 'http://localhost:9/',
+      origin: { kind: 'web', scheme: 'http', subdomain: '', registrableDomain: 'localhost', port: '9', punycode: false }
     })
     render(<LoadErrorPage tabId="browser-tab-1" state={state} mayTakeFocus={() => true} />)
-    expect(screen.getByRole('heading', { name: "Can't open this page" })).toBeInTheDocument()
+    // Commit 18: the per-code title and the loopback hint in place of the next step.
+    expect(screen.getByRole('heading', { name: 'localhost refused to connect' })).toBeInTheDocument()
+    expect(screen.getByText(/Is your dev server running\?/)).toBeInTheDocument()
     expect(screen.getByText(/ERR_CONNECTION_REFUSED \(-102\)/)).toHaveTextContent(
       'http://localhost:9 · '
     )
@@ -154,7 +157,8 @@ describe('CertificatePage', () => {
     )
     const back = screen.getByRole('button', { name: 'Back to safety' })
     expect(back).toHaveFocus()
-    expect(screen.queryByRole('button', { name: /Proceed/ })).not.toBeInTheDocument()
+    // Commit 18: Proceed anyway shows at once, in its guard look just after the page appears.
+    expect(screen.getByRole('button', { name: 'Proceed anyway to staging.test' })).toHaveAttribute('aria-disabled', 'true')
     gateway.certificate.mockRejectedValueOnce(new Error('gone'))
     fireEvent.click(back)
     expect(gateway.certificate).toHaveBeenCalledWith({
@@ -163,6 +167,47 @@ describe('CertificatePage', () => {
       proceed: false
     })
     await vi.waitFor(() => expect(logger.warn).toHaveBeenCalled())
+  })
+
+  it('blocks Proceed anyway for 500 ms and ignores a press begun before the page, then proceeds', () => {
+    vi.useFakeTimers()
+    let now = 5000
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => now)
+    try {
+      render(
+        <CertificatePage
+          tabId="browser-tab-1"
+          state={browserState({ erfanaPage: 'certificate', certificate })}
+          mayTakeFocus={() => false}
+        />
+      )
+      const proceed = screen.getByRole('button', { name: 'Proceed anyway to staging.test' })
+      expect(proceed).toHaveAccessibleDescription(/for staging\.test for 7 days/)
+      const downAt = (at: number): void => {
+        const event = createEvent.pointerDown(proceed)
+        Object.defineProperty(event, 'timeStamp', { value: at })
+        fireEvent(proceed, event)
+      }
+      downAt(now)
+      fireEvent.click(proceed)
+      expect(gateway.certificate).not.toHaveBeenCalled()
+      downAt(now - 1)
+      now += 500
+      act(() => {
+        vi.advanceTimersByTime(500)
+      })
+      expect(proceed).not.toHaveAttribute('aria-disabled')
+      fireEvent.click(proceed)
+      expect(gateway.certificate).not.toHaveBeenCalled()
+      downAt(now)
+      fireEvent.click(proceed)
+      expect(gateway.certificate).toHaveBeenCalledWith({ tabId: 'browser-tab-1', decisionId: 'd-1', proceed: true })
+      expect(screen.getByText('More about this error')).toBeInTheDocument()
+      expect(screen.getByText('ERR_CERT_AUTHORITY_INVALID (-202)')).toBeInTheDocument()
+    } finally {
+      clock.mockRestore()
+      vi.useRealTimers()
+    }
   })
 
   it('renders nothing without the warning parts', () => {

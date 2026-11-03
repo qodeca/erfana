@@ -12,16 +12,22 @@
  *   bar), never to the document.
  * - **Reload becomes Stop** while a page loads; Stop has no key (R5-M5).
  * - **DevTools** is not a toggle: its name says "Show DevTools" while open.
+ * - **Open in system browser** (025-FR-057): `aria-disabled` with "Opening…"
+ *   while the request runs; disabled with no page.
+ * - **More** is always shown (OD-22) and is the row's last control.
+ * - The address bar's chips (zoom, pop-up blocked, in use) sit at its end.
  *
- * Not in this commit: Open in system browser (no `openExternal` on the
- * bridge yet), More and its menu, the zoom and pop-up chips (commit 18).
+ * The fold order of § States › Tiers is not built yet: at narrow widths the
+ * address field shrinks and every tool stays on the row.
  */
-import { forwardRef, useEffect, useId, useRef } from 'react'
-import { ArrowLeft, ArrowRight, RotateCw, CodeXml, X } from 'lucide-react'
+import { forwardRef, useEffect, useId, useRef, useState } from 'react'
+import { ArrowLeft, ArrowRight, RotateCw, CodeXml, ExternalLink, X } from 'lucide-react'
 import type { BrowserTabState } from '../../../stores/useBrowserTabStore'
 import { AddressBar } from './AddressBar'
 import { navGroupDescription } from './browserPanel.logic'
 import { browserShortcut } from './browserShortcuts'
+import { MoreMenu, type MoreMenuActions } from './MoreMenu'
+import { sentenceHost } from './erfanaPageCopy'
 
 /** Props for {@link NavigationRow}. */
 export interface NavigationRowProps {
@@ -37,6 +43,11 @@ export interface NavigationRowProps {
   readonly onAddressEscape: () => void
   readonly onAddressEdit: () => void
   readonly errorId: string | null
+  /** **Open in system browser**; resolves when main answered. */
+  readonly onOpenInSystemBrowser: () => Promise<void>
+  readonly moreActions: MoreMenuActions
+  /** The address bar's chips. */
+  readonly chips?: React.ReactNode
 }
 
 const TOOL_ICON = { size: 16, strokeWidth: 2, 'aria-hidden': true } as const
@@ -83,6 +94,15 @@ export const NavigationRow = forwardRef<HTMLDivElement, NavigationRowProps>(
     const reload = browserShortcut('reload')
     const devTools = browserShortcut('devTools')
     const devToolsName = devToolsOpen ? 'Show DevTools' : 'DevTools'
+    const live = state !== null && state.erfanaPage === null && state.committedUrl !== null
+    const [opening, setOpening] = useState(false)
+    const openExternal = (): void => {
+      if (opening || !live) return
+      setOpening(true)
+      void props.onOpenInSystemBrowser().finally(() => setOpening(false))
+    }
+    const systemName = opening ? 'Opening…' : 'Open in system browser'
+    const systemTitle = opening || !live ? systemName : `Open ${sentenceHost(state?.origin ?? null)} in your system browser`
 
     return (
       <div
@@ -154,9 +174,20 @@ export const NavigationRow = forwardRef<HTMLDivElement, NavigationRowProps>(
           onEscape={props.onAddressEscape}
           onEdit={props.onAddressEdit}
           errorId={errorId}
-        />
+        >
+          {props.chips}
+        </AddressBar>
         <button
-          ref={lastToolRef}
+          type="button"
+          className="erf-brw-tool"
+          aria-label={systemName}
+          title={systemTitle}
+          aria-disabled={opening || !live ? true : undefined}
+          onClick={openExternal}
+        >
+          <ExternalLink {...TOOL_ICON} />
+        </button>
+        <button
           type="button"
           className="erf-brw-tool"
           aria-label={devToolsName}
@@ -166,6 +197,14 @@ export const NavigationRow = forwardRef<HTMLDivElement, NavigationRowProps>(
         >
           <CodeXml {...TOOL_ICON} />
         </button>
+        <MoreMenu
+          buttonRef={lastToolRef}
+          actions={props.moreActions}
+          zoomPercent={state?.zoomPercent ?? 100}
+          widthPreset={state?.widthPreset ?? 'full'}
+          live={live}
+          devToolsOpen={devToolsOpen}
+        />
       </div>
     )
   }

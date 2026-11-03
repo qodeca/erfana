@@ -15,8 +15,8 @@
  *   renderer may use only the `browser-tab:popup*` channels. It reserves
  *   {@link BrowserPopupWindowDeps.stripHeight} above the page for the popup's
  *   origin strip and prompt rows, so the requested content size is the
- *   page's. The strip's renderer arrives with the browser UI (commit 18);
- *   until then the host loads nothing and the strip height is 0.
+ *   page's. The host loads the strip's renderer (`loadHost`, commit 18) and
+ *   is told `browser-tab:popupChanged` after each commit.
  * - **Size and position** (`windowFeatures.ts`): the requested content size,
  *   clamped; every requested position ignored, so the popup opens where the
  *   operating system (Electron: centred) puts it. A window larger than the
@@ -35,6 +35,7 @@
  *   No leave-page prompt when Erfana closes it (S-31).
  */
 import type { NavigationSource } from '../../../../shared/ipc/browser-tab-schema'
+import { BROWSER_TAB_POPUP_EVENTS } from '../../../../shared/ipc/browser-tab-channels'
 import { popupWindowTitle, type RegistrableDomainResolver } from '../../../../shared/browser/originFormat'
 import { logger } from '../../LoggingService'
 import { checkNavigation, type AppAddresses, type FrameKind } from '../browserNavigationPolicy'
@@ -70,7 +71,13 @@ export interface PopupPageView {
 /** The popup's host window (an Electron `BrowserWindow`). */
 export interface PopupHost {
   readonly id: number
-  readonly webContents: { readonly id: number; isDestroyed(): boolean; once(event: 'destroyed', listener: () => void): unknown }
+  readonly webContents: {
+    readonly id: number
+    isDestroyed(): boolean
+    once(event: 'destroyed', listener: () => void): unknown
+    /** Tells the host's strip renderer that the committed address changed (commit 18). */
+    send?(channel: string, payload: unknown): void
+  }
   readonly contentView: { addChildView(view: never): void }
   isDestroyed(): boolean
   setTitle(title: string): void
@@ -118,6 +125,8 @@ export interface BrowserPopupWindowDeps {
   readonly createView: (contents: PopupContents) => PopupPageView
   /** Register the host's renderer as an Erfana window of kind `browserPopup`. */
   readonly registerHost: (host: PopupHost) => void
+  /** Load the origin strip's renderer into the host (commit 18); without it the strip area stays empty. */
+  readonly loadHost?: (host: PopupHost) => void
   /** The window-open handler of the popup's own page (025-FR-011: a popup's opens follow the same rules). */
   readonly windowOpenHandler: (contents: PopupContents) => unknown
   /** Attach the popup-kind CDP session before the popup's first load; `null` without one. */
@@ -149,6 +158,7 @@ export class BrowserPopupWindow {
       title: popupWindowTitle(null, deps.openerUrl, deps.resolveDomain)
     })
     deps.registerHost(this.host)
+    deps.loadHost?.(this.host)
     this.view = deps.createView(deps.contents)
     this.host.contentView.addChildView(this.view as never)
     this.placeView()
@@ -220,7 +230,10 @@ export class BrowserPopupWindow {
     contents.once('destroyed', () => this.close())
     contents.on('did-navigate', (_event: unknown, url: unknown) => {
       this.committedUrl = typeof url === 'string' && url !== '' ? url : null
-      if (!this.host.isDestroyed()) this.host.setTitle(popupWindowTitle(this.committedUrl, this.deps.openerUrl, this.deps.resolveDomain))
+      if (this.host.isDestroyed()) return
+      this.host.setTitle(popupWindowTitle(this.committedUrl, this.deps.openerUrl, this.deps.resolveDomain))
+      // The strip asks `popupStrip` again; the payload names nothing.
+      if (!this.host.webContents.isDestroyed()) this.host.webContents.send?.(BROWSER_TAB_POPUP_EVENTS.popupChanged, {})
     })
     contents.on('content-bounds-updated', (event: unknown, bounds: unknown) => {
       // A page may not move its window; its size is re-clamped (ADR 0011 decision 9).

@@ -45,11 +45,8 @@ import type { Session, WebContents, WebContentsView } from 'electron'
 import { BROWSER_TAB_EVENTS } from '../../../shared/ipc/browser-tab-channels'
 import {
   FindResultEventSchema,
-  FocusEventSchema,
   ContextMenuEventSchema,
-  ForwardedKeyEventSchema,
   NoticeEventSchema,
-  PickEventSchema,
   StripEventSchema,
   TabAddedEventSchema,
   TabStateEventSchema,
@@ -61,7 +58,6 @@ import {
   type StripAnswer,
   type TabStateEvent
 } from '../../../shared/ipc/browser-tab-schema'
-import type { Clock } from '../../../shared/clock'
 import type { RegistrableDomainResolver } from '../../../shared/browser/originFormat'
 import { pathToFileURL } from 'node:url'
 import { isSamePath } from '../../utils/pathCompare'
@@ -76,8 +72,8 @@ import type { BrowserSite, TabSiteLink } from './permissions/BrowserSite'
 import type { AnswerResult, StripFields } from './permissions/tabStrip'
 import type { CertificateAnswerResult } from './site/browserCertificates'
 import { AppWindowBrowserKeys } from './input/appWindowBrowserKeys'
-import { BrowserTabInput } from './input/BrowserTabInput'
-import type { MacAppKeyTargets } from './input/macAppRoles'
+import type { BrowserTabInput } from './input/BrowserTabInput'
+import { newTabInput, type TabInputSetup } from './input/tabInputFactory'
 import type { BrowserPages } from './page/BrowserPages'
 import type { BrowserTabPage, PageHangSource } from './page/BrowserTabPage'
 import { decorateTabState } from './page/tabPageState'
@@ -85,18 +81,14 @@ import type { ClipView } from './page/TabViewFrame'
 import { TabPageExtras, type TabPageExtrasSetup } from './dialogs/TabPageExtras'
 import type { ContextActionResult } from './contextMenu/TabContextMenu'
 import type { z } from 'zod'
+import { TabClosedEventSchema } from '../../../shared/ipc/browser-tab-chrome-schema'
+import { KeyringStrip, type KeyringStripSetup } from './site/keyringStrip'
+import { sendTabEvent } from './tabEventSend'
 
 /** A tab's CDP link, with the hang probe's events for the page features when the session has them. */
 export type TabCdpLink = BrowserTabCdpLink & Partial<PageHangSource>
 
-/** What each tab's input routing needs (`input/BrowserTabInput.ts`). */
-export interface TabInputSetup {
-  /** `process.platform`. */
-  readonly platform: string
-  readonly clock: Pick<Clock, 'now'>
-  /** Where the macOS application keys act for a tab in `host`. */
-  readonly macAppKeys: (host: TabHost) => MacAppKeyTargets
-}
+export type { TabInputSetup } from './input/tabInputFactory'
 
 /** What `openForTab` hands back that a tab needs. */
 export interface TabProfile {
@@ -130,6 +122,8 @@ export interface BrowserTabServiceDeps {
   readonly local?: TabLocalFiles & Pick<LocalFileServers, 'open' | 'releaseTab'>
   /** Window open, the leave-page prompt and the right-click menu (commits 12e–g); without it window opens are denied. */
   readonly extras?: TabPageExtrasSetup
+  /** The keyring notices of the project's first tab in this run (025-FR-018); without it none show. */
+  readonly keyring?: KeyringStripSetup
 }
 
 /** The sources a local file opens from (`LOCAL_FILE_SOURCES`). */
@@ -145,6 +139,7 @@ export class BrowserTabService {
   private readonly inputOf = new WeakMap<BrowserTab, BrowserTabInput>()
   private readonly pageOf = new WeakMap<BrowserTab, BrowserTabPage>()
   private readonly extrasOf = new WeakMap<BrowserTab, TabPageExtras>()
+  private readonly keyringOf = new WeakMap<BrowserTab, KeyringStrip>()
   private readonly windowKeys = new Map<number, AppWindowBrowserKeys>()
   private counter = 0
 
@@ -167,6 +162,11 @@ export class BrowserTabService {
     const tab = this.openTab(host, panelId, profile, project.caseSensitive)
     // The empty tab's first state: no address, Back and Forward disabled.
     this.sendState(tab)
+    if (this.deps.keyring !== undefined) {
+      const keyring = new KeyringStrip(tab.id, (e) => sendTabEvent(host, BROWSER_TAB_EVENTS.strip, StripEventSchema, e), this.deps.keyring)
+      this.keyringOf.set(tab, keyring)
+      void keyring.start()
+    }
     return { tabId: tab.id }
   }
 
@@ -188,7 +188,7 @@ export class BrowserTabService {
       this.closeTab(tab)
       return null
     }
-    this.send(host, BROWSER_TAB_EVENTS.tabAdded, TabAddedEventSchema, { tabId: tab.id, openerTabId, background })
+    sendTabEvent(host, BROWSER_TAB_EVENTS.tabAdded, TabAddedEventSchema, { tabId: tab.id, openerTabId, background })
     return tab.id
   }
 
@@ -242,7 +242,11 @@ export class BrowserTabService {
   ): AnswerResult | null {
     const tab = this.tabOf(windowId, tabId)
     if (tab === null) return null
-    const own = this.pageOf.get(tab)?.answerStrip(requestId, answer) ?? this.extrasOf.get(tab)?.answerStrip(requestId, answer) ?? null
+    const own =
+      this.pageOf.get(tab)?.answerStrip(requestId, answer) ??
+      this.extrasOf.get(tab)?.answerStrip(requestId, answer) ??
+      this.keyringOf.get(tab)?.answer(requestId, answer) ??
+      null
     if (own !== null) return own
     return this.siteOf.get(tab)?.answerStrip(requestId, answer, fields) ?? 'unknown'
   }
@@ -301,7 +305,7 @@ export class BrowserTabService {
     if (host === undefined || host.isDestroyed()) return
     const tab = this.openTab(host, null, { projectRoot: opener.projectRoot, session: opener.contents.session }, opener.caseSensitive)
     if ('refused' in tab.navigate(url, 'contextMenuLink')) return this.closeTab(tab)
-    this.send(host, BROWSER_TAB_EVENTS.tabAdded, TabAddedEventSchema, { tabId: tab.id, openerTabId: opener.id, background: false })
+    sendTabEvent(host, BROWSER_TAB_EVENTS.tabAdded, TabAddedEventSchema, { tabId: tab.id, openerTabId: opener.id, background: false })
   }
 
   /** `browser-tab:contextAction` on `tabId` from `windowId`; `null` when the window does not own the tab. */
@@ -310,13 +314,18 @@ export class BrowserTabService {
     return tab === null ? null : (this.extrasOf.get(tab)?.contextAction(request.menuId, request.action) ?? 'unknown')
   }
 
-  /** The user closes `tabId` of `windowId`: the page may ask to stay (025-FR-058). */
-  close(windowId: number, tabId: string): void {
+  /**
+   * Close `tabId` of `windowId`. The user's close lets the page ask to stay
+   * (025-FR-058); `byUser: false` (the editor tab is already gone) never asks
+   * (S-31). Returns whether the window holds the tab; `tabClosed` follows once it is gone.
+   */
+  close(windowId: number, tabId: string, byUser = true): boolean {
     const tab = this.tabOf(windowId, tabId)
-    if (tab === null) return
+    if (tab === null) return false
     const extras = this.extrasOf.get(tab)
-    if (extras === undefined) this.closeTab(tab)
+    if (extras === undefined || !byUser) this.closeTab(tab)
     else extras.closeByUser()
+    return true
   }
 
   /** Close every tab of a window that is closing. */
@@ -363,8 +372,8 @@ export class BrowserTabService {
     this.hostOf.set(tab, host)
     input = this.attachInput(tab, host)
     const site = this.deps.site?.attachTab(tab, {
-      strip: (event) => this.send(host, BROWSER_TAB_EVENTS.strip, StripEventSchema, event),
-      notice: (event) => this.send(host, BROWSER_TAB_EVENTS.notice, NoticeEventSchema, event),
+      strip: (event) => sendTabEvent(host, BROWSER_TAB_EVENTS.strip, StripEventSchema, event),
+      notice: (event) => sendTabEvent(host, BROWSER_TAB_EVENTS.notice, NoticeEventSchema, event),
       parentWindow: () => (host.isDestroyed() ? null : host)
     })
     if (site !== undefined) this.siteOf.set(tab, site)
@@ -380,8 +389,8 @@ export class BrowserTabService {
     const extras = new TabPageExtras(
       tab,
       {
-        strip: (event) => this.send(host, BROWSER_TAB_EVENTS.strip, StripEventSchema, event),
-        contextMenu: (event) => this.send(host, BROWSER_TAB_EVENTS.contextMenu, ContextMenuEventSchema, event),
+        strip: (event) => sendTabEvent(host, BROWSER_TAB_EVENTS.strip, StripEventSchema, event),
+        contextMenu: (event) => sendTabEvent(host, BROWSER_TAB_EVENTS.contextMenu, ContextMenuEventSchema, event),
         openTab: (url, background, adopt) => this.createFromPage(tab.id, url, background, adopt) !== null,
         openLink: (url) => this.openLinkTab(tab, url),
         forceClose: () => this.closeTab(tab),
@@ -404,8 +413,8 @@ export class BrowserTabService {
     const page = pages.attachTab(
       tab,
       {
-        strip: (event) => this.send(host, BROWSER_TAB_EVENTS.strip, StripEventSchema, event),
-        findResult: (event) => this.send(host, BROWSER_TAB_EVENTS.findResult, FindResultEventSchema, event),
+        strip: (event) => sendTabEvent(host, BROWSER_TAB_EVENTS.strip, StripEventSchema, event),
+        findResult: (event) => sendTabEvent(host, BROWSER_TAB_EVENTS.findResult, FindResultEventSchema, event),
         stateChanged: () => this.sendState(tab),
         endPick: () => this.inputOf.get(tab)?.dispatch({ type: 'endSilently' })
       },
@@ -418,20 +427,7 @@ export class BrowserTabService {
   private attachInput(tab: BrowserTab, host: TabHost): BrowserTabInput | null {
     const setup = this.deps.input
     if (setup === undefined) return null
-    const tabId = tab.id
-    const input = new BrowserTabInput({
-      tabId,
-      contents: tab.contents,
-      platform: setup.platform,
-      clock: setup.clock,
-      macAppKeys: setup.macAppKeys(host),
-      zoom: (step) => this.pageOf.get(tab)?.zoom(step),
-      events: {
-        forwardedKey: (action) => this.send(host, BROWSER_TAB_EVENTS.forwardedKey, ForwardedKeyEventSchema, { tabId, action }),
-        pageFocus: (pageFocused) => this.send(host, BROWSER_TAB_EVENTS.focus, FocusEventSchema, { tabId, pageFocused }),
-        pick: (event) => this.send(host, BROWSER_TAB_EVENTS.pick, PickEventSchema, event)
-      }
-    })
+    const input = newTabInput(tab, host, setup, (step) => this.pageOf.get(tab)?.zoom(step))
     this.inputOf.set(tab, input)
     if (!this.windowKeys.has(host.id) && !host.webContents.isDestroyed()) {
       this.windowKeys.set(host.id, new AppWindowBrowserKeys(host.webContents, setup.platform))
@@ -455,7 +451,14 @@ export class BrowserTabService {
   }
 
   private forget(tab: BrowserTab): void {
-    if (this.tabs.get(tab.id) === tab) this.tabs.delete(tab.id)
+    if (this.tabs.get(tab.id) === tab) {
+      this.tabs.delete(tab.id)
+      // The owning window removes the editor tab only now (commit 18).
+      const host = this.hostOf.get(tab)
+      if (host !== undefined) sendTabEvent(host, BROWSER_TAB_EVENTS.tabClosed, TabClosedEventSchema, { tabId: tab.id })
+    }
+    this.keyringOf.get(tab)?.detach()
+    this.keyringOf.delete(tab)
     this.deps.local?.releaseTab(tab.id)
     this.siteOf.get(tab)?.detach()
     this.siteOf.delete(tab)
@@ -480,21 +483,6 @@ export class BrowserTabService {
 
   private sendState(tab: BrowserTab): void {
     const host = this.hostOf.get(tab)
-    if (host !== undefined) this.send(host, BROWSER_TAB_EVENTS.state, TabStateEventSchema, this.stateOf(tab))
-  }
-
-  /** Send `payload` to the owning window only, after checking it against its schema. */
-  private send(
-    host: TabHost,
-    channel: string,
-    schema: { safeParse(value: unknown): { success: boolean } },
-    payload: unknown
-  ): void {
-    if (host.isDestroyed() || host.webContents.isDestroyed()) return
-    if (!schema.safeParse(payload).success) {
-      logger.error('Dropped a browser tab event that does not match its schema', undefined, { channel })
-      return
-    }
-    host.webContents.send(channel, payload)
+    if (host !== undefined) sendTabEvent(host, BROWSER_TAB_EVENTS.state, TabStateEventSchema, this.stateOf(tab))
   }
 }

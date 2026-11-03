@@ -14,7 +14,14 @@ vi.mock('../../utils/logger', () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }
 }))
 
-import { closeBrowserTab, ensureBrowserTab, resetBrowserTabLifecycle } from './browserTabLifecycle'
+import {
+  browserTabClosedByMain,
+  closeBrowserTab,
+  ensureBrowserTab,
+  requestBrowserPanelClose,
+  resetBrowserTabLifecycle
+} from './browserTabLifecycle'
+import { useBrowserChromeStore } from '../../stores/useBrowserChromeStore'
 import { useBrowserTabStore } from '../../stores/useBrowserTabStore'
 import { logger } from '../../utils/logger'
 
@@ -76,7 +83,7 @@ describe('ensureBrowserTab', () => {
     closeBrowserTab('browser-panel-1')
     answer({ tabId: 'browser-tab-3' })
     await expect(pending).resolves.toEqual({ error: 'The tab closed' })
-    expect(gateway.close).toHaveBeenCalledWith('browser-tab-3')
+    expect(gateway.close).toHaveBeenCalledWith('browser-tab-3', false)
     expect(views.register).not.toHaveBeenCalled()
     expect(store().closing.size).toBe(0)
   })
@@ -93,7 +100,8 @@ describe('closeBrowserTab', () => {
     closeBrowserTab('browser-panel-1')
     unsubscribe()
     expect(order).toEqual(['covered', 'unregister'])
-    expect(gateway.close).toHaveBeenCalledWith('browser-tab-1')
+    // The editor tab is already gone: Erfana's close, which never asks (S-31).
+    expect(gateway.close).toHaveBeenCalledWith('browser-tab-1', false)
     expect(store().tabOf('browser-panel-1')).toBeNull()
   })
 
@@ -107,5 +115,59 @@ describe('closeBrowserTab', () => {
     gateway.close.mockRejectedValue(new Error('gone'))
     closeBrowserTab('browser-panel-1')
     await vi.waitFor(() => expect(logger.error).toHaveBeenCalled())
+  })
+})
+
+describe('requestBrowserPanelClose (commit 18)', () => {
+  it('asks main and keeps the editor tab until main reports the tab gone', async () => {
+    await ensureBrowserTab('browser-panel-1')
+    gateway.close.mockResolvedValue(true)
+    const remove = vi.fn()
+    requestBrowserPanelClose('browser-panel-1', remove)
+    expect(gateway.close).toHaveBeenCalledWith('browser-tab-1')
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(remove).not.toHaveBeenCalled()
+    expect(store().closing.has('browser-panel-1')).toBe(false)
+  })
+
+  it('removes the editor tab at once when main holds no tab, the request fails, or nothing is hosted', async () => {
+    await ensureBrowserTab('browser-panel-1')
+    gateway.close.mockResolvedValue(false)
+    const remove = vi.fn()
+    requestBrowserPanelClose('browser-panel-1', remove)
+    await vi.waitFor(() => expect(remove).toHaveBeenCalledTimes(1))
+    gateway.close.mockRejectedValue(new Error('gone'))
+    requestBrowserPanelClose('browser-panel-1', remove)
+    await vi.waitFor(() => expect(remove).toHaveBeenCalledTimes(2))
+    requestBrowserPanelClose('browser-panel-404', remove)
+    expect(remove).toHaveBeenCalledTimes(3)
+  })
+})
+
+describe('browserTabClosedByMain (commit 18)', () => {
+  it('covers the page first, removes the editor tab and does not close the tab again', async () => {
+    await ensureBrowserTab('browser-panel-1')
+    useBrowserChromeStore.getState().applyFind({ tabId: 'browser-tab-1', active: 1, total: 1 })
+    const order: string[] = []
+    const removePanel = vi.fn((panelId: string) => {
+      order.push(store().closing.has(panelId) ? 'covered-then-removed' : 'removed')
+      closeBrowserTab(panelId) // dockview's onDidRemovePanel
+    })
+    browserTabClosedByMain('browser-tab-1', removePanel)
+    expect(order).toEqual(['covered-then-removed'])
+    expect(gateway.close).not.toHaveBeenCalled()
+    expect(store().tabOf('browser-panel-1')).toBeNull()
+    expect(useBrowserChromeStore.getState().find.has('browser-tab-1')).toBe(false)
+  })
+
+  it('forgets the panel itself when dockview no longer had it, and ignores an unhosted tab', async () => {
+    await ensureBrowserTab('browser-panel-1')
+    browserTabClosedByMain('browser-tab-1', vi.fn())
+    expect(store().tabOf('browser-panel-1')).toBeNull()
+    expect(views.unregister).toHaveBeenCalledWith('browser-tab-1')
+    const removePanel = vi.fn()
+    browserTabClosedByMain('browser-tab-99', removePanel)
+    expect(removePanel).not.toHaveBeenCalled()
   })
 })

@@ -1382,3 +1382,18 @@ Round 4 – 2026-11-01, confirm round, five reviewers (IX had nothing open): R3-
 | Owner decisions recorded: § Open decisions became § Decisions (owner answer, date) and § Spec follow-ups; OD-5 and SPEC-4 answered against the recommendation, so Proceed anyway shows at once on every host and the HSTS frame is gone; OD-7 width labels to "390px"; OD-14 shares one banner pattern with comments; A-24 withdrawn | Owner, 2026-11-01 |
 | Declined – no send-time notice about the AI provider (owner decision D5) | M-49 (SEC-10) |
 | Screen- and card-only items, not note text | M-38, M-39 (central stand-ins noted), M-41, TR-16, TR-17, TR-18, TR-22, VS-17, VS-22, VS-24 |
+
+## Differences in the build
+
+Where the shipped build differs from this note. Each row is a difference to settle – by changing the build or this note – not a decision.
+
+| Build step | Surface | This note says | The build does | Why |
+|---|---|---|---|---|
+| Commit 18 | Page right-click menu, More | The menu draws over the still image taken at the right-click | The menu registers as an occluder, so the native-view guard takes the page off screen while it is open and the page area shows Erfana's background | The still image arrives with commit 19, together with the pick still image |
+| Commit 18 | Address suggestions (025-FR-063) | A suggestion list under the address field | Not built | It draws over the page and needs the same still image (commit 19) |
+| Commit 18 | Pop-up blocked chip | The chip brings the row back while the row is kept | The chip shows only while the row is in the strip; once dismissed, main forgets the blocked open, so there is nothing for the chip to bring back | Main keeps no dismissed row to return to |
+| Commit 18 | Strip rows | Rows fold by tier when the strip runs out of room | Every row shows in the fixed kind order; there is no folding | Folding tiers not built yet |
+| Commit 18 | Keyring notices | – | The weak-protection and keyring-reset notices are `keyring` strip rows with **Dismiss** only; "remembered for this session" wording on a permission row is the build's own | The note has no row copy for them |
+| Commit 18 | Page dialogs | `pageDialog` rows | Rendered generically (Confirm / Close / Decline); main emits none yet | Main-side emitter pending |
+| Commit 18 | Forget this project's browser data | A busy state while main deletes | The confirm closes at once; the outcome is a toast | Not built |
+| Commit 18 | Sign-in rejection line | – | No live region: both fields carry `aria-invalid` and point at the line, and the strip's polite announcer says it when the row arrives (Form card, decided) | `role="alert"` on a line that appears with its text is unreliable (Feedback card) |

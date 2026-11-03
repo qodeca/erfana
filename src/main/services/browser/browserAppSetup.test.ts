@@ -91,7 +91,7 @@ describe('browserAppSetup', () => {
       lockService: { checkLock: vi.fn(), acquireLock: vi.fn() },
       registerTabHandlers
     })
-    expect(registerTabHandlers).toHaveBeenCalledWith({ service: runtime.tabs })
+    expect(registerTabHandlers).toHaveBeenCalledWith({ service: runtime.tabs, openInSystemBrowser: expect.any(Function) })
     expect(handle).toHaveBeenCalledWith('erfana-local', expect.any(Function))
     const response = (handle.mock.calls[0][1] as (r: Request) => Response)(new Request('erfana-local://h/x'))
     expect(response.status).toBe(403)

@@ -10,18 +10,22 @@
  *   `browser-tab:tabAdded`). The tab is then hosted in the store and its view
  *   registered with the bounds owner, which keeps it hidden until the
  *   native-view guard shows it.
+ * - **The user's close** ({@link requestBrowserPanelClose}, commit 18): the
+ *   editor tab stays while main asks the page; it goes only when main sends
+ *   `browser-tab:tabClosed` ({@link browserTabClosedByMain}), so **Stay** on
+ *   the leave-page prompt keeps it (025-FR-058). A tab main does not hold, or
+ *   a request that fails, closes the editor tab at once.
  * - **Close.** {@link closeBrowserTab} runs when dockview removes the panel.
  *   The panel is marked closing first, so the guard hides the page in the same
  *   tick (a page left attached would paint over the next editor tab), then
- *   the view is unregistered and main is asked to close the tab.
- *
- * KNOWN GAP (reported with commit 17): main sends no event when a tab it holds
- * goes away, so the editor tab closes at once on the user's close even when
- * the page asks to stay (025-FR-058); the leave-page row is commit 18's.
+ *   the view is unregistered. A tab main already closed is not asked again;
+ *   any other (a project switch, Close all) is closed as Erfana's close
+ *   (`byUser: false`), which never asks (S-31) – nothing would show the prompt.
  */
 import { browserTabGateway } from '../browserTabGateway'
 import { browserViewBounds } from './browserViewBounds'
 import { useBrowserTabStore } from '../../stores/useBrowserTabStore'
+import { useBrowserChromeStore } from '../../stores/useBrowserChromeStore'
 import { logger } from '../../utils/logger'
 
 /** What opening a panel's tab came to. */
@@ -29,6 +33,9 @@ export type EnsureTabResult = { readonly tabId: string } | { readonly error: str
 
 /** Requests in flight or settled, by panel: one `create` per panel. */
 const opening = new Map<string, Promise<EnsureTabResult>>()
+
+/** Tabs main reported gone whose editor tab is being removed: not closed again. */
+const closedInMain = new Set<string>()
 
 /** Host `tabId` in `panelId`: store entry first, then the view the guard decides. */
 function host(panelId: string, tabId: string): void {
@@ -47,7 +54,7 @@ async function create(panelId: string): Promise<EnsureTabResult> {
     if ('error' in response) return response
     if (closedMeanwhile(panelId)) {
       // The editor tab went before main answered: nothing hosts this tab.
-      await browserTabGateway.close(response.tabId)
+      await browserTabGateway.close(response.tabId, false)
       return { error: 'The tab closed' }
     }
     host(panelId, response.tabId)
@@ -100,14 +107,70 @@ export function closeBrowserTab(panelId: string): void {
   store.markClosing(panelId)
   if (tabId !== null) {
     browserViewBounds.unregister(tabId)
-    browserTabGateway.close(tabId).catch((error: unknown) => {
-      logger.error('Browser tab could not be closed', error instanceof Error ? error : undefined)
-    })
+    useBrowserChromeStore.getState().dropTab(tabId)
+    if (!closedInMain.delete(tabId)) {
+      browserTabGateway.close(tabId, false).catch((error: unknown) => {
+        logger.error('Browser tab could not be closed', error instanceof Error ? error : undefined)
+      })
+    }
   }
   useBrowserTabStore.getState().removePanel(panelId)
+}
+
+/**
+ * The user closes the editor tab `panelId` (its × button, middle click,
+ * Ctrl/Cmd+W, the tab menu): main asks the page first.
+ *
+ * @param panelId - The browser panel
+ * @param removePanel - Removes the editor tab now (dockview's `close`)
+ *
+ * @example
+ * ```ts
+ * requestBrowserPanelClose(panelId, () => api.close())
+ * ```
+ */
+export function requestBrowserPanelClose(panelId: string, removePanel: () => void): void {
+  const tabId = useBrowserTabStore.getState().tabOf(panelId)
+  if (tabId === null) {
+    removePanel()
+    return
+  }
+  browserTabGateway
+    .close(tabId)
+    .then(held => {
+      // `false`: main holds no such tab, so no `tabClosed` will come.
+      if (held !== true) removePanel()
+    })
+    .catch((error: unknown) => {
+      logger.error('Browser tab could not be closed', error instanceof Error ? error : undefined)
+      removePanel()
+    })
+}
+
+/**
+ * Main reports `tabId` gone: hide its page, then remove its editor tab.
+ *
+ * @param tabId - The tab main closed
+ * @param removePanel - Removes the editor tab `panelId` (dockview), which runs {@link closeBrowserTab}
+ */
+export function browserTabClosedByMain(tabId: string, removePanel: (panelId: string) => void): void {
+  useBrowserChromeStore.getState().dropTab(tabId)
+  const store = useBrowserTabStore.getState()
+  const panelId = store.byTab.get(tabId)?.panelId
+  if (panelId === undefined) return
+  closedInMain.add(tabId)
+  store.markClosing(panelId)
+  removePanel(panelId)
+  // A panel dockview no longer had: forget it here instead.
+  if (closedInMain.delete(tabId)) {
+    opening.delete(panelId)
+    browserViewBounds.unregister(tabId)
+    useBrowserTabStore.getState().removePanel(panelId)
+  }
 }
 
 /** Forget every panel (tests). Tabs in main are not closed. */
 export function resetBrowserTabLifecycle(): void {
   opening.clear()
+  closedInMain.clear()
 }

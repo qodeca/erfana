@@ -49,7 +49,9 @@ function ErfanaPage({
     return <LoadErrorPage tabId={tabId} state={state} mayTakeFocus={mayTakeFocus} />
   if (page === 'crashed')
     return <CrashedPage tabId={tabId} state={state} mayTakeFocus={mayTakeFocus} />
-  return <CertificatePage tabId={tabId} state={state} mayTakeFocus={mayTakeFocus} />
+  return (
+    <CertificatePage key={state.certificate?.decisionId} tabId={tabId} state={state} mayTakeFocus={mayTakeFocus} />
+  )
 }
 
 /**

@@ -31,7 +31,7 @@ import type { Size } from './windowFeatures'
 /** What a popup window needs from the app (`browserAppSetup.ts` builds the Electron parts). */
 export type PopupWindowFactory = Pick<
   BrowserPopupWindowDeps,
-  'createHost' | 'createView' | 'registerHost' | 'attachCdp' | 'stripHeight' | 'originMinWidth'
+  'createHost' | 'createView' | 'registerHost' | 'loadHost' | 'attachCdp' | 'stripHeight' | 'originMinWidth'
 > & {
   /** The work area of the screen the opening page's window is on. */
   readonly workArea: (tabId: string) => Size
@@ -166,6 +166,7 @@ export class BrowserPopups {
         createHost: windows.createHost,
         createView: windows.createView,
         registerHost: windows.registerHost,
+        loadHost: windows.loadHost,
         attachCdp: windows.attachCdp,
         windowOpenHandler: (contents) => open.handlerFor(contents as unknown as OpenerContents, true).handler,
         onClosed: (gone) => {

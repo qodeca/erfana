@@ -44,6 +44,7 @@ import type {
 } from './browser-tab-schema'
 import type { ClearDataResponse, ForgetResponse } from './browser-tab-page-schema'
 import type { PickActionResponse } from './browser-tab-pick-schema'
+import type { NewTabCommandEvent, OpenExternalResponse, TabClosedEvent } from './browser-tab-chrome-schema'
 
 export type ClosePickRequest = z.infer<typeof ClosePickRequestSchema>
 
@@ -62,7 +63,24 @@ export type ContextActionRequest = z.infer<typeof ContextActionRequestSchema>
 export interface BrowserTabBridge {
   /** Open an empty tab for the panel; `{ error }` names why it cannot open (a toast). */
   create(panelId: string): Promise<CreateResponse>
-  close(tabId: string): Promise<void>
+  /**
+   * Close the tab. The user's close (`byUser`, the default) lets the page ask
+   * to stay (025-FR-058); `byUser: false` is Erfana's close of a tab whose
+   * editor tab is already gone, which never asks (S-31). Resolves `true` when
+   * main holds the tab – the editor tab then goes on `onTabClosed` – and
+   * `false` when it does not (nothing will follow).
+   */
+  close(tabId: string, byUser?: boolean): Promise<boolean>
+  /** A tab main held is gone; the renderer removes its editor tab now (commit 18). */
+  onTabClosed(callback: (event: TabClosedEvent) => void): () => void
+  /** The app menu's **New browser tab** (025-FR-001). */
+  onNewTabCommand(callback: (event: NewTabCommandEvent) => void): () => void
+  /**
+   * **Open in system browser** (025-FR-057): the tab's committed address, or
+   * `url`; main allows only `http` and `https` and opens it through the
+   * checked external-open path.
+   */
+  openExternal(tabId: string, url?: string): Promise<OpenExternalResponse>
   /** Load what the user typed or chose; `{ refused }` carries the 025-FR-005 rule. */
   navigate(request: NavigateRequest): Promise<NavigateResponse>
   /**

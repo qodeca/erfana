@@ -7,6 +7,10 @@ import type { IDockviewHeaderActionsProps, IDockviewPanelHeaderProps } from 'doc
 vi.mock('./useTabContextMenu', () => ({ useTabContextMenu: () => [] }))
 vi.mock('../ContextMenu/ContextMenu', () => ({ ContextMenu: () => <div data-testid="context-menu" /> }))
 vi.mock('../../utils/platform', () => ({ isMacOS: () => true, isWindows: () => false }))
+const lifecycle = vi.hoisted(() => ({
+  requestBrowserPanelClose: vi.fn((_panelId: string, removePanel: () => void) => removePanel())
+}))
+vi.mock('../../services/browser/browserTabLifecycle', () => lifecycle)
 
 import { BrowserTab } from './BrowserTab'
 import { NewBrowserTabButton } from './NewBrowserTabButton'
@@ -82,6 +86,9 @@ describe('BrowserTab', () => {
     fireEvent(tab, new MouseEvent('auxclick', { bubbles: true, button: 1 }))
     fireEvent(tab, new MouseEvent('auxclick', { bubbles: true, button: 2 }))
     expect(close).toHaveBeenCalledTimes(2)
+    // Each close asked main first (025-FR-058).
+    expect(lifecycle.requestBrowserPanelClose).toHaveBeenCalledTimes(2)
+    expect(lifecycle.requestBrowserPanelClose).toHaveBeenCalledWith(PANEL, expect.any(Function))
     fireEvent.contextMenu(tab)
     expect(screen.getByTestId('context-menu')).toBeInTheDocument()
     fireEvent.dragStart(tab)

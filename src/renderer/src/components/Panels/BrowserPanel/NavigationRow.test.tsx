@@ -27,6 +27,16 @@ function props(
     onAddressEscape: vi.fn(),
     onAddressEdit: vi.fn(),
     errorId: null,
+    onOpenInSystemBrowser: vi.fn(async () => undefined),
+    moreActions: {
+      zoom: vi.fn(),
+      widthPreset: vi.fn(),
+      find: vi.fn(),
+      openInSystemBrowser: vi.fn(),
+      devTools: vi.fn(),
+      clearData: vi.fn(),
+      forget: vi.fn()
+    },
     ...patch
   }
 }
@@ -102,11 +112,11 @@ describe('NavigationRow', () => {
     expect(screen.getByRole('textbox', { name: 'Address and search' })).toHaveFocus()
   })
 
-  it('keeps Tab order Back, Forward, Reload, address bar, DevTools', () => {
+  it('keeps Tab order Back, Forward, Reload, address bar, Open in system browser, DevTools, More', () => {
     render(<NavigationRow {...props(browserState({ canGoBack: true, canGoForward: true }))} />)
     const order = Array.from(screen.getByRole('group').querySelectorAll('button, input')).map(el =>
       el.getAttribute('aria-label')
     )
-    expect(order).toEqual(['Back', 'Forward', 'Reload', 'Address and search', 'DevTools'])
+    expect(order).toEqual(['Back', 'Forward', 'Reload', 'Address and search', 'Open in system browser', 'DevTools', 'More'])
   })
 })

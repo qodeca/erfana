@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The built-in browser's renderer UI (spec 025, commit 17): the New browser
- * tab tool, the browser editor tabs, the navigation row, the address bar, the
- * empty tab and the page area – driven the way a user drives them, through
+ * The built-in browser's renderer UI (spec 025, commits 17–18): the New
+ * browser tab tool, the browser editor tabs, the navigation row, the address
+ * bar and its chips, the strip rows, the find row, More, the page menu, the
+ * Erfana pages and the page area – driven the way a user drives them, through
  * Erfana's DOM. Controls are found by role and accessible name; the panel,
  * the page placeholder and the editor tab by `BROWSER_TEST_IDS`.
  *
@@ -62,6 +63,67 @@ export class BrowserPanelUi {
 
   get emptyHint(): Locator {
     return this.root.getByText(/Load your app, then click/)
+  }
+
+  /** The strip above the page (commit 18). */
+  get strip(): Locator {
+    return this.root.getByTestId(BROWSER_TEST_IDS.STRIP)
+  }
+
+  /** The strip row of `kind` (`popupBlocked`, `leavePage`, …). */
+  stripRow(kind: string): Locator {
+    return this.strip.locator(`[data-strip-kind="${kind}"]`)
+  }
+
+  /**
+   * Press a strip row's button once its input guard is over (OD-6): the
+   * button drops `aria-disabled` when the renderer's guard ends, and main's
+   * own guard runs on the same real time (its test clock only adds offsets).
+   */
+  async answerRow(kind: string, name: string): Promise<void> {
+    const button = this.stripRow(kind).getByRole('button', { name, exact: true })
+    await expect(button).not.toHaveAttribute('aria-disabled', 'true', { timeout: UI_WAIT_MS })
+    await button.click()
+  }
+
+  /** The chips at the end of the address bar. */
+  get chips(): Locator {
+    return this.root.getByTestId(BROWSER_TEST_IDS.CHIPS)
+  }
+
+  /** The find row and its field. */
+  get findRow(): Locator {
+    return this.root.getByTestId(BROWSER_TEST_IDS.FIND_ROW)
+  }
+
+  get findField(): Locator {
+    return this.findRow.getByRole('searchbox', { name: 'Find in page' })
+  }
+
+  /** The find count as drawn ("2 of 3"). */
+  get findCount(): Locator {
+    return this.findRow.locator('.erf-brw-find__count')
+  }
+
+  /** A toolbar control anywhere on the navigation row (More and Open in system browser sit outside the group). */
+  tool(name: string): Locator {
+    return this.root.getByRole('button', { name, exact: true })
+  }
+
+  /** The Erfana page's heading (load error, certificate, crashed). */
+  get pageHeading(): Locator {
+    return this.root.getByRole('heading', { level: 2 })
+  }
+
+  /** A menu drawn by Erfana (portal: outside the panel), by its accessible name. */
+  menu(name: string): Locator {
+    return this.window.getByRole('menu', { name, exact: true })
+  }
+
+  /** Open **More** and choose `item`. */
+  async chooseMore(item: string | RegExp): Promise<void> {
+    await this.tool('More').click()
+    await this.menu('More').getByRole('menuitem', { name: item }).click()
   }
 
   /** Type `text` into the address bar and press Enter. */
@@ -136,6 +198,29 @@ export class BrowserTabUiPage {
     const panel = this.visiblePanel()
     await panel.tabId()
     return panel
+  }
+
+  /** Run File › New browser tab from the application menu, as a mouse user would. */
+  async openFromAppMenu(): Promise<BrowserPanelUi> {
+    await this.tabs.installRecorder()
+    const before = await this.panels.count()
+    await this.app.evaluate(({ Menu, BrowserWindow }) => {
+      const file = Menu.getApplicationMenu()?.items.find(item => item.label === 'File')
+      const item = file?.submenu?.items.find(entry => entry.label === 'New browser tab')
+      if (item === undefined) throw new Error('File › New browser tab is missing')
+      const win = BrowserWindow.getAllWindows().find(w => w.isFocused()) ?? BrowserWindow.getAllWindows()[0]
+      // A menu click, not the accelerator.
+      item.click({ triggeredByAccelerator: false } as unknown as KeyboardEvent, win, win?.webContents)
+    })
+    await expect(this.panels).toHaveCount(before + 1, { timeout: UI_WAIT_MS })
+    const panel = this.visiblePanel()
+    await panel.tabId()
+    return panel
+  }
+
+  /** The browser editor tab whose panel hosts `tabId`. */
+  editorTabFor(index: number): Locator {
+    return this.editorTabs.nth(index)
   }
 
   /** Close every browser editor tab, through their close buttons. */

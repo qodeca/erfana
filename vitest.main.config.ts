@@ -142,6 +142,12 @@ export default defineConfig({
         'src/main/services/browser/BrowserTab.ts': { lines: 97, functions: 98, branches: 95, statements: 96 },
         // measured 96.87/100/92.5/96.05
         'src/main/services/browser/BrowserTabService.ts': { lines: 94, functions: 98, branches: 90, statements: 94 },
+        // Built-in browser, main side (spec 025, commit 18): the keyring notices as strip
+        // rows, the one place tab events are parsed and sent, and the tab's input wiring.
+        // measured 100/100/100/100 each
+        'src/main/services/browser/site/keyringStrip.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/main/services/browser/tabEventSend.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/main/services/browser/input/tabInputFactory.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // Built-in browser local files (spec 025 commit 11, 025-FR-005 rule 1,
         // ADR 0012 option 4 – the per-folder loopback server): the request path,
         // the real-path confinement, the fetch-metadata policy, the server and

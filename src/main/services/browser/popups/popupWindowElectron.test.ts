@@ -2,13 +2,14 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The Electron half of a popup window (025-FR-011, ADR 0011 decision 9): a
- * sandboxed host with no preload and the dark background, the page view
+ * sandboxed host with the popup strip's own preload and the dark background,
+ * the strip's renderer loaded on its route, the page view
  * adopting the popup's `webContents`, the `browserPopup` kind, the work area
  * of the opener's screen and the popup-kind CDP session.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { BrowserWindow, WebContentsView, screen, registerAppWebContents, cdp, CdpSession } = vi.hoisted(() => {
+const { BrowserWindow, WebContentsView, screen, registerAppWebContents, cdp, CdpSession, toolkit } = vi.hoisted(() => {
   const cdp = { attach: vi.fn(), detach: vi.fn(), send: vi.fn(async () => ({})), hangProbe: { setVisible: vi.fn() } }
   return {
     BrowserWindow: Object.assign(vi.fn(), { fromId: vi.fn() }),
@@ -21,20 +22,22 @@ const { BrowserWindow, WebContentsView, screen, registerAppWebContents, cdp, Cdp
     cdp,
     CdpSession: vi.fn(function () {
       return cdp
-    })
+    }),
+    toolkit: { is: { dev: false } }
   }
 })
 vi.mock('electron', () => ({ BrowserWindow, WebContentsView, screen }))
+vi.mock('@electron-toolkit/utils', () => toolkit)
 vi.mock('../../../ipc/appWebContents', () => ({ registerAppWebContents }))
 vi.mock('../cdp/BrowserCdpSession', () => ({ BrowserCdpSession: CdpSession }))
 vi.mock('../../LoggingService', () => ({ logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 
-import { electronPopupWindows } from './popupWindowElectron'
+import { electronPopupWindows, POPUP_HOST_ROUTE, POPUP_STRIP_HEIGHT_PX } from './popupWindowElectron'
 
 beforeEach(() => vi.clearAllMocks())
 
 describe('electronPopupWindows', () => {
-  it('builds a sandboxed host with no preload, Erfana’s background and the content size', () => {
+  it('builds a sandboxed host with the popup preload, Erfana’s background and the content size', () => {
     const windows = electronPopupWindows(() => null)
     windows.createHost({ contentSize: { width: 500, height: 600 }, title: 'about:blank – opened by app.test' })
     expect(BrowserWindow).toHaveBeenCalledWith(
@@ -45,10 +48,16 @@ describe('electronPopupWindows', () => {
         show: false,
         title: 'about:blank – opened by app.test',
         backgroundColor: '#161312',
-        webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, webSecurity: true }
+        webPreferences: {
+          preload: expect.stringMatching(/preload[\\/]browserPopup\.js$/),
+          sandbox: true,
+          contextIsolation: true,
+          nodeIntegration: false,
+          webSecurity: true
+        }
       })
     )
-    expect(windows.stripHeight).toBe(0)
+    expect(windows.stripHeight).toBe(POPUP_STRIP_HEIGHT_PX)
     expect(windows.originMinWidth).toBe(0)
   })
 
@@ -83,5 +92,61 @@ describe('electronPopupWindows', () => {
       throw new Error('another client')
     })
     expect(windows.attachCdp!({ id: 2 } as never)).toBeNull()
+  })
+
+  it('loads the strip renderer on its route and refuses every other navigation of the host', async () => {
+    const windows = electronPopupWindows(() => null)
+    const handlers = new Map<string, (event: { preventDefault: () => void }) => void>()
+    const host = {
+      loadFile: vi.fn(async () => undefined),
+      loadURL: vi.fn(async () => undefined),
+      webContents: { on: vi.fn((name: string, h: (event: { preventDefault: () => void }) => void) => handlers.set(name, h)) }
+    }
+    windows.loadHost?.(host as never)
+    expect(host.loadFile).toHaveBeenCalledWith(expect.stringMatching(/renderer[\\/]index\.html$/), { hash: POPUP_HOST_ROUTE })
+    expect(host.loadURL).not.toHaveBeenCalled()
+    const preventDefault = vi.fn()
+    handlers.get('will-navigate')?.({ preventDefault })
+    expect(preventDefault).toHaveBeenCalled()
+  })
+
+  it('logs, never throws, when the strip renderer fails to load', async () => {
+    const windows = electronPopupWindows(() => null)
+    const host = { loadFile: vi.fn(async () => Promise.reject(new Error('gone'))), webContents: { on: vi.fn() } }
+    expect(() => windows.loadHost?.(host as never)).not.toThrow()
+    await Promise.resolve()
+  })
+
+  it('loads the dev server route in development, and the bundle when no dev URL is set', () => {
+    const windows = electronPopupWindows(() => null)
+    const host = () => ({ loadFile: vi.fn(async () => undefined), loadURL: vi.fn(async () => undefined), webContents: { on: vi.fn() } })
+    toolkit.is.dev = true
+    vi.stubEnv('ELECTRON_RENDERER_URL', 'http://localhost:5173')
+    try {
+      const dev = host()
+      windows.loadHost?.(dev as never)
+      expect(dev.loadURL).toHaveBeenCalledWith(`http://localhost:5173#${POPUP_HOST_ROUTE}`)
+      vi.stubEnv('ELECTRON_RENDERER_URL', '')
+      const noUrl = host()
+      windows.loadHost?.(noUrl as never)
+      expect(noUrl.loadFile).toHaveBeenCalled()
+    } finally {
+      toolkit.is.dev = false
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('logs a load failure that is not an Error by its text', async () => {
+    const windows = electronPopupWindows(() => null)
+    const host = { loadFile: vi.fn(async () => Promise.reject('gone')), webContents: { on: vi.fn() } }
+    expect(() => windows.loadHost?.(host as never)).not.toThrow()
+    await Promise.resolve()
+  })
+
+  it('falls back to the default content size when the page asked for none', () => {
+    electronPopupWindows(() => null).createHost({ contentSize: { width: 0, height: 0 }, title: 't' })
+    const options = vi.mocked(BrowserWindow).mock.calls[0]![0] as { width: number; height: number }
+    expect(options.width).toBeGreaterThan(0)
+    expect(options.height).toBeGreaterThan(0)
   })
 })

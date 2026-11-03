@@ -285,7 +285,10 @@ export default defineConfig(({ mode }) => ({
           // The sealed HTML-preview page (#74 / sd-074b §5.1). Exposes nothing;
           // it only reports link clicks to main. Like the other secondary
           // entries it must stay self-contained — see the guard above.
-          previewPage: resolve('src/preload/previewPage.ts')
+          previewPage: resolve('src/preload/previewPage.ts'),
+          // A browser popup's host window (spec 025, ADR 0011 decision 9): the
+          // origin strip's three popup channels and nothing else.
+          browserPopup: resolve('src/preload/browserPopup.ts')
         },
         output: {
           format: 'cjs'

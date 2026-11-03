@@ -22,12 +22,17 @@ import type { DockviewApi, DockviewPanelApi } from 'dockview'
 import type { ForwardedKeyAction } from '../../../../../shared/ipc/browser-tab-schema'
 import { browserTabGateway } from '../../../services/browserTabGateway'
 import { openBrowserTab } from '../../../utils/openBrowserTab'
+import { requestBrowserPanelClose } from '../../../services/browser/browserTabLifecycle'
 import { logger } from '../../../utils/logger'
 import { useLatestRef } from '../../../hooks/useLatestRef'
 
 /** Options for {@link useBrowserKeys}. */
 export interface UseBrowserKeysOptions {
   readonly tabId: string | null
+  /** The editor panel, for the user's close. */
+  readonly panelId: string
+  /** Open the find row (Ctrl/Cmd+F, 025-FR-008). */
+  readonly openFind: () => void
   /** The panel's dockview api: closing, and its group for editor-tab switching. */
   readonly api: Pick<DockviewPanelApi, 'close' | 'group'>
   readonly containerApi: DockviewApi
@@ -93,7 +98,7 @@ export function useBrowserKeys(options: UseBrowserKeysOptions): BrowserKeyHandle
         case 'devTools':
           return void browserTabGateway.devTools(tab).catch(fail)
         case 'closeTab':
-          return api.close()
+          return requestBrowserPanelClose(latest.current.panelId, () => api.close())
         case 'newTab':
           return void openBrowserTab(containerApi)
         case 'nextEditorTab':
@@ -101,8 +106,9 @@ export function useBrowserKeys(options: UseBrowserKeysOptions): BrowserKeyHandle
         case 'previousEditorTab':
           return cycleEditorTab(api, -1)
         case 'find':
+          return latest.current.openFind()
         case 'focusPanel':
-          // The find row and the focus-panel key map are not built yet.
+          // The focus-panel key map is not built yet.
           logger.debug('Browser key action not available yet', { action })
       }
     },

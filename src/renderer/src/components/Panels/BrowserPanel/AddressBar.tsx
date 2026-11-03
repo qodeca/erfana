@@ -38,6 +38,8 @@ export interface AddressBarProps {
   readonly onEdit: () => void
   /** The id of the refusal message, while one shows. */
   readonly errorId: string | null
+  /** The chips at the field's end (commit 18). */
+  readonly children?: React.ReactNode
 }
 
 const BADGE_ICON = { size: 14, strokeWidth: 2, 'aria-hidden': true } as const
@@ -65,7 +67,7 @@ function DisplayText({ display }: { readonly display: AddressDisplay }): JSX.Ele
  * @returns The field with its badge
  */
 export const AddressBar = forwardRef<HTMLInputElement, AddressBarProps>(function AddressBar(
-  { state, onSubmit, onEscape, onEdit, errorId },
+  { state, onSubmit, onEscape, onEdit, errorId, children },
   ref
 ) {
   const [draft, setDraft] = useState<string | null>(null)
@@ -149,6 +151,7 @@ export const AddressBar = forwardRef<HTMLInputElement, AddressBarProps>(function
           </span>
         )}
       </div>
+      {children}
     </div>
   )
 })

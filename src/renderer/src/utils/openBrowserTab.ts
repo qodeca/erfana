@@ -103,3 +103,15 @@ export function openBrowserTab(
   }
   return panel
 }
+
+/**
+ * Whether keyboard focus is inside the editor area, or on no element at all
+ * (the document body) – where Ctrl/Cmd+T opens a browser tab (025-FR-014).
+ *
+ * @param area - The editor area's root element
+ * @returns `false` while focus is in a terminal, the project tree or another panel
+ */
+export function focusInEditorArea(area: HTMLElement | null): boolean {
+  const active = document.activeElement
+  return active === null || active === document.body || (area !== null && area.contains(active))
+}

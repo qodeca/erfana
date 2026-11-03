@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import {
   DockviewReact,
   DockviewReadyEvent,
@@ -30,6 +30,7 @@ import { closeBrowserTab } from '../../../services/browser/browserTabLifecycle'
 import {
   BROWSER_PANEL_COMPONENT,
   BROWSER_TAB_COMPONENT,
+  focusInEditorArea,
   isBrowserPanelId,
   openBrowserTab,
   type BrowserPanelParams
@@ -152,11 +153,20 @@ export const EditorAreaSplitPanel = (props: ISplitviewPanelProps): JSX.Element =
   // The built-in browser's window-wide events, once per window: tab state and
   // focus into the store, local addresses for the empty tab, and an editor tab
   // for each tab a page opened.
+  const areaRef = useRef<HTMLDivElement>(null)
   useEffect(
     () =>
       mountBrowserTabEvents({
         openPageTab: (event) =>
-          openBrowserTab(useProjectStore.getState().dockviewApi, { tabId: event.tabId, background: event.background })
+          openBrowserTab(useProjectStore.getState().dockviewApi, { tabId: event.tabId, background: event.background }),
+        // Main closed the tab (its close went through, Forget, the page): the editor tab goes.
+        removePanel: (panelId) => useProjectStore.getState().dockviewApi?.getPanel(panelId)?.api.close(),
+        // App menu → New browser tab. From Ctrl/Cmd+T only while focus is in the editor
+        // area (or nowhere), so a terminal or another panel keeps the key (025-FR-014).
+        newTabCommand: (byKey) => {
+          if (byKey && !focusInEditorArea(areaRef.current)) return
+          openBrowserTab(useProjectStore.getState().dockviewApi)
+        }
       }),
     []
   )
@@ -233,7 +243,7 @@ export const EditorAreaSplitPanel = (props: ISplitviewPanelProps): JSX.Element =
   }
 
   return (
-    <div style={{ width: '100%', height: '100%' }} data-testid={TEST_IDS.EDITOR_AREA}>
+    <div ref={areaRef} style={{ width: '100%', height: '100%' }} data-testid={TEST_IDS.EDITOR_AREA}>
       <DockviewReact
         components={editorComponents}
         tabComponents={{

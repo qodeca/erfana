@@ -15,7 +15,10 @@ const C = BROWSER_TAB_CHANNELS
 
 export const browserTabBridge: BrowserTabBridge = {
   create: (panelId) => ipcRenderer.invoke(C.create, { panelId }),
-  close: (tabId) => ipcRenderer.invoke(C.close, { tabId }),
+  close: (tabId, byUser) => ipcRenderer.invoke(C.close, byUser === undefined ? { tabId } : { tabId, byUser }),
+  onTabClosed: (callback) => subscribe(BROWSER_TAB_EVENTS.tabClosed, callback),
+  onNewTabCommand: (callback) => subscribe(BROWSER_TAB_EVENTS.newTabCommand, callback),
+  openExternal: (tabId, url) => ipcRenderer.invoke(C.openExternal, url === undefined ? { tabId } : { tabId, url }),
   navigate: (request) => ipcRenderer.invoke(C.navigate, request),
   openLocalFile: (tabId, filePath) => ipcRenderer.invoke(C.openLocalFile, { tabId, filePath }),
   history: (tabId, step) => ipcRenderer.invoke(C.history, { tabId, step }),

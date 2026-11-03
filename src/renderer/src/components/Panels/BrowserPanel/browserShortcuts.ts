@@ -15,7 +15,7 @@ export interface BrowserShortcut {
   readonly aria: string
 }
 
-export type BrowserShortcutName = 'back' | 'forward' | 'reload' | 'devTools' | 'close' | 'pick'
+export type BrowserShortcutName = 'back' | 'forward' | 'reload' | 'devTools' | 'close' | 'pick' | 'zoomReset' | 'find'
 
 /**
  * The label and ARIA value of a browser key on this platform.
@@ -44,5 +44,9 @@ export function browserShortcut(name: BrowserShortcutName): BrowserShortcut {
       return { label: formatShortcut('W', { mod: true }), aria: `${mod}+W` }
     case 'pick':
       return { label: formatShortcut('E', { mod: true }), aria: `${mod}+E` }
+    case 'zoomReset':
+      return { label: formatShortcut('0', { mod: true }), aria: `${mod}+0` }
+    case 'find':
+      return { label: formatShortcut('F', { mod: true }), aria: `${mod}+F` }
   }
 }

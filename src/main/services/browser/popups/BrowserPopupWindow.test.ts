@@ -215,4 +215,17 @@ describe('BrowserPopupWindow', () => {
     second.page.emit('did-navigate', {}, 'http://staging.test/late')
     second.page.emit('content-bounds-updated', preventable(), { x: 0, y: 0, width: 400, height: 400 })
   })
+
+  it('loads the strip renderer into the host and tells it after each commit (commit 18)', () => {
+    const loadHost = vi.fn()
+    const { page, host } = setup({ loadHost })
+    expect(loadHost).toHaveBeenCalledWith(host)
+    const send = vi.fn()
+    ;(host.webContents as unknown as { send: typeof send }).send = send
+    page.emit('did-navigate', {}, 'https://staging.test/a')
+    expect(send).toHaveBeenCalledWith('browser-tab:popupChanged', {})
+    host.destroyed = true
+    page.emit('did-navigate', {}, 'https://staging.test/b')
+    expect(send).toHaveBeenCalledTimes(1)
+  })
 })

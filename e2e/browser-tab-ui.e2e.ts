@@ -137,8 +137,13 @@ test.describe('built-in browser tab UI', () => {
     await expect(panel.button('Reload')).toBeFocused()
     await windowWithTestProject.keyboard.press('Tab')
     await expect(panel.addressBar).toBeFocused()
+    // Commit 18: Open in system browser follows the field, and More is the row's last control.
+    await windowWithTestProject.keyboard.press('Tab')
+    await expect(panel.tool('Open in system browser')).toBeFocused()
     await windowWithTestProject.keyboard.press('Tab')
     await expect(panel.button('DevTools')).toBeFocused()
+    await windowWithTestProject.keyboard.press('Tab')
+    await expect(panel.tool('More')).toBeFocused()
 
     // With history, Back joins the order and works with Enter.
     await panel.load(sites.static.url('/page-b.html'))

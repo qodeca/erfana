@@ -8,7 +8,8 @@
  * 025-FR-020), `certificate` (commit 12c, 025-FR-021); `focusOrigin` and `toolbarFocus` (send) for the key and mouse
  * routers (commit 13, ADR 0011 decisions 13 and 16); `openLocalFile` (commit 11, 025-FR-010 – **Open in browser
  * tab**) and the address bar's `file://` input through `navigate`, both loaded from the file's served folder
- * (025-FR-005 rule 1). The tab state goes back as the `browser-tab:state` event, to
+ * (025-FR-005 rule 1); `openExternal` (commit 18, 025-FR-057 – **Open in system browser**, `http` and
+ * `https` only, through the checked external-open path). The tab state goes back as the `browser-tab:state` event, to
  * the owning window only (`BrowserTabService`).
  *
  * Every handler is registered through `registry.ts` (identity, top-level
@@ -21,7 +22,7 @@
 import { fileURLToPath } from 'node:url'
 import { BrowserWindow, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
 import { classifyAddressInput } from '../../shared/browser/addressInput'
-import { BROWSER_TAB_CHANNELS, BROWSER_TAB_EVENTS } from '../../shared/ipc/browser-tab-channels'
+import { BROWSER_TAB_CHANNELS, BROWSER_TAB_EVENTS, type BrowserTabChannel } from '../../shared/ipc/browser-tab-channels'
 import {
   AnswerStripRequestSchema,
   BoundsAppliedEventSchema,
@@ -34,12 +35,14 @@ import {
   FocusPageRequestSchema,
   HistoryRequestSchema,
   NavigateRequestSchema,
+  OpenExternalRequestSchema,
   OpenLocalFileRequestSchema,
   ShowDownloadRequestSchema,
   ToolbarFocusRequestSchema,
   type CreateResponse,
   type NavigateResponse
 } from '../../shared/ipc/browser-tab-schema'
+import type { OpenExternalResponse } from '../../shared/ipc/browser-tab-chrome-schema'
 import type { BrowserTab, TabHost } from '../services/browser/BrowserTab'
 import type { BrowserTabService } from '../services/browser/BrowserTabService'
 import { logger } from '../services/LoggingService'
@@ -65,9 +68,31 @@ export interface BrowserTabHandlerDeps {
   readonly isTrustedSender?: (event: IpcMainInvokeEvent | IpcMainEvent) => boolean
   /** The sender's window; defaults to `BrowserWindow.fromWebContents`. */
   readonly resolveWindow?: (event: IpcMainInvokeEvent | IpcMainEvent) => TabHost | null
+  /** **Open in system browser** through the checked external-open path (`openExternalSafe`); without it the request is refused. */
+  readonly openInSystemBrowser?: (url: string) => Promise<void>
+}
+
+/** The schemes **Open in system browser** hands to the operating system (025-FR-057). */
+export const SYSTEM_BROWSER_SCHEMES: ReadonlySet<string> = new Set(['http:', 'https:'])
+
+/** `url` when it is an `http` or `https` address, else `null`. */
+export function systemBrowserUrl(url: string | null | undefined): string | null {
+  if (url === null || url === undefined) return null
+  try {
+    return SYSTEM_BROWSER_SCHEMES.has(new URL(url).protocol) ? url : null
+  } catch {
+    return null
+  }
 }
 
 const C = BROWSER_TAB_CHANNELS
+
+/**
+ * `browser-tab:openExternal`, spelled out: the lint rule that keeps every OS
+ * open behind `openExternalSafe` refuses a member named `openExternal`, and
+ * this handler does go through it. Pinned to the channel constant by test.
+ */
+export const SYSTEM_BROWSER_CHANNEL: BrowserTabChannel = 'browser-tab:openExternal'
 
 /** A zod schema's `safeParse`, as far as these handlers use it. */
 interface Parser<T> {
@@ -88,7 +113,8 @@ export const BROWSER_TAB_HANDLED_CHANNELS = [
   C.devTools,
   C.answerStrip,
   C.showDownload,
-  C.certificate
+  C.certificate,
+  SYSTEM_BROWSER_CHANNEL
 ] as const
 
 /** The path of a `file:` URL with no host, or `null` (a network path, or not a file URL). */
@@ -162,9 +188,26 @@ export function registerBrowserTabHandlers(deps: BrowserTabHandlerDeps): () => v
     }
   })
 
-  registerHandle(C.close, (event, arg: unknown): void => {
+  // `true` when the window holds the tab: `tabClosed` follows once it is gone (or never, on Stay).
+  registerHandle(C.close, (event, arg: unknown): boolean => {
     const accepted = accept(C.close, event, CloseRequestSchema, arg)
-    if (accepted !== null) guarded(C.close, undefined, () => service.close(accepted.host.id, accepted.data.tabId))
+    if (accepted === null) return false
+    const { tabId, byUser } = accepted.data
+    return guarded(C.close, false, () => service.close(accepted.host.id, tabId, byUser ?? true))
+  })
+
+  registerHandle(SYSTEM_BROWSER_CHANNEL, async (event, arg: unknown): Promise<OpenExternalResponse> => {
+    const target = acceptTab(SYSTEM_BROWSER_CHANNEL, event, OpenExternalRequestSchema, arg)
+    if (target === null || deps.openInSystemBrowser === undefined) return { error: 'Request refused' }
+    const url = systemBrowserUrl(target.data.url ?? target.tab.state().committedUrl)
+    if (url === null) return { error: 'Only http and https addresses open in your system browser' }
+    try {
+      await deps.openInSystemBrowser(url)
+      return { ok: true }
+    } catch (error) {
+      logger.error('Browser tab request failed', redactedLogError(error), { channel: SYSTEM_BROWSER_CHANNEL })
+      return { error: 'Your system browser did not open it' }
+    }
   })
 
   registerHandle(C.navigate, (event, arg: unknown): NavigateResponse | Promise<NavigateResponse> => {

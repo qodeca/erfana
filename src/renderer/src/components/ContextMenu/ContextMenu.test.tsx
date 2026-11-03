@@ -238,4 +238,18 @@ describe('ContextMenu', () => {
     expect(action).not.toHaveBeenCalled()
     expect(onClose).not.toHaveBeenCalled()
   })
+
+  it('draws an optional header line that describes the menu and takes no focus', () => {
+    renderMenu({ ariaLabel: 'Page actions', header: 'www.a.test' })
+    const menu = screen.getByRole('menu', { name: 'Page actions' })
+    expect(menu).toHaveAccessibleDescription('www.a.test')
+    expect(screen.getAllByRole('menuitem')).toHaveLength(defaultItems.length)
+    expect(screen.getByText('www.a.test')).not.toHaveAttribute('tabindex')
+  })
+
+  it('has no description without a header', () => {
+    renderMenu({ ariaLabel: 'Actions' })
+    expect(screen.getByRole('menu', { name: 'Actions' })).not.toHaveAttribute('aria-describedby')
+  })
+
 })

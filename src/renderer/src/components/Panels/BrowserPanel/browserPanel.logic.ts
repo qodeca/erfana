@@ -11,6 +11,7 @@
  */
 import {
   hostText,
+  originParts,
   originText,
   type WebOriginParts
 } from '../../../../../shared/browser/originFormat'
@@ -221,4 +222,14 @@ export function navGroupDescription(canGoBack: boolean, canGoForward: boolean): 
   if (!canGoBack) return 'No earlier page'
   if (!canGoForward) return 'No later page'
   return null
+}
+
+/**
+ * An address for a row, through the origin formatter (Security rule 2). The
+ * renderer has no public-suffix list, so the whole host counts as the
+ * registrable domain here – nothing is dimmed, nothing is cut.
+ */
+export function rowAddress(url: string): string {
+  const parts = originParts(url, () => null)
+  return parts?.kind === 'web' ? `${originText(parts)}${pathOf(url)}` : url
 }

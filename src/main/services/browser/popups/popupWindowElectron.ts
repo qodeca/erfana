@@ -8,11 +8,15 @@
  * from `BrowserPopupWindow.ts` so the policy there is tested without
  * Electron.
  *
- * The host loads nothing yet: the popup's own renderer (origin strip, prompt
- * rows, minimal preload) arrives with the browser UI in commit 18. It is
- * sandboxed, has no preload and Erfana's dark background, so the strip area
- * (0 px until then) never flashes white.
+ * The host loads the renderer entry with the `#browser-popup` route and its
+ * own minimal preload (`preload/browserPopup.js`, commit 18), which draws the
+ * read-only origin strip above the page. It is sandboxed and has Erfana's dark
+ * background, so the strip area never flashes white. The route is content,
+ * not a trust signal: the renderer mounts the strip only when
+ * `window.browserPopupApi` exists, which only that preload exposes.
  */
+import { join } from 'node:path'
+import { is } from '@electron-toolkit/utils'
 import { BrowserWindow, screen, WebContentsView, type WebContents } from 'electron'
 import { registerAppWebContents } from '../../../ipc/appWebContents'
 import { redactedLogError } from '../../../utils/redactUserInput'
@@ -26,9 +30,31 @@ import { POPUP_DEFAULT_CONTENT, type Size } from './windowFeatures'
 /** Erfana's window background (`src/main/index.ts`), so the host never shows white. */
 const POPUP_HOST_BACKGROUND = '#161312'
 
-/** The popup strip's height and the origin's minimum width, until the popup's renderer measures them (commit 18). */
-const POPUP_STRIP_HEIGHT_PX = 0
+/**
+ * The popup origin strip's height: `--space-20` (40px) in
+ * `renderer/src/browserPopup/PopupStrip.css`, which must agree. The origin's
+ * minimum width stays 0: the 320 px floor of `windowFeatures.ts` already fits
+ * the badge word, a registrable domain and a port at `--text-sm`.
+ */
+export const POPUP_STRIP_HEIGHT_PX = 40
 const POPUP_ORIGIN_MIN_WIDTH_PX = 0
+/** The renderer route of the popup strip; `main.tsx` checks the preload, not this. */
+export const POPUP_HOST_ROUTE = 'browser-popup'
+
+/** Load the strip's renderer into a popup host: the dev server in development, else the bundled entry. */
+function loadPopupHost(host: PopupHost): void {
+  const window = host as unknown as BrowserWindow
+  const devUrl = process.env['ELECTRON_RENDERER_URL']
+  const loading =
+    is.dev && devUrl
+      ? window.loadURL(`${devUrl}#${POPUP_HOST_ROUTE}`)
+      : window.loadFile(join(__dirname, '../renderer/index.html'), { hash: POPUP_HOST_ROUTE })
+  loading.catch((error: unknown) => {
+    logger.warn('Browser popup strip did not load', { error: redactedLogError(error)?.message ?? String(error) })
+  })
+  // The host shows only its own route: any other navigation is refused.
+  window.webContents.on('will-navigate', (event) => event.preventDefault())
+}
 
 /** Attach a popup-kind CDP session; a refused attach leaves the popup without one. */
 function attachPopupCdp(contents: PopupContents): PopupCdpLink | null {
@@ -66,10 +92,17 @@ export function electronPopupWindows(windowIdOf: (tabId: string) => number | nul
         title,
         backgroundColor: POPUP_HOST_BACKGROUND,
         autoHideMenuBar: true,
-        webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, webSecurity: true }
+        webPreferences: {
+          preload: join(__dirname, '../preload/browserPopup.js'),
+          sandbox: true,
+          contextIsolation: true,
+          nodeIntegration: false,
+          webSecurity: true
+        }
       }) as unknown as PopupHost,
     createView: (contents) => new WebContentsView({ webContents: contents as unknown as WebContents }) as unknown as PopupPageView,
     registerHost: (host) => registerAppWebContents(host.webContents, 'browserPopup'),
+    loadHost: loadPopupHost,
     attachCdp: attachPopupCdp
   }
 }

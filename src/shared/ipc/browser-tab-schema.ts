@@ -79,7 +79,8 @@ export const CreateResponseSchema = z.union([
   z.object({ tabId: BrowserTabIdSchema }).strict(),
   z.object({ error: text }).strict()
 ])
-export const CloseRequestSchema = tabOnly
+/** `byUser: false` – the editor tab is already gone (Erfana's close): no leave-page prompt (S-31). */
+export const CloseRequestSchema = z.object({ tabId: BrowserTabIdSchema, byUser: z.boolean().optional() }).strict()
 export const NavigateRequestSchema = z
   .object({ tabId: BrowserTabIdSchema, input: urlString, source: NavigateSourceSchema })
   .strict()

@@ -1,8 +1,26 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { BrowserWindow, Menu, app, MenuItemConstructorOptions } from 'electron'
+import { BrowserWindow, Menu, app, MenuItemConstructorOptions, type BaseWindow } from 'electron'
 import { spawnNewInstance } from './utils/spawnNewInstance'
 import { PREVIEW } from '../shared/constants'
+import { BROWSER_TAB_EVENTS } from '../shared/ipc/browser-tab-channels'
+import { NewTabCommandEventSchema } from '../shared/ipc/browser-tab-chrome-schema'
+import { appWebContentsKind } from './ipc/appWebContents'
+
+/**
+ * **New browser tab** (spec 025, 025-FR-001; commit 18): told to the window
+ * the menu acted on – the one Electron hands the click, else the focused one –
+ * when it is an Erfana main window, never a popup or overlay. `byKey` marks the
+ * accelerator, so the renderer opens a tab from Ctrl/Cmd+T only while focus
+ * is in the editor area – elsewhere (a terminal, say) the key keeps its
+ * meaning there. A browser tab's own focus never reaches this item: its key
+ * routers consume Ctrl/Cmd+T first (ADR 0011 decisions 12–13).
+ */
+export function sendNewBrowserTab(target: BaseWindow | undefined, byKey: boolean): void {
+  const window = target instanceof BrowserWindow ? target : BrowserWindow.getFocusedWindow()
+  if (window === null || window.isDestroyed() || appWebContentsKind(window.webContents) !== 'main') return
+  window.webContents.send(BROWSER_TAB_EVENTS.newTabCommand, NewTabCommandEventSchema.parse({ byKey }))
+}
 
 /**
  * Routes a zoom request to a previewed page when one has keyboard focus.
@@ -103,6 +121,13 @@ export function createApplicationMenu(): Menu {
           accelerator: 'CmdOrCtrl+Shift+N',
           click: (): void => {
             spawnNewInstance()
+          }
+        },
+        {
+          label: 'New browser tab', // spec-fixed (025-FR-001), so not Title Case
+          accelerator: 'CmdOrCtrl+T',
+          click: (_item, window, event): void => {
+            sendNewBrowserTab(window, event.triggeredByAccelerator === true)
           }
         },
         ...(!isMac

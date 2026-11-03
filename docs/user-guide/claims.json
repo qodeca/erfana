@@ -2963,7 +2963,7 @@
       "quote": "Quit application (Cmd+Q on macOS; File → Quit on Windows and Linux)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/menu.ts:111",
+      "source": "src/main/menu.ts:136",
       "match": "{ role: 'quit' as const }",
       "note": "Ctrl+Q is not guaranteed: on Windows Electron's quit role has no accelerator; the non-mac Quit item lives in the File menu"
     },
@@ -4280,7 +4280,7 @@
       "quote": "- Portal rendering (#portal-root)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:147",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:153",
       "match": "const portalRoot = document.getElementById('portal-root')"
     },
     {
@@ -4290,7 +4290,7 @@
       "quote": "- Shortcut hints are exposed as `aria-keyshortcuts` (`⌘C` → `Meta+C`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:407",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:419",
       "match": "aria-keyshortcuts={toAriaKeyShortcuts(item.shortcut)}"
     },
     {
@@ -4871,7 +4871,7 @@
       "quote": "Registered in `DockLayout/components/EditorAreaSplitPanel.tsx` as the `htmlPreview` component (tab component `htmlPreviewTab`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:230",
+      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:240",
       "match": "htmlPreview: HtmlPreviewPanelWithBoundary,"
     },
     {
@@ -7389,7 +7389,7 @@
       "quote": "Native Edit menu (`src/main/menu.ts` role-based cut/copy/paste/selectAll) stays as-is",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:123",
+      "source": "src/main/menu.ts:148",
       "match": "{ role: 'cut' },"
     },
     {
@@ -11241,7 +11241,7 @@
       "quote": "**View > Toggle Developer Tools**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:135",
+      "source": "src/main/menu.ts:160",
       "match": "{ role: 'toggleDevTools' },"
     },
     {
@@ -11963,7 +11963,7 @@
       "quote": "`imageExport.html` is the hidden rasterize harness for image export",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:310",
+      "source": "electron.vite.config.ts:313",
       "match": "imageExport: resolve('src/renderer/imageExport.html')"
     },
     {
@@ -13209,7 +13209,7 @@
       "quote": "<PanelErrorBoundary key={props.params?.panelId || props.api.id} resetKey={props.params?.filePath ?? null} …>",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:88",
+      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:89",
       "match": "resetKey={props.params?.filePath ?? null}"
     },
     {
@@ -13219,7 +13219,7 @@
       "quote": "2. Register in `editorComponents` inside `EditorAreaSplitPanel`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:227",
+      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:237",
       "match": "const editorComponents = {"
     },
     {
@@ -14556,7 +14556,7 @@
       "quote": "- Protected tabs non-draggable",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:177",
+      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:187",
       "match": "welcomePanel.group.locked = true"
     },
     {
@@ -15313,7 +15313,7 @@
       "quote": "There is no File > Open menu item; the File menu contains only New Window (`src/main/menu.ts`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:102",
+      "source": "src/main/menu.ts:120",
       "match": "label: 'New Window'"
     },
     {
@@ -16470,7 +16470,7 @@
       "quote": "Menu dismisses on Escape, Tab, click outside, or action execution",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:109",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:115",
       "match": "Escape and Tab close and return focus",
       "note": "Tab also closes the menu."
     },
@@ -16727,7 +16727,7 @@
       "quote": "Cmd/Ctrl+Shift+N: New Window – the only `accelerator` declared in `src/main/menu.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:103",
+      "source": "src/main/menu.ts:121",
       "match": "accelerator: 'CmdOrCtrl+Shift+N',"
     },
     {
@@ -20779,7 +20779,7 @@
       "quote": "`editor` – `MarkdownEditorPanel` (Monaco + preview), id prefix `editor-`; `imageViewer`, id prefix `image-`; `htmlPreview`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:230",
+      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:240",
       "match": "htmlPreview: HtmlPreviewPanelWithBoundary,"
     },
     {
@@ -21673,7 +21673,7 @@
       "quote": "introduced exactly that map, `{ index, imageExport }`",
       "status": "verified",
       "evidence": "source",
-      "source": "electron.vite.config.ts:310",
+      "source": "electron.vite.config.ts:313",
       "match": "imageExport: resolve('src/renderer/imageExport.html')"
     },
     {
@@ -22703,7 +22703,7 @@
       "quote": "`menu.ts:103` — `CmdOrCtrl+Shift+N` accelerators",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:103",
+      "source": "src/main/menu.ts:121",
       "match": "accelerator: 'CmdOrCtrl+Shift+N'"
     },
     {
@@ -23278,7 +23278,7 @@
       "quote": "`createApplicationMenu` in `menu.ts:76-158`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:76",
+      "source": "src/main/menu.ts:94",
       "match": "export function createApplicationMenu(): Menu {"
     },
     {
@@ -24771,7 +24771,7 @@
       "quote": "`menu.ts` builds them with `zoomItem()` and routes each through `setPreviewZoomHandler`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:55",
+      "source": "src/main/menu.ts:73",
       "match": "if (previewZoomHandler !== null && (await previewZoomHandler(step))) {"
     },
     {
@@ -24781,7 +24781,7 @@
       "quote": "**File > New Window** is the one other explicit accelerator (`CmdOrCtrl+Shift+N`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/menu.ts:103",
+      "source": "src/main/menu.ts:121",
       "match": "accelerator: 'CmdOrCtrl+Shift+N',",
       "note": "Page said everything other than zoom used standard roles; File > New Window has its own accelerator."
     },
@@ -24792,7 +24792,7 @@
       "quote": "`front` on macOS, and quit/close on Windows and Linux",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/menu.ts:152",
+      "source": "src/main/menu.ts:177",
       "match": ": [{ role: 'close' as const }])",
       "note": "Role list omitted the macOS app-menu roles and front, and implied close exists on every platform; close is Windows/Linux only."
     },
@@ -24833,7 +24833,7 @@
       "quote": "The Window menu's `close` role exists only on Windows and Linux (`menu.ts`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/menu.ts:152",
+      "source": "src/main/menu.ts:177",
       "match": "[{ role: 'close' as const }]",
       "note": "Page said a Cmd+W entry under App and windows is the OS window-close role; the macOS Window menu has no close role and the user reference lists no Cmd+W there."
     },
@@ -25057,7 +25057,7 @@
       "quote": "focus moves to the first item on open, roving tabindex",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:400",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:412",
       "match": "tabIndex={index === current ? 0 : -1}"
     },
     {
@@ -25067,7 +25067,7 @@
       "quote": "and Escape or Tab close it and return focus to the opener (#90)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:345",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:351",
       "match": "case 'Tab':"
     },
     {
@@ -25138,7 +25138,7 @@
       "quote": "Toggle DevTools – Electron's `toggleDevTools` role in the View menu (`src/main/menu.ts`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:135",
+      "source": "src/main/menu.ts:160",
       "match": "{ role: 'toggleDevTools' },"
     },
     {
@@ -25159,7 +25159,7 @@
       "quote": "Reload – Electron's `reload` and `forceReload` roles",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:134",
+      "source": "src/main/menu.ts:159",
       "match": "{ role: 'forceReload' },"
     },
     {
@@ -25169,7 +25169,7 @@
       "quote": "`src/` sets no DevTools accelerator of its own and no inspect-element binding",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/menu.ts:135",
+      "source": "src/main/menu.ts:160",
       "match": "{ role: 'toggleDevTools' },",
       "note": "Page said there is no Cmd/Ctrl+Shift+I DevTools binding; src sets none, but the toggleDevTools role takes Electron's default accelerator (Ctrl+Shift+I on Windows/Linux per Electron's role defaults), so the absolute claim was removed."
     },
@@ -25341,7 +25341,7 @@
       "quote": "Home / End, Enter / Space, typeahead",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:333",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:339",
       "match": "case 'Home':"
     },
     {
@@ -25363,7 +25363,7 @@
       "quote": "The three zoom items are explicit accelerators, not Electron zoom roles",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:137",
+      "source": "src/main/menu.ts:162",
       "match": "zoomItem('Actual Size', 'CommandOrControl+0', 0),"
     },
     {
@@ -25373,7 +25373,7 @@
       "quote": "otherwise the focused window's own web contents is zoomed",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:58",
+      "source": "src/main/menu.ts:76",
       "match": "zoomFocusedWindow(step)"
     },
     {
@@ -25383,7 +25383,7 @@
       "quote": "the header comment in `menu.ts` explains why `role: 'zoomIn'` cannot be used",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:22",
+      "source": "src/main/menu.ts:40",
       "match": "WHY THE MENU CANNOT KEEP `role: 'zoomIn'`"
     },
     {
@@ -29025,7 +29025,7 @@
       "quote": "| HP-09 | Page zoom (View menu",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:138",
+      "source": "src/main/menu.ts:163",
       "match": "zoomItem('Zoom In', 'CommandOrControl+Plus', 1),"
     },
     {
@@ -30009,7 +30009,7 @@
       "quote": "| KEY-23 | <kbd>⇧⌘N</kbd> / <kbd>Ctrl+Shift+N</kbd> | New Window",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:103",
+      "source": "src/main/menu.ts:121",
       "match": "accelerator: 'CmdOrCtrl+Shift+N',"
     },
     {
@@ -30019,7 +30019,7 @@
       "quote": "| Actual size, zoom in, zoom out | menu |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:137",
+      "source": "src/main/menu.ts:162",
       "match": "zoomItem('Actual Size', 'CommandOrControl+0', 0),"
     },
     {
@@ -30029,7 +30029,7 @@
       "quote": "| Window management | OS |",
       "status": "verified",
       "evidence": "app",
-      "source": "src/main/menu.ts:148",
+      "source": "src/main/menu.ts:173",
       "match": "{ role: 'minimize' },",
       "note": "Electron role defaults and OS keys. Real-app test reads the app menu: minimize, hide, quit and togglefullscreen roles carry the OS-default accelerators (macOS run; Windows keys unverified on this host).",
       "test": "e2e/guide-tasks/claims-user-1.guide.ts"
@@ -30041,7 +30041,7 @@
       "quote": "| Open and use any right-click menu | menus |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:346",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:352",
       "match": "// A menu is modal to the keyboard while open: Tab closes it rather",
       "test": "e2e/context-menu-keyboard.e2e.ts"
     },
@@ -30072,7 +30072,7 @@
       "quote": "Erfana menu: About, Hide, Hide Others, Show All, Quit",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:89",
+      "source": "src/main/menu.ts:107",
       "match": "{ role: 'hideOthers' as const },"
     },
     {
@@ -30082,7 +30082,7 @@
       "quote": "File: New Window; Exit (Windows)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:102",
+      "source": "src/main/menu.ts:120",
       "match": "label: 'New Window',"
     },
     {
@@ -30092,7 +30092,7 @@
       "quote": "Edit: Undo, Redo, Cut, Copy, Paste, Select All",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:126",
+      "source": "src/main/menu.ts:151",
       "match": "{ role: 'selectAll' }"
     },
     {
@@ -30102,7 +30102,7 @@
       "quote": "View: Reload, Force Reload, Toggle DevTools, zoom, full screen",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:135",
+      "source": "src/main/menu.ts:160",
       "match": "{ role: 'toggleDevTools' },"
     },
     {
@@ -30112,7 +30112,7 @@
       "quote": "Window: Minimize, Zoom, Bring All to Front (macOS) / Close (Windows)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:151",
+      "source": "src/main/menu.ts:176",
       "match": "? [{ type: 'separator' as const }, { role: 'front' as const }]"
     },
     {
@@ -33505,7 +33505,7 @@
       "quote": "Select **File > New Window** (<kbd>⇧⌘N</kbd>",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:102",
+      "source": "src/main/menu.ts:120",
       "match": "label: 'New Window'"
     },
     {
@@ -33515,7 +33515,7 @@
       "quote": "(<kbd>⇧⌘N</kbd> / <kbd>Ctrl+Shift+N</kbd>) to open another window",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/menu.ts:103",
+      "source": "src/main/menu.ts:121",
       "match": "accelerator: 'CmdOrCtrl+Shift+N'",
       "note": "Added the existing New Window shortcut, which the page did not mention."
     },
@@ -33567,7 +33567,7 @@
       "quote": "1. Select **File > New Window** or press <kbd>⇧⌘N</kbd> / <kbd>Ctrl+Shift+N</kbd>.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/menu.ts:103",
+      "source": "src/main/menu.ts:121",
       "match": "accelerator: 'CmdOrCtrl+Shift+N'",
       "note": "Added the shortcut to the step."
     },
@@ -33589,7 +33589,7 @@
       "quote": "or with **File > Exit** on Windows, closes Erfana without a confirmation",
       "status": "fixed",
       "evidence": "app",
-      "source": "src/main/menu.ts:111",
+      "source": "src/main/menu.ts:136",
       "match": "{ role: 'quit' as const }",
       "test": "e2e/quit-shutdown.e2e.ts",
       "note": "Moved from step 3: File > Exit (Electron's Windows label for the quit role in the File menu) goes through app.quit(), which skips the confirmation."
@@ -34099,7 +34099,7 @@
       "quote": "[work in several windows](how-to/work-in-several-windows.md)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/menu.ts:102",
+      "source": "src/main/menu.ts:120",
       "match": "label: 'New Window',",
       "note": "Link text 'work in windows' read like the Windows OS; changed to 'work in several windows' to match the target page and the New Window command."
     },
@@ -35536,7 +35536,7 @@
       "quote": "**View > Actual Size / Zoom In / Zoom Out** apply to the focused page.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:137",
+      "source": "src/main/menu.ts:162",
       "match": "zoomItem('Actual Size', 'CommandOrControl+0', 0),"
     },
     {
@@ -35546,7 +35546,7 @@
       "quote": "Their shortcuts are <kbd>⌘0</kbd>, <kbd>⌘+</kbd> and <kbd>⌘-</kbd>",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/menu.ts:138",
+      "source": "src/main/menu.ts:163",
       "match": "zoomItem('Zoom In', 'CommandOrControl+Plus', 1),",
       "note": "Zoom shortcuts were not stated; added from the View menu accelerators (menu.ts lines 137-139)."
     },
@@ -35710,7 +35710,7 @@
       "quote": "and <kbd>⌘-</kbd> / <kbd>Ctrl+0</kbd>, <kbd>Ctrl++</kbd> and <kbd>Ctrl+-</kbd>",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:139",
+      "source": "src/main/menu.ts:164",
       "match": "zoomItem('Zoom Out', 'CommandOrControl+-', -1),"
     },
     {
@@ -36612,7 +36612,7 @@
       "quote": "| New Window | <kbd>⇧⌘N</kbd> | <kbd>Ctrl+Shift+N</kbd> |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:103",
+      "source": "src/main/menu.ts:121",
       "match": "accelerator: 'CmdOrCtrl+Shift+N'"
     },
     {
@@ -36622,7 +36622,7 @@
       "quote": "| Actual size; zoom in; zoom out |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:138",
+      "source": "src/main/menu.ts:163",
       "match": "zoomItem('Zoom In', 'CommandOrControl+Plus', 1)"
     },
     {
@@ -36632,7 +36632,7 @@
       "quote": "The View zoom commands zoom a focused HTML page first; otherwise they zoom the Erfana window.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:55",
+      "source": "src/main/menu.ts:73",
       "match": "if (previewZoomHandler !== null && (await previewZoomHandler(step)))"
     },
     {
@@ -36642,7 +36642,7 @@
       "quote": "| Minimize; hide; quit |",
       "status": "verified",
       "evidence": "app",
-      "source": "src/main/menu.ts:148",
+      "source": "src/main/menu.ts:173",
       "match": "{ role: 'minimize' }",
       "note": "Electron role defaults: minimize Cmd/Ctrl+M, hide only in the macOS app menu, quit is File > Exit on Windows (no accelerator).",
       "test": "e2e/guide-tasks/claims-user-2.guide.ts"
@@ -36654,7 +36654,7 @@
       "quote": "<kbd>Ctrl+M</kbd>; none; **File > Exit**",
       "status": "verified",
       "evidence": "app",
-      "source": "src/main/menu.ts:111",
+      "source": "src/main/menu.ts:136",
       "match": "{ role: 'quit' as const }",
       "note": "Test reads the installed menu: Window > Minimize has CommandOrControl+M on every system; its win32 branch asserts no hide role and the quit role labelled Exit under File. Run here on macOS, so only the macOS branch executed; the Windows column is proven when the guide project runs on Windows.",
       "test": "e2e/guide-tasks/claims-user-3.guide.ts"
@@ -36666,7 +36666,7 @@
       "quote": "| Close window; full screen |",
       "status": "verified",
       "evidence": "app",
-      "source": "src/main/menu.ts:141",
+      "source": "src/main/menu.ts:166",
       "match": "{ role: 'togglefullscreen' }",
       "note": "Test reads the installed menu: on macOS no close role (no Cmd+W, so the window close control) and Toggle Full Screen = Control+Command+F (executed here); its win32 branch asserts F11. Alt+F4 is the Windows system close, not asserted.",
       "test": "e2e/guide-tasks/claims-user-3.guide.ts"
@@ -37220,7 +37220,7 @@
       "quote": "| Move to the previous or next item; first or last item |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:334",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:340",
       "match": "next = firstItem(items)"
     },
     {
@@ -37230,7 +37230,7 @@
       "quote": "| Choose the focused item | <kbd>Enter</kbd> or <kbd>Space</kbd> | Same |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:343",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:349",
       "match": "if (current >= 0) handleItemClick(items[current])"
     },
     {
@@ -37240,7 +37240,7 @@
       "quote": "| Jump to an item by name | Type its first letters | Same |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:354",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:360",
       "match": "next = findByTypeahead(event.key)"
     },
     {
@@ -37250,7 +37250,7 @@
       "quote": "| Close the menu | <kbd>Esc</kbd> or <kbd>Tab</kbd> | Same |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:345",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:351",
       "match": "case 'Tab':"
     },
     {
@@ -37260,7 +37260,7 @@
       "quote": "A menu opens with focus on its first item",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:102",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:108",
       "match": "* - Focus moves to the first item when the menu opens."
     },
     {
@@ -37270,7 +37270,7 @@
       "quote": "Greyed-out items can be reached but do nothing.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:106",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:112",
       "match": "*   disabled items are NOT, so they stay discoverable (`aria-disabled` only)."
     },
     {
@@ -37466,7 +37466,7 @@
       "quote": "closing it puts focus back where it was. Greyed-out",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:109",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:115",
       "match": "Escape and Tab close and return focus to whatever had it at open."
     },
     {
@@ -37838,7 +37838,7 @@
       "quote": "**Hide**, **Hide Others** and **Show All** use macOS window management, and **Quit** quits the app",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/menu.ts:86",
+      "source": "src/main/menu.ts:104",
       "match": "{ role: 'about' as const },",
       "note": "Quit was grouped under macOS window management; it quits the app (role quit), so the sentence now says so."
     },
@@ -37849,7 +37849,7 @@
       "quote": "**How to reach it:** the **Erfana** menu in the system menu bar",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:84",
+      "source": "src/main/menu.ts:102",
       "match": "label: app.name,"
     },
     {
@@ -37859,7 +37859,7 @@
       "quote": "**Limits:** macOS only; Windows puts **Exit** in **File**.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:111",
+      "source": "src/main/menu.ts:136",
       "match": "{ role: 'quit' as const }"
     },
     {
@@ -37869,7 +37869,7 @@
       "quote": "**File > New Window**, <kbd>⇧⌘N</kbd> / <kbd>Ctrl+Shift+N</kbd>",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:103",
+      "source": "src/main/menu.ts:121",
       "match": "accelerator: 'CmdOrCtrl+Shift+N',"
     },
     {
@@ -37879,7 +37879,7 @@
       "quote": "**New Window** opens another Erfana window",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:105",
+      "source": "src/main/menu.ts:123",
       "match": "spawnNewInstance()"
     },
     {
@@ -37900,7 +37900,7 @@
       "quote": "**Undo**, **Redo**, **Cut**, **Copy**, **Paste**, and **Select All** act on the focused editable control",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:126",
+      "source": "src/main/menu.ts:151",
       "match": "{ role: 'selectAll' }"
     },
     {
@@ -37910,7 +37910,7 @@
       "quote": "**Reload** and **Force Reload** redraw the app; **Toggle Developer Tools** opens or closes developer tools",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:135",
+      "source": "src/main/menu.ts:160",
       "match": "{ role: 'toggleDevTools' },"
     },
     {
@@ -37920,7 +37920,7 @@
       "quote": "**Toggle Full Screen** changes the window display",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:141",
+      "source": "src/main/menu.ts:166",
       "match": "{ role: 'togglefullscreen' }"
     },
     {
@@ -37930,7 +37930,7 @@
       "quote": "Zoom keys are <kbd>⌘0</kbd>, <kbd>⌘+</kbd>, <kbd>⌘-</kbd> / <kbd>Ctrl+0</kbd>, <kbd>Ctrl++</kbd>, <kbd>Ctrl+-</kbd>",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:138",
+      "source": "src/main/menu.ts:163",
       "match": "zoomItem('Zoom In', 'CommandOrControl+Plus', 1),"
     },
     {
@@ -37940,7 +37940,7 @@
       "quote": "**Actual Size**, **Zoom In**, **Zoom Out** change zoom",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:137",
+      "source": "src/main/menu.ts:162",
       "match": "zoomItem('Actual Size', 'CommandOrControl+0', 0),"
     },
     {
@@ -37950,7 +37950,7 @@
       "quote": "When an HTML page has focus, zoom applies to that page first.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:55",
+      "source": "src/main/menu.ts:73",
       "match": "if (previewZoomHandler !== null && (await previewZoomHandler(step))) {"
     },
     {
@@ -37969,7 +37969,7 @@
       "quote": "macOS also has **Bring All to Front**, while Windows has **Close**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:151",
+      "source": "src/main/menu.ts:176",
       "match": "[{ type: 'separator' as const }, { role: 'front' as const }]"
     },
     {
@@ -37979,7 +37979,7 @@
       "quote": "**Minimize** and **Zoom** manage the window",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:148",
+      "source": "src/main/menu.ts:173",
       "match": "{ role: 'minimize' },"
     },
     {
@@ -38151,7 +38151,7 @@
       "quote": "then use the arrow keys and <kbd>Enter</kbd>",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:327",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:333",
       "match": "case 'ArrowDown':",
       "test": "e2e/context-menu-keyboard.e2e.ts"
     },
@@ -38192,7 +38192,7 @@
       "quote": "on Windows, **Exit** quits the app",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:111",
+      "source": "src/main/menu.ts:136",
       "match": "{ role: 'quit' as const }"
     },
     {
@@ -38202,7 +38202,7 @@
       "quote": "The actions are Electron's platform roles, so their available accelerators follow the operating system.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:120",
+      "source": "src/main/menu.ts:145",
       "match": "{ role: 'undo' },"
     },
     {
@@ -38212,7 +38212,7 @@
       "quote": "Platform window-management keys follow the operating system.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:148",
+      "source": "src/main/menu.ts:173",
       "match": "{ role: 'minimize' },"
     },
     {
@@ -40288,7 +40288,7 @@
       "quote": "Opening a file restores the editor layout.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:202",
+      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:212",
       "match": "setTerminalExpanded(false)"
     },
     {
@@ -41811,7 +41811,7 @@
       "quote": "**File > Exit** replaces the macOS app-menu Quit",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:111",
+      "source": "src/main/menu.ts:136",
       "match": "{ role: 'quit' as const }",
       "note": "Electron's quit role is labelled Exit on Windows; it sits in the File menu only when not macOS"
     },
@@ -41822,7 +41822,7 @@
       "quote": "and **Window > Close** closes the window.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/menu.ts:152",
+      "source": "src/main/menu.ts:177",
       "match": ": [{ role: 'close' as const }])",
       "note": "Alt+F4 (OS-level, not defined by Erfana) and F11 claims removed; Window > Close kept"
     },
@@ -47099,7 +47099,7 @@
       "quote": "auto-restores on file open",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:201",
+      "source": "src/renderer/src/components/DockLayout/components/EditorAreaSplitPanel.tsx:211",
       "match": "exits terminal-expand"
     },
     {
@@ -54533,7 +54533,7 @@
       "quote": "Windows menubar has File/Edit/View/Window only",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/menu.ts:146",
+      "source": "src/main/menu.ts:171",
       "match": "label: 'Window',"
     },
     {

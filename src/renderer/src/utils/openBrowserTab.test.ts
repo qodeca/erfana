@@ -6,6 +6,7 @@ import {
   BROWSER_PANEL_COMPONENT,
   BROWSER_TAB_COMPONENT,
   NEW_BROWSER_TAB_TITLE,
+  focusInEditorArea,
   isBrowserPanelId,
   openBrowserTab
 } from './openBrowserTab'
@@ -72,5 +73,24 @@ describe('openBrowserTab', () => {
   it('tells browser panel ids from other editor panels', () => {
     expect(isBrowserPanelId('browser-panel-3')).toBe(true)
     expect(isBrowserPanelId('editor-a.md')).toBe(false)
+  })
+})
+
+describe('focusInEditorArea', () => {
+  it('is true with nothing focused or focus inside the area, false elsewhere', () => {
+    const area = document.createElement('div')
+    const inside = document.createElement('button')
+    const outside = document.createElement('button')
+    area.appendChild(inside)
+    document.body.append(area, outside)
+    ;(document.activeElement as HTMLElement | null)?.blur()
+    expect(focusInEditorArea(area)).toBe(true)
+    inside.focus()
+    expect(focusInEditorArea(area)).toBe(true)
+    outside.focus()
+    expect(focusInEditorArea(area)).toBe(false)
+    expect(focusInEditorArea(null)).toBe(false)
+    area.remove()
+    outside.remove()
   })
 })

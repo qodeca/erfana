@@ -364,3 +364,78 @@
 .erf-brw-page__action--primary:hover {
   background: var(--color-btn-primary-hover);
 }
+
+/* ---------- certificate page: Proceed anyway (deck, M-43) ---------- */
+
+.erf-brw-page__proceed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-6);
+}
+
+/* Text-style and quieter than Back to safety; the guard's blocked look wins over hover. */
+.erf-brw-page__text-action {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  font-size: var(--text-base);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.erf-brw-page__text-action:hover {
+  color: var(--color-text-primary);
+}
+
+.erf-brw-page__text-action[aria-disabled='true'] {
+  color: var(--color-text-tertiary);
+  cursor: not-allowed;
+}
+
+.erf-brw-page__text-action:focus-visible,
+.erf-brw-page__details > summary:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+.erf-brw-page__caution {
+  flex: 1 1 40ch;
+  margin: 0;
+  color: var(--color-text-tertiary);
+  line-height: var(--leading-normal);
+}
+
+.erf-brw-page__details > summary {
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.erf-brw-page__action[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+/* ---------- Clear browsing data (inside the shared dialog) ---------- */
+
+.erf-brw-clear {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.erf-brw-clear__option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: var(--space-4);
+  align-items: center;
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+}
+
+.erf-brw-clear__desc {
+  grid-column: 2;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-sm);
+}

@@ -68,7 +68,7 @@ import { installSiteRequestHooks } from './site/siteRequestHooks'
 import { electronMacAppKeys } from './input/macAppRoles'
 import { LocalFileServers } from './local/LocalFileServers'
 import { disposeWithin } from '../../utils/disposeWithin'
-import { openExternalSafeDetached } from '../../utils/openExternalSafe'
+import { openExternalSafe, openExternalSafeDetached } from '../../utils/openExternalSafe'
 import { BrowserPopups } from './popups/BrowserPopups'
 import { electronPopupWindows } from './popups/popupWindowElectron'
 import { enablePageDialogEvents } from './dialogs/pageDialogs'
@@ -298,9 +298,14 @@ export function installBrowserAfterReady(deps: BrowserAfterReadyDeps): BrowserRu
         writeClipboardText: (text) => clipboard.writeText(text),
         pickAt: (tabId, at) => pickSetup.picks.pickAt(tabId, at)
       }
+    },
+    keyring: {
+      clock: mainClock,
+      take: () => profiles.takeKeyringNotices(),
+      dismissWeak: () => profiles.dismissWeakProtectionNotice()
     }
   })
-  ;(deps.registerTabHandlers ?? registerBrowserTabHandlers)({ service: tabs })
+  ;(deps.registerTabHandlers ?? registerBrowserTabHandlers)({ service: tabs, openInSystemBrowser: (url) => openExternalSafe(url) })
   ;(deps.registerPageHandlers ?? registerBrowserTabPageHandlers)({
     tabs,
     pages,

@@ -6,8 +6,10 @@
  * commit 17; design `docs/designs/browser/`, proposed).
  *
  * The page runs in a native view main owns; this panel is the DOM around it:
- * the navigation row, the refused-address message, and the page area whose
- * placeholder the view covers – or an Erfana page drawn there instead. Glue
+ * the navigation row (with More and the address chips), the find row, the
+ * strip rows (the refused address first), and the page area whose
+ * placeholder the view covers – or an Erfana page drawn there instead – plus
+ * the page right-click menu and Clear browsing data (commit 18). Glue
  * only: the tab's lifetime is `browserTabLifecycle`, its state the browser tab
  * store, where the page sits `useBrowserBounds`, keys `useBrowserKeys`, focus
  * into the page `useBrowserPageFocus`, decisions `browserPanel.logic.ts`.
@@ -18,10 +20,12 @@
  * and its DOM mounted (025-FR-007). The error boundary is mounted at the
  * registration site (`EditorAreaSplitPanel`), keyed by the project.
  */
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { IDockviewPanelProps } from 'dockview'
 import { DOCKVIEW_PANEL_VISIBLE, useDockviewValue } from '../../../hooks/useDockviewValue'
 import { useBrowserTabStore } from '../../../stores/useBrowserTabStore'
+import { useBrowserChromeStore, type ShownStripRow } from '../../../stores/useBrowserChromeStore'
+import { useOptionalDialog } from '../../Dialog/DialogContext'
 import { browserTabGateway } from '../../../services/browserTabGateway'
 import { ensureBrowserTab } from '../../../services/browser/browserTabLifecycle'
 import type { BrowserPanelParams } from '../../../utils/openBrowserTab'
@@ -34,7 +38,17 @@ import { useBrowserBounds } from './useBrowserBounds'
 import { useBrowserKeys } from './useBrowserKeys'
 import { useBrowserPageFocus } from './useBrowserPageFocus'
 import { BROWSER_TEST_IDS } from './browserTestIds'
+import { StripRows } from './StripRows'
+import { FindRow } from './FindRow'
+import { AddressChips } from './AddressChips'
+import { PageContextMenu } from './PageContextMenu'
+import { ClearDataDialog } from './ClearDataDialog'
+import type { MoreMenuActions } from './MoreMenu'
+import { forgetBrowserData, openInSystemBrowser } from './browserDataActions'
 import './BrowserPanel.css'
+import './BrowserChrome.css'
+
+const NO_ROWS: readonly ShownStripRow[] = []
 
 /** The first focusable element of an Erfana page, for F6 and Esc. */
 const ERFANA_PAGE_FOCUSABLE =
@@ -42,6 +56,11 @@ const ERFANA_PAGE_FOCUSABLE =
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+/** A rejection handler that logs `what`. */
+function fail(what: string): (error: unknown) => void {
+  return error => logger.warn(what, { error: errorText(error) })
 }
 
 /**
@@ -63,6 +82,11 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
   const tabId = useBrowserTabStore(s => s.tabByPanel.get(panelId) ?? null)
   const entry = useBrowserTabStore(s => (tabId === null ? undefined : s.byTab.get(tabId)))
   const localAddresses = useBrowserTabStore(s => s.localAddresses)
+  const rows = useBrowserChromeStore(s => (tabId === null ? NO_ROWS : (s.rows.get(tabId) ?? NO_ROWS)))
+  const findResult = useBrowserChromeStore(s => (tabId === null ? undefined : s.find.get(tabId)))
+  const dialog = useOptionalDialog()
+  const [findOpen, setFindOpen] = useState(false)
+  const [clearOpen, setClearOpen] = useState(false)
   const state = entry?.state ?? null
   const pageFocused = entry?.pageFocused ?? false
   const live = state !== null && state.erfanaPage === null
@@ -105,8 +129,14 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
     pageAreaRef.current?.querySelector<HTMLElement>(ERFANA_PAGE_FOCUSABLE)?.focus()
   }, [live, focusPage])
 
+  const openFind = useCallback(() => {
+    if (live) setFindOpen(true)
+  }, [live])
+
   const keys = useBrowserKeys({
     tabId,
+    panelId,
+    openFind,
     api,
     containerApi,
     rootRef,
@@ -166,6 +196,43 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
     [pageFocused]
   )
 
+  const moreActions = useMemo<MoreMenuActions>(
+    () => ({
+      zoom: step => {
+        if (tabId !== null) browserTabGateway.zoom(tabId, step).catch(fail('Browser tab zoom failed'))
+      },
+      widthPreset: preset => {
+        if (tabId !== null) browserTabGateway.widthPreset(tabId, preset).catch(fail('Browser width preset failed'))
+      },
+      find: () => setFindOpen(true),
+      openInSystemBrowser: () => {
+        if (tabId !== null) void openInSystemBrowser(tabId)
+      },
+      devTools: () => {
+        if (tabId !== null) browserTabGateway.devTools(tabId).catch(fail('Browser tab DevTools failed'))
+      },
+      clearData: () => setClearOpen(true),
+      forget: () => {
+        if (dialog !== undefined) void forgetBrowserData(dialog.showConfirm)
+      }
+    }),
+    [tabId, dialog]
+  )
+
+  const popupBlocked = rows.some(shown => shown.row.kind === 'popupBlocked')
+  const showPopupRow = useCallback(() => {
+    rootRef.current?.querySelector<HTMLElement>('[data-strip-kind="popupBlocked"]')?.focus()
+  }, [])
+  const closeFind = useCallback(() => {
+    setFindOpen(false)
+    if (tabId !== null) useBrowserChromeStore.getState().clearFind(tabId)
+    if (live) focusPage()
+  }, [tabId, live, focusPage])
+  const pageOrigin = useCallback(() => placeholderRef.current?.getBoundingClientRect() ?? null, [])
+  const afterMenu = useCallback(() => {
+    if (live) focusPage()
+  }, [live, focusPage])
+
   return (
     <div
       ref={rootRef}
@@ -198,18 +265,20 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
         }}
         onAddressEdit={() => setRefused(null)}
         errorId={refused === null ? null : refusedId}
+        onOpenInSystemBrowser={() => (tabId === null ? Promise.resolve() : openInSystemBrowser(tabId))}
+        moreActions={moreActions}
+        chips={
+          <AddressChips
+            state={state}
+            popupBlocked={popupBlocked}
+            addressRef={addressRef}
+            onResetZoom={() => moreActions.zoom('reset')}
+            onShowPopupRow={showPopupRow}
+          />
+        }
       />
-      {refused !== null && (
-        <p
-          id={refusedId}
-          className="erf-brw-refused"
-          role="alert"
-          data-testid={BROWSER_TEST_IDS.REFUSED}
-        >
-          <span className="erf-brw-hidden">Error: </span>
-          {refused}
-        </p>
-      )}
+      {findOpen && live && tabId !== null && <FindRow tabId={tabId} result={findResult} onClose={closeFind} />}
+      <StripRows tabId={tabId} rows={rows} refused={refused} refusedId={refusedId} onEmpty={focusPageArea} />
       <PageArea
         tabId={tabId}
         state={state}
@@ -220,6 +289,8 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
         onOpen={url => void load(url, 'history')}
         mayTakeFocus={mayTakeFocus}
       />
+      <PageContextMenu tabId={tabId} pageOrigin={pageOrigin} onClosed={afterMenu} />
+      {clearOpen && <ClearDataDialog onClose={() => setClearOpen(false)} />}
     </div>
   )
 }

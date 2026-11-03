@@ -138,6 +138,27 @@ export default defineConfig({
         'src/renderer/src/components/Panels/BrowserPanel/useBrowserKeys.ts': { lines: 98, functions: 98, branches: 92, statements: 96 },
         // measured 100/100/95/100
         'src/renderer/src/components/Panels/BrowserPanel/useBrowserPageFocus.ts': { lines: 98, functions: 98, branches: 93, statements: 98 },
+        // Built-in browser, renderer side (spec 025, commit 18): the strip rows and their
+        // input guard, the Erfana pages' words, the menus and the data actions. A
+        // regression here shows as an answer sent inside the guard, a wrong sentence on
+        // an error page, or a menu acting on the wrong item. Each floor ~2 points under
+        // the value measured when it landed.
+        // measured 100/100/96/100 (lines/functions/branches/statements)
+        'src/renderer/src/stores/useBrowserChromeStore.ts': { lines: 98, functions: 98, branches: 94, statements: 98 },
+        // measured 100/100/98.14/100
+        'src/renderer/src/components/Panels/BrowserPanel/stripRows.logic.ts': { lines: 98, functions: 98, branches: 96, statements: 98 },
+        // measured 98.07/95/89.55/93.84
+        'src/renderer/src/components/Panels/BrowserPanel/StripRow.tsx': { lines: 96, functions: 93, branches: 87, statements: 91 },
+        // measured 100/100/94.73/100
+        'src/renderer/src/components/Panels/BrowserPanel/StripRows.tsx': { lines: 98, functions: 98, branches: 92, statements: 98 },
+        // measured 100/100/100/100
+        'src/renderer/src/components/Panels/BrowserPanel/erfanaPageCopy.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/97.22/100
+        'src/renderer/src/components/Panels/BrowserPanel/browserMenus.logic.ts': { lines: 98, functions: 98, branches: 95, statements: 98 },
+        // measured 100/100/91.66/100
+        'src/renderer/src/components/Panels/BrowserPanel/browserDataActions.ts': { lines: 98, functions: 98, branches: 89, statements: 98 },
+        // measured 100/100/88/100
+        'src/renderer/src/browserPopup/PopupStrip.tsx': { lines: 98, functions: 98, branches: 86, statements: 98 },
       },
       exclude: [
         'node_modules/**',

@@ -47,6 +47,11 @@ declare global {
       log?: (entry: LogEntry) => void
     }
     /**
+     * A browser popup host's own API (spec 025, commit 18), exposed only by
+     * `src/preload/browserPopup.ts`. `undefined` in every other renderer.
+     */
+    browserPopupApi?: import('../shared/ipc/browser-popup-bridge-types').BrowserPopupBridge
+    /**
      * E2E crash-injection flag, exposed by `src/preload/index.ts` only when the
      * main process appended `--erfana-force-crash` (unpackaged +
      * `ERFANA_E2E_FORCE_CRASH=1`). `undefined` in every normal run — declared
