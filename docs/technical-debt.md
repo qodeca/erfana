@@ -1128,6 +1128,18 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 
 **Re-run**: at every release that touches windows, sessions or `webPreferences`.
 
+### 68. Browser URLs are logged in full, an exception to `redactUserInput` (spec 025, 025-FR-042, 2026-11)
+
+**Severity**: Low (accepted; reconfirmed by the owner 2026-11-01, `specs/spec-t4-025-built-in-browser/requirements/05-notes.md`)
+
+**What**: Erfana's log files may record the full URL of a browser page, path and query included, for navigation errors and load failures, so support can see what failed. This is a deliberate exception to the `redactUserInput` convention in `CLAUDE.md`. Query strings can hold tokens or personal data, and the user guide's Data handling page must say so (025-FR-044).
+
+**Limits that stay in force** (025-FR-064): no page titles, form data, console text, network bodies or typed search text; a failed search-fallback load is logged without a URL; local file paths go through `redactPath`.
+
+**Where the exception applies**: the sites that log a browser URL, each of which carries a comment pointing here. As of this entry no site in `src/main/services/browser/` does: the load-failure log (`page/BrowserTabPage.ts`, `loadFailed`) writes the error code only, and `browserSessionPolicy.ts` (`logDenied`) logs by name with no URL. `cdp/browserLogBuffer.ts` (`failedRequestUrl`) keeps path and query for the context file, not the log file. Add each new site to this entry when it is written.
+
+**Status**: Accepted. Open until the load-failure site logs the URL and carries the comment (025-AC-042).
+
 This doc covers project-wide non-Windows technical debt. For phase-structured deferred items with promotion criteria + risk-if-forgotten:
 
 - [`windows/deferred-work.md`](./windows/deferred-work.md) — D1-D8 (Phase 2 review aftermath, tracked in #168)
