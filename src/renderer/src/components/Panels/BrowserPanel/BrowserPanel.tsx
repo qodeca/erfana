@@ -291,6 +291,11 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
     />
   )
   const { surface, close: closePick } = pick
+  // Another editor tab hid this one: the menu or dialog closes without sending, its capture goes
+  // and the page runs again; the dialog's text stays for the next dialog (025-FR-052).
+  useEffect(() => {
+    if (!isVisible && surface !== 'none') closePick('tabHidden')
+  }, [isVisible, surface, closePick])
   /** A press on the navigation row, the pick row or the strip closes the panel without sending (025-FR-049). */
   const onRowPress = useCallback(
     (event: React.PointerEvent) => {

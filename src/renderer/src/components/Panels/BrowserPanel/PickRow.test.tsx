@@ -135,6 +135,27 @@ describe('PickRow (025-FR-025, 025-FR-065)', () => {
     expect(props.onNoticeDone).toHaveBeenCalledOnce()
     fireEvent.click(show)
     expect(props.onShowTerminal).toHaveBeenCalledOnce()
+  })
+
+  it('after a pause, the send notice goes once the time left has run, not a fresh 5 s', () => {
+    const notice = { text: 'Sent Explain to Terminal', contextPath: '.erfana/browser/captures/c.md' }
+    const { props } = renderRow({ notice })
+    const slot = screen.getByRole('button', { name: 'Show terminal' }).parentElement as HTMLElement
+    act(() => vi.advanceTimersByTime(2000))
+    fireEvent.pointerEnter(slot)
+    act(() => vi.advanceTimersByTime(SEND_NOTICE_MS * 2))
+    fireEvent.pointerLeave(slot)
+    act(() => vi.advanceTimersByTime(SEND_NOTICE_MS - 2000 - 1))
+    expect(props.onNoticeDone).not.toHaveBeenCalled()
+    act(() => vi.advanceTimersByTime(1))
+    expect(props.onNoticeDone).toHaveBeenCalledOnce()
+  })
+
+  it('opens the terminal and the capture from the send notice', () => {
+    const notice = { text: 'Sent Explain to Terminal', contextPath: '.erfana/browser/captures/c.md' }
+    const { props } = renderRow({ notice })
+    fireEvent.click(screen.getByRole('button', { name: 'Show terminal' }))
+    expect(props.onShowTerminal).toHaveBeenCalledOnce()
     fireEvent.click(screen.getByRole('button', { name: 'Open capture' }))
     expect(props.onOpenCapture).toHaveBeenCalledWith('.erfana/browser/captures/c.md')
   })

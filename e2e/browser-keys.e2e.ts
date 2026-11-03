@@ -19,6 +19,11 @@ import type { ElectronApplication, Page } from '@playwright/test'
 import { test, expect } from './fixtures/browserHarness'
 import type { BrowserPagePage } from './pages/browser-page.page'
 import { PAGE_AREA, type BrowserTabPage } from './pages/browser-tab.page'
+import { KeyboardHelper } from './pages/keyboard.helper'
+import { MonacoPage } from './pages/monaco.page'
+import { EditorPanelPage } from './pages/editor-panel.page'
+import { ProjectTreePage } from './pages/project-tree.page'
+import { BrowserSendUi } from './pages/browser-send.page'
 
 type Modifier = 'shift' | 'control' | 'alt' | 'meta'
 
@@ -118,8 +123,20 @@ async function openEventsPage(browserTabs: BrowserTabPage, url: string): Promise
 test.describe('built-in browser key and mouse routing (main side)', () => {
   test('025-AC-061 with page focus the page keeps Erfana app shortcuts and nothing is forwarded', async ({
     browserTabs,
-    browserServers
+    browserServers,
+    windowWithTestProject
   }) => {
+    // Positive control: in the editor the same key is Erfana's – Ctrl/Cmd+K wraps the selection in a link.
+    // (Ctrl/Cmd+P has no binding in Erfana and Ctrl/Cmd+Shift+N is a menu accelerator Playwright cannot press:
+    // their controls are the manual pass.)
+    await new ProjectTreePage(windowWithTestProject).clickFileByName('test.md')
+    await new EditorPanelPage(windowWithTestProject).setViewMode('editor')
+    const editor = new MonacoPage(windowWithTestProject, new KeyboardHelper(windowWithTestProject))
+    await editor.setContent('word')
+    await editor.selectAll()
+    await windowWithTestProject.keyboard.press(`${IS_MAC ? 'Meta' : 'Control'}+k`)
+    await expect.poll(() => editor.getContent(), { timeout: WAIT_MS }).toMatch(/^\[word\]\(/)
+
     const page = await openEventsPage(browserTabs, browserServers.sites.static.url('/events.html'))
     const shortcuts: Array<[string, Modifier[]]> = [
       ['s', [MOD]],
@@ -135,7 +152,7 @@ test.describe('built-in browser key and mouse routing (main side)', () => {
     expect(await forwardedActions(browserTabs.window, page.tabId)).toEqual([])
   })
 
-  test('025-AC-014 025-AC-071 browser and reserved keys from page focus are forwarded and never reach the page', async ({
+  test('025-AC-014 browser and reserved keys from page focus are forwarded and never reach the page', async ({
     browserTabs,
     browserServers
   }) => {
@@ -340,5 +357,127 @@ test.describe('built-in browser key and mouse routing (main side)', () => {
     await page.waitFor(`document.getElementById('text').value === 'hello'`, 'Cmd+Shift+Z redid it')
     // The roles ran in main: the page saw none of the keys.
     expect((await pageKeydowns(page)).filter((k) => k.startsWith('Meta+'))).toEqual([])
+  })
+})
+
+/** The keydowns the page logged, with a capture-phase logger installed on any fixture page. */
+const LOG_KEYS = `addEventListener('keydown', (e) => window.__fixture.record('keydown', e.key), true); window.__fixture.clear(); 0`
+
+test.describe('built-in browser key routing in the tab (renderer and main)', () => {
+  test('025-AC-061 F6 and Shift+F6 from the page land on the address bar, the strip row and the pick row; with a strip prompt and the find row open F6 cycles every zone both ways; the page logs none', async ({
+    appWithTestProject,
+    windowWithTestProject,
+    browserServers,
+    testProject
+  }) => {
+    const send = await BrowserSendUi.open(appWithTestProject, windowWithTestProject, testProject.path)
+    const { panel, pick } = send
+    await panel.load(browserServers.sites.static.url('/popups.html'))
+    await panel.waitForState({ loading: false })
+    const page = await panel.page()
+    await page.waitForLoaded(browserServers.sites.static.url('/popups.html'))
+    await page.eval(LOG_KEYS)
+    const keyboard = windowWithTestProject.keyboard
+    /** Give the page keyboard focus, as a click in it does. */
+    const focusPage = async (): Promise<void> => {
+      await page.clickSelector('h1')
+      await expect.poll(() => send.routingFocus(), { timeout: WAIT_MS }).toBe('page')
+    }
+
+    // F6 with page focus: the address bar.
+    await focusPage()
+    await page.key('F6')
+    await expect(panel.addressBar).toBeFocused()
+    // Shift+F6 with page focus and no strip row: the pick row's last control (the target chooser).
+    await focusPage()
+    await page.key('F6', ['shift'])
+    await expect(pick.target).toBeFocused()
+
+    // A strip prompt: Shift+F6 from the page lands on its last control.
+    await page.eval('window.__fixture.openMany(6)')
+    const row = panel.stripRow('popupBlocked')
+    await expect(row).toBeVisible({ timeout: WAIT_MS })
+    const rowButtons = row.getByRole('button')
+    await focusPage()
+    await page.key('F6', ['shift'])
+    await expect(rowButtons.last()).toBeFocused()
+
+    // The find row too; then the whole cycle from the address bar, forward and back.
+    await focusPage()
+    await page.key('f', [MOD])
+    await expect(panel.findField).toBeFocused()
+    await panel.addressBar.focus()
+    const findControls = panel.findRow.locator('button:not([disabled]), input:not([disabled])')
+    const forward = [pick.pickButton, rowButtons.first(), findControls.first()]
+    for (const expected of forward) {
+      await keyboard.press('F6')
+      await expect(expected).toBeFocused()
+    }
+    await keyboard.press('F6')
+    await expect.poll(() => send.routingFocus(), { timeout: WAIT_MS }).toBe('page')
+    await page.key('F6')
+    await expect(panel.addressBar).toBeFocused()
+
+    // Back: the page, then each zone's last control, then the navigation row's last control (More).
+    await keyboard.press('Shift+F6')
+    await expect.poll(() => send.routingFocus(), { timeout: WAIT_MS }).toBe('page')
+    await page.key('F6', ['shift'])
+    await expect(findControls.last()).toBeFocused()
+    for (const expected of [rowButtons.last(), pick.target, panel.tool('More')]) {
+      await keyboard.press('Shift+F6')
+      await expect(expected).toBeFocused()
+    }
+
+    expect(await page.eval<string[]>(`window.__fixture.log.filter(e => e.type === 'keydown').map(e => e.detail)`)).toEqual([])
+  })
+
+  test('025-AC-071 from page focus, Ctrl/Cmd+L then Tab leaves the browser tab after its last toolbar control; Ctrl+Tab selects the next editor tab', async ({
+    appWithTestProject,
+    windowWithTestProject,
+    browserServers,
+    testProject
+  }) => {
+    const send = await BrowserSendUi.open(appWithTestProject, windowWithTestProject, testProject.path)
+    const { panel } = send
+    const url = browserServers.sites.static.url('/events.html')
+    await send.load(url)
+    const page = await panel.page()
+    await page.clickSelector('#text')
+    await expect.poll(() => send.routingFocus(), { timeout: WAIT_MS }).toBe('page')
+
+    await page.key('l', [MOD])
+    await expect(panel.addressBar).toBeFocused()
+    // The tab's controls in Tab order, ending at the last one before the page.
+    const lastControl = await panel.root.evaluate((root) => {
+      const page = root.querySelector('[data-testid="browser-page-placeholder"]')
+      const tabbable = [...root.querySelectorAll<HTMLElement>('button, input, textarea, select, a[href], [tabindex]')].filter(
+        (el) => el.tabIndex >= 0 && !el.hasAttribute('disabled') && el.getClientRects().length > 0 && !(page?.contains(el) ?? false)
+      )
+      const last = tabbable[tabbable.length - 1]
+      last?.setAttribute('data-e2e-last-control', 'true')
+      return last?.getAttribute('aria-label') ?? last?.textContent ?? ''
+    })
+    expect(lastControl).not.toBe('')
+    const inTab = (): Promise<boolean> => panel.root.evaluate((root) => root.contains(document.activeElement))
+    let presses = 0
+    let previousWasLast = false
+    while (await inTab()) {
+      previousWasLast = await panel.root.evaluate(() => document.activeElement?.getAttribute('data-e2e-last-control') === 'true')
+      await windowWithTestProject.keyboard.press('Tab')
+      presses += 1
+      expect(presses, 'Tab leaves the browser tab within its controls').toBeLessThan(40)
+    }
+    expect(previousWasLast, `focus left from the last toolbar control (${lastControl})`).toBe(true)
+    expect(await send.routingFocus()).toBe('out')
+
+    // Ctrl+Tab from page focus: the next editor tab.
+    const tabId = await panel.tabId()
+    const nextTabId = await (await send.ui.openWithButton()).tabId()
+    await send.ui.editorTabFor(0).click()
+    await expect(panel.root).toHaveAttribute('data-browser-tab-id', tabId)
+    await page.clickSelector('#text')
+    await expect.poll(() => send.routingFocus(), { timeout: WAIT_MS }).toBe('page')
+    await page.key('Tab', ['control'])
+    await expect(panel.root).toHaveAttribute('data-browser-tab-id', nextTabId)
   })
 })

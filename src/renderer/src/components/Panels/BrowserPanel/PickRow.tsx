@@ -20,7 +20,7 @@
  *
  * The row is an F6 zone (`data-brw-zone="pick"`).
  */
-import { forwardRef, useEffect, useState } from 'react'
+import { forwardRef, useEffect, useRef, useState } from 'react'
 import { FileText, SquareMousePointer, SquareTerminal } from 'lucide-react'
 import { useBrowserPickStore, type BrowserPickTab } from '../../../stores/useBrowserPickStore'
 import { browserShortcut } from './browserShortcuts'
@@ -66,10 +66,19 @@ function SendNoticeSlot({
   const [hovered, setHovered] = useState(false)
   const [focused, setFocused] = useState(false)
   const paused = hovered || focused
+  // A pause stops the clock; after it only the time left runs (025-FR-060). A new notice starts afresh.
+  const remainingRef = useRef(SEND_NOTICE_MS)
+  useEffect(() => {
+    remainingRef.current = SEND_NOTICE_MS
+  }, [notice])
   useEffect(() => {
     if (paused) return
-    const timer = setTimeout(onDone, SEND_NOTICE_MS)
-    return () => clearTimeout(timer)
+    const started = Date.now()
+    const timer = setTimeout(onDone, remainingRef.current)
+    return () => {
+      clearTimeout(timer)
+      remainingRef.current = Math.max(0, remainingRef.current - (Date.now() - started))
+    }
   }, [paused, onDone, notice])
   return (
     <span

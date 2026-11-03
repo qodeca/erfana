@@ -118,7 +118,7 @@ describe('useBrowserPick', () => {
     expect(pickTab().capture).toBeNull()
   })
 
-  it('refines and switches between the panel and the dialog, keeping each action’s text', () => {
+  it('refines and switches between the panel and the dialog, keeping the typed text across dialog actions', () => {
     const { result } = setup()
     capture()
     act(() => result.current.refine('parent'))
@@ -133,6 +133,27 @@ describe('useBrowserPick', () => {
     expect(result.current.surface).toBe('panel')
     act(() => result.current.openDialog('ask'))
     expect(result.current.draft).toBe('why?')
+    // The text follows the reviewer to another dialog action (M-25, 025-AC-064).
+    act(() => result.current.back())
+    act(() => result.current.openDialog('change'))
+    expect(result.current).toMatchObject({ dialogAction: 'change', draft: 'why?' })
+  })
+
+  it('keeps the typed text when a hidden tab closes the dialog, and drops it on Cancel (025-FR-052)', () => {
+    const { result } = setup()
+    capture()
+    act(() => result.current.openDialog('change'))
+    act(() => result.current.setDraft('label cut off'))
+    act(() => result.current.close('tabHidden'))
+    expect(gateway.closePick).toHaveBeenCalledWith({ tabId: TAB, captureId: CAPTURE, reason: 'tabHidden' })
+    expect(result.current.surface).toBe('none')
+    capture()
+    act(() => result.current.openDialog('ask'))
+    expect(result.current.draft).toBe('label cut off')
+    act(() => result.current.close('cancel'))
+    capture()
+    act(() => result.current.openDialog('ask'))
+    expect(result.current.draft).toBe('')
   })
 
   it('closes the panel on a page change with a note, but keeps the dialog (025-FR-053)', () => {

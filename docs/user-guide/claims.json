@@ -55423,7 +55423,7 @@
       "quote": "**Parent element** and **Child element** (or <kbd>↑</kbd> and <kbd>↓</kbd>) move the pick",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/BrowserPanel/PromptActionsPanel.tsx:183",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/PromptActionsPanel.tsx:184",
       "match": "title=\"Parent element (↑)\""
     },
     {
@@ -55473,7 +55473,7 @@
       "quote": "with **Choose terminal**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/BrowserPanel/PromptActionsPanel.tsx:294",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/PromptActionsPanel.tsx:295",
       "match": "chooseTerminal: 'Choose terminal',"
     },
     {

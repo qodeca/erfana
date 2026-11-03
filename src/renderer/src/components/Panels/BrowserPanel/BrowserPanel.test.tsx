@@ -13,6 +13,7 @@ const gateway = vi.hoisted(() => ({
   onForwardedKey: vi.fn(() => () => undefined),
   pickMode: vi.fn(async () => undefined),
   closePick: vi.fn(async () => undefined),
+  pickSurface: vi.fn(async () => undefined),
   targetStatus: vi.fn(async () => ({ kind: 'agent', process: 'claude', fresh: true }))
 }))
 const lifecycle = vi.hoisted(() => ({ ensureBrowserTab: vi.fn() }))
@@ -42,13 +43,18 @@ const TAB = 'browser-tab-1'
 
 function renderPanel(params: Partial<BrowserPanelParams> = {}): {
   close: ReturnType<typeof vi.fn>
+  setVisible: (isVisible: boolean) => void
 } {
   const close = vi.fn()
+  const visibility = new Set<(event: { isVisible: boolean }) => void>()
   const api = {
     id: PANEL,
     close,
     isVisible: true,
-    onDidVisibilityChange: () => ({ dispose: () => undefined }),
+    onDidVisibilityChange: (listener: (event: { isVisible: boolean }) => void) => {
+      visibility.add(listener)
+      return { dispose: () => visibility.delete(listener) }
+    },
     group: { panels: [], activePanel: undefined }
   }
   const props = {
@@ -57,7 +63,11 @@ function renderPanel(params: Partial<BrowserPanelParams> = {}): {
     containerApi: {}
   } as unknown as IDockviewPanelProps<BrowserPanelParams>
   render(<BrowserPanel {...props} />)
-  return { close }
+  const setVisible = (isVisible: boolean): void => {
+    api.isVisible = isVisible
+    act(() => visibility.forEach(listener => listener({ isVisible })))
+  }
+  return { close, setVisible }
 }
 
 function host(patch: Parameters<typeof browserState>[0] = {}): void {
@@ -299,6 +309,38 @@ describe('BrowserPanel', () => {
     fireEvent.blur(screen.getByRole('button', { name: 'Explain' }), { relatedTarget: outside })
     expect(gateway.closePick).toHaveBeenCalledWith({ tabId: TAB, captureId: 'b'.repeat(32), reason: 'focusLeft' })
     outside.remove()
+    act(() => {
+      useBrowserPickStore.getState().forget(TAB)
+      useBrowserStillStore.getState().clear(TAB)
+    })
+  })
+  it('closes an open dialog without sending when another editor tab hides this one (025-FR-052)', () => {
+    const summary: PickSummary = {
+      name: 'a',
+      size: '1 × 1',
+      ancestors: ['html', 'a'],
+      box: { x: 0, y: 0, width: 1, height: 1 },
+      atTop: false,
+      atStart: true,
+      gone: false,
+      changedAfterPick: false
+    }
+    const { setVisible } = renderPanel()
+    host()
+    act(() => {
+      useBrowserStillStore.getState().set(TAB, { image: { data: new Uint8Array(4), width: 1, height: 1 }, source: 'pick' })
+      useBrowserPickStore
+        .getState()
+        .apply({ tabId: TAB, kind: 'captured', captureId: 'c'.repeat(32), still: new Uint8Array(4), stillWidth: 1, stillHeight: 1, summary })
+    })
+    const change = screen.getByRole('button', { name: 'Change' })
+    // A fresh Enter on the action, then its keyboard click (025-FR-030).
+    fireEvent.keyDown(change, { key: 'Enter' })
+    fireEvent.click(change)
+    expect(screen.getByTestId(BROWSER_TEST_IDS.INSTRUCTION_DIALOG)).toBeInTheDocument()
+    setVisible(false)
+    expect(gateway.closePick).toHaveBeenCalledWith({ tabId: TAB, captureId: 'c'.repeat(32), reason: 'tabHidden' })
+    expect(screen.queryByTestId(BROWSER_TEST_IDS.INSTRUCTION_DIALOG)).toBeNull()
     act(() => {
       useBrowserPickStore.getState().forget(TAB)
       useBrowserStillStore.getState().clear(TAB)

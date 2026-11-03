@@ -116,6 +116,9 @@ export function useBrowserKeys(options: UseBrowserKeysOptions): BrowserKeyHandle
         })
       switch (action) {
         case 'focusAddress':
+          // With the prompt-actions menu open, Ctrl/Cmd+L closes it without sending first (025-FR-049).
+          if (latest.current.pickSurface === 'panel') latest.current.closePanel?.()
+          return focusAddress()
         case 'focusNextZone':
           return focusAddress()
         case 'focusPreviousZone': {
@@ -226,13 +229,19 @@ export function useBrowserKeys(options: UseBrowserKeysOptions): BrowserKeyHandle
         moveZone(target, event.shiftKey)
         return
       }
+      if (event.key === 'Tab' && event.ctrlKey && !event.metaKey && !event.altKey && latest.current.pickSurface !== 'dialog') {
+        // Ctrl+Tab from the tab's own controls, the menu included: the next editor tab (025-FR-049, 025-FR-051).
+        event.preventDefault()
+        act(event.shiftKey ? 'previousEditorTab' : 'nextEditorTab')
+        return
+      }
       const inPick = target instanceof Element && target.closest('[data-brw-zone="pick"]') !== null
       if (event.key === 'Escape' && (inNav || inPick) && target instanceof HTMLButtonElement) {
         event.preventDefault()
         latest.current.focusPageArea()
       }
     },
-    [navRef, latest, moveZone]
+    [navRef, latest, moveZone, act]
   )
 
   return { onKeyDown, onFocus, onBlur }

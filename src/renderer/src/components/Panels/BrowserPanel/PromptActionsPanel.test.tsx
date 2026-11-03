@@ -116,6 +116,9 @@ describe('PromptActionsPanel (025-FR-027, 025-FR-030)', () => {
     }
     fireEvent.keyDown(panel, { key: 'Tab', shiftKey: true })
     expect(at('Close – nothing is sent')).toHaveFocus()
+    // Ctrl+Tab is the editor tabs' key: the panel leaves it alone.
+    expect(fireEvent.keyDown(panel, { key: 'Tab', ctrlKey: true })).toBe(true)
+    expect(at('Close – nothing is sent')).toHaveFocus()
   })
 
   it('shows a guard as an alert, focuses its button and passes its answer on', () => {

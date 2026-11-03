@@ -137,7 +137,8 @@ export function PromptActionsPanel(props: PromptActionsPanelProps): JSX.Element 
       onRefine(event.key === 'ArrowUp' ? 'parent' : 'child')
       return
     }
-    if (event.key === 'Tab' && rootRef.current !== null) {
+    // Ctrl+Tab is the editor tabs' key, not the panel's Tab cycle (025-FR-049).
+    if (event.key === 'Tab' && !event.ctrlKey && rootRef.current !== null) {
       const stops = tabStops(rootRef.current)
       const at = stops.indexOf(document.activeElement as HTMLElement)
       event.preventDefault()

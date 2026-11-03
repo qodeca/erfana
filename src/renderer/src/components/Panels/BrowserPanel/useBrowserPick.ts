@@ -114,7 +114,8 @@ export function useBrowserPick(options: UseBrowserPickOptions): BrowserPick {
   const captureId = capture?.captureId ?? null
   const [dialog, setDialog] = useState<{ captureId: string; action: DialogAction } | null>(null)
   const [returnAction, setReturnAction] = useState<SendAction | undefined>(undefined)
-  const [drafts, setDrafts] = useState<Partial<Record<DialogAction, string>>>({})
+  // One instruction for the tab: it follows the reviewer from Change… to Ask… or Prompt… (M-25, 025-AC-064).
+  const [draft, setDraftText] = useState('')
   const [busy, setBusy] = useState<SendAction | null>(null)
   const [banner, setBanner] = useState<{ captureId: string; banner: TargetBanner | null } | null>(null)
   const [notice, setNotice] = useState<SendNotice | null>(null)
@@ -144,7 +145,8 @@ export function useBrowserPick(options: UseBrowserPickOptions): BrowserPick {
       if (tabId === null || captureId === null) return
       browserTabGateway.closePick({ tabId, captureId, reason }).catch(warn('Browser closePick failed'))
       drop(captureId)
-      setDrafts({})
+      // A hidden tab keeps the typed text for its next dialog (025-FR-052); every other close ends it.
+      if (reason !== 'tabHidden') setDraftText('')
       if (reason === 'esc' || reason === 'cancel' || reason === 'clickOutside') focusPage()
     },
     [tabId, captureId, drop, focusPage]
@@ -209,7 +211,7 @@ export function useBrowserPick(options: UseBrowserPickOptions): BrowserPick {
 
   const setDraft = useCallback(
     (text: string) => {
-      if (dialogAction !== null) setDrafts(current => ({ ...current, [dialogAction]: text }))
+      if (dialogAction !== null) setDraftText(text)
     },
     [dialogAction]
   )
@@ -234,7 +236,7 @@ export function useBrowserPick(options: UseBrowserPickOptions): BrowserPick {
           terminalId: target.terminalId,
           terminalName: name,
           action,
-          instruction: action === 'explain' ? '' : (drafts[action] ?? ''),
+          instruction: action === 'explain' ? '' : draft,
           sendAnyway
         }
       ).then(outcome => {
@@ -249,7 +251,7 @@ export function useBrowserPick(options: UseBrowserPickOptions): BrowserPick {
           return
         }
         drop(id)
-        setDrafts({})
+        setDraftText('')
         setLastCapture(outcome.contextPath)
         setNotice({ text: `Sent ${ACTION_NAMES[action]} to ${name}`, contextPath: outcome.contextPath })
         focusPage()
@@ -262,7 +264,7 @@ export function useBrowserPick(options: UseBrowserPickOptions): BrowserPick {
         }
       })
     },
-    [tabId, captureId, busy, target.terminalId, target.terminalName, drafts, drop, focusPage, projectPath]
+    [tabId, captureId, busy, target.terminalId, target.terminalName, draft, drop, focusPage, projectPath]
   )
 
   const send = useCallback((action: SendAction) => sendWith(action, false), [sendWith])
@@ -308,7 +310,7 @@ export function useBrowserPick(options: UseBrowserPickOptions): BrowserPick {
       surface,
       dialogAction,
       returnAction,
-      draft: dialogAction === null ? '' : (drafts[dialogAction] ?? ''),
+      draft: dialogAction === null ? '' : draft,
       busy,
       banner: shownBanner,
       notice,
@@ -326,6 +328,6 @@ export function useBrowserPick(options: UseBrowserPickOptions): BrowserPick {
       openCapture,
       dismissNotice
     }),
-    [tab, surface, dialogAction, returnAction, drafts, busy, shownBanner, notice, lastCapture, togglePick, close, refine, openDialog, back, setDraft, send, bannerAction, targetChosenAgain, openCapture, dismissNotice]
+    [tab, surface, dialogAction, returnAction, draft, busy, shownBanner, notice, lastCapture, togglePick, close, refine, openDialog, back, setDraft, send, bannerAction, targetChosenAgain, openCapture, dismissNotice]
   )
 }

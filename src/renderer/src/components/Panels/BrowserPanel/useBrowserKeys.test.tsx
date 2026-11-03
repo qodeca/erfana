@@ -173,6 +173,24 @@ describe('useBrowserKeys – forwarded keys', () => {
     expect(logger.debug).toHaveBeenCalledTimes(1)
   })
 
+  it('closes the open panel before Ctrl/Cmd+L moves to the address bar (025-FR-049)', () => {
+    const closePanel = vi.fn()
+    const focusAddress = vi.fn()
+    render(<ZonesHarness pickSurface="panel" closePanel={closePanel} focusAddress={focusAddress} />)
+    send('focusAddress')
+    expect(closePanel).toHaveBeenCalledOnce()
+    expect(focusAddress).toHaveBeenCalledOnce()
+  })
+
+  it('switches editor tabs on Ctrl+Tab and Ctrl+Shift+Tab from the tab’s own controls', () => {
+    const { api, panels } = makeGroup()
+    render(<Harness api={api} />)
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Reload' }), { key: 'Tab', ctrlKey: true })
+    expect(panels[1].api.setActive).toHaveBeenCalledOnce()
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Reload' }), { key: 'Tab', ctrlKey: true, shiftKey: true })
+    expect(panels[2].api.setActive).toHaveBeenCalledOnce()
+  })
+
   it('logs a failed action, and does not switch tabs in a group of one', async () => {
     gateway.history.mockRejectedValueOnce(new Error('gone'))
     const panel = { id: 'a', api: { setActive: vi.fn() } }
