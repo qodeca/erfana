@@ -91,6 +91,11 @@ async function clickEndButton(button: Locator): Promise<void> {
   await button.click({ force: true })
 }
 
+// Pick, key routing and focus moving into the page all follow the page's
+// native focus, which ends when the window stops being the OS key window: run
+// with the OS-focus lock held exclusive (e2e/fixtures/osFocusLock.ts).
+test.use({ needsOsFocus: true })
+
 test.describe('025-AC-027 Up and Down refinement', () => {
   test('before a confirm Up and Down walk span › button › div › … › html, the ends show their notes for 2 s, and Enter confirms the highlighted element', async ({
     appWithTestProject,

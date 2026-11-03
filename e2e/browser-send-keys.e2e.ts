@@ -30,6 +30,11 @@ async function expectNothingSent(send: BrowserSendUi, agent: StubAgent): Promise
   expect(await send.captureFiles()).toEqual([])
 }
 
+// Pick, key routing and focus moving into the page all follow the page's
+// native focus, which ends when the window stops being the OS key window: run
+// with the OS-focus lock held exclusive (e2e/fixtures/osFocusLock.ts).
+test.use({ needsOsFocus: true })
+
 test.describe('025-AC-066 leaving the tab by key or by mouse ends the pick and sends nothing', () => {
   test.skip(process.platform === 'win32', 'The stub agent is a node program in front of a POSIX shell (macOS and Linux)')
 

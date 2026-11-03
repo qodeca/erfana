@@ -31,6 +31,11 @@ import { BrowserSendUi, SEND_WAIT_MS } from './pages/browser-send.page'
 
 const IS_POSIX = process.platform !== 'win32'
 
+// Pick, key routing and focus moving into the page all follow the page's
+// native focus, which ends when the window stops being the OS key window: run
+// with the OS-focus lock held exclusive (e2e/fixtures/osFocusLock.ts).
+test.use({ needsOsFocus: true })
+
 test.describe('built-in browser send, the shell guard', () => {
   test.skip(!IS_POSIX, 'The foreground is read by name on macOS and Linux; the stand-ins are POSIX links')
 

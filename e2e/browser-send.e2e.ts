@@ -47,6 +47,11 @@ async function golden(id: string): Promise<string> {
   return (await fs.readFile(path.join(GOLDEN_DIR, `prompt-${id}.golden.txt`), 'utf8')).replace(/\r?\n/g, '\r').replace(/\r$/, '')
 }
 
+// Pick, key routing and focus moving into the page all follow the page's
+// native focus, which ends when the window stops being the OS key window: run
+// with the OS-focus lock held exclusive (e2e/fixtures/osFocusLock.ts).
+test.use({ needsOsFocus: true })
+
 test.describe('built-in browser send through the template path', () => {
   test.skip(!IS_POSIX, 'The stub agent is a node program in front of a POSIX shell (macOS and Linux)')
 

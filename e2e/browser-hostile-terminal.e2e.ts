@@ -41,6 +41,11 @@ async function typeSentinel(send: BrowserSendUi, agent: StubAgent, mark: string)
   return agent.received()
 }
 
+// Pick, key routing and focus moving into the page all follow the page's
+// native focus, which ends when the window stops being the OS key window: run
+// with the OS-focus lock held exclusive (e2e/fixtures/osFocusLock.ts).
+test.use({ needsOsFocus: true })
+
 test.describe('built-in browser hostile pages: the terminal and pick mode', () => {
   test('025-AC-046 hostile page: no route opens a terminal or types into one', async ({
     appWithTestProject,

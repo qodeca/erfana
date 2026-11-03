@@ -13841,7 +13841,7 @@
       "quote": "1384x861 on Windows, 1400x868 on macOS",
       "status": "verified",
       "evidence": "source",
-      "source": "e2e/fixtures/index.ts:497",
+      "source": "e2e/fixtures/index.ts:560",
       "match": "process.platform === 'darwin' ? { width: 1400, height: 868 } : { width: 1384, height: 861 }"
     },
     {
@@ -14305,7 +14305,7 @@
       "quote": "const projectPath = path.join(tmpParent, 'visual-project')   // deterministic leaf",
       "status": "verified",
       "evidence": "source",
-      "source": "e2e/fixtures/index.ts:591",
+      "source": "e2e/fixtures/index.ts:654",
       "match": "const projectPath = path.join(tmpParent, 'visual-project')"
     },
     {
@@ -14854,7 +14854,7 @@
       "quote": "| `extraLaunchArgs` | Test (option) |",
       "status": "verified",
       "evidence": "source",
-      "source": "e2e/fixtures/index.ts:249",
+      "source": "e2e/fixtures/index.ts:279",
       "match": "extraLaunchArgs: [[], { option: true }],"
     },
     {
@@ -14864,7 +14864,7 @@
       "quote": "| `resetRendererStorage` | Test (option) |",
       "status": "verified",
       "evidence": "source",
-      "source": "e2e/fixtures/index.ts:252",
+      "source": "e2e/fixtures/index.ts:282",
       "match": "resetRendererStorage: [false, { option: true }],"
     },
     {
@@ -20898,8 +20898,8 @@
       "quote": "appWithTestProject` now depends on `testProject` (`e2e/fixtures/index.ts`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "e2e/fixtures/index.ts:362",
-      "match": "resetRendererStorage, testProject: _testProject }",
+      "source": "e2e/fixtures/index.ts:421",
+      "match": "testProject: _testProject,",
       "note": "Added: the EBUSY teardown cause behind #134 was fixed in 94c5f723; the section only described the old behaviour"
     },
     {
@@ -20999,7 +20999,7 @@
       "quote": "`e2e/directory-watcher.e2e.ts` use a platform-specific 6 s budget",
       "status": "verified",
       "evidence": "source",
-      "source": "e2e/directory-watcher.e2e.ts:61",
+      "source": "e2e/directory-watcher.e2e.ts:63",
       "match": "const LATENCY_BUDGET_MS = process.platform === 'win32' ? 6000 : 2000"
     },
     {
@@ -21260,7 +21260,7 @@
       "quote": "`directory-watcher.e2e.ts` opts in by setting `ERFANA_E2E_FAST_SHELL: '1'`",
       "status": "verified",
       "evidence": "source",
-      "source": "e2e/directory-watcher.e2e.ts:84",
+      "source": "e2e/directory-watcher.e2e.ts:86",
       "match": "ERFANA_E2E_FAST_SHELL: '1'"
     },
     {
@@ -21270,7 +21270,7 @@
       "quote": "now checks the printed line (`terminal.waitForOutputLine(window, 'E2E Terminal Test')`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "e2e/third-party-components.e2e.ts:159",
+      "source": "e2e/third-party-components.e2e.ts:161",
       "match": "await terminal.waitForOutputLine(window, 'E2E Terminal Test')",
       "note": "The 'still latent' claim was stale: the test now asserts the output line"
     },
@@ -21432,7 +21432,7 @@
       "quote": "each of which calls `await window.waitForLoadState('domcontentloaded')` immediately after `firstWindow()`",
       "status": "verified",
       "evidence": "source",
-      "source": "e2e/fixtures/index.ts:575",
+      "source": "e2e/fixtures/index.ts:638",
       "match": "await window.waitForLoadState('domcontentloaded')"
     },
     {
@@ -24084,7 +24084,7 @@
       "quote": "| `e2e/directory-watcher.e2e.ts:152` (budget constant at `:61`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "e2e/directory-watcher.e2e.ts:61",
+      "source": "e2e/directory-watcher.e2e.ts:63",
       "match": "const LATENCY_BUDGET_MS = process.platform === 'win32' ? 6000 : 2000",
       "note": "said :62 (budget constant at :60)"
     },
@@ -24106,7 +24106,7 @@
       "quote": "| `e2e/third-party-components.e2e.ts:41` (`Monaco editor:",
       "status": "fixed",
       "evidence": "source",
-      "source": "e2e/third-party-components.e2e.ts:41",
+      "source": "e2e/third-party-components.e2e.ts:43",
       "match": "test('Monaco editor: Set content via keyboard and verify in preview'",
       "note": "said :40"
     },
@@ -24117,7 +24117,7 @@
       "quote": "and `e2e/third-party-components.e2e.ts:121`",
       "status": "fixed",
       "evidence": "source",
-      "source": "e2e/third-party-components.e2e.ts:121",
+      "source": "e2e/third-party-components.e2e.ts:123",
       "match": "test('xterm.js terminal: Type command and verify output'",
       "note": "said :120"
     },
@@ -24128,7 +24128,7 @@
       "quote": "| `e2e/preview-refresh-terminal.e2e.ts:106` (`readTerminalGrid`; prompt assumption at `:193`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "e2e/preview-refresh-terminal.e2e.ts:106",
+      "source": "e2e/preview-refresh-terminal.e2e.ts:108",
       "match": "async function readTerminalGrid(page: Page)",
       "note": "said :105 and :194"
     },
@@ -24172,7 +24172,7 @@
       "quote": "`e2e/directory-watcher.e2e.ts:42,61` (`retries: 0`",
       "status": "fixed",
       "evidence": "source",
-      "source": "e2e/directory-watcher.e2e.ts:42",
+      "source": "e2e/directory-watcher.e2e.ts:44",
       "match": "test.describe.configure({ retries: 0 })",
       "note": "said :41,60"
     },
@@ -53890,7 +53890,7 @@
       "quote": "path.join(E2E_TEMP_DIR, `worker-${workerInfo.workerIndex}-`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "e2e/fixtures/index.ts:225",
+      "source": "e2e/fixtures/index.ts:255",
       "match": "path.join(E2E_TEMP_DIR, `worker-${workerInfo.workerIndex}-`)",
       "note": "Snippet used a non-existent e2eTempDir; the fixture uses E2E_TEMP_DIR."
     },
@@ -53901,7 +53901,7 @@
       "quote": "const tmpParent = await fs.promises.mkdtemp(path.join(E2E_TEMP_DIR, 'visual-'))",
       "status": "fixed",
       "evidence": "source",
-      "source": "e2e/fixtures/index.ts:589",
+      "source": "e2e/fixtures/index.ts:652",
       "match": "const tmpParent = await fs.promises.mkdtemp(path.join(E2E_TEMP_DIR, 'visual-'))",
       "note": "Snippet used e2eTempDir; the fixture uses E2E_TEMP_DIR."
     },

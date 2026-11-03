@@ -41,6 +41,11 @@ async function openHoverMenu(flow: PickFlow): Promise<void> {
 // 025-AC-028 with browser-pick-freeze-pause.e2e.ts, which proves the engine's pause, the DevTools resume and the
 // same-site popup record (S-25). "No focus emulation remains" is read from Erfana's own session at the protocol:
 // document.hasFocus() cannot show it in this lane (the control test at the end of this block).
+// Pick, key routing and focus moving into the page all follow the page's
+// native focus, which ends when the window stops being the OS key window: run
+// with the OS-focus lock held exclusive (e2e/fixtures/osFocusLock.ts).
+test.use({ needsOsFocus: true })
+
 test.describe('025-AC-028 hover-only element and the freeze', () => {
   test('the second Ctrl/Cmd+E picks a hover-menu item: the menu stays open and the still shows it, the page is held and muted while the menu or dialog is open, and a click while held is never delivered', async ({
     appWithTestProject,

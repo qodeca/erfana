@@ -26,7 +26,9 @@
  * @see src/main/services/import/DependencyDetector.ts - the app's own probe (unit-tested for --headless)
  */
 
-import { test, expect, _electron as electron } from '@playwright/test'
+import { expect, _electron as electron } from '@playwright/test'
+// The fixtures' `test`, for its auto OS-focus lock (e2e/fixtures/osFocusLock.ts).
+import { test } from './fixtures/index'
 import { execFile, spawn, type ChildProcess } from 'child_process'
 import * as fs from 'fs'
 import * as os from 'os'

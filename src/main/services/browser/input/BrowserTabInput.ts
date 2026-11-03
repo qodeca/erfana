@@ -110,6 +110,12 @@ export interface BrowserTabInputDeps {
   readonly onEffect?: (effect: RoutingEffect) => void
   /** A pick menu or dialog opened (`true`) or the last one closed (`false`): site requests wait meanwhile (S-28). */
   readonly onSurface?: (open: boolean) => void
+  /**
+   * Give OS keyboard focus to the owning window's own `webContents`. The
+   * toolbar can take on-screen focus (Cmd/Ctrl+L) while the OS still sends
+   * keys to the page view; this pulls them back (025-AC-071).
+   */
+  readonly focusWindow?: () => void
 }
 
 /** The tab's pick pipeline (commit 14), attached after the routers exist (`pick/BrowserPicks.ts`). */
@@ -199,7 +205,10 @@ export class BrowserTabInput implements ToolbarKeyTarget {
   reportToolbarFocus(focused: boolean): void {
     this.toolbarFocused = focused
     if (focused) {
-      if (this.routing.focus !== 'toolbar' && !this.deps.contents.isFocused()) this.dispatch({ type: 'focusToolbar' })
+      if (this.routing.focus === 'toolbar') return
+      // The page still holds the OS keyboard: move it to the window; the page's blur then routes to the toolbar.
+      if (!this.deps.contents.isDestroyed() && this.deps.contents.isFocused()) this.deps.focusWindow?.()
+      if (!this.deps.contents.isFocused()) this.dispatch({ type: 'focusToolbar' })
       return
     }
     if (this.routing.focus === 'toolbar') this.dispatch({ type: 'focusOut' })

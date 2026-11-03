@@ -21,6 +21,7 @@ import { byTestId } from '../utils/locators'
 import { BrowserTabPage } from '../pages/browser-tab.page'
 import { BROWSER_CHROMIUM_ARGS, test as serveTest } from './browser/serve'
 import { E2E_CHROMIUM_ARGS, buildAppEnv, closeAppAndWait } from './isolation'
+import { focusAppWindow, movePointerOffWindow } from './osFocusLock'
 
 const PROJECT_ROOT = path.join(__dirname, '..', '..')
 
@@ -51,6 +52,8 @@ export async function launchBrowserApp(options: {
   userDataDir: string
   homeDir: string
   projectPath: string
+  /** Make the window the OS key window once the project is open – pass the test's `needsOsFocus`. */
+  needsOsFocus?: boolean
 }): Promise<LaunchedBrowserApp> {
   const app = await electron.launch({
     args: [PROJECT_ROOT, `--user-data-dir=${options.userDataDir}`, ...E2E_CHROMIUM_ARGS, ...BROWSER_CHROMIUM_ARGS],
@@ -61,6 +64,8 @@ export async function launchBrowserApp(options: {
     await window.waitForLoadState('domcontentloaded')
     await byTestId(window, TEST_IDS.ACTIVITY_BAR).waitFor({ state: 'visible', timeout: 10000 })
     await openProjectIn(window, options.projectPath)
+    await movePointerOffWindow(app, options.needsOsFocus === true)
+    if (options.needsOsFocus === true) await focusAppWindow(app)
     const tabs = new BrowserTabPage(app, window)
     await tabs.installRecorder()
     return {

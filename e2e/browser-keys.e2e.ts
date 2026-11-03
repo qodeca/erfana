@@ -120,6 +120,11 @@ async function openEventsPage(browserTabs: BrowserTabPage, url: string): Promise
   return page
 }
 
+// Pick, key routing and focus moving into the page all follow the page's
+// native focus, which ends when the window stops being the OS key window: run
+// with the OS-focus lock held exclusive (e2e/fixtures/osFocusLock.ts).
+test.use({ needsOsFocus: true })
+
 test.describe('built-in browser key and mouse routing (main side)', () => {
   test('025-AC-061 with page focus the page keeps Erfana app shortcuts and nothing is forwarded', async ({
     browserTabs,

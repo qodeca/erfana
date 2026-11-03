@@ -346,7 +346,7 @@ export class PickFlow {
     return testHook(this.app, 'browserInput', 'routingState', await this.tabId())
   }
 
-  /** Main's routing has keyboard focus in the page (Playwright keeps the window itself unfocused). */
+  /** Main's routing has keyboard focus in the page (the window is the OS key window under `needsOsFocus`). */
   async waitForPageFocus(): Promise<void> {
     await expect.poll(async () => (await this.routing()).focus, { timeout: PICK_WAIT_MS }).toBe('page')
   }

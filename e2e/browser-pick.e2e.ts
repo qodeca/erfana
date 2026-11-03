@@ -18,6 +18,11 @@
 import { test, expect } from './fixtures/browserHarness'
 import { expectBoxNear, mainHook, openPicker, PICK_WAIT_MS as WAIT_MS } from './pages/browser-pick.page'
 
+// Pick, key routing and focus moving into the page all follow the page's
+// native focus, which ends when the window stops being the OS key window: run
+// with the OS-focus lock held exclusive (e2e/fixtures/osFocusLock.ts).
+test.use({ needsOsFocus: true })
+
 test.describe('built-in browser pick mode (main side)', () => {
   test('pick mode outlines the hovered element with its exact label and keeps clicks from the page (main side of 025-AC-025, 025-AC-026)', async ({
     browserTabs,

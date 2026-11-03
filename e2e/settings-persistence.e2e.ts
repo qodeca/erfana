@@ -36,7 +36,9 @@
  * @see src/renderer/src/stores/useActivityBarStore.ts
  */
 
-import { test, expect, _electron as electron, type Page } from '@playwright/test'
+import { expect, _electron as electron, type Page } from '@playwright/test'
+// The fixtures' `test`, for its auto OS-focus lock (e2e/fixtures/osFocusLock.ts).
+import { test } from './fixtures/index'
 import type { ElectronApplication } from 'playwright'
 import { mkdtemp, rm } from 'fs/promises'
 import { tmpdir } from 'os'

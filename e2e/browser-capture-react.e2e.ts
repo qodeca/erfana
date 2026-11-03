@@ -28,6 +28,11 @@ async function hints(send: BrowserSendUi, agent: StubAgent, url: string, selecto
   return parseContextFile((await send.explainAndRead(agent)).context)
 }
 
+// Pick, key routing and focus moving into the page all follow the page's
+// native focus, which ends when the window stops being the OS key window: run
+// with the OS-focus lock held exclusive (e2e/fixtures/osFocusLock.ts).
+test.use({ needsOsFocus: true })
+
 test.describe('React hints in the context file', () => {
   test.skip(!IS_POSIX, 'The stub agent is a node program in front of a POSIX shell (macOS and Linux)')
 

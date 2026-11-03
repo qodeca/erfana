@@ -100,6 +100,11 @@ function expectNear(actual: Box, expected: Box, what: string): void {
   }
 }
 
+// Pick, key routing and focus moving into the page all follow the page's
+// native focus, which ends when the window stops being the OS key window: run
+// with the OS-focus lock held exclusive (e2e/fixtures/osFocusLock.ts).
+test.use({ needsOsFocus: true })
+
 test.describe('025-AC-029 picks inside frames', () => {
   test('a button in each frame kind: the outline matches it in top-level CSS px, Up and Down work, the send completes and the context file lists the frame chain with each origin (null for the sandboxed frame)', async ({
     appWithTestProject,

@@ -61,7 +61,7 @@ import * as fs from 'fs'
 import * as fsp from 'fs/promises'
 import * as path from 'path'
 import type { ElectronApplication, Locator, Page } from '@playwright/test'
-import { test, expect } from './fixtures/index'
+import { test, expect, OS_FOCUS_TAG } from './fixtures/index'
 import { TEST_IDS } from '../src/renderer/src/constants/testids'
 import { byTestId } from './utils/locators'
 import { runGit } from './utils/git-helpers'
@@ -889,7 +889,7 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     expect(insertedText(before, await diskBytes(file)).text).toContain(TYPED)
   })
 
-  test('E-016b the shortcut works with focus on the dockview group, where a tab switch leaves it – not in the page', async ({
+  test('E-016b the shortcut works with focus on the dockview group, where a tab switch leaves it – not in the page', { tag: OS_FOCUS_TAG }, async ({
     windowWithTestProject,
     appWithTestProject
   }) => {
@@ -932,7 +932,7 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
       .toBe(true)
   })
 
-  test('K-6, K-8 no mouse: the shortcut from the toolbar takes the keyboard into the page and starts the picker; Esc comes back to the toggle', async ({
+  test('K-6, K-8 no mouse: the shortcut from the toolbar takes the keyboard into the page and starts the picker; Esc comes back to the toggle', { tag: OS_FOCUS_TAG }, async ({
     windowWithTestProject,
     appWithTestProject
   }) => {
@@ -959,7 +959,7 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     await expect(chrome.modeButton()).toBeFocused()
   })
 
-  test('K-1, I-18 no mouse: outside comment mode Shift+F10 opens the menu with the pointer far away, and the page cannot fake it', async ({
+  test('K-1, I-18 no mouse: outside comment mode Shift+F10 opens the menu with the pointer far away, and the page cannot fake it', { tag: OS_FOCUS_TAG }, async ({
     windowWithTestProject,
     appWithTestProject
   }) => {
@@ -1016,7 +1016,7 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     await expect(chrome.window()).toContainText(`${STATIC}, line `)
   })
 
-  test('E-016c a pick made with the page holding the keyboard opens the window with the keyboard in its field; Ctrl/Cmd+Enter saves', async ({
+  test('E-016c a pick made with the page holding the keyboard opens the window with the keyboard in its field; Ctrl/Cmd+Enter saves', { tag: OS_FOCUS_TAG }, async ({
     windowWithTestProject,
     appWithTestProject,
     testProject

@@ -25,7 +25,7 @@ import * as fsp from 'fs/promises'
 import * as path from 'path'
 
 import type { ElectronApplication, Page } from '@playwright/test'
-import { test as base, expect } from './fixtures/index'
+import { test as base, expect, OS_FOCUS_TAG } from './fixtures/index'
 import { HtmlPreviewPage, PREVIEW_BUDGET_MS } from './pages/html-preview.page'
 import { SearchBarPage } from './pages/search-bar.page'
 import { resetHostZoom } from './pages/html-preview.frames'
@@ -288,7 +288,7 @@ test.describe('HTML preview same tab – the tab follows its page (P3-AC2)', () 
     await expect.poll(() => savedDialogNames(h.app), { timeout: PREVIEW_BUDGET_MS }).toEqual(['pricing.pdf'])
   })
 
-  test('should keep the zoom level when the tab moves to another page', async ({ nav: h }) => {
+  test('should keep the zoom level when the tab moves to another page', { tag: OS_FOCUS_TAG }, async ({ nav: h }) => {
     await openOverview(h)
     await turnSameTabOn(h.preview, 'index.html')
     await zoomInPreview(h.app, target(INDEX))

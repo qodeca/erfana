@@ -65,6 +65,11 @@ const popups = (app: ElectronApplication): Promise<Array<{ pageWebContentsId: nu
 /** Run `code` in a popup's page; rejects after the hook's 5 s cap (a paused page never answers). */
 const popupExec = <T>(app: ElectronApplication, id: number, code: string): Promise<T> => mainHook<T>(app, 'popup', 'popupExec', id, code)
 
+// Pick, key routing and focus moving into the page all follow the page's
+// native focus, which ends when the window stops being the OS key window: run
+// with the OS-focus lock held exclusive (e2e/fixtures/osFocusLock.ts).
+test.use({ needsOsFocus: true })
+
 test.describe('025-AC-028 the freeze pauses the page', () => {
   test('after a second-Ctrl/Cmd+E pick the top document and the cross-origin frame stop, and run again once the menu closes', async ({
     appWithTestProject,

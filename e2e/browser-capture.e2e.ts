@@ -122,6 +122,11 @@ async function captureFiles(projectRoot: string): Promise<string[]> {
   return (await fs.readdir(path.join(projectRoot, CAPTURES_REL)).catch(() => [] as string[])).sort()
 }
 
+// Pick, key routing and focus moving into the page all follow the page's
+// native focus, which ends when the window stops being the OS key window: run
+// with the OS-focus lock held exclusive (e2e/fixtures/osFocusLock.ts).
+test.use({ needsOsFocus: true })
+
 test.describe('built-in browser capture and send (main side)', () => {
   test('the guard refuses a missing terminal and a bare shell; toward an agent the three files are written with exact names and the golden structure (main side of 025-AC-077, 025-AC-033)', async ({
     browserTabs,

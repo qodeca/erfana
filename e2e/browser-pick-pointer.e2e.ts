@@ -60,6 +60,11 @@ async function stillOutsideMenu(flow: PickFlow, selector: string): Promise<{ x: 
   return at
 }
 
+// Pick, key routing and focus moving into the page all follow the page's
+// native focus, which ends when the window stops being the OS key window: run
+// with the OS-focus lock held exclusive (e2e/fixtures/osFocusLock.ts).
+test.use({ needsOsFocus: true })
+
 test.describe('025-AC-083 pick and prompt with the pointer alone', () => {
   test('the whole walk – Pick element, hover, click, Parent, Child, a path name, Change, the instruction, Send – sends one prompt; Show terminal and Open capture work', async ({
     appWithTestProject,

@@ -39,6 +39,9 @@ export function newTabInput(
     macAppKeys: setup.macAppKeys(host),
     zoom,
     onSurface,
+    focusWindow: () => {
+      if (!host.isDestroyed()) host.webContents.focus()
+    },
     events: {
       forwardedKey: (action) => sendTabEvent(host, BROWSER_TAB_EVENTS.forwardedKey, ForwardedKeyEventSchema, { tabId, action }),
       pageFocus: (pageFocused) => sendTabEvent(host, BROWSER_TAB_EVENTS.focus, FocusEventSchema, { tabId, pageFocused }),

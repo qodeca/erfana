@@ -26,6 +26,11 @@ function expectNoteDuration(actual: number, ms: number): void {
   expect(actual, `note duration ${actual} ms`).toBeLessThan(ms + 1500)
 }
 
+// Pick, key routing and focus moving into the page all follow the page's
+// native focus, which ends when the window stops being the OS key window: run
+// with the OS-focus lock held exclusive (e2e/fixtures/osFocusLock.ts).
+test.use({ needsOsFocus: true })
+
 test.describe('025-AC-025 pick mode starts, stops and keeps clicks from the page', () => {
   test('Ctrl/Cmd+E starts pick mode after an address-bar load; a click picks without firing the button; Esc and the button each end it', async ({
     appWithTestProject,
@@ -460,10 +465,11 @@ test.describe('pick banner, frame and paused chip (025-AC-081)', () => {
     userDataDir,
     homeDir,
     testProject,
-    browserServers
+    browserServers,
+    osFocusLock
   }) => {
     const url = browserServers.sites.static.url('/hover-menu.html')
-    let launched: LaunchedBrowserApp | null = await launchBrowserApp({ userDataDir, homeDir, projectPath: testProject.path })
+    let launched: LaunchedBrowserApp | null = await launchBrowserApp({ userDataDir, homeDir, projectPath: testProject.path, needsOsFocus: osFocusLock.exclusive })
     try {
       const flow = await PickFlow.open(launched.app, launched.window)
       await flow.load(url)
@@ -474,7 +480,7 @@ test.describe('pick banner, frame and paused chip (025-AC-081)', () => {
       await launched.close()
       launched = null
 
-      launched = await launchBrowserApp({ userDataDir, homeDir, projectPath: testProject.path })
+      launched = await launchBrowserApp({ userDataDir, homeDir, projectPath: testProject.path, needsOsFocus: osFocusLock.exclusive })
       const again = await PickFlow.open(launched.app, launched.window)
       await again.load(url)
       await expect(again.pickButton).toHaveAttribute('aria-pressed', 'false')

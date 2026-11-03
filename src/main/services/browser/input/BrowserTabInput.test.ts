@@ -375,6 +375,29 @@ describe('focus and the first-click rule', () => {
     expect(input.state().focus).toBe('out')
   })
 
+  it('025-AC-071 a toolbar report while the page holds the OS keyboard moves the keyboard to the window', () => {
+    const focusWindow = vi.fn(() => {
+      contents.focused = false
+      contents.emit('blur')
+    })
+    input = make('darwin', { focusWindow })
+    loadAndFocus()
+    input.reportToolbarFocus(true)
+    expect(focusWindow).toHaveBeenCalledTimes(1)
+    expect(input.state().focus).toBe('toolbar')
+    // Already on the toolbar: no second pull.
+    input.reportToolbarFocus(true)
+    expect(focusWindow).toHaveBeenCalledTimes(1)
+  })
+
+  it('a toolbar report with the page not focused never pulls the keyboard', () => {
+    const focusWindow = vi.fn()
+    input = make('darwin', { focusWindow })
+    input.reportToolbarFocus(true)
+    expect(focusWindow).not.toHaveBeenCalled()
+    expect(input.state().focus).toBe('toolbar')
+  })
+
   it('focuses the page for a reducer focus effect and passes the toolbar targets on', () => {
     loadAndFocus()
     input.dispatch({ type: 'contextMenuPick' })
