@@ -98,6 +98,29 @@ describe('openConfinedFile', () => {
     expect(await opened(['.hidden', 'secret.txt'])).toEqual({ ok: false, status: 403 })
   })
 
+  it('refuses a dot-file at the top of the folder even though it exists', async () => {
+    await writeFile(join(root, '.env'), 'TOKEN=fake')
+    expect(await opened(['.env'])).toEqual({ ok: false, status: 403 })
+  })
+
+  it('refuses `..` segments that climb out of the folder, by the parent real path', async () => {
+    expect(await opened(['..', 'outside', 'canary.txt'])).toEqual({ ok: false, status: 403 })
+    expect(await opened(['assets', '..', '..', 'outside', 'canary.txt'])).toEqual({ ok: false, status: 403 })
+  })
+
+  it('opens a file reached through `..` that stays inside the folder', async () => {
+    expect(await opened(['assets', '..', 'index.html'])).toMatchObject({ ok: true, realPath: join(root, 'index.html') })
+  })
+
+  it('refuses the folder itself, named by no segment', async () => {
+    expect((await opened([])).ok).toBe(false)
+  })
+
+  it.runIf(process.platform !== 'win32')('refuses a final-component link even when it stays inside the folder', async () => {
+    if (!canLink) return
+    expect(await opened(['link-in.html'])).toEqual({ ok: false, status: 404 })
+  })
+
   it('serves a case variant of a file on a case-insensitive volume, never one outside', async () => {
     const insensitive = existsSync(join(root, 'INDEX.HTML'))
     const variant = await opened(['INDEX.HTML'])

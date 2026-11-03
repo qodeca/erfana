@@ -344,7 +344,7 @@ async function firstClauseFit(flow: PickFlow): Promise<{ clipped: boolean; lines
 
 // At a 360px tab the target yields its room below 380px (PickRow.css), so the first clause shows whole there too (the test below).
 test.describe('pick banner, frame and paused chip (025-AC-081)', () => {
-  test('pick mode shows the frame, a crosshair over the top document only and the banner; at 400px the shortcut clause folds and at 360px "Esc to stop" too; the tooltip names both uses', async ({
+  test('025-AC-081 pick mode shows the frame, a crosshair over the top document only and the banner; at 400px the shortcut clause folds and at 360px "Esc to stop" too; the tooltip names both uses', async ({
     appWithTestProject,
     windowWithTestProject,
     browserServers
@@ -370,7 +370,7 @@ test.describe('pick banner, frame and paused chip (025-AC-081)', () => {
     await flow.expectStatus(FIRST)
   })
 
-  test('at a 360px tab the first clause shows whole, neither clipped nor wrapped', async ({ appWithTestProject, windowWithTestProject, browserServers }) => {
+  test('025-AC-081 at a 360px tab the first clause shows whole, neither clipped nor wrapped', async ({ appWithTestProject, windowWithTestProject, browserServers }) => {
     const flow = await PickFlow.open(appWithTestProject, windowWithTestProject)
     await flow.load(browserServers.sites.static.url('/elements.html'), { pointer: false })
     await flow.pickButton.click()
@@ -381,7 +381,7 @@ test.describe('pick banner, frame and paused chip (025-AC-081)', () => {
   })
 
   for (const run of ['address bar', 'menu', 'dialog', 'terminal'] as const) {
-    test(`from page focus in pick mode, focus moving to the ${run} gives its own banner`, async ({ appWithTestProject, windowWithTestProject, browserServers }) => {
+    test(`025-AC-081 from page focus in pick mode, focus moving to the ${run} gives its own banner`, async ({ appWithTestProject, windowWithTestProject, browserServers }) => {
       const flow = await PickFlow.open(appWithTestProject, windowWithTestProject)
       const terminal = new TerminalPage(windowWithTestProject)
       if (run === 'terminal') await terminal.open()
@@ -415,7 +415,7 @@ test.describe('pick banner, frame and paused chip (025-AC-081)', () => {
     })
   }
 
-  test('a second-Ctrl/Cmd+E pick shows Page paused; Esc closes the menu and the chip goes while the frame and banner stay', async ({
+  test('025-AC-081 a second-Ctrl/Cmd+E pick shows Page paused; Esc closes the menu and the chip goes while the frame and banner stay', async ({
     appWithTestProject,
     windowWithTestProject,
     browserServers
@@ -433,7 +433,7 @@ test.describe('pick banner, frame and paused chip (025-AC-081)', () => {
     await flow.expectStatus(new RegExp(`^${FIRST}`))
   })
 
-  test('focus leaving with the menu open says the panel closed; with the dialog open it says to click back to the dialog', async ({
+  test('025-AC-081 focus leaving with the menu open says the panel closed; with the dialog open it says to click back to the dialog', async ({
     appWithTestProject,
     windowWithTestProject,
     browserServers
@@ -461,7 +461,7 @@ test.describe('pick banner, frame and paused chip (025-AC-081)', () => {
     await flow.expectStatus('Picking – click to return to the dialog')
   })
 
-  test('closing the window with the menu open over a paused page leaves no frame, banner or freeze once the project reopens', async ({
+  test('025-AC-081 closing the window with the menu open over a paused page leaves no frame, banner or freeze once the project reopens', async ({
     userDataDir,
     homeDir,
     testProject,

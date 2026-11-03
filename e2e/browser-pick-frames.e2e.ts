@@ -304,7 +304,7 @@ test.describe('elements not wholly on screen (025-AC-035)', () => {
     // the pick hit test, DOM.getNodeForLocation with ignorePointerEventsNone: false, so an overlay with
     // `pointer-events: none` is never found as covering. That flag is pinned by ADR 0007 decision 4 and refused
     // otherwise by the CDP allow list (cdpAllowList.ts), so changing it is an owner decision, not a test fix.
-    test.fail()
+    test.fail(true, 'Owner queue item 24 (025-AC-035): the covered-by check needs an ADR 0007 decision 4 amendment')
     const flow = await PickFlow.open(appWithTestProject, windowWithTestProject)
     await new AgentTerminal(windowWithTestProject, flow).start()
     await flow.load(browserServers.sites.static.url('/offscreen.html'))

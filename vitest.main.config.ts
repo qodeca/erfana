@@ -159,8 +159,9 @@ export default defineConfig({
         // landed (2026-11-03), never above 98.
         // measured 100/100/100/100
         'src/main/services/browser/local/localRequestPath.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
-        // measured 100/75/89.47/93.1
-        'src/main/services/browser/local/localConfinedFile.ts': { lines: 98, functions: 73, branches: 87, statements: 91 },
+        // measured 100/100/94.73/100 (2026-11-04, with localConfinedFile.race.test.ts;
+        // the one branch left is the `O_NOFOLLOW ?? 0` fallback, Windows only)
+        'src/main/services/browser/local/localConfinedFile.ts': { lines: 98, functions: 98, branches: 92, statements: 98 },
         // measured 100/100/100/100
         'src/main/services/browser/local/localResponsePolicy.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 96.42/100/87.5/95.58
@@ -185,8 +186,8 @@ export default defineConfig({
         'src/main/services/browser/page/historyStore.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/83.33/94.44/96.42
         'src/main/services/browser/page/hungNotice.ts': { lines: 98, functions: 81, branches: 92, statements: 94 },
-        // measured 90.9/75/75/88.46
-        'src/main/services/browser/page/plainProfileFile.ts': { lines: 88, functions: 73, branches: 73, statements: 86 },
+        // measured 100/100/100/100 (2026-11-04, with plainProfileFile.test.ts and .guards.test.ts)
+        'src/main/services/browser/page/plainProfileFile.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/main/services/browser/page/tabPageState.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/85.71/97.05
