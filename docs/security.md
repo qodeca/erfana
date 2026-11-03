@@ -677,6 +677,8 @@ Released builds are signed with a real identity – Apple Developer ID on macOS,
 
 The HTML preview (#74) executes a project's real CSS and JavaScript in a live page. Shipping execution is a one-way door, so the feature is built as a **sealed box**: the page runs in its own process on its own in-memory session partition, with no channel to Erfana in either direction. This section transcribes the design threat model (`docs/designs/html-preview/sd-074-html-preview.md` §2.8). The user-facing feature page is [HTML preview](./html-preview/README.md).
 
+> **Planned change to this boundary – approved, not built.** [Spec 026](../specs/spec-t4-026-open-preview-limits/requirements/01-overview.md) widens what a page can read and where it can come from. Risk 1 below changes: a page will read every project file, dot folders included, except a hardened secret block list ([026-FR-003](../specs/spec-t4-026-open-preview-limits/requirements/02-requirements.md#026-fr-003-secret-block-list)). Outside-project HTML will be served from user-confirmed folders; those folder approvals are kept in memory only and end at quit. Approved web frames will load all their own resources. Its 026-FR-029 lists what this section must state once it ships. The rules are 026-FR-001 to 026-FR-030 in [02-requirements.md](../specs/spec-t4-026-open-preview-limits/requirements/02-requirements.md). Until then, the controls and risks below describe the current build.
+
 ### Assets protected
 
 - **A1** – files inside the open project, outside the excluded set.

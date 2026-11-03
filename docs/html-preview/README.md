@@ -4,6 +4,8 @@ Erfana previews `.html` files as a **running page** – a live view that execute
 
 For the full threat model and the risks knowingly accepted, see [Security § HTML preview](../security.md#html-preview). This page cross-references that section rather than repeating it.
 
+> **Planned change – approved, not built.** [Spec 026](../../specs/spec-t4-026-open-preview-limits/requirements/01-overview.md) replaces several rules on this page. Every project `.html` will preview, including dot, gitignored and build folders; one in `.git` or another secret folder asks first. A page will be able to read every project file except a secret block list ([026-FR-003](../../specs/spec-t4-026-open-preview-limits/requirements/02-requirements.md#026-fr-003-secret-block-list)). HTML outside the project will preview after a per-folder confirm. It also covers web frames, the live-preview limit, the on/off setting and SVG. Until it ships, this page describes the current behaviour. Build against the spec's rules (026-FR-001 to 026-FR-030 in [02-requirements.md](../../specs/spec-t4-026-open-preview-limits/requirements/02-requirements.md)), not against this page.
+
 ## What previews, what does not
 
 **`.html` runs.** Opening an `.html` file from the project tree renders the live page full width in the editor area, with its CSS applied and its JavaScript executed. Relative `.css`, `.js` and image references resolve against the project folder, and remote subresources load once their host is approved (see [Network allowlist](#network-allowlist)).
