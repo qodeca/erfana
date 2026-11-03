@@ -17,7 +17,14 @@ import { test, expect, launchBrowserApp, type BrowserFixtureServers, type Launch
 import { E2E_TEMP_DIR, removeDirWithRetry } from './fixtures/isolation'
 import { LogTail, appMainLogPath } from './fixtures/logTail'
 import { BrowserTabUiPage } from './pages/browser-tab-ui.page'
-import { BrowserProfileFolder, OLD_CAPTURE_NAME, entriesOf, waitForRefusal, type GuardedLevel } from './pages/browser-profile.page'
+import {
+  BrowserProfileFolder,
+  OLD_CAPTURE_NAME,
+  entriesOf,
+  userDataProfileFolder,
+  waitForRefusal,
+  type GuardedLevel
+} from './pages/browser-profile.page'
 import { initRepoWithCommit, runGit } from './utils/git-helpers'
 
 /** The project's own ignore rules: Erfana must never touch them. */
@@ -44,7 +51,7 @@ test.describe('025-FR-016 the browser folder ignores itself in git', () => {
     const first = await browserTabs.open()
     expect(await folder.gitignore()).toBe('*')
 
-    // Chromium writes its own files once a page loads.
+    // Erfana's own profile files are in the project (Chromium's are under user data).
     const url = browserServers.sites.static.url('/index.html')
     await browserTabs.navigate(first.tabId, url)
     await first.waitForLoaded(url)
@@ -143,18 +150,26 @@ test.describe('025-FR-016 an untrusted profile is set aside (S-12)', () => {
     return cached
   }
 
-  /** Open a tab on the same origin in the fresh profile and prove none of the old profile runs. */
-  async function expectFreshProfile(app: LaunchedBrowserApp, servers: BrowserFixtureServers, folder: BrowserProfileFolder, token: string, cached: string): Promise<void> {
+  /**
+   * Open a tab on the same origin in the fresh profile and prove none of the
+   * old profile runs. Both halves moved aside under one time: the project's
+   * `profile/` (Erfana's files) and the user-data `chromium/` (ADR 0009
+   * decisions 1 and 3).
+   */
+  async function expectFreshProfile(app: LaunchedBrowserApp, servers: BrowserFixtureServers, folder: BrowserProfileFolder, userDataDir: string, token: string, cached: string): Promise<void> {
     const url = servers.sites.static.url('/plain.html', { host: 'localhost' })
     const page = await app.tabs.open()
     const [aside] = await folder.setAsideFolders()
     expect(aside).toMatch(/^profile\.untrusted-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z(-\d+)?$/)
-    // The old data really was there: it moved with the folder.
     expect(await folder.exists(aside!, 'Erfana', 'marker.json')).toBe(true)
-    for (const store of ['Service Worker', 'Local Storage', 'Cache']) {
-      expect(await folder.exists(aside!, store), `the old profile kept its ${store} on disk`).toBe(true)
-    }
     expect(await folder.exists('profile', 'Erfana', 'marker.json')).toBe(true)
+    // The old Chromium data really was there: it moved aside under the same time.
+    const userData = await userDataProfileFolder(userDataDir, folder.projectPath)
+    expect(userData).not.toBeNull()
+    const chromiumAside = aside!.replace(/^profile\./, 'chromium.')
+    for (const store of ['Service Worker', 'Local Storage', 'Cache']) {
+      expect(await fs.lstat(path.join(userData!, chromiumAside, store)).then(() => true, () => false), `the old profile kept its ${store} on disk`).toBe(true)
+    }
 
     await app.tabs.navigate(page.tabId, url)
     await page.waitForLoaded(url)
@@ -186,7 +201,7 @@ test.describe('025-FR-016 an untrusted profile is set aside (S-12)', () => {
 
     await fs.writeFile(folder.at('profile', 'Erfana', 'marker.json'), '{"version":1,"projectPath":"/somewhere/else"}', 'utf8')
     launched = await launchBrowserApp({ userDataDir, homeDir, projectPath: testProject.path })
-    await expectFreshProfile(launched, browserServers, folder, token, cached)
+    await expectFreshProfile(launched, browserServers, folder, userDataDir, token, cached)
   })
 
   test('025-AC-016 a profile that git tracks is renamed profile.untrusted-<UTC time>; a fresh one is created and none of the old service workers, cache or storage runs', async ({
@@ -209,7 +224,7 @@ test.describe('025-FR-016 an untrusted profile is set aside (S-12)', () => {
     expect(runGit(testProject.path, 'ls-files', '.erfana/browser')).toContain('.erfana/browser/profile/Erfana/marker.json')
 
     launched = await launchBrowserApp({ userDataDir, homeDir, projectPath: testProject.path })
-    await expectFreshProfile(launched, browserServers, folder, token, cached)
+    await expectFreshProfile(launched, browserServers, folder, userDataDir, token, cached)
   })
 })
 

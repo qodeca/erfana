@@ -527,7 +527,7 @@ Prefix `browser-tab:` (the older `browser:` domain above is "Open in default bro
 | `browser-tab:contextAction` | Run an item of the page's right-click menu by `menuId` (025-FR-057) (`browserTab/popup-handlers.ts`) |
 | `browser-tab:certificate` | **Proceed anyway** or **Back to safety** on the certificate page, by `decisionId`; main enforces the 500 ms input guard too (025-FR-021) |
 | `browser-tab:clearData` | **Clear browsing data** for the sender's project, by category; answers the kinds that failed or timed out (025-FR-023) (`browserTab/page-handlers.ts`) |
-| `browser-tab:forget` | **Forget this project's browser data**: delete `.erfana/browser/`; `pending` on Windows until the next start |
+| `browser-tab:forget` | **Forget this project's browser data**: delete `.erfana/browser/` and the project's Chromium data under `<sessionData>/browser-profiles/<name>/` (all but `project.json`); `pending` on Windows until the next start |
 | `browser-tab:suggest` | Address-bar suggestions from the project's history for a prefix (025-FR-063) |
 | `browser-tab:pageClipboard` | No payload: whether a browser page wrote the text now on the clipboard, for the terminal's paste guard; the text never crosses IPC (025-FR-009, S-17) |
 

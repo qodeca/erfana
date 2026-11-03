@@ -19,7 +19,7 @@ describe('ForgetDataDialog (025-FR-023)', () => {
   it('asks with the deck words and focuses Cancel', async () => {
     render(<ForgetDataDialog onClose={vi.fn()} forget={vi.fn(async () => undefined)} />)
     const dialog = screen.getByRole('dialog', { name: "Forget this project's browser data?" })
-    expect(dialog).toHaveAccessibleDescription(/deletes the \.erfana\/browser folder/)
+    expect(dialog).toHaveAccessibleDescription(/deletes its browser data.*from the \.erfana\/browser folder and from Erfana's own data folder/)
     await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus())
   })
 

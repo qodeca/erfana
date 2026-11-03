@@ -1146,6 +1146,26 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 
 **Status**: Accepted. The load-failure site logs the URL and carries the comment (025-AC-042); `loadFailureLog.test.ts` pins the fields.
 
+### 69. The macOS network sandbox cannot write a `session.fromPath()` profile (spec 025, ADR 0009 amendment, 2026-11)
+
+**Severity**: Low (worked around; the owner chose not to file upstream yet, 2026-11-03)
+
+**What**: On macOS Chromium always sandboxes the network service, and Electron 44.9.3 grants that sandbox write access only below `app.getPath('sessionData')`. A profile created with `session.fromPath()` anywhere else gets no cookie database, HTTP cache or network state on disk: it silently works in memory and loses every sign-in at quit. Erfana therefore keeps each project's Chromium profile in `<sessionData>/browser-profiles/<name>/chromium` instead of the project folder the owner first chose ([ADR 0009](./adrs/0009-browser-profile-in-the-project-folder.md) § Amendment 2026-11-03).
+
+**Upstream issue, ready to file** (title: *macOS: `session.fromPath()` outside `sessionData` never persists cookies – the network-service sandbox cannot write there*):
+
+> **Electron version**: 44.9.3 · **OS**: macOS (any; network-service sandbox on, the default)
+>
+> **What happens.** `session.fromPath(p)` with `p` outside `app.getPath('sessionData')` returns a working session, but its network context cannot open its files: the `Cookies` database, the HTTP cache, Shared Dictionary, Trust Tokens and network state are never written. Cookies live in memory only and are gone after a restart. No error reaches the app; `cookies.flushStore()` resolves.
+>
+> **Why.** On macOS `IsNetworkSandboxEnabled()` is always true, and the sandbox profile grants write access to the folders the browser client names in `GetNetworkContextsParentDirectory()`. Electron's `ElectronBrowserClient::GetNetworkContextsParentDirectory()` returns only `DIR_SESSION_DATA`, so a `fromPath()` folder elsewhere is outside the sandbox's writable paths (Chromium `sandbox_parameters_mac.mm`).
+>
+> **Expected.** A session created with `session.fromPath(p)` persists like one under `sessionData`: Electron adds each `fromPath()` folder (or its parent) to the folders it returns from `GetNetworkContextsParentDirectory()` – for example by recording the paths given to `fromPath()` before the network context is created – or documents that `fromPath()` must be under `sessionData` on macOS and fails loudly otherwise.
+>
+> **Reproduce.** `const s = session.fromPath('/tmp/x')`; load a page that sets a persistent cookie; `await s.cookies.flushStore()`; quit. `/tmp/x/Cookies` does not exist, and after a restart the cookie is gone. The same code with a path under `app.getPath('sessionData')` writes `Cookies` and keeps the cookie.
+
+**Revisit when**: Electron grants `fromPath()` folders to the macOS network sandbox – then the owner can decide whether the Chromium profile goes back to the project folder. Evidence: `specs/spec-t4-025-built-in-browser/verification/evidence/025-AC-052-macos.md`.
+
 This doc covers project-wide non-Windows technical debt. For phase-structured deferred items with promotion criteria + risk-if-forgotten:
 
 - [`windows/deferred-work.md`](./windows/deferred-work.md) — D1-D8 (Phase 2 review aftermath, tracked in #168)

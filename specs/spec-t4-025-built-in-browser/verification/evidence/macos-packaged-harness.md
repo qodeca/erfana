@@ -2,6 +2,8 @@
 
 The evidence files `025-AC-022-macos.md`, `025-AC-052-macos.md` and `025-AC-079-macos.md` in this folder were produced with the Playwright script below. It is a one-off evidence harness, not part of the repository suite: it ran from a scratch folder with its own config, and `<worktree>` stands for the checkout it was run from (commit `b95ca4fc`). The full procedure, including how the bundles were built, is in each evidence file.
 
+**Re-run after S-36 (2026-11-03, on `07f66b2b` plus the uncommitted S-36 change).** The script below is the S-36 version: the browser tab's cookie database is looked for under `<userData>/browser-profiles/<name>/chromium/` (and asserted absent from `.erfana/`), 025-AC-052 asserts the database's location, and 025-AC-079 gains phase C – a restart of the candidate that checks the browser-tab cookie written after the update is still there. The candidate is `release/test/0.24.0/mac-arm64/Erfana (TEST BUILD).app` of the checkout; the fuse-off control and v0.23.1 copies sit in the scratch folder's `apps/`. `flip.mjs` is the one below. Nothing else changed.
+
 ## How it drives a packaged app
 
 - **Bundles.** A production bundle has `EnableNodeCliInspectArguments` off, so Playwright cannot attach to it. The script drives the documented test build instead (`ERFANA_TEST_BUILD=true`, bundle `Erfana (TEST BUILD).app`), whose fuse wire differs from production only in that inspector fuse (`scripts/fuses.js`, `buildFuseConfig`). The fuse-off control and the drivable v0.23.1 are copies with one fuse flipped by `flip.mjs` (below), then re-signed ad hoc the way `scripts/resign.js` does it (`codesign --force --deep --sign -`).
@@ -107,8 +109,8 @@ import { COOKIE_PROBE_VALUE } from '<worktree>/e2e/fixtures/browser/server/commo
 const WT = '<worktree>'
 const SCRATCH = __dirname
 const APPS = {
-  fuseOn: `${SCRATCH}/../src/release/test/0.24.0/mac-arm64/Erfana (TEST BUILD).app/Contents/MacOS/Erfana (TEST BUILD)`,
-  fuseOff: `${SCRATCH}/apps/fuse-off-v2.app/Contents/MacOS/Erfana (TEST BUILD)`,
+  fuseOn: `${WT}/release/test/0.24.0/mac-arm64/Erfana (TEST BUILD).app/Contents/MacOS/Erfana (TEST BUILD)`,
+  fuseOff: `${SCRATCH}/apps/fuse-off.app/Contents/MacOS/Erfana (TEST BUILD)`,
   v0231: `${SCRATCH}/apps/v0.23.1-inspect.app/Contents/MacOS/Erfana`
 } as const
 const OUT = process.env.EVIDENCE_OUT ?? path.join(SCRATCH, 'results')
@@ -362,7 +364,13 @@ async function cookieProbe(label: 'fuse-on' | 'fuse-off', exe: string): Promise<
   const flushed = await flushTabSession(launched.app, origin)
   await quit(launched)
 
-  const cookieDbs = findFiles(path.join(box.project, '.erfana'), 'Cookies')
+  // S-36: the Chromium profile is <userData>/browser-profiles/<name>/chromium; nothing of Chromium's in the project
+  const cookieDbs = findFiles(path.join(box.userData, 'browser-profiles'), 'Cookies')
+  const projectCookieDbs = findFiles(path.join(box.project, '.erfana'), 'Cookies').map((f) => path.relative(box.root, f))
+  const profileFolders = fs.readdirSync(path.join(box.userData, 'browser-profiles')).map((n) => ({
+    name: n,
+    projectJson: fs.readFileSync(path.join(box.userData, 'browser-profiles', n, 'project.json'), 'utf8')
+  }))
   const rows = cookieDbs.map((db) => ({ db: path.relative(box.root, db), rows: cookieRows(db, 'probe') }))
   const roots = [box.project, box.userData, box.home]
   const cookieSearch = byteSearch(roots, COOKIE_PROBE_VALUE)
@@ -371,7 +379,7 @@ async function cookieProbe(label: 'fuse-on' | 'fuse-off', exe: string): Promise<
     files: s.files,
     hits: s.hits.map((h) => ({ form: h.form, file: path.relative(box.root, h.file) }))
   })
-  return { label, exe, sandbox: box.root, info, opened, url, flushed, cookieDbs: rows, cookieSearch: rel(cookieSearch), localStorageSearch: rel(tokenSearch) }
+  return { label, exe, sandbox: box.root, info, opened, url, flushed, profileFolders, projectCookieDbs, cookieDbs: rows, cookieSearch: rel(cookieSearch), localStorageSearch: rel(tokenSearch) }
 }
 
 test('diag cookie store', async () => {
@@ -440,6 +448,8 @@ test('025-AC-052 cookies at rest: fuse on (candidate) vs fuse off (control)', as
   expect((on.cookieSearch as { hits: unknown[] }).hits).toEqual([])
   expect((on.localStorageSearch as { hits: unknown[] }).hits.length).toBeGreaterThan(0)
 
+  expect(on.projectCookieDbs).toEqual([])
+  expect((on.cookieDbs as Array<{ db: string }>).map((d) => d.db)).toEqual([expect.stringMatching(/^userData\/browser-profiles\/[^/]+\/chromium\/Cookies$/)])
   const offRows = (off.cookieDbs as Array<{ rows: CookieRow[] }>).flatMap((d) => d.rows)
   expect(offRows).toHaveLength(1)
   expect(offRows[0].value).toBe(COOKIE_PROBE_VALUE)
@@ -566,19 +576,30 @@ test('025-AC-079 update from v0.23.1 keeps data; a cookie written afterwards is 
   const logDir = path.join(box.home, '.erfana', 'logs')
   const logText = walk(logDir).map((f) => fs.readFileSync(f, 'utf8')).join('\n')
   result.afterDisk = {
-    defaultSession: findFiles(box.userData, 'Cookies').map((db) => ({
+    defaultSession: findFiles(box.userData, 'Cookies').filter((db) => !db.includes(`${path.sep}browser-profiles${path.sep}`)).map((db) => ({
       db: path.relative(box.root, db),
       legacy: cookieRows(db, 'legacy'),
       fresh: cookieRows(db, 'fresh')
     })),
-    projectProfile: findFiles(path.join(box.project, '.erfana'), 'Cookies').map((db) => ({ db: path.relative(box.root, db), probe: cookieRows(db, 'probe') })),
+    projectFolderCookieDbs: findFiles(path.join(box.project, '.erfana'), 'Cookies').map((db) => path.relative(box.root, db)),
+    browserProfile: findFiles(path.join(box.userData, 'browser-profiles'), 'Cookies').map((db) => ({ db: path.relative(box.root, db), probe: cookieRows(db, 'probe') })),
     plainText: {
       legacy: byteSearch([box.userData], 'erfana-legacy-cookie-0231').hits.map((h) => path.relative(box.root, h.file)),
       fresh: byteSearch([box.userData], 'erfana-fresh-cookie-0240').hits.map((h) => path.relative(box.root, h.file)),
-      probe: byteSearch([box.project], COOKIE_PROBE_VALUE).hits.map((h) => path.relative(box.root, h.file))
+      probe: byteSearch([box.project, box.userData], COOKIE_PROBE_VALUE).hits.map((h) => path.relative(box.root, h.file))
     },
     logLinesMentioningLockHmacOrDecrypt: logText.split('\n').filter((l) => /lockHmac|decrypt|safeStorage|Keychain|\[error\]/i.test(l)).slice(0, 40)
   }
+
+  // Phase C (S-36): restart the candidate; the browser-tab cookie written after the update is still there.
+  launched = await launch(APPS.fuseOn, box)
+  result.restartOpen = await openProject(launched.window, box.project)
+  const plain = servers.sites.static.url('/plain.html')
+  await openTab(launched.window, plain)
+  await waitForPage(launched.app, probeOrigin, `location.href === ${JSON.stringify(plain)} && document.readyState === 'complete'`)
+  result.afterRestartProbeCookie = await pageEval<boolean>(launched.app, probeOrigin, `document.cookie.includes(${JSON.stringify(COOKIE_PROBE_VALUE)})`)
+  result.afterRestartState = await snapshot()
+  await quit(launched)
   record('ac079-update', result)
 
   const before = result.beforeState as Record<string, unknown>
@@ -588,5 +609,12 @@ test('025-AC-079 update from v0.23.1 keeps data; a cookie written afterwards is 
   expect(after.watchDepth).toEqual(before.watchDepth)
   expect(after.filterMode).toEqual(before.filterMode)
   expect(result.afterLegacyCookieRead).toEqual([expect.objectContaining({ value: 'erfana-legacy-cookie-0231' })])
+  const disk = result.afterDisk as Record<string, unknown>
+  expect(disk.projectFolderCookieDbs).toEqual([])
+  const probeRows = (disk.browserProfile as Array<{ probe: CookieRow[] }>).flatMap((d) => d.probe)
+  expect(probeRows).toEqual([expect.objectContaining({ value: '', encrypted_prefix: 'v10' })])
+  expect((disk.plainText as Record<string, unknown[]>).probe).toEqual([])
+  expect(result.afterRestartProbeCookie).toBe(true)
+  expect((result.afterRestartState as Record<string, unknown>).hasApiKey).toBe(true)
 })
 ```

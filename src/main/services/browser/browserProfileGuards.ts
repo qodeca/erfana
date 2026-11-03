@@ -164,7 +164,7 @@ export async function checkExistingLevel(
 }
 
 /** Ensure one folder level exists, guarded; never creates more than this level. */
-async function ensureFolderLevel(canonical: string, segments: readonly string[]): Promise<void> {
+export async function ensureFolderLevel(canonical: string, segments: readonly string[]): Promise<void> {
   if (await checkExistingLevel(canonical, segments, 'dir')) return
   try {
     await mkdir(join(canonical, ...segments), { mode: FOLDER_MODE })

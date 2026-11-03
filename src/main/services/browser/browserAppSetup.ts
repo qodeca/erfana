@@ -247,6 +247,8 @@ export function installBrowserAfterReady(deps: BrowserAfterReadyDeps): BrowserRu
     isTrackedByGit: (canonical) => isBrowserFolderTrackedByGit(canonical),
     markIgnoredBySync: (dir) => markIgnoredBySync(dir),
     homeDir: homedir(),
+    // The macOS network-service sandbox writes only below sessionData (ADR 0009 decision 1)
+    dataDir: app.getPath('sessionData'),
     platform: process.platform,
     clock: mainClock
   })

@@ -17,6 +17,7 @@ import * as path from 'node:path'
 import type { ElectronApplication, Page } from '@playwright/test'
 import { test, expect } from './fixtures/browserHarness'
 import { PAGE_AREA, type BrowserTabPage } from './pages/browser-tab.page'
+import { userDataProfileFolder } from './pages/browser-profile.page'
 
 const IS_MAC = process.platform === 'darwin'
 const MOD = IS_MAC ? 'meta' : 'control'
@@ -359,10 +360,11 @@ test.describe('built-in browser page features', () => {
     }
   })
 
-  test('025-AC-023 Forget closes the project\'s tabs and deletes .erfana/browser', async ({
+  test('025-AC-023 Forget closes the project\'s tabs and deletes .erfana/browser and the project\'s Chromium data under user data', async ({
     browserTabs,
     browserServers,
     testProject,
+    userDataDir,
     windowWithTestProject
   }) => {
     const url = browserServers.sites.static.url('/index.html')
@@ -371,11 +373,18 @@ test.describe('built-in browser page features', () => {
     await page.waitForLoaded(url)
     const browserDir = path.join(testProject.path, '.erfana', 'browser')
     expect(fs.existsSync(browserDir)).toBe(true)
+    const userData = await userDataProfileFolder(userDataDir, testProject.path)
+    expect(userData).not.toBeNull()
+    expect(fs.existsSync(path.join(userData!, 'chromium'))).toBe(true)
 
     const answer = await bridge<Rec>(windowWithTestProject, 'forget')
     expect(answer).toEqual({ deleted: process.platform === 'win32' ? expect.stringMatching(/deleted|pending/) : 'deleted' })
     await expect.poll(async () => (await browserTabs.tabs()).length, { timeout: WAIT_MS }).toBe(0)
-    if (answer['deleted'] === 'deleted') expect(fs.existsSync(browserDir)).toBe(false)
+    if (answer['deleted'] === 'deleted') {
+      expect(fs.existsSync(browserDir)).toBe(false)
+      // Only the record of whose folder it is stays, so the name stays this project's
+      expect(fs.readdirSync(userData!)).toEqual(['project.json'])
+    }
   })
 
   test('025-AC-078 history: loaded addresses are suggested, the newest first, and local terminal addresses are announced', async ({

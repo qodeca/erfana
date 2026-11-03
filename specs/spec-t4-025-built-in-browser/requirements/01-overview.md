@@ -20,7 +20,7 @@ The first and third objectives are business aims, judged by the owner after rele
 
 - Browser tabs in the editor area: address bar, Back, Forward, Reload, Stop, page title and site icon, find in page, zoom, width presets, DevTools; hidden tabs stay loaded; a fixed list of keys reserved for Erfana, every other key going to the page while browsing and to no one while picking.
 - `http`, `https` and `file://` addresses, with local files confined to their folder and served by a per-folder loopback server (ADR 0012; Erfana's own window keeps loading from `file://`); terminal links and the HTML Preview open pages in a browser tab.
-- One persistent browser profile per project in `<project>/.erfana/browser`, kept out of git, with cookies encrypted at rest and a notice on Linux machines without a keyring.
+- One persistent browser profile per project – Erfana's own files in `<project>/.erfana/browser`, kept out of git, and Chromium's cookies, storage and cache in Erfana's own data folder (S-36) – with cookies encrypted at rest and a notice on Linux machines without a keyring.
 - Chrome-like site behaviour: permission prompts, downloads, certificate warnings, HTTP sign-in, new tabs, sign-in popups with a visible origin, a popup blocker, clearing browsing data.
 - Page right-click menu and **Open in system browser**; page dialogs and leave-page prompts; load-error and crashed-tab pages; per-project address history and local addresses seen in the project's terminal output, shown on an empty tab (Should).
 - Pick mode: hover highlight with a label, parent and child refinement, hover-only elements, every frame.

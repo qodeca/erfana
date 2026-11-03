@@ -68,8 +68,8 @@ Tabs belong to their window; `BrowserTabService` refuses a call naming another w
 
 ### 3.3 Session setup order
 
-1. `browserProfileGuards.ensureProfileFolders` (ADR 0009 decision 2) and the marker check (decision 3).
-2. `session.fromPath(<canonical>/.erfana/browser/profile)` in the lock-holding process.
+1. `browserProfileGuards.ensureProfileFolders` (ADR 0009 decision 2), the project's folder under `<sessionData>/browser-profiles/` found or claimed by `browserProfileFolders.resolveProfileFolder` (decision 1, S-36), and the marker check (decision 3) – a distrusted profile is set aside in both places.
+2. `session.fromPath(<sessionData>/browser-profiles/<name>/chromium)` in the lock-holding process (S-36; was `<canonical>/.erfana/browser/profile`, which the macOS network-service sandbox cannot write).
 3. `browserSessionPolicy.harden`: deny-by-default permission request, check, device and display-media handlers, `select-*-device` denial, `will-download`, user agent, spell check – before any page loads.
 4. Local files (ADR 0012, option 4, `local/`): the per-folder loopback servers are started on demand by `LocalFileServers`; `file:` is refused by `webRequest.onBeforeRequest` (`browserAppRequestFilter.ts`), which also gates every request to a served folder by the requesting tab's top-level page; `erfana-local` stays registered and answers 403 outside browser sessions.
 5. Trust store load (signed; memory-only on `basic_text`), keyring canary.
@@ -270,6 +270,9 @@ Two notes (decided 2026-11-03):
 | S-33 | 025-FR-028 | Audio muted while frozen |
 | S-34 | 025-FR-027, 025-FR-033, 025-FR-053 | Refinement draws from boxes snapshotted at the pick; note "the page changed after the pick" when a live box differs by more than 1 px |
 | S-35 | 025-NFR-005 | Worst-case fixture: 1920 × 1080 CSS px at DPR 2 |
+| S-36 | 025-FR-015, 025-FR-016, 025-FR-023, 025-FR-044, 025-AC-015, 025-AC-016, 025-AC-023, 025-AC-044, 025-AC-052, 025-AC-079 | The Chromium profile lives in `<sessionData>/browser-profiles/<name>/chromium`, `<name>` by Claude Code's projects-folder rule with a `project.json` collision check; Erfana's own files and captures stay in `.erfana/browser/`; Forget deletes both; a distrusted profile is set aside in both (owner, 2026-11-03, option E – ADR 0009 amendment) |
+
+**S-36** was added after the 35 were applied (owner, 2026-11-03): the packaged macOS check of 025-AC-052 found no cookie database at all, because the macOS network-service sandbox writes only below `sessionData`; it is written into the requirements and criteria it names, tagged "(S-36)".
 
 025-FR-053's React-while-frozen clause resolved (2026-11-03) to "not allowed": the commit-8 probe failed, so ADR 0008 decision 3 uses its fallback and no page function runs while frozen.
 
@@ -406,7 +409,7 @@ Main paths under `src/main/services/browser/`, shared under `src/shared/browser/
 | 025-FR-012 | `site/browserWidthPreset` (clipping parent view) |
 | 025-FR-013 | `BrowserTab` DevTools; ADR 0007 / 0008 rules |
 | 025-FR-014 | `browserKeys`, `routingState`, `input/*`, `useBrowserKeys` |
-| 025-FR-015 | `BrowserProfileService`, `browserSessionRegistry` |
+| 025-FR-015 | `BrowserProfileService`, `browserProfileFolders` (S-36), `browserSessionRegistry` |
 | 025-FR-016 | `browserProfileGuards` |
 | 025-FR-017 | `scripts/fuses.js` |
 | 025-FR-018 | `BrowserProfileService` (canary, backend) |

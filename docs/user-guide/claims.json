@@ -55760,11 +55760,11 @@
       "id": "user-guide-reference-browser-data-handling/03",
       "audience": "user",
       "doc": "docs/user-guide/reference/browser-data-handling.md",
-      "quote": "| Cookies, local storage and cache | `.erfana/browser/profile/`",
+      "quote": "| Cookies, local storage and cache | Erfana's data folder, `browser-profiles/<project>/chromium/`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/browser/browserProfilePaths.ts:14",
-      "match": "export const PROFILE_DIR_NAME = 'profile'"
+      "source": "src/main/services/browser/browserProfileFolders.ts:56",
+      "match": "export const CHROMIUM_DIR_NAME = 'chromium'"
     },
     {
       "id": "user-guide-reference-browser-data-handling/04",
@@ -55795,6 +55795,16 @@
       "evidence": "source",
       "source": "src/main/services/browser/page/loadFailureLog.ts:46",
       "match": "logger.info('search load failed', { code })"
+    },
+    {
+      "id": "user-guide-reference-browser-data-handling/07",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/browser-data-handling.md",
+      "quote": "named after the project's path the way Claude Code names its `~/.claude/projects/` folders",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/browser/browserProfileFolders.ts:96",
+      "match": "const folded = canonical.replace(/[^A-Za-z0-9]/g, '-')"
     },
     {
       "id": "user-guide-reference-terminal/b01",

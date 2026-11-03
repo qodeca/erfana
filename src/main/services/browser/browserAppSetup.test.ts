@@ -19,7 +19,7 @@ vi.mock('electron', () => ({
   shell: { openExternal: vi.fn() },
   // S-17's page-clipboard marks read the clipboard's text (async in Electron 44).
   clipboard: { readText: vi.fn(async () => '') },
-  app: { on: vi.fn() },
+  app: { on: vi.fn(), getPath: vi.fn(() => '/tmp/erfana-session-data') },
   WebContentsView: vi.fn()
 }))
 vi.mock('../LoggingService', () => ({ logger: mockLogger }))
@@ -41,6 +41,7 @@ import {
   installBrowserBeforeReady
 } from './browserAppSetup'
 import { browserSessionRegistry } from './browserSessionRegistry'
+import { app } from 'electron'
 import { ProjectSessionStore } from '../session/ProjectSession'
 
 describe('browserAppSetup', () => {
@@ -103,6 +104,8 @@ describe('browserAppSetup', () => {
     expect(getBrowserRuntime()).toBe(runtime)
     // No browser session is created until a tab asks for one
     expect(fromPath).not.toHaveBeenCalled()
+    // Profiles go below sessionData: the only folder the macOS network-service sandbox writes (ADR 0009 decision 1)
+    expect(app.getPath).toHaveBeenCalledWith('sessionData')
     await expect(runtime.profiles.openForTab()).rejects.toMatchObject({ code: 'no-project' })
   })
 

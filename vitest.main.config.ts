@@ -120,6 +120,10 @@ export default defineConfig({
         'src/main/services/browser/browserProfileDeletes.ts': { lines: 94, functions: 98, branches: 83, statements: 94 },
         // measured 100/100/100/100
         'src/main/services/browser/BrowserProfileService.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // The per-project Chromium folder under sessionData (ADR 0009 decision 1 as
+        // amended 2026-11-03, S-36). measured 98.97/100/81.33/95.72 (2026-11-03);
+        // the open branches are errno fallbacks and a case-sensitive-volume path.
+        'src/main/services/browser/browserProfileFolders.ts': { lines: 96, functions: 98, branches: 79, statements: 93 },
         // Built-in browser tabs and their gates (spec 025 commits 6–7, 025-NFR-001,
         // 025-FR-005, 025-FR-019, S2, S7, A4, A16): the per-window-kind channel
         // allow-list, the deny-by-default session policy, the pinned view settings,

@@ -235,7 +235,7 @@ Three guardrails keep such a build from being mistaken for a release:
 
 ### Why it is on (spec 025, ADR 0010)
 
-The built-in browser (spec 025) keeps one persistent profile per project in `.erfana/browser/profile/`, with the sign-in cookies of the sites the user visits. The fuse encrypts that cookie store with the OS key (Keychain on macOS, DPAPI on Windows, the Secret Service keyring on Linux), so a cookie value is not readable as plain text from disk (025-NFR-007). [ADR 0010](../adrs/0010-turn-on-cookie-encryption.md) supersedes the v0.22.0 decision to keep it off.
+The built-in browser (spec 025) keeps one persistent Chromium profile per project in `<sessionData>/browser-profiles/<name>/chromium/` (ADR 0009, amended 2026-11-03), with the sign-in cookies of the sites the user visits. The fuse encrypts that cookie store with the OS key (Keychain on macOS, DPAPI on Windows, the Secret Service keyring on Linux), so a cookie value is not readable as plain text from disk (025-NFR-007). [ADR 0010](../adrs/0010-turn-on-cookie-encryption.md) supersedes the v0.22.0 decision to keep it off.
 
 - **One-way.** Electron cannot read encrypted cookies once the fuse is off again, so it must never be turned back off.
 - **Existing cookies.** Plain-text cookies from earlier versions are encrypted the next time they are written, with no data loss (025-AC-079).

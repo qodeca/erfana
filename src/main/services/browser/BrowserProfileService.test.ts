@@ -20,12 +20,14 @@ import { createManualClock } from '../../../shared/clock'
 import type { LockResult, LockStatus } from '../../../shared/ipc/project-lock-schema'
 import {
   BrowserProfileService,
+  combineForgetOutcomes,
   storageBackendFor,
   type BrowserProfileServiceDeps,
   type StorageBackend
 } from './BrowserProfileService'
 import { canonicalProjectPath } from './browserProfileGuards'
 import { homeMarkerPath, type PurposeSigner } from './browserProfileMarker'
+import { profileFolderBaseName } from './browserProfileFolders'
 
 const itPosix = process.platform === 'win32' ? it.skip : it
 const START = Date.UTC(2026, 10, 2, 10, 15, 30, 123)
@@ -48,6 +50,7 @@ function fakeSigner(keyed: boolean, secret = 'k1'): PurposeSigner {
 let base: string
 let project: string
 let home: string
+let data: string
 let fromPathCalls: string[]
 let lockStatus: LockStatus
 let acquireResult: LockResult
@@ -67,6 +70,9 @@ function fakeKeyringCrypto(key: number): BrowserProfileServiceDeps['keyringCrypt
 
 const browserDir = (): string => join(project, '.erfana', 'browser')
 const markerFile = (): string => join(browserDir(), 'profile', 'Erfana', 'marker.json')
+/** The project's folder under `<sessionData>/browser-profiles/` (no collision in these tests). */
+const userDataFolder = (): string => join(data, 'browser-profiles', profileFolderBaseName(project, 'darwin'))
+const chromiumDir = (): string => join(userDataFolder(), 'chromium')
 
 function makeService(overrides: Partial<BrowserProfileServiceDeps> = {}): BrowserProfileService {
   deps = {
@@ -89,6 +95,7 @@ function makeService(overrides: Partial<BrowserProfileServiceDeps> = {}): Browse
     isTrackedByGit: vi.fn(async () => tracked),
     markIgnoredBySync: vi.fn(async () => undefined),
     homeDir: home,
+    dataDir: data,
     platform: 'darwin',
     clock: createManualClock(START),
     ...overrides
@@ -100,6 +107,7 @@ beforeEach(async () => {
   base = await canonicalProjectPath(await mkdtemp(join(tmpdir(), 'erfana-profile-')))
   project = join(base, 'project')
   home = join(base, 'home')
+  data = join(base, 'session-data')
   await mkdir(project)
   await mkdir(home)
   fromPathCalls = []
@@ -123,7 +131,7 @@ describe('BrowserProfileService.openForTab – first tab', () => {
       })
     })
     await service.openForTab()
-    expect(fromPathCalls).toEqual([join(project, '.erfana', 'browser', 'profile')])
+    expect(fromPathCalls).toEqual([chromiumDir()])
     expect(await readFile(join(browserDir(), '.gitignore'), 'utf8')).toBe('*')
   })
 
@@ -137,7 +145,7 @@ describe('BrowserProfileService.openForTab – first tab', () => {
     })
     const profile = await service.openForTab()
     expect(profile.projectRoot).toBe(project)
-    expect(fromPathCalls).toEqual([join(project, '.erfana', 'browser', 'profile')])
+    expect(fromPathCalls).toEqual([chromiumDir()])
     expect(deps.registerSession).toHaveBeenCalledWith(profile.session)
   })
 
@@ -307,7 +315,7 @@ describe('later tabs', () => {
 describe('a cloned or copied profile is set aside (S3, spec change S-12)', () => {
   async function seedProfile(): Promise<void> {
     await makeService().openForTab()
-    await writeFile(join(browserDir(), 'profile', 'Cookies'), 'old cookies')
+    await writeFile(join(chromiumDir(), 'Cookies'), 'old cookies')
   }
 
   async function openAgain(overrides: Partial<BrowserProfileServiceDeps> = {}): Promise<{ setAside: string | null }> {
@@ -319,7 +327,7 @@ describe('a cloned or copied profile is set aside (S3, spec change S-12)', () =>
     await seedProfile()
     const profile = await openAgain()
     expect(profile.setAside).toBeNull()
-    expect(await readFile(join(browserDir(), 'profile', 'Cookies'), 'utf8')).toBe('old cookies')
+    expect(await readFile(join(chromiumDir(), 'Cookies'), 'utf8')).toBe('old cookies')
   })
 
   it('sets aside a profile with no home copy (cloned from another machine or account)', async () => {
@@ -327,8 +335,10 @@ describe('a cloned or copied profile is set aside (S3, spec change S-12)', () =>
     await rm(homeMarkerPath(home, project))
     const profile = await openAgain()
     expect(profile.setAside).toBe('profile.untrusted-2026-11-02T10-15-30-123Z')
-    expect(await readFile(join(browserDir(), profile.setAside!, 'Cookies'), 'utf8')).toBe('old cookies')
-    expect(existsSync(join(browserDir(), 'profile', 'Cookies'))).toBe(false)
+    expect(existsSync(join(browserDir(), profile.setAside!, 'Erfana', 'marker.json'))).toBe(true)
+    // The Chromium half moves aside under the same time: none of its data runs
+    expect(await readFile(join(userDataFolder(), 'chromium.untrusted-2026-11-02T10-15-30-123Z', 'Cookies'), 'utf8')).toBe('old cookies')
+    expect(await readdir(chromiumDir())).toEqual([])
     // A fresh profile gets a fresh marker and home copy
     expect(JSON.parse(await readFile(markerFile(), 'utf8')).projectPath).toBe(project)
     expect(existsSync(homeMarkerPath(home, project))).toBe(true)
@@ -513,6 +523,82 @@ describe('deleteBrowserData', () => {
     expect(fromPathCalls).toHaveLength(1)
     const nextRun = await makeService().openForTab()
     expect(nextRun.setAside).toBeNull()
+  })
+
+  it('Forget also deletes the Chromium data under sessionData, keeping the folder name this project\'s', async () => {
+    const service = makeService()
+    await service.openForTab()
+    await writeFile(join(chromiumDir(), 'Cookies'), 'signed in')
+    await mkdir(join(userDataFolder(), 'chromium.untrusted-2020-01-01T00-00-00-000Z'))
+    expect(await service.deleteBrowserData([])).toBe('deleted')
+    expect(existsSync(browserDir())).toBe(false)
+    expect(await readdir(userDataFolder())).toEqual(['project.json'])
+    // The next tab of this run gets its folders back; the session is the same one
+    await service.openForTab()
+    expect(existsSync(chromiumDir())).toBe(true)
+    expect(fromPathCalls).toEqual([chromiumDir()])
+  })
+
+  it('Forget reports deleted when only the Chromium half had data', async () => {
+    const service = makeService()
+    await service.openForTab()
+    await rm(browserDir(), { recursive: true })
+    expect(await service.deleteBrowserData([])).toBe('deleted')
+  })
+
+  itPosix('Forget still clears the Chromium half when the project half fails, then reports the failure', async () => {
+    const service = makeService()
+    await service.openForTab()
+    await writeFile(join(chromiumDir(), 'Cookies'), 'signed in')
+    await rm(browserDir(), { recursive: true })
+    // `.erfana/browser` is now a link: the project half refuses it
+    await mkdir(join(base, 'outside'))
+    await symlink(join(base, 'outside'), browserDir(), 'dir')
+    await expect(service.deleteBrowserData([])).rejects.toMatchObject({ code: 'link' })
+    expect(existsSync(join(chromiumDir(), 'Cookies'))).toBe(false)
+  })
+
+  it('Forget with no profile opened this run deletes the project half only, and is absent when there is nothing', async () => {
+    const service = makeService()
+    expect(await service.deleteBrowserData([])).toBe('absent')
+    await mkdir(browserDir(), { recursive: true })
+    expect(await service.deleteBrowserData([])).toBe('deleted')
+    expect(existsSync(userDataFolder())).toBe(false)
+  })
+
+  it('a second Forget in the same run finds nothing left', async () => {
+    const service = makeService()
+    await service.openForTab()
+    expect(await service.deleteBrowserData([])).toBe('deleted')
+    expect(await service.deleteBrowserData([])).toBe('absent')
+  })
+
+  it('Forget reports the user-data half failing after deleting the project half', async () => {
+    const service = makeService()
+    await service.openForTab()
+    // A file in place of the profile folder: the user-data half cannot be cleared
+    await rm(userDataFolder(), { recursive: true })
+    await writeFile(userDataFolder(), 'not a folder')
+    await expect(service.deleteBrowserData([])).rejects.toMatchObject({ code: 'wrong-type' })
+    expect(existsSync(browserDir())).toBe(false)
+  })
+
+  it.each([
+    [['pending', 'deleted'], 'pending'],
+    [['absent', 'pending'], 'pending'],
+    [['deleted', 'absent'], 'deleted'],
+    [['absent', 'deleted'], 'deleted'],
+    [['absent', 'absent'], 'absent']
+  ] as const)('combines Forget outcomes %j as %s', (outcomes, combined) => {
+    expect(combineForgetOutcomes(outcomes)).toBe(combined)
+  })
+
+  it('never points the session at a profile left in the project by an earlier build', async () => {
+    await makeService().openForTab()
+    await writeFile(join(browserDir(), 'profile', 'Cookies'), 'left over')
+    await makeService().openForTab()
+    expect(fromPathCalls).toEqual([chromiumDir(), chromiumDir()])
+    expect(await readFile(join(browserDir(), 'profile', 'Cookies'), 'utf8')).toBe('left over')
   })
 
   it('a partial delete does not rewrite the marker', async () => {

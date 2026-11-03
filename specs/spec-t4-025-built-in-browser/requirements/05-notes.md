@@ -103,10 +103,10 @@ Owner decisions taken knowingly in the 2026-10-31 interview:
 |------|----------|-------|
 | Prompt injection from page content, with prompts submitted at once | Accepted; page content is labelled untrusted and the risk is documented | 025-FR-032, 025-FR-036, 025-FR-044 |
 | Client data, form values (including passwords and card numbers typed on the page) and tokens in URLs sent as-is to the agent's AI provider | Accepted by the owner (reconfirmed 2026-11-01); documented | 025-FR-036, 025-FR-044 |
-| The project folder holds the whole profile, including saved credentials, permissions and certificate exceptions, so the agent, project scripts, cloud sync, archives and Docker build contexts can read or change it | Accepted by the owner (2026-11-01); documented | 025-FR-015, 025-FR-044 |
+| The project folder holds Erfana's own profile files, including saved credentials, permissions and certificate exceptions, so the agent, project scripts, cloud sync, archives and Docker build contexts can read or change them; cookies, storage and cache are in Erfana's own data folder since S-36, readable by any program running as the user | Accepted by the owner (2026-11-01; narrowed by S-36, 2026-11-03); documented | 025-FR-015, 025-FR-044 |
 | Only cookies are encrypted at rest; local storage, IndexedDB and the cache are plain text | Accepted; documented | 025-FR-017, 025-FR-044 |
 | Prompts are submitted at once, with no preview and no insert-only variant; the shell guard does not detect a busy agent or an agent showing a permission question | Accepted by the owner (2026-11-01); documented | 025-FR-032, 025-FR-061, 025-FR-044 |
-| `git clean -fdx` deletes the project's profile and captures | Accepted; documented | 025-FR-016, 025-FR-044 |
+| `git clean -fdx` deletes Erfana's own profile files (permissions, exceptions, saved sign-ins, zoom, history) and captures; the sign-ins in the Chromium profile stay (S-36) | Accepted; documented | 025-FR-016, 025-FR-044 |
 | Memory use grows with open tabs | Accepted; no unloading | 025-FR-007 |
 | No feature flag or off-switch; a security issue is handled by a release within 14 days | Accepted (reconfirmed 2026-11-01) | 025-FR-040, 025-NFR-002 |
 | Full URLs in log files | Accepted (reconfirmed 2026-11-01); recorded exception to `redactUserInput` | 025-FR-042 |
@@ -120,11 +120,11 @@ Owner decisions taken knowingly in the 2026-10-31 interview:
 |---|---|---|---|---|---|
 | Context file, screenshot, crop | Client data, may hold personal data and secrets | `.erfana/browser/captures/` | None (plain files) | 7 days (025-FR-039) | Expiry, **Clear browsing data › Captures**, Forget |
 | In-memory capture | Same | Main-process memory | – | Until send or discard | Discarded on close, crash or navigation |
-| Cookies | Credentials | Profile | OS key store (025-FR-017) | Site-set expiry | Clear, Forget |
-| Local storage, session storage, IndexedDB, cache | Client data, may hold tokens | Profile | None | Until cleared | Clear, Forget |
-| Saved sign-in credentials | Credentials | Profile | OS key store; not stored on Linux `basic_text` | Until cleared | Clear |
-| Site permissions, certificate and pop-up exceptions | Trust decisions | Profile | None | Certificate exceptions 7 days; others until cleared | Clear |
-| Address history | Browsing data | Profile | None | Last 100 entries | Clear (cookies and site data) |
+| Cookies | Credentials | Chromium profile, `<sessionData>/browser-profiles/<name>/chromium/` (S-36) | OS key store (025-FR-017) | Site-set expiry | Clear, Forget |
+| Local storage, session storage, IndexedDB, cache | Client data, may hold tokens | Chromium profile (S-36) | None | Until cleared | Clear, Forget |
+| Saved sign-in credentials | Credentials | `.erfana/browser/profile/Erfana/` | OS key store; not stored on Linux `basic_text` | Until cleared | Clear |
+| Site permissions, certificate and pop-up exceptions | Trust decisions | `.erfana/browser/profile/Erfana/` | None | Certificate exceptions 7 days; others until cleared | Clear |
+| Address history | Browsing data | `.erfana/browser/profile/Erfana/` | None | Last 100 entries | Clear (cookies and site data) |
 | Local addresses seen in terminal output | Browsing data | Main-process memory only | – | Until Erfana quits | Not stored on disk |
 | Log entries | Operational, full URLs | Erfana logs folder | None | Erfana's log rotation | Delete logs |
 | Prompt and capture at the provider | Client data | The AI provider | The provider's | The provider's terms | The provider's tools |
@@ -181,7 +181,7 @@ These decide whether requirements can be met, so each needs an accepted ADR befo
 |---|---|---|
 | 0007 | Pick overlay: engine-drawn (DevTools-protocol `Overlay` and `DOM` with auto-attach to every frame target) or an isolated preload in every frame; the frame kinds each supports | 025-FR-026, 025-FR-029, 025-NFR-001 |
 | 0008 | Freeze mechanism and what it stops (`Debugger.pause`, script-execution disabling with a virtual-time pause, or the lifecycle `frozen` state); capture-then-freeze ordering | 025-FR-028, 025-FR-053 |
-| 0009 | The profile and every trust decision live in the project folder (owner decision, 2026-11-01) and the guards that protect it | 025-FR-015, 025-FR-016 |
+| 0009 | Every trust decision lives in the project folder (owner decision, 2026-11-01), the Chromium profile under Erfana's own data folder (amended 2026-11-03, S-36), and the guards that protect both | 025-FR-015, 025-FR-016 |
 | 0010 | Turning on `EnableCookieEncryption` (supersedes `scripts/fuses.js` lines 705–709) | 025-FR-017, 025-NFR-010 |
 | 0011 | Erfana surfaces over the page view (still image, Erfana-owned layer, top strip) and main-process key routing | 025-FR-054, 025-FR-030, 025-FR-031 |
 | 0012 | Local-file confinement mechanism (decided: per-folder loopback server) | 025-FR-005 |

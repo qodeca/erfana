@@ -17,7 +17,7 @@ import { logger } from '../../../utils/logger'
 export const FORGET_CONFIRM: Omit<ConfirmDialogConfig, 'id'> = {
   title: "Forget this project's browser data?",
   message:
-    "This closes the project's browser tabs and deletes the .erfana/browser folder – cookies, saved sign-ins, permissions, history and captures. You'll be signed out of every site in this project.",
+    "This closes the project's browser tabs and deletes its browser data – cookies, saved sign-ins, permissions, history and captures – from the .erfana/browser folder and from Erfana's own data folder. You'll be signed out of every site in this project.",
   confirmLabel: 'Forget browser data',
   cancelLabel: 'Cancel',
   danger: true

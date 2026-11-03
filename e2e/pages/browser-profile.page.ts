@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The project's browser folder, `<project>/.erfana/browser/` (spec 025,
- * 025-FR-016, 025-FR-039; 025-AC-016, 025-AC-069), read and planted from the
+ * 025-FR-016, 025-FR-039; 025-AC-016, 025-AC-069), and the project's Chromium
+ * folder under `<userData>/browser-profiles/`, read and planted from the
  * test side, and the refusal a user sees when Erfana will not open a tab.
  *
  * Disk facts come straight from the file system (never from the app); the
@@ -104,6 +105,28 @@ export class BrowserProfileFolder {
       .split('\n')
       .filter((line) => line.includes('.erfana/browser'))
   }
+}
+
+/**
+ * The project's folder under `<userData>/browser-profiles/` – where its
+ * Chromium profile lives (ADR 0009 decision 1) – found the way the app finds
+ * it: by the `project.json` that names the project's canonical path. Null
+ * when no folder names it.
+ */
+export async function userDataProfileFolder(userDataDir: string, projectPath: string): Promise<string | null> {
+  const canonical = await fs.realpath(projectPath)
+  const root = path.join(userDataDir, 'browser-profiles')
+  for (const name of await fs.readdir(root).catch(() => [] as string[])) {
+    const text = await fs.readFile(path.join(root, name, 'project.json'), 'utf8').catch(() => null)
+    if (text !== null && (JSON.parse(text) as { projectPath?: string }).projectPath === canonical) return path.join(root, name)
+  }
+  return null
+}
+
+/** The project's Chromium profile folder (`…/browser-profiles/<name>/chromium`), or null. */
+export async function chromiumProfileDir(userDataDir: string, projectPath: string): Promise<string | null> {
+  const folder = await userDataProfileFolder(userDataDir, projectPath)
+  return folder === null ? null : path.join(folder, 'chromium')
 }
 
 /** A folder's entries, sorted; empty when it does not exist. */

@@ -90,7 +90,7 @@ If the keyring changes and stored cookies can no longer be read, the tab says on
 
 ## Clear and forget browsing data
 
-**What it does:** **Clear browsing data…** opens a dialog with five kinds of data for this project: **Cookies and other site data**, **Cached files**, **Site permissions, certificate exceptions and pop-up exceptions**, **Saved sign-in credentials** and **Captures**. **Clear** removes the ticked kinds and reloads this project's browser tabs; kinds you did not tick are left alone. **Forget this project's browser data…** closes the project's browser tabs and deletes the `.erfana/browser` folder, after you confirm with **Forget browser data**; the button reads **Forgetting…** until it is done. **How to reach it:** **More** in the navigation row.
+**What it does:** **Clear browsing data…** opens a dialog with five kinds of data for this project: **Cookies and other site data**, **Cached files**, **Site permissions, certificate exceptions and pop-up exceptions**, **Saved sign-in credentials** and **Captures**. **Clear** removes the ticked kinds and reloads this project's browser tabs; kinds you did not tick are left alone. **Forget this project's browser data…** closes the project's browser tabs and deletes the `.erfana/browser` folder and the project's cookies, storage and cache in Erfana's data folder (see [Browser data handling](./browser-data-handling.md#where-data-goes)), after you confirm with **Forget browser data**; the button reads **Forgetting…** until it is done. **How to reach it:** **More** in the navigation row.
 
 ## Keyboard shortcuts
 

@@ -15,25 +15,31 @@
  *    `ProjectLockService`'s own rules;
  * 3. guards `.erfana`, `.erfana/browser` and writes `.gitignore` (exactly `*`)
  *    before anything else exists there (025-AC-016);
- * 4. checks an existing profile's marker and git tracking, and sets a
- *    distrusted profile aside (S3, S-12);
- * 5. guards `profile`, `profile/Erfana`, `captures`; writes a fresh marker;
- * 6. asks cloud sync to ignore the folder (S30, best effort);
- * 7. creates the session with `session.fromPath(<canonical>/.erfana/browser/profile)`
- *    and records it in the browser session registry;
- * 8. hardens it (`browserSessionPolicy.hardenBrowserSession`): deny-by-default
+ * 4. finds or claims the project's folder under
+ *    `<sessionData>/browser-profiles/` (`browserProfileFolders.ts`) and
+ *    finishes a Forget a running session blocked there (Windows);
+ * 5. checks an existing profile's marker and git tracking, and sets a
+ *    distrusted profile aside – both halves, the project's `profile/` and
+ *    the user-data `chromium/` (S3, S-12);
+ * 6. guards `profile`, `profile/Erfana`, `captures`; writes a fresh marker;
+ * 7. asks cloud sync to ignore the folder (S30, best effort);
+ * 8. creates the session with `session.fromPath(<sessionData>/browser-profiles/<name>/chromium)`
+ *    – the only place the macOS network-service sandbox lets Chromium write
+ *    its cookie database (ADR 0009 decision 1) – and records it in the
+ *    browser session registry;
+ * 9. hardens it (`browserSessionPolicy.hardenBrowserSession`): deny-by-default
  *    permission, device, chooser, display-media and download handlers, the
  *    user agent and spell check – before the tab that asked can load a page.
  *
- * Every later tab re-runs steps 3 and 5 only (a deleted `.gitignore` is
+ * Every later tab re-runs steps 3 and 6 only (a deleted `.gitignore` is
  * written again before the page loads). The session is never destroyed while
  * the app runs (Electron cannot), so it is kept per canonical path.
  *
- * 9. checks the keyring (`browserKeyringState`, 025-FR-018): the canary and
+ * 10. checks the keyring (`browserKeyringState`, 025-FR-018): the canary and
  *    the recorded backend decide the notices of the project's first tab.
  *
  * The `erfana-local` handler (commit 11) and the trust store join them after
- * step 9 once they exist, before any page loads.
+ * step 10 once they exist, before any page loads.
  */
 import { join } from 'node:path'
 import type { Clock } from '../../../shared/clock'
@@ -50,7 +56,17 @@ import {
   ensureProfileTree
 } from './browserProfileGuards'
 import { verifyProfileMarker, writeProfileMarker, type PurposeSigner } from './browserProfileMarker'
-import { deleteUnderBrowser, runPendingDeletes, setProfileAside, type DeleteOutcome } from './browserProfileDeletes'
+import { deleteUnderBrowser, runPendingDeletes, setAsideStamp, setProfileAside, type DeleteOutcome } from './browserProfileDeletes'
+import {
+  clearProfileFolder,
+  ensureChromiumDir,
+  finishAllPendingClears,
+  finishPendingClear,
+  resolveProfileFolder,
+  setChromiumAside,
+  type FolderClearOutcome,
+  type ProfileFolder
+} from './browserProfileFolders'
 import { BROWSER_DIR_SEGMENTS, PROFILE_DIR_NAME } from './browserProfilePaths'
 import {
   NO_KEYRING_NOTICES,
@@ -102,6 +118,8 @@ export interface BrowserProfile {
   readonly setAside: string | null
   /** The keyring notices found when this run created the session (025-FR-018). */
   readonly keyring: KeyringNotices
+  /** The project's folder under `<sessionData>/browser-profiles/`, which holds the session's files. */
+  readonly folder: ProfileFolder
 }
 
 export interface BrowserProfileServiceDeps {
@@ -120,6 +138,8 @@ export interface BrowserProfileServiceDeps {
   readonly isTrackedByGit: (canonical: string) => Promise<boolean>
   readonly markIgnoredBySync: (browserDir: string) => Promise<void>
   readonly homeDir: string
+  /** `app.getPath('sessionData')`: the parent of `browser-profiles/`. */
+  readonly dataDir: string
   readonly platform: NodeJS.Platform
   readonly clock: Pick<Clock, 'now'>
 }
@@ -154,6 +174,7 @@ export class BrowserProfileService {
       await ensureBrowserFolder(canonical)
       await ensureProfileTree(canonical)
       if (this.forgotten.delete(canonical)) {
+        await ensureChromiumDir(profile.folder)
         await writeProfileMarker(canonical, this.deps.homeDir, this.deps.signer, new Date(this.deps.clock.now()).toISOString())
       }
       return profile
@@ -200,20 +221,46 @@ export class BrowserProfileService {
 
   /**
    * Delete `.erfana/browser/<relBelowBrowser>` of the open project after the
-   * per-level re-guard; `[]` deletes the whole folder (Forget). On Windows a
-   * delete the running session blocks runs at the next start.
+   * per-level re-guard; `[]` is Forget: the whole folder, and the Chromium
+   * data in the project's user-data folder (all but its `project.json`). On
+   * Windows a delete the running session blocks runs at the next start.
+   *
+   * Forget tries both halves even when one fails, then throws the first error.
    *
    * @throws BrowserProfileError
    */
   async deleteBrowserData(relBelowBrowser: readonly string[]): Promise<DeleteOutcome> {
     const canonical = await this.openProjectCanonical()
-    const outcome = await deleteUnderBrowser(canonical, relBelowBrowser, this.deleteDeps())
-    if (relBelowBrowser.length === 0 && outcome === 'deleted' && this.profiles.has(canonical)) this.forgotten.add(canonical)
+    if (relBelowBrowser.length > 0) return deleteUnderBrowser(canonical, relBelowBrowser, this.deleteDeps())
+    const halves = await Promise.allSettled([
+      deleteUnderBrowser(canonical, [], this.deleteDeps()),
+      this.clearUserDataHalf(canonical)
+    ])
+    const failed = halves.find((half) => half.status === 'rejected')
+    if (failed !== undefined) throw failed.reason
+    const outcomes = halves.map((half) => (half as PromiseFulfilledResult<DeleteOutcome | FolderClearOutcome>).value)
+    const outcome = combineForgetOutcomes(outcomes)
+    if (outcome !== 'absent' && this.profiles.has(canonical)) this.forgotten.add(canonical)
     return outcome
   }
 
-  /** Run deletes stored by earlier runs; at start, after the app is ready. */
+  /**
+   * The Chromium half of Forget. Forget opens the profile first, so the folder
+   * is known; with no profile opened this run there is no session and nothing
+   * of this run to clear.
+   */
+  private async clearUserDataHalf(canonical: string): Promise<FolderClearOutcome> {
+    const profile = this.profiles.get(canonical)
+    return profile === undefined ? 'absent' : clearProfileFolder((await profile).folder, this.deps.platform)
+  }
+
+  /**
+   * Run deletes stored by earlier runs – the project folders' signed entries
+   * and the user-data folders' `forget-pending` – at start, after the app is
+   * ready.
+   */
   async runPendingDeletes(): Promise<void> {
+    await finishAllPendingClears(this.deps.dataDir, this.deps.platform)
     await runPendingDeletes(this.deleteDeps())
   }
 
@@ -259,37 +306,51 @@ export class BrowserProfileService {
   private async createProfile(canonical: string): Promise<BrowserProfile> {
     await this.requireProjectLock(canonical)
     await ensureBrowserFolder(canonical)
-    const setAside = await this.setAsideIfDistrusted(canonical)
+    const folder = await resolveProfileFolder(this.deps.dataDir, canonical, this.deps.platform)
+    await finishPendingClear(folder, this.deps.platform)
+    const setAside = await this.setAsideIfDistrusted(canonical, folder)
     const profileExisted = setAside === null && (await this.profileExists(canonical))
     await ensureProfileTree(canonical)
     if (!profileExisted) {
       await writeProfileMarker(canonical, this.deps.homeDir, this.deps.signer, new Date(this.deps.clock.now()).toISOString())
     }
     await this.deps.markIgnoredBySync(join(canonical, ...BROWSER_DIR_SEGMENTS))
-    const session = this.deps.fromPath(join(canonical, ...BROWSER_DIR_SEGMENTS, PROFILE_DIR_NAME))
+    await ensureChromiumDir(folder)
+    const session = this.deps.fromPath(folder.chromiumDir)
     this.deps.registerSession(session)
     this.deps.hardenSession(session)
     const backend = this.deps.storageBackend()
     const keyring = await assessKeyring(canonical, backend, this.deps.keyringCrypto)
     const trust: TrustPersistence = this.deps.signer.hasKey() ? 'signed' : 'memory'
     logger.info('Browser profile ready', { project: redactPath(canonical), backend, trust, setAside: setAside !== null })
-    return { projectRoot: canonical, session, backend, trust, setAside, keyring }
+    return { projectRoot: canonical, session, backend, trust, setAside, keyring, folder }
   }
 
   private profileExists(canonical: string): Promise<boolean> {
     return checkExistingLevel(canonical, [...BROWSER_DIR_SEGMENTS, PROFILE_DIR_NAME], 'dir')
   }
 
-  /** S3: move a profile Erfana did not create here, or that git tracks, out of the way. */
-  private async setAsideIfDistrusted(canonical: string): Promise<string | null> {
+  /**
+   * S3: move a profile Erfana did not create here, or that git tracks, out of
+   * the way – the project half and, under the same time, the Chromium half.
+   */
+  private async setAsideIfDistrusted(canonical: string, folder: ProfileFolder): Promise<string | null> {
     if (!(await this.profileExists(canonical))) return null
     const tracked = await this.deps.isTrackedByGit(canonical)
     const verdict = tracked
       ? ({ trusted: false, reason: 'git-tracked' } as const)
       : await verifyProfileMarker(canonical, this.deps.homeDir, this.deps.signer)
     if (verdict.trusted) return null
-    const name = await setProfileAside(canonical, this.deps.clock.now())
+    const now = this.deps.clock.now()
+    const name = await setProfileAside(canonical, now)
+    await setChromiumAside(folder, setAsideStamp(now))
     logger.warn('Browser profile set aside', { project: redactPath(canonical), reason: verdict.reason })
     return name
   }
+}
+
+/** Forget's two halves as one outcome: pending wins, then deleted; absent only when both were. */
+export function combineForgetOutcomes(outcomes: readonly (DeleteOutcome | FolderClearOutcome)[]): DeleteOutcome {
+  if (outcomes.includes('pending')) return 'pending'
+  return outcomes.includes('deleted') ? 'deleted' : 'absent'
 }

@@ -547,7 +547,7 @@ How to read: `{braces}` are variables; "Name" is the accessible name when it dif
 | sign in / sign-in | Basic and Digest authentication, and logins generally | log in, login, credentials (new strings) | "Sign in to {host}" |
 | pop-up | A window or tab a page tries to open | popup (spec prose only) | "Pop-up blocked" |
 | full screen | A page filling the page area | fullscreen | "{host} is now full screen." |
-| clear / forget | Clear removes kinds of data; Forget deletes `.erfana/browser/` | reset, wipe | "Clear browsing data…" |
+| clear / forget | Clear removes kinds of data; Forget deletes `.erfana/browser/` and the project's Chromium profile under Erfana's data folder | reset, wipe | "Clear browsing data…" |
 | prompt above the page | How announcements name a strip row (CT-16) | the bar above the page | "Press F6 to answer in the prompt above the page." |
 
 ### Variables
@@ -932,7 +932,7 @@ Shown in the first strip row as a field error, linked to the field; typed text s
 | Blocked reason | Tick at least one kind of data. | – |
 | Buttons, busy, done | Cancel · Clear · Clearing… · toast "Browsing data cleared for this project." | – |
 | Step failed | Some data wasn't cleared · Couldn't clear {kind} – {reason}. Data you didn't tick wasn't touched. | – |
-| Forget | Title "Forget this project's browser data?" · body "This closes the project's browser tabs and deletes the .erfana/browser folder – cookies, saved sign-ins, permissions, history and captures. You'll be signed out of every site in this project." · Cancel · Forget browser data · Forgetting… | – |
+| Forget | Title "Forget this project's browser data?" · body "This closes the project's browser tabs and deletes its browser data – cookies, saved sign-ins, permissions, history and captures – from the .erfana/browser folder and from Erfana's own data folder. You'll be signed out of every site in this project." · Cancel · Forget browser data · Forgetting… | – |
 | Forget done | This project's browser data is deleted. | – |
 | Forget done, Windows | This project's browser data is deleted. A few files still in use go the next time Erfana starts. | CT-21 |
 | Forget failed | Browser data not fully deleted · Couldn't delete {path} – {reason}. | – |
