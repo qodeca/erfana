@@ -1108,6 +1108,26 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 
 ## Deferred-work ledgers (Windows)
 
+### 67. Electronegativity scan findings (spec 025, 2026-11)
+
+**Severity**: Low (no open high finding)
+**Scan**: `npx @doyensec/electronegativity@1.10.3 -i src -e 44.9.3` (issue #448 definition of done § 3). It reads `new BrowserWindow({...})` literals only, so settings built elsewhere are invisible to it.
+
+**High – justified, false positive**:
+
+| Check | Site | Why it is not a defect |
+|---|---|---|
+| `CONTEXT_ISOLATION_JS_CHECK` | `src/main/services/imageExport/ImageRasterizeWindow.ts` (`new BrowserWindow`) | The window's `webPreferences` come from `buildHarnessWebPreferences` in `src/main/services/imageExport/rasterizeSession.ts`, which sets `contextIsolation: true`, `sandbox: true` and `nodeIntegration: false`; `rasterizeSession.test.ts` pins each value |
+
+**Medium and low – reviewed, no change**:
+
+- `SANDBOX_JS_CHECK`, `PRELOAD_JS_CHECK`, `AUXCLICK_JS_CHECK` on the main, PDF, screenshot-overlay and image-export windows: the same blind spot (settings built in a helper or set app-wide); browser tab views use `browserWebPreferences.ts`, pinned by its test, with no preload.
+- `OPEN_EXTERNAL_JS_CHECK` (8 sites): the main-side calls sit in `openExternalSafe` and the preview's link-consent flow; the renderer calls go through the preload's single `shell.openExternal` bridge to the `shell:openExternal` handler (`src/main/ipc/shell-handlers.ts`). The final security review re-checks each site.
+- `CERTIFICATE_VERIFY_PROC_JS_CHECK`, `CERTIFICATE_ERROR_EVENT_JS_CHECK`, `DANGEROUS_FUNCTIONS_JS_CHECK` (`insertCSS`): test hooks only (`src/main/testHooks/`), compiled out of production builds (`npm run check:no-test-hooks`).
+- `CSP_GLOBAL_CHECK` (low): `style-src 'unsafe-inline'` in the app and image-export entries is pre-existing; the local-file server's sandbox CSP is a constant the scanner cannot parse (`LOCAL_SANDBOX_POLICY` in `localResponsePolicy.ts`).
+
+**Re-run**: at every release that touches windows, sessions or `webPreferences`.
+
 This doc covers project-wide non-Windows technical debt. For phase-structured deferred items with promotion criteria + risk-if-forgotten:
 
 - [`windows/deferred-work.md`](./windows/deferred-work.md) — D1-D8 (Phase 2 review aftermath, tracked in #168)
