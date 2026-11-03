@@ -140,6 +140,32 @@ describe('browserTabBridge requests', () => {
   })
 })
 
+describe('browserTabBridge page features and the page menu', () => {
+  type Bridge = typeof browserTabBridge
+  it('wraps find, zoom, width presets, Clear, Forget, suggestions and menu actions on their own channels', async () => {
+    const find = { tabId: TAB, text: 'needle', forward: true, findNext: true, matchCase: false } as unknown as Parameters<Bridge['find']>[0]
+    const action = { tabId: TAB, menuId: 'menu-1', action: 'reload' } as unknown as Parameters<Bridge['contextAction']>[0]
+    await browserTabBridge.find(find)
+    await browserTabBridge.stopFind(TAB)
+    await browserTabBridge.zoom(TAB, 'in')
+    await browserTabBridge.widthPreset(TAB, 'mobile' as Parameters<Bridge['widthPreset']>[1])
+    await browserTabBridge.clearData(['cookies'] as unknown as Parameters<Bridge['clearData']>[0])
+    await browserTabBridge.forget()
+    await browserTabBridge.suggest('app')
+    await browserTabBridge.contextAction(action)
+    expect(ipc.invoke.mock.calls).toEqual([
+      [C.find, find],
+      [C.stopFind, { tabId: TAB }],
+      [C.zoom, { tabId: TAB, step: 'in' }],
+      [C.widthPreset, { tabId: TAB, preset: 'mobile' }],
+      [C.clearData, { categories: ['cookies'] }],
+      [C.forget, {}],
+      [C.suggest, { prefix: 'app' }],
+      [C.contextAction, action]
+    ])
+  })
+})
+
 describe('browserTabBridge events', () => {
   it.each([
     ['onState', E.state],
@@ -149,7 +175,9 @@ describe('browserTabBridge events', () => {
     ['onBoundsApplied', E.boundsApplied],
     ['onFocus', E.focus],
     ['onForwardedKey', E.forwardedKey],
-    ['onPick', E.pick]
+    ['onPick', E.pick],
+    ['onFindResult', E.findResult],
+    ['onContextMenu', E.contextMenu]
   ] as const)('%s delivers events until unsubscribed', (member, channel) => {
     const callback = vi.fn()
     const unsubscribe = browserTabBridge[member](callback)

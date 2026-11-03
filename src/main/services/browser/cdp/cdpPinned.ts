@@ -8,6 +8,8 @@
  * reviewed edit to this file; no caller can build one at run time.
  */
 
+import { PICK_PAGE_FUNCTIONS } from './cdpPickFunctions'
+
 /** A function Erfana may run in a page through `Runtime.callFunctionOn`. */
 export interface CdpPageFunction {
   /** Stable name for logs and tests. */
@@ -34,11 +36,11 @@ export const OUTER_HTML_CUT: CdpPageFunction = Object.freeze({
 })
 
 /**
- * Every function `Runtime.callFunctionOn` may carry, compared by exact source.
- * The React lookup (ADR 0007 decision 10) joins this list with the pick
- * capture commit (solution design § 13, commit 14).
+ * Every function `Runtime.callFunctionOn` may carry, compared by exact source:
+ * the outer-HTML cut and the pick reads, including the React lookup (ADR 0007
+ * decision 10), of `cdpPickFunctions.ts` (solution design § 13, commit 14).
  */
-export const CDP_PAGE_FUNCTIONS: readonly CdpPageFunction[] = Object.freeze([OUTER_HTML_CUT])
+export const CDP_PAGE_FUNCTIONS: readonly CdpPageFunction[] = Object.freeze([OUTER_HTML_CUT, ...PICK_PAGE_FUNCTIONS])
 
 /** The isolated world Erfana's reads run in (`Page.createIsolatedWorld`). */
 export const ISOLATED_WORLD_NAME = 'erfana-pick'

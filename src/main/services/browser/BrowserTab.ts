@@ -10,8 +10,10 @@
  * before the first page loads:
  *
  * - **Window open: deny all** (A4). The registered id skips the app-wide
- *   baseline, so the tab sets its own handler; page-opened tabs and popups
- *   arrive with `site/browserWindowOpen.ts` (commit 12e).
+ *   baseline, so the tab sets its own handler; the service replaces it in the
+ *   same tick with the popup policy (`popups/TabWindowOpen.ts`, commit 12e).
+ * - **Leave-page prompt** (025-FR-058): every load the user starts arms
+ *   {@link BrowserTabDeps.armLeave} with a way to repeat it first.
  * - **Navigation policy** (S2). What the user starts goes through
  *   {@link BrowserTab.navigate} and {@link BrowserTab.history}; what the page
  *   starts – a link, a script, a form, a redirect, a frame – is checked here
@@ -115,6 +117,8 @@ export interface BrowserTabDeps {
   readonly local?: TabLocalFiles
   /** The page view's clipping parent for width presets (ADR 0011 decision 6); without it the view goes straight into the window. */
   readonly createClip?: () => ClipView
+  /** Told before each load the user starts, with a way to repeat it (`dialogs/leavePage.ts`). */
+  readonly armLeave?: (repeat: () => void) => void
 }
 
 /** A `navigate` answer: started, or refused by 025-FR-005. */
@@ -179,6 +183,7 @@ export class BrowserTab {
       else logger.warn('Refused a browser tab navigation', { source, reason: verdict.reason })
       return { refused: verdict.reason }
     }
+    this.deps.armLeave?.(() => this.navigate(url, source))
     this.load(url, source)
     return { ok: true }
   }
@@ -189,6 +194,7 @@ export class BrowserTab {
    * folder's origin; shown as `file://<path>`.
    */
   navigateLocal(url: string, source: Exclude<NavigationSource, 'page'>): void {
+    this.deps.armLeave?.(() => this.navigateLocal(url, source))
     this.armLocal(url)
     this.load(url, source)
   }
@@ -214,6 +220,7 @@ export class BrowserTab {
       return
     }
     if (step === 'reload') {
+      this.deps.armLeave?.(() => this.history('reload'))
       this.armLocal(this.committedUrl)
       this.setPending(this.committedUrl)
       this.contents.reload()
@@ -222,6 +229,7 @@ export class BrowserTab {
     const offset = step === 'back' ? -1 : 1
     const canGo = step === 'back' ? history.canGoBack() : history.canGoForward()
     if (!canGo) return
+    this.deps.armLeave?.(() => this.history(step))
     const target = history.getEntryAtIndex(history.getActiveIndex() + offset)
     this.armLocal(target?.url ?? null)
     this.setPending(target?.url ?? null)

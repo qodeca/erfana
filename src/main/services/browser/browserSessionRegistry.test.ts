@@ -286,6 +286,62 @@ describe('BrowserSessionRegistry', () => {
     })
   })
 
+  describe('page-opened windows (025-FR-011, commit 12e)', () => {
+    function pageWindow(session: object = browserSession): FakeContents {
+      const contents = fakeContents(session)
+      contents.getType = () => 'window'
+      return contents
+    }
+
+    it('refuses a page-opened window nobody expected', () => {
+      expect(registry.classify(pageWindow())).toBe('refused')
+    })
+
+    it('registers one expected page-opened window as a browser view; the next is refused', () => {
+      registry.expectPageWindow(browserSession)
+      const first = pageWindow()
+      expect(registry.classify(first)).toBe('exempt')
+      expect(registry.isRegisteredView(first)).toBe(true)
+      expect(registry.classify(pageWindow())).toBe('refused')
+    })
+
+    it('needs the window type, a live webContents and the same session', () => {
+      const other = { name: 'other' }
+      registry.registerSession(other)
+      registry.expectPageWindow(browserSession)
+      expect(registry.classify(fakeContents(browserSession))).toBe('refused')
+      expect(registry.classify(pageWindow(other))).toBe('refused')
+      const gone = pageWindow()
+      gone.destroy()
+      expect(registry.classify(gone)).toBe('refused')
+      expect(registry.classify(pageWindow())).toBe('exempt')
+    })
+
+    it('counts expectations, and a withdrawn one is gone (twice is harmless)', () => {
+      registry.expectPageWindow(browserSession)
+      const withdraw = registry.expectPageWindow(browserSession)
+      withdraw()
+      withdraw()
+      expect(registry.classify(pageWindow())).toBe('exempt')
+      expect(registry.classify(pageWindow())).toBe('refused')
+    })
+
+    it('two opens at once register two page windows, one each', () => {
+      registry.expectPageWindow(browserSession)
+      registry.expectPageWindow(browserSession)
+      expect(registry.classify(pageWindow())).toBe('exempt')
+      expect(registry.classify(pageWindow())).toBe('exempt')
+      expect(registry.classify(pageWindow())).toBe('refused')
+    })
+
+    it('never takes a DevTools front end for a page window', () => {
+      registry.expectPageWindow(browserSession)
+      const front = fakeContents(browserSession)
+      front.getType = () => 'remote'
+      expect(registry.classify(front)).toBe('refused')
+    })
+  })
+
   it('isRegisteredView refuses a missing webContents', () => {
     expect(registry.isRegisteredView(null)).toBe(false)
     expect(registry.isRegisteredView(undefined)).toBe(false)

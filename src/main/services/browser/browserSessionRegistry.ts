@@ -30,6 +30,16 @@
  * opens no window), and is never a registered view. A page cannot make a
  * `remote` `webContents`: every window open of a tab is denied or created by
  * Erfana through `createView`.
+ *
+ * PAGE-OPENED WINDOWS (025-FR-011, commit 12e). For a `window.open` or a
+ * `target="_blank"` link that Erfana's window-open policy allows, Chromium
+ * creates the new `webContents` itself – after the handler answered and
+ * before `createWindow` runs – so it turns up here unregistered. The policy
+ * arms {@link BrowserSessionRegistry.expectPageWindow} just before it answers
+ * `allow`; the next `webContents` of type `window` in that session is then
+ * registered as a browser view, and `createWindow` adopts it into a tab or a
+ * popup. A page cannot arm it: only an allowed open does, and the slot is
+ * withdrawn as soon as the open settles.
  */
 import { logger } from '../LoggingService'
 
@@ -51,6 +61,9 @@ export interface BrowserViewContents {
  * identifies it.
  */
 const DEVTOOLS_CONTENTS_TYPE = 'remote'
+
+/** The type Electron gives the `webContents` Chromium creates for a page-opened window (measured on Electron 44). */
+const PAGE_WINDOW_CONTENTS_TYPE = 'window'
 
 /** What `web-contents-created` should do with a new `webContents`. */
 export type CreatedWebContentsVerdict =
@@ -79,6 +92,8 @@ export class BrowserSessionRegistry implements CreatedWebContentsGate {
   /** Per session: DevTools front ends a tab has asked for and not yet seen. */
   private readonly devToolsExpected = new Map<object, number>()
   private readonly devToolsIds = new Set<number>()
+  /** Per session: page-opened windows an allowed open is about to create. */
+  private readonly pageWindowsExpected = new Map<object, number>()
 
   /** Record `session` as a browser session. Idempotent. */
   registerSession(session: object): void {
@@ -134,15 +149,17 @@ export class BrowserSessionRegistry implements CreatedWebContentsGate {
    * not used – call it once DevTools opened or the tab closed.
    */
   expectDevTools(session: object): () => void {
-    this.devToolsExpected.set(session, (this.devToolsExpected.get(session) ?? 0) + 1)
-    let withdrawn = false
-    return () => {
-      if (withdrawn) return
-      withdrawn = true
-      const left = (this.devToolsExpected.get(session) ?? 0) - 1
-      if (left > 0) this.devToolsExpected.set(session, left)
-      else this.devToolsExpected.delete(session)
-    }
+    return this.expect(this.devToolsExpected, session)
+  }
+
+  /**
+   * Expect one page-opened window's `webContents` in `session` (an allowed
+   * `window.open` or link; it is registered as a browser view when it turns
+   * up). Returns the function that withdraws the expectation if it was not
+   * used – call it once the open settled.
+   */
+  expectPageWindow(session: object): () => void {
+    return this.expect(this.pageWindowsExpected, session)
   }
 
   /** True when `contents` is a live DevTools front end accepted by {@link expectDevTools}. */
@@ -161,7 +178,32 @@ export class BrowserSessionRegistry implements CreatedWebContentsGate {
       return 'exempt'
     }
     if (this.takeDevToolsExpectation(contents)) return 'baseline'
+    if (this.takePageWindowExpectation(contents)) return 'exempt'
     return 'refused'
+  }
+
+  /** One more expectation of `session` in `counts`; returns its once-only withdraw. */
+  private expect(counts: Map<object, number>, session: object): () => void {
+    counts.set(session, (counts.get(session) ?? 0) + 1)
+    let withdrawn = false
+    return () => {
+      if (withdrawn) return
+      withdrawn = true
+      const left = (counts.get(session) ?? 0) - 1
+      if (left > 0) counts.set(session, left)
+      else counts.delete(session)
+    }
+  }
+
+  /** Register `contents` as an expected page-opened window, using up one expectation. */
+  private takePageWindowExpectation(contents: BrowserViewContents): boolean {
+    const expected = this.pageWindowsExpected.get(contents.session) ?? 0
+    if (expected === 0 || contents.isDestroyed()) return false
+    if (contents.getType?.() !== PAGE_WINDOW_CONTENTS_TYPE) return false
+    if (expected === 1) this.pageWindowsExpected.delete(contents.session)
+    else this.pageWindowsExpected.set(contents.session, expected - 1)
+    this.registerId(contents)
+    return true
   }
 
   /** Accept `contents` as an expected DevTools front end, using up one expectation. */

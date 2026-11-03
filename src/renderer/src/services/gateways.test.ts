@@ -247,6 +247,12 @@ const BROWSER_TAB_METHODS: Record<keyof BrowserTabBridge, true> = {
   onFocus: true,
   onForwardedKey: true,
   onPick: true,
+  pickMode: true,
+  refine: true,
+  closePick: true,
+  writeCapture: true,
+  discardCaptureFiles: true,
+  targetStatus: true,
   find: true,
   stopFind: true,
   onFindResult: true,
@@ -254,7 +260,9 @@ const BROWSER_TAB_METHODS: Record<keyof BrowserTabBridge, true> = {
   widthPreset: true,
   clearData: true,
   forget: true,
-  suggest: true
+  suggest: true,
+  onContextMenu: true,
+  contextAction: true
 }
 const MARKDOWN_IMAGE_METHODS: Record<keyof MarkdownImageBridge, true> = { read: true }
 

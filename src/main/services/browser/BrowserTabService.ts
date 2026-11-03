@@ -16,8 +16,13 @@
  * - **Page-opened tabs** are made here, in main, under the `page` source
  *   ({@link BrowserTabService.createFromPage}), and announced with
  *   `browser-tab:tabAdded`; they never round-trip through the renderer's
- *   create path (S2). Called by `site/browserWindowOpen.ts` (commit 12e);
- *   until then every window open is denied.
+ *   create path (S2). Called by the popup policy (`popups/TabWindowOpen.ts`,
+ *   commit 12e), which hands over the `webContents` Chromium created, and for
+ *   **Open link in new tab** under the `contextMenuLink` source.
+ * - **Window open, leave-page prompt, right-click menu** (025-FR-011,
+ *   025-FR-057, 025-FR-058): attached per tab as `dialogs/TabPageExtras.ts`;
+ *   a close the user asks for ({@link BrowserTabService.close}) lets the page
+ *   ask to stay, Erfana's own closes never do (S-31).
  * - **Teardown.** A closing window closes its tabs (`closeWindow`, wired where
  *   the preview's is); a project switch or close closes the old project's tabs
  *   in the `closeViews` stage of `BrowserProjectTeardown`. Nothing is stored,
@@ -36,17 +41,19 @@
  *   serves the file's folder (`local/LocalFileServers.ts`) and loads it in
  *   the tab; a closing tab releases the folders it held.
  */
-import type { Session, WebContentsView } from 'electron'
+import type { Session, WebContents, WebContentsView } from 'electron'
 import { BROWSER_TAB_EVENTS } from '../../../shared/ipc/browser-tab-channels'
 import {
   FindResultEventSchema,
   FocusEventSchema,
+  ContextMenuEventSchema,
   ForwardedKeyEventSchema,
   NoticeEventSchema,
   PickEventSchema,
   StripEventSchema,
   TabAddedEventSchema,
   TabStateEventSchema,
+  type ContextActionRequestSchema,
   type CreateResponse,
   type FocusOrigin,
   type NavigateResponse,
@@ -75,6 +82,9 @@ import type { BrowserPages } from './page/BrowserPages'
 import type { BrowserTabPage, PageHangSource } from './page/BrowserTabPage'
 import { decorateTabState } from './page/tabPageState'
 import type { ClipView } from './page/TabViewFrame'
+import { TabPageExtras, type TabPageExtrasSetup } from './dialogs/TabPageExtras'
+import type { ContextActionResult } from './contextMenu/TabContextMenu'
+import type { z } from 'zod'
 
 /** A tab's CDP link, with the hang probe's events for the page features when the session has them. */
 export type TabCdpLink = BrowserTabCdpLink & Partial<PageHangSource>
@@ -101,8 +111,8 @@ export interface BrowserTabServiceDeps {
   readonly currentProject: () => Pick<ProjectSessionSnapshot, 'realRoot' | 'caseSensitive'> | null
   /** Per-session setup that must precede the first page (the app-address filter). */
   readonly prepareSession: (session: Session) => void
-  /** Build the page view in `session` through `browserSessionRegistry.createView`. */
-  readonly createView: (session: Session) => WebContentsView
+  /** Build the page view in `session` through `browserSessionRegistry.createView`; `adopt` is a page-opened `webContents` to show. */
+  readonly createView: (session: Session, adopt?: WebContents) => WebContentsView
   /** `browserSessionRegistry.expectDevTools`. */
   readonly expectDevTools: (session: Session) => () => void
   readonly appAddresses: () => AppAddresses
@@ -118,6 +128,8 @@ export interface BrowserTabServiceDeps {
   readonly input?: TabInputSetup
   /** Served local folders; without them every local file is refused. */
   readonly local?: TabLocalFiles & Pick<LocalFileServers, 'open' | 'releaseTab'>
+  /** Window open, the leave-page prompt and the right-click menu (commits 12e–g); without it window opens are denied. */
+  readonly extras?: TabPageExtrasSetup
 }
 
 /** The sources a local file opens from (`LOCAL_FILE_SOURCES`). */
@@ -132,6 +144,7 @@ export class BrowserTabService {
   private readonly siteOf = new WeakMap<BrowserTab, TabSiteLink>()
   private readonly inputOf = new WeakMap<BrowserTab, BrowserTabInput>()
   private readonly pageOf = new WeakMap<BrowserTab, BrowserTabPage>()
+  private readonly extrasOf = new WeakMap<BrowserTab, TabPageExtras>()
   private readonly windowKeys = new Map<number, AppWindowBrowserKeys>()
   private counter = 0
 
@@ -159,18 +172,19 @@ export class BrowserTabService {
 
   /**
    * A tab the page in `openerTabId` opened, created in main under the `page`
-   * source and announced to the owning window (S2). Returns the new tab's id,
-   * or `null` when the opener is gone or `url` is refused.
+   * source and announced to the owning window (S2). `adopt` is the
+   * `webContents` Chromium created for the open, which loads `url` itself
+   * (the popup policy checked it); without it the tab loads `url`. Returns
+   * the new tab's id, or `null` when the opener is gone or `url` is refused.
    */
-  createFromPage(openerTabId: string, url: string, background: boolean): string | null {
+  createFromPage(openerTabId: string, url: string, background: boolean, adopt: WebContents | null = null): string | null {
     const opener = this.tabs.get(openerTabId)
     if (opener === undefined || opener.contents.isDestroyed()) return null
     const host = this.hostOf.get(opener)
     if (host === undefined || host.isDestroyed()) return null
     const profile: TabProfile = { projectRoot: opener.projectRoot, session: opener.contents.session }
-    const tab = this.openTab(host, null, profile, opener.caseSensitive)
-    const result = tab.navigateForPage(url)
-    if ('refused' in result) {
+    const tab = this.openTab(host, null, profile, opener.caseSensitive, adopt ?? undefined)
+    if (adopt === null && 'refused' in tab.navigateForPage(url)) {
       this.closeTab(tab)
       return null
     }
@@ -228,8 +242,8 @@ export class BrowserTabService {
   ): AnswerResult | null {
     const tab = this.tabOf(windowId, tabId)
     if (tab === null) return null
-    const hungNotice = this.pageOf.get(tab)?.answerStrip(requestId, answer) ?? null
-    if (hungNotice !== null) return hungNotice
+    const own = this.pageOf.get(tab)?.answerStrip(requestId, answer) ?? this.extrasOf.get(tab)?.answerStrip(requestId, answer) ?? null
+    if (own !== null) return own
     return this.siteOf.get(tab)?.answerStrip(requestId, answer, fields) ?? 'unknown'
   }
 
@@ -281,10 +295,28 @@ export class BrowserTabService {
     return [...this.tabs.values()]
   }
 
-  /** Close `tabId` when `windowId` owns it. */
+  /** **Open link in new tab** from `opener`'s menu: a user-started load under `contextMenuLink`. */
+  private openLinkTab(opener: BrowserTab, url: string): void {
+    const host = this.hostOf.get(opener)
+    if (host === undefined || host.isDestroyed()) return
+    const tab = this.openTab(host, null, { projectRoot: opener.projectRoot, session: opener.contents.session }, opener.caseSensitive)
+    if ('refused' in tab.navigate(url, 'contextMenuLink')) return this.closeTab(tab)
+    this.send(host, BROWSER_TAB_EVENTS.tabAdded, TabAddedEventSchema, { tabId: tab.id, openerTabId: opener.id, background: false })
+  }
+
+  /** `browser-tab:contextAction` on `tabId` from `windowId`; `null` when the window does not own the tab. */
+  contextAction(windowId: number, tabId: string, request: Omit<z.infer<typeof ContextActionRequestSchema>, 'tabId'>): ContextActionResult | null {
+    const tab = this.tabOf(windowId, tabId)
+    return tab === null ? null : (this.extrasOf.get(tab)?.contextAction(request.menuId, request.action) ?? 'unknown')
+  }
+
+  /** The user closes `tabId` of `windowId`: the page may ask to stay (025-FR-058). */
   close(windowId: number, tabId: string): void {
     const tab = this.tabOf(windowId, tabId)
-    if (tab !== null) this.closeTab(tab)
+    if (tab === null) return
+    const extras = this.extrasOf.get(tab)
+    if (extras === undefined) this.closeTab(tab)
+    else extras.closeByUser()
   }
 
   /** Close every tab of a window that is closing. */
@@ -301,10 +333,10 @@ export class BrowserTabService {
     }
   }
 
-  private openTab(host: TabHost, panelId: string | null, profile: TabProfile, caseSensitive: boolean): BrowserTab {
+  private openTab(host: TabHost, panelId: string | null, profile: TabProfile, caseSensitive: boolean, adopt?: WebContents): BrowserTab {
     const session = profile.session as Session
     this.deps.prepareSession(session)
-    const view = this.deps.createView(session)
+    const view = this.deps.createView(session, ...(adopt === undefined ? [] : [adopt]))
     let input: BrowserTabInput | null = null
     // The CDP link is made while the tab's constructor runs; the page features take its hang events.
     const cdp: { link: TabCdpLink | null } = { link: null }
@@ -324,7 +356,8 @@ export class BrowserTabService {
       onDestroyed: (gone) => this.forget(gone),
       onPageMoved: () => input?.recordRowShift(),
       local: this.deps.local,
-      createClip: this.deps.createClip
+      createClip: this.deps.createClip,
+      armLeave: (repeat) => this.extrasOf.get(tab)?.arm(repeat)
     })
     this.tabs.set(tab.id, tab)
     this.hostOf.set(tab, host)
@@ -336,7 +369,30 @@ export class BrowserTabService {
     })
     if (site !== undefined) this.siteOf.set(tab, site)
     this.attachPage(tab, host, cdp.link)
+    this.attachExtras(tab, host)
     return tab
+  }
+
+  /** Window open, leave-page prompt and right-click menu, after the input routers (`dialogs/TabPageExtras.ts`). */
+  private attachExtras(tab: BrowserTab, host: TabHost): void {
+    const setup = this.deps.extras
+    if (setup === undefined) return
+    const extras = new TabPageExtras(
+      tab,
+      {
+        strip: (event) => this.send(host, BROWSER_TAB_EVENTS.strip, StripEventSchema, event),
+        contextMenu: (event) => this.send(host, BROWSER_TAB_EVENTS.contextMenu, ContextMenuEventSchema, event),
+        openTab: (url, background, adopt) => this.createFromPage(tab.id, url, background, adopt) !== null,
+        openLink: (url) => this.openLinkTab(tab, url),
+        forceClose: () => this.closeTab(tab),
+        blocked: () => {
+          const routing = this.inputOf.get(tab)?.state()
+          return routing !== undefined && (routing.pick || routing.surface !== 'none')
+        }
+      },
+      setup
+    )
+    this.extrasOf.set(tab, extras)
   }
 
   /** The tab's page features (`page/BrowserTabPage.ts`), before its first page loads. */
@@ -406,6 +462,8 @@ export class BrowserTabService {
     const page = this.pageOf.get(tab)
     if (page !== undefined) this.deps.pages?.detachTab(page)
     this.pageOf.delete(tab)
+    this.extrasOf.get(tab)?.detach()
+    this.extrasOf.delete(tab)
     const input = this.inputOf.get(tab)
     if (input !== undefined) {
       this.windowKeys.get(tab.windowId)?.clearTarget(input)

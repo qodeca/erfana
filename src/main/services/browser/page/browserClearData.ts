@@ -10,7 +10,7 @@
  * |---|---|
  * | `cookies` (Cookies and other site data) | cookies, local storage, IndexedDB, service workers, Cache Storage, file systems and WebSQL of the session; the address history (025-FR-063) |
  * | `cache` (Cached files) | the HTTP cache |
- * | `permissions` (Site permissions, certificate exceptions and pop-up exceptions) | saved permissions; certificate exceptions |
+ * | `permissions` (Site permissions, certificate exceptions and pop-up exceptions) | saved permissions and pop-up exceptions (`clearPermissions`, which `browserAppSetup.ts` points at both stores); certificate exceptions |
  * | `credentials` (Saved sign-in credentials) | saved sign-ins; the in-memory sign-in cache |
  * | `captures` (Captures) | `.erfana/browser/captures/`, through the delete re-guard |
  *

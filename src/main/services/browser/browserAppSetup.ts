@@ -12,13 +12,16 @@
  * and its `browser-tab:*` handlers, the project-switch teardown (the old
  * project's tabs close in its `closeViews` stage) and the deletes left by the
  * last run. A closing window's tabs close through {@link closeBrowserWindow},
- * called where the window's previews are torn down.
+ * called where the window's previews are torn down. Each tab also gets the
+ * popup policy, the leave-page prompt and the right-click menu (commits
+ * 12e–g); popup windows close with the tab that opened them.
  */
 import { homedir, tmpdir } from 'node:os'
 import { is } from '@electron-toolkit/utils'
 import {
   app,
   BrowserWindow,
+  clipboard,
   dialog,
   Menu,
   safeStorage,
@@ -56,6 +59,7 @@ import type { AppAddresses } from './browserNavigationPolicy'
 import { BrowserTabService, type TabCdpLink, type TabInputSetup } from './BrowserTabService'
 import { BrowserPages } from './page/BrowserPages'
 import { registerBrowserTabPageHandlers } from '../../ipc/browserTab/page-handlers'
+import { registerBrowserTabPopupHandlers } from '../../ipc/browserTab/popup-handlers'
 import { BROWSER_TAB_EVENTS } from '../../../shared/ipc/browser-tab-channels'
 import { NoticeEventSchema } from '../../../shared/ipc/browser-tab-schema'
 import { BrowserCdpSession } from './cdp/BrowserCdpSession'
@@ -64,6 +68,14 @@ import { installSiteRequestHooks } from './site/siteRequestHooks'
 import { electronMacAppKeys } from './input/macAppRoles'
 import { LocalFileServers } from './local/LocalFileServers'
 import { disposeWithin } from '../../utils/disposeWithin'
+import { openExternalSafeDetached } from '../../utils/openExternalSafe'
+import { BrowserPopups } from './popups/BrowserPopups'
+import { electronPopupWindows } from './popups/popupWindowElectron'
+import { enablePageDialogEvents } from './dialogs/pageDialogs'
+import { browserWebPreferencesFor } from './browserWebPreferences'
+import { installBrowserPicks, registerPickSession } from './pick/pickAppSetup'
+import type { BrowserPicks } from './pick/BrowserPicks'
+import type { TargetTerminals } from './capture/BrowserTargetStatus'
 
 /**
  * Chromium's per-disk-cache maximum: 512 MB (025-FR-015; ADR 0009 decision 9).
@@ -97,11 +109,13 @@ export interface BrowserAfterReadyDeps {
   readonly registerTabHandlers?: typeof registerBrowserTabHandlers
   /** Registers the page-feature `browser-tab:*` handlers (commit 12h); a test seam. */
   readonly registerPageHandlers?: typeof registerBrowserTabPageHandlers
+  /** Registers `browser-tab:contextAction` and the popup channels (commits 12e, 12g); a test seam. */
+  readonly registerPopupHandlers?: typeof registerBrowserTabPopupHandlers
   /**
    * The terminals' output (`TerminalService`'s `data` and `exit` events), for
    * the empty tab's local addresses (025-FR-063); without it none are seen.
    */
-  readonly terminalOutput?: TerminalOutputSource
+  readonly terminalOutput?: TerminalOutputSource & Partial<TargetTerminals>
 }
 
 /** The part of `TerminalService` the empty tab's local-address scan listens to. */
@@ -122,6 +136,10 @@ export interface BrowserRuntime {
   readonly localFiles: LocalFileServers
   /** Load errors, crash and hang notices, find, zoom, presets, Clear, Forget and history (commit 12h). */
   readonly pages: BrowserPages
+  /** Page-opened tabs, popup windows, the popup blocker and pop-up exceptions (commit 12e). */
+  readonly popups: BrowserPopups
+  /** Pick mode, captures, the shell guard and capture expiry (commits 14–15). */
+  readonly picks: BrowserPicks
 }
 
 /** How long quitting waits for the served local folders to close. */
@@ -154,12 +172,22 @@ function attachTabCdp(contents: WebContents): TabCdpLink | null {
     logger.warn('Browser tab opened without a CDP session', { error: redactedLogError(error)?.message ?? String(error) })
     return null
   }
+  // Native page dialogs then pause the hang probe (025-FR-058, Q6).
+  void enablePageDialogEvents(cdp)
+  registerPickSession(contents, cdp)
   return {
     setVisible: (visible) => cdp.hangProbe.setVisible(visible),
     detach: () => cdp.detach(),
     onHang: (listener) => cdp.on('hang', listener),
     waitHang: () => cdp.hangProbe.wait()
   }
+}
+
+/** The terminal service's guard surface (025-FR-061), when the terminals passed in carry it. */
+function terminalTargets(terminals: (TerminalOutputSource & Partial<TargetTerminals>) | undefined): TargetTerminals | null {
+  const { getOwner, getActivity } = terminals ?? {}
+  if (getOwner === undefined || getActivity === undefined) return null
+  return { getOwner: (id) => getOwner.call(terminals, id), getActivity: (id) => getActivity.call(terminals, id) }
 }
 
 /** A `localAddressSeen` notice to the window whose renderer is `webContentsId` (025-FR-063). */
@@ -170,11 +198,18 @@ function noticeLocalAddress(webContentsId: number, address: string): void {
   if (notice.success) target.send(BROWSER_TAB_EVENTS.notice, notice.data)
 }
 
-/** Build a browser page view in `session`, registered before its constructor returns. */
-function createBrowserView(session: Session): WebContentsView {
+/**
+ * Build a browser page view in `session`, registered before its constructor
+ * returns; with `adopt`, around a page-opened `webContents` Chromium created
+ * with the frozen settings (registered by `expectPageWindow`).
+ */
+function createBrowserView(session: Session, adopt?: WebContents): WebContentsView {
   return browserSessionRegistry.createView(
     session,
-    () => new WebContentsView({ webPreferences: buildBrowserWebPreferences(session, process.platform) }),
+    () =>
+      new WebContentsView(
+        adopt === undefined ? { webPreferences: buildBrowserWebPreferences(session, process.platform) } : { webContents: adopt }
+      ),
     (view) => view.webContents
   )
 }
@@ -208,11 +243,25 @@ export function installBrowserAfterReady(deps: BrowserAfterReadyDeps): BrowserRu
   })
   const appAddresses = currentAppAddresses()
   const localFiles = new LocalFileServers({ now: () => mainClock.now(), appAddresses: () => appAddresses })
+  const popups = createBrowserPopups(appAddresses, localFiles, (tabId) => tabs.list().find((t) => t.id === tabId)?.windowId ?? null)
+  const pickSetup = installBrowserPicks({
+    clock: mainClock,
+    tabs: () => tabs,
+    projectSession: deps.projectSession,
+    terminals: () => terminalTargets(deps.terminalOutput)
+  })
   const pages = new BrowserPages({
     clock: mainClock,
     signer: lockHmacSigner,
     homeDir: homedir(),
-    site,
+    site: {
+      clearCertificates: (root) => site.clearCertificates(root),
+      clearCredentials: (root) => site.clearCredentials(root),
+      // **Site permissions, certificate exceptions and pop-up exceptions** (025-FR-023).
+      clearPermissions: async (root) => {
+        await Promise.all([site.clearPermissions(root), popups.clearExceptions(root)])
+      }
+    },
     openProfile: () => profiles.openForTab(),
     deleteBrowserData: (rel) => profiles.deleteBrowserData(rel),
     closeProject: (projectRoot) => tabs.closeProject(projectRoot),
@@ -233,8 +282,18 @@ export function installBrowserAfterReady(deps: BrowserAfterReadyDeps): BrowserRu
     site,
     input: tabInputSetup(),
     local: localFiles,
-    pages,
-    createClip: () => new View()
+    pages: pickSetup.withPicks(pages),
+    createClip: () => new View(),
+    extras: {
+      clock: mainClock,
+      resolveDomain: pinnedRegistrableDomain,
+      popups,
+      menuActions: {
+        openInSystemBrowser: (url) => openExternalSafeDetached(url),
+        writeClipboardText: (text) => clipboard.writeText(text),
+        pickAt: (tabId, at) => pickSetup.picks.pickAt(tabId, at)
+      }
+    }
   })
   ;(deps.registerTabHandlers ?? registerBrowserTabHandlers)({ service: tabs })
   ;(deps.registerPageHandlers ?? registerBrowserTabPageHandlers)({
@@ -242,6 +301,7 @@ export function installBrowserAfterReady(deps: BrowserAfterReadyDeps): BrowserRu
     pages,
     currentProject: () => deps.projectSession.current()
   })
+  ;(deps.registerPopupHandlers ?? registerBrowserTabPopupHandlers)({ tabs, popups, resolveDomain: pinnedRegistrableDomain })
   deps.terminalOutput?.on('data', (event) => pages.terminalOutput(event.webContentsId, event.terminalId, event.data))
   deps.terminalOutput?.on('exit', (event) => pages.terminalGone(event.terminalId))
   const teardown = new BrowserProjectTeardown()
@@ -252,8 +312,32 @@ export function installBrowserAfterReady(deps: BrowserAfterReadyDeps): BrowserRu
   profiles.runPendingDeletes().catch((error: unknown) => {
     logger.warn('Browser pending deletes could not run', { error: redactedLogError(error)?.message ?? String(error) })
   })
-  runtime = { profiles, teardown, tabs, appAddresses, site, localFiles, pages }
+  runtime = { profiles, teardown, tabs, appAddresses, site, localFiles, pages, popups, picks: pickSetup.picks }
   return runtime
+}
+
+/**
+ * Page-opened tabs and popup windows (commit 12e): the popup blocker on the
+ * app clock, pop-up exceptions signed per project, page-opened `webContents`
+ * expected by the session registry and given the frozen settings.
+ */
+function createBrowserPopups(
+  appAddresses: AppAddresses,
+  localFiles: LocalFileServers,
+  windowIdOf: (tabId: string) => number | null
+): BrowserPopups {
+  return new BrowserPopups({
+    clock: mainClock,
+    signer: lockHmacSigner,
+    homeDir: homedir(),
+    resolveDomain: pinnedRegistrableDomain,
+    appAddresses: () => appAddresses,
+    isLocalAddress: (url) => localFiles.isLocalAddress(url),
+    expectPageWindow: (ses) => browserSessionRegistry.expectPageWindow(ses),
+    isRegisteredView: (contents) => browserSessionRegistry.isRegisteredView(contents),
+    childPreferences: () => ({ ...browserWebPreferencesFor(process.platform) }),
+    windows: electronPopupWindows(windowIdOf)
+  })
 }
 
 /** Key and mouse routing for every tab (commit 13): the platform, the app clock and the macOS app keys. */

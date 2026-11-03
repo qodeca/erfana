@@ -24,6 +24,8 @@ vi.mock('@electron-toolkit/utils', () => ({ is: { dev: false } }))
 vi.mock('../../ipc/senderValidation', () => ({ RENDERER_FILE_URL: 'file:///app/out/renderer/index.html' }))
 vi.mock('../../ipc/browser-tab-handlers', () => ({ registerBrowserTabHandlers: vi.fn() }))
 vi.mock('../../ipc/browserTab/page-handlers', () => ({ registerBrowserTabPageHandlers: vi.fn() }))
+vi.mock('../../ipc/browserTab/popup-handlers', () => ({ registerBrowserTabPopupHandlers: vi.fn() }))
+vi.mock('../../ipc/browserTab/pick-handlers', () => ({ registerBrowserTabPickHandlers: vi.fn() }))
 
 import {
   BROWSER_DISK_CACHE_BYTES,
@@ -93,7 +95,8 @@ describe('browserAppSetup', () => {
     expect(handle).toHaveBeenCalledWith('erfana-local', expect.any(Function))
     const response = (handle.mock.calls[0][1] as (r: Request) => Response)(new Request('erfana-local://h/x'))
     expect(response.status).toBe(403)
-    expect(onChange).toHaveBeenCalledTimes(1)
+    // Two followers: the project teardown and capture expiry (025-FR-039).
+    expect(onChange).toHaveBeenCalledTimes(2)
     expect(getBrowserRuntime()).toBe(runtime)
     // No browser session is created until a tab asks for one
     expect(fromPath).not.toHaveBeenCalled()

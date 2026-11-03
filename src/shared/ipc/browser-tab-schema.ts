@@ -142,7 +142,7 @@ export const ClosePickRequestSchema = z
   .object({
     tabId: BrowserTabIdSchema,
     captureId: CaptureIdSchema,
-    reason: z.enum(['esc', 'cancel', 'clickOutside', 'toolbar', 'focusLeft', 'tabHidden'])
+    reason: z.enum(['esc', 'cancel', 'clickOutside', 'toolbar', 'focusLeft', 'tabHidden', 'sent'])
   })
   .strict()
 

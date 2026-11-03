@@ -5,7 +5,8 @@
  * 025-NFR-001): the IPC gate against a browser-session view at the renderer
  * entry (025-AC-068), and the first hostile pages of 025-AC-046 – IPC,
  * `window.electron`, custom schemes, the renderer entry and the dev-server
- * origin, popup escape.
+ * origin, popup escape. Since commit 12e a user click may open one popup
+ * window (025-FR-011), so the popup tests check what that window can reach.
  *
  * Each hostile page reports through its canary (`hostile/canary.js`); where a
  * page cannot see the outcome, Erfana's side is checked: the tab's address,
@@ -17,13 +18,30 @@ import { pathToFileURL } from 'node:url'
 import { test, expect } from './fixtures/browserHarness'
 import { browserHook } from './pages/browser-page.page'
 import type { BrowserTabPage } from './pages/browser-tab.page'
+import type { ElectronApplication } from '@playwright/test'
+
+interface HookPopup {
+  readonly pageWebContentsId: number
+  readonly hostKind: string | null
+  readonly channels: Record<string, boolean>
+}
+
+/** The popup test hook (`src/main/testHooks/browserPopupHook.ts`). */
+async function popupWindows(app: ElectronApplication): Promise<HookPopup[]> {
+  return (await app.evaluate(() => {
+    const hooks = (globalThis as unknown as { __erfanaTestHooks?: { popup?: { popups(): unknown } } }).__erfanaTestHooks
+    if (!hooks?.popup) throw new Error('Test hooks are not installed (build with npm run build:e2e)')
+    return hooks.popup.popups()
+  })) as HookPopup[]
+}
 
 /** The bundled renderer entry the e2e build loads (`out/renderer/index.html`). */
 const RENDERER_ENTRY = pathToFileURL(path.join(__dirname, '..', 'out', 'renderer', 'index.html')).href
 
-/** Only the tab's own page may exist in the browser session. */
+/** Only the tabs' own pages – and the pages of popup windows Erfana opened for them – may exist in the browser session. */
 async function expectOnlyTabsInBrowserSession(tabs: BrowserTabPage): Promise<void> {
-  const ids = (await tabs.tabs()).map((t) => t.webContentsId).sort()
+  const popupPages = (await popupWindows(tabs.app)).map((p) => p.pageWebContentsId)
+  const ids = [...(await tabs.tabs()).map((t) => t.webContentsId), ...popupPages].sort()
   const inSession = await tabs.browserSessionContents()
   expect(inSession.map((c) => c.id).sort()).toEqual(ids)
   expect(inSession.every((c) => c.registeredView)).toBe(true)
@@ -75,12 +93,15 @@ test.describe('built-in browser isolation', () => {
     await page.waitForLoaded(url)
     const windows = await browserHook<number>(browserTabs.app, 'windowCount')
 
+    // A user click may open a popup (025-FR-011); the page probes it and closes it again.
     await page.clickSelector('#open-probe-popup')
-    await page.waitFor(`window.__canary.results.some(r => r.name === 'popup')`, 'popup attempt recorded')
+    await page.waitFor(`window.__canary.results.some(r => r.name === 'popup electron')`, 'popup probed')
     const canary = await page.canary()
     expect(canary.attempts.filter((a) => a.outcome === 'leaked')).toEqual([])
-    expect(canary.attempts).toContainEqual({ name: 'popup', outcome: 'blocked' })
-    expect(await browserHook<number>(browserTabs.app, 'windowCount')).toBe(windows)
+    const popupProbes = canary.attempts.filter((a) => a.name.startsWith('popup '))
+    expect(popupProbes.length).toBeGreaterThanOrEqual(10)
+    expect(popupProbes.every((a) => a.outcome === 'blocked')).toBe(true)
+    await expect.poll(() => browserHook<number>(browserTabs.app, 'windowCount')).toBe(windows)
     await expectOnlyTabsInBrowserSession(browserTabs)
   })
 
@@ -148,7 +169,7 @@ test.describe('built-in browser isolation', () => {
     expect((await browserTabs.lastState(page.tabId))?.committedUrl).toBe(url)
   })
 
-  test('025-AC-046 hostile page: popups cannot open, so nothing escapes through them', async ({
+  test('025-AC-046 hostile page: a user-opened popup reaches nothing of Erfana, and one click opens one popup', async ({
     browserTabs,
     browserServers
   }) => {
@@ -163,10 +184,25 @@ test.describe('built-in browser isolation', () => {
     const opened = await page.eval<string>(
       `document.querySelector('#attempts li[data-name="popups opened"]').textContent`
     )
-    expect(opened).toContain('false,false')
+    // One open per user press (025-FR-011): the same-site popup opens, the second (cross-site) open of that click is blocked.
+    expect(opened).toContain('true,false')
+    const sameOrigin = new URL(url).origin
+    await page.waitFor(
+      `window.__canary.results.some(r => r.name === ${JSON.stringify(`popup ${sameOrigin}: opener.electron`)})`,
+      'popup attacks reported'
+    )
     const canary = await page.canary()
-    expect(canary.attempts.filter((a) => a.outcome === 'leaked')).toEqual([])
-    expect(await browserHook<number>(browserTabs.app, 'windowCount')).toBe(windows)
+    // A same-origin popup reading its opener's document is ordinary web behaviour, not an escape.
+    const normalSameOrigin = `popup ${sameOrigin}: opener.document`
+    expect(canary.attempts.filter((a) => a.outcome === 'leaked' && a.name !== normalSameOrigin)).toEqual([])
+    for (const attack of ['own window.electron', 'opener.electron', 'window.open javascript:', 'window.open chrome://gpu', 'moveTo and resizeTo off the work area']) {
+      expect(canary.attempts).toContainEqual({ name: `popup ${sameOrigin}: ${attack}`, outcome: 'blocked' })
+    }
+    const windowsOpen = await popupWindows(browserTabs.app)
+    expect(windowsOpen).toHaveLength(1)
+    expect(windowsOpen[0]).toMatchObject({ hostKind: 'browserPopup' })
+    expect(windowsOpen[0]!.channels).toMatchObject({ 'browser-tab:create': false, 'terminal:create': false })
+    expect(await browserHook<number>(browserTabs.app, 'windowCount')).toBe(windows + 1)
     await expectOnlyTabsInBrowserSession(browserTabs)
   })
 })

@@ -16,6 +16,8 @@ import type {
   BoundsRequest,
   CertificateRequestSchema,
   ClearDataRequest,
+  ContextActionRequestSchema,
+  ContextMenuEventSchema,
   CreateResponse,
   DevToolsRequestSchema,
   FindRequestSchema,
@@ -28,6 +30,11 @@ import type {
   NavigateResponse,
   NoticeEvent,
   PickEvent,
+  ClosePickRequestSchema,
+  RefineRequest,
+  WriteCaptureRequest,
+  WriteCaptureResponse,
+  TargetStatusResponse,
   StripEvent,
   SuggestResponseSchema,
   TabAddedEventSchema,
@@ -36,6 +43,9 @@ import type {
   ZoomRequestSchema
 } from './browser-tab-schema'
 import type { ClearDataResponse, ForgetResponse } from './browser-tab-page-schema'
+import type { PickActionResponse } from './browser-tab-pick-schema'
+
+export type ClosePickRequest = z.infer<typeof ClosePickRequestSchema>
 
 export type HistoryStep = z.infer<typeof HistoryRequestSchema>['step']
 export type DevToolsInspectPoint = NonNullable<z.infer<typeof DevToolsRequestSchema>['inspectAt']>
@@ -46,6 +56,8 @@ export type FindResultEvent = z.infer<typeof FindResultEventSchema>
 export type ZoomStep = z.infer<typeof ZoomRequestSchema>['step']
 export type WidthPresetChoice = z.infer<typeof WidthPresetRequestSchema>['preset']
 export type SuggestResponse = z.infer<typeof SuggestResponseSchema>
+export type ContextMenuEvent = z.infer<typeof ContextMenuEventSchema>
+export type ContextActionRequest = z.infer<typeof ContextActionRequestSchema>
 
 export interface BrowserTabBridge {
   /** Open an empty tab for the panel; `{ error }` names why it cannot open (a toast). */
@@ -92,6 +104,18 @@ export interface BrowserTabBridge {
   onForwardedKey(callback: (event: ForwardedKeyEvent) => void): () => void
   /** Pick mode on or off, status-slot notes and the pick pipeline's events. */
   onPick(callback: (event: PickEvent) => void): () => void
+  /** **Pick element**: pick mode on or off for the tab; `ok: false` when it did not change (an empty tab, 025-FR-025). */
+  pickMode(tabId: string, on: boolean): Promise<PickActionResponse>
+  /** Up, Down, **Parent element**, **Child element** or a name of the ancestor path on the held capture (025-FR-027). */
+  refine(request: RefineRequest): Promise<PickActionResponse>
+  /** The menu or dialog closed (`esc`, `cancel`, …) – or a send succeeded (`sent`): pick mode ends (025-FR-032). */
+  closePick(request: ClosePickRequest): Promise<PickActionResponse>
+  /** The shell guard, then the capture files: `{ paths }`, `{ guard }` (no file written) or `{ error }` (025-FR-046, 025-FR-061). */
+  writeCapture(request: WriteCaptureRequest): Promise<WriteCaptureResponse>
+  /** The terminal write failed after the files were written: delete them; the capture stays held (025-FR-046). */
+  discardCaptureFiles(tabId: string, captureId: string): Promise<PickActionResponse>
+  /** The target terminal's foreground class for the toolbar (025-FR-061). */
+  targetStatus(terminalId: string): Promise<TargetStatusResponse>
   /**
    * Find in page (025-FR-008); results arrive as {@link BrowserTabBridge.onFindResult}.
    * `findNext` keeps Electron's meaning: `true` starts a new search (the text
@@ -112,4 +136,8 @@ export interface BrowserTabBridge {
   forget(): Promise<ForgetResponse>
   /** History rows for typed text, most recent first; every row for `''` (the empty tab shows 8) – 025-FR-063. */
   suggest(prefix: string): Promise<SuggestResponse>
+  /** The page right-click menu to draw: its id, items, link origin and point (025-FR-057). */
+  onContextMenu(callback: (event: ContextMenuEvent) => void): () => void
+  /** Run one item of the live menu `menuId`; main checks it is one the menu offered. */
+  contextAction(request: ContextActionRequest): Promise<void>
 }

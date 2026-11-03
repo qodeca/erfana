@@ -110,6 +110,15 @@ export interface BrowserTabInputDeps {
   readonly onEffect?: (effect: RoutingEffect) => void
 }
 
+/** The tab's pick pipeline (commit 14), attached after the routers exist (`pick/BrowserPicks.ts`). */
+export interface TabInputPick {
+  /** Pick mode went on or off. */
+  mode(on: boolean): void
+  refine(move: 'parent' | 'child'): void
+  /** A reducer effect the routers do not perform (capture start and discard, unfreeze). */
+  onEffect(effect: RoutingEffect): void
+}
+
 
 export class BrowserTabInput implements ToolbarKeyTarget {
   private routing: RoutingState = INITIAL_ROUTING_STATE
@@ -121,6 +130,7 @@ export class BrowserTabInput implements ToolbarKeyTarget {
   private readonly mouse: BrowserMouseRouter
   private readonly listeners: Array<[string, Listener]> = []
   private disposed = false
+  private pick: TabInputPick | null = null
 
   constructor(private readonly deps: BrowserTabInputDeps) {
     const actions: KeyRouteActions = {
@@ -205,6 +215,11 @@ export class BrowserTabInput implements ToolbarKeyTarget {
     return true
   }
 
+  /** Attach the tab's pick pipeline: it gets pick mode, Up and Down, and the effects not performed here. */
+  attachPick(pick: TabInputPick): void {
+    this.pick = pick
+  }
+
   /** Remove every listener; the tab is closing. */
   dispose(): void {
     if (this.disposed) return
@@ -279,7 +294,8 @@ export class BrowserTabInput implements ToolbarKeyTarget {
     const now = this.deps.clock.now()
     if (action === 'exitPick') this.dispatch({ type: 'pickEsc' })
     else if (action === 'confirm') this.dispatch({ type: 'enter', now })
-    else this.deps.refine?.(action)
+    else if (this.deps.refine !== undefined) this.deps.refine(action)
+    else this.pick?.refine(action)
   }
 
   private exitFullscreen(): void {
@@ -295,6 +311,7 @@ export class BrowserTabInput implements ToolbarKeyTarget {
     switch (effect.type) {
       case 'pickMode':
         events.pick({ tabId, kind: 'mode', on: effect.on })
+        this.pick?.mode(effect.on)
         return
       case 'note':
         events.pick({ tabId, kind: 'note', note: effect.note })
@@ -311,6 +328,7 @@ export class BrowserTabInput implements ToolbarKeyTarget {
         return
       default:
         this.deps.onEffect?.(effect)
+        this.pick?.onEffect(effect)
     }
   }
 }

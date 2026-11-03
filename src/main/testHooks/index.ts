@@ -22,6 +22,8 @@ import { createBrowserTestHook, type BrowserTestHook } from './browserHook'
 import { createBrowserInputTestHook, type BrowserInputTestHook } from './browserInputHook'
 import { createBrowserSiteTestHook, type BrowserSiteTestHook } from './browserSiteHook'
 import { createBrowserPageTestHook, type BrowserPageTestHook } from './browserPageHook'
+import { createBrowserPopupTestHook, type BrowserPopupTestHook } from './browserPopupHook'
+import { createBrowserPickTestHook, type BrowserPickTestHook } from './browserPickHook'
 import { getBrowserRuntime } from '../services/browser/browserAppSetup'
 
 /** The string `scripts/check-no-test-hooks.mjs` looks for in a production build. */
@@ -41,6 +43,10 @@ export interface TestHooks {
   readonly site: BrowserSiteTestHook
   /** Built-in browser page features: load errors, crash, zoom, presets, Clear, history (spec 025 commit 12h). */
   readonly page: BrowserPageTestHook
+  /** Built-in browser popups, leave-page prompt and right-click menu (spec 025 commits 12e–g). */
+  readonly popup: BrowserPopupTestHook
+  /** Built-in browser pick and send: highlight, targets, capture faults, expiry, bench (spec 025 commits 14–15). */
+  readonly pick: BrowserPickTestHook
 }
 
 /** What `globalThis.__erfanaTestHooks` holds. */
@@ -55,6 +61,8 @@ export interface TestHookDependencies {
   readonly createBrowserInput?: () => BrowserInputTestHook
   readonly createSite?: () => BrowserSiteTestHook
   readonly createPage?: () => BrowserPageTestHook
+  readonly createPopup?: () => BrowserPopupTestHook
+  readonly createPick?: () => BrowserPickTestHook
 }
 
 const defaultDependencies: TestHookDependencies = {
@@ -73,7 +81,9 @@ export function createTestHooks(
     browser: deps.createBrowser(),
     browserInput: (deps.createBrowserInput ?? (() => createBrowserInputTestHook(getBrowserRuntime)))(),
     site: (deps.createSite ?? (() => createBrowserSiteTestHook(getBrowserRuntime)))(),
-    page: (deps.createPage ?? (() => createBrowserPageTestHook(getBrowserRuntime)))()
+    page: (deps.createPage ?? (() => createBrowserPageTestHook(getBrowserRuntime)))(),
+    popup: (deps.createPopup ?? (() => createBrowserPopupTestHook(getBrowserRuntime)))(),
+    pick: (deps.createPick ?? (() => createBrowserPickTestHook(getBrowserRuntime)))()
   })
 }
 

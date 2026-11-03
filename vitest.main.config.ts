@@ -187,6 +187,104 @@ export default defineConfig({
         'src/main/services/browser/page/zoomStore.ts': { lines: 98, functions: 98, branches: 85, statements: 95 },
         // measured 96.29/93.75/76.92/96.92
         'src/main/ipc/browserTab/page-handlers.ts': { lines: 94, functions: 91, branches: 74, statements: 94 },
+        // Built-in browser window open, popups, leave-page prompt and page
+        // right-click menu (spec 025 commits 12e–g, 025-FR-011, 025-FR-057,
+        // 025-FR-058): the popup blocker and its row, pop-up exceptions, the
+        // tab-or-window decision, the popup window's size, title and
+        // navigation rules, the leave-page prompt and its guard, and the menu
+        // that takes one offered action. A gap here is an untested way for a
+        // page to open a window or act through the menu. Pinned ~2 points
+        // under the value measured when they landed (2026-11-03, on their own
+        // suites), never above 98.
+        // measured 100/100/100/100
+        'src/main/services/browser/popups/TabWindowOpen.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 96.87/94.11/100/95.23
+        'src/main/services/browser/popups/popupActivation.ts': { lines: 94, functions: 92, branches: 98, statements: 93 },
+        // measured 100/100/100/100
+        'src/main/services/browser/popups/popupBlockedRow.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/popups/popupExceptionStore.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/93.93/100
+        'src/main/services/browser/popups/windowFeatures.ts': { lines: 98, functions: 98, branches: 91, statements: 98 },
+        // measured 98.66/100/95.83/97.8
+        'src/main/services/browser/popups/BrowserPopupWindow.ts': { lines: 96, functions: 98, branches: 93, statements: 95 },
+        // measured 100/100/83.33/100
+        'src/main/services/browser/popups/BrowserPopups.ts': { lines: 98, functions: 98, branches: 81, statements: 98 },
+        // measured 100/100/75/100
+        'src/main/services/browser/popups/popupWindowElectron.ts': { lines: 98, functions: 98, branches: 73, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/dialogs/guardedStripRow.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/93.75/100
+        'src/main/services/browser/dialogs/leavePage.ts': { lines: 98, functions: 98, branches: 91, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/dialogs/pageDialogs.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/94.11/100/96.96
+        'src/main/services/browser/dialogs/TabPageExtras.ts': { lines: 98, functions: 92, branches: 98, statements: 94 },
+        // measured 100/100/100/100
+        'src/main/services/browser/contextMenu/contextMenuItems.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/93.54/100
+        'src/main/services/browser/contextMenu/TabContextMenu.ts': { lines: 98, functions: 98, branches: 91, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/ipc/browserTab/popup-handlers.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Built-in browser pick and send, main side (spec 025 commits 14–15,
+        // 025-FR-025 to 025-FR-039, 025-FR-046, 025-FR-053, 025-FR-061): the hit
+        // test through frames, the highlight, the element chain and its facts,
+        // the freeze, the capture files and their store and expiry, the shell
+        // guard and the pinned page functions. A gap here is an untested way for
+        // a page to reach the capture file outside its fenced block, or for a
+        // capture to be written where it should not. Pinned ~2 points under the
+        // value measured when they landed (2026-11-03, on their own suites),
+        // never above 98.
+        // measured 100/100/96.42/100
+        'src/main/services/browser/capture/BrowserCapture.ts': { lines: 98, functions: 98, branches: 94, statements: 98 },
+        // measured 100/100/96.87/100
+        'src/main/services/browser/capture/BrowserTargetStatus.ts': { lines: 98, functions: 98, branches: 94, statements: 98 },
+        // measured 97.7/95.45/73.77/94.44
+        'src/main/services/browser/capture/CaptureStore.ts': { lines: 95, functions: 93, branches: 71, statements: 92 },
+        // measured 100/100/100/100
+        'src/main/services/browser/capture/accentColour.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/83.72/95.06
+        'src/main/services/browser/capture/captureFacts.ts': { lines: 98, functions: 98, branches: 81, statements: 93 },
+        // measured 100/100/100/100
+        'src/main/services/browser/capture/captureImage.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/88.63/100
+        'src/main/services/browser/capture/captureRender.ts': { lines: 98, functions: 98, branches: 86, statements: 98 },
+        // measured 100/100/98.78/100
+        'src/main/services/browser/capture/sourceHints.ts': { lines: 98, functions: 98, branches: 96, statements: 98 },
+        // measured 97.5/96.29/94.33/98.01
+        'src/main/services/browser/pick/BrowserPicks.ts': { lines: 95, functions: 94, branches: 92, statements: 96 },
+        // measured 96.88/87.93/80.57/92.02
+        'src/main/services/browser/pick/BrowserTabPick.ts': { lines: 94, functions: 85, branches: 78, statements: 90 },
+        // measured 100/100/88.88/100
+        'src/main/services/browser/pick/pickAppSetup.ts': { lines: 98, functions: 98, branches: 86, statements: 98 },
+        // measured 100/92.85/100/98
+        'src/main/services/browser/pick/pickCaptureReads.ts': { lines: 98, functions: 90, branches: 98, statements: 96 },
+        // measured 100/100/90.69/100
+        'src/main/services/browser/pick/pickCdp.ts': { lines: 98, functions: 98, branches: 88, statements: 98 },
+        // measured 98.48/100/83.58/96.25
+        'src/main/services/browser/pick/pickElement.ts': { lines: 96, functions: 98, branches: 81, statements: 94 },
+        // measured 100/100/91.42/98.85
+        'src/main/services/browser/pick/pickFrames.ts': { lines: 98, functions: 98, branches: 89, statements: 96 },
+        // measured 100/93.33/100/98
+        'src/main/services/browser/pick/pickFreeze.ts': { lines: 98, functions: 91, branches: 98, statements: 96 },
+        // measured 100/100/100/100
+        'src/main/services/browser/pick/pickGeometry.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/88.88/91.66/94.11
+        'src/main/services/browser/pick/pickHighlight.ts': { lines: 98, functions: 86, branches: 89, statements: 92 },
+        // measured 98.03/100/87.87/98.43
+        'src/main/services/browser/pick/pickHitTest.ts': { lines: 96, functions: 98, branches: 85, statements: 96 },
+        // measured 100/100/100/100
+        'src/main/services/browser/pick/pickMenu.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/pick/pickModeSwitch.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/pick/pickSupport.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/cdp/cdpPickFunctions.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/ipc/browserTab/pick-handlers.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/testHooks/browserPickHook.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // Built-in browser CDP session (spec 025 commit 9, 025-NFR-001 bullet 2,
         // 025-FR-038, 025-FR-056, S6, S23): the only sendCommand caller, the
         // method allow-list and its pinned parameters, the flood budget, the log
