@@ -84,6 +84,11 @@ export class BrowserTabPage {
     return this.call('navigate', { tabId, input, source })
   }
 
+  /** **Open in browser tab** (025-FR-010): load the local file at `filePath` from its served folder. */
+  openLocalFile(tabId: string, filePath: string): Promise<unknown> {
+    return this.call('openLocalFile', tabId, filePath)
+  }
+
   history(tabId: string, step: 'back' | 'forward' | 'reload' | 'stop'): Promise<unknown> {
     return this.call('history', tabId, step)
   }

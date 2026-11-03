@@ -17,9 +17,11 @@
  *
  * Checked first, whatever the source: Erfana's own addresses – the bundled
  * renderer entry, anything under the app's resources folder, and in
- * development the dev-server origin (025-FR-005 rule 3, 025-AC-068). Local
- * files are refused for now: they wait for the confinement of ADR 0012
- * (commit 11), and a `file:` URL with a host is a network path (rule 2).
+ * development the dev-server origin (025-FR-005 rule 3, 025-AC-068). A
+ * `file:` URL never loads as such: a `file:` URL with a host is a network path
+ * (rule 2), and a local file loads only through its served folder
+ * (`local/LocalFileServers.ts`) from the sources in {@link LOCAL_FILE_SOURCES}
+ * – `BrowserTab.navigate` answers `local-file` and the caller opens it there.
  */
 import { pathToFileURL } from 'node:url'
 import type { NavigationSource } from '../../../shared/ipc/browser-tab-schema'
@@ -53,10 +55,17 @@ const SOURCE_SCHEMES: Readonly<Record<NavigationSource, Readonly<Record<FrameKin
   forward: { main: WEB, frame: [] },
   terminalLink: { main: WEB, frame: [] },
   contextMenuLink: { main: WEB, frame: [] },
-  // Local files only, through openLocalFile (commit 11); nothing until then.
+  // Local files only, through openLocalFile (LOCAL_FILE_SOURCES).
   previewOpen: { main: [], frame: [] },
   page: { main: WEB, frame: [...WEB, 'about:', 'blob:', 'data:'] }
 }
+
+/**
+ * The sources that may open a local file, through its served folder
+ * (design § 3.4): the address bar, a history row and **Open in browser tab**.
+ * Reload, Back and Forward of a local entry reload its served address.
+ */
+export const LOCAL_FILE_SOURCES: ReadonlySet<NavigationSource> = new Set<NavigationSource>(['address', 'history', 'previewOpen'])
 
 /** The `about:` pages a frame may show. */
 const FRAME_ABOUT_PAGES = new Set(['about:blank', 'about:srcdoc'])

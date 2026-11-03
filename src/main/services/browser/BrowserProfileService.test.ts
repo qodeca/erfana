@@ -503,6 +503,28 @@ describe('deleteBrowserData', () => {
     expect(await service.deleteBrowserData(['captures', 'a.png'])).toBe('absent')
   })
 
+  it('after Forget, the next tab re-creates the folder with a fresh marker, so the next start trusts it', async () => {
+    const service = makeService()
+    const first = await service.openForTab()
+    expect(await service.deleteBrowserData([])).toBe('deleted')
+    const again = await service.openForTab()
+    expect(again.session).toBe(first.session)
+    expect(JSON.parse(await readFile(markerFile(), 'utf8')).projectPath).toBe(project)
+    expect(fromPathCalls).toHaveLength(1)
+    const nextRun = await makeService().openForTab()
+    expect(nextRun.setAside).toBeNull()
+  })
+
+  it('a partial delete does not rewrite the marker', async () => {
+    const service = makeService()
+    await service.openForTab()
+    const before = await readFile(markerFile(), 'utf8')
+    await writeFile(join(browserDir(), 'captures', 'a.png'), 'x')
+    await service.deleteBrowserData(['captures', 'a.png'])
+    await expect(service.openForTab()).resolves.toBeDefined()
+    expect(await readFile(markerFile(), 'utf8')).toBe(before)
+  })
+
   it('runs no pending deletes when none are stored', async () => {
     await expect(makeService().runPendingDeletes()).resolves.toBeUndefined()
   })

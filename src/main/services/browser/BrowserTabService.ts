@@ -32,10 +32,14 @@
  *   changes go to the owning window. Each window gets one listener for the
  *   browser keys while a tab's toolbar has focus (`input/appWindowBrowserKeys.ts`),
  *   which {@link BrowserTabService.toolbarFocus} points at that tab.
+ * - **Local files** (025-FR-005 rule 1, 025-FR-010): {@link BrowserTabService.openLocalFile}
+ *   serves the file's folder (`local/LocalFileServers.ts`) and loads it in
+ *   the tab; a closing tab releases the folders it held.
  */
 import type { Session, WebContentsView } from 'electron'
 import { BROWSER_TAB_EVENTS } from '../../../shared/ipc/browser-tab-channels'
 import {
+  FindResultEventSchema,
   FocusEventSchema,
   ForwardedKeyEventSchema,
   NoticeEventSchema,
@@ -45,23 +49,35 @@ import {
   TabStateEventSchema,
   type CreateResponse,
   type FocusOrigin,
-  type StripAnswer
+  type NavigateResponse,
+  type NavigationSource,
+  type StripAnswer,
+  type TabStateEvent
 } from '../../../shared/ipc/browser-tab-schema'
 import type { Clock } from '../../../shared/clock'
 import type { RegistrableDomainResolver } from '../../../shared/browser/originFormat'
+import { pathToFileURL } from 'node:url'
 import { isSamePath } from '../../utils/pathCompare'
 import { redactedLogError } from '../../utils/redactUserInput'
 import { logger } from '../LoggingService'
 import type { ProjectSessionSnapshot } from '../session/ProjectSession'
 import { BrowserProfileError } from './browserProfileGuards'
-import type { AppAddresses } from './browserNavigationPolicy'
-import { BrowserTab, type BrowserTabCdpHook, type TabHost } from './BrowserTab'
+import { isAppAddress, LOCAL_FILE_SOURCES, type AppAddresses } from './browserNavigationPolicy'
+import { BrowserTab, type BrowserTabCdpHook, type BrowserTabCdpLink, type TabHost, type TabLocalFiles } from './BrowserTab'
+import type { LocalFileServers } from './local/LocalFileServers'
 import type { BrowserSite, TabSiteLink } from './permissions/BrowserSite'
 import type { AnswerResult, StripFields } from './permissions/tabStrip'
 import type { CertificateAnswerResult } from './site/browserCertificates'
 import { AppWindowBrowserKeys } from './input/appWindowBrowserKeys'
 import { BrowserTabInput } from './input/BrowserTabInput'
 import type { MacAppKeyTargets } from './input/macAppRoles'
+import type { BrowserPages } from './page/BrowserPages'
+import type { BrowserTabPage, PageHangSource } from './page/BrowserTabPage'
+import { decorateTabState } from './page/tabPageState'
+import type { ClipView } from './page/TabViewFrame'
+
+/** A tab's CDP link, with the hang probe's events for the page features when the session has them. */
+export type TabCdpLink = BrowserTabCdpLink & Partial<PageHangSource>
 
 /** What each tab's input routing needs (`input/BrowserTabInput.ts`). */
 export interface TabInputSetup {
@@ -91,12 +107,21 @@ export interface BrowserTabServiceDeps {
   readonly expectDevTools: (session: Session) => () => void
   readonly appAddresses: () => AppAddresses
   readonly resolveDomain: RegistrableDomainResolver
-  readonly attachCdp?: BrowserTabCdpHook
+  readonly attachCdp?: (...args: Parameters<BrowserTabCdpHook>) => TabCdpLink | null
+  /** Load errors, crash and hang notices, find, zoom, width presets and history (commit 12h); without it none of them. */
+  readonly pages?: Pick<BrowserPages, 'attachTab' | 'detachTab'>
+  /** The page view's clipping parent for width presets (ADR 0011 decision 6). */
+  readonly createClip?: () => ClipView
   /** Permission prompts, notices and downloads; without it the session policy refuses them. */
   readonly site?: Pick<BrowserSite, 'attachTab' | 'showDownload'>
   /** Key and mouse routing; without it a tab's page receives every key and click. */
   readonly input?: TabInputSetup
+  /** Served local folders; without them every local file is refused. */
+  readonly local?: TabLocalFiles & Pick<LocalFileServers, 'open' | 'releaseTab'>
 }
+
+/** The sources a local file opens from (`LOCAL_FILE_SOURCES`). */
+export type LocalFileSource = Exclude<NavigationSource, 'page'>
 
 /** Mints `browser-tab-<n>`, the id shape `BrowserTabIdSchema` accepts. */
 const MAX_TAB_COUNTER = 999_999_999
@@ -106,6 +131,7 @@ export class BrowserTabService {
   private readonly hostOf = new WeakMap<BrowserTab, TabHost>()
   private readonly siteOf = new WeakMap<BrowserTab, TabSiteLink>()
   private readonly inputOf = new WeakMap<BrowserTab, BrowserTabInput>()
+  private readonly pageOf = new WeakMap<BrowserTab, BrowserTabPage>()
   private readonly windowKeys = new Map<number, AppWindowBrowserKeys>()
   private counter = 0
 
@@ -152,6 +178,32 @@ export class BrowserTabService {
     return tab.id
   }
 
+  /**
+   * Load the local file at `filePath` in `tabId` of `windowId`, through its
+   * served folder (025-FR-005 rule 1): the address bar's `file://` input,
+   * a history row, or **Open in browser tab** (025-FR-010). Never rejects.
+   */
+  async openLocalFile(windowId: number, tabId: string, filePath: string, source: LocalFileSource): Promise<NavigateResponse> {
+    const tab = this.tabOf(windowId, tabId)
+    if (tab === null) return { error: 'Request refused' }
+    const local = this.deps.local
+    if (local === undefined || !LOCAL_FILE_SOURCES.has(source)) return { refused: 'local-file' }
+    try {
+      if (isAppAddress(pathToFileURL(filePath).href, this.deps.appAddresses())) return { refused: 'app-entry' }
+      const opened = await local.open({ tabId, projectRoot: tab.projectRoot, caseSensitive: tab.caseSensitive, filePath })
+      if (!opened.ok) return { refused: opened.reason }
+      if (this.tabs.get(tabId) !== tab) {
+        local.releaseTab(tabId)
+        return { error: 'The tab closed' }
+      }
+      tab.navigateLocal(opened.url, source)
+      return { ok: true }
+    } catch (error) {
+      logger.error('Opening a local file in a browser tab failed', redactedLogError(error))
+      return { error: 'The file could not be opened' }
+    }
+  }
+
   /** The tab `tabId` if it belongs to `windowId`; a tab of another window is refused. */
   tabOf(windowId: number, tabId: string): BrowserTab | null {
     const tab = this.tabs.get(tabId)
@@ -176,6 +228,8 @@ export class BrowserTabService {
   ): AnswerResult | null {
     const tab = this.tabOf(windowId, tabId)
     if (tab === null) return null
+    const hungNotice = this.pageOf.get(tab)?.answerStrip(requestId, answer) ?? null
+    if (hungNotice !== null) return hungNotice
     return this.siteOf.get(tab)?.answerStrip(requestId, answer, fields) ?? 'unknown'
   }
 
@@ -204,6 +258,12 @@ export class BrowserTabService {
     const keys = this.windowKeys.get(windowId)
     if (focused) keys?.setTarget(input)
     else keys?.clearTarget(input)
+  }
+
+  /** The page features of `tabId` if it belongs to `windowId` (find, zoom, width preset); `null` otherwise. */
+  pageFor(windowId: number, tabId: string): BrowserTabPage | null {
+    const tab = this.tabOf(windowId, tabId)
+    return tab === null ? null : (this.pageOf.get(tab) ?? null)
   }
 
   /** The input routing of `tab`, for the test hooks; `null` without routing. */
@@ -246,6 +306,9 @@ export class BrowserTabService {
     this.deps.prepareSession(session)
     const view = this.deps.createView(session)
     let input: BrowserTabInput | null = null
+    // The CDP link is made while the tab's constructor runs; the page features take its hang events.
+    const cdp: { link: TabCdpLink | null } = { link: null }
+    const attachCdp = this.deps.attachCdp
     const tab = new BrowserTab({
       id: this.nextId(),
       panelId,
@@ -256,10 +319,12 @@ export class BrowserTabService {
       appAddresses: this.deps.appAddresses,
       resolveDomain: this.deps.resolveDomain,
       expectDevTools: this.deps.expectDevTools,
-      attachCdp: this.deps.attachCdp,
+      attachCdp: attachCdp === undefined ? undefined : (contents) => (cdp.link = attachCdp(contents)),
       onStateChange: (changed) => this.sendState(changed),
       onDestroyed: (gone) => this.forget(gone),
-      onPageMoved: () => input?.recordRowShift()
+      onPageMoved: () => input?.recordRowShift(),
+      local: this.deps.local,
+      createClip: this.deps.createClip
     })
     this.tabs.set(tab.id, tab)
     this.hostOf.set(tab, host)
@@ -270,7 +335,27 @@ export class BrowserTabService {
       parentWindow: () => (host.isDestroyed() ? null : host)
     })
     if (site !== undefined) this.siteOf.set(tab, site)
+    this.attachPage(tab, host, cdp.link)
     return tab
+  }
+
+  /** The tab's page features (`page/BrowserTabPage.ts`), before its first page loads. */
+  private attachPage(tab: BrowserTab, host: TabHost, cdp: TabCdpLink | null): void {
+    const pages = this.deps.pages
+    if (pages === undefined) return
+    const { onHang, waitHang } = cdp ?? {}
+    const hang = onHang === undefined || waitHang === undefined ? null : { onHang, waitHang }
+    const page = pages.attachTab(
+      tab,
+      {
+        strip: (event) => this.send(host, BROWSER_TAB_EVENTS.strip, StripEventSchema, event),
+        findResult: (event) => this.send(host, BROWSER_TAB_EVENTS.findResult, FindResultEventSchema, event),
+        stateChanged: () => this.sendState(tab),
+        endPick: () => this.inputOf.get(tab)?.dispatch({ type: 'endSilently' })
+      },
+      hang
+    )
+    this.pageOf.set(tab, page)
   }
 
   /** The tab's key and mouse routers, before its first page loads; `null` without routing. */
@@ -284,6 +369,7 @@ export class BrowserTabService {
       platform: setup.platform,
       clock: setup.clock,
       macAppKeys: setup.macAppKeys(host),
+      zoom: (step) => this.pageOf.get(tab)?.zoom(step),
       events: {
         forwardedKey: (action) => this.send(host, BROWSER_TAB_EVENTS.forwardedKey, ForwardedKeyEventSchema, { tabId, action }),
         pageFocus: (pageFocused) => this.send(host, BROWSER_TAB_EVENTS.focus, FocusEventSchema, { tabId, pageFocused }),
@@ -314,8 +400,12 @@ export class BrowserTabService {
 
   private forget(tab: BrowserTab): void {
     if (this.tabs.get(tab.id) === tab) this.tabs.delete(tab.id)
+    this.deps.local?.releaseTab(tab.id)
     this.siteOf.get(tab)?.detach()
     this.siteOf.delete(tab)
+    const page = this.pageOf.get(tab)
+    if (page !== undefined) this.deps.pages?.detachTab(page)
+    this.pageOf.delete(tab)
     const input = this.inputOf.get(tab)
     if (input !== undefined) {
       this.windowKeys.get(tab.windowId)?.clearTarget(input)
@@ -324,9 +414,15 @@ export class BrowserTabService {
     }
   }
 
+  /** `tab`'s state with its page features applied (load error, crash, zoom) – what the window gets. */
+  stateOf(tab: BrowserTab): TabStateEvent {
+    const page = this.pageOf.get(tab)
+    return page === undefined ? tab.state() : decorateTabState(tab.state(), page.facts(), this.deps.resolveDomain)
+  }
+
   private sendState(tab: BrowserTab): void {
     const host = this.hostOf.get(tab)
-    if (host !== undefined) this.send(host, BROWSER_TAB_EVENTS.state, TabStateEventSchema, tab.state())
+    if (host !== undefined) this.send(host, BROWSER_TAB_EVENTS.state, TabStateEventSchema, this.stateOf(tab))
   }
 
   /** Send `payload` to the owning window only, after checking it against its schema. */

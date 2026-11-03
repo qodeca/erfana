@@ -46,14 +46,18 @@ exports[`preload surface > window.api.browserTab exposes the expected members 1`
 [
   "answerStrip",
   "certificate",
+  "clearData",
   "close",
   "create",
   "devTools",
+  "find",
   "focusOrigin",
   "focusPage",
+  "forget",
   "history",
   "navigate",
   "onBoundsApplied",
+  "onFindResult",
   "onFocus",
   "onForwardedKey",
   "onNotice",
@@ -61,9 +65,14 @@ exports[`preload surface > window.api.browserTab exposes the expected members 1`
   "onState",
   "onStrip",
   "onTabAdded",
+  "openLocalFile",
   "setBounds",
   "showDownload",
+  "stopFind",
+  "suggest",
   "toolbarFocus",
+  "widthPreset",
+  "zoom",
 ]
 `;
 

@@ -21,6 +21,7 @@ import { installClockTestHook, type ClockTestHook } from './clockHook'
 import { createBrowserTestHook, type BrowserTestHook } from './browserHook'
 import { createBrowserInputTestHook, type BrowserInputTestHook } from './browserInputHook'
 import { createBrowserSiteTestHook, type BrowserSiteTestHook } from './browserSiteHook'
+import { createBrowserPageTestHook, type BrowserPageTestHook } from './browserPageHook'
 import { getBrowserRuntime } from '../services/browser/browserAppSetup'
 
 /** The string `scripts/check-no-test-hooks.mjs` looks for in a production build. */
@@ -38,6 +39,8 @@ export interface TestHooks {
   readonly browserInput: BrowserInputTestHook
   /** Built-in browser site behaviour: the test CA (spec 025 commits 12c–d, probe 10c). */
   readonly site: BrowserSiteTestHook
+  /** Built-in browser page features: load errors, crash, zoom, presets, Clear, history (spec 025 commit 12h). */
+  readonly page: BrowserPageTestHook
 }
 
 /** What `globalThis.__erfanaTestHooks` holds. */
@@ -51,6 +54,7 @@ export interface TestHookDependencies {
   readonly createBrowser: () => BrowserTestHook
   readonly createBrowserInput?: () => BrowserInputTestHook
   readonly createSite?: () => BrowserSiteTestHook
+  readonly createPage?: () => BrowserPageTestHook
 }
 
 const defaultDependencies: TestHookDependencies = {
@@ -68,7 +72,8 @@ export function createTestHooks(
     clock: deps.installClock(),
     browser: deps.createBrowser(),
     browserInput: (deps.createBrowserInput ?? (() => createBrowserInputTestHook(getBrowserRuntime)))(),
-    site: (deps.createSite ?? (() => createBrowserSiteTestHook(getBrowserRuntime)))()
+    site: (deps.createSite ?? (() => createBrowserSiteTestHook(getBrowserRuntime)))(),
+    page: (deps.createPage ?? (() => createBrowserPageTestHook(getBrowserRuntime)))()
   })
 }
 

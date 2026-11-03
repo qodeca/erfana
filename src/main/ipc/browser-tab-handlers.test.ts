@@ -26,7 +26,8 @@ const tab = {
   history: vi.fn(),
   applyBounds: vi.fn((): boolean | null => true),
   focusPage: vi.fn(),
-  devTools: vi.fn()
+  devTools: vi.fn(),
+  windowId: 3
 }
 const service = {
   create: vi.fn(async () => ({ tabId: TAB })),
@@ -36,7 +37,8 @@ const service = {
   answerCertificate: vi.fn(() => 'accepted'),
   showDownload: vi.fn(() => true),
   focusOrigin: vi.fn(),
-  toolbarFocus: vi.fn()
+  toolbarFocus: vi.fn(),
+  openLocalFile: vi.fn(async () => ({ ok: true }))
 }
 let trusted = true
 let windowFor: typeof host | null = host
@@ -100,6 +102,30 @@ describe('registerBrowserTabHandlers', () => {
     expect(invoke('browser-tab:navigate', { tabId: TAB, input: 'file:///r/index.html', source: 'address' })).toEqual({ refused: 'app-entry' })
   })
 
+  it('opens a local file typed in the bar or chosen from history through its served folder, never from a link', async () => {
+    tab.navigate.mockReturnValueOnce({ refused: 'local-file' } as never)
+    expect(await invoke('browser-tab:navigate', { tabId: TAB, input: 'file:///p/site/a%20b.html', source: 'address' })).toEqual({ ok: true })
+    expect(service.openLocalFile).toHaveBeenLastCalledWith(3, TAB, '/p/site/a b.html', 'address')
+    // A network path is the tab's own refusal, never a file to serve.
+    tab.navigate.mockReturnValueOnce({ refused: 'network-path' } as never)
+    expect(invoke('browser-tab:navigate', { tabId: TAB, input: 'file://host/share/x.html', source: 'history' })).toEqual({ refused: 'network-path' })
+    // A link's local-file answer: the service decides by source (terminal links never open files).
+    tab.navigate.mockReturnValueOnce({ refused: 'local-file' } as never)
+    service.openLocalFile.mockResolvedValueOnce({ refused: 'local-file' } as never)
+    expect(await invoke('browser-tab:navigate', { tabId: TAB, input: 'file:///p/a.html', source: 'terminalLink' })).toEqual({ refused: 'local-file' })
+    expect(service.openLocalFile).toHaveBeenCalledTimes(2)
+  })
+
+  it('025-AC-010 openLocalFile opens the previewed file in the sender\'s own tab, refusing bad payloads', async () => {
+    expect(await invoke('browser-tab:openLocalFile', { tabId: TAB, filePath: '/p/site/index.html' })).toEqual({ ok: true })
+    expect(service.openLocalFile).toHaveBeenLastCalledWith(3, TAB, '/p/site/index.html', 'previewOpen')
+    expect(await invoke('browser-tab:openLocalFile', { tabId: TAB, filePath: '' })).toEqual({ error: 'Request refused' })
+    expect(await invoke('browser-tab:openLocalFile', { tabId: TAB, filePath: '/x', source: 'address' })).toEqual({ error: 'Request refused' })
+    windowFor = { id: 4, isDestroyed: () => false }
+    expect(await invoke('browser-tab:openLocalFile', { tabId: TAB, filePath: '/p/x.html' })).toEqual({ error: 'Request refused' })
+    expect(service.openLocalFile).toHaveBeenCalledTimes(1)
+  })
+
   it('never accepts the page source from the renderer', () => {
     expect(invoke('browser-tab:navigate', { tabId: TAB, input: 'https://a.test', source: 'page' })).toEqual({ error: 'Request refused' })
   })
@@ -126,7 +152,7 @@ describe('registerBrowserTabHandlers', () => {
     expect(tab.focusPage).toHaveBeenCalled()
     expect(tab.devTools).toHaveBeenCalledWith({ x: 1, y: 2 })
     expect(service.close).toHaveBeenCalledWith(3, TAB)
-    expect(tab.applyBounds).toHaveBeenCalledWith(rect, 4, false)
+    expect(tab.applyBounds).toHaveBeenCalledWith(rect, 4, false, rect)
   })
 
   it('logs instead of throwing when the tab throws', () => {

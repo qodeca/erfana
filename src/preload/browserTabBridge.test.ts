@@ -19,6 +19,7 @@ import {
   FocusOriginRequestSchema,
   FocusPageRequestSchema,
   HistoryRequestSchema,
+  OpenLocalFileRequestSchema,
   ShowDownloadRequestSchema,
   ToolbarFocusRequestSchema
 } from '../shared/ipc/browser-tab-schema'
@@ -114,6 +115,12 @@ describe('browserTabBridge requests', () => {
     >[0]
     await browserTabBridge.navigate(request)
     expect(ipc.invoke).toHaveBeenCalledWith(C.navigate, request)
+  })
+
+  it('wraps openLocalFile in the payload main validates', async () => {
+    await browserTabBridge.openLocalFile(TAB, '/p/site/index.html')
+    expect(ipc.invoke).toHaveBeenCalledWith(C.openLocalFile, { tabId: TAB, filePath: '/p/site/index.html' })
+    expect(OpenLocalFileRequestSchema.safeParse(ipc.invoke.mock.calls[0]![1]).success).toBe(true)
   })
 
   it('sends bounds fire-and-forget, never through invoke', () => {

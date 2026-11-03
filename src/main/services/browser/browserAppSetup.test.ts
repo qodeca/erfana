@@ -23,11 +23,13 @@ vi.mock('../LoggingService', () => ({ logger: mockLogger }))
 vi.mock('@electron-toolkit/utils', () => ({ is: { dev: false } }))
 vi.mock('../../ipc/senderValidation', () => ({ RENDERER_FILE_URL: 'file:///app/out/renderer/index.html' }))
 vi.mock('../../ipc/browser-tab-handlers', () => ({ registerBrowserTabHandlers: vi.fn() }))
+vi.mock('../../ipc/browserTab/page-handlers', () => ({ registerBrowserTabPageHandlers: vi.fn() }))
 
 import {
   BROWSER_DISK_CACHE_BYTES,
   closeBrowserWindow,
   currentAppAddresses,
+  disposeBrowserForQuit,
   flushBrowserProfiles,
   getBrowserRuntime,
   installBrowserAfterReady,
@@ -116,8 +118,12 @@ describe('browserAppSetup', () => {
     expect(mockLogger.warn).toHaveBeenCalledWith('Browser teardown on window close failed', expect.objectContaining({ windowId: 8 }))
 
     const closeProject = vi.spyOn(runtime.tabs, 'closeProject')
+    const closeLocal = vi.spyOn(runtime.localFiles, 'closeProject')
     await runtime.teardown.run('/projects/a')
     expect(closeProject).toHaveBeenCalledWith('/projects/a')
+    // The project's served local folders close in the same stage, after its tabs.
+    expect(closeLocal).toHaveBeenCalledWith('/projects/a')
+    expect(closeProject.mock.invocationCallOrder[0]).toBeLessThan(closeLocal.mock.invocationCallOrder[0]!)
   })
 
   it('names the renderer entry and the resources folder as app addresses, and no dev server outside development', () => {
@@ -141,5 +147,18 @@ describe('browserAppSetup', () => {
     await expect(flushBrowserProfiles()).resolves.toBeUndefined()
     expect(flushStore).toHaveBeenCalledTimes(1)
     expect(flushStorageData).toHaveBeenCalledTimes(1)
+  })
+
+  it('on quit flushes the profiles and closes every served local folder, and never rejects', async () => {
+    const runtime = installBrowserAfterReady({
+      defaultSession: { protocol: { handle: vi.fn() } } as never,
+      projectSession: new ProjectSessionStore(),
+      lockService: { checkLock: vi.fn(), acquireLock: vi.fn() },
+      registerTabHandlers: vi.fn()
+    })
+    vi.spyOn(runtime.profiles, 'openSessions').mockRejectedValue(new Error('gone'))
+    const closeAll = vi.spyOn(runtime.localFiles, 'closeAll').mockRejectedValue(new Error('stuck'))
+    await expect(disposeBrowserForQuit()).resolves.toBeUndefined()
+    expect(closeAll).toHaveBeenCalledTimes(1)
   })
 })

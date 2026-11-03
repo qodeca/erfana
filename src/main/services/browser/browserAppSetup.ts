@@ -25,6 +25,7 @@ import {
   session as electronSession,
   shell,
   webContents as electronWebContents,
+  View,
   WebContentsView,
   type App,
   type Session,
@@ -52,12 +53,17 @@ import { hardenBrowserSession } from './browserSessionPolicy'
 import { buildBrowserWebPreferences } from './browserWebPreferences'
 import { installAppRequestFilter } from './browserAppRequestFilter'
 import type { AppAddresses } from './browserNavigationPolicy'
-import { BrowserTabService, type TabInputSetup } from './BrowserTabService'
-import type { BrowserTabCdpLink } from './BrowserTab'
+import { BrowserTabService, type TabCdpLink, type TabInputSetup } from './BrowserTabService'
+import { BrowserPages } from './page/BrowserPages'
+import { registerBrowserTabPageHandlers } from '../../ipc/browserTab/page-handlers'
+import { BROWSER_TAB_EVENTS } from '../../../shared/ipc/browser-tab-channels'
+import { NoticeEventSchema } from '../../../shared/ipc/browser-tab-schema'
 import { BrowserCdpSession } from './cdp/BrowserCdpSession'
 import { BrowserSite } from './permissions/BrowserSite'
 import { installSiteRequestHooks } from './site/siteRequestHooks'
 import { electronMacAppKeys } from './input/macAppRoles'
+import { LocalFileServers } from './local/LocalFileServers'
+import { disposeWithin } from '../../utils/disposeWithin'
 
 /**
  * Chromium's per-disk-cache maximum: 512 MB (025-FR-015; ADR 0009 decision 9).
@@ -89,6 +95,19 @@ export interface BrowserAfterReadyDeps {
   readonly lockService: Pick<IProjectLockService, 'checkLock' | 'acquireLock'>
   /** Registers the `browser-tab:*` handlers; a test seam. */
   readonly registerTabHandlers?: typeof registerBrowserTabHandlers
+  /** Registers the page-feature `browser-tab:*` handlers (commit 12h); a test seam. */
+  readonly registerPageHandlers?: typeof registerBrowserTabPageHandlers
+  /**
+   * The terminals' output (`TerminalService`'s `data` and `exit` events), for
+   * the empty tab's local addresses (025-FR-063); without it none are seen.
+   */
+  readonly terminalOutput?: TerminalOutputSource
+}
+
+/** The part of `TerminalService` the empty tab's local-address scan listens to. */
+export interface TerminalOutputSource {
+  on(event: 'data', listener: (event: { terminalId: string; data: string; webContentsId: number }) => void): unknown
+  on(event: 'exit', listener: (event: { terminalId: string }) => void): unknown
 }
 
 export interface BrowserRuntime {
@@ -99,7 +118,14 @@ export interface BrowserRuntime {
   readonly appAddresses: AppAddresses
   /** Site requests, certificates and sign-ins of every tab (commits 12a–d). */
   readonly site: BrowserSite
+  /** Served local folders (commit 11, ADR 0012 option 4). */
+  readonly localFiles: LocalFileServers
+  /** Load errors, crash and hang notices, find, zoom, presets, Clear, Forget and history (commit 12h). */
+  readonly pages: BrowserPages
 }
+
+/** How long quitting waits for the served local folders to close. */
+const LOCAL_SERVERS_QUIT_MS = 2_000
 
 /** Erfana's own addresses in this build: the renderer entry, the resources folder, the dev server. */
 export function currentAppAddresses(): AppAddresses {
@@ -120,7 +146,7 @@ export function currentAppAddresses(): AppAddresses {
  * refused attach (another client holds the debugger) leaves the tab without
  * one rather than without a page.
  */
-function attachTabCdp(contents: WebContents): BrowserTabCdpLink | null {
+function attachTabCdp(contents: WebContents): TabCdpLink | null {
   const cdp = new BrowserCdpSession({ kind: 'tab' })
   try {
     cdp.attach(contents)
@@ -128,7 +154,20 @@ function attachTabCdp(contents: WebContents): BrowserTabCdpLink | null {
     logger.warn('Browser tab opened without a CDP session', { error: redactedLogError(error)?.message ?? String(error) })
     return null
   }
-  return { setVisible: (visible) => cdp.hangProbe.setVisible(visible), detach: () => cdp.detach() }
+  return {
+    setVisible: (visible) => cdp.hangProbe.setVisible(visible),
+    detach: () => cdp.detach(),
+    onHang: (listener) => cdp.on('hang', listener),
+    waitHang: () => cdp.hangProbe.wait()
+  }
+}
+
+/** A `localAddressSeen` notice to the window whose renderer is `webContentsId` (025-FR-063). */
+function noticeLocalAddress(webContentsId: number, address: string): void {
+  const target = electronWebContents.fromId(webContentsId)
+  if (target === undefined || target.isDestroyed()) return
+  const notice = NoticeEventSchema.safeParse({ tabId: null, kind: 'localAddressSeen', text: address })
+  if (notice.success) target.send(BROWSER_TAB_EVENTS.notice, notice.data)
 }
 
 /** Build a browser page view in `session`, registered before its constructor returns. */
@@ -168,11 +207,22 @@ export function installBrowserAfterReady(deps: BrowserAfterReadyDeps): BrowserRu
     clock: mainClock
   })
   const appAddresses = currentAppAddresses()
+  const localFiles = new LocalFileServers({ now: () => mainClock.now(), appAddresses: () => appAddresses })
+  const pages = new BrowserPages({
+    clock: mainClock,
+    signer: lockHmacSigner,
+    homeDir: homedir(),
+    site,
+    openProfile: () => profiles.openForTab(),
+    deleteBrowserData: (rel) => profiles.deleteBrowserData(rel),
+    closeProject: (projectRoot) => tabs.closeProject(projectRoot),
+    noticeToRenderer: noticeLocalAddress
+  })
   const tabs = new BrowserTabService({
     openProfile: () => profiles.openForTab(),
     currentProject: () => deps.projectSession.current(),
     prepareSession: (ses) => {
-      installAppRequestFilter(ses, () => appAddresses)
+      installAppRequestFilter(ses, () => appAddresses, localFiles)
       installSiteRequestHooks(ses, site)
     },
     createView: createBrowserView,
@@ -181,16 +231,28 @@ export function installBrowserAfterReady(deps: BrowserAfterReadyDeps): BrowserRu
     resolveDomain: pinnedRegistrableDomain,
     attachCdp: attachTabCdp,
     site,
-    input: tabInputSetup()
+    input: tabInputSetup(),
+    local: localFiles,
+    pages,
+    createClip: () => new View()
   })
   ;(deps.registerTabHandlers ?? registerBrowserTabHandlers)({ service: tabs })
+  ;(deps.registerPageHandlers ?? registerBrowserTabPageHandlers)({
+    tabs,
+    pages,
+    currentProject: () => deps.projectSession.current()
+  })
+  deps.terminalOutput?.on('data', (event) => pages.terminalOutput(event.webContentsId, event.terminalId, event.data))
+  deps.terminalOutput?.on('exit', (event) => pages.terminalGone(event.terminalId))
   const teardown = new BrowserProjectTeardown()
   teardown.onStage('closeViews', (projectRoot) => tabs.closeProject(projectRoot))
+  teardown.onStage('closeViews', (projectRoot) => localFiles.closeProject(projectRoot))
+  teardown.onStage('closeViews', () => pages.projectChanged())
   teardown.attach(deps.projectSession)
   profiles.runPendingDeletes().catch((error: unknown) => {
     logger.warn('Browser pending deletes could not run', { error: redactedLogError(error)?.message ?? String(error) })
   })
-  runtime = { profiles, teardown, tabs, appAddresses, site }
+  runtime = { profiles, teardown, tabs, appAddresses, site, localFiles, pages }
   return runtime
 }
 
@@ -253,6 +315,21 @@ export async function flushBrowserProfiles(): Promise<void> {
   await Promise.allSettled(
     sessions.flatMap((ses) => [ses.cookies.flushStore(), Promise.resolve().then(() => ses.flushStorageData())])
   )
+}
+
+/**
+ * The browser's quit step: flush every profile ({@link flushBrowserProfiles})
+ * and close the served local folders, the latter bounded by `disposeWithin`
+ * so a socket that will not close cannot hold the quit. Never rejects.
+ */
+export async function disposeBrowserForQuit(): Promise<void> {
+  const localFiles = runtime?.localFiles
+  await Promise.allSettled([
+    flushBrowserProfiles(),
+    localFiles === undefined
+      ? Promise.resolve()
+      : disposeWithin('browser local-file servers', () => localFiles.closeAll(), LOCAL_SERVERS_QUIT_MS)
+  ])
 }
 
 /** Close the browser tabs of a window that closed. Never throws (it runs in a window event). */

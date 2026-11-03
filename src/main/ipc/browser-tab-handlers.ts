@@ -6,7 +6,9 @@
  * Forward, Reload, Stop), `bounds` (send; carries visibility), `focusPage` and
  * `devTools`; `answerStrip` and `showDownload` (commit 12a–b, 025-FR-019,
  * 025-FR-020), `certificate` (commit 12c, 025-FR-021); `focusOrigin` and `toolbarFocus` (send) for the key and mouse
- * routers (commit 13, ADR 0011 decisions 13 and 16). The tab state goes back as the `browser-tab:state` event, to
+ * routers (commit 13, ADR 0011 decisions 13 and 16); `openLocalFile` (commit 11, 025-FR-010 – **Open in browser
+ * tab**) and the address bar's `file://` input through `navigate`, both loaded from the file's served folder
+ * (025-FR-005 rule 1). The tab state goes back as the `browser-tab:state` event, to
  * the owning window only (`BrowserTabService`).
  *
  * Every handler is registered through `registry.ts` (identity, top-level
@@ -16,6 +18,7 @@
  * and never throws: a refusal is an `{ error }` answer, or nothing for a
  * request with no answer.
  */
+import { fileURLToPath } from 'node:url'
 import { BrowserWindow, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
 import { classifyAddressInput } from '../../shared/browser/addressInput'
 import { BROWSER_TAB_CHANNELS, BROWSER_TAB_EVENTS } from '../../shared/ipc/browser-tab-channels'
@@ -31,6 +34,7 @@ import {
   FocusPageRequestSchema,
   HistoryRequestSchema,
   NavigateRequestSchema,
+  OpenLocalFileRequestSchema,
   ShowDownloadRequestSchema,
   ToolbarFocusRequestSchema,
   type CreateResponse,
@@ -53,6 +57,7 @@ type TabServiceSurface = Pick<
   | 'showDownload'
   | 'focusOrigin'
   | 'toolbarFocus'
+  | 'openLocalFile'
 >
 
 export interface BrowserTabHandlerDeps {
@@ -74,6 +79,7 @@ export const BROWSER_TAB_HANDLED_CHANNELS = [
   C.create,
   C.close,
   C.navigate,
+  C.openLocalFile,
   C.history,
   C.bounds,
   C.focusPage,
@@ -84,6 +90,16 @@ export const BROWSER_TAB_HANDLED_CHANNELS = [
   C.showDownload,
   C.certificate
 ] as const
+
+/** The path of a `file:` URL with no host, or `null` (a network path, or not a file URL). */
+function localFilePath(url: string): string | null {
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'file:' && parsed.host === '' ? fileURLToPath(parsed) : null
+  } catch {
+    return null
+  }
+}
 
 /** Register the tab channels; returns the function that removes them. */
 export function registerBrowserTabHandlers(deps: BrowserTabHandlerDeps): () => void {
@@ -151,15 +167,27 @@ export function registerBrowserTabHandlers(deps: BrowserTabHandlerDeps): () => v
     if (accepted !== null) guarded(C.close, undefined, () => service.close(accepted.host.id, accepted.data.tabId))
   })
 
-  registerHandle(C.navigate, (event, arg: unknown): NavigateResponse => {
+  registerHandle(C.navigate, (event, arg: unknown): NavigateResponse | Promise<NavigateResponse> => {
     const target = acceptTab(C.navigate, event, NavigateRequestSchema, arg)
     if (target === null) return { error: 'Request refused' }
-    return guarded<NavigateResponse>(C.navigate, { error: 'The address could not be opened' }, () => {
-      const decision = classifyAddressInput(target.data.input)
+    const { tab, data } = target
+    return guarded<NavigateResponse | Promise<NavigateResponse>>(C.navigate, { error: 'The address could not be opened' }, () => {
+      const decision = classifyAddressInput(data.input)
       if (decision.kind === 'refused') return { refused: decision.reason }
-      const result = target.tab.navigate(decision.url, target.data.source)
-      return 'refused' in result ? { refused: result.refused } : { ok: true }
+      const result = tab.navigate(decision.url, data.source)
+      if (!('refused' in result)) return { ok: true }
+      // The tab loads no file: URL itself; a local file opens through its served folder.
+      const filePath = result.refused === 'local-file' ? localFilePath(decision.url) : null
+      if (filePath === null) return { refused: result.refused }
+      return service.openLocalFile(tab.windowId, data.tabId, filePath, data.source)
     })
+  })
+
+  // **Open in browser tab** from the HTML Preview (025-FR-010): the previewed file, from its served folder.
+  registerHandle(C.openLocalFile, async (event, arg: unknown): Promise<NavigateResponse> => {
+    const target = acceptTab(C.openLocalFile, event, OpenLocalFileRequestSchema, arg)
+    if (target === null) return { error: 'Request refused' }
+    return service.openLocalFile(target.tab.windowId, target.data.tabId, target.data.filePath, 'previewOpen')
   })
 
   registerHandle(C.history, (event, arg: unknown): void => {
@@ -170,8 +198,8 @@ export function registerBrowserTabHandlers(deps: BrowserTabHandlerDeps): () => v
   const onBounds = (event: IpcMainEvent, arg: unknown): void => {
     const target = acceptTab(C.bounds, event, BoundsRequestSchema, arg)
     if (target === null) return
-    const { tabId, bounds, seq, visible, ack } = target.data
-    const shown = guarded(C.bounds, null, () => target.tab.applyBounds(bounds, seq, visible))
+    const { tabId, bounds, seq, visible, ack, clip } = target.data
+    const shown = guarded(C.bounds, null, () => target.tab.applyBounds(bounds, seq, visible, clip))
     // The answer goes to the sender, which acceptTab checked owns the tab
     if (ack && shown !== null && !event.sender.isDestroyed()) {
       event.sender.send(BROWSER_TAB_EVENTS.boundsApplied, BoundsAppliedEventSchema.parse({ tabId, seq, visible: shown }))

@@ -229,6 +229,7 @@ const BROWSER_TAB_METHODS: Record<keyof BrowserTabBridge, true> = {
   create: true,
   close: true,
   navigate: true,
+  openLocalFile: true,
   history: true,
   setBounds: true,
   focusPage: true,
@@ -245,7 +246,15 @@ const BROWSER_TAB_METHODS: Record<keyof BrowserTabBridge, true> = {
   toolbarFocus: true,
   onFocus: true,
   onForwardedKey: true,
-  onPick: true
+  onPick: true,
+  find: true,
+  stopFind: true,
+  onFindResult: true,
+  zoom: true,
+  widthPreset: true,
+  clearData: true,
+  forget: true,
+  suggest: true
 }
 const MARKDOWN_IMAGE_METHODS: Record<keyof MarkdownImageBridge, true> = { read: true }
 

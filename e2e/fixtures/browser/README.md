@@ -33,7 +33,7 @@ test('…', async ({ browserServers }) => {
 })
 ```
 
-- **Host names.** Every launch passes `--host-resolver-rules="MAP *.test 127.0.0.1, MAP * ~NOTFOUND, EXCLUDE localhost"` (`BROWSER_CHROMIUM_ARGS`). A server answers whatever `*.test` name reaches it, so `{ host }` gives a test any site it needs – each permission on its own host, a cross-site frame on `other.test` – on the same server. `localhost:{port}` works too.
+- **Host names.** Every launch passes `--host-resolver-rules="MAP *.test 127.0.0.1, MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1"` (`BROWSER_CHROMIUM_ARGS`; `127.0.0.1` is excluded because Chromium maps IP literals too, and served local folders load from it). A server answers whatever `*.test` name reaches it, so `{ host }` gives a test any site it needs – each permission on its own host, a cross-site frame on `other.test` – on the same server. `localhost:{port}` works too.
 - **Sites and default hosts.** `static` → `app.test`, `react18` → `react18.test`, `react19` → `react19.test`, `staging` → `staging.test`, `hostile` → `hostile.test`. Each runs one HTTP and one HTTPS server; HTTPS presents the valid `*.test` certificate.
 - **Certificate servers.** `certServers.expired` (`expired.test`), `certServers.mismatch` (`mismatch.test`) and `certServers.selfSigned` (`selfsigned.test`) serve the staging site behind a broken certificate. `selfSigned.presentCertificate('second')` swaps in a new self-signed certificate for the same host ("an accepted host presents a new certificate").
 - **Trusting the test CA.** The servers do not decide how Electron trusts the CA. `tls.caPem` holds it, and `tls.validSpkiSha256` is the valid leaf's key hash for `--ignore-certificate-errors-spki-list`, if a test chooses that route over a test hook.

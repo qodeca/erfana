@@ -142,6 +142,51 @@ export default defineConfig({
         'src/main/services/browser/BrowserTab.ts': { lines: 97, functions: 98, branches: 95, statements: 96 },
         // measured 96.87/100/92.5/96.05
         'src/main/services/browser/BrowserTabService.ts': { lines: 94, functions: 98, branches: 90, statements: 94 },
+        // Built-in browser local files (spec 025 commit 11, 025-FR-005 rule 1,
+        // ADR 0012 option 4 – the per-folder loopback server): the request path,
+        // the real-path confinement, the fetch-metadata policy, the server and
+        // the registry. Pinned ~2 points under the value measured when they
+        // landed (2026-11-03), never above 98.
+        // measured 100/100/100/100
+        'src/main/services/browser/local/localRequestPath.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/75/89.47/93.1
+        'src/main/services/browser/local/localConfinedFile.ts': { lines: 98, functions: 73, branches: 87, statements: 91 },
+        // measured 100/100/100/100
+        'src/main/services/browser/local/localResponsePolicy.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 96.42/100/87.5/95.58
+        'src/main/services/browser/local/LocalFolderServer.ts': { lines: 94, functions: 98, branches: 85, statements: 93 },
+        // measured 100/100/93.97/100
+        'src/main/services/browser/local/LocalFileServers.ts': { lines: 98, functions: 98, branches: 91, statements: 98 },
+        // Built-in browser page features (spec 025 commit 12h, 025-FR-008,
+        // 025-FR-012, 025-FR-023, 025-FR-056, 025-FR-059, 025-FR-063): load
+        // errors, crash and hang notices, find, zoom per site, width presets
+        // and the clipping parent, Clear and Forget, history, terminal
+        // addresses, and their channels. Pinned ~2 points under the value
+        // measured when they landed (2026-11-03), never above 98.
+        // measured 97.93/95.45/89.13/97.45
+        'src/main/services/browser/page/BrowserPages.ts': { lines: 95, functions: 93, branches: 87, statements: 95 },
+        // measured 100/100/91.07/98.3
+        'src/main/services/browser/page/BrowserTabPage.ts': { lines: 98, functions: 98, branches: 89, statements: 96 },
+        // measured 100/100/96.87/100
+        'src/main/services/browser/page/TabViewFrame.ts': { lines: 98, functions: 98, branches: 94, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/page/browserClearData.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/page/historyStore.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/83.33/94.44/96.42
+        'src/main/services/browser/page/hungNotice.ts': { lines: 98, functions: 81, branches: 92, statements: 94 },
+        // measured 90.9/75/75/88.46
+        'src/main/services/browser/page/plainProfileFile.ts': { lines: 88, functions: 73, branches: 73, statements: 86 },
+        // measured 100/100/100/100
+        'src/main/services/browser/page/tabPageState.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/85.71/97.05
+        'src/main/services/browser/page/terminalLocalAddressScan.ts': { lines: 98, functions: 98, branches: 83, statements: 95 },
+        // measured 100/100/100/100
+        'src/main/services/browser/page/widthPresetLayout.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/87.5/97.67
+        'src/main/services/browser/page/zoomStore.ts': { lines: 98, functions: 98, branches: 85, statements: 95 },
+        // measured 96.29/93.75/76.92/96.92
+        'src/main/ipc/browserTab/page-handlers.ts': { lines: 94, functions: 91, branches: 74, statements: 94 },
         // Built-in browser CDP session (spec 025 commit 9, 025-NFR-001 bullet 2,
         // 025-FR-038, 025-FR-056, S6, S23): the only sendCommand caller, the
         // method allow-list and its pinned parameters, the flood budget, the log

@@ -59,8 +59,12 @@ export {
   type StagingControls
 } from './server/stagingRoutes'
 
-/** The sealed network of the acceptance intro: `*.test` is local, everything else fails. */
-export const BROWSER_HOST_RESOLVER_RULES = 'MAP *.test 127.0.0.1, MAP * ~NOTFOUND, EXCLUDE localhost'
+/**
+ * The sealed network of the acceptance intro: `*.test` is local, everything else fails.
+ * `127.0.0.1` is excluded as `localhost` is: Chromium maps an IP literal too, and served
+ * local folders load from `http://127.0.0.1:<port>/` (ADR 0012 option 4, commit 11).
+ */
+export const BROWSER_HOST_RESOLVER_RULES = 'MAP *.test 127.0.0.1, MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1'
 /** Chromium switches every browser-test launch passes. */
 export const BROWSER_CHROMIUM_ARGS: readonly string[] = [`--host-resolver-rules=${BROWSER_HOST_RESOLVER_RULES}`]
 

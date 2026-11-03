@@ -15,8 +15,11 @@ import type {
   BoundsAppliedEvent,
   BoundsRequest,
   CertificateRequestSchema,
+  ClearDataRequest,
   CreateResponse,
   DevToolsRequestSchema,
+  FindRequestSchema,
+  FindResultEventSchema,
   FocusEvent,
   FocusOrigin,
   ForwardedKeyEvent,
@@ -26,14 +29,23 @@ import type {
   NoticeEvent,
   PickEvent,
   StripEvent,
+  SuggestResponseSchema,
   TabAddedEventSchema,
-  TabStateEvent
+  TabStateEvent,
+  WidthPresetRequestSchema,
+  ZoomRequestSchema
 } from './browser-tab-schema'
+import type { ClearDataResponse, ForgetResponse } from './browser-tab-page-schema'
 
 export type HistoryStep = z.infer<typeof HistoryRequestSchema>['step']
 export type DevToolsInspectPoint = NonNullable<z.infer<typeof DevToolsRequestSchema>['inspectAt']>
 export type TabAddedEvent = z.infer<typeof TabAddedEventSchema>
 export type CertificateRequest = z.infer<typeof CertificateRequestSchema>
+export type FindRequest = z.infer<typeof FindRequestSchema>
+export type FindResultEvent = z.infer<typeof FindResultEventSchema>
+export type ZoomStep = z.infer<typeof ZoomRequestSchema>['step']
+export type WidthPresetChoice = z.infer<typeof WidthPresetRequestSchema>['preset']
+export type SuggestResponse = z.infer<typeof SuggestResponseSchema>
 
 export interface BrowserTabBridge {
   /** Open an empty tab for the panel; `{ error }` names why it cannot open (a toast). */
@@ -41,6 +53,12 @@ export interface BrowserTabBridge {
   close(tabId: string): Promise<void>
   /** Load what the user typed or chose; `{ refused }` carries the 025-FR-005 rule. */
   navigate(request: NavigateRequest): Promise<NavigateResponse>
+  /**
+   * **Open in browser tab** (025-FR-010): load the previewed file at the
+   * absolute `filePath` in the tab, from its served folder; the bar shows its
+   * `file://` address. `{ refused }` carries the 025-FR-005 reason.
+   */
+  openLocalFile(tabId: string, filePath: string): Promise<NavigateResponse>
   /** Back, Forward, Reload or Stop (025-FR-003). */
   history(tabId: string, step: HistoryStep): Promise<void>
   /** The page area's rectangle and visibility (fire-and-forget, newest `seq` wins). */
@@ -74,4 +92,24 @@ export interface BrowserTabBridge {
   onForwardedKey(callback: (event: ForwardedKeyEvent) => void): () => void
   /** Pick mode on or off, status-slot notes and the pick pipeline's events. */
   onPick(callback: (event: PickEvent) => void): () => void
+  /**
+   * Find in page (025-FR-008); results arrive as {@link BrowserTabBridge.onFindResult}.
+   * `findNext` keeps Electron's meaning: `true` starts a new search (the text
+   * changed), `false` moves to the next (`forward`) or previous match.
+   */
+  find(request: FindRequest): Promise<void>
+  /** Close the find bar: the highlights go. */
+  stopFind(tabId: string): Promise<void>
+  /** "N of M" for the latest find; "0 of 0" when nothing matches. */
+  onFindResult(callback: (event: FindResultEvent) => void): () => void
+  /** Zoom in, out or back to 100% (025-FR-008); per site, the new level arrives in `state.zoomPercent`. */
+  zoom(tabId: string, step: ZoomStep): Promise<void>
+  /** A width preset (025-FR-012); the zoom resets to 100%, the new preset arrives in `state.widthPreset`. */
+  widthPreset(tabId: string, preset: WidthPresetChoice): Promise<void>
+  /** **Clear browsing data** for this window's project (025-FR-023); `failed` names each kind whose step did not finish. */
+  clearData(categories: ClearDataRequest['categories']): Promise<ClearDataResponse>
+  /** **Forget this project's browser data** after the user confirmed (025-FR-023); closes the project's tabs. */
+  forget(): Promise<ForgetResponse>
+  /** History rows for typed text, most recent first; every row for `''` (the empty tab shows 8) – 025-FR-063. */
+  suggest(prefix: string): Promise<SuggestResponse>
 }

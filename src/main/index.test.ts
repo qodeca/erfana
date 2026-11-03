@@ -38,7 +38,7 @@ const mockBrowserAppSetup = {
   installBrowserBeforeReady: vi.fn(),
   installBrowserAfterReady: vi.fn(),
   closeBrowserWindow: vi.fn(),
-  flushBrowserProfiles: vi.fn(async () => undefined)
+  disposeBrowserForQuit: vi.fn(async () => undefined)
 }
 
 /** Renderer token file — the source of truth for the window's paint colour. */

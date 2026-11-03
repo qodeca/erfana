@@ -34,7 +34,7 @@ import { registerBrowserHandlers } from './ipc/browser-handlers'
 import { registerMarkdownImageHandlers } from './ipc/markdown-image-handlers'
 import { registerClaudeStatusHandlers } from './ipc/claude-status-handlers'
 import { registerPreviewHandlers } from './ipc/preview-handlers'
-import { closeBrowserWindow, flushBrowserProfiles, installBrowserAfterReady, installBrowserBeforeReady } from './services/browser/browserAppSetup'
+import { closeBrowserWindow, disposeBrowserForQuit, installBrowserAfterReady, installBrowserBeforeReady } from './services/browser/browserAppSetup'
 import { importToolStatusService, killActiveLibreOfficeProbes } from './services/import'
 import { FORCE_CRASH_ARG, LOGS_DIR_RELATIVE, TEST_HOOKS_ARG } from '../shared/constants'
 import { createApplicationMenu, setPreviewZoomHandler } from './menu'
@@ -556,7 +556,7 @@ app.whenReady().then(async () => {
   // graph exists.
   setPreviewZoomHandler((step) => previewHandlers?.zoomFocused(step) ?? Promise.resolve(false))
   // Built-in browser (spec 025): profiles, project-switch teardown, erfana-local refused here
-  installBrowserAfterReady({ defaultSession: session.defaultSession, projectSession: projectService.session, lockService: projectLockService })
+  installBrowserAfterReady({ defaultSession: session.defaultSession, projectSession: projectService.session, lockService: projectLockService, terminalOutput: terminalService })
 
   // RELIABILITY FIX (todo012): Clean up stale projects on startup
   // This runs asynchronously but doesn't block window creation
@@ -773,7 +773,7 @@ app.on('before-quit', (event): Promise<void> | undefined => {
               previewHandlers ? previewHandlers.dispose() : Promise.resolve(),
               gitWatcherService.dispose(),
               gitStatusService.dispose(),
-              flushBrowserProfiles(), // spec 025: cookies reach disk before app.exit
+              disposeBrowserForQuit(), // spec 025: cookies reach disk, local-file servers close
               whisperModelManager.dispose() // aborts an in-flight download; its temp file goes now
             ])
           },

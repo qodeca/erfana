@@ -129,6 +129,13 @@ export class BrowserProfileService {
   private readonly profiles = new Map<string, Promise<BrowserProfile>>()
   /** Canonical paths whose keyring notices a tab has already taken this run. */
   private readonly keyringNoticesTaken = new Set<string>()
+  /**
+   * Canonical paths whose whole browser folder Forget deleted this run. The
+   * session stays (Electron cannot destroy one), so the next tab re-creates
+   * the folder and writes a fresh marker – else the next start would find a
+   * profile without a marker and set it aside as untrusted.
+   */
+  private readonly forgotten = new Set<string>()
 
   constructor(private readonly deps: BrowserProfileServiceDeps) {}
 
@@ -146,6 +153,9 @@ export class BrowserProfileService {
       const profile = await existing
       await ensureBrowserFolder(canonical)
       await ensureProfileTree(canonical)
+      if (this.forgotten.delete(canonical)) {
+        await writeProfileMarker(canonical, this.deps.homeDir, this.deps.signer, new Date(this.deps.clock.now()).toISOString())
+      }
       return profile
     }
     const created = this.createProfile(canonical)
@@ -197,7 +207,9 @@ export class BrowserProfileService {
    */
   async deleteBrowserData(relBelowBrowser: readonly string[]): Promise<DeleteOutcome> {
     const canonical = await this.openProjectCanonical()
-    return deleteUnderBrowser(canonical, relBelowBrowser, this.deleteDeps())
+    const outcome = await deleteUnderBrowser(canonical, relBelowBrowser, this.deleteDeps())
+    if (relBelowBrowser.length === 0 && outcome === 'deleted' && this.profiles.has(canonical)) this.forgotten.add(canonical)
+    return outcome
   }
 
   /** Run deletes stored by earlier runs; at start, after the app is ready. */

@@ -15,6 +15,7 @@ import { z } from 'zod'
 import { TerminalIdSchema } from './terminal-schema'
 import { PanelIdSchema } from './preview-schema'
 import { CertificateWarningSchema, SignInRowSchema } from './browser-tab-site-schema'
+import { LoadErrorPageSchema } from './browser-tab-page-schema'
 
 /** Longest address or typed input accepted, in UTF-16 code units (Chromium's display cap is 2 MB; this is the bar's). */
 export const BROWSER_URL_MAX_CHARS = 8192
@@ -91,9 +92,7 @@ export const NavigateResponseSchema = z.union([
 export const OpenLocalFileRequestSchema = z
   .object({ tabId: BrowserTabIdSchema, filePath: z.string().min(1).max(BROWSER_PATH_MAX_CHARS) })
   .strict()
-export const HistoryRequestSchema = z
-  .object({ tabId: BrowserTabIdSchema, step: z.enum(['back', 'forward', 'reload', 'stop']) })
-  .strict()
+export const HistoryRequestSchema = z.object({ tabId: BrowserTabIdSchema, step: z.enum(['back', 'forward', 'reload', 'stop']) }).strict()
 /** `bounds` (send): the page area; main drops `seq` ≤ the last applied, as the preview does. */
 export const BoundsRequestSchema = z
   .object({
@@ -122,9 +121,7 @@ export const FindRequestSchema = z
   .strict()
 export const StopFindRequestSchema = tabOnly
 export const ZoomRequestSchema = z.object({ tabId: BrowserTabIdSchema, step: z.enum(['in', 'out', 'reset']) }).strict()
-export const WidthPresetRequestSchema = z
-  .object({ tabId: BrowserTabIdSchema, preset: z.enum(['phone', 'tablet', 'full']) })
-  .strict()
+export const WidthPresetRequestSchema = z.object({ tabId: BrowserTabIdSchema, preset: z.enum(['phone', 'tablet', 'full']) }).strict()
 export const DevToolsRequestSchema = z
   .object({ tabId: BrowserTabIdSchema, inspectAt: z.object({ x: px, y: px }).strict().optional() })
   .strict()
@@ -336,6 +333,7 @@ export const TabStateEventSchema = z
     inUse: z.object({ camera: z.boolean(), microphone: z.boolean(), screen: z.boolean() }).strict(),
     erfanaPage: ErfanaPageSchema.nullable(),
     certificate: CertificateWarningSchema.optional(), // the warning page's parts, with `erfanaPage: 'certificate'` (025-FR-021)
+    loadError: LoadErrorPageSchema.optional(), // the load-error page's parts, with `erfanaPage: 'loadError'` (025-FR-059)
     devToolsOpen: z.boolean()
   })
   .strict()

@@ -27,6 +27,13 @@
  *   tab tells the session registry to expect it first (it would otherwise be
  *   refused and closed as an unregistered browser-session `webContents`).
  *
+ * - **Local files** (025-FR-005 rule 1, ADR 0012 option 4): a local file
+ *   loads from its served folder's loopback address
+ *   ({@link BrowserTab.navigateLocal}). The tab arms that exact address for
+ *   every load the user starts – the open itself, Reload, Back, Forward – so
+ *   only those get the folder's origin; the bar shows `file://<path>`. A tab
+ *   the page opened never loads a local file (S-7).
+ *
  * The tab-kind CDP session (`cdp/BrowserCdpSession.ts`) attaches here, before
  * the first load, through {@link BrowserTabCdpHook}; the tab never touches the
  * debugger itself.
@@ -37,7 +44,8 @@ import { BROWSER_URL_MAX_CHARS } from '../../../shared/ipc/browser-tab-schema'
 import { originParts, type RegistrableDomainResolver } from '../../../shared/browser/originFormat'
 import { sanitizePageText } from '../../../shared/browser/pageText'
 import { logger } from '../LoggingService'
-import { clampAndZoomBounds, type RectLike } from '../preview/previewBoundsClamp'
+import type { RectLike } from '../preview/previewBoundsClamp'
+import { TabViewFrame, type ClipView } from './page/TabViewFrame'
 import {
   checkNavigation,
   isUserStarted,
@@ -54,6 +62,17 @@ const ERR_ABORTED = -3
 
 /** The window a tab lives in: its content view holds the page view. */
 export type TabHost = Pick<BrowserWindow, 'id' | 'isDestroyed' | 'getContentBounds' | 'contentView' | 'webContents'>
+
+/** The served local folders, as a tab uses them (`local/LocalFileServers.ts`). */
+export interface TabLocalFiles {
+  isLocalAddress(url: string): boolean
+  /** Arm `url` for one Erfana-started top-level load. */
+  arm(url: string): void
+  /** `file://<path>` for a served address, or `null`. */
+  displayAddress(url: string): string | null
+  /** The served folders' gate (`LocalFileServers.allowsRequest`), for what the page navigates. */
+  allowsRequest(request: { url: string; resourceType: string; topUrl: string | null }): boolean
+}
 
 /** What a tab tells its CDP session (`cdp/BrowserCdpSession.ts`). */
 export interface BrowserTabCdpLink {
@@ -92,6 +111,10 @@ export interface BrowserTabDeps {
    * went – for the click guard (025-FR-047, `input/BrowserTabInput.ts`).
    */
   readonly onPageMoved?: () => void
+  /** Served local folders; without them no local file loads. */
+  readonly local?: TabLocalFiles
+  /** The page view's clipping parent for width presets (ADR 0011 decision 6); without it the view goes straight into the window. */
+  readonly createClip?: () => ClipView
 }
 
 /** A `navigate` answer: started, or refused by 025-FR-005. */
@@ -115,10 +138,8 @@ export class BrowserTab {
   private committedUrl: string | null = null
   private pendingUrl: string | null = null
   private title = ''
-  private attached = false
-  private lastBoundsSeq = -1
-  /** The shown page's top edge in DIP, or `null` while detached. */
-  private shownTop: number | null = null
+  /** The page view in its window: shown, hidden, placed for the width preset (`page/TabViewFrame.ts`). */
+  readonly viewFrame: TabViewFrame
   private withdrawDevTools: (() => void) | null = null
   private cdp: BrowserTabCdpLink | null = null
   private closed = false
@@ -133,6 +154,13 @@ export class BrowserTab {
     this.projectRoot = deps.projectRoot
     this.caseSensitive = deps.caseSensitive
     this.contents = deps.view.webContents
+    this.viewFrame = new TabViewFrame({
+      host: deps.host,
+      view: deps.view,
+      clip: deps.createClip?.() ?? null,
+      onShown: (shown) => this.cdp?.setVisible(shown),
+      onPageMoved: () => this.deps.onPageMoved?.()
+    })
     this.contents.setWindowOpenHandler(() => ({ action: 'deny' }))
     hardenBrowserContents(this.contents)
     this.listenForPageNavigation()
@@ -146,7 +174,9 @@ export class BrowserTab {
   navigate(url: string, source: Exclude<NavigationSource, 'page'>): NavigateResult {
     const verdict = checkNavigation(url, source, 'main', this.deps.appAddresses())
     if (!verdict.allowed) {
-      logger.warn('Refused a browser tab navigation', { source, reason: verdict.reason })
+      // `local-file` is the cue to open the file through its served folder, not a refusal yet.
+      if (verdict.reason === 'local-file') logger.debug('Browser tab navigation names a local file', { source })
+      else logger.warn('Refused a browser tab navigation', { source, reason: verdict.reason })
       return { refused: verdict.reason }
     }
     this.load(url, source)
@@ -154,10 +184,21 @@ export class BrowserTab {
   }
 
   /**
+   * Load a served local file: `url` is the loopback address
+   * `LocalFileServers.open` answered. Armed first, so the document gets the
+   * folder's origin; shown as `file://<path>`.
+   */
+  navigateLocal(url: string, source: Exclude<NavigationSource, 'page'>): void {
+    this.armLocal(url)
+    this.load(url, source)
+  }
+
+  /**
    * Load `url` for the page itself – a tab the page opened (`createFromPage`).
    * Checked under the `page` source; never shows a pending address.
    */
   navigateForPage(url: string): NavigateResult {
+    if (this.deps.local?.isLocalAddress(url)) return { refused: 'local-file' }
     const verdict = checkNavigation(url, 'page', 'main', this.deps.appAddresses())
     if (!verdict.allowed) return { refused: verdict.reason }
     this.load(url, 'page')
@@ -173,6 +214,7 @@ export class BrowserTab {
       return
     }
     if (step === 'reload') {
+      this.armLocal(this.committedUrl)
       this.setPending(this.committedUrl)
       this.contents.reload()
       return
@@ -181,45 +223,30 @@ export class BrowserTab {
     const canGo = step === 'back' ? history.canGoBack() : history.canGoForward()
     if (!canGo) return
     const target = history.getEntryAtIndex(history.getActiveIndex() + offset)
+    this.armLocal(target?.url ?? null)
     this.setPending(target?.url ?? null)
     if (step === 'back') history.goBack()
     else history.goForward()
   }
 
   /**
-   * Place or hide the page (the renderer's `bounds` push). A push older than
-   * the last applied one is dropped. Hidden – or a rectangle that clamps to
-   * nothing – detaches the view: the page keeps running, unseen (025-FR-007).
+   * Place or hide the page (the renderer's `bounds` push) inside the page
+   * area `clip`, for the tab's width preset (`page/TabViewFrame.ts`). A push
+   * older than the last applied one is dropped. Hidden – or a rectangle that
+   * clamps to nothing – detaches the view: the page keeps running, unseen
+   * (025-FR-007).
    *
    * @returns whether the page is shown after the push, or null when the push
    *   was dropped (stale, closed tab, gone window) – the `ack` answer
    */
-  applyBounds(bounds: RectLike, seq: number, visible: boolean): boolean | null {
-    if (this.closed || seq <= this.lastBoundsSeq) return null
-    this.lastBoundsSeq = seq
-    const host = this.deps.host
-    if (host.isDestroyed()) return null
-    const content = host.getContentBounds()
-    const dip = visible ? clampAndZoomBounds(bounds, content, host.webContents.getZoomFactor()) : null
-    if (dip === null) {
-      this.detach()
-      return false
-    }
-    this.deps.view.setBounds(dip)
-    const movedFrom = this.shownTop
-    this.shownTop = dip.y
-    if (movedFrom !== null && movedFrom !== dip.y) this.deps.onPageMoved?.()
-    if (!this.attached) {
-      host.contentView.addChildView(this.deps.view)
-      this.attached = true
-      this.cdp?.setVisible(true)
-    }
-    return true
+  applyBounds(bounds: RectLike, seq: number, visible: boolean, clip: RectLike = bounds): boolean | null {
+    if (this.closed) return null
+    return this.viewFrame.push({ bounds, clip }, seq, visible)
   }
 
   /** Move keyboard focus into the page; only a shown page can take it. */
   focusPage(): void {
-    if (this.attached && !this.contents.isDestroyed()) this.contents.focus()
+    if (this.viewFrame.isAttached() && !this.contents.isDestroyed()) this.contents.focus()
   }
 
   /**
@@ -240,7 +267,7 @@ export class BrowserTab {
 
   /** Whether the view is in its window now. */
   isAttached(): boolean {
-    return this.attached
+    return this.viewFrame.isAttached()
   }
 
   /** Show the certificate warning page or the warning sign, or neither (`site/browserCertificates.ts`). */
@@ -266,19 +293,21 @@ export class BrowserTab {
 
   /** What the toolbar and the editor tab show (`browser-tab:state`). */
   state(): TabStateEvent {
-    const shown = this.pendingUrl ?? this.committedUrl
+    const committed = this.shownAddress(this.committedUrl)
+    const pending = this.shownAddress(this.pendingUrl)
+    const shown = pending ?? committed
     const history = this.contents.navigationHistory
     return {
       tabId: this.id,
-      committedUrl: capUrl(this.committedUrl),
-      pendingUrl: capUrl(this.pendingUrl),
+      committedUrl: capUrl(committed),
+      pendingUrl: capUrl(pending),
       origin: shown === null ? null : originParts(shown, this.deps.resolveDomain),
       title: this.title,
       canGoBack: history.canGoBack(),
       canGoForward: history.canGoForward(),
       loading: this.contents.isLoading(),
       zoomPercent: 100,
-      widthPreset: 'full',
+      widthPreset: this.viewFrame.widthPreset,
       security: this.certificate.warning !== null ? 'warningUp' : (this.certificate.sign ?? securityStateOf(shown)),
       inUse: { camera: false, microphone: false, screen: false },
       erfanaPage: this.erfanaPage(),
@@ -299,6 +328,17 @@ export class BrowserTab {
     if (this.contents.isDevToolsOpened()) this.contents.closeDevTools()
     // No leave-page prompt when Erfana closes a tab (S-31).
     this.contents.close({ waitForBeforeUnload: false })
+  }
+
+  /** Arm `url` when it is a served local address (an Erfana-started load). */
+  private armLocal(url: string | null): void {
+    if (url !== null && this.deps.local?.isLocalAddress(url)) this.deps.local.arm(url)
+  }
+
+  /** What the bar shows for `url`: `file://<path>` for a served local address (S-6). */
+  private shownAddress(url: string | null): string | null {
+    if (url === null) return null
+    return this.deps.local?.displayAddress(url) ?? url
   }
 
   private load(url: string, source: NavigationSource): void {
@@ -326,9 +366,22 @@ export class BrowserTab {
 
   private refuseUnlessAllowed(event: { preventDefault(): void }, url: string, frame: FrameKind): void {
     const verdict = checkNavigation(url, 'page', frame, this.deps.appAddresses(), this.pageOrigin())
-    if (verdict.allowed) return
+    if (verdict.allowed && !this.refusesLocalNavigation(url, frame)) return
+    if (verdict.allowed) {
+      // Refused here, the page stays; the session filter would refuse the load too, but leave an error page.
+      event.preventDefault()
+      logger.warn('Refused a page navigation to a served local folder', { frame })
+      return
+    }
     event.preventDefault()
     logger.warn('Refused a page navigation in a browser tab', { frame, reason: verdict.reason })
+  }
+
+  /** A page may reach a served folder only from a page of that folder (S-7). */
+  private refusesLocalNavigation(url: string, frame: FrameKind): boolean {
+    const local = this.deps.local
+    if (local === undefined || !local.isLocalAddress(url)) return false
+    return !local.allowsRequest({ url, resourceType: frame === 'main' ? 'mainFrame' : 'subFrame', topUrl: this.committedUrl })
   }
 
   private pageOrigin(): string | null {
@@ -400,12 +453,7 @@ export class BrowserTab {
   }
 
   private detach(): void {
-    this.shownTop = null
-    if (!this.attached) return
-    this.attached = false
-    this.cdp?.setVisible(false)
-    const host = this.deps.host
-    if (!host.isDestroyed()) host.contentView.removeChildView(this.deps.view)
+    this.viewFrame.detach()
   }
 
   private changed(): void {
