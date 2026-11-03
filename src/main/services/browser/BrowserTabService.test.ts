@@ -80,6 +80,18 @@ describe('create', () => {
     expect(deps.createView).not.toHaveBeenCalled()
   })
 
+  it('025-AC-069 names the refused folder in the error the toast shows', async () => {
+    service = make({
+      openProfile: vi.fn(async () => {
+        throw new BrowserProfileError('link', '.erfana/browser/captures', 'A symlink or junction is not allowed here')
+      })
+    })
+    expect(await service.create(a.host, 'panel')).toEqual({
+      error: '.erfana/browser/captures: A symlink or junction is not allowed here'
+    })
+    expect(deps.createView).not.toHaveBeenCalled()
+  })
+
   it('hides an unexpected error behind a generic message', async () => {
     service = make({ openProfile: vi.fn(async () => Promise.reject(new Error('/secret/path'))) })
     expect(await service.create(a.host, 'panel')).toEqual({ error: 'The browser could not start for this project' })

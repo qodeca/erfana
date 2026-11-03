@@ -280,7 +280,8 @@ describe('BrowserSite downloads', () => {
       resume: vi.fn(),
       cancel: vi.fn(),
       getState: () => 'progressing' as const,
-      once: vi.fn()
+      once: vi.fn(),
+      on: vi.fn()
     })
     const first = make()
     site.willDownload({ preventDefault: vi.fn() }, first, contents as never)

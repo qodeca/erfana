@@ -129,6 +129,15 @@ export interface BrowserTabServiceDeps {
 /** The sources a local file opens from (`LOCAL_FILE_SOURCES`). */
 export type LocalFileSource = Exclude<NavigationSource, 'page'>
 
+/**
+ * The toast text of a refused profile: the folder that failed, then why
+ * (025-FR-016 – "an error toast shall name the path"). The path is the
+ * project-relative level, never an absolute one; logs redact it.
+ */
+export function profileErrorText(error: BrowserProfileError): string {
+  return error.relPath === '' ? error.message : `${error.relPath}: ${error.message}`
+}
+
 /** Mints `browser-tab-<n>`, the id shape `BrowserTabIdSchema` accepts. */
 const MAX_TAB_COUNTER = 999_999_999
 
@@ -152,7 +161,7 @@ export class BrowserTabService {
       profile = await this.deps.openProfile()
     } catch (error) {
       logger.error('Browser tab could not open its profile', redactedLogError(error))
-      return { error: error instanceof BrowserProfileError ? error.message : 'The browser could not start for this project' }
+      return { error: error instanceof BrowserProfileError ? profileErrorText(error) : 'The browser could not start for this project' }
     }
     if (host.isDestroyed()) return { error: 'The window closed' }
     const project = this.deps.currentProject()

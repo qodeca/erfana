@@ -49,6 +49,18 @@ export async function browserHook<T>(app: ElectronApplication, name: string, ...
   )) as T
 }
 
+/** Call `<group>.<name>(...args)` on any main-process hook group (`site`, `popup`, `clock`, …). */
+export async function testHook<T>(app: ElectronApplication, group: string, name: string, ...args: unknown[]): Promise<T> {
+  return (await app.evaluate(
+    async (_electron, [hookGroup, hookName, hookArgs]) => {
+      const hooks = (globalThis as Hooks).__erfanaTestHooks
+      if (!hooks?.[hookGroup as string]) throw new Error(`Test hooks "${hookGroup as string}" are not installed (build with npm run build:e2e)`)
+      return hooks[hookGroup as string][hookName as string](...(hookArgs as unknown[]))
+    },
+    [group, name, args] as const
+  )) as T
+}
+
 export class BrowserPagePage {
   constructor(
     private readonly app: ElectronApplication,

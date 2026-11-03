@@ -63,6 +63,7 @@ export interface DownloadItemLike {
   cancel(): void
   getState(): 'progressing' | 'completed' | 'cancelled' | 'interrupted'
   once(event: 'done', listener: (event: unknown, state: 'completed' | 'cancelled' | 'interrupted') => void): unknown
+  on(event: 'updated', listener: (event: unknown, state: 'progressing' | 'interrupted') => void): unknown
 }
 
 /** Downloads counted on the current page load of a tab; reset when a new page commits. */
@@ -112,6 +113,26 @@ export function failureOf(error: unknown): DownloadFailure {
   return 'folderNotWritable'
 }
 
+/**
+ * How `item` ends. Electron fires `done` only in a terminal state: a download
+ * the network interrupted but Chromium could resume (a dropped connection)
+ * only reports `updated` with `interrupted`, and would stay paused with its
+ * partial file for ever. Such a download is cancelled here and counts as
+ * interrupted (025-FR-020: an interrupted download shows an error and loses
+ * its partial file).
+ */
+function endOf(item: DownloadItemLike): Promise<DoneState> {
+  return new Promise((resolve) => {
+    let interrupted = false
+    item.on('updated', (_event, state) => {
+      if (state !== 'interrupted' || interrupted) return
+      interrupted = true
+      item.cancel()
+    })
+    item.once('done', (_event, state) => resolve(interrupted ? 'interrupted' : state))
+  })
+}
+
 export class BrowserDownloads {
   private readonly finished = new Map<string, { windowId: number; path: string }>()
 
@@ -135,7 +156,7 @@ export class BrowserDownloads {
       return
     }
     item.setSavePath(join(staging, name))
-    const done = new Promise<DoneState>((resolve) => item.once('done', (_event, state) => resolve(state)))
+    const done = endOf(item)
     void this.run(item, tab, name, staging, done).catch((error: unknown) => {
       logger.error('A browser download failed unexpectedly', error instanceof Error ? error : undefined)
     })

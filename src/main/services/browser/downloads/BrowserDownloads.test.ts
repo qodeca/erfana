@@ -65,8 +65,21 @@ class FakeItem extends EventEmitter implements DownloadItemLike {
   resume = vi.fn(() => {
     this.paused = false
   })
-  cancel = vi.fn(() => this.end('cancelled'))
+  cancel = vi.fn(() => {
+    // Chromium cancels an interrupted (resumable) download too: it ends `cancelled`.
+    if (this.state === 'interrupted') {
+      this.state = 'cancelled'
+      this.emit('done', {}, 'cancelled')
+      return
+    }
+    this.end('cancelled')
+  })
   getState = (): FakeItem['state'] => this.state
+  /** The connection dropped and Chromium could resume: Electron sends `updated`, never `done`. */
+  interruptResumable(): void {
+    this.state = 'interrupted'
+    this.emit('updated', {}, 'interrupted')
+  }
   /** Chromium writes the partial file and its `.crdownload` next to the save path. */
   receive(): void {
     writeFileSync(`${this.savePath}.crdownload`, 'part')
@@ -210,6 +223,26 @@ describe('BrowserDownloads', () => {
     ])
     expect(existsSync(join(downloadsDir, 'a.pdf'))).toBe(false)
     expect(readdirSync(stagingRoot)).toEqual([])
+  })
+
+  it('025-AC-020 a dropped connection Chromium could resume (updated, no done) is cancelled, shows the interrupted error and deletes the partial files', async () => {
+    const item = new FakeItem('dropped.bin')
+    start(item)
+    item.receive()
+    item.interruptResumable()
+    await vi.waitFor(() => expect(notices).toHaveLength(1))
+    expect(item.cancel).toHaveBeenCalledTimes(1)
+    expect(notices[0]).toEqual({
+      tabId: 'browser-tab-1',
+      kind: 'downloadFailed',
+      text: 'Couldn’t download dropped.bin. The download was interrupted. The partial file was deleted.',
+      download: { fileName: 'dropped.bin', downloadId: null, reason: 'interrupted' }
+    })
+    await vi.waitFor(() => expect(readdirSync(stagingRoot)).toEqual([]))
+    expect(existsSync(join(downloadsDir, 'dropped.bin'))).toBe(false)
+    // A second `updated` with the same state does not cancel again.
+    item.emit('updated', {}, 'interrupted')
+    expect(item.cancel).toHaveBeenCalledTimes(1)
   })
 
   it('025-AC-020 a folder that cannot be written shows an error and leaves no file', async () => {
