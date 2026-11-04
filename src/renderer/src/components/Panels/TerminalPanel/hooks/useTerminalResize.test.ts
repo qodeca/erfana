@@ -41,11 +41,12 @@ vi.stubGlobal(
 
 describe('useTerminalResize', () => {
   const mockFit = vi.fn()
+  const mockProposeDimensions = vi.fn(() => ({ cols: 80, rows: 24 }))
   const mockResizePty = vi.fn()
 
   const createMockRefs = (terminalId: string | null = 'terminal-1') => ({
     terminalRef: { current: document.createElement('div') },
-    fitAddonRef: { current: { fit: mockFit } as unknown as FitAddon },
+    fitAddonRef: { current: { fit: mockFit, proposeDimensions: mockProposeDimensions } as unknown as FitAddon },
     xtermRef: {
       current: { cols: 80, rows: 24 } as unknown as Terminal
     },
@@ -172,6 +173,43 @@ describe('useTerminalResize', () => {
     })
 
     expect(mockFit).toHaveBeenCalled()
+  })
+
+  it('keeps the last size while the panel is collapsed, then resizes again on expand (#465)', () => {
+    const refs = createMockRefs('terminal-1')
+    ;(refs.xtermRef.current as { cols: number }).cols = 120
+    ;(refs.xtermRef.current as { rows: number }).rows = 30
+
+    const { result } = renderHook(() =>
+      useTerminalResize({
+        ...refs,
+        terminalRef: refs.terminalRef as React.RefObject<HTMLDivElement | null>,
+        fitAddonRef: refs.fitAddonRef,
+        xtermRef: refs.xtermRef
+      })
+    )
+    act(() => {
+      vi.advanceTimersByTime(100)
+    })
+    expect(mockResizePty).toHaveBeenLastCalledWith('terminal-1', 120, 30)
+    mockFit.mockClear()
+    mockResizePty.mockClear()
+
+    // Collapsed: the container is 0 px wide and FitAddon proposes 2 columns
+    mockProposeDimensions.mockReturnValueOnce({ cols: 2, rows: 1 })
+    act(() => {
+      result.current.triggerResize()
+    })
+    expect(mockFit).not.toHaveBeenCalled()
+    expect(mockResizePty).not.toHaveBeenCalled()
+
+    // Expanded at a new width: the fit and the PTY resize happen again
+    ;(refs.xtermRef.current as { cols: number }).cols = 100
+    act(() => {
+      result.current.triggerResize()
+    })
+    expect(mockFit).toHaveBeenCalledTimes(1)
+    expect(mockResizePty).toHaveBeenCalledWith('terminal-1', 100, 30)
   })
 
   it('clears pending timeouts on unmount', () => {

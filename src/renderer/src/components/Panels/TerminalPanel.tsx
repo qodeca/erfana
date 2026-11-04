@@ -23,6 +23,7 @@ import { useProjectStore } from '../../stores/useProjectStore'
 import { useActivityBarStore } from '../../stores/useActivityBarStore'
 import { showWarningToast, showSuccessToast, showInfoToast } from '../../utils/toastHelpers'
 import { showNameNotFoundToast } from './TerminalPanel/nameNotFoundToast'
+import { fitTerminalIfUsable } from './TerminalPanel/terminalFit'
 import { useScrollAnomalyRecovery } from '../../hooks/useScrollAnomalyRecovery'
 import { useTerminalParserHooks } from '../../hooks/useTerminalParserHooks'
 import { useTerminalClipboard } from '../../hooks/useTerminalClipboard'
@@ -463,20 +464,17 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
     const handleResize = () => {
       try {
-        fitAddonRef.current?.fit()
-
-        if (xtermRef.current) {
-          // CRITICAL: Enforce integer dimensions to prevent oscillation
-          // Fractional dimensions at certain devicePixelRatios cause flickering
-          const cols = Math.floor(xtermRef.current.cols)
-          const rows = Math.floor(xtermRef.current.rows)
-
+        // Skipped while the panel is collapsed or tiny, so the scrollback and
+        // the program keep the last good size (#465); integer size, see terminalFit
+        const size = fitTerminalIfUsable(fitAddonRef.current, xtermRef.current)
+        if (size) {
+          const { cols, rows } = size
           // THRESHOLD: Only resize PTY if change is >= 2 columns or >= 1 row
           // Prevents flickering from devicePixelRatio rounding oscillation
           const colsDiff = Math.abs(cols - lastCols)
           const rowsDiff = Math.abs(rows - lastRows)
 
-          if ((colsDiff >= 2 || rowsDiff >= 1) && cols > 0 && rows > 0) {
+          if (colsDiff >= 2 || rowsDiff >= 1) {
             terminalGateway.resize(terminalId, cols, rows)
             lastCols = cols
             lastRows = rows
@@ -522,16 +520,9 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     const unsubscribe = portalContext.onRefitRequest(() => {
       // Refit terminal after portal move
       pendingTimeout = setTimeout(() => {
-        fitAddonRef.current?.fit()
-
-        // Also notify PTY of new size
-        if (xtermRef.current && terminalId) {
-          const cols = Math.floor(xtermRef.current.cols)
-          const rows = Math.floor(xtermRef.current.rows)
-          if (cols > 0 && rows > 0) {
-            terminalGateway.resize(terminalId, cols, rows)
-          }
-        }
+        // Also notify PTY of new size (never a collapsed panel's, #465)
+        const size = fitTerminalIfUsable(fitAddonRef.current, xtermRef.current)
+        if (size && terminalId) terminalGateway.resize(terminalId, size.cols, size.rows)
       }, 50)
     })
 
@@ -563,15 +554,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
     // Refit after move
     const timer = setTimeout(() => {
-      fitAddonRef.current?.fit()
-
-      if (xtermRef.current && terminalId) {
-        const cols = Math.floor(xtermRef.current.cols)
-        const rows = Math.floor(xtermRef.current.rows)
-        if (cols > 0 && rows > 0) {
-          terminalGateway.resize(terminalId, cols, rows)
-        }
-      }
+      const size = fitTerminalIfUsable(fitAddonRef.current, xtermRef.current)
+      if (size && terminalId) terminalGateway.resize(terminalId, size.cols, size.rows)
     }, 50)
 
     return () => {

@@ -46,6 +46,7 @@ import { hasBridgeMethod } from '../../../../services/bridgePresence'
 import { createTerminalLinkHandler, ensureTerminalFontLoaded } from '../terminalPanel.logic'
 import { routeTerminalMenuKey, terminalCursorAnchor } from '../terminalMenuKey'
 import { isKeyboardMenuEcho } from '../../../ContextMenu/contextMenuKey'
+import { fitTerminalIfUsable } from '../terminalFit'
 
 /**
  * Options of the xterm instance.
@@ -589,8 +590,7 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
       fitAddonRef.current = fitAddon
       inRefs = true
 
-      // --- attach ---
-      attachHandlers(xterm)
+      attachHandlers(xterm) // --- attach ---
 
       xterm.clear()
       xterm.write(CLEAR_SEQUENCE)
@@ -600,7 +600,7 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
 
       fitTimerRef.current = setTimeout(() => {
         fitTimerRef.current = null
-        if (xtermRef.current === xterm) fitAddon.fit()
+        if (xtermRef.current === xterm) fitTerminalIfUsable(fitAddon, xterm) // not while collapsed (#465)
       }, INITIAL_FIT_DELAY_MS)
 
       // Subscribe to clear events BEFORE the PTY exists: main starts marker
