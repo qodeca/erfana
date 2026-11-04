@@ -4080,7 +4080,7 @@
       "quote": "**Restart**: `RotateCw` icon in the header (`title=\"Restart terminal\"`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:845",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:829",
       "match": "title: 'Restart terminal',"
     },
     {
@@ -4100,7 +4100,7 @@
       "quote": "an idle terminal restarts straight away (`TerminalPanel/restartGuard.ts`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:62",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:63",
       "match": "import { getRestartRisk, buildRestartConfirm } from './TerminalPanel/restartGuard'"
     },
     {
@@ -4110,7 +4110,7 @@
       "quote": "| Capture screen | `Camera` | Capture screen |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:815",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:799",
       "match": "'Capture screen', 'Capture full screen screenshot'"
     },
     {
@@ -4120,7 +4120,7 @@
       "quote": "| Capture window | `AppWindow` | Capture window |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:817",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:801",
       "match": "'Capture window', 'Capture window screenshot'"
     },
     {
@@ -4130,7 +4130,7 @@
       "quote": "| Capture area | `BoxSelect` | Capture area |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:819",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:803",
       "match": "'Capture area', 'Capture area screenshot'"
     },
     {
@@ -4140,7 +4140,7 @@
       "quote": "| Capture photo (webcam) | `Webcam` | Capture photo |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:828",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:812",
       "match": "title: 'Capture photo',"
     },
     {
@@ -4150,7 +4150,7 @@
       "quote": "| Scroll to bottom | `ArrowDownToLine` | Scroll to bottom |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:837",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:821",
       "match": "title: 'Scroll to bottom',"
     },
     {
@@ -4160,7 +4160,7 @@
       "quote": "| Scroll lock | `LockKeyhole` / `LockKeyholeOpen` | Lock scroll to bottom / Disable scroll lock |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:853",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:837",
       "match": "title: scrollLocked ? 'Disable scroll lock' : 'Lock scroll to bottom',"
     },
     {
@@ -4170,7 +4170,7 @@
       "quote": "| Maximize terminal | `Maximize2` / `Minimize2` |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:863",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:847",
       "match": "icon: terminalExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />,"
     },
     {
@@ -4220,7 +4220,7 @@
       "quote": "`TerminalPanel.tsx` consumes the extracted session hooks `useXtermSession`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:48",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:49",
       "match": "import { useXtermSession } from './TerminalPanel/hooks/useXtermSession'"
     },
     {
@@ -4590,7 +4590,7 @@
       "quote": "- 500ms warm-up period ignored after terminal opens",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:104",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:105",
       "match": "const WARMUP_MS = 500"
     },
     {
@@ -5419,7 +5419,7 @@
       "quote": "No app-wide `::selection` rule",
       "status": "fixed",
       "evidence": "app",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:57",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:58",
       "match": "import '@xterm/xterm/css/xterm.css'",
       "test": "e2e/guide-tasks/claims-dev-0.guide.ts",
       "note": "Said \"No renderer stylesheet declares ::selection\"; the running renderer does load one – xterm.css hides selected text in its screen-reader tree. The guide test walks every loaded stylesheet and finds only that xterm rule and the Markdown preview's scoped rule (spec 024, C-12)."
@@ -5451,7 +5451,7 @@
       "quote": "are hex (`useXtermSession.ts:65`–`85`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:65",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:66",
       "match": "background: '#000000',"
     },
     {
@@ -11080,7 +11080,7 @@
       "quote": "xterm.clear()  // TerminalPanel/hooks/useXtermSession.ts",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:561",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:562",
       "match": "const xterm = new Terminal({",
       "note": "Pointed at TerminalPanel.tsx; the xterm.js Terminal instance is created in TerminalPanel/hooks/useXtermSession.ts"
     },
@@ -14317,7 +14317,7 @@
       "quote": "`MarkdownEditorPanel` mounts `useKeyboardShortcuts`, which registers on `window`.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:490",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:489",
       "match": "enabled: isActivePanel"
     },
     {
@@ -14482,7 +14482,7 @@
       "quote": "Auto-save after 2000 ms (the `useAutoSave` debounce",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:257",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:256",
       "match": "{ delay: 2000, enabled: true, maxInterval: 30000 }"
     },
     {
@@ -14503,7 +14503,7 @@
       "quote": "Stats appear in the `DocumentStatsBar` footer of the editor panel",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:724",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:723",
       "match": "<DocumentStatsBar stats={documentStats} selectedText={selectedText} />",
       "note": "Said the stats appear in the editor header; they are a footer bar."
     },
@@ -14617,7 +14617,7 @@
       "quote": "xterm.js draws its text with the WebGL renderer, so the DOM holds no text to assert on",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:474",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:475",
       "match": "const { WebglAddon } = await import('@xterm/addon-webgl')",
       "note": "The examples asserted terminal output with toContainText and a 1 s waitForTimeout; output is read from xterm's buffer via TerminalPage."
     },
@@ -15535,7 +15535,7 @@
       "quote": "- **Font**: **Cascadia Mono**, 12px, bold support",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:60",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:61",
       "match": "fontFamily: \"'Cascadia Mono', 'SF Mono', 'Monaco', Consolas, 'Courier New', monospace\","
     },
     {
@@ -15545,7 +15545,7 @@
       "quote": "- **Theme**: High contrast – black background (`#000000`), white foreground (`#ffffff`), cyan cursor (`#4fc1ff`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:67",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:68",
       "match": "cursor: '#4fc1ff',"
     },
     {
@@ -15727,7 +15727,7 @@
       "quote": "- `useTerminalPortal.ts` - DOM portal management for xterm; exported but not used by the panel",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:36",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:37",
       "match": "import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'",
       "note": "Listed as an extracted hook of the panel; the panel uses the context hook instead."
     },
@@ -15738,7 +15738,7 @@
       "quote": "- `TerminalToolbar.tsx` - Screenshot, scroll, restart buttons; exported but not rendered",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:837",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:821",
       "match": "title: 'Scroll to bottom',",
       "note": "Implied the panel renders TerminalToolbar; the header buttons are inline in TerminalPanel.tsx and TerminalToolbar is only re-exported."
     },
@@ -15759,7 +15759,7 @@
       "quote": "- Clean screen and scrollback on mount (`\\x1b[2J\\x1b[3J\\x1b[H`, `CLEAR_SEQUENCE` in `useXtermSession.ts`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:96",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:97",
       "match": "const CLEAR_SEQUENCE = '\\x1b[2J\\x1b[3J\\x1b[H'",
       "note": "Gave the sequence as \\x1b[2J\\x1b[H; the code also clears scrollback with \\x1b[3J."
     },
@@ -15770,7 +15770,7 @@
       "quote": "A step that throws is logged (`Terminal teardown step failed`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:389",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:390",
       "match": "guarded('Terminal teardown step failed', run)"
     },
     {
@@ -15832,7 +15832,7 @@
       "quote": "| **WebLinksAddon** | Makes URLs clickable | Loaded automatically on creation |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:565",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:566",
       "match": "const webLinksAddon = new WebLinksAddon("
     },
     {
@@ -15932,7 +15932,7 @@
       "quote": "- Clears xterm screen and scrollback (`\\x1b[2J\\x1b[3J\\x1b[H`, `CLEAR_SEQUENCE`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:96",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:97",
       "match": "const CLEAR_SEQUENCE = '\\x1b[2J\\x1b[3J\\x1b[H'",
       "note": "Gave \\x1b[2J\\x1b[H; the renderer clear also wipes scrollback (\\x1b[3J), matching § 4 of the same page."
     },
@@ -16094,7 +16094,7 @@
       "quote": "**File**: `TerminalPanel/hooks/useXtermSession.ts` – the `webglAddon.onContextLoss` handler in `loadWebgl`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:478",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:479",
       "match": "webglAddon.onContextLoss(() => {",
       "note": "Pointed at TerminalPanel.tsx; the handler moved to useXtermSession.ts (loadWebgl)."
     },
@@ -16105,7 +16105,7 @@
       "quote": "1. First loss: Wait 100ms (GPU stabilization)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:100",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:101",
       "match": "const WEBGL_RECOVERY_DELAY_MS = 100"
     },
     {
@@ -16115,8 +16115,8 @@
       "quote": "**File**: `TerminalPanel.tsx` – the `ResizeObserver` resize path, which inlines the check with literal `2` / `1`.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:479",
-      "match": "if ((colsDiff >= 2 || rowsDiff >= 1) && cols > 0 && rows > 0) {",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:477",
+      "match": "if (colsDiff >= 2 || rowsDiff >= 1) {",
       "note": "Said TerminalPanel.tsx calls shouldApplyResize; it inlines the check, and shouldApplyResize is used only by the unwired useTerminalResize hook."
     },
     {
@@ -16147,7 +16147,7 @@
       "quote": "#### 1. Scroll Position Tracking (`TerminalPanel.tsx`, the `dataHandler` in the terminal-data effect)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:402",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:403",
       "match": "const dataHandler = wrapOnDataHandler("
     },
     {
@@ -16157,7 +16157,7 @@
       "quote": "#### 2. Terminal Configuration (`TerminalPanel/hooks/useXtermSession.ts`, the `XTERM_OPTIONS` passed to `new Terminal({...})`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:561",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:562",
       "match": "const xterm = new Terminal({ ...XTERM_OPTIONS",
       "note": "Pointed at an xterm init effect in TerminalPanel.tsx; the options now live in useXtermSession.ts."
     },
@@ -16168,7 +16168,7 @@
       "quote": "- `scrollOnUserInput: false` - Prevents auto-scroll when user types",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:89",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:90",
       "match": "scrollOnUserInput: false,"
     },
     {
@@ -16178,7 +16178,7 @@
       "quote": "- `smoothScrollDuration: 0` - Eliminates animation lag for instant response",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:91",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:92",
       "match": "smoothScrollDuration: 0,"
     },
     {
@@ -16208,7 +16208,7 @@
       "quote": "**Icon**: ⬇️ (ArrowDownToLine from lucide-react)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:835",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:819",
       "match": "<ArrowDownToLine size={14} />"
     },
     {
@@ -16218,7 +16218,7 @@
       "quote": "  title=\"Scroll to bottom\"",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:837",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:821",
       "match": "title: 'Scroll to bottom',",
       "note": "Title was given as \"Scroll to Bottom\"; the button's title is sentence case."
     },
@@ -16251,7 +16251,7 @@
       "quote": "**Implementation** (`TerminalPanel/hooks/useXtermSession.ts`):",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:458",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:459",
       "match": "isElementVisible(current)",
       "note": "Pointed at TerminalPanel.tsx; the visibility check and WebGL load are in useXtermSession.ts."
     },
@@ -16262,7 +16262,7 @@
       "quote": "- Ignores shell warm-up noise for ~500ms after spawn",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:104",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:105",
       "match": "const WARMUP_MS = 500"
     },
     {
@@ -16293,7 +16293,7 @@
       "quote": "- Copy fix command — copies `npm rebuild node-pty --build-from-source`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:339",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:340",
       "match": "textClipboard.writeText('npm rebuild node-pty --build-from-source')",
       "note": "Button label was quoted in title case; it reads \"Copy fix command\"."
     },
@@ -16304,7 +16304,7 @@
       "quote": "- Recheck (debounced) — attempts a quick availability check",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:71",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:72",
       "match": "const RECHECK_COOLDOWN_MS = 1000"
     },
     {
@@ -16314,7 +16314,7 @@
       "quote": "- **Built-in Helper**: Erfana v0.3.2+ includes a \"Scroll to bottom\" button",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:836",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:820",
       "match": "label: 'Scroll to bottom',",
       "note": "Label was quoted in title case."
     },
@@ -16325,7 +16325,7 @@
       "quote": "3. Large scrollback buffer (> 10,000 lines)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:87",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:88",
       "match": "scrollback: 10000,"
     },
     {
@@ -16629,7 +16629,7 @@
       "quote": "wires to `useDockviewValue(props.api, DOCKVIEW_PANEL_ACTIVE)` (which follows `onDidActiveChange`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:131",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:132",
       "match": "const isActivePanel = useDockviewValue(props.api, DOCKVIEW_PANEL_ACTIVE)",
       "note": "Said it reads props.api.isActive directly; it goes through useDockviewValue."
     },
@@ -20116,7 +20116,7 @@
       "quote": "# - Red warning banner: \"This file was deleted on disk. Save to restore it.\"",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:682",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:681",
       "match": "<span>This file was deleted on disk. Save to restore it.</span>"
     },
     {
@@ -22670,7 +22670,7 @@
       "quote": "`TerminalPanel.tsx:45` imports it",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:46",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:47",
       "match": "import { useScreenshotCapture } from './TerminalPanel/hooks/useScreenshotCapture'"
     },
     {
@@ -22680,7 +22680,7 @@
       "quote": "`:221` calls it (`useScreenshotCapture({ terminalIdRef, shellKindRef, xtermRef })`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:222",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:223",
       "match": "useScreenshotCapture({ terminalIdRef, shellKindRef, xtermRef })"
     },
     {
@@ -24810,7 +24810,7 @@
       "quote": "therefore takes an `enabled` flag, and `MarkdownEditorPanel` wires it to the",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:490",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:489",
       "match": "enabled: isActivePanel"
     },
     {
@@ -25400,7 +25400,7 @@
       "quote": "`Cmd/Ctrl+W` closed *every* tab and a single `Cmd/Ctrl+S` wrote *every* open",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:488",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:487",
       "match": "Without this, one ⌘W closed every open tab and one ⌘S wrote every open"
     },
     {
@@ -26200,7 +26200,7 @@
       "quote": "Claude Code or any CLI agent in an xterm.js terminal",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:561",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:562",
       "match": "new Terminal({ ...XTERM_OPTIONS"
     },
     {
@@ -26210,7 +26210,7 @@
       "quote": "and screenshot and camera capture",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:828",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:812",
       "match": "title: 'Capture photo',"
     },
     {
@@ -26220,7 +26220,7 @@
       "quote": "screenshot and camera capture",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:815",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:799",
       "match": "'Capture screen', 'Capture full screen screenshot'"
     },
     {
@@ -26555,7 +26555,7 @@
       "quote": "Monaco with live preview, scroll sync",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:423",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:422",
       "match": "} = useScrollSync({"
     },
     {
@@ -27106,7 +27106,7 @@
       "quote": "`useXtermSession` passes the result to the `Terminal` constructor",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:561",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:562",
       "match": "new Terminal({ ...XTERM_OPTIONS, screenReaderMode: optionsRef.current.screenReaderMode })"
     },
     {
@@ -28229,7 +28229,7 @@
       "quote": "Autosave: 2 s after typing stops, at least every 30 s; not a setting",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:257",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:256",
       "match": "{ delay: 2000, enabled: true, maxInterval: 30000 }"
     },
     {
@@ -28626,7 +28626,7 @@
       "quote": "new tabs open in Preview",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:117",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:118",
       "match": "useState<ViewMode>('preview')"
     },
     {
@@ -28892,7 +28892,7 @@
       "quote": "Image paths selected in the terminal open in the viewer | all | R/components/Panels/TerminalPanel.tsx",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:247",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:248",
       "match": "an image path now opens the image viewer",
       "note": "Source named useTerminalFileLinks.ts; image routing is in TerminalPanel.tsx. 'clicked' changed to 'selected' per house style."
     },
@@ -30548,7 +30548,7 @@
       "quote": "Erfana autosaves your editor changes",
       "status": "verified",
       "evidence": "app",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:257",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:256",
       "match": "{ delay: 2000, enabled: true, maxInterval: 30000 }",
       "test": "e2e/editor-save.e2e.ts"
     },
@@ -30729,7 +30729,7 @@
       "quote": "let you select **Restart terminal** or **Maximize terminal**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:845",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:829",
       "match": "title: 'Restart terminal',",
       "note": "'restart it' named without its UI label; now uses the exact button label."
     },
@@ -30740,7 +30740,7 @@
       "quote": "or **Maximize terminal**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:865",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:849",
       "match": "title: `Maximize terminal ("
     },
     {
@@ -30871,7 +30871,7 @@
       "quote": "Erfana autosaves 2 seconds after you stop typing.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:257",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:256",
       "match": "{ delay: 2000, enabled: true, maxInterval: 30000 }",
       "note": "Added the actual 2000 ms debounce; previous text was vague ('after typing stops')."
     },
@@ -31040,7 +31040,7 @@
       "quote": "select a Markdown file in the project tree",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:719",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:718",
       "match": "Select a markdown file from the project panel to start editing"
     },
     {
@@ -31690,7 +31690,7 @@
       "quote": "The terminal opens when a project loads.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:376",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:377",
       "match": "void startSession()"
     },
     {
@@ -32456,7 +32456,7 @@
       "quote": "Select **Maximize terminal** when you need more terminal space.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:865",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:849",
       "match": "title: `Maximize terminal ("
     },
     {
@@ -32466,7 +32466,7 @@
       "quote": "![Screenshot of the maximized terminal over the editor.]",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:866",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:850",
       "match": "ariaLabel: 'Maximize terminal over the editor',",
       "note": "Alt text said 'maximised'; aligned spelling with the UI's 'Maximize'."
     },
@@ -32477,7 +32477,7 @@
       "quote": "Use **Restart terminal** if a shell is stuck.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:845",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:829",
       "match": "title: 'Restart terminal',"
     },
     {
@@ -32549,7 +32549,7 @@
       "quote": "If Claude Code or another program is still running, Erfana asks before it ends it.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:699",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:683",
       "match": "const confirmed = await showConfirm(buildRestartConfirm(risk))"
     },
     {
@@ -32559,7 +32559,7 @@
       "quote": "Select **Capture screen**, **Capture window** or **Capture area** in the terminal header.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:815",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:799",
       "match": "'Capture screen', 'Capture full screen screenshot'",
       "note": "Step named a generic 'capture button for screen, window, or area' instead of the exact button labels."
     },
@@ -32570,7 +32570,7 @@
       "quote": "**Capture window** or **Capture area** in the terminal header",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:817",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:801",
       "match": "'Capture window', 'Capture window screenshot'",
       "note": "Exact button label added."
     },
@@ -32581,7 +32581,7 @@
       "quote": "or **Capture area** in the terminal header.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:819",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:803",
       "match": "'Capture area', 'Capture area screenshot'",
       "note": "Exact button label added."
     },
@@ -32592,7 +32592,7 @@
       "quote": "If more than one display is connected, **Capture screen** opens **Select display**",
       "status": "fixed",
       "evidence": "app",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:606",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:590",
       "match": "if (fresh.length > 1) {",
       "note": "Guide task run: with several displays the step said only 'asks for a display' and never named the Select display dialog or its Capture button, so the reader did not know how to confirm.",
       "test": "e2e/guide-tasks/screenshot.guide.ts"
@@ -32615,7 +32615,7 @@
       "quote": "Select **Capture photo**, then select **Capture** in the dialog",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:828",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:812",
       "match": "title: 'Capture photo',",
       "note": "Step implied the toolbar button itself takes the photo; it opens the Capture photo dialog, where the Capture button takes it."
     },
@@ -32668,7 +32668,7 @@
       "quote": "Erfana pastes the photo's file path into the terminal.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:655",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:639",
       "match": "terminalGateway.write(currentTerminalId, quotedPath)"
     },
     {
@@ -32742,7 +32742,7 @@
       "quote": "Screenshot of the terminal header capture buttons with the Capture area tooltip.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:819",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:803",
       "match": "'Capture area', 'Capture area screenshot'",
       "note": "Alt text tightened to name the terminal header control."
     },
@@ -32775,7 +32775,7 @@
       "quote": "the capture buttons appear only while a terminal is running",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:810",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:794",
       "match": "const headerActions: ToolbarAction[] = !terminalId",
       "note": "Prerequisite said 'open a project and terminal'; the buttons are gated on a live terminal id, nothing project-specific."
     },
@@ -34419,7 +34419,7 @@
       "quote": "New Markdown tabs open in Preview mode",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:117",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:118",
       "match": "useState<ViewMode>('preview')"
     },
     {
@@ -34617,7 +34617,7 @@
       "quote": "Autosave writes after two seconds idle and during continued editing at least every 30 seconds",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:257",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:256",
       "match": "{ delay: 2000, enabled: true, maxInterval: 30000 }",
       "test": "e2e/editor-save.e2e.ts"
     },
@@ -34937,7 +34937,7 @@
       "quote": "Markdown edits are saved two seconds after typing stops and at least every 30 seconds",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:257",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:256",
       "match": "{ delay: 2000, enabled: true, maxInterval: 30000 }"
     },
     {
@@ -34969,8 +34969,8 @@
       "quote": "Autosave waits while a tab shows the file-changed-on-disk notice",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:253",
-      "match": "if (externalChangeDetected) return"
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:252",
+      "match": "if (!shouldAutosave(externalChangeDetected, isFileDeleted)) return"
     },
     {
       "id": "user-guide-reference-files-erfana-keeps/05",
@@ -34979,7 +34979,7 @@
       "quote": "a save that failed is tried again on your next edit",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:254",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:253",
       "match": "makes autosave back off until the next edit"
     },
     {
@@ -34989,7 +34989,7 @@
       "quote": "There is no autosave setting.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:257",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:256",
       "match": "enabled: true"
     },
     {
@@ -35768,7 +35768,7 @@
       "quote": "or select a linked image path in the terminal",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:255",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:256",
       "match": "void resolvePanelKind(filePath).then((kind) => {"
     },
     {
@@ -37473,7 +37473,7 @@
       "quote": "in the terminal at the terminal cursor",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:515",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:516",
       "match": "terminalCursorAnchor(xterm), open)) return false"
     },
     {
@@ -40225,7 +40225,7 @@
       "quote": "**Scroll to bottom** jumps to the latest output",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:837",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:821",
       "match": "title: 'Scroll to bottom',"
     },
     {
@@ -40235,7 +40235,7 @@
       "quote": "**Restart terminal** starts a new terminal session",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:845",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:829",
       "match": "title: 'Restart terminal',"
     },
     {
@@ -40245,7 +40245,7 @@
       "quote": "**Lock scroll to bottom** keeps new output in view, while **Disable scroll lock**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:853",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:837",
       "match": "scrollLocked ? 'Disable scroll lock' : 'Lock scroll to bottom'"
     },
     {
@@ -40255,7 +40255,7 @@
       "quote": "**Maximize terminal** expands it over the editor",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:866",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:850",
       "match": "ariaLabel: 'Maximize terminal over the editor',"
     },
     {
@@ -40365,7 +40365,7 @@
       "quote": "**Capture screen**, **Capture window**, **Capture area** and **Capture photo**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:815",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:799",
       "match": "'Capture screen', 'Capture full screen screenshot'",
       "note": "Replaced the vague 'terminal header capture buttons' with the four exact button titles."
     },
@@ -40376,7 +40376,7 @@
       "quote": "**Capture screen**, **Capture window**, **Capture area** and **Capture photo**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:828",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:812",
       "match": "title: 'Capture photo',"
     },
     {
@@ -40416,7 +40416,7 @@
       "quote": "Windows uses pickers and an area overlay",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:918",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:902",
       "match": "{!hasNativeWindowPicker && ("
     },
     {
@@ -40538,7 +40538,7 @@
       "quote": "to open it at the terminal cursor",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:515",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:516",
       "match": "routeTerminalMenuKey(event, () => terminalCursorAnchor(xterm), open)"
     },
     {
@@ -40588,7 +40588,7 @@
       "quote": "A change applies to open terminals at once.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:277",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:278",
       "match": "applyScreenReaderMode(xtermRef.current, screenReaderMode)"
     },
     {
@@ -40629,7 +40629,7 @@
       "quote": "The terminal draws its text as a picture",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:477",
+      "source": "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts:478",
       "match": "const webglAddon = new WebglAddon()",
       "note": "WebGL renderer draws to a canvas, so text is not in the DOM unless screenReaderMode is on (useXtermSession.ts:561)."
     },
@@ -40848,7 +40848,7 @@
       "quote": "editor and image tabs show **(deleted)** when their files disappear from disk",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:619",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:618",
       "match": "formatTabTitle(fileName, titleModified, isFileDeleted)",
       "test": "e2e/deleted-folder-tabs.e2e.ts",
       "note": "Page claimed HTML-preview tabs show (deleted); HtmlPreviewPanel sets a plain basename title and shows a banner instead. Only the Markdown editor and image viewer use formatTabTitle with the deleted flag."
@@ -41013,7 +41013,7 @@
       "quote": "Open a Markdown file, the project tree, or a Claude Code terminal session respectively",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:724",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:723",
       "match": "<DocumentStatsBar stats={documentStats} selectedText={selectedText} />"
     },
     {
@@ -41033,7 +41033,7 @@
       "quote": "or a Claude Code terminal session respectively",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:957",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:941",
       "match": "{terminalId && <ClaudeStatusBar terminalId={terminalId} />}"
     },
     {
@@ -41423,8 +41423,8 @@
       "quote": "autosave waits for your choice instead of writing over the newer file",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:253",
-      "match": "if (externalChangeDetected) return"
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:252",
+      "match": "if (!shouldAutosave(externalChangeDetected, isFileDeleted)) return"
     },
     {
       "id": "user-guide-reference-troubleshooting/38",
@@ -41889,7 +41889,7 @@
       "quote": "Windows capture offers an in-app window picker",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:626",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:610",
       "match": "setShowWindowPickerDialog(true)",
       "note": "Clarified the window picker is in-app on Windows (no native picker)"
     },
@@ -41900,7 +41900,7 @@
       "quote": "a display picker when more than one display is connected",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:606",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:590",
       "match": "if (fresh.length > 1) {",
       "note": "Display picker only opens with more than one display"
     },
@@ -42115,7 +42115,7 @@
       "quote": "- **Restart terminal** asks first",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:845",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:829",
       "match": "title: 'Restart terminal',"
     },
     {
@@ -46826,7 +46826,7 @@
       "quote": "Monaco with live preview, scroll sync",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:89",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:90",
       "match": "Bidirectional scroll synchronization"
     },
     {
@@ -46866,7 +46866,7 @@
       "quote": "unified in-file search (Cmd/Ctrl+F)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:170",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:171",
       "match": "Global keyboard shortcuts for search (Cmd/Ctrl+F)"
     },
     {
@@ -49059,7 +49059,7 @@
       "quote": "the 'changed on disk' conflict (MarkdownEditorPanel.tsx:673-674)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:670",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:669",
       "match": "{externalChangeDetected && ("
     },
     {
@@ -54752,7 +54752,7 @@
       "quote": "| screenshot | Capture window for the agent |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:817",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:801",
       "match": "'Capture window screenshot'"
     },
     {
