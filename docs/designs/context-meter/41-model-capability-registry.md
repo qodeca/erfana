@@ -1,6 +1,6 @@
 # Design – Issue #41: Shared model-id parser and context-window capability registry
 
-> Status: IMPLEMENTED, all waves complete. **Revision 6 (2026-08-08).** Rev 1 = post-four-lens-review design (25 findings, §15). Rev 2 = first reconciliation against shipped code. Rev 3 = corrected a wrong capability row (§7.1 Sonnet 4.6), added the §2.0 procedure, recorded the R_ENV withdrawal. Rev 4 = citations and the §7.1 parsing contract. Rev 5 = §12 file plan, §7.2 rule 3 wording, §18 results. **Rev 6 = pre-commit reconciliation: the pre-commit review blocked on this file for contradicting the code in nine places, all in sections guard 1 does not parse.** Corrections carry dated markers.
+> Status: IMPLEMENTED, all waves complete. **Revision 6 (2026-08-08).** Rev 1 = post-four-lens-review design (25 findings, §15). Rev 2 = first reconciliation against shipped code. Rev 3 = corrected a wrong capability row (§7.1 Sonnet 4.6), added the §2.0 procedure, recorded the R_ENV withdrawal. Rev 4 = citations and the §7.1 parsing contract. Rev 5 = §12 file plan, §7.2 rule 3 wording, §18 results. **Rev 6 = pre-commit reconciliation: the pre-commit review blocked on this file for contradicting the code in nine places, all in sections guard 1 does not parse.** **Rev 7 (2026-11-03, [#383](https://github.com/qodeca/erfana/issues/383)) = §2.0 re-run: five §7.1 rows added (Opus 5.5, Sonnet 5.5, Haiku 5.5, Fable 5.1, Mythos 5.1), no existing window changed; AC7 and R0' narrowed so `/model <id>` no longer forces 200k on a model that has no 200k window.  The family heuristic (§7.2) now lets a newer unknown id inherit the newest listed model unbounded, in `familyHeuristic.ts`, and every guess shows `(inferred)` (AC3, §5.4).** Corrections carry dated markers.
 >
 > **Why Rev 6 exists.** Guard 1 parses only §7.1/§7.1.1, so every prose section is unguarded – and nine of them had drifted past the post-lens-review rework (the `modelNativelySupportsExtended` deletion, the `inferred` field, the sanitizer rework, the merged-env fix). A document whose stated job is to be the oracle of record, wrong in the sections nobody checks, is precisely the failure this change set was built to prevent. §18.2 records the structural lesson.
 >
@@ -82,9 +82,10 @@ Every §7.1 window value passed the 2026-08-07 gate, so **no value here is in do
 | Row | Gap | Risk if wrong |
 |---|---|---|
 | `claude-opus-4-5` | Source (1) supports it as a paraphrase only ("legacy table, 200k"). | Low – a wrong 200k self-corrects via R2 (§7.2 asymmetry). |
-| `claude-haiku-4-5` | Same: paraphrase only ("current comparison table, 200k"). | Low, same direction. |
 | `claude-haiku-4-5-20251001` | Weakest. Its JSDoc states only that this is "the API ID Haiku 4.5 ships under" – it asserts **no window at all**. The value is **inherited by reasoning** from the undated row. | Low, same direction; the inference is labelled in §7.1. |
 | `claude-mythos-5` | Closed by transcription, not by fetch – see its §7.1 Note for the chain of custody. | Low; the value is independent of the code. |
+
+> `AMENDED 2026-11-03 (#383)`: the `claude-haiku-4-5` item is closed – source (2) now names it: "200k tokens for Claude Sonnet 4.5 (deprecated) and Claude Haiku 4.5".
 
 ### 2.1 URLs of record
 
@@ -95,7 +96,7 @@ Every §7.1 window value passed the 2026-08-07 gate, so **no value here is in do
 5. `https://code.claude.com/docs/en/context-window` – CLI compaction boundaries
 6. `https://platform.claude.com/docs/en/about-claude/models/whats-new-opus-5` – Opus 5
 
-The gate ran on 2026-08-07; `modelId.ts` records `CAPABILITIES_VERIFIED_ON = '2026-08-07'`.
+The gate ran on 2026-08-07 and again on **2026-11-03** ([#383](https://github.com/qodeca/erfana/issues/383)); `modelId.ts` records `CAPABILITIES_VERIFIED_ON = '2026-11-03'`. On the 2026-11-03 run all six URLs still resolved, but (1), (4) and (6) now redirect to per-model pages under `https://platform.claude.com/docs/en/models/` (`models/overview`, `models/fable-5/overview`, `models/opus-5/overview`). Each new 2026-11 row is also on its own model page, e.g. `https://platform.claude.com/docs/en/models/opus-5-5/overview` ("Context window: 1M tokens").
 
 ### 2.2 What the design pass verified first-hand (local, read-only)
 
@@ -124,11 +125,11 @@ The gate ran on 2026-08-07; `modelId.ts` records `CAPABILITIES_VERIFIED_ON = '20
 |---|---|
 | AC1 | A session on `claude-opus-5` shows a 1M-scaled meter from its first reading, before consumption reaches 200k |
 | AC2 | A bracketed variant suffix never causes a parse failure, a raw-id label, or an unintended standard-mode downgrade. It is a defensive path, not the detection mechanism (§2.2) |
-| AC3 | An unrecognised id from a known family, within the bounded extrapolation limits of §7.2, resolves to that family's applicable known window (unknown ids only) |
+| AC3 | An unrecognised id from a known family resolves to that family's applicable known window by the rules of §7.2 (unknown ids only). `AMENDED 2026-11-03 (#383)`: an id newer than the family's newest listed model inherits that model's window with no lookahead bound, and the meter marks every such guess `(inferred)` |
 | AC4 | Every id present in the exact-id capability map reports exactly its mapped window, for both 200k and 1M entries |
 | AC5 | For a model the registry resolves **to 1M**, the reported window is invariant in `usedTokens` across `[0, 199_999, 200_000, 200_001, 250_000]`. A model the registry resolves **to 200k** is invariant only *below* the boundary and **must** flip at it: R2 is a physical fact that outranks the registry |
 | AC6 | `claude-opus-5` renders as "Opus 5", not the raw identifier |
-| AC7 | An explicit `/model <id>` selection without a 1M marker reports 200k even when the registry would say 1M |
+| AC7 | An explicit `/model <id>` selection without a 1M marker reports 200k for a model that offers a 200k window, even when settings.json says `[1m]`. `AMENDED 2026-11-03 (#383)`: it originally read "even when the registry would say 1M", which pinned 1M-only models such as Opus 5 at 200k; a model the registry sizes at 1M has no standard window to select, so the pick reports 1M (§8) |
 
 All seven were verified SATISFIED in Phase 9, each with a proving test confirmed to fail if the behaviour broke, and none proven only through a mock.
 
@@ -178,7 +179,7 @@ A 1M verdict is **corroborated** when it rests on an observed or explicit signal
 
 > **Rev 5 said "main-process text only – `ClaudeStatusBar.tsx` renders `snapshot.tooltip` verbatim". That described the design this section's own rework replaced,** and it was the section that owns the marker. Corrected below against the shipped code.
 
-The window badge is an inference whenever it is provisional, and the user is told so. Two carriers, deliberately:
+The window badge is an inference whenever it is provisional, and the user is told so. `AMENDED 2026-11-03 (#383)`: a **200k guessed by the family heuristic** (§7.2 rule 3, e.g. `claude-sonnet-4-7`) is provisional too and carries the marker; before #383 only an unrecognised id's 200k did. Two carriers, deliberately:
 
 1. **`tooltip`** – composed in `ClaudeStatusService` and carrying a trailing `" (inferred)"` when the window is provisional. The renderer uses this **verbatim for the visual `title`**, so hover text is unchanged in shape.
 2. **`inferred: boolean`** – a **required field on `ClaudeStatusSnapshot`** (`claude-status-schema.ts`), set from `resolveWindow`'s structured result. It is not merely a duplicate of the tooltip suffix.
@@ -256,13 +257,18 @@ export const REGISTRY_IDS_FOR_TESTS: readonly string[]
 | claude-opus-4-7 | 1000000 | Opus 4.7 | (3) | "Opus 4.7 and later always run with the 1M window". |
 | claude-opus-4-8 | 1000000 | Opus 4.8 | (1)(3) | Covered by "Opus 4.7 and later". |
 | claude-opus-5 | 1000000 | Opus 5 | (6) | The **AC1** acceptance case. "1M tokens is both the default and the maximum". |
+| claude-opus-5-5 | 1000000 | Opus 5.5 | (2)(3) | **ADDED 2026-11-03 (#383).** (3): "Opus 4.7 and later run with the 1M window by default, with no `[1m]` suffix needed"; (2) lists "Claude Opus 5.5" among the models that "have a 1M-token context window". |
 | claude-sonnet-4-5 | 200000 | Sonnet 4.5 | (2) | "Claude Sonnet 4.5 … 200k-token context window". |
 | claude-sonnet-4-6 | 200000 | Sonnet 4.6 | (3)(5) | **CORRECTED 2026-08-08 – this row read `1000000` and was wrong.** 1M at the API layer, but on the metered CLI layer Sonnet 4.6 is "not part of the automatic upgrade and requires usage credits on every subscription plan, including Max", and per (5) it "compact[s] at the 200K boundary" without extended context. Provenance of the error: the original value was **transcribed from the four-lens review rather than fetched**; the §2.1 gate caught it and the code shipped the standard window correctly, but §2.0 step 3 did not exist, so this row never followed. The oracle was then edited to agree with the code – the precise failure §2.0 step 3 now prohibits. The quoted numeral above is the canary named in this table's parsing contract. |
 | claude-sonnet-5 | 1000000 | Sonnet 5 | (3) | "No 200K variant, no `[1m]` suffix to select, and no usage credits required on any plan." |
-| claude-haiku-4-5 | 200000 | Haiku 4.5 | (1) | Current comparison table. **Paraphrase only – no verbatim sentence captured** (§2.0.4). |
+| claude-sonnet-5-5 | 1000000 | Sonnet 5.5 | (2)(3) | **ADDED 2026-11-03 (#383).** (3): "Sonnet 5 and later … run with the 1M window by default, with no `[1m]` suffix needed"; (2) lists "Claude Sonnet 5.5" among the 1M-token models. |
+| claude-haiku-4-5 | 200000 | Haiku 4.5 | (1)(2) | (1) now lists it under "Legacy models (still available)". `AMENDED 2026-11-03`: verbatim from (2), "200k tokens for Claude Sonnet 4.5 (deprecated) and Claude Haiku 4.5" – closes its §2.0.4 item. |
 | claude-haiku-4-5-20251001 | 200000 | Haiku 4.5 | (1) | Pinned snapshot kept as its own key so a dated id resolves without falling through; label drops the date per §6.2. **The window is inherited by reasoning from the undated row, not separately cited** (§2.0.4). |
+| claude-haiku-5-5 | 1000000 | Haiku 5.5 | (2)(3) | **ADDED 2026-11-03 (#383).** The first Haiku with a 1M window, so it must not be inferred from Haiku 4.5. (3): "On the Anthropic API, Haiku 5.5 runs with the 1M context window on every plan, with no `[1m]` suffix to select", and Haiku 5.5 is in the provider-wide list "Fable 5.1, Fable 5, Sonnet 5 and later, Haiku 5.5, and Opus 4.7 and later run with the 1M window by default". (2) lists it among the 1M-token models. |
 | claude-fable-5 | 1000000 | Fable 5 | (4) | "A 1M token context window by default." |
+| claude-fable-5-1 | 1000000 | Fable 5.1 | (2)(3) | **ADDED 2026-11-03 (#383).** (3): "Fable 5.1, Fable 5 … run with the 1M window by default, with no `[1m]` suffix needed"; (2) lists "Claude Fable 5.1" among the 1M-token models. |
 | claude-mythos-5 | 1000000 | Mythos 5 | (2)(4) | **Window-fixing citation, source (2):** "claude-fable-5 and claude-mythos-5 also have a 1M-token context window" – the sentence names this id explicitly. **Chain of custody:** captured at the 2026-08-07 gate and recorded in this entry's JSDoc; this document's copy is **transcribed from that record, not independently fetched** (§2.0.4). The *value* is independent of the code, so guard 1 is unaffected. Separately: this id is decomposable, so §7.1.1 would **not** catch it. |
+| claude-mythos-5-1 | 1000000 | Mythos 5.1 | (2) | **ADDED 2026-11-03 (#383).** (2) lists "Claude Mythos 5.1" among the models that "have a 1M-token context window"; its model page (`https://platform.claude.com/docs/en/models/mythos-5-1/overview`) gives the id `claude-mythos-5-1` and "Context window: 1M tokens". The Claude Code layer (3) does not name Mythos 5.1 – the same standing as `claude-mythos-5`. |
 
 Lookup is dated-canonical-id first, then the undated alias (`exactWindowFor`). Keys are canonicalised on load (`buildExactLookup`).
 
@@ -278,29 +284,29 @@ Implemented as a `Map`, not an object literal (`UNDECOMPOSABLE_WINDOWS`): the ke
 
 A single monotonic scalar per family cannot represent the real lineup, and the true counterexample is stronger than a cross-family one: the class boundary sits *inside* a major generation. `claude-opus-4-6` is 200k while `claude-opus-4-7` is 1M – same family, same major, different class.
 
+> `AMENDED 2026-11-03 (#383)`: rules 3 and 4 below replaced a **bounded** guess – one major ahead (`MAX_MAJOR_LOOKAHEAD = 1`) or four minors ahead in a known major – that sent every release past the bound to 200k: Opus 5.5 and Sonnet 5.5 showed 200k until the session crossed 200k, the bug #383 reported. The owner chose the opposite trade-off: **an id newer than its family's newest listed model inherits that model's window, unbounded**, and every guessed window is marked `(inferred)` (§5.4), 200k included. The risk the old bound guarded against – a wrong 1M persisting for the session – is accepted and made visible instead. The logic moved to `claudeStatus/familyHeuristic.ts` (pure, data-free; `modelId.ts` keeps the capability data private and passes parsed rows in), and `isFamilyGuess` in `modelId.ts` tells the service the answer is a guess.
+
 ```ts
 interface FamilyHeuristic {
-  newestKnownMajor: number
-  newestKnownWindow: Window
-  newestByMajor: ReadonlyMap<number, { minor: number; window: Window }>
+  newest: { major: number; minor: number; window: Window }          // the family's newest listed model
+  newestByMajor: ReadonlyMap<number, { major: number; minor: number; window: Window }>
 }
 
-const MAX_MAJOR_LOOKAHEAD = 1
-const MAX_MINOR_LOOKAHEAD = 4
+const MAX_MINOR_LOOKAHEAD = 4  // older majors only
 ```
 
-Resolution order (`heuristicWindowFor`), reached **only** when the exact map misses:
+Resolution order (`guessWindow`), reached **only** when the exact map misses:
 
-1. **Known major, unknown point release.** If the id's major is in `newestByMajor`, inherit that **major's** newest known window when `minor >= knownMinor` and `minor <= knownMinor + MAX_MINOR_LOOKAHEAD`.
-2. **Older point release** (`minor < knownMinor`) → `null`.
-3. **Unknown major, strictly ahead and at most one generation on.** The test is **one-sided**: `major > newestKnownMajor && major <= newestKnownMajor + MAX_MAJOR_LOOKAHEAD`. **A major below the newest known never inherits** – it falls to no-opinion, and R2 remains its only route to 1M.
-4. **Further out, or an unknown family** → `null`.
+1. **Unknown family** → `null`.
+2. **Newer than the family's newest listed model** (higher major, or same major and higher minor) → that model's window, however far ahead (#383).
+3. **Known older major, unknown point release.** If the id's major is in `newestByMajor`, inherit that **major's** newest known window when `minor >= knownMinor` and `minor <= knownMinor + MAX_MINOR_LOOKAHEAD`; an older point release (`minor < knownMinor`) → `null`.
+4. **Unlisted major below the newest** → `null`; R2 remains its only route to 1M.
 
-**Why both bounds, and why asymmetric.** Observation can only *upgrade* a window (R2 fires above 200k), never demote one. A wrong 200k self-corrects; a wrong 1M persists for the session. Every unbounded extrapolation axis is a way to manufacture a wrong 1M, so each needs its own ceiling. Minor gets the looser bound (4 vs 1) because point releases within a major have usually shared a window – though Opus 4.6 → 4.7 shows even that is not guaranteed.
+**Why the remaining bound.** Rule 3 keeps the minor bound on older majors: those are not the next release, and `claude-opus-4-99` inheriting 1M forever would be a guess about a model that will never ship. The class boundary can sit inside a major (Opus 4.6 → 4.7), which is why rule 3 asks the major, not the family.
 
 #### 7.2.1 The per-major map decides first
 
-`newestByMajor` is consulted **before** `newestKnownWindow`, and when the id's major is present it **decides**: rule 1 returns unconditionally. The family-wide field only ever answers for an id whose major is entirely unknown.
+For an id that is **not** newer than the family's newest listed model, `newestByMajor` **decides** (rule 3). `AMENDED 2026-11-03 (#383)`: the family-wide value (`newest`) now answers for any id newer than the newest listed model, in its own major too, not only for an unknown major.
 
 **Worked counterexample.** For `sonnet`, `newestByMajor` holds major 4 → `{ minor: 6, window: 200000 }` and major 5 → `{ minor: 0, window: 1000000 }`. An unknown `claude-sonnet-4-7` resolves through **major 4** and reports **200000**, even though the family's newest known entry is 1M. **"Inherits that family's newest known window" is therefore a wrong summary** – right only for the unknown-major case.
 
@@ -322,7 +328,7 @@ First match wins. Order matches `detectWindowDetail`: **R2 → R0 → R0' → R1
 |---|---|---|---|---|
 | R2 | `usedTokens > 200_000` – a **physical fact**, not a policy claim | 1M | yes | none |
 | R0 | `forceExtended === true` (fresh `/model …[1m]`) | 1M | yes | none |
-| R0' | `forceStandard === true` (explicit `/model <id>` with no 1M marker) | 200k | n/a | none |
+| R0' | `forceStandard === true` (explicit `/model <id>` with no 1M marker) **and** the registry does not size the model at 1M. `AMENDED 2026-11-03 (#383)`: the second condition is new – a registry 1M means 1M with no `[1m]` selection (§2.0.2), so `/model claude-opus-5` falls through to R1 instead of being pinned at 200k | 200k | n/a | none |
 | R1m | The id itself carries a recognised `1m` variant, checked **before** R1 because `windowForModelId` collapses "the id says 1M" and "the registry says 1M" into one value | 1M | yes | none |
 | R1 | Exact-id map or bounded family heuristic returning 1M | 1M | no (provisional) | none |
 | R1 (200k) | Exact map or heuristic returning 200k – **deliberately does not short-circuit**, so R3 can still upgrade it | falls through to R3 | – | none |
@@ -388,11 +394,11 @@ The 256 KB payload test asserting `stripModelVariants(hostile) === null` does **
 |---|---|
 | AC1 | `windowForModelId('claude-opus-5')` is the extended window; `detectWindowSize` likewise, with a real `{model:'opus'}` temp settings.json and spies on **both `fs.readFile` and `fs.stat`** asserting zero calls (an absent-path spy could never fail). |
 | AC2 | `friendlyModelName('claude-opus-5[1m]') === 'Opus 5'`; `windowForModelId('claude-opus-5[1m]') === windowForModelId('claude-opus-5')`; a test named `unreachable-in-practice` records the §2.2 evidence. |
-| AC3 | one major past newest known inherits; two past → `null`; a lower major → `null`; one point release past inherits; five past → `null`. |
+| AC3 | `AMENDED 2026-11-03 (#383)`: any id newer than the family's newest listed model inherits it (`claude-opus-7`, `claude-opus-5-10`); a lower unlisted major → `null`; on an older major one point release past inherits and five past → `null`; `isFamilyGuess` is true exactly for those guesses (`familyHeuristic.test.ts`), and the service marks them `(inferred)` (`ClaudeStatusService.familyGuess.test.ts`). |
 | AC4 | a sweep asserting every §7.1 row reports exactly its mapped window, 200k rows included. |
 | AC5 | invariance sweep for `claude-opus-5`; **plus** the negative pin proving a registry-200k model and an unknown id both still flip at the boundary. |
 | AC6 | `'claude-opus-5'` → `'Opus 5'`; `'claude-opus-5-0'` → `'Opus 5.0'`; `'claude-sonnet-5'` → `'Sonnet 5'`. |
-| AC7 | `/model claude-opus-5` → `modelForcedStandard`, snapshot reports 200k despite the registry saying 1M; R0 still outranks R0'. |
+| AC7 | `AMENDED 2026-11-03 (#383)`: `/model claude-opus-4-6` (a dual-window model) with a settings.json `[1m]` reports 200k (R0'); `/model claude-opus-5` and every other 1M-only row report 1M (R1); R0 still outranks R0'. |
 
 ### 9.4 The cross-module oracle
 
@@ -618,7 +624,7 @@ Coverage is in any case a weak oracle for a data table: the pre-correction table
 4. `npm run check:headers` passes.
 5. Coverage floor for `modelId.ts` is **declared but not enforced** (§9.5); met by reading `npm run test:cov` output.
 6. The §9.4 oracle passes with no expectation computed from `modelId.ts`.
-7. AC7 test proves `/model claude-opus-5` reports 200k.
+7. AC7 test proves `/model claude-opus-5` reports 200k. *(Superseded 2026-11-03 by #383: that pick now reports 1M; AC7 is pinned on `claude-opus-4-6` – see §9.3.)*
 8. AC5 invariance sweep passes **and** its negative pin still flips a registry-200k model at the boundary.
 9. §9.1.1 cap-position test present with its positive control.
 10. **Document-parity guard** present, column-indexed per the §7.1 parsing contract.

@@ -16,7 +16,7 @@
     "src/main/services/TerminalService.ts": 1434,
     "src/main/services/WhisperModelManager.ts": 1114,
     "src/main/services/claudeStatus/ClaudeStatusService.ts": 724,
-    "src/main/services/claudeStatus/modelId.ts": 619,
+    "src/main/services/claudeStatus/modelId.ts": 547,
     "src/main/services/conptyHostReaper.ts": 634,
     "src/main/services/preview/PreviewAllowlistStore.ts": 524,
     "src/main/services/watcher/NativeRecursiveWatcher.ts": 1041,

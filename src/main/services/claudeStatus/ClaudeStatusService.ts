@@ -47,7 +47,7 @@ import {
   sanitizeModelId,
   sanitizeProviderModelId
 } from './friendlyModelName'
-import { isRecognisedModelId, stickyModelKey, stripModelVariants } from './modelId'
+import { isFamilyGuess, isRecognisedModelId, stickyModelKey, stripModelVariants } from './modelId'
 import { clampPercent, levelFor } from './thresholds'
 import { createProcessDetector } from './process/createProcessDetector'
 import type { IClaudeProcessDetector } from './process/types'
@@ -568,13 +568,13 @@ export class ClaudeStatusService {
     const recognised = isRecognisedModelId(parsed.modelId)
     if (!recognised) this.logUnrecognisedOnce(parsed.modelId)
 
-    // Say so in the UI (#41 §5.4): a registry-only 1M badge is an inference, and
-    // so is the 200k default for an unrecognised id.
+    // Say so in the UI (#41 §5.4): a registry-only 1M is an inference, and so is a
+    // 200k for an unrecognised id or one guessed from the model's family (#383).
     return {
       windowSize,
       inferred:
         (windowSize === 1000000 && !corroborated && !sticky) ||
-        (windowSize === 200000 && !recognised),
+        (windowSize === 200000 && (!recognised || isFamilyGuess(parsed.modelId))),
       rule: detail?.rule
     }
   }
