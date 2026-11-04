@@ -14,7 +14,7 @@
  * `useTerminalFileDrop`. This component wires them to the panel UI.
  */
 
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, type ReactNode } from 'react'
 import { ISplitviewPanelProps } from 'dockview'
 import { Terminal as TerminalIcon, RotateCw, ArrowDownToLine, LockKeyhole, LockKeyholeOpen, Camera, AppWindow, BoxSelect, Webcam, Maximize2, Minimize2 } from 'lucide-react'
 import type { Terminal } from '@xterm/xterm'
@@ -35,6 +35,7 @@ import { useMergedProjectFiles } from '../../hooks/useMergedProjectFiles'
 import type { FileNode } from '../../../../shared/ipc/file-schema'
 import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
 import { TerminalContextMenu } from '../ContextMenu/TerminalContextMenu'
+import { ToolbarOverflow, type ToolbarAction } from '../ToolbarOverflow/ToolbarOverflow'
 import { FilePickerDialog } from '../Dialog/FilePickerDialog'
 import {
   ScreenSelectDialog,
@@ -781,6 +782,97 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   // - createPortal re-renders JSX, creating NEW DOM nodes each time
   // - xterm.js is attached to the original DOM node and won't move
   // - appendChild() physically moves the existing DOM node, preserving xterm.js
+  // The header's buttons, in toolbar order (#451: one definition each for the
+  // row button and its "More actions" menu item). Screenshot buttons announce
+  // their loading state through a dynamic `aria-label` + `aria-busy`
+  // (#164 F[39]) and the shared live region below the header.
+  const captureAction = (
+    mode: 'screen' | 'window' | 'area',
+    label: string,
+    idleName: string,
+    icon: ReactNode,
+    onSelect: () => void,
+    testId: string
+  ): ToolbarAction => ({
+    id: `capture-${mode}`,
+    icon,
+    label,
+    title: label,
+    ariaLabel: capturingMode === mode ? `Capturing ${mode}, please wait` : idleName,
+    busy: capturingMode === mode,
+    busyLabel: `Capturing ${mode}…`,
+    disabled: capturingMode !== null,
+    className: `icon-btn${capturingMode === mode ? ' icon-btn--loading' : ''}`,
+    onSelect,
+    testId
+  })
+  const expandShortcut = formatShortcut('M', { mod: true, shift: true })
+  const headerActions: ToolbarAction[] = !terminalId
+    ? []
+    : [
+        ...(isScreenshotSupported
+          ? [
+              captureAction('screen', 'Capture screen', 'Capture full screen screenshot', <Camera size={14} />,
+                onCaptureScreenClick, TEST_IDS.TERMINAL_BTN_CAPTURE_SCREEN),
+              captureAction('window', 'Capture window', 'Capture window screenshot', <AppWindow size={14} />,
+                onCaptureWindowClick, TEST_IDS.TERMINAL_BTN_CAPTURE_WINDOW),
+              captureAction('area', 'Capture area', 'Capture area screenshot', <BoxSelect size={14} />,
+                () => handleScreenshot('area'), TEST_IDS.TERMINAL_BTN_CAPTURE_AREA)
+            ]
+          : []),
+        {
+          // Camera photo capture (Spec #014) - cross-platform
+          id: 'camera',
+          icon: <Webcam size={14} />,
+          label: 'Capture photo',
+          title: 'Capture photo',
+          ariaLabel: 'Capture photo from camera',
+          onSelect: () => setIsCameraDialogOpen(true),
+          testId: TEST_IDS.TERMINAL_BTN_CAMERA
+        },
+        {
+          id: 'scroll-to-bottom',
+          icon: <ArrowDownToLine size={14} />,
+          label: 'Scroll to bottom',
+          title: 'Scroll to bottom',
+          onSelect: handleScrollToBottom,
+          testId: TEST_IDS.TERMINAL_BTN_SCROLL
+        },
+        {
+          id: 'restart',
+          icon: <RotateCw size={14} />,
+          label: 'Restart terminal',
+          title: 'Restart terminal',
+          onSelect: () => void handleRestartRequest(),
+          testId: TEST_IDS.TERMINAL_BTN_RESTART
+        },
+        {
+          id: 'scroll-lock',
+          icon: scrollLocked ? <LockKeyhole size={14} /> : <LockKeyholeOpen size={14} />,
+          label: 'Lock scroll to bottom',
+          title: scrollLocked ? 'Disable scroll lock' : 'Lock scroll to bottom',
+          pressed: scrollLocked,
+          className: `icon-btn${scrollLocked ? ' icon-btn--active' : ''}`,
+          onSelect: handleToggleScrollLock,
+          testId: TEST_IDS.TERMINAL_BTN_LOCK
+        },
+        {
+          // Raised (Toolbar overflow card): the action a user reaches for
+          // because the terminal is narrow, so it moves last (#451).
+          id: 'maximize',
+          icon: terminalExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />,
+          label: 'Maximize terminal',
+          title: `Maximize terminal (${expandShortcut})`,
+          ariaLabel: 'Maximize terminal over the editor',
+          shortcut: expandShortcut,
+          pressed: terminalExpanded,
+          className: `icon-btn${terminalExpanded ? ' icon-btn--active' : ''}`,
+          onSelect: toggleTerminalExpanded,
+          testId: TEST_IDS.TERMINAL_BTN_EXPAND,
+          moveLast: true
+        }
+      ]
+
   const terminalState: TerminalState =
     isAvailable === null ? 'checking' :
     !isAvailable ? 'unavailable' :
@@ -790,159 +882,66 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     <div ref={mainContainerRef} className="terminal-portal-shell">
       {/* Terminal panel - rendered here initially, moved by useLayoutEffect */}
       <div ref={terminalPanelRef} className="terminal-panel sidebar-panel" role="region" aria-label="Terminal" data-testid={TEST_IDS.TERMINAL_PANEL}>
-        {/* Hide header when portalled to DiagramViewer (issue #37) */}
+        {/* Hide header when portalled to DiagramViewer (issue #37). Buttons
+          * that do not fit move into a "More actions" menu (#451). */}
         {portalTarget !== 'diagram-viewer' && (
-          <div className="sidebar-panel-header">
-            <TerminalIcon size={16} className="panel-header-icon" />
-            <span className="sidebar-panel-title">Terminal</span>
-            {terminalId && (
-              <>
-                {/* Screenshot capture buttons (#86 macOS → #164 cross-platform).
-                  * Loading state via `icon-btn--loading` is announced to SRs via
-                  * dynamic `aria-label` + `aria-busy` (#164 F[39]) plus a shared
-                  * live region below. */}
-                {isScreenshotSupported && (
-                  <>
-                    <button
-                      className={`icon-btn${capturingMode === 'screen' ? ' icon-btn--loading' : ''}`}
-                      onClick={onCaptureScreenClick}
-                      title="Capture screen"
-                      aria-label={
-                        capturingMode === 'screen'
-                          ? 'Capturing screen, please wait'
-                          : 'Capture full screen screenshot'
-                      }
-                      aria-busy={capturingMode === 'screen'}
-                      disabled={!terminalId || capturingMode !== null}
-                      data-testid={TEST_IDS.TERMINAL_BTN_CAPTURE_SCREEN}
-                    >
-                      <Camera size={14} />
-                    </button>
-                    <ScreenSelectDialog
-                      isOpen={showScreenSelectDialog}
-                      displays={displays}
-                      zIndex={10000}
-                      onSelect={(displayId) => {
-                        setShowScreenSelectDialog(false)
-                        handleScreenshot('screen', { displayId })
-                      }}
-                      onCancel={() => setShowScreenSelectDialog(false)}
-                    />
-                    <ScreenPermissionDialog
-                      isOpen={screenPermissionDialogOpen}
-                      status={screenPermissionStatus}
-                      zIndex={10000}
-                      onClose={closeScreenPermissionDialog}
-                    />
-                    <button
-                      className={`icon-btn${capturingMode === 'window' ? ' icon-btn--loading' : ''}`}
-                      onClick={onCaptureWindowClick}
-                      title="Capture window"
-                      aria-label={
-                        capturingMode === 'window'
-                          ? 'Capturing window, please wait'
-                          : 'Capture window screenshot'
-                      }
-                      aria-busy={capturingMode === 'window'}
-                      disabled={!terminalId || capturingMode !== null}
-                      data-testid={TEST_IDS.TERMINAL_BTN_CAPTURE_WINDOW}
-                    >
-                      <AppWindow size={14} />
-                    </button>
-                    {!hasNativeWindowPicker && (
-                      <WindowPickerDialog
-                        isOpen={showWindowPickerDialog}
-                        sources={windowSources}
-                        isLoading={isLoadingWindowSources}
-                        zIndex={10000}
-                        onSelect={(windowId) => {
-                          setShowWindowPickerDialog(false)
-                          handleScreenshot('window', { windowId })
-                        }}
-                        onCancel={() => setShowWindowPickerDialog(false)}
-                      />
-                    )}
-                    <button
-                      className={`icon-btn${capturingMode === 'area' ? ' icon-btn--loading' : ''}`}
-                      onClick={() => handleScreenshot('area')}
-                      title="Capture area"
-                      aria-label={
-                        capturingMode === 'area'
-                          ? 'Capturing area, please wait'
-                          : 'Capture area screenshot'
-                      }
-                      aria-busy={capturingMode === 'area'}
-                      disabled={!terminalId || capturingMode !== null}
-                      data-testid={TEST_IDS.TERMINAL_BTN_CAPTURE_AREA}
-                    >
-                      <BoxSelect size={14} />
-                    </button>
-                    {/* Shared SR status for the in-progress capture.
-                      *
-                      * (#164 round-2 F#4): the live region MUST be present
-                      * before the value changes, otherwise NVDA / JAWS see a
-                      * region added and removed and never announce its
-                      * contents. Always render the span; the text content
-                      * (empty when idle) is what changes, which is what AT
-                      * listens for. */}
-                    <span role="status" aria-live="polite" className="sr-only">
-                      {capturingMode === 'screen' && 'Capturing screen…'}
-                      {capturingMode === 'window' && 'Capturing window…'}
-                      {capturingMode === 'area' && 'Capturing area…'}
-                    </span>
-                  </>
-                )}
-                {/* Camera photo capture button (Spec #014) - cross-platform */}
-                <button
-                  className="icon-btn"
-                  onClick={() => setIsCameraDialogOpen(true)}
-                  title="Capture photo"
-                  aria-label="Capture photo from camera"
-                  data-testid={TEST_IDS.TERMINAL_BTN_CAMERA}
-                >
-                  <Webcam size={14} />
-                </button>
-                <button
-                  className="icon-btn"
-                  onClick={handleScrollToBottom}
-                  title="Scroll to bottom"
-                  aria-label="Scroll to bottom"
-                  data-testid={TEST_IDS.TERMINAL_BTN_SCROLL}
-                >
-                  <ArrowDownToLine size={14} />
-                </button>
-                <button
-                  className="icon-btn"
-                  onClick={() => void handleRestartRequest()}
-                  title="Restart terminal"
-                  aria-label="Restart terminal"
-                  data-testid={TEST_IDS.TERMINAL_BTN_RESTART}
-                >
-                  <RotateCw size={14} />
-                </button>
-                <button
-                  className={`icon-btn${scrollLocked ? ' icon-btn--active' : ''}`}
-                  onClick={handleToggleScrollLock}
-                  title={scrollLocked ? 'Disable scroll lock' : 'Lock scroll to bottom'}
-                  aria-label="Lock scroll to bottom"
-                  aria-pressed={scrollLocked}
-                  data-testid={TEST_IDS.TERMINAL_BTN_LOCK}
-                >
-                  {scrollLocked ? <LockKeyhole size={14} /> : <LockKeyholeOpen size={14} />}
-                </button>
-                <button
-                  className={`icon-btn${terminalExpanded ? ' icon-btn--active' : ''}`}
-                  onClick={toggleTerminalExpanded}
-                  title={`Maximize terminal (${formatShortcut('M', { mod: true, shift: true })})`}
-                  aria-label="Maximize terminal over the editor"
-                  aria-pressed={terminalExpanded}
-                  data-testid={TEST_IDS.TERMINAL_BTN_EXPAND}
-                >
-                  {terminalExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-                </button>
-              </>
+          <ToolbarOverflow
+            className="sidebar-panel-header"
+            icon={<TerminalIcon size={16} className="panel-header-icon" />}
+            title="Terminal"
+            titleClassName="sidebar-panel-title"
+            buttonClassName="icon-btn"
+            menuLabel="Terminal actions"
+            actions={headerActions}
+          />
+        )}
+        {/* Screenshot capture dialogs (#86 macOS → #164 cross-platform). They
+          * portal out, so they sit beside the header rather than in it. */}
+        {terminalId && isScreenshotSupported && (
+          <>
+            <ScreenSelectDialog
+              isOpen={showScreenSelectDialog}
+              displays={displays}
+              zIndex={10000}
+              onSelect={(displayId) => {
+                setShowScreenSelectDialog(false)
+                handleScreenshot('screen', { displayId })
+              }}
+              onCancel={() => setShowScreenSelectDialog(false)}
+            />
+            <ScreenPermissionDialog
+              isOpen={screenPermissionDialogOpen}
+              status={screenPermissionStatus}
+              zIndex={10000}
+              onClose={closeScreenPermissionDialog}
+            />
+            {!hasNativeWindowPicker && (
+              <WindowPickerDialog
+                isOpen={showWindowPickerDialog}
+                sources={windowSources}
+                isLoading={isLoadingWindowSources}
+                zIndex={10000}
+                onSelect={(windowId) => {
+                  setShowWindowPickerDialog(false)
+                  handleScreenshot('window', { windowId })
+                }}
+                onCancel={() => setShowWindowPickerDialog(false)}
+              />
             )}
-          </div>
+            {/* Shared SR status for the in-progress capture.
+              *
+              * (#164 round-2 F#4): the live region MUST be present
+              * before the value changes, otherwise NVDA / JAWS see a
+              * region added and removed and never announce its
+              * contents. Always render the span; the text content
+              * (empty when idle) is what changes, which is what AT
+              * listens for. */}
+            <span role="status" aria-live="polite" className="sr-only">
+              {capturingMode === 'screen' && 'Capturing screen…'}
+              {capturingMode === 'window' && 'Capturing window…'}
+              {capturingMode === 'area' && 'Capturing area…'}
+            </span>
+          </>
         )}
         <TerminalStatusContent
           state={terminalState}

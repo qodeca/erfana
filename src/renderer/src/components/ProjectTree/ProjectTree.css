@@ -25,6 +25,8 @@
   border-bottom: var(--border-width) solid var(--color-border-default);
   font-weight: var(--font-semibold);
   text-transform: uppercase;
+  /* The button rhythm of this row, read by the toolbar overflow group (#451). */
+  --erf-toolbar-overflow-gap: var(--space-2);
 }
 
 .project-name {
