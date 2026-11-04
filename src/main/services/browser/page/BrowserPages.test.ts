@@ -97,7 +97,8 @@ describe('BrowserPages zoom', () => {
     const later = attach(fakePageTab(projectA, 'http://app.test/later'))
     later.tab.contents.emit('did-navigate', {}, 'http://app.test/later')
     await until(() => expect(later.tab.contents.zoom).toBe(1.25))
-  })
+    // Two `until` waits of up to 5 s each (signed store writes are slow on Windows runners).
+  }, 15_000)
 
   it('025-AC-008 Plus at 500% and Minus at 25% do nothing', () => {
     const { attach } = setup()

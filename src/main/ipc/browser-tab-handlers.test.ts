@@ -115,13 +115,16 @@ describe('registerBrowserTabHandlers', () => {
     // A link's local-file answer: the service decides by source (terminal links never open files).
     tab.navigate.mockReturnValueOnce({ refused: 'local-file' } as never)
     service.openLocalFile.mockResolvedValueOnce({ refused: 'local-file' } as never)
-    expect(await invoke('browser-tab:navigate', { tabId: TAB, input: 'file:///p/a.html', source: 'terminalLink' })).toEqual({ refused: 'local-file' })
+    const linked = process.platform === 'win32' ? 'C:\\p\\a.html' : '/p/a.html'
+    expect(await invoke('browser-tab:navigate', { tabId: TAB, input: pathToFileURL(linked).href, source: 'terminalLink' })).toEqual({ refused: 'local-file' })
     expect(service.openLocalFile).toHaveBeenCalledTimes(2)
   })
 
   it('025-AC-010 openLocalFile opens the previewed file in the sender\'s own tab, refusing bad payloads', async () => {
-    expect(await invoke('browser-tab:openLocalFile', { tabId: TAB, filePath: '/p/site/index.html' })).toEqual({ ok: true })
-    expect(service.openLocalFile).toHaveBeenLastCalledWith(3, TAB, '/p/site/index.html', 'previewOpen')
+    // An absolute path of the host the test runs on.
+    const previewed = process.platform === 'win32' ? 'C:\\p\\site\\index.html' : '/p/site/index.html'
+    expect(await invoke('browser-tab:openLocalFile', { tabId: TAB, filePath: previewed })).toEqual({ ok: true })
+    expect(service.openLocalFile).toHaveBeenLastCalledWith(3, TAB, previewed, 'previewOpen')
     expect(await invoke('browser-tab:openLocalFile', { tabId: TAB, filePath: '' })).toEqual({ error: 'Request refused' })
     expect(await invoke('browser-tab:openLocalFile', { tabId: TAB, filePath: '/x', source: 'address' })).toEqual({ error: 'Request refused' })
     windowFor = { id: 4, isDestroyed: () => false }
