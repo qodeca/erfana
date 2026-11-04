@@ -112,7 +112,8 @@ test.describe('browser fixture servers', () => {
     }
     const bundle = await fetchFixture(sites.react18.url('/bundle/dev/app.js'))
     expect(bundle.status).toBe(200)
-    expect(bundle.body.startsWith('// SPDX-License-Identifier: GPL-3.0-only AND MIT')).toBe(true)
+    // Split, so REUSE does not read this string as the file's own licence line.
+    expect(bundle.body.startsWith('// SPDX-License-' + 'Identifier: GPL-3.0-only AND MIT')).toBe(true)
     expect(bundle.body).toContain('//# sourceMappingURL=app.js.map')
   })
 

@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /** The `browser-tab:*` handlers of commit 7 (spec 025, § 8). */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { pathToFileURL } from 'node:url'
 
 const { handles, ons, removed } = vi.hoisted(() => ({
   handles: new Map<string, (...args: unknown[]) => unknown>(),
@@ -103,9 +104,11 @@ describe('registerBrowserTabHandlers', () => {
   })
 
   it('opens a local file typed in the bar or chosen from history through its served folder, never from a link', async () => {
+    // An absolute path of the host the test runs on: `file:///p/…` is no local file on Windows.
+    const local = process.platform === 'win32' ? 'C:\\p\\site\\a b.html' : '/p/site/a b.html'
     tab.navigate.mockReturnValueOnce({ refused: 'local-file' } as never)
-    expect(await invoke('browser-tab:navigate', { tabId: TAB, input: 'file:///p/site/a%20b.html', source: 'address' })).toEqual({ ok: true })
-    expect(service.openLocalFile).toHaveBeenLastCalledWith(3, TAB, '/p/site/a b.html', 'address')
+    expect(await invoke('browser-tab:navigate', { tabId: TAB, input: pathToFileURL(local).href, source: 'address' })).toEqual({ ok: true })
+    expect(service.openLocalFile).toHaveBeenLastCalledWith(3, TAB, local, 'address')
     // A network path is the tab's own refusal, never a file to serve.
     tab.navigate.mockReturnValueOnce({ refused: 'network-path' } as never)
     expect(invoke('browser-tab:navigate', { tabId: TAB, input: 'file://host/share/x.html', source: 'history' })).toEqual({ refused: 'network-path' })

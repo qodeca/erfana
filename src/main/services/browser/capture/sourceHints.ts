@@ -22,6 +22,7 @@
  */
 import { realpath, stat } from 'node:fs/promises'
 import { isAbsolute, join, relative, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { Clock } from '../../../../shared/clock'
 import type { ReactHints } from '../../../../shared/browser/contextFile'
 import { PICK_STRING_MAX, REACT_OWNER_MAX } from '../cdp/cdpPickFunctions'
@@ -126,7 +127,8 @@ export async function resolveSourcePath(projectRoot: string, reported: string): 
   let path = reported
   if (/^file:\/\//i.test(path)) {
     try {
-      path = decodeURIComponent(new URL(path).pathname)
+      // fileURLToPath, not the URL's pathname: on Windows `file:///C:/x` is `C:\\x`, never `/C:/x`.
+      path = fileURLToPath(path)
     } catch {
       return null
     }
