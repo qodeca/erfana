@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import type { FileNode } from '../../../../shared/ipc/file-schema'
-import { claimForUser, planReveal, resolveReveal } from './revealActiveFile'
+import { claimForUser, planReveal, resolveReveal, revealPathsEqual } from './revealActiveFile'
 
 const P = '/proj'
 
@@ -69,9 +69,58 @@ describe('resolveReveal', () => {
       expect(resolveReveal(WIN_ROOT, 'C:\\PROJ\\notes.md', 'all', null, 'win32')?.folders).toEqual([WIN_ROOT])
     })
 
-    it('on macOS and Linux, keeps case: another case is another path', () => {
+    it('on Linux, keeps case: another case is another path', () => {
       expect(resolveReveal('/Proj', '/proj/src/toast.md', 'all', null, 'linux')).toBeNull()
       expect(resolveReveal('/Proj', '/Proj//src/toast.md', 'all', null, 'linux')?.folders).toEqual(['/Proj', '/Proj//src'])
+    })
+
+    describe('on macOS, where the disk ignores case and Unicode form', () => {
+      const MAC_ROOT = '/Users/a/Proj'
+      // 'Zażółć' with the accents composed (NFC), as the tree reads it
+      const NFC_DIR = 'Za\u017C\u00F3\u0142\u0107'
+      const macTree: FileNode = {
+        name: 'Proj', path: MAC_ROOT, type: 'directory', children: [
+          { name: 'docs', path: `${MAC_ROOT}/docs`, type: 'directory', children: [
+            { name: 'README.md', path: `${MAC_ROOT}/docs/README.md`, type: 'file', extension: '.md' }
+          ] },
+          { name: NFC_DIR, path: `${MAC_ROOT}/${NFC_DIR}`, type: 'directory', children: [
+            { name: 'a.md', path: `${MAC_ROOT}/${NFC_DIR}/a.md`, type: 'file', extension: '.md' }
+          ] }
+        ]
+      }
+
+      it('finds the tree’s row for a path in another letter case', () => {
+        expect(resolveReveal(MAC_ROOT, `${MAC_ROOT}/Docs/readme.md`, 'all', macTree, 'darwin')).toEqual({
+          folders: [MAC_ROOT, `${MAC_ROOT}/docs`],
+          file: `${MAC_ROOT}/docs/README.md`
+        })
+      })
+
+      it('counts a project root in another letter case as the project', () => {
+        expect(resolveReveal(MAC_ROOT, '/Users/a/proj/docs/README.md', 'all', macTree, 'darwin')?.file).toBe(
+          `${MAC_ROOT}/docs/README.md`
+        )
+      })
+
+      it('finds the tree’s row for a path with decomposed accents (NFD)', () => {
+        const nfd = `${MAC_ROOT}/${NFC_DIR.normalize('NFD')}/a.md`
+        expect(nfd).not.toBe(`${MAC_ROOT}/${NFC_DIR}/a.md`)
+        expect(resolveReveal(MAC_ROOT, nfd, 'all', macTree, 'darwin')).toEqual({
+          folders: [MAC_ROOT, `${MAC_ROOT}/${NFC_DIR}`],
+          file: `${MAC_ROOT}/${NFC_DIR}/a.md`
+        })
+      })
+
+      it('prefers the exact spelling when a case-sensitive volume holds both', () => {
+        const both: FileNode = {
+          name: 'Proj', path: MAC_ROOT, type: 'directory', children: [
+            { name: 'Notes.md', path: `${MAC_ROOT}/Notes.md`, type: 'file', extension: '.md' },
+            { name: 'notes.md', path: `${MAC_ROOT}/notes.md`, type: 'file', extension: '.md' }
+          ]
+        }
+        expect(resolveReveal(MAC_ROOT, `${MAC_ROOT}/notes.md`, 'all', both, 'darwin')?.file).toBe(`${MAC_ROOT}/notes.md`)
+        expect(resolveReveal(MAC_ROOT, `${MAC_ROOT}/Notes.md`, 'all', both, 'darwin')?.file).toBe(`${MAC_ROOT}/Notes.md`)
+      })
     })
 
     it('keeps the tab’s spelling below a folder the tree has not read', () => {
@@ -80,6 +129,23 @@ describe('resolveReveal', () => {
         file: 'c:/proj/src/deep/x.md'
       })
     })
+  })
+})
+
+describe('revealPathsEqual', () => {
+  it('folds case and Unicode form on macOS only', () => {
+    const nfc = '/p/caf\u00E9.md'
+    const nfd = nfc.normalize('NFD')
+    expect(revealPathsEqual('/p/Docs', '/p/docs', 'darwin')).toBe(true)
+    expect(revealPathsEqual(nfc, nfd, 'darwin')).toBe(true)
+    expect(revealPathsEqual('/p/Docs', '/p/docs', 'linux')).toBe(false)
+    expect(revealPathsEqual(nfc, nfd, 'linux')).toBe(false)
+    expect(revealPathsEqual('C:\\P\\Docs', 'c:/p/docs', 'win32')).toBe(true)
+  })
+
+  it('never matches an empty path', () => {
+    expect(revealPathsEqual('', '', 'darwin')).toBe(false)
+    expect(revealPathsEqual('/p', '', 'darwin')).toBe(false)
   })
 })
 

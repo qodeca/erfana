@@ -24,12 +24,11 @@ import { useEffect, useMemo, useRef, type Dispatch, type RefObject, type SetStat
 import type { Virtualizer } from '@tanstack/react-virtual'
 import type { FileNode } from '../../../../shared/ipc/file-schema'
 import type { FilterMode } from '../../types/filters'
-import { pathsEqual } from '../../utils/fileUtils'
 import { isFollowActiveTabEnabled } from '../../../../shared/ipc/global-settings-schema'
 import { useGlobalSettingsStore } from '../../stores/useGlobalSettingsStore'
 import { useActiveTabFilePath } from '../../hooks/useActiveTabFilePath'
 import { useLatestRef } from '../../hooks/useLatestRef'
-import { claimForUser, planReveal, resolveReveal } from './revealActiveFile'
+import { claimForUser, planReveal, resolveReveal, revealPathsEqual } from './revealActiveFile'
 
 /** What {@link useRevealActiveFile} needs from the tree. */
 export interface RevealActiveFileOptions {
@@ -47,11 +46,11 @@ export interface RevealActiveFileOptions {
   setFocusedPath: (path: string) => void
 }
 
-/** The row showing `path` – its own path and index – compared by `pathsEqual` when the exact spelling is not a row. */
+/** The row showing `path` – its own path and index – compared by `revealPathsEqual` when the exact spelling is not a row. */
 function findRow(indexByPath: ReadonlyMap<string, number>, path: string): [string, number] | undefined {
   const exact = indexByPath.get(path)
   if (exact !== undefined) return [path, exact]
-  for (const entry of indexByPath) if (pathsEqual(entry[0], path)) return entry
+  for (const entry of indexByPath) if (revealPathsEqual(entry[0], path)) return entry
   return undefined
 }
 

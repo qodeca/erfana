@@ -20,7 +20,29 @@
 import type { FileNode } from '../../../../shared/ipc/file-schema'
 import type { FilterMode } from '../../types/filters'
 import { getBasename, getDirname, isStrictDescendant, pathsEqual } from '../../utils/fileUtils'
+import { isMacOS } from '../../utils/platform'
 import { isMarkdownFileName } from './markdownFilter'
+
+/**
+ * Whether the reveal treats `a` and `b` as one path: by `pathsEqual`, and on
+ * macOS also when they differ only in letter case or in Unicode form (NFC vs
+ * NFD). The default macOS disk (APFS) ignores both, so a preview or terminal
+ * link spelled `Docs/readme.md` opens the row `docs/README.md`. Main's
+ * `pathCompare.ts` folds the same way. Callers try the exact spelling first,
+ * so on a case-sensitive Mac volume the exact row still wins.
+ *
+ * @example
+ * ```ts
+ * revealPathsEqual('/p/Docs', '/p/docs', 'darwin') // true
+ * revealPathsEqual('/p/Docs', '/p/docs', 'linux')  // false
+ * ```
+ */
+export function revealPathsEqual(a: string, b: string, platform?: NodeJS.Platform): boolean {
+  if (pathsEqual(a, b, platform)) return true
+  if (!a || !b || !isMacOS(platform)) return false
+  const fold = (p: string) => p.normalize('NFC').toLowerCase()
+  return pathsEqual(fold(a), fold(b), platform)
+}
 
 /** What a reveal changes: the tree's open folders, and the ones the reveal owns. */
 export interface RevealPlan {
@@ -42,9 +64,9 @@ export interface RevealTarget {
  * Where to reveal `filePath` in the tree – or `null` when the tree must not
  * reveal it.
  *
- * Paths are compared with `pathsEqual`: either separator, and on Windows any
- * case, so `c:/proj/src/toast.md` from one source finds the row
- * `C:\Proj\src\Toast.md`. Each folder and the file are then named the way
+ * Paths are compared with {@link revealPathsEqual}: either separator, and on
+ * Windows and macOS any case (macOS also any Unicode form), so
+ * `c:/proj/src/toast.md` from one source finds the row `C:\Proj\src\Toast.md`. Each folder and the file are then named the way
  * the tree names them, read off `root`; below a folder the tree has not read
  * (a lazy folder), the active tab's own spelling is used.
  *
@@ -76,7 +98,7 @@ export function resolveReveal(
   // The file's own folders, nearest first, up to (not including) the project
   const below: string[] = []
   let dir = getDirname(filePath)
-  while (dir !== '' && !pathsEqual(dir, projectPath, platform)) {
+  while (dir !== '' && !revealPathsEqual(dir, projectPath, platform)) {
     below.push(dir)
     dir = getDirname(dir)
   }
@@ -93,7 +115,10 @@ export function resolveReveal(
   return { folders, file: findChild(level, filePath, 'file', platform)?.path ?? filePath }
 }
 
-/** The child of `level` with the same name as `path`'s last segment, by `pathsEqual` rules. */
+/**
+ * The child of `level` with the same name as `path`'s last segment: the exact
+ * spelling (by `pathsEqual`) first, then by {@link revealPathsEqual} rules.
+ */
 function findChild(
   level: readonly FileNode[] | undefined,
   path: string,
@@ -101,7 +126,11 @@ function findChild(
   platform: NodeJS.Platform | undefined
 ): FileNode | undefined {
   const name = getBasename(path)
-  return level?.find((node) => node.type === type && pathsEqual(node.name, name, platform))
+  const ofType = level?.filter((node) => node.type === type)
+  return (
+    ofType?.find((node) => pathsEqual(node.name, name, platform)) ??
+    ofType?.find((node) => revealPathsEqual(node.name, name, platform))
+  )
 }
 
 /**
