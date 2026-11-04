@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react'
-import { FilePlus, FolderPlus, FolderOpen, Replace, FileText, Files, FileUp, RotateCw, X as CloseIcon } from 'lucide-react'
+import { FilePlus, FolderPlus, FolderOpen, Replace, FileInput, RotateCw, X as CloseIcon } from 'lucide-react'
 import { useVirtualizer, defaultRangeExtractor, type Range } from '@tanstack/react-virtual'
 import type { FileNode } from '../../../../preload/index'
 import type { FilterMode } from '../../types/filters'
 import { ProjectTreeNode, TREE_ROW_HEIGHT } from './ProjectTreeNode'
 import { buildVisibleRows, dropTargetPath, isNodeRow, placeholderKey } from './visibleRows'
 import { TreePlaceholderRow } from './TreePlaceholderRow'
+import { FileFilterChoice } from './FileFilterChoice'
 import { filterMarkdownTree } from './markdownFilter'
 import { resolveInternalDropFolder, isSameFolderMove } from './dropTarget'
 import { isKeyboardContextMenu, rowMenuAnchor, KEYBOARD_MENU_ECHO_MS, type PointerPress } from './contextMenuOrigin'
@@ -42,7 +43,7 @@ import {
 import { useDragDropTree } from '../../hooks/useDragDropTree'
 import { useClipboardStore } from '../../stores/useClipboardStore'
 import { formatFileOperationError } from '../../utils/errorUtils'
-import { DRAG_DROP, AUTO_EXPAND } from './constants'
+import { DRAG_DROP, AUTO_EXPAND, PROJECT_FILTER_PANEL_ID } from './constants'
 import { withWatcherPause } from './withWatcherPause'
 import { useLazyFolderChildren } from './useLazyFolderChildren'
 import { logger } from '../../utils/logger'
@@ -1559,16 +1560,19 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
               </button>
               <button
                 className="icon-btn"
-                onClick={handleToolbarImport}
-                disabled={isImporting}
+                // Busy keeps focus: aria-disabled, not disabled (Buttons card), so the click is ignored here.
+                onClick={isImporting ? undefined : handleToolbarImport}
+                aria-busy={isImporting || undefined}
+                aria-disabled={isImporting || undefined}
                 title={isImporting ? 'Importing file...' : 'Import a file'}
                 aria-label={isImporting ? 'Importing file...' : 'Import a file'}
                 data-testid={TEST_IDS.PROJECT_TREE_BTN_IMPORT}
               >
+                {/* Busy is the system's ring, not Refresh's arrows (#452). */}
                 {isImporting ? (
-                  <RotateCw size={14} strokeWidth={2} className="spin" />
+                  <span className="icon-btn__busy-ring" aria-hidden="true" />
                 ) : (
-                  <FileUp size={14} strokeWidth={2} />
+                  <FileInput size={14} strokeWidth={2} />
                 )}
               </button>
               <button
@@ -1588,29 +1592,9 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
 
       {/* Control Panel */}
       {showControlPanel && (
-        <div className="project-control-panel">
+        <div className="project-control-panel" id={PROJECT_FILTER_PANEL_ID}>
           <div className="control-panel-content">
-          <div className="control-panel-section">
-            <div className="control-panel-label">File Filter</div>
-            <div className="filter-options">
-                <button
-                  className={`filter-option ${filterMode === 'all' ? 'active' : ''}`}
-                  onClick={() => onFilterModeChange('all')}
-                  title="Show all files and folders"
-                >
-                  <Files size={14} />
-                  <span>All Files</span>
-                </button>
-                <button
-                  className={`filter-option ${filterMode === 'markdown' ? 'active' : ''}`}
-                  onClick={() => onFilterModeChange('markdown')}
-                  title="Show only markdown files and their folders"
-                >
-                  <FileText size={14} />
-                  <span>Markdown Only</span>
-                </button>
-            </div>
-          </div>
+            <FileFilterChoice filterMode={filterMode} onFilterModeChange={onFilterModeChange} />
           {/* Watching controls removed from UI by request */}
         </div>
       </div>

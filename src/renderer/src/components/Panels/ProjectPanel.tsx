@@ -9,8 +9,9 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { ISplitviewPanelProps, DockviewApi } from 'dockview'
-import { FolderOpen, ChevronDown, ChevronLeft } from 'lucide-react'
+import { FolderOpen, Funnel } from 'lucide-react'
 import { ProjectTree } from '../ProjectTree/ProjectTree'
+import { PROJECT_FILTER_PANEL_ID } from '../ProjectTree/constants'
 import { PanelErrorBoundary } from './PanelErrorBoundary'
 import { useProjectManagementContextSafe } from '../../context/ProjectManagementContext'
 import type { FilterMode } from '../../types/filters'
@@ -103,17 +104,19 @@ export function ProjectPanel(props: ISplitviewPanelProps) {
       <div className="sidebar-panel-header">
         <FolderOpen size={16} className="panel-header-icon" />
         <span className="sidebar-panel-title">Project</span>
-        <span
+        {/* The active filter stays visible in words while the panel is closed (#452). */}
+        {filterMode === 'markdown' && <span className="project-filter-chip">Markdown only</span>}
+        <button
+          type="button"
           className="control-panel-chevron"
-          onClick={() => setShowControlPanel(!showControlPanel)}
+          onClick={() => setShowControlPanel(open => !open)}
+          aria-label="File filter"
+          aria-expanded={showControlPanel}
+          aria-controls={PROJECT_FILTER_PANEL_ID}
           title={showControlPanel ? 'Hide Filter Options' : 'Show Filter Options'}
         >
-          {showControlPanel ? (
-            <ChevronDown size={16} strokeWidth={2} />
-          ) : (
-            <ChevronLeft size={16} strokeWidth={2} />
-          )}
-        </span>
+          <Funnel size={16} strokeWidth={2} aria-hidden="true" />
+        </button>
       </div>
       <div className="sidebar-panel-content">
         {/* Panel-scoped containment (#60): a tree render failure degrades to
