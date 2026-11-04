@@ -402,8 +402,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       if (data.terminalId !== terminalId) return
       const parsed = acker.received(data.data.length, document.visibilityState === 'hidden')
       if (xtermRef.current) {
-        // Write data to terminal
         xtermRef.current.write(data.data, parsed)
+        useTerminalStore.getState().noteOutput(terminalId) // unthrottled: a prompt send waits on it (#449)
 
         // Record recent activity (ignore warmup period noise)
         if (Date.now() >= warmupUntilRef.current) {

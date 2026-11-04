@@ -13,12 +13,12 @@
 
 ### Test File: `useTerminalStore.autoExecute.test.ts`
 
-The tests cover core autoExecute functionality, error handling, bracketed paste, timing and recent-input marking. The store is built with `createTerminalStore(mockTerminalOps)`, and the 200ms delay is driven with fake timers.
+The tests cover core autoExecute functionality, error handling, bracketed paste, timing and recent-input marking. The store is built with `createTerminalStore(mockTerminalOps)`, and the wait before Enter is driven with fake timers; `noteOutput` stands in for the terminal's output.
 
 ### Test Categories
 
 #### 1. Basic Functionality (2 tests)
-- Sends text, then Enter after 200ms, when `autoExecute=true`
+- Sends text, then Enter, when `autoExecute=true`
 - Does NOT send Enter key when `autoExecute=false`
 
 #### 2. Error Handling (4 tests)
@@ -38,8 +38,11 @@ The tests cover core autoExecute functionality, error handling, bracketed paste,
 - Does NOT wrap single-line text
 - Normalizes Windows line endings (`\r\n` becomes one `\r`)
 
-#### 5. Timing (1 test)
-- Waits exactly 200ms before sending Enter (nothing at 199ms, Enter at 200ms)
+#### 5. Timing (8 tests, #449)
+- With no output after the text, waits ENTER_NO_OUTPUT_DELAY_MS before Enter
+- Sends Enter once a short paste's echo has been quiet for ENTER_MIN_QUIET_MS, never sooner than ENTER_MIN_DELAY_MS
+- Does not send Enter while a long paste is still arriving in pieces, nor cut a very slow paste short at ENTER_MAX_DELAY_MS
+- Ignores output from before the paste and from other terminals; a spinner that never goes quiet gets Enter at ENTER_MAX_DELAY_MS
 
 #### 6. Getters (1 test)
 - `getActiveTerminalId()` returns correct terminal ID
@@ -52,7 +55,7 @@ The tests cover core autoExecute functionality, error handling, bracketed paste,
 
 **Send text, then Enter after the delay**
 ```typescript
-it('should send text then Enter with 200ms delay when autoExecute is true', async () => {
+it('should send text then Enter when autoExecute is true', async () => {
   useTerminalStore.setState({ activeTerminalId: 'term1' })
 
   const promise = useTerminalStore.getState().sendToTerminal('echo hello', true)
@@ -97,23 +100,23 @@ it('should wrap multi-line text in bracketed paste mode without autoExecute', as
 })
 ```
 
-**Exact 200ms timing**
+**No Enter while a long paste is still arriving (#449)**
 ```typescript
-it('should wait exactly 200ms before sending Enter', async () => {
+it('does not send Enter while a long paste is still arriving in pieces', async () => {
   useTerminalStore.setState({ activeTerminalId: 'term1' })
+  const elapsed = { ms: 0 }
 
-  const promise = useTerminalStore.getState().sendToTerminal('test', true)
+  const promise = useTerminalStore.getState().sendToTerminal(longPrompt, true)
+  for (const at of [600, 1200, 1800, 2400]) {
+    await outputAt(at, elapsed) // the terminal redraws as a piece arrives
+    expect(enterSent()).toBe(false)
+  }
 
-  await vi.advanceTimersByTimeAsync(0)
-  expect(mockWrite).toHaveBeenCalledTimes(1)
-
-  await vi.advanceTimersByTimeAsync(199)
-  expect(mockWrite).toHaveBeenCalledTimes(1)
-
-  await vi.advanceTimersByTimeAsync(1)
-  expect(mockWrite).toHaveBeenCalledTimes(2)
-
-  await promise
+  // Quiet for twice the longest pause (2 x 600 ms) before Enter
+  await vi.advanceTimersByTimeAsync(1200 - 1)
+  expect(enterSent()).toBe(false)
+  await vi.advanceTimersByTimeAsync(60)
+  expect(enterSent()).toBe(true)
 })
 ```
 

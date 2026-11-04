@@ -40,7 +40,7 @@
 │  - sendToTerminal(text, autoExecute)                            │
 │  - Multi-line text: wrap in bracketed paste, \n → \r            │
 │  - AWAIT terminalOps.write(terminalId, text)  (injected)        │
-│  - If autoExecute: wait 200ms (rendering delay)                 │
+│  - If autoExecute: wait until output goes quiet (min 200ms)     │
 │  - If autoExecute: AWAIT terminalOps.write(id, '\r')            │
 └────────────────────────────┬─────────────────────────────────────┘
                              │
@@ -95,7 +95,7 @@
 - Receives its terminal operations by injection (`createTerminalStore(terminalOps)`; the default store passes `terminalGateway`, which forwards to `window.api.terminal`)
 - Wraps multi-line text in bracketed paste mode (`\x1b[200~` … `\x1b[201~`, line endings converted to `\r`) so the receiving CLI treats it as one paste
 - Awaits both text write and Enter key write for error handling
-- Implements 200ms delay between text and Enter (rendering time)
+- Waits between text and Enter until the paste has been taken (`stores/terminalInputSettle.ts`, #449)
 - Simple, reliable fire-and-forget approach
 
 **Preload Bridge** (`preload/terminalBridge.ts`, exposed through `preload/index.ts`)
@@ -158,14 +158,29 @@ Write Call → Socket Buffer → PTY Buffer → Shell Input → Terminal Render 
 3. **200ms delay ensures rendering completes** before Enter
 4. **No synchronization needed** - timing is sufficient
 
+### Since #449: Enter waits for the paste to be taken
+
+A fixed delay was not sufficient for long prompts. The program in the terminal reads a paste in pieces – on Windows ConPTY hands it over about 1 KiB per read, and far slower on a loaded machine (a 9.5 KB paste took about 700 ms on an idle host; on a busy one, seconds per piece). An Enter written 200 ms after the text sits in the input queue behind the rest of the paste and reaches the program **in the same read as the paste's last piece**. A prompt box takes a carriage return that shares a read with pasted text for a line break in that text, so the prompt was pasted and never sent.
+
+`waitForInputToSettle` (`stores/terminalInputSettle.ts`) waits the way a person does – until the paste has appeared. `TerminalPanel` records the time of every output batch (`useTerminalStore.noteOutput`, a plain map, not store state), and Enter goes once that output has been quiet for twice the longest pause seen while the paste was arriving (at least 400 ms), never sooner than 200 ms after the text:
+
+| Case | Enter goes |
+|------|-----------|
+| The program redraws as the paste arrives | quiet for max(400 ms, 2 × longest pause) after its last output |
+| No output at all after the paste | after 3 s |
+| Output that never pauses longer than 400 ms (a spinner) | after 8 s |
+| Long pauses that never end (a very slow paste) | after 60 s at most |
+
+The e2e test `e2e/prompt-submit.e2e.ts` runs a stand-in agent (`e2e/fixtures/pasteSubmitAgent.cjs`) in the real terminal and fails on Windows with the fixed delay.
+
 ### Alternative Approaches Considered
 
 | Approach | Pros | Cons | Verdict |
 |----------|------|------|---------|
 | Write callbacks | Precise timing | Unreliable (v0.3.3 failure) | ❌ Rejected |
 | Polling terminal state | Can check readiness | Complex, overkill | ❌ Rejected |
-| Adaptive delays | Smart sizing | Added complexity | ⚠️ Future |
-| Fixed 200ms delay | Simple, reliable | Slightly slow for small text | ✅ **Current** |
+| Fixed 200ms delay | Simple | Enter merged into the end of a long paste on Windows (#449) | ❌ Replaced |
+| Wait for output to go quiet | Follows the real delivery speed | A spinner or silent program waits for a cap | ✅ **Current** |
 
 ---
 
