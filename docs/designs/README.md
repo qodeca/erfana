@@ -71,6 +71,7 @@ also `inert`.
 | [`packaging/`](packaging/README.md) | Packaging guards for the installers |
 | [`project-tree/`](project-tree/README.md) | The Project panel: header, tree toolbar row and file filter (#452), and following the active tab (#453) |
 | [`readme/`](readme/README.md) | The README and GitHub presentation redesign (#139) |
+| [`terminal-header/`](terminal-header/README.md) | The terminal panel header: which buttons stay in the row at the default width (#462) |
 | [`user-guide/`](user-guide/README.md) | The illustrated user guide with automated screenshots (#138) |
 
 ## Template for a feature folder's README
