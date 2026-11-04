@@ -32,9 +32,10 @@ vi.mock('../services/textClipboard', () => ({
 // Platform detection is resolved via the preload bridge (utils/platform);
 // getClipboardAction reads it internally. Mock it so tests drive the
 // macOS-vs-Windows clipboard behavior directly.
-const { mockIsMacOS } = vi.hoisted(() => ({ mockIsMacOS: vi.fn() }))
+const { mockIsMacOS, mockIsWindows } = vi.hoisted(() => ({ mockIsMacOS: vi.fn(), mockIsWindows: vi.fn() }))
 vi.mock('../utils/platform', () => ({
-  isMacOS: mockIsMacOS
+  isMacOS: mockIsMacOS,
+  isWindows: mockIsWindows
 }))
 
 describe('useTerminalClipboard', () => {
@@ -297,15 +298,23 @@ describe('useTerminalClipboard', () => {
   describe('handleKeyEvent()', () => {
     const createKeyboardEvent = (
       key: string,
-      modifiers: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean } = {}
+      modifiers: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean; altKey?: boolean } = {},
+      type: 'keydown' | 'keypress' | 'keyup' = 'keydown'
     ): KeyboardEvent => {
-      return new KeyboardEvent('keydown', {
+      return new KeyboardEvent(type, {
         key,
         ctrlKey: modifiers.ctrlKey ?? false,
         metaKey: modifiers.metaKey ?? false,
-        shiftKey: modifiers.shiftKey ?? false
+        shiftKey: modifiers.shiftKey ?? false,
+        altKey: modifiers.altKey ?? false,
+        cancelable: true
       })
     }
+
+    beforeEach(() => {
+      // Windows unless a block says otherwise
+      mockIsWindows.mockReturnValue(true)
+    })
 
     it('returns true (pass through) if no terminal', () => {
       const xtermRef = { current: null }
@@ -441,23 +450,92 @@ describe('useTerminalClipboard', () => {
       })
     })
 
-    describe('Paste action (Windows)', () => {
+    describe('Paste action (Windows, #463)', () => {
       beforeEach(() => {
         mockIsMacOS.mockReturnValue(false)
+        mockIsWindows.mockReturnValue(true)
       })
 
-      it('returns true for Ctrl+V (lets xterm handle native paste)', () => {
-        // Standard Ctrl+V returns true (pass through) to let xterm handle native paste
+      // xterm sends Ctrl+V to the shell as ^V and fires no paste event, so the
+      // hook must paste itself – once per press, whatever the chord's key-up does
+      it.each([
+        ['Ctrl+V', 'v', { ctrlKey: true }],
+        ['Ctrl+V (uppercase)', 'V', { ctrlKey: true }],
+        ['Ctrl+Shift+V', 'v', { ctrlKey: true, shiftKey: true }],
+        ['Shift+Insert', 'Insert', { shiftKey: true }]
+      ] as const)('%s pastes exactly once and stops the browser paste', async (_name, key, mods) => {
         const mockXterm = createMockXterm()
         const xtermRef = { current: mockXterm }
-
+        mockReadText.mockResolvedValue('paste content')
         const { result } = renderHook(() => useTerminalClipboard(xtermRef))
 
-        const event = createKeyboardEvent('v', { ctrlKey: true })
-        const shouldPassThrough = result.current.handleKeyEvent(event)
+        const down = createKeyboardEvent(key, mods)
+        expect(result.current.handleKeyEvent(down)).toBe(false)
+        expect(down.defaultPrevented).toBe(true)
+        // The rest of the chord is swallowed and does not paste again
+        expect(result.current.handleKeyEvent(createKeyboardEvent(key, mods, 'keypress'))).toBe(false)
+        expect(result.current.handleKeyEvent(createKeyboardEvent(key, mods, 'keyup'))).toBe(false)
 
-        expect(shouldPassThrough).toBe(true)
-        expect(mockXterm.paste).not.toHaveBeenCalled()
+        await waitFor(() => {
+          expect(mockXterm.paste).toHaveBeenCalledWith('paste content')
+        })
+        expect(mockReadText).toHaveBeenCalledTimes(1)
+        expect(mockXterm.paste).toHaveBeenCalledTimes(1)
+        mockReadText.mockReset()
+      })
+
+      it('Ctrl+C copies a selection once and keeps it; the key-up is swallowed', async () => {
+        const mockXterm = createMockXterm(true, 'selected')
+        const xtermRef = { current: mockXterm }
+        const { result } = renderHook(() => useTerminalClipboard(xtermRef))
+
+        expect(result.current.handleKeyEvent(createKeyboardEvent('c', { ctrlKey: true }))).toBe(false)
+        expect(result.current.handleKeyEvent(createKeyboardEvent('c', { ctrlKey: true }, 'keyup'))).toBe(false)
+
+        await waitFor(() => {
+          expect(mockWriteText).toHaveBeenCalledWith('selected')
+        })
+        expect(mockWriteText).toHaveBeenCalledTimes(1)
+        expect(mockXterm.clearSelection).not.toHaveBeenCalled()
+      })
+
+      it('Ctrl+C without a selection reaches the shell on press and release (interrupt)', () => {
+        const mockXterm = createMockXterm(false)
+        const xtermRef = { current: mockXterm }
+        const { result } = renderHook(() => useTerminalClipboard(xtermRef))
+
+        const down = createKeyboardEvent('c', { ctrlKey: true })
+        expect(result.current.handleKeyEvent(down)).toBe(true)
+        expect(down.defaultPrevented).toBe(false)
+        expect(result.current.handleKeyEvent(createKeyboardEvent('c', { ctrlKey: true }, 'keyup'))).toBe(true)
+        expect(mockWriteText).not.toHaveBeenCalled()
+      })
+
+      it('leaves AltGr chords (Ctrl+Alt) to the shell', () => {
+        const mockXterm = createMockXterm(true, 'selected')
+        const xtermRef = { current: mockXterm }
+        const { result } = renderHook(() => useTerminalClipboard(xtermRef))
+
+        expect(result.current.handleKeyEvent(createKeyboardEvent('v', { ctrlKey: true, altKey: true }))).toBe(true)
+        expect(result.current.handleKeyEvent(createKeyboardEvent('c', { ctrlKey: true, altKey: true }))).toBe(true)
+        expect(mockReadText).not.toHaveBeenCalled()
+        expect(mockWriteText).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('Paste action (Linux)', () => {
+      beforeEach(() => {
+        mockIsMacOS.mockReturnValue(false)
+        mockIsWindows.mockReturnValue(false)
+      })
+
+      it('Ctrl+V reaches the shell as ^V, as in other Linux terminals', () => {
+        const mockXterm = createMockXterm()
+        const xtermRef = { current: mockXterm }
+        const { result } = renderHook(() => useTerminalClipboard(xtermRef))
+
+        expect(result.current.handleKeyEvent(createKeyboardEvent('v', { ctrlKey: true }))).toBe(true)
+        expect(mockReadText).not.toHaveBeenCalled()
       })
     })
 

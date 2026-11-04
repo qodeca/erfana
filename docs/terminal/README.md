@@ -88,13 +88,15 @@ Full copy/paste operations with keyboard shortcuts and context menu.
 
 **Keyboard Shortcuts**:
 - **Smart Ctrl/Cmd+C**: Copies text when selected, sends SIGINT when no selection
-- **Cmd+V / Ctrl+V**: Paste (handled natively by xterm.js)
-- **Ctrl+Shift+C / Ctrl+Shift+V**: Explicit copy/paste (Windows/Linux style)
+- **Cmd+V** (macOS): Paste, handled natively by xterm.js
+- **Ctrl+V** (Windows) and **Shift+Insert** (Windows, Linux): Paste, handled by the app (#463) – xterm would send `^V` to the shell and fire no paste event. On Linux Ctrl+V still sends `^V`, as in other Linux terminals
+- **Ctrl+Shift+C / Ctrl+Shift+V**: Explicit copy/paste (all platforms)
+- A handled chord acts once, on `keydown`, and calls `preventDefault()` so the browser does not paste a second time; its `keypress` / `keyup` are swallowed (`useTerminalClipboard.ts`). Chords with Alt (AltGr on Windows) always go to the shell
 
 **Context Menu**:
 - Right-click (or Shift+F10 / the Menu key, #90) opens context menu with Copy and Paste options
 - Copy is disabled when no text is selected
-- Platform-specific shortcut display (⌘C/⌘V on macOS, Ctrl+C/Ctrl+V on Windows)
+- Platform-specific shortcut display: the paste key that really works there – ⌘V on macOS, Ctrl+V on Windows, Ctrl+Shift+V on Linux (`terminalPasteShortcut`)
 
 **Behavior**:
 - Selection preserved after copy (VS Code behavior)

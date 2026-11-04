@@ -101,6 +101,7 @@ In the HTML preview the comment window stays in front until you close it, so <kb
 | --- | --- | --- |
 | Copy selection; paste | <kbd>⌘C</kbd>; <kbd>⌘V</kbd> | <kbd>Ctrl+C</kbd>; <kbd>Ctrl+V</kbd> |
 | Explicit copy; paste | <kbd>⌃⇧C</kbd>; <kbd>⌃⇧V</kbd> | <kbd>Ctrl+Shift+C</kbd>; <kbd>Ctrl+Shift+V</kbd> |
+| Paste (also) | – | <kbd>Shift+Insert</kbd> |
 | Interrupt without selected text | <kbd>⌃C</kbd> | <kbd>Ctrl+C</kbd> |
 
 On macOS the explicit copy and paste keys and the interrupt key use the Control key (⌃), not Command (⌘). Other keys go to the shell or program running in the terminal, so what they do depends on that program.
