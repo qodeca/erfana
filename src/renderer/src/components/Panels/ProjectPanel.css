@@ -74,6 +74,11 @@
   transition: var(--transition-normal);
 }
 
+.control-panel-chevron:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
 .control-panel-chevron:hover {
   color: var(--color-text-primary);
   background: var(--color-bg-hover);

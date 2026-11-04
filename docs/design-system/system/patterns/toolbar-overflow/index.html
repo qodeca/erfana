@@ -1,0 +1,553 @@
+<!-- @card group="Patterns" name="Toolbar overflow" subtitle="Buttons that do not fit move into a … menu – icon only in the row, icon and label in the menu" status="decided" reviewed="2026-11-03" answers="Keep every panel action reachable when the panel is narrow; Add a button to a panel header; Handle a toolbar that does not fit" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Toolbar overflow – Erfana design system</title>
+<link rel="stylesheet" href="../../../tokens.css">
+<link rel="stylesheet" href="../../../ds.css">
+<link rel="stylesheet" href="../../components/button/button.css">
+<link rel="stylesheet" href="../../components/menu/menu.css">
+<style>
+  /* Documentation-only scaffolding. The panel rows below draw the two shipping panel headers at
+     the app's scale (AppDockLayout.css, TerminalPanel.css, ProjectTree.css), built from the
+     Buttons card's icon button and the Menu card's menu. Card-private prefix: tbo-. */
+  .tbo-frames { grid-template-columns: 1fr; }
+
+  /* A stage: the editor area and one side panel beside it. Terminal on the right, project on the left. */
+  .tbo-stage { display: flex; justify-content: flex-end; position: relative; background: var(--color-bg-primary);
+               min-block-size: calc(var(--header-height) + var(--space-24) * 1.5); overflow: hidden; }
+  .tbo-stage--left { justify-content: flex-start; }
+  .tbo-stage--menu { min-block-size: calc(var(--space-24) * 6.5); }
+  .tbo-stage--menu-short { min-block-size: calc(var(--space-24) * 4.5); }
+
+  /* The panel is the container the rows measure, as the real header measures its own width. */
+  .tbo-panel { display: flex; flex-direction: column; flex: 0 0 auto; inline-size: var(--tbo-w, 100%);
+               max-inline-size: 100%; container-type: inline-size; background: var(--color-black);
+               outline: var(--border-width) solid var(--color-border-default); }
+  .tbo-panel--project { background: var(--color-bg-tertiary); }
+  .tbo-body { flex: 1 1 auto; }
+  .tbo-w-400 { --tbo-w: 400px; }
+  .tbo-w-280 { --tbo-w: 280px; }
+  .tbo-w-256 { --tbo-w: 256px; }
+  .tbo-w-170 { --tbo-w: 170px; }
+  .tbo-w-48 { --tbo-w: 48px; }
+
+  /* A panel row. --head is the panel header (icon, title, buttons); --path is the project tree's
+     second row (project name, buttons). */
+  .tbo-row { /* mockup: app scale – a panel header */ display: flex; flex: 0 0 auto; align-items: center;
+             box-sizing: border-box; block-size: var(--header-height); background: var(--color-bg-tertiary);
+             border-block-end: var(--border-width) solid var(--color-border-default);
+             font-size: var(--text-sm); font-weight: var(--font-semibold); text-transform: uppercase;
+             white-space: nowrap; }
+  .tbo-row--head { gap: var(--space-4); padding: 0 var(--space-6); color: var(--color-text-primary); }
+  .tbo-row--path { gap: var(--space-2); padding: 0 var(--space-4); color: var(--color-text-secondary); }
+  .tbo-row__icon { flex: 0 0 auto; inline-size: var(--icon-size-sm); block-size: var(--icon-size-sm); opacity: 0.8; }
+  /* The title keeps a reserve of a few letters before any button moves (rule 3). */
+  .tbo-row__title { flex: 1 1 auto; min-inline-size: var(--space-24); overflow: hidden; text-overflow: ellipsis; }
+  .tbo-row .erf-button { flex: 0 0 auto; }
+  .tbo-row .tbo-more { display: none; }
+  .tbo-always .tbo-more { display: inline-flex; }
+
+  /* The overflow rule, drawn with container queries at the widths where the next button no longer
+     fits whole. Shipping code measures instead (rule 1); these numbers only draw the two rows.
+     tbo-l1 leaves first. Terminal: header padding, icon, gap and the title reserve, then one
+     button plus its gap per step. */
+  @container (width < 352px) { .tbo-term .tbo-l1, .tbo-term .tbo-l2 { display: none; } .tbo-term .tbo-more { display: inline-flex; } }
+  @container (width < 320px) { .tbo-term .tbo-l3 { display: none; } }
+  @container (width < 288px) { .tbo-term .tbo-l4 { display: none; } }
+  @container (width < 256px) { .tbo-term .tbo-l5 { display: none; } }
+  @container (width < 224px) { .tbo-term .tbo-l6 { display: none; } }
+  @container (width < 192px) { .tbo-term .tbo-l7 { display: none; } }
+  @container (width < 160px) { .tbo-term .tbo-l8 { display: none; } }
+  @container (width < 128px) { .tbo-row--head .tbo-row__title { display: none; } }
+  @container (width < 72px)  { .tbo-row--head .tbo-row__icon { display: none; } }
+  /* Project tree path row. */
+  @container (width < 232px) { .tbo-proj .tbo-l1, .tbo-proj .tbo-l2 { display: none; } .tbo-proj .tbo-more { display: inline-flex; } }
+  @container (width < 204px) { .tbo-proj .tbo-l3 { display: none; } }
+  @container (width < 176px) { .tbo-proj .tbo-l4 { display: none; } }
+  @container (width < 148px) { .tbo-proj .tbo-l5 { display: none; } }
+  @container (width < 120px) { .tbo-proj .tbo-l6 { display: none; } }
+  @container (width < 92px)  { .tbo-row--path .tbo-row__title { display: none; } }
+
+  /* The live frame may go narrower than ds.css's default floor. */
+  .tbo-resize { min-inline-size: var(--space-24); }
+
+  /* The open menu, floating from the … button. Terminal: its inline-end edge on the …'s.
+     Project: flipped, its inline-start edge on the …'s, because the panel sits at the window edge. */
+  .tbo-stage .erf-menu { position: absolute; min-inline-size: calc(var(--space-24) * 4.5); }
+  .tbo-menu-term { inset-block-start: calc(var(--header-height) + var(--space-1)); inset-inline-end: var(--space-6); }
+  .tbo-menu-proj { inset-block-start: calc(var(--header-height) * 2 + var(--space-1));
+                   inset-inline-start: calc(var(--tbo-w) - var(--space-4) - var(--btn-height-sm)); }
+  .erf-menu .erf-menu-icon svg { inline-size: var(--icon-size-sm); block-size: var(--icon-size-sm); }
+  /* The check of a menuitemcheckbox: its own column at the inline end, lime as the toggle's foot. */
+  .tbo-check { display: inline-flex; flex: 0 0 auto; inline-size: var(--icon-size-sm); block-size: var(--icon-size-sm);
+               margin-inline-start: var(--space-6); color: var(--color-brand-lime); }
+  .tbo-check svg { inline-size: 100%; block-size: 100%; }
+  .erf-menu-item[aria-disabled='true'] .tbo-check { color: inherit; }
+
+  /* The … button in each state, side by side. */
+  .tbo-states { display: flex; flex-wrap: wrap; gap: var(--space-12); }
+  .tbo-state { display: flex; flex-direction: column; align-items: center; gap: var(--space-4);
+               padding: var(--space-6); background: var(--color-bg-tertiary); font-size: var(--ds-text-small);
+               color: var(--color-text-tertiary); }
+
+  /* An icon inside a documentation table. */
+  .tbo-ic { inline-size: var(--icon-size-sm); block-size: var(--icon-size-sm); vertical-align: middle; color: var(--color-text-secondary); }
+  .tbo-rules { max-inline-size: var(--ds-measure); }
+  .tbo-rules li { margin-block-end: var(--space-4); }
+</style>
+</head>
+<body>
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../../index.html#patterns">Patterns</a> <span aria-hidden="true">/</span> <span aria-current="page">Toolbar overflow</span></nav>
+<main>
+<h1>Toolbar overflow</h1>
+<p class="ds-meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-11-03</p>
+<p class="ds-lede" id="decision">
+  No panel toolbar ever cuts a button off. When the panel gets too narrow, buttons move one at a time into a
+  <strong>…</strong> menu at the end of the row, and the … button never leaves. In the row a button stays icon-only;
+  in the menu it shows its icon and its label. This applies to every panel toolbar, not only the terminal and the
+  project tree.
+</p>
+
+<div class="ds-note">
+  <strong>Why this card exists.</strong> <a href="https://github.com/qodeca/erfana/issues/451">#451</a>: dragging the
+  terminal or the project tree narrow clips its header buttons, and the terminal's Maximize button – the one that would
+  give the terminal room – is the first to vanish.
+  <br><br>
+  <strong>What it does not decide.</strong> The icon button and its states are the
+  <a href="../../components/button/index.html">Buttons</a> card's; the menu's look and keyboard are the
+  <a href="../../components/menu/index.html">Menu</a> card's, reused here unchanged. The one thing this card adds to a
+  menu is the checked item (rule 7). The <a href="../../components/toolbar/index.html">Toolbar</a> card used to
+  sketch overflow by whole groups, with text-only menu items; this card replaces that sketch, and the Toolbar card's
+  overflow section now points here.
+</div>
+
+<h2 id="rules">The rules</h2>
+<ol class="tbo-rules">
+  <li><strong>Nothing is clipped.</strong> At any width a button is either whole in the row or in the menu, never
+    half-visible and never pushed out of view. The row measures its own width (a panel resizes without the window
+    resizing), not the window's.</li>
+  <li><strong>The … button.</strong> A ghost icon button with the lucide <code>ellipsis</code> glyph, named “More
+    actions” (<code>aria-label</code>, and the same text as its tooltip), with <code>aria-haspopup="menu"</code> and
+    <code>aria-expanded</code>. It appears as soon as one button has moved, sits at the inline end of the row, and is
+    the last thing standing – it never moves, it is never disabled.</li>
+  <li><strong>What gives way, in order.</strong> First the panel title truncates with an ellipsis down to a reserve of a
+    few letters. Then buttons move, one at a time, lowest priority first. Then the title goes, then the panel icon. The
+    … button stays.</li>
+  <li><strong>Who moves first.</strong> Priority is the toolbar order: the rightmost button moves first, so the buttons
+    left in the row stay a run from the left. A toolbar may <em>raise</em> a button so it moves last – the terminal raises
+    Maximize terminal, the project tree raises New file (<a href="#order">the order</a>). Nothing is pinned: any button may
+    move, and at the narrowest only … is left.</li>
+  <li><strong>Never trade one button for ….</strong> The menu never holds a single button that would fit in the …
+    button's place, so a toolbar with one button never shows … (the project header's filter toggle is the case).</li>
+  <li><strong>Icon only in the row, icon and label in the menu.</strong> The row's buttons do not change. A menu item
+    shows the button's current icon, its label – the button's tooltip text without the shortcut – and the shortcut in
+    the Menu card's shortcut column. Items keep the <strong>toolbar order</strong>, not the order they moved in.</li>
+  <li><strong>State moves with the button.</strong> A toggle (<code>aria-pressed</code>) becomes a
+    <code>menuitemcheckbox</code> whose <code>aria-checked</code> matches, drawn with a lime check in its own column at
+    the inline end – the same lime as the toolbar toggle's foot, so “on” reads alike in both places. A view-mode radio
+    becomes a <code>menuitemradio</code>. A disabled button becomes an <code>aria-disabled</code> item that is still
+    reachable. A busy button becomes a disabled item with its busy label (“Importing file…”).</li>
+  <li><strong>The menu floats.</strong> It opens under …, its inline-end edge on …'s. Where that would leave the
+    window – a panel at the window's edge – it flips and opens toward the window's interior. It floats over the
+    neighbouring panel, is never clipped by its own panel, and never truncates a label; a long label widens it.</li>
+  <li><strong>One copy of each action.</strong> A moved button leaves the row's layout and the accessibility tree; it
+    is not hidden with <code>visibility</code> or opacity. A screen reader meets each action once, in the row or in the
+    menu.</li>
+  <li><strong>No motion.</strong> Buttons leave and return instantly; nothing slides while the splitter is being
+    dragged. A button returns only when it fits whole, so the row never flickers at the boundary. The open menu closes
+    if its toolbar resizes.</li>
+  <li><strong>Focus never falls off the row.</strong> If the focused button is about to move, focus moves to …. After
+    a menu item runs, focus goes to … (the item's own button is not in the row), and a dialog that item opened returns
+    focus to … when it closes.</li>
+</ol>
+
+<h2 id="states">Every state</h2>
+<h3 id="terminal">Terminal</h3>
+<p class="ds-muted">The shipping buttons of <code>TerminalPanel.tsx</code>'s header, in their order. The panel sits
+on the right of the editor.</p>
+<div class="ds-frames tbo-frames">
+
+<figure class="ds-frame">
+<div aria-hidden="true" class="tbo-stage">
+  <div class="tbo-panel tbo-w-400">
+    <div class="tbo-row tbo-row--head tbo-term">
+      <svg class="tbo-row__icon" data-icon="terminal" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></svg>
+      <span class="tbo-row__title">Terminal</span>
+      <span class="erf-button erf-button--icon tbo-l7"><svg data-icon="camera" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l6"><svg data-icon="app-window" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 4v4"/><path d="M2 8h20"/><path d="M6 4v4"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l5"><svg data-icon="square-dashed" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M9 3h1"/><path d="M9 21h1"/><path d="M14 3h1"/><path d="M14 21h1"/><path d="M3 9v1"/><path d="M21 9v1"/><path d="M3 14v1"/><path d="M21 14v1"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l4"><svg data-icon="webcam" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="8"/><circle cx="12" cy="10" r="3"/><path d="M7 22h10"/><path d="M12 22v-4"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l3"><svg data-icon="arrow-down-to-line" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l2"><svg data-icon="rotate-cw" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span>
+      <span class="erf-button erf-button--icon erf-button--toggle tbo-l1" aria-pressed="true"><svg data-icon="lock-keyhole" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="16" r="1"/><rect x="3" y="10" width="18" height="12" rx="2"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/></svg></span>
+      <span class="erf-button erf-button--icon erf-button--toggle tbo-l8" aria-pressed="false"><svg data-icon="maximize-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-more"><svg data-icon="ellipsis" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></span>
+    </div>
+    <div class="tbo-body"></div>
+  </div>
+</div>
+<figcaption><strong>Wide – everything fits</strong> – capture screen, window, area and photo, scroll to bottom, restart,
+scroll lock (on) and maximize. No … button: nothing has moved.</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true" class="tbo-stage">
+  <div class="tbo-panel tbo-w-256">
+    <div class="tbo-row tbo-row--head tbo-term">
+      <svg class="tbo-row__icon" data-icon="terminal" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></svg>
+      <span class="tbo-row__title">Terminal</span>
+      <span class="erf-button erf-button--icon tbo-l7"><svg data-icon="camera" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l6"><svg data-icon="app-window" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 4v4"/><path d="M2 8h20"/><path d="M6 4v4"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l5"><svg data-icon="square-dashed" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M9 3h1"/><path d="M9 21h1"/><path d="M14 3h1"/><path d="M14 21h1"/><path d="M3 9v1"/><path d="M21 9v1"/><path d="M3 14v1"/><path d="M21 14v1"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l4"><svg data-icon="webcam" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="8"/><circle cx="12" cy="10" r="3"/><path d="M7 22h10"/><path d="M12 22v-4"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l3"><svg data-icon="arrow-down-to-line" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l2"><svg data-icon="rotate-cw" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span>
+      <span class="erf-button erf-button--icon erf-button--toggle tbo-l1" aria-pressed="true"><svg data-icon="lock-keyhole" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="16" r="1"/><rect x="3" y="10" width="18" height="12" rx="2"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/></svg></span>
+      <span class="erf-button erf-button--icon erf-button--toggle tbo-l8" aria-pressed="false"><svg data-icon="maximize-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-more"><svg data-icon="ellipsis" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></span>
+    </div>
+    <div class="tbo-body"></div>
+  </div>
+</div>
+<figcaption><strong>Narrow – some buttons moved</strong> – the title is down to its reserve; scroll lock, restart,
+scroll to bottom and capture photo are in the menu. Maximize stays, because the terminal raised it, and … sits
+after it.</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true" class="tbo-stage">
+  <div class="tbo-panel tbo-w-170">
+    <div class="tbo-row tbo-row--head tbo-term">
+      <svg class="tbo-row__icon" data-icon="terminal" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></svg>
+      <span class="tbo-row__title">Terminal</span>
+      <span class="erf-button erf-button--icon tbo-l7"><svg data-icon="camera" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l6"><svg data-icon="app-window" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 4v4"/><path d="M2 8h20"/><path d="M6 4v4"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l5"><svg data-icon="square-dashed" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M9 3h1"/><path d="M9 21h1"/><path d="M14 3h1"/><path d="M14 21h1"/><path d="M3 9v1"/><path d="M21 9v1"/><path d="M3 14v1"/><path d="M21 14v1"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l4"><svg data-icon="webcam" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="8"/><circle cx="12" cy="10" r="3"/><path d="M7 22h10"/><path d="M12 22v-4"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l3"><svg data-icon="arrow-down-to-line" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l2"><svg data-icon="rotate-cw" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span>
+      <span class="erf-button erf-button--icon erf-button--toggle tbo-l1" aria-pressed="true"><svg data-icon="lock-keyhole" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="16" r="1"/><rect x="3" y="10" width="18" height="12" rx="2"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/></svg></span>
+      <span class="erf-button erf-button--icon erf-button--toggle tbo-l8" aria-pressed="false"><svg data-icon="maximize-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-more is-focus"><svg data-icon="ellipsis" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></span>
+    </div>
+    <div class="tbo-body"></div>
+  </div>
+</div>
+<figcaption><strong>The dock's minimum width</strong> – the narrowest a side panel goes today (<code>MIN_SIZES</code> in
+<code>AppDockLayout.tsx</code>). Only Maximize is left beside …, and #451's button is still one click away. … has
+keyboard focus here: the focus ring is the Focus card's, unchanged.</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true" class="tbo-stage">
+  <div class="tbo-panel tbo-w-48">
+    <div class="tbo-row tbo-row--head tbo-term">
+      <svg class="tbo-row__icon" data-icon="terminal" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></svg>
+      <span class="tbo-row__title">Terminal</span>
+      <span class="erf-button erf-button--icon tbo-l7"><svg data-icon="camera" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l6"><svg data-icon="app-window" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 4v4"/><path d="M2 8h20"/><path d="M6 4v4"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l5"><svg data-icon="square-dashed" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M9 3h1"/><path d="M9 21h1"/><path d="M14 3h1"/><path d="M14 21h1"/><path d="M3 9v1"/><path d="M21 9v1"/><path d="M3 14v1"/><path d="M21 14v1"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l4"><svg data-icon="webcam" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="8"/><circle cx="12" cy="10" r="3"/><path d="M7 22h10"/><path d="M12 22v-4"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l3"><svg data-icon="arrow-down-to-line" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l2"><svg data-icon="rotate-cw" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span>
+      <span class="erf-button erf-button--icon erf-button--toggle tbo-l1" aria-pressed="true"><svg data-icon="lock-keyhole" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="16" r="1"/><rect x="3" y="10" width="18" height="12" rx="2"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/></svg></span>
+      <span class="erf-button erf-button--icon erf-button--toggle tbo-l8" aria-pressed="false"><svg data-icon="maximize-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-more"><svg data-icon="ellipsis" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></span>
+    </div>
+    <div class="tbo-body"></div>
+  </div>
+</div>
+<figcaption><strong>The floor – only …</strong> – every button has moved, then the title, then the panel icon. Narrower
+than the dock allows today; drawn because the rule has to hold for any toolbar at any width, including one hosted
+somewhere narrower.</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true" class="tbo-stage tbo-stage--menu">
+  <div class="tbo-panel tbo-w-48">
+    <div class="tbo-row tbo-row--head tbo-term">
+      <svg class="tbo-row__icon" data-icon="terminal" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></svg>
+      <span class="tbo-row__title">Terminal</span>
+      <span class="erf-button erf-button--icon tbo-l8"><svg data-icon="maximize-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></svg></span>
+      <span class="erf-button erf-button--icon erf-button--menu tbo-more" aria-expanded="true"><svg data-icon="ellipsis" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></span>
+    </div>
+    <div class="tbo-body"></div>
+  </div>
+  <div class="erf-menu tbo-menu-term">
+    <div class="erf-menu-item"><span class="erf-menu-icon"><svg data-icon="camera" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg></span><span class="erf-menu-label">Capture screen</span></div>
+    <div class="erf-menu-item"><span class="erf-menu-icon"><svg data-icon="app-window" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 4v4"/><path d="M2 8h20"/><path d="M6 4v4"/></svg></span><span class="erf-menu-label">Capture window</span></div>
+    <div class="erf-menu-item"><span class="erf-menu-icon"><svg data-icon="square-dashed" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M9 3h1"/><path d="M9 21h1"/><path d="M14 3h1"/><path d="M14 21h1"/><path d="M3 9v1"/><path d="M21 9v1"/><path d="M3 14v1"/><path d="M21 14v1"/></svg></span><span class="erf-menu-label">Capture area</span></div>
+    <div class="erf-menu-item"><span class="erf-menu-icon"><svg data-icon="webcam" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="8"/><circle cx="12" cy="10" r="3"/><path d="M7 22h10"/><path d="M12 22v-4"/></svg></span><span class="erf-menu-label">Capture photo</span></div>
+    <div class="erf-menu-item"><span class="erf-menu-icon"><svg data-icon="arrow-down-to-line" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/></svg></span><span class="erf-menu-label">Scroll to bottom</span></div>
+    <div class="erf-menu-item"><span class="erf-menu-icon"><svg data-icon="rotate-cw" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span><span class="erf-menu-label">Restart terminal</span></div>
+    <div class="erf-menu-item"><span class="erf-menu-icon"><svg data-icon="lock-keyhole" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="16" r="1"/><rect x="3" y="10" width="18" height="12" rx="2"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/></svg></span><span class="erf-menu-label">Lock scroll to bottom</span><span class="tbo-check"><svg data-icon="check" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+    <div class="erf-menu-item erf-menu-item--active"><span class="erf-menu-icon"><svg data-icon="maximize-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></svg></span><span class="erf-menu-label">Maximize terminal</span><span class="erf-menu-shortcut">Ctrl+Shift+M</span><span class="tbo-check"></span></div>
+  </div>
+</div>
+<figcaption><strong>The menu, open at the floor</strong> – every terminal action, in toolbar order, each with its icon
+and label. … shows the open fill (<code>aria-expanded="true"</code>). Scroll lock is on: a
+<code>menuitemcheckbox</code>, checked, with the lime check. Maximize terminal is the active row – the pointer is on it
+or the arrows reached it; the Menu card draws both the same. Its shortcut sits in the shortcut column. The menu
+floats left over the editor, its right edge on …'s.</figcaption>
+</figure>
+
+</div>
+
+<h3 id="project">Project tree</h3>
+<p class="ds-muted">Two rows: the panel header (<code>ProjectPanel.tsx</code>) with one button, the filter toggle, and
+the project row (<code>ProjectTree.tsx</code>) with the project's buttons. The panel sits on the left of the editor.</p>
+<div class="ds-frames tbo-frames">
+
+<figure class="ds-frame">
+<div aria-hidden="true" class="tbo-stage tbo-stage--left">
+  <div class="tbo-panel tbo-panel--project tbo-w-280">
+    <div class="tbo-row tbo-row--head">
+      <svg class="tbo-row__icon" data-icon="folder-open" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
+      <span class="tbo-row__title">Project</span>
+      <span class="erf-button erf-button--icon"><svg data-icon="chevron-left" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></span>
+    </div>
+    <div class="tbo-row tbo-row--path tbo-proj">
+      <span class="tbo-row__title">erfana</span>
+      <span class="erf-button erf-button--icon tbo-l5"><svg data-icon="replace" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4a1 1 0 0 1 1-1"/><path d="M15 10a1 1 0 0 1-1-1"/><path d="M21 4a1 1 0 0 0-1-1"/><path d="M21 9a1 1 0 0 1-1 1"/><path d="m3 7 3 3 3-3"/><path d="M6 10V5a2 2 0 0 1 2-2h2"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l4"><svg data-icon="x" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l6"><svg data-icon="file-plus" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 18v-6"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l3"><svg data-icon="folder-plus" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10v6"/><path d="M9 13h6"/><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l2"><svg data-icon="file-up" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 12v6"/><path d="m15 15-3-3-3 3"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l1"><svg data-icon="rotate-cw" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-more"><svg data-icon="ellipsis" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></span>
+    </div>
+    <div class="tbo-body"></div>
+  </div>
+</div>
+<figcaption><strong>Wide – everything fits</strong> – change project, close project, new file, new folder, import and
+refresh. No ….</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true" class="tbo-stage tbo-stage--left">
+  <div class="tbo-panel tbo-panel--project tbo-w-170">
+    <div class="tbo-row tbo-row--head">
+      <svg class="tbo-row__icon" data-icon="folder-open" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
+      <span class="tbo-row__title">Project</span>
+      <span class="erf-button erf-button--icon"><svg data-icon="chevron-left" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></span>
+    </div>
+    <div class="tbo-row tbo-row--path tbo-proj">
+      <span class="tbo-row__title">erfana</span>
+      <span class="erf-button erf-button--icon tbo-l5"><svg data-icon="replace" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4a1 1 0 0 1 1-1"/><path d="M15 10a1 1 0 0 1-1-1"/><path d="M21 4a1 1 0 0 0-1-1"/><path d="M21 9a1 1 0 0 1-1 1"/><path d="m3 7 3 3 3-3"/><path d="M6 10V5a2 2 0 0 1 2-2h2"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l4"><svg data-icon="x" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l6"><svg data-icon="file-plus" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 18v-6"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l3"><svg data-icon="folder-plus" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10v6"/><path d="M9 13h6"/><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l2"><svg data-icon="file-up" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 12v6"/><path d="m15 15-3-3-3 3"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l1"><svg data-icon="rotate-cw" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-more"><svg data-icon="ellipsis" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></span>
+    </div>
+    <div class="tbo-body"></div>
+  </div>
+</div>
+<figcaption><strong>The dock's minimum width</strong> – refresh, import, new folder and close project have moved. New
+file stays because the project tree raised it; change project stays because it is leftmost. The header row keeps its
+one button: it never trades it for … (rule 5).</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true" class="tbo-stage tbo-stage--left tbo-stage--menu-short">
+  <div class="tbo-panel tbo-panel--project tbo-w-170">
+    <div class="tbo-row tbo-row--head">
+      <svg class="tbo-row__icon" data-icon="folder-open" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
+      <span class="tbo-row__title">Project</span>
+      <span class="erf-button erf-button--icon"><svg data-icon="chevron-left" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></span>
+    </div>
+    <div class="tbo-row tbo-row--path tbo-proj">
+      <span class="tbo-row__title">erfana</span>
+      <span class="erf-button erf-button--icon tbo-l5"><svg data-icon="replace" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4a1 1 0 0 1 1-1"/><path d="M15 10a1 1 0 0 1-1-1"/><path d="M21 4a1 1 0 0 0-1-1"/><path d="M21 9a1 1 0 0 1-1 1"/><path d="m3 7 3 3 3-3"/><path d="M6 10V5a2 2 0 0 1 2-2h2"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l6"><svg data-icon="file-plus" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 18v-6"/></svg></span>
+      <span class="erf-button erf-button--icon erf-button--menu tbo-more" aria-expanded="true"><svg data-icon="ellipsis" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></span>
+    </div>
+    <div class="tbo-body"></div>
+  </div>
+  <div class="erf-menu tbo-menu-proj tbo-w-170">
+    <div class="erf-menu-item"><span class="erf-menu-icon"><svg data-icon="x" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span><span class="erf-menu-label">Close project</span></div>
+    <div class="erf-menu-item erf-menu-item--active"><span class="erf-menu-icon"><svg data-icon="folder-plus" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10v6"/><path d="M9 13h6"/><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span><span class="erf-menu-label">Create new folder</span></div>
+    <div class="erf-menu-item"><span class="erf-menu-icon"><svg data-icon="file-up" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 12v6"/><path d="m15 15-3-3-3 3"/></svg></span><span class="erf-menu-label">Import a file</span></div>
+    <div class="erf-menu-item" aria-disabled="true"><span class="erf-menu-icon"><svg data-icon="rotate-cw" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span><span class="erf-menu-label">Refresh</span><span class="erf-menu-shortcut">Ctrl+Alt+R</span></div>
+  </div>
+</div>
+<figcaption><strong>The menu, open, flipped</strong> – the four moved buttons in toolbar order. The panel is at the
+window's left edge, so the menu opens to the right of …, over the editor, instead of off-screen. Create new folder is
+the active row. A refresh is already running, so Refresh is disabled: dim, still reachable by the arrows, and
+<kbd>Enter</kbd> does nothing.</figcaption>
+</figure>
+
+</div>
+
+<h3 id="more-states">The … button</h3>
+<div class="ds-frame" aria-hidden="true">
+  <div class="tbo-states">
+    <div class="tbo-state"><span class="erf-button erf-button--icon"><svg data-icon="ellipsis" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></span>Resting</div>
+    <div class="tbo-state"><span class="erf-button erf-button--icon is-hover"><svg data-icon="ellipsis" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></span>Hover</div>
+    <div class="tbo-state"><span class="erf-button erf-button--icon is-focus"><svg data-icon="ellipsis" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></span>Keyboard focus</div>
+    <div class="tbo-state"><span class="erf-button erf-button--icon erf-button--menu" aria-expanded="true"><svg data-icon="ellipsis" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></span>Menu open</div>
+  </div>
+</div>
+<p class="ds-muted">Every state is the Buttons card's icon button and menu button; nothing here is new. There is no
+disabled state: … is never disabled, even when every item in its menu is.</p>
+
+<h3 id="resize">Drag the corner</h3>
+<p class="ds-muted">The rule, live: resize this frame by its bottom-right corner. Buttons leave from the right, Maximize
+leaves last, then the title and the icon.</p>
+<div class="ds-frame ds-resize tbo-resize" aria-hidden="true">
+  <div class="tbo-panel">
+    <div class="tbo-row tbo-row--head tbo-term">
+      <svg class="tbo-row__icon" data-icon="terminal" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></svg>
+      <span class="tbo-row__title">Terminal</span>
+      <span class="erf-button erf-button--icon tbo-l7"><svg data-icon="camera" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l6"><svg data-icon="app-window" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 4v4"/><path d="M2 8h20"/><path d="M6 4v4"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l5"><svg data-icon="square-dashed" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M9 3h1"/><path d="M9 21h1"/><path d="M14 3h1"/><path d="M14 21h1"/><path d="M3 9v1"/><path d="M21 9v1"/><path d="M3 14v1"/><path d="M21 14v1"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l4"><svg data-icon="webcam" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="8"/><circle cx="12" cy="10" r="3"/><path d="M7 22h10"/><path d="M12 22v-4"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l3"><svg data-icon="arrow-down-to-line" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-l2"><svg data-icon="rotate-cw" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span>
+      <span class="erf-button erf-button--icon erf-button--toggle tbo-l1" aria-pressed="true"><svg data-icon="lock-keyhole" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="16" r="1"/><rect x="3" y="10" width="18" height="12" rx="2"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/></svg></span>
+      <span class="erf-button erf-button--icon erf-button--toggle tbo-l8" aria-pressed="false"><svg data-icon="maximize-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></svg></span>
+      <span class="erf-button erf-button--icon tbo-more"><svg data-icon="ellipsis" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></span>
+    </div>
+  </div>
+</div>
+
+<h2 id="order">Which button moves first</h2>
+<p class="ds-muted">1 moves first. The menu always lists its items in the toolbar order, whatever order they moved in.
+The menu label is the button's tooltip without its shortcut.</p>
+<table>
+  <thead><tr><th>Toolbar</th><th>Button, left to right</th><th>Menu label</th><th>Moves</th></tr></thead>
+  <tbody>
+    <tr><td rowspan="8">Terminal</td><td><svg class="tbo-ic" data-icon="camera" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg> Capture screen</td><td>Capture screen</td><td>7th</td></tr>
+    <tr><td><svg class="tbo-ic" data-icon="app-window" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 4v4"/><path d="M2 8h20"/><path d="M6 4v4"/></svg> Capture window</td><td>Capture window</td><td>6th</td></tr>
+    <tr><td><svg class="tbo-ic" data-icon="square-dashed" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M9 3h1"/><path d="M9 21h1"/><path d="M14 3h1"/><path d="M14 21h1"/><path d="M3 9v1"/><path d="M21 9v1"/><path d="M3 14v1"/><path d="M21 14v1"/></svg> Capture area</td><td>Capture area</td><td>5th</td></tr>
+    <tr><td><svg class="tbo-ic" data-icon="webcam" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="8"/><circle cx="12" cy="10" r="3"/><path d="M7 22h10"/><path d="M12 22v-4"/></svg> Capture photo</td><td>Capture photo</td><td>4th</td></tr>
+    <tr><td><svg class="tbo-ic" data-icon="arrow-down-to-line" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/></svg> Scroll to bottom</td><td>Scroll to bottom</td><td>3rd</td></tr>
+    <tr><td><svg class="tbo-ic" data-icon="rotate-cw" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg> Restart terminal</td><td>Restart terminal</td><td>2nd</td></tr>
+    <tr><td><svg class="tbo-ic" data-icon="lock-keyhole-open" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="16" r="1"/><rect width="18" height="12" x="3" y="10" rx="2"/><path d="M7 10V7a5 5 0 0 1 9.33-2.5"/></svg> Scroll lock (toggle)</td><td>Lock scroll to bottom, checked when on</td><td>1st</td></tr>
+    <tr><td><svg class="tbo-ic" data-icon="maximize-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></svg> Maximize terminal (toggle)</td><td>Maximize terminal, checked when on</td><td><strong>Last – raised</strong></td></tr>
+    <tr><td rowspan="6">Project tree</td><td><svg class="tbo-ic" data-icon="replace" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4a1 1 0 0 1 1-1"/><path d="M15 10a1 1 0 0 1-1-1"/><path d="M21 4a1 1 0 0 0-1-1"/><path d="M21 9a1 1 0 0 1-1 1"/><path d="m3 7 3 3 3-3"/><path d="M6 10V5a2 2 0 0 1 2-2h2"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg> Change project</td><td>Change project (Open project with none open)</td><td>5th</td></tr>
+    <tr><td><svg class="tbo-ic" data-icon="x" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg> Close project</td><td>Close project</td><td>4th</td></tr>
+    <tr><td><svg class="tbo-ic" data-icon="file-plus" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 18v-6"/></svg> New file</td><td>Create new markdown file</td><td><strong>Last – raised</strong></td></tr>
+    <tr><td><svg class="tbo-ic" data-icon="folder-plus" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10v6"/><path d="M9 13h6"/><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg> New folder</td><td>Create new folder</td><td>3rd</td></tr>
+    <tr><td><svg class="tbo-ic" data-icon="file-up" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 12v6"/><path d="m15 15-3-3-3 3"/></svg> Import</td><td>Import a file</td><td>2nd</td></tr>
+    <tr><td><svg class="tbo-ic" data-icon="rotate-cw" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg> Refresh</td><td>Refresh</td><td>1st</td></tr>
+    <tr><td>Project header</td><td><svg class="tbo-ic" data-icon="chevron-left" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg> Filter options</td><td>–</td><td>Never: one button (rule 5)</td></tr>
+  </tbody>
+</table>
+<p class="ds-muted"><strong>Why raise those two.</strong> Maximize terminal is the action a user reaches for
+<em>because</em> the terminal is narrow – #451's complaint – so it is the last to go. New file is the project tree's
+everyday action; change and close project are occasional. Every other toolbar takes the plain right-to-left order until
+someone raises a button on purpose.</p>
+
+<h2 id="keyboard">The keyboard contract</h2>
+<p class="ds-muted">The WAI-ARIA menu button pattern on …, and the Menu card's contract inside the menu. … is a normal
+stop in the row's tab order; when a header adopts the Toolbar card's roving <code>tabindex</code>, … is its last
+control.</p>
+<table class="ds-keys">
+  <thead><tr><th>Key</th><th>Result</th><th>Focus ends on</th><th>Held by</th></tr></thead>
+  <tbody>
+    <tr><td><kbd>Tab</kbd></td><td>Reaches … like any button in the row. Moved buttons are not stops.</td><td>…</td><td rowspan="8"><code>ToolbarOverflow.test.tsx</code> (keyboard, focus, what moves), <code>ContextMenu.anchor.test.tsx</code> (placement, flip, opening on the last item), and <code>e2e/toolbar-overflow.e2e.ts</code>, which drags the terminal and project splitters to the dock minimum and reaches every action through the menu</td></tr>
+    <tr><td><kbd>Enter</kbd> <kbd>Space</kbd> <kbd>↓</kbd> on …</td><td>Opens the menu.</td><td>The first item.</td></tr>
+    <tr><td><kbd>↑</kbd> on …</td><td>Opens the menu.</td><td>The last item.</td></tr>
+    <tr><td><kbd>↑</kbd> <kbd>↓</kbd> <kbd>Home</kbd> <kbd>End</kbd>, a letter</td><td>Move between items, wrapping; disabled items are reached, not skipped. Exactly as on the Menu card.</td><td>That item.</td></tr>
+    <tr><td><kbd>Enter</kbd> <kbd>Space</kbd> on an item</td><td>Runs the action and closes the menu. On a checkbox item it flips <code>aria-checked</code> and the button's <code>aria-pressed</code> together. A disabled item does nothing and the menu stays open.</td><td>… – or the dialog the action opened, which returns focus to … when it closes.</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>Closes the menu.</td><td>…</td></tr>
+    <tr><td><kbd>Tab</kbd> in the menu</td><td>Closes the menu (Menu card).</td><td>…</td></tr>
+    <tr><td>Panel narrows</td><td>The focused button moves into the menu; an open menu closes.</td><td>…</td></tr>
+  </tbody>
+</table>
+
+<h2 id="contrast">Contrast</h2>
+<table>
+  <thead><tr><th>Pair</th><th>Where</th><th>Ratio</th></tr></thead>
+  <tbody>
+    <tr><td>… glyph on the header</td><td>Resting, a graphic (3:1)</td><td data-contrast="--color-text-secondary on --color-bg-tertiary" data-min="3" data-result="pass">4.15:1 · pass</td></tr>
+    <tr><td>… glyph, hovered</td><td>Translucent hover over the header</td><td data-contrast="--color-text-bright on --color-bg-hover over --color-bg-tertiary" data-min="3" data-result="pass">10.00:1 · pass</td></tr>
+    <tr><td>… glyph, menu open</td><td>The menu button's open fill</td><td data-contrast="--color-text-bright on --color-bg-hover-solid" data-min="3" data-result="pass">10.51:1 · pass</td></tr>
+    <tr><td>Focus ring on …</td><td>Against the header</td><td data-contrast="--color-border-focus on --color-bg-tertiary" data-min="3" data-result="pass">6.95:1 · pass</td></tr>
+    <tr><td>Item label</td><td>On the menu</td><td data-contrast="--color-text-primary on --color-bg-tertiary" data-min="4.5" data-result="pass">9.53:1 · pass</td></tr>
+    <tr><td>Item label, active row</td><td>On the highlight</td><td data-contrast="--color-text-primary on --color-bg-hover-solid" data-min="4.5" data-result="pass">8.64:1 · pass</td></tr>
+    <tr><td>Lime check</td><td>On the menu, a graphic (3:1)</td><td data-contrast="--color-brand-lime on --color-bg-tertiary" data-min="3" data-result="pass">11.55:1 · pass</td></tr>
+    <tr><td>Lime check, active row</td><td>On the highlight</td><td data-contrast="--color-brand-lime on --color-bg-hover-solid" data-min="3" data-result="pass">10.46:1 · pass</td></tr>
+  </tbody>
+</table>
+<p class="ds-muted">The check is never the only sign: the item carries <code>aria-checked</code>, and under forced colours
+the glyph takes the system text colour like every <code>currentColor</code> stroke. A disabled item's dim label is
+exempt from contrast (SC 1.4.3) – the Menu card's rule.</p>
+
+<h2 id="applies">Where it applies</h2>
+<p class="ds-muted">Every panel toolbar. Found in <code>src/renderer</code> on this card's date. The shared component is
+<code>components/ToolbarOverflow/ToolbarOverflow.tsx</code>; the first three rows below ship it (#451):</p>
+<ul class="ds-muted">
+  <li>The terminal header – <code>TerminalPanel.tsx</code>. (<code>TerminalToolbar.tsx</code> holds an older copy of
+    the same buttons, without Capture photo and Maximize; it is exported but not rendered – inferred from its
+    imports.)</li>
+  <li>The project header and the project row – <code>ProjectPanel.tsx</code>, <code>ProjectTree.tsx</code>.</li>
+  <li>The Markdown, Mermaid and image viewer toolbars and the HTML preview band's bar – the
+    <a href="../../components/toolbar/index.html">Toolbar</a> card lists them. The image viewer scrolls instead (#73,
+    a locked requirement); it stays an exception there. The Markdown and Mermaid toolbars <strong>do not ship the
+    overflow yet</strong>: they carry separators, a spacer, a live status region, a view-mode group (radio items) and,
+    in the Markdown toolbar, a comment-tools slot that is not a plain button – adopting them is follow-up work.</li>
+</ul>
+
+<section id="found">
+<h2>Found while drawing</h2>
+<ul class="ds-muted">
+  <li><strong>The filter toggle was not a button.</strong> <code>ProjectPanel.tsx</code> drew it as a
+    <code>&lt;span&gt;</code> with a click handler: no role, no <code>tabindex</code>, no <code>aria-pressed</code>, so the
+    keyboard could not reach it. Fixed with #451: it is a button with <code>aria-pressed</code>, named “Filter options”.</li>
+  <li><strong>Two row rhythms.</strong> The terminal header spaces its buttons by <code>--space-4</code>, the project row
+    by <code>--space-2</code>. The frames draw each as it ships; this card does not choose between them.</li>
+</ul>
+</section>
+
+<h2 id="decisions">For the owner</h2>
+<p class="ds-muted">Answered 2026-11-03: the owner approved every recommendation, and with it this card's promotion
+to decided and the change to the Toolbar card's overflow section.</p>
+<table>
+  <thead><tr><th>Decision</th><th>Recommended</th><th>Alternatives</th><th>Owner's answer</th></tr></thead>
+  <tbody>
+    <tr><td>Overflow order</td><td>Right to left, with a per-toolbar “moves last” list (Maximize terminal; New file)</td><td>Plain right to left – Maximize moves first, #451's button is always in the menu when narrow. Or a hand-written priority list per toolbar.</td><td>Recommended – approved 2026-11-03</td></tr>
+    <tr><td>Pinned buttons</td><td>None – any button may move, as the issue requires</td><td>Pin Maximize terminal: it would then never move, and the floor would be Maximize plus ….</td><td>Recommended – approved 2026-11-03</td></tr>
+    <tr><td>When … shows</td><td>Only once a button has moved</td><td>Always, even when everything fits – a fixed place, but a menu that is sometimes empty.</td><td>Recommended – approved 2026-11-03</td></tr>
+    <tr><td>Title reserve</td><td>The title keeps a few letters until every button has moved</td><td>The title truncates to nothing first, so buttons stay longer.</td><td>Recommended – approved 2026-11-03</td></tr>
+    <tr><td>Checked item</td><td>Lime check at the inline end (new on the Menu card)</td><td>The toolbar's pressed look – fill and lime foot – on the menu row.</td><td>Recommended – approved 2026-11-03</td></tr>
+  </tbody>
+</table>
+
+<h2 id="tokens">Tokens</h2>
+<table class="ds-tokens">
+  <thead><tr><th>Token</th><th>Value</th><th>Used for</th></tr></thead>
+  <tbody>
+    <tr><td><code>--header-height</code></td><td><code data-token="--header-height">41px</code></td><td>A panel header row</td></tr>
+    <tr><td><code>--btn-height-sm</code></td><td><code data-token="--btn-height-sm">24px</code></td><td>A header button and …, square</td></tr>
+    <tr><td><code>--icon-size-sm</code></td><td><code data-token="--icon-size-sm">16px</code></td><td>The glyph in a button, a menu item and the check</td></tr>
+    <tr><td><code>--space-6</code></td><td><code data-token="--space-6">12px</code></td><td>The header's inline padding; the gap before the check</td></tr>
+    <tr><td><code>--color-brand-lime</code></td><td><code data-token="--color-brand-lime">#E3E829</code></td><td>The check on a checked item</td></tr>
+  </tbody>
+</table>
+
+<h2 id="related">Related</h2>
+<ul class="ds-muted">
+  <li><a href="../../components/toolbar/index.html">Toolbar</a> – the row, grouping and the roving keyboard; its overflow section now points here.</li>
+  <li><a href="../../components/menu/index.html">Menu</a> (decided) – the menu's look and keyboard, reused unchanged.</li>
+  <li><a href="../../components/button/index.html">Buttons</a> – the icon button, the toggle and the menu button.</li>
+  <li><a href="../../components/splitter/index.html">Splitter</a> – what narrows the panel.</li>
+  <li><a href="../../foundations/focus.html">Focus and keyboard</a> – the ring on ….</li>
+</ul>
+
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None recorded.</p>
+</section>
+</main>
+</body>
+</html>

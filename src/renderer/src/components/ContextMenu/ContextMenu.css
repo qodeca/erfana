@@ -99,3 +99,22 @@
   background-color: var(--color-border-subtle);
   margin: var(--space-2) 0;
 }
+
+/* The check of a menuitemcheckbox (Toolbar overflow card, rule 7): its own
+   column at the inline end, in the lime of the toolbar toggle's "on", so on
+   reads alike in the row and in the menu. Never the only sign: the item
+   carries aria-checked. A disabled item's check dims with its label. */
+.context-menu-check {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+  margin-left: var(--space-6);
+  color: var(--color-brand-lime);
+}
+
+.context-menu-item.disabled .context-menu-check {
+  color: inherit;
+}

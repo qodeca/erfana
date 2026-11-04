@@ -91,6 +91,12 @@ const LOCAL_PROPERTIES: readonly LocalProperty[] = [
     why:
       'Set inline per row by ProjectTreeNode and TreePlaceholderRow; ProjectTree.css turns ' +
       'it into indentation with spacing tokens.'
+  },
+  {
+    name: '--erf-toolbar-overflow-gap',
+    why:
+      'A host row (ProjectTree.css on .project-header) sets it to a spacing token so the ' +
+      'toolbar overflow group (ToolbarOverflow.css) keeps that row’s button rhythm (#451).'
   }
 ]
 

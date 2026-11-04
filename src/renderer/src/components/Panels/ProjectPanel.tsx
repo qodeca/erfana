@@ -13,6 +13,8 @@ import { FolderOpen, Funnel } from 'lucide-react'
 import { ProjectTree } from '../ProjectTree/ProjectTree'
 import { PROJECT_FILTER_PANEL_ID } from '../ProjectTree/constants'
 import { PanelErrorBoundary } from './PanelErrorBoundary'
+import { ToolbarOverflow } from '../ToolbarOverflow/ToolbarOverflow'
+import { TOOLBAR_OVERFLOW_TEST_IDS } from '../../constants/toolbarOverflowTestids'
 import { useProjectManagementContextSafe } from '../../context/ProjectManagementContext'
 import type { FilterMode } from '../../types/filters'
 import { openFileInPanel } from '../../utils/openFileInPanel'
@@ -101,23 +103,30 @@ export function ProjectPanel(props: ISplitviewPanelProps) {
 
   return (
     <div className="project-panel sidebar-panel">
-      <div className="sidebar-panel-header">
-        <FolderOpen size={16} className="panel-header-icon" />
-        <span className="sidebar-panel-title">Project</span>
-        {/* The active filter stays visible in words while the panel is closed (#452). */}
-        {filterMode === 'markdown' && <span className="project-filter-chip">Markdown only</span>}
-        <button
-          type="button"
-          className="control-panel-chevron"
-          onClick={() => setShowControlPanel(open => !open)}
-          aria-label="File filter"
-          aria-expanded={showControlPanel}
-          aria-controls={PROJECT_FILTER_PANEL_ID}
-          title={showControlPanel ? 'Hide Filter Options' : 'Show Filter Options'}
-        >
-          <Funnel size={16} strokeWidth={2} aria-hidden="true" />
-        </button>
-      </div>
+      {/* One button: it never trades itself for "More actions" (Toolbar
+          overflow card, rule 5), but the title and icon still give way (#451).
+          The active filter stays visible in words while the panel is closed (#452). */}
+      <ToolbarOverflow
+        className="sidebar-panel-header"
+        icon={<FolderOpen size={16} className="panel-header-icon" />}
+        title="Project"
+        titleClassName="sidebar-panel-title"
+        titleAddon={filterMode === 'markdown' && <span className="project-filter-chip">Markdown only</span>}
+        buttonClassName="control-panel-chevron"
+        menuLabel="Project panel actions"
+        actions={[
+          {
+            id: 'filter',
+            icon: <Funnel size={16} strokeWidth={2} aria-hidden="true" />,
+            label: 'File filter',
+            title: showControlPanel ? 'Hide Filter Options' : 'Show Filter Options',
+            expanded: showControlPanel,
+            controls: PROJECT_FILTER_PANEL_ID,
+            onSelect: () => setShowControlPanel((shown) => !shown),
+            testId: TOOLBAR_OVERFLOW_TEST_IDS.PROJECT_PANEL_BTN_FILTER
+          }
+        ]}
+      />
       <div className="sidebar-panel-content">
         {/* Panel-scoped containment (#60): a tree render failure degrades to
             "Project tree unavailable" here instead of blanking the window.
