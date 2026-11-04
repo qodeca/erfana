@@ -115,7 +115,7 @@ test.describe('Panel toolbar overflow (#451)', () => {
         expect(Object.values(reach)).toContain('menu')
         expect(reach[TEST_IDS.PROJECT_TREE_BTN_NEW_FILE]).toBe('row')
         // The project header's one button never trades itself for … (card rule 5).
-        const filter = bars.projectHeader().getByRole('button', { name: /filter options/i })
+        const filter = bars.projectHeader().getByRole('button', { name: 'File filter' })
         await expect(filter).toBeVisible()
         await expect(bars.moreButton(bars.projectHeader())).toHaveCount(0)
       })
