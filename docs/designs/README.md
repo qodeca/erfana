@@ -68,6 +68,7 @@ also `inert`.
 | [`html-waiting/`](html-waiting/README.md) | What the HTML preview shows while a page loads |
 | [`large-projects/`](large-projects/README.md) | Very large projects: the renderer crash fix and the Windows file watcher |
 | [`packaging/`](packaging/README.md) | Packaging guards for the installers |
+| [`project-tree/`](project-tree/README.md) | The Project panel: header, tree toolbar row and file filter |
 | [`readme/`](readme/README.md) | The README and GitHub presentation redesign (#139) |
 | [`user-guide/`](user-guide/README.md) | The illustrated user guide with automated screenshots (#138) |
 

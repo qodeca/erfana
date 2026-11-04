@@ -1,0 +1,503 @@
+<!-- @card group="Project tree" name="Project tree toolbar icons" subtitle="Import, Import while busy, and the file filter – icon options and how the active filter shows (#452)" status="decided" reviewed="2026-11-03" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project tree toolbar icons – Erfana feature designs</title>
+<link rel="stylesheet" href="../../design-system/tokens.css">
+<link rel="stylesheet" href="../../design-system/ds.css">
+<!-- The filter options are the Segmented control card's .erf-segmented; the "Markdown only" label is the Badge card's .erf-chip. -->
+<link rel="stylesheet" href="../../design-system/system/components/badge/badge.css">
+<link rel="stylesheet" href="../../design-system/system/components/segmented/segmented.css">
+<style>
+  /* Feature-specific only: the top of the Project panel drawn at the app's real scale.
+     Values copied from ProjectPanel.css (.sidebar-panel-header) and ProjectTree.css
+     (.project-tree-path, .icon-btn, .project-control-panel, .filter-option). */
+
+  .pt-frames { grid-template-columns: repeat(auto-fill, minmax(calc(var(--space-20) * 8), 1fr)); }
+  .pt-frames--wide { grid-template-columns: repeat(auto-fill, minmax(calc(var(--space-20) * 9), 1fr)); }
+
+  /* The panel: a typical sidebar width. Nothing below depends on it except the drawing. */
+  .pt-panel { inline-size: calc(var(--space-20) * 7); max-inline-size: 100%; background: var(--color-bg-tertiary);
+              border: var(--border-width) solid var(--color-border-subtle); color: var(--color-text-primary); }
+
+  .pt-panel + .pt-panel { margin-block-start: var(--space-8); }
+
+  /* .sidebar-panel-header */
+  .pt-head { display: flex; align-items: center; gap: var(--space-4); padding: 0 var(--space-6);
+             block-size: var(--header-height); box-sizing: border-box; background: var(--color-bg-tertiary);
+             border-block-end: var(--border-width) solid var(--color-border-default); }
+  .pt-head__icon { inline-size: var(--icon-size-sm); block-size: var(--icon-size-sm); flex: 0 0 auto; opacity: 0.8; }
+  /* mockup: app scale – the panel title */
+  .pt-head__title { flex: 1 1 auto; font-size: var(--text-sm); font-weight: var(--font-semibold);
+                    text-transform: uppercase; letter-spacing: var(--ds-caps-tracking); color: var(--color-text-primary); }
+
+  /* .project-tree-path – the tree toolbar row */
+  /* mockup: app scale – the project name */
+  .pt-row { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-4);
+            block-size: var(--header-height); box-sizing: border-box; font-size: var(--text-sm);
+            font-weight: var(--font-semibold); text-transform: uppercase; color: var(--color-text-secondary);
+            border-block-end: var(--border-width) solid var(--color-border-default); }
+  .pt-row__name { flex: 1 1 auto; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pt-actions { display: flex; gap: var(--space-2); flex: 0 0 auto; }
+
+  /* .icon-btn – a 24px target around the shipping 14px glyph */
+  .pt-btn { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+            inline-size: var(--icon-size-lg); block-size: var(--icon-size-lg); box-sizing: border-box;
+            border-radius: var(--border-radius); color: var(--color-text-secondary); }
+  .pt-btn.is-hover { color: var(--color-text-primary); background: var(--color-bg-hover); }
+  .pt-btn.is-pressed { color: var(--color-text-primary); background: var(--color-bg-hover-solid); }
+  .pt-btn.is-focus { outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: var(--space-1); }
+  .pt-btn.is-dim > * { opacity: var(--opacity-disabled); }
+  /* An expanded disclosure (the filter trigger while its panel is open). */
+  .pt-btn.is-open { color: var(--color-text-bright); background: var(--color-bg-hover-solid); }
+  /* A pressed toggle – the Buttons card's signature: a fill and a lime bottom edge, never colour alone. */
+  .pt-btn.is-on { color: var(--color-text-bright); background: var(--color-bg-selected);
+                  box-shadow: inset 0 calc(var(--border-width-thick) * -1) 0 var(--color-brand-lime); }
+  /* The context buttons that do not change, drawn quieter so the eye lands on the one being decided. */
+  .pt-btn.is-context { opacity: 0.55; }
+
+  /* The shipping glyph size, size={14}. No icon token is 14px (the Icons card maps it to sm); every
+     option is drawn at the size that ships so the comparison is about shape, not size. */
+  .pt-glyph { inline-size: var(--space-7); block-size: var(--space-7); display: block; }
+
+  /* The Buttons card's busy ring (button.css, .erf-button[aria-busy]::before), drawn still: a frame is a picture. */
+  .pt-ring { display: block; box-sizing: border-box; inline-size: var(--icon-size-xs); block-size: var(--icon-size-xs);
+             border: var(--border-width-thick) solid currentColor; border-block-start-color: transparent;
+             border-radius: var(--border-radius-circle); transform: rotate(45deg); }
+
+  /* A "this one spins" mark under a glyph in the static frames. */
+  .pt-spin-note { color: var(--color-text-tertiary); font-size: var(--ds-text-small); }
+
+  /* .project-control-panel – the file filter as it ships */
+  .pt-cp { background: var(--color-bg-tertiary); border-block-end: var(--border-width) solid var(--color-bg-active);
+           padding: var(--space-8); display: flex; flex-direction: column; gap: var(--space-4); }
+  /* mockup: app scale – "File Filter" */
+  .pt-cp__label { font-size: var(--text-xs); font-weight: var(--font-semibold); color: var(--color-text-secondary);
+                  text-transform: uppercase; letter-spacing: var(--ds-caps-tracking); }
+  .pt-cp__opts { display: flex; gap: var(--space-4); }
+  /* mockup: app scale – the filter option label */
+  .pt-cp__opt { flex: 1 1 0; display: flex; align-items: center; justify-content: center; gap: var(--space-3);
+                padding: var(--space-4) var(--space-6); background: var(--color-bg-hover);
+                border: var(--border-width) solid var(--color-bg-active); border-radius: var(--border-radius);
+                color: var(--color-text-primary); font-size: var(--text-sm); font-weight: var(--font-medium); white-space: nowrap; }
+  .pt-cp__opt.is-on { background: var(--color-accent-drag-bg); border-color: var(--color-accent-drag-border); color: var(--color-accent-drag); }
+  /* The proposed panel: the segmented control at the sidebar's width. Two short cells fit one row well
+     below the card's default break, so the break comes down for this instance. */
+  .pt-cp .erf-segmented { --erf-segmented-break: calc(var(--space-24) * 4); }
+
+  /* A few tree rows under the toolbar, so the filter frames show what the filter does. */
+  .pt-tree { list-style: none; margin: 0; padding: var(--space-2) 0; }
+  .pt-tree li { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-1) var(--space-8);
+                font-size: var(--text-base); color: var(--color-text-primary); }
+  .pt-tree li.pt-tree__in { padding-inline-start: var(--space-16); }
+  .pt-tree svg { inline-size: var(--space-7); block-size: var(--space-7); flex: 0 0 auto; color: var(--color-text-secondary); }
+
+  /* The option strip: one glyph in each of its states. */
+  .pt-states { display: flex; flex-wrap: wrap; gap: var(--space-6); align-items: flex-end; margin-block-start: var(--space-6); }
+  .pt-states__cell { display: flex; flex-direction: column; align-items: center; gap: var(--space-2);
+                     font-size: var(--ds-text-small); color: var(--color-text-tertiary); }
+
+  .pt-pick { color: var(--color-brand-lime); font-weight: var(--font-semibold); }
+  .pt-sum td:first-child { white-space: nowrap; color: var(--color-text-bright); }
+  .pt-sum svg { inline-size: var(--icon-size-sm); block-size: var(--icon-size-sm); vertical-align: middle; color: var(--color-text-primary); }
+</style>
+</head>
+<body>
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../index.html">Feature designs</a> <span aria-hidden="true">/</span> <span aria-current="page">Project tree toolbar icons</span></nav>
+<main>
+<h1>Project tree toolbar icons</h1>
+<p class="ds-meta"><span class="ds-status" data-status="decided">decided</span> owner approved 2026-11-03 · design note <a href="README.md">README.md</a> · issue <a href="https://github.com/qodeca/erfana/issues/452">#452</a></p>
+<p class="ds-lede" id="decision">
+  Four controls at the top of the Project panel show an icon that does not say what they do. This screen
+  draws each one as it ships beside two or three lucide options, at the app's real scale, and marks one
+  pick per control. Decided (owner, 2026-11-03 – every recommendation below): Import becomes <code>file-input</code> (an arrow going <em>into</em> a file),
+  Import-while-busy shows the system's busy ring instead of Refresh's arrows, and the file filter becomes a
+  labelled one-of-two choice whose active side is visible even when its panel is closed.
+</p>
+
+<div class="ds-note">
+  <strong>What ships, and where.</strong> Import and Refresh are in the tree toolbar row
+  (<code>ProjectTree.tsx</code>, <code>.project-tree-actions</code>). The two filter buttons are <em>not</em>
+  in that row: they sit in a “File Filter” panel that opens from a chevron in the Project panel header
+  (<code>ProjectPanel.tsx</code>, <code>.control-panel-chevron</code>). With that panel closed, nothing on
+  screen says Markdown only is on – the only trace is a tree with fewer files in it. The chevron is also a
+  <code>&lt;span&gt;</code> with a click handler and a <code>title</code>: no role, no tab stop, no name.
+  Every other button in the row stays exactly as it is; the frames draw them quieter so the eye lands on the
+  control being decided.
+</div>
+
+<h2 id="toolbar">The top of the panel, before and after</h2>
+<p class="ds-muted">A project is open and Markdown only is on. Panel header above, tree toolbar row below, a
+few rows under it. Drawn at the shipping sizes: <code data-token="--header-height">41px</code> rows,
+<code data-token="--icon-size-lg">24px</code> buttons, the <code>size={14}</code> glyph at lucide's default stroke.</p>
+<div class="ds-frames pt-frames">
+
+<figure class="ds-frame"><div aria-hidden="true">
+  <div class="pt-panel">
+    <div class="pt-head"><svg class="pt-head__icon" data-icon="folder-open" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg><span class="pt-head__title">Project</span>
+      <span class="pt-btn"><svg class="pt-glyph" data-icon="chevron-left" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></span></div>
+    <div class="pt-row"><span class="pt-row__name">erfana-docs</span><span class="pt-actions">
+      <span class="pt-btn"><svg class="pt-glyph" data-icon="replace" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4a1 1 0 0 1 1-1"/><path d="M15 10a1 1 0 0 1-1-1"/><path d="M21 4a1 1 0 0 0-1-1"/><path d="M21 9a1 1 0 0 1-1 1"/><path d="m3 7 3 3 3-3"/><path d="M6 10V5a2 2 0 0 1 2-2h2"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg></span>
+      <span class="pt-btn"><svg class="pt-glyph" data-icon="x" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span>
+      <span class="pt-btn"><svg class="pt-glyph" data-icon="file-plus" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 18v-6"/></svg></span>
+      <span class="pt-btn"><svg class="pt-glyph" data-icon="folder-plus" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 10v6"/><path d="M9 13h6"/><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span>
+      <span class="pt-btn"><svg class="pt-glyph" data-icon="file-up" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 12v6"/><path d="m15 15-3-3-3 3"/></svg></span>
+      <span class="pt-btn"><svg class="pt-glyph" data-icon="rotate-cw" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span></span></div>
+    <ul class="pt-tree">
+      <li><svg data-icon="chevron-down" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>docs</li>
+      <li class="pt-tree__in"><svg data-icon="file-text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>guide.md</li>
+      <li><svg data-icon="file-text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>README.md</li>
+    </ul>
+  </div></div>
+<figcaption><strong>As it ships</strong> – Import is <code>file-up</code>: an up arrow on a file, the shape every other app uses for upload or export. The header shows a chevron and no filter state, although half the project is hidden.</figcaption></figure>
+
+<figure class="ds-frame"><div aria-hidden="true">
+  <div class="pt-panel">
+    <div class="pt-head"><svg class="pt-head__icon" data-icon="folder-open" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg><span class="pt-head__title">Project</span>
+      <span class="erf-chip erf-chip--outline">Markdown only</span>
+      <span class="pt-btn"><svg class="pt-glyph" data-icon="funnel" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"/></svg></span></div>
+    <div class="pt-row"><span class="pt-row__name">erfana-docs</span><span class="pt-actions">
+      <span class="pt-btn"><svg class="pt-glyph" data-icon="replace" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4a1 1 0 0 1 1-1"/><path d="M15 10a1 1 0 0 1-1-1"/><path d="M21 4a1 1 0 0 0-1-1"/><path d="M21 9a1 1 0 0 1-1 1"/><path d="m3 7 3 3 3-3"/><path d="M6 10V5a2 2 0 0 1 2-2h2"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg></span>
+      <span class="pt-btn"><svg class="pt-glyph" data-icon="x" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span>
+      <span class="pt-btn"><svg class="pt-glyph" data-icon="file-plus" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 18v-6"/></svg></span>
+      <span class="pt-btn"><svg class="pt-glyph" data-icon="folder-plus" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 10v6"/><path d="M9 13h6"/><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span>
+      <span class="pt-btn"><svg class="pt-glyph" data-icon="file-input" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M2 15h10"/><path d="m9 18 3-3-3-3"/></svg></span>
+      <span class="pt-btn"><svg class="pt-glyph" data-icon="rotate-cw" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span></span></div>
+    <ul class="pt-tree">
+      <li><svg data-icon="chevron-down" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>docs</li>
+      <li class="pt-tree__in"><svg data-icon="file-text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>guide.md</li>
+      <li><svg data-icon="file-text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>README.md</li>
+    </ul>
+  </div></div>
+<figcaption><strong>Proposed (all picks)</strong> – Import is <code>file-input</code>. The header trigger is a <code>funnel</code> button, and while a filter is on a “Markdown only” label sits beside it in words. With All files the label is absent. The other five buttons are unchanged.</figcaption></figure>
+
+</div>
+
+<h2 id="import">1 · Import a file – idle</h2>
+<p class="ds-muted">Each option drawn in its place between New folder and Refresh, then alone in every state the
+shipping <code>.icon-btn</code> has. The neighbours are context and do not change.</p>
+<div class="ds-frames pt-frames">
+
+<figure class="ds-frame"><div aria-hidden="true">
+  <div class="pt-row"><span class="pt-actions">
+    <span class="pt-btn is-context"><svg class="pt-glyph" data-icon="file-plus" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 18v-6"/></svg></span>
+    <span class="pt-btn is-context"><svg class="pt-glyph" data-icon="folder-plus" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 10v6"/><path d="M9 13h6"/><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span>
+    <span class="pt-btn"><svg class="pt-glyph" data-icon="file-up" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 12v6"/><path d="m15 15-3-3-3 3"/></svg></span>
+    <span class="pt-btn is-context"><svg class="pt-glyph" data-icon="rotate-cw" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span></span></div>
+  <div class="pt-states">
+    <span class="pt-states__cell"><span class="pt-btn"><svg class="pt-glyph" data-icon="file-up" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 12v6"/><path d="m15 15-3-3-3 3"/></svg></span>rest</span>
+    <span class="pt-states__cell"><span class="pt-btn is-hover"><svg class="pt-glyph" data-icon="file-up" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 12v6"/><path d="m15 15-3-3-3 3"/></svg></span>hover</span>
+    <span class="pt-states__cell"><span class="pt-btn is-pressed"><svg class="pt-glyph" data-icon="file-up" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 12v6"/><path d="m15 15-3-3-3 3"/></svg></span>pressed</span>
+    <span class="pt-states__cell"><span class="pt-btn is-focus"><svg class="pt-glyph" data-icon="file-up" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 12v6"/><path d="m15 15-3-3-3 3"/></svg></span>focus</span>
+  </div></div>
+<figcaption><strong>Ships – <code>file-up</code></strong>. The arrow leaves the file: upload, export, share. The opposite of what the button does.</figcaption></figure>
+
+<figure class="ds-frame"><div aria-hidden="true">
+  <div class="pt-row"><span class="pt-actions">
+    <span class="pt-btn is-context"><svg class="pt-glyph" data-icon="file-plus" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 18v-6"/></svg></span>
+    <span class="pt-btn is-context"><svg class="pt-glyph" data-icon="folder-plus" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 10v6"/><path d="M9 13h6"/><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span>
+    <span class="pt-btn"><svg class="pt-glyph" data-icon="file-input" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M2 15h10"/><path d="m9 18 3-3-3-3"/></svg></span>
+    <span class="pt-btn is-context"><svg class="pt-glyph" data-icon="rotate-cw" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span></span></div>
+  <div class="pt-states">
+    <span class="pt-states__cell"><span class="pt-btn"><svg class="pt-glyph" data-icon="file-input" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M2 15h10"/><path d="m9 18 3-3-3-3"/></svg></span>rest</span>
+    <span class="pt-states__cell"><span class="pt-btn is-hover"><svg class="pt-glyph" data-icon="file-input" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M2 15h10"/><path d="m9 18 3-3-3-3"/></svg></span>hover</span>
+    <span class="pt-states__cell"><span class="pt-btn is-pressed"><svg class="pt-glyph" data-icon="file-input" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M2 15h10"/><path d="m9 18 3-3-3-3"/></svg></span>pressed</span>
+    <span class="pt-states__cell"><span class="pt-btn is-focus"><svg class="pt-glyph" data-icon="file-input" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M2 15h10"/><path d="m9 18 3-3-3-3"/></svg></span>focus</span>
+  </div></div>
+<figcaption><span class="pt-pick">Recommended.</span> <strong>A – <code>file-input</code></strong>. An arrow travels from outside <em>into</em> a file: “bring a file in”. It stays in the file family beside New file, and nothing in it points down, so it does not read as download.</figcaption></figure>
+
+<figure class="ds-frame"><div aria-hidden="true">
+  <div class="pt-row"><span class="pt-actions">
+    <span class="pt-btn is-context"><svg class="pt-glyph" data-icon="file-plus" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 18v-6"/></svg></span>
+    <span class="pt-btn is-context"><svg class="pt-glyph" data-icon="folder-plus" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 10v6"/><path d="M9 13h6"/><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span>
+    <span class="pt-btn"><svg class="pt-glyph" data-icon="import" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M8 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-4"/></svg></span>
+    <span class="pt-btn is-context"><svg class="pt-glyph" data-icon="rotate-cw" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span></span></div>
+  <div class="pt-states">
+    <span class="pt-states__cell"><span class="pt-btn"><svg class="pt-glyph" data-icon="import" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M8 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-4"/></svg></span>rest</span>
+    <span class="pt-states__cell"><span class="pt-btn is-hover"><svg class="pt-glyph" data-icon="import" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M8 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-4"/></svg></span>hover</span>
+    <span class="pt-states__cell"><span class="pt-btn is-pressed"><svg class="pt-glyph" data-icon="import" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M8 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-4"/></svg></span>pressed</span>
+    <span class="pt-states__cell"><span class="pt-btn is-focus"><svg class="pt-glyph" data-icon="import" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M8 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-4"/></svg></span>focus</span>
+  </div></div>
+<figcaption><strong>B – <code>import</code></strong>. Lucide's own import glyph: an arrow down into a tray. Clear to people who know it, but at 14px the tray is a few pixels and it reads as the common Download icon.</figcaption></figure>
+
+<figure class="ds-frame"><div aria-hidden="true">
+  <div class="pt-row"><span class="pt-actions">
+    <span class="pt-btn is-context"><svg class="pt-glyph" data-icon="file-plus" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 18v-6"/></svg></span>
+    <span class="pt-btn is-context"><svg class="pt-glyph" data-icon="folder-plus" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 10v6"/><path d="M9 13h6"/><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span>
+    <span class="pt-btn"><svg class="pt-glyph" data-icon="folder-input" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-1"/><path d="M2 13h10"/><path d="m9 16 3-3-3-3"/></svg></span>
+    <span class="pt-btn is-context"><svg class="pt-glyph" data-icon="rotate-cw" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span></span></div>
+  <div class="pt-states">
+    <span class="pt-states__cell"><span class="pt-btn"><svg class="pt-glyph" data-icon="folder-input" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-1"/><path d="M2 13h10"/><path d="m9 16 3-3-3-3"/></svg></span>rest</span>
+    <span class="pt-states__cell"><span class="pt-btn is-hover"><svg class="pt-glyph" data-icon="folder-input" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-1"/><path d="M2 13h10"/><path d="m9 16 3-3-3-3"/></svg></span>hover</span>
+    <span class="pt-states__cell"><span class="pt-btn is-pressed"><svg class="pt-glyph" data-icon="folder-input" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-1"/><path d="M2 13h10"/><path d="m9 16 3-3-3-3"/></svg></span>pressed</span>
+    <span class="pt-states__cell"><span class="pt-btn is-focus"><svg class="pt-glyph" data-icon="folder-input" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-1"/><path d="M2 13h10"/><path d="m9 16 3-3-3-3"/></svg></span>focus</span>
+  </div></div>
+<figcaption><strong>C – <code>folder-input</code></strong>. “Into this project” – the best literal meaning, but it is a folder next to New folder, and the two folder shapes side by side are the next thing people would mix up.</figcaption></figure>
+
+</div>
+
+<h2 id="import-busy">2 · Import a file – while busy</h2>
+<p class="ds-muted">Each frame draws Import busy beside Refresh at rest, then both busy at once – the case where today
+they are the same picture. A frame is still; the caption says what turns. Under reduced motion nothing turns
+(<code>ProjectTree.css</code> already stops <code>.spin</code>), so the still shape alone must tell them apart.</p>
+<div class="ds-frames pt-frames">
+
+<figure class="ds-frame"><div aria-hidden="true">
+  <div class="pt-row"><span class="pt-row__name">Import busy</span><span class="pt-actions">
+    <span class="pt-btn"><svg class="pt-glyph" data-icon="rotate-cw" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span>
+    <span class="pt-btn is-context"><svg class="pt-glyph" data-icon="rotate-cw" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span></span></div>
+  <div class="pt-row"><span class="pt-row__name">Both busy</span><span class="pt-actions">
+    <span class="pt-btn"><svg class="pt-glyph" data-icon="rotate-cw" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span>
+    <span class="pt-btn"><svg class="pt-glyph" data-icon="rotate-cw" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span></span></div></div>
+<figcaption><strong>Ships – <code>rotate-cw</code>, spinning</strong>. The same glyph and the same motion as Refresh. Two spinning arrows in a row read as “refreshing”, and nothing says which one is the import.</figcaption></figure>
+
+<figure class="ds-frame"><div aria-hidden="true">
+  <div class="pt-row"><span class="pt-row__name">Import busy</span><span class="pt-actions">
+    <span class="pt-btn"><span class="pt-ring"></span></span>
+    <span class="pt-btn is-context"><svg class="pt-glyph" data-icon="rotate-cw" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span></span></div>
+  <div class="pt-row"><span class="pt-row__name">Both busy</span><span class="pt-actions">
+    <span class="pt-btn"><span class="pt-ring"></span></span>
+    <span class="pt-btn"><svg class="pt-glyph" data-icon="rotate-cw" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span></span></div></div>
+<figcaption><span class="pt-pick">Recommended.</span> <strong>A – the busy ring</strong>. The Buttons card's one busy spinner (<code>button.css</code>, <code>aria-busy</code>), <code data-token="--icon-size-xs">12px</code>, in place of the glyph. A ring with a gap is “working”; arrows stay Refresh's alone. With motion off it is still a ring.</figcaption></figure>
+
+<figure class="ds-frame"><div aria-hidden="true">
+  <div class="pt-row"><span class="pt-row__name">Import busy</span><span class="pt-actions">
+    <span class="pt-btn"><svg class="pt-glyph" data-icon="loader-circle" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg></span>
+    <span class="pt-btn is-context"><svg class="pt-glyph" data-icon="rotate-cw" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span></span></div>
+  <div class="pt-row"><span class="pt-row__name">Both busy</span><span class="pt-actions">
+    <span class="pt-btn"><svg class="pt-glyph" data-icon="loader-circle" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg></span>
+    <span class="pt-btn"><svg class="pt-glyph" data-icon="rotate-cw" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span></span></div></div>
+<figcaption><strong>B – <code>loader-circle</code>, spinning</strong>. Reads as busy and not as refresh, but it is one more spinner shape in an app the Motion card already counts too many of.</figcaption></figure>
+
+<figure class="ds-frame"><div aria-hidden="true">
+  <div class="pt-row"><span class="pt-row__name">Import busy</span><span class="pt-actions">
+    <span class="pt-btn is-dim"><svg class="pt-glyph" data-icon="file-input" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M2 15h10"/><path d="m9 18 3-3-3-3"/></svg></span>
+    <span class="pt-btn is-context"><svg class="pt-glyph" data-icon="rotate-cw" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span></span></div>
+  <div class="pt-row"><span class="pt-row__name">Both busy</span><span class="pt-actions">
+    <span class="pt-btn is-dim"><svg class="pt-glyph" data-icon="file-input" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M2 15h10"/><path d="m9 18 3-3-3-3"/></svg></span>
+    <span class="pt-btn"><svg class="pt-glyph" data-icon="rotate-cw" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span></span></div></div>
+<figcaption><strong>C – the glyph stays, dimmed, nothing turns</strong>. What the Buttons card says today (“an icon-only button never goes busy; its surface shows progress”). It cannot be mistaken for Refresh, but the tree has no surface that shows an import in progress, so the user sees a greyed button and nothing else.</figcaption></figure>
+
+</div>
+
+<h2 id="filter">3 and 4 · Show all files / Show only Markdown files</h2>
+<p class="ds-muted">The issue is two problems, and an icon fixes only half of one. <strong>“Is this a filter?”</strong> is
+answered by the control's shape and its words; <strong>“which one is on?”</strong> by a checked state that is not
+colour alone, and by a trace that survives closing the panel. So this section draws three ways to show the
+filter, then the icon options for each of the two choices.</p>
+
+<h3 id="filter-ships">As it ships</h3>
+<div class="ds-frames pt-frames">
+
+<figure class="ds-frame"><div aria-hidden="true">
+  <div class="pt-panel">
+    <div class="pt-head"><svg class="pt-head__icon" data-icon="folder-open" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg><span class="pt-head__title">Project</span>
+      <span class="pt-btn"><svg class="pt-glyph" data-icon="chevron-down" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></div>
+    <div class="pt-cp"><span class="pt-cp__label">File Filter</span><div class="pt-cp__opts">
+      <span class="pt-cp__opt is-on"><svg class="pt-glyph" data-icon="files" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2a2 2 0 0 1 1.414.586l4 4A2 2 0 0 1 21 8v7a2 2 0 0 1-2 2h-8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M15 2v4a2 2 0 0 0 2 2h4"/><path d="M5 7a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h8a2 2 0 0 0 1.732-1"/></svg>All Files</span>
+      <span class="pt-cp__opt"><svg class="pt-glyph" data-icon="file-text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>Markdown Only</span></div></div>
+    <ul class="pt-tree"><li><svg data-icon="file-text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>README.md</li><li><svg data-icon="file" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>package.json</li></ul>
+  </div></div>
+<figcaption><strong>Open, All files on</strong> – the active side is a violet tint and a violet word; the other side is a grey tint. Both are filled boxes, so “on” is a hue change only.</figcaption></figure>
+
+<figure class="ds-frame"><div aria-hidden="true">
+  <div class="pt-panel">
+    <div class="pt-head"><svg class="pt-head__icon" data-icon="folder-open" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg><span class="pt-head__title">Project</span>
+      <span class="pt-btn"><svg class="pt-glyph" data-icon="chevron-down" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></div>
+    <div class="pt-cp"><span class="pt-cp__label">File Filter</span><div class="pt-cp__opts">
+      <span class="pt-cp__opt"><svg class="pt-glyph" data-icon="files" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2a2 2 0 0 1 1.414.586l4 4A2 2 0 0 1 21 8v7a2 2 0 0 1-2 2h-8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M15 2v4a2 2 0 0 0 2 2h4"/><path d="M5 7a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h8a2 2 0 0 0 1.732-1"/></svg>All Files</span>
+      <span class="pt-cp__opt is-on"><svg class="pt-glyph" data-icon="file-text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>Markdown Only</span></div></div>
+    <ul class="pt-tree"><li><svg data-icon="file-text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>README.md</li></ul>
+  </div></div>
+<figcaption><strong>Open, Markdown only on</strong> – the same tint, moved. Two side-by-side buttons with icons read as two actions, not as one choice of two.</figcaption></figure>
+
+<figure class="ds-frame"><div aria-hidden="true">
+  <div class="pt-panel">
+    <div class="pt-head"><svg class="pt-head__icon" data-icon="folder-open" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg><span class="pt-head__title">Project</span>
+      <span class="pt-btn"><svg class="pt-glyph" data-icon="chevron-left" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></span></div>
+    <ul class="pt-tree"><li><svg data-icon="file-text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>README.md</li></ul>
+  </div></div>
+<figcaption><strong>Closed, Markdown only on</strong> – nothing on screen says a filter is on; <code>package.json</code> is simply gone. The chevron gives no hint that a filter lives behind it, and it cannot be reached by keyboard.</figcaption></figure>
+
+</div>
+
+<h3 id="filter-options">How the filter shows – three options</h3>
+<div class="ds-frames pt-frames--wide">
+
+<figure class="ds-frame"><div aria-hidden="true">
+  <div class="pt-panel">
+    <div class="pt-head"><svg class="pt-head__icon" data-icon="folder-open" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg><span class="pt-head__title">Project</span>
+      <span class="erf-chip erf-chip--outline">Markdown only</span>
+      <span class="pt-btn is-open"><svg class="pt-glyph" data-icon="funnel" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"/></svg></span></div>
+    <div class="pt-cp"><div class="erf-segmented"><span class="erf-segmented__label">Show</span><div class="erf-segmented__cells">
+      <span class="erf-segmented__cell" aria-checked="false"><svg class="pt-glyph" data-icon="folder-tree" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/></svg>All files</span>
+      <span class="erf-segmented__cell" aria-checked="true"><svg class="pt-glyph" data-icon="file-text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>Markdown only</span></div></div></div>
+    <ul class="pt-tree"><li><svg data-icon="file-text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>README.md</li></ul>
+  </div>
+  <div class="pt-panel">
+    <div class="pt-head"><svg class="pt-head__icon" data-icon="folder-open" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg><span class="pt-head__title">Project</span>
+      <span class="erf-chip erf-chip--outline">Markdown only</span>
+      <span class="pt-btn"><svg class="pt-glyph" data-icon="funnel" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"/></svg></span></div>
+    <ul class="pt-tree"><li><svg data-icon="file-text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>README.md</li></ul>
+  </div></div>
+<figcaption><span class="pt-pick">Recommended.</span> <strong>A – a labelled choice, and a trace when closed</strong>. The trigger is a real <code>funnel</code> button (<code>aria-expanded</code>). The panel holds the <a href="../../design-system/system/components/segmented/index.html">Segmented control</a> named “Show”: checked is a fill <em>and</em> a lime bottom edge. While Markdown only is on, the header says so in words (<a href="../../design-system/system/components/badge/index.html">Badge</a> card's outline chip), open or closed. Top: open. Bottom: closed.</figcaption></figure>
+
+<figure class="ds-frame"><div aria-hidden="true">
+  <div class="pt-panel">
+    <div class="pt-head"><svg class="pt-head__icon" data-icon="folder-open" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg><span class="pt-head__title">Project</span>
+      <span class="pt-btn is-open"><svg class="pt-glyph" data-icon="list-filter" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 5h20"/><path d="M6 12h12"/><path d="M9 19h6"/></svg></span></div>
+    <div class="pt-cp"><div class="erf-segmented"><span class="erf-segmented__label">Show</span><div class="erf-segmented__cells">
+      <span class="erf-segmented__cell" aria-checked="false"><svg class="pt-glyph" data-icon="files" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2a2 2 0 0 1 1.414.586l4 4A2 2 0 0 1 21 8v7a2 2 0 0 1-2 2h-8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M15 2v4a2 2 0 0 0 2 2h4"/><path d="M5 7a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h8a2 2 0 0 0 1.732-1"/></svg>All files</span>
+      <span class="erf-segmented__cell" aria-checked="true"><svg class="pt-glyph" data-icon="file-text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>Markdown only</span></div></div></div>
+    <ul class="pt-tree"><li><svg data-icon="file-text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>README.md</li></ul>
+  </div>
+  <div class="pt-panel">
+    <div class="pt-head"><svg class="pt-head__icon" data-icon="folder-open" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg><span class="pt-head__title">Project</span>
+      <span class="pt-btn is-on"><svg class="pt-glyph" data-icon="list-filter" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 5h20"/><path d="M6 12h12"/><path d="M9 19h6"/></svg></span></div>
+    <ul class="pt-tree"><li><svg data-icon="file-text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>README.md</li></ul>
+  </div></div>
+<figcaption><strong>B – the same choice, the trigger carries the state</strong>. Segmented control in the panel; when closed with a filter on, the trigger wears the pressed signature (fill and lime edge). Smaller, but the closed state is a mark to learn, not words – and the same mark on a disclosure button is easy to read as “open”.</figcaption></figure>
+
+<figure class="ds-frame"><div aria-hidden="true">
+  <div class="pt-panel">
+    <div class="pt-head"><svg class="pt-head__icon" data-icon="folder-open" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg><span class="pt-head__title">Project</span></div>
+    <div class="pt-row"><span class="pt-row__name">erfana-docs</span><span class="pt-actions">
+      <span class="pt-btn is-context"><svg class="pt-glyph" data-icon="file-plus" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 18v-6"/></svg></span>
+      <span class="pt-btn is-context"><svg class="pt-glyph" data-icon="folder-plus" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 10v6"/><path d="M9 13h6"/><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span>
+      <span class="pt-btn is-context"><svg class="pt-glyph" data-icon="file-input" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M2 15h10"/><path d="m9 18 3-3-3-3"/></svg></span>
+      <span class="pt-btn is-on"><svg class="pt-glyph" data-icon="funnel" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"/></svg></span>
+      <span class="pt-btn is-context"><svg class="pt-glyph" data-icon="rotate-cw" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span></span></div>
+    <ul class="pt-tree"><li><svg data-icon="file-text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>README.md</li></ul>
+  </div>
+  <div class="pt-panel">
+    <div class="pt-head"><svg class="pt-head__icon" data-icon="folder-open" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg><span class="pt-head__title">Project</span></div>
+    <div class="pt-row"><span class="pt-row__name">erfana-docs</span><span class="pt-actions">
+      <span class="pt-btn is-context"><svg class="pt-glyph" data-icon="file-plus" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 18v-6"/></svg></span>
+      <span class="pt-btn is-context"><svg class="pt-glyph" data-icon="folder-plus" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 10v6"/><path d="M9 13h6"/><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span>
+      <span class="pt-btn is-context"><svg class="pt-glyph" data-icon="file-input" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M2 15h10"/><path d="m9 18 3-3-3-3"/></svg></span>
+      <span class="pt-btn"><svg class="pt-glyph" data-icon="funnel" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"/></svg></span>
+      <span class="pt-btn is-context"><svg class="pt-glyph" data-icon="rotate-cw" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span></span></div>
+    <ul class="pt-tree"><li><svg data-icon="file-text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>README.md</li><li><svg data-icon="file" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>package.json</li></ul>
+  </div></div>
+<figcaption><strong>C – one toggle in the toolbar, no panel</strong>. “Show only Markdown files” as a <code>funnel</code> toggle (<code>aria-pressed</code>). Top: on. Bottom: off. Always visible and one click, but it removes the panel and adds a button to the row – a layout change that needs the UX side, and the row is already crowded at narrow widths.</figcaption></figure>
+
+</div>
+
+<h3 id="filter-icons">The icon on each choice</h3>
+<p class="ds-muted">Inside a labelled choice the icon supports the word, it does not replace it. Each option is drawn
+in the Segmented cell, checked and not.</p>
+<div class="ds-frames pt-frames">
+
+<figure class="ds-frame"><div aria-hidden="true"><div class="pt-cp"><div class="erf-segmented"><span class="erf-segmented__label">Show</span><div class="erf-segmented__cells">
+  <span class="erf-segmented__cell" aria-checked="true"><svg class="pt-glyph" data-icon="files" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2a2 2 0 0 1 1.414.586l4 4A2 2 0 0 1 21 8v7a2 2 0 0 1-2 2h-8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M15 2v4a2 2 0 0 0 2 2h4"/><path d="M5 7a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h8a2 2 0 0 0 1.732-1"/></svg>All files</span>
+  <span class="erf-segmented__cell" aria-checked="false"><svg class="pt-glyph" data-icon="file-text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>Markdown only</span></div></div></div></div>
+<figcaption><strong>All files – ships: <code>files</code></strong>. Two stacked pages: reads as “copies” or “several files”, and says nothing about folders.</figcaption></figure>
+
+<figure class="ds-frame"><div aria-hidden="true"><div class="pt-cp"><div class="erf-segmented"><span class="erf-segmented__label">Show</span><div class="erf-segmented__cells">
+  <span class="erf-segmented__cell" aria-checked="true"><svg class="pt-glyph" data-icon="folder-tree" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/></svg>All files</span>
+  <span class="erf-segmented__cell" aria-checked="false"><svg class="pt-glyph" data-icon="file-text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>Markdown only</span></div></div></div></div>
+<figcaption><span class="pt-pick">Recommended.</span> <strong>All files – A: <code>folder-tree</code></strong>. A whole tree: “everything, folders included”, which is what the tooltip promises.</figcaption></figure>
+
+<figure class="ds-frame"><div aria-hidden="true"><div class="pt-cp"><div class="erf-segmented"><span class="erf-segmented__label">Show</span><div class="erf-segmented__cells">
+  <span class="erf-segmented__cell" aria-checked="true"><svg class="pt-glyph" data-icon="list-tree" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5h13"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="M3 10a2 2 0 0 0 2 2h3"/><path d="M3 5v12a2 2 0 0 0 2 2h3"/></svg>All files</span>
+  <span class="erf-segmented__cell" aria-checked="false"><svg class="pt-glyph" data-icon="file-text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>Markdown only</span></div></div></div></div>
+<figcaption><strong>All files – B: <code>list-tree</code></strong>. An outline: “the full list”. Abstract; at 14px close to a text-align glyph.</figcaption></figure>
+
+<figure class="ds-frame"><div aria-hidden="true"><div class="pt-cp"><div class="erf-segmented"><span class="erf-segmented__label">Show</span><div class="erf-segmented__cells">
+  <span class="erf-segmented__cell" aria-checked="false"><svg class="pt-glyph" data-icon="folder-tree" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/></svg>All files</span>
+  <span class="erf-segmented__cell" aria-checked="true"><svg class="pt-glyph" data-icon="file-text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>Markdown only</span></div></div></div></div>
+<figcaption><span class="pt-pick">Recommended.</span> <strong>Markdown only – keep <code>file-text</code></strong>. It is the exact glyph the tree draws on every Markdown row (<code>ProjectTreeNode.tsx</code>), so the choice says “only rows with this icon”.</figcaption></figure>
+
+<figure class="ds-frame"><div aria-hidden="true"><div class="pt-cp"><div class="erf-segmented"><span class="erf-segmented__label">Show</span><div class="erf-segmented__cells">
+  <span class="erf-segmented__cell" aria-checked="false"><svg class="pt-glyph" data-icon="folder-tree" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/></svg>All files</span>
+  <span class="erf-segmented__cell" aria-checked="true"><svg class="pt-glyph" data-icon="file-type" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 13v-1h6v1"/><path d="M12 12v6"/><path d="M11 18h2"/></svg>Markdown only</span></div></div></div></div>
+<figcaption><strong>Markdown only – B: <code>file-type</code></strong>. A file with a “T”: “text documents”. Close in meaning, but it matches nothing in the tree.</figcaption></figure>
+
+<figure class="ds-frame"><div aria-hidden="true"><div class="pt-cp"><div class="erf-segmented"><span class="erf-segmented__label">Show</span><div class="erf-segmented__cells">
+  <span class="erf-segmented__cell" aria-checked="false"><svg class="pt-glyph" data-icon="folder-tree" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/></svg>All files</span>
+  <span class="erf-segmented__cell" aria-checked="true"><svg class="pt-glyph" data-icon="funnel" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"/></svg>Markdown only</span></div></div></div></div>
+<figcaption><strong>Markdown only – C: <code>funnel</code></strong>. Says “filtered”, not “Markdown”. Only right with option C above, where the button has no word beside it; with A the funnel is already the trigger.</figcaption></figure>
+
+</div>
+
+<h2 id="summary">The picks, in one table</h2>
+<table class="pt-sum">
+<thead><tr><th>Control</th><th>Ships</th><th>Options</th><th>Recommended</th><th>Why, in one line</th></tr></thead>
+<tbody>
+  <tr><td>Import a file</td><td><svg data-icon="file-up" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 12v6"/><path d="m15 15-3-3-3 3"/></svg> <code>file-up</code></td><td>A <code>file-input</code> · B <code>import</code> · C <code>folder-input</code></td><td><svg data-icon="file-input" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M2 15h10"/><path d="m9 18 3-3-3-3"/></svg> A <code>file-input</code></td><td>The arrow goes into the file – “bring in”, not upload – and it does not look like New folder.</td></tr>
+  <tr><td>Import, while busy</td><td><svg data-icon="rotate-cw" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg> <code>rotate-cw</code>, spinning</td><td>A busy ring · B <code>loader-circle</code> · C glyph dimmed, still</td><td>A the busy ring</td><td>The system's one busy shape; arrows stay Refresh's alone, and it still differs with motion off.</td></tr>
+  <tr><td>Show all files and folders</td><td><svg data-icon="files" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2a2 2 0 0 1 1.414.586l4 4A2 2 0 0 1 21 8v7a2 2 0 0 1-2 2h-8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M15 2v4a2 2 0 0 0 2 2h4"/><path d="M5 7a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h8a2 2 0 0 0 1.732-1"/></svg> <code>files</code></td><td>A <code>folder-tree</code> · B <code>list-tree</code> · keep <code>files</code></td><td><svg data-icon="folder-tree" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/></svg> A <code>folder-tree</code></td><td>Says “everything, folders too”; <code>files</code> reads as copies.</td></tr>
+  <tr><td>Show only Markdown files</td><td><svg data-icon="file-text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg> <code>file-text</code></td><td>keep <code>file-text</code> · B <code>file-type</code> · C <code>funnel</code></td><td><svg data-icon="file-text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg> keep <code>file-text</code></td><td>The same glyph as every Markdown row in the tree.</td></tr>
+  <tr><td>Which filter is on</td><td>Violet tint inside a closed-by-default panel</td><td>A Segmented + header words · B Segmented + pressed trigger · C toolbar toggle</td><td>A</td><td>A checked fill and lime edge, plus words in the header that stay when the panel closes.</td></tr>
+</tbody>
+</table>
+
+<h2 id="contrast">Contrast, measured</h2>
+<table>
+<thead><tr><th>Pair</th><th>Where</th><th>Ratio</th></tr></thead>
+<tbody>
+  <tr><td><code>--color-text-secondary</code> on <code>--color-bg-tertiary</code></td><td>Every toolbar glyph at rest, and the busy ring (graphic, 3:1)</td><td data-contrast="--color-text-secondary on --color-bg-tertiary" data-min="3" data-result="pass">4.15:1 · pass</td></tr>
+  <tr><td><code>--color-text-primary</code> on <code>--color-bg-hover</code></td><td>A glyph on hover (graphic, 3:1)</td><td data-contrast="--color-text-primary on --color-bg-hover over --color-bg-tertiary" data-min="3" data-result="pass">8.22:1 · pass</td></tr>
+  <tr><td><code>--color-accent-drag</code> on <code>--color-accent-drag-bg</code></td><td>Ships: the active filter's word</td><td data-contrast="--color-accent-drag on --color-accent-drag-bg over --color-bg-tertiary" data-min="4.5" data-result="pass">4.68:1 · pass</td></tr>
+  <tr><td><code>--color-accent-drag-border</code> on <code>--color-bg-tertiary</code></td><td>Ships: the active filter's edge, the only non-hue cue (3:1)</td><td data-contrast="--color-accent-drag-border on --color-bg-tertiary over --color-bg-tertiary" data-min="3" data-result="fail">1.84:1 · fail</td></tr>
+  <tr><td><code>--color-text-emphasis</code> on <code>--color-bg-selected</code></td><td>Proposed: the checked choice's word</td><td data-contrast="--color-text-emphasis on --color-bg-selected over --color-bg-tertiary" data-min="4.5" data-result="pass">10.30:1 · pass</td></tr>
+  <tr><td><code>--color-brand-lime</code> on <code>--color-bg-tertiary</code></td><td>Proposed: the checked edge (3:1)</td><td data-contrast="--color-brand-lime on --color-bg-tertiary" data-min="3" data-result="pass">11.55:1 · pass</td></tr>
+  <tr><td><code>--color-text-primary</code> on <code>--color-bg-tertiary</code></td><td>Proposed: the “Markdown only” words in the header</td><td data-contrast="--color-text-primary on --color-bg-tertiary" data-min="4.5" data-result="pass">9.53:1 · pass</td></tr>
+  <tr><td><code>--color-accent-primary</code> on <code>--color-bg-tertiary</code></td><td>Proposed: that chip's edge (3:1)</td><td data-contrast="--color-accent-primary on --color-bg-tertiary" data-min="3" data-result="pass">6.95:1 · pass</td></tr>
+</tbody>
+</table>
+
+<h2 id="names">Names, keyboard and the test</h2>
+<table class="ds-keys">
+<thead><tr><th>Control</th><th>Name and state</th><th>Keyboard</th></tr></thead>
+<tbody>
+  <tr><td>Import</td><td><code>aria-label</code> “Import a file”; while busy “Importing file…”, <code>aria-busy="true"</code> and <code>aria-disabled="true"</code> instead of <code>disabled</code>, so focus is not dropped to the page mid-import (Buttons card)</td><td>Unchanged: a tab stop, <kbd>Enter</kbd> / <kbd>Space</kbd></td></tr>
+  <tr><td>Filter trigger (A, B)</td><td>A <code>&lt;button&gt;</code> named “File filter”, <code>aria-expanded</code>, <code>aria-controls</code> the panel – today a <code>&lt;span&gt;</code> with <code>title</code> only</td><td>Becomes a tab stop; <kbd>Enter</kbd> / <kbd>Space</kbd> open and close</td></tr>
+  <tr><td>Filter choice (A, B)</td><td><code>role="radiogroup"</code> named “Show”, two <code>role="radio"</code> with <code>aria-checked</code> – today two buttons with no state</td><td>The Segmented control card's contract: one tab stop, <kbd>←</kbd> <kbd>→</kbd> move and check</td></tr>
+  <tr><td>Header words (A)</td><td>Plain text “Markdown only”, read with the header; not a live region</td><td>Not focusable</td></tr>
+</tbody>
+</table>
+<p class="ds-muted">The issue asks for a test that pins each icon. lucide-react renders <code>class="lucide lucide-&lt;name&gt;"</code>
+on its SVG, so <code>ProjectTree.toolbar.test.tsx</code> (which already asserts “idle: FileUp icon”) can assert the class
+on each button: <code>lucide-file-input</code> idle, no <code>lucide-rotate-cw</code> while importing, and the filter
+choices' icons and <code>aria-checked</code>. The Welcome panel's Import button (<code>WelcomePanel.tsx</code>) draws
+the same <code>FileUp</code> and should take the same pick.</p>
+
+<h2 id="owner">What the owner decided</h2>
+<p class="ds-muted">The owner approved every recommendation on 2026-11-03. Built in
+<code>ProjectTree.tsx</code>, <code>FileFilterChoice.tsx</code>, <code>ProjectPanel.tsx</code> and
+<code>WelcomePanel.tsx</code> (#452).</p>
+<table>
+<thead><tr><th>Question</th><th>Decision</th><th>How it ships</th></tr></thead>
+<tbody>
+  <tr><td>Import a file</td><td>A – <code>file-input</code></td><td>The toolbar Import button, and the Welcome panel's Import button, which drew the same <code>file-up</code>.</td></tr>
+  <tr><td>Import, while busy</td><td>A – the busy ring</td><td>The ring in place of the glyph, <code>aria-busy</code> with <code>aria-disabled</code>; a still ring under reduced motion. The <a href="../../design-system/system/components/button/index.html">Buttons</a> card's line is not changed: the site records a deviation (<code>ProjectTree.css</code>) and the card lists it.</td></tr>
+  <tr><td>Show all files and folders</td><td>A – <code>folder-tree</code></td><td>The “All files” choice.</td></tr>
+  <tr><td>Show only Markdown files</td><td>Keep <code>file-text</code></td><td>The “Markdown only” choice.</td></tr>
+  <tr><td>Which filter is on</td><td>A – labelled choice and header words</td><td>A radio group named “Show” (fill and lime edge on the checked side), a <code>funnel</code> trigger button with <code>aria-expanded</code>, and “Markdown only” in the header while that filter is on, open or closed.</td></tr>
+</tbody>
+</table>
+
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None recorded.</p>
+</section>
+
+<h2 id="related">Cards it builds on</h2>
+<ul class="ds-muted">
+  <li><a href="../../design-system/system/components/icon/index.html">Icons</a> (proposed) – lucide glyphs as <code>data-icon</code>; a new glyph joins the registry before it is used. The card's size and stroke rules are a separate change, so every frame here draws the shipping 14px and stroke.</li>
+  <li><a href="../../design-system/system/components/button/index.html">Buttons</a> (proposed) – the busy ring, the pressed signature, <code>aria-busy</code> with <code>aria-disabled</code>.</li>
+  <li><a href="../../design-system/system/components/segmented/index.html">Segmented control</a> (proposed) – the filter choice and its keyboard.</li>
+  <li><a href="../../design-system/system/components/badge/index.html">Badges, chips and keys</a> (proposed) – the outline chip for “Markdown only”.</li>
+  <li><a href="../../design-system/system/components/toolbar/index.html">Toolbar</a> (proposed) – the row itself, unchanged here.</li>
+  <li><a href="../../design-system/system/foundations/motion.html">Motion</a> (proposed) – one spinner, and nothing turns under reduced motion.</li>
+</ul>
+
+</main>
+</body>
+</html>

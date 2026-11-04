@@ -3973,23 +3973,23 @@
       "id": "docs-ui-components/20",
       "audience": "developer",
       "doc": "docs/ui-components.md",
-      "quote": "Header with a ChevronDown (open) / ChevronLeft (closed) icon.",
+      "quote": "Header with a `Funnel` toggle button.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:112",
-      "match": "<ChevronDown size={16} strokeWidth={2} />",
+      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:118",
+      "match": "<Funnel size={16} strokeWidth={2} aria-hidden=\"true\" />",
       "note": "Claimed a 150ms rotation transition and 8px spacing; the icon is swapped, and only colours transition via --transition-normal."
     },
     {
       "id": "docs-ui-components/21",
       "audience": "developer",
       "doc": "docs/ui-components.md",
-      "quote": "the toggle is a `<span>` with a `title`, not a `<button>`",
+      "quote": "a real `<button>`, keyboard-reachable, named \"File filter\"",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:107",
-      "match": "className=\"control-panel-chevron\"",
-      "note": "The code sample showed a <button> with a local `show` state; the shipped toggle is a <span> driven by showControlPanel."
+      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:113",
+      "match": "aria-label=\"File filter\"",
+      "note": "Was a <span> with a title and no role; became a named <button> with aria-expanded in #452."
     },
     {
       "id": "docs-ui-components/22",
@@ -3998,7 +3998,7 @@
       "quote": "title={showControlPanel ? 'Hide Filter Options' : 'Show Filter Options'}",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:109",
+      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:116",
       "match": "title={showControlPanel ? 'Hide Filter Options' : 'Show Filter Options'}",
       "note": "Sample now mirrors the shipped markup."
     },
@@ -4006,11 +4006,11 @@
       "id": "docs-ui-components/23",
       "audience": "developer",
       "doc": "docs/ui-components.md",
-      "quote": "**CSS**: `.control-panel-chevron` (plus `:hover` / `:active`) in `ProjectPanel.css`",
+      "quote": "**CSS**: `.control-panel-chevron` (plus `:hover` / `:active` / `[aria-expanded='true']` / `:focus-visible`) in `ProjectPanel.css`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ProjectPanel.css:63",
-      "match": ".control-panel-chevron:active {"
+      "source": "src/renderer/src/components/Panels/ProjectPanel.css:86",
+      "match": ".control-panel-chevron[aria-expanded='true'] {"
     },
     {
       "id": "docs-ui-components/24",
@@ -4070,7 +4070,7 @@
       "quote": "**Hidden** (70% opacity, italic): Files starting with `.`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:249",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:276",
       "match": "opacity: 0.7;"
     },
     {
@@ -4610,7 +4610,7 @@
       "quote": "It has three mount sites: `ProjectPanel.tsx` (the project tree)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:124",
+      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:127",
       "match": "<PanelErrorBoundary key={projectPath ?? 'none'} componentName=\"Project tree\">"
     },
     {
@@ -5298,7 +5298,7 @@
       "quote": "(`ProjectTree/ProjectTree.css:620`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:620",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:668",
       "match": "background-color: var(--color-git-renamed);"
     },
     {
@@ -6108,7 +6108,7 @@
       "quote": "manual refresh button (Cmd/Ctrl+Alt+R)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1341",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1342",
       "match": "(e.metaKey || e.ctrlKey) && e.altKey && e.key.toLowerCase() === 'r'"
     },
     {
@@ -8774,7 +8774,7 @@
       "quote": "as `openInBrowser: openInDefaultBrowser` (line numbers dropped",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1387",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1388",
       "match": "openInBrowser: openInDefaultBrowser",
       "note": "Cited ProjectTree.tsx:1223/:1248/:1254; buildMenuContext is now at :1357 and openInBrowser at :1387."
     },
@@ -13197,7 +13197,7 @@
       "quote": "the `<PanelErrorBoundary key={projectPath ?? 'none'} componentName=\"Project tree\">` around the tree",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:124",
+      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:127",
       "match": "componentName=\"Project tree\""
     },
     {
@@ -18315,7 +18315,7 @@
       "quote": "a pasted cut asks \"Replace Item\" first, while a drag onto a folder that already holds the name fails with an error toast",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:901",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:902",
       "match": "title: 'Replace Item',",
       "note": "Said moves always get a confirm dialog; only a pasted cut does – handleDragEnd calls moveItem without a conflict check."
     },
@@ -18326,7 +18326,7 @@
       "quote": "dnd-kit's own `DndContext` auto-scroll, driven by the live pointer",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:572",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:573",
       "match": "own (`DndContext` autoScroll, on by default), driven by the live pointer.",
       "test": "e2e/tree-keyboard.e2e.ts",
       "note": "Claimed a custom 50px / 60fps auto-scroll; the tree interval was removed and AUTO_SCROLL is unused."
@@ -18380,7 +18380,7 @@
       "quote": "Cut items appear dimmed with dashed underline until pasted",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:419",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:467",
       "match": ".project-tree-item[data-clipboard-cut=\"true\"]::after {"
     },
     {
@@ -18390,7 +18390,7 @@
       "quote": "Keyboard and menu paste ask before replacing a same-named item; a mouse drag does not",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:895",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:896",
       "match": "const hasConflict = await fileGateway.checkConflict({ targetParentPath: targetPath, itemName: sourceItemName })",
       "note": "Said keyboard operations work identically to mouse drag-drop; only paste checks for a name conflict."
     },
@@ -18412,7 +18412,7 @@
       "quote": "Folder stays highlighted during the 1 s auto-expand countdown (no pulse animation)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:384",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:432",
       "match": ".project-tree-node[data-drop-highlight=\"true\"] > .project-tree-item.directory {",
       "note": "Claimed a pulse animation; no such keyframe exists in ProjectTree.css."
     },
@@ -18513,7 +18513,7 @@
       "quote": "**Cmd+Shift+I** (Mac) or **Ctrl+Shift+I** (Windows/Linux):",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1313",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1314",
       "match": "if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'i') {"
     },
     {
@@ -18553,7 +18553,7 @@
       "quote": "Move and Copy do not filter by type. In the Import path:",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1039",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1040",
       "match": "if (mode === 'import') {",
       "note": "Said every multi-file drop filters out documents from move/copy; filtering happens only in processFiles (Import mode)."
     },
@@ -18773,7 +18773,7 @@
       "quote": "A target folder must be selected – otherwise the toast \"Select a folder to paste into\"",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:884",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:885",
       "match": "message: 'Select a folder to paste into',",
       "note": "Rule had no traceable outcome; now names the toast."
     },
@@ -18916,7 +18916,7 @@
       "quote": "a custom `treeCollisionDetection` function in `ProjectTree.tsx`, passed to `DndContext`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1631",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1615",
       "match": "collisionDetection={treeCollisionDetection}"
     },
     {
@@ -18926,7 +18926,7 @@
       "quote": "this is dnd-kit's own `DndContext` auto-scroll, driven by the live pointer",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:572",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:573",
       "match": "own (`DndContext` autoScroll, on by default), driven by the live pointer.",
       "note": "Claimed 50px / 60fps custom auto-scroll."
     },
@@ -18937,7 +18937,7 @@
       "quote": "A custom dnd-kit `<DragOverlay>` ghost (`.drag-overlay`, the dragged item's name) follows the cursor",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1697",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1681",
       "match": "<DragOverlay dropAnimation={null}>"
     },
     {
@@ -18947,7 +18947,7 @@
       "quote": "const moveResult = await fileGateway.moveItem({ sourcePath, targetParentPath: targetParent })",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:778",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:779",
       "match": "const moveResult = await fileGateway.moveItem({ sourcePath, targetParentPath: targetParent })",
       "note": "Excerpt called window.api.file.moveItem positionally and refreshed outside the pause."
     },
@@ -18958,7 +18958,7 @@
       "quote": "showGlobalToast({ title: 'Success', message: 'Item moved successfully', type: 'success' })",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:800",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:801",
       "match": "message: 'Item moved successfully',",
       "note": "Toast was given as \"Moved 1 file\" / \"Move failed\"."
     },
@@ -18969,7 +18969,7 @@
       "quote": "showGlobalToast({ title: 'Error', message: formatFileOperationError(err, 'move'), type: 'error' })",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:805",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:806",
       "match": "const errorMessage = formatFileOperationError(err, 'move')",
       "note": "Failure toast title was \"Move failed\"."
     },
@@ -19187,7 +19187,7 @@
       "quote": "a drag-drop move does not ask and fails with an error toast",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:805",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:806",
       "match": "const errorMessage = formatFileOperationError(err, 'move')",
       "note": "Said every move conflict shows a confirm dialog."
     },
@@ -19209,7 +19209,7 @@
       "quote": "\"Cannot move project root\" (renderer toast); \"Cannot move the project root directory\" (main)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:732",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:733",
       "match": "message: 'Cannot move project root',",
       "note": "Table gave only the main-process message for the renderer check."
     },
@@ -19314,7 +19314,7 @@
       "quote": "opacity: var(--opacity-disabled);",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:362",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:410",
       "match": "opacity: var(--opacity-disabled);"
     },
     {
@@ -19334,7 +19334,7 @@
       "quote": ".project-tree-node[data-in-drop-zone=\"internal\"] {",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:391",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:439",
       "match": ".project-tree-node[data-in-drop-zone=\"internal\"] {"
     },
     {
@@ -19355,7 +19355,7 @@
       "quote": "The tree's former `startAutoScroll` interval read the pointer position from when the drag *started*",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:573",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:574",
       "match": "// The tree's former interval read `activatorEvent.clientY` – the pointer",
       "test": "e2e/tree-keyboard.e2e.ts",
       "note": "Showed a startAutoScroll function and 50px/5px/60fps parameters that no longer run."
@@ -19367,7 +19367,7 @@
       "quote": "dnd-kit's default live region and drag instructions are still rendered",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1638",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1622",
       "match": "accessibility={TREE_DND_ACCESSIBILITY}",
       "note": "Said no aria-live region is rendered; dnd-kit renders its own at document.body."
     },
@@ -19378,7 +19378,7 @@
       "quote": "\"Success\" – `Item moved successfully` after a drag inside the tree",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:800",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:801",
       "match": "message: 'Item moved successfully',",
       "note": "Said an internal drop shows \"Moved N file(s)\" (that is the OS-drop toast)."
     },
@@ -19389,7 +19389,7 @@
       "quote": "`Moved 1 file` / `Moved N files` / `Copied …` after a drop from the OS",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1162",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1163",
       "match": "? `${operationLabel} 1 file`"
     },
     {
@@ -19399,7 +19399,7 @@
       "quote": "\"Symlink Moved\" / \"Symlink Copied\" – warning toast when the operated item was a symlink",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:793",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:794",
       "match": "title: 'Symlink Moved',",
       "note": "Toast type was given as info; it is warning."
     },
@@ -19410,7 +19410,7 @@
       "quote": "\"Invalid Move\" – a folder dropped into its own subfolder, or the project root dragged",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:721",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:722",
       "match": "title: 'Invalid Move',",
       "note": "Replaced the non-existent \"Move failed\" title."
     },
@@ -19462,7 +19462,7 @@
       "quote": "gives every visible row inside it `data-in-drop-zone=\"internal\"`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1660",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1644",
       "match": "? 'internal'"
     },
     {
@@ -19472,7 +19472,7 @@
       "quote": "`DropIndicator.tsx` and `FolderDropHighlight.tsx` exist in the same folder but are rendered nowhere",
       "status": "verified",
       "evidence": "app",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1697",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1681",
       "match": "<DragOverlay dropAnimation={null}>",
       "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
@@ -20179,7 +20179,7 @@
       "quote": "# - Error message: \"Project folder no longer exists\"",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:347",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:348",
       "match": "message: 'Project folder no longer exists'"
     },
     {
@@ -20320,7 +20320,7 @@
       "quote": "**Location**: `src/renderer/src/components/Panels/ProjectPanel.tsx`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:30",
+      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:31",
       "match": "export function ProjectPanel(props: ISplitviewPanelProps) {"
     },
     {
@@ -20330,7 +20330,7 @@
       "quote": "<ProjectTree showControlPanel filterMode onFilterModeChange />",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:127",
+      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:130",
       "match": "showControlPanel={showControlPanel}",
       "note": "Diagram placed the control panel in ProjectPanel; ProjectTree renders it from the showControlPanel prop."
     },
@@ -20341,7 +20341,7 @@
       "quote": "**ProjectTree**: Toolbar, control panel markup, tree rendering (virtualised)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1590",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1594",
       "match": "{showControlPanel && (",
       "note": "Responsibility split misplaced the control panel and file opening."
     },
@@ -20372,7 +20372,7 @@
       "quote": "The panel reads that path from `useProjectManagementContextSafe()`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:37",
+      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:38",
       "match": "const projectPath = useProjectManagementContextSafe()?.projectPath ?? null"
     },
     {
@@ -20382,7 +20382,7 @@
       "quote": "**Keyboard Shortcut**: Cmd+Alt+R (macOS) / Ctrl+Alt+R (Windows/Linux)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1578",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1582",
       "match": "title={`Refresh (${formatShortcut('R', { mod: true, alt: true })})`}"
     },
     {
@@ -20392,7 +20392,7 @@
       "quote": "ARIA label \"Refresh project tree and git status\"",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1579",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1583",
       "match": "aria-label=\"Refresh project tree and git status\"",
       "note": "Named only \"ARIA label, focus state\" without the text."
     },
@@ -20400,10 +20400,10 @@
       "id": "docs-project-panel/09",
       "audience": "developer",
       "doc": "docs/project-panel.md",
-      "quote": "the icon is swapped, not rotated; tooltip \"Show Filter Options\" / \"Hide Filter Options\"",
+      "quote": "tooltip \"Show Filter Options\" / \"Hide Filter Options\"",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:109",
+      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:116",
       "match": "title={showControlPanel ? 'Hide Filter Options' : 'Show Filter Options'}",
       "note": "Claimed 8px spacing and a 150ms rotation; the icon is swapped and only colour transitions."
     },
@@ -20425,39 +20425,39 @@
       "quote": "**State**: Local component state (`showControlPanel`), hidden by default",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:31",
+      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:32",
       "match": "const [showControlPanel, setShowControlPanel] = useState(false)"
     },
     {
       "id": "docs-project-panel/12",
       "audience": "developer",
       "doc": "docs/project-panel.md",
-      "quote": "Under the label \"File Filter\", two mutually exclusive toggle buttons:",
+      "quote": "A radio group named \"Show\" (`FileFilterChoice.tsx`), two choices:",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1594",
-      "match": "<div className=\"control-panel-label\">File Filter</div>",
+      "source": "src/renderer/src/components/ProjectTree/FileFilterChoice.tsx:55",
+      "match": "className=\"file-filter__label\">Show</span>",
       "note": "Described radio buttons with checkmark icons."
     },
     {
       "id": "docs-project-panel/13",
       "audience": "developer",
       "doc": "docs/project-panel.md",
-      "quote": "- **Markdown Only** (`FileText` icon) - Show only Markdown files + folders containing them",
+      "quote": "- **Markdown only** (`FileText` icon) - Show only Markdown files + folders containing them",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1610",
-      "match": "<span>Markdown Only</span>"
+      "source": "src/renderer/src/components/ProjectTree/FileFilterChoice.tsx:25",
+      "match": "{ mode: 'markdown', label: 'Markdown only'"
     },
     {
       "id": "docs-project-panel/14",
       "audience": "developer",
       "doc": "docs/project-panel.md",
-      "quote": "text in `var(--color-accent-drag)` on `var(--color-accent-drag-bg)`",
+      "quote": "the checked choice (`.file-filter__cell[aria-checked='true']`) gets a fill and a lime bottom edge",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:345",
-      "match": ".filter-option.active {",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:386",
+      "match": ".file-filter__cell[aria-checked='true'] {",
       "note": "Dropped the untraceable \"12px spacing\" and gray-text claims."
     },
     {
@@ -20579,7 +20579,7 @@
       "quote": "Color `var(--color-warning-bright)` (amber – a RETIRED token",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:229",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:256",
       "match": "color: var(--color-warning-bright);"
     },
     {
@@ -20589,7 +20589,7 @@
       "quote": "**Visual**: 70% opacity, italic font; full opacity on row hover",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:259",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:286",
       "match": ".project-tree-item:hover .file-name.hidden-file {",
       "note": "Hover behaviour was missing."
     },
@@ -20622,7 +20622,7 @@
       "quote": "`FileText` in `var(--color-brand-violet)` (`.md` / `.markdown`), `File` (any other file)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:212",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:239",
       "match": "color: var(--color-brand-violet);",
       "note": "Said blue / gray FileText icons."
     },
@@ -20633,7 +20633,7 @@
       "quote": "**Size**: 16px icons drawn at `var(--icon-size-sm)`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:206",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:233",
       "match": "width: var(--icon-size-sm);",
       "note": "Size was given as 14px."
     },
@@ -20675,7 +20675,7 @@
       "quote": "(\"Cannot move project root\")",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:732",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:733",
       "match": "message: 'Cannot move project root',"
     },
     {
@@ -20809,7 +20809,7 @@
       "quote": "**Expansion State**: `expandedFolders` (a `Set` of paths) is component state in `ProjectTree.tsx`.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:183",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:184",
       "match": "const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() =>"
     },
     {
@@ -21001,7 +21001,7 @@
       "quote": "and Cmd/Ctrl+Alt+R forces a manual refresh",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1341",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1342",
       "match": "(e.metaKey || e.ctrlKey) && e.altKey && e.key.toLowerCase() === 'r'"
     },
     {
@@ -21629,7 +21629,7 @@
       "quote": "destructures `findNode`, `findNodeWithRoot` and `isDescendant` only",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:261",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:262",
       "match": "const { findNode, findNodeWithRoot, isDescendant } = useDragDropTree(files, projectPath)"
     },
     {
@@ -23345,7 +23345,7 @@
       "quote": "manual refresh (`Ctrl+Alt+R`) works (#160)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1341",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1342",
       "match": "e.altKey && e.key.toLowerCase() === 'r'"
     },
     {
@@ -25177,7 +25177,7 @@
       "quote": "`Cmd/Ctrl+Shift+I` is the project tree's import-into-folder shortcut",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1313",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1314",
       "match": "if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'i') {",
       "note": "Was 'Project Panel's external-file import shortcut'; the handler lives in ProjectTree and imports into the selected folder."
     },
@@ -27538,7 +27538,7 @@
       "quote": "The project-scoped panel boundary is keyed by project path",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:124",
+      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:127",
       "match": "<PanelErrorBoundary key={projectPath ?? 'none'}"
     },
     {
@@ -28027,7 +28027,7 @@
       "quote": "`src/renderer/src/components/ProjectTree/ProjectTree.tsx`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:776",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:777",
       "match": "await withWatcherPause(projectPath"
     },
     {
@@ -28409,7 +28409,7 @@
       "quote": "Toolbar: Create new markdown file, Create new folder, Import a file, Refresh",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1544",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1545",
       "match": "title=\"Create new markdown file\"",
       "note": "Labels were shortened (New markdown file, New folder, Import); the tooltips read Create new markdown file, Create new folder and Import a file."
     },
@@ -28417,11 +28417,11 @@
       "id": "user-guide-feature-inventory/32",
       "audience": "user",
       "doc": "docs/user-guide/feature-inventory.md",
-      "quote": "Filter: All Files / Markdown Only | all | R/components/ProjectTree/ProjectTree.tsx",
+      "quote": "Filter: All files / Markdown only | all | R/components/ProjectTree/ProjectTree.tsx",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1610",
-      "match": "<span>Markdown Only</span>",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1597",
+      "match": "<FileFilterChoice filterMode={filterMode}",
       "note": "Source path named ProjectPanel.tsx; the filter lives in ProjectTree.tsx."
     },
     {
@@ -29800,7 +29800,7 @@
       "quote": "| KEY-04 | <kbd>⌥⌘R</kbd> / <kbd>Ctrl+Alt+R</kbd> | Refresh the project tree",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1341",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1342",
       "match": "if ((e.metaKey || e.ctrlKey) && e.altKey && e.key.toLowerCase() === 'r') {"
     },
     {
@@ -29810,7 +29810,7 @@
       "quote": "| KEY-05 | <kbd>⇧⌘I</kbd> / <kbd>Ctrl+Shift+I</kbd> | Import into the selected folder",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1313",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1314",
       "match": "if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'i') {"
     },
     {
@@ -30223,7 +30223,7 @@
       "quote": "Open, change and close a project (project panel header)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1514",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1515",
       "match": "title={projectPath ? 'Change project' : 'Open project'}"
     },
     {
@@ -30612,7 +30612,7 @@
       "quote": "Select a file in the project tree.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:327",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:328",
       "match": "onFileSelect(filePath)",
       "note": "A single click on a file row opens it in the editor area."
     },
@@ -31239,7 +31239,7 @@
       "quote": "Select **Import a file** in the tree toolbar",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1564",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1567",
       "match": "'Import a file'",
       "note": "Page called the toolbar button **Import**; its tooltip and accessible name are 'Import a file'."
     },
@@ -31567,7 +31567,7 @@
       "quote": "use **Change project** or **Close project** in the project header",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1514",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1515",
       "match": "title={projectPath ? 'Change project' : 'Open project'}"
     },
     {
@@ -31577,7 +31577,7 @@
       "quote": "2. Select **Close project** to return to Home.",
       "status": "verified",
       "evidence": "app",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1531",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1532",
       "match": "title=\"Close project\"",
       "test": "e2e/project-switch-unsaved.e2e.ts"
     },
@@ -31619,7 +31619,7 @@
       "quote": "3. Select a file in the project tree to open it.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:327",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:328",
       "match": "onFileSelect(filePath)"
     },
     {
@@ -31732,7 +31732,7 @@
       "quote": "1. Select **Change project** to choose another folder.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1515",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1516",
       "match": "aria-label={projectPath ? 'Change project' : 'Open project'}",
       "note": "Project-header button reads Change project once a project is open; it runs the same folder picker"
     },
@@ -31763,7 +31763,7 @@
       "quote": "Use the tree toolbar buttons **Create new markdown file**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1544",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1545",
       "match": "title=\"Create new markdown file\"",
       "note": "Page said **New markdown file**; the button's tooltip and aria-label is \"Create new markdown file\"."
     },
@@ -31774,7 +31774,7 @@
       "quote": "**Create new folder**, **Import a file**, and **Refresh**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1554",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1555",
       "match": "title=\"Create new folder\"",
       "note": "Page said **New folder**; the tooltip is \"Create new folder\"."
     },
@@ -31785,7 +31785,7 @@
       "quote": "**Import a file**, and **Refresh**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1564",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1567",
       "match": "'Import a file'",
       "note": "Page said **Import**; the toolbar tooltip is \"Import a file\"."
     },
@@ -31796,7 +31796,7 @@
       "quote": "and **Refresh**. New files and folders go into the selected folder",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1578",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1582",
       "match": "title={`Refresh ("
     },
     {
@@ -31898,7 +31898,7 @@
       "quote": "Drag a file to a folder to move it.",
       "status": "verified",
       "evidence": "app",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:778",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:779",
       "match": "fileGateway.moveItem({ sourcePath, targetParentPath: targetParent })",
       "test": "e2e/tree-keyboard.e2e.ts"
     },
@@ -31920,7 +31920,7 @@
       "quote": "**Copy**, or **Import** (shown only when a dropped file can be imported)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1027",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1028",
       "match": "showImport: hasImportableFiles",
       "note": "Import is offered only when at least one dropped file is importable; page implied it is always offered."
     },
@@ -31968,11 +31968,11 @@
       "id": "user-guide-how-to-organise-project-files/21",
       "audience": "user",
       "doc": "docs/user-guide/how-to/organise-project-files.md",
-      "quote": "Screenshot of filter options with Markdown Only selected.",
+      "quote": "Screenshot of filter options with Markdown only selected.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1610",
-      "match": "<span>Markdown Only</span>"
+      "source": "src/renderer/src/components/ProjectTree/FileFilterChoice.tsx:25",
+      "match": "label: 'Markdown only'"
     },
     {
       "id": "user-guide-how-to-organise-project-files/22",
@@ -32065,7 +32065,7 @@
       "quote": "**Before you start:** open a project and select the destination folder.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1538",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1539",
       "match": "{projectPath && (",
       "note": "Toolbar create/import/refresh buttons render only once a project is open."
     },
@@ -32539,7 +32539,7 @@
       "quote": "Open the changed file from the project tree if it is not already open.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:327",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:328",
       "match": "onFileSelect(filePath)"
     },
     {
@@ -32911,7 +32911,7 @@
       "quote": "select the **Import a file** toolbar button",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1565",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1568",
       "match": "'Import a file'",
       "note": "Page said \"choose **Import**\"; the toolbar button is labelled \"Import a file\"."
     },
@@ -33492,7 +33492,7 @@
       "quote": "Open an image from the project tree, then zoom, fit, export, or copy it",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:98",
+      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:99",
       "match": "openFileInPanel(dockviewApi, filePath, { kind })"
     },
     {
@@ -35758,7 +35758,7 @@
       "quote": "Select a supported image in the tree",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:92",
+      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:93",
       "match": "const kind = await resolvePanelKind(filePath)"
     },
     {
@@ -35998,7 +35998,7 @@
       "quote": "project tree **Import a file** button",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1564",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1567",
       "match": "'Import a file'",
       "note": "Toolbar button is labelled \"Import a file\", not \"Import\"."
     },
@@ -36030,7 +36030,7 @@
       "quote": "<kbd>⇧⌘I</kbd> / <kbd>Ctrl+Shift+I</kbd> opens a picker for several files",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1313",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1314",
       "match": "e.shiftKey && e.key.toLowerCase() === 'i'",
       "note": "Shortcut opens a multi-file picker and the drop-mode dialog, not the same import flow as the button."
     },
@@ -36528,7 +36528,7 @@
       "quote": "That route, like dropping files on the tree,",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1048",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1049",
       "match": "await processFiles(importFiles)"
     },
     {
@@ -36599,7 +36599,7 @@
       "quote": "| Refresh project tree | <kbd>⌥⌘R</kbd>",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1341",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1342",
       "match": "e.altKey && e.key.toLowerCase() === 'r'"
     },
     {
@@ -36736,7 +36736,7 @@
       "quote": "| Import into selected folder | <kbd>⇧⌘I</kbd>",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1313",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1314",
       "match": "e.shiftKey && e.key.toLowerCase() === 'i'"
     },
     {
@@ -36746,7 +36746,7 @@
       "quote": "import also needs a selected folder",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1317",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1318",
       "match": "if (node && node.type === 'directory') {"
     },
     {
@@ -36756,7 +36756,7 @@
       "quote": "Refresh and import are ignored while typing in a text field",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1335",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1336",
       "match": "activeElement?.tagName === 'TEXTAREA' ||",
       "note": "Ledger fix: line 933 is the cut/copy/paste guard; the refresh shortcut guard is at 1335 (import guard at 1306). Page text unchanged."
     },
@@ -36827,7 +36827,7 @@
       "quote": "| Open a file; open or close and select a folder |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1465",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1466",
       "match": "if (node.type === 'directory') handleToggleFolder(node.path)"
     },
     {
@@ -37318,7 +37318,7 @@
       "quote": "The arrow keys move focus without changing the selected folder",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:532",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:533",
       "match": "setFocusedPath(row.node.path)"
     },
     {
@@ -38249,7 +38249,7 @@
       "quote": "**Create new markdown file**, **Create new folder**, **Import a file** and **Refresh**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1544",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1545",
       "match": "title=\"Create new markdown file\"",
       "note": "Toolbar labels were 'New markdown file', 'New folder', 'Import'; the icon buttons' tooltips are 'Create new markdown file', 'Create new folder', 'Import a file'."
     },
@@ -38260,7 +38260,7 @@
       "quote": "**Create new markdown file**, **Create new folder**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1554",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1555",
       "match": "title=\"Create new folder\"",
       "note": "Was 'New folder'."
     },
@@ -38271,7 +38271,7 @@
       "quote": "**Import a file** and **Refresh** act on the tree or the selected folder",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1564",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1567",
       "match": "'Import a file'",
       "note": "Was 'Import'."
     },
@@ -38282,7 +38282,7 @@
       "quote": "refresh with <kbd>⌥⌘R</kbd> / <kbd>Ctrl+Alt+R</kbd>",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1341",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1342",
       "match": "e.altKey && e.key.toLowerCase() === 'r'"
     },
     {
@@ -38292,28 +38292,28 @@
       "quote": "Select a folder before importing with <kbd>⇧⌘I</kbd> / <kbd>Ctrl+Shift+I</kbd>",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1313",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1314",
       "match": "e.shiftKey && e.key.toLowerCase() === 'i'"
     },
     {
       "id": "user-guide-reference-project-tree/06",
       "audience": "user",
       "doc": "docs/user-guide/reference/project-tree.md",
-      "quote": "The filter switches between **All Files** and **Markdown Only**",
+      "quote": "The filter switches between **All files** and **Markdown only**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1610",
-      "match": "<span>Markdown Only</span>"
+      "source": "src/renderer/src/components/ProjectTree/FileFilterChoice.tsx:25",
+      "match": "label: 'Markdown only'"
     },
     {
       "id": "user-guide-reference-project-tree/07",
       "audience": "user",
       "doc": "docs/user-guide/reference/project-tree.md",
-      "quote": "select the arrow in the panel header (**Show Filter Options**)",
+      "quote": "select the funnel button in the panel header (**File filter**)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:109",
-      "match": "'Show Filter Options'",
+      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:113",
+      "match": "aria-label=\"File filter\"",
       "note": "Page said 'filter control' without saying the filter is hidden behind the header chevron; 'click' changed to house-style 'select'."
     },
     {
@@ -38438,7 +38438,7 @@
       "quote": "A cut item is dimmed until you paste it",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:414",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:462",
       "match": "[data-clipboard-cut=\"true\"]"
     },
     {
@@ -38580,7 +38580,7 @@
       "quote": "<kbd>Enter</kbd> opens a file, or opens or closes a folder and selects it",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1465",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1466",
       "match": "if (node.type === 'directory') handleToggleFolder(node.path)",
       "note": "Page said Enter 'opens' a folder; it toggles it (opens or closes), as a click does."
     },
@@ -38612,7 +38612,7 @@
       "quote": "Moving with the arrows does not change the selected folder",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1454",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1455",
       "match": "moveFocusTo(action.index)"
     },
     {
@@ -38622,7 +38622,7 @@
       "quote": "The selected folder is the row with the lime edge",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:164",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:191",
       "match": "solid var(--color-brand-lime)"
     },
     {
@@ -38653,7 +38653,7 @@
       "quote": "Opening a file does not select it",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:327",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:328",
       "match": "onFileSelect(filePath)"
     },
     {
@@ -38673,7 +38673,7 @@
       "quote": "The tree draws only the rows on screen",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:489",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:490",
       "match": "const virtualizer = useVirtualizer({"
     },
     {
@@ -38720,7 +38720,7 @@
       "id": "user-guide-reference-project-tree/47",
       "audience": "user",
       "doc": "docs/user-guide/reference/project-tree.md",
-      "quote": "With **Markdown Only** on, unread build folders stay hidden",
+      "quote": "With **Markdown only** on, unread build folders stay hidden",
       "status": "verified",
       "evidence": "source",
       "source": "src/renderer/src/components/ProjectTree/markdownFilter.ts:18",
@@ -38733,7 +38733,7 @@
       "quote": "the **Refresh** tooltip also shows its shortcut",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1578",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1582",
       "match": "title={`Refresh (${formatShortcut('R', { mod: true, alt: true })})`}",
       "note": "Page said every label is the exact tooltip; the Refresh tooltip appends the shortcut."
     },
@@ -38741,11 +38741,11 @@
       "id": "user-guide-reference-project-tree/49",
       "audience": "user",
       "doc": "docs/user-guide/reference/project-tree.md",
-      "quote": "switches between **All Files** and",
+      "quote": "switches between **All files** and",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1602",
-      "match": "<span>All Files</span>"
+      "source": "src/renderer/src/components/ProjectTree/FileFilterChoice.tsx:24",
+      "match": "label: 'All files'"
     },
     {
       "id": "user-guide-reference-project-tree/50",
@@ -40744,7 +40744,7 @@
       "quote": "The project panel also offers **Change project** and **Close project**.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1514",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1515",
       "match": "title={projectPath ? 'Change project' : 'Open project'}"
     },
     {
@@ -40754,7 +40754,7 @@
       "quote": "also offers **Change project** and **Close project**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1531",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1532",
       "match": "title=\"Close project\""
     },
     {
@@ -41165,7 +41165,7 @@
       "quote": "The panel displays **Project tree unavailable** and a **Reload** button",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:124",
+      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:127",
       "match": "componentName=\"Project tree\""
     },
     {
@@ -41195,7 +41195,7 @@
       "quote": "A new project gets a fresh tree.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:124",
+      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:127",
       "match": "key={projectPath ?? 'none'}"
     },
     {
@@ -43334,7 +43334,7 @@
       "quote": "**Refresh** reloads the tree whenever you want",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1576",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1580",
       "match": "onClick={handleRefresh}",
       "note": "Added for #210: says what Refresh is for."
     },
@@ -43345,7 +43345,7 @@
       "quote": "**Import** is offered only when at least one dropped file can be imported",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1027",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1028",
       "match": "showImport: hasImportableFiles",
       "note": "Page implied Import is always offered on an outside drop; it appears only when a dropped file is importable (cross-page note)."
     },
@@ -46576,7 +46576,7 @@
       "quote": "`wait_for_selector(.project-tree)`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1490",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1491",
       "match": "className=\"project-tree\""
     },
     {
@@ -46886,7 +46886,7 @@
       "quote": "File explorer with drag-drop reorganization",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:306",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:307",
       "match": "Drag sensors - require movement"
     },
     {
@@ -46906,7 +46906,7 @@
       "quote": "markdown filtering",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:11",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:12",
       "match": "import { filterMarkdownTree } from './markdownFilter'"
     },
     {
@@ -53044,7 +53044,7 @@
       "quote": "/* ProjectTree.css – \"Dragging state\" */",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:360",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:408",
       "match": "/* Dragging state - dim the original item */"
     },
     {
@@ -53054,7 +53054,7 @@
       "quote": ".project-tree-item[data-drop-target=\"true\"].directory {",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:377",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:425",
       "match": ".project-tree-item[data-drop-target=\"true\"].directory {"
     },
     {
@@ -53064,7 +53064,7 @@
       "quote": ".project-tree-node[data-drop-highlight=\"true\"] > .project-tree-item.directory {",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:384",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:432",
       "match": ".project-tree-node[data-drop-highlight=\"true\"] > .project-tree-item.directory {"
     },
     {
@@ -53074,7 +53074,7 @@
       "quote": "background-color: var(--color-accent-drag-bg-subtle);",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:391",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:439",
       "match": ".project-tree-node[data-in-drop-zone=\"internal\"] {"
     },
     {
@@ -53084,7 +53084,7 @@
       "quote": "width: var(--border-width-thick);",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:402",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:450",
       "match": "width: var(--border-width-thick);"
     },
     {
@@ -53094,7 +53094,7 @@
       "quote": "from the OS, drawn with a dashed edge):",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:516",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:564",
       "match": ".project-tree-node[data-in-drop-zone=\"external\"]::before {"
     },
     {
@@ -53104,7 +53104,7 @@
       "quote": ".project-tree-item[data-drop-invalid=\"true\"] {",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:407",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:455",
       "match": ".project-tree-item[data-drop-invalid=\"true\"] {"
     },
     {
@@ -53114,7 +53114,7 @@
       "quote": "**Cut item** (dimmed with dashed underline):",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:419",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:467",
       "match": ".project-tree-item[data-clipboard-cut=\"true\"]::after {"
     },
     {
@@ -53124,7 +53124,7 @@
       "quote": "background: var(--color-bg-tertiary);",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:283",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:310",
       "match": "background: var(--color-bg-tertiary);"
     },
     {
@@ -53134,7 +53134,7 @@
       "quote": "pointer-events: none;",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:444",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:492",
       "match": "Allow elementFromPoint() to see through overlay"
     },
     {
@@ -53154,7 +53154,7 @@
       "quote": "- \"Copied\" – `\"<name>\" ready to paste` (keyboard copy and `CopyCommand`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:969",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:970",
       "match": "message: `\"${node.name}\" ready to paste`"
     },
     {
@@ -53164,7 +53164,7 @@
       "quote": "- \"Error\" – other failures; after a drag the message goes through `formatFileOperationError`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:805",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:806",
       "match": "const errorMessage = formatFileOperationError(err, 'move')"
     },
     {
@@ -53194,7 +53194,7 @@
       "quote": "- Project root appears as first collapsible tree item",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:375",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:376",
       "match": "Create synthetic root folder node (VS Code style)"
     },
     {
@@ -53204,7 +53204,7 @@
       "quote": "| Cut | 60% opacity, dashed underline |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:415",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:463",
       "match": "opacity: 0.6;"
     },
     {
@@ -53254,7 +53254,7 @@
       "quote": "- **State**: activeId, overId, expandedFolders",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:252",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:253",
       "match": "const [overId, setOverId] = useState<string | null>(null)"
     },
     {
@@ -53274,7 +53274,7 @@
       "quote": "- **Dependencies**: useDragDropTree, useClipboardStore, dnd-kit",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:43",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:44",
       "match": "import { useClipboardStore } from '../../stores/useClipboardStore'"
     },
     {
@@ -54722,7 +54722,7 @@
       "quote": "| import | Import a file: PDF to Markdown |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1565",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1568",
       "match": "aria-label={isImporting ? 'Importing file...' : 'Import a file'}"
     },
     {

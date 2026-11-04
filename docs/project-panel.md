@@ -17,10 +17,10 @@ Project panel displays hierarchical file tree with filtering, visual indicators,
 
 ```
 <ProjectPanel>
-  <Header> FolderOpen icon + "Project" + Chevron toggle </Header>
+  <Header> FolderOpen icon + "Project" + "Markdown only" words (when on) + Funnel toggle </Header>
   <PanelErrorBoundary key={projectPath ?? 'none'} componentName="Project tree">
     <ProjectTree showControlPanel filterMode onFilterModeChange />
-      (toolbar, then the control panel with the filter buttons, then the rows)
+      (toolbar, then the control panel with the "Show" filter choice, then the rows)
   </PanelErrorBoundary>
 </ProjectPanel>
 ```
@@ -55,20 +55,21 @@ Manual refresh button in the toolbar (rightmost position, after Open/Change proj
 
 ## Control Panel
 
-Collapsible panel with chevron toggle (common pattern across panels).
+Collapsible panel opened by the file-filter button in the panel header.
 
 ### Toggle Behavior
 
-**Chevron**: ChevronDown (shown) / ChevronLeft (hidden) – the icon is swapped, not rotated; tooltip "Show Filter Options" / "Hide Filter Options"; colour transition `var(--transition-normal)` (0.15s)
+**Trigger**: a `<button>` named "File filter" with a `Funnel` icon, `aria-expanded` and `aria-controls` the panel; tooltip "Show Filter Options" / "Hide Filter Options"; colour transition `var(--transition-normal)` (0.15s). While **Markdown only** is on, the header shows the words "Markdown only" beside it, whether the panel is open or closed (#452)
 **State**: Local component state (`showControlPanel`), hidden by default
 
 ### Filter Options
 
-Under the label "File Filter", two mutually exclusive toggle buttons:
-- **All Files** (`Files` icon) - Show all
-- **Markdown Only** (`FileText` icon) - Show only Markdown files + folders containing them
+A radio group named "Show" (`FileFilterChoice.tsx`), two choices:
+- **All files** (`FolderTree` icon) - Show all
+- **Markdown only** (`FileText` icon) - Show only Markdown files + folders containing them
 
-**Visual**: the active button gets `.filter-option.active` – text in `var(--color-accent-drag)` on `var(--color-accent-drag-bg)`
+**Visual**: the checked choice (`.file-filter__cell[aria-checked='true']`) gets a fill and a lime bottom edge – the Segmented control card's checked state, never colour alone
+**Keyboard**: one tab stop; the arrow keys move and check
 **Persistence**: electron-store key `projectFilterMode` (`SettingsService`), survives restarts; default `all`
 
 See: [IPC Patterns](./ipc-patterns.md) for filter persistence channels

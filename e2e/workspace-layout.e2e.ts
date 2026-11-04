@@ -137,16 +137,22 @@ test.describe('Project tree filter', () => {
     await expect(tree.fileRow('readme.md')).toBeVisible({ timeout: 10_000 })
     await expect(tree.fileRow('notes.txt')).toBeVisible()
 
-    await windowWithTestProject.getByTitle('Show Filter Options').click()
+    await windowWithTestProject.getByRole('button', { name: 'File filter' }).click()
     // Exact name: "Create new markdown file" in the toolbar also matches a
     // loose /markdown/ search.
     await windowWithTestProject
-      .getByRole('button', { name: 'Markdown Only', exact: true })
+      .getByRole('radio', { name: 'Markdown only', exact: true })
       .click()
 
     // The markdown file stays; the plain-text one goes.
     await expect(tree.fileRow('readme.md')).toBeVisible()
     await expect(tree.fileRow('notes.txt')).toHaveCount(0, { timeout: 10_000 })
+
+    // With the filter panel closed, the header still says which filter is on (#452).
+    const trigger = windowWithTestProject.getByRole('button', { name: 'File filter' })
+    await trigger.click()
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    await expect(windowWithTestProject.locator('.project-panel .sidebar-panel-header')).toContainText('Markdown only')
   })
 })
 

@@ -61,7 +61,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | ID | Feature | Platforms | Source | Guide section |
 |---|---|---|---|---|
 | TREE-01 | Toolbar: Create new markdown file, Create new folder, Import a file, Refresh | all | ProjectTree.tsx | [reference/project-tree](./reference/project-tree.md#toolbar-and-filter) |
-| TREE-02 | Filter: All Files / Markdown Only | all | R/components/ProjectTree/ProjectTree.tsx | [how-to/organise-project-files](./how-to/organise-project-files.md#manage-files) |
+| TREE-02 | Filter: All files / Markdown only | all | R/components/ProjectTree/ProjectTree.tsx | [how-to/organise-project-files](./how-to/organise-project-files.md#manage-files) |
 | TREE-03 | Git badges on files and folders | all | ProjectTree/GitStatusBadge.tsx | [reference/project-tree](./reference/project-tree.md#git-badges-and-status) |
 | TREE-04 | Git status bar: branch, "Clean", detached HEAD, 10,000-file cap | all | ProjectTree/GitStatusBar.tsx | [reference/project-tree](./reference/project-tree.md#git-badges-and-status) |
 | TREE-05 | Sensitive-file and symlink icons | all | ProjectTreeNode.tsx | [reference/project-tree](./reference/project-tree.md#special-files-and-visibility) |

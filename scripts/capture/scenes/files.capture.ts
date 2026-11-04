@@ -77,12 +77,14 @@ test('files', async () => {
     await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
     await expect(dialog).toHaveCount(0)
 
-    // The filter, with Markdown Only chosen and the options left open.
-    await page.locator('.control-panel-chevron').click()
-    await page.locator('.filter-option', { hasText: 'Markdown Only' }).click()
+    // The filter, with Markdown only chosen and the options left open.
+    const filterTrigger = page.getByRole('button', { name: 'File filter' })
+    const filterChoice = page.getByRole('radiogroup', { name: 'Show' })
+    await filterTrigger.click()
+    await filterChoice.getByRole('radio', { name: 'Markdown only', exact: true }).click()
     await expect(tree.fileRow('site/index.html')).toHaveCount(0)
-    if (!(await page.locator('.filter-option').first().isVisible())) await page.locator('.control-panel-chevron').click()
-    await expect(page.locator('.filter-option').first()).toBeVisible()
+    if (!(await filterChoice.isVisible())) await filterTrigger.click()
+    await expect(filterChoice).toBeVisible()
     await shot(cap, 'organise-files/filter', { crop: panel, pad: 0 })
   } finally {
     await cap.close()

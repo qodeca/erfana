@@ -48,24 +48,28 @@ Lightweight toast notifications in bottom-left corner.
 
 ## Control Panels
 
-Collapsible panels with chevron toggle (VS Code pattern).
+Collapsible panels opened by a toggle button in the panel header.
 
 ### Pattern
 
-Header with a ChevronDown (open) / ChevronLeft (closed) icon. Click toggles visibility; the icon is swapped, not rotated, and only the hover/active colours transition (`--transition-normal`).
+Header with a `Funnel` toggle button. Click, <kbd>Enter</kbd> or <kbd>Space</kbd> toggles visibility; `aria-expanded` reports the state and the open button keeps a fill. Only the hover/active colours transition (`--transition-normal`).
 
-**Implementation** (`ProjectPanel.tsx`; the toggle is a `<span>` with a `title`, not a `<button>`):
+**Implementation** (`ProjectPanel.tsx`; a real `<button>`, keyboard-reachable, named "File filter" – #452):
 ```typescript
-<span
+<button
+  type="button"
   className="control-panel-chevron"
-  onClick={() => setShowControlPanel(!showControlPanel)}
+  onClick={() => setShowControlPanel(open => !open)}
+  aria-label="File filter"
+  aria-expanded={showControlPanel}
+  aria-controls={PROJECT_FILTER_PANEL_ID}
   title={showControlPanel ? 'Hide Filter Options' : 'Show Filter Options'}
 >
-  {showControlPanel ? <ChevronDown size={16} strokeWidth={2} /> : <ChevronLeft size={16} strokeWidth={2} />}
-</span>
+  <Funnel size={16} strokeWidth={2} aria-hidden="true" />
+</button>
 ```
 
-**CSS**: `.control-panel-chevron` (plus `:hover` / `:active`) in `ProjectPanel.css`
+**CSS**: `.control-panel-chevron` (plus `:hover` / `:active` / `[aria-expanded='true']` / `:focus-visible`) in `ProjectPanel.css`
 
 **Example**: ProjectPanel file filtering - see [Project Panel](./project-panel.md#control-panel)
 
@@ -76,7 +80,7 @@ Header with a ChevronDown (open) / ChevronLeft (closed) icon. Click toggles visi
 Hierarchical file tree with filtering, visual indicators, context menu operations.
 
 **Features**:
-- File filtering (All Files | Markdown Only) with recursive logic
+- File filtering (All files | Markdown only) with recursive logic
 - Sensitive file detection (credentials, keys, certificates, dotfile secrets)
 - Hidden file styling (dotfiles, 70% opacity)
 - Context menu (Open as source, Open in default browser (both HTML files only), Cut, Copy, Paste, New File, New Folder, Rename, Import..., Delete, Reveal in Finder / Reveal in Explorer / Reveal in File Manager – built per node type by `context-menu/strategies.tsx`)
