@@ -466,7 +466,8 @@ export function MarkdownEditorPanel(
     handleCloseEditorContextMenu,
     handleEditorCopy,
     handleEditorCut,
-    handleEditorPaste
+    handleEditorPaste,
+    handleEditorDelete
   } = useEditorContextMenu({ editorRef })
 
   // =========================================================================
@@ -723,7 +724,6 @@ export function MarkdownEditorPanel(
         <DocumentStatsBar stats={documentStats} selectedText={selectedText} />
       </EditorErrorBoundary>
 
-      {/* Editor context menu */}
       {editorContextMenu && currentFile?.path && (
         <EditorContextMenu
           x={editorContextMenu.x}
@@ -737,6 +737,7 @@ export function MarkdownEditorPanel(
           onCopy={handleEditorCopy}
           onCut={handleEditorCut}
           onPaste={handleEditorPaste}
+          onDelete={handleEditorDelete}
         />
       )}
     </div>

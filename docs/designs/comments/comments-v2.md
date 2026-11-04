@@ -270,7 +270,7 @@ Cards: docs/designs/comments/selection-comments/index.html (new frame: keyboard 
 
 **Markdown keyboard focus model for comment mode** – P0, surfaces: markdown-proposed. Source findings: ACC-04.
 
-**Problem.** The Markdown design lists picker keys but not where focus lives. `.markdown-preview` has no tabindex (MarkdownPreview.tsx:1273-1278). The menu opens only on a mouse right-click with a selection (1217-1243). With no focus owner, Tab would walk links or leave the panel, and a screen reader would read nothing about the picked block.
+**Problem.** The Markdown design lists picker keys but not where focus lives. `.markdown-preview` has no tabindex (MarkdownPreview.tsx:1273-1278). The menu opened only on a mouse right-click with a selection (since #463 it opens without one too, its items disabled). With no focus owner, Tab would walk links or leave the panel, and a screen reader would read nothing about the picked block.
 
 **Design.**
 

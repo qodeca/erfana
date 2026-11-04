@@ -180,6 +180,7 @@ Reusable menu for Project Panel file/folder operations and tab actions.
 - Separator support
 - Disabled state (grayed out, non-clickable) - v0.4.2. A disabled item never shows danger styling, so a disabled Delete is grey, not red
 - Shortcut hints are exposed as `aria-keyshortcuts` (`⌘C` → `Meta+C`)
+- Cut, Copy, Paste and Delete come from one builder, `clipboardMenuItems.tsx` (same labels, icons and `formatShortcut` hints in the editor, preview, text-field and tree menus, #463). Text fields without a menu of their own get one from the app-level `TextFieldContextMenuHost` – see [Keyboard Shortcuts § Clipboard items](./keyboard-shortcuts.md#clipboard-items-463)
 
 **Interface**:
 ```typescript

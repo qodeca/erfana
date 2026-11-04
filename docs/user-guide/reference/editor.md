@@ -20,7 +20,7 @@ Erfana uses a Monaco text editor with Markdown formatting, a separate Find bar, 
 
 **What they do:** Monaco's built-in editing commands work, such as multiple cursors, undo and redo, and line operations. **How to reach them:** Focus the editor. Right-click, or press <kbd>⇧F10</kbd> / <kbd>Shift+F10</kbd>, to open Erfana's context menu. Erfana provides its own Find bar, not Monaco's find widget.
 
-**Context menu items:** **Explain**, **Modify**, **Ask**, **Visualize** and **Prompt** send the selected text to the CLI agent in the terminal. **Cut**, **Copy** and **Paste** follow them. Every item except **Paste** needs a text selection. For the steps, see [Turn a selection into a prompt](../how-to/turn-a-selection-into-a-prompt.md).
+**Context menu items:** **Explain**, **Modify**, **Ask**, **Visualize** and **Prompt** send the selected text to the CLI agent in the terminal. **Cut**, **Copy**, **Paste** and **Delete** follow them, each with its shortcut. Every item except **Paste** needs a text selection; **Delete** removes the selected text without copying it. For the steps, see [Turn a selection into a prompt](../how-to/turn-a-selection-into-a-prompt.md).
 
 ## View modes and scroll sync
 

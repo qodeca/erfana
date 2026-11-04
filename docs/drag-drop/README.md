@@ -38,7 +38,7 @@ Erfana's project tree supports VS Code-style drag-drop file reorganization with:
 Right-click any file/folder in the project tree:
 - **Cut** - Same as Ctrl+X
 - **Copy** - Same as Ctrl+C
-- **Paste** - Same as Ctrl+V (shown only on folders, and only when the clipboard holds an item)
+- **Paste** - Same as Ctrl+V (shown on folders and on files – on a file it pastes into that file's folder – and only when the clipboard holds an item)
 
 ## Documentation Structure
 

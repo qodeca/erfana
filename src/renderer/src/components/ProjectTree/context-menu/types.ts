@@ -134,6 +134,8 @@ export interface IMenuItem {
   icon?: ReactNode
   danger?: boolean
   separator?: boolean
+  /** Shortcut hint shown beside the label, e.g. `⌘C` (#463) */
+  shortcut?: string
   execute: () => void | Promise<void>
 }
 

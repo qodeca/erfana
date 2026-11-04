@@ -9,6 +9,7 @@ import { DialogProvider } from './components/Dialog/DialogContext'
 import { DialogManager } from './components/Dialog/DialogManager'
 import { SettingsOverlay } from './components/Settings/SettingsOverlay'
 import { UIBlocker } from './components/UIBlocker/UIBlocker'
+import { TextFieldContextMenuHost } from './components/ContextMenu/TextFieldContextMenuHost'
 import { TranscriptionDialog } from './components/Transcription/TranscriptionDialog'
 import { DocumentImportDialog } from './components/DocumentImport/DocumentImportDialog'
 import { ProjectManagementProvider } from './context/ProjectManagementContext'
@@ -73,6 +74,8 @@ function AppContent() {
             <UIBlocker />
             <TranscriptionDialog />
             <DocumentImportDialog />
+            {/* Cut / Copy / Paste / Delete for text fields without a menu of their own (#463) */}
+            <TextFieldContextMenuHost />
           </div>
         </ToastProvider>
       </TerminalPortalProvider>

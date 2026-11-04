@@ -26,7 +26,8 @@ import { openFileInPanel } from '../../utils/openFileInPanel'
 import { openInDefaultBrowser } from '../Panels/HtmlPreviewPanel/previewOpenInBrowser'
 import { useProjectStore } from '../../stores/useProjectStore'
 import type { MenuContext } from './context-menu/types'
-import { ContextMenuFactory } from './context-menu/factory'
+import { ContextMenuFactory, toContextMenuItems } from './context-menu/factory'
+import { deleteCommandFor } from './context-menu/fileRowCommands'
 import {
   DndContext,
   PointerSensor,
@@ -903,9 +904,11 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         return // Let native text handling work
       }
 
-      // Cmd+X/C/V on macOS, Ctrl+X/C/V elsewhere
+      // Cmd+X/C/V on macOS, Ctrl+X/C/V elsewhere, on the focused row – a file
+      // row too (#463) – or else the clicked folder
       const action = treeClipboardAction(e, isMacOS())
-      if (action !== null && selectedFolder) {
+      const targetPath = rowFromEventTarget(document.activeElement)?.dataset.path ?? selectedFolder
+      if (action !== null && targetPath) {
         // Only when the keystroke belongs to the tree ([27]): otherwise a
         // folder clicked earlier hijacked Cmd+C on selected text elsewhere.
         if (!isTreeClipboardKeystroke(treeContainerRef.current, document.activeElement, window.getSelection())) {
@@ -913,7 +916,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         }
         // Root-EXCLUSIVE on purpose: the synthetic project root must not
         // resolve here, which is what keeps it non-cuttable / non-copyable.
-        const node = findNode(selectedFolder)
+        const node = findNode(targetPath)
         if (!node) return
 
         if (action === 'cut') {
@@ -939,7 +942,8 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         } else if (action === 'paste' && clipboard.hasClipboard()) {
           // Paste
           e.preventDefault()
-          handlePaste()
+          // On a file row the item lands in the file's folder, as the menu's Paste does
+          handlePaste(node.type === 'directory' ? node.path : getDirname(node.path) || undefined)
         }
       }
     }
@@ -1354,23 +1358,9 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     openInBrowser: openInDefaultBrowser
   })
 
-  /**
-   * Get context menu items using Strategy + Command pattern
-   * Uses factory to select appropriate strategy and build menu
-   */
-  const getContextMenuItems = (node: FileNode): ContextMenuItem[] => {
-    const ctx = buildMenuContext()
-    const menuItems = contextMenuFactory.build(node, ctx)
-
-    // Adapt IMenuItem to ContextMenuItem (execute -> action)
-    return menuItems.map((item) => ({
-      label: item.label,
-      icon: item.icon,
-      danger: item.danger,
-      separator: item.separator,
-      action: item.execute
-    }))
-  }
+  /** Context menu items from the Strategy + Command factory, adapted for ContextMenu. */
+  const getContextMenuItems = (node: FileNode): ContextMenuItem[] =>
+    toContextMenuItems(contextMenuFactory.build(node, buildMenuContext()))
 
   // `handleFileClick` reads the current tree and selection, so it changes on
   // every render. The rows get a stable wrapper instead; it always calls the
@@ -1397,7 +1387,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     const index = row?.dataset.path !== undefined ? indexByPath.get(row.dataset.path) : undefined
     if (row === null || index === undefined) return
 
-    const action = resolveTreeKey(visibleRows, index, e)
+    const action = resolveTreeKey(visibleRows, index, e, isMacOS())
     if (action === null) {
       if (!isTypeAheadKey(e)) return
       const buffer = typeAheadRef.current
@@ -1441,6 +1431,10 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         setContextMenu({ ...rowMenuAnchor(row), node })
         break
       }
+      case 'delete':
+        // The menu's own Delete, confirmation included (#463); never the project root
+        if (node.path !== projectPath) void deleteCommandFor(buildMenuContext(), node).execute()
+        break
     }
   }
 

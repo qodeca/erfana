@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { Copy, Scissors, ClipboardPaste } from 'lucide-react'
 import { ContextMenu, ContextMenuItem } from './ContextMenu'
+import { clipboardMenuItems } from './clipboardMenuItems'
 import { useDialog } from '../Dialog'
 import { executePromptTemplate } from '../../utils/panelUtils'
 import { PROMPT_REGISTRY, getPromptsForArea } from '../../prompts/registry'
 import { formatLineRange } from '../../prompts/helpers'
 import { validateVariables } from '../../prompts/validation'
-import { renderIcon, DEFAULT_ICON_PROPS } from '../../utils/iconRegistry'
+import { renderIcon } from '../../utils/iconRegistry'
 import { TEXT_INPUT_LIMITS } from '../../../../shared/constants'
 import { TEST_IDS } from '../../constants/testids'
 import type { PromptVariables, PromptConfig } from '../../prompts/types'
@@ -52,6 +52,8 @@ interface EditorContextMenuProps {
   onCut?: () => void
   /** Callback to paste from clipboard (inserts at current cursor/selection) */
   onPaste?: () => void
+  /** Callback to delete the selection (the Delete key's edit; clipboard untouched) */
+  onDelete?: () => void
 }
 
 /**
@@ -89,7 +91,8 @@ export function EditorContextMenu({
   onClose,
   onCopy,
   onCut,
-  onPaste
+  onPaste,
+  onDelete
 }: EditorContextMenuProps) {
   // Unified dialog system for prompts requiring user input
   const { showPrompt } = useDialog()
@@ -231,43 +234,13 @@ export function EditorContextMenu({
     onClose()
   }
 
-  /**
-   * Cuts the selected text. The full write-guards-delete invariant lives in the
-   * shared pure `clipboardCut` (invoked via `onCut` → `handleEditorCut`), so the
-   * menu path and keybinding path cannot diverge: the menu only triggers the
-   * action and closes; the clipboard write + conditional delete happen in the
-   * hook against the live editor.
+  /*
+   * Cut, Copy, Paste and Delete only trigger the action; the menu closes itself.
+   * The real work – reading the LIVE selection, the write-guards-delete
+   * invariant of cut, the read-only and empty guards – lives in the shared pure
+   * commands of `monacoClipboardCommands.ts` (via `useEditorContextMenu`), so
+   * the menu path and the keybinding path cannot diverge.
    */
-  const handleCut = () => {
-    onCut?.()
-    onClose()
-  }
-
-  /**
-   * Copies the selection. Mirrors `handleCut`/`handlePaste`: the menu only
-   * triggers the action (`onCopy` → `handleEditorCopy`) and closes; the real
-   * copy — reading the LIVE selection range and writing it via the central
-   * service — lives in the shared pure `clipboardCopy` against the live editor,
-   * so the menu path and keybinding path cannot diverge (no stale `selectedText`
-   * snapshot, and the same collapsed-selection guard).
-   */
-  const handleCopy = () => {
-    onCopy?.()
-    onClose()
-  }
-
-  /**
-   * Pastes text from the clipboard. Mirrors `handleCut`: the menu only triggers
-   * the action (`onPaste` → `handleEditorPaste`) and closes; the real paste —
-   * clipboard read, read-only/empty guards, and the deterministic post-edit
-   * caret — lives in the shared pure `clipboardPaste` against the live editor,
-   * so the menu path and keybinding path cannot diverge.
-   */
-  const handlePaste = () => {
-    onPaste?.()
-    onClose()
-  }
-
   // Check if there's a meaningful selection (for disabling selection-dependent items)
   const hasSelection = selectedText.trim().length > 0
 
@@ -282,27 +255,13 @@ export function EditorContextMenu({
       testId: PROMPT_TEST_ID_MAP[prompt.id]
     })),
     { separator: true } as ContextMenuItem,
-    {
-      label: 'Cut',
-      icon: <Scissors {...DEFAULT_ICON_PROPS} />,
-      action: handleCut,
-      disabled: !hasSelection, // Cut requires selection
-      testId: TEST_IDS.CONTEXT_MENU_ITEM_CUT
-    },
-    {
-      label: 'Copy',
-      icon: <Copy {...DEFAULT_ICON_PROPS} />,
-      action: handleCopy,
-      disabled: !hasSelection, // Copy requires selection
-      testId: TEST_IDS.CONTEXT_MENU_ITEM_COPY
-    },
-    {
-      label: 'Paste',
-      icon: <ClipboardPaste {...DEFAULT_ICON_PROPS} />,
-      action: handlePaste,
-      // Paste is always enabled
-      testId: TEST_IDS.CONTEXT_MENU_ITEM_PASTE
-    }
+    ...clipboardMenuItems([
+      // Cut, Copy and Delete need a selection; Paste is always enabled
+      { action: 'cut', run: () => onCut?.(), disabled: !hasSelection, testId: TEST_IDS.CONTEXT_MENU_ITEM_CUT },
+      { action: 'copy', run: () => onCopy?.(), disabled: !hasSelection, testId: TEST_IDS.CONTEXT_MENU_ITEM_COPY },
+      { action: 'paste', run: () => onPaste?.(), testId: TEST_IDS.CONTEXT_MENU_ITEM_PASTE },
+      { action: 'delete', run: () => onDelete?.(), disabled: !hasSelection }
+    ])
   ]
 
   return (

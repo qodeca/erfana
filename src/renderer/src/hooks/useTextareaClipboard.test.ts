@@ -488,4 +488,37 @@ describe('useTextareaClipboard', () => {
       })
     })
   })
+
+  describe('handleDelete (#463)', () => {
+    const render = (value = 'hello world') =>
+      renderHook(() =>
+        useTextareaClipboard({
+          textareaRef: mockRef as React.RefObject<HTMLTextAreaElement>,
+          value,
+          setValue: mockSetValue
+        })
+      )
+
+    it('removes the selection, leaves the clipboard alone and puts the caret there', () => {
+      mockRef.current!.selectionStart = 5
+      mockRef.current!.selectionEnd = 11
+      const { result } = render()
+
+      act(() => result.current.handleDelete())
+
+      expect(mockSetValue).toHaveBeenCalledWith('hello')
+      expect(mockWriteText).not.toHaveBeenCalled()
+      expect(mockRef.current!.setSelectionRange).toHaveBeenCalledWith(5, 5)
+    })
+
+    it('is a no-op with a collapsed caret', () => {
+      mockRef.current!.selectionStart = 3
+      mockRef.current!.selectionEnd = 3
+      const { result } = render()
+
+      act(() => result.current.handleDelete())
+
+      expect(mockSetValue).not.toHaveBeenCalled()
+    })
+  })
 })

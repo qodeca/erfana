@@ -126,7 +126,8 @@ describe('PreviewContextMenu Component', () => {
       expect(portalRoot).toBeTruthy()
 
       const menuItems = portalRoot!.querySelectorAll('.context-menu-item:not(.context-menu-separator)')
-      const labels = Array.from(menuItems).map((item) => item.textContent)
+      // The label alone: Copy selection carries a shortcut hint in its own span (#463)
+      const labels = Array.from(menuItems).map((item) => item.querySelector('.context-menu-label')?.textContent)
 
       expect(labels[0]).toBe('Explain')
       expect(labels[1]).toBe('Modify')
@@ -454,6 +455,30 @@ describe('PreviewContextMenu Component', () => {
 
       // Restore
       ;(PROMPT_REGISTRY as any)['explain'] = originalExplain
+    })
+  })
+
+  describe('without a selection (#463)', () => {
+    it('still shows every item, disabled', () => {
+      renderWithProvider(<PreviewContextMenu {...defaultProps} selectedText="" />)
+
+      const items = screen.getAllByRole('menuitem')
+      expect(items.length).toBeGreaterThan(1)
+      for (const menuItem of items) expect(menuItem).toHaveAttribute('aria-disabled', 'true')
+    })
+
+    it('Copy selection does nothing', async () => {
+      renderWithProvider(<PreviewContextMenu {...defaultProps} selectedText="" />)
+
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Copy selection' }))
+
+      expect(mockWriteText).not.toHaveBeenCalled()
+    })
+
+    it('Copy selection carries the copy shortcut hint', () => {
+      renderWithProvider(<PreviewContextMenu {...defaultProps} />)
+
+      expect(screen.getByRole('menuitem', { name: 'Copy selection' })).toHaveAttribute('aria-keyshortcuts')
     })
   })
 })

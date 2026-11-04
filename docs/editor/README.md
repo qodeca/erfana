@@ -41,7 +41,7 @@ Right-click in the Monaco editor shows a context menu (Monaco's own menu is turn
 **Features:**
 - Prompts filtered by `area: code-editor`, `subArea: context-menu`
 - Actions: Explain (direct), Modify/Ask (with input dialog), Visualize (with dropdown)
-- The prompt items, Cut and Copy are disabled without a selection; Paste is always enabled
+- The prompt items, Cut, Copy and Delete are disabled without a selection; Paste is always enabled. Delete removes the selection without touching the clipboard, the same edit as the Delete key, and every clipboard item shows its shortcut hint (#463)
 - Menu dismisses on Escape, Tab, click outside, or action execution
 
 **Templates** (5 editor-specific):

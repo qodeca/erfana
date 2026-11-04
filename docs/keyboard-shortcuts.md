@@ -74,7 +74,19 @@ The image panel handles its own keys in `imageViewer.logic.ts`; the [user-facing
 
 ## Context menus
 
-Every context menu is the shared `ContextMenu` (`components/ContextMenu/ContextMenu.tsx`), which implements the decided [Menu card](design-system/system/components/menu/index.html): focus moves to the first item on open, roving tabindex, ↑ ↓ with wrap, Home / End, Enter / Space, typeahead, and Escape or Tab close it and return focus to the opener (#90). **Shift+F10** and the **Menu key** open the menu of the focused project-tree row (`ProjectTree/treeKeyboard.ts`), dock tab (`Tabs/useTabMenuKey.ts`, on dockview's `.dv-tab`), editor (a Monaco action, under the caret), terminal (`TerminalPanel/terminalMenuKey.ts`, at the cursor – the shell no longer receives Shift+F10) and the dialog and diagram-chat text fields (`onKeyDownCapture`). Windows also sends a native `contextmenu` after the Menu key; `contextMenuKey.ts` drops that echo so the menu does not open twice.
+Every context menu is the shared `ContextMenu` (`components/ContextMenu/ContextMenu.tsx`), which implements the decided [Menu card](design-system/system/components/menu/index.html): focus moves to the first item on open, roving tabindex, ↑ ↓ with wrap, Home / End, Enter / Space, typeahead, and Escape or Tab close it and return focus to the opener (#90). **Shift+F10** and the **Menu key** open the menu of the focused project-tree row (`ProjectTree/treeKeyboard.ts`), dock tab (`Tabs/useTabMenuKey.ts`, on dockview's `.dv-tab`), editor (a Monaco action, under the caret), terminal (`TerminalPanel/terminalMenuKey.ts`, at the cursor – the shell no longer receives Shift+F10) and the dialog and diagram-chat text fields (`onKeyDownCapture`). Windows also sends a native `contextmenu` after the Menu key; `contextMenuKey.ts` drops that echo so the menu does not open twice. Every other `input` and `textarea` (Settings, the search bar, comment boxes) gets its menu from the one app-level `TextFieldContextMenuHost` (mounted in `App.tsx`), which listens on `window` for `contextmenu`, Shift+F10 and the Menu key and steps aside when an earlier handler called `preventDefault()` – so the fields above, Monaco and xterm keep their own menus.
+
+### Clipboard items (#463)
+
+Cut, Copy, Paste and Delete are built by one helper, `clipboardMenuItems` (`components/ContextMenu/clipboardMenuItems.tsx`), so the labels, icons and `formatShortcut` hints match in the editor, preview, text-field and tree menus. The terminal keeps its own Copy / Paste items, because its paste key differs per platform (`terminalPasteShortcut`).
+
+| Item | macOS hint | Windows / Linux hint | Notes |
+| --- | --- | --- | --- |
+| Cut, Copy, Paste | ⌘X, ⌘C, ⌘V | Ctrl+X, Ctrl+C, Ctrl+V | |
+| Delete (text) | ⌫ | Delete | Removes the selection; disabled without one; the clipboard is untouched |
+| Delete (tree item) | ⌘⌫ | Delete | `isTreeDeleteKey` in `ProjectTree/treeKeyboard.ts`; runs the menu's own delete command (`deleteCommandFor`), confirmation included. Never on the project root row, never on an auto-repeat |
+
+The tree's Cut, Copy and Paste keys act on the focused row – a file row too – and fall back to the clicked folder; Paste on a file row (menu or key) lands in the file's folder (`PasteIntoParentFolderCommand`). The project root row shows no hints, because none of those keys act on it.
 
 ## DevTools
 

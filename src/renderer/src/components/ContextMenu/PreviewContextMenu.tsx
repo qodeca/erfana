@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { Copy } from 'lucide-react'
 import { ContextMenu, ContextMenuItem } from './ContextMenu'
+import { clipboardIcon, clipboardShortcut } from './clipboardMenuItems'
 import { useDialog } from '../Dialog'
 import { executePromptTemplate } from '../../utils/panelUtils'
 import { PROMPT_REGISTRY, getPromptsForArea } from '../../prompts/registry'
 import { formatLineRange } from '../../prompts/helpers'
-import { renderIcon, DEFAULT_ICON_PROPS } from '../../utils/iconRegistry'
+import { renderIcon } from '../../utils/iconRegistry'
 import { TEXT_INPUT_LIMITS } from '../../../../shared/constants'
 import { TEST_IDS } from '../../constants/testids'
 import type { PromptVariables, PromptConfig } from '../../prompts/types'
@@ -221,6 +221,10 @@ export function PreviewContextMenu({
     onClose()
   }
 
+  // A right-click with nothing selected still opens the menu (#463): every
+  // item shows, disabled, so the commands stay discoverable.
+  const hasText = selectedText.trim().length > 0
+
   const handleCopySelection = () => {
     // Transport errors (incl. logging) are owned by the textClipboard service
     // (issue #203). Result intentionally ignored — copy has nothing to roll back.
@@ -237,6 +241,7 @@ export function PreviewContextMenu({
       label: prompt.label,
       icon: renderIcon(prompt.icon),
       action: () => handleAction(prompt.id),
+      disabled: !hasText,
       testId: PROMPT_TEST_ID_MAP[prompt.id]
     })),
     ...(hideCopy
@@ -244,9 +249,12 @@ export function PreviewContextMenu({
       : [
           { separator: true } as ContextMenuItem,
           {
+            // "Copy selection", not "Copy": it pairs with "Comment on selection" (spec 024, C-16)
             label: 'Copy selection',
-            icon: <Copy {...DEFAULT_ICON_PROPS} />,
+            shortcut: clipboardShortcut('copy'),
+            icon: clipboardIcon('copy'),
             action: handleCopySelection,
+            disabled: !hasText,
             testId: TEST_IDS.CONTEXT_MENU_ITEM_COPY
           }
         ])

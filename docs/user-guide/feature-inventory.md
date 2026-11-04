@@ -87,7 +87,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | ED-03 | Formatting toolbar: Bold, Italic, Strikethrough, Inline Code, Insert Link, Insert Image, Heading 1, Bullet List, Numbered List, Find | all | MarkdownToolbar.tsx | [reference/editor](./reference/editor.md#formatting-toolbar) |
 | ED-04 | Find bar: next/previous, case sensitive, whole word | all | R/components/Search/SearchBar.tsx | [how-to/edit-and-preview-markdown](./how-to/edit-and-preview-markdown.md#choose-a-view) |
 | ED-05 | Statistics bar: words, characters, lines, reading time, selection | all | R/components/Panels/DocumentStatsBar.tsx | [reference/editor](./reference/editor.md#statistics-bar) |
-| ED-06 | Editor right-click menu: prompt templates, Cut, Copy, Paste | all | R/components/ContextMenu/EditorContextMenu.tsx | [reference/menus](./reference/menus.md#editor-and-preview-context-menus) |
+| ED-06 | Editor right-click menu: prompt templates, Cut, Copy, Paste, Delete | all | R/components/ContextMenu/EditorContextMenu.tsx | [reference/menus](./reference/menus.md#editor-and-preview-context-menus) |
 | ED-07 | Scroll sync between editor and preview | all | hooks/useScrollSync.ts | [reference/editor](./reference/editor.md#view-modes-and-scroll-sync) |
 | ED-08 | Unsaved-changes prompt on closing a tab | all | R/components/Tabs/EditorTab.tsx | [how-to/edit-and-preview-markdown](./how-to/edit-and-preview-markdown.md#choose-a-view) |
 
@@ -99,7 +99,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | PV-02 | Frontmatter shown as a table | all | FrontmatterTable.tsx | [reference/markdown-preview](./reference/markdown-preview.md#markdown-and-frontmatter) |
 | PV-03 | Preserve line breaks option | all | Settings | [reference/settings](./reference/settings.md#editor) |
 | PV-04 | Links: anchors, project files inside the app, external links to the OS, unsafe links blocked | all | MarkdownPreview.tsx | [reference/markdown-preview](./reference/markdown-preview.md#links) |
-| PV-05 | Preview right-click menu: prompt templates, Copy selection | all | ContextMenu/PreviewContextMenu.tsx | [reference/menus](./reference/menus.md#editor-and-preview-context-menus) |
+| PV-05 | Preview right-click menu: prompt templates, Copy selection; opens without a selection too, its items disabled | all | ContextMenu/PreviewContextMenu.tsx | [reference/menus](./reference/menus.md#editor-and-preview-context-menus) |
 | PV-06 | Project images (relative path) shown and refreshed on change; outside, absolute and `file:` images show alt text (#71) | all | Editor/MarkdownImage.tsx | [reference/markdown-preview](./reference/markdown-preview.md#images) |
 | PV-07 | Comments in the Preview Only view, saved in the `.md` file: comment mode, comments on selected words, icons and underlines, the Comments list, threads; read-only while the editor has unsaved changes | all | M/services/comments/, S/markdownComments/, R/components/Comments/, Editor/markdownComments/ | [reference/markdown-preview](./reference/markdown-preview.md#comments) |
 | MM-01 | Mermaid diagrams with a toolbar: direction buttons, View fullscreen | all | MermaidToolbar.tsx | [how-to/work-with-mermaid-diagrams](./how-to/work-with-mermaid-diagrams.md#view-a-diagram) |
@@ -266,7 +266,7 @@ Every row goes into `reference/keyboard-shortcuts.md` with macOS and Windows col
 | MENU-04 | View: Reload, Force Reload, Toggle DevTools, zoom, full screen | all | M/menu.ts | [reference/menus](./reference/menus.md#view-menu) |
 | MENU-05 | Window: Minimize, Zoom, Bring All to Front (macOS) / Close (Windows) | all | M/menu.ts | [reference/menus](./reference/menus.md#window-menu) |
 | MENU-06 | Tab right-click: Close, Close Others, Close All | all | R/components/Tabs/useTabContextMenu.tsx | [reference/menus](./reference/menus.md#tab-context-menu) |
-| MENU-07 | Text-box right-click in dialogs: Cut, Copy, Paste | all | ContextMenu/TextareaContextMenu.tsx | [reference/menus](./reference/menus.md#terminal-and-text-box-context-menus) |
+| MENU-07 | Text-box right-click in every text field: Cut, Copy, Paste, Delete | all | ContextMenu/TextareaContextMenu.tsx | [reference/menus](./reference/menus.md#terminal-and-text-box-context-menus) |
 | DLG-01 | New file, new folder, rename dialogs | all | Dialog/NewFileDialog.tsx, NewFolderDialog.tsx, RenameDialog.tsx | [how-to/organise-project-files](./how-to/organise-project-files.md#manage-files) |
 | DLG-02 | External link confirmation (native message box) | all | HTML preview | [how-to/preview-an-html-page](./how-to/preview-an-html-page.md#open-and-navigate-a-page) |
 
