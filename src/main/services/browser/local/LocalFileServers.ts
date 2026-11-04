@@ -29,6 +29,14 @@
  *   server, or – for a top-level load – when it is armed. So a web page, a
  *   page of another folder, a page-opened tab or popup, and a page's
  *   navigation from elsewhere never reach a folder (S-7).
+ * - **Pending top-level load** ({@link LocalFileServers.setPendingLoad};
+ *   ADR 0012 amendment 2026-11-04): until a tab's new page commits, the
+ *   tab's `webContents.getURL()` still answers the previous page, while the
+ *   new page's first images, scripts and frames are already asked about. So
+ *   the folder of the tab's pending top-level load – one Erfana armed, or the
+ *   page's own navigation within its folder – also lets that tab's
+ *   subresources and frames through, until the load commits, fails, stops or
+ *   is replaced. Only that folder, only that tab, never a top-level load.
  * - **Address shown** ({@link LocalFileServers.displayAddress}): the bar shows
  *   `file://<path>`, never the loopback address (spec change S-6).
  * - **Close**: when the last tab holding a server closes
@@ -73,6 +81,8 @@ export interface LocalGateRequest {
   readonly resourceType: string
   /** The requesting tab's top-level address, or `null` when no page is known. */
   readonly topUrl: string | null
+  /** The requesting `webContents`' id, for its pending top-level load; absent when not known. */
+  readonly contentsId?: number
 }
 
 /** The server seam; the real one is {@link LocalFolderServer}. */
@@ -99,6 +109,13 @@ export interface LocalFileServersDeps {
 
 function defaultRefusesFolder(folder: string): boolean {
   return isFilesystemRoot(folder) || isSystemDirectory(folder)
+}
+
+/** A tab's top-level load that has not committed yet. */
+interface PendingLoad {
+  /** {@link armKey} of the loading address. */
+  readonly key: string
+  readonly server: LocalServerHandle
 }
 
 interface Entry {
@@ -137,6 +154,8 @@ export class LocalFileServers {
   /** Servers starting now: they count against {@link MAX_LOCAL_SERVERS} before they are entries. */
   private pendingStarts = 0
   private readonly arms = new Map<string, number>()
+  /** Pending top-level loads to a served folder, by `webContents` id. */
+  private readonly pendingLoads = new Map<number, PendingLoad>()
 
   constructor(private readonly deps: LocalFileServersDeps) {}
 
@@ -176,6 +195,23 @@ export class LocalFileServers {
     while (this.arms.size > MAX_ARMS) this.arms.delete(this.arms.keys().next().value!)
   }
 
+  /**
+   * Record `url` as the top-level load pending in the `webContents`
+   * `contentsId`, replacing the one before; `null`, or an address no server
+   * owns, clears it. The caller checks that the load may start.
+   */
+  setPendingLoad(contentsId: number, url: string | null): void {
+    const key = url === null ? null : armKey(url)
+    const server = url === null ? null : this.serverOf(url)
+    if (key === null || server === null) this.pendingLoads.delete(contentsId)
+    else this.pendingLoads.set(contentsId, { key, server })
+  }
+
+  /** The pending load of `contentsId` ended; with `url`, only when that address is the pending one. */
+  endPendingLoad(contentsId: number, url?: string): void {
+    if (url === undefined || this.pendingLoads.get(contentsId)?.key === armKey(url)) this.pendingLoads.delete(contentsId)
+  }
+
   /** Whether `url` is the address of a served folder. */
   isLocalAddress(url: string): boolean {
     return this.serverOf(url) !== null
@@ -187,7 +223,12 @@ export class LocalFileServers {
     const entry = parsed === null ? undefined : this.entries.get(parsed.origin)
     if (parsed === null || entry === undefined) return true
     if (!parsed.pathname.startsWith(`/${entry.server.token}/`)) return false
-    if (request.resourceType === 'mainFrame' && this.isArmed(request.url)) return true
+    if (request.resourceType === 'mainFrame') {
+      if (this.isArmed(request.url)) return true
+    } else if (request.contentsId !== undefined && this.pendingLoads.get(request.contentsId)?.server === entry.server) {
+      // The new page's own subresources before its commit, while `topUrl` is still the previous page.
+      return true
+    }
     return request.topUrl !== null && this.serverOf(request.topUrl) === entry.server
   }
 
@@ -227,6 +268,7 @@ export class LocalFileServers {
   async closeAll(): Promise<void> {
     await Promise.all([...this.entries].map(([origin, entry]) => this.closeEntry(origin, entry)))
     this.arms.clear()
+    this.pendingLoads.clear()
   }
 
   /** Whether `folder` (a real path) is one of the user's own folders, or holds one. */
@@ -329,6 +371,9 @@ export class LocalFileServers {
 
   private closeEntry(origin: string, entry: Entry): Promise<void> {
     this.entries.delete(origin)
+    for (const [contentsId, pending] of this.pendingLoads) {
+      if (pending.server === entry.server) this.pendingLoads.delete(contentsId)
+    }
     return entry.server.close().catch((error: unknown) => {
       logger.warn('A local folder server did not close cleanly', { error: redactedLogError(error)?.message ?? String(error) })
     })

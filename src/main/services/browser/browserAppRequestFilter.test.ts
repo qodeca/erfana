@@ -77,6 +77,16 @@ describe('installAppRequestFilter', () => {
     ])
   })
 
+  it('passes the requesting webContents id, for its pending top-level load (ADR 0012 amendment 2026-11-04)', () => {
+    const fake = fakeSession()
+    const allowsRequest = vi.fn(() => true)
+    installAppRequestFilter(fake.session as never, () => app, { allowsRequest })
+    type IdFilter = (details: { url: string; resourceType: string; webContentsId?: number }, cb: (r: { cancel: boolean }) => void) => void
+    const filter = fake.filter() as unknown as IdFilter
+    filter({ url: 'http://127.0.0.1:1/t/canary.js', resourceType: 'script', webContentsId: 42 }, () => undefined)
+    expect(allowsRequest).toHaveBeenLastCalledWith({ url: 'http://127.0.0.1:1/t/canary.js', resourceType: 'script', topUrl: null, contentsId: 42 })
+  })
+
   it('installs once per session', () => {
     const fake = fakeSession()
     installAppRequestFilter(fake.session as never, () => app)

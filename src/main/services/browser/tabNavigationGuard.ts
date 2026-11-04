@@ -21,6 +21,8 @@ export interface TabNavigationGuardDeps {
   readonly local?: Pick<TabLocalFiles, 'isLocalAddress' | 'allowsRequest'>
   /** The tab's committed address now, for the page's origin and the served-folder rule. */
   readonly committedUrl: () => string | null
+  /** The tab's `webContents` id: a frame of its pending load's folder goes ahead before the commit (ADR 0012 amendment 2026-11-04). */
+  readonly contentsId?: number
 }
 
 /** The page's origin for `url`, or null. */
@@ -39,7 +41,8 @@ export function guardPageNavigation(contents: Pick<WebContents, 'on'>, deps: Tab
   const refusesLocal = (url: string, frame: FrameKind): boolean => {
     const local = deps.local
     if (local === undefined || !local.isLocalAddress(url)) return false
-    return !local.allowsRequest({ url, resourceType: frame === 'main' ? 'mainFrame' : 'subFrame', topUrl: deps.committedUrl() })
+    const request = { url, resourceType: frame === 'main' ? 'mainFrame' : 'subFrame', topUrl: deps.committedUrl() }
+    return !local.allowsRequest(deps.contentsId === undefined ? request : { ...request, contentsId: deps.contentsId })
   }
 
   const refuseUnlessAllowed = (event: { preventDefault(): void }, url: string, frame: FrameKind): void => {

@@ -436,6 +436,7 @@ test.describe('025-AC-034 the screenshot and the crop', () => {
     // An empty canvas area, away from what the page drew.
     const canvasPoint = { x: Math.round(canvasBox.x + canvasBox.width - 20), y: Math.round(canvasBox.y + 20) }
     const canvas = await capture(send, agent, '#canvas', canvasPoint)
+    expect(parseNumbers(canvas.parsed.facts['Pick point (top-level viewport, CSS px)'])).toEqual(canvasPoint)
     await crosshairAt(canvas.screenshot, canvasPoint, Number(canvas.parsed.facts['Device pixel ratio']))
 
     // A canvas pick by the second Ctrl/Cmd+E with the mouse still: the crosshair is at the mouse.
@@ -455,6 +456,8 @@ test.describe('025-AC-034 the screenshot and the crop', () => {
 
     await send.load(browserServers.sites.static.url('/shadow.html'))
     const shadow = await capture(send, agent, '#closed-host')
+    // The recorded pick point is the point clicked: a miss here is the pick, not the crosshair drawing.
+    expect(parseNumbers(shadow.parsed.facts['Pick point (top-level viewport, CSS px)'])).toEqual(shadow.point)
     await crosshairAt(shadow.screenshot, shadow.point, Number(shadow.parsed.facts['Device pixel ratio']))
 
     await send.load(browserServers.sites.static.url('/elements.html'))

@@ -51,7 +51,9 @@ beforeEach(() => {
     isLocalAddress: (url: string) => url === SERVED,
     arm: vi.fn(),
     displayAddress: (url: string) => (url === SERVED ? 'file:///p/site/index.html' : null),
-    allowsRequest: () => true
+    allowsRequest: () => true,
+    setPendingLoad: vi.fn(),
+    endPendingLoad: vi.fn()
   }
   service = make()
 })

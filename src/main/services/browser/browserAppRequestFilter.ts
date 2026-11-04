@@ -20,7 +20,9 @@
  * - Erfana's own addresses (rule 3);
  * - a request to a served local folder that its gate refuses: the
  *   requesting tab's top-level page is not on that folder's server and the
- *   load is not one Erfana armed (rule 1, S-7).
+ *   load is not one Erfana armed (rule 1, S-7), nor – for a subresource or
+ *   a frame – the tab's pending top-level load to that folder, whose commit
+ *   `getURL()` does not show yet (ADR 0012 amendment 2026-11-04).
  */
 import type { Session } from 'electron'
 import { logger } from '../LoggingService'
@@ -39,6 +41,7 @@ interface FilterDetails {
   readonly url: string
   readonly resourceType: string
   readonly webContents?: { getURL(): string; isDestroyed(): boolean }
+  readonly webContentsId?: number
 }
 
 const installed = new WeakSet<object>()
@@ -60,10 +63,15 @@ function refusedFileRequest(details: FilterDetails): boolean {
   }
 }
 
+function gateRequest(details: FilterDetails): LocalGateRequest {
+  const request = { url: details.url, resourceType: details.resourceType, topUrl: topUrlOf(details) }
+  return details.webContentsId === undefined ? request : { ...request, contentsId: details.webContentsId }
+}
+
 function refusal(details: FilterDetails, app: AppAddresses, local: LocalRequestGate | undefined): string | null {
   if (refusedFileRequest(details)) return 'Refused a browser request to a file: address'
   if (isAppAddress(details.url, app)) return 'Refused a browser request to an Erfana address'
-  if (local !== undefined && !local.allowsRequest({ url: details.url, resourceType: details.resourceType, topUrl: topUrlOf(details) })) {
+  if (local !== undefined && !local.allowsRequest(gateRequest(details))) {
     return 'Refused a browser request to a served local folder'
   }
   return null

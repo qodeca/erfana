@@ -31,7 +31,9 @@
  *   served folder ({@link BrowserTab.navigateLocal}); every load the user
  *   starts – the open, Reload, Back, Forward – arms its exact address, so only
  *   those get the folder's origin; the bar shows `file://<path>`. A tab the
- *   page opened never loads a local file (S-7).
+ *   page opened never loads a local file (S-7). The pending load into a
+ *   folder is tracked until it commits (`local/tabLocalLoad.ts`, ADR 0012
+ *   amendment 2026-11-04).
  *
  * The tab-kind CDP session (`cdp/BrowserCdpSession.ts`) attaches before the
  * first load through {@link BrowserTabCdpHook}; the tab never touches the debugger.
@@ -46,6 +48,7 @@ import type { RectLike } from '../preview/previewBoundsClamp'
 import { TabViewFrame, type ClipView } from './page/TabViewFrame'
 import { checkNavigation, isUserStarted, securityStateOf, type AppAddresses, type NavigationRefusal } from './browserNavigationPolicy'
 import { guardPageNavigation } from './tabNavigationGuard'
+import { TabLocalLoad } from './local/tabLocalLoad'
 import { hardenBrowserContents } from './browserSessionPolicy'
 import type { TabCertificateState } from './site/browserCertificates'
 
@@ -63,7 +66,11 @@ export interface TabLocalFiles {
   /** `file://<path>` for a served address, or `null`. */
   displayAddress(url: string): string | null
   /** The served folders' gate (`LocalFileServers.allowsRequest`), for what the page navigates. */
-  allowsRequest(request: { url: string; resourceType: string; topUrl: string | null }): boolean
+  allowsRequest(request: { url: string; resourceType: string; topUrl: string | null; contentsId?: number }): boolean
+  /** Record the tab's pending top-level load (`null`, or a non-served address, clears it). */
+  setPendingLoad(contentsId: number, url: string | null): void
+  /** The tab's pending load ended; with `url`, only when that address is the pending one. */
+  endPendingLoad(contentsId: number, url?: string): void
 }
 
 /** What a tab tells its CDP session (`cdp/BrowserCdpSession.ts`). */
@@ -132,6 +139,8 @@ export class BrowserTab {
   readonly projectRoot: string
   readonly caseSensitive: boolean
   readonly contents: WebContents
+  /** Arms and the pending load into a served folder (`local/tabLocalLoad.ts`). */
+  private readonly localLoad: TabLocalLoad
   private readonly deps: BrowserTabDeps
   private committedUrl: string | null = null
   private pendingUrl: string | null = null
@@ -152,6 +161,7 @@ export class BrowserTab {
     this.projectRoot = deps.projectRoot
     this.caseSensitive = deps.caseSensitive
     this.contents = deps.view.webContents
+    this.localLoad = new TabLocalLoad(deps.local, this.contents.id)
     this.viewFrame = new TabViewFrame({
       host: deps.host,
       view: deps.view,
@@ -164,7 +174,12 @@ export class BrowserTab {
     })
     this.contents.setWindowOpenHandler(() => ({ action: 'deny' }))
     hardenBrowserContents(this.contents)
-    guardPageNavigation(this.contents, { appAddresses: deps.appAddresses, local: deps.local, committedUrl: () => this.committedUrl })
+    guardPageNavigation(this.contents, {
+      appAddresses: deps.appAddresses,
+      local: deps.local,
+      committedUrl: () => this.committedUrl,
+      contentsId: this.contents.id
+    })
     this.listenForLoadState()
     this.listenForDevTools()
     this.contents.once('destroyed', () => this.handleDestroyed())
@@ -181,6 +196,7 @@ export class BrowserTab {
       return { refused: verdict.reason }
     }
     this.deps.armLeave?.(() => this.navigate(url, source))
+    this.localLoad.end()
     this.load(url, source)
     return { ok: true }
   }
@@ -192,7 +208,7 @@ export class BrowserTab {
    */
   navigateLocal(url: string, source: Exclude<NavigationSource, 'page'>): void {
     this.deps.armLeave?.(() => this.navigateLocal(url, source))
-    this.armLocal(url)
+    this.localLoad.arm(url)
     this.load(url, source)
   }
 
@@ -204,6 +220,7 @@ export class BrowserTab {
     if (this.deps.local?.isLocalAddress(url)) return { refused: 'local-file' }
     const verdict = checkNavigation(url, 'page', 'main', this.deps.appAddresses())
     if (!verdict.allowed) return { refused: verdict.reason }
+    this.localLoad.end()
     this.load(url, 'page')
     return { ok: true }
   }
@@ -213,12 +230,13 @@ export class BrowserTab {
     const history = this.contents.navigationHistory
     if (step === 'stop') {
       this.contents.stop()
+      this.localLoad.end()
       this.setPending(null)
       return
     }
     if (step === 'reload') {
       this.deps.armLeave?.(() => this.history('reload'))
-      this.armLocal(this.committedUrl)
+      this.localLoad.arm(this.committedUrl)
       this.setPending(this.committedUrl)
       this.contents.reload()
       return
@@ -228,7 +246,7 @@ export class BrowserTab {
     if (!canGo) return
     this.deps.armLeave?.(() => this.history(step))
     const target = history.getEntryAtIndex(history.getActiveIndex() + offset)
-    this.armLocal(target?.url ?? null)
+    this.localLoad.arm(target?.url ?? null)
     this.setPending(target?.url ?? null)
     if (step === 'back') history.goBack()
     else history.goForward()
@@ -355,11 +373,6 @@ export class BrowserTab {
     this.contents.close({ waitForBeforeUnload: false })
   }
 
-  /** Arm `url` when it is a served local address (an Erfana-started load). */
-  private armLocal(url: string | null): void {
-    if (url !== null && this.deps.local?.isLocalAddress(url)) this.deps.local.arm(url)
-  }
-
   /** What the bar shows for `url`: `file://<path>` for a served local address (S-6). */
   private shownAddress(url: string | null): string | null {
     if (url === null) return null
@@ -379,10 +392,13 @@ export class BrowserTab {
   private listenForLoadState(): void {
     const contents = this.contents
     contents.on('did-start-navigation', (details) => {
+      if (!details.isMainFrame || details.isSameDocument) return
+      this.localLoad.navigationStarted(details.url, Boolean(details.initiator), this.committedUrl)
       // A navigation the page started drops the user's pending address.
-      if (details.isMainFrame && !details.isSameDocument && details.initiator) this.setPending(null)
+      if (details.initiator) this.setPending(null)
     })
     contents.on('did-navigate', (_event, url) => {
+      this.localLoad.end()
       this.committedUrl = url
       this.title = ''
       this.setPending(null, true)
@@ -392,11 +408,17 @@ export class BrowserTab {
       this.committedUrl = url
       this.changed()
     })
-    contents.on('did-fail-load', (_event, _code, _description, _url, isMainFrame) => {
-      if (isMainFrame) this.setPending(null, true)
+    contents.on('did-fail-load', (_event, _code, _description, url, isMainFrame) => {
+      if (!isMainFrame) return
+      // An older load replaced by the pending one fails too: it must not clear the newer one.
+      this.localLoad.end(url)
+      this.setPending(null, true)
     })
     contents.on('did-start-loading', () => this.changed())
-    contents.on('did-stop-loading', () => this.setPending(null, true))
+    contents.on('did-stop-loading', () => {
+      this.localLoad.end()
+      this.setPending(null, true)
+    })
     contents.on('page-title-updated', (_event, title) => {
       this.title = sanitizePageText(title)
       this.changed()
@@ -446,6 +468,7 @@ export class BrowserTab {
 
   private handleDestroyed(): void {
     this.closed = true
+    this.localLoad.end()
     this.withdrawDevToolsExpectation()
     this.cdp?.detach()
     this.cdp = null

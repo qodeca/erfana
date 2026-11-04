@@ -281,6 +281,89 @@ describe('arms and the request gate', () => {
   })
 })
 
+describe('the pending top-level load (ADR 0012 amendment 2026-11-04)', () => {
+  const TAB = 7
+  const OTHER_TAB = 8
+
+  /** A request of tab `contentsId` whose `getURL()` still answers the previous, web page. */
+  const beforeCommit = (url: string, resourceType = 'script', contentsId: number = TAB): boolean =>
+    servers.allowsRequest({ url, resourceType, topUrl: 'https://previous.test/', contentsId })
+
+  it('lets the pending folder\'s subresources and frames through from that tab before the commit', async () => {
+    const { url } = await openOk('site/index.html')
+    const canary = url.replace('index.html', 'canary.js')
+    expect(beforeCommit(canary)).toBe(false)
+    servers.setPendingLoad(TAB, url)
+    expect(beforeCommit(canary)).toBe(true)
+    expect(beforeCommit(url.replace('index.html', 'a.png'), 'image')).toBe(true)
+    expect(beforeCommit(url.replace('index.html', 'page%20b.html'), 'subFrame')).toBe(true)
+  })
+
+  it('never lets a top-level load through on the pending load alone', async () => {
+    const { url } = await openOk('site/index.html')
+    servers.setPendingLoad(TAB, url)
+    expect(beforeCommit(url.replace('index.html', 'page%20b.html'), 'mainFrame')).toBe(false)
+  })
+
+  it('still refuses another folder, and a request with no tab id', async () => {
+    const site = await openOk('site/index.html')
+    const other = await openOk('other/index.html')
+    servers.setPendingLoad(TAB, site.url)
+    expect(beforeCommit(other.url.replace('index.html', 'canary.js'))).toBe(false)
+    const canary = site.url.replace('index.html', 'canary.js')
+    expect(servers.allowsRequest({ url: canary, resourceType: 'script', topUrl: 'https://previous.test/' })).toBe(false)
+  })
+
+  it('leaves other tabs to the committed-page rule', async () => {
+    const { url } = await openOk('site/index.html')
+    const canary = url.replace('index.html', 'canary.js')
+    servers.setPendingLoad(TAB, url)
+    expect(beforeCommit(canary, 'script', OTHER_TAB)).toBe(false)
+    servers.setPendingLoad(OTHER_TAB, null)
+    expect(beforeCommit(canary)).toBe(true)
+  })
+
+  it('is cleared by its end, by a newer load and by null or an address no server owns', async () => {
+    const site = await openOk('site/index.html')
+    const other = await openOk('other/index.html')
+    const canary = site.url.replace('index.html', 'canary.js')
+    servers.setPendingLoad(TAB, site.url)
+    servers.endPendingLoad(TAB)
+    expect(beforeCommit(canary)).toBe(false)
+    servers.setPendingLoad(TAB, site.url)
+    servers.setPendingLoad(TAB, other.url)
+    expect(beforeCommit(canary)).toBe(false)
+    expect(beforeCommit(other.url.replace('index.html', 'canary.js'))).toBe(true)
+    servers.setPendingLoad(TAB, 'https://a.test/')
+    expect(beforeCommit(other.url.replace('index.html', 'canary.js'))).toBe(false)
+    servers.setPendingLoad(TAB, site.url)
+    servers.setPendingLoad(TAB, null)
+    expect(beforeCommit(canary)).toBe(false)
+  })
+
+  it('ends on a named failure only when that address is the pending one (fragment ignored)', async () => {
+    const { url } = await openOk('site/index.html')
+    const canary = url.replace('index.html', 'canary.js')
+    servers.setPendingLoad(TAB, url)
+    servers.endPendingLoad(TAB, 'https://older.test/')
+    expect(beforeCommit(canary)).toBe(true)
+    servers.endPendingLoad(TAB, `${url}#top`)
+    expect(beforeCommit(canary)).toBe(false)
+  })
+
+  it('is dropped with its server, and on quit', async () => {
+    const site = await openOk('site/index.html')
+    servers.setPendingLoad(TAB, site.url)
+    servers.releaseTab('t1')
+    const again = await openOk('site/index.html')
+    expect(beforeCommit(again.url.replace('index.html', 'canary.js'))).toBe(false)
+    servers.setPendingLoad(TAB, again.url)
+    await servers.closeAll()
+    const third = await openOk('site/index.html')
+    expect(beforeCommit(third.url.replace('index.html', 'canary.js'))).toBe(false)
+  })
+})
+
 describe('displayAddress', () => {
   it('shows a served address as its file:// address, query and fragment kept', async () => {
     const { url } = await openOk('site/page b.html')

@@ -24,7 +24,9 @@ function make() {
     isLocalAddress: (url: string) => url.startsWith('http://127.0.0.1:4000/'),
     arm: vi.fn(),
     displayAddress: () => null,
-    allowsRequest: () => true
+    allowsRequest: () => true,
+    setPendingLoad: vi.fn(),
+    endPendingLoad: vi.fn()
   }
   const tab = new BrowserTab({
     id: 'browser-tab-1',
