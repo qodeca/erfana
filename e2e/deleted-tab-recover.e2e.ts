@@ -15,15 +15,15 @@
  * still shows the deleted state once the first tab has recovered: both tabs
  * look on the same clock, so by then the gone file has been looked for too.
  *
- * A tab the user typed in while it was deleted gets the "file changed on disk"
- * choice instead of the disk's text; that needs a restore inside the 2 s before
- * autosave writes the buffer back itself, so it is covered by unit tests
- * (`useFileWatcher.restore.test.ts`) rather than raced here.
+ * A tab the user typed in while it was deleted is never written back by
+ * autosave (issue #460): the file stays gone until the user saves on purpose,
+ * and when the file comes back the tab gets the "file changed on disk" choice
+ * instead of the disk's text. Both are checked here.
  *
  * Waits are condition-based only (Playwright auto-waiting and `expect.poll`).
  */
 
-import { rm, writeFile } from 'fs/promises'
+import { readFile, rm, stat, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { test, expect } from './fixtures/index'
 import { ProjectTreePage } from './pages/project-tree.page'
@@ -39,6 +39,30 @@ const DELETE_BUDGET_MS = 15_000
 /** The issue's acceptance budget for a returned file to show in its tab. */
 const RECOVER_BUDGET_MS = 10_000
 const DELETED_BANNER = 'This file was deleted on disk. Save to restore it.'
+/** Longer than the 2 s autosave delay after the last keystroke, with room for a slow write. */
+const AUTOSAVE_WATCH_MS = 5_000
+
+/** Whether a file exists on disk now. */
+async function exists(path: string): Promise<boolean> {
+  return stat(path).then(() => true, () => false)
+}
+
+/**
+ * Watches `path` for longer than the autosave delay and answers `'stayed-gone'`
+ * only if the file never appeared, `'recreated'` as soon as it does. Used with
+ * `expect.poll`, so the wait ends on a condition, not on a fixed sleep.
+ */
+function watchStaysGone(path: string): () => Promise<'watching' | 'recreated' | 'stayed-gone'> {
+  const start = Date.now()
+  let recreated = false
+  return async () => {
+    if (recreated || (await exists(path))) {
+      recreated = true
+      return 'recreated'
+    }
+    return Date.now() - start >= AUTOSAVE_WATCH_MS ? 'stayed-gone' : 'watching'
+  }
+}
 
 test.describe('Editor tab whose file is deleted and comes back', () => {
   test.use({
@@ -157,5 +181,80 @@ test.describe('HTML preview tab whose page is deleted and comes back', () => {
 
     await expect(failedBanner).toHaveCount(0, { timeout: RECOVER_BUDGET_MS })
     await preview.waitForTitled('-SECOND-')
+  })
+})
+
+test.describe('Editor tab typed in while its file is deleted (#460)', () => {
+  test.use({
+    testProjectFiles: {
+      'docs/typed.md': '# Typed\n\nOriginal body.\n',
+      'other.md': '# Other\n'
+    }
+  })
+
+  test('autosave does not bring the file back; Cmd/Ctrl+S does', async ({
+    windowWithTestProject: page,
+    testProject
+  }) => {
+    const tree = new ProjectTreePage(page)
+    const tabs = new TabBarPage(page)
+    const panel = new EditorPanelPage(page)
+    const keyboard = new KeyboardHelper(page)
+    const monaco = new MonacoPage(page, keyboard)
+    const typed = join(testProject.path, 'docs', 'typed.md')
+
+    await tree.expandTo(['docs'])
+    await tree.fileRow('docs/typed.md').click()
+    await tabs.waitForTab('typed.md')
+    await panel.waitForReady()
+    await panel.setViewMode('editor')
+    await monaco.waitForReady()
+
+    await rm(typed)
+    await expect(tabs.tab('typed.md').locator('.editor-tab-deleted')).toBeVisible({ timeout: DELETE_BUDGET_MS })
+
+    await monaco.appendContent('\nTyped while deleted.\n')
+    await expect.poll(async () => monaco.getContent()).toContain('Typed while deleted.')
+
+    // Longer than the autosave delay: the file must not come back
+    await expect.poll(watchStaysGone(typed), { timeout: AUTOSAVE_WATCH_MS + 5_000 }).toBe('stayed-gone')
+    await expect(page.getByText(DELETED_BANNER)).toBeVisible()
+
+    // The user's own save restores it, with the typed text
+    await monaco.focus()
+    await keyboard.save()
+    await expect.poll(async () => (await exists(typed)) ? readFile(typed, 'utf-8') : '', { timeout: RECOVER_BUDGET_MS })
+      .toContain('Typed while deleted.')
+    await expect(page.getByText(DELETED_BANNER)).toHaveCount(0, { timeout: RECOVER_BUDGET_MS })
+  })
+
+  test('a file that comes back offers the changed-on-disk choice and keeps the typed text', async ({
+    windowWithTestProject: page,
+    testProject
+  }) => {
+    const tree = new ProjectTreePage(page)
+    const tabs = new TabBarPage(page)
+    const panel = new EditorPanelPage(page)
+    const monaco = new MonacoPage(page, new KeyboardHelper(page))
+    const typed = join(testProject.path, 'docs', 'typed.md')
+
+    await tree.expandTo(['docs'])
+    await tree.fileRow('docs/typed.md').click()
+    await tabs.waitForTab('typed.md')
+    await panel.waitForReady()
+    await panel.setViewMode('editor')
+    await monaco.waitForReady()
+
+    await rm(typed)
+    await expect(tabs.tab('typed.md').locator('.editor-tab-deleted')).toBeVisible({ timeout: DELETE_BUDGET_MS })
+    await monaco.appendContent('\nTyped while deleted.\n')
+    await expect.poll(watchStaysGone(typed), { timeout: AUTOSAVE_WATCH_MS + 5_000 }).toBe('stayed-gone')
+
+    // The other branch puts the file back
+    await writeFile(typed, '# Typed\n\nFrom the other branch.\n')
+
+    await expect(panel.conflictNotification()).toBeVisible({ timeout: RECOVER_BUDGET_MS })
+    expect(await monaco.getContent()).toContain('Typed while deleted.')
+    expect(await readFile(typed, 'utf-8')).toContain('From the other branch.')
   })
 })
