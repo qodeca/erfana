@@ -138,6 +138,31 @@ export const TerminalSettingsSchema = z
 export type TerminalSettings = z.infer<typeof TerminalSettingsSchema>
 
 /**
+ * Project tree configuration (#453). `followActiveTab` – "Follow the active
+ * tab" in Settings, default on: when a file or preview tab becomes active, the
+ * tree opens its folders, scrolls to it and underlines it. Global only, never
+ * under `files`: a cloned project must not decide whether your tree moves.
+ * Lenient, like `terminal`: a missing or malformed value resolves to on
+ * instead of tripping the corruption reset that would replace every other
+ * setting. Read it through {@link isFollowActiveTabEnabled}.
+ */
+export const ProjectTreeSettingsSchema = z
+  .object({
+    followActiveTab: z.boolean().catch(true)
+  })
+  .catch(() => ({ followActiveTab: true }))
+export type ProjectTreeSettings = z.infer<typeof ProjectTreeSettingsSchema>
+
+/**
+ * Whether the project tree follows the active tab (`projectTree.followActiveTab`,
+ * default on). Reads a settings object without the section (an older file, a
+ * partial test fixture) as on.
+ */
+export function isFollowActiveTabEnabled(settings: Partial<Pick<GlobalSettings, 'projectTree'>>): boolean {
+  return settings.projectTree?.followActiveTab !== false
+}
+
+/**
  * The reviewer's identity for HTML Preview comments (docs/designs/
  * html-preview-comments.md §7.9, decision 3): written into the HTML file next
  * to each comment. App-level only – never a project's `.erfana/`, so a cloned
@@ -217,6 +242,8 @@ export const GlobalSettingsSchema = z.object({
   files: FilesSettingsSchema,
   /** Terminal configuration (lens review [23]) */
   terminal: TerminalSettingsSchema,
+  /** Project tree configuration (#453; lenient, absent means on) */
+  projectTree: ProjectTreeSettingsSchema,
   /** HTML Preview comments: the reviewer's identity (lenient, see the schema) */
   comments: CommentIdentitySettingsSchema
 })

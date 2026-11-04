@@ -10,6 +10,7 @@ Open **Settings** with the gear at the bottom of the left activity bar. <kbd>Esc
 **On this page**
 
 - [Editor](#editor)
+- [Project tree](#project-tree)
 - [Git status](#git-status)
 - [Logging](#logging)
 - [Transcription](#transcription)
@@ -29,6 +30,14 @@ Open **Settings** with the gear at the bottom of the left activity bar. <kbd>Esc
 | Option | Default | Effect |
 | --- | --- | --- |
 | **Preserve line breaks** | Off | When on, single newlines render as line breaks. |
+
+## Project tree
+
+**What it does:** **Follow the active tab** shows where the file you are looking at sits in the project. **How to reach it:** **Settings > Project tree**.
+
+| Option | Default | Effect |
+| --- | --- | --- |
+| **Follow the active tab** | On | When you switch to a file or preview tab, the project tree opens its folders, scrolls to the file and underlines it. Folders it opened close again at the next switch, unless you opened or worked inside them. A file the tree's filter hides, or one outside the project, is left alone. Keyboard focus stays in the editor. |
 
 ## Git status
 

@@ -24,6 +24,7 @@ function settingsWith(enabled: boolean): GlobalSettings {
     htmlPreview: { enabled },
     files: { exclude: [] },
     terminal: { screenReaderMode: 'auto' },
+    projectTree: { followActiveTab: true },
     comments: { identityNoticeSeen: false }
   }
 }

@@ -13,6 +13,7 @@ import {
   LoggingLevelSchema,
   GitStatusSettingsSchema,
   getDefaultGlobalSettings,
+  isFollowActiveTabEnabled,
   type GlobalSettings,
   type LoggingLevel,
   type GitStatusSettings
@@ -118,6 +119,9 @@ describe('GlobalSettingsSchema', () => {
         terminal: {
           screenReaderMode: 'on' as const
         },
+        projectTree: {
+          followActiveTab: false
+        },
         comments: {
           authorName: 'Ada',
           identityNoticeSeen: true
@@ -153,6 +157,9 @@ describe('GlobalSettingsSchema', () => {
         },
         terminal: {
           screenReaderMode: 'on' as const
+        },
+        projectTree: {
+          followActiveTab: false
         },
         comments: {
           authorName: 'Ada',
@@ -242,6 +249,33 @@ describe('GlobalSettingsSchema', () => {
     it('keeps a non-string entry as an empty string so indexes stay stable', () => {
       const result = GlobalSettingsSchema.parse({ files: { exclude: ['a', 7, 'b'] } })
       expect(result.files.exclude).toEqual(['a', '', 'b'])
+    })
+  })
+
+  describe('projectTree.followActiveTab (#453)', () => {
+    it('defaults to on when the section is missing', () => {
+      expect(GlobalSettingsSchema.parse({}).projectTree).toEqual({ followActiveTab: true })
+      expect(getDefaultGlobalSettings().projectTree.followActiveTab).toBe(true)
+    })
+
+    it.each([true, false])('keeps %s', (value) => {
+      expect(GlobalSettingsSchema.parse({ projectTree: { followActiveTab: value } }).projectTree.followActiveTab).toBe(value)
+    })
+
+    it('never fails on a bad value, so it cannot trip the corruption reset', () => {
+      const badValue = GlobalSettingsSchema.safeParse({ projectTree: { followActiveTab: 'yes' } })
+      expect(badValue.success).toBe(true)
+      expect(badValue.data?.projectTree).toEqual({ followActiveTab: true })
+
+      const badSection = GlobalSettingsSchema.safeParse({ projectTree: 'off' })
+      expect(badSection.success).toBe(true)
+      expect(badSection.data?.projectTree).toEqual({ followActiveTab: true })
+    })
+
+    it('is read as on unless it is exactly false', () => {
+      expect(isFollowActiveTabEnabled({})).toBe(true)
+      expect(isFollowActiveTabEnabled({ projectTree: { followActiveTab: true } })).toBe(true)
+      expect(isFollowActiveTabEnabled({ projectTree: { followActiveTab: false } })).toBe(false)
     })
   })
 
@@ -350,6 +384,9 @@ describe('GlobalSettingsSchema', () => {
         terminal: {
           screenReaderMode: 'auto'
         },
+        projectTree: {
+          followActiveTab: true
+        },
         comments: {
           identityNoticeSeen: false
         }
@@ -370,6 +407,7 @@ describe('GlobalSettingsSchema', () => {
         htmlPreview: { enabled: true },
         files: { exclude: [] },
         terminal: { screenReaderMode: 'auto' },
+        projectTree: { followActiveTab: true },
         comments: { identityNoticeSeen: false }
       }
       expect(validSettings.logging.level).toBe('info')

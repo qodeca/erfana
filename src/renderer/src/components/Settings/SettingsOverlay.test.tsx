@@ -45,10 +45,11 @@ vi.mock('../../utils/logger', () => ({ logger: mockLogger }))
 // The settings sections no test in this file varies. Every fixture spreads
 // them so it is a complete GlobalSettings; `enabled: true` is also what the
 // HTML preview section falls back to when the section is absent.
-const UNVARIED_SECTIONS: Pick<GlobalSettings, 'htmlPreview' | 'files' | 'terminal' | 'comments'> = {
+const UNVARIED_SECTIONS: Pick<GlobalSettings, 'htmlPreview' | 'files' | 'terminal' | 'projectTree' | 'comments'> = {
   htmlPreview: { enabled: true },
   files: { exclude: [] },
   terminal: { screenReaderMode: 'auto' },
+  projectTree: { followActiveTab: true },
   comments: { identityNoticeSeen: false }
 }
 
@@ -432,6 +433,25 @@ describe('SettingsOverlay', () => {
       const heading = screen.getByRole('heading', { name: 'Logging' })
       expect(heading).toBeInTheDocument()
       expect(heading).toHaveClass('settings-section-title')
+    })
+
+    it('places the Project tree section right after Editor (#453)', () => {
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
+        }
+      })
+
+      render(<SettingsOverlay />)
+
+      const titles = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)
+      expect(titles.indexOf('Editor')).toBeGreaterThanOrEqual(0)
+      expect(titles.indexOf('Project tree')).toBe(titles.indexOf('Editor') + 1)
+      expect(screen.getByRole('checkbox', { name: 'Follow the active tab' })).toBeChecked()
     })
 
     it('renders log level dropdown with current value', () => {
@@ -2474,6 +2494,7 @@ describe('SettingsOverlay', () => {
           htmlPreview: { enabled: true },
           files: UNVARIED_SECTIONS.files,
           terminal: UNVARIED_SECTIONS.terminal,
+          projectTree: UNVARIED_SECTIONS.projectTree,
           comments: UNVARIED_SECTIONS.comments
         }
       })

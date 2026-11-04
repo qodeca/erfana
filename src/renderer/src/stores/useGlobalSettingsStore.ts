@@ -36,6 +36,8 @@ interface GlobalSettingsState {
   updateWhisperModel: (model: WhisperModel) => Promise<void>
   updateHtmlPreviewEnabled: (enabled: boolean) => Promise<void>
   updateTerminalScreenReaderMode: (mode: TerminalScreenReaderMode) => Promise<void>
+  /** Project tree follows the active tab on/off (`projectTree.followActiveTab`, #453). */
+  updateProjectTreeFollowActiveTab: (enabled: boolean) => Promise<void>
   /** HTML Preview comments on/off (`htmlPreview.comments.enabled`). */
   updateHtmlPreviewCommentsEnabled: (enabled: boolean) => Promise<void>
   /** Markdown Preview comments on/off (`markdownPreview.comments.enabled`, spec 024). */
@@ -117,6 +119,11 @@ export const useGlobalSettingsStore = create<GlobalSettingsState>((set, get) => 
   // Read live by every terminal panel (useTerminalScreenReaderMode), no restart needed
   updateTerminalScreenReaderMode: async (mode: TerminalScreenReaderMode) => {
     await get()._updateSection('terminal', (current) => ({ ...current, screenReaderMode: mode }))
+  },
+
+  // Read live by the project tree (useRevealActiveFile), no restart needed
+  updateProjectTreeFollowActiveTab: async (enabled: boolean) => {
+    await get()._updateSection('projectTree', (current) => ({ ...current, followActiveTab: enabled }))
   },
 
   updateHtmlPreviewCommentsEnabled: async (enabled: boolean) => {

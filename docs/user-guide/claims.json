@@ -3254,7 +3254,7 @@
       "quote": "- **Settings UI**: Gear icon → Logging section → dropdown. Applied immediately.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:498",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:480",
       "match": "<h2 className=\"settings-section-title\">Logging</h2>"
     },
     {
@@ -5298,7 +5298,7 @@
       "quote": "(`ProjectTree/ProjectTree.css:620`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:668",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:692",
       "match": "background-color: var(--color-git-renamed);"
     },
     {
@@ -6108,7 +6108,7 @@
       "quote": "manual refresh button (Cmd/Ctrl+Alt+R)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1342",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1308",
       "match": "(e.metaKey || e.ctrlKey) && e.altKey && e.key.toLowerCase() === 'r'"
     },
     {
@@ -8774,7 +8774,7 @@
       "quote": "as `openInBrowser: openInDefaultBrowser` (line numbers dropped",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1388",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1354",
       "match": "openInBrowser: openInDefaultBrowser",
       "note": "Cited ProjectTree.tsx:1223/:1248/:1254; buildMenuContext is now at :1357 and openInBrowser at :1387."
     },
@@ -16426,7 +16426,7 @@
       "quote": "Toggle in Settings overlay under \"Editor\" section",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:428",
+      "source": "src/renderer/src/components/Settings/sections/EditorSection.tsx:21",
       "match": "<h2 className=\"settings-section-title\">Editor</h2>"
     },
     {
@@ -18315,7 +18315,7 @@
       "quote": "a pasted cut asks \"Replace Item\" first, while a drag onto a folder that already holds the name fails with an error toast",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:902",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:868",
       "match": "title: 'Replace Item',",
       "note": "Said moves always get a confirm dialog; only a pasted cut does – handleDragEnd calls moveItem without a conflict check."
     },
@@ -18326,7 +18326,7 @@
       "quote": "dnd-kit's own `DndContext` auto-scroll, driven by the live pointer",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:573",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:539",
       "match": "own (`DndContext` autoScroll, on by default), driven by the live pointer.",
       "test": "e2e/tree-keyboard.e2e.ts",
       "note": "Claimed a custom 50px / 60fps auto-scroll; the tree interval was removed and AUTO_SCROLL is unused."
@@ -18380,7 +18380,7 @@
       "quote": "Cut items appear dimmed with dashed underline until pasted",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:467",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:491",
       "match": ".project-tree-item[data-clipboard-cut=\"true\"]::after {"
     },
     {
@@ -18390,7 +18390,7 @@
       "quote": "Keyboard and menu paste ask before replacing a same-named item; a mouse drag does not",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:896",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:862",
       "match": "const hasConflict = await fileGateway.checkConflict({ targetParentPath: targetPath, itemName: sourceItemName })",
       "note": "Said keyboard operations work identically to mouse drag-drop; only paste checks for a name conflict."
     },
@@ -18412,7 +18412,7 @@
       "quote": "Folder stays highlighted during the 1 s auto-expand countdown (no pulse animation)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:432",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:456",
       "match": ".project-tree-node[data-drop-highlight=\"true\"] > .project-tree-item.directory {",
       "note": "Claimed a pulse animation; no such keyframe exists in ProjectTree.css."
     },
@@ -18513,7 +18513,7 @@
       "quote": "**Cmd+Shift+I** (Mac) or **Ctrl+Shift+I** (Windows/Linux):",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1314",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1280",
       "match": "if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'i') {"
     },
     {
@@ -18553,7 +18553,7 @@
       "quote": "Move and Copy do not filter by type. In the Import path:",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1040",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1006",
       "match": "if (mode === 'import') {",
       "note": "Said every multi-file drop filters out documents from move/copy; filtering happens only in processFiles (Import mode)."
     },
@@ -18773,7 +18773,7 @@
       "quote": "A target folder must be selected – otherwise the toast \"Select a folder to paste into\"",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:885",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:851",
       "match": "message: 'Select a folder to paste into',",
       "note": "Rule had no traceable outcome; now names the toast."
     },
@@ -18916,7 +18916,7 @@
       "quote": "a custom `treeCollisionDetection` function in `ProjectTree.tsx`, passed to `DndContext`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1615",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1581",
       "match": "collisionDetection={treeCollisionDetection}"
     },
     {
@@ -18926,7 +18926,7 @@
       "quote": "this is dnd-kit's own `DndContext` auto-scroll, driven by the live pointer",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:573",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:539",
       "match": "own (`DndContext` autoScroll, on by default), driven by the live pointer.",
       "note": "Claimed 50px / 60fps custom auto-scroll."
     },
@@ -18937,7 +18937,7 @@
       "quote": "A custom dnd-kit `<DragOverlay>` ghost (`.drag-overlay`, the dragged item's name) follows the cursor",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1681",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1648",
       "match": "<DragOverlay dropAnimation={null}>"
     },
     {
@@ -18947,7 +18947,7 @@
       "quote": "const moveResult = await fileGateway.moveItem({ sourcePath, targetParentPath: targetParent })",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:779",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:745",
       "match": "const moveResult = await fileGateway.moveItem({ sourcePath, targetParentPath: targetParent })",
       "note": "Excerpt called window.api.file.moveItem positionally and refreshed outside the pause."
     },
@@ -18958,7 +18958,7 @@
       "quote": "showGlobalToast({ title: 'Success', message: 'Item moved successfully', type: 'success' })",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:801",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:767",
       "match": "message: 'Item moved successfully',",
       "note": "Toast was given as \"Moved 1 file\" / \"Move failed\"."
     },
@@ -18969,7 +18969,7 @@
       "quote": "showGlobalToast({ title: 'Error', message: formatFileOperationError(err, 'move'), type: 'error' })",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:806",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:772",
       "match": "const errorMessage = formatFileOperationError(err, 'move')",
       "note": "Failure toast title was \"Move failed\"."
     },
@@ -19187,7 +19187,7 @@
       "quote": "a drag-drop move does not ask and fails with an error toast",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:806",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:772",
       "match": "const errorMessage = formatFileOperationError(err, 'move')",
       "note": "Said every move conflict shows a confirm dialog."
     },
@@ -19209,7 +19209,7 @@
       "quote": "\"Cannot move project root\" (renderer toast); \"Cannot move the project root directory\" (main)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:733",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:699",
       "match": "message: 'Cannot move project root',",
       "note": "Table gave only the main-process message for the renderer check."
     },
@@ -19251,7 +19251,7 @@
       "quote": "Visual indicator in tree (link icon, `aria-label=\"Symlink\"`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:314",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:322",
       "match": "{isSymlink && <LinkIcon size={12} className=\"symlink-icon\" aria-label=\"Symlink\" />}"
     },
     {
@@ -19314,7 +19314,7 @@
       "quote": "opacity: var(--opacity-disabled);",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:410",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:434",
       "match": "opacity: var(--opacity-disabled);"
     },
     {
@@ -19334,7 +19334,7 @@
       "quote": ".project-tree-node[data-in-drop-zone=\"internal\"] {",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:439",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:463",
       "match": ".project-tree-node[data-in-drop-zone=\"internal\"] {"
     },
     {
@@ -19344,7 +19344,7 @@
       "quote": "but `ProjectTree.tsx` never passes `isDropInvalid` to `ProjectTreeNode`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:152",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:159",
       "match": "isDropInvalid = false,",
       "note": "Presented the invalid-drop style as a live state; nothing sets it."
     },
@@ -19355,7 +19355,7 @@
       "quote": "The tree's former `startAutoScroll` interval read the pointer position from when the drag *started*",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:574",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:540",
       "match": "// The tree's former interval read `activatorEvent.clientY` – the pointer",
       "test": "e2e/tree-keyboard.e2e.ts",
       "note": "Showed a startAutoScroll function and 50px/5px/60fps parameters that no longer run."
@@ -19367,7 +19367,7 @@
       "quote": "dnd-kit's default live region and drag instructions are still rendered",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1622",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1588",
       "match": "accessibility={TREE_DND_ACCESSIBILITY}",
       "note": "Said no aria-live region is rendered; dnd-kit renders its own at document.body."
     },
@@ -19378,7 +19378,7 @@
       "quote": "\"Success\" – `Item moved successfully` after a drag inside the tree",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:801",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:767",
       "match": "message: 'Item moved successfully',",
       "note": "Said an internal drop shows \"Moved N file(s)\" (that is the OS-drop toast)."
     },
@@ -19389,7 +19389,7 @@
       "quote": "`Moved 1 file` / `Moved N files` / `Copied …` after a drop from the OS",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1163",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1129",
       "match": "? `${operationLabel} 1 file`"
     },
     {
@@ -19399,7 +19399,7 @@
       "quote": "\"Symlink Moved\" / \"Symlink Copied\" – warning toast when the operated item was a symlink",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:794",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:760",
       "match": "title: 'Symlink Moved',",
       "note": "Toast type was given as info; it is warning."
     },
@@ -19410,7 +19410,7 @@
       "quote": "\"Invalid Move\" – a folder dropped into its own subfolder, or the project root dragged",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:722",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:688",
       "match": "title: 'Invalid Move',",
       "note": "Replaced the non-existent \"Move failed\" title."
     },
@@ -19451,7 +19451,7 @@
       "quote": "`data-in-drop-zone=\"internal\"` (`\"external\"` for an OS drag)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:248",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:255",
       "match": "data-in-drop-zone={inDropZone ?? undefined}",
       "note": "Children-highlight row named data-drop-highlight."
     },
@@ -19462,7 +19462,7 @@
       "quote": "gives every visible row inside it `data-in-drop-zone=\"internal\"`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1644",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1610",
       "match": "? 'internal'"
     },
     {
@@ -19472,7 +19472,7 @@
       "quote": "`DropIndicator.tsx` and `FolderDropHighlight.tsx` exist in the same folder but are rendered nowhere",
       "status": "verified",
       "evidence": "app",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1681",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1648",
       "match": "<DragOverlay dropAnimation={null}>",
       "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
@@ -20158,7 +20158,7 @@
       "quote": "// 1. Open the main-process log (Settings → Logging → Logs folder → Open)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:531",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:513",
       "match": "<label className=\"settings-label\">Logs folder</label>",
       "note": "Path was \"Help → Open logs folder\"; the app menu has no Help menu."
     },
@@ -20179,7 +20179,7 @@
       "quote": "# - Error message: \"Project folder no longer exists\"",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:348",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:310",
       "match": "message: 'Project folder no longer exists'"
     },
     {
@@ -20341,7 +20341,7 @@
       "quote": "**ProjectTree**: Toolbar, control panel markup, tree rendering (virtualised)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1594",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1560",
       "match": "{showControlPanel && (",
       "note": "Responsibility split misplaced the control panel and file opening."
     },
@@ -20382,7 +20382,7 @@
       "quote": "**Keyboard Shortcut**: Cmd+Alt+R (macOS) / Ctrl+Alt+R (Windows/Linux)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1582",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1548",
       "match": "title={`Refresh (${formatShortcut('R', { mod: true, alt: true })})`}"
     },
     {
@@ -20392,7 +20392,7 @@
       "quote": "ARIA label \"Refresh project tree and git status\"",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1583",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1549",
       "match": "aria-label=\"Refresh project tree and git status\"",
       "note": "Named only \"ARIA label, focus state\" without the text."
     },
@@ -20456,7 +20456,7 @@
       "quote": "the checked choice (`.file-filter__cell[aria-checked='true']`) gets a fill and a lime bottom edge",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:386",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:410",
       "match": ".file-filter__cell[aria-checked='true'] {",
       "note": "Dropped the untraceable \"12px spacing\" and gray-text claims."
     },
@@ -20557,7 +20557,7 @@
       "quote": "lucide `AlertTriangle` icon (14px) before the name, ARIA label \"Warning: sensitive file\"",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:313",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:321",
       "match": "aria-label=\"Warning: sensitive file\"",
       "note": "Said icon ⚠️ and ARIA label \"Sensitive file\"."
     },
@@ -20568,7 +20568,7 @@
       "quote": "`isSensitiveFile()` in `ProjectTreeNode.tsx`, files only (folders are never flagged)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:210",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:217",
       "match": "const isSensitive = node.type === 'file' && isSensitiveFile(node.name)",
       "note": "Icon section claimed an amber sensitive-folder variant."
     },
@@ -20611,7 +20611,7 @@
       "quote": "**Folders**: `ChevronDown` (expanded) / `ChevronRight` (collapsed) – no folder icon",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:217",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:224",
       "match": "<ChevronDown size={16} strokeWidth={2} />",
       "note": "Described blue/gray FolderOpen/Folder icons that the row does not draw."
     },
@@ -20675,7 +20675,7 @@
       "quote": "(\"Cannot move project root\")",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:733",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:699",
       "match": "message: 'Cannot move project root',"
     },
     {
@@ -20756,7 +20756,7 @@
       "quote": "the rows inside the target folder are tinted (`data-in-drop-zone` on each row; `FolderDropHighlight.tsx` is not rendered)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:248",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:255",
       "match": "data-in-drop-zone={inDropZone ?? undefined}",
       "note": "Credited the tint to FolderDropHighlight.tsx, which is never rendered."
     },
@@ -20809,7 +20809,7 @@
       "quote": "**Expansion State**: `expandedFolders` (a `Set` of paths) is component state in `ProjectTree.tsx`.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:184",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:146",
       "match": "const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() =>"
     },
     {
@@ -20921,7 +20921,7 @@
       "quote": "\"Local (macOS / Windows x64 only – ARM64 not supported)\"",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:578",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:560",
       "match": "'Local (macOS / Windows x64 only – ARM64 not supported)'"
     },
     {
@@ -21001,7 +21001,7 @@
       "quote": "and Cmd/Ctrl+Alt+R forces a manual refresh",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1342",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1308",
       "match": "(e.metaKey || e.ctrlKey) && e.altKey && e.key.toLowerCase() === 'r'"
     },
     {
@@ -21629,7 +21629,7 @@
       "quote": "destructures `findNode`, `findNodeWithRoot` and `isDescendant` only",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:262",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:224",
       "match": "const { findNode, findNodeWithRoot, isDescendant } = useDragDropTree(files, projectPath)"
     },
     {
@@ -22069,7 +22069,7 @@
       "quote": "(`export const ProjectTreeNode = memo(ProjectTreeNodeRow)` in `ProjectTreeNode.tsx`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:327",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:335",
       "match": "export const ProjectTreeNode = memo(ProjectTreeNodeRow)"
     },
     {
@@ -22690,7 +22690,7 @@
       "quote": "The renderer mirror at `SettingsOverlay.tsx:114-126` is policed by a comment",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:121",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:122",
       "match": "Mirrors `classifyPlatform()` in src/main/services/whisper-assets.ts"
     },
     {
@@ -23185,7 +23185,7 @@
       "quote": "`isLocalWhisperSupported = darwin || (win32 && x64)`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:124",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:125",
       "match": "const isLocalWhisperSupported ="
     },
     {
@@ -23345,7 +23345,7 @@
       "quote": "manual refresh (`Ctrl+Alt+R`) works (#160)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1342",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1308",
       "match": "e.altKey && e.key.toLowerCase() === 'r'"
     },
     {
@@ -23913,7 +23913,7 @@
       "quote": "Settings → Logging shows the **Logs folder** path with an **Open** button.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:531",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:513",
       "match": "<label className=\"settings-label\">Logs folder</label>",
       "note": "said an \"Open logs folder\" button; the row is labelled Logs folder and the button reads Open"
     },
@@ -24086,7 +24086,7 @@
       "quote": "`src/renderer/src/components/Settings/SettingsOverlay.test.tsx:263,276` (`describe('Focus management')` at `:247`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.test.tsx:263",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.test.tsx:264",
       "match": "it('focuses close button when opened'",
       "note": "said :262,275 and :246"
     },
@@ -24152,7 +24152,7 @@
       "quote": "`SettingsOverlay.test.tsx:256` (post-#172).",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.test.tsx:256",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.test.tsx:257",
       "match": "vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })",
       "note": "said :255"
     },
@@ -25177,7 +25177,7 @@
       "quote": "`Cmd/Ctrl+Shift+I` is the project tree's import-into-folder shortcut",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1314",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1280",
       "match": "if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'i') {",
       "note": "Was 'Project Panel's external-file import shortcut'; the handler lives in ProjectTree and imports into the selected folder."
     },
@@ -26585,7 +26585,7 @@
       "quote": "remembers the previously focused element when it opens",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:357",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:358",
       "match": "previousActiveElement.current = document.activeElement as HTMLElement"
     },
     {
@@ -26595,7 +26595,7 @@
       "quote": "unless a section was asked for, which then focuses its own heading",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:364",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:365",
       "match": "if (!isOpen || focusSection) return undefined",
       "note": "Added: the close button is not focused when a section is requested."
     },
@@ -26606,7 +26606,7 @@
       "quote": "focuses the close button after the overlay renders",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:367",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:368",
       "match": "closeButtonRef.current?.focus()"
     },
     {
@@ -26616,7 +26616,7 @@
       "quote": "closes Settings on Escape only while it is the topmost overlay",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:381",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:382",
       "match": "onEscape: closeSettings",
       "note": "Escape is handled by the shared overlay stack, not a Settings-owned listener, and only while Settings is topmost."
     },
@@ -26637,7 +26637,7 @@
       "quote": "It restores the earlier focus when it closes",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:387",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:388",
       "match": "previousActiveElement.current.focus()"
     },
     {
@@ -26700,7 +26700,7 @@
       "quote": "Settings shows the reason under the key field",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:617",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:599",
       "match": "backend === 'openai' && apiKeyError &&"
     },
     {
@@ -26771,7 +26771,7 @@
       "quote": "Download progress is shown in Settings.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:196",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:197",
       "match": "whisperGateway.onDownloadProgress((progress) => {"
     },
     {
@@ -26781,7 +26781,7 @@
       "quote": "**Local (macOS / Windows x64 only – ARM64 not supported)**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:578",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:560",
       "match": "'Local (macOS / Windows x64 only – ARM64 not supported)'",
       "note": "Replaced vague 'ARM64-specific copy' with the exact option label."
     },
@@ -26801,7 +26801,7 @@
       "quote": "stopped with the **Cancel** button in Settings",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:705",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:687",
       "match": "{cancelPending ? 'Cancelling…' : 'Cancel'}",
       "note": "Replaced the false timeout claim with the real way to stop a download."
     },
@@ -26956,7 +26956,7 @@
       "quote": "`authorName` (at most 100 characters)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/ipc/global-settings-schema.ts:158",
+      "source": "src/shared/ipc/global-settings-schema.ts:183",
       "match": ".max(100, 'The name is longer than 100 characters.')"
     },
     {
@@ -26966,7 +26966,7 @@
       "quote": "`authorEmail` (at most 254)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/ipc/global-settings-schema.ts:162",
+      "source": "src/shared/ipc/global-settings-schema.ts:187",
       "match": ".max(254, 'The email is longer than 254 characters.')"
     },
     {
@@ -26976,7 +26976,7 @@
       "quote": "a malformed section becomes `{ identityNoticeSeen: false }`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/ipc/global-settings-schema.ts:172",
+      "source": "src/shared/ipc/global-settings-schema.ts:197",
       "match": ".catch(() => ({ identityNoticeSeen: false }))"
     },
     {
@@ -26986,7 +26986,7 @@
       "quote": "is checked strictly instead (`CommentIdentityWriteSchema`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/ipc/global-settings-schema.ts:187",
+      "source": "src/shared/ipc/global-settings-schema.ts:212",
       "match": "comments: CommentIdentityWriteSchema"
     },
     {
@@ -27266,7 +27266,7 @@
       "quote": "`src/renderer/src/components/Settings/SettingsOverlay.tsx`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:93",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:95",
       "match": "export function SettingsOverlay"
     },
     {
@@ -27276,7 +27276,7 @@
       "quote": "`useSettingsStore` (open/close), `useGlobalSettingsStore` (values)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:94",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:96",
       "match": "const { isOpen, closeSettings, focusSection } = useSettingsStore()"
     },
     {
@@ -27286,7 +27286,7 @@
       "quote": "**Schema**: `src/shared/ipc/global-settings-schema.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/ipc/global-settings-schema.ts:193",
+      "source": "src/shared/ipc/global-settings-schema.ts:218",
       "match": "export const GlobalSettingsSchema"
     },
     {
@@ -27356,7 +27356,7 @@
       "quote": "with a control or invisible character (the writer's own rule",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/ipc/global-settings-schema.ts:159",
+      "source": "src/shared/ipc/global-settings-schema.ts:184",
       "match": "!hasRefusedIdentityChar(name)"
     },
     {
@@ -27376,7 +27376,7 @@
       "quote": "App-level only, so a cloned project cannot preset who you are",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/ipc/global-settings-schema.ts:143",
+      "source": "src/shared/ipc/global-settings-schema.ts:168",
       "match": "App-level only – never a project's `.erfana/`, so a cloned"
     },
     {
@@ -27386,7 +27386,7 @@
       "quote": "main reads it at every Save",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/ipc/global-settings-schema.ts:144",
+      "source": "src/shared/ipc/global-settings-schema.ts:169",
       "match": "Main reads it at Save"
     },
     {
@@ -28027,7 +28027,7 @@
       "quote": "`src/renderer/src/components/ProjectTree/ProjectTree.tsx`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:777",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:743",
       "match": "await withWatcherPause(projectPath"
     },
     {
@@ -28409,7 +28409,7 @@
       "quote": "Toolbar: Create new markdown file, Create new folder, Import a file, Refresh",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1545",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1511",
       "match": "title=\"Create new markdown file\"",
       "note": "Labels were shortened (New markdown file, New folder, Import); the tooltips read Create new markdown file, Create new folder and Import a file."
     },
@@ -28420,7 +28420,7 @@
       "quote": "Filter: All files / Markdown only | all | R/components/ProjectTree/ProjectTree.tsx",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1597",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1563",
       "match": "<FileFilterChoice filterMode={filterMode}",
       "note": "Source path named ProjectPanel.tsx; the filter lives in ProjectTree.tsx."
     },
@@ -28451,7 +28451,7 @@
       "quote": "Sensitive-file and symlink icons",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:212",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:219",
       "match": "const isSymlink = node.isSymlink === true"
     },
     {
@@ -29505,7 +29505,7 @@
       "quote": "Backends: OpenAI API (audio leaves the machine) or local whisper.cpp (offline)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:576",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:558",
       "match": "? 'Local (whisper.cpp)'"
     },
     {
@@ -29515,7 +29515,7 @@
       "quote": "| local: M, W x64 |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:126",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:127",
       "match": "(whisperPlatform === 'win32' && whisperArch === 'x64')"
     },
     {
@@ -29586,7 +29586,7 @@
       "quote": "| SET-03 | Git status > Polling interval | 3/5/7/10 s, 5 s |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:41",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:43",
       "match": "{ value: 7000, label: '7s' },"
     },
     {
@@ -29606,7 +29606,7 @@
       "quote": "| SET-05 | Logging > Logs folder, Open |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:531",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:513",
       "match": "<label className=\"settings-label\">Logs folder</label>",
       "test": "e2e/settings-logs.e2e.ts"
     },
@@ -29617,7 +29617,7 @@
       "quote": "| SET-06 | Transcription > Backend | OpenAI / Local, OpenAI |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/ipc/global-settings-schema.ts:204",
+      "source": "src/shared/ipc/global-settings-schema.ts:229",
       "match": "backend: 'openai' as const,"
     },
     {
@@ -29627,7 +29627,7 @@
       "quote": "| SET-07 | Transcription > OpenAI API key, Remove key | password field |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:606",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:588",
       "match": "type=\"password\""
     },
     {
@@ -29647,7 +29647,7 @@
       "quote": "| SET-09 | Transcription > Model status, Download model |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:696",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:678",
       "match": "{modelDownloading ? 'Downloading...' : 'Download model'}"
     },
     {
@@ -29687,7 +29687,7 @@
       "quote": "| SET-12 | Settings overlay: gear icon, Esc closes, no shortcut |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:89",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:91",
       "match": "Escape closes Settings while it is the topmost overlay (#229)"
     },
     {
@@ -29728,7 +29728,7 @@
       "quote": "| SET-15 | Transcription > Cancel a model download",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:705",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:687",
       "match": "{cancelPending ? 'Cancelling…' : 'Cancel'}"
     },
     {
@@ -29800,7 +29800,7 @@
       "quote": "| KEY-04 | <kbd>⌥⌘R</kbd> / <kbd>Ctrl+Alt+R</kbd> | Refresh the project tree",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1342",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1308",
       "match": "if ((e.metaKey || e.ctrlKey) && e.altKey && e.key.toLowerCase() === 'r') {"
     },
     {
@@ -29810,7 +29810,7 @@
       "quote": "| KEY-05 | <kbd>⇧⌘I</kbd> / <kbd>Ctrl+Shift+I</kbd> | Import into the selected folder",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1314",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1280",
       "match": "if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'i') {"
     },
     {
@@ -30223,7 +30223,7 @@
       "quote": "Open, change and close a project (project panel header)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1515",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1481",
       "match": "title={projectPath ? 'Change project' : 'Open project'}"
     },
     {
@@ -30612,7 +30612,7 @@
       "quote": "Select a file in the project tree.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:328",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:290",
       "match": "onFileSelect(filePath)",
       "note": "A single click on a file row opens it in the editor area."
     },
@@ -31239,7 +31239,7 @@
       "quote": "Select **Import a file** in the tree toolbar",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1567",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1533",
       "match": "'Import a file'",
       "note": "Page called the toolbar button **Import**; its tooltip and accessible name are 'Import a file'."
     },
@@ -31567,7 +31567,7 @@
       "quote": "use **Change project** or **Close project** in the project header",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1515",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1481",
       "match": "title={projectPath ? 'Change project' : 'Open project'}"
     },
     {
@@ -31577,7 +31577,7 @@
       "quote": "2. Select **Close project** to return to Home.",
       "status": "verified",
       "evidence": "app",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1532",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1498",
       "match": "title=\"Close project\"",
       "test": "e2e/project-switch-unsaved.e2e.ts"
     },
@@ -31619,7 +31619,7 @@
       "quote": "3. Select a file in the project tree to open it.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:328",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:290",
       "match": "onFileSelect(filePath)"
     },
     {
@@ -31732,7 +31732,7 @@
       "quote": "1. Select **Change project** to choose another folder.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1516",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1482",
       "match": "aria-label={projectPath ? 'Change project' : 'Open project'}",
       "note": "Project-header button reads Change project once a project is open; it runs the same folder picker"
     },
@@ -31763,7 +31763,7 @@
       "quote": "Use the tree toolbar buttons **Create new markdown file**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1545",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1511",
       "match": "title=\"Create new markdown file\"",
       "note": "Page said **New markdown file**; the button's tooltip and aria-label is \"Create new markdown file\"."
     },
@@ -31774,7 +31774,7 @@
       "quote": "**Create new folder**, **Import a file**, and **Refresh**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1555",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1521",
       "match": "title=\"Create new folder\"",
       "note": "Page said **New folder**; the tooltip is \"Create new folder\"."
     },
@@ -31785,7 +31785,7 @@
       "quote": "**Import a file**, and **Refresh**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1567",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1533",
       "match": "'Import a file'",
       "note": "Page said **Import**; the toolbar tooltip is \"Import a file\"."
     },
@@ -31796,7 +31796,7 @@
       "quote": "and **Refresh**. New files and folders go into the selected folder",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1582",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1548",
       "match": "title={`Refresh ("
     },
     {
@@ -31898,7 +31898,7 @@
       "quote": "Drag a file to a folder to move it.",
       "status": "verified",
       "evidence": "app",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:779",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:745",
       "match": "fileGateway.moveItem({ sourcePath, targetParentPath: targetParent })",
       "test": "e2e/tree-keyboard.e2e.ts"
     },
@@ -31920,7 +31920,7 @@
       "quote": "**Copy**, or **Import** (shown only when a dropped file can be imported)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1028",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:994",
       "match": "showImport: hasImportableFiles",
       "note": "Import is offered only when at least one dropped file is importable; page implied it is always offered."
     },
@@ -32001,7 +32001,7 @@
       "quote": "Screenshot of the project tree with git badges.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:319",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:327",
       "match": "<GitStatusBadge status={gitStatus}"
     },
     {
@@ -32065,7 +32065,7 @@
       "quote": "**Before you start:** open a project and select the destination folder.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1539",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1505",
       "match": "{projectPath && (",
       "note": "Toolbar create/import/refresh buttons render only once a project is open."
     },
@@ -32539,7 +32539,7 @@
       "quote": "Open the changed file from the project tree if it is not already open.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:328",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:290",
       "match": "onFileSelect(filePath)"
     },
     {
@@ -32837,7 +32837,7 @@
       "quote": "The **Local (whisper.cpp)** backend runs on your computer once its model is downloaded",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:638",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:620",
       "match": "First-time setup downloads a small (~8 MB) verified whisper.cpp",
       "note": "Label was \"Local\"; UI shows \"Local (whisper.cpp)\". Reworded \"works offline\" to the download-first fact."
     },
@@ -32848,7 +32848,7 @@
       "quote": "In **Settings**, under **Transcription**, choose a **Backend**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:551",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:533",
       "match": "Backend",
       "note": "Page said \"In Settings, choose OpenAI or Local\" as step 3 after the dialog opens; the backend is a Settings > Transcription > Backend list and must be set before starting. Moved to Before you start."
     },
@@ -32859,7 +32859,7 @@
       "quote": "under **Transcription**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:547",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:529",
       "match": "<h2 className=\"settings-section-title\">Transcription</h2>"
     },
     {
@@ -32869,7 +32869,7 @@
       "quote": "**OpenAI** – enter your key in **OpenAI API key**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:589",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:571",
       "match": "OpenAI API key"
     },
     {
@@ -32879,7 +32879,7 @@
       "quote": "**Local (whisper.cpp)** – pick a **Whisper model**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:576",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:558",
       "match": "'Local (whisper.cpp)'",
       "note": "Label was \"Local\"."
     },
@@ -32890,7 +32890,7 @@
       "quote": "pick a **Whisper model**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:634",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:616",
       "match": "Whisper model"
     },
     {
@@ -32900,7 +32900,7 @@
       "quote": "then select **Download model**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:696",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:678",
       "match": "'Download model'",
       "note": "Page said only \"download a model\"; named the exact button."
     },
@@ -32911,7 +32911,7 @@
       "quote": "select the **Import a file** toolbar button",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1568",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1534",
       "match": "'Import a file'",
       "note": "Page said \"choose **Import**\"; the toolbar button is labelled \"Import a file\"."
     },
@@ -33029,7 +33029,7 @@
       "quote": "Local transcription runs on macOS and Windows x64 only",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:579",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:561",
       "match": "Local (macOS / Windows x64 only)",
       "note": "Note only mentioned Windows ARM64; local backend is macOS and Windows x64 only. Ledger repair: previous source was the Linux/other-platform reason string; repointed to the Settings label."
     },
@@ -33093,7 +33093,7 @@
       "quote": "To stop a model download, select **Cancel** in Settings",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:705",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:687",
       "match": "'Cancelling…' : 'Cancel'"
     },
     {
@@ -33143,7 +33143,7 @@
       "quote": "**OpenAI** – enter your key",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:573",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:555",
       "match": "<option value=\"openai\">OpenAI</option>"
     },
     {
@@ -35248,7 +35248,7 @@
       "quote": "The log level defaults to **Info**.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:31",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:33",
       "match": "{ value: 'info', label: 'Info' }",
       "note": "Proves the UI label Info for the default level (default itself in entry 27)."
     },
@@ -35259,7 +35259,7 @@
       "quote": "It is on by default; [**Run HTML files**](settings.md#html-preview) can turn it off",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/ipc/global-settings-schema.ts:209",
+      "source": "src/shared/ipc/global-settings-schema.ts:234",
       "match": "HtmlPreviewSettingsSchema.default(() => ({ enabled: true }))"
     },
     {
@@ -35998,7 +35998,7 @@
       "quote": "project tree **Import a file** button",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1567",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1533",
       "match": "'Import a file'",
       "note": "Toolbar button is labelled \"Import a file\", not \"Import\"."
     },
@@ -36030,7 +36030,7 @@
       "quote": "<kbd>⇧⌘I</kbd> / <kbd>Ctrl+Shift+I</kbd> opens a picker for several files",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1314",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1280",
       "match": "e.shiftKey && e.key.toLowerCase() === 'i'",
       "note": "Shortcut opens a multi-file picker and the drop-mode dialog, not the same import flow as the button."
     },
@@ -36341,7 +36341,7 @@
       "quote": "The backend is **OpenAI** or **Local (whisper.cpp)**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:573",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:555",
       "match": "<option value=\"openai\">OpenAI</option>",
       "note": "Option label is \"OpenAI\", not \"OpenAI API\"."
     },
@@ -36352,7 +36352,7 @@
       "quote": "**Local (whisper.cpp)**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:576",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:558",
       "match": "'Local (whisper.cpp)'"
     },
     {
@@ -36382,7 +36382,7 @@
       "quote": "Local is available only on macOS and Windows x64.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:126",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:127",
       "match": "(whisperPlatform === 'win32' && whisperArch === 'x64')",
       "note": "Was \"unavailable on Windows ARM64\"; Local is also unavailable on Linux."
     },
@@ -36528,7 +36528,7 @@
       "quote": "That route, like dropping files on the tree,",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1049",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1015",
       "match": "await processFiles(importFiles)"
     },
     {
@@ -36599,7 +36599,7 @@
       "quote": "| Refresh project tree | <kbd>⌥⌘R</kbd>",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1342",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1308",
       "match": "e.altKey && e.key.toLowerCase() === 'r'"
     },
     {
@@ -36726,7 +36726,7 @@
       "quote": "<kbd>Esc</kbd> closes it.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:381",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:382",
       "match": "onEscape: closeSettings"
     },
     {
@@ -36736,7 +36736,7 @@
       "quote": "| Import into selected folder | <kbd>⇧⌘I</kbd>",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1314",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1280",
       "match": "e.shiftKey && e.key.toLowerCase() === 'i'"
     },
     {
@@ -36746,7 +36746,7 @@
       "quote": "import also needs a selected folder",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1318",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1284",
       "match": "if (node && node.type === 'directory') {"
     },
     {
@@ -36756,7 +36756,7 @@
       "quote": "Refresh and import are ignored while typing in a text field",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1336",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1302",
       "match": "activeElement?.tagName === 'TEXTAREA' ||",
       "note": "Ledger fix: line 933 is the cut/copy/paste guard; the refresh shortcut guard is at 1335 (import guard at 1306). Page text unchanged."
     },
@@ -36827,7 +36827,7 @@
       "quote": "| Open a file; open or close and select a folder |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1466",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1432",
       "match": "if (node.type === 'directory') handleToggleFolder(node.path)"
     },
     {
@@ -36858,7 +36858,7 @@
       "quote": "The whole tree is a single <kbd>Tab</kbd> stop",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:279",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:287",
       "match": "tabIndex={isTabStop ? 0 : -1}"
     },
     {
@@ -37318,7 +37318,7 @@
       "quote": "The arrow keys move focus without changing the selected folder",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:533",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:499",
       "match": "setFocusedPath(row.node.path)"
     },
     {
@@ -37534,7 +37534,7 @@
       "quote": "**Preserve line breaks** in [Settings](settings.md#editor)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:432",
+      "source": "src/renderer/src/components/Settings/sections/EditorSection.tsx:25",
       "match": "Preserve line breaks"
     },
     {
@@ -38249,7 +38249,7 @@
       "quote": "**Create new markdown file**, **Create new folder**, **Import a file** and **Refresh**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1545",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1511",
       "match": "title=\"Create new markdown file\"",
       "note": "Toolbar labels were 'New markdown file', 'New folder', 'Import'; the icon buttons' tooltips are 'Create new markdown file', 'Create new folder', 'Import a file'."
     },
@@ -38260,7 +38260,7 @@
       "quote": "**Create new markdown file**, **Create new folder**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1555",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1521",
       "match": "title=\"Create new folder\"",
       "note": "Was 'New folder'."
     },
@@ -38271,7 +38271,7 @@
       "quote": "**Import a file** and **Refresh** act on the tree or the selected folder",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1567",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1533",
       "match": "'Import a file'",
       "note": "Was 'Import'."
     },
@@ -38282,7 +38282,7 @@
       "quote": "refresh with <kbd>⌥⌘R</kbd> / <kbd>Ctrl+Alt+R</kbd>",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1342",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1308",
       "match": "e.altKey && e.key.toLowerCase() === 'r'"
     },
     {
@@ -38292,7 +38292,7 @@
       "quote": "Select a folder before importing with <kbd>⇧⌘I</kbd> / <kbd>Ctrl+Shift+I</kbd>",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1314",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1280",
       "match": "e.shiftKey && e.key.toLowerCase() === 'i'"
     },
     {
@@ -38323,7 +38323,7 @@
       "quote": "File and folder badges show changed or untracked content",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:319",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:327",
       "match": "<GitStatusBadge status={gitStatus} isFolder={node.type === 'directory'} />",
       "note": "Source repointed from the label map to the row that renders the badge on files and folders."
     },
@@ -38388,7 +38388,7 @@
       "quote": "Sensitive-file and symlink icons distinguish those entries",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:313",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:321",
       "match": "aria-label=\"Warning: sensitive file\""
     },
     {
@@ -38398,7 +38398,7 @@
       "quote": "Sensitive-file and symlink icons",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:314",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:322",
       "match": "className=\"symlink-icon\" aria-label=\"Symlink\""
     },
     {
@@ -38438,7 +38438,7 @@
       "quote": "A cut item is dimmed until you paste it",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:462",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:486",
       "match": "[data-clipboard-cut=\"true\"]"
     },
     {
@@ -38558,7 +38558,7 @@
       "quote": "The tree is one stop in the <kbd>Tab</kbd> order",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:279",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:287",
       "match": "tabIndex={isTabStop ? 0 : -1}",
       "test": "e2e/tree-keyboard.e2e.ts"
     },
@@ -38580,7 +38580,7 @@
       "quote": "<kbd>Enter</kbd> opens a file, or opens or closes a folder and selects it",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1466",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1432",
       "match": "if (node.type === 'directory') handleToggleFolder(node.path)",
       "note": "Page said Enter 'opens' a folder; it toggles it (opens or closes), as a click does."
     },
@@ -38612,7 +38612,7 @@
       "quote": "Moving with the arrows does not change the selected folder",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1455",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1421",
       "match": "moveFocusTo(action.index)"
     },
     {
@@ -38643,7 +38643,7 @@
       "quote": "screen readers announce that row as selected",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:278",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:285",
       "match": "aria-selected={isSelected}"
     },
     {
@@ -38653,7 +38653,7 @@
       "quote": "Opening a file does not select it",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:328",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:290",
       "match": "onFileSelect(filePath)"
     },
     {
@@ -38663,7 +38663,7 @@
       "quote": "Screen readers hear each row's own name, level and position, such as \"3 of 7\"",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:270",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:277",
       "match": "aria-posinset={posInSet}"
     },
     {
@@ -38673,7 +38673,7 @@
       "quote": "The tree draws only the rows on screen",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:490",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:452",
       "match": "const virtualizer = useVirtualizer({"
     },
     {
@@ -38733,7 +38733,7 @@
       "quote": "the **Refresh** tooltip also shows its shortcut",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1582",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1548",
       "match": "title={`Refresh (${formatShortcut('R', { mod: true, alt: true })})`}",
       "note": "Page said every label is the exact tooltip; the Refresh tooltip appends the shortcut."
     },
@@ -38834,7 +38834,7 @@
       "quote": "each row's own name, level and position",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:269",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:276",
       "match": "aria-level={level + 1}"
     },
     {
@@ -38844,7 +38844,7 @@
       "quote": "such as \"3 of 7\"",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:271",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx:278",
       "match": "aria-setsize={setSize}"
     },
     {
@@ -39199,7 +39199,7 @@
       "quote": "<kbd>Esc</kbd> closes the overlay",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:381",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:382",
       "match": "onEscape: closeSettings"
     },
     {
@@ -39230,7 +39230,7 @@
       "quote": "renders a single Markdown line break as a visible line break in Preview",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:435",
+      "source": "src/renderer/src/components/Settings/sections/EditorSection.tsx:28",
       "match": "Show single line breaks in preview"
     },
     {
@@ -39260,7 +39260,7 @@
       "quote": "Choose 3, 5, 7 or 10 seconds.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:42",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:44",
       "match": "{ value: 10000, label: '10s' }"
     },
     {
@@ -39331,7 +39331,7 @@
       "quote": "| **Backend** | OpenAI |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/ipc/global-settings-schema.ts:204",
+      "source": "src/shared/ipc/global-settings-schema.ts:229",
       "match": "backend: 'openai' as const"
     },
     {
@@ -39341,7 +39341,7 @@
       "quote": "or **Local (whisper.cpp)**, which runs offline",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:576",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:558",
       "match": "'Local (whisper.cpp)'"
     },
     {
@@ -39351,7 +39351,7 @@
       "quote": "Local works only on macOS and Windows x64; elsewhere it is greyed out.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:574",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:556",
       "match": "<option value=\"local\" disabled={!isLocalWhisperSupported}>",
       "note": "Said Local is unavailable on Windows ARM64 only; it is also unavailable on Linux (isLocalWhisperSupported is darwin or win32 x64)."
     },
@@ -39362,7 +39362,7 @@
       "quote": "| **OpenAI API key** | Empty |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:589",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:571",
       "match": "OpenAI API key"
     },
     {
@@ -39372,7 +39372,7 @@
       "quote": "**Remove key** deletes the stored key",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:602",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:584",
       "match": "Remove key"
     },
     {
@@ -39392,7 +39392,7 @@
       "quote": "| **Whisper model** | Base |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/ipc/global-settings-schema.ts:206",
+      "source": "src/shared/ipc/global-settings-schema.ts:231",
       "match": "whisperModel: 'base' as const"
     },
     {
@@ -39402,7 +39402,7 @@
       "quote": "choose Tiny, Base, Small, Medium or Large; each option shows its download size",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:80",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:82",
       "match": "(${formatModelSize(LOCAL_WHISPER.MODEL_SIZES[model])})",
       "note": "Added that each option label carries the download size; the model list itself was right."
     },
@@ -39413,7 +39413,7 @@
       "quote": "| **Model status** / **Download model** | Model not downloaded until installed |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:679",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:661",
       "match": ": 'Model not downloaded'}"
     },
     {
@@ -39658,7 +39658,7 @@
       "quote": "Both are stored in Erfana's own settings (`~/.erfana/settings.json`), never in the project",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/ipc/global-settings-schema.ts:143",
+      "source": "src/shared/ipc/global-settings-schema.ts:168",
       "match": "to each comment. App-level only – never a project's `.erfana/`, so a cloned"
     },
     {
@@ -40744,7 +40744,7 @@
       "quote": "The project panel also offers **Change project** and **Close project**.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1515",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1481",
       "match": "title={projectPath ? 'Change project' : 'Open project'}"
     },
     {
@@ -40754,7 +40754,7 @@
       "quote": "also offers **Change project** and **Close project**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1532",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1498",
       "match": "title=\"Close project\""
     },
     {
@@ -41185,7 +41185,7 @@
       "quote": "from **Settings > Logging > Open** for a bug report",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:498",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:480",
       "match": "settings-section-title\">Logging</h2>"
     },
     {
@@ -41618,7 +41618,7 @@
       "quote": "from **Settings > Logging > Open** for a bug report",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:541",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:523",
       "match": "      Open"
     },
     {
@@ -41868,7 +41868,7 @@
       "quote": "select **Open** beside **Logs folder** in Settings",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:531",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:513",
       "match": "<label className=\"settings-label\">Logs folder</label>"
     },
     {
@@ -41942,7 +41942,7 @@
       "quote": "**Local (whisper.cpp)** runs offline on Windows x64.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:576",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:558",
       "match": "? 'Local (whisper.cpp)'"
     },
     {
@@ -41952,7 +41952,7 @@
       "quote": "**Local (macOS / Windows x64 only – ARM64 not supported)**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:578",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:560",
       "match": "'Local (macOS / Windows x64 only – ARM64 not supported)'",
       "note": "Now names the disabled option's exact label on ARM64"
     },
@@ -41963,7 +41963,7 @@
       "quote": "**Settings > Transcription > Backend**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:551",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:533",
       "match": "Backend"
     },
     {
@@ -42074,7 +42074,7 @@
       "quote": "select **Open** beside **Logs folder**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:538",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:520",
       "match": "data-testid={TEST_IDS.SETTINGS_BTN_OPEN_LOGS}",
       "note": "Button labelled Open (line 541) beside the Logs folder label"
     },
@@ -42095,7 +42095,7 @@
       "quote": "On Windows ARM64 the option is greyed out",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:574",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:556",
       "match": "disabled={!isLocalWhisperSupported}"
     },
     {
@@ -42105,7 +42105,7 @@
       "quote": "OpenAI remains an option",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:573",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:555",
       "match": "<option value=\"openai\">OpenAI</option>"
     },
     {
@@ -42997,7 +42997,7 @@
       "quote": "**Settings > Git status > Enable polling fallback** turns off the five-second check",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:455",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:437",
       "match": "Enable polling fallback"
     },
     {
@@ -43334,7 +43334,7 @@
       "quote": "**Refresh** reloads the tree whenever you want",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1580",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1546",
       "match": "onClick={handleRefresh}",
       "note": "Added for #210: says what Refresh is for."
     },
@@ -43345,7 +43345,7 @@
       "quote": "**Import** is offered only when at least one dropped file can be imported",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1028",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:994",
       "match": "showImport: hasImportableFiles",
       "note": "Page implied Import is always offered on an outside drop; it appears only when a dropped file is importable (cross-page note)."
     },
@@ -43433,7 +43433,7 @@
       "quote": "There it reads **Local (macOS / Windows x64 only)**, or **Local (macOS / Windows x64 only – ARM64 not supported)** on Windows ARM64.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:578",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:560",
       "match": "'Local (macOS / Windows x64 only – ARM64 not supported)'",
       "note": "Added the exact disabled-option labels (cross-page note from windows-differences.md); line 579 holds the non-ARM64 variant."
     },
@@ -46576,7 +46576,7 @@
       "quote": "`wait_for_selector(.project-tree)`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1491",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1457",
       "match": "className=\"project-tree\""
     },
     {
@@ -46856,7 +46856,7 @@
       "quote": "preserve line breaks option",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:442",
+      "source": "src/renderer/src/components/Settings/sections/EditorSection.tsx:35",
       "match": "settings?.editor.preserveLineBreaks"
     },
     {
@@ -46886,7 +46886,7 @@
       "quote": "File explorer with drag-drop reorganization",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:307",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:269",
       "match": "Drag sensors - require movement"
     },
     {
@@ -47319,7 +47319,7 @@
       "quote": "keyboard navigation (Escape to close)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:89",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:91",
       "match": "Escape closes Settings while it is the topmost overlay"
     },
     {
@@ -47329,7 +47329,7 @@
       "quote": "logs folder path display with native file manager open",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:221",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:222",
       "match": "Open logs folder in the system file manager"
     },
     {
@@ -47549,7 +47549,7 @@
       "quote": "Windows ARM64 unsupported (OpenAI API only)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:578",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:560",
       "match": "ARM64 not supported"
     },
     {
@@ -47950,7 +47950,7 @@
       "quote": "or switch the backend to **OpenAI**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:573",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:555",
       "match": "<option value=\"openai\">OpenAI</option>",
       "note": "Added for #398: the OpenAI backend does not run the local engine, so it is the workaround."
     },
@@ -48956,7 +48956,7 @@
       "quote": "`identityNoticeSeen` is one global flag (global-settings-schema.ts:138)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/shared/ipc/global-settings-schema.ts:170",
+      "source": "src/shared/ipc/global-settings-schema.ts:195",
       "match": "identityNoticeSeen: z.boolean()"
     },
     {
@@ -53044,7 +53044,7 @@
       "quote": "/* ProjectTree.css – \"Dragging state\" */",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:408",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:432",
       "match": "/* Dragging state - dim the original item */"
     },
     {
@@ -53054,7 +53054,7 @@
       "quote": ".project-tree-item[data-drop-target=\"true\"].directory {",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:425",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:449",
       "match": ".project-tree-item[data-drop-target=\"true\"].directory {"
     },
     {
@@ -53064,7 +53064,7 @@
       "quote": ".project-tree-node[data-drop-highlight=\"true\"] > .project-tree-item.directory {",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:432",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:456",
       "match": ".project-tree-node[data-drop-highlight=\"true\"] > .project-tree-item.directory {"
     },
     {
@@ -53074,7 +53074,7 @@
       "quote": "background-color: var(--color-accent-drag-bg-subtle);",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:439",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:463",
       "match": ".project-tree-node[data-in-drop-zone=\"internal\"] {"
     },
     {
@@ -53084,7 +53084,7 @@
       "quote": "width: var(--border-width-thick);",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:450",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:474",
       "match": "width: var(--border-width-thick);"
     },
     {
@@ -53094,7 +53094,7 @@
       "quote": "from the OS, drawn with a dashed edge):",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:564",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:588",
       "match": ".project-tree-node[data-in-drop-zone=\"external\"]::before {"
     },
     {
@@ -53104,7 +53104,7 @@
       "quote": ".project-tree-item[data-drop-invalid=\"true\"] {",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:455",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:479",
       "match": ".project-tree-item[data-drop-invalid=\"true\"] {"
     },
     {
@@ -53114,7 +53114,7 @@
       "quote": "**Cut item** (dimmed with dashed underline):",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:467",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:491",
       "match": ".project-tree-item[data-clipboard-cut=\"true\"]::after {"
     },
     {
@@ -53124,7 +53124,7 @@
       "quote": "background: var(--color-bg-tertiary);",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:310",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:334",
       "match": "background: var(--color-bg-tertiary);"
     },
     {
@@ -53134,7 +53134,7 @@
       "quote": "pointer-events: none;",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:492",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:516",
       "match": "Allow elementFromPoint() to see through overlay"
     },
     {
@@ -53154,7 +53154,7 @@
       "quote": "- \"Copied\" – `\"<name>\" ready to paste` (keyboard copy and `CopyCommand`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:970",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:936",
       "match": "message: `\"${node.name}\" ready to paste`"
     },
     {
@@ -53164,7 +53164,7 @@
       "quote": "- \"Error\" – other failures; after a drag the message goes through `formatFileOperationError`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:806",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:772",
       "match": "const errorMessage = formatFileOperationError(err, 'move')"
     },
     {
@@ -53194,7 +53194,7 @@
       "quote": "- Project root appears as first collapsible tree item",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:376",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:338",
       "match": "Create synthetic root folder node (VS Code style)"
     },
     {
@@ -53204,7 +53204,7 @@
       "quote": "| Cut | 60% opacity, dashed underline |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:463",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.css:487",
       "match": "opacity: 0.6;"
     },
     {
@@ -53254,7 +53254,7 @@
       "quote": "- **State**: activeId, overId, expandedFolders",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:253",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:215",
       "match": "const [overId, setOverId] = useState<string | null>(null)"
     },
     {
@@ -53274,7 +53274,7 @@
       "quote": "- **Dependencies**: useDragDropTree, useClipboardStore, dnd-kit",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:44",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:42",
       "match": "import { useClipboardStore } from '../../stores/useClipboardStore'"
     },
     {
@@ -54600,7 +54600,7 @@
       "quote": "`SettingsOverlay.tsx:114-126` mirrors this logic by comment",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:121",
+      "source": "src/renderer/src/components/Settings/SettingsOverlay.tsx:122",
       "match": "// Mirrors `classifyPlatform()` in src/main/services/whisper-assets.ts."
     },
     {
@@ -54722,7 +54722,7 @@
       "quote": "| import | Import a file: PDF to Markdown |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1568",
+      "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1534",
       "match": "aria-label={isImporting ? 'Importing file...' : 'Import a file'}"
     },
     {
@@ -55104,6 +55104,26 @@
       "evidence": "source",
       "source": "src/shared/ipc/global-settings-schema.ts:106",
       "match": "return settings.markdownPreview?.comments?.enabled !== false"
+    },
+    {
+      "id": "user-guide-reference-settings/453-01",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/settings.md",
+      "quote": "| **Follow the active tab** | On |",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/shared/ipc/global-settings-schema.ts:151",
+      "match": "followActiveTab: z.boolean().catch(true)"
+    },
+    {
+      "id": "user-guide-reference-settings/453-02",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/settings.md",
+      "quote": "**How to reach it:** **Settings > Project tree**.",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Settings/sections/ProjectTreeSection.tsx:28",
+      "match": "Project tree</h2>"
     },
     {
       "id": "user-guide-reference-keyboard-shortcuts/s024-01",

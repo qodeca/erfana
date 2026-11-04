@@ -13,7 +13,7 @@ import { filterMarkdownTree } from './markdownFilter'
 import { resolveInternalDropFolder, isSameFolderMove } from './dropTarget'
 import { isKeyboardContextMenu, rowMenuAnchor, KEYBOARD_MENU_ECHO_MS, type PointerPress } from './contextMenuOrigin'
 import { resolveTreeKey, findTypeAheadMatch, isTypeAheadKey } from './treeKeyboard'
-import { isStrictDescendant } from '../../utils/fileUtils'
+import { isStrictDescendant, pathsEqual } from '../../utils/fileUtils'
 import { ContextMenu, ContextMenuItem } from '../ContextMenu/ContextMenu'
 import { useDialog } from '../Dialog'
 import type { DropModeDialogResult, ConflictDialogResult } from '../Dialog/types'
@@ -34,12 +34,10 @@ import {
   DragStartEvent,
   DragOverEvent,
   DragEndEvent,
-  DragOverlay,
-  type CollisionDetection,
-  type DroppableContainer,
-  pointerWithin,
-  rectIntersection
+  DragOverlay
 } from '@dnd-kit/core'
+import { treeCollisionDetection } from './treeCollisionDetection'
+import { useRevealActiveFile } from './useRevealActiveFile'
 import { useDragDropTree } from '../../hooks/useDragDropTree'
 import { useClipboardStore } from '../../stores/useClipboardStore'
 import { formatFileOperationError } from '../../utils/errorUtils'
@@ -80,42 +78,6 @@ interface ProjectTreeProps {
   showControlPanel: boolean
   filterMode: FilterMode
   onFilterModeChange: (mode: FilterMode) => void
-}
-
-/**
- * Collision detection that prioritises folders over files.
- *
- * Pointer intersection first (immediate feedback while dragging), narrowed to
- * directory targets when there are any, with rectangle intersection as the
- * fallback for pointer-less collisions.
- *
- * Two properties matter for large trees:
- * - Each collision already carries the container it came from in
- *   `data.droppableContainer` (`pointerWithin` populates it), so the type is
- *   read off the entry instead of scanning `args.droppableContainers` once per
- *   collision — that scan was O(collisions x droppables) on every pointer move,
- *   with one droppable per rendered row.
- * - It lives at module scope, so its identity is stable across renders and
- *   `DndContext` is never handed a fresh `collisionDetection` prop.
- */
-const treeCollisionDetection: CollisionDetection = (args) => {
-  const pointerCollisions = pointerWithin(args)
-
-  if (pointerCollisions.length > 0) {
-    const directoryCollisions = pointerCollisions.filter(collision => {
-      const container = collision.data?.droppableContainer as DroppableContainer | undefined
-      return container?.data.current?.type === 'directory'
-    })
-
-    if (directoryCollisions.length > 0) {
-      return directoryCollisions
-    }
-
-    return pointerCollisions
-  }
-
-  // Fallback to rectangle intersection
-  return rectIntersection(args)
 }
 
 /**
@@ -499,6 +461,10 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     scrollMargin: listOffset,
     rangeExtractor
   })
+
+  // The active tab's file: folders opened, scrolled to, marked (#453)
+  const revealedPath = useRevealActiveFile({ projectPath, filterMode, rootFolderNode, expandedFolders, setExpandedFolders,
+    indexByPath, virtualizer, treeContainerRef, setFocusedPath })
 
   // A keyboard move to a row that is not mounted yet parks its path here; the
   // layout effect below focuses it once the row renders. Only then: a row that
@@ -1659,6 +1625,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
                     // "Selected" = the paste-target folder; see the prop's doc.
                     isSelected={node.path === selectedFolder}
                     isTabStop={item.index === tabStopIndex}
+                    isRevealed={pathsEqual(node.path, revealedPath)}
                     onFileClick={handleRowClick}
                     onContextMenu={handleContextMenu}
                     onToggleFolder={handleToggleFolder}

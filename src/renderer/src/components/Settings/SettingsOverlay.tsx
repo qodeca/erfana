@@ -14,6 +14,8 @@ import { useOccluder } from '../../hooks/useOccluder'
 import { useOverlayStackEntry } from '../../hooks/useOverlayStackEntry'
 import { TEST_IDS } from '../../constants/testids'
 import { HtmlPreviewSection } from './sections/HtmlPreviewSection'
+import { EditorSection } from './sections/EditorSection'
+import { ProjectTreeSection } from './sections/ProjectTreeSection'
 import { TerminalSection } from './sections/TerminalSection'
 import { ImportToolsSection } from './sections/ImportToolsSection'
 import './SettingsOverlay.css'
@@ -101,7 +103,6 @@ export function SettingsOverlay() {
   const {
     settings,
     updateLoggingLevel,
-    updatePreserveLineBreaks,
     updateGitStatusPollingEnabled,
     updateGitStatusPollingInterval,
     updateTranscriptionBackend,
@@ -424,28 +425,9 @@ export function SettingsOverlay() {
         </div>
         <div className="settings-content">
           <div className="settings-body">
-            <section className="settings-section" data-testid={TEST_IDS.SETTINGS_SECTION_EDITOR}>
-              <h2 className="settings-section-title">Editor</h2>
-              <div className="settings-row">
-                <div className="settings-field">
-                  <label htmlFor="preserve-line-breaks" className="settings-label">
-                    Preserve line breaks
-                  </label>
-                  <p className="settings-description">
-                    Show single line breaks in preview (converts to &lt;br&gt; tags)
-                  </p>
-                </div>
-                <input
-                  type="checkbox"
-                  id="preserve-line-breaks"
-                  className="settings-checkbox"
-                  checked={settings?.editor.preserveLineBreaks ?? false}
-                  onChange={(e) => updatePreserveLineBreaks(e.target.checked)}
-                  disabled={!settings}
-                  data-testid={TEST_IDS.SETTINGS_TOGGLE_LINE_BREAKS}
-                />
-              </div>
-            </section>
+            <EditorSection />
+
+            <ProjectTreeSection />
 
             <section className="settings-section" data-testid={TEST_IDS.SETTINGS_SECTION_GIT}>
               <h2 className="settings-section-title">Git status</h2>
