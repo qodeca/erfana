@@ -21,7 +21,7 @@
 import { expect, type ElectronApplication, type Locator, type Page } from '@playwright/test'
 import { BROWSER_TEST_IDS } from '../../src/renderer/src/components/Panels/BrowserPanel/browserTestIds'
 import { BrowserTabPage } from './browser-tab.page'
-import { BrowserPagePage, type HookTab } from './browser-page.page'
+import { BrowserPagePage, testHook, type HookTab } from './browser-page.page'
 
 const UI_WAIT_MS = 15_000
 
@@ -104,13 +104,35 @@ export class BrowserPanelUi {
   /**
    * Dismiss the strip rows the host machine adds by itself – "No keyring" on
    * a Linux host without a keyring – so a test that walks the F6 zones starts
-   * from an empty strip, as on a host with a keyring.
+   * from an empty strip, as on a host with a keyring. For a project's first
+   * tab, after a load: the notice shows there once per project and run.
+   *
+   * The row's going moves the page up under the pointer, which starts main's
+   * click guard (025-FR-047): a click or Enter in the page within it is
+   * ignored as aimed at the old layout. Main records the move as it places
+   * the page, so once the page has its new size the guard is known; main's
+   * test clock is then moved past it instead of waiting it out.
    */
   async dismissHostRows(): Promise<void> {
     const keyring = this.stripRow('keyring')
-    if ((await keyring.count()) === 0) return
+    // Main shows the notice when Linux stores secrets in the weak `basic_text` store (no keyring).
+    const noKeyring = await this.tabs.app.evaluate(
+      ({ safeStorage }) => process.platform === 'linux' && safeStorage.getSelectedStorageBackend() === 'basic_text'
+    )
+    if (!noKeyring) {
+      await expect(keyring).toHaveCount(0)
+      return
+    }
+    await expect(keyring).toBeVisible({ timeout: UI_WAIT_MS })
+    const page = await this.page()
+    const before = await page.eval<number>('innerHeight')
     await this.answerRow('keyring', 'Dismiss')
     await expect(keyring).toHaveCount(0, { timeout: UI_WAIT_MS })
+    await page.waitFor(`innerHeight !== ${before}`, 'the page grew into the dismissed row')
+    const tabId = await this.tabId()
+    const { clickGuardUntil } = await testHook<{ clickGuardUntil: number }>(this.tabs.app, 'browserInput', 'routingState', tabId)
+    const now = await testHook<number>(this.tabs.app, 'clock', 'now')
+    if (clickGuardUntil >= now) await testHook(this.tabs.app, 'clock', 'advance', clickGuardUntil - now + 1)
   }
 
   /** The chips at the end of the address bar. */

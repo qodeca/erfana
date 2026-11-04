@@ -68,6 +68,8 @@ export class FakeInputContents extends EventEmitter {
   isFocused = (): boolean => this.focused
   isDestroyed = (): boolean => this.destroyed
   setIgnoreMenuShortcuts = vi.fn()
+  /** The page's main frame; a navigation that commits a new document replaces it. */
+  mainFrame: { processId: number; routingId: number } | null = { processId: 9, routingId: 1 }
   executeJavaScriptInIsolatedWorld = vi.fn(async (): Promise<unknown> => undefined)
   copy = vi.fn()
   paste = vi.fn()

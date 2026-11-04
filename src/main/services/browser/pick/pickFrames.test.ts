@@ -132,6 +132,16 @@ describe('PickFrames', () => {
     expect(await frames.viewBox('S1')).toMatchObject({ box: { x: 400, y: 100, width: 300, height: 150 } })
   })
 
+  it("maps through the owner's content box, not its border box: a bordered frame keeps the frame's own scale (025-AC-029)", async () => {
+    const { page, frames } = setup()
+    // An <iframe> 300 × 150 inside a 1 px border: its border box is 302 × 152, its viewport starts 1 px in.
+    page.remove(6)
+    page.add({ id: 6, tag: 'iframe', parent: 2, attrs: { id: 'cross' }, box: [400, 100, 302, 152], inset: 1, contentFrameId: 'F1' })
+    expect(applyAffine(await frames.toView('S1'), { x: 0, y: 0 })).toEqual({ x: 401, y: 101 })
+    expect(applyAffine(await frames.toView('S1'), { x: 162, y: 20 })).toEqual({ x: 563, y: 121 })
+    expect(await frames.viewBox('S1')).toMatchObject({ box: { x: 401, y: 101, width: 300, height: 150 } })
+  })
+
   it('composes the map through a nested out-of-process frame', async () => {
     const { page, frames } = setup()
     page.add({ id: 103, tag: 'iframe', session: 'S1', frameId: 'F1', parent: 101, box: [100, 50, 100, 50], contentFrameId: 'F2' })
@@ -146,8 +156,13 @@ describe('PickFrames', () => {
     page.cdp.handle('DOM.getFrameOwner', () => ({}))
     await expect(frames.toView('S1')).rejects.toThrow('frame owner not found')
     const other = setup()
-    other.page.cdp.handle('DOM.getContentQuads', () => ({ quads: [] }))
+    other.page.cdp.handle('DOM.getBoxModel', () => ({ model: {} }))
     await expect(other.frames.toView('S1')).rejects.toThrow('frame owner has no content box')
+    const gone = setup()
+    gone.page.cdp.handle('DOM.getBoxModel', () => {
+      throw new Error('Could not compute box model.')
+    })
+    await expect(gone.frames.toView('S1')).rejects.toThrow('frame owner has no content box')
   })
 
   it('reads a viewport of 0 × 0 when the metrics are missing', async () => {

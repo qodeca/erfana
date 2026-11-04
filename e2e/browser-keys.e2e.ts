@@ -454,8 +454,12 @@ test.describe('built-in browser key routing in the tab (renderer and main)', () 
     const keyboard = windowWithTestProject.keyboard
     // One bubble, drawn inside the pick row's band for both toolbar rows (design R2-H5).
     const tooltip = pick.row.getByTestId(BROWSER_TEST_IDS.TOOLBAR_TOOLTIP)
+    /**
+     * Give the page keyboard focus. Only when it lacks it: with pick mode on and focus already in the page (the
+     * second Esc of `twoPressEsc` put it there) a click is a pick (025-FR-048), which would open the menu.
+     */
     const focusPage = async (): Promise<void> => {
-      await page.clickSelector('#text')
+      if ((await send.routingFocus()) !== 'page') await page.clickSelector('#text')
       await expect.poll(() => send.routingFocus(), { timeout: WAIT_MS }).toBe('page')
     }
     const pressed = (): Promise<string | null> => pick.pickButton.getAttribute('aria-pressed')

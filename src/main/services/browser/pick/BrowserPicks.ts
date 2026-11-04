@@ -96,6 +96,7 @@ export class BrowserPicks {
         const content = host.getContentBounds()
         return { x: content.x + placed.view.x, y: content.y + placed.view.y }
       },
+      viewSize: () => tab.viewFrame.placement()?.view ?? null,
       widthPreset: () => ({ kind: 'preset', name: presetOf(tab.viewFrame.widthPreset).recordName }),
       projectRoot: () => tab.projectRoot,
       clock: this.deps.clock,

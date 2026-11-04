@@ -79,6 +79,8 @@ export interface TabInputContents extends EditableContents {
   isDestroyed(): boolean
   setIgnoreMenuShortcuts(ignore: boolean): void
   executeJavaScriptInIsolatedWorld(worldId: number, scripts: Array<{ code: string }>, userGesture?: boolean): Promise<unknown>
+  /** The page's current main frame (Electron's `WebFrameMain`); null while there is none. */
+  readonly mainFrame?: { readonly processId: number; readonly routingId: number } | null
 }
 
 /** What the tab's input tells the owning window. */
@@ -139,6 +141,8 @@ export class BrowserTabInput implements ToolbarKeyTarget {
   private readonly listeners: Array<[string, Listener]> = []
   private disposed = false
   private pick: TabInputPick | null = null
+  /** The page document (its main frame) that last held keyboard focus or committed; null before either. */
+  private focusDocument: string | null = null
 
   constructor(private readonly deps: BrowserTabInputDeps) {
     const actions: KeyRouteActions = {
@@ -176,6 +180,7 @@ export class BrowserTabInput implements ToolbarKeyTarget {
       this.fullscreen = false
     })
     this.listen('did-navigate', (_event: unknown, url: string) => {
+      this.focusDocument = this.mainDocument()
       this.dispatch({ type: 'pageLoaded', loaded: url !== '' })
     })
   }
@@ -265,10 +270,12 @@ export class BrowserTabInput implements ToolbarKeyTarget {
 
   private onPageFocus(): void {
     this.deps.events.pageFocus(true)
+    this.focusDocument = this.mainDocument()
     if (this.routing.focus !== 'page') this.enterPage()
   }
 
   private enterPage(): void {
+    this.focusDocument = this.mainDocument()
     const origin = this.nextFocusOrigin ?? (this.routing.focus === 'toolbar' ? 'toolbar' : 'outside')
     this.nextFocusOrigin = null
     this.dispatch({ type: 'focusPage', from: origin === 'toolbar' ? 'tab' : 'outside' })
@@ -279,7 +286,29 @@ export class BrowserTabInput implements ToolbarKeyTarget {
     this.keys.reset()
     this.mouse.reset()
     if (this.routing.focus !== 'page') return
+    // A navigation that commits a new document moves focus from the old document's widget to the new one's: on
+    // Linux a blur, after the new document became the main frame, then a focus. That blur is no focus leaving
+    // the tab – routed, it closed an open pick menu as "focus left" and ended pick mode as `navigated` instead of
+    // `pageChanged` (025-AC-025). The new document's focus follows; a later blur of the current document routes.
+    // A page whose process ended (a crash) has no main document to compare: its blur routes as before.
+    const current = this.mainDocument()
+    if (this.focusDocument !== null && current !== null && current !== this.focusDocument) return
     this.dispatch(this.toolbarFocused ? { type: 'focusToolbar' } : { type: 'focusOut' })
+  }
+
+  /**
+   * The page's main document, as `processId:routingId` of its main frame;
+   * null when there is none or it cannot be read – Electron throws for a
+   * frame whose process is gone (a crash, a killed hung page).
+   */
+  private mainDocument(): string | null {
+    if (this.deps.contents.isDestroyed()) return null
+    try {
+      const frame = this.deps.contents.mainFrame
+      return frame === undefined || frame === null ? null : `${frame.processId}:${frame.routingId}`
+    } catch {
+      return null
+    }
   }
 
   private browserKey(action: BrowserKeyAction): void {

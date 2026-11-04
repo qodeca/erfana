@@ -108,11 +108,23 @@ describe('PickCaptureReads', () => {
     await expect(setup({ faults }).reads.screenshot()).rejects.toThrow('The screenshot could not be taken')
   })
 
-  it('reads the top viewport, failing when it has no size', async () => {
+  it('reads the top viewport as the whole page view, a classic scrollbar included, at the page zoom (025-FR-034)', async () => {
     const { page, reads } = setup()
-    expect(await reads.viewport()).toEqual({ width: 800, height: 600 })
+    // The layout viewport is 15 px narrower than the view: a classic vertical scrollbar (Linux, Windows).
+    page.viewports.set('', { width: 377, height: 540 })
+    expect(await reads.viewport({ width: 392, height: 540 }, 1)).toEqual({ width: 392, height: 540 })
+    // Page zoom: a CSS px is zoom DIP.
+    expect(await reads.viewport({ width: 500, height: 400 }, 1.25)).toEqual({ width: 400, height: 320 })
+    // A zoom the page does not report counts as 1.
+    expect(await reads.viewport({ width: 392, height: 540 }, 0)).toEqual({ width: 392, height: 540 })
+  })
+
+  it('falls back to the layout viewport without a placed view, and fails when the page has no size', async () => {
+    const { page, reads } = setup()
+    expect(await reads.viewport(null, 1)).toEqual({ width: 800, height: 600 })
+    expect(await reads.viewport({ width: 0, height: 0 }, 1)).toEqual({ width: 800, height: 600 })
     page.viewports.delete('')
-    await expect(reads.viewport()).rejects.toThrow('The page size could not be read')
+    await expect(reads.viewport({ width: 10, height: 10 }, 1)).rejects.toThrow('The page size could not be read')
   })
 
   it('reads the facts of an entry from the page', async () => {

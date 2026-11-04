@@ -22,6 +22,14 @@ export class FakePickContents extends EventEmitter implements PickContents {
   title = 'App'
   /** An opaque 800 × 600 image at scale 2 unless replaced. */
   image = { width: 800, height: 600, scale: 2, alpha: 255 }
+  /** The fixed scripts run in an isolated world, in order. */
+  readonly scripts: Array<{ worldId: number; code: string }> = []
+  /** How many screenshots were taken. */
+  captures = 0
+  /** How the page answers a frame wait: drawn at once, never (a busy main thread), or with an error (the page went). */
+  paint: 'drawn' | 'never' | 'fails' = 'drawn'
+  /** Called as a fixed script starts, before it answers (a test reads what had happened by then). */
+  onScript: (() => void) | null = null
   readonly css: string[] = []
   readonly removedCss: string[] = []
 
@@ -34,7 +42,14 @@ export class FakePickContents extends EventEmitter implements PickContents {
   setAudioMuted(m: boolean): void {
     this.muted = m
   }
+  executeJavaScriptInIsolatedWorld(worldId: number, scripts: Array<{ code: string }>): Promise<unknown> {
+    for (const script of scripts) this.scripts.push({ worldId, code: script.code })
+    this.onScript?.()
+    if (this.paint === 'never') return new Promise(() => undefined)
+    return this.paint === 'fails' ? Promise.reject(new Error('Script failed to execute')) : Promise.resolve(0)
+  }
   async capturePage() {
+    this.captures++
     const { width, height, scale, alpha } = this.image
     const data = Buffer.alloc(width * scale * height * scale * 4, 255)
     if (alpha !== 255) for (let i = 3; i < data.length; i += 4) data[i] = alpha
@@ -74,7 +89,9 @@ export interface PickHarness {
   state(): RoutingState
 }
 
-export function pickHarness(options: { projectRoot?: string | null; crossSite?: boolean } = {}): PickHarness {
+export function pickHarness(
+  options: { projectRoot?: string | null; crossSite?: boolean; viewSize?: { width: number; height: number } | null } = {}
+): PickHarness {
   const contents = new FakePickContents()
   const events: PickEvent[] = []
   const clock = createManualClock(Date.UTC(2026, 10, 2, 21, 5, 9))
@@ -108,6 +125,7 @@ export function pickHarness(options: { projectRoot?: string | null; crossSite?: 
         widthPreset: () => ({ kind: 'preset', name: 'Full width' }),
         projectRoot: () => options.projectRoot ?? null,
         clock,
+        viewSize: options.viewSize === undefined ? undefined : () => options.viewSize ?? null,
         events: { pick: (e) => events.push(e) },
         faults,
         bench

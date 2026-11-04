@@ -45,6 +45,7 @@ import { PickHover } from './pickHover'
 import { closeEvent, refineHeld } from './pickMenu'
 import { centre, flashThenHide } from './pickFlash'
 import { PickModeSwitch } from './pickModeSwitch'
+import { pagePainted, type PaintContents } from './pickPainted'
 import { PickBench, type PickFaults } from './pickSupport'
 
 /** The still image's longest side; 4096² × 4 bytes is the event's 64 MiB cap. */
@@ -53,7 +54,7 @@ export const STILL_MAX_EDGE_PX = 4096
 type Listener = (...args: unknown[]) => void
 
 /** The page `webContents` surface pick mode needs. */
-export interface PickContents extends FreezeAudio {
+export interface PickContents extends FreezeAudio, PaintContents {
   on(event: string, listener: Listener): unknown
   removeListener(event: string, listener: Listener): unknown
   capturePage(): Promise<{ toBitmap(): Buffer; getSize(): { width: number; height: number }; getScaleFactors?(): number[] }>
@@ -81,6 +82,8 @@ export interface BrowserTabPickDeps {
   /** The open project's root, for the resolved source; null when unknown. */
   readonly projectRoot: () => string | null
   readonly clock: Clock
+  /** The page view's size in window DIP, as placed now; null when it is not placed. */
+  readonly viewSize?: () => { readonly width: number; readonly height: number } | null
   readonly events: { pick(event: PickEvent): void }
   readonly faults?: PickFaults
   readonly bench?: PickBench
@@ -131,7 +134,11 @@ export class BrowserTabPick {
     this.reads = new PickCaptureReads({
       reader: this.reader,
       frames: this.frames,
-      capturePage: () => deps.contents.capturePage(),
+      // The image is copied from the last frame drawn: the frame without the live outline must be drawn first.
+      capturePage: async () => {
+        await pagePainted(deps.contents, deps.clock)
+        return deps.contents.capturePage()
+      },
       isFrozen: () => this.freeze.isFrozen,
       projectRoot: deps.projectRoot,
       clock: deps.clock,
@@ -307,7 +314,9 @@ export class BrowserTabPick {
       const title = this.deps.contents.getTitle()
       await this.highlight.hide()
       const image = await this.reads.screenshot()
-      const [viewport, chain] = await Promise.all([this.reads.viewport(), readChain(this.reader, this.frames, target.node)])
+      const view = this.deps.viewSize?.() ?? null
+      const zoom = this.deps.contents.getZoomFactor()
+      const [viewport, chain] = await Promise.all([this.reads.viewport(view, zoom), readChain(this.reader, this.frames, target.node)])
       const time = new Date(this.deps.clock.now())
       const capture = new BrowserCapture(
         captureId(),

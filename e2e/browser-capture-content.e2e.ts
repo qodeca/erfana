@@ -339,6 +339,9 @@ test.describe('025-AC-034 the screenshot and the crop', () => {
           await send.pick.pickButton.click()
           const driver = await send.driver()
           await expect.poll(async () => (await driver.state()).active, { timeout: SEND_WAIT_MS }).toBe(true)
+          // In a small window (the Linux run's 1920 × 1080 virtual screen is 960 × 540 at 2×) the element starts
+          // below the page's viewport: bring it in, so the pointer reaches it.
+          await driver.page.eval(`document.getElementById('1abc').scrollIntoView({ block: 'center', inline: 'center' }); 0`)
           const target = await driver.rect('[id="1abc"]')
           await driver.move(Math.round(target.x + target.width / 2), Math.round(target.y + target.height / 2))
           await expect.poll(async () => (await driver.highlight())?.label ?? '', { timeout: SEND_WAIT_MS }).toMatch(/^div/)

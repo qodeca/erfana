@@ -88,11 +88,20 @@ export class PickCaptureReads {
     throw new CaptureFailure('The screenshot came back empty')
   }
 
-  /** The top document's layout viewport in CSS px. Throws {@link CaptureFailure}. */
-  async viewport(): Promise<{ width: number; height: number }> {
+  /**
+   * The top-level viewport in CSS px: the whole page view the screenshot
+   * shows – `view` (window DIP) at page zoom `zoom` – a classic scrollbar
+   * included (025-FR-034). The layout viewport leaves the scrollbar out, so
+   * the image divided by it gave a device pixel ratio of 2.08 at 2× on Linux
+   * and shifted the drawn outline and the crop. Without a placed view, the
+   * layout viewport. Throws {@link CaptureFailure} when the page reports no
+   * size.
+   */
+  async viewport(view: { readonly width: number; readonly height: number } | null, zoom: number): Promise<{ width: number; height: number }> {
     const size = await this.deps.frames.viewportSize(TOP_SESSION)
-    if (size.width > 0 && size.height > 0) return size
-    throw new CaptureFailure('The page size could not be read')
+    if (!(size.width > 0 && size.height > 0)) throw new CaptureFailure('The page size could not be read')
+    const z = zoom > 0 ? zoom : 1
+    return view !== null && view.width > 0 && view.height > 0 ? { width: view.width / z, height: view.height / z } : size
   }
 
   /** The facts of entry `index` of `chain`; never rejects. */

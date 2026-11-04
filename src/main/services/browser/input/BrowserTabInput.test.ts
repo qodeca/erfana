@@ -357,6 +357,65 @@ describe('focus and the first-click rule', () => {
     expect(input.state().firstClickOnlyFocuses).toBe(false)
   })
 
+  it('025-AC-025 a new document taking focus from the old one is no focus leaving the tab: the open menu stays', () => {
+    loadAndFocus()
+    startPick()
+    input.dispatch({ type: 'hover', element: true })
+    contents.press(keyDown('Enter'))
+    input.dispatch({ type: 'captureReady' })
+    expect(input.state().surface).toBe('menu')
+    // Linux: the navigation commits a new document (a new main frame), then the old document's widget blurs
+    // and the new one's takes focus, before did-navigate.
+    contents.mainFrame = { processId: 9, routingId: 8 }
+    contents.focused = false
+    contents.emit('blur')
+    expect(input.state()).toMatchObject({ focus: 'page', surface: 'menu' })
+    expect(onEffect).not.toHaveBeenCalledWith({ type: 'discardCapture' })
+    contents.focused = true
+    contents.emit('focus')
+    expect(input.state()).toMatchObject({ focus: 'page', surface: 'menu' })
+    // The page's own report (keys reset, the window told) still runs for the blur.
+    expect(events.pageFocus.mock.calls.slice(-2)).toEqual([[false], [true]])
+    // The new document's own blur is focus leaving the tab.
+    contents.focused = false
+    contents.emit('blur')
+    expect(input.state()).toMatchObject({ focus: 'out', surface: 'none' })
+    expect(onEffect).toHaveBeenCalledWith({ type: 'discardCapture' })
+  })
+
+  it('routes the blur of a document that committed with no focus hand-over (macOS), and of a page with no main frame', () => {
+    loadAndFocus()
+    contents.mainFrame = { processId: 9, routingId: 8 }
+    contents.emit('did-navigate', {}, 'https://a.test/next')
+    contents.focused = false
+    contents.emit('blur')
+    expect(input.state().focus).toBe('out')
+
+    contents.mainFrame = null
+    contents.focused = true
+    contents.emit('focus')
+    contents.focused = false
+    contents.emit('blur')
+    expect(input.state().focus).toBe('out')
+  })
+
+  it('routes the blur of a crashed page, whose main frame Electron refuses to read, without throwing (025-AC-072)', () => {
+    loadAndFocus()
+    startPick()
+    Object.defineProperty(contents, 'mainFrame', {
+      configurable: true,
+      get: () => {
+        throw new Error('Render frame was disposed before WebFrameMain could be accessed')
+      }
+    })
+    contents.focused = false
+    expect(() => contents.emit('blur')).not.toThrow()
+    expect(input.state().focus).toBe('out')
+    // Focus and a key on such a page do not throw either.
+    expect(() => contents.emit('focus')).not.toThrow()
+    expect(input.state().focus).toBe('page')
+  })
+
   it('ignores a toolbar focus report for a page already destroyed, without touching it', () => {
     contents.destroyed = true
     contents.isFocused = () => {

@@ -21,7 +21,8 @@
  *   parent frame.
  * - **To the view** (025-FR-033 boxes, the pick point): a session's
  *   coordinates map to the top-level viewport through the owner's content
- *   quad (`DOM.getContentQuads`, transformed frames included) and the frame's
+ *   quad (`DOM.getBoxModel`'s `content`: inside the border and padding,
+ *   transformed frames included) and the frame's
  *   own viewport size (`Page.getLayoutMetrics`), composed up the chain.
  */
 import { isRecord } from '../cdp/cdpTypes'
@@ -258,12 +259,14 @@ export class PickFrames {
 
   /** The map from the child session's viewport into its parent's, through the owner's content quad. */
   async childToParent(childKey: string, parentKey: string, ownerBackendNodeId: number): Promise<Affine> {
-    const [quads, size] = await Promise.all([
-      this.reader.call('DOM.getContentQuads', { backendNodeId: ownerBackendNodeId }, parentKey),
+    // The frame's viewport starts inside the owner's border and padding: its content box. `DOM.getContentQuads`
+    // answers the border box, which stretched every mapped box by the border (a 1 px border: 322 / 320 wide).
+    const [model, size] = await Promise.all([
+      this.reader.call('DOM.getBoxModel', { backendNodeId: ownerBackendNodeId }, parentKey).catch(() => null),
       this.viewportSize(childKey)
     ])
-    const list = isRecord(quads) && Array.isArray(quads.quads) ? quads.quads : []
-    const quad = quadFrom(list[0])
+    const boxModel = isRecord(model) ? model.model : undefined
+    const quad = quadFrom(isRecord(boxModel) ? boxModel.content : undefined)
     const map = quad === null ? null : frameToParent(quad, size.width, size.height)
     if (map === null) throw new Error('frame owner has no content box')
     return map

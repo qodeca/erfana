@@ -25,6 +25,8 @@ export interface FakeNode {
   readonly attrs?: Record<string, string>
   /** `[x, y, width, height]` in the node's own frame, CSS px; absent for a node with no box. */
   readonly box?: readonly [number, number, number, number]
+  /** Border plus padding on each side, CSS px: the content box lies this far inside `box` (none: 0). */
+  readonly inset?: number
   /** For an `<iframe>`: the frame it holds. */
   readonly contentFrameId?: string
   readonly shadow?: 'open' | 'closed'
@@ -136,7 +138,10 @@ export class FakePage {
       const n = this.node(p.backendNodeId)
       const border = this.quad(n)
       if (border === null) throw new Error('Could not compute box model.')
-      return { model: { border, width: n.box![2], height: n.box![3] } }
+      const inset = n.inset ?? 0
+      const [x, y, w, h] = n.box!
+      const content = [x + inset, y + inset, x + w - inset, y + inset, x + w - inset, y + h - inset, x + inset, y + h - inset]
+      return { model: { border, content, width: w, height: h } }
     })
     c.handle('DOM.resolveNode', (p) => ({ object: { objectId: objectIdOf(this.node(p.backendNodeId).id) } }))
     c.handle('Page.createIsolatedWorld', () => ({ executionContextId: 1 }))

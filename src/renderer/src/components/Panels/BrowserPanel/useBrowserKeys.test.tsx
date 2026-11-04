@@ -6,7 +6,8 @@ import { useRef } from 'react'
 import type { DockviewApi } from 'dockview'
 
 const forwarded = vi.hoisted(() => ({
-  listener: null as null | ((event: { tabId: string; action: string }) => void)
+  listener: null as null | ((event: { tabId: string; action: string }) => void),
+  focus: null as null | ((event: { tabId: string; pageFocused: boolean }) => void)
 }))
 const gateway = vi.hoisted(() => ({
   history: vi.fn(async () => undefined),
@@ -15,6 +16,10 @@ const gateway = vi.hoisted(() => ({
   onForwardedKey: vi.fn((listener: (event: { tabId: string; action: string }) => void) => {
     forwarded.listener = listener
     return () => (forwarded.listener = null)
+  }),
+  onFocus: vi.fn((listener: (event: { tabId: string; pageFocused: boolean }) => void) => {
+    forwarded.focus = listener
+    return () => (forwarded.focus = null)
   })
 }))
 const openBrowserTab = vi.hoisted(() => vi.fn())
@@ -222,6 +227,36 @@ describe('useBrowserKeys – toolbar focus and keys', () => {
       ['browser-tab-1', true],
       ['browser-tab-1', false]
     ])
+  })
+
+  it('reports toolbar focus again after main says the page took focus with no blur in the panel (025-AC-065)', () => {
+    render(<Harness api={makeGroup().api} />)
+    act(() => screen.getByRole('button', { name: 'Reload' }).focus())
+    // Another tab's page, and a page losing focus, change nothing.
+    act(() => forwarded.focus?.({ tabId: 'browser-tab-2', pageFocused: true }))
+    act(() => forwarded.focus?.({ tabId: 'browser-tab-1', pageFocused: false }))
+    act(() => screen.getByRole('textbox', { name: 'field' }).focus())
+    expect(gateway.toolbarFocus.mock.calls).toEqual([['browser-tab-1', true]])
+    // The page took focus (the emptied strip focused it) while the panel's DOM saw no blur.
+    act(() => forwarded.focus?.({ tabId: 'browser-tab-1', pageFocused: true }))
+    act(() => screen.getByRole('button', { name: 'Reload' }).focus())
+    expect(gateway.toolbarFocus.mock.calls).toEqual([
+      ['browser-tab-1', true],
+      ['browser-tab-1', true]
+    ])
+    // Leaving still reports the end, once.
+    act(() => screen.getByRole('button', { name: 'Outside' }).focus())
+    expect(gateway.toolbarFocus.mock.calls.at(-1)).toEqual(['browser-tab-1', false])
+    expect(gateway.toolbarFocus).toHaveBeenCalledTimes(3)
+  })
+
+  it('ignores a page focus before any toolbar focus was reported, and stops listening without a tab', () => {
+    const { unmount } = render(<Harness api={makeGroup().api} />)
+    act(() => forwarded.focus?.({ tabId: 'browser-tab-1', pageFocused: true }))
+    act(() => screen.getByRole('button', { name: 'Reload' }).focus())
+    expect(gateway.toolbarFocus.mock.calls).toEqual([['browser-tab-1', true]])
+    unmount()
+    expect(forwarded.focus).toBeNull()
   })
 
   it('keeps toolbar focus while focus is in a menu the tab drew in the portal root (025-FR-030)', () => {

@@ -11,6 +11,7 @@ const gateway = vi.hoisted(() => ({
   suggest: vi.fn(async (): Promise<{ rows: Array<{ url: string }> }> => ({ rows: [] })),
   toolbarFocus: vi.fn(),
   onForwardedKey: vi.fn(() => () => undefined),
+  onFocus: vi.fn(() => () => undefined),
   pickMode: vi.fn(async () => undefined),
   closePick: vi.fn(async () => undefined),
   pickSurface: vi.fn(async () => undefined),

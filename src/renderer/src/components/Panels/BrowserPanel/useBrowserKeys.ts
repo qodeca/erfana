@@ -103,7 +103,11 @@ function cycleEditorTab(api: Pick<DockviewPanelApi, 'group'>, step: 1 | -1): voi
 export function useBrowserKeys(options: UseBrowserKeysOptions): BrowserKeyHandlers {
   const { tabId, rootRef, navRef } = options
   const latest = useLatestRef(options)
-  const reportedRef = useRef<string | null>(null)
+  /**
+   * The tab whose toolbar focus was reported, and whether main still routes by
+   * that report (`false` once main says the page took focus).
+   */
+  const reportedRef = useRef<{ readonly tab: string; readonly current: boolean } | null>(null)
 
   const act = useCallback(
     (action: ForwardedKeyAction): void => {
@@ -161,17 +165,29 @@ export function useBrowserKeys(options: UseBrowserKeysOptions): BrowserKeyHandle
   }, [tabId, act])
 
   const report = useCallback((tab: string | null, focused: boolean): void => {
-    if (focused && tab !== null && reportedRef.current !== tab) {
-      reportedRef.current = tab
+    const reported = reportedRef.current
+    if (focused && tab !== null && (reported === null || reported.tab !== tab || !reported.current)) {
+      reportedRef.current = { tab, current: true }
       browserTabGateway.toolbarFocus(tab, true)
-    } else if (!focused && reportedRef.current !== null) {
-      browserTabGateway.toolbarFocus(reportedRef.current, false)
+    } else if (!focused && reported !== null) {
+      browserTabGateway.toolbarFocus(reported.tab, false)
       reportedRef.current = null
     }
   }, [])
 
   // A tab change or unmount ends what was reported.
   useEffect(() => () => report(null, false), [tabId, report])
+
+  // The page took keyboard focus, so main routes keys to the page whatever this root reported last. Focus can
+  // reach the page without a blur here – the focused strip button is removed, then the emptied strip focuses the
+  // page – so the next focus in the toolbar is reported again (025-AC-065). A blur still reports the end.
+  useEffect(() => {
+    if (tabId === null) return
+    return browserTabGateway.onFocus(event => {
+      const reported = reportedRef.current
+      if (event.tabId === tabId && event.pageFocused && reported !== null) reportedRef.current = { tab: reported.tab, current: false }
+    })
+  }, [tabId])
 
   const onFocus = useCallback(() => report(latest.current.tabId, true), [latest, report])
 

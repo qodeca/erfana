@@ -5,8 +5,9 @@
  * ADR 0007 decision 4 and its commit-8 probe results).
  *
  * Coordinates are CSS pixels. A frame's coordinates map into its parent's
- * through the owner `<iframe>`'s content quad, as `DOM.getContentQuads`
- * reports it: the quad's corners are the frame viewport's (0,0), (w,0), (w,h)
+ * through the owner `<iframe>`'s content quad, as `DOM.getBoxModel`'s
+ * `content` reports it (the border box, `DOM.getContentQuads`, is wider by
+ * the border and padding): the quad's corners are the frame viewport's (0,0), (w,0), (w,h)
  * and (0,h), so a transformed (rotated, scaled) frame maps exactly. The map is
  * the affine map through three of the corners; a perspective transform, whose
  * quad is no parallelogram, is approximated by it (inferred: rare in pages).

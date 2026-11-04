@@ -602,10 +602,29 @@ test.describe('spec 025 engine probes: the view on screen', () => {
     browserServers
   }) => {
     const view = await ProbeView.open(appWithTestProject)
-    await view.load(browserServers.sites.static.url('/probes/page.html'))
+    const linux = process.platform === 'linux'
+    // On Linux the 10 ms timer page: its ticks measure time passing in the page without a sleep in the test.
+    await view.load(browserServers.sites.static.url(linux ? '/probes/page.html?timer=1' : '/probes/page.html'))
     expect(await framesPainted(view, 2)).toBe('visible')
-    await view.setPhase('detached')
-    await view.hook('probeDetachView')
+    if (linux) {
+      // Linux (2026-11-04, Electron 44, xvfb): the detached view also stays visible with no visibilitychange,
+      // but it draws no animation frame until it is attached again – decision 3's "hidden tabs cost no
+      // compositing" holds here, unlike on macOS (ADR 0011 probe results).
+      await view.eval('window.__probe.logFrames()')
+      await view.setPhase('detached')
+      await view.hook('probeDetachView')
+      // A frame already on its way as the view went may still land: start counting 5 ticks later.
+      const detachedTicks = await view.eval<number>('window.__probe.ticks')
+      await view.waitFor(`window.__probe.ticks >= ${detachedTicks + 5}`, 'timers run in the detached view')
+      const before = await view.eval<{ ticks: number; frames: number }>('({ ticks: window.__probe.ticks, frames: window.__probe.frameLog.length })')
+      await view.waitFor(`window.__probe.ticks >= ${before.ticks + 10}`, '10 more timer ticks in the detached view')
+      expect(await view.eval<number>('window.__probe.frameLog.length'), 'animation frames while detached').toBe(before.frames)
+      expect(await view.eval<string>('document.visibilityState')).toBe('visible')
+      await view.hook('probeAttachView')
+    } else {
+      await view.setPhase('detached')
+      await view.hook('probeDetachView')
+    }
     expect(await framesPainted(view, 10)).toBe('visible')
     expect(await view.eval(`window.__probe.events.filter(e => e.phase === 'detached').map(e => e.type)`)).toEqual([])
   })

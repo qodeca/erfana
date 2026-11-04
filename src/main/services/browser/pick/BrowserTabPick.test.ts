@@ -9,6 +9,7 @@ import { STILL_MAX_EDGE_PX } from './BrowserTabPick'
 import { pickHarness, settle, type PickHarness } from './__test-helpers__/pickHarness'
 import { CHAIN_REST_MS } from './pickHover'
 import { PICK_CHAIN } from '../cdp/cdpPickFunctions'
+import { PAINT_WAIT_CAP_MS, PAINT_WAIT_SCRIPT, PAINT_WAIT_WORLD_ID } from './pickPainted'
 
 /** Pick mode on, the pointer over the label, its highlight shown. */
 async function hovering(h: PickHarness, x = 35, y = 30): Promise<void> {
@@ -267,6 +268,51 @@ describe('BrowserTabPick', () => {
       expect(h.pick.capture?.moment.pickPoint).toEqual({ x: 35, y: 30 })
       expect(h.state().surface).toBe('menu')
       expect(h.bench.read('confirmToMenu')).toHaveLength(1)
+    })
+
+    it('takes the screenshot only once the page drew two frames after the highlight was hidden (025-AC-034)', async () => {
+      let atWait: { hidden: boolean; captures: number } | null = null
+      h.contents.onScript = () => {
+        atWait = { hidden: h.page.cdp.sent.some((c) => c.method === 'Overlay.hideHighlight'), captures: h.contents.captures }
+      }
+      await confirmed(h)
+      expect(atWait).toEqual({ hidden: true, captures: 0 })
+      expect(h.contents.scripts).toEqual([{ worldId: PAINT_WAIT_WORLD_ID, code: PAINT_WAIT_SCRIPT }])
+      expect(h.contents.captures).toBe(1)
+    })
+
+    it('takes the screenshot at the cap when the page draws no frame, and at once when the wait cannot run', async () => {
+      h.contents.paint = 'never'
+      await hovering(h)
+      h.routing.dispatch({ type: 'enter', now: h.clock.now() })
+      await settle()
+      expect(h.contents.captures).toBe(0)
+      h.clock.advance(PAINT_WAIT_CAP_MS - 1)
+      await settle()
+      expect(h.contents.captures).toBe(0)
+      h.clock.advance(1)
+      await settle()
+      expect(h.contents.captures).toBe(1)
+      expect(h.events.some((e) => e.kind === 'captured')).toBe(true)
+
+      const failing = pickHarness()
+      failing.contents.paint = 'fails'
+      await confirmed(failing)
+      expect(failing.contents.captures).toBe(1)
+    })
+
+    it('records the viewport as the whole placed page view at the page zoom, a classic scrollbar included (025-FR-034)', async () => {
+      const placed = pickHarness({ viewSize: { width: 800, height: 600 } })
+      // The layout viewport leaves out a 15 px classic scrollbar.
+      placed.page.viewports.set('', { width: 785, height: 600 })
+      await confirmed(placed)
+      expect(placed.pick.capture?.moment.viewport).toEqual({ width: 800, height: 600 })
+      expect(placed.pick.capture?.moment.image.width).toBe(1600)
+
+      const zoomed = pickHarness({ viewSize: { width: 800, height: 600 } })
+      zoomed.contents.zoom = 1.25
+      await confirmed(zoomed)
+      expect(zoomed.pick.capture?.moment.viewport).toEqual({ width: 640, height: 480 })
     })
 
     it('caps the still image at 4096 px a side', async () => {
