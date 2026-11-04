@@ -29,6 +29,7 @@ import {
   type FileWatchSlot
 } from './fileWatchSlot'
 import { logger } from '../utils/logger'
+import { useDeletedFileProbe } from './useDeletedFileProbe'
 import { fileGateway } from '../services/fileGateway'
 import { fileWatchGateway } from '../services/fileWatchGateway'
 
@@ -132,6 +133,10 @@ export interface UseFileChangeSubscriptionResult {
  *    means the main process already dropped the watch, so the slot forgets
  *    its hold without a `stop`. See {@link FileWatchSlot} for what each
  *    imbalance costs.
+ * 6. **A deleted file is looked for until it is back** (#450). Nothing reports
+ *    a deleted file reappearing, so while `isFileDeleted` holds the hook asks
+ *    the disk every couple of seconds (`useDeletedFileProbe`) and, when the
+ *    file is there, runs `recover()` and reports a change.
  *
  * @param filePath - Absolute path to watch. An empty string subscribes to nothing.
  * @param options - Change callback
@@ -256,6 +261,13 @@ export function useFileChangeSubscription(
   useEffect(() => {
     recoverRef.current = recover
   }, [recover])
+
+  // A genuine delete ended the watch, so nothing reports the file coming back
+  // (a branch switch, a merge). Look for it while the tab shows the deleted
+  // state, and recover exactly as a misreported delete does (#450).
+  useDeletedFileProbe(filePath, isFileDeleted, async () => {
+    if (await recoverRef.current()) onExternalChangeRef.current()
+  })
 
   // A new path starts with neither degraded state. Reset during render, when
   // the path changes, rather than in the subscription effect below.
