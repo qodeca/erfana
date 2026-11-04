@@ -10,6 +10,12 @@
  * measures 0 wide; that is "not drawn", not "narrow", and leaves the layout as
  * it was.
  *
+ * Pinned content (#461) is measured as drawn, 0 included – an empty live region
+ * is 0 wide, not "not drawn" – and a spacer by its CSS `min-width`, since it
+ * otherwise takes whatever width is left. Pinned content can change width
+ * without this row re-rendering (a count inside the comment tools), so it is
+ * observed too.
+ *
  * @module components/ToolbarOverflow/useToolbarOverflow
  */
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
@@ -18,6 +24,9 @@ import { computeOverflow, FULL_LAYOUT, sameLayout, type OverflowLayout } from '.
 
 /** The attribute each button's slot carries, naming the action it holds. */
 export const SLOT_ID_ATTRIBUTE = 'data-overflow-id'
+
+/** Marks a slot whose content never moves; its value is `pinned` or `spacer`. */
+export const SLOT_KIND_ATTRIBUTE = 'data-overflow-kind'
 
 /** Cache keys for the row's fixed parts, outside any action id space. */
 const ICON_KEY = '\u0000icon'
@@ -38,6 +47,8 @@ export interface ToolbarOverflowRefs {
 export interface ToolbarOverflowSpec {
   id: string
   moveLast?: boolean
+  /** Never moves: pinned content or a spacer (#461) */
+  pinned?: boolean
 }
 
 /** Options for {@link useToolbarOverflow}. */
@@ -63,6 +74,26 @@ function displayedWidth(element: HTMLElement | null): number | null {
   return width > 0 ? width : null
 }
 
+/** The inline padding and border of an element: what its content box loses. */
+function inlineChrome(element: HTMLElement | null): number {
+  if (!element) return 0
+  const style = getComputedStyle(element)
+  return (
+    px(style.paddingLeft) + px(style.paddingRight) + px(style.borderLeftWidth) + px(style.borderRightWidth)
+  )
+}
+
+/**
+ * The width a slot counts for: a button as drawn (null while not drawn),
+ * pinned content as drawn even when 0, a spacer at its minimum.
+ */
+function slotWidth(slot: HTMLElement): number | null {
+  const kind = slot.getAttribute(SLOT_KIND_ATTRIBUTE)
+  if (kind === 'spacer') return px(getComputedStyle(slot).minWidth)
+  if (kind === 'pinned') return slot.getBoundingClientRect().width
+  return displayedWidth(slot)
+}
+
 /**
  * Read the row's widths (caching each part's last drawn width) and compute its
  * layout.
@@ -81,15 +112,18 @@ function measureRow(
   const rowStyle = getComputedStyle(row)
   // The addon never moves or hides, so its width (and its gap) is taken off the top.
   const addonWidth = displayedWidth(refs.addon?.current ?? null)
+  const actions = refs.actions.current
+  // A button group drawn as a box of its own (the Mermaid toolbar's) loses its
+  // padding and border too.
   const available =
     row.clientWidth -
     px(rowStyle.paddingLeft) -
     px(rowStyle.paddingRight) -
-    (addonWidth === null ? 0 : addonWidth + px(rowStyle.columnGap))
+    (addonWidth === null ? 0 : addonWidth + px(rowStyle.columnGap)) -
+    inlineChrome(actions)
 
-  const actions = refs.actions.current
   actions?.querySelectorAll<HTMLElement>(`[${SLOT_ID_ATTRIBUTE}]`).forEach((slot) => {
-    const width = displayedWidth(slot)
+    const width = slotWidth(slot)
     const id = slot.getAttribute(SLOT_ID_ATTRIBUTE)
     if (id && width !== null) cache.set(id, width)
   })
@@ -100,7 +134,10 @@ function measureRow(
 
   // Before a part has ever been drawn, borrow a sibling's width: the header
   // buttons and … share one size, so the first frame is already right.
-  const anyAction = specs.map((spec) => cache.get(spec.id)).find((w) => w !== undefined)
+  const anyAction = specs
+    .filter((spec) => !spec.pinned)
+    .map((spec) => cache.get(spec.id))
+    .find((w) => w !== undefined)
   const fallback = cache.get(MORE_KEY) ?? anyAction ?? 0
   const title = refs.title.current
 
@@ -113,7 +150,12 @@ function measureRow(
     hasIcon,
     hasTitle,
     moreWidth: fallback,
-    items: specs.map((spec) => ({ id: spec.id, width: cache.get(spec.id) ?? fallback, moveLast: spec.moveLast }))
+    items: specs.map((spec) => ({
+      id: spec.id,
+      width: cache.get(spec.id) ?? (spec.pinned ? 0 : fallback),
+      moveLast: spec.moveLast,
+      pinned: spec.pinned
+    }))
   })
 }
 
@@ -200,6 +242,16 @@ export function useToolbarOverflow({
     observer.observe(row)
     return () => observer.disconnect()
   }, [refs, measureRef, onResizeRef])
+
+  // Pinned content resizes on its own (a count, a status message): re-measure.
+  // Re-attached after every commit, since the pinned slots may have changed.
+  useLayoutEffect(() => {
+    const pinned = refs.actions.current?.querySelectorAll<HTMLElement>(`[${SLOT_KIND_ATTRIBUTE}="pinned"]`)
+    if (!pinned || pinned.length === 0 || typeof ResizeObserver === 'undefined') return undefined
+    const observer = new ResizeObserver(() => measureRef.current())
+    pinned.forEach((slot) => observer.observe(slot))
+    return () => observer.disconnect()
+  })
 
   return layout
 }

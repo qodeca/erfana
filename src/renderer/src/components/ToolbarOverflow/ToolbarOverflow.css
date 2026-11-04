@@ -68,3 +68,37 @@
   flex: 0 0 auto;
   align-items: center;
 }
+
+/* #461: a toolbar with a spacer fills the row, so the spacer has room to take. */
+.erf-toolbar-overflow__actions--fill {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Takes the leftover width; useToolbarOverflow counts it at its min-width. */
+.erf-toolbar-overflow__spacer {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Content that never moves (a live region, the comment tools), spaced like the buttons. */
+.erf-toolbar-overflow__pinned {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: inherit;
+}
+
+/* A separator travels inside its button's slot, so it moves with the button. */
+.erf-toolbar-overflow__slot--separated {
+  align-items: center;
+  gap: inherit;
+}
+
+.erf-toolbar-overflow__separator {
+  flex: 0 0 auto;
+  align-self: stretch;
+  width: var(--border-width);
+  margin-inline: var(--space-2);
+  background-color: var(--color-border-default);
+}

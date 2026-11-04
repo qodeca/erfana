@@ -493,9 +493,10 @@ exempt from contrast (SC 1.4.3) – the Menu card's rule.</p>
   <li>The project header and the project row – <code>ProjectPanel.tsx</code>, <code>ProjectTree.tsx</code>.</li>
   <li>The Markdown, Mermaid and image viewer toolbars and the HTML preview band's bar – the
     <a href="../../components/toolbar/index.html">Toolbar</a> card lists them. The image viewer scrolls instead (#73,
-    a locked requirement); it stays an exception there. The Markdown and Mermaid toolbars <strong>do not ship the
-    overflow yet</strong>: they carry separators, a spacer, a live status region, a view-mode group (radio items) and,
-    in the Markdown toolbar, a comment-tools slot that is not a plain button – adopting them is follow-up work.</li>
+    a locked requirement); it stays an exception there. The Markdown and Mermaid toolbars – <code>MarkdownToolbar.tsx</code>,
+    <code>MermaidToolbar.tsx</code> – ship it since #461: a separator moves with the button after it, the spacer counts at
+    its minimum width, and the live status region, the modified dot and the comment tools stay in the row (two
+    recorded exceptions below). The HTML preview band's bar does not ship it yet.</li>
 </ul>
 
 <section id="found">
@@ -546,7 +547,27 @@ to decided and the change to the Toolbar card's overflow section.</p>
 
 <section id="exceptions">
 <h2>Exceptions</h2>
-<p class="ds-muted">None recorded.</p>
+<p class="ds-muted">Where a shipping toolbar departs from a rule above, with the reason (#461). Each file carries a
+<code>deviates:</code> marker at the site.</p>
+<table>
+  <thead><tr><th>Where</th><th>The rule</th><th>The component, and why</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>MarkdownToolbar.tsx</code></td>
+      <td>Rule 4 – nothing is pinned</td>
+      <td>The comment tools stay in the row at every width. They are a component of their own – two stateful buttons
+        with a count, a busy label and a drawer – not one action a menu item can stand for, so the buttons around them
+        move instead. The live status region and the modified dot also stay, but they are not actions.</td>
+    </tr>
+    <tr>
+      <td><code>MarkdownToolbar.tsx</code>, <code>MermaidToolbar.tsx</code></td>
+      <td>Rule 7 – a view-mode radio becomes a <code>menuitemradio</code></td>
+      <td>The view modes and the diagram directions are mutually exclusive, but the shared menu has only checkbox
+        items, so the current one is a checked <code>menuitemcheckbox</code>; in the row each is a toggle with
+        <code>aria-pressed</code>. A <code>menuitemradio</code> item in <code>ContextMenu</code> would close this.</td>
+    </tr>
+  </tbody>
+</table>
 </section>
 </main>
 </body>

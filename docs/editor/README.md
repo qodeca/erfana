@@ -293,6 +293,20 @@ one calls the matching method on the `MonacoEditorHandle`:
 A Find button (Cmd/Ctrl+F) sits beside them, and is rendered separately in the
 preview and split-horizontal modes where the formatting buttons are hidden.
 
+### Narrow panels
+
+The toolbar is a `ToolbarOverflow` row (#461, after #451): when the panel is too
+narrow, buttons move into a "More actions" (…) menu, rightmost first – the
+exports, then the view modes, then Find and the formatting groups. A separator
+moves with the button after it, and the menu separates the groups. The comment
+tools, the modified dot and the live status region are pinned and never move;
+the spacer counts at its minimum width. In the menu the current view mode is a
+checked item, and a disabled export says why ("Switch to preview or split
+mode"). Each Mermaid diagram's toolbar (`MermaidToolbar.tsx`) works the same
+way, with the current direction checked. Contract: the Toolbar overflow card
+(`docs/design-system/system/patterns/toolbar-overflow/`); design:
+`docs/designs/editor-toolbar-overflow/`.
+
 ### Usage
 
 - Click a button to apply the formatting

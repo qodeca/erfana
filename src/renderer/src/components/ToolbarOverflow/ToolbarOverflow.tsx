@@ -16,6 +16,9 @@
  *   item with its busy label.
  * - The menu is the shared {@link ContextMenu} (Menu card, decided): ↑ ↓ Home
  *   End and typeahead, Enter/Space run, Esc/Tab close; focus returns to ….
+ * - Wider toolbars (#461) mix in a separator before a button (it moves with
+ *   the button; the menu separates the groups), pinned content that never
+ *   moves (a live region must stay mounted) and a flexible spacer.
  *
  * @module components/ToolbarOverflow/ToolbarOverflow
  */
@@ -30,7 +33,8 @@ import {
 import { Ellipsis } from 'lucide-react'
 import { ContextMenu, type ContextMenuItem } from '../ContextMenu/ContextMenu'
 import { TOOLBAR_OVERFLOW_TEST_IDS } from '../../constants/toolbarOverflowTestids'
-import { SLOT_ID_ATTRIBUTE, useToolbarOverflow } from './useToolbarOverflow'
+import { menuSeparatorsBefore } from './toolbarOverflow.logic'
+import { SLOT_ID_ATTRIBUTE, SLOT_KIND_ATTRIBUTE, useToolbarOverflow } from './useToolbarOverflow'
 import './ToolbarOverflow.css'
 
 /** The … button's name and tooltip (card rule 2). */
@@ -38,6 +42,7 @@ export const MORE_ACTIONS_LABEL = 'More actions'
 
 /** One toolbar action: its row button and its menu item, from one definition. */
 export interface ToolbarAction {
+  kind?: 'action'
   /** Stable id, unique in the toolbar */
   id: string
   /** The button's current icon, used in the row and in the menu */
@@ -68,6 +73,39 @@ export interface ToolbarAction {
   testId?: string
   /** Raised: moves into the menu only after every other button */
   moveLast?: boolean
+  /** A separator stands before the button and moves with it; the menu separates the groups (#461) */
+  separatorBefore?: boolean
+  /** Why it is disabled, shown under the menu item's label (Menu card `#reason`) */
+  reason?: string
+}
+
+/**
+ * Content that never moves into the menu (#461): it is not a plain button (the
+ * comment tools) or must stay mounted (a live region). It still takes its width
+ * in the row, so the buttons around it give way instead.
+ */
+export interface ToolbarPinned {
+  kind: 'pinned'
+  /** Stable id, unique in the toolbar */
+  id: string
+  content: ReactNode
+}
+
+/** A flexible gap that takes the row's leftover width and counts as its `min-width` (#461). */
+export interface ToolbarSpacer {
+  kind: 'spacer'
+  /** Stable id, unique in the toolbar */
+  id: string
+  /** The spacer's own class, e.g. for a minimum width */
+  className?: string
+}
+
+/** One thing in a toolbar row, in toolbar order. */
+export type ToolbarEntry = ToolbarAction | ToolbarPinned | ToolbarSpacer
+
+/** Whether an entry is a button that can move. */
+export function isToolbarAction(entry: ToolbarEntry): entry is ToolbarAction {
+  return entry.kind === undefined || entry.kind === 'action'
 }
 
 /**
@@ -92,8 +130,8 @@ export interface ToolbarOverflowProps {
   titleClassName?: string
   /** Words beside the title that never move or hide, e.g. the active filter (#452) */
   titleAddon?: ReactNode
-  /** The buttons, in toolbar order */
-  actions: readonly ToolbarAction[]
+  /** The buttons, and any pinned content or spacer, in toolbar order */
+  actions: readonly ToolbarEntry[]
   /** The default class of a row button and of … */
   buttonClassName: string
   /** Extra class on the button group, for the panel's own rhythm */
@@ -102,6 +140,14 @@ export interface ToolbarOverflowProps {
   menuLabel: string
   /** Optional test id on the row */
   testId?: string
+  /** Makes the row a `role="toolbar"` with this name */
+  toolbarLabel?: string
+  /** Makes the button group a `role="group"` with this name */
+  groupLabel?: string
+  /** Optional test id on the button group */
+  actionsTestId?: string
+  /** The class of a row separator (`separatorBefore`) */
+  separatorClassName?: string
 }
 
 type OpenState = null | 'first' | 'last'
@@ -114,8 +160,29 @@ function toMenuItem(action: ToolbarAction): ContextMenuItem {
     disabled: action.disabled || action.busy,
     shortcut: action.shortcut,
     checked: action.pressed,
+    reason: action.reason,
     testId: overflowItemTestId(action)
   }
+}
+
+const MENU_SEPARATOR: ContextMenuItem = { label: '', action: () => {}, separator: true }
+
+/** The moved actions as menu items, in toolbar order, with a separator between groups of the row. */
+function toMenuItems(entries: readonly ToolbarEntry[], moved: readonly string[]): ContextMenuItem[] {
+  const breaks = menuSeparatorsBefore(
+    entries.map((entry) => ({
+      id: entry.id,
+      separatorBefore: isToolbarAction(entry) && entry.separatorBefore === true,
+      spacer: entry.kind === 'spacer'
+    })),
+    moved
+  )
+  const inMenu = new Set(moved)
+  return entries.filter(isToolbarAction).flatMap((action) => {
+    if (!inMenu.has(action.id)) return []
+    const item = toMenuItem(action)
+    return breaks.has(action.id) ? [MENU_SEPARATOR, item] : [item]
+  })
 }
 
 /**
@@ -148,7 +215,11 @@ export function ToolbarOverflow({
   buttonClassName,
   actionsClassName,
   menuLabel,
-  testId
+  testId,
+  toolbarLabel,
+  groupLabel,
+  actionsTestId,
+  separatorClassName = 'erf-toolbar-overflow__separator'
 }: ToolbarOverflowProps) {
   const rowRef = useRef<HTMLDivElement>(null)
   const actionsRef = useRef<HTMLDivElement>(null)
@@ -170,7 +241,13 @@ export function ToolbarOverflow({
     setMoreElement(node)
   }, [])
 
-  const specs = useMemo(() => actions.map(({ id, moveLast }) => ({ id, moveLast })), [actions])
+  const specs = useMemo(
+    () =>
+      actions.map((entry) =>
+        isToolbarAction(entry) ? { id: entry.id, moveLast: entry.moveLast } : { id: entry.id, pinned: true }
+      ),
+    [actions]
+  )
   const layout = useToolbarOverflow({
     refs,
     specs,
@@ -180,9 +257,9 @@ export function ToolbarOverflow({
   })
 
   const moved = useMemo(() => new Set(layout.moved), [layout.moved])
-  const inRow = actions.filter((action) => !moved.has(action.id))
-  const inMenu = actions.filter((action) => moved.has(action.id))
-  const showMore = inMenu.length > 0
+  const inRow = actions.filter((entry) => !moved.has(entry.id))
+  const showMore = layout.moved.length > 0
+  const hasSpacer = actions.some((entry) => entry.kind === 'spacer')
   // … has gone (everything fits again): forget an open request rather than
   // reopening the menu the next time … appears.
   if (!showMore && open !== null) setOpen(null)
@@ -195,7 +272,13 @@ export function ToolbarOverflow({
   }
 
   return (
-    <div ref={rowRef} className={`${className} erf-toolbar-overflow`} data-testid={testId}>
+    <div
+      ref={rowRef}
+      className={`${className} erf-toolbar-overflow`}
+      role={toolbarLabel ? 'toolbar' : undefined}
+      aria-label={toolbarLabel}
+      data-testid={testId}
+    >
       {icon !== undefined && (
         <span ref={iconRef} className="erf-toolbar-overflow__icon" hidden={!layout.showIcon} aria-hidden="true">
           {icon}
@@ -217,29 +300,46 @@ export function ToolbarOverflow({
       )}
       <div
         ref={actionsRef}
-        className={`erf-toolbar-overflow__actions${actionsClassName ? ` ${actionsClassName}` : ''}`}
+        className={`erf-toolbar-overflow__actions${hasSpacer ? ' erf-toolbar-overflow__actions--fill' : ''}${
+          actionsClassName ? ` ${actionsClassName}` : ''
+        }`}
+        role={groupLabel ? 'group' : undefined}
+        aria-label={groupLabel}
+        data-testid={actionsTestId}
       >
-        {inRow.map((action) => (
-          <span key={action.id} className="erf-toolbar-overflow__slot" {...{ [SLOT_ID_ATTRIBUTE]: action.id }}>
-            <button
-              type="button"
-              className={action.className ?? buttonClassName}
-              // Busy keeps focus: aria-disabled, not disabled (Buttons card), so the click is ignored here.
-              onClick={action.busy ? undefined : action.onSelect}
-              title={action.title}
-              aria-label={action.ariaLabel ?? action.label}
-              aria-pressed={action.pressed}
-              aria-expanded={action.expanded}
-              aria-controls={action.controls}
-              aria-busy={action.busy || undefined}
-              aria-disabled={action.busy || undefined}
-              disabled={action.disabled}
-              data-testid={action.testId}
-            >
-              {action.icon}
-            </button>
-          </span>
-        ))}
+        {inRow.map((entry, index) => {
+          if (entry.kind === 'spacer') {
+            return (
+              <span
+                key={entry.id}
+                className={`erf-toolbar-overflow__spacer${entry.className ? ` ${entry.className}` : ''}`}
+                {...{ [SLOT_ID_ATTRIBUTE]: entry.id, [SLOT_KIND_ATTRIBUTE]: 'spacer' }}
+              />
+            )
+          }
+          if (entry.kind === 'pinned') {
+            return (
+              <span
+                key={entry.id}
+                className="erf-toolbar-overflow__pinned"
+                {...{ [SLOT_ID_ATTRIBUTE]: entry.id, [SLOT_KIND_ATTRIBUTE]: 'pinned' }}
+              >
+                {entry.content}
+              </span>
+            )
+          }
+          // A separator never leads the row: once everything before it has moved, it stays out.
+          const separated =
+            entry.separatorBefore === true && inRow.slice(0, index).some((before) => before.kind !== 'spacer')
+          return (
+            <ActionButton
+              key={entry.id}
+              action={entry}
+              buttonClassName={buttonClassName}
+              separatorClassName={separated ? separatorClassName : undefined}
+            />
+          )
+        })}
         {showMore && (
           <button
             ref={bindMore}
@@ -260,7 +360,7 @@ export function ToolbarOverflow({
       {isOpen && (
         <ContextMenu
           anchorElement={moreElement}
-          items={inMenu.map(toMenuItem)}
+          items={toMenuItems(actions, layout.moved)}
           onClose={closeMenu}
           ariaLabel={menuLabel}
           initialFocus={open ?? 'first'}
@@ -269,5 +369,41 @@ export function ToolbarOverflow({
         />
       )}
     </div>
+  )
+}
+
+interface ActionButtonProps {
+  action: ToolbarAction
+  buttonClassName: string
+  /** Set when a separator stands before the button in the row */
+  separatorClassName?: string
+}
+
+/** One action's slot in the row: an optional separator, then its button. */
+function ActionButton({ action, buttonClassName, separatorClassName }: ActionButtonProps) {
+  return (
+    <span
+      className={`erf-toolbar-overflow__slot${separatorClassName ? ' erf-toolbar-overflow__slot--separated' : ''}`}
+      {...{ [SLOT_ID_ATTRIBUTE]: action.id }}
+    >
+      {separatorClassName && <span className={separatorClassName} aria-hidden="true" />}
+      <button
+        type="button"
+        className={action.className ?? buttonClassName}
+        // Busy keeps focus: aria-disabled, not disabled (Buttons card), so the click is ignored here.
+        onClick={action.busy ? undefined : action.onSelect}
+        title={action.title}
+        aria-label={action.ariaLabel ?? action.label}
+        aria-pressed={action.pressed}
+        aria-expanded={action.expanded}
+        aria-controls={action.controls}
+        aria-busy={action.busy || undefined}
+        aria-disabled={action.busy || undefined}
+        disabled={action.disabled}
+        data-testid={action.testId}
+      >
+        {action.icon}
+      </button>
+    </span>
   )
 }

@@ -31,7 +31,31 @@ export const MENU_LABEL_BY_TEST_ID: Readonly<Record<string, string>> = {
   [TEST_IDS.PROJECT_TREE_BTN_NEW_FILE]: 'Create new markdown file',
   [TEST_IDS.PROJECT_TREE_BTN_NEW_FOLDER]: 'Create new folder',
   [TEST_IDS.PROJECT_TREE_BTN_IMPORT]: 'Import a file',
-  [TEST_IDS.PROJECT_TREE_BTN_REFRESH]: 'Refresh'
+  [TEST_IDS.PROJECT_TREE_BTN_REFRESH]: 'Refresh',
+  // The Markdown toolbar (#461): the menu label is the button's accessible name.
+  [TEST_IDS.TOOLBAR_BTN_BOLD]: 'Bold',
+  [TEST_IDS.TOOLBAR_BTN_ITALIC]: 'Italic',
+  [TEST_IDS.TOOLBAR_BTN_STRIKETHROUGH]: 'Strikethrough',
+  [TEST_IDS.TOOLBAR_BTN_CODE]: 'Inline code',
+  [TEST_IDS.TOOLBAR_BTN_LINK]: 'Insert link',
+  [TEST_IDS.TOOLBAR_BTN_IMAGE]: 'Insert image',
+  [TEST_IDS.TOOLBAR_BTN_HEADING]: 'Heading 1',
+  [TEST_IDS.TOOLBAR_BTN_LIST]: 'Bullet list',
+  [TEST_IDS.TOOLBAR_BTN_LIST_ORDERED]: 'Numbered list',
+  [TEST_IDS.TOOLBAR_BTN_SEARCH]: 'Find',
+  [TEST_IDS.VIEW_MODE_BTN_EDITOR]: 'Editor only',
+  [TEST_IDS.VIEW_MODE_BTN_SPLIT_HORIZONTAL]: 'Split horizontal',
+  [TEST_IDS.VIEW_MODE_BTN_SPLIT]: 'Split vertical',
+  [TEST_IDS.VIEW_MODE_BTN_PREVIEW]: 'Preview only',
+  [TEST_IDS.TOOLBAR_BTN_EXPORT_PDF]: 'Export to PDF',
+  [TEST_IDS.TOOLBAR_BTN_EXPORT_DOCX]: 'Export to Word',
+  // The Mermaid toolbar (#461): a direction's label is its tooltip.
+  [`${TEST_IDS.MERMAID_DIRECTION_BTN}-TB`]: 'Top to Bottom',
+  [`${TEST_IDS.MERMAID_DIRECTION_BTN}-TD`]: 'Top Down',
+  [`${TEST_IDS.MERMAID_DIRECTION_BTN}-BT`]: 'Bottom to Top',
+  [`${TEST_IDS.MERMAID_DIRECTION_BTN}-LR`]: 'Left to Right',
+  [`${TEST_IDS.MERMAID_DIRECTION_BTN}-RL`]: 'Right to Left',
+  [TEST_IDS.MERMAID_BTN_EXPAND]: 'View fullscreen'
 }
 
 /** How a toolbar action was reached. */
@@ -72,6 +96,24 @@ export class ToolbarOverflowPage {
   /** The project tree's project row (project name and its buttons). */
   projectRow(): Locator {
     return this.page.locator(`[data-testid="${TEST_IDS.PROJECT_TREE}"] .project-tree-path`)
+  }
+
+  /** The Markdown editor panel's toolbar (#461). */
+  markdownToolbar(): Locator {
+    return this.page.locator(`[data-testid="${TEST_IDS.MARKDOWN_TOOLBAR}"]`)
+  }
+
+  /** The first Mermaid diagram's toolbar in the preview (#461). */
+  mermaidToolbar(): Locator {
+    return this.page.locator(`[data-testid="${TEST_IDS.MERMAID_TOOLBAR}"]`).first()
+  }
+
+  /**
+   * A Mermaid toolbar's button group – the part that takes the pointer (the row
+   * itself lets clicks through to the diagram), so hover this to reveal it.
+   */
+  mermaidGroup(toolbar: Locator): Locator {
+    return toolbar.getByRole('group', { name: 'Layout direction' })
   }
 
   /** The row's "More actions" (…) button. */

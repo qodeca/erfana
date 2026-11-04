@@ -7,7 +7,14 @@
  * holds a single button that would fit in its place.
  */
 import { describe, it, expect } from 'vitest'
-import { computeOverflow, moveOrder, sameLayout, type OverflowInput, type OverflowItem } from './toolbarOverflow.logic'
+import {
+  computeOverflow,
+  menuSeparatorsBefore,
+  moveOrder,
+  sameLayout,
+  type OverflowInput,
+  type OverflowItem
+} from './toolbarOverflow.logic'
 
 const BTN = 24
 const GAP = 8
@@ -155,5 +162,112 @@ describe('sameLayout', () => {
     expect(sameLayout({ moved: ['a'], showTitle: true, showIcon: true }, { moved: ['a'], showTitle: true, showIcon: true })).toBe(true)
     expect(sameLayout({ moved: ['a'], showTitle: true, showIcon: true }, { moved: ['b'], showTitle: true, showIcon: true })).toBe(false)
     expect(sameLayout({ moved: [], showTitle: true, showIcon: true }, { moved: [], showTitle: false, showIcon: true })).toBe(false)
+  })
+})
+
+/**
+ * #461: the Markdown and Mermaid toolbars – no icon or title, pinned content
+ * (comment tools, the live region) and a spacer that counts at its minimum.
+ */
+describe('pinned items and the spacer (#461)', () => {
+  /** [a b] [pinned 40] [spacer, min 0] [c d e] – a bare toolbar row, gaps of 2. */
+  function bar(available: number, spacerMin = 0): OverflowInput {
+    return {
+      available,
+      rowGap: 0,
+      itemGap: 2,
+      iconWidth: 0,
+      titleReserve: 0,
+      hasIcon: false,
+      hasTitle: false,
+      moreWidth: BTN,
+      items: [
+        { id: 'a', width: BTN },
+        { id: 'b', width: BTN },
+        { id: 'tools', width: 40, pinned: true },
+        { id: 'spacer', width: spacerMin, pinned: true },
+        { id: 'c', width: BTN },
+        { id: 'd', width: BTN },
+        { id: 'e', width: BTN }
+      ]
+    }
+  }
+
+  /** Every item at its counted width, plus a gap between each pair (7 items, 6 gaps). */
+  const ALL = 5 * BTN + 40 + 0 + 6 * 2
+
+  it('leaves pinned items out of the move order', () => {
+    expect(moveOrder(bar(0).items)).toEqual(['e', 'd', 'c', 'b', 'a'])
+  })
+
+  it('counts a spacer at 0: everything fits at exactly the sum of the rest', () => {
+    expect(computeOverflow(bar(ALL)).moved).toEqual([])
+    expect(computeOverflow(bar(ALL - 1)).moved).not.toEqual([])
+  })
+
+  it('counts a spacer at its minimum width when it has one', () => {
+    expect(computeOverflow(bar(ALL, 12)).moved).not.toEqual([])
+    expect(computeOverflow(bar(ALL + 12, 12)).moved).toEqual([])
+  })
+
+  it('never moves a pinned item, even at the floor', () => {
+    const layout = computeOverflow(bar(0))
+    expect(layout.moved).toEqual(['a', 'b', 'c', 'd', 'e'])
+    expect(layout.moved).not.toContain('tools')
+    expect(layout.moved).not.toContain('spacer')
+  })
+
+  it('moves the rightmost buttons first, past the pinned content', () => {
+    // Room for a, b, tools, spacer, … and one more button: c stays, d and e move.
+    const keep = 3 * BTN + 40 + 0 + BTN + 5 * 2
+    expect(computeOverflow(bar(keep)).moved).toEqual(['d', 'e'])
+  })
+
+  it('works with nothing but pinned items', () => {
+    const input: OverflowInput = { ...bar(10), items: [{ id: 'status', width: 0, pinned: true }] }
+    expect(computeOverflow(input).moved).toEqual([])
+  })
+})
+
+describe('menuSeparatorsBefore (#461)', () => {
+  /** The Markdown toolbar in the editor view, shortened: [b i] | [code link] | [find] ~ [modes] | [pdf docx]. */
+  const entries = [
+    { id: 'b' },
+    { id: 'i' },
+    { id: 'code', separatorBefore: true },
+    { id: 'link' },
+    { id: 'find', separatorBefore: true },
+    { id: 'status' },
+    { id: 'spacer', spacer: true },
+    { id: 'editor' },
+    { id: 'preview' },
+    { id: 'pdf', separatorBefore: true },
+    { id: 'docx' }
+  ]
+
+  it('separates moved buttons that came from different groups', () => {
+    expect([...menuSeparatorsBefore(entries, ['find', 'editor', 'preview', 'pdf', 'docx'])]).toEqual([
+      'editor',
+      'pdf'
+    ])
+  })
+
+  it('never puts a separator first: the first menu item never gets one', () => {
+    expect([...menuSeparatorsBefore(entries, ['pdf', 'docx'])]).toEqual([])
+    expect([...menuSeparatorsBefore(entries, ['code', 'link'])]).toEqual([])
+  })
+
+  it('never puts one last or doubles it when a whole group stays in the row', () => {
+    // link and the export group moved, find and the modes stayed: one separator, before pdf.
+    expect([...menuSeparatorsBefore(entries, ['link', 'pdf', 'docx'])]).toEqual(['pdf'])
+  })
+
+  it('treats a spacer as a group boundary', () => {
+    expect([...menuSeparatorsBefore(entries, ['find', 'editor'])]).toEqual(['editor'])
+  })
+
+  it('returns nothing for an empty menu or a single group', () => {
+    expect(menuSeparatorsBefore(entries, []).size).toBe(0)
+    expect(menuSeparatorsBefore(entries, ['b', 'i']).size).toBe(0)
   })
 })

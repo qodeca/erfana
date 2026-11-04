@@ -90,7 +90,7 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 
 ## Panel toolbar overflow (3 testids, outside the count above)
 
-Panel header rows move buttons that do not fit into a "More actions" menu (#451). These ids live in `src/renderer/src/constants/toolbarOverflowTestids.ts` (`TOOLBAR_OVERFLOW_TEST_IDS`), not in `TEST_IDS`: `testids.ts` is at its max-lines ratchet. A moved button's menu item carries its row button's testid plus `-overflow-item` (`terminal-btn-expand-overflow-item`), built by `overflowItemTestId()` in `components/ToolbarOverflow/ToolbarOverflow.tsx`. POM: `e2e/pages/toolbar-overflow.page.ts`.
+Panel header rows (#451) and the Markdown and Mermaid toolbars (#461) move buttons that do not fit into a "More actions" menu. These ids live in `src/renderer/src/constants/toolbarOverflowTestids.ts` (`TOOLBAR_OVERFLOW_TEST_IDS`), not in `TEST_IDS`: `testids.ts` is at its max-lines ratchet. A moved button's menu item carries its row button's testid plus `-overflow-item` (`terminal-btn-expand-overflow-item`), built by `overflowItemTestId()` in `components/ToolbarOverflow/ToolbarOverflow.tsx`. POM: `e2e/pages/toolbar-overflow.page.ts`.
 
 | Test ID | Element | Type |
 |---------|---------|------|

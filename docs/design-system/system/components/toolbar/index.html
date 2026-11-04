@@ -22,7 +22,7 @@
              font-size: var(--text-base); }
   .tl-canvas { position: relative; min-block-size: calc(var(--space-24) * 3); background: var(--color-bg-preview); }
   .tl-float { position: absolute; inset-block-end: var(--space-6); inset-inline-end: var(--space-6);
-              block-size: var(--erf-toolbar-tool-height, var(--input-height-sm)); }
+              block-size: var(--toolbar-tool-height); }
   .tl-measure { display: flex; align-items: flex-end; gap: var(--space-8); padding: var(--space-8);
                 background: var(--color-bg-secondary); }
   .tl-measure__box { display: flex; align-items: flex-end; justify-content: center; inline-size: calc(var(--space-24) * 1.5);
@@ -204,18 +204,16 @@ written. The mode group sits in its own <code>erf-toolbar__group</code>, with a 
 <h2 id="tool-height">Tool height</h2>
 <p class="ds-muted">
   One height for every tool in a toolbar, and for anything that has to line up with one: a count button
-  (the comments list), a menu button, a find field, a floating action over a canvas. The proposal is a token,
-  <code>--toolbar-tool-height</code>, at the value of <code>--input-height-sm</code>
-  (<code data-token="--input-height-sm">28px</code>). It is a <strong>proposed token, not yet in
-  <code>design-tokens.css</code></strong>; adding it is an owner decision. Until then <code>toolbar.css</code> carries a
-  card-private fallback, <code>--erf-toolbar-tool-height</code>, that every frame on this card reads, and a comment
-  saying to delete it when the token lands.
+  (the comments list), a menu button, a find field, a floating action over a canvas. It is the token
+  <code>--toolbar-tool-height</code> (<code data-token="--toolbar-tool-height">28px</code>), defined in
+  <code>design-tokens.css</code> as <code>--input-height-sm</code> – the owner added it on 2026-10-28 (#433) – and every
+  frame on this card, every toolbar button rule in the app and the feature screens read it.
 </p>
 <table class="ds-tokens">
   <thead><tr><th>Token</th><th>Value</th><th>Where it is the height</th></tr></thead>
   <tbody>
     <tr><td><code>--btn-height-sm</code></td><td><code data-token="--btn-height-sm">24px</code></td><td>The target floor: an icon button in a tree row, a dialog header, a tab's close. Not a toolbar tool.</td></tr>
-    <tr><td><code>--toolbar-tool-height</code> <span class="ds-status" data-status="proposed">proposed</span></td><td><code data-token="--input-height-sm">28px</code>, the same as <code>--input-height-sm</code></td><td>Every toolbar tool, and what aligns with one. Above the target floor, and on the same line as a small field, so a find field and its tools share both edges.</td></tr>
+    <tr><td><code>--toolbar-tool-height</code></td><td><code data-token="--toolbar-tool-height">28px</code>, the same as <code>--input-height-sm</code></td><td>Every toolbar tool, and what aligns with one. Above the target floor, and on the same line as a small field, so a find field and its tools share both edges.</td></tr>
     <tr><td><code>--btn-height-md</code></td><td><code data-token="--btn-height-md">32px</code></td><td>A text button in a dialog, a panel or settings. Not a toolbar tool: too tall for a dense row.</td></tr>
   </tbody>
 </table>
@@ -297,9 +295,8 @@ records it as an <a href="../button/index.html#exceptions">exception</a>); this 
   <li><strong>View-mode buttons carry their state in a class only</strong> – <code>MarkdownToolbar.tsx</code> marks the current
     mode with <code>.active</code> and no <code>aria-pressed</code> or <code>aria-checked</code>, and the modes are not a radio group, so a
     screen reader cannot tell which mode is on.</li>
-  <li><strong>Literal sizes</strong> – <code>MarkdownToolbar.css</code> sets its buttons to <code>height: var(--space-14)</code> (lines 72 and 108), a
-    spacing token, and its separator to <code>width: 1px</code> (line 134), off the button scale and the border token. The height is the proposed
-    tool height; it becomes the token once <code>--toolbar-tool-height</code> exists.</li>
+  <li><strong>Literal sizes</strong> – <code>MarkdownToolbar.css</code> sets its separator to <code>width: 1px</code> (line 134), off the
+    border token. Its buttons, the Mermaid, editor and app toolbars and the preview band now read <code>--toolbar-tool-height</code> (#433).</li>
   <li><strong>The image viewer scrolls instead of overflowing</strong> (#73) – a locked requirement there, kept as a legitimate
     exception once it carries a <code>deviates:</code> marker.</li>
 </ul>
@@ -309,7 +306,7 @@ records it as an <a href="../button/index.html#exceptions">exception</a>); this 
 <table class="ds-tokens">
   <thead><tr><th>Token</th><th>Value</th><th>Used for</th></tr></thead>
   <tbody>
-    <tr><td><code>--input-height-sm</code></td><td><code data-token="--input-height-sm">28px</code></td><td>The proposed tool height, through <code>--erf-toolbar-tool-height</code></td></tr>
+    <tr><td><code>--toolbar-tool-height</code></td><td><code data-token="--toolbar-tool-height">28px</code></td><td>The tool height (an alias of <code>--input-height-sm</code>)</td></tr>
     <tr><td><code>--space-1</code></td><td><code data-token="--space-1">2px</code></td><td>The gap between controls in a group</td></tr>
     <tr><td><code>--space-4</code></td><td><code data-token="--space-4">8px</code></td><td>The margin either side of a separator</td></tr>
     <tr><td><code>--icon-size-lg</code></td><td><code data-token="--icon-size-lg">24px</code></td><td>A separator's height</td></tr>
@@ -335,7 +332,7 @@ records it as an <a href="../button/index.html#exceptions">exception</a>); this 
 <table>
   <thead><tr><th>File</th><th>Departure</th><th>Why</th></tr></thead>
   <tbody>
-    <tr><td><code>docs/designs/browser/tab-and-toolbar.html</code> (proposed screen, spec 025)</td><td>The browser tab’s navigation, pick and find rows use <code>--color-bg-primary</code> and 28px tools in <code>--space-3</code> padding, not this card’s surface and height, and its tools sit <code>--space-2</code> (4px) apart so an outward focus ring lands in the gap, never on the next tool (M-37).</td><td>They copy the HTML preview bar (Permission band, decided), so Erfana’s two web-page surfaces look alike. Proposed here: a <code>--toolbar-tool-height</code> token instead of the screen’s local height override.</td></tr>
+    <tr><td><code>docs/designs/browser/tab-and-toolbar.html</code> (proposed screen, spec 025)</td><td>The browser tab’s navigation, pick and find rows use <code>--color-bg-primary</code> and 28px tools in <code>--space-3</code> padding, not this card’s surface and height, and its tools sit <code>--space-2</code> (4px) apart so an outward focus ring lands in the gap, never on the next tool (M-37).</td><td>They copy the HTML preview bar (Permission band, decided), so Erfana’s two web-page surfaces look alike. The screen now reads <code>--toolbar-tool-height</code> instead of a local height override (#433).</td></tr>
   </tbody>
 </table>
 

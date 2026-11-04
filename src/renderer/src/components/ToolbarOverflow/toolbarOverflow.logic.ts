@@ -10,6 +10,11 @@
  * buttons move one at a time, then the title goes, then the panel icon. The …
  * button never goes.
  *
+ * Wider toolbars (the Markdown and Mermaid toolbars, #461) also carry content
+ * that never moves – a live status region, a modified dot, the comment tools –
+ * and a flexible spacer. Both are `pinned` items: counted in the row's width
+ * (a spacer at its minimum width, usually 0) and never offered to the menu.
+ *
  * @module components/ToolbarOverflow/toolbarOverflow.logic
  */
 
@@ -20,6 +25,8 @@ export interface OverflowItem {
   width: number
   /** Raised: moves only after every other button has (Maximize terminal, New file) */
   moveLast?: boolean
+  /** Never moves: content that is not a button, or a spacer at its minimum width (#461) */
+  pinned?: boolean
 }
 
 /** Everything the row measures. All widths in px. */
@@ -38,7 +45,7 @@ export interface OverflowInput {
   hasTitle: boolean
   /** The … button's width */
   moreWidth: number
-  /** The buttons in toolbar order, left to right */
+  /** The buttons (and pinned items) in toolbar order, left to right */
   items: readonly OverflowItem[]
 }
 
@@ -55,13 +62,13 @@ const FIT_TOLERANCE_PX = 0.5
 
 /**
  * The order buttons leave in: rightmost first, raised buttons after all the
- * others (again rightmost first among themselves).
+ * others (again rightmost first among themselves). Pinned items never leave.
  *
  * @param items - Buttons in toolbar order
  * @returns Their ids, first to move first
  */
 export function moveOrder(items: readonly OverflowItem[]): string[] {
-  const reversed = [...items].reverse()
+  const reversed = items.filter((item) => !item.pinned).reverse()
   return [...reversed.filter((item) => !item.moveLast), ...reversed.filter((item) => item.moveLast)].map(
     (item) => item.id
   )
@@ -88,6 +95,7 @@ export function computeOverflow(input: OverflowInput): OverflowLayout {
   const { items, itemGap, moreWidth } = input
   const widthById = new Map(items.map((item) => [item.id, item.width]))
   const order = moveOrder(items)
+  const movable = order.length
 
   /** The button group's width with the first `k` of `order` moved. */
   const groupWidth = (k: number): number => {
@@ -120,15 +128,52 @@ export function computeOverflow(input: OverflowInput): OverflowLayout {
 
   // Stage 1: icon and title (at its reserve) stay; move as few buttons as fit.
   const withAll = budget(true, true)
-  for (let k = 0; k <= items.length; k += 1) {
+  for (let k = 0; k <= movable; k += 1) {
     if (worthAMenu(k) && groupWidth(k) <= withAll + FIT_TOLERANCE_PX) return layout(k, true, true)
   }
 
   // Every button that can move has moved: the floor is … alone, or the single
   // button that is not worth a menu.
-  const floor = worthAMenu(items.length) ? items.length : 0
+  const floor = worthAMenu(movable) ? movable : 0
   if (groupWidth(floor) <= budget(true, false) + FIT_TOLERANCE_PX) return layout(floor, true, false)
   return layout(floor, false, false)
+}
+
+/** One toolbar entry, as the menu's grouping sees it. */
+export interface GroupedEntry {
+  id: string
+  /** A separator stands before it in the row: it starts a new group */
+  separatorBefore?: boolean
+  /** A flexible spacer: what follows it is a new group */
+  spacer?: boolean
+}
+
+/**
+ * Where the "…" menu draws a separator (#461).
+ *
+ * A row separator travels with the button after it, so the menu shows a
+ * separator wherever two consecutive moved buttons came from different groups
+ * of the row – groups being split by a row separator or by a spacer. Never
+ * first, never last, never two in a row.
+ *
+ * @param entries - Every toolbar entry, in toolbar order
+ * @param moved - The ids in the menu
+ * @returns The ids of the moved buttons that get a separator before them
+ */
+export function menuSeparatorsBefore(entries: readonly GroupedEntry[], moved: readonly string[]): Set<string> {
+  const inMenu = new Set(moved)
+  const result = new Set<string>()
+  let group = 0
+  let lastGroup: number | null = null
+  for (const entry of entries) {
+    if (entry.separatorBefore) group += 1
+    if (inMenu.has(entry.id)) {
+      if (lastGroup !== null && group !== lastGroup) result.add(entry.id)
+      lastGroup = group
+    }
+    if (entry.spacer) group += 1
+  }
+  return result
 }
 
 /**
