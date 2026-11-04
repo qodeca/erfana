@@ -63,6 +63,7 @@ import { refusalCode, type CommentRefusal } from './commentRefusals'
 import { boundedWrite, changeOf, SAVE_TIMEOUT_MS } from './commentSaveFlow'
 import type { CommentUnsavedSources } from './commentUnsavedSources'
 import { FileCommentPanels, type FileCommentPanel } from './fileCommentPanels'
+import { FileCommentEchoes } from './fileCommentEchoes'
 import { createFileCommentWatches, defaultFileCommentWatch, type FileCommentWatchFactory, type FileCommentWatches } from './fileCommentWatches'
 
 /** Who asks, and in which project: the sender's window, the project root as opened and as resolved. */
@@ -135,6 +136,7 @@ export class FileCommentService {
   private readonly panels: FileCommentPanels
   private readonly watches: FileCommentWatches
   private readonly writer: CommentWriter
+  private readonly echoes = new FileCommentEchoes()
   private readonly runners = new Map<string, CommentFileJobRunner>()
   private stamp = 0
   /** Grows with every project change ({@link FileCommentService.clear}). */
@@ -267,7 +269,8 @@ export class FileCommentService {
     const file = writeTargetOf(caller, panel)
     const work = request.files.map(named => {
       const found = resolveBulkFile(panel.keys, panel.binding, named, (_file, key) => key === panel.realPath)
-      return { fileKey: named.fileKey, threads: found?.threads ?? null, write: (threads: readonly BulkThread[]) => this.writer.changeThreads({ file, threads, change: request.change }) }
+      const write = (threads: readonly BulkThread[]) => this.echoes.track(panel.realPath, subscriberOf(panel), this.writer.changeThreads({ file, threads, change: request.change }))
+      return { fileKey: named.fileKey, threads: found?.threads ?? null, write }
     })
     const { windowId } = caller
     const { panelId } = panel.binding
@@ -284,6 +287,7 @@ export class FileCommentService {
   async clear(): Promise<void> {
     this.projectEpoch += 1
     this.panels.clear()
+    this.echoes.clear()
     await this.watches.closeAll()
   }
 
@@ -297,13 +301,13 @@ export class FileCommentService {
       panel.keys.settleDraft(request.draftToken, false)
       return KEY_INVALID
     }
-    const write = this.writer.addPicked({
+    const write = this.echoes.track(panel.realPath, subscriberOf(panel), this.writer.addPicked({
       file: writeTargetOf(caller, panel),
       pick: request.target,
       ...(request.sel === undefined ? {} : { sel: request.sel }),
       view: request.view,
       text: request.text
-    })
+    }))
     // A write consumes the draft – also one whose bytes changed right after the rename
     // (`changed-during-save`): its thread landed, so a retry would add a second. Any
     // other refusal wrote nothing and leaves the draft, with the window's text, for the next try.
@@ -320,7 +324,7 @@ export class FileCommentService {
     if (request.op === 'deleteBlock') {
       const block = panel.keys.resolve(panel.binding, request.blockKey, 'block')
       if (!block.ok || block.value.realPath !== panel.realPath) return KEY_INVALID
-      const write = this.writer.deleteDamagedBlock({ file, rawHash: request.rawHash, start: block.value.start })
+      const write = this.echoes.track(panel.realPath, subscriberOf(panel), this.writer.deleteDamagedBlock({ file, rawHash: request.rawHash, start: block.value.start }))
       return this.answerInTime(caller, panel, write, { op: request.op, blockKey: request.blockKey })
     }
     if (request.op === 'rebuildBlock') {
@@ -328,12 +332,12 @@ export class FileCommentService {
       const block = panel.keys.resolve(panel.binding, request.blockKey, 'block')
       if (!block.ok || block.value.realPath !== panel.realPath) return KEY_INVALID
       const status = request.status === undefined ? {} : { status: request.status }
-      const write = this.writer.rebuildDamagedBlock({ file, rawHash: request.rawHash, start: block.value.start, ...status })
+      const write = this.echoes.track(panel.realPath, subscriberOf(panel), this.writer.rebuildDamagedBlock({ file, rawHash: request.rawHash, start: block.value.start, ...status }))
       return this.answerInTime(caller, panel, write, { op: request.op, blockKey: request.blockKey })
     }
     const thread = panel.keys.resolve(panel.binding, request.threadKey, 'thread')
     if (!thread.ok || thread.value.realPath !== panel.realPath) return KEY_INVALID
-    const write = this.writer.changeThread({ file, threadId: thread.value.threadId, rawHash: request.rawHash, change: changeOf(request) })
+    const write = this.echoes.track(panel.realPath, subscriberOf(panel), this.writer.changeThread({ file, threadId: thread.value.threadId, rawHash: request.rawHash, change: changeOf(request) }))
     return this.answerInTime(caller, panel, write, { op: request.op, threadKey: request.threadKey })
   }
 
@@ -469,12 +473,15 @@ export class FileCommentService {
     for (const panel of panels) this.watches.unsubscribe(panel.realPath, subscriberOf(panel))
   }
 
-  /** A watched file changed: tell each window whose panel shows it, and only those. */
+  /** A watched file changed: tell each window whose panel shows it, and only those – less the panel whose own write it echoes (§7.5). */
   private changed(realPath: string): void {
-    for (const panel of this.panels.showing(realPath)) {
-      this.stamp += 1
-      this.deps.send(panel.binding.windowId, { panelId: panel.binding.panelId, filePath: panel.requestedPath, stamp: this.stamp })
-    }
+    this.echoes.dispatch(realPath, skipWriter => {
+      for (const panel of this.panels.showing(realPath)) {
+        if (subscriberOf(panel) === skipWriter) continue
+        this.stamp += 1
+        this.deps.send(panel.binding.windowId, { panelId: panel.binding.panelId, filePath: panel.requestedPath, stamp: this.stamp })
+      }
+    })
   }
 }
 

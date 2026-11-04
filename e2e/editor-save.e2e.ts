@@ -31,6 +31,7 @@ import { TabBarPage } from './pages/tab-bar.page'
 import { EditorPanelPage } from './pages/editor-panel.page'
 import { MonacoPage } from './pages/monaco.page'
 import { KeyboardHelper } from './pages/keyboard.helper'
+import { readFileIfPresent } from './utils/files'
 import { byTestId } from './utils/locators'
 import { TEST_IDS } from '../src/renderer/src/constants/testids'
 
@@ -79,7 +80,7 @@ async function openForEditing(
 /** Poll a file until it contains `text`, or fail with what it actually held. */
 async function expectFileToContain(path: string, text: string): Promise<void> {
   await expect
-    .poll(async () => readFile(path, 'utf-8'), { timeout: AUTOSAVE_BUDGET_MS })
+    .poll(async () => readFileIfPresent(path), { timeout: AUTOSAVE_BUDGET_MS })
     .toContain(text)
 }
 
@@ -139,7 +140,7 @@ test.describe('Manual save', () => {
 
     // Inside the autosave debounce, so only the shortcut can have written it.
     await expect
-      .poll(async () => readFile(join(testProject.path, 'notes.md'), 'utf-8'), {
+      .poll(async () => readFileIfPresent(join(testProject.path, 'notes.md')), {
         timeout: MANUAL_SAVE_BUDGET_MS
       })
       .toContain('manually saved')

@@ -14804,7 +14804,7 @@
       "quote": "The script sets `ERFANA_E2E_LINUX_CONTAINER=1`.",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/e2e-linux.sh:64",
+      "source": "scripts/e2e-linux.sh:68",
       "match": "-e ERFANA_E2E_LINUX_CONTAINER=1"
     },
     {
@@ -46585,7 +46585,7 @@
       "quote": "*Automated: `e2e/editor-save.e2e.ts` (asserts the write against real disk)*",
       "status": "verified",
       "evidence": "source",
-      "source": "e2e/editor-save.e2e.ts:86",
+      "source": "e2e/editor-save.e2e.ts:87",
       "match": "test.describe('Autosave', () => {"
     },
     {
@@ -55122,7 +55122,7 @@
       "quote": "a Markdown comment's write is refused for a tab in any window",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/comments/FileCommentService.ts:161",
+      "source": "src/main/services/comments/FileCommentService.ts:163",
       "match": "hasUnsavedSource: realPath => deps.unsaved.hasAny(realPath)",
       "note": "Said the guard sees every window; the HTML write asks its own window only (previewSaveFlows.ts, deps.shared.unsaved.has)."
     },

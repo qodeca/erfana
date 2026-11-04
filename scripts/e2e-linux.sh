@@ -8,7 +8,9 @@
 #
 # The repo is bind-mounted read-write, but node_modules and out/ live in named Docker
 # volumes so the host's macOS copies are never overwritten. The npm download cache has
-# a volume too. Reports land in .local/e2e-linux/ (git-ignored), written by the
+# a volume too, and so does .e2e-temp/: the test projects stay on the Docker VM's own
+# disk, where an atomic save (temp file + rename) is never caught half-done through
+# the shared folder. Reports land in .local/e2e-linux/ (git-ignored), written by the
 # container as the host user.
 set -uo pipefail
 
@@ -28,6 +30,7 @@ fi
 IMAGE="${ERFANA_E2E_LINUX_IMAGE:-erfana-e2e-linux}:$KEY"
 NM_VOLUME="erfana-e2e-node-modules-$KEY"
 OUT_VOLUME="erfana-e2e-out-$KEY"
+TEMP_VOLUME="erfana-e2e-temp-$KEY"
 NPM_VOLUME="erfana-e2e-npm-cache-$KEY"
 CONTAINER_HOME=/tmp/home
 
@@ -50,8 +53,9 @@ docker build -t "$IMAGE" -f "$ROOT/e2e/docker/Dockerfile" "$ROOT/e2e/docker" || 
 mkdir -p "$ROOT/$REPORT_DIR"
 find "$ROOT/$REPORT_DIR" -mindepth 1 -delete
 docker run --rm --user 0 \
-  -v "$NM_VOLUME":/work/node_modules -v "$OUT_VOLUME":/work/out -v "$NPM_VOLUME":"$CONTAINER_HOME/.npm" \
-  "$IMAGE" chown "$(id -u):$(id -g)" /work/node_modules /work/out "$CONTAINER_HOME/.npm" || exit 1
+  -v "$NM_VOLUME":/work/node_modules -v "$OUT_VOLUME":/work/out -v "$TEMP_VOLUME":/work/.e2e-temp \
+  -v "$NPM_VOLUME":"$CONTAINER_HOME/.npm" \
+  "$IMAGE" chown "$(id -u):$(id -g)" /work/node_modules /work/out /work/.e2e-temp "$CONTAINER_HOME/.npm" || exit 1
 
 lock_before="$(hash_text < "$ROOT/package-lock.json")"
 
@@ -67,6 +71,7 @@ docker run --rm \
   -v "$ROOT":/work \
   -v "$NM_VOLUME":/work/node_modules \
   -v "$OUT_VOLUME":/work/out \
+  -v "$TEMP_VOLUME":/work/.e2e-temp \
   -v "$NPM_VOLUME":"$CONTAINER_HOME/.npm" \
   "$IMAGE" bash /work/e2e/docker/run-suite.sh "${args[@]}"
 status=$?
