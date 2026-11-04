@@ -119,11 +119,8 @@ export class FileWatcherService {
    * Start watching a file for changes
    */
   async watchFile(filePath: string, webContents: WebContents): Promise<void> {
-    // Security: Prevent watching files outside project
-    // The watch channels move onto the confined-path wrapper in a follow-up
-    // (docs/technical-debt.md #24); until then this prefix test stays as it was.
-    // eslint-disable-next-line no-restricted-syntax
-    if (this.projectPath && !filePath.startsWith(this.projectPath)) {
+    // Security: inside the project, lexically on resolved paths (a terminal link sends C:/proj/a.md, #464); the re-arm re-checks with realpath
+    if (this.projectPath && !isLexicallyInside(filePath, this.projectPath)) {
       throw new Error('Cannot watch files outside the project directory')
     }
 
@@ -294,8 +291,9 @@ export class FileWatcherService {
    * @see Issue #59 - App enters broken state after window close
    */
   async cleanupForWebContentsId(webContentsId: number): Promise<void> {
-    // Bump session version FIRST to invalidate pending events before cleanup (issue #59)
-    this.switchVersion++
+    // Bump session version FIRST to invalidate pending events (issue #59); a watch another window still holds moves to the new session, or all its later changes were dropped (#464)
+    const before = this.switchVersion++
+    for (const w of this.watchedFiles.values()) if (w.version === before) w.version = this.switchVersion
     await this.dropSubscriber(webContentsId)
     this.safeLog(`👁️  Cleaned up file watches for webContentsId ${webContentsId}`)
   }

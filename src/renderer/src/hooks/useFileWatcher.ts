@@ -59,6 +59,8 @@ export interface FileWatcherState {
   isFileDeleted: boolean
   /** Whether the file is currently being reloaded from disk */
   isReloading: boolean
+  /** Auto-refresh stopped: the watch never started or the watcher failed (#464) */
+  isWatchUnavailable: boolean
 }
 
 /** File watcher actions */
@@ -82,6 +84,8 @@ export interface FileWatcherActions {
   unmarkSaving: () => void
   /** Notify that a save completed with the given content (for self-save echo detection) */
   notifySaveComplete: (savedContent: string) => void
+  /** Start the watch again and re-read the file – the stopped notice's Reload (#464) */
+  restartWatch: () => void
 }
 
 /** Return type for useFileWatcher hook */
@@ -121,50 +125,11 @@ export type UseFileWatcherConfig = UseFileWatcherOptions
  *
  * @example
  * ```tsx
- * function Editor({ filePath, content, setContent }) {
- *   const [isModified, setIsModified] = useState(false)
- *
- *   const {
- *     externalChangeDetected,
- *     isFileDeleted,
- *     reloadFromDisk,
- *     keepLocal,
- *     dismissConflict,
- *     markSaving,
- *     unmarkSaving
- *   } = useFileWatcher({
- *     filePath,
- *     hasLocalChanges: isModified,
- *     onContentUpdate: (newContent) => {
- *       setContent(newContent)
- *       setIsModified(false)
- *     }
- *   })
- *
- *   const handleSave = async () => {
- *     markSaving()
- *     try {
- *       await saveFile(content)
- *     } finally {
- *       unmarkSaving()
- *     }
- *   }
- *
- *   return (
- *     <div>
- *       {externalChangeDetected && (
- *         <ConflictNotification
- *           onReload={reloadFromDisk}
- *           onKeepLocal={keepLocal}
- *           onDismiss={dismissConflict}
- *         />
- *       )}
- *       {isFileDeleted && <DeletedWarning />}
- *       <textarea value={content} />
- *     </div>
- *   )
- * }
- * ```
+ * const { externalChangeDetected, isFileDeleted, isWatchUnavailable, restartWatch, markSaving, unmarkSaving } =
+ *   useFileWatcher({ filePath, hasLocalChanges: isModified, onContentUpdate: setContent })
+ * // Bracket every write with markSaving() / unmarkSaving(); show the conflict
+ * // bar, the deleted warning and the stopped notice from the three flags
+ *  * ```
  */
 export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherReturn {
   const { filePath, hasLocalChanges, onContentUpdate, onReload } = options
@@ -172,6 +137,9 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
   const [externalChangeDetected, setExternalChangeDetected] = useState(false)
   const [isFileDeleted, setIsFileDeleted] = useState(false)
   const [isReloading, setIsReloading] = useState(false)
+  // The path whose watch failed; keyed by path so a file switch clears it (#464)
+  const [unavailableFor, setUnavailableFor] = useState<string | null>(null)
+  const isWatchUnavailable = filePath !== null && unavailableFor === filePath
 
   // Mirrors isFileDeleted for clearDeletedState, which must know synchronously
   // whether the main-process watch is gone (it ends the watch on a delete).
@@ -268,6 +236,19 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
       setIsReloading(false)
     }
   }, [filePath, onContentUpdate, onReload, clearDeletedState])
+
+  // Release any hold (the main watch may be half-dead), start again, then catch
+  // up with the disk – unless the tab holds edits a re-read would throw away
+  const restartWatch = useCallback(() => {
+    if (!filePath) return
+    void releaseFileWatch(slot, filePath)
+      .then(() => acquireFileWatch(slot, filePath))
+      .then(({ started, error, cause }) => {
+        if (!started) return logger.error('Failed to restart watching file', cause, { error })
+        setUnavailableFor((current) => (current === filePath ? null : current))
+        if (!hasLocalChangesRef.current) void reloadFromDisk()
+      })
+  }, [filePath, slot, reloadFromDisk])
 
   const bufferNowRef = useLatestRef(options.bufferNow)
   const reloadIfUnedited = useCallback(async () => {
@@ -401,6 +382,7 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
     void acquireFileWatch(slot, filePath).then(({ started, error, cause }) => {
       if (!started) {
         logger.error('Failed to start watching file', cause, { error })
+        setUnavailableFor(filePath)
       }
     })
 
@@ -420,10 +402,10 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
     const unsubscribeError = fileWatchGateway.onFileError((data) => {
       if (data.filePath === filePath) {
         // The main process ended the watch: forget the hold, as on a delete
-        // (#252). The editor has no degraded state for this yet, so outside
-        // edits stop reaching the tab until it is reopened - logged only.
+        // (#252). Outside edits no longer reach the tab, so it says so.
         if (data.ended) forgetFileWatch(slot)
         logger.error('File watch error', undefined, { error: data.error, ended: data.ended === true })
+        setUnavailableFor(filePath) // say so, with Reload (#464)
       }
     })
 
@@ -443,8 +425,10 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
     externalChangeDetected,
     isFileDeleted,
     isReloading,
+    isWatchUnavailable,
     // Actions
     reloadFromDisk,
+    restartWatch,
     reloadIfUnedited,
     keepLocal,
     dismissConflict,

@@ -22,6 +22,7 @@ import { MonacoEditorHandle } from '../Editor/MonacoMarkdownEditor'
 import { MarkdownPreviewHandle } from '../Editor/MarkdownPreview'
 import { EditorContextMenu } from '../ContextMenu/EditorContextMenu'
 import { FileConflictNotification } from '../FileConflictNotification/FileConflictNotification'
+import { WatchStoppedNotice } from '../FileConflictNotification/WatchStoppedNotice'
 import { useDialog } from '../Dialog'
 import { useToast } from '../Toast/ToastContext'
 import { useProjectStore } from '../../stores/useProjectStore'
@@ -204,7 +205,7 @@ export function MarkdownEditorPanel(
   const {
     externalChangeDetected,
     isFileDeleted,
-    isReloading,
+    isReloading, isWatchUnavailable, restartWatch,
     reloadFromDisk: handleReloadFromDisk, reloadIfUnedited,
     keepLocal: handleKeepLocal,
     dismissConflict,
@@ -674,8 +675,7 @@ export function MarkdownEditorPanel(
               onDismiss={dismissConflict}
             />
           )}
-
-          {/* File deleted warning */}
+          {isWatchUnavailable && <WatchStoppedNotice fileName={getBasename(currentFile.path) || 'File'} onReload={restartWatch} />}
           {isFileDeleted && (
             <div className="file-deleted-warning">
               <span>This file was deleted on disk. Save to restore it.</span>
