@@ -124,6 +124,7 @@ The preview watches the page plus every local file it links, and re-subscribes w
 - **HTML or JS saves fully reload.** Saving an HTML or JavaScript change performs a full page reload.
 - **Frames are watched too.** A frame's own `.html` file and the files it links are part of the page's watch set, so saving any of them reloads the page. A stylesheet that a frame uses reloads the whole page rather than swapping in place, so the frame is never left showing the old styling; a stylesheet only the top page uses still swaps in place.
 - **After a page opens in place**, the watch set follows the new page: saving the old page's files no longer reloads the tab.
+- **A deleted page that comes back reloads by itself.** Deleting the page shows "The preview stopped running." When the file returns – a branch switch, a merge – the preview notices within about 2 seconds, reloads and shows the page again; no Reload click is needed (#450).
 
 **At most 16 files are watched per preview.** The page's own links come first, then the frames' files by depth. A file past that budget is left out and counted, so a framed page with many files can report a non-zero "not watched" count – expected, not a fault. Saving an unwatched file does not refresh the preview.
 

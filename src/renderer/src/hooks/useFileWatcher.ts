@@ -20,15 +20,10 @@ import {
 } from './fileWatchSlot'
 import { logger } from '../utils/logger'
 import { useLatestRef } from './useLatestRef'
+import { useTakeBackReturnedFile } from './takeBackReturnedFile'
+import { normalizeLF } from '../utils/lineEndings'
 import { fileGateway } from '../services/fileGateway'
 import { fileWatchGateway } from '../services/fileWatchGateway'
-
-/**
- * Normalizes line endings to LF for cross-platform content comparison.
- */
-function normalizeLF(content: string): string {
-  return content.replace(/\r\n/g, '\n')
-}
 
 /**
  * Determines whether a file-watch change event is an echo of our own save.
@@ -60,7 +55,7 @@ export function isEchoEvent(
 export interface FileWatcherState {
   /** Whether an external change was detected while file has local modifications */
   externalChangeDetected: boolean
-  /** Whether the file was deleted externally */
+  /** Whether the file was deleted externally; clears itself when the file is back (#450) */
   isFileDeleted: boolean
   /** Whether the file is currently being reloaded from disk */
   isReloading: boolean
@@ -386,6 +381,10 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
     setIsFileDeleted(true)
     setExternalChangeDetected(false) // Clear conflict notification if shown
   }, [filePath, slot])
+
+  // A deleted tab looks for its file and takes it back when it returns (#450)
+  useTakeBackReturnedFile(filePath, isFileDeleted, { isSavingRef, isFileDeletedRef, hasLocalChangesRef, bufferNowRef },
+    { reload: reloadFromDisk, clearDeletedState, setConflict: setExternalChangeDetected })
 
   // Set up file watching
   useEffect(() => {

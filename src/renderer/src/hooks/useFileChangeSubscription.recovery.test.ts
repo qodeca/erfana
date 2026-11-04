@@ -15,6 +15,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { act, waitFor } from '@testing-library/react'
 
+import { DELETED_FILE_PROBE_INTERVAL_MS } from '../../../shared/deletedFileProbe'
 import {
   installFileWatchHarness,
   renderSubscription,
@@ -192,5 +193,68 @@ describe('useFileChangeSubscription – recover()', () => {
 
     expect(recovered).toBe(false)
     expect(h.fileWatch.start).not.toHaveBeenCalled()
+  })
+})
+
+describe('useFileChangeSubscription – a deleted file that comes back (#450)', () => {
+  /** One probe interval passes and everything it started settles. */
+  async function nextProbe(): Promise<void> {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DELETED_FILE_PROBE_INTERVAL_MS)
+    })
+  }
+
+  /** Mounted, watching, then deleted for real: the tab shows the deleted state. */
+  async function renderDeleted(onExternalChange = vi.fn()) {
+    vi.useFakeTimers()
+    h.getStats.mockRejectedValue(new Error('ENOENT'))
+    const rendered = renderSubscription(WATCHED_PATH, onExternalChange)
+    await act(async () => {})
+    h.emitDeleted(WATCHED_PATH)
+    await act(async () => {})
+    expect(rendered.result.current.isFileDeleted).toBe(true)
+    h.getStats.mockClear()
+    return rendered
+  }
+
+  it('keeps looking, and keeps the deleted state, while the file stays gone', async () => {
+    const onExternalChange = vi.fn()
+    const { result } = await renderDeleted(onExternalChange)
+
+    await nextProbe()
+    await nextProbe()
+
+    expect(h.getStats).toHaveBeenCalledTimes(2)
+    expect(result.current.isFileDeleted).toBe(true)
+    expect(onExternalChange).not.toHaveBeenCalled()
+    expect(h.fileWatch.start).toHaveBeenCalledTimes(1)
+  })
+
+  it('recovers on its own and reports a change once the file is back, then stops looking', async () => {
+    const onExternalChange = vi.fn()
+    const { result } = await renderDeleted(onExternalChange)
+    await nextProbe()
+
+    h.getStats.mockResolvedValue({ size: 2048 })
+    await nextProbe()
+
+    expect(result.current.isFileDeleted).toBe(false)
+    expect(onExternalChange).toHaveBeenCalledTimes(1)
+    // A fresh watch, and no `stop` for the one main already ended (#252)
+    expect(h.fileWatch.start).toHaveBeenCalledTimes(2)
+    expect(h.fileWatch.stop).not.toHaveBeenCalled()
+
+    const asked = h.getStats.mock.calls.length
+    await nextProbe()
+    expect(h.getStats).toHaveBeenCalledTimes(asked)
+  })
+
+  it('stops looking when the tab closes', async () => {
+    const { unmount } = await renderDeleted()
+
+    unmount()
+    await nextProbe()
+
+    expect(h.getStats).not.toHaveBeenCalled()
   })
 })

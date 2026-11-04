@@ -20063,7 +20063,7 @@
       "quote": "const unsubscribeChanged = fileWatchGateway.onFileChanged((data) => {",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:409",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:408",
       "match": "const unsubscribeChanged = fileWatchGateway.onFileChanged((data) => {",
       "note": "Excerpt used window.api.fileWatch directly."
     },
@@ -20074,7 +20074,7 @@
       "quote": "void acquireFileWatch(slot, filePath).then(({ started, error, cause }) => {",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:402",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:401",
       "match": "void acquireFileWatch(slot, filePath).then(({ started, error, cause }) => {"
     },
     {
@@ -30559,7 +30559,7 @@
       "quote": "external file changes reload in the open tab",
       "status": "fixed",
       "evidence": "app",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:361",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:356",
       "match": "await reloadFromDisk(diskContent)",
       "test": "e2e/editor-outside-change.e2e.ts",
       "note": "Page said external changes simply 'appear in the open tab'; code auto-reloads only when the tab has no unsaved edits (useFileWatcher.ts:340-347), otherwise it shows a conflict bar. Page now states both cases."
@@ -30902,7 +30902,7 @@
       "quote": "while you have unsaved edits, choose",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:357",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:352",
       "match": "setExternalChangeDetected(true)"
     },
     {
@@ -30912,7 +30912,7 @@
       "quote": "With no local edits, Erfana reloads the disk change automatically.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:361",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:356",
       "match": "await reloadFromDisk(diskContent)"
     },
     {
@@ -32527,7 +32527,7 @@
       "quote": "Watch the editor or preview after the agent finishes.",
       "status": "verified",
       "evidence": "app",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:361",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:356",
       "match": "await reloadFromDisk(diskContent)",
       "test": "e2e/editor-outside-change.e2e.ts",
       "note": "An open file with no local edits auto-reloads when changed on disk; with local edits a conflict notice is shown instead."
@@ -34670,7 +34670,7 @@
       "quote": "If the file changes outside Erfana, a tab with no unsaved edits reloads it automatically",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:361",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:356",
       "match": "await reloadFromDisk(diskContent)",
       "test": "e2e/editor-outside-change.e2e.ts",
       "note": "Added with the fix to 24: clean tabs auto-reload."
@@ -41728,7 +41728,7 @@
       "quote": "A conflict notice appears if the file changed outside Erfana while the editor has local changes.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:355",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:350",
       "match": "if (hasLocalChangesRef.current) {"
     },
     {
@@ -46086,7 +46086,7 @@
       "quote": "1. **`isSavingRef` guard**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:187",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:182",
       "match": "const isSavingRef = useRef(false)"
     },
     {
@@ -46096,7 +46096,7 @@
       "quote": "Compares incoming file content against `pendingSavedContentsRef`, a `Set` of recently saved content strings",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:199",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:194",
       "match": "const pendingSavedContentsRef = useRef<Set<string>>(new Set())"
     },
     {
@@ -46106,7 +46106,7 @@
       "quote": "2. **Content comparison (`isEchoEvent`)**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:45",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:40",
       "match": "export function isEchoEvent("
     },
     {
@@ -46116,7 +46116,7 @@
       "quote": "3. **`hasLocalChangesRef`**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:191",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:186",
       "match": "const hasLocalChangesRef = useRef(hasLocalChanges)"
     },
     {
@@ -46176,7 +46176,7 @@
       "quote": "`classifyWatchStartFailure` maps a refused `start` to `'limit'` only for the",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileChangeSubscription.ts:42",
+      "source": "src/renderer/src/hooks/useFileChangeSubscription.ts:43",
       "match": "export type FileWatchUnavailableReason = 'limit' | 'watcher-error'"
     },
     {
