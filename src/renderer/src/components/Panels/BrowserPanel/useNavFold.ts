@@ -113,6 +113,12 @@ function decideFold(row: HTMLElement, parts: WebOriginParts | null, current: num
   return navFoldCount({ room, needed, freed, current })
 }
 
+/** The fold steps the row's committed DOM shows: the count of steps in its `data-fold`. */
+export function renderedFold(row: HTMLElement): number {
+  const value = row.getAttribute('data-fold')
+  return value === null || value.trim() === '' ? 0 : value.trim().split(/\s+/).length
+}
+
 /**
  * The number of fold steps (0–5) the row takes.
  *
@@ -131,9 +137,11 @@ export function useNavFold(row: HTMLElement | null, parts: WebOriginParts | null
   const [count, setCount] = useState(0)
   const partsRef = useRef(parts)
 
-  // Measured from the DOM against the steps taken now: the updater always sees the committed count.
+  // Measured from the DOM against the steps the DOM shows now (its `data-fold`), never against a
+  // count still waiting to render: two measurements in one frame (the observer and the frame
+  // callback) would otherwise read one layout against another count and flip the row every frame.
   const remeasure = useCallback(() => {
-    if (row !== null) setCount(current => decideFold(row, partsRef.current, current))
+    if (row !== null) setCount(decideFold(row, partsRef.current, renderedFold(row)))
   }, [row])
 
   // The row or the field resized (a fold taken, the panel's width, a chip on the field): observer

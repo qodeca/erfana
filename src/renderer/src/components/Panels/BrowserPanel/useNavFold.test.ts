@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import type { WebOriginParts } from '../../../../../shared/browser/originFormat'
 import { navFoldAttribute } from './navFold.logic'
-import { useNavFold } from './useNavFold'
+import { renderedFold, useNavFold } from './useNavFold'
 
 const CHAR_PX = 8
 
@@ -134,5 +134,26 @@ describe('useNavFold', () => {
   it('takes no step when the text cannot be measured (no canvas)', () => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
     expect(foldOf(buildRow(200), PARTS).result.current).toBe(0)
+  })
+
+  it('decides against the steps the DOM shows, not a count still waiting to render (no flip every frame)', () => {
+    // The row shows steps 3 and 4 taken while the hook's own count is still 0: with them out of the
+    // flow the field has 216px, of which 144 came from those steps – 72 with none, so 2 steps stay.
+    // Read against the stale 0, the same layout says "fits" and the row would unfold and fold again.
+    const row = buildRow(400)
+    row.setAttribute('data-fold', '3 4')
+    const { result } = renderHook(() => useNavFold(row, PARTS))
+    expect(result.current).toBe(2)
+  })
+})
+
+describe('renderedFold', () => {
+  it('counts the steps in the row\'s data-fold', () => {
+    const row = document.createElement('div')
+    expect(renderedFold(row)).toBe(0)
+    row.setAttribute('data-fold', '')
+    expect(renderedFold(row)).toBe(0)
+    row.setAttribute('data-fold', '3 4 5')
+    expect(renderedFold(row)).toBe(3)
   })
 })
