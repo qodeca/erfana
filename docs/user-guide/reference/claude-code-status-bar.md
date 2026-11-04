@@ -38,7 +38,7 @@ Claude Code's transcript does not record the window size, so the meter works it 
 
 1. The session has used more than 200k tokens: **1M**, because a 200k window cannot hold that much.
 2. You picked a model in this session with `/model` and the name ends in `[1m]`: **1M**.
-3. You picked a model in this session with `/model` without `[1m]`: **200k**.
+3. You picked a model in this session with `/model` without `[1m]`, and the model offers a 200k window: **200k**. A model that runs only at 1M, such as Opus 5, skips this rule and keeps its 1M.
 4. The built-in model table below lists the model at 1M: **1M**.
 5. The `model` value in `~/.claude/settings.json` contains `[1m]`: **1M**.
 6. Otherwise: **200k**.
@@ -46,17 +46,18 @@ Claude Code's transcript does not record the window size, so the meter works it 
 | Model | Window in the built-in table |
 | --- | --- |
 | Opus 4.5, Opus 4.6 | 200k |
-| Opus 4.7, Opus 4.8, Opus 5 | 1M |
+| Opus 4.7, Opus 4.8, Opus 5, Opus 5.5 | 1M |
 | Sonnet 4.5, Sonnet 4.6 | 200k |
-| Sonnet 5 | 1M |
+| Sonnet 5, Sonnet 5.5 | 1M |
 | Haiku 4.5 | 200k |
-| Fable 5, Mythos 5, Mythos Preview | 1M |
+| Haiku 5.5 | 1M |
+| Fable 5, Fable 5.1, Mythos 5, Mythos 5.1, Mythos Preview | 1M |
 
-For a model not in the table, the meter makes a bounded guess:
+For a model not in the table, the meter guesses, and the tooltip marks the guess **(inferred)**:
 
-- A newer point release, up to four steps past the newest listed one, takes that version's window. For example, Opus 5.1 to Opus 5.4 count as 1M.
-- The next major version takes the family's newest window. For example, Opus 6 counts as 1M and Haiku 5 as 200k.
-- Anything further out, such as Opus 5.5, Sonnet 5.5 or Opus 7, gets no table answer. An older unlisted version gets none either. These fall through to rules 5 and 6, so they show **200k** until the session passes 200k tokens.
+- A model newer than its family's newest listed one takes that model's window, however far ahead it is. For example, Opus 5.6, Opus 6 and Opus 7 all count as 1M, like Opus 5.5.
+- A newer point release of an older version, up to four steps past that version's newest listed one, takes that version's window. For example, Sonnet 4.7 counts as 200k, like Sonnet 4.6.
+- An older unlisted version, such as Opus 5.1, gets no table answer, and neither does an unknown family. These fall through to rules 5 and 6, so they show **200k** until the session passes 200k tokens.
 
 Once the window is **1M** because of rule 1, rule 2, rule 5, or a `[1m]` ending on the id itself, it stays **1M** for that model for the rest of the session. A model switch or a `/model` pick without `[1m]` resets it.
 
@@ -66,7 +67,7 @@ Related issues: [#41](https://github.com/qodeca/erfana/issues/41), [#48](https:/
 
 ## Tooltip and limits
 
-**What it does:** Hover the bar for token counts, rounded to thousands, and the detected context-window size (for example `84k / 200k`). If the window size was inferred, the tooltip adds **(inferred)**. That happens when **1M** comes only from the built-in table, or when **200k** is the default for an id the meter cannot read. **How to reach it:** pointer over the Claude Code status area. The meter works on macOS and Windows only; on Linux it never appears. On Windows, the meter follows the folder the terminal started in, not a later `cd`, so status can disappear after changing directory before starting `claude`; the terminal session itself continues. Meter values depend on the available Claude Code transcript format and can be unavailable without affecting the terminal.
+**What it does:** Hover the bar for token counts, rounded to thousands, and the detected context-window size (for example `84k / 200k`). If the window size was inferred, the tooltip adds **(inferred)**. That happens when **1M** comes only from the built-in table, when **200k** is guessed from the model's family, or when **200k** is the default for an id the meter cannot read. **How to reach it:** pointer over the Claude Code status area. The meter works on macOS and Windows only; on Linux it never appears. On Windows, the meter follows the folder the terminal started in, not a later `cd`, so status can disappear after changing directory before starting `claude`; the terminal session itself continues. Meter values depend on the available Claude Code transcript format and can be unavailable without affecting the terminal.
 
 ![Screenshot of the Claude Code status bar.](../images/claude-code-status-bar/status-bar.png)
 

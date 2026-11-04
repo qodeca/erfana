@@ -6361,7 +6361,7 @@
       "quote": "its 180-day staleness test",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.test.ts:582",
+      "source": "src/main/services/claudeStatus/modelId.test.ts:600",
       "match": "const MAX_AGE_DAYS = 180"
     },
     {
@@ -7876,7 +7876,7 @@
       "quote": "export function windowForModelId(raw: string): 200000 | 1000000 | null",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:591",
+      "source": "src/main/services/claudeStatus/modelId.ts:521",
       "match": "export function windowForModelId(raw: string): 200000 | 1000000 | null"
     },
     {
@@ -7886,7 +7886,7 @@
       "quote": "export function parseModelId(raw: string): ParsedModelId | null",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:266",
+      "source": "src/main/services/claudeStatus/modelId.ts:260",
       "match": "export function parseModelId(raw: string): ParsedModelId | null"
     },
     {
@@ -7896,7 +7896,7 @@
       "quote": "export const REGISTRY_IDS_FOR_TESTS: readonly string[]",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:440",
+      "source": "src/main/services/claudeStatus/modelId.ts:441",
       "match": "export const REGISTRY_IDS_FOR_TESTS: readonly string[]"
     },
     {
@@ -15241,28 +15241,28 @@
       "quote": "within `MAX_MINOR_LOOKAHEAD` (4) minor releases",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:470",
-      "match": "const MAX_MINOR_LOOKAHEAD = 4"
+      "source": "src/main/services/claudeStatus/familyHeuristic.ts:55",
+      "match": "export const MAX_MINOR_LOOKAHEAD = 4"
     },
     {
       "id": "docs-terminal-README/08",
       "audience": "developer",
       "doc": "docs/terminal/README.md",
-      "quote": "only `MAX_MAJOR_LOOKAHEAD` (1) generation ahead",
+      "quote": "inherits that model's window however far ahead it is, with no lookahead bound",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:462",
-      "match": "const MAX_MAJOR_LOOKAHEAD = 1"
+      "source": "src/main/services/claudeStatus/familyHeuristic.ts:91",
+      "match": "if (isAfter(id, family.newest)) return family.newest.window"
     },
     {
       "id": "docs-terminal-README/09",
       "audience": "developer",
       "doc": "docs/terminal/README.md",
-      "quote": "**1M** for `claude-opus-5` / `4-8` / `4-7`, `claude-sonnet-5`, `claude-fable-5` and Mythos",
+      "quote": "**1M** for `claude-opus-5-5` / `5` / `4-8` / `4-7`, `claude-sonnet-5-5` / `5`, `claude-haiku-5-5`, `claude-fable-5-1` / `5` and Mythos",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:392",
-      "match": "'claude-opus-5': EXTENDED"
+      "source": "src/main/services/claudeStatus/modelId.ts:385",
+      "match": "'claude-opus-5-5': EXTENDED"
     },
     {
       "id": "docs-terminal-README/10",
@@ -21021,28 +21021,28 @@
       "quote": "The table carries a verification date with a test that fails once it is 180 days old",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.test.ts:582",
+      "source": "src/main/services/claudeStatus/modelId.test.ts:600",
       "match": "const MAX_AGE_DAYS = 180"
     },
     {
       "id": "docs-known-issues/21",
       "audience": "developer",
       "doc": "docs/known-issues.md",
-      "quote": "verified 2026-08-07 against Anthropic's published model",
+      "quote": "verified 2026-11-03 against Anthropic's published model",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:55",
-      "match": "export const CAPABILITIES_VERIFIED_ON = '2026-08-07'"
+      "source": "src/main/services/claudeStatus/modelId.ts:49",
+      "match": "export const CAPABILITIES_VERIFIED_ON = '2026-11-03'"
     },
     {
       "id": "docs-known-issues/22",
       "audience": "developer",
       "doc": "docs/known-issues.md",
-      "quote": "1M for `claude-opus-5` / `4-8` / `4-7`, `claude-sonnet-5`, `claude-fable-5` and Mythos",
+      "quote": "1M for `claude-opus-5-5` / `5` / `4-8` / `4-7`, `claude-sonnet-5-5` / `5`, `claude-haiku-5-5`, `claude-fable-5-1` / `5` and Mythos",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:409",
-      "match": "'claude-fable-5': EXTENDED"
+      "source": "src/main/services/claudeStatus/modelId.ts:408",
+      "match": "'claude-fable-5-1': EXTENDED"
     },
     {
       "id": "docs-known-issues/23",
@@ -21051,7 +21051,7 @@
       "quote": "200k for `claude-opus-4-6` and older Opus",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:383",
+      "source": "src/main/services/claudeStatus/modelId.ts:377",
       "match": "'claude-opus-4-6': STANDARD"
     },
     {
@@ -29238,7 +29238,7 @@
       "quote": "Reads Claude Code's own transcripts only; never writes its config",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:37",
+      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:39",
       "match": "Reading settings.json is a READ (allowed); it is NEVER written."
     },
     {
@@ -29248,7 +29248,7 @@
       "quote": "a deployment that caps a 1M model lower is still badged 1M (#48)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:41",
+      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:43",
       "match": "There is deliberately NO deployment-environment rule.",
       "note": "Reworded and re-sourced: the Source column cited docs/features/README.md."
     },
@@ -30817,7 +30817,7 @@
       "quote": "It reads Claude Code's transcripts and settings file, and never writes to them.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:37",
+      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:39",
       "match": "it is NEVER written",
       "note": "Page said it reads transcripts only; it also reads ~/.claude/settings.json (read-only) for the 1M-window signal."
     },
@@ -34212,7 +34212,7 @@
       "quote": "It reads Claude Code's transcripts and the `model` value in `~/.claude/settings.json`.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:290",
+      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:298",
       "match": "path.join(os.homedir(), '.claude', 'settings.json')",
       "note": "Cross-page note: the meter also reads the model value in ~/.claude/settings.json (read-only), not only transcripts."
     },
@@ -34275,7 +34275,7 @@
       "quote": "The meter has no rule for setups that cap the 1M window",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:41",
+      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:43",
       "match": "There is deliberately NO deployment-environment rule.",
       "note": "Reworded around #48 gap: no deployment/env rule exists, so CLAUDE_CODE_DISABLE_1M_CONTEXT is not honoured."
     },
@@ -42292,7 +42292,7 @@
       "quote": "It never writes Claude Code configuration.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:37",
+      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:39",
       "match": "it is NEVER written"
     },
     {
@@ -42313,7 +42313,7 @@
       "quote": "This covers Amazon Bedrock ids that start with `anthropic.`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:120",
+      "source": "src/main/services/claudeStatus/modelId.ts:114",
       "match": "const BEDROCK_VENDOR_PREFIX = 'anthropic.'",
       "note": "New: Bedrock ids are normalised (#49)."
     },
@@ -42324,7 +42324,7 @@
       "quote": "`global.` or `us-gov.`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:136",
+      "source": "src/main/services/claudeStatus/modelId.ts:130",
       "match": "'us-gov'",
       "note": "New: documented Bedrock geography prefixes."
     },
@@ -42335,7 +42335,7 @@
       "quote": "a version ending such as `-v1:0`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:140",
+      "source": "src/main/services/claudeStatus/modelId.ts:134",
       "match": "BEDROCK_VERSION_SUFFIX_RE = /-v\\d+(?::\\d+)?$/",
       "note": "New: Bedrock version suffix dropped."
     },
@@ -42346,7 +42346,7 @@
       "quote": "Bedrock inference-profile and foundation-model ARNs",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:117",
+      "source": "src/main/services/claudeStatus/modelId.ts:111",
       "match": "(?:inference-profile|foundation-model)",
       "note": "New: Bedrock ARNs accepted."
     },
@@ -42357,7 +42357,7 @@
       "quote": "Google Vertex ids that end in `@` and a date",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:146",
+      "source": "src/main/services/claudeStatus/modelId.ts:140",
       "match": "const VERTEX_DATE_RE = /^(claude-[a-z0-9-]+)@(\\d{8})$/",
       "note": "New: Vertex snapshot ids accepted."
     },
@@ -42368,7 +42368,7 @@
       "quote": "Microsoft Foundry uses the plain id.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:182",
+      "source": "src/main/services/claudeStatus/modelId.ts:176",
       "match": "Foundry deployments default to the bare Claude API id",
       "note": "New: Foundry ids need no normalisation."
     },
@@ -42412,7 +42412,7 @@
       "quote": "An application inference profile ARN names no model, so the meter cannot read it.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:112",
+      "source": "src/main/services/claudeStatus/modelId.ts:106",
       "match": "`application-inference-profile/` id is a name the user chose, not a model",
       "note": "New: application-inference-profile ARNs are not parsed."
     },
@@ -42424,7 +42424,7 @@
       "status": "fixed",
       "evidence": "source",
       "source": "src/main/services/claudeStatus/ClaudeStatusService.ts:577",
-      "match": "(windowSize === 200000 && !recognised)",
+      "match": "(windowSize === 200000 && (!recognised || isFamilyGuess(parsed.modelId)))",
       "note": "New: unrecognised id gets 200k marked inferred."
     },
     {
@@ -42445,7 +42445,7 @@
       "quote": "The session has used more than 200k tokens: **1M**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:254",
+      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:258",
       "match": "if (usedTokens > EXTENDED_THRESHOLD) {",
       "note": "New rule list, order R2 first."
     },
@@ -42456,7 +42456,7 @@
       "quote": "with `/model` and the name ends in `[1m]`: **1M**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:260",
+      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:264",
       "match": "if (forceExtended) {",
       "note": "New: R0."
     },
@@ -42464,11 +42464,11 @@
       "id": "user-guide-reference-claude-code-status-bar/g17",
       "audience": "user",
       "doc": "docs/user-guide/reference/claude-code-status-bar.md",
-      "quote": "with `/model` without `[1m]`: **200k**",
+      "quote": "with `/model` without `[1m]`, and the model offers a 200k window: **200k**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:266",
-      "match": "if (opts?.forceStandard) {",
+      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:274",
+      "match": "if (opts?.forceStandard && windowForModelId(modelId) !== EXTENDED_WINDOW) {",
       "note": "New: R0'."
     },
     {
@@ -42478,7 +42478,7 @@
       "quote": "The built-in model table below lists the model at 1M: **1M**.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:286",
+      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:294",
       "match": "if (windowForModelId(modelId) === EXTENDED_WINDOW) {",
       "note": "New: R1."
     },
@@ -42489,7 +42489,7 @@
       "quote": "in `~/.claude/settings.json` contains `[1m]`: **1M**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:154",
+      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:156",
       "match": "return model.includes(EXTENDED_MODEL_MARKER)",
       "note": "New: R3."
     },
@@ -42500,7 +42500,7 @@
       "quote": "Otherwise: **200k**.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:298",
+      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:306",
       "match": "rule: 'R4' }",
       "note": "New: R4 default."
     },
@@ -42511,7 +42511,7 @@
       "quote": "| Opus 4.5, Opus 4.6 | 200k |",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:383",
+      "source": "src/main/services/claudeStatus/modelId.ts:377",
       "match": "'claude-opus-4-6': STANDARD,",
       "note": "New table row; opus-4-5 also STANDARD at modelId.ts:374."
     },
@@ -42519,11 +42519,11 @@
       "id": "user-guide-reference-claude-code-status-bar/g22",
       "audience": "user",
       "doc": "docs/user-guide/reference/claude-code-status-bar.md",
-      "quote": "| Opus 4.7, Opus 4.8, Opus 5 | 1M |",
+      "quote": "| Opus 4.7, Opus 4.8, Opus 5, Opus 5.5 | 1M |",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:392",
-      "match": "'claude-opus-5': EXTENDED,",
+      "source": "src/main/services/claudeStatus/modelId.ts:385",
+      "match": "'claude-opus-5-5': EXTENDED,",
       "note": "New table row; 4-7 and 4-8 EXTENDED at modelId.ts:385/387."
     },
     {
@@ -42533,7 +42533,7 @@
       "quote": "| Sonnet 4.5, Sonnet 4.6 | 200k |",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:401",
+      "source": "src/main/services/claudeStatus/modelId.ts:394",
       "match": "'claude-sonnet-4-6': STANDARD,",
       "note": "New table row; sonnet-4-5 STANDARD at modelId.ts:394."
     },
@@ -42541,11 +42541,11 @@
       "id": "user-guide-reference-claude-code-status-bar/g24",
       "audience": "user",
       "doc": "docs/user-guide/reference/claude-code-status-bar.md",
-      "quote": "| Sonnet 5 | 1M |",
+      "quote": "| Sonnet 5, Sonnet 5.5 | 1M |",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:403",
-      "match": "'claude-sonnet-5': EXTENDED,",
+      "source": "src/main/services/claudeStatus/modelId.ts:398",
+      "match": "'claude-sonnet-5-5': EXTENDED,",
       "note": "New table row."
     },
     {
@@ -42555,7 +42555,7 @@
       "quote": "| Haiku 4.5 | 200k |",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:405",
+      "source": "src/main/services/claudeStatus/modelId.ts:400",
       "match": "'claude-haiku-4-5': STANDARD,",
       "note": "New table row."
     },
@@ -42563,43 +42563,63 @@
       "id": "user-guide-reference-claude-code-status-bar/g26",
       "audience": "user",
       "doc": "docs/user-guide/reference/claude-code-status-bar.md",
-      "quote": "| Fable 5, Mythos 5, Mythos Preview | 1M |",
+      "quote": "| Fable 5, Fable 5.1, Mythos 5, Mythos 5.1, Mythos Preview | 1M |",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:426",
+      "source": "src/main/services/claudeStatus/modelId.ts:427",
       "match": "['claude-mythos-preview', EXTENDED as Window]",
       "note": "New table row; fable-5 and mythos-5 EXTENDED at modelId.ts:409/411."
+    },
+    {
+      "id": "user-guide-reference-claude-code-status-bar/g35",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/claude-code-status-bar.md",
+      "quote": "| Haiku 5.5 | 1M |",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/claudeStatus/modelId.ts:404",
+      "match": "'claude-haiku-5-5': EXTENDED,"
+    },
+    {
+      "id": "user-guide-reference-claude-code-status-bar/g36",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/claude-code-status-bar.md",
+      "quote": "when **200k** is guessed from the model's family",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/claudeStatus/ClaudeStatusService.ts:577",
+      "match": "isFamilyGuess(parsed.modelId)"
     },
     {
       "id": "user-guide-reference-claude-code-status-bar/g27",
       "audience": "user",
       "doc": "docs/user-guide/reference/claude-code-status-bar.md",
-      "quote": "up to four steps past the newest listed one, takes that version's window",
+      "quote": "up to four steps past that version's newest listed one, takes that version's window",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:470",
-      "match": "const MAX_MINOR_LOOKAHEAD = 4",
+      "source": "src/main/services/claudeStatus/familyHeuristic.ts:55",
+      "match": "export const MAX_MINOR_LOOKAHEAD = 4",
       "note": "New: minor lookahead; probe: claude-opus-5-4 -> 1M."
     },
     {
       "id": "user-guide-reference-claude-code-status-bar/g28",
       "audience": "user",
       "doc": "docs/user-guide/reference/claude-code-status-bar.md",
-      "quote": "The next major version takes the family's newest window.",
+      "quote": "A model newer than its family's newest listed one takes that model's window, however far ahead it is.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:462",
-      "match": "const MAX_MAJOR_LOOKAHEAD = 1",
+      "source": "src/main/services/claudeStatus/familyHeuristic.ts:91",
+      "match": "if (isAfter(id, family.newest)) return family.newest.window",
       "note": "New: major lookahead; probe: claude-opus-6 -> 1M, claude-haiku-5 -> 200k."
     },
     {
       "id": "user-guide-reference-claude-code-status-bar/g29",
       "audience": "user",
       "doc": "docs/user-guide/reference/claude-code-status-bar.md",
-      "quote": "Anything further out, such as Opus 5.5, Sonnet 5.5 or Opus 7, gets no table answer.",
+      "quote": "An older unlisted version, such as Opus 5.1, gets no table answer, and neither does an unknown family.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:572",
+      "source": "src/main/services/claudeStatus/familyHeuristic.ts:96",
       "match": "return withinRange ? inMajor.window : null",
       "note": "New: probe of windowForModelId returned null for claude-opus-5-5, claude-sonnet-5-5, claude-opus-7."
     },
@@ -42610,7 +42630,7 @@
       "quote": "so they show **200k** until the session passes 200k tokens",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:254",
+      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:258",
       "match": "if (usedTokens > EXTENDED_THRESHOLD) {",
       "note": "New: unlisted ids self-correct via R2."
     },
@@ -47589,7 +47609,7 @@
       "quote": "Erfana never writes the user's Claude Code config",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:37",
+      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:39",
       "match": "it is NEVER written"
     },
     {
@@ -47619,7 +47639,7 @@
       "quote": "→ the capability registry → a settings.json `[1m]` model → default 200k",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:29",
+      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:31",
       "match": "`model` carries `[1m]` → 1M"
     },
     {
@@ -47639,7 +47659,7 @@
       "quote": "Bedrock ids (`us.anthropic.claude-…`, a Bedrock ARN)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:109",
+      "source": "src/main/services/claudeStatus/modelId.ts:103",
       "match": "A Bedrock ARN whose resource names a model"
     },
     {
@@ -47750,7 +47770,7 @@
       "quote": "the registry answer is never latched by the sticky bit",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:161",
+      "source": "src/main/services/claudeStatus/ClaudeWindowDetector.ts:163",
       "match": "Corroborated 1M may be latched"
     },
     {
@@ -47760,7 +47780,7 @@
       "quote": "Google Cloud snapshots (`claude-…@20251001`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/claudeStatus/modelId.ts:143",
+      "source": "src/main/services/claudeStatus/modelId.ts:137",
       "match": "Vertex's pinned-snapshot form"
     },
     {

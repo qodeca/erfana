@@ -20,6 +20,10 @@
  * No revision number is pinned here for the same reason: the guard tracks the
  * document, and a hand-maintained version stamp would be one more thing to drift.
  *
+ * The five rows added on 2026-11-03 (#383 – Opus 5.5, Sonnet 5.5, Haiku 5.5,
+ * Fable 5.1, Mythos 5.1) were transcribed from the amended §7.1 by §9.4.1: Id
+ * and Window by column, Label computed from the id by the §6.2 rule.
+ *
  * **No test can verify where these numbers came from.** Provenance is procedure,
  * not enforcement: nothing stops a future editor from reading `modelId.ts` while
  * writing a row. That procedure lives in design §9.4.1. What IS mechanically
@@ -86,13 +90,18 @@ const REGISTRY_ORACLE: ReadonlyArray<[id: string, window: number, label: string]
   ['claude-opus-4-7', EXTENDED, 'Opus 4.7'],
   ['claude-opus-4-8', EXTENDED, 'Opus 4.8'],
   ['claude-opus-5', EXTENDED, 'Opus 5'],
+  ['claude-opus-5-5', EXTENDED, 'Opus 5.5'],
   ['claude-sonnet-4-5', STANDARD, 'Sonnet 4.5'],
   ['claude-sonnet-4-6', STANDARD, 'Sonnet 4.6'],
   ['claude-sonnet-5', EXTENDED, 'Sonnet 5'],
+  ['claude-sonnet-5-5', EXTENDED, 'Sonnet 5.5'],
   ['claude-haiku-4-5', STANDARD, 'Haiku 4.5'],
   ['claude-haiku-4-5-20251001', STANDARD, 'Haiku 4.5'],
+  ['claude-haiku-5-5', EXTENDED, 'Haiku 5.5'],
   ['claude-fable-5', EXTENDED, 'Fable 5'],
+  ['claude-fable-5-1', EXTENDED, 'Fable 5.1'],
   ['claude-mythos-5', EXTENDED, 'Mythos 5'],
+  ['claude-mythos-5-1', EXTENDED, 'Mythos 5.1'],
   ['claude-mythos-preview', EXTENDED, 'claude-mythos-preview']
 ]
 
@@ -263,44 +272,52 @@ describe('windowForModelId - AC2 bracketed variants', () => {
   })
 })
 
-describe('windowForModelId - AC3 bounded family heuristic', () => {
+describe('windowForModelId - AC3 family heuristic', () => {
   const cases: ReadonlyArray<[string, number | null]> = [
     // Unknown point release at/after the newest known entry in a known major.
     ['claude-opus-4-9', EXTENDED],
     ['claude-opus-4-12', EXTENDED],
-    // ...but only within MAX_MINOR_LOOKAHEAD. Newest known opus-4 is 4-8, so a
-    // far-future minor gets no opinion: over-stating is the unbounded-error
-    // direction (§5.1) because observation can upgrade a window but never demote
-    // one, so a wrong 1M persists while a wrong 200k self-corrects.
+    // ...but only within MAX_MINOR_LOOKAHEAD on an OLDER major. Newest known
+    // opus-4 is 4-8, and opus-4 is not the family's newest major, so a
+    // far-future 4.x minor gets no opinion.
     ['claude-opus-4-13', null],
     ['claude-opus-4-99', null],
     ['claude-sonnet-4-99', null],
-    // Exactly one major past the newest known major → inherits it.
+    // Newer than the family's newest listed model → inherits its window, however
+    // far ahead (#383: a bounded guess re-created the bug at every new release).
+    // Haiku's newest listed entry is 5.5 at 1M, so a newer Haiku inherits 1M.
     ['claude-opus-6', EXTENDED],
     ['claude-sonnet-6', EXTENDED],
-    ['claude-haiku-5', STANDARD],
-    // Two majors past → no opinion; the meter falls through to observed usage.
-    ['claude-opus-7', null],
-    ['claude-opus-10-12', null],
+    ['claude-haiku-6', EXTENDED],
+    ['claude-opus-7', EXTENDED],
+    ['claude-opus-10-12', EXTENDED],
     // Older unlisted id → no opinion (defaults safely at R4).
     ['claude-opus-4-1', null],
     ['claude-sonnet-3-5', null],
     // Unknown family → no opinion.
     ['claude-zephyr-9', null],
 
-    // ---- major-5 boundaries: the shape #41 was actually opened for ----
-    // Every positive minor row above sits on opus major 4, where the exact map
-    // supplies minor 8. But `claude-opus-5` canonicalises to minor 0, so major
-    // 5's live bound is 0..4 — the untested half, on the family the issue names.
-    ['claude-opus-5-1', EXTENDED],
-    ['claude-opus-5-4', EXTENDED],
-    ['claude-opus-5-5', null],
-    ['claude-sonnet-5-1', EXTENDED],
-    ['claude-sonnet-5-5', null],
-    ['claude-fable-5-4', EXTENDED],
-    ['claude-fable-5-5', null],
-    ['claude-mythos-5-1', EXTENDED],
-    ['claude-mythos-5-5', null],
+    // ---- major 5, the family's newest: no minor bound since #383 ----
+    // The exact map lists 5.5 for opus/sonnet/haiku and 5.1 for fable/mythos. A
+    // newer minor inherits however far ahead; a minor BELOW the newest listed one
+    // is an older unlisted id (no opinion).
+    ['claude-opus-5-6', EXTENDED],
+    ['claude-opus-5-9', EXTENDED],
+    ['claude-opus-5-10', EXTENDED],
+    ['claude-opus-5-1', null],
+    ['claude-sonnet-5-9', EXTENDED],
+    ['claude-sonnet-5-10', EXTENDED],
+    ['claude-haiku-5-9', EXTENDED],
+    ['claude-haiku-5-10', EXTENDED],
+    // `claude-haiku-5` sits below 5.5 in a known major: no opinion, NOT the 1M
+    // of Haiku 5.5 and not the 200k of Haiku 4.5.
+    ['claude-haiku-5', null],
+    ['claude-fable-5-5', EXTENDED],
+    ['claude-fable-5-6', EXTENDED],
+    ['claude-fable-6', EXTENDED],
+    ['claude-mythos-5-5', EXTENDED],
+    ['claude-mythos-5-6', EXTENDED],
+    ['claude-mythos-6', EXTENDED],
 
     // ---- per-major bounds on other families ----
     // sonnet major 4 tops out at minor 6, so 6..10 inherit and 11 does not.
@@ -324,8 +341,8 @@ describe('windowForModelId - AC3 bounded family heuristic', () => {
     // newest known window". That is wrong whenever the major is known, and
     // sonnet is the counterexample: the family's newest known entry is
     // `claude-sonnet-5` at 1M, yet a hypothetical `claude-sonnet-4-7` belongs to
-    // the 4-series and must report 200k. The family-wide value only ever answers
-    // for an id whose major is entirely unknown.
+    // the 4-series and must report 200k. The family-wide value only answers for
+    // an id newer than the family's newest listed model.
     expect(windowForModelId('claude-sonnet-5')).toBe(EXTENDED)
     expect(windowForModelId('claude-sonnet-4-7')).toBe(STANDARD)
     // ...while an unknown MAJOR does take the family-wide value.
@@ -343,9 +360,10 @@ describe('windowForModelId - AC3 bounded family heuristic', () => {
     expect(parseModelId('claude-opus-5-0-2026')?.canonicalId).toBe('claude-opus-5-0')
   })
 
-  it('AC3: extrapolation reaches exactly one major past the newest known entry', () => {
+  it('AC3 (#383): a newer id inherits the family newest however far ahead', () => {
     expect(windowForModelId('claude-opus-6')).toBe(EXTENDED)
-    expect(windowForModelId('claude-opus-7')).toBeNull()
+    expect(windowForModelId('claude-opus-7')).toBe(EXTENDED)
+    expect(windowForModelId('claude-opus-99-99')).toBe(EXTENDED)
   })
 })
 
