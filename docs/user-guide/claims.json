@@ -6693,11 +6693,11 @@
       "id": "docs-prompts-README/12",
       "audience": "developer",
       "doc": "docs/prompts/README.md",
-      "quote": "the prompt is pasted and Enter is pressed after 200 ms",
+      "quote": "the prompt is pasted and Enter is pressed once the terminal has taken the paste",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:159",
-      "match": "await new Promise(resolve => setTimeout(resolve, 200))"
+      "source": "src/renderer/src/stores/useTerminalStore.ts:173",
+      "match": "const reason = await waitForInputToSettle(() => lastOutputById.get(terminalId), writtenAt)"
     },
     {
       "id": "docs-prompts-README/13",
@@ -6895,11 +6895,11 @@
       "id": "docs-prompts-autoexecute-overview/01",
       "audience": "developer",
       "doc": "docs/prompts/autoexecute-overview.md",
-      "quote": "followed by a fixed 200ms delay before Enter",
+      "quote": "Enter follows once the terminal's output has gone quiet after the paste",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:159",
-      "match": "await new Promise(resolve => setTimeout(resolve, 200))"
+      "source": "src/renderer/src/stores/useTerminalStore.ts:173",
+      "match": "const reason = await waitForInputToSettle(() => lastOutputById.get(terminalId), writtenAt)"
     },
     {
       "id": "docs-prompts-autoexecute-overview/02",
@@ -6908,7 +6908,7 @@
       "quote": "(multi-line text as one bracketed paste)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:136",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:151",
       "match": "? `\\x1b[200~${text.replace(/\\r?\\n/g, '\\r')}\\x1b[201~`"
     },
     {
@@ -6918,7 +6918,7 @@
       "quote": "4. Sends Enter key (`\\r`) to execute the command",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:162",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:177",
       "match": "const enterResult = await terminalOps.write(terminalId, '\\r')"
     },
     {
@@ -6950,7 +6950,7 @@
       "quote": "the default store passes `terminalGateway`, which forwards to `window.api.terminal`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:196",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:211",
       "match": "_defaultStore = createTerminalStore(terminalGateway)",
       "note": "Said the default store passes window.api.terminal directly."
     },
@@ -6981,7 +6981,7 @@
       "quote": "Wraps multi-line text in bracketed paste mode",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:136",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:151",
       "match": "? `\\x1b[200~${text.replace(/\\r?\\n/g, '\\r')}\\x1b[201~`"
     },
     {
@@ -7011,7 +7011,7 @@
       "quote": "The tests cover core autoExecute functionality",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.autoExecute.test.ts:29",
+      "source": "src/renderer/src/stores/useTerminalStore.autoExecute.test.ts:38",
       "match": "describe('useTerminalStore.sendToTerminal with autoExecute'",
       "note": "Said 15, then 17 tests; a test count drifts and no line pins it, so it was dropped."
     },
@@ -7022,7 +7022,7 @@
       "quote": "#### 7. Recent-input marking (2 tests)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.autoExecute.test.ts:314",
+      "source": "src/renderer/src/stores/useTerminalStore.autoExecute.test.ts:454",
       "match": "it('counts a programmatic send as recent user input for the restart and quit guards'",
       "note": "Category missing from the list."
     },
@@ -7030,11 +7030,11 @@
       "id": "docs-prompts-autoexecute-testing/03",
       "audience": "developer",
       "doc": "docs/prompts/autoexecute-testing.md",
-      "quote": "Waits exactly 200ms before sending Enter (nothing at 199ms, Enter at 200ms)",
+      "quote": "Does not send Enter while a long paste is still arriving in pieces",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.autoExecute.test.ts:292",
-      "match": "it('should wait exactly 200ms before sending Enter'"
+      "source": "src/renderer/src/stores/useTerminalStore.autoExecute.test.ts:363",
+      "match": "it('does not send Enter while a long paste is still arriving in pieces'"
     },
     {
       "id": "docs-prompts-autoexecute-testing/04",
@@ -7043,7 +7043,7 @@
       "quote": "Normalizes Windows line endings",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.autoExecute.test.ts:258",
+      "source": "src/renderer/src/stores/useTerminalStore.autoExecute.test.ts:270",
       "match": "it('should normalize Windows line endings"
     },
     {
@@ -7073,7 +7073,7 @@
       "quote": "the default store passes `terminalGateway`, which forwards to `window.api.terminal`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:196",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:211",
       "match": "_defaultStore = createTerminalStore(terminalGateway)",
       "note": "Said the default store passes window.api.terminal directly."
     },
@@ -7084,7 +7084,7 @@
       "quote": "get().markUserInput(terminalId)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:150",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:166",
       "match": "get().markUserInput(terminalId)",
       "note": "The sendToTerminal excerpt left out the recent-input marking after a successful write."
     },
@@ -7095,7 +7095,7 @@
       "quote": "`src/renderer/src/stores/useTerminalStore.autoExecute.test.ts` - Unit tests for autoExecute",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.autoExecute.test.ts:29",
+      "source": "src/renderer/src/stores/useTerminalStore.autoExecute.test.ts:38",
       "match": "describe('useTerminalStore.sendToTerminal with autoExecute'",
       "note": "Said 15, then 17 tests; a test count drifts and no line pins it, so it was dropped."
     },
@@ -15777,11 +15777,11 @@
       "id": "docs-terminal-README/60",
       "audience": "developer",
       "doc": "docs/terminal/README.md",
-      "quote": "send the Enter key 200 ms after the text",
+      "quote": "send the Enter key after the text",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:159",
-      "match": "await new Promise(resolve => setTimeout(resolve, 200))"
+      "source": "src/renderer/src/stores/useTerminalStore.ts:173",
+      "match": "const reason = await waitForInputToSettle(() => lastOutputById.get(terminalId), writtenAt)"
     },
     {
       "id": "docs-terminal-README/61",
@@ -15800,7 +15800,7 @@
       "quote": "Multi-line terminal prompt writes are wrapped in **bracketed paste mode** escape sequences",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:136",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:151",
       "match": "? `\\x1b[200~${text.replace(/\\r?\\n/g, '\\r')}\\x1b[201~`",
       "note": "Said all prompt writes are wrapped; only text containing a line break is wrapped."
     },
@@ -15811,7 +15811,7 @@
       "quote": "into the terminal (in bracketed-paste mode when it spans lines) and presses Enter automatically",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:134",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:149",
       "match": "const isMultiLine = /[\\r\\n]/.test(text)",
       "note": "Same: bracketed paste applies to multi-line text only."
     },
@@ -22219,7 +22219,7 @@
       "quote": "`markActivity` records at most one timestamp per 250 ms per terminal",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:11",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:12",
       "match": "export const ACTIVITY_THROTTLE_MS = 250"
     },
     {
@@ -30772,7 +30772,7 @@
       "quote": "Erfana then pastes the prompt into the terminal and presses Enter for you.",
       "status": "fixed",
       "evidence": "app",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:157",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:172",
       "match": "if (autoExecute) {",
       "test": "e2e/context-menu-explain.e2e.ts",
       "note": "Clarified that templates run with autoExecute: true, so Enter is sent automatically."
@@ -33304,7 +33304,7 @@
       "quote": "Read the prompt in the terminal before accepting an edit.",
       "status": "fixed",
       "evidence": "app",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:157",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:172",
       "match": "if (autoExecute) {",
       "test": "e2e/context-menu-explain.e2e.ts",
       "note": "Entry previously cited a template frontmatter line; the behaviour (prompt sent then submitted, agent asks to accept edits) is proven by sendToTerminal pressing Enter when autoExecute is set. Page line extended to say Erfana presses Enter."
@@ -33316,7 +33316,7 @@
       "quote": "Erfana pastes the prompt into the active terminal and presses Enter for you.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:162",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:177",
       "match": "terminalOps.write(terminalId, '\\r')",
       "note": "Added: every template sets autoExecute: true, so the prompt is submitted, not just typed."
     },
@@ -33327,7 +33327,7 @@
       "quote": "open a project and start the agent that should receive the prompt",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:123",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:138",
       "match": "if (!terminalId) {",
       "note": "Prompts go to the active terminal only; with none, nothing is sent."
     },
@@ -47036,7 +47036,7 @@
       "quote": "bracketed paste mode for safe multi-line input",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:136",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:151",
       "match": "\\x1b[200~"
     },
     {

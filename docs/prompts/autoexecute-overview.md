@@ -16,7 +16,7 @@ The prompt template system sends the selected text, with instructions, to the CL
 
 ### Lesson kept from the v0.3.x fixes
 
-Waiting on node-pty's write callback hung the IPC reply ("reply was never sent"): the callback only means the socket buffer flushed, not that the shell or the renderer is ready, and it did not fire reliably. Writes are fire-and-forget, followed by a fixed 200ms delay before Enter – do not bring the callback back. For why 200ms and the alternatives considered, see [AutoExecute Technical](./autoexecute-technical.md#why-200ms).
+Waiting on node-pty's write callback hung the IPC reply ("reply was never sent"): the callback only means the socket buffer flushed, not that the shell or the renderer is ready, and it did not fire reliably. Writes are fire-and-forget; Enter follows once the terminal's output has gone quiet after the paste (never sooner than 200ms) – do not bring the callback back. For the timing rule and why a fixed delay was dropped (#449), see [AutoExecute Technical](./autoexecute-technical.md#since-449-enter-waits-for-the-paste-to-be-taken).
 
 The version-by-version fix history now lives in [AutoExecute v0.3 history](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/archive/autoexecute-v0.3-history.md).
 
@@ -38,7 +38,7 @@ The version-by-version fix history now lives in [AutoExecute v0.3 history](https
 When `autoExecute: true` is set in a prompt template's YAML frontmatter, the system:
 1. Pastes the rendered prompt text into the active terminal (multi-line text as one bracketed paste)
 2. Waits for the write IPC call to return
-3. Waits 200ms for text rendering
+3. Waits until the program has taken the paste: its output has gone quiet (at least 200ms; see [AutoExecute Technical](./autoexecute-technical.md#since-449-enter-waits-for-the-paste-to-be-taken))
 4. Sends Enter key (`\r`) to execute the command
 
 ### When to Use

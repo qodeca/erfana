@@ -469,7 +469,7 @@ export const terminalService = new TerminalService()
 
 **Pattern**: OOP service with singleton instance (follows FileService pattern)
 
-**History note**: v0.3.3 made `write()` Promise-based with a completion callback to support autoExecute for prompt templates. That change was later reverted – `write()` is a plain synchronous boolean today, and autoExecute reliability comes from the renderer's fixed 200 ms delay before sending Enter (`useTerminalStore.sendToTerminal`). The renderer-facing `window.api.terminal.write()` still returns a Promise because it is an `ipcRenderer.invoke` round-trip. See [AutoExecute Reference](../prompts/autoexecute-reference.md).
+**History note**: v0.3.3 made `write()` Promise-based with a completion callback to support autoExecute for prompt templates. That change was later reverted – `write()` is a plain synchronous boolean today, and autoExecute reliability comes from the renderer waiting for the terminal's output to go quiet after the paste before sending Enter (`useTerminalStore.sendToTerminal`, `terminalInputSettle.ts`, #449). The renderer-facing `window.api.terminal.write()` still returns a Promise because it is an `ipcRenderer.invoke` round-trip. See [AutoExecute Reference](../prompts/autoexecute-reference.md).
 
 ### IPC Handlers
 
@@ -573,7 +573,7 @@ interface TerminalStore {
 
 **Purpose**: Cross-component communication (PreviewContextMenu → Terminal Panel)
 
-**v0.3.3 Enhancement**: `sendToTerminal()` supports an `autoExecute` parameter to send the Enter key 200 ms after the text. The store itself does no readiness polling; the readiness helper is `waitForTerminalReady()` in `src/renderer/src/utils/panelUtils.ts` (event-based via `waitForReady` when available, otherwise polling with a 5 s timeout and 50 ms interval). See [AutoExecute Reference](../prompts/autoexecute-reference.md).
+**v0.3.3 Enhancement**: `sendToTerminal()` supports an `autoExecute` parameter to send the Enter key after the text – since #449 once the terminal has taken the paste (its output goes quiet), not on a fixed 200 ms timer. The store itself does no readiness polling; the readiness helper is `waitForTerminalReady()` in `src/renderer/src/utils/panelUtils.ts` (event-based via `waitForReady` when available, otherwise polling with a 5 s timeout and 50 ms interval). See [AutoExecute Reference](../prompts/autoexecute-reference.md).
 
 ### Bracketed Paste Mode (v0.7.2+, #108)
 
