@@ -176,6 +176,28 @@ describe('pickAnnouncement (design § Announcements, M-45)', () => {
     expect(pickAnnouncement({ ...idle, on: true }, { ...idle, on: true, note: 'topOfPage', noteSeq: 1 })).toBeNull()
   })
 
+  it('says the page change, element gone and load-a-page notes whenever they show, with one full stop each', () => {
+    // The page change drops the capture as its note shows: no held capture on either side.
+    expect(pickAnnouncement(held, { ...idle, on: true, note: 'pageChanged', noteSeq: 1 })).toBe('The page changed – pick the element again.')
+    expect(pickAnnouncement(held, { ...held, note: 'elementGone', noteSeq: 1 })).toBe('That element is gone – pick again.')
+    expect(pickAnnouncement(idle, { ...idle, note: 'loadAPage', noteSeq: 1 })).toBe('Load a page to pick an element.')
+    // The same note shown again (a new noteSeq) is said again; an unchanged noteSeq is not.
+    const loadAPage = { ...idle, note: 'loadAPage' as const, noteSeq: 1 }
+    expect(pickAnnouncement(loadAPage, { ...loadAPage, noteSeq: 2 })).toBe('Load a page to pick an element.')
+    expect(pickAnnouncement(loadAPage, loadAPage)).toBeNull()
+  })
+
+  it('says a second identical send that replaces the notice still showing', () => {
+    const first = { ...idle, sent: 'Sent Explain to Terminal', sentKey: {} }
+    expect(pickAnnouncement(first, { ...first, sentKey: {} })).toBe('Sent Explain to Terminal. Show terminal and Open last capture are also in the target menu.')
+    expect(pickAnnouncement(first, { ...first })).toBeNull()
+  })
+
+  it('does not say "Picking stopped." while a send is in flight', () => {
+    expect(pickAnnouncement({ ...held, sending: true }, { ...idle, sending: true })).toBeNull()
+    expect(pickAnnouncement({ ...held, sending: false }, { ...idle, sending: false })).toBe('Picking stopped.')
+  })
+
   it('says "Page paused." once, when the held capture freezes', () => {
     expect(pickAnnouncement(held, { ...held, frozen: true })).toBe('Page paused.')
     expect(pickAnnouncement({ ...held, frozen: true }, { ...held, frozen: true })).toBeNull()
@@ -183,7 +205,7 @@ describe('pickAnnouncement (design § Announcements, M-45)', () => {
 
   it('says the send with the fallback named, instead of "Picking stopped." when the send ends pick mode', () => {
     const sent = { ...idle, sent: 'Sent Explain to Terminal' }
-    const expected = 'Sent Explain to Terminal. Show terminal and Open capture are also in the target menu.'
+    const expected = 'Sent Explain to Terminal. Show terminal and Open last capture are also in the target menu.'
     expect(pickAnnouncement(held, sent)).toBe(expected)
     expect(pickAnnouncement({ ...sent, on: true }, sent)).toBeNull()
     expect(pickAnnouncement(sent, idle)).toBeNull()

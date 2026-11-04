@@ -190,6 +190,54 @@ describe('useBrowserPick', () => {
     expect(gateway.closePick).not.toHaveBeenCalled()
   })
 
+  describe('focus when a page change closes the panel (WCAG 2.4.3)', () => {
+    /** A stand-in for the panel's DOM: a focusable action inside a `.erf-picker-owned` root. */
+    function mountPanelDom(): { root: HTMLDivElement; action: HTMLButtonElement } {
+      const root = document.createElement('div')
+      root.className = 'erf-brw-actions erf-picker-owned'
+      const action = document.createElement('button')
+      root.append(action)
+      document.body.append(root)
+      return { root, action }
+    }
+    const pageChanged = (): void => act(() => useBrowserPickStore.getState().apply({ tabId: TAB, kind: 'ended', reason: 'pageChanged' }))
+
+    it('moves focus to the page area when focus was inside the panel', () => {
+      const { root, action } = mountPanelDom()
+      const { focusPage } = setup()
+      capture()
+      act(() => action.focus())
+      // React removes the panel with its focused button in the same commit; focus falls to the body.
+      root.remove()
+      pageChanged()
+      expect(focusPage).toHaveBeenCalledTimes(1)
+    })
+
+    it('also when the panel took focus as it opened, before the hook listened', () => {
+      const { root, action } = mountPanelDom()
+      action.focus()
+      const { focusPage } = setup()
+      capture()
+      root.remove()
+      pageChanged()
+      expect(focusPage).toHaveBeenCalledTimes(1)
+    })
+
+    it('leaves focus alone when it had moved out of the panel', () => {
+      const { root, action } = mountPanelDom()
+      const elsewhere = document.createElement('input')
+      document.body.append(elsewhere)
+      const { focusPage } = setup()
+      capture()
+      act(() => action.focus())
+      act(() => elsewhere.focus())
+      root.remove()
+      pageChanged()
+      expect(focusPage).not.toHaveBeenCalled()
+      elsewhere.remove()
+    })
+  })
+
   it('drops the typed text when a page change closes the panel the dialog went back to (025-FR-052, 025-FR-053)', () => {
     const { result } = setup()
     capture()

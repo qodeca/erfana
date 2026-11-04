@@ -94,6 +94,17 @@ describe('PickRow (025-FR-025, 025-FR-065)', () => {
     expect(row).not.toHaveAttribute('data-surface')
   })
 
+  it('marks data-panel-closed after the panel closed when the reviewer left, so its long clause gets the same fold', () => {
+    const { rerender, props } = renderRow({ pick: { ...IDLE_PICK, on: true }, place: 'out' })
+    const row = screen.getByTestId(BROWSER_TEST_IDS.PICK_ROW)
+    expect(row).not.toHaveAttribute('data-panel-closed')
+    rerender(<PickRow {...props} place="outPanelClosed" />)
+    expect(row).toHaveAttribute('data-panel-closed', 'true')
+    expect(status()).toHaveTextContent('Picking – the panel closed when you left; pick again')
+    rerender(<PickRow {...props} place="page" />)
+    expect(row).not.toHaveAttribute('data-panel-closed')
+  })
+
   it('draws the toolbar tooltip in its band, and holds the send notice while one shows', () => {
     const notice = { text: 'Sent Explain to Terminal', contextPath: 'c.md' }
     const { rerender, props } = renderRow({ notice, tooltip: <span role="tooltip">Reload (⌘R)</span>, tooltipOpen: true })
@@ -199,5 +210,16 @@ describe('PickRow (025-FR-025, 025-FR-065)', () => {
     expect(props.onShowTerminal).toHaveBeenCalledOnce()
     fireEvent.click(screen.getByRole('button', { name: 'Open capture' }))
     expect(props.onOpenCapture).toHaveBeenCalledWith('.erfana/browser/captures/c.md')
+  })
+
+  it('names the notice actions in the band tooltip, as they are icons below 800px', () => {
+    renderRow({ notice: { text: 'Sent Explain to Terminal', contextPath: 'c.md' } })
+    const show = screen.getByRole('button', { name: 'Show terminal' })
+    const open = screen.getByRole('button', { name: 'Open capture' })
+    expect(show.dataset.tip).toBe('Show terminal')
+    expect(open.dataset.tip).toBe('Open capture')
+    // The tooltip never replaces Open capture's own description, and Show terminal's name is not said twice.
+    expect(open).toHaveAccessibleDescription('Opens the context file in an editor tab')
+    expect(show).not.toHaveAttribute('aria-description')
   })
 })

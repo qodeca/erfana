@@ -365,7 +365,8 @@ test.describe('025-AC-070 the send notice and the terminal reveal', () => {
     await send.notice.getByRole('button', { name: 'Open capture' }).focus()
     await window.clock.runFor(10_000)
     await expect(send.notice).toBeVisible()
-    await send.pick.pickButton.focus()
+    // Away to the address bar: a pick-row control would show its focus tooltip, which holds the notice too (R2-H5).
+    await send.panel.addressBar.focus()
     await window.clock.runFor(2999)
     await expect(send.notice).toBeVisible()
     await window.clock.runFor(1)

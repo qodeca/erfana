@@ -775,7 +775,7 @@ Shown in the first strip row as a field error, linked to the field; typed text s
 | Send notice | Sent {action} to {terminal name} | – | spec-fixed (025-FR-060) |
 | Show terminal | Show terminal (icon below 800px) | "Show terminal" | spec-fixed |
 | Open capture | Open capture (icon below 800px) | "Open capture"; Desc. "Opens the context file in an editor tab" | spec-fixed |
-| Announce – sent | Sent {action} to {terminal name}. Show terminal and Open capture are also in the target menu. | – | Polite (H-12) |
+| Announce – sent | Sent {action} to {terminal name}. Show terminal and Open last capture are also in the target menu. | – | Polite (H-12) |
 | Note – page changed | The page changed – pick the element again. | – | spec-fixed (025-FR-053); takes its full stop even in the status slot (OD-9), over voice rule 10's one-line-clause exception |
 
 ### Guard, pre-warn and failure messages
@@ -967,6 +967,8 @@ Fed into one always-mounted, visually hidden polite region per browser tab (M-45
 | Guard hit | The guard text – assertive |
 | Capture or write failed | The toast title and message – assertive |
 | Page changed | The page changed – pick the element again. |
+| Element gone (↑ ↓ in the panel) | That element is gone – pick again. |
+| Load a page (Pick element or Ctrl/Cmd+E on an empty tab or Erfana page) | Load a page to pick an element. |
 | Site prompt arrives | *Announce – prompt arrives* |
 | Sign-in arrives without focus | *Announce – prompt arrives*, with "{host} asks you to sign in" as the request |
 | Page dialog waits | *Announce – page dialog waiting* |

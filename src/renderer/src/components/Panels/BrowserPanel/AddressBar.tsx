@@ -16,7 +16,7 @@
  *   (025-FR-051). While an input method composes, Esc and Enter belong to it.
  * - **A refused address** shows as a field error under the navigation row
  *   (`errorId`); the panel clears it on the next edit.
- * - **Suggestions** (025-FR-063, commit 19) list matches from the project's
+ * - **Suggestions** (025-FR-063) list matches from the project's
  *   address history while the user types, over the page's still image. The
  *   field is a combobox: ↓ and ↑ move through the rows, Enter loads the row
  *   reached (or the typed text when none is), and the first Esc closes the
@@ -51,9 +51,9 @@ export interface AddressBarProps {
   readonly onEdit: () => void
   /** The id of the refusal message, while one shows. */
   readonly errorId: string | null
-  /** The chips at the field's end (commit 18). */
+  /** The chips at the field's end. */
   readonly children?: React.ReactNode
-  /** The page's still image under the suggestion list (commit 19). */
+  /** The page's still image under the suggestion list. */
   readonly suggestStill?: StillSurface
 }
 

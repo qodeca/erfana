@@ -21,8 +21,10 @@
  * - **Where the page sits is published** (`usePreviewViewportStore`) while the
  *   tab is visible, so a toast places itself beside it.
  *
- * The clip sent is the placeholder itself: width presets wider than the panel
- * (ADR 0011 decision 6) come with commit 18.
+ * The clip sent is the placeholder itself. A width preset wider than the
+ * panel is not clipped here: main places the page inside a clipping parent
+ * view whose bounds are this area (`page/TabViewFrame.ts`, ADR 0011
+ * decision 6).
  */
 import { useCallback, useEffect, useRef } from 'react'
 import { visibleArea } from '../HtmlPreviewPanel/previewClip'

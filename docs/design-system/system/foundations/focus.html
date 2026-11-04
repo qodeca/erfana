@@ -351,12 +351,14 @@ keyboard. The ratio under each frame is the ring against what it actually touche
         <a href="../../../designs/comments/html-comments/overlay.html">Comment overlay</a> card.</td>
     </tr>
     <tr>
-      <td>Built-in browser element picker (outline inside the page, spec 025 – planned)</td>
+      <td>Built-in browser element picker (outline on the page and on its still image, spec 025)</td>
       <td>The ring is <code>var(--color-border-focus)</code> at <code>--border-width-thick</code>.</td>
-      <td>The two-tone outline – a 2px accent ring with a 1px ink line on both sides – drawn by the engine over a page Erfana
+      <td>The two-tone outline – a 2px accent ring with a 1px ink line on both sides – over a page Erfana
         does not own, for the same reason as the comment overlay: tokens do not reach that page, and one colour vanishes on a
-        page in the accent colour. Owner decision OD-2 (2026-11-01). See the <a href="../patterns/picker/index.html">Element
-        picker</a> card and <a href="../../../designs/browser/picking.html">Picking</a>. No <code>src/</code> site yet.</td>
+        page in the accent colour. Owner decision OD-2 (2026-11-01). On the page's still image Erfana draws it itself, two-tone
+        (<code>.erf-brw-still__outline</code> in <code>PickRow.css</code>). On the live page the engine draws it in one colour
+        today, pending owner queue item 16. See the <a href="../patterns/picker/index.html">Element
+        picker</a> card and <a href="../../../designs/browser/picking.html">Picking</a>.</td>
     </tr>
     <tr>
       <td>Built-in browser address chips (zoom, pop-up blocked)</td>

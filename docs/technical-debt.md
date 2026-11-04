@@ -1168,6 +1168,16 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 
 **Revisit when**: Electron grants `fromPath()` folders to the macOS network sandbox – then the owner can decide whether the Chromium profile goes back to the project folder. Evidence: `specs/spec-t4-025-built-in-browser/verification/evidence/025-AC-052-macos.md`.
 
+### 70. A send's screenshot is PNG-encoded on main's thread (spec 025, 2026-11)
+
+**Severity**: Medium (performance; found by the AAA performance review, round 2)
+
+**What**: each send encodes the capture's full-resolution screenshot and crop with `nativeImage.toPNG()` on the main process's thread (`src/main/services/browser/pick/pickAppSetup.ts`, `encodePng`, called from `capture/captureRender.ts`). While it runs, main handles no IPC: terminal output, window events and every tab's key and mouse routing wait. The measured Explain → terminal p95 is 265.8 ms on the 3840 × 2160 worst case (`docs/performance/browser-025-send.md`), which bounds the block at that size; a 5K or 6K window costs more.
+
+**Fix**: encode in a `worker_thread` (as git status and the preview link scan already do), transferring the bitmap's buffer. It needs its own bundle entry in the build config, so it is a design change rather than an edit.
+
+**Revisit when**: a send is reported to stall the terminal, or before the browser leaves its first release.
+
 This doc covers project-wide non-Windows technical debt. For phase-structured deferred items with promotion criteria + risk-if-forgotten:
 
 - [`windows/deferred-work.md`](./windows/deferred-work.md) — D1-D8 (Phase 2 review aftermath, tracked in #168)

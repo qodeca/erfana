@@ -70,7 +70,7 @@ describe('tabRequestGate', () => {
 
   it('guarded returns the result, or logs a throw and returns the fallback', () => {
     expect(guarded('c', 0, () => 5)).toBe(5)
-    expect(gate().gate.guarded('c', 'fallback', () => {
+    expect(guarded('c', 'fallback', () => {
       throw new Error('boom')
     })).toBe('fallback')
     expect(logger.error).toHaveBeenCalledWith('Browser tab request failed', expect.any(Error), { channel: 'c' })

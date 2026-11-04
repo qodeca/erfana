@@ -7,7 +7,8 @@ const { mockLogger } = vi.hoisted(() => ({
 }))
 vi.mock('../LoggingService', () => ({ logger: mockLogger }))
 
-import { BrowserProjectTeardown, leavesProject, tabInScope, type TeardownScope } from './browserProjectTeardown'
+import { createManualClock } from '../../../shared/clock'
+import { BrowserProjectTeardown, leavesProject, tabInScope, TEARDOWN_STEP_TIMEOUT_MS, type TeardownScope } from './browserProjectTeardown'
 import { ProjectSessionStore, type ProjectSessionSnapshot } from '../session/ProjectSession'
 
 const snap = (realRoot: string, caseSensitive = true): Omit<ProjectSessionSnapshot, 'generation'> => ({
@@ -87,6 +88,34 @@ describe('BrowserProjectTeardown (ADR 0009 decision 14, A10)', () => {
     expect(order).toEqual(['closeViews'])
     expect(mockLogger.error).toHaveBeenCalledTimes(2)
     expect(mockLogger.error).toHaveBeenCalledWith('Browser teardown step failed', expect.any(Error), { stage: 'endPick' })
+  })
+
+  it('gives up on a step that never finishes, logs it like a throw, and still runs the rest and the next teardown', async () => {
+    const clock = createManualClock()
+    teardown = new BrowserProjectTeardown({ clock })
+    teardown.onStage('endPick', (scope) => (at(scope) === '/stuck' ? new Promise<void>(() => undefined) : undefined))
+    teardown.onStage('closeViews', (scope) => void order.push(`closeViews:${at(scope)}`))
+    const stuck = teardown.run('/stuck')
+    const next = teardown.runForWindow(2)
+    await Promise.resolve()
+    clock.advance(TEARDOWN_STEP_TIMEOUT_MS - 1)
+    await Promise.resolve()
+    expect(order).toEqual([])
+    clock.advance(1)
+    await stuck
+    await next
+    expect(order).toEqual(['closeViews:/stuck', 'closeViews:window:2'])
+    expect(mockLogger.error).toHaveBeenCalledTimes(1)
+    expect(mockLogger.error).toHaveBeenCalledWith('Browser teardown step failed', expect.objectContaining({ message: expect.stringContaining('timed out') }), { stage: 'endPick' })
+  })
+
+  it('clears the time limit of a step that finishes, so no timer is left behind', async () => {
+    const clock = createManualClock()
+    teardown = new BrowserProjectTeardown({ clock, stepTimeoutMs: 10 })
+    recordAll()
+    await teardown.run('/old')
+    expect(clock.pendingTimers()).toBe(0)
+    expect(order).toEqual(['endPick:/old', 'abortCaptureWrites:/old', 'closeViews:/old'])
   })
 
   it('runs teardowns one at a time, in order', async () => {

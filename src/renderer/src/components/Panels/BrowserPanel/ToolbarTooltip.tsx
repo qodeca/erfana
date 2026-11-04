@@ -108,6 +108,10 @@ function isFocusVisible(element: Element): boolean {
   }
 }
 
+function samePlacement(a: TooltipPlacement | null, b: TooltipPlacement | null): boolean {
+  return a === b || (a !== null && b !== null && a.left === b.left && a.width === b.width)
+}
+
 /**
  * Where the bubble goes in `band` for `trigger`, or `null` when there is no room.
  *
@@ -145,6 +149,9 @@ export function useToolbarTooltip(options: UseToolbarTooltipOptions): ToolbarToo
   const dismissedFocus = useRef(new WeakSet<HTMLElement>())
   const dismissedHover = useRef(new WeakSet<HTMLElement>())
   const rowsRef = useLatestRef(rows)
+  // Whether the bubble is drawn: a tooltip with no room shows nothing, so it takes no Esc (OD-16).
+  const view = shown !== null && placement !== null && shown.text !== '' ? { lines: shown.text.split('\n'), placement } : null
+  const drawnRef = useLatestRef(view !== null)
 
   useEffect(() => {
     if (!enabled) return
@@ -185,7 +192,7 @@ export function useToolbarTooltip(options: UseToolbarTooltipOptions): ToolbarToo
     }
     const onKeyDown = (event: KeyboardEvent): void => {
       const current = shownRef.current
-      if (event.key !== 'Escape' || event.isComposing || current === null) return
+      if (event.key !== 'Escape' || event.isComposing || current === null || !drawnRef.current) return
       if (current.by === 'focus' && document.activeElement === current.trigger) {
         // The first Esc is the tooltip's alone (025-AC-065); the next one routes.
         event.preventDefault()
@@ -218,7 +225,7 @@ export function useToolbarTooltip(options: UseToolbarTooltipOptions): ToolbarToo
       root?.removeEventListener('keydown', onKeyDown)
       setShown(null)
     }
-  }, [enabled, scope, rowsRef, shownRef])
+  }, [enabled, scope, rowsRef, shownRef, drawnRef])
 
   // The control's text changed while shown: a focus tooltip follows it; a hover one was pressed, so it goes.
   const trigger = shown?.trigger ?? null
@@ -244,6 +251,20 @@ export function useToolbarTooltip(options: UseToolbarTooltipOptions): ToolbarToo
     setPlacement(shown === null || host === null || !shown.trigger.isConnected ? null : placeTooltip(host, shown.trigger))
   }, [shown, band])
 
+  // Measured again while it shows, as the band changes under it: the panel is resized, or a send notice or
+  // a note takes the place of the clause the bubble starts after (code review round 2).
+  useEffect(() => {
+    const host = band.current
+    if (shown === null || host === null || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => {
+      const next = shown.trigger.isConnected ? placeTooltip(host, shown.trigger) : null
+      setPlacement(prev => (samePlacement(prev, next) ? prev : next))
+    })
+    observer.observe(host)
+    for (const part of host.querySelectorAll('.erf-brw-status')) observer.observe(part)
+    return () => observer.disconnect()
+  }, [shown, band])
+
   const dismissHover = useCallback(() => {
     const current = shownRef.current
     if (current?.by !== 'hover') return
@@ -251,7 +272,6 @@ export function useToolbarTooltip(options: UseToolbarTooltipOptions): ToolbarToo
     setShown(null)
   }, [shownRef])
 
-  const view = shown !== null && placement !== null && shown.text !== '' ? { lines: shown.text.split('\n'), placement } : null
   return { view, dismissHover }
 }
 

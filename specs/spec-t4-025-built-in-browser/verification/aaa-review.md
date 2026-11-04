@@ -55,3 +55,17 @@ Scores are added after this rubric is committed, one row per lens, with a link t
 | Test | 8 | 0 | 0 | 2 | 3 | [reviews/test.md](reviews/test.md) |
 
 Four lenses are under 8. Every finding goes to a fix round; each lens is then reviewed again by a fresh agent of the same type, against the new HEAD.
+
+### Round 2 – 2026-11-04, against `8fd4ed87` (fresh agents of the same types)
+
+| Lens | Score | Critical | High | Medium | Low | Report |
+|---|---|---|---|---|---|---|
+| Code | 8 | 0 | 0 | 1 | 5 | [reviews/code-r2.md](reviews/code-r2.md) |
+| Security | 9 | 0 | 0 | 0 | 2 | [reviews/security-r2.md](reviews/security-r2.md) |
+| Architecture | 8 | 0 | 0 | 0 | 6 | [reviews/architecture-r2.md](reviews/architecture-r2.md) |
+| UX | 8 | 0 | 0 | 2 | 5 | [reviews/ux-r2.md](reviews/ux-r2.md) |
+| UI | 8 | 0 | 0 | 3 | 3 | [reviews/ui-r2.md](reviews/ui-r2.md) |
+| Performance | 8 | 0 | 0 | 1 | 5 | [reviews/performance-r2.md](reviews/performance-r2.md) |
+| Test | 8 | 0 | 0 | 1 | 3 | [reviews/test-r2.md](reviews/test-r2.md) |
+
+Every lens scores 8 or higher, with no critical or high finding. The remaining medium findings are fixed after this round or recorded as technical debt; the fix record follows.

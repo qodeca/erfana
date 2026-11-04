@@ -52,7 +52,8 @@ const MUTEX_DIR = 'mutex'
 /** A mutex older than this was left by a process that died inside it. */
 const MUTEX_STALE_MS = 10_000
 /** How often a waiter looks again. */
-const POLL_MS = 50
+/** How often a waiting request looks at the lock again. */
+export const OS_FOCUS_LOCK_POLL_MS = 50
 
 /**
  * How long a test waits for the lock. The longest wait is one other test of
@@ -114,7 +115,7 @@ async function withMutex<T>(dir: string, body: () => T, deadline: number): Promi
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
       clearStaleMutex(mutex)
       if (Date.now() > deadline) throw new Error(`os-focus lock: mutex ${mutex} was never released`)
-      await delay(POLL_MS)
+      await delay(OS_FOCUS_LOCK_POLL_MS)
       continue
     }
     try {
@@ -247,7 +248,7 @@ export async function acquireOsFocusLock(
             `(holders: ${describeHolders(last)}; dir ${dir})`
         )
       }
-      await delay(POLL_MS)
+      await delay(OS_FOCUS_LOCK_POLL_MS)
     }
   } catch (error) {
     if (waiting !== null) disown(waiting)

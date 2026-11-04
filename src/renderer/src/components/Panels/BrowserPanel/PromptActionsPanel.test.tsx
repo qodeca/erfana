@@ -140,6 +140,8 @@ describe('PromptActionsPanel (025-FR-027, 025-FR-030)', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('No agent is running in Terminal.')
     const button = screen.getByRole('button', { name: 'Choose terminal' })
     expect(button).toHaveFocus()
+    // Focus lands on the button at once, so the button itself carries the reason.
+    expect(button).toHaveAccessibleDescription('No agent is running in Terminal.')
     fireEvent.click(button)
     expect(props.onBannerAction).toHaveBeenCalledWith('chooseTerminal')
   })

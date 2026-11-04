@@ -84,9 +84,14 @@ function freedByStep(row: HTMLElement): Record<NavFoldStep, number> {
   return freed
 }
 
+/** The one canvas text is measured on: the row re-measures after every render (performance review round 2). */
+let measureCanvas: HTMLCanvasElement | null = null
+
 /** The drawn width of `text` in `element`'s font; 0 without a canvas (no fold is decided then). */
 function textWidth(element: HTMLElement, text: string): number {
-  const ctx = document.createElement('canvas').getContext('2d')
+  measureCanvas ??= document.createElement('canvas')
+  // A canvas hands back the same context each time; asking again keeps a missing one missing.
+  const ctx = measureCanvas.getContext('2d')
   if (ctx === null) return 0
   const style = getComputedStyle(element)
   ctx.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`

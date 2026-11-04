@@ -110,7 +110,9 @@ function SendNoticeSlot({
       onBlur={() => setFocused(false)}
     >
       <span className="erf-brw-notice__text">{notice.text}</span>
-      <button type="button" className="erf-brw-notice__action" aria-label="Show terminal" onClick={onShowTerminal}>
+      {/* Icons only below 800px: the band tooltip names them for sighted users (Nielsen H6). Show terminal
+          takes the tooltip alone – a description repeating its name would be said twice. */}
+      <button type="button" className="erf-brw-notice__action" aria-label="Show terminal" data-tip="Show terminal" onClick={onShowTerminal}>
         <SquareTerminal size={14} strokeWidth={2} aria-hidden="true" />
         <span className="erf-brw-notice__label">Show terminal</span>
       </button>
@@ -118,6 +120,7 @@ function SendNoticeSlot({
         type="button"
         className="erf-brw-notice__action"
         aria-label="Open capture"
+        {...tooltipProps('Open capture')}
         aria-description="Opens the context file in an editor tab"
         onClick={() => onOpenCapture(notice.contextPath)}
       >
@@ -169,6 +172,7 @@ export const PickRow = forwardRef<HTMLDivElement, PickRowProps>(function PickRow
       data-picking={pick.on ? 'true' : undefined}
       data-notice={notice !== null ? 'true' : undefined}
       data-surface={props.surface === undefined || props.surface === 'none' ? undefined : props.surface}
+      data-panel-closed={place === 'outPanelClosed' ? 'true' : undefined}
       data-testid={BROWSER_TEST_IDS.PICK_ROW}
     >
       <button

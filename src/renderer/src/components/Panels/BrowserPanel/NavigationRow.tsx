@@ -59,7 +59,7 @@ export interface NavigationRowProps {
   readonly moreActions: MoreMenuActions
   /** The address bar's chips. */
   readonly chips?: React.ReactNode
-  /** The page's still image under More and under the address suggestions (commit 19). */
+  /** The page's still image under More and under the address suggestions. */
   readonly moreStill?: StillSurface
   readonly suggestStill?: StillSurface
 }

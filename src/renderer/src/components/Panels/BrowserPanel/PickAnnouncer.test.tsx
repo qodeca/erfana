@@ -59,11 +59,60 @@ describe('PickAnnouncer (design § Announcements, M-45)', () => {
   it('says the send with its fallback, and re-announces a repeated sentence as a new node', () => {
     const { rerender } = render(<PickAnnouncer tabId={TAB} sent={null} />)
     rerender(<PickAnnouncer tabId={TAB} sent="Sent Explain to Terminal" />)
-    expect(region()).toHaveTextContent('Sent Explain to Terminal. Show terminal and Open capture are also in the target menu.')
+    expect(region()).toHaveTextContent('Sent Explain to Terminal. Show terminal and Open last capture are also in the target menu.')
     const first = region().firstElementChild
     rerender(<PickAnnouncer tabId={TAB} sent={null} />)
     rerender(<PickAnnouncer tabId={TAB} sent="Sent Explain to Terminal" />)
     expect(region().firstElementChild).not.toBe(first)
-    expect(region()).toHaveTextContent('Sent Explain to Terminal. Show terminal and Open capture are also in the target menu.')
+    expect(region()).toHaveTextContent('Sent Explain to Terminal. Show terminal and Open last capture are also in the target menu.')
+  })
+
+  it('says the page change, element gone and load-a-page notes (design § Announcements)', () => {
+    render(<PickAnnouncer tabId={TAB} sent={null} />)
+    apply({ tabId: TAB, kind: 'mode', on: true })
+    apply({ tabId: TAB, kind: 'captured', captureId: CAPTURE, still: new Uint8Array(4), stillWidth: 1, stillHeight: 1, summary: SUMMARY })
+    act(() => {
+      const store = useBrowserPickStore.getState()
+      store.dropCapture(TAB, CAPTURE)
+      store.showNote(TAB, 'pageChanged')
+    })
+    expect(region()).toHaveTextContent('The page changed – pick the element again.')
+    expect(region()).not.toHaveTextContent('again..')
+    act(() => useBrowserPickStore.getState().showNote(TAB, 'elementGone'))
+    expect(region()).toHaveTextContent('That element is gone – pick again.')
+    act(() => useBrowserPickStore.getState().showNote(TAB, 'loadAPage'))
+    expect(region()).toHaveTextContent('Load a page to pick an element.')
+  })
+
+  it('says the send, not "Picking stopped.", when pick mode goes off one render before the notice', () => {
+    const { rerender } = render(<PickAnnouncer tabId={TAB} sent={null} />)
+    apply({ tabId: TAB, kind: 'mode', on: true })
+    rerender(<PickAnnouncer tabId={TAB} sent={null} sending />)
+    // Main ends pick mode as it records the send, before the closeSent reply lands.
+    apply({ tabId: TAB, kind: 'mode', on: false })
+    expect(region()).toHaveTextContent('Picking. Esc to stop.')
+    const notice = { text: 'Sent Explain to Terminal' }
+    rerender(<PickAnnouncer tabId={TAB} sent={notice.text} sentKey={notice} sending={false} />)
+    expect(region()).toHaveTextContent('Sent Explain to Terminal. Show terminal and Open last capture are also in the target menu.')
+    expect(region()).not.toHaveTextContent('Picking stopped.')
+  })
+
+  it('says "Picking stopped." once a send ends without a notice', () => {
+    const { rerender } = render(<PickAnnouncer tabId={TAB} sent={null} />)
+    apply({ tabId: TAB, kind: 'mode', on: true })
+    rerender(<PickAnnouncer tabId={TAB} sent={null} sending />)
+    apply({ tabId: TAB, kind: 'mode', on: false })
+    rerender(<PickAnnouncer tabId={TAB} sent={null} sending={false} />)
+    expect(region()).toHaveTextContent('Picking stopped.')
+  })
+
+  it('says a second identical send that replaces the notice still showing', () => {
+    const first = { text: 'Sent Explain to Terminal' }
+    const { rerender } = render(<PickAnnouncer tabId={TAB} sent={first.text} sentKey={first} />)
+    const before = region().firstElementChild
+    const second = { text: 'Sent Explain to Terminal' }
+    rerender(<PickAnnouncer tabId={TAB} sent={second.text} sentKey={second} />)
+    expect(region().firstElementChild).not.toBe(before)
+    expect(region()).toHaveTextContent('Sent Explain to Terminal. Show terminal and Open last capture are also in the target menu.')
   })
 })

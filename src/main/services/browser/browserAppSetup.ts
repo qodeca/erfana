@@ -266,7 +266,7 @@ export function installBrowserAfterReady(deps: BrowserAfterReadyDeps): BrowserRu
   )
   const localFiles = new LocalFileServers({ now: () => mainClock.now(), appAddresses: () => appAddresses, userFolders: userFolderPaths })
   const popups = createBrowserPopups(appAddresses, localFiles, (tabId) => tabs.list().find((t) => t.id === tabId)?.windowId ?? null)
-  const teardown = new BrowserProjectTeardown()
+  const teardown = new BrowserProjectTeardown({ clock: mainClock })
   const pickSetup = installBrowserPicks({
     clock: mainClock,
     tabs: () => tabs,

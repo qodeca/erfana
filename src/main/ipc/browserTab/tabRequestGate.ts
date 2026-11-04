@@ -61,7 +61,6 @@ export interface TabGate<E extends GateEvent, W, Tab> {
   accept<T>(channel: string, event: E, schema: Parser<T>, arg: unknown): { window: W; data: T } | null
   /** As {@link accept}, plus the named tab, which the sender's window must own. */
   acceptTab<T extends { readonly tabId: string }>(channel: string, event: E, schema: Parser<T>, arg: unknown): { window: W; tab: Tab; data: T } | null
-  readonly guarded: typeof guarded
 }
 
 export function createTabGate<E extends GateEvent, W, Tab>(deps: TabGateDeps<E, W, Tab>): TabGate<E, W, Tab> {
@@ -86,7 +85,6 @@ export function createTabGate<E extends GateEvent, W, Tab>(deps: TabGateDeps<E, 
       if (accepted === null) return null
       const tab = deps.tabOf?.(accepted.window, accepted.data.tabId) ?? null
       return tab === null ? null : { window: accepted.window, tab, data: accepted.data }
-    },
-    guarded
+    }
   }
 }

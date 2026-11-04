@@ -13,7 +13,8 @@
  *   Refused: a missing file or a folder, a file inside a dot-folder (below
  *   the project root when inside it, anywhere otherwise), a volume root, a
  *   system folder or one of the user's own folders (the home folder itself,
- *   Downloads, Desktop, Documents, …) as the served folder, and Erfana's own
+ *   Downloads, Desktop, Documents, …) or a folder holding one as the served
+ *   folder, and Erfana's own
  *   files. The opened page has its folder's origin, so it can read the
  *   folder's images, style sheets, scripts and media (a canvas is not
  *   tainted by them): a whole user folder is never handed to one page.
@@ -88,9 +89,10 @@ export interface LocalFileServersDeps {
    */
   readonly refusesFolder?: (folder: string) => boolean
   /**
-   * The user's own folders, each refused as a served folder itself (not the
-   * folders below it): `app.getPath('home' | 'downloads' | 'desktop' |
-   * 'documents' | …)` in the app. Compared by real path.
+   * The user's own folders: a served folder that is one of them, or holds
+   * one (a OneDrive or iCloud root that Documents and Desktop sync into), is
+   * refused; the folders below them are not: `app.getPath('home' |
+   * 'downloads' | 'desktop' | 'documents' | …)` in the app. Compared by real path.
    */
   readonly userFolders?: () => readonly string[]
 }
@@ -227,13 +229,13 @@ export class LocalFileServers {
     this.arms.clear()
   }
 
-  /** Whether `folder` (a real path) is one of the user's own folders. */
+  /** Whether `folder` (a real path) is one of the user's own folders, or holds one. */
   private async isUserFolder(folder: string): Promise<boolean> {
     const caseSensitive = process.platform === 'linux'
     for (const candidate of this.deps.userFolders?.() ?? []) {
       // A user folder that does not exist (an unset XDG folder) is compared as named.
       const real = await realpath(candidate).catch(() => candidate)
-      if (isSamePath(folder, real, caseSensitive)) return true
+      if (isInsideRoot(real, folder, caseSensitive)) return true
     }
     return false
   }

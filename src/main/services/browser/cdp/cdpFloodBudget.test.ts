@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { describe, expect, it } from 'vitest'
 import { createManualClock } from '../../../../shared/clock'
+import { LOG_URL_MAX_CODE_UNITS } from './browserLogBuffer'
 import {
   CdpFloodBudget,
   floodClassOf,
@@ -85,6 +86,10 @@ describe('floodClassOf and keptPayloadSize (025-FR-038)', () => {
     expect(keptPayloadSize('Log.entryAdded', { entry: { text: 'hello', url: 'http://a/' } })).toBe(14)
     expect(keptPayloadSize('Network.requestWillBeSent', { request: { url: 'http://a/', headers: { big: 'y'.repeat(9999) } } })).toBe(9)
     expect(keptPayloadSize('Network.responseReceived', { response: { url: 'http://a/b' } })).toBe(10)
+    // A URL counts as the log keeps it: a data: URL as its media type plus ",…", any URL cut at LOG_URL_MAX_CODE_UNITS.
+    expect(keptPayloadSize('Network.requestWillBeSent', { request: { url: `data:image/png;base64,${'A'.repeat(5000)}` } })).toBe('data:image/png;base64,…'.length)
+    expect(keptPayloadSize('Network.responseReceived', { response: { url: `data:${'A'.repeat(5000)}` } })).toBe(LOG_URL_MAX_CODE_UNITS)
+    expect(keptPayloadSize('Network.requestWillBeSent', { request: { url: `http://a/${'q'.repeat(5000)}` } })).toBe(LOG_URL_MAX_CODE_UNITS)
     expect(keptPayloadSize('Network.loadingFailed', { errorText: 'net::ERR_FAILED', blockedReason: 'mixed' })).toBe(20)
     expect(keptPayloadSize('Network.loadingFinished', { requestId: 'r1' })).toBe(0)
     expect(keptPayloadSize('Log.entryAdded', null)).toBe(0)
@@ -135,9 +140,18 @@ describe('TargetFloodBudget (025-FR-038, performance review high finding)', () =
   })
 
   it('trips the network class on its byte limit', () => {
+    // A URL counts at most LOG_URL_MAX_CODE_UNITS, as the log keeps it; a failure's text is counted whole.
     const budget = new TargetFloodBudget(createManualClock(0))
-    const big = { request: { url: `data:,${'x'.repeat(FLOOD_MAX_NETWORK_BYTES)}` } }
-    expect(budget.count('Network.requestWillBeSent', big)).toBe(true)
+    const big = { errorText: 'x'.repeat(FLOOD_MAX_NETWORK_BYTES + 1) }
+    expect(budget.count('Network.loadingFailed', big)).toBe(true)
+  })
+
+  it('does not trip on large data: URLs: each counts as its media type, as the log keeps it', () => {
+    const budget = new TargetFloodBudget(createManualClock(0))
+    const inline = `data:image/png;base64,${'A'.repeat(FLOOD_MAX_NETWORK_BYTES)}`
+    expect(budget.count('Network.requestWillBeSent', { request: { url: inline } })).toBe(false)
+    expect(budget.count('Network.responseReceived', { response: { url: inline } })).toBe(false)
+    expect(budget.isTripped).toBe(false)
   })
 
   it('never counts a free event, however many arrive', () => {

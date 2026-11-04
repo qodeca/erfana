@@ -18,7 +18,11 @@
  * it is either bounded by real page work or not read at all.
  *
  * The payload counted is the text the collector keeps (messages and URLs),
- * read from the fields themselves – no event is serialised to be measured.
+ * read from the fields themselves – no event is serialised to be measured. A
+ * URL counts as the collector keeps it (`failedRequestUrl`): a `data:` URL as
+ * its media type, any URL at most {@link LOG_URL_MAX_CODE_UNITS} – so a page
+ * that loads large inline images cannot trip the budget with text that is
+ * never kept.
  * The first event past either limit of either class trips the budget, and it
  * stays tripped until {@link TargetFloodBudget.reset} (the next navigation).
  * The session then turns the target's log domains off and notes "logs
@@ -28,6 +32,7 @@
  * window ended; all time comes from the injected clock.
  */
 import type { Clock } from '../../../../shared/clock'
+import { LOG_URL_MAX_CODE_UNITS } from './browserLogBuffer'
 import { argumentText } from './cdpLogCollector'
 import { isRecord } from './cdpTypes'
 
@@ -64,6 +69,16 @@ export function floodClassOf(method: string): FloodClass | null {
 
 const len = (v: unknown): number => (typeof v === 'string' ? v.length : 0)
 
+/** A URL's length as the log keeps it: a `data:` URL up to its comma plus ",…", and never past the cut. */
+function urlLen(v: unknown): number {
+  if (typeof v !== 'string') return 0
+  if (/^data:/i.test(v)) {
+    const comma = v.indexOf(',')
+    return Math.min(comma === -1 ? v.length : comma + 2, LOG_URL_MAX_CODE_UNITS)
+  }
+  return Math.min(v.length, LOG_URL_MAX_CODE_UNITS)
+}
+
 /**
  * Length, in UTF-16 units, of the text the collector reads from one event:
  * the console arguments, the exception text, the log entry's text and URL, a
@@ -83,9 +98,9 @@ export function keptPayloadSize(method: string, params: unknown): number {
     case 'Log.entryAdded':
       return isRecord(params.entry) ? len(params.entry.text) + len(params.entry.url) : 0
     case 'Network.requestWillBeSent':
-      return isRecord(params.request) ? len(params.request.url) : 0
+      return isRecord(params.request) ? urlLen(params.request.url) : 0
     case 'Network.responseReceived':
-      return isRecord(params.response) ? len(params.response.url) : 0
+      return isRecord(params.response) ? urlLen(params.response.url) : 0
     case 'Network.loadingFailed':
       return len(params.errorText) + len(params.blockedReason)
     default:

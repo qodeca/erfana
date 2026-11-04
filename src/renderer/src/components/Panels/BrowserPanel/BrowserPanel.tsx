@@ -438,7 +438,7 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
         tooltip={<ToolbarTooltipBubble view={tooltip.view} />}
         tooltipOpen={tooltip.view !== null}
       />
-      <PickAnnouncer tabId={tabId} sent={pick.notice?.text ?? null} />
+      <PickAnnouncer tabId={tabId} sent={pick.notice?.text ?? null} sentKey={pick.notice} sending={pick.busy !== null} />
       {findOpen && live && tabId !== null && <FindRow tabId={tabId} result={findResult} onClose={closeFind} />}
       <StripRows tabId={tabId} rows={rows} refused={refused} refusedId={refusedId} onEmpty={focusPageArea} />
       <PageArea

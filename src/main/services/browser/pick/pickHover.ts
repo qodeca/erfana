@@ -110,11 +110,28 @@ export class PickHover {
   async refine(move: 'parent' | 'child'): Promise<void> {
     const hovered = this.hovered
     if (hovered === null) return this.deps.emit({ kind: 'note', note: 'moveTheMouse' })
-    const step = liveStep(await this.chainOf(hovered).catch(() => null), hovered.index, move)
+    const chain = await this.chainOf(hovered).catch(() => null)
+    // The first read can take a while: a move to another element meanwhile wins, and this press is dropped.
+    if (!this.stillOn(hovered)) return
+    const step = liveStep(chain, hovered.index, move)
     if ('note' in step) return this.deps.emit({ kind: 'note', note: step.note })
     hovered.index = step.index
     const record = await this.deps.highlight.show(step.node)
+    if (!this.stillOn(hovered)) return this.reoutline()
     if (record !== null) this.deps.emit({ kind: 'highlight', label: record.label })
+  }
+
+  /** Whether `hovered` is still the hovered element and a hover may outline. */
+  private stillOn(hovered: Hovered): boolean {
+    return this.hovered === hovered && this.deps.canHover()
+  }
+
+  /** Outline the element now hovered again, after a refinement drew over it. */
+  private async reoutline(): Promise<void> {
+    const current = this.hovered
+    if (current === null || current.index !== null || !this.deps.canHover()) return
+    const record = await this.deps.highlight.show(current.node)
+    if (record !== null && this.hovered === current) this.deps.emit({ kind: 'highlight', label: record.label })
   }
 
   /** Forget the hovered element and its chain (pick mode off, a navigation). */

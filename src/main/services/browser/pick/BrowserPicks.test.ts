@@ -17,7 +17,7 @@ import type { Bitmap } from '../capture/captureImage'
 import { CAPTURES_REL } from '../capture/CaptureStore'
 import type { TabInputPick } from '../input/BrowserTabInput'
 import { BrowserPicks, SEND_READ_TIMEOUT_MS, TEARDOWN_WRITE_WAIT_MS, type TabPickInput } from './BrowserPicks'
-import { BrowserProjectTeardown } from '../browserProjectTeardown'
+import { BrowserProjectTeardown, TEARDOWN_STEP_TIMEOUT_MS } from '../browserProjectTeardown'
 import type { BrowserTabPick } from './BrowserTabPick'
 import { FakePickContents, settle } from './__test-helpers__/pickHarness'
 import { samplePage } from './__test-helpers__/samplePage'
@@ -397,6 +397,25 @@ describe('BrowserPicks', () => {
       })
       await run
       expect(logger.warn).toHaveBeenCalledWith('Browser teardown: a capture write is still running; it deletes its files when it ends')
+    })
+
+    it('closes the views when ending pick mode never finishes (a frozen page that never answers)', async () => {
+      const s = setup()
+      await held(s)
+      vi.spyOn(s.pick, 'end').mockReturnValue(new Promise<void>(() => undefined))
+      const teardown = new BrowserProjectTeardown({ clock: s.clock })
+      const closed = vi.fn()
+      s.picks.registerTeardown(teardown)
+      teardown.onStage('closeViews', closed)
+      const run = teardown.run(root)
+      await settle()
+      expect(closed).not.toHaveBeenCalled()
+      await vi.waitFor(() => {
+        s.clock.advance(TEARDOWN_STEP_TIMEOUT_MS)
+        expect(closed).toHaveBeenCalledTimes(1)
+      })
+      await run
+      expect(logger.error).toHaveBeenCalledWith('Browser teardown step failed', expect.any(Error), { stage: 'endPick' })
     })
 
     it('unregisters both stages', async () => {

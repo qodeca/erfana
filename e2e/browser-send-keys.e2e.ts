@@ -465,6 +465,8 @@ test.describe('025-AC-063 keys and clicks with the prompt-actions menu open', ()
       const send = await BrowserSendUi.open(appWithTestProject, windowWithTestProject, testProject.path)
       const agent = await send.startStubAgent(test.info().outputPath('agent-input.bin'))
       await send.load(browserServers.sites.static.url('/elements.html'))
+      // With no strip row Shift+F6 goes to More; a Linux host without a keyring adds one of its own.
+      await send.panel.dismissHostRows()
       await setPanelWidth(appWithTestProject, send.panel.root, width)
       // More is the last navigation control drawn at this width.
       const drawn = send.panel.root.locator('.erf-brw-nav button:visible')
@@ -494,6 +496,8 @@ test.describe('025-AC-063 keys and clicks with the prompt-actions menu open', ()
     const send = await BrowserSendUi.open(appWithTestProject, windowWithTestProject, testProject.path)
     const agent = await send.startStubAgent(test.info().outputPath('agent-input.bin'))
     await send.load(browserServers.sites.static.url('/popups.html'))
+    // The strip's last control must be the pop-up row's: no host row ("No keyring" on Linux) beside it.
+    await send.panel.dismissHostRows()
     await pickAtAnyWidth(send, 'h1', 'h1 ')
     // The page opens pop-ups with the menu open (no user activation): the strip prompt shows above the page.
     await (await send.panel.page()).eval('window.__fixture.openMany(6)')

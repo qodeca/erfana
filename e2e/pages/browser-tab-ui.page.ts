@@ -101,6 +101,18 @@ export class BrowserPanelUi {
     await button.click()
   }
 
+  /**
+   * Dismiss the strip rows the host machine adds by itself – "No keyring" on
+   * a Linux host without a keyring – so a test that walks the F6 zones starts
+   * from an empty strip, as on a host with a keyring.
+   */
+  async dismissHostRows(): Promise<void> {
+    const keyring = this.stripRow('keyring')
+    if ((await keyring.count()) === 0) return
+    await this.answerRow('keyring', 'Dismiss')
+    await expect(keyring).toHaveCount(0, { timeout: UI_WAIT_MS })
+  }
+
   /** The chips at the end of the address bar. */
   get chips(): Locator {
     return this.root.getByTestId(BROWSER_TEST_IDS.CHIPS)

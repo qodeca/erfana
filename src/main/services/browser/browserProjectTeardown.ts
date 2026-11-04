@@ -17,14 +17,25 @@
  * The owners register their steps in `browserAppSetup.ts` and
  * `pick/pickAppSetup.ts` with {@link BrowserProjectTeardown.onStage}; each
  * step gets the {@link TeardownScope} and acts on the tabs inside it. A step
- * that throws or rejects is logged and the rest still run: a teardown that
- * stopped half-way would leave the old project's pages alive in the new one.
- * Teardowns run one at a time, in the order they were asked for.
+ * that throws, rejects or outlasts {@link TEARDOWN_STEP_TIMEOUT_MS} is logged
+ * and the rest still run: a teardown that stopped half-way would leave the old
+ * project's pages alive in the new one. The time limit matters because
+ * teardowns run one at a time, in the order they were asked for, so one step
+ * that never finishes (a frozen page that never answers its debugger) would
+ * otherwise stall every later project switch and window close too.
  */
+import { realClock, type Clock } from '../../../shared/clock'
 import type { ProjectSession, ProjectSessionSnapshot } from '../session/ProjectSession'
 import { isSamePath } from '../../utils/pathCompare'
 import { logger } from '../LoggingService'
 import { redactedLogError } from '../../utils/redactUserInput'
+
+/**
+ * Longest one step may run before the teardown moves on. Above the capture
+ * write wait (`TEARDOWN_WRITE_WAIT_MS`, 2 s), which bounds itself, so that
+ * step's own bound decides first.
+ */
+export const TEARDOWN_STEP_TIMEOUT_MS = 5_000
 
 export const TEARDOWN_STAGES = ['endPick', 'abortCaptureWrites', 'closeViews'] as const
 export type TeardownStage = (typeof TEARDOWN_STAGES)[number]
@@ -57,6 +68,13 @@ export class BrowserProjectTeardown {
     TEARDOWN_STAGES.map((stage) => [stage, new Set<TeardownStep>()])
   )
   private tail: Promise<void> = Promise.resolve()
+  private readonly clock: Clock
+  private readonly stepTimeoutMs: number
+
+  constructor(options: { readonly clock?: Clock; readonly stepTimeoutMs?: number } = {}) {
+    this.clock = options.clock ?? realClock
+    this.stepTimeoutMs = options.stepTimeoutMs ?? TEARDOWN_STEP_TIMEOUT_MS
+  }
 
   /** Add a step to a stage; the returned function removes it. */
   onStage(stage: TeardownStage, step: TeardownStep): () => void {
@@ -97,11 +115,35 @@ export class BrowserProjectTeardown {
     for (const stage of TEARDOWN_STAGES) {
       for (const step of [...this.steps.get(stage)!]) {
         try {
-          await step(scope)
+          await this.bounded(step, scope)
         } catch (error) {
           logger.error('Browser teardown step failed', redactedLogError(error), { stage })
         }
       }
     }
+  }
+
+  /** Runs `step`, rejecting once it has run {@link stepTimeoutMs}; the step itself is left to finish on its own. */
+  private bounded(step: TeardownStep, scope: TeardownScope): Promise<void> {
+    // Called at once, as before the limit: a step starts in the same tick its turn comes.
+    let work: Promise<void>
+    try {
+      work = Promise.resolve(step(scope))
+    } catch (error) {
+      return Promise.reject(error instanceof Error ? error : new Error(String(error)))
+    }
+    return new Promise<void>((resolve, reject) => {
+      const timer = this.clock.setTimeout(() => reject(new Error(`Browser teardown step timed out after ${this.stepTimeoutMs} ms`)), this.stepTimeoutMs)
+      work.then(
+        () => {
+          this.clock.clearTimeout(timer)
+          resolve()
+        },
+        (error: unknown) => {
+          this.clock.clearTimeout(timer)
+          reject(error instanceof Error ? error : new Error(String(error)))
+        }
+      )
+    })
   }
 }

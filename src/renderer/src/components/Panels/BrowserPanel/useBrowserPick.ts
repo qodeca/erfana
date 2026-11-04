@@ -22,7 +22,7 @@
  *   pick the element again."; with the dialog open, the dialog stays and says
  *   the page reloaded (025-FR-053).
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { DockviewApi } from 'dockview'
 import type { ClosePickReason, RefineMoveRequest } from '../../../../../shared/ipc/browser-tab-pick-schema'
 import { useShallow } from 'zustand/react/shallow'
@@ -35,10 +35,19 @@ import { openFileInPanel } from '../../../utils/openFileInPanel'
 import { joinPath } from '../../../utils/fileUtils'
 import { showErrorToast, showInfoToast } from '../../../utils/toastHelpers'
 import { logger } from '../../../utils/logger'
+import { useLatestRef } from '../../../hooks/useLatestRef'
 import { ACTION_NAMES, sendCapture, type SendAction } from './browserSend'
 import { guardBanner, preWarning, targetChosen, type TargetBanner } from './pickRow.logic'
 import type { DialogAction } from './InstructionDialog'
 import type { BrowserTarget } from './useBrowserTarget'
+
+/** The prompt-actions panel and the instruction dialog: the surfaces that hold keyboard focus over the page. */
+const PICK_SURFACE_SELECTOR = '.erf-picker-owned'
+
+/** True when keyboard focus sits on nothing: the focused element was removed, so focus fell to the body. */
+function focusFellToBody(): boolean {
+  return document.activeElement === null || document.activeElement === document.body
+}
 
 /** Projects whose first send already offered the agent deny rule this session (S-21). */
 const denyRuleOffered = new Set<string>()
@@ -170,7 +179,24 @@ export function useBrowserPick(options: UseBrowserPickOptions): BrowserPick {
   // during render, React's pattern for state derived from a change).
   if (afterNavigation && dialogAction === null && captureId !== null && draft !== '') setDraftText('')
 
+  // Whether keyboard focus last landed inside the panel. A page change removes the panel with its focused
+  // button, so focus falls to the body unless it is handed on (WCAG 2.4.3, ux review round 2).
+  const focusInPanelRef = useRef(false)
+  const panelOpen = surface === 'panel'
+  useEffect(() => {
+    if (!panelOpen) return
+    // The panel focuses its first action in its own effect, which runs before this one.
+    focusInPanelRef.current = document.activeElement?.closest(PICK_SURFACE_SELECTOR) != null
+    const onFocusIn = (event: FocusEvent): void => {
+      focusInPanelRef.current = event.target instanceof Element && event.target.closest(PICK_SURFACE_SELECTOR) !== null
+    }
+    document.addEventListener('focusin', onFocusIn)
+    return () => document.removeEventListener('focusin', onFocusIn)
+  }, [panelOpen])
+
   // A page change: the panel closes with a note and main lets the capture go; the dialog stays (025-FR-053).
+  // Focus that was in the panel goes to the page area, like every other way the panel closes.
+  const focusPageRef = useLatestRef(focusPage)
   useEffect(() => {
     if (!afterNavigation || dialogAction !== null || tabId === null || captureId === null) return
     browserTabGateway.closePick({ tabId, captureId, reason: 'cancel' }).catch(warn('Browser closePick failed'))
@@ -178,7 +204,9 @@ export function useBrowserPick(options: UseBrowserPickOptions): BrowserPick {
     store.dropCapture(tabId, captureId)
     store.showNote(tabId, 'pageChanged')
     browserStill.release(tabId, PICK_STILL_HOLDER)
-  }, [afterNavigation, dialogAction, tabId, captureId])
+    if (focusInPanelRef.current && focusFellToBody()) focusPageRef.current()
+    focusInPanelRef.current = false
+  }, [afterNavigation, dialogAction, tabId, captureId, focusPageRef])
 
   // A capture main ended (navigation, crash, hidden tab) takes the still image with it.
   useEffect(() => {

@@ -63,12 +63,33 @@
   opacity: var(--opacity-disabled);
 }
 
-/* Forced colours override the border and the fill, so pressed takes the system's full Highlight (design § Cross-cutting cases). */
+/* Disabled: hover does nothing (Buttons card), as on `.erf-brw-tool:disabled`. */
+.erf-brw-pickbtn[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+.erf-brw-pickbtn[aria-disabled='true']:hover {
+  background: transparent;
+  color: var(--color-text-primary);
+}
+
+/*
+ * Forced colours override the border and the fill, so pressed takes the
+ * system's full Highlight (design § Cross-cutting cases). Opting out with
+ * `forced-color-adjust: none` keeps the authored lime edge and violet ring,
+ * so both are repainted in system colours too (Forced colours card rule 4):
+ * the edge in Highlight, the ring in CanvasText, offset onto Canvas.
+ */
 @media (forced-colors: active) {
   .erf-brw-pickbtn[aria-pressed='true'] {
+    border-color: Highlight;
     background: Highlight;
     color: HighlightText;
     forced-color-adjust: none;
+  }
+
+  .erf-brw-pickbtn[aria-pressed='true']:focus-visible {
+    outline-color: CanvasText;
   }
 }
 
@@ -131,9 +152,15 @@
   }
 }
 
+/* Icon only below 380px: the label leaves sight but stays the button's accessible name (it has no other). */
 @container (max-width: 380px) {
   .erf-brw-pickbtn__label {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .erf-brw-status {
@@ -346,26 +373,50 @@
 }
 
 /*
- * While the panel or the dialog is open (`data-surface`), the banner's first
- * clause and its "Still image" / "Page paused" chip keep their room
- * (025-FR-065, M-03): the width preset leaves the row (More keeps Page
- * width), the target yields to its arrow and process under 800px, and under
- * 660px it leaves too – the panel footer and the dialog's target line carry
- * the same menu button (design § Pick row, TR-20). 660px is the panel's
- * clause, its chip, Pick element and the folded target side by side.
+ * While the panel or the dialog is open (`data-surface`), and after the panel
+ * closed when the reviewer left (`data-panel-closed`, the longest clause),
+ * the banner's first clause and its "Still image" / "Page paused" chip keep
+ * their room (025-FR-065, M-03): the width preset leaves the row (More keeps
+ * Page width), the target yields to its arrow and process under 800px, and
+ * under 660px it leaves too – the panel footer and the dialog's target line
+ * carry the same menu button, and after a panel closed the next pick opens a
+ * panel that carries it again (design § Pick row, TR-20). 660px is the
+ * panel's clause, its chip, Pick element and the folded target side by side.
  */
-.erf-brw-pick[data-surface] .erf-brw-width {
+.erf-brw-pick:is([data-surface], [data-panel-closed]) .erf-brw-width {
   display: none;
 }
 
 @container (max-width: 800px) {
-  .erf-brw-pick[data-surface] .erf-brw-target__name:has(+ .erf-brw-target__proc) {
+  .erf-brw-pick:is([data-surface], [data-panel-closed]) .erf-brw-target__name:has(+ .erf-brw-target__proc) {
     display: none;
   }
 }
 
 @container (max-width: 660px) {
-  .erf-brw-pick[data-surface] .erf-brw-target {
+  .erf-brw-pick:is([data-surface], [data-panel-closed]) .erf-brw-target {
+    display: none;
+  }
+}
+
+/*
+ * Under 560px those long clauses (about 300–330px) plus Pick element's label
+ * and the tag no longer fit (ui review round 2), so the clause keeps its room:
+ * Pick element shows its icon only and the tag leaves. The label stays in the
+ * accessibility tree, hidden visually, so the button keeps its name. The
+ * clause alone then fits a 400px tab (376px here) with room to spare.
+ */
+@container (max-width: 560px) {
+  .erf-brw-pick:is([data-surface], [data-panel-closed]) .erf-brw-pickbtn__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .erf-brw-pick:is([data-surface], [data-panel-closed]) .erf-brw-banner-line .erf-brw-tag {
     display: none;
   }
 }
@@ -548,6 +599,15 @@
 
 .erf-brw-actions__step[aria-disabled='true'] > svg {
   opacity: var(--opacity-disabled);
+}
+
+/* Disabled: hover does nothing (Buttons card). */
+.erf-brw-actions__step[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+.erf-brw-actions__step[aria-disabled='true']:hover {
+  background: transparent;
 }
 
 .erf-brw-actions__close {

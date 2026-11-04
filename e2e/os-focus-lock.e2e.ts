@@ -12,7 +12,7 @@ import { test, expect } from '@playwright/test'
 import { spawn } from 'child_process'
 import * as fs from 'fs'
 import * as path from 'path'
-import { acquireOsFocusLock, isProcessAlive } from './fixtures/osFocusLock'
+import { acquireOsFocusLock, isProcessAlive, OS_FOCUS_LOCK_POLL_MS } from './fixtures/osFocusLock'
 import { E2E_TEMP_DIR, removeDirWithRetry } from './fixtures/isolation'
 
 /** A PID that belonged to a process which has exited. */
@@ -23,6 +23,22 @@ async function deadPid(): Promise<number> {
   await new Promise<void>((resolve) => child.once('exit', () => resolve()))
   await expect.poll(() => isProcessAlive(pid)).toBe(false)
   return pid
+}
+
+/**
+ * Wait until `pending` has stayed unsettled across three of the lock's polls,
+ * so a waiter that should still be blocked has looked at the lock again – an
+ * expectation read straight after a release would pass whatever the lock did.
+ */
+async function expectStillPending(pending: { settled: () => boolean }, what: string): Promise<void> {
+  let unsettledReads = 0
+  await expect
+    .poll(() => (pending.settled() ? -1 : ++unsettledReads), {
+      message: `${what} stays pending`,
+      intervals: [OS_FOCUS_LOCK_POLL_MS],
+      timeout: 20 * OS_FOCUS_LOCK_POLL_MS
+    })
+    .toBeGreaterThanOrEqual(3)
 }
 
 /** Resolves when `p` settles; `settled()` says whether it has. */
@@ -56,7 +72,7 @@ test.describe('OS-focus lock', () => {
     expect(exclusive.settled()).toBe(false)
 
     a.release()
-    expect(exclusive.settled()).toBe(false)
+    await expectStillPending(exclusive, 'the exclusive request while one shared lease is still held')
     b.release()
     const lease = await exclusive.promise
     expect(lease.mode).toBe('exclusive')
@@ -86,6 +102,15 @@ test.describe('OS-focus lock', () => {
     fs.writeFileSync(path.join(dir, `exclusive.${Date.now()}.${pid}.00000000-0000-4000-8000-000000000000`), '')
 
     const lease = await acquireOsFocusLock('exclusive', { dir, waitMs: 5_000 })
+    expect(fs.readdirSync(dir).some((n) => n.includes(`.${pid}.`))).toBe(false)
+    lease.release()
+  })
+
+  test('should clear a waiting entry left by a process that has exited, so shared leases are not blocked', async () => {
+    const pid = await deadPid()
+    fs.writeFileSync(path.join(dir, `waiting.${Date.now()}.${pid}.00000000-0000-4000-8000-000000000000`), '')
+
+    const lease = await acquireOsFocusLock('shared', { dir, waitMs: 5_000 })
     expect(fs.readdirSync(dir).some((n) => n.includes(`.${pid}.`))).toBe(false)
     lease.release()
   })

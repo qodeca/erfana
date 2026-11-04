@@ -159,12 +159,28 @@
   outline-offset: var(--space-1);
 }
 
-/* The input guard's blocked look wins over hover; the pointer says why nothing happens. */
+/*
+ * The input guard's blocked look (OD-6) is the Buttons card's: a transparent
+ * fill, the edge dimmed, and the label or icon – always an element – at
+ * --opacity-disabled, never the button, so a focus ring keeps full strength.
+ * It wins over hover; the pointer says why nothing happens.
+ */
 .erf-site-prompt__button[aria-disabled='true'],
-.erf-site-prompt__close[aria-disabled='true'] {
-  background: var(--color-btn-secondary-bg);
-  color: var(--color-text-tertiary);
+.erf-site-prompt__button[aria-disabled='true']:hover,
+.erf-site-prompt__close[aria-disabled='true'],
+.erf-site-prompt__close[aria-disabled='true']:hover {
+  background: transparent;
+  color: var(--color-text-primary);
   cursor: not-allowed;
+}
+
+.erf-site-prompt__button[aria-disabled='true'] {
+  border-color: color-mix(in srgb, var(--color-border-subtle) calc(var(--opacity-disabled) * 100%), transparent);
+}
+
+.erf-site-prompt__button[aria-disabled='true'] > *,
+.erf-site-prompt__close[aria-disabled='true'] > * {
+  opacity: var(--opacity-disabled);
 }
 
 .erf-site-prompt__queue {
@@ -242,5 +258,11 @@
   }
   .erf-site-prompt__quote {
     border-color: CanvasText;
+  }
+  /* The blocked look survives a contrast theme (Buttons card, Forced colours card map). */
+  .erf-site-prompt__button[aria-disabled='true'],
+  .erf-site-prompt__close[aria-disabled='true'] {
+    border-color: GrayText;
+    color: GrayText;
   }
 }

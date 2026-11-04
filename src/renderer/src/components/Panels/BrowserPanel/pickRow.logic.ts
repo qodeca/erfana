@@ -212,10 +212,30 @@ export interface PickAnnounceFacts {
   readonly noteSeq: number
   /** The send notice's sentence ("Sent Explain to Terminal"), while it shows. */
   readonly sent: string | null
+  /**
+   * The send notice's identity, while it shows: a second send with the same
+   * sentence replaces the notice with a new one, and is said again.
+   */
+  readonly sentKey?: object | null
+  /** A send is in flight: pick mode ending now is the send's doing, said by its own sentence. */
+  readonly sending?: boolean
 }
 
-/** The refinement end notes the region repeats as a sentence (§ Announcements, *Refinement*). */
+/** The refinement end notes the region repeats as a sentence, for the held capture (§ Announcements, *Refinement*). */
 const SPOKEN_NOTES: ReadonlySet<StatusNote> = new Set<StatusNote>(['topOfPage', 'backAtStart'])
+
+/**
+ * The notes said whenever they show, capture held or not (§ Announcements,
+ * *Page changed*; ux review round 2): the page change drops the capture as it
+ * shows, and the other two answer a key press that otherwise seems to do nothing.
+ */
+const NOTES_ALWAYS_SPOKEN: ReadonlySet<StatusNote> = new Set<StatusNote>(['pageChanged', 'elementGone', 'loadAPage'])
+
+/** A note's words as a sentence: with its full stop (OD-9), never two. */
+function noteSentence(note: StatusNote): string {
+  const text = NOTE_TEXT[note]
+  return text.endsWith('.') ? text : `${text}.`
+}
 
 /**
  * A size as a screen reader says it: "101 × 18" → "101 by 18".
@@ -231,7 +251,8 @@ export function spokenSize(size: string): string {
  * What the tab's polite region says as the pick state moves from `prev` to
  * `next`, or `null` for nothing (design § Announcements: *Pick mode on*,
  * *off*, *Announce – refined* and its end notes, *Page paused* once,
- * *Announce – sent*). The send outranks the pick mode ending with it.
+ * *Announce – sent*, *Page changed*, and the element-gone and load-a-page
+ * notes). The send outranks the pick mode ending with it.
  *
  * @param prev - The facts last spoken about
  * @param next - The facts now
@@ -243,12 +264,13 @@ export function spokenSize(size: string): string {
  * ```
  */
 export function pickAnnouncement(prev: PickAnnounceFacts, next: PickAnnounceFacts): string | null {
-  if (next.sent !== null && next.sent !== prev.sent) {
-    return `${next.sent}. Show terminal and Open capture are also in the target menu.`
+  if (next.sent !== null && (next.sent !== prev.sent || (next.sentKey ?? null) !== (prev.sentKey ?? null))) {
+    return `${next.sent}. Show terminal and Open last capture are also in the target menu.`
   }
   const sameCapture = next.captureId !== null && next.captureId === prev.captureId
-  if (sameCapture && next.note !== null && next.noteSeq !== prev.noteSeq && SPOKEN_NOTES.has(next.note)) {
-    return `${NOTE_TEXT[next.note]}.`
+  const newNote = next.note !== null && next.noteSeq !== prev.noteSeq ? next.note : null
+  if (newNote !== null && (NOTES_ALWAYS_SPOKEN.has(newNote) || (sameCapture && SPOKEN_NOTES.has(newNote)))) {
+    return noteSentence(newNote)
   }
   if (sameCapture && next.changedAt !== null && next.changedAt !== prev.changedAt && next.name !== null && next.size !== null) {
     return `Picked ${next.name}, ${spokenSize(next.size)}.`
@@ -256,6 +278,6 @@ export function pickAnnouncement(prev: PickAnnounceFacts, next: PickAnnounceFact
   if (sameCapture && next.frozen && !prev.frozen) return 'Page paused.'
   if (next.on && !prev.on) return 'Picking. Esc to stop.'
   // A send ends pick mode too; its own sentence is said instead.
-  if (!next.on && prev.on && next.sent === null) return 'Picking stopped.'
+  if (!next.on && prev.on && next.sent === null && next.sending !== true) return 'Picking stopped.'
   return null
 }

@@ -351,8 +351,10 @@ test.describe('pick banner, frame and paused chip (025-AC-081)', () => {
   }) => {
     const flow = await PickFlow.open(appWithTestProject, windowWithTestProject)
     await flow.load(browserServers.sites.static.url('/frames.html'), { pointer: false })
+    // The tooltip's text: drawn by the band tooltip on focus and hover (025-AC-065), never a native title.
+    await expect(flow.pickButton).not.toHaveAttribute('title')
     await expect(flow.pickButton).toHaveAttribute(
-      'title',
+      'data-tip',
       `Pick element (${PICK_KEY_LABEL}) – press ${PICK_KEY_LABEL} again to pick what is under the mouse\nMenus stay open while picking – click to pick`
     )
     await flow.pickButton.click()
@@ -379,6 +381,44 @@ test.describe('pick banner, frame and paused chip (025-AC-081)', () => {
     await flow.expectStatus(FIRST)
     expect(await firstClauseFit(flow)).toEqual({ clipped: false, lines: 1, insideSlot: true })
   })
+
+  // The longest first clauses (ui review round 2): under 560px of row the label of Pick element and the tag
+  // give their room (PickRow.css), so each shows whole at a 400px and a 480px tab.
+  const LONG_CLAUSES = {
+    panel: 'Picking – Esc or click outside closes the panel',
+    dialog: 'Picking – Esc or Cancel closes the dialog',
+    outPanelClosed: 'Picking – the panel closed when you left; pick again'
+  } as const
+  for (const width of [400, 480] as const) {
+    for (const place of ['panel', 'dialog', 'outPanelClosed'] as const) {
+      test(`025-AC-081 at a ${width}px tab the ${place} first clause shows whole, neither clipped nor wrapped`, async ({
+        appWithTestProject,
+        windowWithTestProject,
+        browserServers
+      }) => {
+        const flow = await PickFlow.open(appWithTestProject, windowWithTestProject)
+        const terminal = new TerminalPage(windowWithTestProject)
+        // Opened before the width is set: the terminal panel takes its room from the editor area.
+        if (place === 'outPanelClosed') await terminal.open()
+        await flow.load(browserServers.sites.static.url('/elements.html'))
+        await flow.setTabWidth(width)
+        await flow.pickButton.click()
+        await flow.pickByClick('#save-label', 'span#save-label ')
+        if (place === 'dialog') {
+          await flow.action('Ask').click()
+          await expect(flow.dialog).toBeVisible()
+        }
+        if (place === 'outPanelClosed') {
+          await terminal.focus()
+          await expect(flow.actions).toHaveCount(0, { timeout: WAIT_MS })
+        }
+        await expect(flow.status.locator('.erf-brw-banner-line__first')).toHaveText(LONG_CLAUSES[place], { timeout: WAIT_MS })
+        expect(await firstClauseFit(flow)).toEqual({ clipped: false, lines: 1, insideSlot: true })
+        // The label is hidden from sight only: the button keeps its name.
+        await expect(flow.pickButton).toHaveAccessibleName('Pick element')
+      })
+    }
+  }
 
   for (const run of ['address bar', 'menu', 'dialog', 'terminal'] as const) {
     test(`025-AC-081 from page focus in pick mode, focus moving to the ${run} gives its own banner`, async ({ appWithTestProject, windowWithTestProject, browserServers }) => {

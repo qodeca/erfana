@@ -217,6 +217,34 @@ describe('BrowserTabPick', () => {
       expect(h.page.cdp.sent.length).toBe(sent)
     })
 
+    it('keeps the new element outlined when the pointer moves on while the first Up reads the chain', async () => {
+      await hovering(h)
+      // The chain read takes several round trips; the move to the frame's element lands before it ends.
+      h.pick.refine('parent')
+      h.contents.mouse('mouseMove', 415, 115)
+      await settle()
+      expect(h.pick.highlight.record?.node).toEqual({ sessionKey: 'S1', backendNodeId: 102, frameId: 'F1' })
+      expect(h.events.filter((e) => e.kind === 'highlight').at(-1)).toMatchObject({ label: h.pick.highlight.record?.label })
+    })
+
+    it('outlines the new element again when the pointer moves on while an Up draws its outline', async () => {
+      await hovering(h)
+      h.clock.advance(CHAIN_REST_MS)
+      await settle()
+      // The chain is read: the Up goes straight to drawing, and the move lands (and is outlined) while it does.
+      const highlight = h.pick.highlight
+      const show = highlight.show.bind(highlight)
+      vi.spyOn(highlight, 'show').mockImplementationOnce(async (node) => {
+        h.contents.mouse('mouseMove', 415, 115)
+        await settle()
+        return show(node)
+      })
+      h.pick.refine('parent')
+      await settle()
+      expect(h.pick.highlight.record?.node).toEqual({ sessionKey: 'S1', backendNodeId: 102, frameId: 'F1' })
+      expect(h.events.filter((e) => e.kind === 'highlight').at(-1)).toMatchObject({ label: h.pick.highlight.record?.label })
+    })
+
     it('moving onto the same element keeps the refined highlight', async () => {
       await hovering(h)
       h.pick.refine('parent')
@@ -377,6 +405,13 @@ describe('BrowserTabPick', () => {
       expect(h.pick.capture?.afterNavigation).toBe(true)
       h.pick.close(id, 'cancel')
       expect(h.pick.capture).toBeNull()
+    })
+
+    it('ends pick mode with the page-changed reason when the page navigates under the open menu (025-FR-053)', async () => {
+      await confirmed(h)
+      h.contents.emit('did-navigate')
+      await settle()
+      expect(h.events.filter((e) => e.kind === 'ended').at(-1)).toMatchObject({ kind: 'ended', reason: 'pageChanged' })
     })
 
     it('ends pick mode on a new document with the navigated reason when nothing is held', async () => {

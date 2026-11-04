@@ -131,6 +131,14 @@ describe('useNavFold', () => {
     expect(foldOf(buildRow(0), PARTS).result.current).toBe(0)
   })
 
+  it('measures on one canvas, never a new one per measure', () => {
+    const create = vi.spyOn(document, 'createElement')
+    const { rerender } = foldOf(buildRow(400), PARTS)
+    rerender()
+    foldOf(buildRow(200), PARTS)
+    expect(create.mock.calls.filter(([tag]) => String(tag) === 'canvas').length).toBeLessThanOrEqual(1)
+  })
+
   it('takes no step when the text cannot be measured (no canvas)', () => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
     expect(foldOf(buildRow(200), PARTS).result.current).toBe(0)

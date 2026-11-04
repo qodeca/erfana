@@ -7,10 +7,16 @@
  * hovered element's label and every banner rewrite stay silent; this region
  * says only what the design lists: pick mode on and off, each refinement
  * ("Picked {tag}, {size spoken}.") and its end notes, "Page paused." once,
- * and the send with its fallback route named (`pickAnnouncement`).
+ * the send with its fallback route named, the page change, and the
+ * element-gone and load-a-page notes (`pickAnnouncement`).
  *
  * Each sentence replaces the region's child under a new key, so the same
  * sentence said twice in a row is still announced.
+ *
+ * A send ends pick mode in main before its reply reaches the panel, so pick
+ * mode can go off one render before the send notice appears. While a send is
+ * in flight that change is held back: the send's sentence is said instead,
+ * and "Picking stopped." only if the send ends without a notice.
  */
 import { useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
@@ -23,10 +29,14 @@ export interface PickAnnouncerProps {
   readonly tabId: string | null
   /** The send notice's sentence while it shows, else `null`. */
   readonly sent: string | null
+  /** The send notice itself while it shows: a new notice with the same sentence is said again. */
+  readonly sentKey?: object | null
+  /** A send is in flight (the panel's or dialog's busy action). */
+  readonly sending?: boolean
 }
 
 /** The facts of `tab` the region speaks about – never its hover label. */
-function storeFacts(tab: BrowserPickTab): Omit<PickAnnounceFacts, 'sent'> {
+function storeFacts(tab: BrowserPickTab): Omit<PickAnnounceFacts, 'sent' | 'sentKey' | 'sending'> {
   const capture = tab.capture
   return {
     on: tab.on,
@@ -50,10 +60,12 @@ function sameFacts(a: PickAnnounceFacts, b: PickAnnounceFacts): boolean {
  * @param props - {@link PickAnnouncerProps}
  * @returns The hidden live region
  */
-export function PickAnnouncer({ tabId, sent }: PickAnnouncerProps): JSX.Element {
+export function PickAnnouncer({ tabId, sent, sentKey = null, sending = false }: PickAnnouncerProps): JSX.Element {
   const fromStore = useBrowserPickStore(useShallow(s => storeFacts(tabId === null ? IDLE_PICK : (s.byTab.get(tabId) ?? IDLE_PICK))))
-  const facts: PickAnnounceFacts = { ...fromStore, sent }
-  const [seen, setSeen] = useState(facts)
+  const current: PickAnnounceFacts = { ...fromStore, sent, sentKey, sending }
+  const [seen, setSeen] = useState(current)
+  // Pick mode going off while a send is in flight is held back until the send ends (see the header).
+  const facts: PickAnnounceFacts = sending && seen.on && !current.on ? { ...current, on: true } : current
   const [said, setSaid] = useState({ text: '', seq: 0 })
   // A change of state is said once, adjusted during render (React's pattern for state derived from a change).
   if (!sameFacts(seen, facts)) {

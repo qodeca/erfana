@@ -148,6 +148,49 @@ describe('useToolbarTooltip (025-AC-065, design R2-H5, R4-M3)', () => {
     expect(tip()).toBeNull()
   })
 
+  const box = (left: number, width: number): DOMRect =>
+    ({ left, right: left + width, width, top: 0, bottom: 28, height: 28, x: left, y: 0, toJSON: () => ({}) }) as DOMRect
+
+  it('takes no Esc for a focus tooltip that has no room to show: that Esc routes at once (OD-16)', () => {
+    render(<Harness />)
+    const pick = button('Pick element')
+    ;(pick.parentElement as HTMLElement).getBoundingClientRect = () => box(0, 40)
+    pick.getBoundingClientRect = () => box(0, 10)
+    focus(pick)
+    expect(tip()).toBeNull()
+    fireEvent.keyDown(pick, { key: 'Escape' })
+    expect(routed).toHaveBeenCalledOnce()
+  })
+
+  it('measures its place again when the band changes size while it shows', () => {
+    const observers: Array<() => void> = []
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          observers.push(callback)
+        }
+        observe(): void {}
+        disconnect(): void {}
+      }
+    )
+    try {
+      render(<Harness />)
+      const pick = button('Pick element')
+      const band = pick.parentElement as HTMLElement
+      band.getBoundingClientRect = () => box(0, 600)
+      pick.getBoundingClientRect = () => box(0, 100)
+      focus(pick)
+      const before = tip()?.style.width
+      expect(before).not.toBe('')
+      band.getBoundingClientRect = () => box(0, 400)
+      act(() => observers.at(-1)?.())
+      expect(tip()?.style.width).not.toBe(before)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('lets focus win over a pending hover', () => {
     render(<Harness />)
     focus(button('Reload'))

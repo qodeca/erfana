@@ -133,10 +133,10 @@ export function SignInBox(props: SignInBoxProps): JSX.Element {
           aria-disabled={guarded ? true : undefined}
           onClick={props.onCancel}
         >
-          Cancel
+          <span>Cancel</span>
         </button>
         <button type="submit" className="erf-site-prompt__button" aria-disabled={guarded || busy ? true : undefined}>
-          {busy ? 'Signing in…' : 'Sign in'}
+          <span>{busy ? 'Signing in…' : 'Sign in'}</span>
         </button>
       </div>
     </form>

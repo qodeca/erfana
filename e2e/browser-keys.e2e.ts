@@ -382,6 +382,8 @@ test.describe('built-in browser key routing in the tab (renderer and main)', () 
     await panel.waitForState({ loading: false })
     const page = await panel.page()
     await page.waitForLoaded(browserServers.sites.static.url('/popups.html'))
+    // "No strip row" below means none: a Linux host without a keyring adds its own.
+    await panel.dismissHostRows()
     await page.eval(LOG_KEYS)
     const keyboard = windowWithTestProject.keyboard
     /** Give the page keyboard focus, as a click in it does. */
@@ -446,6 +448,8 @@ test.describe('built-in browser key routing in the tab (renderer and main)', () 
     const send = await BrowserSendUi.open(appWithTestProject, windowWithTestProject, testProject.path)
     const { panel, pick } = send
     await send.load(browserServers.sites.static.url('/events.html'))
+    // Shift+F6 from the page must land on the pick row: no host strip row ("No keyring" on Linux) in between.
+    await panel.dismissHostRows()
     const page = await panel.page()
     const keyboard = windowWithTestProject.keyboard
     // One bubble, drawn inside the pick row's band for both toolbar rows (design R2-H5).

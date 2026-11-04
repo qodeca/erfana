@@ -27,7 +27,7 @@
  * shows those under the header. The text is the page's and is drawn as page
  * text (mono, isolated), never next to an Erfana verb (Security rule 8).
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import { useLatestRef } from '../../../hooks/useLatestRef'
 import type { RefineMoveRequest } from '../../../../../shared/ipc/browser-tab-pick-schema'
@@ -327,14 +327,19 @@ const BANNER_BUTTON: Readonly<Record<NonNullable<TargetBanner['action']>, string
 export function BannerSlot({ banner, buttonRef, onAction }: BannerSlotProps): JSX.Element {
   const error = banner.kind.startsWith('guard')
   const tone = error ? 'error' : banner.kind === 'targetChosen' ? 'info' : 'warning'
+  // The guard moves focus to the button at once, which can cut the alert short: the button carries the reason.
+  const textId = useId()
   return (
     <div className={`erf-brw-banner erf-brw-banner--${tone}`} role={error ? 'alert' : 'status'}>
-      <p className="erf-brw-banner__text">{banner.text}</p>
+      <p id={textId} className="erf-brw-banner__text">
+        {banner.text}
+      </p>
       {banner.action !== null && (
         <button
           ref={buttonRef}
           type="button"
           data-tab-stop=""
+          aria-describedby={textId}
           className="erf-brw-banner__button"
           onClick={() => onAction(banner.action as NonNullable<TargetBanner['action']>)}
         >

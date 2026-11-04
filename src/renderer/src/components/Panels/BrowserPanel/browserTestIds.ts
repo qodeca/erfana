@@ -15,7 +15,7 @@ export const BROWSER_TEST_IDS = {
   EDITOR_TAB: 'browser-editor-tab',
   /** The refused-address message under the navigation row. */
   REFUSED: 'browser-refused-address',
-  /** The strip above the page: refused address and site prompts (commit 18). */
+  /** The strip above the page: refused address and site prompts. */
   STRIP: 'browser-strip',
   /** The tab's polite announcement region. */
   STRIP_ANNOUNCER: 'browser-strip-announcer',
@@ -25,7 +25,7 @@ export const BROWSER_TEST_IDS = {
   CHIPS: 'browser-address-chips',
   /** A browser popup's origin strip (its own window). */
   POPUP_STRIP: 'browser-popup-strip',
-  /** The pick row under the navigation row (commit 19). */
+  /** The pick row under the navigation row. */
   PICK_ROW: 'browser-pick-row',
   /** The pick row's status slot. */
   PICK_STATUS: 'browser-pick-status',

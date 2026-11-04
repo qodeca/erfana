@@ -211,7 +211,8 @@ export function StripRow({ row, since: shownSince, onAnswer, onLeavingWithFocus 
               aria-disabled={guarded ? true : undefined}
               onClick={() => answer(given)}
             >
-              {answerLabel(row, given)}
+              {/* An element, so the blocked look can dim it (Buttons card). */}
+              <span>{answerLabel(row, given)}</span>
             </button>
           ))}
         </div>

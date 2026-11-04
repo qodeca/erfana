@@ -173,6 +173,19 @@ describe('open', () => {
     expect(started).toHaveLength(1)
   })
 
+  it('refuses a folder that holds a user folder, such as a sync root Documents lives in (security review round 2)', async () => {
+    const users = new LocalFileServers({
+      now: () => now,
+      appAddresses: () => app,
+      createServer: fakeServer,
+      refusesFolder: () => false,
+      // `site/Documents` stands for a user folder synced below `site` (a OneDrive root).
+      userFolders: () => [join(project, 'site', 'Documents')]
+    })
+    expect(await users.open(request('site/index.html'))).toEqual({ ok: false, reason: 'local-file' })
+    expect((await users.open(request('other/index.html'))).ok).toBe(true)
+  })
+
   itPosix('compares a user folder by its real path, so a link to it is refused too', async () => {
     const link = join(base, 'downloads-link')
     await symlink(join(project, 'site'), link).catch(() => undefined)

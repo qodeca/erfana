@@ -95,6 +95,17 @@ describe('StripRows', () => {
     expect(gateway.answerStrip).toHaveBeenLastCalledWith({ tabId: TAB, requestId: 'p', answer: 'dismiss' })
   })
 
+  it('wraps every guarded answer\'s label or icon in an element, so the blocked look dims it and not the button (Buttons card)', () => {
+    render(<StripRows tabId={TAB} rows={[{ row: row('p'), since: now }]} refused={null} refusedId="r" onEmpty={vi.fn()} />)
+    const guarded = Array.from(document.querySelectorAll<HTMLElement>('.erf-site-prompt__button, .erf-site-prompt__close'))
+    expect(guarded.length).toBeGreaterThan(1)
+    for (const button of guarded) {
+      expect(button).toHaveAttribute('aria-disabled', 'true')
+      // No bare text node: `> *` reaches all of the label.
+      expect(Array.from(button.childNodes).every(node => node.nodeType === Node.ELEMENT_NODE)).toBe(true)
+    }
+  })
+
   it('ends the guard even when its timer fires a moment before the clock says 500 ms', () => {
     render(<StripRows tabId={TAB} rows={[{ row: row('p'), since: now }]} refused={null} refusedId="r" onEmpty={vi.fn()} />)
     const allow = screen.getByRole('button', { name: 'Allow' })
