@@ -323,6 +323,11 @@ describe('Markdown Preview comments', () => {
       await user.keyboard('{Escape}')
       await waitFor(() => expect(screen.queryByTestId('comment-window')).toBeNull())
       expect(modeTool()).toHaveAttribute('aria-pressed', 'true')
+      // The next Esc is comment mode's: it turns off and focus goes to its button (#445)
+      act(() => paragraph().focus())
+      await user.keyboard('{Escape}')
+      expect(modeTool()).toHaveAttribute('aria-pressed', 'false')
+      expect(modeTool()).toHaveFocus()
     })
 
     it('024-AC-029: Esc leaves comment mode and returns focus to the toggle; Shift+F10 opens the menu on the picked target', async () => {

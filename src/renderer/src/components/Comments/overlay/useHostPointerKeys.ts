@@ -309,6 +309,9 @@ export function useHostPointerKeys(options: HostPointerKeysOptions): HostPointer
       if (step === 'exit' && latest.current.windowOpen) {
         event.preventDefault()
         event.stopPropagation()
+        // Its release is taken too, as in comment mode (OVL-E-01, #445); a press
+        // outside the mode is not deleted above until this one is added
+        swallowedKeys.add(keyOf(event))
         latest.current.onWindowEscape()
         return
       }
