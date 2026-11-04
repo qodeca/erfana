@@ -3995,7 +3995,7 @@
       "id": "docs-ui-components/22",
       "audience": "developer",
       "doc": "docs/ui-components.md",
-      "quote": "title={showControlPanel ? 'Hide Filter Options' : 'Show Filter Options'}",
+      "quote": "title: showControlPanel ? 'Hide Filter Options' : 'Show Filter Options',",
       "status": "fixed",
       "evidence": "source",
       "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:122",

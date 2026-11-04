@@ -54,19 +54,23 @@ Collapsible panels opened by a toggle button in the panel header.
 
 Header with a `Funnel` toggle button. Click, <kbd>Enter</kbd> or <kbd>Space</kbd> toggles visibility; `aria-expanded` reports the state and the open button keeps a fill. Only the hover/active colours transition (`--transition-normal`).
 
-**Implementation** (`ProjectPanel.tsx`; a real `<button>`, keyboard-reachable, named "File filter" – #452):
+**Implementation** (`ProjectPanel.tsx`; a real `<button>`, keyboard-reachable, named "File filter" – #452). The header is a `ToolbarOverflow` row (#451), which renders the button from one action; `expanded` and `controls` become `aria-expanded` and `aria-controls`, and `titleAddon` shows "Markdown only" after the title (trimmed – the real call also passes `icon`, `titleClassName`, `menuLabel` and a `testId`):
 ```typescript
-<button
-  type="button"
-  className="control-panel-chevron"
-  onClick={() => setShowControlPanel(open => !open)}
-  aria-label="File filter"
-  aria-expanded={showControlPanel}
-  aria-controls={PROJECT_FILTER_PANEL_ID}
-  title={showControlPanel ? 'Hide Filter Options' : 'Show Filter Options'}
->
-  <Funnel size={16} strokeWidth={2} aria-hidden="true" />
-</button>
+<ToolbarOverflow
+  className="sidebar-panel-header"
+  title="Project"
+  titleAddon={filterMode === 'markdown' && <span className="project-filter-chip">Markdown only</span>}
+  buttonClassName="control-panel-chevron"
+  actions={[{
+    id: 'filter',
+    icon: <Funnel size={16} strokeWidth={2} aria-hidden="true" />,
+    label: 'File filter',
+    title: showControlPanel ? 'Hide Filter Options' : 'Show Filter Options',
+    expanded: showControlPanel,
+    controls: PROJECT_FILTER_PANEL_ID,
+    onSelect: () => setShowControlPanel((shown) => !shown)
+  }]}
+/>
 ```
 
 **CSS**: `.control-panel-chevron` (plus `:hover` / `:active` / `[aria-expanded='true']` / `:focus-visible`) in `ProjectPanel.css`
