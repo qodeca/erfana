@@ -1,0 +1,378 @@
+<!-- @card group="Components" name="Active file in the tree" subtitle="The tree row of the file showing in the active tab – a lime underline on the name, the tab's own mark, kept apart from selection, focus and hover" status="proposed" reviewed="2026-11-03" answers="Show which tree row is the open file; Reveal the active tab in the project tree" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Active file in the tree – Erfana design system</title>
+<link rel="stylesheet" href="../../../tokens.css">
+<link rel="stylesheet" href="../../../ds.css">
+<link rel="stylesheet" href="../row/row.css">
+<style>
+  /* ---------- the decision (shipped in ProjectTree.css) ----------
+     Option A, decided by the owner on 2026-11-03: the active tab's mark, moved
+     onto the row's name.
+     The same colour role and the same thickness as the selected tab's
+     underline (tabs.css), on the NAME only – never the icon or the git badge. */
+  .erf-row--revealed .erf-row__name {
+    text-decoration-line: underline;
+    text-decoration-style: solid;
+    text-decoration-color: var(--color-accent-secondary);
+    text-decoration-thickness: var(--border-width-thick);
+    text-underline-offset: var(--space-2);
+    text-decoration-skip-ink: none;
+    /* The name clips its overflow (it elides its tail), and a line drawn below
+       the text box is clipped with it. Symmetric block padding keeps the line
+       inside the box without moving the text off centre. */
+    padding-block: var(--space-2);
+  }
+  /* Cut + revealed: cut keeps its dimmed name and its dashed shape; the line
+     takes the reveal colour. Row card: cut is a dashed underline. */
+  .erf-row--revealed.erf-row--cut .erf-row__name {
+    text-decoration-style: dashed;
+    text-decoration-color: var(--color-accent-secondary);
+  }
+
+  /* Option B, rejected by the owner on 2026-11-03: a lime edge on the row's inline-end side –
+     the side that faces the editor. */
+  .erf-row--revealed-edge { border-inline-end: var(--border-width-thick) solid var(--color-accent-secondary); }
+
+  /* ---------- documentation chrome ---------- */
+  .ta-stage { display: flex; gap: var(--space-16); flex-wrap: wrap; align-items: flex-start; }
+  .ta-col { display: flex; flex-direction: column; gap: var(--space-4); }
+  .ta-col-title { font-size: var(--ds-text-small); color: var(--color-text-bright); font-weight: var(--font-medium); margin: 0; }
+  .ta-states { display: flex; flex-direction: column; gap: var(--border-width);
+               background: var(--color-border-default);
+               border: var(--border-width) solid var(--color-border-default); width: 320px; }
+  .ta-state { background: var(--color-bg-tertiary); padding: var(--space-2) 0; }
+  .ta-state-name { font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-text-tertiary);
+                   padding: var(--space-2) var(--space-8) 0; }
+  .ta-tree { background: var(--color-bg-tertiary); padding: var(--space-4) 0; }
+  .ta-tabs { display: flex; gap: var(--space-2); margin-bottom: var(--space-4); }
+  .ta-tab { font-size: var(--ds-text-small); color: var(--color-text-tertiary); padding: var(--space-2) var(--space-4);
+            border-bottom: var(--border-width-thick) solid transparent; }
+  .ta-tab--on { color: var(--color-text-emphasis); border-bottom-color: var(--color-accent-secondary); }
+  .ta-narrow { width: 220px; }
+  .ta-notes { flex: 1 1 32ch; max-width: var(--ds-measure); }
+
+  /* The forced-colours simulation (Forced colours card): system colours only. */
+  .ta-fc { color-scheme: dark; forced-color-adjust: none; background: Canvas; color: CanvasText;
+           padding: var(--space-4) 0; font-size: var(--text-base); }
+  .ta-fc-row { display: flex; align-items: center; min-height: var(--space-14); padding: 0 var(--space-8);
+               border-left: var(--border-width-thick) solid transparent; }
+  .ta-fc-edge { border-left-color: CanvasText; }
+  .ta-fc-name--revealed { text-decoration: underline solid CanvasText; text-decoration-thickness: var(--border-width-thick);
+                          text-underline-offset: var(--space-2); text-decoration-skip-ink: none; }
+  .ta-fc-name--cut { text-decoration: underline dashed CanvasText; text-underline-offset: var(--space-1); }
+  .ta-fc-focus { outline: var(--border-width-thick) solid Highlight; outline-offset: calc(var(--space-1) * -1); }
+</style>
+</head>
+<body>
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../../index.html#components">Components</a> <span aria-hidden="true">/</span> <span aria-current="page">Active file in the tree</span></nav>
+<main>
+<h1>Active file in the tree</h1>
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> reviewed 2026-11-03 · for <a href="https://github.com/qodeca/erfana/issues/453">#453</a> · design note <a href="../../../../designs/project-tree/README.md">project-tree</a></p>
+<p class="ds-lede" id="decision">
+  When a file or preview tab becomes active, the project tree marks that file's row with the <strong>active tab's own
+  mark – a 2px lime line – drawn under the file name</strong>. The tab and the row then say the same thing in the same
+  shape: "this is the file you are looking at". The mark is not selection, not focus and not hover, and it never
+  moves keyboard focus.
+</p>
+
+<div class="ds-note">
+  <strong>This card adds one state to <a href="../row/index.html">Rows and lists</a> (decided) and changes nothing in
+  it.</strong> The row, its height, its indent, the selected state (fill plus lime left edge), the inset focus ring,
+  hover, cut and the git badges are all that card's; the frames below link its <code>row.css</code> rather than copy it.
+  A row is in this state when it carries <code>aria-current="true"</code>, so what is drawn is exactly what a screen
+  reader announces – the same rule <code>ProjectTreeNode.tsx</code> follows for <code>aria-selected</code>.
+</div>
+
+<div class="ds-note">
+  <strong>Why four marks have to stay apart.</strong> In the tree today, <em>selected</em> means "the folder paste and
+  New file act on" – only a folder click or <kbd>Enter</kbd> on a folder sets it; opening a file never does
+  (<code>ProjectTreeNode.tsx</code>, <code>isSelected</code>). <em>Focus</em> means "where the keys go". <em>Hover</em>
+  means "where the pointer is". <em>Active file</em> means "what the editor shows". All four can sit on screen at once,
+  on different rows, while the editor holds focus – so each needs its own shape, not just its own colour.
+</div>
+
+<h2 id="states">Every state, both options</h2>
+<p class="ds-muted">Left: option A, decided. Right: option B, rejected, kept in the same states so the comparison that
+decided it stays on record.</p>
+<div class="ta-stage">
+  <div class="ta-col">
+    <p class="ta-col-title">A – lime underline on the name (decided)</p>
+    <div class="ta-states" aria-hidden="true">
+      <div class="ta-state"><div class="ta-state-name">resting</div><div class="erf-row"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span></div></div>
+      <div class="ta-state"><div class="ta-state-name">hover</div><div class="erf-row erf-row--hover"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span></div></div>
+      <div class="ta-state"><div class="ta-state-name">selected (a folder)</div><div class="erf-row erf-row--selected"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">services</span></div></div>
+      <div class="ta-state"><div class="ta-state-name">focused (keys in the tree)</div><div class="erf-row erf-row--focus"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span></div></div>
+      <div class="ta-state"><div class="ta-state-name">active file</div><div class="erf-row erf-row--revealed"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span></div></div>
+      <div class="ta-state"><div class="ta-state-name">active file + hover</div><div class="erf-row erf-row--revealed erf-row--hover"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span></div></div>
+      <div class="ta-state"><div class="ta-state-name">active file + focused</div><div class="erf-row erf-row--revealed erf-row--focus"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span></div></div>
+      <div class="ta-state"><div class="ta-state-name">active file + selected</div><div class="erf-row erf-row--revealed erf-row--selected"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span></div></div>
+      <div class="ta-state"><div class="ta-state-name">active file + selected + focused</div><div class="erf-row erf-row--revealed erf-row--selected erf-row--focus"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span></div></div>
+      <div class="ta-state"><div class="ta-state-name">active file + cut</div><div class="erf-row erf-row--revealed erf-row--cut"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span></div></div>
+      <div class="ta-state"><div class="ta-state-name">active file, long name, git badge</div><div class="erf-row erf-row--revealed"><span class="erf-row__glyph"></span><span class="erf-row__name">useProjectTreeRevealOnActiveTabChange.ts</span><span class="erf-row__badge" data-git="modified">M</span></div></div>
+    </div>
+  </div>
+  <div class="ta-col">
+    <p class="ta-col-title">B – lime edge on the inline-end side (rejected)</p>
+    <div class="ta-states" aria-hidden="true">
+      <div class="ta-state"><div class="ta-state-name">resting</div><div class="erf-row"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span></div></div>
+      <div class="ta-state"><div class="ta-state-name">hover</div><div class="erf-row erf-row--hover"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span></div></div>
+      <div class="ta-state"><div class="ta-state-name">selected (a folder)</div><div class="erf-row erf-row--selected"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">services</span></div></div>
+      <div class="ta-state"><div class="ta-state-name">focused (keys in the tree)</div><div class="erf-row erf-row--focus"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span></div></div>
+      <div class="ta-state"><div class="ta-state-name">active file</div><div class="erf-row erf-row--revealed-edge"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span></div></div>
+      <div class="ta-state"><div class="ta-state-name">active file + hover</div><div class="erf-row erf-row--revealed-edge erf-row--hover"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span></div></div>
+      <div class="ta-state"><div class="ta-state-name">active file + focused</div><div class="erf-row erf-row--revealed-edge erf-row--focus"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span></div></div>
+      <div class="ta-state"><div class="ta-state-name">active file + selected</div><div class="erf-row erf-row--revealed-edge erf-row--selected"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span></div></div>
+      <div class="ta-state"><div class="ta-state-name">active file + selected + focused</div><div class="erf-row erf-row--revealed-edge erf-row--selected erf-row--focus"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span></div></div>
+      <div class="ta-state"><div class="ta-state-name">active file + cut</div><div class="erf-row erf-row--revealed-edge erf-row--cut"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span></div></div>
+      <div class="ta-state"><div class="ta-state-name">active file, long name, git badge</div><div class="erf-row erf-row--revealed-edge"><span class="erf-row__glyph"></span><span class="erf-row__name">useProjectTreeRevealOnActiveTabChange.ts</span><span class="erf-row__badge" data-git="modified">M</span></div></div>
+    </div>
+  </div>
+  <div class="ta-notes">
+    <div class="ds-note">
+      <strong>Why A.</strong> The person just clicked a tab that wears a lime line. Finding the same lime line in the
+      tree needs no learning – it is the same mark, in the same colour role (<code>--color-accent-secondary</code>) and
+      the same thickness (<code>--border-width-thick</code>) as the selected tab's underline on the
+      <a href="../tabs/index.html">Tabs</a> card. It sits right under the name the eye reads, so it is found at once
+      after the scroll. It adds no fill, so it can never be mistaken for hover or selection; it is a line, not a ring,
+      so it can never be mistaken for focus.
+    </div>
+    <div class="ds-note">
+      <strong>Why B was rejected.</strong> An edge on the side facing the editor is a neat spatial idea and has no
+      clash with cut. But it puts a second lime edge on the same row type: a newcomer has to learn that left means
+      "paste target" and right means "open file". In a wide sidebar it also sits far from a short name, so it is
+      slower to find – and finding the file is the whole point of #453.
+    </div>
+    <div class="ds-note">
+      <strong>Cut + active file is the one combination A has to resolve.</strong> The Rows card draws cut as a dashed
+      underline on a dimmed name. With both, the name stays dimmed and the line stays dashed – the shape still says
+      cut – and the line turns lime. That one combination tells "also the open file" by colour, which is acceptable
+      only because the active tab says the same thing in words. The app today draws cut differently (a full-width
+      dashed line under the row and an opacity fade, <code>ProjectTree.css</code>), and there the two lines simply
+      stack.
+    </div>
+    <div class="ds-note">
+      <strong>"Active file + selected" cannot happen today</strong> – only folders are selected, and only files are
+      revealed. It is drawn so the layering is settled if selection ever reaches files: the fill and left edge are
+      selection's, the underline is the reveal's, and they do not touch.
+    </div>
+  </div>
+</div>
+
+<h3 id="rejected">Considered and rejected</h3>
+<table>
+  <thead><tr><th>Treatment</th><th>Why not</th></tr></thead>
+  <tbody>
+    <tr><td>A fill of its own (a lime or grey tint)</td><td>Fill-only, so it is told from hover and selection by hue alone, and a contrast theme removes it (Forced colours card, rule 1). A lime tint also reads olive on the sidebar – the colour #432 is moving success away from.</td></tr>
+    <tr><td>Bold name</td><td>Folders and Markdown files already ship in <code>--font-medium</code>; weight cannot mean a third thing.</td></tr>
+    <tr><td>An outline around the row</td><td>That is the focus ring's shape (<a href="../../foundations/focus.html">Focus and keyboard</a>).</td></tr>
+    <tr><td>A marker icon</td><td>The app's row has no free slot – the icon slot holds the file icon – so a marker would push every name out of line.</td></tr>
+    <tr><td>A flash or pulse when it lands</td><td>The reveal is a state, not an event. Motion in the side panel pulls the eye off the editor the person is reading.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="sequence">In the tree, one tab switch at a time</h2>
+<p class="ds-muted">The editor holds focus throughout frames 1–3 and 5–6, so no row shows a ring. The strip above each
+tree stands in for the tab bar. <code>docs</code> was opened by the person; every other open folder was opened by the
+reveal.</p>
+<div class="ds-frames">
+<figure class="ds-frame">
+<div aria-hidden="true">
+  <div class="ta-tabs"><span class="ta-tab ta-tab--on">README.md</span><span class="ta-tab">toastService.ts</span><span class="ta-tab">guide.md</span></div>
+  <div class="ta-tree">
+    <div class="erf-row erf-row--selected" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">docs</span></div>
+    <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">guide.md</span></div>
+    <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-right" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span><span class="erf-row__name">src</span></div>
+    <div class="erf-row erf-row--revealed" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">README.md</span></div>
+  </div>
+</div>
+<figcaption><span class="ds-frame__step">1</span><strong>README.md is active</strong> – its row carries the line. <em>docs</em> is open and selected because the person clicked it.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div aria-hidden="true">
+  <div class="ta-tabs"><span class="ta-tab">README.md</span><span class="ta-tab ta-tab--on">toastService.ts</span><span class="ta-tab">guide.md</span></div>
+  <div class="ta-tree">
+    <div class="erf-row erf-row--selected" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">docs</span></div>
+    <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">guide.md</span></div>
+    <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">src</span></div>
+    <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">services</span></div>
+    <div class="erf-row erf-row--revealed" style="padding-left: calc(var(--space-4) + 2 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span></div>
+    <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">README.md</span></div>
+  </div>
+</div>
+<figcaption><span class="ds-frame__step">2</span><strong>Switch to toastService.ts</strong> – <em>src</em> and <em>services</em> open, the row scrolls into view, the line moves. Selection stays on <em>docs</em>.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div aria-hidden="true">
+  <div class="ta-tabs"><span class="ta-tab">README.md</span><span class="ta-tab">toastService.ts</span><span class="ta-tab ta-tab--on">guide.md</span></div>
+  <div class="ta-tree">
+    <div class="erf-row erf-row--selected" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">docs</span></div>
+    <div class="erf-row erf-row--revealed" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">guide.md</span></div>
+    <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-right" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span><span class="erf-row__name">src</span></div>
+    <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">README.md</span></div>
+  </div>
+</div>
+<figcaption><span class="ds-frame__step">3</span><strong>Switch to guide.md</strong> – <em>src</em> and <em>services</em> close again: only the reveal opened them. <em>docs</em> stays open: the person opened it.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div aria-hidden="true">
+  <div class="ta-tabs"><span class="ta-tab">README.md</span><span class="ta-tab ta-tab--on">toastService.ts</span><span class="ta-tab">guide.md</span></div>
+  <div class="ta-tree">
+    <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">src</span></div>
+    <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">components</span></div>
+    <div class="erf-row" style="padding-left: calc(var(--space-4) + 2 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">Toast.tsx</span></div>
+    <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">services</span></div>
+    <div class="erf-row erf-row--revealed" style="padding-left: calc(var(--space-4) + 2 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span></div>
+  </div>
+</div>
+<figcaption><span class="ds-frame__step">4</span><strong>The person works inside a revealed folder</strong> – while toastService.ts is active they open <em>components</em> inside <em>src</em>. <em>src</em> now counts as theirs and stays open on the next switch; <em>services</em> still closes.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div aria-hidden="true">
+  <div class="ta-tabs"><span class="ta-tab">README.md</span><span class="ta-tab ta-tab--on">logo.png</span></div>
+  <div class="ta-tree">
+    <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-right" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span><span class="erf-row__name">docs</span></div>
+    <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-right" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span><span class="erf-row__name">src</span></div>
+    <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">README.md</span></div>
+  </div>
+</div>
+<figcaption><span class="ds-frame__step">5</span><strong>Filter "Markdown only", switch to logo.png</strong> – the file is filtered out, so nothing opens and <strong>no row carries the line</strong>. The old line is gone: it would point at a file that is no longer showing.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div aria-hidden="true">
+  <div class="ta-tabs"><span class="ta-tab">README.md</span><span class="ta-tab ta-tab--on">~/notes/todo.md</span></div>
+  <div class="ta-tree">
+    <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-right" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span><span class="erf-row__name">docs</span></div>
+    <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-right" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span><span class="erf-row__name">src</span></div>
+    <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">README.md</span></div>
+  </div>
+</div>
+<figcaption><span class="ds-frame__step">6</span><strong>A file outside the project</strong> – the same as frame 5: no reveal, no line, nothing scrolls.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div aria-hidden="true">
+  <div class="ta-tabs"><span class="ta-tab">README.md</span><span class="ta-tab ta-tab--on">toastService.ts</span></div>
+  <div class="ta-tree">
+    <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">src</span></div>
+    <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">services</span></div>
+    <div class="erf-row erf-row--revealed erf-row--focus" style="padding-left: calc(var(--space-4) + 2 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span></div>
+    <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">README.md</span></div>
+  </div>
+</div>
+<figcaption><span class="ds-frame__step">7</span><strong><kbd>Tab</kbd> into the tree afterwards</strong> – focus lands on the active file's row, because the reveal moved the tree's one Tab stop there without focusing it. Line and ring together.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div aria-hidden="true">
+  <div class="ta-tabs"><span class="ta-tab ta-tab--on">toastService.ts</span></div>
+  <div class="ta-tree ta-narrow">
+    <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">src</span></div>
+    <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">services</span></div>
+    <div class="erf-row erf-row--revealed" style="padding-left: calc(var(--space-4) + 2 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">notificationToastService.ts</span><span class="erf-row__badge" data-git="modified">M</span></div>
+  </div>
+</div>
+<figcaption><span class="ds-frame__step">8</span><strong>A narrow sidebar</strong> – the name loses its tail (Rows card) and the line ends at the ellipsis. The badge keeps its place and is never underlined.</figcaption>
+</figure>
+</div>
+
+<h2 id="keyboard">The keyboard contract</h2>
+<p class="ds-muted">The reveal never takes focus. The app is held to this contract by
+<code>ProjectTree.reveal.test.tsx</code> and <code>revealActiveFile.test.ts</code> (unit) and
+<code>e2e/tree-follow-active-tab.e2e.ts</code> (the real app).</p>
+<table class="ds-keys">
+  <thead><tr><th>Key or action</th><th>Result</th><th>Focus ends on</th></tr></thead>
+  <tbody>
+    <tr><td>Click a tab, switch tabs from the keyboard, open a file from search or a link</td><td>The tree opens the file's folders, scrolls it into view and draws the line.</td><td>Where it was – the editor or preview. Never the tree.</td></tr>
+    <tr><td><kbd>Tab</kbd> into the tree</td><td>The active file's row holds the tree's one Tab stop (roving <code>tabindex</code>, Rows card – amended for #453). The reveal moves the Tab stop only while focus is outside the tree.</td><td>The active file's row.</td></tr>
+    <tr><td><kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> from there</td><td>The Rows card's contract, unchanged. The line stays on its row; it follows the tab, not focus.</td><td>As the Rows card says.</td></tr>
+    <tr><td><kbd>←</kbd> on a folder above the active file</td><td>The folder closes. The person closed it, so the reveal does not reopen it until the tab changes again.</td><td>The folder.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="motion">Motion</h2>
+<table>
+  <thead><tr><th>What</th><th>How</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>Folders opening and closing</td><td>Instant, as every expand in the tree is today.</td><td>No new motion to keep in step with the <a href="../../foundations/motion.html#reduce">reduced-motion rule</a>.</td></tr>
+    <tr><td>The scroll</td><td>Only when the row is not fully in view; then instant, with the row placed in the middle of the tree.</td><td>A smooth scroll in the side panel is movement at the edge of vision while the person reads the editor. The middle shows the file's neighbours above and below; an edge does not.</td></tr>
+    <tr><td>The line</td><td>Appears and moves instantly. No fade, no flash, no pulse.</td><td>It is a state, not a notification.</td></tr>
+    <tr><td>Reduced motion</td><td>Identical to the above.</td><td>Nothing here animates, so there is nothing to turn off.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="contrast">Contrast</h2>
+<p class="ds-muted">WCAG 1.4.11 asks 3:1 of a state indicator against what it sits on. Measured on every surface the
+row can have under the line.</p>
+<table>
+  <thead><tr><th>The line on</th><th>Ratio</th></tr></thead>
+  <tbody>
+    <tr><td>The tree (<code>--color-bg-tertiary</code>)</td><td data-contrast="--color-accent-secondary on --color-bg-tertiary" data-min="3" data-result="pass">11.55:1 · pass</td></tr>
+    <tr><td>A hovered row (<code>--color-bg-hover-solid</code>)</td><td data-contrast="--color-accent-secondary on --color-bg-hover-solid" data-min="3" data-result="pass">10.46:1 · pass</td></tr>
+    <tr><td>A selected row (<code>--color-bg-selected</code> over the tree)</td><td data-contrast="--color-accent-secondary on --color-bg-selected over --color-bg-tertiary" data-min="3" data-result="pass">7.77:1 · pass</td></tr>
+    <tr><td>Against the focus ring it may sit inside (<code>--color-border-focus</code>)</td><td data-contrast="--color-accent-secondary on --color-border-focus">1.66:1</td></tr>
+  </tbody>
+</table>
+<p class="ds-muted">The last row has no minimum: the line and the ring never touch – the ring is inset at the row's
+edge, the line sits under the name – and they differ in shape. It is shown so nobody has to wonder.</p>
+
+<h2 id="forced">In a contrast theme</h2>
+<p class="ds-muted">Simulated with system colours, as on the <a href="../../foundations/forced-colors.html#frames">Forced
+colours</a> card. The browser repaints a text decoration in the text colour, so the line survives as a shape.</p>
+<div class="ds-frames">
+  <figure class="ds-frame"><div class="ta-fc" aria-hidden="true">
+    <div class="ta-fc-row ta-fc-edge">services</div>
+    <div class="ta-fc-row"><span class="ta-fc-name--revealed">toastService.ts</span></div>
+    <div class="ta-fc-row"><span class="ta-fc-name--cut">Toast.tsx</span></div>
+    <div class="ta-fc-row ta-fc-focus">README.md</div>
+  </div>
+  <figcaption><strong>Option A survives.</strong> Selected keeps its left edge, the active file its solid line, cut its dashed line, focus its <code>Highlight</code> ring – four shapes.</figcaption></figure>
+</div>
+
+<h2 id="measurements">Measurements</h2>
+<table>
+  <thead><tr><th>Property</th><th>Value</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>Hook</td><td><code>aria-current="true"</code> on the <code>treeitem</code></td><td>One attribute is both the announcement and the style hook.</td></tr>
+    <tr><td>Where the line goes</td><td>The name only</td><td>Never the file icon, the sensitive-file warning or the git badge.</td></tr>
+    <tr><td>Colour</td><td><code>--color-accent-secondary</code></td><td>The selected tab's underline role (Tabs card).</td></tr>
+    <tr><td>Thickness</td><td><code data-token="--border-width-thick">2px</code></td><td>The tab underline's thickness.</td></tr>
+    <tr><td>Offset below the text</td><td><code data-token="--space-2">4px</code></td><td>Clears descenders, stays inside the <code data-token="--space-14">28px</code> row.</td></tr>
+    <tr><td>Name box padding</td><td><code data-token="--space-2">4px</code> top and bottom</td><td>The name clips its overflow so it can elide its tail (<code>.file-name</code> in the app, <code>.erf-row__name</code> here), and that clip also cuts a line drawn below the text. The first render of this card lost the line on every row without a fill – found by looking, not by reading.</td></tr>
+    <tr><td>Skip ink</td><td><code>none</code></td><td>One unbroken line, like the tab's; a broken line reads as dashed, which is cut.</td></tr>
+    <tr><td>How many rows</td><td>At most one</td><td>The active tab of the focused editor group. A split view does not mark two.</td></tr>
+  </tbody>
+</table>
+<div class="ds-note">
+  <strong>Hidden files.</strong> <code>ProjectTree.css</code> dims a hidden file's name with <code>opacity</code>,
+  which would fade the line with it. The active file's row therefore shows a hidden file's name at full strength –
+  what a hovered hidden file already does – so the line is always measured at the values above.
+</div>
+
+<section id="owner">
+<h2>Owner decisions</h2>
+<p class="ds-muted">Answered on 2026-11-03; the owner approved every recommendation of the design note
+<a href="../../../../designs/project-tree/453-follow-active-tab.md">453-follow-active-tab.md</a>.</p>
+<table>
+  <thead><tr><th>Question</th><th>Answer</th></tr></thead>
+  <tbody>
+    <tr><td>The mark</td><td>Option A – the 2px lime underline on the file name, with the name-box padding of the Measurements table so the line is not clipped. No motion; scroll only when the row is not fully in view.</td></tr>
+    <tr><td>The setting</td><td><code>projectTree.followActiveTab</code>, "Follow the active tab", default on, global only, in a new Project tree section after Editor.</td></tr>
+    <tr><td>Where <kbd>Tab</kbd> lands</td><td>On the revealed file. The Rows card's "remembered row" rule was amended to say so.</td></tr>
+    <tr><td>The note's assumptions</td><td>All kept: the old line clears when the new tab cannot be revealed; reveal-opened folders still close then; a folder closed by hand is not reopened until the next tab switch; in a split view only the focused group's active tab is followed; reveal-opened folders get no special look.</td></tr>
+    <tr><td>Promotion</td><td>This card goes from proposed to decided.</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None recorded.</p>
+</section>
+</main>
+</body>
+</html>

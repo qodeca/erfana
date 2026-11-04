@@ -260,6 +260,30 @@
   opacity: 1;
 }
 
+/* The file in the active tab (#453): the selected tab's own 2px lime
+   underline, on the name only – never the icon or the git badge. Decided by
+   docs/design-system/system/components/tree-active-file/index.html; the row's
+   aria-current is the hook, so what is drawn is what is announced. */
+.project-tree-item[aria-current="true"] .file-name {
+  text-decoration-line: underline;
+  text-decoration-style: solid;
+  text-decoration-color: var(--color-accent-secondary);
+  text-decoration-thickness: var(--border-width-thick);
+  text-underline-offset: var(--space-2);
+  /* One unbroken line, like the tab's: a broken one reads as dashed (cut) */
+  text-decoration-skip-ink: none;
+  /* The name clips its overflow to elide its tail, and that clip would cut a
+     line drawn below the text: symmetric padding keeps it inside the box
+     without moving the text off centre (card § Measurements). */
+  padding-block: var(--space-2);
+}
+
+/* A hidden file's fade would fade the line with it: the active file shows at
+   full strength, as a hovered hidden file already does (card § Measurements). */
+.project-tree-item[aria-current="true"] .file-name.hidden-file {
+  opacity: 1;
+}
+
 /* Scrollbar styling */
 .project-tree-content::-webkit-scrollbar {
   width: var(--scrollbar-width);
