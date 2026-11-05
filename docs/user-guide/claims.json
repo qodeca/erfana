@@ -55248,7 +55248,7 @@
       "status": "verified",
       "evidence": "source",
       "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:253",
-      "match": "if (externalChangeDetected || isFileDeleted) return",
+      "match": "if (!shouldAutosave(externalChangeDetected, isFileDeleted)) return",
       "note": "#450: autosave holds while the tab shows its file as deleted."
     },
     {
@@ -55292,7 +55292,7 @@
       "status": "verified",
       "evidence": "source",
       "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:253",
-      "match": "if (externalChangeDetected || isFileDeleted) return",
+      "match": "if (!shouldAutosave(externalChangeDetected, isFileDeleted)) return",
       "note": "#450: autosave is skipped while the tab is in the deleted state."
     },
     {
