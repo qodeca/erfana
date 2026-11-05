@@ -26,7 +26,7 @@ vi.mock('@xterm/xterm', () => {
   }
   return { Terminal: MockTerminal }
 })
-vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit() {} } }))
+vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit() {} proposeDimensions() { return { cols: 80, rows: 24 } } } }))
 vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: class {} }))
 vi.mock('@xterm/addon-webgl', () => ({ WebglAddon: class { onContextLoss() {}; dispose() {} } }))
 

@@ -51,6 +51,31 @@ describe('GlobalSettingsService upgrade from the old file format', () => {
     expect(await readdir(settingsDir)).toEqual(['settings.json'])
   })
 
+  it('loads a file that still holds the removed terminal.screenReaderMode (#440) and drops it at the next save', async () => {
+    const settingsPath = join(settingsDir, 'settings.json')
+    const old = {
+      ...getDefaultGlobalSettings(),
+      logging: { level: 'debug' },
+      projectTree: { followActiveTab: false },
+      terminal: { screenReaderMode: 'on' }
+    }
+    await writeFile(settingsPath, JSON.stringify(old, null, 2), 'utf-8')
+
+    const service = new GlobalSettingsService()
+    await service.initialize()
+
+    // No corruption reset: every other value is kept and no backup is written
+    expect(service.getSettings()).not.toHaveProperty('terminal')
+    expect(service.getSettings().logging.level).toBe('debug')
+    expect(service.getSettings().projectTree.followActiveTab).toBe(false)
+    expect(await readdir(settingsDir)).toEqual(['settings.json'])
+
+    await service.setSetting('editor', { preserveLineBreaks: true })
+    const saved = JSON.parse(await readFile(settingsPath, 'utf-8'))
+    expect(saved).not.toHaveProperty('terminal')
+    expect(saved.logging.level).toBe('debug')
+  })
+
   it('a save is written atomically, leaves no temp file, and reloads', async () => {
     const service = new GlobalSettingsService()
     await service.initialize()

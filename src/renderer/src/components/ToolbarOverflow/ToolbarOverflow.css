@@ -1,0 +1,104 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/* Panel toolbar overflow (#451) – docs/design-system/system/patterns/toolbar-overflow
+   (decided). The row keeps its panel's own class for colour, height and padding;
+   these rules only decide what gives way. No transitions: buttons leave and
+   return instantly (card rule 10). */
+
+.erf-toolbar-overflow {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.erf-toolbar-overflow__icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+/* The title gives way first, down to a reserve of a few letters (card rule 3).
+   useToolbarOverflow reads this min-width as the reserve. */
+.erf-toolbar-overflow__title {
+  min-width: var(--space-16);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Beats a panel's own display rule; a hidden part leaves layout entirely. */
+.erf-toolbar-overflow__icon[hidden],
+.erf-toolbar-overflow__title[hidden] {
+  display: none;
+}
+
+/* The button group never shrinks: a button is whole in the row or in the menu. */
+.erf-toolbar-overflow__actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--erf-toolbar-overflow-gap, var(--space-4));
+  margin-left: auto;
+}
+
+.erf-toolbar-overflow__slot {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+/* The … button: the row's icon button, with the menu button's open fill. */
+.erf-toolbar-overflow__more[aria-expanded='true'] {
+  color: var(--color-text-primary);
+  background: var(--color-bg-active);
+}
+
+/* Menu glyphs at the menu's icon size (the row draws them smaller). */
+.erf-toolbar-overflow-menu .context-menu-icon svg {
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+}
+
+/* A label is never truncated: a long label widens the menu (card rule 8). */
+.erf-toolbar-overflow-menu .context-menu-label {
+  white-space: nowrap;
+}
+
+/* Words beside the title that never move or hide (the active filter, #452). */
+.erf-toolbar-overflow__addon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+/* #461: a toolbar with a spacer fills the row, so the spacer has room to take. */
+.erf-toolbar-overflow__actions--fill {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Takes the leftover width; useToolbarOverflow counts it at its min-width. */
+.erf-toolbar-overflow__spacer {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Content that never moves (a live region, the comment tools), spaced like the buttons. */
+.erf-toolbar-overflow__pinned {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: inherit;
+}
+
+/* A separator travels inside its button's slot, so it moves with the button. */
+.erf-toolbar-overflow__slot--separated {
+  align-items: center;
+  gap: inherit;
+}
+
+.erf-toolbar-overflow__separator {
+  flex: 0 0 auto;
+  align-self: stretch;
+  width: var(--border-width);
+  margin-inline: var(--space-2);
+  background-color: var(--color-border-default);
+}

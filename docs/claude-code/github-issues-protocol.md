@@ -106,7 +106,7 @@ When user asks for help organizing issues:
 
 ## Available labels
 
-The labels below exist on `qodeca/erfana` (read live with `gh label list --repo qodeca/erfana` on 2026-10-29; `bug`, `documentation`, `dependencies` and `security` were removed with the agent pipeline's label set, and a bug is marked by its `[Bug]: ` title prefix). Do not create new ones without user approval — and check this list before assuming a label is missing.
+The labels below exist on `qodeca/erfana` (read live with `gh label list --repo qodeca/erfana` on 2026-11-03; `bug`, `documentation`, `dependencies` and `security` were removed with the agent pipeline's label set, and a bug is marked by its `[Bug]: ` title prefix). Do not create new ones without user approval — and check this list before assuming a label is missing.
 
 | Label | Color | Purpose |
 |-------|-------|---------|
@@ -125,8 +125,13 @@ The labels below exist on `qodeca/erfana` (read live with `gh label list --repo 
 | `windows` | #1d76db | Windows platform enablement; session-start filter named in `docs/windows/README.md` |
 | `release-0.21.0` | #0E8A16 | In scope for the 0.21.0 campaign |
 | `release-0.22.0` | #0E8A16 | In scope for the 0.22.0 campaign |
+| `release-0.24.1` | #0E8A16 | In scope for the 0.24.1 campaign |
 
 `gh label list` is the authority — this table is a snapshot and can go stale.
+
+### Release scope (no milestones)
+
+The repo has no milestones: a release's scope is the set of issues carrying its `release-<version>` label. A new release label follows the same pattern: color `#0E8A16`, description "In scope for the X.Y.Z campaign".
 
 ## Issue templates
 

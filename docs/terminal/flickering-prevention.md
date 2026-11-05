@@ -133,6 +133,16 @@ if ((colsDiff >= RESIZE_COL_THRESHOLD || rowsDiff >= RESIZE_ROW_THRESHOLD) && co
 
 **Validation**: Reject dimensions <= 0 to prevent PTY errors
 
+### 3a. No fit while the panel is collapsed (#465)
+
+**File**: `TerminalPanel/terminalFit.ts` – `fitTerminalIfUsable`, used by every fit: the `ResizeObserver` path and both portal refits in `TerminalPanel.tsx`, `useTerminalPortal`, `useTerminalResize`, and the first fit in `useXtermSession`.
+
+**Strategy**: Ask FitAddon for its proposed size first (`proposeDimensions()`), and skip both the fit and the PTY resize when it is under `MIN_FIT_COLS` (20) columns or `MIN_FIT_ROWS` (3) rows. The terminal keeps its last good size.
+
+**Why**: the activity-bar Terminal button collapses the panel to 0 px but keeps it mounted. FitAddon clamps a 0 px container to 2 columns. Fitting to that reflowed the whole scrollback to 2 columns – rows past the 10,000-row scrollback were dropped for good – and told the program (an agent's TUI) it was 2 columns wide, so it redrew one letter per line. Expanding again could not bring either back. The same floor covers a panel dragged very narrow.
+
+**Tests**: `terminalFit.test.ts` (the floor), `useTerminalResize.test.ts` and `useTerminalPortal.test.ts` (no fit or PTY resize while collapsed), `e2e/terminal-collapse-history.e2e.ts` (300 long lines survive a collapse and expand).
+
 ### 4. Dimension Change Threshold
 
 **File**: `TerminalPanel.tsx` (inline `colsDiff >= 2 || rowsDiff >= 1`; mirrored by `RESIZE_COL_THRESHOLD = 2`, `RESIZE_ROW_THRESHOLD = 1` in `TerminalPanel/terminalPanel.logic.ts`)
@@ -145,17 +155,17 @@ let lastCols = 0
 let lastRows = 0
 
 const handleResize = () => {
-  fitAddonRef.current?.fit()
+  // null while the panel is collapsed or tiny (see 3a)
+  const size = fitTerminalIfUsable(fitAddonRef.current, xtermRef.current)
 
-  if (xtermRef.current) {
-    const cols = Math.floor(xtermRef.current.cols)
-    const rows = Math.floor(xtermRef.current.rows)
+  if (size) {
+    const { cols, rows } = size
 
     // THRESHOLD: Only resize PTY if change is >= 2 columns or >= 1 row
     const colsDiff = Math.abs(cols - lastCols)
     const rowsDiff = Math.abs(rows - lastRows)
 
-    if ((colsDiff >= 2 || rowsDiff >= 1) && cols > 0 && rows > 0) {
+    if (colsDiff >= 2 || rowsDiff >= 1) {
       window.api.terminal.resize(terminalId, cols, rows)
       lastCols = cols
       lastRows = rows

@@ -15,6 +15,7 @@ export type TreeKeyAction =
   | { type: 'collapse'; path: string }
   | { type: 'activate'; index: number }
   | { type: 'menu'; index: number }
+  | { type: 'delete'; index: number }
 
 /** The subset of a keyboard event the contract reads. */
 export interface TreeKey {
@@ -23,6 +24,25 @@ export interface TreeKey {
   altKey?: boolean
   ctrlKey?: boolean
   metaKey?: boolean
+  /** An auto-repeat of a held key */
+  repeat?: boolean
+}
+
+/**
+ * Whether a key press asks to delete the focused item (#463).
+ *
+ * The Delete key on every platform; on macOS also ⌘⌫, Finder's shortcut, since
+ * a Mac laptop has no Delete key (its "delete" is Backspace). A held key does
+ * not repeat: one press, one confirmation.
+ *
+ * @param event - The key press
+ * @param mac - Whether the app runs on macOS (`isMacOS()`)
+ * @returns True for a bare Delete, or ⌘⌫ on macOS
+ */
+export function isTreeDeleteKey(event: TreeKey, mac: boolean): boolean {
+  if (event.repeat || event.shiftKey || event.altKey || event.ctrlKey) return false
+  if (event.key === 'Delete') return !event.metaKey
+  return mac && event.key === 'Backspace' && event.metaKey === true
 }
 
 /**
@@ -33,19 +53,27 @@ export interface TreeKey {
  * - ←: an open folder closes; anything else moves to its parent.
  * - Enter: the row's default action (open a file, toggle a folder).
  * - Shift+F10 / the ContextMenu key: open the row's context menu.
+ * - Delete (and ⌘⌫ on macOS): delete the row's item, after confirmation.
  *
- * Keys with Ctrl, Alt or Cmd held are left alone: those belong to app
+ * Other keys with Ctrl, Alt or Cmd held are left alone: those belong to app
  * shortcuts (Cmd+C on the tree, Cmd+Alt+R refresh, …).
  *
  * @param rows - The visible rows in display order
  * @param index - Index of the focused row
  * @param event - The key press
+ * @param mac - Whether the app runs on macOS (`isMacOS()`); only ⌘⌫ reads it
  * @returns The action, or null when the key is not part of the contract
  */
-export function resolveTreeKey(rows: readonly TreeRow[], index: number, event: TreeKey): TreeKeyAction | null {
-  if (event.ctrlKey || event.altKey || event.metaKey) return null
+export function resolveTreeKey(
+  rows: readonly TreeRow[],
+  index: number,
+  event: TreeKey,
+  mac = false
+): TreeKeyAction | null {
   const row = rows[index]
   if (!isNodeRow(row)) return null
+  if (isTreeDeleteKey(event, mac)) return { type: 'delete', index }
+  if (event.ctrlKey || event.altKey || event.metaKey) return null
   // Placeholder lines (lazy folders, #320) are stepped over, never focused
   const step = (from: number, by: 1 | -1): number | null => {
     for (let i = from + by; i >= 0 && i < rows.length; i += by) if (isNodeRow(rows[i])) return i

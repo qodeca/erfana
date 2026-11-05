@@ -1198,13 +1198,11 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
 
     const handleContextMenu = (e: React.MouseEvent) => {
       e.preventDefault() // Always prevent default context menu
+      if (!filePath || !previewRef.current) return
 
       // Read selection directly from DOM to avoid race condition with stale state
       const sel = window.getSelection()
-      if (sel && sel.toString().trim().length > 0 && filePath && previewRef.current) {
-        // Validate selection has ranges
-        if (sel.rangeCount === 0) return
-
+      if (sel && sel.rangeCount > 0 && sel.toString().trim().length > 0) {
         // Extract line numbers from current selection
         const lineNumbers = getLineNumbersFromSelection(sel, previewRef)
 
@@ -1215,13 +1213,11 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
           startLine: lineNumbers?.startLine,
           endLine: lineNumbers?.endLine
         })
-
-        // Show context menu at cursor position
-        setContextMenu({
-          x: e.clientX,
-          y: e.clientY
-        })
+      } else {
+        // No selection still opens the menu, its items disabled (#463)
+        setSelection(null)
       }
+      setContextMenu({ x: e.clientX, y: e.clientY })
     }
 
     const handleCloseContextMenu = () => {
@@ -1294,15 +1290,15 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
           </PreviewWorkContext.Provider>
         </div>
 
-        {contextMenu && selection && filePath && (
+        {contextMenu && filePath && (
           <PreviewContextMenu
             x={contextMenu.x}
             y={contextMenu.y}
-            selectedText={selection.text}
+            selectedText={selection?.text ?? ''}
             filePath={filePath}
             fullDocument={content}
-            startLine={selection.startLine}
-            endLine={selection.endLine}
+            startLine={selection?.startLine}
+            endLine={selection?.endLine}
             onClose={handleCloseContextMenu}
           />
         )}

@@ -11,11 +11,14 @@ import {
   type ReactNode
 } from 'react'
 import { createPortal } from 'react-dom'
+import { Check } from 'lucide-react'
 import { TEST_IDS } from '../../constants/testids'
 import { useLatestRef } from '../../hooks/useLatestRef'
 import { useOccluder } from '../../hooks/useOccluder'
 import { useOverlayStackEntry } from '../../hooks/useOverlayStackEntry'
 import { toAriaKeyShortcuts } from './ariaKeyShortcuts'
+import { firstItem, lastItem, stepFrom } from './menuItemSteps'
+import { placeUnderAnchor } from './placeUnderAnchor'
 import './ContextMenu.css'
 
 /**
@@ -49,19 +52,33 @@ export interface ContextMenuItem {
    */
   reason?: string
   /**
-   * Makes the item one choice of a set (`menuitemradio`) and says whether it
-   * is the current one (`aria-checked`). Leave it out for a plain item. The
-   * visible check stays the caller's `icon`; this carries the state to
-   * assistive tech, which ignores the icon.
+   * Makes the item a `menuitemcheckbox` with this `aria-checked`, drawn with a
+   * lime check when on (Toolbar overflow card, rule 7: a toolbar toggle that
+   * moved into the "…" menu). Leave unset for a plain `menuitem`. With
+   * `checkKind: 'radio'` it is one choice of a set instead – see there.
    */
   checked?: boolean
+  /**
+   * With `checked`, `'radio'` makes the item one choice of a set
+   * (`menuitemradio`, e.g. the browser's width presets). Its visible check
+   * stays the caller's `icon`, so no lime check is drawn; `aria-checked`
+   * carries the state to assistive tech, which ignores the icon. Default
+   * `'checkbox'`.
+   */
+  checkKind?: 'checkbox' | 'radio'
 }
 
+/** Give either `x` and `y` (a right-click) or `anchorElement` (a menu button). */
 interface ContextMenuProps {
   /** Anchor x in viewport pixels (the menu opens 8 px right of it) */
-  x: number
+  x?: number
   /** Anchor y in viewport pixels (the menu opens 8 px below it) */
-  y: number
+  y?: number
+  /**
+   * A menu button to open under (`placeUnderAnchor`); wins over `x`/`y`. A press
+   * on it is not an outside click (it toggles the menu), and focus returns to it.
+   */
+  anchorElement?: HTMLElement
   /** Entries in display order */
   items: ContextMenuItem[]
   /** Called to close the menu; the parent unmounts it */
@@ -76,37 +93,14 @@ interface ContextMenuProps {
    * typeahead match; it describes the menu.
    */
   header?: string
+  /** Which item takes focus on open: the first (default) or the last (↑ on a menu button) */
+  initialFocus?: 'first' | 'last'
+  /** Extra class on the menu element */
+  className?: string
 }
 
 /** Typed characters within this many ms extend one typeahead search. */
 export const TYPEAHEAD_RESET_MS = 800
-
-/**
- * The next non-separator item after `from`, stepping by `by` with wrap-around.
- *
- * @returns Its index, or -1 when the menu has no items at all
- */
-function stepFrom(items: ContextMenuItem[], from: number, by: 1 | -1): number {
-  const count = items.length
-  for (let i = 1; i <= count; i += 1) {
-    const at = (((from + by * i) % count) + count) % count
-    if (!items[at].separator) return at
-  }
-  return -1
-}
-
-/** The first non-separator item, or -1 for an empty menu. */
-function firstItem(items: ContextMenuItem[]): number {
-  return items.findIndex((item) => !item.separator)
-}
-
-/** The last non-separator item, or -1 for an empty menu. */
-function lastItem(items: ContextMenuItem[]): number {
-  for (let i = items.length - 1; i >= 0; i -= 1) {
-    if (!items[i].separator) return i
-  }
-  return -1
-}
 
 /**
  * The shared right-click menu, with the keyboard contract `role="menu"`
@@ -144,7 +138,18 @@ function lastItem(items: ContextMenuItem[]): number {
  * )}
  * ```
  */
-export function ContextMenu({ x, y, items, onClose, containerTestId, ariaLabel, header }: ContextMenuProps) {
+export function ContextMenu({
+  x,
+  y,
+  anchorElement,
+  items,
+  onClose,
+  containerTestId,
+  ariaLabel,
+  header,
+  initialFocus = 'first',
+  className
+}: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
   // Stamped on mount by the click-outside effect below, on the events' own clock; 0 until then.
   const openTimeRef = useRef<number>(0)
@@ -154,6 +159,7 @@ export function ContextMenu({ x, y, items, onClose, containerTestId, ariaLabel, 
   // there on every close, and BEFORE an item's action runs, so a dialog the
   // action opens records the real opener and can return focus there.
   const [opener] = useState<HTMLElement | null>(() => {
+    if (anchorElement) return anchorElement
     const active = document.activeElement
     return active instanceof HTMLElement && active !== document.body ? active : null
   })
@@ -161,7 +167,9 @@ export function ContextMenu({ x, y, items, onClose, containerTestId, ariaLabel, 
   // Unique per menu, so the label and reason ids of two menus never clash.
   const idBase = `cm${useId().replace(/[^\w-]/g, '')}`
   const itemRefs = useRef<Array<HTMLDivElement | null>>([])
-  const [activeIndex, setActiveIndex] = useState(() => firstItem(items))
+  const [activeIndex, setActiveIndex] = useState(() =>
+    initialFocus === 'last' ? lastItem(items) : firstItem(items)
+  )
   // A parent may rebuild `items` while the menu is open (the tab menu
   // recounts its tabs): never let the roving stop sit on a separator or past
   // the end.
@@ -221,6 +229,8 @@ export function ContextMenu({ x, y, items, onClose, containerTestId, ariaLabel, 
     const handleClickOutside = (e: MouseEvent) => {
       if (e.timeStamp < openTimeRef.current) return
 
+      // A press on the menu button is the button's to handle: it toggles the menu.
+      if (opener && opener === anchorElement && opener.contains(e.target as Node)) return
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         onCloseRef.current()
       }
@@ -234,11 +244,16 @@ export function ContextMenu({ x, y, items, onClose, containerTestId, ariaLabel, 
       // Must match capture option when removing
       document.removeEventListener('mousedown', handleClickOutside, { capture: true })
     }
-  }, [onCloseRef]) // onCloseRef is stable, so this runs on mount/unmount only
+    // onCloseRef and the opener are stable, so this runs on mount/unmount only
+  }, [onCloseRef, opener, anchorElement])
 
   // Calculate optimal position with viewport boundary checks
   useEffect(() => {
-    if (menuRef.current) {
+    if (menuRef.current && anchorElement) {
+      placeUnderAnchor(menuRef.current, anchorElement)
+      return
+    }
+    if (menuRef.current && x !== undefined && y !== undefined) {
       const menu = menuRef.current
       const menuRect = menu.getBoundingClientRect()
       const viewportWidth = window.innerWidth
@@ -274,7 +289,7 @@ export function ContextMenu({ x, y, items, onClose, containerTestId, ariaLabel, 
       menu.style.top = `${finalY}px`
       menu.style.opacity = '1'
     }
-  }, [x, y])
+  }, [x, y, anchorElement])
 
   // Real DOM focus follows the roving stop. Declared after the positioning
   // effect, so the menu is in place (and visible) when it takes focus; the
@@ -379,7 +394,7 @@ export function ContextMenu({ x, y, items, onClose, containerTestId, ariaLabel, 
   const menu = (
     <div
       ref={menuRef}
-      className="context-menu"
+      className={className ? `context-menu ${className}` : 'context-menu'}
       role="menu"
       aria-label={ariaLabel}
       aria-describedby={header === undefined ? undefined : `${idBase}-header`}
@@ -390,8 +405,10 @@ export function ContextMenu({ x, y, items, onClose, containerTestId, ariaLabel, 
       data-testid={containerTestId ?? TEST_IDS.CONTEXT_MENU}
       style={{
         position: 'fixed',
-        left: `${x}px`,
-        top: `${y}px`,
+        // Under an anchor the menu is measured at the window's corner first, so
+        // a label is never wrapped by a narrow space left of a right-edge anchor.
+        left: `${x ?? 0}px`,
+        top: `${y ?? 0}px`,
         opacity: 0
       }}
     >
@@ -415,7 +432,7 @@ export function ContextMenu({ x, y, items, onClose, containerTestId, ariaLabel, 
               itemRefs.current[index] = node
             }}
             className={`context-menu-item ${item.danger ? 'danger' : ''} ${item.disabled ? 'disabled' : ''}${item.reason ? ' context-menu-item--described' : ''}`}
-            role={item.checked === undefined ? 'menuitem' : 'menuitemradio'}
+            role={item.checked === undefined ? 'menuitem' : item.checkKind === 'radio' ? 'menuitemradio' : 'menuitemcheckbox'}
             aria-checked={item.checked}
             tabIndex={index === current ? 0 : -1}
             aria-disabled={item.disabled || undefined}
@@ -444,6 +461,11 @@ export function ContextMenu({ x, y, items, onClose, containerTestId, ariaLabel, 
             {item.shortcut && (
               <span className="context-menu-shortcut" aria-hidden="true">
                 {item.shortcut}
+              </span>
+            )}
+            {item.checked !== undefined && item.checkKind !== 'radio' && (
+              <span className="context-menu-check" aria-hidden="true">
+                {item.checked && <Check size={16} strokeWidth={2} />}
               </span>
             )}
             {item.reason && (

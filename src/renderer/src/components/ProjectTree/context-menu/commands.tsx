@@ -8,7 +8,7 @@
  *
  * Command Classes:
  * - CutCommand, CopyCommand: Clipboard operations
- * - PasteIntoDirectoryCommand: Paste with conflict checking
+ * - PasteIntoDirectoryCommand: Paste with conflict checking (file rows: fileRowCommands.ts)
  * - RenameFileCommand, RenameDirectoryCommand: Rename with duplicate detection
  * - DeleteFileCommand, DeleteDirectoryCommand: Delete with confirmation
  * - NewFileInDirectoryCommand, NewFolderInDirectoryCommand: Create operations
@@ -16,10 +16,12 @@
  * All commands are testable via dependency injection (MenuContext).
  */
 
-import { Copy, Scissors, Clipboard as ClipboardIcon, Edit, Trash, FilePlus, FolderPlus, FileUp, FolderOpen, FileCode, ExternalLink } from 'lucide-react'
+import { Edit, FilePlus, FolderPlus, FileInput, FolderOpen, FileCode, ExternalLink } from 'lucide-react'
+import type { ReactNode } from 'react'
 import type { IMenuItem, MenuContext, FileNode, FileNodeDirectory, FileNodeFile } from './types'
 import { isMacOS, isWindows } from '../../../utils/platform'
 import { getDirname } from '../../../utils/fileUtils'
+import { clipboardIcon, clipboardShortcut } from '../../ContextMenu/clipboardMenuItems'
 
 /**
  * Base class for all commands
@@ -27,8 +29,10 @@ import { getDirname } from '../../../utils/fileUtils'
  */
 abstract class CommandBase {
   abstract label: string
-  icon?: JSX.Element
+  icon?: ReactNode
   danger?: boolean
+  /** The key that does the same from the tree (see `clipboardShortcut`) */
+  shortcut?: string
 
   constructor(protected ctx: MenuContext, protected node: FileNode) {}
 
@@ -39,6 +43,9 @@ abstract class CommandBase {
       label: this.label,
       icon: this.icon,
       danger: this.danger,
+      // The project root's keys are not wired (it is never cut, copied or
+      // deleted from the keyboard), so its menu shows no hint it cannot keep.
+      shortcut: this.node.path === this.ctx.projectPath ? undefined : this.shortcut,
       execute: () => this.execute()
     }
   }
@@ -51,7 +58,8 @@ abstract class CommandBase {
  */
 export class CutCommand extends CommandBase {
   label = 'Cut'
-  icon = <Scissors size={14} strokeWidth={2} />
+  icon = clipboardIcon('cut')
+  shortcut = clipboardShortcut('cut')
 
   execute(): void {
     this.ctx.clipboard.cut(this.node.path, this.node.name, this.node.type)
@@ -68,7 +76,8 @@ export class CutCommand extends CommandBase {
  */
 export class CopyCommand extends CommandBase {
   label = 'Copy'
-  icon = <Copy size={14} strokeWidth={2} />
+  icon = clipboardIcon('copy')
+  shortcut = clipboardShortcut('copy')
 
   execute(): void {
     this.ctx.clipboard.copy(this.node.path, this.node.name, this.node.type)
@@ -86,15 +95,21 @@ export class CopyCommand extends CommandBase {
  */
 export class PasteIntoDirectoryCommand extends CommandBase {
   label = 'Paste'
-  icon = <ClipboardIcon size={14} strokeWidth={2} />
+  icon = clipboardIcon('paste')
+  shortcut = clipboardShortcut('paste')
 
-  constructor(ctx: MenuContext, node: FileNodeDirectory) {
+  constructor(ctx: MenuContext, node: FileNode) {
     super(ctx, node)
+  }
+
+  /** The folder the item lands in: this folder. */
+  protected targetPath(): string {
+    return this.node.path
   }
 
   async execute(): Promise<void> {
     const { clipboard, dialogs } = this.ctx
-    const targetPath = (this.node as FileNodeDirectory).path
+    const targetPath = this.targetPath()
 
     // Pre-check conflicts only for CUT (move) to mirror current behavior
     const sourceItemName = clipboard.itemName
@@ -276,7 +291,8 @@ export class RenameDirectoryCommand extends RenameCommandBase<FileNodeDirectory>
  */
 abstract class DeleteCommandBase<T extends FileNodeFile | FileNodeDirectory> extends CommandBase {
   danger = true
-  icon = <Trash size={14} strokeWidth={2} />
+  icon = clipboardIcon('delete')
+  shortcut = clipboardShortcut('delete', 'item')
   protected abstract confirmTitle: string
   protected abstract confirmMessage(name: string): string
   protected abstract doDelete(node: T): Promise<void>
@@ -420,7 +436,7 @@ export class NewFolderInDirectoryCommand extends CommandBase {
  */
 export class ImportCommand extends CommandBase {
   label = 'Import...'
-  icon = <FileUp size={14} strokeWidth={2} />
+  icon = <FileInput size={14} strokeWidth={2} />
 
   private importFile: () => Promise<string | null>
 

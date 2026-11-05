@@ -43,6 +43,7 @@ The terminal shortcuts do nothing until a project is open. While the editor has 
 | --- | --- | --- |
 | Import into selected folder | <kbd>⇧⌘I</kbd> | <kbd>Ctrl+Shift+I</kbd> |
 | Cut; copy; paste selected files | <kbd>⌘X</kbd>; <kbd>⌘C</kbd>; <kbd>⌘V</kbd> | <kbd>Ctrl+X</kbd>; <kbd>Ctrl+C</kbd>; <kbd>Ctrl+V</kbd> |
+| Delete the focused file or folder (asks first) | <kbd>⌘⌫</kbd> or <kbd>Delete</kbd> | <kbd>Delete</kbd> |
 | Move to the previous or next row | <kbd>↑</kbd>; <kbd>↓</kbd> | Same |
 | Move to the first or last row | <kbd>Home</kbd>; <kbd>End</kbd> | Same |
 | Open a closed folder; on an open folder, move to its first item | <kbd>→</kbd> | Same |
@@ -51,7 +52,7 @@ The terminal shortcuts do nothing until a project is open. While the editor has 
 | Jump to a row by name | Type its first letters | Same |
 | Open the row's menu | <kbd>⇧F10</kbd> or the <kbd>Menu</kbd> key | <kbd>Shift+F10</kbd> or the <kbd>Menu</kbd> key |
 
-Cut, copy and paste act on the tree only while the tree has focus, so they never copy a folder you picked earlier when you meant the text selected elsewhere. The whole tree is a single <kbd>Tab</kbd> stop: <kbd>Tab</kbd> enters it on the last row you used, and the next <kbd>Tab</kbd> leaves it. The arrow keys move focus without changing the selected folder; <kbd>Enter</kbd> or the pointer selects one. The row menu works like every other menu – see [Menus](#menus). Refresh and import are ignored while typing in a text field; import also needs a selected folder.
+Cut, copy and paste act on the tree only while the tree has focus, so they never copy a folder you picked earlier when you meant the text selected elsewhere. They act on the focused row – a file too – and pasting on a file puts the item in that file's folder. <kbd>Delete</kbd> asks for the same confirmation as the menu's **Delete**; it does nothing on the project folder's own row or while you type in a text field. The whole tree is a single <kbd>Tab</kbd> stop: <kbd>Tab</kbd> enters it on the last row you used, and the next <kbd>Tab</kbd> leaves it. The arrow keys move focus without changing the selected folder; <kbd>Enter</kbd> or the pointer selects one. The row menu works like every other menu – see [Menus](#menus). Refresh and import are ignored while typing in a text field; import also needs a selected folder.
 
 ## Editor and Markdown preview
 
@@ -61,6 +62,7 @@ Cut, copy and paste act on the tree only while the tree has focus, so they never
 | Find; next; previous | <kbd>⌘F</kbd>; <kbd>⌘G</kbd>; <kbd>⇧⌘G</kbd> | <kbd>Ctrl+F</kbd>; <kbd>Ctrl+G</kbd>; <kbd>Ctrl+Shift+G</kbd> |
 | Bold; italic; insert link | <kbd>⌘B</kbd>; <kbd>⌘I</kbd>; <kbd>⌘K</kbd> | <kbd>Ctrl+B</kbd>; <kbd>Ctrl+I</kbd>; <kbd>Ctrl+K</kbd> |
 | Copy; cut; paste text | <kbd>⌘C</kbd>; <kbd>⌘X</kbd>; <kbd>⌘V</kbd> | <kbd>Ctrl+C</kbd>; <kbd>Ctrl+X</kbd>; <kbd>Ctrl+V</kbd> |
+| Delete selected text | <kbd>⌫</kbd> | <kbd>Delete</kbd> |
 | Undo; redo; toggle comment | <kbd>⌘Z</kbd>; <kbd>⇧⌘Z</kbd>; <kbd>⌘/</kbd> | <kbd>Ctrl+Z</kbd>; <kbd>Ctrl+Shift+Z</kbd>; <kbd>Ctrl+/</kbd> |
 | Move line; select next match; add cursor | <kbd>⌥↑</kbd> or <kbd>⌥↓</kbd>; <kbd>⌘D</kbd>; hold <kbd>⌥</kbd> and select | <kbd>Alt+↑</kbd> or <kbd>Alt+↓</kbd>; <kbd>Ctrl+D</kbd>; hold <kbd>Alt</kbd> and select |
 | Command palette | <kbd>F1</kbd> | <kbd>F1</kbd> |
@@ -101,6 +103,7 @@ In the HTML preview the comment window stays in front until you close it, so <kb
 | --- | --- | --- |
 | Copy selection; paste | <kbd>⌘C</kbd>; <kbd>⌘V</kbd> | <kbd>Ctrl+C</kbd>; <kbd>Ctrl+V</kbd> |
 | Explicit copy; paste | <kbd>⌃⇧C</kbd>; <kbd>⌃⇧V</kbd> | <kbd>Ctrl+Shift+C</kbd>; <kbd>Ctrl+Shift+V</kbd> |
+| Paste (also) | – | <kbd>Shift+Insert</kbd> |
 | Interrupt without selected text | <kbd>⌃C</kbd> | <kbd>Ctrl+C</kbd> |
 
 On macOS the explicit copy and paste keys and the interrupt key use the Control key (⌃), not Command (⌘). Other keys go to the shell or program running in the terminal, so what they do depends on that program.
@@ -145,4 +148,4 @@ In ordinary dialogs, <kbd>Enter</kbd> activates the focused button, even when it
 | Jump to an item by name | Type its first letters | Same |
 | Close the menu | <kbd>Esc</kbd> or <kbd>Tab</kbd> | Same |
 
-The <kbd>Menu</kbd> key works on every platform, on keyboards that have one. A menu opens with focus on its first item, and closing it puts focus back where it was. Greyed-out items can be reached but do nothing. In the editor the menu opens under the text cursor, in the terminal at the terminal cursor. While the terminal has focus, <kbd>⇧F10</kbd> / <kbd>Shift+F10</kbd> opens the menu and is not sent to the program running there.
+The <kbd>Menu</kbd> key works on every platform, on keyboards that have one. A menu opens with focus on its first item, and closing it puts focus back where it was. Greyed-out items can be reached but do nothing. **Cut**, **Copy**, **Paste** and **Delete** have the same names and shortcuts in every menu – the editor, the preview, the project tree and every text field – and the shortcut shown is the one that works on your platform. In the editor the menu opens under the text cursor, in the terminal at the terminal cursor. While the terminal has focus, <kbd>⇧F10</kbd> / <kbd>Shift+F10</kbd> opens the menu and is not sent to the program running there.

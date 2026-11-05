@@ -78,6 +78,10 @@ Design summary: one `v*.*.*` tag push from `main` produces one GitHub draft rele
       │    gh release edit v{tag} --draft=false --latest
 ```
 
+## Release scope
+
+What goes into a release is tracked by a `release-<version>` issue label (for example `release-0.24.1`), not by a GitHub milestone – the repo has none. List the scope with `gh issue list --repo qodeca/erfana --label 'release-<version>' --state all`. Label conventions: [GitHub issues protocol § Release scope](../claude-code/github-issues-protocol.md#release-scope-no-milestones).
+
 ## Sequence
 
 ```mermaid

@@ -1,68 +1,48 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { Scissors, Copy, ClipboardPaste } from 'lucide-react'
-import { ContextMenu, type ContextMenuItem } from './ContextMenu'
-import { formatShortcut } from '../../utils/shortcutLabel'
+import { ContextMenu } from './ContextMenu'
+import { clipboardMenuItems } from './clipboardMenuItems'
 
 interface TextareaContextMenuProps {
   x: number
   y: number
+  /** Whether the field has selected text when the menu opens */
   hasSelection: boolean
-  onCut: () => void
-  onCopy: () => void
-  onPaste: () => void
+  /** A read-only field offers Copy only: Cut, Paste and Delete are disabled */
+  readOnly?: boolean
+  /** A password field never lets its text out: Cut and Copy are disabled */
+  concealed?: boolean
+  onCut: () => void | Promise<void>
+  onCopy: () => void | Promise<void>
+  onPaste: () => void | Promise<void>
+  /** Deletes the selection, like the Delete key (#463) */
+  onDelete: () => void | Promise<void>
   onClose: () => void
 }
 
 /**
- * Context menu for textarea elements with Cut, Copy, and Paste operations.
- * Cut and Copy are disabled when no text is selected.
+ * Context menu for a text field (textarea or input): Cut, Copy, Paste and
+ * Delete, with their shortcut hints. Cut, Copy and Delete are disabled when no
+ * text is selected.
  */
 export function TextareaContextMenu({
   x,
   y,
   hasSelection,
+  readOnly = false,
+  concealed = false,
   onCut,
   onCopy,
   onPaste,
+  onDelete,
   onClose
 }: TextareaContextMenuProps): JSX.Element {
-  const cutShortcut = formatShortcut('X', { mod: true })
-  const copyShortcut = formatShortcut('C', { mod: true })
-  const pasteShortcut = formatShortcut('V', { mod: true })
-
-  // Standard order: Cut, Copy, Paste
-  const items: ContextMenuItem[] = [
-    {
-      label: 'Cut',
-      shortcut: cutShortcut,
-      icon: <Scissors size={14} />,
-      action: () => {
-        onCut()
-        onClose()
-      },
-      disabled: !hasSelection
-    },
-    {
-      label: 'Copy',
-      shortcut: copyShortcut,
-      icon: <Copy size={14} />,
-      action: () => {
-        onCopy()
-        onClose()
-      },
-      disabled: !hasSelection
-    },
-    {
-      label: 'Paste',
-      shortcut: pasteShortcut,
-      icon: <ClipboardPaste size={14} />,
-      action: () => {
-        onPaste()
-        onClose()
-      }
-    }
-  ]
+  const items = clipboardMenuItems([
+    { action: 'cut', run: onCut, disabled: !hasSelection || readOnly || concealed },
+    { action: 'copy', run: onCopy, disabled: !hasSelection || concealed },
+    { action: 'paste', run: onPaste, disabled: readOnly },
+    { action: 'delete', run: onDelete, disabled: !hasSelection || readOnly }
+  ])
 
   return <ContextMenu x={x} y={y} items={items} onClose={onClose} />
 }

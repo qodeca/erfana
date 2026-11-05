@@ -59,16 +59,19 @@ also `inert`.
 | Folder | Functionality |
 | --- | --- |
 | [`browser/`](browser/README.md) | The built-in browser tab (spec 025): tab and toolbar, picking, prompt actions, site prompts, page states, menus and data |
-| [`clipboard/`](clipboard/README.md) | The central text-clipboard service |
+| [`clipboard/`](clipboard/README.md) | The central text-clipboard service, and Cut, Copy, Paste and Delete on every surface (#463) |
 | [`comments/`](comments/README.md) | Comments in the HTML and Markdown previews, including comments on selected text, with their screens |
 | [`context-meter/`](context-meter/README.md) | The Claude Code context-window meter and status bar |
+| [`editor-toolbar-overflow/`](editor-toolbar-overflow/README.md) | The Markdown and Mermaid toolbars' “More actions” (…) menu when narrow (#461) |
 | [`github-presentation/`](github-presentation/README.md) | The README banner, wordmark and social preview |
 | [`html-approval/`](html-approval/README.md) | Approving a remote host in the HTML preview |
 | [`html-preview/`](html-preview/README.md) | The HTML preview: running pages, navigation, preview tabs, `http://` and IPv6; `multi-page/` holds the multi-page preview (#124) |
 | [`html-waiting/`](html-waiting/README.md) | What the HTML preview shows while a page loads |
 | [`large-projects/`](large-projects/README.md) | Very large projects: the renderer crash fix and the Windows file watcher |
 | [`packaging/`](packaging/README.md) | Packaging guards for the installers |
+| [`project-tree/`](project-tree/README.md) | The Project panel: header, tree toolbar row and file filter (#452), and following the active tab (#453) |
 | [`readme/`](readme/README.md) | The README and GitHub presentation redesign (#139) |
+| [`terminal-header/`](terminal-header/README.md) | The terminal panel header: which buttons stay in the row at the default width (#462) |
 | [`user-guide/`](user-guide/README.md) | The illustrated user guide with automated screenshots (#138) |
 
 ## Template for a feature folder's README

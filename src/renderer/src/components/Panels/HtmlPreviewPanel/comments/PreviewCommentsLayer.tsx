@@ -14,7 +14,10 @@
  * "Comment on selection" then "Comment on the whole section" (M-02, M-04).
  * When main minted no draft, or comments are unavailable for the page, the
  * same items stay – disabled, each with its reason line (M-05, M-06, M-08,
- * M-10; C-19). The window is {@link CommentWindow}.
+ * M-10; C-19). Last, after a separator, **Copy selection** with its ⌘C / Ctrl+C
+ * hint, as in the Markdown Preview (#463): disabled, never hidden, when no text
+ * is selected. Choosing it returns focus to the page, as a dismissal does. The
+ * window is {@link CommentWindow}.
  *
  * The live regions are mounted for the tab's whole life and empty until they
  * speak: a region created together with its text is not announced. Polite:
@@ -27,6 +30,8 @@ import type { AnchorSelection } from '../../../../../../shared/comments/anchorSe
 import { HTML_WORDS } from '../../../Comments/commentCopyWords'
 import { hostMenuItems, hostMenuLabel } from '../../../Comments/overlay/hostMenu'
 import type { ContextMenuItem } from '../../../ContextMenu/ContextMenu'
+import { COPY_SELECTION_LABEL, clipboardIcon, clipboardShortcut } from '../../../ContextMenu/clipboardMenuItems'
+import { TEST_IDS } from '../../../../constants/testids'
 import type { DraftScope } from './previewCommentRequests'
 import { renderIcon } from '../../../../utils/iconRegistry'
 import type {
@@ -60,6 +65,8 @@ export interface PreviewCommentsLayerProps {
   readonly getArea: () => Box | null
   /** `chosen`: an item ran (focus goes on with it); else focus returns to the page. */
   readonly onMenuClose: (chosen: boolean) => void
+  /** "Copy selection" ran: copy the page's selected text (#463). Absent: the item is disabled. */
+  readonly onCopySelection?: () => void
   /** An item ran: open the window on the selected words, or on the whole element (the default). */
   readonly onAddComment: (draft: ElementDraft, scope?: DraftScope) => void
   /** `returnFocus: false` when the caller moves focus itself ("Go to tab"). */
@@ -82,6 +89,24 @@ export interface PreviewCommentsLayerProps {
   readonly drawerId?: string
   /** Injected clock for the window's times (tests). */
   readonly now?: () => Date
+}
+
+/**
+ * The menu's Copy selection (#463): the Markdown Preview's label, icon and hint.
+ * It leaves `chosen` unset, so focus goes back to the page, where the selection is.
+ *
+ * @param selection - The pick was made on selected text.
+ * @param copy - Copies the page's selection; absent, the item is disabled.
+ */
+function copyItem(selection: boolean, copy: (() => void) | undefined): ContextMenuItem {
+  return {
+    label: COPY_SELECTION_LABEL,
+    shortcut: clipboardShortcut('copy'),
+    icon: clipboardIcon('copy'),
+    disabled: !selection || copy === undefined,
+    testId: TEST_IDS.CONTEXT_MENU_ITEM_COPY,
+    action: () => copy?.()
+  }
 }
 
 /**
@@ -113,7 +138,7 @@ export function PreviewCommentsLayer(props: PreviewCommentsLayerProps): React.JS
           : HTML_WORDS.reasonText(menu.reason ?? 'not-commentable', menu.displayPath)
   // The matrix gives labels, order and each item's action, and keeps each item, disabled with its reason line,
   // when it cannot be used. The ref is written only on click; ContextMenu never runs a disabled item.
-  const items: ContextMenuItem[] =
+  const commentItems: ContextMenuItem[] =
     menu === null
       ? []
       : hostMenuItems(
@@ -127,6 +152,8 @@ export function PreviewCommentsLayer(props: PreviewCommentsLayerProps): React.JS
             item.action()
           }
         }))
+  const items: ContextMenuItem[] =
+    menu === null ? [] : [...commentItems, { separator: true } as ContextMenuItem, copyItem(selection, props.onCopySelection)]
   return (
     <>
       <div

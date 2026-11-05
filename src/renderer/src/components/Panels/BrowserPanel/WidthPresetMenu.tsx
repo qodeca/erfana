@@ -44,6 +44,7 @@ export function widthMenuItems(preset: WidthPresetId, onChoose: (id: WidthPreset
     // Radio choices: the check shows the current one, `checked` says it to assistive tech (as in More).
     icon: item.id === preset ? <Check size={14} strokeWidth={2} /> : <span className="erf-brw-more__blank" />,
     checked: item.id === preset,
+    checkKind: 'radio',
     action: () => onChoose(item.id),
     ...(item.reason === undefined ? {} : { reason: item.reason })
   }))

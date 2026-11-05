@@ -86,7 +86,7 @@
   justify-content: center;
   flex: 0 0 auto;
   width: var(--btn-height-md);           /* 32px */
-  height: var(--space-14);               /* 28px, as `.markdown-toolbar .toolbar-btn` */
+  height: var(--toolbar-tool-height);    /* as `.markdown-toolbar .toolbar-btn` */
   padding: 0;
   background: transparent;
   border: none;

@@ -119,7 +119,7 @@ The menu is assembled by `ContextMenuFactory` (`context-menu/`) from these comma
 
 **Context-aware menu**:
 - Cut/Copy always available
-- Paste offered on directory nodes when the clipboard has content
+- Paste offered on directory and file nodes when the clipboard has content; on a file node it pastes into the file's folder (`PasteIntoParentFolderCommand`, #463)
 - Feedback is a toast, not a screen-reader announcement
 - Icons for visual clarity; the commands carry no `shortcut` label – the keyboard shortcuts are handled by the tree's keydown handler in `ProjectTree.tsx`
 

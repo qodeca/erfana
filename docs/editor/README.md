@@ -41,7 +41,7 @@ Right-click in the Monaco editor shows a context menu (Monaco's own menu is turn
 **Features:**
 - Prompts filtered by `area: code-editor`, `subArea: context-menu`
 - Actions: Explain (direct), Modify/Ask (with input dialog), Visualize (with dropdown)
-- The prompt items, Cut and Copy are disabled without a selection; Paste is always enabled
+- The prompt items, Cut, Copy and Delete are disabled without a selection; Paste is always enabled. Delete removes the selection without touching the clipboard, the same edit as the Delete key, and every clipboard item shows its shortcut hint (#463)
 - Menu dismisses on Escape, Tab, click outside, or action execution
 
 **Templates** (5 editor-specific):
@@ -290,8 +290,22 @@ one calls the matching method on the `MonacoEditorHandle`:
 | Bullet list | `insertList(false)` | `- ` prefix |
 | Numbered list | `insertList(true)` | incremental numbers |
 
-A Find button (Cmd/Ctrl+F) sits beside them, and is rendered separately in the
+A Find button (Cmd/Ctrl+F) sits beside them, and stands alone at the start of the toolbar in the
 preview and split-horizontal modes where the formatting buttons are hidden.
+
+### Narrow panels
+
+The toolbar is a `ToolbarOverflow` row (#461, after #451): when the panel is too
+narrow, buttons move into a "More actions" (…) menu, rightmost first – the
+exports, then the view modes, then Find and the formatting groups. A separator
+moves with the button after it, and the menu separates the groups. The comment
+tools, the modified dot and the live status region are pinned and never move;
+the spacer counts at its minimum width. In the menu the current view mode is a
+checked item, and a disabled export says why ("Switch to preview or split
+mode"). Each Mermaid diagram's toolbar (`MermaidToolbar.tsx`) works the same
+way, with the current direction checked. Contract: the Toolbar overflow card
+(`docs/design-system/system/patterns/toolbar-overflow/`); design:
+`docs/designs/editor-toolbar-overflow/`.
 
 ### Usage
 

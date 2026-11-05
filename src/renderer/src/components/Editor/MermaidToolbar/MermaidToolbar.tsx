@@ -2,7 +2,9 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * MermaidToolbar - Unified toolbar for Mermaid diagrams
- * Shows direction buttons (for supported chart types) and expand button
+ * Shows direction buttons (for supported chart types) and expand button.
+ * Buttons that do not fit a narrow diagram move into a "More actions" (…)
+ * menu, rightmost first (#461, the Toolbar overflow card).
  */
 
 import { Maximize2 } from 'lucide-react'
@@ -22,6 +24,7 @@ import { useTerminalPortalOptional } from '../../../context/TerminalPortalContex
 import { scheduleScrollIfNeeded } from '../../../utils/promptScrollScheduler.logic'
 import { logger } from '../../../utils/logger'
 import { TEST_IDS } from '../../../constants/testids'
+import { ToolbarOverflow, type ToolbarAction } from '../../ToolbarOverflow/ToolbarOverflow'
 import './MermaidToolbar.css'
 
 export interface MermaidToolbarProps {
@@ -106,44 +109,51 @@ export function MermaidToolbar({
     return null
   }
 
+  // A direction is a toggle: the current one is pressed (and disabled, there is
+  // nothing to change to); in the menu it is the checked item.
+  /* deviates: docs/design-system/system/patterns/toolbar-overflow/index.html – the directions
+     are mutually exclusive, but the shared ContextMenu has only checkbox items, so the current
+     direction is a checked menuitemcheckbox rather than a menuitemradio (rule 7). */
+  const directions: ToolbarAction[] = showDirectionButtons
+    ? availableDirections.map((direction) => {
+        const active = isDirectionActive(direction, currentDirection, chartType)
+        return {
+          id: `direction-${direction}`,
+          icon: <span className="mermaid-direction-glyph">{direction}</span>,
+          label: getDirectionTooltip(direction),
+          title: getDirectionTooltip(direction),
+          ariaLabel: `Change layout to ${getDirectionTooltip(direction)}`,
+          pressed: active,
+          disabled: isDirectionDisabled(direction, currentDirection, chartType),
+          className: `mermaid-direction-btn ${active ? 'mermaid-direction-btn--active' : ''}`,
+          testId: `${TEST_IDS.MERMAID_DIRECTION_BTN}-${direction}`,
+          onSelect: () => void handleDirectionClick(direction)
+        }
+      })
+    : []
+
+  const expand: ToolbarAction = {
+    id: 'expand',
+    icon: <Maximize2 size={14} />,
+    label: 'View fullscreen',
+    title: 'View fullscreen',
+    ariaLabel: 'Open diagram in fullscreen',
+    disabled: !hasSvgContent,
+    testId: TEST_IDS.MERMAID_BTN_EXPAND,
+    onSelect: onExpand
+  }
+
   return (
-    <div className="mermaid-toolbar" role="toolbar" aria-label="Mermaid diagram toolbar" data-testid={TEST_IDS.MERMAID_TOOLBAR}>
-      <div className="mermaid-toolbar-directions" role="group" aria-label="Layout direction" data-testid={TEST_IDS.MERMAID_DIRECTIONS_GROUP}>
-        {showDirectionButtons && (
-          <>
-            {availableDirections.map((direction) => {
-              const disabled = isDirectionDisabled(direction, currentDirection, chartType)
-              const active = isDirectionActive(direction, currentDirection, chartType)
-
-              return (
-                <button
-                  key={direction}
-                  className={`mermaid-direction-btn ${active ? 'mermaid-direction-btn--active' : ''}`}
-                  onClick={() => handleDirectionClick(direction)}
-                  disabled={disabled}
-                  title={getDirectionTooltip(direction)}
-                  aria-label={`Change layout to ${getDirectionTooltip(direction)}`}
-                  aria-pressed={active}
-                  data-testid={`${TEST_IDS.MERMAID_DIRECTION_BTN}-${direction}`}
-                >
-                  {direction}
-                </button>
-              )
-            })}
-          </>
-        )}
-
-        <button
-          className="mermaid-toolbar-expand-btn"
-          onClick={onExpand}
-          disabled={!hasSvgContent}
-          title="View fullscreen"
-          aria-label="Open diagram in fullscreen"
-          data-testid={TEST_IDS.MERMAID_BTN_EXPAND}
-        >
-          <Maximize2 size={14} />
-        </button>
-      </div>
-    </div>
+    <ToolbarOverflow
+      className="mermaid-toolbar"
+      toolbarLabel="Mermaid diagram toolbar"
+      testId={TEST_IDS.MERMAID_TOOLBAR}
+      actions={[...directions, expand]}
+      buttonClassName="mermaid-toolbar-expand-btn"
+      actionsClassName="mermaid-toolbar-directions"
+      groupLabel="Layout direction"
+      actionsTestId={TEST_IDS.MERMAID_DIRECTIONS_GROUP}
+      menuLabel="Mermaid diagram actions"
+    />
   )
 }

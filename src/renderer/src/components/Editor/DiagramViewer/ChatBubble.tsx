@@ -378,11 +378,7 @@ export function ChatBubble({
   // Clipboard operations via the central textClipboard service (issue #203).
   // CHAT_LIMITS.MAX_LENGTH stays a silent paste-reject rule (no toast);
   // transport errors are handled centrally by the service.
-  const {
-    handleCut: handleCutText,
-    handleCopy: handleCopyText,
-    handlePaste: handlePasteText
-  } = useTextareaClipboard({
+  const textareaClipboard = useTextareaClipboard({
     textareaRef,
     value: message,
     setValue: setMessage,
@@ -661,9 +657,10 @@ export function ChatBubble({
           x={textareaContextMenu.x}
           y={textareaContextMenu.y}
           hasSelection={textareaContextMenu.hasSelection}
-          onCut={handleCutText}
-          onCopy={handleCopyText}
-          onPaste={handlePasteText}
+          onCut={textareaClipboard.handleCut}
+          onCopy={textareaClipboard.handleCopy}
+          onPaste={textareaClipboard.handlePaste}
+          onDelete={textareaClipboard.handleDelete}
           onClose={handleCloseTextareaContextMenu}
         />
       )}

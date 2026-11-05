@@ -48,24 +48,32 @@ Lightweight toast notifications in bottom-left corner.
 
 ## Control Panels
 
-Collapsible panels with chevron toggle (VS Code pattern).
+Collapsible panels opened by a toggle button in the panel header.
 
 ### Pattern
 
-Header with a ChevronDown (open) / ChevronLeft (closed) icon. Click toggles visibility; the icon is swapped, not rotated, and only the hover/active colours transition (`--transition-normal`).
+Header with a `Funnel` toggle button. Click, <kbd>Enter</kbd> or <kbd>Space</kbd> toggles visibility; `aria-expanded` reports the state and the open button keeps a fill. Only the hover/active colours transition (`--transition-normal`).
 
-**Implementation** (`ProjectPanel.tsx`; the toggle is a `<span>` with a `title`, not a `<button>`):
+**Implementation** (`ProjectPanel.tsx`; a real `<button>`, keyboard-reachable, named "File filter" – #452). The header is a `ToolbarOverflow` row (#451), which renders the button from one action; `expanded` and `controls` become `aria-expanded` and `aria-controls`, and `titleAddon` shows "Markdown only" after the title (trimmed – the real call also passes `icon`, `titleClassName`, `menuLabel` and a `testId`):
 ```typescript
-<span
-  className="control-panel-chevron"
-  onClick={() => setShowControlPanel(!showControlPanel)}
-  title={showControlPanel ? 'Hide Filter Options' : 'Show Filter Options'}
->
-  {showControlPanel ? <ChevronDown size={16} strokeWidth={2} /> : <ChevronLeft size={16} strokeWidth={2} />}
-</span>
+<ToolbarOverflow
+  className="sidebar-panel-header"
+  title="Project"
+  titleAddon={filterMode === 'markdown' && <span className="project-filter-chip">Markdown only</span>}
+  buttonClassName="control-panel-chevron"
+  actions={[{
+    id: 'filter',
+    icon: <Funnel size={16} strokeWidth={2} aria-hidden="true" />,
+    label: 'File filter',
+    title: showControlPanel ? 'Hide Filter Options' : 'Show Filter Options',
+    expanded: showControlPanel,
+    controls: PROJECT_FILTER_PANEL_ID,
+    onSelect: () => setShowControlPanel((shown) => !shown)
+  }]}
+/>
 ```
 
-**CSS**: `.control-panel-chevron` (plus `:hover` / `:active`) in `ProjectPanel.css`
+**CSS**: `.control-panel-chevron` (plus `:hover` / `:active` / `[aria-expanded='true']` / `:focus-visible`) in `ProjectPanel.css`
 
 **Example**: ProjectPanel file filtering - see [Project Panel](./project-panel.md#control-panel)
 
@@ -76,7 +84,7 @@ Header with a ChevronDown (open) / ChevronLeft (closed) icon. Click toggles visi
 Hierarchical file tree with filtering, visual indicators, context menu operations.
 
 **Features**:
-- File filtering (All Files | Markdown Only) with recursive logic
+- File filtering (All files | Markdown only) with recursive logic
 - Sensitive file detection (credentials, keys, certificates, dotfile secrets)
 - Hidden file styling (dotfiles, 70% opacity)
 - Context menu (Open as source, Open in default browser (both HTML files only), Cut, Copy, Paste, New File, New Folder, Rename, Import..., Delete, Reveal in Finder / Reveal in Explorer / Reveal in File Manager – built per node type by `context-menu/strategies.tsx`)
@@ -121,7 +129,6 @@ The three capture buttons appear only on platforms where screenshot capture is s
 - Cross-platform screenshot capture (screen / window / area) and webcam photo capture, inserted as a path into the terminal
 - Maximize over the editor (Cmd/Ctrl+Shift+M)
 - Per-terminal Claude Code context status bar (`ClaudeStatusBar`) – Claude Code only; other CLI agents run in the terminal without it
-- Screen-reader mode (xterm's `screenReaderMode`): **Settings > Terminal > Screen reader mode** – Auto (on while macOS or Windows reports a screen reader, through `terminal:getScreenReaderSupport`), On or Off; changes apply to open terminals at once (`useTerminalScreenReaderMode`)
 - Right-click menu from the keyboard: Shift+F10 or the Menu key
 - Preview and editor context menus send a selection to the terminal via prompt templates (there is no "Send selection to terminal" item)
 
@@ -172,6 +179,7 @@ Reusable menu for Project Panel file/folder operations and tab actions.
 - Separator support
 - Disabled state (grayed out, non-clickable) - v0.4.2. A disabled item never shows danger styling, so a disabled Delete is grey, not red
 - Shortcut hints are exposed as `aria-keyshortcuts` (`⌘C` → `Meta+C`)
+- Cut, Copy, Paste and Delete come from one builder, `clipboardMenuItems.tsx` (same labels, icons and `formatShortcut` hints in the editor, preview, text-field and tree menus, #463). Text fields without a menu of their own get one from the app-level `TextFieldContextMenuHost` – see [Keyboard Shortcuts § Clipboard items](./keyboard-shortcuts.md#clipboard-items-463)
 
 **Interface**:
 ```typescript

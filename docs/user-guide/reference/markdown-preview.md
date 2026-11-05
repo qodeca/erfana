@@ -23,7 +23,7 @@ Preview renders GitHub-style Markdown, frontmatter, links and Mermaid diagrams b
 
 ## Links
 
-**What they do:** Heading anchors move within the document; links to project files open in Erfana; external URLs go to the operating system's browser. Unsafe destinations are blocked. **How to reach them:** Select a link in Preview. For selected preview text, the right-click menu offers **Copy selection** and prompt templates.
+**What they do:** Heading anchors move within the document; links to project files open in Erfana; external URLs go to the operating system's browser. Unsafe destinations are blocked. **How to reach them:** Select a link in Preview. For selected preview text, the right-click menu offers **Copy selection** and prompt templates. Without a selection the menu still opens, with its items greyed out.
 
 ## Images
 

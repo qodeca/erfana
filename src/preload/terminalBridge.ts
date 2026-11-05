@@ -42,8 +42,5 @@ export const terminalBridge: TerminalBridge = {
   },
   ackOutput: (terminalId, chars) => {
     ipcRenderer.send(TERMINAL_CHANNELS.ackOutput, { terminalId, chars })
-  },
-  // No payload: main reads the OS state itself and gates on the sender
-  getScreenReaderSupport: () => ipcRenderer.invoke(TERMINAL_CHANNELS.getScreenReaderSupport),
-  onScreenReaderSupportChanged: (callback) => subscribe(TERMINAL_EVENTS.screenReaderSupportChanged, callback)
+  }
 }

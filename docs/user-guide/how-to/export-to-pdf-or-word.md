@@ -11,7 +11,7 @@ Open a Markdown file in a split view or in preview only, then select **Export to
 
 ## Export Markdown
 
-1. Select **Export to PDF** or **Export to Word** on the toolbar.
+1. Select **Export to PDF** or **Export to Word** on the toolbar. When the toolbar is too narrow, they are in its **More actions** (…) menu.
 2. Choose a destination in the system save dialog.
 3. Find the saved document at the destination you chose. A **PDF exported** or **DOCX exported** message shows its file name. Erfana does not open it automatically.
 

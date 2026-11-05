@@ -238,15 +238,14 @@ describe('EditorContextMenu Component', () => {
       expect(portalRoot).toBeTruthy()
 
       const menuItems = portalRoot!.querySelectorAll('.context-menu-item:not(.context-menu-separator)')
-      const labels = Array.from(menuItems).map((item) => item.textContent)
+      // The label alone: the shortcut hint is its own span (#463)
+      const labels = Array.from(menuItems).map((item) => item.querySelector('.context-menu-label')?.textContent)
 
-      // Last 3 items should be Cut, Copy, Paste
-      expect(labels[labels.length - 3]).toBe('Cut')
-      expect(labels[labels.length - 2]).toBe('Copy')
-      expect(labels[labels.length - 1]).toBe('Paste')
+      // Last 4 items should be Cut, Copy, Paste, Delete (#463)
+      expect(labels.slice(-4)).toEqual(['Cut', 'Copy', 'Paste', 'Delete'])
 
-      // Should have at least Ask prompt + Cut/Copy/Paste
-      expect(labels.length).toBeGreaterThanOrEqual(4)
+      // Should have at least Ask prompt + Cut/Copy/Paste/Delete
+      expect(labels.length).toBeGreaterThanOrEqual(5)
     })
 
     it('should render icons for each menu item', () => {
@@ -795,6 +794,33 @@ describe('EditorContextMenu Component', () => {
           })
         )
       })
+    })
+  })
+
+  describe('Delete and shortcut hints (#463)', () => {
+    it('offers Delete after Paste, and Delete runs onDelete', async () => {
+      const onDelete = vi.fn()
+      renderWithProvider(<EditorContextMenu {...defaultProps} onDelete={onDelete} />)
+
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Delete' }))
+
+      expect(onDelete).toHaveBeenCalledTimes(1)
+      expect(defaultProps.onClose).toHaveBeenCalled()
+    })
+
+    it('disables Delete without a selection', () => {
+      renderWithProvider(<EditorContextMenu {...defaultProps} selectedText="" onDelete={vi.fn()} />)
+
+      expect(screen.getByRole('menuitem', { name: 'Delete' })).toHaveAttribute('aria-disabled', 'true')
+      expect(screen.getByRole('menuitem', { name: 'Paste' })).not.toHaveAttribute('aria-disabled')
+    })
+
+    it('shows a shortcut hint on Cut, Copy, Paste and Delete', () => {
+      renderWithProvider(<EditorContextMenu {...defaultProps} />)
+
+      for (const name of ['Cut', 'Copy', 'Paste', 'Delete']) {
+        expect(screen.getByRole('menuitem', { name })).toHaveAttribute('aria-keyshortcuts')
+      }
     })
   })
 })

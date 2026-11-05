@@ -101,6 +101,16 @@ owner-only decision.
   provider change: it needs the architecture review, the security review and the owner's go.
 - **Never stop a process by pattern.** `pkill -f` and the like match every peer agent on the
   machine. Stop only a PID you started.
+- **Worktrees live in `.local/worktrees/` – no exceptions.** Every git worktree of this repository,
+  created by a person, an agent, a skill or a tool, MUST be created inside the repository's own
+  `.local/worktrees/<name>/` folder (`git worktree add .local/worktrees/<name> -b feature/<name>
+  <base>`). A worktree anywhere else – a sibling folder such as `../erfana-wt/`, the system temp
+  folder, a home-folder path – is forbidden, even for a short task, and even when a skill or tool
+  defaults to another location: override the default, or do not create the worktree. `.local/` is
+  git-ignored, so worktrees never show up as changes, and keeping them in one known place lets
+  every session see, reuse and clean up the others' worktrees. An agent that finds a worktree
+  outside `.local/worktrees/` stops and reports it to the owner; it does not move or delete it
+  while another session may be working in it.
 
 ## How a change moves
 

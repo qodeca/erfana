@@ -14,15 +14,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { TerminalContextMenu } from './TerminalContextMenu'
-import { isMacOS } from '../../utils/platform'
+import { isMacOS, isWindows } from '../../utils/platform'
 
 // Platform detection is resolved via the preload bridge (utils/platform).
 // Mock it so tests drive the macOS-vs-Windows shortcut rendering directly.
 vi.mock('../../utils/platform', () => ({
-  isMacOS: vi.fn()
+  isMacOS: vi.fn(),
+  isWindows: vi.fn()
 }))
 
 const mockIsMacOS = vi.mocked(isMacOS)
+const mockIsWindows = vi.mocked(isWindows)
 
 describe('TerminalContextMenu', () => {
   const defaultProps = {
@@ -36,8 +38,9 @@ describe('TerminalContextMenu', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    // Default to non-macOS (Windows/Linux shortcuts) unless a test overrides.
+    // Default to Windows unless a test overrides.
     mockIsMacOS.mockReturnValue(false)
+    mockIsWindows.mockReturnValue(true)
 
     // Create portal-root div for ContextMenu (uses createPortal)
     const portalRoot = document.createElement('div')
@@ -63,6 +66,7 @@ describe('TerminalContextMenu', () => {
 
     it('shows macOS shortcuts (⌘C/⌘V) on macOS', () => {
       mockIsMacOS.mockReturnValue(true)
+      mockIsWindows.mockReturnValue(false)
 
       render(<TerminalContextMenu {...defaultProps} />)
 
@@ -79,13 +83,15 @@ describe('TerminalContextMenu', () => {
       expect(screen.getByText('Ctrl+V')).toBeInTheDocument()
     })
 
-    it('shows Windows shortcuts on Linux', () => {
+    it('shows the paste key that works on Linux, Ctrl+Shift+V (Ctrl+V sends ^V there, #463)', () => {
       mockIsMacOS.mockReturnValue(false)
+      mockIsWindows.mockReturnValue(false)
 
       render(<TerminalContextMenu {...defaultProps} />)
 
       expect(screen.getByText('Ctrl+C')).toBeInTheDocument()
-      expect(screen.getByText('Ctrl+V')).toBeInTheDocument()
+      expect(screen.getByText('Ctrl+Shift+V')).toBeInTheDocument()
+      expect(screen.queryByText('Ctrl+V')).not.toBeInTheDocument()
     })
 
     it('renders Copy icon', () => {

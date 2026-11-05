@@ -3,15 +3,18 @@
 /**
  * The watch on a live view's page, which follows a same-tab move (issue #124,
  * WI-17b; part 3 §3.4). The watcher factory is a fake that hands each watcher's
- * handlers back, so a late event from a closed watcher can be delivered.
+ * handlers back, so a late event from a closed watcher can be delivered. The
+ * disk is a fake too: `isPresent` says whether a deleted page is back (#450).
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { DELETED_FILE_PROBE_INTERVAL_MS } from '../../../shared/deletedFileProbe'
 import { stablePathDigest } from '../../../shared/stablePathDigest'
 import { logger } from '../LoggingService'
 import { createPreviewEntryWatch, type PreviewEntryWatcherFactory } from './previewEntryWatch'
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.restoreAllMocks()
 })
 
@@ -41,14 +44,17 @@ function makeHarness() {
   })
   const onChange = vi.fn<() => void>()
   const onDeleted = vi.fn<() => void>()
+  // A deleted page stays gone unless a test says otherwise.
+  const isPresent = vi.fn<(path: string) => Promise<boolean>>(() => Promise.resolve(false))
   const watch = createPreviewEntryWatch({
     panelId: PANEL_ID,
     initialPath: '/proj/a.html',
     createEntryWatcher,
     onChange,
-    onDeleted
+    onDeleted,
+    isPresent
   })
-  return { watch, watchers, createEntryWatcher, onChange, onDeleted }
+  return { watch, watchers, createEntryWatcher, onChange, onDeleted, isPresent }
 }
 
 describe('previewEntryWatch — the first page', () => {
@@ -213,5 +219,138 @@ describe('previewEntryWatch — dispose', () => {
     watch.retarget('/proj/b.html')
 
     await expect(watch.dispose()).resolves.toBeUndefined()
+  })
+})
+
+/** One probe interval passes, and the ask it starts settles. */
+async function nextProbe(): Promise<void> {
+  await vi.advanceTimersByTimeAsync(DELETED_FILE_PROBE_INTERVAL_MS)
+}
+
+describe('previewEntryWatch — a deleted page that comes back (#450)', () => {
+  it('asks for the page once per interval while it is gone, and reports nothing', async () => {
+    vi.useFakeTimers()
+    const { watchers, onChange, isPresent } = makeHarness()
+
+    watchers[0].handlers.onUnlink()
+    expect(isPresent).not.toHaveBeenCalled()
+    await nextProbe()
+    await nextProbe()
+    await nextProbe()
+
+    expect(isPresent.mock.calls).toEqual([['/proj/a.html'], ['/proj/a.html'], ['/proj/a.html']])
+    expect(onChange).not.toHaveBeenCalled()
+    expect(watchers).toHaveLength(1)
+  })
+
+  it('watches the page again and reports a change once it is back, then stops asking', async () => {
+    vi.useFakeTimers()
+    const { watchers, onChange, onDeleted, isPresent } = makeHarness()
+
+    watchers[0].handlers.onUnlink()
+    expect(onDeleted).toHaveBeenCalledTimes(1)
+    await nextProbe()
+    isPresent.mockResolvedValue(true)
+    await nextProbe()
+
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(watchers.map((watcher) => watcher.path)).toEqual(['/proj/a.html', '/proj/a.html'])
+    expect(watchers[0].close).toHaveBeenCalledTimes(1)
+    await nextProbe()
+    expect(isPresent).toHaveBeenCalledTimes(2)
+
+    // The new watcher is the live one: a later save reloads, the old one is silent.
+    watchers[0].handlers.onChange()
+    watchers[1].handlers.onChange()
+    expect(onChange).toHaveBeenCalledTimes(2)
+  })
+
+  it('looks again after the returned page is deleted a second time', async () => {
+    vi.useFakeTimers()
+    const { watchers, onDeleted, onChange, isPresent } = makeHarness()
+    isPresent.mockResolvedValue(true)
+    watchers[0].handlers.onUnlink()
+    await nextProbe()
+
+    isPresent.mockResolvedValue(false)
+    watchers[1].handlers.onUnlink()
+    await nextProbe()
+    isPresent.mockResolvedValue(true)
+    await nextProbe()
+
+    expect(onDeleted).toHaveBeenCalledTimes(2)
+    expect(onChange).toHaveBeenCalledTimes(2)
+    expect(watchers).toHaveLength(3)
+  })
+
+  it('stops asking when the tab moves to another page', async () => {
+    vi.useFakeTimers()
+    const { watch, watchers, onChange, isPresent } = makeHarness()
+    watchers[0].handlers.onUnlink()
+
+    watch.retarget('/proj/b.html')
+    isPresent.mockResolvedValue(true)
+    await nextProbe()
+
+    expect(isPresent).not.toHaveBeenCalled()
+    expect(onChange).not.toHaveBeenCalled()
+    expect(watchers.map((watcher) => watcher.path)).toEqual(['/proj/a.html', '/proj/b.html'])
+  })
+
+  it('drops an answer that arrives after the tab moved away', async () => {
+    vi.useFakeTimers()
+    const { watch, watchers, onChange, isPresent } = makeHarness()
+    let answer: (present: boolean) => void = () => {}
+    isPresent.mockImplementationOnce(
+      () => new Promise<boolean>((resolve) => {
+        answer = resolve
+      })
+    )
+    watchers[0].handlers.onUnlink()
+    await nextProbe()
+
+    watch.retarget('/proj/b.html')
+    answer(true)
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(onChange).not.toHaveBeenCalled()
+    expect(watchers).toHaveLength(2)
+  })
+
+  it('stops asking when the tab closes', async () => {
+    vi.useFakeTimers()
+    const { watch, watchers, isPresent } = makeHarness()
+    watchers[0].handlers.onUnlink()
+
+    await watch.dispose()
+    await nextProbe()
+
+    expect(isPresent).not.toHaveBeenCalled()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('keeps asking when the returned page cannot be watched, and logs it without the path', async () => {
+    vi.useFakeTimers()
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {})
+    const { watchers, createEntryWatcher, onChange, isPresent } = makeHarness()
+    watchers[0].handlers.onUnlink()
+    isPresent.mockResolvedValue(true)
+    createEntryWatcher.mockImplementationOnce(() => {
+      throw new Error("EMFILE: too many open files, watch '/proj/a.html'")
+    })
+
+    await nextProbe()
+
+    expect(onChange).not.toHaveBeenCalled()
+    expect(warn).toHaveBeenCalledWith('Preview entry watcher could not watch the returned page', {
+      panelId: LOGGED_PANEL_ID,
+      path: '[redacted]/a.html',
+      error: 'Error'
+    })
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('/proj')
+
+    await nextProbe()
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(watchers.map((watcher) => watcher.path)).toEqual(['/proj/a.html', '/proj/a.html'])
   })
 })

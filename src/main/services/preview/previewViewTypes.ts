@@ -81,6 +81,13 @@ export interface IPreviewViewService {
    * view that is not drawn – with `false`, never a rejection.
    */
   focusPage(panelId: string, windowId: number): boolean
+  /**
+   * `preview:copySelection` (#463): copy the text selected in the page a panel
+   * of `windowId` shows to the system clipboard. Refuses – no live view,
+   * another window's view, a view being torn down – with `false`, never a
+   * rejection. The copied text never leaves main.
+   */
+  copySelection(panelId: string, windowId: number): boolean
   /** Zoom the previewed page by `step` levels, or back to 100% with `0`. */
   setZoom(panelId: string, step: number): Promise<void>
   /** Tear down every preview hosted by a window that is closing. */

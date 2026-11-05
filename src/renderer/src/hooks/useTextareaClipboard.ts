@@ -3,7 +3,7 @@
 /**
  * useTextareaClipboard Hook
  *
- * Provides consistent clipboard operations (cut/copy/paste) for textarea and input elements.
+ * Provides consistent clipboard operations (cut/copy/paste/delete) for textarea and input elements.
  * Includes optional character limit enforcement and cursor-position preservation.
  *
  * Features:
@@ -64,6 +64,8 @@ export interface UseTextareaClipboardReturn {
   handleCopy: () => Promise<void>
   /** Paste text from clipboard */
   handlePaste: () => Promise<void>
+  /** Delete the selected text without touching the clipboard (the menu's Delete, #463) */
+  handleDelete: () => void
   /** Check if there is currently selected text */
   hasSelection: () => boolean
 }
@@ -159,6 +161,22 @@ export function useTextareaClipboard<
     })
   }, [textareaRef, value, setValue, maxLength])
 
+  const handleDelete = useCallback(() => {
+    if (!textareaRef.current) return
+    const element = textareaRef.current
+    const start = element.selectionStart ?? 0
+    const end = element.selectionEnd ?? 0
+    // No selection is a no-op: the menu item is disabled then, and a collapsed
+    // caret must never lose a character the way the Backspace key would.
+    if (start === end) return
+
+    setValue(value.substring(0, start) + value.substring(end))
+    requestAnimationFrame(() => {
+      element.focus()
+      element.setSelectionRange(start, start)
+    })
+  }, [textareaRef, value, setValue])
+
   const hasSelection = useCallback(() => {
     if (!textareaRef.current) return false
     const element = textareaRef.current
@@ -169,6 +187,7 @@ export function useTextareaClipboard<
     handleCut,
     handleCopy,
     handlePaste,
+    handleDelete,
     hasSelection
   }
 }

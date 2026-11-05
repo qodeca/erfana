@@ -52,7 +52,13 @@ export const PreviewChannels = {
    * accelerator needs focus to be inside the page already. Escape is the way
    * back out (`preview:forwardedShortcut`).
    */
-  FOCUS_PAGE: 'preview:focusPage'
+  FOCUS_PAGE: 'preview:focusPage',
+  /**
+   * Copy the text selected in the previewed page to the system clipboard
+   * (#463): the right-click menu's Copy selection. Main runs the page's own
+   * Copy command; the text never travels to the renderer.
+   */
+  COPY_SELECTION: 'preview:copySelection'
 } as const
 
 /**

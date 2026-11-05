@@ -195,7 +195,7 @@ No rebuild possible during the outage. Existing `whisper-build-*` releases remai
 `.github/workflows/whisper-binaries-canary.yml` runs automatically on the 1st of every month at 09:00 UTC (`cron: '0 9 1 * *'`). Three jobs:
 
 - **`macos-notarization-canary`** — calls `xcrun notarytool history` with the same Apple ID / app-specific password / team ID the main workflow uses for `notarytool submit`. Non-zero exit = credentials can no longer authenticate. Catches the silent-rotation failure where an Apple app-specific password expires after ~6 months of inactivity.
-- **`windows-signtool-canary`** — currently a **resolvability** probe only (`Get-Command signtool.exe`). Phase 4 ships unsigned on Windows, so there's no cert chain to verify yet. Phase 5 grows this into a real `signtool verify` once the Windows cert is procured.
+- **`windows-signtool-canary`** — currently a **resolvability** probe only: it looks for `signtool.exe` in the newest Windows 10 SDK `bin` folder, as `build_win.yml` does, because signtool is not on `PATH` on GitHub runners. Phase 4 ships unsigned on Windows, so there's no cert chain to verify yet. Phase 5 grows this into a real `signtool verify` once the Windows cert is procured.
 - **`notify-on-failure`** — on any probe failure, creates (or comments on) a GitHub issue with the failure date + run URL + link to the cert-revocation runbook. Label: `canary`.
 
 Manual trigger: `gh workflow run whisper-binaries-canary.yml`.

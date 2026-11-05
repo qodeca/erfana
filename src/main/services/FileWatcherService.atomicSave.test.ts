@@ -20,6 +20,8 @@ import { UNREADABLE_RECHECK_MS } from './watcher/pathPresence'
 
 const DETECTOR_WINDOW_MS = 100
 const DEBOUNCE_MS = 300
+/** The single-file watch's stability threshold plus one poll. */
+const WRITE_SETTLE_MS = 400
 
 interface FakeWatcher {
   path: string
@@ -182,6 +184,14 @@ async function flushDebounce(): Promise<void> {
   await vi.advanceTimersByTimeAsync(DEBOUNCE_MS + 20)
 }
 
+/**
+ * Let a raw chokidar change reach the renderer: the write-finish gate's settle
+ * (300 ms stable size, polled every 100 ms, #464), then the debounce.
+ */
+async function flushChange(): Promise<void> {
+  await vi.advanceTimersByTimeAsync(WRITE_SETTLE_MS + DEBOUNCE_MS + 20)
+}
+
 const channels = (): string[] => sends.map(s => s.channel)
 
 const HOST_PLATFORM = process.platform
@@ -263,7 +273,7 @@ describe('FileWatcherService atomic save re-arm', () => {
 
     // A change on the NEW watcher still reaches both original subscribers
     createdWatchers[1].handlers.change()
-    await flushDebounce()
+    await flushChange()
 
     expect(sends.map(s => s.id).sort()).toEqual([1, 2])
     // The re-arm mutates in place, so it can never grow the map towards
