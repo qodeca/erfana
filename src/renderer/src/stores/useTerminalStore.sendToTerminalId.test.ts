@@ -2,6 +2,12 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { createTerminalStore } from './useTerminalStore'
+import {
+  ENTER_MIN_DELAY_MS,
+  ENTER_MIN_QUIET_MS,
+  ENTER_NO_OUTPUT_DELAY_MS,
+  ENTER_POLL_MS
+} from './terminalInputSettle'
 import type { ITerminalOperations } from '../interfaces/ITerminalOperations'
 
 const PASTE_START = '\x1b[200~'
@@ -11,10 +17,15 @@ const mockWrite = vi.fn()
 const mockTerminalOps: ITerminalOperations = { write: mockWrite }
 const useTerminalStore = createTerminalStore(mockTerminalOps)
 
-/** Run a send to completion through the 200 ms paste-to-Enter wait. */
+/** Every write as `[terminalId, data]`, in order. */
+function writes(): Array<[string, string]> {
+  return mockWrite.mock.calls.map(([id, data]) => [String(id), String(data)])
+}
+
+/** Run a send to completion; with no output from the terminal, Enter waits ENTER_NO_OUTPUT_DELAY_MS. */
 async function send(terminalId: string, text: string): Promise<boolean> {
   const promise = useTerminalStore.getState().sendToTerminalId(terminalId, text)
-  await vi.advanceTimersByTimeAsync(200)
+  await vi.advanceTimersByTimeAsync(ENTER_NO_OUTPUT_DELAY_MS)
   return promise
 }
 
@@ -25,6 +36,8 @@ describe('useTerminalStore.sendToTerminalId', () => {
       activityById: new Map(),
       userInputById: new Map()
     })
+    // Output times live outside store state and would leak between tests
+    for (const id of ['t1', 't2', 'target-term', 'active-term']) useTerminalStore.getState().clearActivity(id)
     vi.clearAllMocks()
     vi.useFakeTimers()
     mockWrite.mockResolvedValue({ success: true })
@@ -57,18 +70,125 @@ describe('useTerminalStore.sendToTerminalId', () => {
     expect(mockWrite).toHaveBeenNthCalledWith(1, 't1', `${PASTE_START}a[31mbcd[201~e${PASTE_END}`)
   })
 
-  it('sends Enter only after the 200 ms wait', async () => {
-    const promise = useTerminalStore.getState().sendToTerminalId('t1', 'hello')
-    await vi.advanceTimersByTimeAsync(0)
-    expect(mockWrite).toHaveBeenCalledTimes(1)
+  describe('Enter waits until the paste has settled (#449)', () => {
+    it('sends Enter once the echo has been quiet for ENTER_MIN_QUIET_MS, not on a fixed timer', async () => {
+      const promise = useTerminalStore.getState().sendToTerminalId('t1', 'hello')
+      await vi.advanceTimersByTimeAsync(0)
+      expect(mockWrite).toHaveBeenCalledTimes(1)
 
-    await vi.advanceTimersByTimeAsync(199)
-    expect(mockWrite).toHaveBeenCalledTimes(1)
+      // The program is still taking the paste well past the old fixed 200 ms
+      for (let i = 0; i < 5; i++) {
+        await vi.advanceTimersByTimeAsync(90)
+        useTerminalStore.getState().noteOutput('t1')
+      }
+      expect(mockWrite).toHaveBeenCalledTimes(1)
 
-    await vi.advanceTimersByTimeAsync(1)
-    expect(await promise).toBe(true)
-    expect(mockWrite).toHaveBeenCalledTimes(2)
-    expect(mockWrite).toHaveBeenLastCalledWith('t1', '\r')
+      await vi.advanceTimersByTimeAsync(ENTER_MIN_QUIET_MS - 1)
+      expect(mockWrite).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(ENTER_POLL_MS)
+      expect(await promise).toBe(true)
+      expect(mockWrite).toHaveBeenCalledTimes(2)
+      expect(mockWrite).toHaveBeenLastCalledWith('t1', '\r')
+    })
+
+    it('never sends Enter sooner than ENTER_MIN_DELAY_MS, even after a quick echo', async () => {
+      const promise = useTerminalStore.getState().sendToTerminalId('t1', 'hello')
+      await vi.advanceTimersByTimeAsync(1)
+      useTerminalStore.getState().noteOutput('t1')
+
+      await vi.advanceTimersByTimeAsync(ENTER_MIN_DELAY_MS - 2)
+      expect(mockWrite).toHaveBeenCalledTimes(1)
+
+      await vi.advanceTimersByTimeAsync(ENTER_MIN_QUIET_MS + ENTER_POLL_MS)
+      expect(await promise).toBe(true)
+      expect(mockWrite).toHaveBeenCalledTimes(2)
+    })
+
+    it('sends Enter after ENTER_NO_OUTPUT_DELAY_MS when the terminal prints nothing', async () => {
+      const promise = useTerminalStore.getState().sendToTerminalId('t1', 'hello')
+      await vi.advanceTimersByTimeAsync(ENTER_NO_OUTPUT_DELAY_MS - 1)
+      expect(mockWrite).toHaveBeenCalledTimes(1)
+
+      await vi.advanceTimersByTimeAsync(ENTER_POLL_MS)
+      expect(await promise).toBe(true)
+      expect(mockWrite).toHaveBeenLastCalledWith('t1', '\r')
+    })
+
+    it('waits on the output of the named terminal, not the active one', async () => {
+      const promise = useTerminalStore.getState().sendToTerminalId('t1', 'hello')
+      await vi.advanceTimersByTimeAsync(10)
+      useTerminalStore.getState().noteOutput('active-term')
+
+      await vi.advanceTimersByTimeAsync(ENTER_MIN_QUIET_MS + ENTER_POLL_MS)
+      expect(mockWrite).toHaveBeenCalledTimes(1)
+
+      await vi.advanceTimersByTimeAsync(ENTER_NO_OUTPUT_DELAY_MS)
+      expect(await promise).toBe(true)
+    })
+  })
+
+  describe('sends to one terminal run one after another', () => {
+    it('never lets the second paste land between the first paste and its Enter', async () => {
+      const first = useTerminalStore.getState().sendToTerminalId('t1', 'Explain\nthis')
+      await vi.advanceTimersByTimeAsync(50)
+      const second = useTerminalStore.getState().sendToTerminalId('t1', 'Ask\nthat')
+
+      // The second paste waits for the first Enter
+      await vi.advanceTimersByTimeAsync(ENTER_NO_OUTPUT_DELAY_MS - 100)
+      expect(writes()).toHaveLength(1)
+
+      await vi.advanceTimersByTimeAsync(2 * ENTER_NO_OUTPUT_DELAY_MS)
+      await expect(Promise.all([first, second])).resolves.toEqual([true, true])
+      expect(writes()).toEqual([
+        ['t1', `${PASTE_START}Explain\rthis${PASTE_END}`],
+        ['t1', '\r'],
+        ['t1', `${PASTE_START}Ask\rthat${PASTE_END}`],
+        ['t1', '\r']
+      ])
+    })
+
+    it('shares the queue with sendToTerminal for the same terminal', async () => {
+      useTerminalStore.setState({ activeTerminalId: 't1' })
+      const first = useTerminalStore.getState().sendToTerminal('Explain\nthis', true)
+      await vi.advanceTimersByTimeAsync(50)
+      const second = useTerminalStore.getState().sendToTerminalId('t1', 'Ask that')
+
+      await vi.advanceTimersByTimeAsync(2 * ENTER_NO_OUTPUT_DELAY_MS + ENTER_POLL_MS)
+      await expect(Promise.all([first, second])).resolves.toEqual([true, true])
+      expect(writes().map(([, data]) => data)).toEqual([
+        `${PASTE_START}Explain\rthis${PASTE_END}`,
+        '\r',
+        `${PASTE_START}Ask that${PASTE_END}`,
+        '\r'
+      ])
+    })
+
+    it('runs the next send after one that failed', async () => {
+      mockWrite.mockResolvedValueOnce({ success: false, error: 'closed' })
+      const first = useTerminalStore.getState().sendToTerminalId('t1', 'one')
+      const second = useTerminalStore.getState().sendToTerminalId('t1', 'two')
+
+      await vi.advanceTimersByTimeAsync(ENTER_NO_OUTPUT_DELAY_MS + ENTER_POLL_MS)
+      await expect(Promise.all([first, second])).resolves.toEqual([false, true])
+      expect(writes().map(([, data]) => data)).toEqual([
+        `${PASTE_START}one${PASTE_END}`,
+        `${PASTE_START}two${PASTE_END}`,
+        '\r'
+      ])
+    })
+
+    it('does not hold a send to another terminal behind one still waiting', async () => {
+      const first = useTerminalStore.getState().sendToTerminalId('t1', 'one')
+      const second = useTerminalStore.getState().sendToTerminalId('t2', 'two')
+      await vi.advanceTimersByTimeAsync(0)
+      expect(writes()).toEqual([
+        ['t1', `${PASTE_START}one${PASTE_END}`],
+        ['t2', `${PASTE_START}two${PASTE_END}`]
+      ])
+
+      await vi.advanceTimersByTimeAsync(ENTER_NO_OUTPUT_DELAY_MS + ENTER_POLL_MS)
+      await expect(Promise.all([first, second])).resolves.toEqual([true, true])
+    })
   })
 
   it('marks user input and activity on the named terminal', async () => {

@@ -4284,7 +4284,7 @@
       "quote": "- Portal rendering (#portal-root)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:166",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:175",
       "match": "const portalRoot = document.getElementById('portal-root')"
     },
     {
@@ -4294,7 +4294,7 @@
       "quote": "- Shortcut hints are exposed as `aria-keyshortcuts` (`⌘C` → `Meta+C`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:444",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:453",
       "match": "aria-keyshortcuts={toAriaKeyShortcuts(item.shortcut)}"
     },
     {
@@ -5342,7 +5342,7 @@
       "quote": "(`ToolbarOverflow/ToolbarOverflow.tsx:278`, shared by the Markdown and Mermaid toolbars, and `ImageViewerToolbar.tsx:173`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ToolbarOverflow/ToolbarOverflow.tsx:278",
+      "source": "src/renderer/src/components/ToolbarOverflow/ToolbarOverflow.tsx:285",
       "match": "role={toolbarLabel ? 'toolbar' : undefined}"
     },
     {
@@ -6698,7 +6698,7 @@
       "quote": "the prompt is pasted and Enter is pressed once the terminal has taken the paste",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:252",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:238",
       "match": "const reason = await waitForInputToSettle(() => lastOutputById.get(terminalId), writtenAt)"
     },
     {
@@ -6900,7 +6900,7 @@
       "quote": "Enter follows once the terminal's output has gone quiet after the paste",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:252",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:238",
       "match": "const reason = await waitForInputToSettle(() => lastOutputById.get(terminalId), writtenAt)"
     },
     {
@@ -6910,7 +6910,7 @@
       "quote": "(multi-line text as one bracketed paste)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:230",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:164",
       "match": "? `\\x1b[200~${text.replace(/\\r?\\n/g, '\\r')}\\x1b[201~`"
     },
     {
@@ -6920,7 +6920,7 @@
       "quote": "4. Sends Enter key (`\\r`) to execute the command",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:256",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:242",
       "match": "const enterResult = await terminalOps.write(terminalId, '\\r')"
     },
     {
@@ -6952,7 +6952,7 @@
       "quote": "the default store passes `terminalGateway`, which forwards to `window.api.terminal`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:281",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:267",
       "match": "_defaultStore = createTerminalStore(terminalGateway)",
       "note": "Said the default store passes window.api.terminal directly."
     },
@@ -6983,7 +6983,7 @@
       "quote": "Wraps multi-line text in bracketed paste mode",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:230",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:164",
       "match": "? `\\x1b[200~${text.replace(/\\r?\\n/g, '\\r')}\\x1b[201~`"
     },
     {
@@ -7075,7 +7075,7 @@
       "quote": "the default store passes `terminalGateway`, which forwards to `window.api.terminal`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:281",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:267",
       "match": "_defaultStore = createTerminalStore(terminalGateway)",
       "note": "Said the default store passes window.api.terminal directly."
     },
@@ -7086,7 +7086,7 @@
       "quote": "get().markUserInput(terminalId)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:245",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:231",
       "match": "get().markUserInput(terminalId)",
       "note": "The sendToTerminal excerpt left out the recent-input marking after a successful write."
     },
@@ -14663,7 +14663,7 @@
       "quote": "| Change direction | Click `mermaid-direction-btn-{TB/BT/LR/RL}` |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:129",
+      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:128",
       "match": "testId: `${TEST_IDS.MERMAID_DIRECTION_BTN}-${direction}`"
     },
     {
@@ -15782,7 +15782,7 @@
       "quote": "send the Enter key after the text",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:252",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:238",
       "match": "const reason = await waitForInputToSettle(() => lastOutputById.get(terminalId), writtenAt)"
     },
     {
@@ -15802,7 +15802,7 @@
       "quote": "Multi-line terminal prompt writes are wrapped in **bracketed paste mode** escape sequences",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:230",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:164",
       "match": "? `\\x1b[200~${text.replace(/\\r?\\n/g, '\\r')}\\x1b[201~`",
       "note": "Said all prompt writes are wrapped; only text containing a line break is wrapped."
     },
@@ -15813,7 +15813,7 @@
       "quote": "into the terminal (in bracketed-paste mode when it spans lines) and presses Enter automatically",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:228",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:162",
       "match": "const isMultiLine = /[\\r\\n]/.test(text)",
       "note": "Same: bracketed paste applies to multi-line text only."
     },
@@ -16470,7 +16470,7 @@
       "quote": "Menu dismisses on Escape, Tab, click outside, or action execution",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:116",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:125",
       "match": "Escape and Tab close and return focus",
       "note": "Tab also closes the menu."
     },
@@ -16877,7 +16877,7 @@
       "quote": "Click the **View fullscreen** button (a maximize icon) in the toolbar that appears when you hover",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:139",
+      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:138",
       "match": "title: 'View fullscreen'",
       "note": "Described an expand arrow icon; the control is the View fullscreen button in the diagram's hover toolbar."
     },
@@ -20108,7 +20108,7 @@
       "quote": "# - Toolbar shows \"Reloaded from disk\" (1 second)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:333",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:332",
       "match": "Reloaded from disk"
     },
     {
@@ -25057,7 +25057,7 @@
       "quote": "focus moves to the first item on open, roving tabindex",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:437",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:446",
       "match": "tabIndex={index === current ? 0 : -1}"
     },
     {
@@ -25067,7 +25067,7 @@
       "quote": "and Escape or Tab close it and return focus to the opener (#90)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:373",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:382",
       "match": "case 'Tab':"
     },
     {
@@ -25341,7 +25341,7 @@
       "quote": "Home / End, Enter / Space, typeahead",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:361",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:370",
       "match": "case 'Home':"
     },
     {
@@ -28764,7 +28764,7 @@
       "quote": "Mermaid diagrams with a toolbar: direction buttons, View fullscreen",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:139",
+      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:138",
       "match": "title: 'View fullscreen'"
     },
     {
@@ -30028,7 +30028,7 @@
       "quote": "| Open and use any right-click menu | menus |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:374",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:383",
       "match": "// A menu is modal to the keyboard while open: Tab closes it rather",
       "test": "e2e/context-menu-keyboard.e2e.ts"
     },
@@ -30762,7 +30762,7 @@
       "quote": "Erfana then pastes the prompt into the terminal and presses Enter for you.",
       "status": "fixed",
       "evidence": "app",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:251",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:237",
       "match": "if (autoExecute) {",
       "test": "e2e/context-menu-explain.e2e.ts",
       "note": "Clarified that templates run with autoExecute: true, so Enter is sent automatically."
@@ -31060,7 +31060,7 @@
       "quote": "then select **Export to PDF** or **Export to Word**.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:260",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:259",
       "match": "label: 'Export to PDF'"
     },
     {
@@ -31070,7 +31070,7 @@
       "quote": "1. Select **Export to PDF** or **Export to Word** on the toolbar.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:272",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:271",
       "match": "label: 'Export to Word'"
     },
     {
@@ -33294,7 +33294,7 @@
       "quote": "Read the prompt in the terminal before accepting an edit.",
       "status": "fixed",
       "evidence": "app",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:251",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:237",
       "match": "if (autoExecute) {",
       "test": "e2e/context-menu-explain.e2e.ts",
       "note": "Entry previously cited a template frontmatter line; the behaviour (prompt sent then submitted, agent asks to accept edits) is proven by sendToTerminal pressing Enter when autoExecute is set. Page line extended to say Erfana presses Enter."
@@ -33306,7 +33306,7 @@
       "quote": "Erfana pastes the prompt into the active terminal and presses Enter for you.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:256",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:242",
       "match": "terminalOps.write(terminalId, '\\r')",
       "note": "Added: every template sets autoExecute: true, so the prompt is submitted, not just typed."
     },
@@ -33317,7 +33317,7 @@
       "quote": "open a project and start the agent that should receive the prompt",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:153",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:152",
       "match": "if (!terminalId) {",
       "note": "Prompts go to the active terminal only; with none, nothing is sent."
     },
@@ -33707,7 +33707,7 @@
       "quote": "select a direction button such as **TB** or **LR** in the diagram toolbar",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:129",
+      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:128",
       "match": "{direction}",
       "note": "Named the direction buttons; they show the direction code as their label. Checker: repointed from mermaidDirections.ts:48 (tooltip text, not the button label) to the button body."
     },
@@ -33740,7 +33740,7 @@
       "quote": "Select **View fullscreen** to open the diagram viewer.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:139",
+      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:138",
       "match": "title: 'View fullscreen'"
     },
     {
@@ -34673,7 +34673,7 @@
       "quote": "**How to reach them:** the Markdown toolbar.",
       "status": "fixed",
       "evidence": "app",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:253",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:252",
       "match": "onSelect: () => onViewModeChange(mode)",
       "note": "Removed the unprovable absence claim (no dedicated shortcut); kept the toolbar route, which markdown-toolbar.e2e.ts View modes tests exercise by clicking each mode button.",
       "test": "e2e/markdown-toolbar.e2e.ts"
@@ -34740,7 +34740,7 @@
       "quote": "Select **Export to PDF** or **Export to Word** in the toolbar",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:260",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:259",
       "match": "label: 'Export to PDF'"
     },
     {
@@ -34750,7 +34750,7 @@
       "quote": "Select **Export to PDF** or **Export to Word** in the toolbar",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:272",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:271",
       "match": "label: 'Export to Word'"
     },
     {
@@ -34876,7 +34876,7 @@
       "quote": "Screenshot of the Markdown toolbar with the Export to PDF and Export to Word buttons.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:273",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:272",
       "match": ": 'Export to Word'",
       "note": "Alt text did not name the controls; now names both buttons."
     },
@@ -37208,7 +37208,7 @@
       "quote": "| Move to the previous or next item; first or last item |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:362",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:371",
       "match": "next = firstItem(items)"
     },
     {
@@ -37218,7 +37218,7 @@
       "quote": "| Choose the focused item | <kbd>Enter</kbd> or <kbd>Space</kbd> | Same |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:371",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:380",
       "match": "if (current >= 0) handleItemClick(items[current])"
     },
     {
@@ -37228,7 +37228,7 @@
       "quote": "| Jump to an item by name | Type its first letters | Same |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:382",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:391",
       "match": "next = findByTypeahead(event.key)"
     },
     {
@@ -37238,7 +37238,7 @@
       "quote": "| Close the menu | <kbd>Esc</kbd> or <kbd>Tab</kbd> | Same |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:373",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:382",
       "match": "case 'Tab':"
     },
     {
@@ -37248,7 +37248,7 @@
       "quote": "A menu opens with focus on its first item",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:109",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:118",
       "match": "* - Focus moves to the first item when the menu opens."
     },
     {
@@ -37258,7 +37258,7 @@
       "quote": "Greyed-out items can be reached but do nothing.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:113",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:122",
       "match": "*   disabled items are NOT, so they stay discoverable (`aria-disabled` only)."
     },
     {
@@ -37454,7 +37454,7 @@
       "quote": "closing it puts focus back where it was. Greyed-out",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:116",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:125",
       "match": "Escape and Tab close and return focus to whatever had it at open."
     },
     {
@@ -37692,7 +37692,7 @@
       "quote": "Its toolbar changes direction and opens the full-screen viewer",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:140",
+      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:139",
       "match": "ariaLabel: 'Open diagram in fullscreen'"
     },
     {
@@ -37702,7 +37702,7 @@
       "quote": "Its toolbar changes direction",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:125",
+      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:123",
       "match": "ariaLabel: `Change layout to ${getDirectionTooltip(direction)}`"
     },
     {
@@ -38139,7 +38139,7 @@
       "quote": "then use the arrow keys and <kbd>Enter</kbd>",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:355",
+      "source": "src/renderer/src/components/ContextMenu/ContextMenu.tsx:364",
       "match": "case 'ArrowDown':",
       "test": "e2e/context-menu-keyboard.e2e.ts"
     },
@@ -47012,7 +47012,7 @@
       "quote": "bracketed paste mode for safe multi-line input",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.ts:230",
+      "source": "src/renderer/src/stores/useTerminalStore.ts:164",
       "match": "\\x1b[200~"
     },
     {
@@ -55955,7 +55955,7 @@
       "quote": "When it is too narrow, the buttons that do not fit are in its **More actions** (…) menu.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:344",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:343",
       "match": "<ToolbarOverflow",
       "note": "#461: the Markdown toolbar renders through ToolbarOverflow."
     },

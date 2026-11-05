@@ -208,6 +208,20 @@ describe('ToolbarOverflow', () => {
       expect(delta).toHaveAttribute('data-testid', overflowItemTestId({ testId: 'btn-d' }))
     })
 
+    it('makes a choice a radio item with the lime check, while the row button keeps aria-pressed', () => {
+      renderRow(makeActions({ c: { choice: true } }))
+      expect(screen.getByTestId('btn-c')).toHaveAttribute('aria-pressed', 'true')
+      resizeTo(NARROW)
+      fireEvent.click(more())
+      const charlie = menuItems()[1]
+      expect(charlie).toHaveAccessibleName('Charlie lock')
+      expect(charlie).toHaveAttribute('role', 'menuitemradio')
+      expect(charlie).toHaveAttribute('aria-checked', 'true')
+      // Its own icon stays in the icon slot (rule 6); the check marks the current choice (rule 7).
+      expect(charlie.querySelector('.context-menu-icon svg')).not.toBeNull()
+      expect(charlie.querySelector('.context-menu-check svg')).not.toBeNull()
+    })
+
     it('shows a shortcut in the shortcut column and as aria-keyshortcuts', () => {
       renderRow()
       resizeTo(BTN)

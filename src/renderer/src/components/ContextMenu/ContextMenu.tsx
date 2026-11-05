@@ -66,6 +66,15 @@ export interface ContextMenuItem {
    * `'checkbox'`.
    */
   checkKind?: 'checkbox' | 'radio'
+  /**
+   * How a radio item (`checkKind: 'radio'`) shows it is the current choice:
+   * `'icon'` (default) leaves it to the caller's icon, as the browser's width
+   * presets do; `'check'` draws the lime check at the inline end, as a
+   * checkbox item does – for a toolbar's view modes in the "…" menu, whose
+   * icon slot keeps the button's own icon (Toolbar overflow card, rules 6
+   * and 7). Ignored on other items.
+   */
+  radioMark?: 'icon' | 'check'
 }
 
 /** Give either `x` and `y` (a right-click) or `anchorElement` (a menu button). */
@@ -463,7 +472,7 @@ export function ContextMenu({
                 {item.shortcut}
               </span>
             )}
-            {item.checked !== undefined && item.checkKind !== 'radio' && (
+            {item.checked !== undefined && (item.checkKind !== 'radio' || item.radioMark === 'check') && (
               <span className="context-menu-check" aria-hidden="true">
                 {item.checked && <Check size={16} strokeWidth={2} />}
               </span>

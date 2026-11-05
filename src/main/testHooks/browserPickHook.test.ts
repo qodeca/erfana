@@ -7,7 +7,7 @@ vi.mock('../utils/mainClock', () => ({ mainClock: { now: () => Date.UTC(2026, 10
 
 import type { BrowserRuntime } from '../services/browser/browserAppSetup'
 import { PickBench, PickFaults } from '../services/browser/pick/pickSupport'
-import { createBrowserPickTestHook } from './browserPickHook'
+import { BAND_DRAW_RECORDS, createBrowserPickTestHook } from './browserPickHook'
 
 function runtime() {
   const tab = { id: 'browser-tab-1', contents: { capturePage: vi.fn(async () => ({ toPNG: () => Buffer.from('png bytes') })) } }
@@ -31,7 +31,13 @@ function runtime() {
     capture: capture as unknown
   }
   const expire = vi.fn(async () => ['old.md'])
-  const picks = { forTab: vi.fn(() => pick as unknown), faults: new PickFaults(), bench: new PickBench(), store: { expire } }
+  const picks = {
+    forTab: vi.fn(() => pick as unknown),
+    faults: new PickFaults(),
+    bench: new PickBench(),
+    store: { expire },
+    bandDrawn: null as ((tabId: string, box: unknown, state: { strips: readonly unknown[] }) => void) | null
+  }
   const rt = { tabs: { list: () => [tab] }, picks } as unknown as BrowserRuntime
   return { rt, pick, picks, expire }
 }
@@ -103,7 +109,60 @@ describe('createBrowserPickTestHook', () => {
     expect(hook.bench('send')).toEqual([])
   })
 
+  it('025-AC-049 records each band draw per tab on its clock, from the latest recordBandDraws on', () => {
+    const { rt, picks } = runtime()
+    let now = 1_000
+    const hook = createBrowserPickTestHook(() => rt, () => now)
+    expect(picks.bandDrawn).toBeNull()
+    hook.recordBandDraws()
+    const box = { x: 1, y: 2, width: 3, height: 4 }
+    picks.bandDrawn!('browser-tab-1', box, { strips: [1, 2, 3, 4, 5, 6, 7, 8] })
+    now = 1_250
+    picks.bandDrawn!('browser-tab-2', { x: 0, y: 0, width: 1, height: 1 }, { strips: [1] })
+    picks.bandDrawn!('browser-tab-1', { x: 5, y: 6, width: 7, height: 8 }, { strips: [1, 2] })
+    const draws = hook.bandDraws('browser-tab-1')
+    expect(draws).toEqual([
+      { atUs: 1_000, box, strips: 8 },
+      { atUs: 1_250, box: { x: 5, y: 6, width: 7, height: 8 }, strips: 2 }
+    ])
+    // Copies: neither the band's box nor the hook's own record can be changed from outside.
+    expect(draws[0].box).not.toBe(box)
+    ;(draws[0].box as { x: number }).x = 99
+    expect(hook.bandDraws('browser-tab-1')[0].box.x).toBe(1)
+    expect(hook.bandDraws('browser-tab-2')).toHaveLength(1)
+    expect(hook.bandDraws('browser-tab-9')).toEqual([])
+    // A new recording forgets the earlier draws.
+    hook.recordBandDraws()
+    expect(hook.bandDraws('browser-tab-1')).toEqual([])
+  })
+
+  it('025-AC-049 keeps the latest BAND_DRAW_RECORDS band draws, oldest dropped first', () => {
+    const { rt, picks } = runtime()
+    let now = 0
+    const hook = createBrowserPickTestHook(() => rt, () => now++)
+    hook.recordBandDraws()
+    for (let i = 0; i < BAND_DRAW_RECORDS + 1; i++) picks.bandDrawn!('browser-tab-1', { x: i, y: 0, width: 1, height: 1 }, { strips: [] })
+    const draws = hook.bandDraws('browser-tab-1')
+    expect(draws).toHaveLength(BAND_DRAW_RECORDS)
+    expect(draws[0].box.x).toBe(1)
+    expect(draws.at(-1)?.box.x).toBe(BAND_DRAW_RECORDS)
+  })
+
+  it('025-AC-049 stamps band draws on process.hrtime in µs by default', () => {
+    const { rt, picks } = runtime()
+    const hrtime = vi.spyOn(process.hrtime, 'bigint').mockReturnValue(123_456_789n)
+    try {
+      const hook = createBrowserPickTestHook(() => rt)
+      hook.recordBandDraws()
+      picks.bandDrawn!('browser-tab-1', { x: 0, y: 0, width: 1, height: 1 }, { strips: [] })
+      expect(hook.bandDraws('browser-tab-1')[0].atUs).toBe(123_456)
+    } finally {
+      hrtime.mockRestore()
+    }
+  })
+
   it('throws for a missing runtime, an unknown tab and a tab without a pick pipeline', () => {
+    expect(() => createBrowserPickTestHook(() => null).recordBandDraws()).toThrow('The browser runtime is not installed')
     expect(() => createBrowserPickTestHook(() => null).highlight('browser-tab-1')).toThrow('The browser runtime is not installed')
     const { rt, picks } = runtime()
     const hook = createBrowserPickTestHook(() => rt)

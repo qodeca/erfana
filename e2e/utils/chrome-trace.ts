@@ -7,9 +7,10 @@
  * contains a given main-thread change was displayed.
  *
  * Timestamps are Chromium's `TimeTicks` in microseconds. On macOS that is
- * `mach_absolute_time`, the same clock as Node's `process.hrtime` in Electron's
- * main process and in the bench's own Node programs, so a timestamp taken
- * there (in µs) lines up with the trace.
+ * `mach_absolute_time` and on Linux `CLOCK_MONOTONIC`: in both cases the same
+ * clock as Node's `process.hrtime` in Electron's main process and in the
+ * bench's own Node programs, so a timestamp taken there (in µs) lines up with
+ * the trace.
  *
  * "Displayed" is the end of the frame's `PipelineReporter` slice, which
  * Chromium closes at the presentation timestamp the display compositor
@@ -104,29 +105,42 @@ export function inputEventTimes(events: readonly TraceEvent[], from: number, to:
   return times.sort((a, b) => a - b)
 }
 
-/** One frame of a renderer as its `PipelineReporter` slice describes it. */
+/** One frame of a compositor as its `PipelineReporter` slice describes it. */
 export interface FrameRecord {
   sequence: number
   state: string
+  /**
+   * The compositor that made the frame (`layer_tree_host_id`), or null when
+   * the trace names none. A renderer has one per page; the browser process
+   * has one per native window, so its frames are told apart by this.
+   */
+  layerTreeHostId: number | null
   /** The frame's main-thread commit (end of `SendBeginMainFrameToCommit`), or null for a compositor-only frame. */
   commitAt: number | null
   /** When the frame was displayed (the slice's end), for a presented frame. */
   presentedAt: number | null
 }
 
-/** Every frame `pid` reported, ordered by frame sequence. */
+/**
+ * Every frame `pid` reported, ordered by frame sequence. In a process with
+ * several compositors (the browser process), filter by
+ * {@link FrameRecord.layerTreeHostId} before reading: each has its own
+ * sequence numbers.
+ */
 export function rendererFrames(events: readonly TraceEvent[], pid: number): FrameRecord[] {
   const ordered = events
     .map((e, index) => ({ e, index }))
     .filter(({ e }) => e.pid === pid && e.id2?.local !== undefined && (e.ph === 'b' || e.ph === 'e'))
     .sort((a, b) => a.e.ts - b.e.ts || a.index - b.index)
-  const open = new Map<string, { sequence: number; state: string; commitAt: number | null }>()
+  const open = new Map<string, { sequence: number; state: string; layerTreeHostId: number | null; commitAt: number | null }>()
   const frames: FrameRecord[] = []
   for (const { e } of ordered) {
     const key = `${e.tid}|${e.id2!.local}`
     if (e.name === 'PipelineReporter' && e.ph === 'b') {
-      const reporter = (e.args as { frame_reporter?: { frame_sequence: number; state: string } } | undefined)?.frame_reporter
-      if (reporter !== undefined) open.set(key, { sequence: reporter.frame_sequence, state: reporter.state, commitAt: null })
+      const reporter = (e.args as { frame_reporter?: { frame_sequence: number; state: string; layer_tree_host_id?: number } } | undefined)?.frame_reporter
+      if (reporter !== undefined) {
+        open.set(key, { sequence: reporter.frame_sequence, state: reporter.state, layerTreeHostId: reporter.layer_tree_host_id ?? null, commitAt: null })
+      }
     } else if (e.name === 'SendBeginMainFrameToCommit' && e.ph === 'e') {
       const frame = open.get(key)
       if (frame !== undefined) frame.commitAt = e.ts

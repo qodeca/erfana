@@ -67,6 +67,8 @@ docker run --rm \
   -e HOME="$CONTAINER_HOME" \
   -e ERFANA_E2E_LINUX_CONTAINER=1 \
   -e CI="${CI:-}" \
+  -e ERFANA_E2E_BENCH="${ERFANA_E2E_BENCH:-}" \
+  -e ERFANA_BENCH_LABEL="${ERFANA_BENCH_LABEL:-}" \
   -e REPORT_DIR="$REPORT_DIR" \
   -v "$ROOT":/work \
   -v "$NM_VOLUME":/work/node_modules \

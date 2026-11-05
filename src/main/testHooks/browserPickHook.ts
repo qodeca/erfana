@@ -17,7 +17,9 @@
  *   colours – and the page as `capturePage` gives it, so a test shows the
  *   band is absent from the page's own image even while it is drawn.
  * - **Expiry**: run the 025-FR-039 sweep now, on the test clock.
- * - **Bench** (025-AC-049, 025-AC-050): the stage timings.
+ * - **Bench** (025-AC-049, 025-AC-050): the stage timings, and when each
+ *   draw of Erfana's band placed its strips, on `process.hrtime` (the
+ *   clock of Chromium's trace) – the hover bench's end mark.
  *
  * Never touches a `webContents`' debugger (only `cdp/` may).
  */
@@ -36,6 +38,19 @@ export interface HookHighlight {
   readonly backendNodeId: number
   readonly frameId: string
 }
+
+/** One draw of Erfana's band, as {@link BrowserPickTestHook.bandDraws} gives it. */
+export interface HookBandDraw {
+  /** Main's `process.hrtime` in µs, taken right after the strips' bounds and visibility were set. */
+  readonly atUs: number
+  /** The box outlined: the element's border box in the top-level viewport, CSS px. */
+  readonly box: Box
+  /** How many strips were placed (at most `BAND_STRIP_COUNT`). */
+  readonly strips: number
+}
+
+/** Band draws kept per recording; the oldest go first. */
+export const BAND_DRAW_RECORDS = 2_000
 
 export interface HookPickState {
   readonly active: boolean
@@ -84,6 +99,18 @@ export interface BrowserPickTestHook {
   expire(projectRoot: string): Promise<string[]>
   bench(stage: BenchStage): number[]
   clearBench(): void
+  /**
+   * Record every draw of Erfana's band from now on, of every tab, and forget
+   * the draws recorded before (025-AC-049 bench).
+   */
+  recordBandDraws(): void
+  /** The band draws of tab `tabId` recorded since {@link recordBandDraws}, oldest first. */
+  bandDraws(tabId: string): HookBandDraw[]
+}
+
+/** Main's monotonic clock in µs: the clock Chromium's trace timestamps are on (`e2e/utils/chrome-trace.ts`). */
+function hrtimeUs(): number {
+  return Number(process.hrtime.bigint() / 1000n)
 }
 
 function requireRuntime(getRuntime: () => BrowserRuntime | null): BrowserRuntime {
@@ -92,8 +119,11 @@ function requireRuntime(getRuntime: () => BrowserRuntime | null): BrowserRuntime
   return runtime
 }
 
-/** Build the pick hook over the runtime `getRuntime` returns at call time. */
-export function createBrowserPickTestHook(getRuntime: () => BrowserRuntime | null): BrowserPickTestHook {
+/**
+ * Build the pick hook over the runtime `getRuntime` returns at call time;
+ * `nowUs` stamps the band draws (tests pass their own).
+ */
+export function createBrowserPickTestHook(getRuntime: () => BrowserRuntime | null, nowUs: () => number = hrtimeUs): BrowserPickTestHook {
   const pickOf = (tabId: string): BrowserTabPick => {
     const runtime = requireRuntime(getRuntime)
     const tab = runtime.tabs.list().find((t) => t.id === tabId)
@@ -103,6 +133,7 @@ export function createBrowserPickTestHook(getRuntime: () => BrowserRuntime | nul
     return pick
   }
   const faults = () => requireRuntime(getRuntime).picks.faults
+  const bandDraws: Array<HookBandDraw & { readonly tabId: string }> = []
 
   return {
     highlight: (tabId) => {
@@ -153,6 +184,16 @@ export function createBrowserPickTestHook(getRuntime: () => BrowserRuntime | nul
     },
     expire: (projectRoot) => requireRuntime(getRuntime).picks.store.expire(projectRoot, new Date(mainClock.now())),
     bench: (stage) => [...requireRuntime(getRuntime).picks.bench.read(stage)],
-    clearBench: () => requireRuntime(getRuntime).picks.bench.clear()
+    clearBench: () => requireRuntime(getRuntime).picks.bench.clear(),
+    recordBandDraws: () => {
+      bandDraws.length = 0
+      requireRuntime(getRuntime).picks.bandDrawn = (tabId, box, state) => {
+        // Stamped first: the strips were placed just before this call.
+        const atUs = nowUs()
+        bandDraws.push({ tabId, atUs, box: { ...box }, strips: state.strips.length })
+        if (bandDraws.length > BAND_DRAW_RECORDS) bandDraws.shift()
+      }
+    },
+    bandDraws: (tabId) => bandDraws.filter((d) => d.tabId === tabId).map(({ atUs, box, strips }) => ({ atUs, box: { ...box }, strips }))
   }
 }

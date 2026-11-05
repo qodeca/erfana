@@ -60,6 +60,12 @@ export interface ToolbarAction {
   disabled?: boolean
   /** Set for a toggle: the row button's `aria-pressed`, the item's `aria-checked` */
   pressed?: boolean
+  /**
+   * With `pressed`: the button is one choice of a set (a view mode, a diagram
+   * direction). The row button keeps `aria-pressed`; the menu item is a
+   * `menuitemradio` with the same lime check (Toolbar overflow card, rule 7).
+   */
+  choice?: boolean
   /** Set for a disclosure: the row button's `aria-expanded` */
   expanded?: boolean
   /** The id of the region a disclosure opens: the row button's `aria-controls` */
@@ -160,6 +166,7 @@ function toMenuItem(action: ToolbarAction): ContextMenuItem {
     disabled: action.disabled || action.busy,
     shortcut: action.shortcut,
     checked: action.pressed,
+    ...(action.choice === true && action.pressed !== undefined ? { checkKind: 'radio' as const, radioMark: 'check' as const } : {}),
     reason: action.reason,
     testId: overflowItemTestId(action)
   }

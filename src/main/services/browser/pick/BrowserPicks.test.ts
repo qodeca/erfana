@@ -172,6 +172,9 @@ describe('BrowserPicks', () => {
       }
       const openBand = vi.fn(() => surface)
       const picks = new BrowserPicks({ clock: createManualClock(), encodePng, sessionOf: () => page.cdp, openBand })
+      expect(picks.bandDrawn).toBeNull()
+      const bandDrawn = vi.fn()
+      picks.bandDrawn = bandDrawn
       const routing = input()
       const pick = picks.attach(tab, host, routing, () => undefined)!
       routing.dispatch({ type: 'pickButton' })
@@ -182,6 +185,9 @@ describe('BrowserPicks', () => {
       expect(page.cdp.calls('Overlay.highlightQuad')).toEqual([])
       // The surface covers the page area on the screen; the element (30, 25 at zoom 2) sits 20 px above the clip's top.
       expect(draws[0]).toEqual({ bounds: { x: 110, y: 240, width: 400, height: 300 }, first: { x: 59, y: 29, width: 82, height: 4 } })
+      // The test hook's seam hears of the draw, with the tab and the element's box in CSS px.
+      expect(bandDrawn).toHaveBeenCalledTimes(1)
+      expect(bandDrawn).toHaveBeenCalledWith('tab-b', expect.objectContaining({ x: 30, y: 25 }), expect.objectContaining({ bounds: { x: 110, y: 240, width: 400, height: 300 } }))
       // The page is taken out of the window: the band hides; placed again, it draws again.
       placed = null
       for (const w of watchers) w()

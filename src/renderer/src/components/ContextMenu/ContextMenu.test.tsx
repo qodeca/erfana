@@ -68,6 +68,22 @@ describe('ContextMenu', () => {
     expect(plain).not.toHaveAttribute('aria-checked')
   })
 
+  it('draws no end check on a radio item by default, and the lime end check with radioMark "check"', () => {
+    const items: ContextMenuItem[] = [
+      { label: 'Full width', action: vi.fn(), checked: true, checkKind: 'radio' },
+      { label: 'Split', action: vi.fn(), checked: true, checkKind: 'radio', radioMark: 'check' },
+      { label: 'Preview', action: vi.fn(), checked: false, checkKind: 'radio', radioMark: 'check' }
+    ]
+    renderMenu({ items })
+    expect(screen.getByRole('menuitemradio', { name: 'Full width' }).querySelector('.context-menu-check')).toBeNull()
+    const split = screen.getByRole('menuitemradio', { name: 'Split' })
+    expect(split.querySelector('.context-menu-check svg')).not.toBeNull()
+    // The column is kept on an unchecked choice so the labels stay aligned, but it is empty.
+    const preview = screen.getByRole('menuitemradio', { name: 'Preview' })
+    expect(preview.querySelector('.context-menu-check')).not.toBeNull()
+    expect(preview.querySelector('.context-menu-check svg')).toBeNull()
+  })
+
   it('separators have role="separator"', () => {
     const items: ContextMenuItem[] = [
       { label: 'Copy', action: vi.fn() },

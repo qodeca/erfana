@@ -38,8 +38,9 @@ import { tabSessionFetch } from '../capture/pageResourceFetch'
 import { CaptureStore, CaptureWriteError } from '../capture/CaptureStore'
 import type { TabInputPick } from '../input/BrowserTabInput'
 import { BrowserTabPick, type PickRouting } from './BrowserTabPick'
-import { OutlineBand, type BandHostEvents, type BandPlacement, type BandSurface } from './pickBand'
+import { OutlineBand, type BandHostEvents, type BandPlacement, type BandState, type BandSurface } from './pickBand'
 import type { PickCdp } from './pickCdp'
+import type { Box } from './pickGeometry'
 import { PickBench, PickFaults } from './pickSupport'
 
 /** Longest a send waits for the facts and hints before writing what it has. */
@@ -81,6 +82,13 @@ export type WriteCaptureInput = {
 export class BrowserPicks {
   readonly faults = new PickFaults()
   readonly bench = new PickBench()
+  /**
+   * Told right after a tab's band placed its strips: the tab, the box
+   * outlined (top-level viewport, CSS px) and what is drawn. Null in
+   * production; only the pick test hook sets it, to time the 025-AC-049
+   * bench's end mark.
+   */
+  bandDrawn: ((tabId: string, box: Box, state: BandState) => void) | null = null
   readonly store: CaptureStore
   private readonly byTab = new Map<string, { tab: BrowserTab; pick: BrowserTabPick }>()
   /** Capture writes in flight, for {@link abortCaptureWrites}. */
@@ -125,7 +133,8 @@ export class BrowserPicks {
       open: (events) => (host.isDestroyed() ? null : openBand(host.id, events)),
       placement: () => bandPlacement(tab, host),
       watchPlacement: (listener) => tab.viewFrame.watchPlacement(listener),
-      onError: (error) => logger.warn('Browser pick: the live outline could not be drawn; the engine draws it', { error: String(error) })
+      onError: (error) => logger.warn('Browser pick: the live outline could not be drawn; the engine draws it', { error: String(error) }),
+      onDrawn: (box, state) => this.bandDrawn?.(tab.id, box, state)
     })
   }
 

@@ -15,40 +15,58 @@
  * Method (025-NFR-004): pick mode on the React sample app; 20 warm-up mouse
  * moves, then 200 measured ones, each to the centre of a different element so
  * every move crosses an element boundary. Pointer input goes through main-side
- * `sendInputEvent` (S-27), as in the e2e lanes. One Chromium performance trace
- * covers the whole run; per move it reads:
+ * `sendInputEvent` (S-27), as in the e2e lanes. The live outline is Erfana's
+ * band (`pickBand.ts`, ADR 0007 decision 6 as amended 2026-11-05): strips on
+ * a click-through child window over the page, drawn by the browser process's
+ * own compositor for that window, not by the page. One Chromium performance
+ * trace covers the whole run; per move it reads:
  *
  * - **start** – the input event's own timestamp
  *   (`InputLatency::MouseMove`, `COMPONENT_INPUT_EVENT_LATENCY_ORIGINAL`);
- * - **the outline** – the first `Overlay.highlightQuad` Erfana sent after it,
- *   and the engine overlay's first paint after that command;
- * - **end** – the presentation time of the first frame that committed that
- *   paint (`PipelineReporter`, see `utils/chrome-trace.ts`).
+ * - **the band drawn** – main's `process.hrtime` (the trace's clock, see
+ *   `utils/chrome-trace.ts`) taken right after the band set its strips'
+ *   bounds and visibility for this move's element (the pick test hook's
+ *   `bandDraws`, test builds only);
+ * - **end** – the presentation time of the band window's first frame that
+ *   committed that change (`PipelineReporter` of that window's compositor in
+ *   the browser process, see `utils/chrome-trace.ts`): when the new outline
+ *   was on screen. Setting the strips' bounds only marks the window's layers
+ *   dirty; the user sees them one compositor frame later, at that frame's
+ *   presentation, which is measured here rather than assumed.
  *
- * Pacing is condition-based and does not touch rendering: the next move goes
- * out once main reports the new element and the page's Event Timing observer
- * has seen the `pointerover` entry of this move, which the engine delivers only
- * after the frame following the move was presented. A move whose outline was
- * replaced by the next one before any frame showed it counts as a miss (an
- * infinite latency), never as a skipped sample.
+ * The band window's compositor is the browser-process compositor that commits
+ * first after the band draws: the compositor and the draw share the browser's
+ * main thread, so no commit can fall between the strips being set and the
+ * mark. It is found once per run, by majority over every draw, and recorded.
+ *
+ * Pacing is condition-based: the next move goes out once main has drawn the
+ * band at this move's element and the page has then run
+ * {@link SETTLE_FRAMES} animation frames (about 50 ms at 60 Hz, past the
+ * band frame's own presentation). The page's frames are not in the measured
+ * path: the band is drawn by another compositor. A move whose band was
+ * replaced by the next one before a frame showed it counts as a miss (an
+ * infinite latency), never as a skipped sample, so loose pacing can only
+ * make the result worse.
  *
  * Raw results go to `$ERFANA_BENCH_OUT` (default `.local/bench/`).
  *
  * @see docs/performance/browser-025-highlight.md
  */
-import type { Page } from '@playwright/test'
+import type { ElectronApplication, Page } from '@playwright/test'
 import { test, expect } from './fixtures/browserHarness'
 import { PickFlow, PICK_WAIT_MS } from './pages/browser-pick-flow.page'
 import type { Box } from './pages/browser-pick.page'
-import { rendererFrames, displayedAfter, inputEventTimes, rendererMainThread, startTrace, type TraceEvent } from './utils/chrome-trace'
+import { displayedAfter, inputEventTimes, rendererFrames, startTrace, type FrameRecord, type TraceEvent } from './utils/chrome-trace'
 import { machine, summarise, writeBenchRecord } from './utils/bench-stats'
 
 const WARM_UP_MOVES = 20
 const MEASURED_MOVES = 200
 /** 025-NFR-004: the 95th percentile is at most this. */
 const TARGET_P95_MS = 50
-/** How long the page may take to report the frame after a move before pacing gives up on that move. */
-const PRESENTED_WAIT_MS = 3_000
+/** Page animation frames the next move waits for once the band was drawn. */
+const SETTLE_FRAMES = 3
+/** How long the page may take to run those frames before pacing gives up on that move. */
+const SETTLE_WAIT_MS = 3_000
 const LABEL = process.env.ERFANA_BENCH_LABEL ?? 'run'
 
 /** Elements of the React home page worth hovering; the hover menu is left out (hovering it changes the layout). */
@@ -65,10 +83,18 @@ interface Target {
   y: number
 }
 
+/** One band draw as the pick test hook's `bandDraws` gives it. */
+interface BandDraw {
+  atUs: number
+  box: Box
+  strips: number
+}
+
 interface MoveRecord {
   move: number
   warmUp: boolean
   target: string
+  box: Box
   sentFrom: number
   sentTo: number
   paced: boolean
@@ -78,12 +104,18 @@ interface Sample {
   move: number
   target: string
   inputAt: number | null
-  commandAt: number | null
-  paintAt: number | null
+  drawAt: number | null
+  commitAt: number | null
   presentedAt: number | null
   frame: number | null
+  inputToDrawMs: number | null
   latencyMs: number | null
   miss: string | null
+}
+
+/** The band outlines `box` (the hook's box is the node's border box, CSS px). */
+function sameBox(a: Box, b: Box): boolean {
+  return Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1 && Math.abs(a.width - b.width) <= 1 && Math.abs(a.height - b.height) <= 1
 }
 
 /** Visible elements whose centre hits the element itself, read once from the page. */
@@ -107,75 +139,87 @@ async function readTargets(pwPage: Page): Promise<Target[]> {
   }, TARGET_SELECTORS)
 }
 
-/** Count the page's `pointerover` Event Timing entries (reported after the next presented frame). */
-async function installPresentedCounter(pwPage: Page): Promise<void> {
-  await pwPage.evaluate(() => {
-    const w = window as unknown as { __benchOver?: { count: number; waiters: Array<() => void> } }
-    const state = { count: 0, waiters: [] as Array<() => void> }
-    w.__benchOver = state
-    new PerformanceObserver((list) => {
-      state.count += list.getEntries().filter((e) => e.name === 'pointerover').length
-      for (const wake of state.waiters.splice(0)) wake()
-    }).observe({ type: 'event', durationThreshold: 16 } as PerformanceObserverInit)
-  })
-}
-
-/** Resolve true once the page counted more than `seen` entries, false after `timeoutMs`. No polling. */
-async function waitForPresented(pwPage: Page, seen: number, timeoutMs: number): Promise<boolean> {
+/** Resolve true once the page ran `count` animation frames, false after `timeoutMs`. No polling. */
+async function waitForFrames(pwPage: Page, count: number, timeoutMs: number): Promise<boolean> {
   return pwPage.evaluate(
-    ([before, limit]) =>
+    ([frames, limit]) =>
       new Promise<boolean>((resolve) => {
-        const state = (window as unknown as { __benchOver: { count: number; waiters: Array<() => void> } }).__benchOver
-        if (state.count > before) return resolve(true)
         const timer = setTimeout(() => resolve(false), limit)
-        state.waiters.push(() => {
-          if (state.count > before) {
-            clearTimeout(timer)
-            resolve(true)
-          }
-        })
+        let left = frames
+        const tick = (): void => {
+          left -= 1
+          if (left > 0) return void requestAnimationFrame(tick)
+          clearTimeout(timer)
+          resolve(true)
+        }
+        requestAnimationFrame(tick)
       }),
-    [seen, timeoutMs] as const
+    [count, timeoutMs] as const
   )
 }
 
-async function presentedCount(pwPage: Page): Promise<number> {
-  return pwPage.evaluate(() => (window as unknown as { __benchOver: { count: number } }).__benchOver.count)
+/* eslint-disable @typescript-eslint/no-explicit-any -- the hooks live on main's globalThis, untyped there */
+async function recordBandDraws(app: ElectronApplication): Promise<void> {
+  await app.evaluate(() => (globalThis as any).__erfanaTestHooks.pick.recordBandDraws())
 }
 
-/** Per move: input time → highlightQuad → overlay paint → displayed frame. */
-function analyse(events: readonly TraceEvent[], moves: readonly MoveRecord[], tabPid: number, pageFrame: string): Sample[] {
-  const mainTid = rendererMainThread(events, tabPid)
-  if (mainTid === null) throw new Error(`The trace has no main thread for the tab renderer ${tabPid}`)
-  const frames = rendererFrames(events, tabPid)
-  const quads = events
-    .filter((e) => e.name === 'DevToolsSession::HandleCommand in Browser' && e.ph === 'X' && (e.args as { method?: string })?.method === 'Overlay.highlightQuad')
-    .map((e) => e.ts)
-    .sort((a, b) => a - b)
-  const overlayPaints = events
-    .filter((e) => {
-      if (e.pid !== tabPid || e.tid !== mainTid || e.name !== 'Paint') return false
-      const data = (e.args as { data?: { frame?: string; nodeName?: string } })?.data
-      return data?.frame !== pageFrame && (data?.nodeName ?? '').startsWith('CANVAS')
-    })
-    .map((e) => e.ts)
-    .sort((a, b) => a - b)
+async function bandDraws(app: ElectronApplication, tabId: string): Promise<BandDraw[]> {
+  return app.evaluate((_e, id) => (globalThis as any).__erfanaTestHooks.pick.bandDraws(id) as BandDraw[], tabId)
+}
 
+async function lastBandDraw(app: ElectronApplication, tabId: string): Promise<BandDraw | null> {
+  return app.evaluate((_e, id) => ((globalThis as any).__erfanaTestHooks.pick.bandDraws(id) as BandDraw[]).at(-1) ?? null, tabId)
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+/** The first frame of `frames` that committed at or after `at` (µs), whatever its compositor. */
+function firstCommitAfter(frames: readonly FrameRecord[], at: number): FrameRecord | null {
+  let first: FrameRecord | null = null
+  for (const f of frames) {
+    if (f.commitAt === null || f.commitAt < at) continue
+    if (first === null || f.commitAt < first.commitAt!) first = f
+  }
+  return first
+}
+
+/**
+ * The band window's compositor: the browser-process compositor that commits
+ * first after most band draws. Throws when no draw is followed by a commit.
+ */
+function bandCompositor(frames: readonly FrameRecord[], draws: readonly BandDraw[]): { layerTreeHostId: number; votes: number; draws: number } {
+  const votes = new Map<number, number>()
+  for (const d of draws) {
+    const id = firstCommitAfter(frames, d.atUs)?.layerTreeHostId
+    if (id !== null && id !== undefined) votes.set(id, (votes.get(id) ?? 0) + 1)
+  }
+  const [best] = [...votes.entries()].sort((a, b) => b[1] - a[1])
+  if (best === undefined) throw new Error('No browser-process compositor committed after any band draw: the trace has no band frames')
+  return { layerTreeHostId: best[0], votes: best[1], draws: draws.length }
+}
+
+/** Per move: input time → band drawn at the element → the band window's displayed frame. */
+function analyse(frames: readonly FrameRecord[], events: readonly TraceEvent[], moves: readonly MoveRecord[], draws: readonly BandDraw[]): Sample[] {
   return moves.map((m, i) => {
-    const sample: Sample = { move: m.move, target: m.target, inputAt: null, commandAt: null, paintAt: null, presentedAt: null, frame: null, latencyMs: null, miss: null }
+    const sample: Sample = { move: m.move, target: m.target, inputAt: null, drawAt: null, commitAt: null, presentedAt: null, frame: null, inputToDrawMs: null, latencyMs: null, miss: null }
     const nextSent = moves[i + 1]?.sentFrom ?? Number.POSITIVE_INFINITY
-    sample.inputAt = inputEventTimes(events, m.sentFrom, m.sentTo, 'MouseMove')[0] ?? null
-    if (sample.inputAt === null) return { ...sample, miss: 'no input event in the trace' }
-    sample.commandAt = quads.find((t) => t >= sample.inputAt! && t < nextSent) ?? null
-    if (sample.commandAt === null) return { ...sample, miss: 'no highlightQuad before the next move' }
-    const nextCommand = quads.find((t) => t > sample.commandAt!) ?? Number.POSITIVE_INFINITY
-    sample.paintAt = overlayPaints.find((t) => t > sample.commandAt!) ?? null
-    if (sample.paintAt === null || sample.paintAt > nextCommand) return { ...sample, miss: 'outline replaced before it was painted' }
-    const shown = displayedAfter(frames, sample.paintAt)
-    if (shown === null) return { ...sample, miss: 'no presented frame after the paint' }
+    const inputAt = inputEventTimes(events, m.sentFrom, m.sentTo, 'MouseMove')[0] ?? null
+    if (inputAt === null) return { ...sample, miss: 'no input event in the trace' }
+    sample.inputAt = inputAt
+    const drawIndex = draws.findIndex((d) => d.atUs >= inputAt && d.atUs < nextSent && d.strips > 0 && sameBox(d.box, m.box))
+    if (drawIndex < 0) return { ...sample, miss: 'no band draw at the element before the next move' }
+    const drawAt = draws[drawIndex].atUs
+    sample.drawAt = drawAt
+    sample.inputToDrawMs = (drawAt - inputAt) / 1000
+    const committed = firstCommitAfter(frames, drawAt)
+    const shown = displayedAfter(frames, drawAt)
+    if (committed === null || shown === null) return { ...sample, miss: 'no presented band frame after the draw' }
+    sample.commitAt = committed.commitAt
+    // Drawn again at the same element (the page view placed again) changes nothing on screen; at another one it does.
+    const replacedAt = draws.slice(drawIndex + 1).find((d) => !sameBox(d.box, m.box))?.atUs ?? Number.POSITIVE_INFINITY
+    if (replacedAt < committed.commitAt!) return { ...sample, miss: 'band moved on before a frame showed it' }
     sample.presentedAt = shown.presentedAt
     sample.frame = shown.sequence
-    sample.latencyMs = (shown.presentedAt - sample.inputAt) / 1000
+    sample.latencyMs = (shown.presentedAt - inputAt) / 1000
     return sample
   })
 }
@@ -188,30 +232,28 @@ test('025-NFR-004 bench: pick highlight latency on the React app', async ({ appW
   let pwPage: Page | undefined
   await expect.poll(() => (pwPage = app.context().pages().find((p) => p.url() === url)) !== undefined, { timeout: PICK_WAIT_MS }).toBe(true)
   const cdp = await app.context().newCDPSession(pwPage!)
-  const pageFrame = ((await cdp.send('Page.getFrameTree')) as { frameTree: { frame: { id: string } } }).frameTree.frame.id
   const tabId = await flow.tabId()
   const { webContentsId } = await flow.panel.hookTab()
   const env = await app.evaluate(({ app: electronApp, screen, webContents }, id) => ({
+    browserPid: process.pid,
     tabPid: webContents.fromId(id)!.getOSProcessId(),
     electron: process.versions.electron,
     chrome: process.versions.chrome,
     gpu: electronApp.getGPUFeatureStatus(),
-    display: { scaleFactor: screen.getPrimaryDisplay().scaleFactor, size: screen.getPrimaryDisplay().size }
+    display: { scaleFactor: screen.getPrimaryDisplay().scaleFactor, size: screen.getPrimaryDisplay().size, hz: screen.getPrimaryDisplay().displayFrequency }
   }), webContentsId)
 
   await flow.pickButton.click()
   await flow.waitForActive(true)
-  const driver = await flow.driver()
   const targets = await readTargets(pwPage!)
   expect(targets.length, 'distinct hover targets on the page').toBeGreaterThanOrEqual(8)
-  await installPresentedCounter(pwPage!)
   const viewport = await pwPage!.evaluate(() => ({ width: innerWidth, height: innerHeight, dpr: devicePixelRatio }))
 
+  await recordBandDraws(app)
   const trace = await startTrace(cdp)
   const moves: MoveRecord[] = []
   for (let move = 0; move < WARM_UP_MOVES + MEASURED_MOVES; move++) {
     const target = targets[move % targets.length]
-    const seen = await presentedCount(pwPage!)
     const [sentFrom, sentTo] = await app.evaluate((_e, [id, x, y]) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the hooks live on main's globalThis, untyped there
       const hooks = (globalThis as any).__erfanaTestHooks
@@ -219,20 +261,25 @@ test('025-NFR-004 bench: pick highlight latency on the React app', async ({ appW
       hooks.browser.move(id, x, y)
       return [from, Number(process.hrtime.bigint() / 1000n)]
     }, [tabId, target.x, target.y] as const)
-    // Main outlined this element (the hook's box is the node's border box).
+    // Main drew Erfana's band at this element (not the engine's fallback outline).
     await expect
       .poll(async () => {
-        const box = (await driver.highlight())?.box
-        return box !== null && box !== undefined && Math.abs(box.x - target.box.x) <= 1 && Math.abs(box.y - target.box.y) <= 1 && Math.abs(box.width - target.box.width) <= 1
-      }, { timeout: PICK_WAIT_MS, message: `highlight on ${target.selector}[${target.index}]` })
+        const last = await lastBandDraw(app, tabId)
+        return last !== null && last.atUs >= sentFrom && last.strips > 0 && sameBox(last.box, target.box)
+      }, { timeout: PICK_WAIT_MS, message: `band drawn at ${target.selector}[${target.index}]` })
       .toBe(true)
-    const paced = await waitForPresented(pwPage!, seen, PRESENTED_WAIT_MS)
-    moves.push({ move, warmUp: move < WARM_UP_MOVES, target: `${target.selector}[${target.index}]`, sentFrom, sentTo, paced })
+    const paced = await waitForFrames(pwPage!, SETTLE_FRAMES, SETTLE_WAIT_MS)
+    moves.push({ move, warmUp: move < WARM_UP_MOVES, target: `${target.selector}[${target.index}]`, box: target.box, sentFrom, sentTo, paced })
   }
   const events = await trace.stop()
+  const draws = await bandDraws(app, tabId)
 
-  const samples = analyse(events, moves, env.tabPid, pageFrame).filter((s) => s.move >= WARM_UP_MOVES)
+  const browserFrames = rendererFrames(events, env.browserPid)
+  const compositor = bandCompositor(browserFrames, draws)
+  const bandFrames = browserFrames.filter((f) => f.layerTreeHostId === compositor.layerTreeHostId)
+  const samples = analyse(bandFrames, events, moves, draws).filter((s) => s.move >= WARM_UP_MOVES)
   const latencies = samples.map((s) => (s.latencyMs === null ? Number.POSITIVE_INFINITY : s.latencyMs))
+  const drawn = samples.filter((s) => s.latencyMs !== null)
   const summary = {
     label: LABEL,
     date: new Date().toISOString(),
@@ -241,14 +288,16 @@ test('025-NFR-004 bench: pick highlight latency on the React app', async ({ appW
     misses: samples.filter((s) => s.miss !== null).length,
     unpaced: moves.filter((m) => !m.paced && !m.warmUp).length,
     latencyMs: summarise(latencies),
+    inputToDrawMs: summarise(drawn.map((s) => s.inputToDrawMs!)),
+    drawToPresentedMs: summarise(drawn.map((s) => (s.presentedAt! - s.drawAt!) / 1000)),
     targetP95Ms: TARGET_P95_MS,
     pass: summarise(latencies).p95 <= TARGET_P95_MS
   }
   await writeBenchRecord(`browser-025-highlight-${LABEL}`, {
     summary,
-    environment: { ...env, viewport, machine: machine(), targets: targets.length },
+    environment: { ...env, viewport, machine: machine(), targets: targets.length, bandCompositor: compositor },
     samples
   })
   // The run is valid when every measured move was found in the trace; the result is a number, not a pass/fail of the test.
-  expect(samples.filter((s) => s.miss === 'no input event in the trace' || s.miss === 'no presented frame after the paint')).toEqual([])
+  expect(samples.filter((s) => s.miss === 'no input event in the trace' || s.miss === 'no presented band frame after the draw')).toEqual([])
 })

@@ -237,11 +237,9 @@ export function MarkdownToolbar({
     onSelect: handleOpenSearch
   }
 
-  // The view modes keep their look (`.active`) and now say which is on in
-  // `aria-pressed`; in the menu the current one is a checked item.
-  /* deviates: docs/design-system/system/patterns/toolbar-overflow/index.html – rule 7 makes a
-     view-mode radio a menuitemradio; the shared ContextMenu has only checkbox items, so the
-     current view mode is a checked menuitemcheckbox (and a toggle button in the row). */
+  // The view modes keep their look (`.active`) and say which is on in
+  // `aria-pressed`; in the menu they are one choice of a set – a menuitemradio,
+  // the current one checked (Toolbar overflow card, rule 7).
   const viewModes: ToolbarAction[] = VIEW_MODES.map(([mode, icon, label, title, testId]) => ({
     id: `view-${mode}`,
     icon,
@@ -249,6 +247,7 @@ export function MarkdownToolbar({
     title,
     testId,
     pressed: viewMode === mode,
+    choice: true,
     className: `view-mode-btn ${viewMode === mode ? 'active' : ''}`,
     onSelect: () => onViewModeChange(mode)
   }))

@@ -128,6 +128,12 @@ export interface OutlineBandDeps {
   readonly watchPlacement?: (listener: () => void) => () => void
   /** Called when drawing failed; the band then reports itself unavailable. */
   readonly onError?: (error: unknown) => void
+  /**
+   * Called right after each draw placed the strips, with the box outlined
+   * (top-level viewport, CSS px) and what is drawn. The seam the test hook
+   * times the 025-AC-049 bench's end mark on; must not throw.
+   */
+  readonly onDrawn?: (box: Box, state: BandState) => void
 }
 
 /**
@@ -171,13 +177,14 @@ export class OutlineBand {
     const placement = this.deps.placement()
     const strips = placement === null ? [] : bandStrips(inSurface(wanted.box, placement), placement.clip)
     if (placement === null || strips.length === 0) return this.suspend()
-    const bounds = roundBox(placement.clip)
+    const drawn: BandState = { bounds: roundBox(placement.clip), strips, colours: wanted.colours }
     try {
-      surface.draw(bounds, strips, wanted.colours)
-      this.drawn = { bounds, strips, colours: wanted.colours }
+      surface.draw(drawn.bounds, strips, wanted.colours)
+      this.drawn = drawn
     } catch (error) {
-      this.fail(error)
+      return this.fail(error)
     }
+    this.deps.onDrawn?.(wanted.box, drawn)
   }
 
   /** Hide the band but keep what it outlines (the page scrolls, the window is hidden). */

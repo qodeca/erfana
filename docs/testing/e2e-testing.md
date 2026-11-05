@@ -631,7 +631,7 @@ These `ERFANA_E2E_*` variables change behaviour for tests. Most are read by the 
 | `ERFANA_E2E_FAST_SHELL=1` | POSIX only: the PTY bootstrap execs `/bin/sh -i` instead of `exec -l "$SHELL" -i`, skipping user rc files so terminal specs start in tens of milliseconds rather than seconds |
 | `ERFANA_E2E_TRANSCRIPTION=1` | Enables the `transcription` Playwright project (real, paid OpenAI calls; also needs `OPENAI_API_KEY`). Without it the project matches nothing and the `capability-summary` reporter prints a `SKIPPED CAPABILITIES` line |
 | `ERFANA_E2E_TEST_HOOKS=1` | In an unpackaged build only, installs the e2e test hooks – `window.__erfanaTest` (terminal screen, editor value) and main's `globalThis.__erfanaE2eComments`, plus main's `globalThis.__erfanaTestHooks` in an e2e-mode build ([Main-process test hooks and the test clock](#main-process-test-hooks-and-the-test-clock)). Set by `buildAppEnv()` for every fixture launch |
-| `ERFANA_E2E_BENCH=1` | Enables the `bench` Playwright project (`*.bench.ts`); without it the project matches nothing |
+| `ERFANA_E2E_BENCH=1` | Enables the `bench` Playwright project (`*.bench.ts`); without it the project matches nothing. `scripts/e2e-linux.sh` forwards it (and `ERFANA_BENCH_LABEL`) into the container: `ERFANA_E2E_BENCH=1 npm run test:e2e:linux -- --project=bench e2e/browser-pick-highlight.bench.ts` |
 
 `ERFANA_TEST_BUILD=true` is a *build*-time variable, not a test-time one – see [Test build vs production build](#test-build-vs-production-build) above. Canonical table: [Testing overview § E2E environment variables](./README.md#e2eui-playwright-electron).
 

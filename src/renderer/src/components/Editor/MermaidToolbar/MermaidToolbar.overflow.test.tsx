@@ -3,7 +3,7 @@
 /**
  * MermaidToolbar on a narrow diagram (#461): direction buttons that do not fit
  * move into the "More actions" (…) menu, rightmost first, and every action
- * stays reachable; the current direction is the checked (and disabled) item.
+ * stays reachable; the directions are radio items, the current one checked (and disabled).
  *
  * jsdom does no layout, so the row's width and each button's width are stubbed
  * (as in ToolbarOverflow.test.tsx). A stubbed ResizeObserver stands in for the
@@ -128,17 +128,20 @@ describe('MermaidToolbar overflow (#461)', () => {
     expect(group).toContainElement(more())
   })
 
-  it('shows the current direction as a checked, disabled item and runs another', async () => {
+  it('shows the directions as radio items, the current one checked and disabled, and runs another', async () => {
     renderToolbar()
     resizeTo(1)
     const menu = openMenu()
     const lr = within(menu).getByTestId(`${TEST_IDS.MERMAID_DIRECTION_BTN}-LR-overflow-item`)
-    expect(lr).toHaveAttribute('role', 'menuitemcheckbox')
+    expect(lr).toHaveAttribute('role', 'menuitemradio')
     expect(lr).toHaveAttribute('aria-checked', 'true')
     expect(lr).toHaveAttribute('aria-disabled', 'true')
+    expect(lr.querySelector('.context-menu-check svg')).not.toBeNull()
     const tb = within(menu).getByTestId(`${TEST_IDS.MERMAID_DIRECTION_BTN}-TB-overflow-item`)
     expect(tb).toHaveAccessibleName('Top to Bottom')
+    expect(tb).toHaveAttribute('role', 'menuitemradio')
     expect(tb).toHaveAttribute('aria-checked', 'false')
+    expect(tb.querySelector('.context-menu-check svg')).toBeNull()
     await act(async () => {
       fireEvent.click(tb)
     })

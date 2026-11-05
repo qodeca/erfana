@@ -12,9 +12,6 @@ import { waitForInputToSettle } from './terminalInputSettle'
 /** Shortest gap between two recorded activity timestamps for one terminal. */
 export const ACTIVITY_THROTTLE_MS = 250
 
-/** Wait between a paste and its Enter, so the PTY and the program take the paste first. */
-const PASTE_ENTER_DELAY_MS = 200
-
 interface TerminalStore {
   // Active terminal ID (null if no terminal is active)
   activeTerminalId: string | null
@@ -39,14 +36,16 @@ interface TerminalStore {
   /**
    * Record that a terminal printed output. Called for every output batch, so it
    * writes a plain map, not store state: nothing re-renders on it. Read only by
-   * `sendToTerminal`, to know when a paste has been taken.
+   * `sendToTerminal` and `sendToTerminalId`, to know when a paste has been taken.
    */
   noteOutput: (id: string) => void
   sendToTerminal: (text: string, autoExecute?: boolean) => Promise<boolean>
   /**
    * Type a prompt into the named terminal (active or not): control characters
-   * except line breaks removed, one bracketed paste, then Enter. False when the
-   * id is empty, nothing is left to send, or a write fails.
+   * except line breaks removed, one bracketed paste, then Enter once the paste
+   * has settled. Queued behind any other send to the same terminal, like
+   * `sendToTerminal` (#449). False when the id is empty, nothing is left to
+   * send, or a write fails.
    */
   sendToTerminalId: (terminalId: string, text: string) => Promise<boolean>
 
@@ -155,52 +154,31 @@ export function createTerminalStore(
       return Promise.resolve(false)
     }
 
-    // Wait for the previous send to this terminal – its Enter included – to finish
-    // (none pending: start at once, so a lone send writes in the same tick as before)
-    const previous = sendQueueById.get(terminalId)
-    const send = previous
-      ? previous.then(() => sendNow(get, terminalId, text, autoExecute))
-      : sendNow(get, terminalId, text, autoExecute)
-    sendQueueById.set(terminalId, send)
-    void send.finally(() => {
-      if (sendQueueById.get(terminalId) === send) sendQueueById.delete(terminalId)
-    })
-    return send
+    // For multi-line text, wrap in bracketed paste mode so the receiving
+    // terminal program (e.g. Claude CLI) treats it as a single paste event
+    // rather than character-by-character input. Convert line endings to \r
+    // (the standard terminal input line ending – Enter key sends \r).
+    // Uses the same bracketed paste protocol that xterm.js uses for clipboard pastes.
+    const isMultiLine = /[\r\n]/.test(text)
+    const textToWrite = isMultiLine
+      ? `\x1b[200~${text.replace(/\r?\n/g, '\r')}\x1b[201~`
+      : text
+
+    return enqueueSend(terminalId, () => sendNow(get, terminalId, textToWrite, autoExecute, 'sendToTerminal'))
   },
 
-  sendToTerminalId: async (terminalId: string, text: string): Promise<boolean> => {
+  sendToTerminalId: (terminalId: string, text: string): Promise<boolean> => {
     if (!terminalId) {
       logger.warn('sendToTerminalId: No terminal id given')
-      return false
+      return Promise.resolve(false)
     }
     if (stripControlCharacters(text).trim() === '') {
       logger.warn(`sendToTerminalId: Nothing to send to ${terminalId}`)
-      return false
+      return Promise.resolve(false)
     }
 
-    try {
-      const pasteResult = await terminalOps.write(terminalId, toBracketedPaste(text))
-      if (!pasteResult.success) {
-        logger.error(`sendToTerminalId: Write failed: ${pasteResult.error}`)
-        return false
-      }
-
-      // Same bookkeeping as sendToTerminal: a prompt sent for the user counts as their input.
-      get().markUserInput(terminalId)
-      get().markActivity(terminalId)
-
-      await new Promise(resolve => setTimeout(resolve, PASTE_ENTER_DELAY_MS))
-
-      const enterResult = await terminalOps.write(terminalId, '\r')
-      if (!enterResult.success) {
-        logger.error(`sendToTerminalId: Failed to send Enter: ${enterResult.error}`)
-        return false
-      }
-      return true
-    } catch (error) {
-      logger.error('sendToTerminalId: Unexpected error', error instanceof Error ? error : undefined)
-      return false
-    }
+    const paste = toBracketedPaste(text)
+    return enqueueSend(terminalId, () => sendNow(get, terminalId, paste, true, 'sendToTerminalId'))
   },
 
   // Scroll lock state - ephemeral, resets on app restart
@@ -212,30 +190,38 @@ export function createTerminalStore(
   }
   }))
 
-  /** Write one send to `terminalId` – the text, then Enter when `autoExecute` – never throwing. */
+  /**
+   * Run `send` once the previous send to `terminalId` – its Enter included – has
+   * finished (none pending: start at once, so a lone send writes in the same
+   * tick). `send` must not reject, or every later send to that terminal would.
+   */
+  function enqueueSend(terminalId: string, send: () => Promise<boolean>): Promise<boolean> {
+    const previous = sendQueueById.get(terminalId)
+    const queued = previous ? previous.then(send) : send()
+    sendQueueById.set(terminalId, queued)
+    void queued.finally(() => {
+      if (sendQueueById.get(terminalId) === queued) sendQueueById.delete(terminalId)
+    })
+    return queued
+  }
+
+  /**
+   * Write one send to `terminalId` – `data` as given, then Enter when
+   * `autoExecute` – never throwing. `label` names the caller in the log.
+   */
   async function sendNow(
     get: () => TerminalStore,
     terminalId: string,
-    text: string,
-    autoExecute: boolean
+    data: string,
+    autoExecute: boolean,
+    label: string
   ): Promise<boolean> {
     try {
-      // For multi-line text, wrap in bracketed paste mode so the receiving
-      // terminal program (e.g. Claude CLI) treats it as a single paste event
-      // rather than character-by-character input. Convert line endings to \r
-      // (the standard terminal input line ending – Enter key sends \r).
-      // Uses the same bracketed paste protocol that xterm.js uses for clipboard pastes.
-      const isMultiLine = /[\r\n]/.test(text)
-      const textToWrite = isMultiLine
-        ? `\x1b[200~${text.replace(/\r?\n/g, '\r')}\x1b[201~`
-        : text
-
-      // Write text to terminal using injected terminal operations
-      const writeResult = await terminalOps.write(terminalId, textToWrite)
+      const writeResult = await terminalOps.write(terminalId, data)
       const writtenAt = Date.now()
 
       if (!writeResult.success) {
-        logger.error(`sendToTerminal: Write failed: ${writeResult.error}`)
+        logger.error(`${label}: Write failed: ${writeResult.error}`)
         return false
       }
 
@@ -250,22 +236,22 @@ export function createTerminalStore(
       // a long paste and counts as a line break in it (#449, terminalInputSettle.ts)
       if (autoExecute) {
         const reason = await waitForInputToSettle(() => lastOutputById.get(terminalId), writtenAt)
-        logger.info(`sendToTerminal: sending Enter (${reason}) ${Date.now() - writtenAt} ms after the text`)
+        logger.info(`${label}: sending Enter (${reason}) ${Date.now() - writtenAt} ms after the text`)
 
         // Send Enter key (carriage return)
         const enterResult = await terminalOps.write(terminalId, '\r')
 
         if (!enterResult.success) {
-          logger.error(`sendToTerminal: Failed to send Enter: ${enterResult.error}`)
+          logger.error(`${label}: Failed to send Enter: ${enterResult.error}`)
           return false
         }
-        logger.info(`sendToTerminal: Enter sent successfully`)
+        logger.info(`${label}: Enter sent successfully`)
       }
 
-      logger.info(`sendToTerminal: Write successful`)
+      logger.info(`${label}: Write successful`)
       return true
     } catch (error) {
-      logger.error('sendToTerminal: Unexpected error', error instanceof Error ? error : undefined)
+      logger.error(`${label}: Unexpected error`, error instanceof Error ? error : undefined)
       return false
     }
   }

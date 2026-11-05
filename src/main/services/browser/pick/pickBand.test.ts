@@ -229,6 +229,32 @@ describe('OutlineBand', () => {
     expect(() => band.dispose()).not.toThrow()
   })
 
+  it('tells onDrawn after every draw that placed the strips – the box asked for and what is drawn – and never on a hide or a failed draw', () => {
+    const surface = new FakeSurface()
+    // Called once the surface has the strips.
+    const drawsAtCall: number[] = []
+    const onDrawn = vi.fn((_box: Box, _state: unknown) => void drawsAtCall.push(surface.draws.length))
+    let placement: BandPlacement | null = { clip: { x: 0, y: 0, width: 100, height: 100 }, view: { x: 0, y: 0, width: 100, height: 100 }, zoom: 1 }
+    const band = new OutlineBand({ open: () => surface, placement: () => placement, onDrawn, onError: () => undefined })
+    const box = { x: 10, y: 10, width: 10, height: 10 }
+    band.show(box, PAIR)
+    expect(onDrawn).toHaveBeenCalledTimes(1)
+    expect(onDrawn).toHaveBeenLastCalledWith(box, band.state)
+    band.redraw()
+    expect(onDrawn).toHaveBeenCalledTimes(2)
+    expect(drawsAtCall).toEqual([1, 2])
+    // Nothing placed: no element on the surface, or no page.
+    band.show({ x: 500, y: 500, width: 10, height: 10 }, PAIR)
+    placement = null
+    band.show(box, PAIR)
+    band.hide()
+    expect(onDrawn).toHaveBeenCalledTimes(2)
+    placement = { clip: { x: 0, y: 0, width: 100, height: 100 }, view: { x: 0, y: 0, width: 100, height: 100 }, zoom: 1 }
+    surface.failDraw = true
+    band.show(box, PAIR)
+    expect(onDrawn).toHaveBeenCalledTimes(2)
+  })
+
   it('treats a zero or missing zoom as 100 %', () => {
     const { band, surface } = setup({ placement: { clip: { x: 0, y: 0, width: 100, height: 100 }, view: { x: 0, y: 0, width: 100, height: 100 }, zoom: 0 } })
     band.show({ x: 10, y: 10, width: 10, height: 10 }, PAIR)

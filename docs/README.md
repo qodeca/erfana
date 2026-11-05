@@ -82,7 +82,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
   - [Deferred Markdown preview: remembered link checks](./performance/deferred-markdown-preview.md) - finding [31], v0.22.0
   - [Opening a large project: the lazy tree walk](./performance/2026-10-22-lazy-tree-walk.md) - finding [32], v0.22.0
   - [Manual Windows run on a 222k-entry project](./performance/211-large-project-windows-run.md) - #211, W17 (no-exclusion arm)
-  - [Built-in browser: pick highlight latency](./performance/browser-025-highlight.md) - spec 025, 025-AC-049 (macOS)
+  - [Built-in browser: pick highlight latency](./performance/browser-025-highlight.md) - spec 025, 025-AC-049 (Linux; macOS history)
   - [Built-in browser: send latency](./performance/browser-025-send.md) - spec 025, 025-AC-050 (macOS)
 - Spikes (`spikes/`) - time-boxed findings that a decision rests on
   - [ASAR packaging with integrity enforcement](./spikes/2026-10-22-asar-integrity.md) - the v0.22.0 `app.asar` integrity check
