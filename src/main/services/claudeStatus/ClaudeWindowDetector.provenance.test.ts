@@ -106,8 +106,9 @@ describe('#41 M4 - detectWindowDetail reports WHY, not just what', () => {
 
     expect(await rule('claude-haiku-4-5', 250_000, false, { settingsPath: absent })).toBe('R2')
     expect(await rule('claude-haiku-4-5', 12_000, true, { settingsPath: absent })).toBe('R0')
+    // A dual-window model: since #383 a 1M-only one (Opus 5) skips R0' for R1.
     expect(
-      await rule('claude-opus-5', 12_000, false, { settingsPath: absent, forceStandard: true })
+      await rule('claude-opus-4-6', 12_000, false, { settingsPath: absent, forceStandard: true })
     ).toBe('R0prime')
     expect(await rule('claude-sonnet-4-5[1m]', 12_000, false, { settingsPath: absent })).toBe(
       'R1m'
@@ -120,7 +121,7 @@ describe('#41 M4 - detectWindowDetail reports WHY, not just what', () => {
     // The one failure the module docblock names in prose and nothing tested.
     // Every other R2 assertion omits forceStandard and every R0' assertion uses
     // <=200k usage, so moving the R2 block below R0' left the whole suite green
-    // while re-introducing the #41 failure class: `/model claude-opus-5` typed at
+    // while re-introducing the #41 failure class: `/model claude-opus-4-6` typed at
     // 250k used sets modelForcedStandard with usedTokens 250_000, R0' would then
     // report 200k, `resolveWindow` additionally clears the sticky bit on
     // forceStandard, and the meter pins at "250k / 200k" — 100%, red, stuck for
@@ -128,7 +129,9 @@ describe('#41 M4 - detectWindowDetail reports WHY, not just what', () => {
     // must outrank the selection.
     const absent = path.join(tmpDir, 'absent.json')
 
-    const detail = await detectWindowDetail('claude-opus-5', 250_000, false, {
+    // Opus 4.6, not Opus 5: since #383 R0' no longer fires for a 1M-only model,
+    // so only a dual-window model still exercises the R2-above-R0' ordering.
+    const detail = await detectWindowDetail('claude-opus-4-6', 250_000, false, {
       settingsPath: absent,
       forceStandard: true
     })

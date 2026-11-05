@@ -403,9 +403,17 @@ describe('MarkdownEditorPanel Integration', () => {
       // a ref that a layout effect keeps on the latest handleSave
       expect(source).toContain("return handleSaveRef.current('autosave')")
       expect(source).toContain('handleSaveRef.current = handleSave')
-      // an autosave never overwrites a file that changed on disk
-      expect(source.indexOf('if (externalChangeDetected) return')).toBeLessThan(
+      // an autosave never overwrites a file that changed on disk, and never
+      // brings back a file deleted on disk (#460)
+      const guard = 'if (!shouldAutosave(externalChangeDetected, isFileDeleted)) return'
+      expect(source).toContain(guard)
+      expect(source.indexOf(guard)).toBeLessThan(
         source.indexOf("return handleSaveRef.current('autosave')")
+      )
+      // ...and resumes on its own once the bar or the banner goes away
+      expect(source).toContain(
+        'if (shouldAutosave(externalChangeDetected, isFileDeleted)) signalChange()\n' +
+          '  }, [externalChangeDetected, isFileDeleted, signalChange])'
       )
       expect(source).toContain("() => handleSave('registry'), externalChangeDetected")
       expect(source.match(/handleSave(?:Ref\.current)?\(/g)).toHaveLength(3)

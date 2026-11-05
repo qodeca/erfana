@@ -1023,6 +1023,18 @@
     "match": "min-inline-size:\\s*([1-9][0-9]*)px",
     "group": 1
   },
+  "terminal-default-width-px": {
+    "kind": "capture",
+    "card": "../designs/terminal-header/terminal-header.html",
+    "label": "rightWidth in useActivityBarStore.ts – the right (terminal) panel's default width, px",
+    "dir": "src/renderer",
+    "ext": [
+      ".ts"
+    ],
+    "includePath": "stores/useActivityBarStore\\.ts$",
+    "match": "rightWidth:\\s*([0-9]+)\\b",
+    "group": 1
+  },
   "band-blocked-hosts-per-view": {
     "kind": "capture",
     "card": "system/components/permission-band/index.html",

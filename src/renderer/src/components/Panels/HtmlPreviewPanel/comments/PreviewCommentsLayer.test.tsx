@@ -3,6 +3,10 @@
 /**
  * The element menu and the live regions (docs/designs/comments/html-preview-comments.md
  * §10.3, §10.9; R-001, R-002, R-013).
+ *
+ * Every menu also ends with Copy selection (#463), pinned on its own in
+ * `PreviewCommentsLayer.copy.test.tsx`; the matrix rows here are about the
+ * comment items, so they read {@link commentItems}.
  */
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -13,6 +17,11 @@ import { menuDraft, newRequest, threadsRequest } from './__test-helpers__/commen
 import { COPY, IDENTITY_COPY } from '../../../Comments/commentCopy'
 import { MD_SURFACE_COPY, SELECTION_COPY } from '../../../Comments/commentCopyWords'
 import { PreviewCommentsLayer, type PreviewCommentsLayerProps } from './PreviewCommentsLayer'
+import { TEST_IDS } from '../../../../constants/testids'
+
+/** The menu's comment items: every item but the trailing Copy selection (#463). */
+const commentItems = (): HTMLElement[] =>
+  screen.getAllByRole('menuitem').filter(item => item.dataset.testid !== TEST_IDS.CONTEXT_MENU_ITEM_COPY)
 
 function setup(patch: Partial<PreviewCommentsLayerProps> = {}) {
   const props: PreviewCommentsLayerProps = {
@@ -50,11 +59,11 @@ describe('PreviewCommentsLayer', () => {
   })
   afterEach(() => portalRoot.remove())
 
-  describe('R-001 the menu holds only "Add comment"', () => {
-    it('shows one item, focused, in a menu named Element', () => {
+  describe('R-001 the menu holds only "Add comment" (then Copy selection, #463)', () => {
+    it('shows one comment item, focused, in a menu named Element', () => {
       setup({ menu: menuDraft() })
       const menu = screen.getByRole('menu', { name: COPY.menuLabel })
-      const items = screen.getAllByRole('menuitem')
+      const items = commentItems()
       expect(items).toHaveLength(1)
       expect(items[0]).toHaveTextContent(COPY.addComment)
       expect(menu).toHaveAttribute('data-testid', 'comment-context-menu')
@@ -70,15 +79,18 @@ describe('PreviewCommentsLayer', () => {
       expect(props.onMenuClose).toHaveBeenCalledWith(true)
     })
 
-    it('arrows keep focus on the only item', async () => {
+    it('arrows move between the comment item and the disabled Copy selection, which stays reachable', async () => {
       const user = userEvent.setup()
       setup({ menu: menuDraft() })
       const item = screen.getByTestId('comment-menu-add')
+      const copy = screen.getByTestId(TEST_IDS.CONTEXT_MENU_ITEM_COPY)
       item.focus()
+      await user.keyboard('{ArrowDown}')
+      expect(copy).toHaveFocus()
       await user.keyboard('{ArrowDown}')
       expect(item).toHaveFocus()
       await user.keyboard('{ArrowUp}')
-      expect(item).toHaveFocus()
+      expect(copy).toHaveFocus()
     })
 
     it('Esc closes without choosing', async () => {
@@ -99,7 +111,7 @@ describe('PreviewCommentsLayer', () => {
 
     /** Every item: its label, disabled, named from its label and described by its visible reason line. */
     function expectDisabledWithReason(labels: readonly string[], reason: string): void {
-      const items = screen.getAllByRole('menuitem')
+      const items = commentItems()
       expect(items.map(item => item.querySelector('.context-menu-label')?.textContent ?? item.textContent)).toEqual(labels)
       items.forEach((item, i) => {
         expect(item).toHaveAttribute('aria-disabled', 'true')
@@ -125,7 +137,7 @@ describe('PreviewCommentsLayer', () => {
       const reason = "One comment in index.html is broken, so Erfana can't add new ones. Fix or delete the broken comment first."
       expectDisabledWithReason([SELECTION_COPY.commentOnSelection, SELECTION_COPY.commentOnWhole('section')], reason)
       // Two items, two reason lines – never one shared element.
-      const [first, second] = screen.getAllByRole('menuitem')
+      const [first, second] = commentItems()
       expect(first.getAttribute('aria-describedby')).not.toBe(second.getAttribute('aria-describedby'))
       for (const item of [first, second]) await user.click(item)
       expect(props.onAddComment).not.toHaveBeenCalled()
@@ -172,24 +184,24 @@ describe('PreviewCommentsLayer', () => {
   describe('OD-01 024-AC-004 the menu matrix in the HTML Preview', () => {
     const WORDS = { text: 'We ship the beta to ten customers', start: 20, end: 33, cut: false }
 
-    it('OD-01 outside comment mode the one item is "Comment on section" (M-01)', async () => {
+    it('OD-01 outside comment mode the one comment item is "Comment on section" (M-01)', async () => {
       const user = userEvent.setup()
       const draft = menuDraft()
       const { props } = setup({ menu: draft, mode: false })
       expect(screen.getByRole('menu', { name: COPY.menuLabel })).toBeVisible()
-      const items = screen.getAllByRole('menuitem')
+      const items = commentItems()
       expect(items).toHaveLength(1)
       expect(items[0]).toHaveTextContent(/^Comment on section$/)
       await user.click(items[0])
       expect(props.onAddComment).toHaveBeenCalledWith(draft)
     })
 
-    it('M-03 in comment mode without a selection the one item is "Add comment", on the picked element', async () => {
+    it('M-03 in comment mode without a selection the one comment item is "Add comment", on the picked element', async () => {
       const user = userEvent.setup()
       const draft = menuDraft()
       const { props } = setup({ menu: draft, mode: true })
       expect(screen.getByRole('menu', { name: COPY.menuLabel })).toBeVisible()
-      const items = screen.getAllByRole('menuitem')
+      const items = commentItems()
       expect(items.map(item => item.textContent)).toEqual([COPY.addComment])
       expect(items[0]).not.toHaveAttribute('aria-disabled')
       await user.click(items[0])
@@ -203,7 +215,7 @@ describe('PreviewCommentsLayer', () => {
       for (const mode of [false, true]) {
         const { props, unmount } = setup({ menu: draft, mode })
         expect(screen.getByRole('menu', { name: SELECTION_COPY.menuLabel })).toBeVisible()
-        const items = screen.getAllByRole('menuitem')
+        const items = commentItems()
         expect(items.map(item => item.textContent)).toEqual([
           SELECTION_COPY.commentOnSelection,
           SELECTION_COPY.commentOnWhole('section')

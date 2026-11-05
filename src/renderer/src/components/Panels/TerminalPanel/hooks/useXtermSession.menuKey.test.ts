@@ -58,7 +58,7 @@ vi.mock('@xterm/xterm', () => ({
     }
   })
 }))
-vi.mock('@xterm/addon-fit', () => ({ FitAddon: vi.fn().mockImplementation(function () { return ({ fit: vi.fn() }) }) }))
+vi.mock('@xterm/addon-fit', () => ({ FitAddon: vi.fn().mockImplementation(function () { return ({ fit: vi.fn(), proposeDimensions: vi.fn(() => ({ cols: 80, rows: 24 })) }) }) }))
 vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: vi.fn().mockImplementation(function () { return ({}) }) }))
 vi.mock('@xterm/addon-webgl', () => ({
   WebglAddon: vi.fn().mockImplementation(function () { return ({ onContextLoss: vi.fn(), dispose: vi.fn() }) })
@@ -90,8 +90,7 @@ async function startSession() {
     wheelEventHandler: vi.fn(() => true),
     onContextMenu: vi.fn(),
     attachFileDrop: vi.fn(),
-    detachFileDrop: vi.fn(),
-    screenReaderMode: false
+    detachFileDrop: vi.fn()
   }
   const hook = renderHook(() => useXtermSession(options))
   await act(async () => {

@@ -18,6 +18,7 @@ import {
   RESIZE_INITIAL_DELAY_MS,
   RESIZE_DEBOUNCE_MS
 } from '../terminalPanel.logic'
+import { fitTerminalIfUsable } from '../terminalFit'
 
 /**
  * Configuration options for the useTerminalResize hook.
@@ -81,12 +82,10 @@ export function useTerminalResize(options: UseTerminalResizeOptions): UseTermina
    */
   const handleResize = useCallback(() => {
     try {
-      fitAddonRef.current?.fit()
-
-      if (xtermRef.current && terminalId) {
-        // Enforce integer dimensions to prevent oscillation
-        const cols = Math.floor(xtermRef.current.cols)
-        const rows = Math.floor(xtermRef.current.rows)
+      // Never a collapsed or tiny container's size (#465); integer size
+      const size = fitTerminalIfUsable(fitAddonRef.current, xtermRef.current)
+      if (size && terminalId) {
+        const { cols, rows } = size
 
         if (shouldApplyResize(cols, rows, lastColsRef.current, lastRowsRef.current)) {
           resizePty(terminalId, cols, rows)

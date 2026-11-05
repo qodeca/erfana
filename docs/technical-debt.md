@@ -130,7 +130,7 @@ Moving the block would require synchronized edits to checks.yml + skill + README
 
 ### 8. Renderer components exceed the 500-line guideline
 
-**Severity**: Low — `MarkdownPreview.tsx` (1,335 lines) and `ChatBubble.tsx` (672 lines), measured 2026-10-25 (1,032 and 641 when filed), exceed the 500-line-per-file guideline (pre-existing; out of scope for the issue #203 clipboard change). Both are frozen in `scripts/max-lines-baseline.json` (entry #26), so they can shrink but not grow; `MarkdownPreview.tsx` has since shrunk to 1,317. Candidates for a future decomposition pass.
+**Severity**: Low — `MarkdownPreview.tsx` (1,335 lines) and `ChatBubble.tsx` (672 lines), measured 2026-10-25 (1,032 and 641 when filed), exceed the 500-line-per-file guideline (pre-existing; out of scope for the issue #203 clipboard change). Both are frozen in `scripts/max-lines-baseline.json` (entry #26), so they can shrink but not grow; `MarkdownPreview.tsx` has since shrunk to 1,313. Candidates for a future decomposition pass.
 
 ---
 
@@ -355,7 +355,7 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 **Severity**: Medium — it is a main-process security boundary, though a notification-only one.
 
-**Impact**: `watchFile` gates on `filePath.startsWith(this.projectPath)` (`FileWatcherService.ts:126`) – no `path.resolve`, no trailing separator, and no `fs.realpath`. It is wrong in both directions: `/proj-evil/x.png` **passes** when the project is `/proj` (prefix match without a separator), and `/proj/../p2/x.png` fails closed. The read handlers next to it (`file:readFile`, `file:readImage`) went through `assertInsideProject` in #70 and now do the two-stage lexical + canonical check.
+**Impact**: `watchFile` gates on `isLexicallyInside(filePath, this.projectPath)` (`FileWatcherService.ts:123`). Since #464 that resolves both paths and compares on a separator boundary, so `/proj-evil/x.png` no longer passes when the project is `/proj` – but the check is still lexical only, with no `fs.realpath`, so a symlink inside the project that points outside it still passes. The read handlers next to it (`file:readFile`, `file:readImage`) went through `assertInsideProject` in #70 and now do the two-stage lexical + canonical check.
 
 **Why it was left alone in #70**: it is a shared boundary used by every watcher consumer and deserves its own tests and review pass rather than a drive-by edit inside a bugfix. The exposure is bounded — watching is a notification side channel, the *content* read behind it goes through the stricter guard, and the atomic re-arm path already re-validates the path with `classifyConfinement` before rebuilding a watcher (`watcher/atomicRearm.ts` → `AtomicRearmDeps.isPathConfined`).
 
@@ -437,7 +437,7 @@ The policy before the ratchet, as practised: *a file a change adds behaviour to 
 | `src/main/services/workers/git-status.worker.ts` | 520 | Pre-existing |
 | `src/renderer/src/hooks/useExternalFileDrop.ts` | 518 | Pre-existing |
 
-`FileWatcherService.ts` deliberately stayed under the cap (498 lines at the #70 measurement) by moving the watch factory, the unlink branch, the send loop and the subscriber counting into `src/main/services/watcher/`. It has since grown past it: 581 lines, frozen there in `scripts/max-lines-baseline.json`.
+`FileWatcherService.ts` deliberately stayed under the cap (498 lines at the #70 measurement) by moving the watch factory, the unlink branch, the send loop and the subscriber counting into `src/main/services/watcher/`. It has since grown past it: 579 lines, frozen there in `scripts/max-lines-baseline.json`.
 
 **Recommended Solution**: (#124 made the split below for both preview files; the rest stands.) `PreviewLiveView.ts` and `PreviewViewService.ts` were the entries gaining code fastest and the ones to split first – the lifecycle wiring, teardown and still-frame paths in the former and the suspend/resume policy in the latter are separable. `file-handlers.ts` remains a candidate: the project/file/stat/CRUD handler groups are independent. The `imageViewer.logic.ts` file is a candidate for the next pass that genuinely changes it.
 
@@ -766,7 +766,7 @@ One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns 
 
 (all under `src/renderer/src/components/Panels/HtmlPreviewPanel/`)
 
-**Re-measured 2026-10-29**: five files have grown since the tables above – `PreviewViewService.pageScope.test.ts` is 504 lines, `PreviewSessionFactory.ts` 500, `PreviewViewService.ts` 472, `PreviewChromeBand.css` 509 and `HtmlPreviewPanel.tsx` 477. `usePreviewStillStore.ts` has not been split out.
+**Re-measured 2026-10-29**: five files have grown since the tables above – `PreviewViewService.pageScope.test.ts` is 504 lines, `PreviewSessionFactory.ts` 500, `PreviewViewService.ts` 472 (475 after #463), `PreviewChromeBand.css` 509 and `HtmlPreviewPanel.tsx` 477. `usePreviewStillStore.ts` has not been split out.
 
 **Recommended Solution**: split on the next behaviour change, as planned above; do not grow the band stylesheet further without moving a block (the nav controls already live in `PreviewNavControls.css`).
 

@@ -36,17 +36,17 @@ jobs:
       - name: Probe notarytool history
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         # `notarytool history` lists recent notarization submissions; it
         # authenticates with the same creds used by the main workflow's
         # `notarytool submit`. Non-zero exit = creds no longer work.
         run: |
           set -euo pipefail
-          echo "::add-mask::$APPLE_APP_PASSWORD"
+          echo "::add-mask::$APPLE_APP_SPECIFIC_PASSWORD"
           xcrun notarytool history \
             --apple-id "$APPLE_ID" \
-            --password "$APPLE_APP_PASSWORD" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
             --output-format json >/tmp/notary-history.json
           # Confirm the response is structured JSON, not a pass-through of a
@@ -67,12 +67,15 @@ jobs:
         # signtool itself resolves so the Phase-5 flip is drop-in.
         run: |
           $ErrorActionPreference = 'Stop'
-          $signtool = Get-Command signtool.exe -ErrorAction SilentlyContinue
+          # signtool is not on PATH on GitHub runners; find it in the newest SDK, as build_win.yml does.
+          $sdkRoot = "C:\Program Files (x86)\Windows Kits\10\bin"
+          $sdkBin = Get-ChildItem $sdkRoot -Directory | Where-Object { $_.Name -match '^10\.' } | Sort-Object Name -Descending | Select-Object -First 1
+          $signtool = Get-Item (Join-Path $sdkBin.FullName "x64\signtool.exe") -ErrorAction SilentlyContinue
           if ($null -eq $signtool) {
-            Write-Error "signtool.exe not found on PATH; Phase-5 cert-chain probe will need to locate it via the Windows SDK."
+            Write-Error "signtool.exe not found under $sdkRoot"
             exit 1
           }
-          Write-Host "signtool resolved at $($signtool.Source)"
+          Write-Host "signtool resolved at $($signtool.FullName)"
 
   notify-on-failure:
     name: Post failure issue

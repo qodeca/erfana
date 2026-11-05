@@ -24,7 +24,7 @@ Templates split into two categories: **read-only** prompts (Explain, Ask, Prompt
 
 ### AutoExecute Implementation (v0.3.4)
 - [Overview](./autoexecute-overview.md) - Feature overview and architecture
-- [Technical Details](./autoexecute-technical.md) - Write pipeline and 200ms delay rationale
+- [Technical Details](./autoexecute-technical.md) - Write pipeline and Enter timing
 - [Testing](./autoexecute-testing.md) - Test coverage and mocking strategy
 - [Reference](./autoexecute-reference.md) - Error handling and implementation files
 
@@ -198,7 +198,7 @@ Introduced in v0.10.0. Mutation templates set `mutatesDocument: true` in their f
 
 All templates target Terminal panel:
 - `sendDirectly: false` (the default in every template; the terminal path does not act on it)
-- `autoExecute: true` - the prompt is pasted and Enter is pressed after 200 ms
+- `autoExecute: true` - the prompt is pasted and Enter is pressed once the terminal has taken the paste (its output goes quiet; never sooner than 200 ms)
 - `mutatesDocument: false` (default) — read-only prompt; **true** composes the apply-footer (v0.10.0)
 - **Auto-scroll (v0.5.4)** - Terminal scrolls to bottom 1 second after execution
 

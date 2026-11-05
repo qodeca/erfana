@@ -101,3 +101,9 @@ export const GIT_STATUS = {
    */
   COOLDOWN_DURATION: 500
 } as const
+
+/**
+ * The file-filter panel's element id: the Project panel header's filter
+ * trigger points at it with aria-controls (#452). One Project panel per window.
+ */
+export const PROJECT_FILTER_PANEL_ID = 'project-filter-panel'

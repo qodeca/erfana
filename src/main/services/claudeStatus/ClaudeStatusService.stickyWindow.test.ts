@@ -9,8 +9,9 @@
  * the REAL capability registry.
  *
  * Three behaviours live here:
- *  - AC7 / R0': an explicit `/model <id>` standard selection outranks a registry
- *    that says 1M for that very model.
+ *  - AC7 / R0': an explicit `/model <id>` standard selection pins a model that
+ *    offers a 200k window at 200k — and, since #383, leaves a model that has
+ *    only a 1M window at 1M.
  *  - The canonical sticky key: `claude-haiku-4-5` and its dated snapshot id are
  *    ONE model for latching purposes (the reachable production case — brackets
  *    are stripped long before the service sees an id).
@@ -64,8 +65,8 @@ afterEach(() => {
   __resetSettingsCacheForTests()
 })
 
-describe('AC7 - an explicit standard /model selection outranks the registry (R0\')', () => {
-  it('AC7: reports 200k for claude-opus-5 when modelForcedStandard is set', async () => {
+describe('AC7 - an explicit standard /model selection (R0\')', () => {
+  it('#383: /model claude-opus-5 without [1m] reports 1M, as Opus 5 has no 200k window', async () => {
     const detect = realDetectWindowSize()
     const h = makeHarness({ detectWindowSize: detect as never })
     h.parseTranscript.mockResolvedValue({
@@ -79,13 +80,29 @@ describe('AC7 - an explicit standard /model selection outranks the registry (R0\
 
     // R0' rides in `opts` so every other call site keeps its 3-arg shape.
     expect(detect).toHaveBeenCalledWith('claude-opus-5', 12_000, false, { forceStandard: true })
+    expect(h.emitted.at(-1)?.payload.snapshot?.windowSize).toBe(1_000_000)
+    expect(h.emitted.at(-1)?.payload.snapshot?.tooltip).toBe('12k / 1M (inferred)')
+  })
+
+  it("AC7: /model claude-opus-4-6 without [1m] reports 200k (R0')", async () => {
+    const detect = realDetectWindowSize()
+    const h = makeHarness({ detectWindowSize: detect as never })
+    h.parseTranscript.mockResolvedValue({
+      modelId: 'claude-opus-4-6',
+      usedTokens: 12_000,
+      modelForcedStandard: true
+    })
+
+    h.service.registerPanel('t1', 4242, '/p', 7)
+    await flush()
+
+    expect(detect).toHaveBeenCalledWith('claude-opus-4-6', 12_000, false, { forceStandard: true })
     expect(h.emitted.at(-1)?.payload.snapshot?.windowSize).toBe(200_000)
     expect(h.emitted.at(-1)?.payload.snapshot?.tooltip).toBe('12k / 200k')
   })
 
-  it('AC7 control: the SAME model reports 1M without the explicit standard selection', async () => {
-    // Proves the 200k above comes from R0' and not from the registry simply
-    // failing to recognise `claude-opus-5` — the #41 bug itself.
+  it('AC7 control: claude-opus-5 reports 1M without the explicit standard selection', async () => {
+    // Proves the registry recognises `claude-opus-5` — the #41 bug itself.
     const detect = realDetectWindowSize()
     const h = makeHarness({ detectWindowSize: detect as never })
     h.parseTranscript.mockResolvedValue({ modelId: 'claude-opus-5', usedTokens: 12_000 })
@@ -101,14 +118,14 @@ describe('AC7 - an explicit standard /model selection outranks the registry (R0\
     const detect = realDetectWindowSize()
     const h = makeHarness({ detectWindowSize: detect as never })
     // Observed >200k usage latches a corroborated 1M for this model…
-    h.parseTranscript.mockResolvedValueOnce({ modelId: 'claude-opus-5', usedTokens: 250_000 })
+    h.parseTranscript.mockResolvedValueOnce({ modelId: 'claude-opus-4-6', usedTokens: 250_000 })
     h.service.registerPanel('t1', 4242, '/p', 7)
     await flush()
     expect(h.emitted.at(-1)?.payload.snapshot?.windowSize).toBe(1_000_000)
 
-    // …and an explicit `/model claude-opus-5` (no marker) must still win.
+    // …and an explicit `/model claude-opus-4-6` (no marker) must still win.
     h.parseTranscript.mockResolvedValue({
-      modelId: 'claude-opus-5',
+      modelId: 'claude-opus-4-6',
       usedTokens: 30_000,
       modelForcedStandard: true
     })

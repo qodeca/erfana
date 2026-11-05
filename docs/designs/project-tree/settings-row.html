@@ -1,0 +1,90 @@
+<!-- @card group="Project tree" name="Settings – follow the active tab" subtitle="The on/off switch for #453 in a new Project tree section of Settings – on, off, focused, and the runner-up wording" status="decided" reviewed="2026-11-03" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana – project tree: Settings row</title>
+<link rel="stylesheet" href="../../design-system/tokens.css">
+<link rel="stylesheet" href="../../design-system/ds.css">
+<link rel="stylesheet" href="../../design-system/system/components/form/form.css">
+<style>
+  /* The Settings overlay's section and row, drawn at the app's own scale
+     (SettingsOverlay.css: .settings-section-title, .settings-row,
+     .settings-label, .settings-description). */
+  .erf-ps-panel { background: var(--color-bg-secondary); padding: var(--space-12); max-width: 640px; }
+  .erf-ps-title { font-size: var(--text-lg); font-weight: var(--font-semibold); color: var(--color-text-emphasis);
+                  margin: 0 0 var(--space-8); padding-bottom: var(--space-4);
+                  border-bottom: var(--border-width) solid var(--color-border-default); }
+  .erf-ps-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-12);
+                padding: var(--space-6) 0; }
+  .erf-ps-field { flex: 1; display: flex; flex-direction: column; gap: var(--space-2); }
+  .erf-ps-label { font-size: var(--text-base); font-weight: var(--font-medium); color: var(--color-text-primary); }
+  /* mockup: the app's description size */
+  .erf-ps-desc { font-size: var(--text-sm); color: var(--color-text-secondary); margin: 0; line-height: var(--leading-normal); }
+</style>
+</head>
+<body>
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../index.html">Feature designs</a> <span aria-hidden="true">/</span> <span aria-current="page">Project tree – Settings row</span></nav>
+<main>
+<h1>Settings – follow the active tab</h1>
+<p class="ds-meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-11-03 · design note <a href="453-follow-active-tab.md">453-follow-active-tab.md</a> · issue <a href="https://github.com/qodeca/erfana/issues/453">#453</a></p>
+<p class="ds-lede" id="decision">
+  One checkbox in a new <strong>Project tree</strong> section, on by default. This screen cites the
+  <a href="../../design-system/system/components/form/index.html">Form controls</a> card for the checkbox and
+  decides no system rule. The owner chose the wording and the key on 2026-11-03 (option A) – see the note.
+</p>
+
+<h2 id="states">States</h2>
+<div class="ds-frames">
+  <figure class="ds-frame"><div inert aria-hidden="true"><div class="erf-ps-panel">
+    <h3 class="erf-ps-title">Project tree</h3>
+    <div class="erf-ps-row">
+      <div class="erf-ps-field"><span class="erf-ps-label">Follow the active tab</span>
+        <p class="erf-ps-desc">When you switch to a file or preview tab, the project tree opens its folders, scrolls to the file and underlines it.</p></div>
+      <input class="erf-checkbox" type="checkbox" checked>
+    </div>
+  </div></div>
+  <figcaption><strong>On – the default.</strong> The decided wording (option A).</figcaption></figure>
+
+  <figure class="ds-frame"><div inert aria-hidden="true"><div class="erf-ps-panel">
+    <h3 class="erf-ps-title">Project tree</h3>
+    <div class="erf-ps-row">
+      <div class="erf-ps-field"><span class="erf-ps-label">Follow the active tab</span>
+        <p class="erf-ps-desc">When you switch to a file or preview tab, the project tree opens its folders, scrolls to the file and underlines it.</p></div>
+      <input class="erf-checkbox" type="checkbox">
+    </div>
+  </div></div>
+  <figcaption><strong>Off.</strong> The tree stays where the person left it; no line is drawn.</figcaption></figure>
+
+  <figure class="ds-frame"><div inert aria-hidden="true"><div class="erf-ps-panel">
+    <h3 class="erf-ps-title">Project tree</h3>
+    <div class="erf-ps-row">
+      <div class="erf-ps-field"><span class="erf-ps-label">Follow the active tab</span>
+        <p class="erf-ps-desc">When you switch to a file or preview tab, the project tree opens its folders, scrolls to the file and underlines it.</p></div>
+      <input class="erf-checkbox is-focus" type="checkbox" checked>
+    </div>
+  </div></div>
+  <figcaption><strong>Keyboard focus.</strong> The Form card's inset ring.</figcaption></figure>
+
+  <figure class="ds-frame"><div inert aria-hidden="true"><div class="erf-ps-panel">
+    <h3 class="erf-ps-title">Project tree</h3>
+    <div class="erf-ps-row">
+      <div class="erf-ps-field"><span class="erf-ps-label">Show the active file in the tree</span>
+        <p class="erf-ps-desc">When you switch to a file or preview tab, the project tree opens its folders, scrolls to the file and underlines it.</p></div>
+      <input class="erf-checkbox" type="checkbox" checked>
+    </div>
+  </div></div>
+  <figcaption><strong>Option B wording – rejected.</strong> Same row, the runner-up label, kept for the record.</figcaption></figure>
+</div>
+
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None recorded.</p>
+</section>
+</main>
+</body>
+</html>

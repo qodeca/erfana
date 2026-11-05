@@ -90,6 +90,16 @@ export interface PreviewFocusPageResult {
   readonly ok: boolean
 }
 
+/**
+ * Result of `preview:copySelection` (#463): whether the page was told to copy
+ * its selection. A bare flag for the reason {@link PreviewFocusPageResult} is
+ * one, and never the copied text: that stays in main and the clipboard.
+ */
+export interface PreviewCopySelectionResult {
+  /** `true` when a live page of the sender's window ran its Copy command. */
+  readonly ok: boolean
+}
+
 /** Result of `preview:approveHost`; the new host set is returned on success. */
 export type PreviewApproveResult =
   | { ok: true; hosts: readonly string[] }

@@ -263,6 +263,23 @@ export class PreviewLiveView {
     return true
   }
 
+  /**
+   * Copy the page's selected text to the system clipboard (#463): Chromium's
+   * own Copy command in the page's focused frame, as Ctrl+C / ⌘C runs it.
+   *
+   * Unlike {@link focusPage} this does not need the view drawn: the menu that
+   * asks for it hides the page behind its still frame. Nothing is read back.
+   *
+   * @returns `true` when the command was sent to a live page.
+   */
+  copySelection(): boolean {
+    if (this.isDefunct || typeof this.wc.copy !== 'function') {
+      return false
+    }
+    this.wc.copy()
+    return true
+  }
+
   reload(ignoreCache: boolean): void {
     this.parts.pipeline.reload(ignoreCache)
   }

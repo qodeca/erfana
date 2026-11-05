@@ -8,7 +8,7 @@
  *
  * Strategies:
  * - DirectoryContextMenuStrategy: Cut, Copy, Paste, New File, New Folder, Rename, Delete
- * - FileContextMenuStrategy: (HTML only: Open as source, Open in default browser), Cut, Copy, Rename, Delete
+ * - FileContextMenuStrategy: (HTML only: Open as source, Open in default browser), Cut, Copy, Paste (into the file's folder), Rename, Delete
  *
  * All strategies implement IContextMenuStrategy and use Command pattern for actions.
  */
@@ -31,6 +31,7 @@ import {
   RevealInFileManagerCommand,
   separatorItem
 } from './commands'
+import { PasteIntoParentFolderCommand } from './fileRowCommands'
 
 /**
  * Directory context menu strategy
@@ -112,6 +113,11 @@ export class FileContextMenuStrategy implements IContextMenuStrategy {
     // Clipboard operations
     items.push(new CutCommand(ctx, fileNode).toMenuItem())
     items.push(new CopyCommand(ctx, fileNode).toMenuItem())
+
+    // Paste into the file's folder (#463), only if the clipboard has an item
+    if (ctx.clipboard.hasClipboard()) {
+      items.push(new PasteIntoParentFolderCommand(ctx, fileNode).toMenuItem())
+    }
 
     items.push(separatorItem())
 

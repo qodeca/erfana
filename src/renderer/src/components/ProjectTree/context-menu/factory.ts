@@ -18,6 +18,24 @@
 
 import type { IContextMenuFactory, IContextMenuStrategy, IMenuItem, MenuContext, FileNode } from './types'
 import { DirectoryContextMenuStrategy, FileContextMenuStrategy } from './strategies'
+import type { ContextMenuItem } from '../../ContextMenu/ContextMenu'
+
+/**
+ * Adapt command items to the shared ContextMenu's items (`execute` → `action`).
+ *
+ * @param items - Items a strategy built
+ * @returns The same items for `ContextMenu`, shortcut hints included
+ */
+export function toContextMenuItems(items: readonly IMenuItem[]): ContextMenuItem[] {
+  return items.map(({ label, icon, danger, separator, shortcut, execute }) => ({
+    label,
+    icon,
+    danger,
+    separator,
+    shortcut,
+    action: execute
+  }))
+}
 
 /**
  * Context menu factory

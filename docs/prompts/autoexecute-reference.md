@@ -48,7 +48,7 @@ sendToTerminal: async (text: string, autoExecute = false): Promise<boolean> => {
     get().markUserInput(terminalId)
     get().markActivity(terminalId)
 
-    // If autoExecute, send Enter after the 200ms delay
+    // If autoExecute, send Enter once the output has gone quiet (waitForInputToSettle)
     if (autoExecute) {
       await new Promise(resolve => setTimeout(resolve, 200))
 
@@ -177,7 +177,7 @@ The per-version modified-files tables (v0.3.3 and v0.3.4) are archived in [AutoE
 - [Template Examples](./examples.md) - Sample templates and use cases
 - [Prompt Templates README](./README.md) - User-facing overview
 - [AutoExecute Overview](./autoexecute-overview.md) - Feature overview and architecture
-- [AutoExecute Technical](./autoexecute-technical.md) - Write pipeline and 200ms delay details
+- [AutoExecute Technical](./autoexecute-technical.md) - Write pipeline and Enter timing
 - [AutoExecute Testing](./autoexecute-testing.md) - Test coverage and mocking strategy
 
 ### Terminal & Architecture
@@ -269,8 +269,8 @@ The v0.3.2→v0.3.4 migration guide is archived in [AutoExecute v0.3 history](ht
 **Issue**: Enter key not executing after paste
 **Solution**: Verify terminal is initialized (check Terminal Bootstrap Pattern)
 
-**Issue**: Partial command execution
-**Solution**: Increase delay if needed (current: 200ms, try 250ms)
+**Issue**: Partial command execution, or Enter arriving as a line break inside the prompt
+**Solution**: Enter waits until the terminal output goes quiet (`waitForInputToSettle`, `stores/terminalInputSettle.ts`); there is no fixed delay to raise. See [AutoExecute Technical](./autoexecute-technical.md#since-449-enter-waits-for-the-paste-to-be-taken) for the rule and its caps
 
 **Issue**: Write operations failing
 **Solution**: Check terminal availability with `getActiveTerminalId()`
@@ -280,7 +280,7 @@ The v0.3.2→v0.3.4 migration guide is archived in [AutoExecute v0.3 history](ht
 
 ### Debug Logging
 
-`sendToTerminal` already logs each step through the renderer `logger` – the `autoExecute` flag, terminal id and text length, the 200ms wait, and whether Enter was sent – and `openPanelAndSendContent` / `executePromptTemplate` log the flag they pass on. Read them in the renderer log rather than adding `console.log` calls.
+`sendToTerminal` already logs each step through the renderer `logger` – the `autoExecute` flag, terminal id and text length, the wait before Enter (its reason and length), and whether Enter was sent – and `openPanelAndSendContent` / `executePromptTemplate` log the flag they pass on. Read them in the renderer log rather than adding `console.log` calls.
 
 ### Performance Monitoring
 
@@ -291,8 +291,4 @@ const duration = Date.now() - start
 console.log(`⏱️  AutoExecute completed in ${duration}ms`)
 ```
 
-Expected timing:
-- Text write: ~5-20ms
-- Delay: 200ms
-- Enter write: ~5-20ms
-- **Total**: ~210-240ms
+Expected timing: Enter goes once the output has been quiet for at least 400 ms, after 3 s when the terminal prints nothing, and after 8 s (60 s at most) when the output never goes quiet – see [AutoExecute Technical](./autoexecute-technical.md#since-449-enter-waits-for-the-paste-to-be-taken). A send queued behind another send to the same terminal also waits for that one's Enter.

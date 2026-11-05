@@ -40,6 +40,7 @@ import type {
 import type {
   PdfExportResult,
   PreviewApproveResult,
+  PreviewCopySelectionResult,
   PreviewFindResult,
   PreviewFocusPageResult,
   PreviewNavigateResult,
@@ -107,6 +108,9 @@ export const previewBridge: PreviewBridge = {
 
   focusPage: (panelId: string): Promise<PreviewFocusPageResult> =>
     ipcRenderer.invoke(PreviewChannels.FOCUS_PAGE, { panelId }),
+
+  copySelection: (panelId: string): Promise<PreviewCopySelectionResult> =>
+    ipcRenderer.invoke(PreviewChannels.COPY_SELECTION, { panelId }),
 
   onFailuresChanged: (callback: (payload: PreviewFailureListPayload) => void): (() => void) =>
     subscribe(PreviewEvents.FAILURES_CHANGED, callback),

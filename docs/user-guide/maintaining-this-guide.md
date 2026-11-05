@@ -39,6 +39,10 @@ npm run check:claims
 
 It fails when a quote is no longer on its page, or when the source line no longer holds its `match` – for example, after a menu label is renamed. If the text only moved to another line, `npm run check:claims -- --update` moves the entry. A renamed label still fails, because the page must change with it. Prove a claim from code, never from another doc. A claim you cannot prove gets corrected or removed; record a removed claim with `"status": "removed"` and a note.
 
+When the `match` text is on more than one line, `--update` does not guess: it fails with "pick one by hand". Set `source` to the line whose surrounding code proves the claim.
+
+When a merge conflicts in `claims.json`, resolve only the conflict blocks. Do not take one whole side with `git checkout --ours` or `--theirs`: that drops the entries the other branch added in the parts that merged cleanly. Then run `npm run check:claims -- --update` and fix what still fails.
+
 Before a push, also run the prose, Markdown and web-link linters:
 
 ```sh

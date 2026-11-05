@@ -88,6 +88,18 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 
 ---
 
+## Panel toolbar overflow (3 testids, outside the count above)
+
+Panel header rows (#451) and the Markdown and Mermaid toolbars (#461) move buttons that do not fit into a "More actions" menu. These ids live in `src/renderer/src/constants/toolbarOverflowTestids.ts` (`TOOLBAR_OVERFLOW_TEST_IDS`), not in `TEST_IDS`: `testids.ts` is at its max-lines ratchet. A moved button's menu item carries its row button's testid plus `-overflow-item` (`terminal-btn-expand-overflow-item`), built by `overflowItemTestId()` in `components/ToolbarOverflow/ToolbarOverflow.tsx`. POM: `e2e/pages/toolbar-overflow.page.ts`.
+
+| Test ID | Element | Type |
+|---------|---------|------|
+| `toolbar-overflow-more` | The "More actions" (…) button; one per row that overflows, so scope it by row | static |
+| `toolbar-overflow-menu` | The menu it opens | static |
+| `project-panel-btn-filter` | The project panel header's filter-options toggle | static |
+
+---
+
 ## Screen permission dialog (4 testids)
 
 Advisory macOS Screen Recording permission prompt. It appears **after** the OS denies a capture and never blocks one – see [`ScreenPermissionDialog.tsx`](../../src/renderer/src/components/Dialog/ScreenPermissionDialog.tsx).
@@ -490,9 +502,6 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 | `settings-btn-whisper-cancel` | Cancel button shown while the Whisper binary or model downloads | static |
 | `settings-whisper-download-live` | Always-mounted, visually hidden status region announcing download progress | static |
 | `settings-whisper-download-alert` | Always-mounted, visually hidden alert region announcing a failed download | static |
-| `settings-section-terminal` | Terminal settings section (lens review [23]) | static |
-| `settings-select-screen-reader-mode` | Terminal screen-reader mode select: Auto / On / Off | static |
-| `settings-screen-reader-status` | What Auto currently detects (screen reader reported or not) | static |
 | `settings-section-import-tools` | Import tools section (#250) | static |
 | `settings-import-tool-status` | One format row's status; the row carries `data-format` and `data-state` | static |
 | `settings-btn-import-tools-recheck` | "Check again" button (#250) | static |

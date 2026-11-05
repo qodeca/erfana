@@ -20,11 +20,11 @@ Erfana uses a Monaco text editor with Markdown formatting, a separate Find bar, 
 
 **What they do:** Monaco's built-in editing commands work, such as multiple cursors, undo and redo, and line operations. **How to reach them:** Focus the editor. Right-click, or press <kbd>⇧F10</kbd> / <kbd>Shift+F10</kbd>, to open Erfana's context menu. Erfana provides its own Find bar, not Monaco's find widget.
 
-**Context menu items:** **Explain**, **Modify**, **Ask**, **Visualize** and **Prompt** send the selected text to the CLI agent in the terminal. **Cut**, **Copy** and **Paste** follow them. Every item except **Paste** needs a text selection. For the steps, see [Turn a selection into a prompt](../how-to/turn-a-selection-into-a-prompt.md).
+**Context menu items:** **Explain**, **Modify**, **Ask**, **Visualize** and **Prompt** send the selected text to the CLI agent in the terminal. **Cut**, **Copy**, **Paste** and **Delete** follow them, each with its shortcut. Every item except **Paste** needs a text selection; **Delete** removes the selected text without copying it. For the steps, see [Turn a selection into a prompt](../how-to/turn-a-selection-into-a-prompt.md).
 
 ## View modes and scroll sync
 
-**What they do:** **Editor Only**, **Split Horizontal**, **Split Vertical** and **Preview Only** change the panes. Both split views keep editor and preview scrolling together. **How to reach them:** the Markdown toolbar.
+**What they do:** **Editor Only**, **Split Horizontal**, **Split Vertical** and **Preview Only** change the panes. Both split views keep editor and preview scrolling together. **How to reach them:** the Markdown toolbar. When it is too narrow, the buttons that do not fit are in its **More actions** (…) menu.
 
 ## Formatting toolbar
 
@@ -44,4 +44,4 @@ Erfana uses a Monaco text editor with Markdown formatting, a separate Find bar, 
 
 ## Save and close
 
-**What it does:** Autosave writes after two seconds idle and during continued editing at least every 30 seconds. <kbd>⌘S</kbd> / <kbd>Ctrl+S</kbd> saves the active buffer; <kbd>⌘W</kbd> / <kbd>Ctrl+W</kbd> closes the active tab. An unsaved tab asks before closing. If the file changes outside Erfana, a tab with no unsaved edits reloads it automatically; a tab with unsaved edits asks you to choose **Reload from Disk** or **Keep My Version**.
+**What it does:** Autosave writes after two seconds idle and during continued editing at least every 30 seconds. <kbd>⌘S</kbd> / <kbd>Ctrl+S</kbd> saves the active buffer; <kbd>⌘W</kbd> / <kbd>Ctrl+W</kbd> closes the active tab. An unsaved tab asks before closing. If the file changes outside Erfana, a tab with no unsaved edits reloads it automatically; a tab with unsaved edits asks you to choose **Reload from Disk** or **Keep My Version**. While a tab shows its file as deleted, autosave waits; <kbd>⌘S</kbd> / <kbd>Ctrl+S</kbd> still writes the file back.

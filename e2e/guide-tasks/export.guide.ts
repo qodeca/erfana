@@ -15,6 +15,8 @@ import * as path from 'path'
 import { stubDialog } from 'electron-playwright-helpers'
 
 import { waitForAppReady, openProject, createTestProject, createTempUserDataDir } from '../utils/helpers'
+import { clickToolbarAction, readToolbarAction } from '../utils/toolbarAction'
+import { TEST_IDS } from '../../src/renderer/src/constants/testids'
 import {
   buildAppEnv,
   closeAppAndWait,
@@ -64,30 +66,36 @@ test.describe('Guide: export to PDF or Word', () => {
         await expect(window.getByText('Export proof paragraph.').first()).toBeVisible({ timeout: 15_000 })
       })
 
-      // The view-mode labels the page names are the buttons' tooltips (title attribute).
-      const exportPdf = window.getByRole('button', { name: 'Export to PDF' })
-      const exportWord = window.getByRole('button', { name: 'Export to Word' })
+      // The page's controls are on the Markdown toolbar, or in its **More actions** (…)
+      // menu when the toolbar is too narrow for them (#461) – at the default window,
+      // Preview Only and both exports are in the menu. The helpers use either.
+      const toolbar = window.getByTestId(TEST_IDS.MARKDOWN_TOOLBAR)
+      const select = (testId: string): Promise<void> => clickToolbarAction(window, toolbar, testId)
+      const disabled = async (testId: string): Promise<boolean> =>
+        (await readToolbarAction(window, toolbar, testId)).disabled
+      const PDF = TEST_IDS.TOOLBAR_BTN_EXPORT_PDF
+      const WORD = TEST_IDS.TOOLBAR_BTN_EXPORT_DOCX
 
       await test.step('Before you start: export is unavailable in Editor Only', async () => {
         // "Export is unavailable in **Editor Only**."
-        await window.getByTitle('Editor Only', { exact: true }).click()
-        await expect(exportPdf).toBeDisabled()
-        await expect(exportWord).toBeDisabled()
+        await select(TEST_IDS.VIEW_MODE_BTN_EDITOR)
+        await expect.poll(() => disabled(PDF)).toBe(true)
+        await expect.poll(() => disabled(WORD)).toBe(true)
       })
 
       await test.step('Before you start: switch to Split Vertical (Side by Side)', async () => {
         // "switch the Markdown file to **Split Horizontal (Preview Top)**, **Split Vertical
         // (Side by Side)** or **Preview Only**."
-        await window.getByTitle('Split Vertical (Side by Side)', { exact: true }).click()
-        await expect(exportPdf).toBeEnabled()
-        await expect(exportWord).toBeEnabled()
+        await select(TEST_IDS.VIEW_MODE_BTN_SPLIT)
+        await expect.poll(() => disabled(PDF)).toBe(false)
+        await expect.poll(() => disabled(WORD)).toBe(false)
       })
 
       await test.step('PDF – steps 1 to 3', async () => {
         // 2. "Choose a destination in the system save dialog." (stubbed before the click opens it)
         await stubDialog(app, 'showSaveDialog', { filePath: pdfPath, canceled: false })
-        // 1. "Select **Export to PDF** or **Export to Word** on the toolbar."
-        await exportPdf.click()
+        // 1. "Select **Export to PDF** or **Export to Word** on the toolbar, or in its **More actions** (…) menu ..."
+        await select(PDF)
         // 3. "Find the saved document at the destination you chose. A **PDF exported** ...
         // message shows its file name."
         await expectFileWritten(pdfPath, '%PDF')
@@ -97,12 +105,12 @@ test.describe('Guide: export to PDF or Word', () => {
       })
 
       await test.step('Word – steps 1 to 3 (in Preview Only)', async () => {
-        await window.getByTitle('Preview Only', { exact: true }).click()
-        await expect(exportWord).toBeEnabled()
+        await select(TEST_IDS.VIEW_MODE_BTN_PREVIEW)
+        await expect.poll(() => disabled(WORD)).toBe(false)
         // 2. "Choose a destination in the system save dialog."
         await stubDialog(app, 'showSaveDialog', { filePath: docxPath, canceled: false })
-        // 1. "Select **Export to PDF** or **Export to Word** on the toolbar."
-        await exportWord.click()
+        // 1. "Select **Export to PDF** or **Export to Word** on the toolbar, or in its **More actions** (…) menu ..."
+        await select(WORD)
         // 3. "... **DOCX exported** message shows its file name. Erfana does not open it automatically."
         await expectFileWritten(docxPath, 'PK')
         await expect(window.getByText('DOCX exported', { exact: false }).first()).toBeVisible({ timeout: 15_000 })

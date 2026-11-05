@@ -1,19 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react'
-import { FilePlus, FolderPlus, FolderOpen, Replace, FileText, Files, FileUp, RotateCw, X as CloseIcon } from 'lucide-react'
 import { useVirtualizer, defaultRangeExtractor, type Range } from '@tanstack/react-virtual'
 import type { FileNode } from '../../../../preload/index'
 import type { FilterMode } from '../../types/filters'
 import { ProjectTreeNode, TREE_ROW_HEIGHT } from './ProjectTreeNode'
 import { buildVisibleRows, dropTargetPath, isNodeRow, placeholderKey } from './visibleRows'
 import { TreePlaceholderRow } from './TreePlaceholderRow'
+import { FileFilterChoice } from './FileFilterChoice'
 import { filterMarkdownTree } from './markdownFilter'
 import { resolveInternalDropFolder, isSameFolderMove } from './dropTarget'
 import { isKeyboardContextMenu, rowMenuAnchor, KEYBOARD_MENU_ECHO_MS, type PointerPress } from './contextMenuOrigin'
 import { resolveTreeKey, findTypeAheadMatch, isTypeAheadKey } from './treeKeyboard'
-import { isStrictDescendant } from '../../utils/fileUtils'
+import { isStrictDescendant, pathsEqual } from '../../utils/fileUtils'
 import { ContextMenu, ContextMenuItem } from '../ContextMenu/ContextMenu'
+import { ToolbarOverflow } from '../ToolbarOverflow/ToolbarOverflow'
+import { buildProjectRowActions } from './projectRowActions'
 import { useDialog } from '../Dialog'
 import type { DropModeDialogResult, ConflictDialogResult } from '../Dialog/types'
 import './ProjectTree.css'
@@ -24,7 +26,8 @@ import { openFileInPanel } from '../../utils/openFileInPanel'
 import { openInDefaultBrowser } from '../Panels/HtmlPreviewPanel/previewOpenInBrowser'
 import { useProjectStore } from '../../stores/useProjectStore'
 import type { MenuContext } from './context-menu/types'
-import { ContextMenuFactory } from './context-menu/factory'
+import { ContextMenuFactory, toContextMenuItems } from './context-menu/factory'
+import { deleteCommandFor } from './context-menu/fileRowCommands'
 import {
   DndContext,
   PointerSensor,
@@ -33,22 +36,19 @@ import {
   DragStartEvent,
   DragOverEvent,
   DragEndEvent,
-  DragOverlay,
-  type CollisionDetection,
-  type DroppableContainer,
-  pointerWithin,
-  rectIntersection
+  DragOverlay
 } from '@dnd-kit/core'
+import { treeCollisionDetection } from './treeCollisionDetection'
+import { useRevealActiveFile } from './useRevealActiveFile'
 import { useDragDropTree } from '../../hooks/useDragDropTree'
 import { useClipboardStore } from '../../stores/useClipboardStore'
 import { formatFileOperationError } from '../../utils/errorUtils'
-import { DRAG_DROP, AUTO_EXPAND } from './constants'
+import { DRAG_DROP, AUTO_EXPAND, PROJECT_FILTER_PANEL_ID } from './constants'
 import { withWatcherPause } from './withWatcherPause'
 import { useLazyFolderChildren } from './useLazyFolderChildren'
 import { logger } from '../../utils/logger'
 import { getLastSeenProjectGeneration } from '../../services/projectGeneration'
 import { useTerminalStore } from '../../stores/useTerminalStore'
-import { formatShortcut } from '../../utils/shortcutLabel'
 import { TEST_IDS as TERMINAL_TEST_IDS } from '../../constants/testids'
 import { useDirectoryWatcher } from '../../hooks/useDirectoryWatcher'
 import { useProjectManagementContext, useProjectChangedEffect } from '../../context/ProjectManagementContext'
@@ -79,42 +79,6 @@ interface ProjectTreeProps {
   showControlPanel: boolean
   filterMode: FilterMode
   onFilterModeChange: (mode: FilterMode) => void
-}
-
-/**
- * Collision detection that prioritises folders over files.
- *
- * Pointer intersection first (immediate feedback while dragging), narrowed to
- * directory targets when there are any, with rectangle intersection as the
- * fallback for pointer-less collisions.
- *
- * Two properties matter for large trees:
- * - Each collision already carries the container it came from in
- *   `data.droppableContainer` (`pointerWithin` populates it), so the type is
- *   read off the entry instead of scanning `args.droppableContainers` once per
- *   collision — that scan was O(collisions x droppables) on every pointer move,
- *   with one droppable per rendered row.
- * - It lives at module scope, so its identity is stable across renders and
- *   `DndContext` is never handed a fresh `collisionDetection` prop.
- */
-const treeCollisionDetection: CollisionDetection = (args) => {
-  const pointerCollisions = pointerWithin(args)
-
-  if (pointerCollisions.length > 0) {
-    const directoryCollisions = pointerCollisions.filter(collision => {
-      const container = collision.data?.droppableContainer as DroppableContainer | undefined
-      return container?.data.current?.type === 'directory'
-    })
-
-    if (directoryCollisions.length > 0) {
-      return directoryCollisions
-    }
-
-    return pointerCollisions
-  }
-
-  // Fallback to rectangle intersection
-  return rectIntersection(args)
 }
 
 /**
@@ -498,6 +462,10 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     scrollMargin: listOffset,
     rangeExtractor
   })
+
+  // The active tab's file: folders opened, scrolled to, marked (#453)
+  const revealedPath = useRevealActiveFile({ projectPath, filterMode, rootFolderNode, expandedFolders, setExpandedFolders,
+    indexByPath, virtualizer, treeContainerRef, setFocusedPath })
 
   // A keyboard move to a row that is not mounted yet parks its path here; the
   // layout effect below focuses it once the row renders. Only then: a row that
@@ -936,9 +904,11 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         return // Let native text handling work
       }
 
-      // Cmd+X/C/V on macOS, Ctrl+X/C/V elsewhere
+      // Cmd+X/C/V on macOS, Ctrl+X/C/V elsewhere, on the focused row – a file
+      // row too (#463) – or else the clicked folder
       const action = treeClipboardAction(e, isMacOS())
-      if (action !== null && selectedFolder) {
+      const targetPath = rowFromEventTarget(document.activeElement)?.dataset.path ?? selectedFolder
+      if (action !== null && targetPath) {
         // Only when the keystroke belongs to the tree ([27]): otherwise a
         // folder clicked earlier hijacked Cmd+C on selected text elsewhere.
         if (!isTreeClipboardKeystroke(treeContainerRef.current, document.activeElement, window.getSelection())) {
@@ -946,7 +916,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         }
         // Root-EXCLUSIVE on purpose: the synthetic project root must not
         // resolve here, which is what keeps it non-cuttable / non-copyable.
-        const node = findNode(selectedFolder)
+        const node = findNode(targetPath)
         if (!node) return
 
         if (action === 'cut') {
@@ -972,7 +942,8 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         } else if (action === 'paste' && clipboard.hasClipboard()) {
           // Paste
           e.preventDefault()
-          handlePaste()
+          // On a file row the item lands in the file's folder, as the menu's Paste does
+          handlePaste(node.type === 'directory' ? node.path : getDirname(node.path) || undefined)
         }
       }
     }
@@ -1387,23 +1358,9 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     openInBrowser: openInDefaultBrowser
   })
 
-  /**
-   * Get context menu items using Strategy + Command pattern
-   * Uses factory to select appropriate strategy and build menu
-   */
-  const getContextMenuItems = (node: FileNode): ContextMenuItem[] => {
-    const ctx = buildMenuContext()
-    const menuItems = contextMenuFactory.build(node, ctx)
-
-    // Adapt IMenuItem to ContextMenuItem (execute -> action)
-    return menuItems.map((item) => ({
-      label: item.label,
-      icon: item.icon,
-      danger: item.danger,
-      separator: item.separator,
-      action: item.execute
-    }))
-  }
+  /** Context menu items from the Strategy + Command factory, adapted for ContextMenu. */
+  const getContextMenuItems = (node: FileNode): ContextMenuItem[] =>
+    toContextMenuItems(contextMenuFactory.build(node, buildMenuContext()))
 
   // `handleFileClick` reads the current tree and selection, so it changes on
   // every render. The rows get a stable wrapper instead; it always calls the
@@ -1430,7 +1387,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     const index = row?.dataset.path !== undefined ? indexByPath.get(row.dataset.path) : undefined
     if (row === null || index === undefined) return
 
-    const action = resolveTreeKey(visibleRows, index, e)
+    const action = resolveTreeKey(visibleRows, index, e, isMacOS())
     if (action === null) {
       if (!isTypeAheadKey(e)) return
       const buffer = typeAheadRef.current
@@ -1474,6 +1431,10 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         setContextMenu({ ...rowMenuAnchor(row), node })
         break
       }
+      case 'delete':
+        // The menu's own Delete, confirmation included (#463); never the project root
+        if (node.path !== projectPath) void deleteCommandFor(buildMenuContext(), node).execute()
+        break
     }
   }
 
@@ -1484,6 +1445,20 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     [activeId, overId, indexByPath, visibleRows]
   )
   const isCut = clipboard.operation === 'cut'
+
+  const projectRowActions = buildProjectRowActions({
+    projectPath,
+    isSwitchingProject,
+    loading,
+    isImporting,
+    isAnyRefreshing,
+    onOpenProject: handleOpenProject,
+    onCloseProject: handleCloseProject,
+    onNewFile: handleNewFile,
+    onNewFolder: handleNewFolder,
+    onImport: handleToolbarImport,
+    onRefresh: handleRefresh
+  })
 
   return (
     <div
@@ -1504,113 +1479,23 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         </div>
       )}
 
-      <div className="project-tree-path">
-        <span className="project-name">{projectPath ? getBasename(projectPath) : 'No project open'}</span>
-        <div className="project-tree-actions">
-          <button
-            className="icon-btn"
-            onClick={handleOpenProject}
-            disabled={isSwitchingProject}
-            title={projectPath ? 'Change project' : 'Open project'}
-            aria-label={projectPath ? 'Change project' : 'Open project'}
-            data-testid={TEST_IDS.PROJECT_TREE_BTN_OPEN}
-          >
-            {isSwitchingProject ? (
-              <RotateCw size={14} strokeWidth={2} className="spin" data-testid={TEST_IDS.PROJECT_TREE_LOADING} />
-            ) : projectPath ? (
-              <Replace size={14} strokeWidth={2} />
-            ) : (
-              <FolderOpen size={14} strokeWidth={2} />
-            )}
-          </button>
-          {projectPath && (
-            <button
-              className="icon-btn"
-              onClick={handleCloseProject}
-              disabled={isSwitchingProject}
-              title="Close project"
-              aria-label="Close project"
-              data-testid={TEST_IDS.PROJECT_TREE_BTN_CLOSE}
-            >
-              <CloseIcon size={14} strokeWidth={2} />
-            </button>
-          )}
-          {projectPath && (
-            <>
-              <button
-                className="icon-btn"
-                onClick={handleNewFile}
-                disabled={loading}
-                title="Create new markdown file"
-                aria-label="Create new markdown file"
-                data-testid={TEST_IDS.PROJECT_TREE_BTN_NEW_FILE}
-              >
-                <FilePlus size={14} strokeWidth={2} />
-              </button>
-              <button
-                className="icon-btn"
-                onClick={handleNewFolder}
-                disabled={loading}
-                title="Create new folder"
-                aria-label="Create new folder"
-                data-testid={TEST_IDS.PROJECT_TREE_BTN_NEW_FOLDER}
-              >
-                <FolderPlus size={14} strokeWidth={2} />
-              </button>
-              <button
-                className="icon-btn"
-                onClick={handleToolbarImport}
-                disabled={isImporting}
-                title={isImporting ? 'Importing file...' : 'Import a file'}
-                aria-label={isImporting ? 'Importing file...' : 'Import a file'}
-                data-testid={TEST_IDS.PROJECT_TREE_BTN_IMPORT}
-              >
-                {isImporting ? (
-                  <RotateCw size={14} strokeWidth={2} className="spin" />
-                ) : (
-                  <FileUp size={14} strokeWidth={2} />
-                )}
-              </button>
-              <button
-                className="icon-btn"
-                onClick={handleRefresh}
-                disabled={isAnyRefreshing}
-                title={`Refresh (${formatShortcut('R', { mod: true, alt: true })})`}
-                aria-label="Refresh project tree and git status"
-                data-testid={TEST_IDS.PROJECT_TREE_BTN_REFRESH}
-              >
-                <RotateCw size={14} strokeWidth={2} className={isAnyRefreshing ? 'spin' : ''} />
-              </button>
-            </>
-          )}
-        </div>
-      </div>
+      {/* The project row: buttons that do not fit move into a "More actions"
+          menu (#451). New file is raised: the everyday action moves last. */}
+      <ToolbarOverflow
+        className="project-tree-path"
+        title={projectPath ? getBasename(projectPath) : 'No project open'}
+        titleClassName="project-name"
+        actionsClassName="project-tree-actions"
+        buttonClassName="icon-btn"
+        menuLabel="Project actions"
+        actions={projectRowActions}
+      />
 
       {/* Control Panel */}
       {showControlPanel && (
-        <div className="project-control-panel">
+        <div className="project-control-panel" id={PROJECT_FILTER_PANEL_ID}>
           <div className="control-panel-content">
-          <div className="control-panel-section">
-            <div className="control-panel-label">File Filter</div>
-            <div className="filter-options">
-                <button
-                  className={`filter-option ${filterMode === 'all' ? 'active' : ''}`}
-                  onClick={() => onFilterModeChange('all')}
-                  title="Show all files and folders"
-                >
-                  <Files size={14} />
-                  <span>All Files</span>
-                </button>
-                <button
-                  className={`filter-option ${filterMode === 'markdown' ? 'active' : ''}`}
-                  onClick={() => onFilterModeChange('markdown')}
-                  title="Show only markdown files and their folders"
-                >
-                  <FileText size={14} />
-                  <span>Markdown Only</span>
-                </button>
-            </div>
-          </div>
+            <FileFilterChoice filterMode={filterMode} onFilterModeChange={onFilterModeChange} />
           {/* Watching controls removed from UI by request */}
         </div>
       </div>
@@ -1675,6 +1560,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
                     // "Selected" = the paste-target folder; see the prop's doc.
                     isSelected={node.path === selectedFolder}
                     isTabStop={item.index === tabStopIndex}
+                    isRevealed={pathsEqual(node.path, revealedPath)}
                     onFileClick={handleRowClick}
                     onContextMenu={handleContextMenu}
                     onToggleFolder={handleToggleFolder}

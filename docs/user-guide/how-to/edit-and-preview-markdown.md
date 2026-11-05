@@ -24,7 +24,9 @@ Use the view-mode buttons to work in the editor, preview, or both. Erfana autosa
 
 ## What happens next / If something goes wrong
 
-If you close a tab with unsaved changes, Erfana asks first. Select **Close Without Saving** to discard them. Use [troubleshooting](../reference/troubleshooting.md) for an unavailable panel.
+If you close a tab with unsaved changes, Erfana asks first. Select **Close Without Saving** to discard them.
+
+If the file is deleted on disk, the tab says so and autosave waits. If the file comes back, for example after a branch switch, a tab without edits shows it again on its own. If you typed meanwhile, choose **Reload from Disk** or **Keep My Version**. To write your version back while the file is gone, press <kbd>⌘S</kbd> / <kbd>Ctrl+S</kbd>. Use [troubleshooting](../reference/troubleshooting.md) for an unavailable panel.
 
 ## Related
 

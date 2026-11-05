@@ -411,6 +411,12 @@ describe.each([
     call: () => previewBridge.focusPage(PANEL_ID),
     channel: PreviewChannels.FOCUS_PAGE,
     payload: { panelId: PANEL_ID }
+  },
+  {
+    name: 'copySelection',
+    call: () => previewBridge.copySelection(PANEL_ID),
+    channel: PreviewChannels.COPY_SELECTION,
+    payload: { panelId: PANEL_ID }
   }
 ])('previewBridge.$name', ({ call, channel, payload }) => {
   it(`invokes ${channel} with the payload the handler expects`, async () => {
@@ -471,6 +477,7 @@ const BRIDGE_MEMBERS: Record<keyof PreviewBridge, true> = {
   exportPdf: true,
   navigate: true,
   focusPage: true,
+  copySelection: true,
   onFailuresChanged: true,
   onHostBlocked: true,
   onVisibilityApplied: true,

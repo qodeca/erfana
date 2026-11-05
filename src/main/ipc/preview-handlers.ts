@@ -5,7 +5,8 @@
  *
  * Builds the preview object graph (via {@link buildPreviewGraph}), registers the
  * lifecycle / find / allowlist handler bundles (items 44–46) and, beside the
- * lifecycle ones, `preview:navigate` and `preview:focusPage` (issue #124), the
+ * lifecycle ones, `preview:navigate` and `preview:focusPage` (issue #124) and
+ * `preview:copySelection` (#463), the
  * HTML Preview comment channels (`comment-handlers.ts`), and wires the two
  * cross-cutting hops:
  *   - `globalSettings.onSettingsChanged` → `service.destroyAll('globally-disabled')`
@@ -41,6 +42,7 @@ import type { PreviewEmitTarget } from './preview/emit'
 import { registerPreviewLifecycleHandlers } from './preview/lifecycle-handlers'
 import { registerPreviewNavigationHandlers } from './preview/navigation-handlers'
 import { registerPreviewFocusHandlers } from './preview/focus-handlers'
+import { registerPreviewCopyHandlers } from './preview/copy-handlers'
 import { registerPreviewFindHandlers } from './preview/find-handlers'
 import { registerPreviewAllowlistHandlers } from './preview/allowlist-handlers'
 import { registerPreviewCommentHandlers } from './preview/comment-handlers'
@@ -134,6 +136,11 @@ export function registerPreviewHandlers(deps: PreviewHandlerDeps): PreviewHandle
     service: graph.service,
     isTrustedSender
   })
+  // The right-click menu's Copy selection (#463).
+  const unregisterCopy = registerPreviewCopyHandlers({
+    service: graph.service,
+    isTrustedSender
+  })
   const unregisterFind = registerPreviewFindHandlers({
     service: graph.service,
     isTrustedSender
@@ -197,6 +204,7 @@ export function registerPreviewHandlers(deps: PreviewHandlerDeps): PreviewHandle
       unregisterLifecycle()
       unregisterNavigation()
       unregisterFocus()
+      unregisterCopy()
       unregisterFind()
       unregisterAllowlist()
       unregisterComments()

@@ -19,6 +19,7 @@ import type { Terminal } from '@xterm/xterm'
 import type { FitAddon } from '@xterm/addon-fit'
 import { useTerminalPortalOptional } from '../../../../context/TerminalPortalContext'
 import { FIT_DELAY_MS } from '../terminalPanel.logic'
+import { fitTerminalIfUsable } from '../terminalFit'
 
 /**
  * Configuration options for the useTerminalPortal hook.
@@ -94,15 +95,9 @@ export function useTerminalPortal(options: UseTerminalPortalOptions): UseTermina
    * Called after portal moves and refit requests.
    */
   const fitAndResize = useCallback(() => {
-    fitAddonRef.current?.fit()
-
-    if (xtermRef.current && terminalId) {
-      const cols = Math.floor(xtermRef.current.cols)
-      const rows = Math.floor(xtermRef.current.rows)
-      if (cols > 0 && rows > 0) {
-        resizePty(terminalId, cols, rows)
-      }
-    }
+    // Never a collapsed or tiny container's size (#465)
+    const size = fitTerminalIfUsable(fitAddonRef.current, xtermRef.current)
+    if (size && terminalId) resizePty(terminalId, size.cols, size.rows)
   }, [fitAddonRef, xtermRef, terminalId, resizePty])
 
   // DOM-based portal: physically move terminal panel between containers

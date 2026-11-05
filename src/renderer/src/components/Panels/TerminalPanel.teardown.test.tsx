@@ -61,7 +61,7 @@ vi.mock('@xterm/xterm', () => ({
 
 const fit = vi.fn()
 vi.mock('@xterm/addon-fit', () => ({
-  FitAddon: vi.fn().mockImplementation(function () { return ({ fit }) })
+  FitAddon: vi.fn().mockImplementation(function () { return ({ fit, proposeDimensions: () => ({ cols: 80, rows: 24 }) }) })
 }))
 
 vi.mock('@xterm/addon-web-links', () => ({

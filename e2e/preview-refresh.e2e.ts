@@ -11,7 +11,9 @@
  *
  * Covered acceptance criteria:
  * - AC1: in-place rewrite AND atomic replace repaint the open tab
- * - AC1: a deleted file shows a banner, keeps the last image, and Reload recovers
+ * - AC1: a deleted file shows a banner and keeps the last image; Reload says the
+ *   file is still missing, and the tab recovers on its own once the file is
+ *   back (#450)
  * - AC3: "Reloaded from disk" appears and clears itself
  * - AC4: zoom survives a same-size rewrite; a size change re-fits in fit mode
  *   and keeps a deliberate zoom otherwise
@@ -352,7 +354,7 @@ test.describe('Refresh does not flicker', () => {
 })
 
 test.describe('Deleted file', () => {
-  test('should show the deleted banner, keep the last image, and recover via Reload', async ({
+  test('should show the deleted banner, keep the last image, and recover when the file is back', async ({
     windowWithTestProject,
     testProject
   }) => {
@@ -371,10 +373,15 @@ test.describe('Deleted file', () => {
     await expect(viewer.image()).toBeVisible()
     expect(await viewer.marker()).toBe('v1')
 
-    // A genuine delete drops the main-process watch by design, so a restored
-    // file does not auto-refresh – Reload is the documented escape hatch.
-    await rewriteInPlace(testProject.path, 'v2', 200)
+    // Reload while the file is still gone: nothing to read, and it says so.
     await viewer.clickReload()
+    await expect(viewer.statusSlot()).toHaveText(VIEWER_STATUS_COPY.reloadFailedMissing)
+    await viewer.expectBanner('deleted')
+
+    // A genuine delete drops the main-process watch, so the tab looks for the
+    // file itself and recovers once it is back (#450) – no Reload needed. A
+    // Reload click here would race that recovery for the button.
+    await rewriteInPlace(testProject.path, 'v2', 200)
 
     await viewer.expectNoBanner()
     await viewer.waitForMarker('v2')

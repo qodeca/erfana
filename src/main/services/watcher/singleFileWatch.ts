@@ -17,9 +17,15 @@
  * instead (see `directoryWatchBackend`).
  */
 import chokidar, { FSWatcher, ChokidarOptions } from 'chokidar'
+import { createWriteFinishGate, type WriteFinishOptions } from './writeFinishGate'
 
 /**
  * Production chokidar options for a single-file watch.
+ *
+ * `awaitWriteFinish` here is read by this module, not by chokidar: chokidar
+ * is always given `awaitWriteFinish: false` and the change goes through
+ * `writeFinishGate` instead, because chokidar 5.0.0's own wait can get stuck
+ * after a failed stat and swallow every later change (#464).
  *
  * Exported so the real-chokidar rename integration test can pin the actual
  * event sequence this exact configuration produces, rather than trusting a
@@ -69,14 +75,35 @@ export function createSingleFileWatcher(
   handlers: SingleFileWatchHandlers,
   overrides?: Partial<ChokidarOptions>
 ): FSWatcher {
-  const watcher = chokidar.watch(filePath, {
+  const options: ChokidarOptions = {
     ...SINGLE_FILE_WATCH_OPTIONS,
     awaitWriteFinish: { ...(SINGLE_FILE_WATCH_OPTIONS.awaitWriteFinish as object) },
     ...overrides
-  })
+  }
+  const writeFinish = options.awaitWriteFinish
+  const watcher = chokidar.watch(filePath, { ...options, awaitWriteFinish: false })
 
-  watcher.on('change', handlers.onChange)
-  watcher.on('unlink', handlers.onUnlink)
+  // A change is held until its writes settle, by our gate rather than
+  // chokidar's (see SINGLE_FILE_WATCH_OPTIONS); `awaitWriteFinish: false` in
+  // the options passes every change straight through
+  let onChange = handlers.onChange
+  let cancelWait = (): void => {}
+  if (writeFinish) {
+    const timings: WriteFinishOptions =
+      typeof writeFinish === 'object'
+        ? { stabilityThreshold: writeFinish.stabilityThreshold ?? 2000, pollInterval: writeFinish.pollInterval ?? 100 }
+        : { stabilityThreshold: 2000, pollInterval: 100 }
+    const gate = createWriteFinishGate(filePath, timings, handlers.onChange, { isClosed: () => watcher.closed })
+    onChange = () => gate.trigger()
+    cancelWait = () => gate.cancel()
+  }
+
+  watcher.on('change', onChange)
+  watcher.on('unlink', () => {
+    // As chokidar did: an unlink drops the wait for the writes before it
+    cancelWait()
+    handlers.onUnlink()
+  })
   watcher.on('error', handlers.onError)
   // chokidar emits `ready` on a later tick, so a listener added here hears it.
   if (handlers.onReady !== undefined) {

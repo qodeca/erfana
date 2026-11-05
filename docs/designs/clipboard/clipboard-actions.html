@@ -1,0 +1,173 @@
+<!-- @card group="Clipboard" name="Clipboard actions" subtitle="Cut, Copy, Paste and Delete with the same labels and hints on every surface – the text-field menu, a tree file row, the editor, the Markdown preview without a selection, and the HTML preview menu (#463)" status="proposed" reviewed="2026-11-05" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana – clipboard actions</title>
+<link rel="stylesheet" href="../../design-system/tokens.css">
+<link rel="stylesheet" href="../../design-system/ds.css">
+<link rel="stylesheet" href="../../design-system/system/components/menu/menu.css">
+<style>
+  /* A frame's stand-in for the surface the menu opens over. */
+  .erf-ca-surface { background: var(--color-bg-secondary); padding: var(--space-8);
+                    border: var(--border-width) solid var(--color-border-default); }
+  .erf-ca-menu { min-width: 220px; margin-top: var(--space-4); }
+  /* mockup: a text field and tree rows at the app's own scale */
+  .erf-ca-field { background: var(--color-bg-primary); color: var(--color-text-primary);
+                  border: var(--border-width) solid var(--color-border-focus);
+                  padding: var(--space-4) var(--space-6); font-size: var(--text-sm); }
+  .erf-ca-sel { background: var(--color-bg-selected); }
+  .erf-ca-row { padding: var(--space-2) var(--space-8); font-size: var(--text-sm); color: var(--color-text-primary); }
+  .erf-ca-row--selected { background: var(--color-bg-hover); }
+</style>
+</head>
+<body>
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../index.html">Feature designs</a> <span aria-hidden="true">/</span> <span aria-current="page">Clipboard actions</span></nav>
+<main>
+<h1>Clipboard actions</h1>
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> reviewed 2026-11-05 · design note <a href="README.md#clipboard-actions-463">README.md</a> · issue <a href="https://github.com/qodeca/erfana/issues/463">#463</a></p>
+<p class="ds-lede" id="decision">
+  Every right-click menu that offers clipboard commands offers them under the same four names – <strong>Cut</strong>,
+  <strong>Copy</strong>, <strong>Paste</strong>, <strong>Delete</strong> – with the same icons and the shortcut that works on
+  the platform. This screen draws the new items. It cites the
+  <a href="../../design-system/system/components/menu/index.html">Menu</a> card (decided) for the keyboard contract,
+  disabled items, the danger item and the hint glyphs, and decides no system rule.
+</p>
+
+<h2 id="states">States</h2>
+<div class="ds-frames">
+  <figure class="ds-frame"><div inert aria-hidden="true"><div class="erf-ca-surface">
+    <div class="erf-ca-field">model <span class="erf-ca-sel">gpt-4o</span></div>
+    <div class="erf-menu erf-ca-menu" role="menu" aria-label="Text field">
+      <div class="erf-menu-item erf-menu-item--active" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="scissors" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></svg></span><span class="erf-menu-label">Cut</span><span class="erf-menu-shortcut" aria-hidden="true">Ctrl+X</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="copy" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span><span class="erf-menu-label">Copy</span><span class="erf-menu-shortcut" aria-hidden="true">Ctrl+C</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="clipboard-paste" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 14h10"/><path d="M16 4h2a2 2 0 0 1 2 2v1.344"/><path d="m17 18 4-4-4-4"/><path d="M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 1.793-1.113"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg></span><span class="erf-menu-label">Paste</span><span class="erf-menu-shortcut" aria-hidden="true">Ctrl+V</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="trash" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span><span class="erf-menu-label">Delete</span><span class="erf-menu-shortcut" aria-hidden="true">Delete</span></div>
+    </div>
+  </div></div>
+  <figcaption><strong>Text field · Windows · text selected.</strong> Settings, the search bar, comment boxes and the dialogs share this menu. Delete removes the selection, like the <kbd>Delete</kbd> key, and leaves the clipboard alone.</figcaption></figure>
+  <figure class="ds-frame"><div inert aria-hidden="true"><div class="erf-ca-surface">
+    <div class="erf-ca-field">model gpt-4o</div>
+    <div class="erf-menu erf-ca-menu" role="menu" aria-label="Text field">
+      <div class="erf-menu-item" role="menuitem" tabindex="-1" aria-disabled="true"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="scissors" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></svg></span><span class="erf-menu-label">Cut</span><span class="erf-menu-shortcut" aria-hidden="true">⌘X</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1" aria-disabled="true"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="copy" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span><span class="erf-menu-label">Copy</span><span class="erf-menu-shortcut" aria-hidden="true">⌘C</span></div>
+      <div class="erf-menu-item erf-menu-item--active" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="clipboard-paste" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 14h10"/><path d="M16 4h2a2 2 0 0 1 2 2v1.344"/><path d="m17 18 4-4-4-4"/><path d="M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 1.793-1.113"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg></span><span class="erf-menu-label">Paste</span><span class="erf-menu-shortcut" aria-hidden="true">⌘V</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1" aria-disabled="true"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="trash" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span><span class="erf-menu-label">Delete</span><span class="erf-menu-shortcut" aria-hidden="true">⌫</span></div>
+    </div>
+  </div></div>
+  <figcaption><strong>Text field · macOS · nothing selected.</strong> Cut, Copy and Delete are greyed out and still reached by the arrows (Menu card). On a Mac keyboard the delete key is <kbd>⌫</kbd>.</figcaption></figure>
+  <figure class="ds-frame"><div inert aria-hidden="true"><div class="erf-ca-surface">
+    <div class="erf-ca-field"><span class="erf-ca-sel">•••</span>•••••</div>
+    <div class="erf-menu erf-ca-menu" role="menu" aria-label="Text field">
+      <div class="erf-menu-item" role="menuitem" tabindex="-1" aria-disabled="true"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="scissors" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></svg></span><span class="erf-menu-label">Cut</span><span class="erf-menu-shortcut" aria-hidden="true">Ctrl+X</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1" aria-disabled="true"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="copy" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span><span class="erf-menu-label">Copy</span><span class="erf-menu-shortcut" aria-hidden="true">Ctrl+C</span></div>
+      <div class="erf-menu-item erf-menu-item--active" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="clipboard-paste" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 14h10"/><path d="M16 4h2a2 2 0 0 1 2 2v1.344"/><path d="m17 18 4-4-4-4"/><path d="M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 1.793-1.113"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg></span><span class="erf-menu-label">Paste</span><span class="erf-menu-shortcut" aria-hidden="true">Ctrl+V</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="trash" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span><span class="erf-menu-label">Delete</span><span class="erf-menu-shortcut" aria-hidden="true">Delete</span></div>
+    </div>
+  </div></div>
+  <figcaption><strong>Password field · text selected.</strong> Its text never leaves the field: Cut and Copy stay disabled. A read-only field is the mirror image – Copy only.</figcaption></figure>
+  <figure class="ds-frame"><div inert aria-hidden="true"><div class="erf-ca-surface">
+    <div class="erf-ca-row">README.md</div>
+    <div class="erf-ca-row erf-ca-row--selected">notes.md</div>
+    <div class="erf-menu erf-ca-menu" role="menu" aria-label="File actions">
+      <div class="erf-menu-item erf-menu-item--active" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="scissors" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></svg></span><span class="erf-menu-label">Cut</span><span class="erf-menu-shortcut" aria-hidden="true">Ctrl+X</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="copy" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span><span class="erf-menu-label">Copy</span><span class="erf-menu-shortcut" aria-hidden="true">Ctrl+C</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="clipboard-paste" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 14h10"/><path d="M16 4h2a2 2 0 0 1 2 2v1.344"/><path d="m17 18 4-4-4-4"/><path d="M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 1.793-1.113"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg></span><span class="erf-menu-label">Paste</span><span class="erf-menu-shortcut" aria-hidden="true">Ctrl+V</span></div>
+      <div class="erf-menu-separator" role="separator"></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="pencil" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></span><span class="erf-menu-label">Rename</span></div>
+      <div class="erf-menu-separator" role="separator"></div>
+      <div class="erf-menu-item erf-menu-item--danger" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="trash" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span><span class="erf-menu-label">Delete</span><span class="erf-menu-shortcut" aria-hidden="true">Delete</span></div>
+      <div class="erf-menu-separator" role="separator"></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="folder-open" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg></span><span class="erf-menu-label">Reveal in Explorer</span></div>
+    </div>
+  </div></div>
+  <figcaption><strong>Tree file row · Windows.</strong> Paste is new on a file row: the item lands in the file's folder. It shows only when the tree clipboard holds an item, as on folders.</figcaption></figure>
+  <figure class="ds-frame"><div inert aria-hidden="true"><div class="erf-ca-surface">
+    <div class="erf-ca-row">README.md</div>
+    <div class="erf-ca-row erf-ca-row--selected">notes.md</div>
+    <div class="erf-menu erf-ca-menu" role="menu" aria-label="File actions">
+      <div class="erf-menu-item erf-menu-item--active" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="scissors" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></svg></span><span class="erf-menu-label">Cut</span><span class="erf-menu-shortcut" aria-hidden="true">⌘X</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="copy" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span><span class="erf-menu-label">Copy</span><span class="erf-menu-shortcut" aria-hidden="true">⌘C</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="clipboard-paste" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 14h10"/><path d="M16 4h2a2 2 0 0 1 2 2v1.344"/><path d="m17 18 4-4-4-4"/><path d="M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 1.793-1.113"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg></span><span class="erf-menu-label">Paste</span><span class="erf-menu-shortcut" aria-hidden="true">⌘V</span></div>
+      <div class="erf-menu-separator" role="separator"></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="pencil" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></span><span class="erf-menu-label">Rename</span></div>
+      <div class="erf-menu-separator" role="separator"></div>
+      <div class="erf-menu-item erf-menu-item--danger" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="trash" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span><span class="erf-menu-label">Delete</span><span class="erf-menu-shortcut" aria-hidden="true">⌘⌫</span></div>
+      <div class="erf-menu-separator" role="separator"></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="folder-open" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg></span><span class="erf-menu-label">Reveal in Finder</span></div>
+    </div>
+  </div></div>
+  <figcaption><strong>Tree file row · macOS.</strong> Delete is <kbd>⌘⌫</kbd>, as in Finder – the hint the Menu card already draws. Delete stays the danger item.</figcaption></figure>
+  <figure class="ds-frame"><div inert aria-hidden="true"><div class="erf-ca-surface">
+    <div class="erf-ca-row erf-ca-row--selected">my-project</div>
+    <div class="erf-menu erf-ca-menu" role="menu" aria-label="Folder actions">
+      <div class="erf-menu-item erf-menu-item--active" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="scissors" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></svg></span><span class="erf-menu-label">Cut</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="copy" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span><span class="erf-menu-label">Copy</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="clipboard-paste" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 14h10"/><path d="M16 4h2a2 2 0 0 1 2 2v1.344"/><path d="m17 18 4-4-4-4"/><path d="M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 1.793-1.113"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg></span><span class="erf-menu-label">Paste</span></div>
+      <div class="erf-menu-separator" role="separator"></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"></span><span class="erf-menu-label">New File</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"></span><span class="erf-menu-label">New Folder</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="pencil" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></span><span class="erf-menu-label">Rename</span></div>
+      <div class="erf-menu-separator" role="separator"></div>
+      <div class="erf-menu-item erf-menu-item--danger" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="trash" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span><span class="erf-menu-label">Delete</span></div>
+      <div class="erf-menu-separator" role="separator"></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="folder-open" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg></span><span class="erf-menu-label">Reveal in Explorer</span></div>
+    </div>
+  </div></div>
+  <figcaption><strong>Project root row.</strong> The same items with no hints: the root is never cut, copied, pasted on or deleted from the keyboard, so it shows no key it cannot keep.</figcaption></figure>
+  <figure class="ds-frame"><div inert aria-hidden="true"><div class="erf-ca-surface">
+    <div class="erf-menu erf-ca-menu" role="menu" aria-label="Editor">
+      <div class="erf-menu-item erf-menu-item--active" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"></span><span class="erf-menu-label">Explain</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"></span><span class="erf-menu-label">Modify</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"></span><span class="erf-menu-label">Ask</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"></span><span class="erf-menu-label">Prompt</span></div>
+      <div class="erf-menu-separator" role="separator"></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="scissors" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></svg></span><span class="erf-menu-label">Cut</span><span class="erf-menu-shortcut" aria-hidden="true">Ctrl+X</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="copy" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span><span class="erf-menu-label">Copy</span><span class="erf-menu-shortcut" aria-hidden="true">Ctrl+C</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="clipboard-paste" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 14h10"/><path d="M16 4h2a2 2 0 0 1 2 2v1.344"/><path d="m17 18 4-4-4-4"/><path d="M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 1.793-1.113"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg></span><span class="erf-menu-label">Paste</span><span class="erf-menu-shortcut" aria-hidden="true">Ctrl+V</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="trash" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span><span class="erf-menu-label">Delete</span><span class="erf-menu-shortcut" aria-hidden="true">Delete</span></div>
+    </div>
+  </div></div>
+  <figcaption><strong>Editor · text selected.</strong> The prompt items, then Cut, Copy, Paste and the new Delete, each with its hint.</figcaption></figure>
+  <figure class="ds-frame"><div inert aria-hidden="true"><div class="erf-ca-surface">
+    <div class="erf-menu erf-ca-menu" role="menu" aria-label="Selection">
+      <div class="erf-menu-item erf-menu-item--active" role="menuitem" tabindex="-1" aria-disabled="true"><span class="erf-menu-icon" aria-hidden="true"></span><span class="erf-menu-label">Explain</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1" aria-disabled="true"><span class="erf-menu-icon" aria-hidden="true"></span><span class="erf-menu-label">Modify</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1" aria-disabled="true"><span class="erf-menu-icon" aria-hidden="true"></span><span class="erf-menu-label">Ask</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1" aria-disabled="true"><span class="erf-menu-icon" aria-hidden="true"></span><span class="erf-menu-label">Visualize</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1" aria-disabled="true"><span class="erf-menu-icon" aria-hidden="true"></span><span class="erf-menu-label">Prompt</span></div>
+      <div class="erf-menu-separator" role="separator"></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1" aria-disabled="true"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="copy" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span><span class="erf-menu-label">Copy selection</span><span class="erf-menu-shortcut" aria-hidden="true">Ctrl+C</span></div>
+    </div>
+  </div></div>
+  <figcaption><strong>Markdown preview · nothing selected.</strong> The menu now opens anyway, every item greyed out. The label stays "Copy selection": it pairs with "Comment on selection" (spec 024, C-16).</figcaption></figure>
+  <figure class="ds-frame"><div inert aria-hidden="true"><div class="erf-ca-surface">
+    <div class="erf-menu erf-ca-menu" role="menu" aria-label="Selection">
+      <div class="erf-menu-item erf-menu-item--active" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="message-square-plus" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M12 8v6"/><path d="M9 11h6"/></svg></span><span class="erf-menu-label">Comment on selection</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="message-square-plus" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M12 8v6"/><path d="M9 11h6"/></svg></span><span class="erf-menu-label">Comment on the whole section</span></div>
+      <div class="erf-menu-separator" role="separator"></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="copy" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span><span class="erf-menu-label">Copy selection</span><span class="erf-menu-shortcut" aria-hidden="true">⌘C</span></div>
+    </div>
+  </div></div>
+  <figcaption><strong>HTML preview · macOS · words selected.</strong> The comment menu ends with "Copy selection", the Markdown preview's label and hint. Main runs the page's own Copy, so the words go from the page to the clipboard and never reach Erfana's window; focus goes back to the page.</figcaption></figure>
+  <figure class="ds-frame"><div inert aria-hidden="true"><div class="erf-ca-surface">
+    <div class="erf-menu erf-ca-menu" role="menu" aria-label="Section">
+      <div class="erf-menu-item erf-menu-item--active" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="message-square-plus" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M12 8v6"/><path d="M9 11h6"/></svg></span><span class="erf-menu-label">Comment on section</span></div>
+      <div class="erf-menu-separator" role="separator"></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1" aria-disabled="true"><span class="erf-menu-icon" aria-hidden="true"><svg data-icon="copy" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span><span class="erf-menu-label">Copy selection</span><span class="erf-menu-shortcut" aria-hidden="true">Ctrl+C</span></div>
+    </div>
+  </div></div>
+  <figcaption><strong>HTML preview · Windows · nothing selected.</strong> "Copy selection" stays in the menu, greyed out and still reached by the arrows. Cut, Paste and Delete are left out: the page is read-only.</figcaption></figure>
+</div>
+
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None recorded.</p>
+</section>
+</main>
+</body>
+</html>

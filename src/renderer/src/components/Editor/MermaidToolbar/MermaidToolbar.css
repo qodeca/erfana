@@ -2,10 +2,17 @@
 /* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
 /* MermaidToolbar - Unified toolbar for Mermaid diagrams */
 
+/* The row spans the diagram's width (minus the inset), so the overflow logic
+   (#461) measures the room the diagram gives it; the button group stays at the
+   inline end. Only the group takes the pointer, so the empty part of the row
+   never blocks the diagram under it. */
 .mermaid-toolbar {
+  --erf-toolbar-overflow-gap: var(--space-1);
   position: absolute;
   top: var(--space-4);
   right: var(--space-4);
+  left: var(--space-4);
+  pointer-events: none;
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -27,8 +34,15 @@
   }
 }
 
+/* The overflow row clips as a safety net; here that would cut the focus ring,
+   which sits outside the group's buttons. The row is sized never to overflow. */
+.mermaid-toolbar.erf-toolbar-overflow {
+  overflow: visible;
+}
+
 /* Direction buttons group */
 .mermaid-toolbar-directions {
+  pointer-events: auto;
   display: flex;
   align-items: center;
   gap: var(--space-1);
@@ -43,7 +57,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 28px;
+  min-width: var(--toolbar-tool-height);
   height: 24px;
   padding: 0 var(--space-3);
   background: transparent;
@@ -92,7 +106,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 28px;
+  min-width: var(--toolbar-tool-height);
   height: 24px;
   padding: 0 var(--space-3);
   background: transparent;
@@ -121,6 +135,13 @@
 .mermaid-toolbar-expand-btn:focus-visible {
   outline: var(--border-width-thick) solid var(--color-border-focus);
   outline-offset: var(--space-1);
+}
+
+/* A direction's glyph is its two letters; in the "…" menu they sit in the icon column. */
+.mermaid-direction-glyph {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  font-family: var(--font-system);
 }
 
 /* Light mode adjustments */

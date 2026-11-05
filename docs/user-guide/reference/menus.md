@@ -47,7 +47,7 @@ The app menu provides window, editing and view commands. Right-click menus act o
 
 ## Project tree context menus
 
-**What they do:** Folder menus offer **Cut**, **Copy**, **Paste** (when the clipboard has items), **New File**, **New Folder**, **Rename**, **Import...**, **Delete**, and **Reveal in Finder** or **Reveal in Explorer**. File menus offer **Cut**, **Copy**, **Rename**, **Delete**, and the same platform-specific **Reveal** action. The HTML-file menu also offers **Open as source** and **Open in default browser**. **How to reach them:** right-click a file or folder in the tree. **Delete** asks for confirmation because it cannot be undone. Erfana removes the item from disk straight away; it does not go to the Trash on macOS or the Recycle Bin on Windows. Deleting a folder also removes everything inside it.
+**What they do:** Folder menus offer **Cut**, **Copy**, **Paste** (when the clipboard has items), **New File**, **New Folder**, **Rename**, **Import...**, **Delete**, and **Reveal in Finder** or **Reveal in Explorer**. File menus offer **Cut**, **Copy**, **Paste** (when the clipboard has items – it pastes into the file's folder), **Rename**, **Delete**, and the same platform-specific **Reveal** action. **Cut**, **Copy**, **Paste** and **Delete** show their shortcuts; the project folder's own row shows none, because those keys do not act on it. The HTML-file menu also offers **Open as source** and **Open in default browser**. **How to reach them:** right-click a file or folder in the tree. **Delete** asks for confirmation because it cannot be undone. Erfana removes the item from disk straight away; it does not go to the Trash on macOS or the Recycle Bin on Windows. Deleting a folder also removes everything inside it.
 
 ![Screenshot of the folder context menu in the project tree, from Cut to Reveal in Finder.](../images/organise-files/folder-menu.png)
 ![Screenshot of the HTML-file context menu with Open as source and Open in default browser.](../images/organise-files/html-file-menu.png)
@@ -56,8 +56,10 @@ Related issues: [#431](https://github.com/qodeca/erfana/issues/431).
 
 ## Editor and preview context menus
 
-**What they do:** With selected text, both menus offer **Explain**, **Modify**, **Ask**, **Visualize**, and **Prompt**; the editor also offers **Cut**, **Copy**, **Paste**, while Markdown Preview offers **Copy selection**. The prompt actions send text to the agent running in the terminal. **How to reach them:** right-click selected text in the editor or preview. See [prompt templates](prompt-templates.md).
+**What they do:** With selected text, both menus offer **Explain**, **Modify**, **Ask**, **Visualize**, and **Prompt**; the editor also offers **Cut**, **Copy**, **Paste**, **Delete**, while Markdown Preview offers **Copy selection**. The clipboard items show their shortcuts. The prompt actions send text to the agent running in the terminal. **How to reach them:** right-click in the editor or preview. Without a selection both menus still open, with the items that need one greyed out. See [prompt templates](prompt-templates.md).
+
+In HTML Preview, the right-click menu lists the comment items, then **Copy selection** <kbd>⌘C</kbd> / <kbd>Ctrl+C</kbd>, which copies the words you right-clicked. It is greyed out when you did not right-click on selected words. The page is read-only, so there is no Cut, Paste or Delete. This menu appears only while comments are turned on in [Settings > Comments](settings.md#comments).
 
 ## Terminal and text-box context menus
 
-**What they do:** The terminal menu offers **Copy** and **Paste**; text inputs in dialogs offer **Cut**, **Copy**, and **Paste**. **How to reach them:** right-click in the relevant control. Copy requires a selection.
+**What they do:** The terminal menu offers **Copy** and **Paste**; every text field – in dialogs, Settings, the search bar and comment boxes – offers **Cut**, **Copy**, **Paste**, and **Delete**, with their shortcuts. **Delete** removes the selected text without copying it. **How to reach them:** right-click in the relevant control, or press <kbd>⇧F10</kbd> / <kbd>Shift+F10</kbd> in a text field. Cut, Copy and Delete require a selection; a read-only field offers only **Copy**, and a password field never offers **Cut** or **Copy**.

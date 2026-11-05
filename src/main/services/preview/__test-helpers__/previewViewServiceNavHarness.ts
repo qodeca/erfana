@@ -139,6 +139,8 @@ function makePage() {
     isFocused: vi.fn(() => false),
     /** `preview:focusPage` (issue #124, QG-8 U1) calls this on the live page. */
     focus: vi.fn<() => void>(),
+    /** `preview:copySelection` (#463) calls this on the live page. */
+    copy: vi.fn<() => void>(),
     on: (event: string, listener: Listener) => add(listeners, event, listener),
     once: (event: string, listener: Listener) => add(listeners, event, listener),
     removeListener: (event: string, listener: Listener) => remove(listeners, event, listener)

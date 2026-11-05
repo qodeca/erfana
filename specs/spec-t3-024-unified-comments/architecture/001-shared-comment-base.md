@@ -85,6 +85,7 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 | **Added since** `src/renderer/src/components/Comments/overlay/useSavingSign.ts` (1) | S (for renderer-hosted previews) | The waiting sign between a save's answer and the new icon (P-F17) |
 | **Added since** `src/renderer/src/components/Panels/HtmlPreviewPanel/comments/useRevealNote.ts` (1) | H | The HTML Preview's half: waits for the page's report, because the target opens in the page |
 | **Added since** `src/renderer/src/components/Comments/overlay/useHostPanelKeys.ts` (1) | S (for renderer-hosted previews) | – |
+| **Added since** `src/renderer/src/components/Comments/overlay/hostPointerOptions.ts` (1) | S (for renderer-hosted previews) | The host's options for `useHostPointerKeys`, moved out of `useCommentOverlayHost.ts` for its line limit (#445) |
 | **Added since** `src/renderer/src/components/Comments/commentWindowDismiss.ts` (1) | S | – |
 | **Added since** `src/renderer/src/components/Comments/commentModeEscape.ts` (1) | S | – |
 | **Added since** `src/renderer/src/components/Comments/overlay/{iconLayout,commentTiming}.ts` (2) | S (for renderer-hosted previews) | Icon placement with the 3-per-row cap, ghost and damaged icons (C-05, C-17, S-01..S-08); the 024-NFR-001 `performance.mark` points |

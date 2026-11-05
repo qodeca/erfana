@@ -135,6 +135,22 @@ export async function clipboardCut(deps: MonacoClipboardDeps): Promise<void> {
 }
 
 /**
+ * Delete the current selection without touching the clipboard – the menu's
+ * Delete item, the same edit as the Delete key (#463).
+ *
+ * No-op when the editor is read-only or the selection is missing or empty, so
+ * a collapsed caret never loses a character.
+ */
+export function clipboardDelete(deps: MonacoClipboardDeps): void {
+  if (deps.isReadOnly()) return
+
+  const selection = deps.getSelection()
+  if (!selection || deps.isSelectionEmpty(selection)) return
+
+  deps.executeEdits(selection, '')
+}
+
+/**
  * Paste clipboard text at the current cursor / over the current selection.
  *
  * No-op when the editor is read-only, no selection is available, or the

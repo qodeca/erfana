@@ -114,7 +114,6 @@ describe('channel names', () => {
           "create": "terminal:create",
           "getActivity": "terminal:getActivity",
           "getInfo": "terminal:getInfo",
-          "getScreenReaderSupport": "terminal:getScreenReaderSupport",
           "isAvailable": "terminal:isAvailable",
           "kill": "terminal:kill",
           "list": "terminal:list",
@@ -126,7 +125,6 @@ describe('channel names', () => {
           "data": "terminal:data",
           "error": "terminal:error",
           "exit": "terminal:exit",
-          "screenReaderSupportChanged": "terminal:screenReaderSupportChanged",
         },
       }
     `)
@@ -289,9 +287,7 @@ describe('terminal bridge', () => {
     { method: 'kill', channel: TERMINAL_CHANNELS.kill, args: ['t'], wire: ['t'] },
     { method: 'getInfo', channel: TERMINAL_CHANNELS.getInfo, args: ['t'], wire: ['t'] },
     { method: 'list', channel: TERMINAL_CHANNELS.list, args: [], wire: [] },
-    { method: 'getActivity', channel: TERMINAL_CHANNELS.getActivity, args: ['t'], wire: ['t'] },
-    // Payload-free: nothing travels with the request (lens review [23])
-    { method: 'getScreenReaderSupport', channel: TERMINAL_CHANNELS.getScreenReaderSupport, args: [], wire: [] }
+    { method: 'getActivity', channel: TERMINAL_CHANNELS.getActivity, args: ['t'], wire: ['t'] }
   ]
 
   it.each(requests)('$method sends $channel', async ({ method, channel, args, wire }) => {
@@ -331,8 +327,7 @@ describe('terminal bridge', () => {
     ['onData', TERMINAL_EVENTS.data],
     ['onExit', TERMINAL_EVENTS.exit],
     ['onError', TERMINAL_EVENTS.error],
-    ['onClear', TERMINAL_EVENTS.clear],
-    ['onScreenReaderSupportChanged', TERMINAL_EVENTS.screenReaderSupportChanged]
+    ['onClear', TERMINAL_EVENTS.clear]
   ] as const)('%s listens on %s, delivers the payload and unsubscribes', (method, event) => {
     const callback = vi.fn()
     const unsubscribe = terminalBridge[method](callback)

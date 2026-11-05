@@ -35,13 +35,13 @@
 <main>
 <h1>Erfana design system</h1>
 <p class="ds-lede">
-  33 cards, generated from the folder itself. Every page reads a synced copy of the app's
+  35 cards, generated from the folder itself. Every page reads a synced copy of the app's
   <code>design-tokens.css</code> and the real bundled Cascadia Mono, and every number a card quotes is
   baked in from the source by <code>npm run design</code> – no page runs JavaScript.
 </p>
 
 <ul class="ix-summary" aria-label="Cards by status">
-  <li><span class="ds-status" data-status="decided">decided</span> 5</li>
+  <li><span class="ds-status" data-status="decided">decided</span> 7</li>
   <li><span class="ds-status" data-status="proposed">proposed</span> 28</li>
   <li><span class="ds-status" data-status="superseded">superseded</span> 0</li>
 </ul>
@@ -135,7 +135,7 @@
     </a>
 </div>
 
-<h2 id="components">Components <span class="ix-count">15</span></h2>
+<h2 id="components">Components <span class="ix-count">16</span></h2>
 <div class="ix-grid">
     <a class="ix-card" href="system/components/badge/index.html">
       <span class="ix-card__name">Badges, chips and keys</span>
@@ -212,9 +212,14 @@
       <span class="ix-card__sub">A description on hover and focus – never a name, never the only way to learn something</span>
       <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
     </a>
+    <a class="ix-card" href="system/components/tree-active-file/index.html">
+      <span class="ix-card__name">Active file in the tree</span>
+      <span class="ix-card__sub">The tree row of the file showing in the active tab – a lime underline on the name, the tab&#x27;s own mark, kept apart from selection, focus and hover</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-11-03</span>
+    </a>
 </div>
 
-<h2 id="patterns">Patterns <span class="ix-count">5</span></h2>
+<h2 id="patterns">Patterns <span class="ix-count">6</span></h2>
 <div class="ix-grid">
     <a class="ix-card" href="system/patterns/dialog/index.html">
       <span class="ix-card__name">Dialog</span>
@@ -241,6 +246,11 @@
       <span class="ix-card__sub">What a region shows when it has nothing, is waiting, or has failed – one shape for each</span>
       <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
     </a>
+    <a class="ix-card" href="system/patterns/toolbar-overflow/index.html">
+      <span class="ix-card__name">Toolbar overflow</span>
+      <span class="ix-card__sub">Buttons that do not fit move into a … menu – icon only in the row, icon and label in the menu</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-11-03</span>
+    </a>
 </div>
 
 <h2 id="start-here">Start here by task</h2>
@@ -248,6 +258,7 @@
 <thead><tr><th>I need to…</th><th>Card</th></tr></thead>
 <tbody>
   <tr><td>Add a button</td><td><a href="system/components/button/index.html">Buttons</a></td></tr>
+  <tr><td>Add a button to a panel header</td><td><a href="system/patterns/toolbar-overflow/index.html">Toolbar overflow</a></td></tr>
   <tr><td>Add a context menu</td><td><a href="system/components/menu/index.html">Menu</a></td></tr>
   <tr><td>Add a dialog</td><td><a href="system/patterns/dialog/index.html">Dialog</a></td></tr>
   <tr><td>Add a footer to a panel</td><td><a href="system/components/status-bar/index.html">Status bar</a></td></tr>
@@ -289,10 +300,11 @@
   <tr><td>Find a registry glyph</td><td><a href="system/components/icon/index.html">Icons</a></td></tr>
   <tr><td>Focus a button on a coloured fill</td><td><a href="system/foundations/focus.html">Focus and keyboard</a></td></tr>
   <tr><td>Group toolbar buttons</td><td><a href="system/components/toolbar/index.html">Toolbar</a></td></tr>
-  <tr><td>Handle a toolbar that does not fit</td><td><a href="system/components/toolbar/index.html">Toolbar</a></td></tr>
+  <tr><td>Handle a toolbar that does not fit</td><td><a href="system/patterns/toolbar-overflow/index.html">Toolbar overflow</a></td></tr>
   <tr><td>Highlight a search hit</td><td><a href="system/foundations/highlights.html">Text highlights</a></td></tr>
   <tr><td>Highlight an element on a third-party page</td><td><a href="system/patterns/picker/index.html">Element picker</a></td></tr>
   <tr><td>Keep a mark from looking like a link or a selection</td><td><a href="system/foundations/highlights.html">Text highlights</a></td></tr>
+  <tr><td>Keep every panel action reachable when the panel is narrow</td><td><a href="system/patterns/toolbar-overflow/index.html">Toolbar overflow</a></td></tr>
   <tr><td>Keep focus visible under a sticky header</td><td><a href="system/foundations/focus.html">Focus and keyboard</a></td></tr>
   <tr><td>Label a destructive action</td><td><a href="system/components/button/index.html">Buttons</a></td></tr>
   <tr><td>Label a picked element</td><td><a href="system/patterns/picker/index.html">Element picker</a></td></tr>
@@ -315,6 +327,7 @@
   <tr><td>Remove an outline safely</td><td><a href="system/foundations/focus.html">Focus and keyboard</a></td></tr>
   <tr><td>Replace a title attribute</td><td><a href="system/components/tooltip/index.html">Tooltip</a></td></tr>
   <tr><td>Respect reduced motion</td><td><a href="system/foundations/motion.html">Motion</a></td></tr>
+  <tr><td>Reveal the active tab in the project tree</td><td><a href="system/components/tree-active-file/index.html">Active file in the tree</a></td></tr>
   <tr><td>Set code or paths in the mono face</td><td><a href="system/foundations/type.html">Typography</a></td></tr>
   <tr><td>Show a count on an icon</td><td><a href="system/components/badge/index.html">Badges, chips and keys</a></td></tr>
   <tr><td>Show a field error</td><td><a href="system/components/form/index.html">Form controls</a></td></tr>
@@ -339,6 +352,7 @@
   <tr><td>Show that something is loading</td><td><a href="system/foundations/motion.html">Motion</a>, <a href="system/patterns/states/index.html">Empty, loading and error states</a></td></tr>
   <tr><td>Show the current address</td><td><a href="system/components/origin-field/index.html">Origin field</a></td></tr>
   <tr><td>Show which tab is active</td><td><a href="system/components/tabs/index.html">Tabs</a></td></tr>
+  <tr><td>Show which tree row is the open file</td><td><a href="system/components/tree-active-file/index.html">Active file in the tree</a></td></tr>
   <tr><td>Size a clickable target</td><td><a href="system/foundations/surfaces.html">Surfaces and elevation</a></td></tr>
   <tr><td>Size an icon</td><td><a href="system/components/icon/index.html">Icons</a></td></tr>
   <tr><td>Space a panel header, a menu or a dialog</td><td><a href="system/foundations/spacing.html">Spacing</a></td></tr>

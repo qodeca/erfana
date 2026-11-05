@@ -10,13 +10,13 @@ Open **Settings** with the gear at the bottom of the left activity bar. <kbd>Esc
 **On this page**
 
 - [Editor](#editor)
+- [Project tree](#project-tree)
 - [Git status](#git-status)
 - [Logging](#logging)
 - [Transcription](#transcription)
 - [Import tools](#import-tools)
 - [HTML preview](#html-preview)
 - [Comments](#comments)
-- [Terminal](#terminal)
 - [Per-project settings](#per-project-settings)
 - [Excluded folders](#excluded-folders)
 
@@ -29,6 +29,14 @@ Open **Settings** with the gear at the bottom of the left activity bar. <kbd>Esc
 | Option | Default | Effect |
 | --- | --- | --- |
 | **Preserve line breaks** | Off | When on, single newlines render as line breaks. |
+
+## Project tree
+
+**What it does:** **Follow the active tab** shows where the file you are looking at sits in the project. **How to reach it:** **Settings > Project tree**.
+
+| Option | Default | Effect |
+| --- | --- | --- |
+| **Follow the active tab** | On | When you switch to a file or preview tab, the project tree opens its folders, scrolls to the file and underlines it. Folders it opened close again at the next switch, unless you opened or worked inside them. A file the tree's filter hides, or one outside the project, is left alone. Keyboard focus stays in the editor. |
 
 ## Git status
 
@@ -99,16 +107,6 @@ Remote-host approvals belong to each project. An approved host is saved to `.erf
 | **Your email (optional)** | Empty | Also saved into the file. Leave it empty to keep it out. |
 
 Each field is saved when you leave it. Both are stored in Erfana's own settings (`~/.erfana/settings.json`), never in the project, and both are visible to anyone who can open the file – in its source and in git history once pushed.
-
-## Terminal
-
-**What it does:** **Screen reader mode** lets VoiceOver, NVDA and other screen readers read the terminal's output. **How to reach it:** **Settings > Terminal**.
-
-| Option | Default | Effect |
-| --- | --- | --- |
-| **Screen reader mode** | Auto | **Auto** turns it on while the system reports a screen reader (macOS and Windows) and off otherwise. **On** keeps it on – use it on Linux, where the system does not report screen readers to Erfana. **Off** keeps it off, for a tool the system mistakes for a screen reader. Changes apply to open terminals at once. |
-
-The line under the option says what Auto detects right now.
 
 ## Per-project settings
 

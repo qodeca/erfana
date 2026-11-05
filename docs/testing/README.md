@@ -87,7 +87,7 @@ npm run test:e2e:visual            # Visual regression tests (visual project) �
 npm run test:e2e:update-screenshots  # Update visual baselines
 ```
 
-**E2E test files** (a selection of the 76 specs in `e2e/`, counted 2026-11-01 – the full list is in [e2e-testing.md § Test files](./e2e-testing.md#test-files)):
+**E2E test files** (a selection of the 84 specs in `e2e/`, counted 2026-11-05 – the full list is in [e2e-testing.md § Test files](./e2e-testing.md#test-files)):
 - `html-preview-corpus.e2e.ts` - HTML-preview corpus acceptance (#74): the fixture corpus renders, the native view is sized on open, and the process-isolation floor holds
 - `html-preview-links.e2e.ts` - in-page links and independent previews (sd-074b): a new tab per target and reuse on a second click, `javascript:` refused, a link out of the project refused, `#anchor` scrolls; plus the external-link case, where an `https:` link asks first and the cancelled outcome is read back from the main log
 - `html-preview-perf.e2e.ts` - the save-to-visible-change gate (sd-074b AC24), asserting the P95 against its budget
