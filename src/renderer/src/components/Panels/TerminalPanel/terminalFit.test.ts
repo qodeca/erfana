@@ -57,6 +57,13 @@ describe('fitTerminalIfUsable', () => {
     expect(xterm).toEqual({ cols: 120, rows: 30 })
   })
 
+  it('sends no size to the PTY when the terminal took an unusable one after the fit', () => {
+    const xterm = { cols: 0, rows: 24 }
+    const addon = { proposeDimensions: () => ({ cols: 80, rows: 24 }), fit: vi.fn() }
+    expect(fitTerminalIfUsable(addon, xterm)).toBeNull()
+    expect(addon.fit).toHaveBeenCalledTimes(1)
+  })
+
   it('does nothing before the terminal or its addon exist, or when nothing can be measured', () => {
     const xterm = { cols: 80, rows: 24 }
     expect(fitTerminalIfUsable(null, xterm)).toBeNull()

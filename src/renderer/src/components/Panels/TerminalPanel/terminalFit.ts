@@ -63,5 +63,7 @@ export function fitTerminalIfUsable(
   if (!fitAddon || !xterm) return null
   if (!isUsableFit(fitAddon.proposeDimensions())) return null
   fitAddon.fit()
-  return { cols: Math.floor(xterm.cols), rows: Math.floor(xterm.rows) }
+  // The size the terminal took is what reaches the PTY, so it is checked too
+  const size = { cols: Math.floor(xterm.cols), rows: Math.floor(xterm.rows) }
+  return isUsableFit(size) ? size : null
 }

@@ -70,7 +70,7 @@ vi.mock('@xterm/xterm', () => ({
 }))
 
 vi.mock('@xterm/addon-fit', () => ({
-  FitAddon: vi.fn().mockImplementation(function () { return ({ fit: vi.fn() }) })
+  FitAddon: vi.fn().mockImplementation(function () { return ({ fit: vi.fn(), proposeDimensions: vi.fn(() => ({ cols: 80, rows: 24 })) }) })
 }))
 
 vi.mock('@xterm/addon-web-links', () => ({
@@ -209,10 +209,11 @@ describe('TerminalPanel header actions through the overflow menu (#451)', () => 
         TEST_IDS.TERMINAL_BTN_CAPTURE_WINDOW,
         TEST_IDS.TERMINAL_BTN_CAPTURE_AREA,
         TEST_IDS.TERMINAL_BTN_CAMERA,
-        TEST_IDS.TERMINAL_BTN_SCROLL,
-        TEST_IDS.TERMINAL_BTN_RESTART,
+        // Owner order (#462): Maximize, then the three that hide first
+        TEST_IDS.TERMINAL_BTN_EXPAND,
         TEST_IDS.TERMINAL_BTN_LOCK,
-        TEST_IDS.TERMINAL_BTN_EXPAND
+        TEST_IDS.TERMINAL_BTN_RESTART,
+        TEST_IDS.TERMINAL_BTN_SCROLL
       ])
       expect(screen.queryByTestId(TOOLBAR_OVERFLOW_TEST_IDS.MORE)).toBeNull()
     })
@@ -267,12 +268,15 @@ describe('TerminalPanel header actions through the overflow menu (#451)', () => 
       expect(item('Maximize terminal').querySelector('.lucide-minimize-2')).not.toBeNull()
     })
 
-    it('restores the terminal from the keyboard: ↑ on … opens on Maximize, Enter runs it', async () => {
+    it('restores the terminal from the keyboard: ↑ on … opens on the last item, ↑ reaches Maximize, Enter runs it', async () => {
       useActivityBarStore.setState({ terminalExpanded: true })
       await renderPanel()
       resizeTo(FLOOR)
       more().focus()
       fireEvent.keyDown(more(), { key: 'ArrowUp' })
+      // Owner order (#462): Scroll to bottom is last, then Restart and Lock scroll above it
+      expect(item('Scroll to bottom')).toHaveFocus()
+      for (let i = 0; i < 3; i += 1) fireEvent.keyDown(document.activeElement as Element, { key: 'ArrowUp' })
       const maximize = item('Maximize terminal')
       expect(maximize).toHaveFocus()
       expect(maximize).toHaveAttribute('aria-checked', 'true')
