@@ -79,7 +79,7 @@ describe('SiteSecurity', () => {
   it('025-AC-021 routes the tab\'s certificate error to the warning page and its answer back', async () => {
     const link = security.attachTab(ref, strip)
     const results = certificateError(contents)
-    await flush()
+    await vi.waitFor(() => expect(states.at(-1)?.warning).not.toBeFalsy())
     expect(results).toEqual([false])
     expect(states.at(-1)?.warning).toMatchObject({ decisionId: 'd1', host: 'selfsigned.test', code: -202 })
     clock.advance(CERTIFICATE_INPUT_GUARD_MS)
@@ -112,23 +112,22 @@ describe('SiteSecurity', () => {
       { isProxy: false, scheme: 'basic', host: 'a.test', port: 443, realm: 'R' },
       (...a: unknown[]) => calls.push(a)
     )
-    await flush()
+    // The row follows real store reads: wait for it rather than a fixed number of turns (flaky under CI load).
+    await vi.waitFor(() => expect(events.some((e) => e.op === 'add')).toBe(true))
     const add = events.find((e) => e.op === 'add')
     expect(add?.op === 'add' && add.row).toMatchObject({ kind: 'signIn', takesFocus: true, text: 'Sign in to a.test' })
     clock.advance(STRIP_INPUT_GUARD_MS)
     if (add?.op !== 'add') throw new Error('no row')
     strip.answer(add.row.requestId, 'signIn', { username: 'u', password: 'p', remember: true })
     link.requestCompleted('https://a.test/basic', 200)
-    await flush()
-    expect(calls).toEqual([['u', 'p']])
+    await vi.waitFor(() => expect(calls).toEqual([['u', 'p']]))
 
     // A second tab of the project shares the store: the sign-in is sent without a box.
     const other = new FakeContents()
     security.attachTab({ ...ref, contents: other as never }, strip)
     const sent: unknown[] = []
     other.emit('login', { preventDefault: vi.fn() }, { url: 'https://a.test/basic', firstAuthAttempt: true }, { isProxy: false, scheme: 'basic', host: 'a.test', port: 443, realm: 'R' }, (...a: unknown[]) => sent.push(a))
-    await flush()
-    expect(sent).toEqual([['u', 'p']])
+    await vi.waitFor(() => expect(sent).toEqual([['u', 'p']]))
 
     await security.clearCredentials(root)
     await security.clearCredentials('/never/opened')

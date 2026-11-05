@@ -312,21 +312,72 @@ test.describe('025-AC-026 the outline and its label', () => {
     expect([...longText].length).toBeLessThanOrEqual(40)
     expect('div.alpha-component-wrapper.beta-layout-container.gamma-visual-style'.startsWith(longText.replace(/…$/, ''))).toBe(true)
 
-    // One check of the live paint (S-1): the pick colour on the edge of div#outer, and no fill inside it.
+    // One check of the live outline (S-1) on div#outer. Since ADR 0007's 2026-11-05 amendment the outline is
+    // Erfana's band – a click-through child window over the page, drawn in ink and paper – not paint in the page,
+    // so the page's own capture never holds it. It is read natively (`outlineBand()`): one shown band window whose
+    // strip views ring the element's box on the screen – ink 4 DIP wide from 1 DIP outside the border box, paper
+    // 2 DIP wide inside its edge, which leaves ink-paper-ink – in the outline tokens' colours. No fill: no strip
+    // reaches inside the ring, and the page's pixels inside the element are its own background. The tab is at
+    // zoom 100 %, so CSS px = DIP.
     const outer = await flow.rect('#outer')
     await hoverAt('#outer', 'div#outer ', { dx: 4, dy: 4 })
+    const tokens = await windowWithTestProject.evaluate(() => {
+      const css = getComputedStyle(document.documentElement)
+      return { ink: css.getPropertyValue('--color-brand-black').trim().toLowerCase(), paper: css.getPropertyValue('--color-white').trim().toLowerCase() }
+    })
+    expect(tokens.ink, 'the ink token is a hex colour').toMatch(/^#[0-9a-f]{6}$/)
+    expect(tokens.paper, 'the paper token is a hex colour').toMatch(/^#[0-9a-f]{6}$/)
+    expect(tokens.ink).not.toBe(tokens.paper)
+    // The element's border box on the screen, rounded to whole DIP as native views take it (the page view does not move here).
+    const { view } = await flow.outlineBand()
+    const left = view.x + Math.round(outer.x)
+    const top = view.y + Math.round(outer.y)
+    const element = { x: left, y: top, width: view.x + Math.round(outer.x + outer.width) - left, height: view.y + Math.round(outer.y + outer.height) - top }
+    const interior = { x: element.x + 3, y: element.y + 3, width: element.width - 6, height: element.height - 6 }
+    type Rect = { x: number; y: number; width: number; height: number }
+    const bboxOf = (rects: Rect[]): Rect | null => {
+      if (rects.length === 0) return null
+      const x = Math.min(...rects.map((r) => r.x))
+      const y = Math.min(...rects.map((r) => r.y))
+      return { x, y, width: Math.max(...rects.map((r) => r.x + r.width)) - x, height: Math.max(...rects.map((r) => r.y + r.height)) - y }
+    }
+    const overlaps = (a: Rect, b: Rect): boolean => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+    const ring = (rects: Rect[]) => ({ box: bboxOf(rects), strips: rects.length, widths: [...new Set(rects.map((r) => Math.min(r.width, r.height)))] })
     const near = (c: [number, number, number], want: [number, number, number], tol: number): boolean => c.every((v, i) => Math.abs(v - want[i]) <= tol)
     await expect
       .poll(
         async () => {
-          const paint = await flow.livePaint()
-          const edge = [-1, 0, 1].some((d) => near(paint(outer.x + outer.width / 2, outer.y + d), [160, 168, 255], 24))
-          const inside = paint(outer.x + 6, outer.y + outer.height / 2)
-          return { edge, insideIsBackground: near(inside, [236, 239, 241], 3) }
+          const band = await flow.outlineBand()
+          const shown = band.windows.filter((w) => w.visible)
+          const win = shown.length === 1 ? shown[0] : null
+          const views = win === null ? [] : win.views.filter((v) => v.visible)
+          // Each native strip on the screen, with the tone main drew the strip of the same slot in.
+          const placed = win === null || band.hook === null ? [] : views.map((v, i) => ({
+            tone: band.hook!.strips[i]?.tone,
+            rect: { x: win.bounds.x + v.rect.x, y: win.bounds.y + v.rect.y, width: v.rect.width, height: v.rect.height }
+          }))
+          const inside = (await flow.livePaint())(outer.x + 6, outer.y + outer.height / 2)
+          return {
+            bandWindowsShown: shown.length,
+            nativeIsWhatMainDrew: band.hook !== null && JSON.stringify(views.map((v) => v.rect)) === JSON.stringify(band.hook.strips.map((s) => s.rect)),
+            colours: band.hook?.colours ?? null,
+            ink: ring(placed.filter((s) => s.tone === 'ink').map((s) => s.rect)),
+            paper: ring(placed.filter((s) => s.tone === 'paper').map((s) => s.rect)),
+            stripInsideRing: placed.some((s) => overlaps(s.rect, interior)),
+            insideIsBackground: near(inside, [236, 239, 241], 3)
+          }
         },
-        { timeout: WAIT_MS, message: 'outline painted, no fill' }
+        { timeout: WAIT_MS, message: 'outline band shown at the element in ink and paper, no fill' }
       )
-      .toEqual({ edge: true, insideIsBackground: true })
+      .toEqual({
+        bandWindowsShown: 1,
+        nativeIsWhatMainDrew: true,
+        colours: tokens,
+        ink: { box: { x: element.x - 1, y: element.y - 1, width: element.width + 2, height: element.height + 2 }, strips: 4, widths: [4] },
+        paper: { box: element, strips: 4, widths: [2] },
+        stripInsideRing: false,
+        insideIsBackground: true
+      })
 
     expect(await flow.eval<number>('window.__fixture.mutations()')).toBe(0)
     expect(await flow.eval<number>('window.__fixture.resizeChanges()')).toBe(0)

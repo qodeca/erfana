@@ -48,6 +48,16 @@ export const PICK_KEY_LABEL = IS_MAC ? '⌘E' : 'Ctrl+E'
 /** One `webContents.sendInputEvent` argument (page CSS px at zoom 100%). */
 export type PageInput = Record<string, unknown> & { type: string }
 
+/** What {@link PickFlow.outlineBand} reads: the live outline's band, natively and as main drew it. Screen DIP. */
+export interface OutlineBandRead {
+  /** The page view on the screen. */
+  view: Box
+  /** Every band window over the page's window: shown or not, where, and its strip views (surface DIP). */
+  windows: Array<{ visible: boolean; bounds: Box; views: Array<{ visible: boolean; rect: Box }> }>
+  /** What main drew (surface bounds, strips in draw order with their tone, the colours), or null. */
+  hook: { bounds: Box; strips: Array<{ tone: 'ink' | 'paper'; rect: Box }>; colours: { ink: string; paper: string } } | null
+}
+
 /** One change of the status slot, stamped with the window's `performance.now()`. */
 export interface StatusChange {
   t: number
@@ -543,6 +553,56 @@ export class PickFlow {
       const i = (Math.round(y * scale) * shot.width + Math.round(x * scale)) * 4
       return [data[i + 2], data[i + 1], data[i]]
     }
+  }
+
+  /**
+   * The live pick outline as the user sees it: Erfana's band (ADR 0007
+   * decision 6, amended 2026-11-05), a click-through child window of the
+   * page's window holding one plain `View` per strip. The band never shows
+   * in the page's `capturePage` (by design), so it is read natively, main-side:
+   * the page view's place on the screen (window content bounds plus the
+   * offsets of the views it sits in), every band window over that window
+   * with its visibility, content bounds and strip views, and the tones and
+   * colours main drew them in (the `pick` hook's `band`; a `View` has no
+   * colour getter). All in screen DIP. `hook` is null when no band is drawn
+   * (nothing outlined, or the engine's fallback outline on Wayland).
+   */
+  async outlineBand(): Promise<OutlineBandRead> {
+    const tabId = await this.tabId()
+    const contentsId = (await this.panel.hookTab()).webContentsId
+    const native = await this.app.evaluate(({ BaseWindow, WebContentsView }, id) => {
+      type Rect = { x: number; y: number; width: number; height: number }
+      const find = (view: Electron.View, ox: number, oy: number): Rect | null => {
+        const b = view.getBounds()
+        const x = ox + b.x
+        const y = oy + b.y
+        if (view instanceof WebContentsView && view.webContents.id === id) return { x, y, width: b.width, height: b.height }
+        for (const child of view.children) {
+          const found = find(child, x, y)
+          if (found !== null) return found
+        }
+        return null
+      }
+      for (const host of BaseWindow.getAllWindows()) {
+        if (host.isDestroyed()) continue
+        const content = host.getContentBounds()
+        const view = find(host.contentView, 0, 0)
+        if (view === null) continue
+        // The band's window has no webContents: a BaseWindow, not a BrowserWindow.
+        const bands = host
+          .getChildWindows()
+          .filter((w) => !w.isDestroyed() && !('webContents' in w))
+          .map((w) => ({
+            visible: w.isVisible(),
+            bounds: w.getContentBounds(),
+            views: w.contentView.children.map((v) => ({ visible: v.getVisible(), rect: v.getBounds() }))
+          }))
+        return { view: { x: content.x + view.x, y: content.y + view.y, width: view.width, height: view.height }, bands }
+      }
+      throw new Error(`No window holds the page view of web contents ${id}`)
+    }, contentsId)
+    const hook = await mainHook<OutlineBandRead['hook']>(this.app, 'pick', 'band', tabId)
+    return { view: native.view, windows: native.bands, hook }
   }
 
   /**

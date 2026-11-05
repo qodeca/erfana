@@ -319,8 +319,11 @@ test.describe('025-AC-070 the send notice and the terminal reveal', () => {
       await expect(send.pick.action('Explain')).toBeFocused()
       await pauseClockNow(window)
       await window.keyboard.press('Enter')
-      // The paste and its Enter are a renderer timer apart: step it, then stop. No step runs after the
-      // send settled, so the notice's timer starts at the clock time it is read at below.
+      // The paste and its Enter are renderer timers apart: Enter goes once the agent's echo of the paste has
+      // been quiet ENTER_MIN_QUIET_MS, never before ENTER_MIN_DELAY_MS (#449, terminalInputSettle.ts) – some
+      // 600 ms of renderer clock, more with no echo. Step it 20 ms at a time, then stop. No step runs after the
+      // send settled, so the notice's timer starts at the clock time it is read at below. The poll comes round
+      // at once: at expect.poll's default intervals (up to 1 s each) 15 s holds only ~18 steps, ~360 ms.
       await expect
         .poll(
           async () => {
@@ -328,7 +331,7 @@ test.describe('025-AC-070 the send notice and the terminal reveal', () => {
             if (!done) await window.clock.runFor(20)
             return done
           },
-          { timeout: SEND_WAIT_MS }
+          { timeout: SEND_WAIT_MS, intervals: [0], message: 'Enter reached the agent after the paste settled' }
         )
         .toBe(true)
       await expect(send.notice).toBeVisible()
