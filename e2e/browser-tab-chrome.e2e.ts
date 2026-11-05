@@ -84,6 +84,10 @@ const externalOpens = (app: ElectronApplication): Promise<string[]> =>
   app.evaluate(() => (globalThis as unknown as { __externalOpens: string[] }).__externalOpens)
 
 test.describe('built-in browser tab chrome', () => {
+  // These tests check which control has keyboard focus (toBeFocused), which needs Erfana to be the OS's key
+  // window: a second e2e app opening a window beside it takes that away (seen once: "inactive").
+  test.use({ needsOsFocus: true })
+
   test('025-AC-011 "Pop-up blocked" shows in the strip, not the toolbar, and Allow once opens one', async ({
     appWithTestProject,
     windowWithTestProject,
