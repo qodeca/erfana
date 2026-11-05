@@ -19,6 +19,7 @@
 import { Page, Locator, expect } from '@playwright/test'
 import { TEST_IDS } from '../../src/renderer/src/constants/testids'
 import { byTestId } from '../utils/locators'
+import { clickToolbarAction } from '../utils/toolbarAction'
 import type { Api } from '../../src/preload/index'
 
 /** How long `waitForPrompt` waits for a settled prompt by default. */
@@ -308,8 +309,14 @@ export class TerminalPage {
     await this.sendCommand('clear')
   }
 
+  /** The terminal header row – its buttons, and the "More actions" menu for those that do not fit. */
+  header(): Locator {
+    return this.page.locator(`[data-testid="${TEST_IDS.TERMINAL_PANEL}"] .sidebar-panel-header`)
+  }
+
+  /** Scroll to bottom – from the header, or its "More actions" menu (#462 moves it there first). */
   async scrollToBottom(): Promise<void> {
-    await byTestId(this.page, TEST_IDS.TERMINAL_BTN_SCROLL).click()
+    await clickToolbarAction(this.page, this.header(), TEST_IDS.TERMINAL_BTN_SCROLL)
   }
 
   /**
@@ -321,7 +328,8 @@ export class TerminalPage {
    * restarts without one.
    */
   async restart(options: { confirm?: boolean } = {}): Promise<void> {
-    await byTestId(this.page, TEST_IDS.TERMINAL_BTN_RESTART).click()
+    // From the header, or its "More actions" menu (#462 moves Restart there first)
+    await clickToolbarAction(this.page, this.header(), TEST_IDS.TERMINAL_BTN_RESTART)
     if (options.confirm) {
       await expect(byTestId(this.page, TEST_IDS.DIALOG_CONFIRM)).toBeVisible({ timeout: 10_000 })
       await byTestId(this.page, TEST_IDS.DIALOG_BTN_CONFIRM).click()
@@ -332,7 +340,7 @@ export class TerminalPage {
   }
 
   async toggleScrollLock(): Promise<void> {
-    await byTestId(this.page, TEST_IDS.TERMINAL_BTN_LOCK).click()
+    await clickToolbarAction(this.page, this.header(), TEST_IDS.TERMINAL_BTN_LOCK)
   }
 
   /** The expand/restore (maximize-over-editor) toolbar button. */

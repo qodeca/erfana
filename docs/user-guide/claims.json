@@ -8238,7 +8238,7 @@
       "quote": "then read the DOM, where the WebGL terminal puts no text); both now poll xterm's own screen buffer",
       "status": "fixed",
       "evidence": "source",
-      "source": "e2e/pages/terminal.page.ts:280",
+      "source": "e2e/pages/terminal.page.ts:281",
       "match": "(await this.readScreen()).lines.join",
       "note": "Said waitForPrompt() ends with a fixed 1500 ms wait and waitForOutput() reads the DOM; both now poll readScreen()."
     },
@@ -8280,7 +8280,7 @@
       "quote": "then ended in `waitForTimeout(PTY_INIT_DELAY_MS)`",
       "status": "fixed",
       "evidence": "source",
-      "source": "e2e/pages/terminal.page.ts:179",
+      "source": "e2e/pages/terminal.page.ts:180",
       "match": "const screen = await this.readScreen()",
       "note": "Present-tense claim of a fixed wait; waitForPrompt now polls the xterm screen buffer."
     },
@@ -13713,7 +13713,7 @@
       "id": "testing-README/18",
       "audience": "developer",
       "doc": "docs/testing/README.md",
-      "quote": "**E2E test files** (a selection of the 76 specs in `e2e/`",
+      "quote": "**E2E test files** (a selection of the 84 specs in `e2e/`",
       "status": "verified",
       "evidence": "app",
       "source": "playwright.config.ts:68",
@@ -14180,7 +14180,7 @@
       "quote": "(up to `PROMPT_TIMEOUT_MS`, 30 s; no fixed sleep)",
       "status": "verified",
       "evidence": "source",
-      "source": "e2e/pages/terminal.page.ts:25",
+      "source": "e2e/pages/terminal.page.ts:26",
       "match": "export const PROMPT_TIMEOUT_MS = 30_000"
     },
     {
@@ -14417,7 +14417,7 @@
       "quote": "or the last line ends in `%`, `$`, `>` or `#` (#288)",
       "status": "verified",
       "evidence": "app",
-      "source": "e2e/pages/terminal.page.ts:189",
+      "source": "e2e/pages/terminal.page.ts:190",
       "match": "Last terminal screen read:",
       "test": "e2e/terminal-prompt-detection.e2e.ts"
     },
@@ -14623,7 +14623,7 @@
       "quote": "| Wait for output | `terminalPage.waitForOutput(text)`",
       "status": "fixed",
       "evidence": "source",
-      "source": "e2e/pages/terminal.page.ts:277",
+      "source": "e2e/pages/terminal.page.ts:278",
       "match": "async waitForOutput(text: string, options: { timeout?: number } = {}): Promise<void> {",
       "note": "Said to wait with expect(terminal).toContainText(), which finds no text on a WebGL-rendered terminal."
     },
@@ -14634,7 +14634,7 @@
       "quote": "// Wait for the prompt – a condition, never a fixed sleep",
       "status": "fixed",
       "evidence": "source",
-      "source": "e2e/pages/terminal.page.ts:158",
+      "source": "e2e/pages/terminal.page.ts:159",
       "match": "async waitForPrompt(options?: { timeout?: number }): Promise<void> {",
       "note": "The example used waitForTimeout(1000), against the condition-based-waits rule."
     },
@@ -21216,7 +21216,7 @@
       "quote": "waits for a settled prompt instead of sleeping – two equal screen reads showing a drawn prompt, within `PROMPT_TIMEOUT_MS` (30 s)",
       "status": "fixed",
       "evidence": "source",
-      "source": "e2e/pages/terminal.page.ts:25",
+      "source": "e2e/pages/terminal.page.ts:26",
       "match": "export const PROMPT_TIMEOUT_MS = 30_000",
       "note": "The 1500 ms blind sleep (PTY_INIT_DELAY_MS) is gone; waitForPrompt now polls for a settled prompt"
     },
@@ -24218,7 +24218,7 @@
       "quote": "| `e2e/pages/terminal.page.ts:229` (`TerminalPage.open`)",
       "status": "verified",
       "evidence": "source",
-      "source": "e2e/pages/terminal.page.ts:230",
+      "source": "e2e/pages/terminal.page.ts:231",
       "match": "async open(): Promise<void> {"
     },
     {
@@ -45762,7 +45762,7 @@
       "quote": "| `TerminalPage` |",
       "status": "verified",
       "evidence": "source",
-      "source": "e2e/pages/terminal.page.ts:110",
+      "source": "e2e/pages/terminal.page.ts:111",
       "match": "export class TerminalPage"
     },
     {
@@ -45772,7 +45772,7 @@
       "quote": "`, `sendCommand()`, `waitForOutput()` |",
       "status": "verified",
       "evidence": "source",
-      "source": "e2e/pages/terminal.page.ts:277",
+      "source": "e2e/pages/terminal.page.ts:278",
       "match": "async waitForOutput(text: string, options: { timeout?: numbe"
     },
     {
@@ -45872,7 +45872,7 @@
       "quote": "| `EditorPanelPage` |",
       "status": "verified",
       "evidence": "source",
-      "source": "e2e/pages/editor-panel.page.ts:50",
+      "source": "e2e/pages/editor-panel.page.ts:51",
       "match": "export class EditorPanelPage"
     },
     {
@@ -45882,7 +45882,7 @@
       "quote": "tosaveIndicator()`, `reloadIndicator()`), the s",
       "status": "verified",
       "evidence": "source",
-      "source": "e2e/pages/editor-panel.page.ts:160",
+      "source": "e2e/pages/editor-panel.page.ts:163",
       "match": "reloadIndicator(): Locator {"
     },
     {
@@ -55305,6 +55305,39 @@
       "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:314",
       "match": "if (shouldRecreateParentDirs(trigger, isFileDeleted)) {",
       "note": "#450: the tab's own save writes a deleted file back."
+    },
+    {
+      "id": "user-guide-how-to-export-to-pdf-or-word/17",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/export-to-pdf-or-word.md",
+      "quote": "When the toolbar is too narrow, they are in its **More actions** (…) menu.",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/ToolbarOverflow/ToolbarOverflow.tsx:41",
+      "match": "export const MORE_ACTIONS_LABEL = 'More actions'",
+      "note": "#461: the Markdown toolbar is a ToolbarOverflow row; buttons that do not fit become items of its More actions menu."
+    },
+    {
+      "id": "user-guide-reference-editor/34",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/editor.md",
+      "quote": "When it is too narrow, the buttons that do not fit are in its **More actions** (…) menu.",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:344",
+      "match": "<ToolbarOverflow",
+      "note": "#461: the Markdown toolbar renders through ToolbarOverflow."
+    },
+    {
+      "id": "user-guide-reference-terminal/53",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/terminal.md",
+      "quote": "**Lock scroll to bottom**, **Restart terminal** and **Scroll to bottom** are the first to move into its **More actions** (…) menu",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:814",
+      "match": "// Scroll lock, Restart and Scroll to bottom follow it and hide first (owner, #462).",
+      "note": "#462: owner-decided order; these three come last in the row and move into the menu first."
     }
   ],
   "reviewed": {

@@ -21,6 +21,7 @@
 import { Page, Locator, expect } from '@playwright/test'
 import { TEST_IDS } from '../../src/renderer/src/constants/testids'
 import { byTestId } from '../utils/locators'
+import { clickToolbarAction, readToolbarAction } from '../utils/toolbarAction'
 
 /** The four layouts the toolbar can switch between. */
 export type ViewMode = 'editor' | 'preview' | 'split' | 'split-horizontal'
@@ -92,9 +93,11 @@ export class EditorPanelPage {
    *
    * Waiting on the panes rather than on the button's `active` class is
    * deliberate: the class is styling, the mounted panes are the contract.
+   * The button is taken from the toolbar row, or from its "More actions" menu
+   * when the toolbar is too narrow for it (#461).
    */
   async setViewMode(mode: ViewMode): Promise<void> {
-    await this.viewModeButton(mode).click()
+    await clickToolbarAction(this.page, this.toolbar(), VIEW_MODE_TESTIDS[mode])
 
     const wantsEditor = mode !== 'preview'
     const wantsPreview = mode !== 'editor'
@@ -114,8 +117,7 @@ export class EditorPanelPage {
 
   /** True when the toolbar marks this mode as the current one. */
   async isViewModeActive(mode: ViewMode): Promise<boolean> {
-    const cls = (await this.viewModeButton(mode).getAttribute('class')) ?? ''
-    return cls.split(/\s+/).includes('active')
+    return (await readToolbarAction(this.page, this.toolbar(), VIEW_MODE_TESTIDS[mode])).checked
   }
 
   // ---------------------------------------------------------------------------
@@ -126,8 +128,9 @@ export class EditorPanelPage {
     return byTestId(this.page, FORMAT_TESTIDS[action])
   }
 
+  /** Apply a formatting action from the toolbar row, or its "More actions" menu when narrow (#461). */
   async format(action: FormatAction): Promise<void> {
-    await this.formatButton(action).click()
+    await clickToolbarAction(this.page, this.toolbar(), FORMAT_TESTIDS[action])
   }
 
   searchButton(): Locator {
