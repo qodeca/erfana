@@ -153,6 +153,27 @@ describe('useDeletedFileProbe', () => {
     expect(onFileBack).toHaveBeenCalledTimes(2)
   })
 
+  it('asks for a Windows path exactly as the tab holds it, backslashes and drive letter included', async () => {
+    // Main passes native separators across IPC; a rewritten path would stat a
+    // file that does not exist and the tab would never recover on Windows
+    const windowsPath = 'C:\\Users\\dev\\project\\docs\\notes.md'
+    const onFileBack = vi.fn()
+    renderProbe({ filePath: windowsPath, onFileBack })
+
+    await advance(DELETED_FILE_PROBE_INTERVAL_MS)
+    expect(mockGetStats).toHaveBeenCalledWith({ filePath: windowsPath })
+    expect(onFileBack).not.toHaveBeenCalled()
+
+    mockGetStats.mockImplementation(async ({ filePath }) => {
+      if (filePath !== windowsPath) throw new Error('ENOENT')
+      return { size: 1 }
+    })
+    await advance(DELETED_FILE_PROBE_INTERVAL_MS)
+
+    expect(onFileBack).toHaveBeenCalledTimes(1)
+    expect(mockGetStats.mock.calls.every(([request]) => request.filePath === windowsPath)).toBe(true)
+  })
+
   it('calls the latest onFileBack without restarting the clock', async () => {
     const first = vi.fn()
     const second = vi.fn()

@@ -64,7 +64,10 @@ describe('#383 - /model <id> without [1m] on a model with ONLY a 1M window', () 
     ['claude-opus-5'],
     ['claude-opus-4-7'],
     ['claude-sonnet-5'],
-    ['claude-fable-5']
+    ['claude-fable-5'],
+    // Not in the table: the §7.2 family guess (newer than Opus 5.5) sizes it at
+    // 1M, and a guessed 1M is still a 1M the pick cannot narrow.
+    ['claude-opus-7']
   ]
 
   it.each(extendedOnly)('%s reports 1M, decided by the registry (R1)', async (modelId) => {

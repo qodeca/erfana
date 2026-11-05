@@ -7011,7 +7011,7 @@
       "quote": "The tests cover core autoExecute functionality",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.autoExecute.test.ts:38",
+      "source": "src/renderer/src/stores/useTerminalStore.autoExecute.test.ts:39",
       "match": "describe('useTerminalStore.sendToTerminal with autoExecute'",
       "note": "Said 15, then 17 tests; a test count drifts and no line pins it, so it was dropped."
     },
@@ -7022,7 +7022,7 @@
       "quote": "#### 7. Recent-input marking (2 tests)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.autoExecute.test.ts:454",
+      "source": "src/renderer/src/stores/useTerminalStore.autoExecute.test.ts:464",
       "match": "it('counts a programmatic send as recent user input for the restart and quit guards'",
       "note": "Category missing from the list."
     },
@@ -7033,7 +7033,7 @@
       "quote": "Does not send Enter while a long paste is still arriving in pieces",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.autoExecute.test.ts:363",
+      "source": "src/renderer/src/stores/useTerminalStore.autoExecute.test.ts:373",
       "match": "it('does not send Enter while a long paste is still arriving in pieces'"
     },
     {
@@ -7043,7 +7043,7 @@
       "quote": "Normalizes Windows line endings",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.autoExecute.test.ts:270",
+      "source": "src/renderer/src/stores/useTerminalStore.autoExecute.test.ts:273",
       "match": "it('should normalize Windows line endings"
     },
     {
@@ -7095,7 +7095,7 @@
       "quote": "`src/renderer/src/stores/useTerminalStore.autoExecute.test.ts` - Unit tests for autoExecute",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/stores/useTerminalStore.autoExecute.test.ts:38",
+      "source": "src/renderer/src/stores/useTerminalStore.autoExecute.test.ts:39",
       "match": "describe('useTerminalStore.sendToTerminal with autoExecute'",
       "note": "Said 15, then 17 tests; a test count drifts and no line pins it, so it was dropped."
     },

@@ -170,6 +170,26 @@ export class ToolbarOverflowPage {
     return result
   }
 
+  /**
+   * Hold the row narrower than its panel with an inline `max-width`, so the
+   * row's own ResizeObserver sees it narrow – the same signal a splitter drag
+   * gives it. Needed only below the dock's 170 px minimum, where the terminal
+   * keeps the raised Maximize beside … by design. Undo with {@link releaseRow}.
+   */
+  async constrainRow(row: Locator, maxWidthPx: number): Promise<void> {
+    await row.evaluate((el, px) => {
+      ;(el as HTMLElement).style.maxWidth = `${px}px`
+    }, maxWidthPx)
+    await expect.poll(async () => (await row.boundingBox())?.width ?? Infinity).toBeLessThanOrEqual(maxWidthPx)
+  }
+
+  /** Remove the width {@link constrainRow} set. */
+  async releaseRow(row: Locator): Promise<void> {
+    await row.evaluate((el) => {
+      ;(el as HTMLElement).style.maxWidth = ''
+    })
+  }
+
   /** The `data-testid` or accessible name of the focused element. */
   async focusedName(): Promise<string> {
     return this.page.evaluate(() => {

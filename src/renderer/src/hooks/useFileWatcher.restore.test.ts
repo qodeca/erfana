@@ -189,6 +189,85 @@ describe('useFileWatcher – a deleted file that comes back (#450)', () => {
     expect(hook.result.current.isFileDeleted).toBe(true)
   })
 
+  it('once a successful save lands, the deleted state clears, the file is watched again and the probe stops', async () => {
+    const { hook, onContentUpdate } = watcher()
+    await act(async () => {})
+    deleteOnDisk()
+    act(() => {
+      hook.result.current.markSaving()
+    })
+    mockGetStats.mockResolvedValue({ size: 12 })
+    await nextProbe()
+
+    // The panel's handleSave, after the write: clearDeletedState, then unmarkSaving
+    act(() => {
+      hook.result.current.clearDeletedState()
+      hook.result.current.unmarkSaving()
+    })
+    await act(async () => {})
+
+    expect(hook.result.current.isFileDeleted).toBe(false)
+    expect(mockFileWatch.start).toHaveBeenCalledTimes(2)
+    const asked = mockGetStats.mock.calls.length
+    await nextProbe()
+    await nextProbe()
+    expect(mockGetStats).toHaveBeenCalledTimes(asked)
+    expect(mockReadFile).not.toHaveBeenCalled()
+    expect(onContentUpdate).not.toHaveBeenCalled()
+  })
+
+  it('a save that failed leaves the probe running: the next interval takes the returned file back', async () => {
+    const { hook, onContentUpdate } = watcher()
+    deleteOnDisk()
+    act(() => {
+      hook.result.current.markSaving()
+    })
+    mockGetStats.mockResolvedValue({ size: 12 })
+    mockReadFile.mockResolvedValue('# Notes\n\nFrom the other branch.\n')
+    await nextProbe()
+    expect(mockReadFile).not.toHaveBeenCalled()
+
+    // The write failed (its folder was gone): only unmarkSaving runs
+    act(() => {
+      hook.result.current.unmarkSaving()
+    })
+    await nextProbe()
+
+    expect(hook.result.current.isFileDeleted).toBe(false)
+    expect(onContentUpdate).toHaveBeenCalledWith('# Notes\n\nFrom the other branch.\n')
+  })
+
+  it('recovers every time: deleted, back, deleted again, back again', async () => {
+    const { hook, onContentUpdate } = watcher()
+    await act(async () => {})
+
+    deleteOnDisk()
+    mockGetStats.mockResolvedValue({ size: 12 })
+    mockReadFile.mockResolvedValue('# Notes\n\nBranch B.\n')
+    await nextProbe()
+    expect(hook.result.current.isFileDeleted).toBe(false)
+    expect(onContentUpdate).toHaveBeenLastCalledWith('# Notes\n\nBranch B.\n')
+    // Watched again, so the next delete can reach the tab at all
+    expect(mockFileWatch.start).toHaveBeenCalledTimes(2)
+
+    // Back to branch A: deleted once more, gone for one interval, then back
+    mockGetStats.mockReset().mockImplementation(gone)
+    deleteOnDisk()
+    expect(hook.result.current.isFileDeleted).toBe(true)
+    await nextProbe()
+    expect(mockGetStats).toHaveBeenCalledTimes(1)
+    expect(hook.result.current.isFileDeleted).toBe(true)
+
+    mockGetStats.mockResolvedValue({ size: 12 })
+    mockReadFile.mockResolvedValue('# Notes\n\nBranch A.\n')
+    await nextProbe()
+
+    expect(hook.result.current.isFileDeleted).toBe(false)
+    expect(onContentUpdate).toHaveBeenLastCalledWith('# Notes\n\nBranch A.\n')
+    expect(mockFileWatch.start).toHaveBeenCalledTimes(3)
+    expect(mockFileWatch.stop).not.toHaveBeenCalled()
+  })
+
   it('stays deleted and looks again when the file is gone once more by the time it is read', async () => {
     const { hook, onContentUpdate } = watcher()
     deleteOnDisk()

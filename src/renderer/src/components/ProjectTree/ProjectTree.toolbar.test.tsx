@@ -8,7 +8,10 @@
  * - renders only when a project is open, positioned after New Folder / before Refresh
  * - idle: FileInput icon, enabled, accessible name "Import a file"
  * - importing: busy (aria-busy + aria-disabled, focus kept) + the busy ring
- * - the icon of each #452 control is pinned (Import, Import busy, All files, Markdown only)
+ * - the icon of each #452 control is pinned (Import, Import busy, All files, Markdown only),
+ *   and the icon and tooltip of every other row button (unchanged by #452)
+ * - the tooltips of Import (idle and busy) and both filter cells; the busy ring is aria-hidden
+ *   (the checked cell's CSS cue is pinned in ProjectTree.fileFilter.css.test.ts)
  * - clicking invokes the import flow (proves onClick wiring)
  *
  * Render setup mirrors ProjectTree.switching.test.tsx (window.api mock +
@@ -250,6 +253,56 @@ describe('ProjectTree toolbar icons (#452, docs/designs/project-tree/toolbar-ico
     await renderWithProjectOpen({ showControlPanel: true })
 
     expect(lucideNames(screen.getByRole('radio', { name: 'Markdown only' }))).toEqual(['lucide-file-text'])
+  })
+
+  // #452 acceptance: "Other toolbar buttons are unchanged" – pinned on the rendered row.
+  it.each([
+    { testId: TEST_IDS.PROJECT_TREE_BTN_OPEN, icon: 'lucide-replace', title: 'Change project' },
+    { testId: TEST_IDS.PROJECT_TREE_BTN_CLOSE, icon: 'lucide-x', title: 'Close project' },
+    { testId: TEST_IDS.PROJECT_TREE_BTN_NEW_FILE, icon: 'lucide-file-plus', title: 'Create new markdown file' },
+    { testId: TEST_IDS.PROJECT_TREE_BTN_NEW_FOLDER, icon: 'lucide-folder-plus', title: 'Create new folder' },
+    { testId: TEST_IDS.PROJECT_TREE_BTN_REFRESH, icon: 'lucide-rotate-cw', title: 'Refresh (Ctrl+Alt+R)' }
+  ])('the unchanged $title button keeps $icon', async ({ testId, icon, title }) => {
+    await renderWithProjectOpen()
+
+    const button = screen.getByTestId(testId)
+    expect(lucideNames(button)).toEqual([icon])
+    expect(button).toHaveAttribute('title', title)
+  })
+
+  it('with no project open, Open project keeps folder-open', () => {
+    setupMockApi()
+    renderProjectTree()
+
+    const open = screen.getByTestId(TEST_IDS.PROJECT_TREE_BTN_OPEN)
+    expect(lucideNames(open)).toEqual(['lucide-folder-open'])
+    expect(open).toHaveAttribute('title', 'Open project')
+  })
+})
+
+describe('ProjectTree toolbar tooltips and busy ring (#452)', () => {
+  it('Import idle has the "Import a file" tooltip', async () => {
+    await renderWithProjectOpen()
+
+    expect(screen.getByTestId(TEST_IDS.PROJECT_TREE_BTN_IMPORT)).toHaveAttribute('title', 'Import a file')
+  })
+
+  it('Import busy has the busy tooltip, no glyph, and a ring hidden from assistive tech', async () => {
+    importState.isImporting = true
+    await renderWithProjectOpen()
+
+    const importBtn = screen.getByTestId(TEST_IDS.PROJECT_TREE_BTN_IMPORT)
+    expect(importBtn).toHaveAttribute('title', 'Importing file...')
+    expect(importBtn.querySelector('svg')).toBeNull()
+    expect(importBtn.querySelector('.icon-btn__busy-ring')).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('each filter cell keeps its tooltip', async () => {
+    await renderWithProjectOpen({ showControlPanel: true })
+
+    expect(screen.getByRole('radio', { name: 'All files' })).toHaveAttribute('title', 'Show all files and folders')
+    expect(screen.getByRole('radio', { name: 'Markdown only' }))
+      .toHaveAttribute('title', 'Show only markdown files and their folders')
   })
 })
 

@@ -15,6 +15,13 @@
  * runs the real Explain command from the preview context menu on a 150-line
  * paragraph, so the prompt goes through the real template, IPC and PTY.
  *
+ * The agent takes its input ~1 KiB per read, 50 ms apart, as ConPTY does, so
+ * the bug reproduces on every OS: an Enter on the old fixed 200 ms timer is
+ * still queued behind the paste and lands in the read with its end
+ * (AGENT-LINEBREAK). The agent reports how long the paste took to read, and the
+ * test checks that this outlasted the old 200 ms – otherwise it would prove
+ * nothing about the timer.
+ *
  * Uses the manual launch pattern of context-menu-explain.e2e.ts.
  */
 
@@ -51,6 +58,12 @@ const AGENT_SCRIPT = path.join(__dirname, 'fixtures', 'pasteSubmitAgent.cjs').re
 
 /** Long enough for a paste of this size on a loaded Windows host. */
 const SUBMIT_TIMEOUT_MS = 30_000
+
+/** The fixed Enter delay before #449 (ENTER_MIN_DELAY_MS in terminalInputSettle.ts). */
+const OLD_FIXED_ENTER_DELAY_MS = 200
+
+/** `AGENT-SUBMIT <characters> took=<ms>` – see pasteSubmitAgent.cjs. */
+const SUBMIT_LINE = /^AGENT-SUBMIT (\d+) took=(\d+)$/
 
 /**
  * Select the paragraph and fire the context menu on it in one step, so no
@@ -125,13 +138,18 @@ test.describe('Prompt commands submit by themselves (#449)', () => {
           message: 'the agent should report the prompt as submitted',
           timeout: SUBMIT_TIMEOUT_MS
         })
-        .toContainEqual(expect.stringMatching(/^AGENT-SUBMIT \d+$/))
+        .toContainEqual(expect.stringMatching(SUBMIT_LINE))
       const screen = (await terminal.readScreen()).lines.map((l) => l.trim())
       expect(screen, 'Enter must not arrive as a line break inside the paste').not.toContain('AGENT-LINEBREAK')
 
+      const submitted = screen.map((l) => SUBMIT_LINE.exec(l)).find((m) => m !== null)
       // The whole prompt arrived: the template plus every selected line
-      const submitted = screen.find((l) => l.startsWith('AGENT-SUBMIT '))
-      expect(Number(submitted?.split(' ')[1])).toBeGreaterThan(longParagraph.length)
+      expect(Number(submitted?.[1])).toBeGreaterThan(longParagraph.length)
+      // The paste was still being read when the old fixed Enter would have gone
+      expect(
+        Number(submitted?.[2]),
+        'the paste must outlast the old fixed Enter delay, or this test cannot catch #449'
+      ).toBeGreaterThan(OLD_FIXED_ENTER_DELAY_MS)
     } finally {
       await closeApp(electronApp, window)
       await cleanupProject()

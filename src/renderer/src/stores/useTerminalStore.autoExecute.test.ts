@@ -6,7 +6,8 @@ import {
   ENTER_MAX_DELAY_MS,
   ENTER_MIN_DELAY_MS,
   ENTER_MIN_QUIET_MS,
-  ENTER_NO_OUTPUT_DELAY_MS
+  ENTER_NO_OUTPUT_DELAY_MS,
+  ENTER_POLL_MS
 } from './terminalInputSettle'
 import type { ITerminalOperations } from '../interfaces/ITerminalOperations'
 
@@ -185,7 +186,9 @@ describe('useTerminalStore.sendToTerminal with autoExecute', () => {
 
     await Promise.all(promises)
 
-    // Verify - 6 writes total (3 text + 3 Enter)
+    // Verify - 6 writes total (3 text + 3 Enter). Counts only: the order
+    // (each Enter right after its own paste) is asserted, as a known bug, in
+    // useTerminalStore.autoExecute.paste.test.ts › two sends at once
     expect(writeCalls.length).toBe(6)
     expect(writeCalls).toContain('first')
     expect(writeCalls).toContain('second')
@@ -356,7 +359,14 @@ describe('useTerminalStore.sendToTerminal with autoExecute', () => {
       await vi.advanceTimersByTimeAsync(ENTER_MIN_DELAY_MS - 2)
       expect(enterSent()).toBe(false)
 
-      await vi.advanceTimersByTimeAsync(ENTER_MAX_DELAY_MS)
+      // …and once the echo is quiet it does go, within one poll of the quiet
+      // time – not at a cap. (ENTER_MIN_QUIET_MS > ENTER_MIN_DELAY_MS, so the
+      // quiet time, not the 200 ms floor, is what sets the moment here.)
+      await vi.advanceTimersByTimeAsync(1 + ENTER_MIN_QUIET_MS - ENTER_MIN_DELAY_MS)
+      expect(enterSent()).toBe(false)
+      await vi.advanceTimersByTimeAsync(ENTER_POLL_MS)
+      expect(enterSent()).toBe(true)
+      expect(mockWrite).toHaveBeenCalledTimes(2)
       await expect(promise).resolves.toBe(true)
     })
 

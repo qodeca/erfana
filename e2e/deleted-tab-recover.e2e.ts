@@ -16,16 +16,25 @@
  * look on the same clock, so by then the gone file has been looked for too.
  *
  * A tab the user typed in while it was deleted gets the "file changed on disk"
- * choice instead of the disk's text; that needs a restore inside the 2 s before
- * autosave writes the buffer back itself, so it is covered by unit tests
- * (`useFileWatcher.restore.test.ts`) rather than raced here.
+ * choice instead of the disk's text. Autosave fires 2 s after the last
+ * keystroke and would write the buffer back before the file returns, so that
+ * test removes the file's whole folder, as a branch switch does when the folder
+ * exists on one branch only: the autosave then fails (its toast is the wait
+ * condition) and backs off until the next edit, and the folder is put back only
+ * after that – no race with the autosave clock. The panel-level version, with
+ * both clocks on fake timers, is `MarkdownEditorPanel.deletedRecover.test.tsx`.
+ *
+ * A delete followed at once by the write back (`rm` then `writeFile`, back to
+ * back) may reach the tab as a delete or as a change, depending on the
+ * watcher's timing; either way the tab must end normal, with the new text.
  *
  * Waits are condition-based only (Playwright auto-waiting and `expect.poll`).
  */
 
-import { rm, writeFile } from 'fs/promises'
+import { mkdir, readFile, rm, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { test, expect } from './fixtures/index'
+import { toastWithText } from './utils/toast'
 import { ProjectTreePage } from './pages/project-tree.page'
 import { TabBarPage } from './pages/tab-bar.page'
 import { EditorPanelPage } from './pages/editor-panel.page'
@@ -89,6 +98,101 @@ test.describe('Editor tab whose file is deleted and comes back', () => {
 
     // The file that never came back still says so
     await expect(staysGoneDeleted).toBeVisible()
+  })
+})
+
+test.describe('Editor tab typed in while its file is gone', () => {
+  const BRANCH_TEXT = '# Typed\n\nFrom the other branch.\n'
+
+  test.use({
+    testProjectFiles: {
+      'drafts/typed.md': '# Typed\n\nOriginal body.\n',
+      'other.md': '# Other\n'
+    }
+  })
+
+  test('keeps the typed text and offers the conflict choice when the file comes back', async ({
+    windowWithTestProject: page,
+    testProject
+  }) => {
+    const tree = new ProjectTreePage(page)
+    const tabs = new TabBarPage(page)
+    const panel = new EditorPanelPage(page)
+    const monaco = new MonacoPage(page, new KeyboardHelper(page))
+    const drafts = join(testProject.path, 'drafts')
+    const typed = join(drafts, 'typed.md')
+    const deletedMarker = tabs.tab('typed.md').locator('.editor-tab-deleted')
+
+    await tree.expandTo(['drafts'])
+    await tree.fileRow('drafts/typed.md').click()
+    await tabs.waitForTab('typed.md')
+    await panel.waitForReady()
+    await panel.setViewMode('editor')
+    await monaco.waitForReady()
+
+    // The branch switch removes the file and its folder
+    await rm(drafts, { recursive: true })
+    await expect(deletedMarker).toBeVisible({ timeout: DELETE_BUDGET_MS })
+
+    // Typed while gone; the autosave has nowhere to land, says so and backs off
+    await monaco.appendContent('\nTYPED-WHILE-GONE\n')
+    await expect(toastWithText(page, 'its folder no longer exists on disk')).toBeVisible({
+      timeout: DELETE_BUDGET_MS
+    })
+    await expect(tabs.dirtyDot('typed.md')).toBeVisible()
+
+    // The switch completes: folder and file are back, with the other text
+    await mkdir(drafts, { recursive: true })
+    await writeFile(typed, BRANCH_TEXT, 'utf-8')
+
+    await expect(panel.conflictNotification()).toBeVisible({ timeout: RECOVER_BUDGET_MS })
+    await expect(deletedMarker).toHaveCount(0)
+    await expect(page.getByText(DELETED_BANNER)).toHaveCount(0)
+    // Nothing was overwritten in either direction
+    expect(await monaco.visibleText()).toContain('TYPED-WHILE-GONE')
+    expect(await monaco.visibleText()).not.toContain('From the other branch.')
+    expect(await readFile(typed, 'utf-8')).toBe(BRANCH_TEXT)
+    await expect(tabs.dirtyDot('typed.md')).toBeVisible()
+  })
+})
+
+test.describe('Editor tab whose file is deleted and written back at once', () => {
+  test.use({
+    testProjectFiles: {
+      'quick.md': '# Quick\n\nOriginal body.\n',
+      'other.md': '# Other\n'
+    }
+  })
+
+  test('ends normal with the new content, never left in the deleted state', async ({
+    windowWithTestProject: page,
+    testProject
+  }) => {
+    const tree = new ProjectTreePage(page)
+    const tabs = new TabBarPage(page)
+    const panel = new EditorPanelPage(page)
+    const monaco = new MonacoPage(page, new KeyboardHelper(page))
+    const quick = join(testProject.path, 'quick.md')
+
+    await tree.fileRow('quick.md').click()
+    await tabs.waitForTab('quick.md')
+    await panel.waitForReady()
+    await panel.setViewMode('editor')
+    await monaco.waitForReady()
+
+    // A checkout rewrites the file: unlink, then create, back to back
+    await rm(quick)
+    await writeFile(quick, '# Quick\n\nFrom the other branch.\n', 'utf-8')
+
+    await expect
+      .poll(async () => monaco.visibleText(), { timeout: RECOVER_BUDGET_MS })
+      .toContain('From the other branch.')
+    await expect(tabs.tab('quick.md').locator('.editor-tab-deleted')).toHaveCount(0, {
+      timeout: RECOVER_BUDGET_MS
+    })
+    await expect(page.getByText(DELETED_BANNER)).toHaveCount(0)
+    await expect(tabs.dirtyDot('quick.md')).toHaveCount(0)
+    await expect(panel.conflictNotification()).toHaveCount(0)
   })
 })
 

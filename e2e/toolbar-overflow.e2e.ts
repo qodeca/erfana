@@ -7,7 +7,10 @@
  * to the dock's minimum width, then checks each action the toolbar showed when
  * wide: either its button is whole inside the row, or the row's "More actions"
  * (…) menu lists it. Then drives the menu by keyboard and runs Maximize terminal
- * from it – the button #451 lost.
+ * from it – the button #451 lost. A real splitter drag with the menu open must
+ * close it and leave focus on …; and with the row held below the dock minimum
+ * (where Maximize finally moves), Maximize runs from the menu and its item's
+ * aria-checked follows the expanded state.
  *
  * The contract is the Toolbar overflow card
  * (docs/design-system/system/patterns/toolbar-overflow, decided 2026-11-03).
@@ -38,6 +41,23 @@ const DRAG_TO_MIN_PX = 1500
 
 /** The dock's minimum side-panel width is 170 px (`MIN_SIZES`); allow the sash. */
 const NARROW_MAX_PX = 200
+
+/**
+ * A terminal header narrower than the dock allows: padding (2 × 12) + icon (16)
+ * + gap (8) + … (24) = 72 px fits, Maximize beside … does not, so it moves.
+ */
+const BELOW_DOCK_MIN_ROW_PX = 80
+
+/** Splitter travel that widens the terminal without making every button fit. */
+const SMALL_DRAG_PX = 40
+
+/** Rendered width of the editor area; 0 while the terminal is maximized over it. */
+async function editorAreaWidth(page: Page): Promise<number> {
+  return page.evaluate((id) => {
+    const el = document.querySelector(`[data-testid="${id}"]`) as HTMLElement | null
+    return el?.offsetWidth ?? -1
+  }, TEST_IDS.EDITOR_AREA)
+}
 
 function unreachable(reach: Record<string, Reach>): string[] {
   return Object.entries(reach)
@@ -153,6 +173,65 @@ test.describe('Panel toolbar overflow (#451)', () => {
         await more.click()
         await expect(bars.menuItem('Lock scroll to bottom')).toHaveAttribute('aria-checked', String(!wasChecked))
         await win.keyboard.press('Escape')
+      })
+
+      await test.step('a real splitter drag while the menu is open closes it', async () => {
+        const more = bars.moreButton(bars.terminalHeader())
+        await more.focus()
+        await win.keyboard.press('ArrowDown')
+        await expect(bars.menu()).toBeVisible()
+        const before = (await terminalPanel.boundingBox())?.width ?? 0
+        await bars.dragPanelEdge(terminalPanel, 'left', -SMALL_DRAG_PX)
+        await expect.poll(async () => (await terminalPanel.boundingBox())?.width ?? 0).toBeGreaterThan(before)
+        await expect(bars.menu()).toHaveCount(0)
+        // Still too narrow for every button, so … stays. Focus is not checked here: pressing the
+        // mouse on the sash (not focusable) moves focus to the body, as any pointer press elsewhere does.
+        await expect(more).toBeVisible()
+      })
+
+      await test.step('a resize with no pointer press while the menu is open closes it, focus on …', async () => {
+        const row = bars.terminalHeader()
+        const more = bars.moreButton(row)
+        await more.focus()
+        await win.keyboard.press('ArrowDown')
+        await expect(bars.menu()).toBeVisible()
+        // The row's resize observer sees this exactly as it sees a panel narrowing (card: "Panel narrows").
+        await bars.constrainRow(row, BELOW_DOCK_MIN_ROW_PX)
+        await expect(bars.menu()).toHaveCount(0)
+        await expect(more).toBeFocused()
+        await bars.releaseRow(row)
+      })
+
+      await test.step('Maximize runs from the menu once it has moved; the item’s checked state follows', async () => {
+        const row = bars.terminalHeader()
+        const more = bars.moreButton(row)
+        await bars.constrainRow(row, BELOW_DOCK_MIN_ROW_PX)
+        await expect(terminal.expandButton()).toHaveCount(0)
+
+        await more.click()
+        const maximize = bars.menuItem('Maximize terminal')
+        await expect(maximize).toHaveAttribute('role', 'menuitemcheckbox')
+        await expect(maximize).toHaveAttribute('aria-checked', 'false')
+        await maximize.click()
+        await expect(bars.menu()).toHaveCount(0)
+        await expect.poll(() => editorAreaWidth(win)).toBe(0)
+        // Maximizing moves focus into the terminal on purpose (AppDockLayout: never strand focus on
+        // the hidden editor), so it does not return to … here.
+        await expect(win.locator('[data-testid="terminal-instance"] textarea')).toBeFocused()
+
+        // Expanding widens the panel; the row is held narrow so Maximize stays in the menu.
+        await bars.constrainRow(row, BELOW_DOCK_MIN_ROW_PX)
+        await more.click()
+        await expect(bars.menuItem('Maximize terminal')).toHaveAttribute('aria-checked', 'true')
+        await bars.menuItem('Maximize terminal').click()
+        await expect.poll(() => editorAreaWidth(win)).toBeGreaterThan(0)
+
+        await bars.constrainRow(row, BELOW_DOCK_MIN_ROW_PX)
+        await more.click()
+        await expect(bars.menuItem('Maximize terminal')).toHaveAttribute('aria-checked', 'false')
+        await win.keyboard.press('Escape')
+        await bars.releaseRow(row)
+        await expect(terminal.expandButton()).toBeVisible()
       })
     } finally {
       await closeApp(electronApp, window)
