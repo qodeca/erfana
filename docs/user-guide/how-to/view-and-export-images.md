@@ -20,7 +20,7 @@ Open an image from the project tree, then zoom, fit, export, or copy it from the
 
 ## What happens next / If something goes wrong
 
-The viewer refreshes files that change on disk and shows **Reloaded from disk**. If a file is deleted, a banner says "This file was deleted on disk." Restore the file, then select **Reload**.
+The viewer refreshes files that change on disk and shows **Reloaded from disk**. If a file is deleted, a banner says "This file was deleted on disk." When the file comes back – for example after a branch switch – the viewer shows it again on its own within about 2 seconds. To check at once, select **Reload**.
 
 ## Related
 

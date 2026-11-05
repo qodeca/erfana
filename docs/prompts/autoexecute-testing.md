@@ -150,7 +150,7 @@ beforeEach(() => {
     userInputById: new Map()
   })
   vi.clearAllMocks()
-  vi.useFakeTimers() // drives the 200ms delay
+  vi.useFakeTimers() // drives the wait before Enter
   mockWrite.mockResolvedValue({ success: true })
 })
 
@@ -209,6 +209,6 @@ The v0.3.4 coverage snapshot, its missing-branch note and test-performance figur
 ## See Also
 
 - [AutoExecute Overview](./autoexecute-overview.md) - Feature overview and architecture
-- [AutoExecute Technical](./autoexecute-technical.md) - Write pipeline and 200ms delay details
+- [AutoExecute Technical](./autoexecute-technical.md) - Write pipeline and Enter timing
 - [AutoExecute Reference](./autoexecute-reference.md) - Error handling and implementation files
 - [Testing Strategy](../testing/README.md) - Overall testing approach

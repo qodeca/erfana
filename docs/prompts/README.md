@@ -24,7 +24,7 @@ Templates split into two categories: **read-only** prompts (Explain, Ask, Prompt
 
 ### AutoExecute Implementation (v0.3.4)
 - [Overview](./autoexecute-overview.md) - Feature overview and architecture
-- [Technical Details](./autoexecute-technical.md) - Write pipeline and 200ms delay rationale
+- [Technical Details](./autoexecute-technical.md) - Write pipeline and Enter timing
 - [Testing](./autoexecute-testing.md) - Test coverage and mocking strategy
 - [Reference](./autoexecute-reference.md) - Error handling and implementation files
 

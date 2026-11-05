@@ -44,4 +44,4 @@ Erfana uses a Monaco text editor with Markdown formatting, a separate Find bar, 
 
 ## Save and close
 
-**What it does:** Autosave writes after two seconds idle and during continued editing at least every 30 seconds. <kbd>⌘S</kbd> / <kbd>Ctrl+S</kbd> saves the active buffer; <kbd>⌘W</kbd> / <kbd>Ctrl+W</kbd> closes the active tab. An unsaved tab asks before closing. If the file changes outside Erfana, a tab with no unsaved edits reloads it automatically; a tab with unsaved edits asks you to choose **Reload from Disk** or **Keep My Version**.
+**What it does:** Autosave writes after two seconds idle and during continued editing at least every 30 seconds. <kbd>⌘S</kbd> / <kbd>Ctrl+S</kbd> saves the active buffer; <kbd>⌘W</kbd> / <kbd>Ctrl+W</kbd> closes the active tab. An unsaved tab asks before closing. If the file changes outside Erfana, a tab with no unsaved edits reloads it automatically; a tab with unsaved edits asks you to choose **Reload from Disk** or **Keep My Version**. While a tab shows its file as deleted, autosave waits; <kbd>⌘S</kbd> / <kbd>Ctrl+S</kbd> still writes the file back.
