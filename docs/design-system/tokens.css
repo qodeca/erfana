@@ -421,6 +421,12 @@
   --input-height-md: 36px;
   --input-height-lg: 44px;
 
+  /* Toolbar tool size (#433, owner decision 2026-10-28): the one height of a
+     toolbar tool and of anything that lines up with one – a count button, a
+     menu button, a floating action. Equal to --input-height-sm, so a find
+     field in the row shares the tools' edges (Toolbar card). */
+  --toolbar-tool-height: var(--input-height-sm);
+
   /* HTML Preview comments (docs/designs/comments/html-preview-comments.md §10.9):
      the comment window's inline size and its cap, and the drawer's width */
   --comments-window-width: 360px;

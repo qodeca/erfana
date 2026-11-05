@@ -11,7 +11,6 @@ import { registerFileWatcherHandlers } from './ipc/file-watcher-handlers'
 import { registerDirectoryWatcherHandlers } from './ipc/directory-watcher-handlers'
 import { registerSettingsHandlers } from './ipc/settings-handlers'
 import { registerTerminalHandlers } from './ipc/terminal-handlers'
-import { registerTerminalScreenReaderHandlers } from './ipc/terminal-screen-reader-handlers'
 import { registerImportHandlers, registerDocumentImportHandlers } from './ipc/import-handlers'
 import { registerGitHandlers } from './ipc/git-handlers'
 import { registerGitWatcherHandlers } from './ipc/git-watcher-handlers'
@@ -512,7 +511,6 @@ app.whenReady().then(async () => {
   registerDirectoryWatcherHandlers()
   registerSettingsHandlers()
   registerTerminalHandlers(projectService.session)
-  registerTerminalScreenReaderHandlers()
   registerImportHandlers()
   registerDocumentImportHandlers()
   registerGitHandlers()

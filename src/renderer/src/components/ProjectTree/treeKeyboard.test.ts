@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest'
 import type { FileNode } from '../../../../preload/index'
 import { getBasename } from '../../utils/fileUtils'
 import { buildVisibleRows } from './visibleRows'
-import { resolveTreeKey, findTypeAheadMatch, isTypeAheadKey } from './treeKeyboard'
+import { resolveTreeKey, findTypeAheadMatch, isTypeAheadKey, isTreeDeleteKey } from './treeKeyboard'
 
 const file = (path: string): FileNode => ({ name: getBasename(path), path, type: 'file', extension: '.md' })
 const dir = (path: string, children: FileNode[]): FileNode => ({
@@ -136,5 +136,26 @@ describe('the keyboard and lazy-folder placeholder lines (#320)', () => {
   it('never matches the line in type-ahead', () => {
     expect(findTypeAheadMatch(withLine, 1, 'l')).toBeNull()
     expect(findTypeAheadMatch(withLine, 1, 'z')).toBe(3)
+  })
+})
+
+describe('the Delete key (#463)', () => {
+  it('asks to delete the focused file or folder with a bare Delete, on every platform', () => {
+    expect(resolveTreeKey(rows, 1, key('Delete'))).toEqual({ type: 'delete', index: 1 })
+    expect(resolveTreeKey(rows, 2, key('Delete'), true)).toEqual({ type: 'delete', index: 2 })
+  })
+
+  it('takes ⌘⌫ on macOS only', () => {
+    expect(resolveTreeKey(rows, 1, key('Backspace', { metaKey: true }), true)).toEqual({ type: 'delete', index: 1 })
+    expect(resolveTreeKey(rows, 1, key('Backspace', { metaKey: true }), false)).toBeNull()
+    expect(resolveTreeKey(rows, 1, key('Backspace'), true)).toBeNull()
+  })
+
+  it('leaves modified and auto-repeated presses alone', () => {
+    const held: Record<string, boolean>[] = [{ shiftKey: true }, { ctrlKey: true }, { altKey: true }, { metaKey: true }, { repeat: true }]
+    for (const mods of held) {
+      expect(isTreeDeleteKey(key('Delete', mods), false)).toBe(false)
+    }
+    expect(isTreeDeleteKey(key('Backspace', { metaKey: true, shiftKey: true }), true)).toBe(false)
   })
 })

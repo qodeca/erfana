@@ -423,7 +423,7 @@ describe('#41 capability registry - AC1/AC3/AC4/AC5/AC7', () => {
     ['claude-opus-4-6', STANDARD_WINDOW],
     ['claude-haiku-4-5', STANDARD_WINDOW],
     ['claude-opus-6', EXTENDED_WINDOW],
-    ['claude-opus-7', STANDARD_WINDOW],
+    ['claude-opus-7', EXTENDED_WINDOW],
     ['claude-zephyr-9', STANDARD_WINDOW],
     ['claude-opus-4', STANDARD_WINDOW],
     ['claude-opus-3', STANDARD_WINDOW]
@@ -487,14 +487,14 @@ describe('#41 capability registry - AC1/AC3/AC4/AC5/AC7', () => {
     )
   })
 
-  it("AC7: opts.forceStandard outranks a registry that says 1M (R0')", async () => {
-    const settingsPath = path.join(tmpDir, 'absent.json')
-    expect(
-      await detectWindowSize('claude-opus-5', 12_000, false, { settingsPath, forceStandard: true })
-    ).toBe(STANDARD_WINDOW)
+  it("AC7: forceStandard beats a settings [1m] on a dual-window model (R0')", async () => {
+    // Control: R3 upgrades Opus 4.6 without the pick. 1M-only: *.modelSelection.test.ts
+    const id = 'claude-opus-4-6'
+    const settingsPath = await writeSettings({ model: 'opus[1m]' })
+    expect(await detectWindowSize(id, 12_000, false, { settingsPath })).toBe(EXTENDED_WINDOW)
+    const opts = { settingsPath, forceStandard: true }
+    expect(await detectWindowSize(id, 12_000, false, opts)).toBe(STANDARD_WINDOW)
     // R0 still outranks R0': an explicit `[1m]` selection wins.
-    expect(
-      await detectWindowSize('claude-opus-5', 12_000, true, { settingsPath, forceStandard: true })
-    ).toBe(EXTENDED_WINDOW)
+    expect(await detectWindowSize(id, 12_000, true, opts)).toBe(EXTENDED_WINDOW)
   })
 })

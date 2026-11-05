@@ -61,7 +61,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | ID | Feature | Platforms | Source | Guide section |
 |---|---|---|---|---|
 | TREE-01 | Toolbar: Create new markdown file, Create new folder, Import a file, Refresh | all | ProjectTree.tsx | [reference/project-tree](./reference/project-tree.md#toolbar-and-filter) |
-| TREE-02 | Filter: All Files / Markdown Only | all | R/components/ProjectTree/ProjectTree.tsx | [how-to/organise-project-files](./how-to/organise-project-files.md#manage-files) |
+| TREE-02 | Filter: All files / Markdown only | all | R/components/ProjectTree/ProjectTree.tsx | [how-to/organise-project-files](./how-to/organise-project-files.md#manage-files) |
 | TREE-03 | Git badges on files and folders | all | ProjectTree/GitStatusBadge.tsx | [reference/project-tree](./reference/project-tree.md#git-badges-and-status) |
 | TREE-04 | Git status bar: branch, "Clean", detached HEAD, 10,000-file cap | all | ProjectTree/GitStatusBar.tsx | [reference/project-tree](./reference/project-tree.md#git-badges-and-status) |
 | TREE-05 | Sensitive-file and symlink icons | all | ProjectTreeNode.tsx | [reference/project-tree](./reference/project-tree.md#special-files-and-visibility) |
@@ -87,7 +87,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | ED-03 | Formatting toolbar: Bold, Italic, Strikethrough, Inline Code, Insert Link, Insert Image, Heading 1, Bullet List, Numbered List, Find | all | MarkdownToolbar.tsx | [reference/editor](./reference/editor.md#formatting-toolbar) |
 | ED-04 | Find bar: next/previous, case sensitive, whole word | all | R/components/Search/SearchBar.tsx | [how-to/edit-and-preview-markdown](./how-to/edit-and-preview-markdown.md#choose-a-view) |
 | ED-05 | Statistics bar: words, characters, lines, reading time, selection | all | R/components/Panels/DocumentStatsBar.tsx | [reference/editor](./reference/editor.md#statistics-bar) |
-| ED-06 | Editor right-click menu: prompt templates, Cut, Copy, Paste | all | R/components/ContextMenu/EditorContextMenu.tsx | [reference/menus](./reference/menus.md#editor-and-preview-context-menus) |
+| ED-06 | Editor right-click menu: prompt templates, Cut, Copy, Paste, Delete | all | R/components/ContextMenu/EditorContextMenu.tsx | [reference/menus](./reference/menus.md#editor-and-preview-context-menus) |
 | ED-07 | Scroll sync between editor and preview | all | hooks/useScrollSync.ts | [reference/editor](./reference/editor.md#view-modes-and-scroll-sync) |
 | ED-08 | Unsaved-changes prompt on closing a tab | all | R/components/Tabs/EditorTab.tsx | [how-to/edit-and-preview-markdown](./how-to/edit-and-preview-markdown.md#choose-a-view) |
 
@@ -99,7 +99,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | PV-02 | Frontmatter shown as a table | all | FrontmatterTable.tsx | [reference/markdown-preview](./reference/markdown-preview.md#markdown-and-frontmatter) |
 | PV-03 | Preserve line breaks option | all | Settings | [reference/settings](./reference/settings.md#editor) |
 | PV-04 | Links: anchors, project files inside the app, external links to the OS, unsafe links blocked | all | MarkdownPreview.tsx | [reference/markdown-preview](./reference/markdown-preview.md#links) |
-| PV-05 | Preview right-click menu: prompt templates, Copy selection | all | ContextMenu/PreviewContextMenu.tsx | [reference/menus](./reference/menus.md#editor-and-preview-context-menus) |
+| PV-05 | Preview right-click menu: prompt templates, Copy selection; opens without a selection too, its items disabled | all | ContextMenu/PreviewContextMenu.tsx | [reference/menus](./reference/menus.md#editor-and-preview-context-menus) |
 | PV-06 | Project images (relative path) shown and refreshed on change; outside, absolute and `file:` images show alt text (#71) | all | Editor/MarkdownImage.tsx | [reference/markdown-preview](./reference/markdown-preview.md#images) |
 | PV-07 | Comments in the Preview Only view, saved in the `.md` file: comment mode, comments on selected words, icons and underlines, the Comments list, threads; read-only while the editor has unsaved changes | all | M/services/comments/, S/markdownComments/, R/components/Comments/, Editor/markdownComments/ | [reference/markdown-preview](./reference/markdown-preview.md#comments) |
 | MM-01 | Mermaid diagrams with a toolbar: direction buttons, View fullscreen | all | MermaidToolbar.tsx | [how-to/work-with-mermaid-diagrams](./how-to/work-with-mermaid-diagrams.md#view-a-diagram) |
@@ -166,7 +166,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | TERM-10 | "Terminal not available": Recheck, Copy fix command | all | TerminalStatusContent.tsx | [reference/troubleshooting](./reference/troubleshooting.md#terminal-not-available) |
 | TERM-11 | Clean agent environment: Claude Code runs as a top-level session | all | M/services/TerminalService.ts | [Start your own agent](./how-erfana-works-with-agents.md#start-your-own-agent) |
 | TERM-12 | Restart terminal asks first while Claude Code runs, output follows input, or (macOS) a program runs | all | TerminalPanel/restartGuard.ts | [reference/terminal](./reference/terminal.md#header-controls) |
-| TERM-13 | Screen-reader mode: Auto / On / Off | all | R/hooks/useTerminalScreenReaderMode.ts | [reference/terminal](./reference/terminal.md#screen-readers) |
+| TERM-13 | Removed 2026-11-05 – screen-reader support dropped (#440); was screen-reader mode: Auto / On / Off | – | – | – |
 | TERM-14 | Web links: plain click opens a browser tab, Cmd/Ctrl-click the system browser | all | TerminalPanel/terminalLinks.ts | [reference/terminal](./reference/terminal.md#web-links) |
 | TERM-15 | Paste or drop of page-written or outside text with a line break or control character asks first | all | R/utils/terminalPasteGuard.ts, TerminalPanel/terminalPasteGuardAddon.ts | [reference/terminal](./reference/terminal.md#copy-and-paste) |
 
@@ -228,7 +228,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | SET-11 | Per project `.erfana/settings.json`: `watcher.ignoreList`, `tree.hiddenPatterns` (extend/replace), `htmlPreview.allowlist.origins` | JSON file | [reference/settings](./reference/settings.md#per-project-settings) |
 | SET-12 | Settings overlay: gear icon, Esc closes, no shortcut | – | [reference/settings](./reference/settings.md#editor) |
 | SET-13 | Import tools: PDF, images, Office (LibreOffice found / not found / unsafe), install hint per OS, Check again | status list + button | [reference/settings](./reference/settings.md#import-tools) |
-| SET-14 | Terminal > Screen reader mode | Auto / On / Off, Auto | [reference/settings](./reference/settings.md#terminal) |
+| SET-14 | Removed 2026-11-05 – screen-reader support dropped (#440); was Terminal > Screen reader mode | – | – |
 | SET-15 | Transcription > Cancel a model download | button while downloading | [reference/settings](./reference/settings.md#transcription) |
 | SET-16 | Comments > Comments in HTML preview, Your name, Your email (optional) | checkbox, on; two text fields, empty | [reference/settings](./reference/settings.md#comments) |
 | SET-17 | Comments > Comments in Markdown preview | checkbox, on | [reference/settings](./reference/settings.md#comments) |
@@ -280,7 +280,7 @@ Every row goes into `reference/keyboard-shortcuts.md` with macOS and Windows col
 | MENU-04 | View: Reload, Force Reload, Toggle DevTools, zoom, full screen | all | M/menu.ts | [reference/menus](./reference/menus.md#view-menu) |
 | MENU-05 | Window: Minimize, Zoom, Bring All to Front (macOS) / Close (Windows) | all | M/menu.ts | [reference/menus](./reference/menus.md#window-menu) |
 | MENU-06 | Tab right-click: Close, Close Others, Close All | all | R/components/Tabs/useTabContextMenu.tsx | [reference/menus](./reference/menus.md#tab-context-menu) |
-| MENU-07 | Text-box right-click in dialogs: Cut, Copy, Paste | all | ContextMenu/TextareaContextMenu.tsx | [reference/menus](./reference/menus.md#terminal-and-text-box-context-menus) |
+| MENU-07 | Text-box right-click in every text field: Cut, Copy, Paste, Delete | all | ContextMenu/TextareaContextMenu.tsx | [reference/menus](./reference/menus.md#terminal-and-text-box-context-menus) |
 | DLG-01 | New file, new folder, rename dialogs | all | Dialog/NewFileDialog.tsx, NewFolderDialog.tsx, RenameDialog.tsx | [how-to/organise-project-files](./how-to/organise-project-files.md#manage-files) |
 | DLG-02 | External link confirmation (native message box) | all | HTML preview | [how-to/preview-an-html-page](./how-to/preview-an-html-page.md#open-and-navigate-a-page) |
 

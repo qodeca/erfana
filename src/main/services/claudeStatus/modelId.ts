@@ -3,15 +3,8 @@
 /**
  * Shared Claude model-id parser + context-window capability registry (#41).
  *
- * Before this module three separate regexes each tried to understand a model id
- * (`ClaudeWindowDetector`, `friendlyModelName`, `ClaudeTranscriptParser`), all
- * assuming `claude-opus-4-8`. Current ids look like `claude-opus-5` (no minor),
- * so each failed differently: the meter scaled a 1M model to 200k and the label
- * fell back to the raw id. This module is the single parse and the single
- * window-policy entry point, so for ids the grammar ACCEPTS the label and the
- * window can no longer disagree. Ids it REFUSES still resolve by separate routes
- * and may differ: an over-length id, a bare alias and `claude-mythos-preview`
- * each get their label and their window from different fallbacks.
+ * The single parse and window-policy entry point that replaced three divergent regexes (design §1),
+ * so for ids the grammar ACCEPTS the label and the window cannot disagree. Ids it REFUSES (over-length, a bare alias, `claude-mythos-preview`) get both from separate fallbacks.
  *
  * PURE by contract: no fs, no network, no spawn, no logging, no Electron. Every
  * exported function is total — none throws, for any input.
@@ -37,6 +30,7 @@
  * @see docs/designs/context-meter/41-model-capability-registry.md §5, §6, §7, §8, §11
  */
 import { MAX_MODEL_ID_LENGTH } from '../../../shared/ipc/claude-status-schema'
+import { buildFamilyHeuristics, guessWindow } from './familyHeuristic'
 
 /** Standard Claude Code context window, in tokens. */
 const STANDARD = 200000 as const
@@ -52,7 +46,7 @@ type Window = typeof STANDARD | typeof EXTENDED
  * freshness test fails once it is more than 180 days stale, so a drifting lineup
  * breaks CI instead of quietly mis-metering.
  */
-export const CAPABILITIES_VERIFIED_ON = '2026-08-07'
+export const CAPABILITIES_VERIFIED_ON = '2026-11-03'
 
 /**
  * Bracketed variant tokens this parser understands. `1m` is the Claude Code
@@ -385,11 +379,10 @@ const EXACT_WINDOWS: Readonly<Record<string, Window>> = {
   'claude-opus-4-7': EXTENDED,
   /** @see https://platform.claude.com/docs/en/about-claude/models/overview — legacy table, 1M; covered by "Opus 4.7 and later". */
   'claude-opus-4-8': EXTENDED,
-  /**
-   * The #41 acceptance case.
-   * @see https://platform.claude.com/docs/en/about-claude/models/whats-new-opus-5 — "1M tokens is both the default and the maximum"
-   */
+  /** The #41 acceptance case. @see https://platform.claude.com/docs/en/about-claude/models/whats-new-opus-5 — "1M tokens is both the default and the maximum". */
   'claude-opus-5': EXTENDED,
+  /** #383. @see https://code.claude.com/docs/en/model-config — "Opus 4.7 and later run with the 1M window by default, with no `[1m]` suffix needed". */
+  'claude-opus-5-5': EXTENDED,
   /** @see https://platform.claude.com/docs/en/build-with-claude/context-windows — "Claude Sonnet 4.5 … 200k-token context window". */
   'claude-sonnet-4-5': STANDARD,
   /**
@@ -401,14 +394,22 @@ const EXACT_WINDOWS: Readonly<Record<string, Window>> = {
   'claude-sonnet-4-6': STANDARD,
   /** @see https://code.claude.com/docs/en/model-config — "no 200K variant, no `[1m]` suffix to select, and no usage credits required on any plan". */
   'claude-sonnet-5': EXTENDED,
-  /** @see https://platform.claude.com/docs/en/about-claude/models/overview — current comparison table, 200k. */
+  /** #383. @see https://code.claude.com/docs/en/model-config — "Sonnet 5 and later … run with the 1M window by default, with no `[1m]` suffix needed". */
+  'claude-sonnet-5-5': EXTENDED,
+  /** @see https://platform.claude.com/docs/en/build-with-claude/context-windows — "200k tokens for Claude Sonnet 4.5 (deprecated) and Claude Haiku 4.5". */
   'claude-haiku-4-5': STANDARD,
   /** @see https://platform.claude.com/docs/en/about-claude/models/overview — the API ID Haiku 4.5 ships under. */
   'claude-haiku-4-5-20251001': STANDARD,
+  /** #383, unlike Haiku 4.5. @see https://code.claude.com/docs/en/model-config — "Haiku 5.5 … run with the 1M window by default, with no `[1m]` suffix needed". */
+  'claude-haiku-5-5': EXTENDED,
   /** @see https://platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5-and-claude-mythos-5 — "a 1M token context window by default". */
   'claude-fable-5': EXTENDED,
+  /** #383. @see https://code.claude.com/docs/en/model-config — "Fable 5.1, Fable 5 … run with the 1M window by default, with no `[1m]` suffix needed". */
+  'claude-fable-5-1': EXTENDED,
   /** @see https://platform.claude.com/docs/en/build-with-claude/context-windows — "claude-fable-5 and claude-mythos-5 also have a 1M-token context window". */
-  'claude-mythos-5': EXTENDED
+  'claude-mythos-5': EXTENDED,
+  /** #383. @see https://platform.claude.com/docs/en/build-with-claude/context-windows — "Claude Fable 5.1, Claude Mythos 5.1 … have a 1M-token context window". */
+  'claude-mythos-5-1': EXTENDED
 }
 
 /**
@@ -443,33 +444,6 @@ export const REGISTRY_IDS_FOR_TESTS: readonly string[] = Object.freeze([
 ])
 
 /**
- * HEURISTIC — extrapolation for UNKNOWN ids only, never published capability.
- * The class boundary sits INSIDE a major (`claude-opus-4-6` is 200k, `4-7` is
- * 1M), so no per-family scalar can express the lineup; this states in one place
- * how far we will guess. Derived from {@link EXACT_WINDOWS} at load, so the two
- * cannot drift.
- */
-interface FamilyHeuristic {
-  /** Newest major present in the exact map for this family. */
-  newestKnownMajor: number
-  /** Window of that family's newest known entry — what an unknown newer id inherits. */
-  newestKnownWindow: Window
-  /** Newest known minor (and its window) per major present in the exact map. */
-  newestByMajor: ReadonlyMap<number, { minor: number; window: Window }>
-}
-
-/** Refuse to extrapolate more than this many majors past the newest known one. */
-const MAX_MAJOR_LOOKAHEAD = 1
-
-/**
- * Refuse to extrapolate more than this many MINORS past a known major's newest
- * entry — without it `claude-opus-4-99` would inherit 1M forever. The error is
- * ASYMMETRIC (§5.1): observation can only upgrade a window, so a wrong 1M
- * persists while a wrong 200k self-corrects once usage crosses 200k.
- */
-const MAX_MINOR_LOOKAHEAD = 4
-
-/**
  * {@link EXACT_WINDOWS} re-keyed on canonical id, so a published key written
  * without a minor (`claude-opus-5`) and the equivalent explicit form
  * (`claude-opus-5-0`) resolve to the same entry.
@@ -485,54 +459,17 @@ function buildExactLookup(): ReadonlyMap<string, Window> {
 
 const EXACT_LOOKUP = buildExactLookup()
 
-/** Mutable accumulator shape used only while building {@link FAMILY_HEURISTICS}. */
-interface MutableFamilyHeuristic {
-  newestKnownMajor: number
-  newestKnownWindow: Window
-  newestByMajor: Map<number, { minor: number; window: Window }>
-}
-
 /**
- * Build the per-family heuristic table from the exact map (single source of
- * truth). Accumulates into a mutable shape and widens to the readonly interface
- * on return, so no cast has to contradict the published type.
+ * HEURISTIC — the guess for UNKNOWN ids only, never published capability
+ * (`familyHeuristic.ts`, design §7.2). Derived from {@link EXACT_WINDOWS} at load,
+ * so the two cannot drift; the data itself stays private to this module.
  */
-function buildFamilyHeuristics(): ReadonlyMap<string, FamilyHeuristic> {
-  const byFamily = new Map<string, MutableFamilyHeuristic>()
-
-  for (const [id, window] of Object.entries(EXACT_WINDOWS)) {
+const FAMILY_HEURISTICS = buildFamilyHeuristics(
+  Object.entries(EXACT_WINDOWS).flatMap(([id, window]): Array<[ParsedModelId, Window]> => {
     const parsed = parseModelId(id)
-    if (parsed === null) continue
-
-    let entry = byFamily.get(parsed.family)
-    if (entry === undefined) {
-      entry = {
-        newestKnownMajor: parsed.major,
-        newestKnownWindow: window,
-        newestByMajor: new Map()
-      }
-      byFamily.set(parsed.family, entry)
-    }
-
-    // Compute what this major should hold, then write it — so the value is in
-    // hand without a read-back, and without an `undefined` branch that can never
-    // be taken standing in the code as if it were a real case.
-    const inMajor = entry.newestByMajor.get(parsed.major)
-    const newestInMajor =
-      inMajor === undefined || parsed.minor >= inMajor.minor
-        ? { minor: parsed.minor, window }
-        : inMajor
-    entry.newestByMajor.set(parsed.major, newestInMajor)
-    if (parsed.major >= entry.newestKnownMajor) {
-      entry.newestKnownMajor = parsed.major
-      entry.newestKnownWindow = newestInMajor.window
-    }
-  }
-
-  return byFamily
-}
-
-const FAMILY_HEURISTICS = buildFamilyHeuristics()
+    return parsed === null ? [] : [[parsed, window]]
+  })
+)
 
 /**
  * Look the parsed id up in the exact map, dated canonical id first, then its
@@ -546,42 +483,35 @@ function exactWindowFor(parsed: ParsedModelId): Window | undefined {
   return EXACT_LOOKUP.get(undatedKey(parsed.family, parsed.major, parsed.minor))
 }
 
-/**
- * Bounded extrapolation for an id the exact map does not list.
- *
- *  - Unknown point release of a KNOWN major, at or after that major's newest
- *    entry and within {@link MAX_MINOR_LOOKAHEAD} → inherit THAT MAJOR's window
- *    (`claude-opus-4-9` → 1M; `claude-opus-4-99` → no opinion).
- *  - Older unlisted id → no opinion; a legacy id is more likely 200k and "no
- *    opinion" already defaults safely.
- *  - UNKNOWN major within {@link MAX_MAJOR_LOOKAHEAD} → inherit the family's
- *    newest known window (`claude-opus-6`). This branch, and only this branch,
- *    consults the family-wide value; a known major is decided above.
- *  - Further out, or an unknown family → no opinion: two generations on the
- *    lineup may have restructured, and a table that extrapolates forever is how
- *    this bug's mirror image arises.
- */
-function heuristicWindowFor(parsed: ParsedModelId): Window | null {
-  const heuristic = FAMILY_HEURISTICS.get(parsed.family)
-  if (heuristic === undefined) return null
+/** Where a window answer came from; `guess` is the family heuristic (#383). */
+interface WindowAnswer {
+  window: Window | null
+  guess: boolean
+}
 
-  const inMajor = heuristic.newestByMajor.get(parsed.major)
-  if (inMajor !== undefined) {
-    const withinRange =
-      parsed.minor >= inMajor.minor && parsed.minor <= inMajor.minor + MAX_MINOR_LOOKAHEAD
-    return withinRange ? inMajor.window : null
-  }
+/** {@link windowForModelId} plus whether the answer is a family guess. */
+function answerFor(raw: string): WindowAnswer {
+  const stripped = stripModelVariants(raw)
+  if (stripped === null || stripped.base === '') return { window: null, guess: false }
 
-  const isWithinLookahead =
-    parsed.major > heuristic.newestKnownMajor &&
-    parsed.major <= heuristic.newestKnownMajor + MAX_MAJOR_LOOKAHEAD
-  return isWithinLookahead ? heuristic.newestKnownWindow : null
+  const undecomposable = UNDECOMPOSABLE_WINDOWS.get(stripped.base)
+  if (undecomposable !== undefined) return { window: undecomposable, guess: false }
+
+  const parsed = parseStrippedId(stripped.base, stripped.variants)
+  if (parsed === null) return { window: null, guess: false }
+
+  if (parsed.variants.includes(EXTENDED_VARIANT)) return { window: EXTENDED, guess: false }
+
+  const exact = exactWindowFor(parsed)
+  if (exact !== undefined) return { window: exact, guess: false }
+  const guessed = guessWindow(FAMILY_HEURISTICS, parsed)
+  return { window: guessed, guess: guessed !== null }
 }
 
 /**
  * THE single window-policy entry point (design §8, rules R1a–R1g). Resolution
  * order: length/shape guard → undecomposable-id map → grammar → recognised `1m`
- * variant → exact-id map → bounded family heuristic.
+ * variant → exact-id map → family heuristic (`familyHeuristic.ts`).
  *
  * @param raw Untrusted model id from a transcript or a `/model` selection.
  * @returns The window this id implies, or `null` for "no opinion" — the caller
@@ -589,18 +519,16 @@ function heuristicWindowFor(parsed: ParsedModelId): Window | null {
  *   settings.json `[1m]`) and finally to the safe 200k default. Never throws.
  */
 export function windowForModelId(raw: string): 200000 | 1000000 | null {
-  const stripped = stripModelVariants(raw)
-  if (stripped === null || stripped.base === '') return null
+  return answerFor(raw).window
+}
 
-  const undecomposable = UNDECOMPOSABLE_WINDOWS.get(stripped.base)
-  if (undecomposable !== undefined) return undecomposable
-
-  const parsed = parseStrippedId(stripped.base, stripped.variants)
-  if (parsed === null) return null
-
-  if (parsed.variants.includes(EXTENDED_VARIANT)) return EXTENDED
-
-  return exactWindowFor(parsed) ?? heuristicWindowFor(parsed)
+/**
+ * True iff {@link windowForModelId}'s answer for this id is the family GUESS
+ * rather than a listed row, so the meter must mark it `(inferred)` (#383).
+ * Never throws.
+ */
+export function isFamilyGuess(raw: string): boolean {
+  return answerFor(raw).guess
 }
 
 /**

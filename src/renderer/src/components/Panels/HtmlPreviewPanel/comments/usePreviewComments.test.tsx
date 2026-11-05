@@ -196,6 +196,18 @@ describe('usePreviewComments', () => {
     })
   })
 
+  it("#463 the menu's Copy selection asks main to copy in this tab's page, by panel id only", async () => {
+    const copySelection = vi.fn(async () => ({ ok: true }))
+    ;(window as unknown as { api: { preview: Record<string, unknown> } }).api.preview.copySelection = copySelection
+    render(<Harness onValue={onValue} />)
+    act(() => fake.emitDraft(menuDraft({ selection: true })))
+    expect(latest.layer.onCopySelection).toBeTypeOf('function')
+    act(() => latest.layer.onCopySelection?.())
+    await waitFor(() => expect(copySelection).toHaveBeenCalledWith(PANEL))
+    // Nothing else opened: no comment window.
+    expect(latest.layer.request).toBeNull()
+  })
+
   describe('S-03 a window opened from the page: which route it came by', () => {
     const iconDraft = { panelId: PANEL, kind: 'icon', point: { x: 1, y: 2 }, displayPath: 'index.html', filePath: 'index.html', frame: false, fileKey: 'f1', threadKeys: ['t1'], blockKeys: [] }
 

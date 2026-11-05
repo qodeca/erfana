@@ -3,6 +3,7 @@
 import { Copy, ClipboardPaste } from 'lucide-react'
 import { ContextMenu, type ContextMenuItem } from './ContextMenu'
 import { formatShortcut } from '../../utils/shortcutLabel'
+import { terminalPasteShortcut } from '../../utils/terminalClipboard.logic'
 import { TEST_IDS } from '../../constants/testids'
 
 interface TerminalContextMenuProps {
@@ -27,7 +28,9 @@ export function TerminalContextMenu({
   onClose
 }: TerminalContextMenuProps): JSX.Element {
   const copyShortcut = formatShortcut('C', { mod: true })
-  const pasteShortcut = formatShortcut('V', { mod: true })
+  // The paste key that really works here: Ctrl+Shift+V on Linux (#463)
+  const paste = terminalPasteShortcut()
+  const pasteShortcut = formatShortcut(paste.key, paste.modifiers)
 
   const items: ContextMenuItem[] = [
     {

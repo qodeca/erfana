@@ -12,6 +12,7 @@
  *
  * @see Issue #41 - Context meter reads the 200k window for Opus 5 sessions
  * @see Issue #49 - Model ids from Bedrock, Vertex and Foundry are not recognised
+ * @see Issue #383 - context meter shows 200k for newer Claude models and when /model names a 1M-only model
  * @see docs/designs/context-meter/41-model-capability-registry.md §9.1, §11, §13 (decision (e))
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -24,6 +25,7 @@ vi.mock('../LoggingService', () => ({
 }))
 
 import { parseTranscript } from './ClaudeTranscriptParser'
+import { detectWindowDetail, __resetSettingsCacheForTests } from './ClaudeWindowDetector'
 
 let tmpDir: string
 
@@ -271,5 +273,38 @@ describe('/model override - linear <command-args> extraction (security audit MED
       usedTokens: 42,
       modelForcedStandard: true
     })
+  })
+})
+
+describe('#383 - /model on a 1M-only model, real parser into the real detector', () => {
+  // The unit tests on each side use hand-built inputs; this pins the hand-off.
+  // The assistant turn is on a 200k model (Opus 4.6), so a dropped override, a
+  // lost `modelForcedStandard`, or an R0' that pins every pick at 200k all
+  // surface as a 200k window instead of the 1M asserted here.
+  beforeEach(() => __resetSettingsCacheForTests())
+  afterEach(() => __resetSettingsCacheForTests())
+
+  it('/model claude-opus-5-5 parses as a standard pick and is sized 1M by the registry (R1)', async () => {
+    const file = path.join(tmpDir, 'opus-5-5.jsonl')
+    await fs.writeFile(
+      file,
+      [assistantLine('claude-opus-4-6', 12_000), modelCommandLine('claude-opus-5-5')].join('\n'),
+      'utf8'
+    )
+
+    const parsed = await parseTranscript(file)
+    expect(parsed).toEqual({
+      modelId: 'claude-opus-5-5',
+      usedTokens: 12_000,
+      modelForcedStandard: true
+    })
+    if (parsed === null) throw new Error('unreachable: asserted above')
+
+    // Called exactly as ClaudeStatusService.resolveWindow does for a standard pick.
+    const detail = await detectWindowDetail(parsed.modelId, parsed.usedTokens, false, {
+      settingsPath: path.join(tmpDir, 'absent-settings.json'),
+      forceStandard: parsed.modelForcedStandard === true
+    })
+    expect(detail).toEqual({ windowSize: 1_000_000, corroborated: false, rule: 'R1' })
   })
 })

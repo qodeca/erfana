@@ -25,6 +25,8 @@
   border-bottom: var(--border-width) solid var(--color-border-default);
   font-weight: var(--font-semibold);
   text-transform: uppercase;
+  /* The button rhythm of this row, read by the toolbar overflow group (#451). */
+  --erf-toolbar-overflow-gap: var(--space-2);
 }
 
 .project-name {
@@ -88,6 +90,33 @@
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* Import while busy (#452): the Buttons card's busy ring in place of the glyph,
+   so a busy Import never looks like Refresh's arrows – with motion off it is a
+   still ring with a gap, which still differs from rotate-cw. */
+/* deviates: docs/design-system/system/components/button/index.html – an icon-only
+   button shows the busy ring in place of its glyph; the tree has no surface that
+   could show an import in progress (card Exceptions, "Import busy") */
+.icon-btn[aria-busy='true'] {
+  cursor: progress;
+}
+
+.icon-btn__busy-ring {
+  display: block;
+  box-sizing: border-box;
+  inline-size: var(--icon-size-xs);
+  block-size: var(--icon-size-xs);
+  border: var(--border-width-thick) solid currentColor;
+  border-block-start-color: transparent;
+  border-radius: var(--border-radius-circle);
+  animation: spin 0.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon-btn__busy-ring {
+    animation: none;
   }
 }
 
@@ -260,6 +289,30 @@
   opacity: 1;
 }
 
+/* The file in the active tab (#453): the selected tab's own 2px lime
+   underline, on the name only – never the icon or the git badge. Decided by
+   docs/design-system/system/components/tree-active-file/index.html; the row's
+   aria-current is the hook, so what is drawn is what is announced. */
+.project-tree-item[aria-current="true"] .file-name {
+  text-decoration-line: underline;
+  text-decoration-style: solid;
+  text-decoration-color: var(--color-accent-secondary);
+  text-decoration-thickness: var(--border-width-thick);
+  text-underline-offset: var(--space-2);
+  /* One unbroken line, like the tab's: a broken one reads as dashed (cut) */
+  text-decoration-skip-ink: none;
+  /* The name clips its overflow to elide its tail, and that clip would cut a
+     line drawn below the text: symmetric padding keeps it inside the box
+     without moving the text off centre (card § Measurements). */
+  padding-block: var(--space-2);
+}
+
+/* A hidden file's fade would fade the line with it: the active file shows at
+   full strength, as a hovered hidden file already does (card § Measurements). */
+.project-tree-item[aria-current="true"] .file-name.hidden-file {
+  opacity: 1;
+}
+
 /* Scrollbar styling */
 .project-tree-content::-webkit-scrollbar {
   width: var(--scrollbar-width);
@@ -301,56 +354,77 @@
   }
 }
 
-.control-panel-section {
+/* The "Show" filter (FileFilterChoice.tsx, #452) – the Segmented control card's
+   rules (docs/design-system/system/components/segmented/segmented.css): checked
+   is a fill AND a 2px lime bottom edge, never colour alone. */
+.file-filter {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-2);
+  min-inline-size: 0;
 }
 
-.control-panel-label {
-  font-size: var(--text-xs);
-  font-weight: var(--font-semibold);
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+.file-filter__label {
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  color: var(--color-text-tertiary);
 }
 
-.filter-options {
+.file-filter__cells {
   display: flex;
-  gap: var(--space-4);
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
-.filter-option {
-  flex: 1;
-  display: flex;
+.file-filter__cell {
+  flex: 1 1 0;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-3);
-  padding: var(--space-4) var(--space-6);
-  background: var(--color-bg-hover);
-  border: var(--border-width) solid var(--color-bg-active);
+  box-sizing: border-box;
+  block-size: var(--btn-height-sm);
+  padding: 0 var(--space-4);
+  margin: 0;
+  background: transparent;
+  border: var(--border-width) solid var(--color-border-subtle);
+  /* Every cell has its 2px bottom edge – quiet until checked, then lime – so
+     checking a cell changes a colour, not a height. */
+  border-block-end: var(--border-width-thick) solid var(--color-border-subtle);
   border-radius: var(--border-radius);
   color: var(--color-text-primary);
+  font-family: var(--font-sans);
   font-size: var(--text-sm);
-  font-weight: var(--font-medium);
+  line-height: var(--leading-none);
+  white-space: nowrap;
   cursor: pointer;
-  transition: all var(--transition-normal);
+  user-select: none;
 }
 
-.filter-option:hover {
+.file-filter__cell:hover {
   background: var(--color-bg-hover-solid);
-  border-color: var(--color-bg-active);
 }
 
-.filter-option.active {
-  background: var(--color-accent-drag-bg);
-  border-color: var(--color-accent-drag-border);
-  color: var(--color-accent-drag);
+.file-filter__cell:active {
+  background: var(--color-bg-active);
 }
 
-.filter-option.active:hover {
-  background: var(--color-brand-violet-muted);
-  border-color: var(--color-accent-drag);
+.file-filter__cell[aria-checked='true'] {
+  background: var(--color-bg-selected);
+  border-block-end-color: var(--color-brand-lime);
+  color: var(--color-text-emphasis);
+}
+
+.file-filter__cell:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+/* A Windows contrast theme drops every fill: the checked cell keeps its edge. */
+@media (forced-colors: active) {
+  .file-filter__cell[aria-checked='true'] {
+    border-block-end-color: Highlight;
+  }
 }
 
 /* ===================================================================

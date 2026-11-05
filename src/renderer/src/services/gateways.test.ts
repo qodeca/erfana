@@ -102,9 +102,7 @@ const TERMINAL_METHODS: Record<keyof TerminalBridge, true> = {
   onError: true,
   onClear: true,
   markClearComplete: true,
-  ackOutput: true,
-  getScreenReaderSupport: true,
-  onScreenReaderSupportChanged: true
+  ackOutput: true
 }
 
 const FILE_WATCH_METHODS: Record<keyof FileWatchBridge, true> = {
@@ -285,6 +283,7 @@ const PREVIEW_METHODS: Record<keyof PreviewBridge, true> = {
   exportPdf: true,
   navigate: true,
   focusPage: true,
+  copySelection: true,
   onFailuresChanged: true,
   onHostBlocked: true,
   onVisibilityApplied: true,

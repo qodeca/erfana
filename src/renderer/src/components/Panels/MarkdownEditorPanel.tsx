@@ -22,6 +22,7 @@ import { MonacoEditorHandle } from '../Editor/MonacoMarkdownEditor'
 import { MarkdownPreviewHandle } from '../Editor/MarkdownPreview'
 import { EditorContextMenu } from '../ContextMenu/EditorContextMenu'
 import { FileConflictNotification } from '../FileConflictNotification/FileConflictNotification'
+import { WatchStoppedNotice } from '../FileConflictNotification/WatchStoppedNotice'
 import { useDialog } from '../Dialog'
 import { useToast } from '../Toast/ToastContext'
 import { useProjectStore } from '../../stores/useProjectStore'
@@ -55,6 +56,7 @@ import { useMarkdownComments } from '../Editor/markdownComments/useMarkdownComme
 // Types and pure functions
 import type { ViewMode, EditorFile } from '../Editor/MarkdownEditorPanel/types'
 import { calculateStats, extractFileName, getDefaultViewMode, settleSavedFile, shouldRecreateParentDirs, shouldToastSaveError, trackSaveInFlight, type SaveTrigger } from './markdownEditorPanel.logic'
+import { shouldAutosave } from './autosaveGate'
 import { formatSaveError, loggableError } from '../../utils/errorUtils'
 import { formatTabTitle } from '../../utils/tabTitle'
 
@@ -203,7 +205,7 @@ export function MarkdownEditorPanel(
   const {
     externalChangeDetected,
     isFileDeleted,
-    isReloading,
+    isReloading, isWatchUnavailable, restartWatch,
     reloadFromDisk: handleReloadFromDisk, reloadIfUnedited,
     keepLocal: handleKeepLocal,
     dismissConflict,
@@ -247,10 +249,8 @@ export function MarkdownEditorPanel(
   const { isAutoSaving, setIsAutoSaving, holdAutoSave, signalChange } = useAutoSave(
     currentFile?.modified ?? false,
     async () => {
-      // A file that changed on disk while the tab holds unsaved edits waits for
-      // the user's choice in the conflict bar; an autosave would overwrite the
-      // newer file and dismiss the bar.
-      if (externalChangeDetected) return
+      // Never over a changed-on-disk conflict or a deleted file (#460)
+      if (!shouldAutosave(externalChangeDetected, isFileDeleted)) return
       // `false` (a failed write) makes autosave back off until the next edit
       return handleSaveRef.current('autosave')
     },
@@ -382,11 +382,11 @@ export function MarkdownEditorPanel(
     handleSaveRef.current = handleSave
   }, [handleSave])
 
-  // When the conflict bar goes away with edits still unsaved ("Keep My
-  // Version", Dismiss), autosave resumes without waiting for another keystroke.
+  // When the conflict bar or the deleted banner goes away with edits unsaved
+  // (Keep My Version, Dismiss, the file back), autosave resumes on its own.
   useEffect(() => {
-    if (!externalChangeDetected) signalChange()
-  }, [externalChangeDetected, signalChange])
+    if (shouldAutosave(externalChangeDetected, isFileDeleted)) signalChange()
+  }, [externalChangeDetected, isFileDeleted, signalChange])
 
   // Read-only during an autosave hold, including an editor that remounts
   // (view-mode switch) while the hold is active – see handleEditorMount
@@ -466,7 +466,8 @@ export function MarkdownEditorPanel(
     handleCloseEditorContextMenu,
     handleEditorCopy,
     handleEditorCut,
-    handleEditorPaste
+    handleEditorPaste,
+    handleEditorDelete
   } = useEditorContextMenu({ editorRef })
 
   // =========================================================================
@@ -675,8 +676,7 @@ export function MarkdownEditorPanel(
               onDismiss={dismissConflict}
             />
           )}
-
-          {/* File deleted warning */}
+          {isWatchUnavailable && <WatchStoppedNotice fileName={getBasename(currentFile.path) || 'File'} onReload={restartWatch} />}
           {isFileDeleted && (
             <div className="file-deleted-warning">
               <span>This file was deleted on disk. Save to restore it.</span>
@@ -724,7 +724,6 @@ export function MarkdownEditorPanel(
         <DocumentStatsBar stats={documentStats} selectedText={selectedText} />
       </EditorErrorBoundary>
 
-      {/* Editor context menu */}
       {editorContextMenu && currentFile?.path && (
         <EditorContextMenu
           x={editorContextMenu.x}
@@ -738,6 +737,7 @@ export function MarkdownEditorPanel(
           onCopy={handleEditorCopy}
           onCut={handleEditorCut}
           onPaste={handleEditorPaste}
+          onDelete={handleEditorDelete}
         />
       )}
     </div>

@@ -148,14 +148,24 @@ describe('Context Menu Strategies', () => {
       expect(items[1].label).toBe('Copy')
     })
 
-    it('should not include paste', () => {
+    // Paste is offered on file rows too and lands in the file's folder (#463)
+    it('should include paste when the clipboard has an item', () => {
       const node = createMockFileNode('test.md', 'file')
       vi.mocked(ctx.clipboard.hasClipboard).mockReturnValue(true)
 
       const items = strategy.build(node as FileNodeFile, ctx)
 
-      const pasteItem = items.find((item) => item.label === 'Paste')
-      expect(pasteItem).toBeUndefined()
+      const labels = items.filter((item) => !item.separator).map((item) => item.label)
+      expect(labels.slice(0, 3)).toEqual(['Cut', 'Copy', 'Paste'])
+    })
+
+    it('should not include paste when the clipboard is empty', () => {
+      const node = createMockFileNode('test.md', 'file')
+      vi.mocked(ctx.clipboard.hasClipboard).mockReturnValue(false)
+
+      const items = strategy.build(node as FileNodeFile, ctx)
+
+      expect(items.find((item) => item.label === 'Paste')).toBeUndefined()
     })
 
     it('should not include new file/folder', () => {

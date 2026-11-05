@@ -32,6 +32,7 @@ export const previewGateway: PreviewBridge = {
   exportPdf: (...args) => bridge().exportPdf(...args),
   navigate: (...args) => bridge().navigate(...args),
   focusPage: (...args) => bridge().focusPage(...args),
+  copySelection: (...args) => bridge().copySelection(...args),
   onFailuresChanged: (...args) => bridge().onFailuresChanged(...args),
   onHostBlocked: (...args) => bridge().onHostBlocked(...args),
   onVisibilityApplied: (...args) => bridge().onVisibilityApplied(...args),

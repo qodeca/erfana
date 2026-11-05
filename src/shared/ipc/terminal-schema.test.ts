@@ -5,7 +5,6 @@ import {
   TERMINAL_MAX_DIM,
   TERMINAL_OUTPUT_ACK_MAX_CHARS,
   TERMINAL_WRITE_MAX_CHARS,
-  ScreenReaderSupportSchema,
   TerminalCreateRequestSchema,
   TerminalCreateResponseSchema,
   TerminalIdSchema,
@@ -96,15 +95,6 @@ describe('write and resize', () => {
   })
 })
 
-describe('ScreenReaderSupportSchema (lens review [23])', () => {
-  it('accepts { enabled } only', () => {
-    expect(ScreenReaderSupportSchema.parse({ enabled: true })).toEqual({ enabled: true })
-    expect(ScreenReaderSupportSchema.safeParse({ enabled: 'yes' }).success).toBe(false)
-    expect(ScreenReaderSupportSchema.safeParse({ enabled: true, extra: 1 }).success).toBe(false)
-    expect(ScreenReaderSupportSchema.safeParse({}).success).toBe(false)
-  })
-})
-
 describe('compatibility and channel names', () => {
   it('re-exports the event schemas from schema.ts', () => {
     expect(legacy.TerminalDataSchema).toBe(moved.TerminalDataSchema)
@@ -124,12 +114,11 @@ describe('compatibility and channel names', () => {
         'terminal:list',
         'terminal:getActivity',
         'terminal:clearComplete',
-        'terminal:ackOutput',
-        'terminal:getScreenReaderSupport'
+        'terminal:ackOutput'
       ].sort()
     )
     expect(Object.values(TERMINAL_EVENTS).sort()).toEqual(
-      ['terminal:data', 'terminal:exit', 'terminal:error', 'terminal:clear', 'terminal:screenReaderSupportChanged'].sort()
+      ['terminal:data', 'terminal:exit', 'terminal:error', 'terminal:clear'].sort()
     )
   })
 })

@@ -188,7 +188,7 @@ export function FileSystemDialog({
   // Clipboard operations via the central textClipboard service (issue #203).
   // The hook supports HTMLInputElement and preserves cursor position; the
   // 255-char limit stays a silent product rule (no toast).
-  const { handleCut, handleCopy, handlePaste } = useTextareaClipboard({
+  const { handleCut, handleCopy, handlePaste, handleDelete } = useTextareaClipboard({
     textareaRef: inputRef,
     value: inputValue,
     setValue: setInputValue,
@@ -299,6 +299,7 @@ export function FileSystemDialog({
           onCut={handleCut}
           onCopy={handleCopy}
           onPaste={handlePaste}
+          onDelete={handleDelete}
           onClose={handleCloseContextMenu}
         />
       )}

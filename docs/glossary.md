@@ -39,7 +39,6 @@ Project-specific terminology used in Erfana documentation and code.
 | **tessdata** | Pre-trained Tesseract language models bundled in `resources/tessdata/` for offline OCR |
 | **Preview tab** | A dockview tab showing an HTML preview. It opens with a `preview-` panel id and keeps that id when it moves to another page, so never read a path back out of it |
 | **Import tools** | Settings section (#250) that lists which import formats work on this computer and whether LibreOffice was found, with an install hint per platform |
-| **Screen reader mode** | xterm.js option that keeps an offscreen accessibility tree of the terminal text so screen readers can read it. Setting `terminal.screenReaderMode`: `auto` (follows the OS on macOS and Windows), `on`, `off` |
 | **Native watcher** | The `native-recursive` directory-watch backend (`NativeRecursiveWatcher`, Node's `fs.watch`) used on macOS and Windows; Linux uses chokidar |
 | **Same-tab navigation** | Per-tab **Open links in this tab** mode of the HTML preview (#124): a plain link to another project page replaces the page in the same tab, which then has its own Back and Forward history. Off by default and kept in memory only |
 

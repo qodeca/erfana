@@ -63,6 +63,7 @@ export function moreMenuItems(facts: MoreMenuFacts, actions: MoreMenuActions): C
     label: preset.label,
     icon: preset.id === facts.widthPreset ? <Check {...ICON} /> : <span className="erf-brw-more__blank" />,
     checked: preset.id === facts.widthPreset,
+    checkKind: 'radio',
     action: () => actions.widthPreset(preset.id),
     ...(preset.reason === undefined ? {} : { reason: preset.reason })
   }))

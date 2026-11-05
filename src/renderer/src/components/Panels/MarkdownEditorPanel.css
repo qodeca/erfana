@@ -113,7 +113,7 @@
   align-items: center;
   justify-content: center;
   width: var(--btn-height-md);
-  height: 28px;
+  height: var(--toolbar-tool-height);
   padding: 0;
   background-color: transparent;
   border: none;

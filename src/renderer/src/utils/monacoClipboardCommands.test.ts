@@ -18,6 +18,7 @@ import {
   clipboardPaste,
   computePasteEndPosition,
   buildMonacoClipboardDeps,
+  clipboardDelete,
   type MonacoClipboardDeps,
   type MonacoRangeLike
 } from './monacoClipboardCommands'
@@ -316,6 +317,29 @@ describe('monacoClipboardCommands', () => {
 
       expect(typeof deps.clipboard.readText).toBe('function')
       expect(typeof deps.clipboard.writeText).toBe('function')
+    })
+  })
+
+  describe('clipboardDelete (#463)', () => {
+    it('deletes the selection without touching the clipboard', () => {
+      clipboardDelete(deps)
+
+      expect(deps.executeEdits).toHaveBeenCalledWith(SELECTION, '')
+      expect(deps.clipboard.writeText).not.toHaveBeenCalled()
+    })
+
+    it('does nothing with an empty selection – never a character beside the caret', () => {
+      deps.isSelectionEmpty.mockReturnValue(true)
+      clipboardDelete(deps)
+      expect(deps.executeEdits).not.toHaveBeenCalled()
+    })
+
+    it('does nothing without a selection or in a read-only editor', () => {
+      deps.getSelection.mockReturnValue(null)
+      clipboardDelete(deps)
+      deps = createDeps({ isReadOnly: vi.fn(() => true) })
+      clipboardDelete(deps)
+      expect(deps.executeEdits).not.toHaveBeenCalled()
     })
   })
 })

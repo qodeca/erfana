@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { IDockviewPanelProps } from 'dockview'
-import { Folder, Clock, X, FileUp, FolderOpen, Replace } from 'lucide-react'
+import { Folder, Clock, X, FileInput, FolderOpen, Replace } from 'lucide-react'
 import { useState, useEffect, useCallback, useRef, useId } from 'react'
 import { useProjectStore } from '../../stores/useProjectStore'
 import { useOpenProjectByPath, useProjectManagementContext } from '../../context/ProjectManagementContext'
@@ -314,7 +314,7 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
                 title={isImporting ? 'Importing file...' : 'Import a file'}
                 data-testid={TEST_IDS.WELCOME_BTN_IMPORT}
               >
-                <FileUp size={16} />
+                <FileInput size={16} />
                 {isImporting ? 'Importing...' : 'Import...'}
               </button>
             )}

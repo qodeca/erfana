@@ -39,7 +39,26 @@
   flex-direction: column;
 }
 
-/* Control Panel Chevron in Header */
+/* "Markdown only" while that filter is on – the Badge card's outline chip (#452) */
+.project-filter-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  border: var(--border-width) solid var(--color-accent-primary);
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  /* The header row sets uppercase; the chip says its words as written. */
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: nowrap;
+}
+
+/* The file-filter trigger in the header: a button with aria-expanded (#452) */
 .control-panel-chevron {
   display: inline-flex;
   align-items: center;
@@ -55,6 +74,11 @@
   transition: var(--transition-normal);
 }
 
+.control-panel-chevron:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
 .control-panel-chevron:hover {
   color: var(--color-text-primary);
   background: var(--color-bg-hover);
@@ -62,4 +86,14 @@
 
 .control-panel-chevron:active {
   background: var(--color-bg-active);
+}
+
+.control-panel-chevron[aria-expanded='true'] {
+  color: var(--color-text-bright);
+  background: var(--color-bg-hover-solid);
+}
+
+.control-panel-chevron:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }

@@ -59,17 +59,16 @@ import { fileCommentGateway } from '../../../services/comments/fileCommentGatewa
 import { useCommentSettleNotices } from '../useCommentSettleNotices'
 import type { AnchorSelection } from '../../../../../shared/comments/anchorSel'
 import { pointerOnLines } from '../../../../../shared/comments/overlayCore/selectionRules'
-import { commentMarkAt } from './commentHighlights'
 import { targetText } from './domWords'
 import { areaBox, useNotVisible } from './hostDrawer'
-import { draftKeyOf, noNewCommentText, pointOf, spokenTarget, threadsOn, toolbarCounts, unavailableOf, viewOf } from './hostParts'
+import { draftKeyOf, noNewCommentText, pointOf, threadsOn, toolbarCounts, unavailableOf, viewOf } from './hostParts'
 import { hostMenuItems, hostMenuLabel, targetlessMenu } from './hostMenu'
 import { drawn, newRequestExtras, newTargetOf, threadTarget, useDraftKeepAlive, windowTargetOf, type HostDock } from './hostWindow'
 import type { CommentOverlayHost, CommentOverlayHostOptions, HostMenu } from './hostTypes'
 import { useSelectionComments, useWordsCheck } from './useSelectionComments'
 import { nounTargetOf } from './previewAdapter'
 import { useHostCommentMode } from './useHostCommentMode'
-import { useHostPointerKeys } from './useHostPointerKeys'
+import { useHostPointer } from './hostPointerOptions'
 import { useHostList } from './useHostList'
 import { useSavingSign } from './useSavingSign'
 import { useHostThreads } from './useHostThreads'
@@ -245,31 +244,16 @@ export function useCommentOverlayHost(options: CommentOverlayHostOptions): Comme
 
   const panelKeys = useHostPanelKeys({ live, adapter, file, placements, drawerId, reveal: reveal.showThread, openThreads: openStepped, mode, windowOpen: request !== null, menuOpen: menu !== null, leaveMode: () => (setMode(false), announce(ANNOUNCE.modeOff)), closeWindow: () => setRequest(null) })
 
-  const pointer = useHostPointerKeys({
-    live,
-    mode,
-    activePanel,
-    adapter,
-    scroller,
+  const pointer = useHostPointer({
+    ...{ live, mode, activePanel, adapter, scroller, placements, file, markOwner, selection, setMode, openThreads },
     scrollerLabel: options.scrollerLabel,
     windowOpen: request !== null || menu !== null,
     onToggleMode: toggleMode,
-    onExit: () => {
-      setMode(false)
-      announce(ANNOUNCE.modeOff)
-      modeButtonRef.current?.focus()
-    },
     onWindowEscape: panelKeys.dismissWindow,
     onPick: pickTarget,
-    speak: target => spokenTarget(target, adapter, placements, file),
-    markAt: (x, y) => commentMarkAt(markOwner, x, y),
-    onOpenMark: (threadKey, at) => openThreads([threadKey], at),
     onMenu: openMenu,
-    selectionRect: () => selection.read()?.rect ?? null,
-    selectionTarget: () => selection.readInView()?.target ?? null,
-    onSelectionAt: (x, y) => pointerOnLines(selection.read()?.lines ?? [], { x, y }),
     onSay: announce,
-    onKeyMove: selection.hideButton,
+    modeButton: () => modeButtonRef.current,
     onScroll: () => setScrollTick(n => n + 1)
   })
   useEffect(() => {

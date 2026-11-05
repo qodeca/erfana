@@ -4,7 +4,7 @@
  * Editor Context Menu Hook
  *
  * Manages the state and handlers for the Monaco editor's custom context menu.
- * Provides cut, copy (via EditorContextMenu), and paste functionality.
+ * Provides cut, copy (via EditorContextMenu), paste and delete functionality.
  *
  * @module useEditorContextMenu
  */
@@ -13,6 +13,7 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   clipboardCopy,
   clipboardCut,
+  clipboardDelete,
   clipboardPaste,
   buildMonacoClipboardDeps
 } from '../utils/monacoClipboardCommands'
@@ -58,6 +59,8 @@ export interface UseEditorContextMenuReturn {
   handleEditorCut: () => Promise<void>
   /** Handler for paste action (inserts clipboard content) */
   handleEditorPaste: () => Promise<void>
+  /** Handler for delete action (removes the selection, clipboard untouched) */
+  handleEditorDelete: () => void
 }
 
 /**
@@ -189,12 +192,25 @@ export function useEditorContextMenu(
     await clipboardPaste(buildMonacoClipboardDeps(editor, monaco))
   }, [editorRef])
 
+  /**
+   * Handle delete action from the context menu: the shared pure
+   * `clipboardDelete`, so the read-only and empty-selection guards match cut.
+   */
+  const handleEditorDelete = useCallback(() => {
+    const editor = editorRef.current?.getEditor()
+    const monaco = editorRef.current?.getMonaco()
+    if (!editor || !monaco) return
+
+    clipboardDelete(buildMonacoClipboardDeps(editor, monaco))
+  }, [editorRef])
+
   return {
     editorContextMenu,
     handleEditorContextMenu,
     handleCloseEditorContextMenu,
     handleEditorCopy,
     handleEditorCut,
-    handleEditorPaste
+    handleEditorPaste,
+    handleEditorDelete
   }
 }

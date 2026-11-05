@@ -104,9 +104,9 @@ test.describe('Claims: developer docs (dev-1)', () => {
     }
   })
 
-  test('e2e/ holds 76 *.e2e.ts specs (docs/testing/README.md)', () => {
+  test('e2e/ holds 84 *.e2e.ts specs (docs/testing/README.md)', () => {
     const specs = fs.readdirSync(path.join(ROOT, 'e2e')).filter((f) => f.endsWith('.e2e.ts'))
-    expect(specs.length).toBe(76)
+    expect(specs.length).toBe(84)
   })
 
   test('both darwin and win32 baselines are committed for all six visual states', () => {

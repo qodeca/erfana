@@ -245,12 +245,14 @@ test.describe('HTML Preview comments – the reviewer path (P6 exit)', () => {
     await turnOnCommentMode(preview, page, app, panelId)
 
     // Hover, then right-click the paragraph: Erfana's element menu opens with
-    // exactly one item (R-001).
+    // Add comment (R-001) and, since #463, Copy selection – disabled here, as
+    // nothing is selected.
     const target = HtmlPreviewPage.target(PAGE)
     expect(await rightClickAt(app, 'target', target), '#target not found').toBe(true)
     const menu = page.getByTestId('comment-context-menu')
     await expect(menu).toBeVisible({ timeout: PREVIEW_BUDGET_MS })
-    await expect(menu.getByRole('menuitem')).toHaveCount(1)
+    await expect(menu.getByRole('menuitem')).toHaveText(['Add comment', /^Copy selection/])
+    await expect(menu.getByRole('menuitem', { name: /^Copy selection/ })).toBeDisabled()
     await menu.getByTestId('comment-menu-add').click()
 
     // The identity is unset, so the first comment asks for a name first,

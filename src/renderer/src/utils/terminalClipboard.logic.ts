@@ -5,13 +5,16 @@
  * Extracted for testability without React/xterm dependencies.
  */
 
-import { isMacOS } from './platform'
+import { isMacOS, isWindows } from './platform'
+import type { ShortcutModifiers } from './shortcutLabel'
 
 export interface KeyEventInfo {
   key: string
   ctrlKey: boolean
   metaKey: boolean
   shiftKey: boolean
+  /** Alt (Option on macOS). AltGr on Windows arrives as Ctrl+Alt, so a chord with it is never a clipboard shortcut. */
+  altKey?: boolean
 }
 
 export type ClipboardAction = 'copy' | 'paste' | 'none'
@@ -19,13 +22,22 @@ export type ClipboardAction = 'copy' | 'paste' | 'none'
 /**
  * Determines clipboard action from keyboard event.
  *
- * Logic:
- * - Ctrl+Shift+C/V: Explicit copy/paste (all platforms) - we handle these
- * - macOS Cmd+C: Copy (if selection) - we handle for toast + clear selection
- * - Windows/Linux Ctrl+C: Copy (if selection) - we handle for toast + clear selection
- * - Cmd+V / Ctrl+V: Returns 'none' - let xterm.js handle native paste
- *   (Intercepting these causes double-paste: our handler + native paste event)
- * - Ctrl+C without selection: Returns 'none' to allow SIGINT pass-through
+ * Decision table (#463, owner decisions of 2026-11-04):
+ *
+ * | Keys | macOS | Windows | Linux |
+ * |---|---|---|---|
+ * | Ctrl+Shift+C | copy | copy | copy |
+ * | Ctrl+Shift+V | paste | paste | paste |
+ * | Cmd+C | copy with a selection | – | – |
+ * | Cmd+V | none: the native paste event pastes | – | – |
+ * | Ctrl+C | none (^C) | copy with a selection, else none (interrupt) | same as Windows |
+ * | Ctrl+V | none (^V) | paste | none (^V, as in other Linux terminals) |
+ * | Shift+Insert | none | paste | paste |
+ *
+ * Every chord that also holds Alt is `none`. Cmd+V stays with xterm on macOS
+ * because it produces no key there and the native paste event pastes once;
+ * Ctrl+V on Windows produces `^V` in xterm and no paste event, so it must be
+ * handled here.
  *
  * @param event Key event information
  * @param hasSelection Whether terminal has text selected
@@ -39,14 +51,14 @@ export function getClipboardAction(
   hasSelection: boolean,
   platform?: NodeJS.Platform
 ): ClipboardAction {
-  // Resolve the macOS-ness once so the decision table below stays
-  // behaviorally identical regardless of how platform was supplied.
   const isMac = isMacOS(platform)
-  const { key, ctrlKey, metaKey, shiftKey } = event
+  const isWin = isWindows(platform)
+  const { key, ctrlKey, metaKey, shiftKey, altKey = false } = event
   const keyLower = key.toLowerCase()
 
+  if (altKey) return 'none'
+
   // Explicit shortcuts: Ctrl+Shift+C/V work on all platforms
-  // We handle these because they won't trigger native paste event
   if (ctrlKey && shiftKey) {
     if (keyLower === 'c') return 'copy'
     if (keyLower === 'v') return 'paste'
@@ -55,13 +67,16 @@ export function getClipboardAction(
   // macOS: Cmd+C (copy only, let native handle Cmd+V paste)
   if (isMac && metaKey && !ctrlKey && !shiftKey) {
     if (keyLower === 'c') return hasSelection ? 'copy' : 'none'
-    // Cmd+V: return 'none' to let xterm handle native paste
   }
 
-  // Windows/Linux: Ctrl+C (copy only, let native handle Ctrl+V paste)
-  if (!isMac && ctrlKey && !shiftKey && !metaKey) {
-    if (keyLower === 'c') return hasSelection ? 'copy' : 'none'
-    // Ctrl+V: return 'none' to let xterm handle native paste
+  if (!isMac) {
+    // Ctrl+C copies a selection and interrupts without one; Ctrl+V pastes on Windows
+    if (ctrlKey && !shiftKey && !metaKey) {
+      if (keyLower === 'c') return hasSelection ? 'copy' : 'none'
+      if (keyLower === 'v' && isWin) return 'paste'
+    }
+    // Shift+Insert: the classic paste key on Windows and Linux
+    if (shiftKey && !ctrlKey && !metaKey && key === 'Insert') return 'paste'
   }
 
   return 'none'
@@ -82,4 +97,17 @@ export function shouldPassThrough(
   platform?: NodeJS.Platform
 ): boolean {
   return getClipboardAction(event, hasSelection, platform) === 'none'
+}
+
+/**
+ * The paste shortcut the terminal menu shows: the one that really pastes on
+ * this platform (#463). Ctrl+V on Windows, Ctrl+Shift+V on Linux (Ctrl+V sends
+ * ^V there), ⌘V on macOS.
+ *
+ * @param platform Optional platform override, for tests
+ * @returns The key and modifiers for `formatShortcut`
+ */
+export function terminalPasteShortcut(platform?: NodeJS.Platform): { key: string; modifiers: ShortcutModifiers } {
+  const linux = !isMacOS(platform) && !isWindows(platform)
+  return { key: 'V', modifiers: linux ? { mod: true, shift: true } : { mod: true } }
 }

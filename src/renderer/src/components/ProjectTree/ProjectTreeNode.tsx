@@ -92,6 +92,12 @@ interface ProjectTreeNodeProps {
   isSelected: boolean
   /** The one row that holds the tree's Tab stop (roving tabindex) */
   isTabStop: boolean
+  /**
+   * The file in the active tab (#453). Drives `aria-current`, which is also
+   * the style hook, so what is drawn – the lime underline of the Active file
+   * in the tree card – is exactly what is announced.
+   */
+  isRevealed?: boolean
   onFileClick: (filePath: string) => void
   onContextMenu?: (e: React.MouseEvent, node: FileNode) => void
   onToggleFolder: (folderPath: string) => void
@@ -144,6 +150,7 @@ function ProjectTreeNodeRow({
   isBusy = false,
   isSelected,
   isTabStop,
+  isRevealed = false,
   onFileClick,
   onContextMenu,
   onToggleFolder,
@@ -276,6 +283,7 @@ function ProjectTreeNodeRow({
         aria-expanded={node.type === 'directory' ? isExpanded : undefined}
         aria-busy={isBusy ? true : undefined}
         aria-selected={isSelected}
+        aria-current={isRevealed ? 'true' : undefined}
         tabIndex={isTabStop ? 0 : -1}
         onClick={handleClick}
         onContextMenu={handleContextMenu}

@@ -173,6 +173,29 @@ describe('Markdown Preview comments – comments-v2', () => {
       expect(api.openDraft).not.toHaveBeenCalled()
     })
 
+    it('C-17 (Markdown) Esc on the preview closes a window opened outside comment mode, and its release never reaches the preview (#445)', async () => {
+      const user = userEvent.setup()
+      await ready()
+      caretAt(paragraph(), paragraph().textContent!.indexOf('customers'))
+      plainClick(paragraph())
+      expect(await screen.findByRole('dialog', { name: 'Comment on paragraph' })).toBeVisible()
+      const leaked: string[] = []
+      const onKeyUp = (event: KeyboardEvent): void => {
+        if (event.key === 'Escape') leaked.push(event.type)
+      }
+      document.addEventListener('keyup', onKeyUp)
+      try {
+        // A mark is not a tab stop outside the mode: the click leaves focus on the scroller (C-08.1)
+        act(() => paragraph().closest<HTMLElement>('[tabindex]')!.focus())
+        await user.keyboard('{Escape}')
+        await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Comment on paragraph' })).toBeNull())
+        expect(leaked).toEqual([])
+        expect(modeTool()).toHaveAttribute('aria-pressed', 'false')
+      } finally {
+        document.removeEventListener('keyup', onKeyUp)
+      }
+    })
+
     it('C-17 (Markdown) in comment mode a click on the words opens that thread only', async () => {
       const user = userEvent.setup()
       await ready()

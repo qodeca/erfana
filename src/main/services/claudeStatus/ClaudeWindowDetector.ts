@@ -22,7 +22,9 @@
  *         "250k / 200k" — 100%, red, and stuck for the session. That is the #41
  *         failure class re-entered by another door.
  *  R0.    A fresh `/model …[1m]` override (`forceExtended`) → 1M.
- *  R0'.   An explicit standard-mode `/model <id>` (`opts.forceStandard`) → 200k.
+ *  R0'.   An explicit standard-mode `/model <id>` (`opts.forceStandard`) → 200k,
+ *         unless the registry says the model runs at 1M with no `[1m]` to
+ *         select (Opus 5, Sonnet 5): that pick lands on 1M, so R1 decides (#383).
  *  R1m.   The model id itself carries a recognised `1m` variant → 1M. Explicit
  *         CONFIGURATION, so corroborated like R3, not inferred like R1.
  *  R1.    The shared capability registry ({@link windowForModelId}) says 1M → 1M.
@@ -197,8 +199,10 @@ export function windowIsCorroborated(usedTokens: number, forceExtended = false):
  * @param opts.now Injected clock (defaults to `Date.now`) controlling the
  *   settings-cache TTL; test-only.
  * @param opts.forceStandard R0' — the user explicitly selected standard mode via
- *   `/model <id>` with no 1M marker, which outranks the registry. Rides in
- *   `opts` so the positional signature stays exactly as callers pin it.
+ *   `/model <id>` with no 1M marker. Decides 200k only for a model the registry
+ *   does not size at 1M; a 1M-only model has no standard window to select
+ *   (#383). Rides in `opts` so the positional signature stays exactly as
+ *   callers pin it.
  * @returns {@link EXTENDED_WINDOW} if a 1M signal holds; else
  *   {@link STANDARD_WINDOW}. Never throws.
  */
@@ -261,9 +265,13 @@ export async function detectWindowDetail(
     return { windowSize: EXTENDED_WINDOW, corroborated: true, rule: 'R0' }
   }
 
-  // R0': the mirror image — an explicit standard-mode selection outranks a
-  // registry that would otherwise report 1M for this model.
-  if (opts?.forceStandard) {
+  // R0': the mirror image — an explicit `/model <id>` with no 1M marker selects
+  // the standard window, but ONLY for a model that has one to select (#383).
+  // A registry 1M — an exact row, or the bounded guess for an unlisted id — means
+  // 1M with no `[1m]` selection (design §2.0.2), so for such a model the same
+  // pick lands on 1M and falls through to R1 below. Forcing 200k there pinned
+  // Opus 5 at 200k. A dual-window model (Opus 4.6) still gets 200k here.
+  if (opts?.forceStandard && windowForModelId(modelId) !== EXTENDED_WINDOW) {
     return { windowSize: STANDARD_WINDOW, corroborated: false, rule: 'R0prime' }
   }
 

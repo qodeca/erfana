@@ -121,7 +121,8 @@ export function useTerminalClipboard(
       key: event.key,
       ctrlKey: event.ctrlKey,
       metaKey: event.metaKey,
-      shiftKey: event.shiftKey
+      shiftKey: event.shiftKey,
+      altKey: event.altKey
     }
 
     // Check selection state on-demand (more reliable than state)
@@ -131,6 +132,13 @@ export function useTerminalClipboard(
     if (shouldPassThrough(eventInfo, currentHasSelection)) {
       return true
     }
+
+    // xterm calls this for keydown, keypress and keyup. Act once, on keydown,
+    // and swallow the rest of the chord so the shell never sees half of it.
+    // preventDefault stops the browser's own paste (Ctrl+Shift+V, the Edit
+    // menu's Ctrl+V), which xterm would paste a second time (#463).
+    if (event.type !== 'keydown') return false
+    event.preventDefault()
 
     const action = getClipboardAction(eventInfo, currentHasSelection)
 

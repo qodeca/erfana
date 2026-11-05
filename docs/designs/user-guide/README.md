@@ -210,7 +210,7 @@ which is drawn by a separate Electron view and is not in a normal page screensho
 | 26 | `organise-files/tree.png` | organise-project-files, reference/project-tree | Tree with git badges (one modified, one untracked file) and the git status bar | project panel | | |
 | 27 | `organise-files/folder-menu.png` | organise-project-files, reference/menus | Right-click menu on the `handbook` folder | project panel | | |
 | 28 | `organise-files/html-file-menu.png` | preview-an-html-page, reference/menus | Right-click menu on `site/index.html` (Open as source, Open in default browser) | project panel | | |
-| 29 | `organise-files/filter.png` | organise-project-files | Filter options open, **Markdown Only** chosen | project panel | | |
+| 29 | `organise-files/filter.png` | organise-project-files | Filter options open, **Markdown only** chosen | project panel | | |
 | 30 | `organise-files/new-file-dialog.png` | organise-project-files | Create New File dialog | dialog | | |
 | 31 | `organise-files/name-clash.png` | organise-project-files | Paste of a file into a folder that already has it: File already exists dialog | dialog | | |
 | 32 | `organise-files/delete-confirm.png` | organise-project-files | Delete File confirmation | dialog | | |

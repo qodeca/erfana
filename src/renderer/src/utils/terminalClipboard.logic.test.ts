@@ -16,6 +16,7 @@ import { describe, it, expect } from 'vitest'
 import {
   getClipboardAction,
   shouldPassThrough,
+  terminalPasteShortcut,
   type ClipboardAction,
   type KeyEventInfo
 } from './terminalClipboard.logic'
@@ -23,12 +24,13 @@ import {
 // Helper to create key event info
 const createEvent = (
   key: string,
-  modifiers: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean } = {}
+  modifiers: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean; altKey?: boolean } = {}
 ): KeyEventInfo => ({
   key,
   ctrlKey: modifiers.ctrlKey ?? false,
   metaKey: modifiers.metaKey ?? false,
-  shiftKey: modifiers.shiftKey ?? false
+  shiftKey: modifiers.shiftKey ?? false,
+  altKey: modifiers.altKey ?? false
 })
 
 describe('terminalClipboard.logic', () => {
@@ -92,15 +94,35 @@ describe('terminalClipboard.logic', () => {
         expect(getClipboardAction(event, false, 'win32')).toBe('none')
       })
 
-      it('returns none for Ctrl+V (let xterm handle native paste)', () => {
+      it('returns paste for Ctrl+V on Windows (xterm would send ^V and no paste event, #463)', () => {
         const event = createEvent('v', { ctrlKey: true })
-        expect(getClipboardAction(event, true, 'win32')).toBe('none')
-        expect(getClipboardAction(event, false, 'win32')).toBe('none')
+        expect(getClipboardAction(event, true, 'win32')).toBe('paste')
+        expect(getClipboardAction(event, false, 'win32')).toBe('paste')
       })
 
-      it('returns none for Ctrl+V with uppercase V', () => {
+      it('returns paste for Ctrl+V with uppercase V on Windows', () => {
         const event = createEvent('V', { ctrlKey: true })
-        expect(getClipboardAction(event, true, 'win32')).toBe('none')
+        expect(getClipboardAction(event, true, 'win32')).toBe('paste')
+      })
+
+      it('returns none for Ctrl+V on Linux, where it sends ^V as in other terminals', () => {
+        expect(getClipboardAction(createEvent('v', { ctrlKey: true }), false, 'linux')).toBe('none')
+      })
+
+      it('returns paste for Shift+Insert on Windows and Linux, none on macOS', () => {
+        const event = createEvent('Insert', { shiftKey: true })
+        expect(getClipboardAction(event, false, 'win32')).toBe('paste')
+        expect(getClipboardAction(event, false, 'linux')).toBe('paste')
+        expect(getClipboardAction(event, false, 'darwin')).toBe('none')
+        expect(getClipboardAction(createEvent('Insert'), false, 'win32')).toBe('none')
+        expect(getClipboardAction(createEvent('Insert', { shiftKey: true, ctrlKey: true }), false, 'win32')).toBe('none')
+      })
+
+      it('returns none for any chord with Alt (AltGr is Ctrl+Alt on Windows)', () => {
+        expect(getClipboardAction(createEvent('v', { ctrlKey: true, altKey: true }), false, 'win32')).toBe('none')
+        expect(getClipboardAction(createEvent('c', { ctrlKey: true, altKey: true }), true, 'win32')).toBe('none')
+        expect(getClipboardAction(createEvent('v', { ctrlKey: true, shiftKey: true, altKey: true }), false, 'win32')).toBe('none')
+        expect(getClipboardAction(createEvent('Insert', { shiftKey: true, altKey: true }), false, 'win32')).toBe('none')
       })
 
       it('returns copy for Ctrl+Shift+C (handled in explicit shortcuts)', () => {
@@ -227,14 +249,17 @@ describe('terminalClipboard.logic', () => {
     describe('decision table regression (pin behavior)', () => {
       // Independent reference mirroring the documented decision table.
       const referenceAction = (
-        isMac: boolean,
+        platform: NodeJS.Platform,
         key: string,
         ctrlKey: boolean,
         metaKey: boolean,
         shiftKey: boolean,
+        altKey: boolean,
         hasSelection: boolean
       ): ClipboardAction => {
+        const isMac = platform === 'darwin'
         const k = key.toLowerCase()
+        if (altKey) return 'none'
         if (ctrlKey && shiftKey) {
           if (k === 'c') return 'copy'
           if (k === 'v') return 'paste'
@@ -244,42 +269,34 @@ describe('terminalClipboard.logic', () => {
         }
         if (!isMac && ctrlKey && !shiftKey && !metaKey) {
           if (k === 'c') return hasSelection ? 'copy' : 'none'
+          if (k === 'v' && platform === 'win32') return 'paste'
         }
+        if (!isMac && shiftKey && !ctrlKey && !metaKey && key === 'Insert') return 'paste'
         return 'none'
       }
 
-      const keys = ['c', 'C', 'v', 'V', 'a', 'x', 'Enter']
+      const keys = ['c', 'C', 'v', 'V', 'a', 'x', 'Enter', 'Insert']
       const bools = [false, true]
-      const platforms: Array<{ platform: NodeJS.Platform; isMac: boolean }> = [
-        { platform: 'darwin', isMac: true },
-        { platform: 'win32', isMac: false }
-      ]
+      const platforms: NodeJS.Platform[] = ['darwin', 'win32', 'linux']
 
-      it('matches the reference for every input combination on darwin and win32', () => {
-        for (const { platform, isMac } of platforms) {
+      it('matches the reference for every input combination on darwin, win32 and linux', () => {
+        for (const platform of platforms) {
           for (const key of keys) {
             for (const ctrlKey of bools) {
               for (const metaKey of bools) {
                 for (const shiftKey of bools) {
-                  for (const hasSelection of bools) {
-                    const event = createEvent(key, { ctrlKey, metaKey, shiftKey })
-                    const expected = referenceAction(
-                      isMac,
-                      key,
-                      ctrlKey,
-                      metaKey,
-                      shiftKey,
-                      hasSelection
-                    )
-                    const actual = getClipboardAction(event, hasSelection, platform)
-                    expect(
-                      actual,
-                      `platform=${platform} key=${key} ctrl=${ctrlKey} meta=${metaKey} shift=${shiftKey} sel=${hasSelection}`
-                    ).toBe(expected)
-                    // shouldPassThrough must stay the exact inverse of "action !== none"
-                    expect(shouldPassThrough(event, hasSelection, platform)).toBe(
-                      expected === 'none'
-                    )
+                  for (const altKey of bools) {
+                    for (const hasSelection of bools) {
+                      const event = createEvent(key, { ctrlKey, metaKey, shiftKey, altKey })
+                      const expected = referenceAction(platform, key, ctrlKey, metaKey, shiftKey, altKey, hasSelection)
+                      const actual = getClipboardAction(event, hasSelection, platform)
+                      expect(
+                        actual,
+                        `platform=${platform} key=${key} ctrl=${ctrlKey} meta=${metaKey} shift=${shiftKey} alt=${altKey} sel=${hasSelection}`
+                      ).toBe(expected)
+                      // shouldPassThrough must stay the exact inverse of "action !== none"
+                      expect(shouldPassThrough(event, hasSelection, platform)).toBe(expected === 'none')
+                    }
                   }
                 }
               }
@@ -287,6 +304,14 @@ describe('terminalClipboard.logic', () => {
           }
         }
       })
+    })
+  })
+
+  describe('terminalPasteShortcut()', () => {
+    it('names the paste key that really works on each platform (#463)', () => {
+      expect(terminalPasteShortcut('win32')).toEqual({ key: 'V', modifiers: { mod: true } })
+      expect(terminalPasteShortcut('darwin')).toEqual({ key: 'V', modifiers: { mod: true } })
+      expect(terminalPasteShortcut('linux')).toEqual({ key: 'V', modifiers: { mod: true, shift: true } })
     })
   })
 

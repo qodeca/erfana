@@ -152,9 +152,9 @@ test.describe('Target size', () => {
   test('every settings checkbox is a full 24 x 24 target', async ({ window: page }) => {
     await openSettings(page)
     const boxes = page.locator('.settings-checkbox')
-    // Editor, git polling, HTML preview, HTML Preview comments and (spec 024) Markdown Preview
-    // comments toggles; an empty list would prove nothing
-    await expect(boxes).toHaveCount(5)
+    // Editor, git polling, HTML preview, HTML Preview comments, (spec 024) Markdown Preview
+    // comments and (#453) Project tree follow-the-active-tab toggles; an empty list would prove nothing
+    await expect(boxes).toHaveCount(6)
     for (const box of await boxes.all()) {
       expectTarget(await measureLocator(box, `settings checkbox ${await box.getAttribute('id')}`))
     }

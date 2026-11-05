@@ -227,7 +227,7 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
   // Clipboard operations via the central textClipboard service (issue #203).
   // maxLength reject stays a silent product rule (no toast); transport errors
   // are handled centrally by the service.
-  const { handleCut, handleCopy, handlePaste } = useTextareaClipboard({
+  const { handleCut, handleCopy, handlePaste, handleDelete } = useTextareaClipboard({
     textareaRef,
     value: inputValue,
     setValue: setInputValue,
@@ -400,6 +400,7 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
           onCut={handleCut}
           onCopy={handleCopy}
           onPaste={handlePaste}
+          onDelete={handleDelete}
           onClose={handleCloseContextMenu}
         />
       )}

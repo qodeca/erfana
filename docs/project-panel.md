@@ -17,10 +17,10 @@ Project panel displays hierarchical file tree with filtering, visual indicators,
 
 ```
 <ProjectPanel>
-  <Header> FolderOpen icon + "Project" + Chevron toggle </Header>
+  <Header> FolderOpen icon + "Project" + "Markdown only" words (when on) + Funnel toggle </Header>
   <PanelErrorBoundary key={projectPath ?? 'none'} componentName="Project tree">
     <ProjectTree showControlPanel filterMode onFilterModeChange />
-      (toolbar, then the control panel with the filter buttons, then the rows)
+      (toolbar, then the control panel with the "Show" filter choice, then the rows)
   </PanelErrorBoundary>
 </ProjectPanel>
 ```
@@ -55,20 +55,21 @@ Manual refresh button in the toolbar (rightmost position, after Open/Change proj
 
 ## Control Panel
 
-Collapsible panel with chevron toggle (common pattern across panels).
+Collapsible panel opened by the file-filter button in the panel header.
 
 ### Toggle Behavior
 
-**Chevron**: ChevronDown (shown) / ChevronLeft (hidden) – the icon is swapped, not rotated; tooltip "Show Filter Options" / "Hide Filter Options"; colour transition `var(--transition-normal)` (0.15s)
+**Trigger**: a `<button>` named "File filter" with a `Funnel` icon, `aria-expanded` and `aria-controls` the panel; tooltip "Show Filter Options" / "Hide Filter Options"; colour transition `var(--transition-normal)` (0.15s). While **Markdown only** is on, the header shows the words "Markdown only" beside it, whether the panel is open or closed (#452)
 **State**: Local component state (`showControlPanel`), hidden by default
 
 ### Filter Options
 
-Under the label "File Filter", two mutually exclusive toggle buttons:
-- **All Files** (`Files` icon) - Show all
-- **Markdown Only** (`FileText` icon) - Show only Markdown files + folders containing them
+A radio group named "Show" (`FileFilterChoice.tsx`), two choices:
+- **All files** (`FolderTree` icon) - Show all
+- **Markdown only** (`FileText` icon) - Show only Markdown files + folders containing them
 
-**Visual**: the active button gets `.filter-option.active` – text in `var(--color-accent-drag)` on `var(--color-accent-drag-bg)`
+**Visual**: the checked choice (`.file-filter__cell[aria-checked='true']`) gets a fill and a lime bottom edge – the Segmented control card's checked state, never colour alone
+**Keyboard**: one tab stop; the arrow keys move and check
 **Persistence**: electron-store key `projectFilterMode` (`SettingsService`), survives restarts; default `all`
 
 See: [IPC Patterns](./ipc-patterns.md) for filter persistence channels
@@ -201,6 +202,7 @@ context-menu/
 ├── types.ts        # Interfaces
 ├── commands.tsx    # 13 command classes
 ├── strategies.tsx  # FileContextMenuStrategy, DirectoryContextMenuStrategy
+├── fileRowCommands.ts # PasteIntoParentFolderCommand, deleteCommandFor (the Delete key)
 └── factory.ts      # ContextMenuFactory.build(node, ctx)
 ```
 
@@ -208,14 +210,16 @@ context-menu/
 
 Built by `strategies.tsx` from the command classes in `commands.tsx`, in this order:
 
-**Files**: Open as source, Open in default browser (HTML files only, each under its own gate), ---, Cut, Copy, ---, Rename, ---, Delete, ---, Reveal in Finder / Show in Explorer
+**Files**: Open as source, Open in default browser (HTML files only, each under its own gate), ---, Cut, Copy, Paste (into the file's folder), ---, Rename, ---, Delete, ---, Reveal in Finder / Show in Explorer
 **Folders**: Cut, Copy, Paste, ---, New File, New Folder, Rename, ---, Import..., ---, Delete,
 ---, Reveal in Finder / Show in Explorer
 **Project root**: the root row is also a valid target; it cannot be moved
 ("Cannot move project root")
 
-**Conditional items**: Paste appears only on directories and only when the internal
-clipboard is non-empty. Import... appears only on directories and only when an import
+**Conditional items**: Paste appears only when the internal clipboard is non-empty; on a
+file it pastes into the file's folder (`PasteIntoParentFolderCommand` in
+`fileRowCommands.ts`, #463). Cut, Copy, Paste and Delete carry shortcut hints (`IMenuItem.shortcut`,
+from `clipboardShortcut`), except on the project root row, whose keys do not act on it. Import... appears only on directories and only when an import
 handler is supplied; it gets its own separator. The Reveal label switches on `isMacOS()`.
 
 **Gates for the HTML open group**: Open as source appears only when `ctx.openAsSource` is wired (the tree can reach the editor), and Open in default browser only when `ctx.openInBrowser` is wired (`MenuContext` in `context-menu/types.ts`). The separator follows the group only when it holds at least one item. `openInBrowser` raises its own toasts and never rejects.
@@ -231,6 +235,7 @@ interface IMenuItem {
   icon?: ReactNode
   danger?: boolean
   separator?: boolean
+  shortcut?: string   // e.g. ⌘C – adapted by toContextMenuItems (factory.ts)
   execute: () => void | Promise<void>
 }
 
@@ -360,9 +365,10 @@ Since v0.22.0 (#87, #88, #89) the tree is **one Tab stop** (roving `tabindex`), 
 | Letters | Type-ahead: jump to the next row whose name starts with what was typed |
 | Shift+F10 / Menu key | Open the row's context menu under the row |
 | Cmd/Ctrl+Alt+R | Refresh tree and git status |
-| Cmd+C / X / V (macOS), Ctrl+C / X / V (elsewhere) | Copy, cut, paste – only while the tree has focus, only with the platform's own modifier and no Shift or Alt (`treeClipboardScope.ts`) |
+| Cmd+C / X / V (macOS), Ctrl+C / X / V (elsewhere) | Copy, cut, paste – only while the tree has focus, only with the platform's own modifier and no Shift or Alt (`treeClipboardScope.ts`). They act on the focused row (a file too, #463), else the clicked folder; paste on a file lands in its folder |
+| Delete (all platforms), Cmd+Backspace (macOS) | Delete the focused item after the menu's own confirmation (`isTreeDeleteKey`, `deleteCommandFor`, #463). Not on the project root row, not on auto-repeat |
 
-Keys with Ctrl, Alt or Cmd held are left to app shortcuts. Placeholder lines ("Loading…") are stepped over. Each row states `aria-level`, `aria-posinset` and `aria-setsize`, because a virtualised tree does not have every row in the DOM for a screen reader to count. When the focused row disappears (deleted, renamed, filtered out), focus moves to the row with the same path, else its nearest ancestor, else the first row (`useTreeFocusRecovery.ts`); after New File, Rename or Delete from the menu, focus returns to the tree.
+Other keys with Ctrl, Alt or Cmd held are left to app shortcuts. Placeholder lines ("Loading…") are stepped over. Each row states `aria-level`, `aria-posinset` and `aria-setsize`, because a virtualised tree does not have every row in the DOM for a screen reader to count. When the focused row disappears (deleted, renamed, filtered out), focus moves to the row with the same path, else its nearest ancestor, else the first row (`useTreeFocusRecovery.ts`); after New File, Rename or Delete from the menu, focus returns to the tree.
 
 **Right-Click**: Context menu
 

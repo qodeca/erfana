@@ -73,7 +73,7 @@
 <table class="ds-keys">
   <thead><tr><th>Key</th><th>Result</th><th>Focus ends on</th></tr></thead>
   <tbody>
-    <tr><td><kbd>Tab</kbd></td><td>Enters the list <strong>once</strong> – not once per row.</td><td>The remembered row.</td></tr>
+    <tr><td><kbd>Tab</kbd></td><td>Enters the list <strong>once</strong> – not once per row.</td><td>The remembered row – in the file tree, after a tab switch, the active tab's file (<a href="../tree-active-file/index.html">Active file in the tree</a>, #453).</td></tr>
     <tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>Move between visible rows.</td><td>The previous or next row.</td></tr>
     <tr><td><kbd>→</kbd></td><td>On a closed folder, expand it; on an open one, step in.</td><td>The folder, then its first child.</td></tr>
     <tr><td><kbd>←</kbd></td><td>On an open folder, collapse it; on a leaf, go to the parent.</td><td>The folder, or the parent.</td></tr>
@@ -418,6 +418,11 @@ switch user cannot drag at all.</p>
 </main>
 <section id="approvals">
 <h2>Approvals</h2>
+<p class="ds-muted">
+  2026-11-03 – the owner approved that, in the file tree, a tab switch moves the remembered row to the active tab's
+  file (#453): the reveal moves the Tab stop without focusing anything, so <kbd>Tab</kbd> into the tree lands on the
+  file being shown.
+</p>
 <p class="ds-muted">
   2026-10-29 – the owner approved the changes comments-v2 makes to this card (spec 024, 024-FR-025), before the
   first UI commit of spec 024. The owner gave full sign-off for every approval spec 024 requires in the Claude Code

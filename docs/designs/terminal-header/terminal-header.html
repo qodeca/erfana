@@ -1,0 +1,287 @@
+<!-- @card group="Terminal header" name="Terminal header at the default width" subtitle="Which terminal buttons stay in the row at the default width – today and two options (#462)" status="proposed" reviewed="never" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terminal header at the default width – Erfana feature designs</title>
+<link rel="stylesheet" href="../../design-system/tokens.css">
+<link rel="stylesheet" href="../../design-system/ds.css">
+<!-- The row buttons are the Buttons card's icon button; the menus are the Menu card's .erf-menu, unchanged. -->
+<link rel="stylesheet" href="../../design-system/system/components/button/button.css">
+<link rel="stylesheet" href="../../design-system/system/components/menu/menu.css">
+<style>
+  /* Feature-specific only: the terminal panel header drawn at the app's real scale and at the
+     default terminal width. Values copied from TerminalPanel.css (.sidebar-panel-header,
+     .sidebar-panel-title) and ToolbarOverflow.css. Screen-private prefix: th-. */
+  .th-frames { grid-template-columns: 1fr; }
+  /* A stage: the editor on the left, the terminal panel docked on the right. */
+  .th-stage { position: relative; display: flex; justify-content: flex-end; overflow: hidden;
+              background: var(--color-bg-primary); min-block-size: calc(var(--header-height) + var(--space-24) * 1.5); }
+  .th-stage--menu { min-block-size: calc(var(--space-24) * 5.5); }
+  .th-stage--menu-tall { min-block-size: calc(var(--space-24) * 9); }
+  /* The panel at a fixed width; its open menu hangs from it. */
+  .th-panel { position: relative; display: flex; flex-direction: column; flex: 0 0 auto;
+              inline-size: var(--th-w); background: var(--color-black);
+              outline: var(--border-width) solid var(--color-border-default); }
+  .th-w-default { --th-w: 300px; }
+  .th-w-min { --th-w: 170px; }
+  .th-body { min-block-size: calc(var(--space-24) * 1.5); }
+  /* .terminal-panel .sidebar-panel-header: the row measures this box. Overflow hidden, as in the
+     app, so a drawing whose arithmetic were wrong would visibly clip its last button. */
+  .th-row { /* mockup: app scale – the terminal header */ display: flex; align-items: center; gap: var(--space-4);
+            box-sizing: border-box; block-size: var(--header-height); padding: 0 var(--space-6); overflow: hidden;
+            background: var(--color-gray-950); border-block-end: var(--border-width) solid var(--color-border-default);
+            color: var(--color-text-primary); font-size: var(--text-sm); font-weight: var(--font-semibold);
+            text-transform: uppercase; white-space: nowrap; }
+  .th-row__icon { flex: 0 0 auto; inline-size: var(--icon-size-sm); block-size: var(--icon-size-sm); opacity: 0.8; }
+  /* .erf-toolbar-overflow__title: truncates down to its reserve (Toolbar overflow card, rule 3). */
+  .th-row__title { flex: 1 1 auto; min-inline-size: var(--space-16); overflow: hidden; text-overflow: ellipsis; }
+  /* .erf-toolbar-overflow__actions: the button group, gap from --erf-toolbar-overflow-gap. */
+  .th-actions { display: flex; flex: 0 0 auto; align-items: center; gap: var(--th-gap, var(--space-4)); margin-inline-start: auto; }
+  /* Option B narrows the button gap, as the Project panel row already does (ProjectTree.css). */
+  .th-gap-b { --th-gap: var(--space-3); }
+  .th-actions .erf-button { flex: 0 0 auto; }
+  /* An open menu button (the … or Option A's Capture): the Buttons card's open fill. */
+  .th-open { color: var(--color-text-primary); background: var(--color-bg-active); }
+  /* A highlighted button: a frame's way of pointing at what changed. Not shipped. */
+  .th-mark { outline: var(--border-width) dashed var(--color-brand-lime); outline-offset: var(--space-1); }
+  /* The menus. The … menu: its inline-end edge on …'s (card rule 8). Option A's Capture menu:
+     under its button, its inline-start edge on the button's (the group is five buttons and four gaps from
+     the row's inline end). Drawn outside the row, which clips like the app's. */
+  .th-panel .erf-menu { position: absolute; z-index: var(--z-dropdown); min-inline-size: calc(var(--space-24) * 7); }
+  .th-menu-more { inset-block-start: calc(var(--header-height) + var(--space-1)); inset-inline-end: var(--space-6); }
+  .th-menu-capture { inset-block-start: calc(var(--header-height) + var(--space-1));
+                     inset-inline-start: calc(var(--th-w) - var(--space-6) - var(--btn-height-sm) * 5 - var(--space-4) * 4); }
+  .erf-menu .erf-menu-icon svg { inline-size: var(--icon-size-sm); block-size: var(--icon-size-sm); }
+  /* The check column of a menuitemcheckbox (the Toolbar overflow card's lime check). */
+  .th-check { display: inline-flex; flex: 0 0 auto; inline-size: var(--icon-size-sm); block-size: var(--icon-size-sm);
+              box-sizing: content-box; margin-inline-start: auto; padding-inline-start: var(--space-6); }
+  .th-budget td:not(:first-child), .th-budget th:not(:first-child) { text-align: end; }
+  .th-budget .th-total td { font-weight: var(--font-semibold); }
+</style>
+</head>
+<body>
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../index.html">Erfana feature designs</a> <span aria-hidden="true">/</span> <span aria-current="page">Terminal header at the default width</span></nav>
+<main>
+<h1>Terminal header at the default width</h1>
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</p>
+<p class="ds-lede" id="decision">At the default terminal width (<span data-claim="terminal-default-width-px" title="rightWidth in useActivityBarStore.ts – the right (terminal) panel&#x27;s default width, px">300</span> px) the
+header keeps the four capture buttons and moves Scroll to bottom, Restart terminal and Lock scroll to bottom into the
+… menu (#462). This screen draws that, and two ways to keep the terminal's own buttons in the row. Both apply the
+<a href="../../design-system/system/patterns/toolbar-overflow/index.html">Toolbar overflow</a> card (decided) unchanged –
+they change only the toolbar's order, its button gap or its buttons. The owner picks one; the card records it.</p>
+
+<h2 id="today">Today, on macOS and Windows</h2>
+<p>Both platforms show all eight buttons (screen capture is supported on both; Linux has no screen capture, so its
+five buttons all fit and it has no … at this width).</p>
+<div class="ds-frames th-frames">
+<figure class="ds-frame">
+  <div class="th-stage" aria-hidden="true">
+    <div class="th-panel th-w-default">
+      <div class="th-row"><svg class="th-row__icon" data-icon="terminal" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></svg><span class="th-row__title">Terminal</span>
+        <span class="th-actions">
+          <span class="erf-button erf-button--icon"><svg data-icon="camera" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg></span>
+          <span class="erf-button erf-button--icon"><svg data-icon="app-window" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 4v4"/><path d="M2 8h20"/><path d="M6 4v4"/></svg></span>
+          <span class="erf-button erf-button--icon"><svg data-icon="square-dashed" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M9 3h1"/><path d="M9 21h1"/><path d="M14 3h1"/><path d="M14 21h1"/><path d="M3 9v1"/><path d="M21 9v1"/><path d="M3 14v1"/><path d="M21 14v1"/></svg></span>
+          <span class="erf-button erf-button--icon"><svg data-icon="webcam" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="8"/><circle cx="12" cy="10" r="3"/><path d="M7 22h10"/><path d="M12 22v-4"/></svg></span>
+          <span class="erf-button erf-button--icon"><svg data-icon="maximize-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></svg></span>
+          <span class="erf-button erf-button--icon th-mark"><svg data-icon="ellipsis" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></span>
+        </span></div>
+      <div class="th-body"></div>
+    </div>
+  </div>
+  <figcaption><strong>Today at the default width</strong> – capture screen, window, area and photo, then Maximize
+  (raised) and …. The three buttons that act on the terminal itself are the ones that moved, because they are the
+  rightmost before Maximize.</figcaption>
+</figure>
+<figure class="ds-frame">
+  <div class="th-stage th-stage--menu" aria-hidden="true">
+    <div class="th-panel th-w-default">
+      <div class="th-row"><svg class="th-row__icon" data-icon="terminal" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></svg><span class="th-row__title">Terminal</span>
+        <span class="th-actions">
+          <span class="erf-button erf-button--icon"><svg data-icon="camera" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg></span>
+          <span class="erf-button erf-button--icon"><svg data-icon="app-window" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 4v4"/><path d="M2 8h20"/><path d="M6 4v4"/></svg></span>
+          <span class="erf-button erf-button--icon"><svg data-icon="square-dashed" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M9 3h1"/><path d="M9 21h1"/><path d="M14 3h1"/><path d="M14 21h1"/><path d="M3 9v1"/><path d="M21 9v1"/><path d="M3 14v1"/><path d="M21 14v1"/></svg></span>
+          <span class="erf-button erf-button--icon"><svg data-icon="webcam" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="8"/><circle cx="12" cy="10" r="3"/><path d="M7 22h10"/><path d="M12 22v-4"/></svg></span>
+          <span class="erf-button erf-button--icon"><svg data-icon="maximize-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></svg></span>
+          <span class="erf-button erf-button--icon th-open"><svg data-icon="ellipsis" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></span>
+        </span></div>
+      <div class="th-body"></div>
+      <div class="erf-menu th-menu-more">
+        <div class="erf-menu-item erf-menu-item--active"><span class="erf-menu-icon"><svg data-icon="arrow-down-to-line" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/></svg></span><span class="erf-menu-label">Scroll to bottom</span></div>
+        <div class="erf-menu-item"><span class="erf-menu-icon"><svg data-icon="rotate-cw" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span><span class="erf-menu-label">Restart terminal</span></div>
+        <div class="erf-menu-item"><span class="erf-menu-icon"><svg data-icon="lock-keyhole-open" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="16" r="1"/><rect width="18" height="12" x="3" y="10" rx="2"/><path d="M7 10V7a5 5 0 0 1 9.33-2.5"/></svg></span><span class="erf-menu-label">Lock scroll to bottom</span><span class="th-check"></span></div>
+      </div>
+    </div>
+  </div>
+  <figcaption><strong>Today, … open</strong> – the extra click #462 is about: scrolling back to the agent's latest
+  output, locking the scroll and restarting all go through this menu at the default width.</figcaption>
+</figure>
+</div>
+
+<h2 id="option-a">Option A – one Capture menu button</h2>
+<p>The three screenshot buttons and the camera become one icon-only Capture button (the camera glyph) that opens a
+menu – a menu button, like …: <code>aria-haspopup="menu"</code>, <code>aria-expanded</code>, named “Capture”. The row
+holds five buttons and no …, with room to spare. If the panel is narrowed until Capture itself moves, its four items
+join the … menu as one separated group – never a submenu (the Menu card has none and asks not to add one). On Linux,
+where only the camera exists, the Capture button is the plain Capture photo button.</p>
+<div class="ds-frames th-frames">
+<figure class="ds-frame">
+  <div class="th-stage" aria-hidden="true">
+    <div class="th-panel th-w-default">
+      <div class="th-row"><svg class="th-row__icon" data-icon="terminal" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></svg><span class="th-row__title">Terminal</span>
+        <span class="th-actions">
+          <span class="erf-button erf-button--icon th-mark"><svg data-icon="camera" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg></span>
+          <span class="erf-button erf-button--icon"><svg data-icon="arrow-down-to-line" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/></svg></span>
+          <span class="erf-button erf-button--icon"><svg data-icon="rotate-cw" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span>
+          <span class="erf-button erf-button--icon"><svg data-icon="lock-keyhole-open" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="16" r="1"/><rect width="18" height="12" x="3" y="10" rx="2"/><path d="M7 10V7a5 5 0 0 1 9.33-2.5"/></svg></span>
+          <span class="erf-button erf-button--icon"><svg data-icon="maximize-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></svg></span>
+        </span></div>
+      <div class="th-body"></div>
+    </div>
+  </div>
+  <figcaption><strong>Option A at the default width</strong> – Capture, Scroll to bottom, Restart terminal, Lock
+  scroll to bottom, Maximize terminal. No …: nothing has moved, and the title has room to read in full.</figcaption>
+</figure>
+<figure class="ds-frame">
+  <div class="th-stage th-stage--menu" aria-hidden="true">
+    <div class="th-panel th-w-default">
+      <div class="th-row"><svg class="th-row__icon" data-icon="terminal" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></svg><span class="th-row__title">Terminal</span>
+        <span class="th-actions">
+          <span class="erf-button erf-button--icon th-open"><svg data-icon="camera" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg></span>
+          <span class="erf-button erf-button--icon"><svg data-icon="arrow-down-to-line" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/></svg></span>
+          <span class="erf-button erf-button--icon"><svg data-icon="rotate-cw" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span>
+          <span class="erf-button erf-button--icon"><svg data-icon="lock-keyhole-open" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="16" r="1"/><rect width="18" height="12" x="3" y="10" rx="2"/><path d="M7 10V7a5 5 0 0 1 9.33-2.5"/></svg></span>
+          <span class="erf-button erf-button--icon"><svg data-icon="maximize-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></svg></span>
+        </span></div>
+      <div class="th-body"></div>
+      <div class="erf-menu th-menu-capture">
+        <span class="erf-menu-item erf-menu-item--active"><span class="erf-menu-icon"><svg data-icon="camera" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg></span><span class="erf-menu-label">Capture screen</span></span>
+        <span class="erf-menu-item"><span class="erf-menu-icon"><svg data-icon="app-window" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 4v4"/><path d="M2 8h20"/><path d="M6 4v4"/></svg></span><span class="erf-menu-label">Capture window</span></span>
+        <span class="erf-menu-item"><span class="erf-menu-icon"><svg data-icon="square-dashed" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M9 3h1"/><path d="M9 21h1"/><path d="M14 3h1"/><path d="M14 21h1"/><path d="M3 9v1"/><path d="M21 9v1"/><path d="M3 14v1"/><path d="M21 14v1"/></svg></span><span class="erf-menu-label">Capture area</span></span>
+        <span class="erf-menu-separator"></span>
+        <span class="erf-menu-item"><span class="erf-menu-icon"><svg data-icon="webcam" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="8"/><circle cx="12" cy="10" r="3"/><path d="M7 22h10"/><path d="M12 22v-4"/></svg></span><span class="erf-menu-label">Capture photo</span></span>
+      </div>
+    </div>
+  </div>
+  <figcaption><strong>Option A, Capture open</strong> – the three screenshots, a separator, then the camera photo.
+  Every capture is now two clicks at every width, including a wide terminal where it is one click today. A busy
+  capture shows here as a disabled item with its busy label (card rule 7); the Capture button shows the busy
+  spinner while any capture runs.</figcaption>
+</figure>
+<figure class="ds-frame">
+  <div class="th-stage th-stage--menu-tall" aria-hidden="true">
+    <div class="th-panel th-w-min">
+      <div class="th-row"><svg class="th-row__icon" data-icon="terminal" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></svg><span class="th-row__title">Terminal</span>
+        <span class="th-actions">
+          <span class="erf-button erf-button--icon"><svg data-icon="maximize-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></svg></span>
+          <span class="erf-button erf-button--icon th-open"><svg data-icon="ellipsis" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></span>
+        </span></div>
+      <div class="th-body"></div>
+      <div class="erf-menu th-menu-more">
+        <div class="erf-menu-item erf-menu-item--active"><span class="erf-menu-icon"><svg data-icon="camera" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg></span><span class="erf-menu-label">Capture screen</span></div>
+        <div class="erf-menu-item"><span class="erf-menu-icon"><svg data-icon="app-window" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 4v4"/><path d="M2 8h20"/><path d="M6 4v4"/></svg></span><span class="erf-menu-label">Capture window</span></div>
+        <div class="erf-menu-item"><span class="erf-menu-icon"><svg data-icon="square-dashed" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M9 3h1"/><path d="M9 21h1"/><path d="M14 3h1"/><path d="M14 21h1"/><path d="M3 9v1"/><path d="M21 9v1"/><path d="M3 14v1"/><path d="M21 14v1"/></svg></span><span class="erf-menu-label">Capture area</span></div>
+        <div class="erf-menu-item"><span class="erf-menu-icon"><svg data-icon="webcam" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="8"/><circle cx="12" cy="10" r="3"/><path d="M7 22h10"/><path d="M12 22v-4"/></svg></span><span class="erf-menu-label">Capture photo</span></div>
+        <div class="erf-menu-separator"></div>
+        <div class="erf-menu-item"><span class="erf-menu-icon"><svg data-icon="arrow-down-to-line" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/></svg></span><span class="erf-menu-label">Scroll to bottom</span></div>
+        <div class="erf-menu-item"><span class="erf-menu-icon"><svg data-icon="rotate-cw" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span><span class="erf-menu-label">Restart terminal</span></div>
+        <div class="erf-menu-item"><span class="erf-menu-icon"><svg data-icon="lock-keyhole-open" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="16" r="1"/><rect width="18" height="12" x="3" y="10" rx="2"/><path d="M7 10V7a5 5 0 0 1 9.33-2.5"/></svg></span><span class="erf-menu-label">Lock scroll to bottom</span><span class="th-check"></span></div>
+      </div>
+    </div>
+  </div>
+  <figcaption><strong>Option A at the dock's minimum, … open</strong> – Capture has moved, so its four items sit in
+  … as their own group, flat, before the terminal's own actions. Maximize stays raised beside ….</figcaption>
+</figure>
+</div>
+
+<h2 id="option-b">Option B – terminal actions first, a tighter gap</h2>
+<p>Reorder so the actions on the terminal's output lead and leave last: Scroll to bottom, Lock scroll to bottom, then
+Capture screen, window, area and photo, then Restart terminal, with Maximize still raised. The button gap goes from
+<code data-token="--space-4">8px</code> to <code data-token="--space-3">6px</code> – the Project panel's row already uses
+<code data-token="--space-2">4px</code>. Restart is placed to move first on purpose: it is a recovery action used rarely,
+and it ends whatever the agent is running, so it is better one deliberate click away than beside the buttons pressed
+all day.</p>
+<div class="ds-frames th-frames">
+<figure class="ds-frame">
+  <div class="th-stage" aria-hidden="true">
+    <div class="th-panel th-w-default">
+      <div class="th-row"><svg class="th-row__icon" data-icon="terminal" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></svg><span class="th-row__title">Terminal</span>
+        <span class="th-actions th-gap-b">
+          <span class="erf-button erf-button--icon th-mark"><svg data-icon="arrow-down-to-line" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/></svg></span>
+          <span class="erf-button erf-button--icon th-mark"><svg data-icon="lock-keyhole-open" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="16" r="1"/><rect width="18" height="12" x="3" y="10" rx="2"/><path d="M7 10V7a5 5 0 0 1 9.33-2.5"/></svg></span>
+          <span class="erf-button erf-button--icon"><svg data-icon="camera" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg></span>
+          <span class="erf-button erf-button--icon"><svg data-icon="app-window" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 4v4"/><path d="M2 8h20"/><path d="M6 4v4"/></svg></span>
+          <span class="erf-button erf-button--icon"><svg data-icon="square-dashed" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M9 3h1"/><path d="M9 21h1"/><path d="M14 3h1"/><path d="M14 21h1"/><path d="M3 9v1"/><path d="M21 9v1"/><path d="M3 14v1"/><path d="M21 14v1"/></svg></span>
+          <span class="erf-button erf-button--icon"><svg data-icon="maximize-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></svg></span>
+          <span class="erf-button erf-button--icon"><svg data-icon="ellipsis" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></span>
+        </span></div>
+      <div class="th-body"></div>
+    </div>
+  </div>
+  <figcaption><strong>Option B at the default width</strong> – Scroll to bottom, Lock scroll to bottom, the three
+  screenshots and Maximize stay; Capture photo and Restart terminal are in …. The title is down to its reserve
+  (rule 3), which is what a full row looks like.</figcaption>
+</figure>
+<figure class="ds-frame">
+  <div class="th-stage th-stage--menu" aria-hidden="true">
+    <div class="th-panel th-w-default">
+      <div class="th-row"><svg class="th-row__icon" data-icon="terminal" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></svg><span class="th-row__title">Terminal</span>
+        <span class="th-actions th-gap-b">
+          <span class="erf-button erf-button--icon"><svg data-icon="arrow-down-to-line" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/></svg></span>
+          <span class="erf-button erf-button--icon"><svg data-icon="lock-keyhole-open" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="16" r="1"/><rect width="18" height="12" x="3" y="10" rx="2"/><path d="M7 10V7a5 5 0 0 1 9.33-2.5"/></svg></span>
+          <span class="erf-button erf-button--icon"><svg data-icon="camera" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg></span>
+          <span class="erf-button erf-button--icon"><svg data-icon="app-window" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 4v4"/><path d="M2 8h20"/><path d="M6 4v4"/></svg></span>
+          <span class="erf-button erf-button--icon"><svg data-icon="square-dashed" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M9 3h1"/><path d="M9 21h1"/><path d="M14 3h1"/><path d="M14 21h1"/><path d="M3 9v1"/><path d="M21 9v1"/><path d="M3 14v1"/><path d="M21 14v1"/></svg></span>
+          <span class="erf-button erf-button--icon"><svg data-icon="maximize-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></svg></span>
+          <span class="erf-button erf-button--icon th-open"><svg data-icon="ellipsis" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></span>
+        </span></div>
+      <div class="th-body"></div>
+      <div class="erf-menu th-menu-more">
+        <div class="erf-menu-item erf-menu-item--active"><span class="erf-menu-icon"><svg data-icon="webcam" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="8"/><circle cx="12" cy="10" r="3"/><path d="M7 22h10"/><path d="M12 22v-4"/></svg></span><span class="erf-menu-label">Capture photo</span></div>
+        <div class="erf-menu-item"><span class="erf-menu-icon"><svg data-icon="rotate-cw" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></span><span class="erf-menu-label">Restart terminal</span></div>
+      </div>
+    </div>
+  </div>
+  <figcaption><strong>Option B, … open</strong> – the two moved buttons in toolbar order. Narrower than this, the
+  captures leave next (area, window, screen), and Scroll and Lock are the last before Maximize.</figcaption>
+</figure>
+</div>
+
+<h2 id="budget">The pixel budget at the default width</h2>
+<p>The header measures its own box (<code class="ds-nowrap">useToolbarOverflow</code>) and hands the widths to
+<code class="ds-nowrap">computeOverflow</code>: the buttons get what is left after the padding, the icon and the title's
+<em>reserve</em> – the title's text width never counts, so a shorter title gains nothing. Every button and … is
+<code data-token="--btn-height-sm">24px</code> wide.</p>
+<table class="th-budget">
+  <thead><tr><th>Part</th><th>Token</th><th>Today</th><th>Option A</th><th>Option B</th></tr></thead>
+  <tbody>
+    <tr><td>Panel width</td><td>default</td><td><span data-claim="terminal-default-width-px" title="rightWidth in useActivityBarStore.ts – the right (terminal) panel&#x27;s default width, px">300</span></td><td><span data-claim="terminal-default-width-px" title="rightWidth in useActivityBarStore.ts – the right (terminal) panel&#x27;s default width, px">300</span></td><td><span data-claim="terminal-default-width-px" title="rightWidth in useActivityBarStore.ts – the right (terminal) panel&#x27;s default width, px">300</span></td></tr>
+    <tr><td>Row padding, both sides</td><td><code data-token="--space-6">12px</code> × 2</td><td>−24</td><td>−24</td><td>−24</td></tr>
+    <tr><td>Panel icon and its gap</td><td><code data-token="--icon-size-sm">16px</code> + <code data-token="--space-4">8px</code></td><td>−24</td><td>−24</td><td>−24</td></tr>
+    <tr><td>Title reserve and its gap</td><td><code data-token="--space-16">32px</code> + <code data-token="--space-4">8px</code></td><td>−40</td><td>−40</td><td>−40</td></tr>
+    <tr class="th-total"><td>Left for the buttons</td><td></td><td>212</td><td>212</td><td>212</td></tr>
+    <tr><td>Button gap</td><td></td><td>8</td><td>8</td><td>6</td></tr>
+    <tr><td>All buttons, no …</td><td></td><td>8 × 24 + 7 × 8 = 248</td><td>5 × 24 + 4 × 8 = 152</td><td>8 × 24 + 7 × 6 = 234</td></tr>
+    <tr class="th-total"><td>What the row shows</td><td></td><td>5 buttons + … = 184</td><td>5 buttons = 152</td><td>6 buttons + … = 204</td></tr>
+    <tr><td>Spare</td><td></td><td>28</td><td>60</td><td>8</td></tr>
+    <tr><td>Panel width where the next button moves</td><td></td><td>below 272</td><td>below 240</td><td>below 292</td></tr>
+    <tr><td>Panel width where nothing moves</td><td></td><td>336 and up</td><td>240 and up</td><td>322 and up</td></tr>
+  </tbody>
+</table>
+<p class="ds-muted">The arithmetic, not the app: these numbers are design decisions and their sums, checked by running the
+shipping <code class="ds-nowrap">computeOverflow</code> on the same inputs. One button moved alone is never chosen
+(card rule 5), which is why today jumps from none moved to three.</p>
+
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None recorded. Neither option needs one: rule 4 lets a toolbar choose its order and raise a
+button, and the gap is the panel's own (<code class="ds-nowrap">--erf-toolbar-overflow-gap</code>).</p>
+</section>
+</main>
+</body>
+</html>

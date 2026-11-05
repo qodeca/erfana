@@ -162,7 +162,6 @@ src/
 │   │   ├── screenshot-handlers.ts, camera-handlers.ts, clipboard-handlers.ts, claude-status-handlers.ts
 │   │   ├── import-handlers.ts, transcription-handlers.ts, docx-handlers.ts, pdf-handlers.ts
 │   │   ├── image-export-handlers.ts, preview-handlers.ts, markdown-image-handlers.ts
-│   │   ├── terminal-screen-reader-handlers.ts  # terminal:getScreenReaderSupport + change broadcast
 │   │   ├── browser-handlers.ts  # browser:openFile – isTrustedSender before Zod (#124)
 │   │   ├── confinement/         # registerConfinedHandle, resolveConfinedPath, ConfinementError – path checks (v0.22.0)
 │   │   ├── comments/            # file-comment-handlers (file-comment:* – sender gate, strict schemas) and

@@ -13,6 +13,7 @@ import {
   LoggingLevelSchema,
   GitStatusSettingsSchema,
   getDefaultGlobalSettings,
+  isFollowActiveTabEnabled,
   type GlobalSettings,
   type LoggingLevel,
   type GitStatusSettings
@@ -115,8 +116,8 @@ describe('GlobalSettingsSchema', () => {
         files: {
           exclude: ['tmp']
         },
-        terminal: {
-          screenReaderMode: 'on' as const
+        projectTree: {
+          followActiveTab: false
         },
         comments: {
           authorName: 'Ada',
@@ -151,8 +152,8 @@ describe('GlobalSettingsSchema', () => {
         files: {
           exclude: ['tmp']
         },
-        terminal: {
-          screenReaderMode: 'on' as const
+        projectTree: {
+          followActiveTab: false
         },
         comments: {
           authorName: 'Ada',
@@ -245,28 +246,57 @@ describe('GlobalSettingsSchema', () => {
     })
   })
 
-  describe('terminal.screenReaderMode (lens review [23])', () => {
-    it('defaults to auto when the section is missing', () => {
-      expect(GlobalSettingsSchema.parse({}).terminal).toEqual({ screenReaderMode: 'auto' })
+  describe('projectTree.followActiveTab (#453)', () => {
+    it('defaults to on when the section is missing', () => {
+      expect(GlobalSettingsSchema.parse({}).projectTree).toEqual({ followActiveTab: true })
+      expect(getDefaultGlobalSettings().projectTree.followActiveTab).toBe(true)
     })
 
-    it.each(['auto', 'on', 'off'] as const)('keeps %s', (mode) => {
-      expect(GlobalSettingsSchema.parse({ terminal: { screenReaderMode: mode } }).terminal.screenReaderMode).toBe(mode)
+    it.each([true, false])('keeps %s', (value) => {
+      expect(GlobalSettingsSchema.parse({ projectTree: { followActiveTab: value } }).projectTree.followActiveTab).toBe(value)
     })
 
     it('never fails on a bad value, so it cannot trip the corruption reset', () => {
-      const badMode = GlobalSettingsSchema.safeParse({ terminal: { screenReaderMode: 'loud' } })
-      expect(badMode.success).toBe(true)
-      expect(badMode.data?.terminal).toEqual({ screenReaderMode: 'auto' })
+      const badValue = GlobalSettingsSchema.safeParse({ projectTree: { followActiveTab: 'yes' } })
+      expect(badValue.success).toBe(true)
+      expect(badValue.data?.projectTree).toEqual({ followActiveTab: true })
 
-      const badSection = GlobalSettingsSchema.safeParse({ terminal: 'on' })
+      const badSection = GlobalSettingsSchema.safeParse({ projectTree: 'off' })
       expect(badSection.success).toBe(true)
-      expect(badSection.data?.terminal).toEqual({ screenReaderMode: 'auto' })
+      expect(badSection.data?.projectTree).toEqual({ followActiveTab: true })
     })
 
-    it('strips unknown keys', () => {
-      const parsed = GlobalSettingsSchema.parse({ terminal: { screenReaderMode: 'on', extra: 1 } })
-      expect(parsed.terminal).toEqual({ screenReaderMode: 'on' })
+    it('is read as on unless it is exactly false', () => {
+      expect(isFollowActiveTabEnabled({})).toBe(true)
+      expect(isFollowActiveTabEnabled({ projectTree: { followActiveTab: true } })).toBe(true)
+      expect(isFollowActiveTabEnabled({ projectTree: { followActiveTab: false } })).toBe(false)
+    })
+  })
+
+  describe('a settings file from before #440 (terminal.screenReaderMode removed)', () => {
+    it.each(['auto', 'on', 'off', 'loud'])('loads with terminal.screenReaderMode %s, drops it and keeps every other value', (mode) => {
+      const result = GlobalSettingsSchema.safeParse({
+        logging: { level: 'debug' },
+        files: { exclude: ['tmp'] },
+        terminal: { screenReaderMode: mode },
+        projectTree: { followActiveTab: false }
+      })
+
+      expect(result.success).toBe(true)
+      expect(result.data).not.toHaveProperty('terminal')
+      expect(result.data?.logging.level).toBe('debug')
+      expect(result.data?.files.exclude).toEqual(['tmp'])
+      expect(result.data?.projectTree.followActiveTab).toBe(false)
+    })
+
+    it('loads when the old terminal section is malformed', () => {
+      const result = GlobalSettingsSchema.safeParse({ terminal: 'on' })
+      expect(result.success).toBe(true)
+      expect(result.data).toEqual(getDefaultGlobalSettings())
+    })
+
+    it('has no terminal section in the defaults', () => {
+      expect(getDefaultGlobalSettings()).not.toHaveProperty('terminal')
     })
   })
 
@@ -347,8 +377,8 @@ describe('GlobalSettingsSchema', () => {
         files: {
           exclude: []
         },
-        terminal: {
-          screenReaderMode: 'auto'
+        projectTree: {
+          followActiveTab: true
         },
         comments: {
           identityNoticeSeen: false
@@ -369,7 +399,7 @@ describe('GlobalSettingsSchema', () => {
         transcription: { backend: 'openai', openaiApiKeyStored: false, whisperModel: 'base' },
         htmlPreview: { enabled: true },
         files: { exclude: [] },
-        terminal: { screenReaderMode: 'auto' },
+        projectTree: { followActiveTab: true },
         comments: { identityNoticeSeen: false }
       }
       expect(validSettings.logging.level).toBe('info')

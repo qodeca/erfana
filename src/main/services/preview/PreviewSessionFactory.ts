@@ -132,10 +132,10 @@ export interface PreviewWebContentsHandle {
   /** Chromium zoom level; 0 is 100%, each step is a ~20% change. */
   setZoomLevel(level: number): void
   getZoomLevel(): number
-  /** Whether this web contents currently has keyboard focus. */
   isFocused(): boolean
-  /** Take keyboard focus (#124, QG-8 U1). Optional like `ipc`: test doubles stay valid. */
+  /** Take keyboard focus (#124, QG-8 U1); copy the page's selection (#463). Optional like `ipc`. */
   focus?(): void
+  copy?(): void
   // Event surface: `on`, `once` and `removeListener` are intentionally loose
   // because the wired events (`render-process-gone`, `unresponsive`,
   // `will-navigate`, `did-finish-load`, `destroyed`, `before-input-event`) carry

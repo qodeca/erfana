@@ -360,7 +360,7 @@
 /* ---------- rows above the page: navigation, pick, find ---------- */
 
 /* The HTML preview bar's height (Permission band, decided): a tool at the
-   proposed --toolbar-tool-height (--input-height-sm until it lands) in
+   --toolbar-tool-height in
    --space-3 / --space-6 padding, a 1px neutral rule under it. Rows never wrap
    and never change height; they degrade by tier instead. */
 .erf-brw-row {
@@ -377,8 +377,8 @@
   background: var(--color-bg-primary);
   border-block-end: var(--border-width) solid var(--color-border-default);
 }
-.erf-brw-row .erf-button { block-size: var(--input-height-sm); }
-.erf-brw-row .erf-button--icon { inline-size: var(--input-height-sm); }
+.erf-brw-row .erf-button { block-size: var(--toolbar-tool-height); }
+.erf-brw-row .erf-button--icon { inline-size: var(--toolbar-tool-height); }
 .erf-brw-row .erf-button--ghost { padding-inline: var(--space-4); font-weight: var(--font-normal); }
 
 /* A group of tools (role="group", not role="toolbar" – note F-7), --space-2

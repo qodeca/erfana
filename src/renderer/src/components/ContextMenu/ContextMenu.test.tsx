@@ -57,8 +57,8 @@ describe('ContextMenu', () => {
 
   it('renders a choice item as menuitemradio with aria-checked, and leaves plain items as menuitem', () => {
     const items: ContextMenuItem[] = [
-      { label: 'Full width', action: vi.fn(), checked: true },
-      { label: 'Phone width', action: vi.fn(), checked: false },
+      { label: 'Full width', action: vi.fn(), checked: true, checkKind: 'radio' },
+      { label: 'Phone width', action: vi.fn(), checked: false, checkKind: 'radio' },
       { label: 'Zoom in', action: vi.fn() }
     ]
     renderMenu({ items })

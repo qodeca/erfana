@@ -26,10 +26,19 @@ vi.mock('chokidar', () => {
   return { default: { watch }, watch }
 })
 
+const gateCalls: Array<{ path: string; options: unknown }> = []
+vi.mock('./writeFinishGate', () => ({
+  createWriteFinishGate: vi.fn((path: string, options: unknown) => {
+    gateCalls.push({ path, options })
+    return { trigger: vi.fn(), cancel: vi.fn(), isPending: () => false }
+  })
+}))
+
 const noopHandlers = { onChange: () => {}, onUnlink: () => {}, onError: () => {} }
 
 beforeEach(() => {
   watchCalls.length = 0
+  gateCalls.length = 0
 })
 
 describe('createSingleFileWatcher options merge', () => {
@@ -47,7 +56,18 @@ describe('createSingleFileWatcher options merge', () => {
       usePolling: SINGLE_FILE_WATCH_OPTIONS.usePolling,
       followSymlinks: false
     })
-    expect(options.awaitWriteFinish).toEqual({ stabilityThreshold: 300, pollInterval: 100 })
+    // chokidar's own wait is off (it can get stuck, #464); the timings go to the gate
+    expect(options.awaitWriteFinish).toBe(false)
+    expect(gateCalls).toEqual([{ path: '/proj/a.md', options: { stabilityThreshold: 300, pollInterval: 100 } }])
+  })
+
+  it('passes changes straight through when an override turns the wait off', async () => {
+    const { createSingleFileWatcher } = await import('./singleFileWatch')
+
+    createSingleFileWatcher('/proj/a.md', noopHandlers, { awaitWriteFinish: false })
+
+    expect(watchCalls[0].options.awaitWriteFinish).toBe(false)
+    expect(gateCalls).toHaveLength(0)
   })
 
   it('copies awaitWriteFinish rather than sharing the constant', async () => {
@@ -68,7 +88,8 @@ describe('createSingleFileWatcher options merge', () => {
     })
 
     const { options } = watchCalls[0]
-    expect(options.awaitWriteFinish).toEqual({ stabilityThreshold: 50, pollInterval: 25 })
+    expect(options.awaitWriteFinish).toBe(false)
+    expect(gateCalls[0].options).toEqual({ stabilityThreshold: 50, pollInterval: 25 })
     // The security invariants are NOT in the overrides, so they survive.
     expect(options.followSymlinks).toBe(false)
   })
