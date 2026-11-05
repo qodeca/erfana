@@ -165,7 +165,7 @@ export function preWarning(terminal: string | null, status: TargetStatus): Targe
   if (status?.kind !== 'shell') return null
   return {
     kind: 'preWarnShell',
-    text: `${terminal} is running ${status.process ?? 'a shell'}, not an agent. Choose another terminal, or start your agent there and pick again – ${KEEP_PICK}`,
+    text: `${terminal} is running ${status.process ?? 'a shell'}, not an agent. Start your agent there, then pick again – ${KEEP_PICK}`,
     action: 'chooseTerminal'
   }
 }
@@ -219,6 +219,8 @@ export interface PickAnnounceFacts {
   readonly sentKey?: object | null
   /** A send is in flight: pick mode ending now is the send's doing, said by its own sentence. */
   readonly sending?: boolean
+  /** The sentence for a send that has started ("Sending Explain to Terminal…"), while it is in flight. */
+  readonly sendingText?: string | null
 }
 
 /** The refinement end notes the region repeats as a sentence, for the held capture (§ Announcements, *Refinement*). */
@@ -267,6 +269,8 @@ export function pickAnnouncement(prev: PickAnnounceFacts, next: PickAnnounceFact
   if (next.sent !== null && (next.sent !== prev.sent || (next.sentKey ?? null) !== (prev.sentKey ?? null))) {
     return `${next.sent}. Show terminal and Open last capture are also in the target menu.`
   }
+  // The wait for Enter can take seconds while the agent works (#449): say that the send started (round-3 UX review).
+  if (next.sendingText != null && next.sendingText !== (prev.sendingText ?? null)) return next.sendingText
   const sameCapture = next.captureId !== null && next.captureId === prev.captureId
   const newNote = next.note !== null && next.noteSeq !== prev.noteSeq ? next.note : null
   if (newNote !== null && (NOTES_ALWAYS_SPOKEN.has(newNote) || (sameCapture && SPOKEN_NOTES.has(newNote)))) {

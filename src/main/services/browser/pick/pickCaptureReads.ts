@@ -26,8 +26,8 @@ import { logger } from '../../LoggingService'
 import { readElementFacts, type ElementFacts, type StyleSheetHeader } from '../capture/captureFacts'
 import { isEmptyBitmap, type Bitmap } from '../capture/captureImage'
 import type { PageFetch } from '../capture/pageResourceFetch'
-import { collectSourceHints, type ReportedLocation, type SourceHints } from '../capture/sourceHints'
-import { locateInSourceMap } from '../capture/sourceMapLocation'
+import { collectSourceHints, type IsGitIgnored, type ReportedLocation, type SourceHints } from '../capture/sourceHints'
+import { locateInSourceMap, SourceMapCache } from '../capture/sourceMapLocation'
 import { REACT_DEBUG_STACK, REACT_LOOKUP } from '../cdp/cdpPickFunctions'
 import { isRecord } from '../cdp/cdpTypes'
 import { TOP_SESSION, type PickNode, type PickReader } from './pickCdp'
@@ -56,6 +56,8 @@ export interface PickCaptureReadsDeps {
   readonly faults?: PickFaults
   /** The tab session's `fetch`, for the React 19 source map; without it React 19 names no source. */
   readonly fetchFromPage?: PageFetch
+  /** The git-ignored check of a resolved source (S-13); without it none runs. */
+  readonly isGitIgnored?: IsGitIgnored
 }
 
 /** Screenshot attempts before the capture fails (one retry). */
@@ -63,6 +65,7 @@ const SCREENSHOT_ATTEMPTS = 2
 
 export class PickCaptureReads {
   private readonly styleSheets = new Map<string, StyleSheetHeader>()
+  private readonly sourceMaps = new SourceMapCache()
   private readonly sessionQueues = new Map<string, Promise<unknown>>()
 
   constructor(private readonly deps: PickCaptureReadsDeps) {}
@@ -70,6 +73,7 @@ export class PickCaptureReads {
   /** Forget the style sheets (pick mode starts over on a fresh set). */
   clearStyleSheets(): void {
     this.styleSheets.clear()
+    this.sourceMaps.clear()
   }
 
   /** Record a `CSS.styleSheetAdded` header. */
@@ -140,6 +144,7 @@ export class PickCaptureReads {
       reactLookup: lookup,
       reactSourceLookup: sourceLookup,
       projectRoot: this.deps.projectRoot(),
+      ...(this.deps.isGitIgnored ? { isGitIgnored: this.deps.isGitIgnored } : {}),
       clock: this.deps.clock
     })
   }
@@ -149,7 +154,7 @@ export class PickCaptureReads {
     const { reader } = this.deps
     const stack = await reader.callErrorDescription(node.sessionKey, await reader.resolve(node, 'main'), REACT_DEBUG_STACK)
     if (stack === null) return []
-    const result = await locateInSourceMap(stack, { frameOrigin, fetch: fetchFromPage, signal })
+    const result = await locateInSourceMap(stack, { frameOrigin, fetch: fetchFromPage, signal, cache: this.sourceMaps })
     if ('miss' in result) {
       // A fixed reason only: the page's URLs and paths stay out of the log.
       logger.debug('Browser pick: no React source from the source map', { reason: result.miss })

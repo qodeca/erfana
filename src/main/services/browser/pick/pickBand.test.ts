@@ -179,6 +179,13 @@ describe('OutlineBand', () => {
     expect(surface.hides).toBe(2)
   })
 
+  it('does not open its window for a placement change while nothing is outlined', () => {
+    const { band, open } = setup()
+    band.redraw()
+    expect(open).not.toHaveBeenCalled()
+    expect(band.state).toBeNull()
+  })
+
   it('is unavailable where no surface can be placed, or when opening it throws (reported once)', () => {
     expect(setup({ open: 'null' }).band.available).toBe(false)
     const failing = setup({ open: 'throws' })

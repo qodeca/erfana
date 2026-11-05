@@ -34,6 +34,7 @@ import { logger } from '../../LoggingService'
 import { BrowserCapture, type RefineMove } from '../capture/BrowserCapture'
 import { downscaleBitmap } from '../capture/captureImage'
 import type { PageFetch } from '../capture/pageResourceFetch'
+import type { IsGitIgnored } from '../capture/sourceHints'
 import type { OutlineBand } from './pickBand'
 import { PickReader, type PickCdp, type PickNode } from './pickCdp'
 import { CaptureFailure, PickCaptureReads } from './pickCaptureReads'
@@ -92,6 +93,8 @@ export interface BrowserTabPickDeps {
   readonly bench?: PickBench
   /** The tab session's `fetch`, for the React 19 source map (`PickCaptureReads`). */
   readonly fetchFromPage?: PageFetch
+  /** The git-ignored check of a resolved source (S-13, `PickCaptureReads`). */
+  readonly isGitIgnored?: IsGitIgnored
   /** Erfana's live outline (ADR 0007 decision 6, amended 2026-11-05); without it the engine draws one. */
   readonly band?: OutlineBand | null
 }
@@ -154,7 +157,8 @@ export class BrowserTabPick {
       projectRoot: deps.projectRoot,
       clock: deps.clock,
       faults: deps.faults,
-      fetchFromPage: deps.fetchFromPage
+      fetchFromPage: deps.fetchFromPage,
+      isGitIgnored: deps.isGitIgnored
     })
     this.offs.push(
       deps.cdp.on('protocolEvent', (event) => {

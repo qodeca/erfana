@@ -50,6 +50,9 @@ function focusFellToBody(): boolean {
 }
 
 /** Projects whose first send already offered the agent deny rule this session (S-21). */
+/** The closes the user starts; while a send is in flight they do nothing (the prompt is already in the terminal). */
+const USER_CLOSES: ReadonlySet<ClosePickReason> = new Set<ClosePickReason>(['esc', 'cancel', 'clickOutside', 'toolbar'])
+
 const denyRuleOffered = new Set<string>()
 
 /** The notice after a successful send. */
@@ -166,13 +169,16 @@ export function useBrowserPick(options: UseBrowserPickOptions): BrowserPick {
   const close = useCallback(
     (reason: ClosePickReason) => {
       if (tabId === null || captureId === null) return
+      // The prompt is already in the terminal while a send waits for Enter: the user's own close cannot stop it,
+      // so it does nothing until the send ends (round-3 UX review). A page change or a hidden tab still closes.
+      if (busy !== null && USER_CLOSES.has(reason)) return
       browserTabGateway.closePick({ tabId, captureId, reason }).catch(warn('Browser closePick failed'))
       drop(captureId)
       // A hidden tab keeps the typed text for its next dialog (025-FR-052); every other close ends it.
       if (reason !== 'tabHidden') setDraftText('')
       if (reason === 'esc' || reason === 'cancel' || reason === 'clickOutside') focusPage()
     },
-    [tabId, captureId, drop, focusPage]
+    [tabId, captureId, busy, drop, focusPage]
   )
 
   // Like every close but a hidden tab's, the page change's ends the typed instruction (state adjusted

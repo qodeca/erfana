@@ -25,8 +25,9 @@ export const ACCEPTANCE = `${SPEC}/requirements/04-acceptance.md`
 export const MANUAL_EVIDENCE = `${SPEC}/verification/manual-evidence.md`
 
 const ID = String.raw`025-AC-\d{3}`
-// it / test, optionally .only/.concurrent/.each(...) – never .skip/.todo/.fixme.
-const TITLE = new RegExp(String.raw`\b(?:it|test)(?:\.(?!skip|todo|fixme)\w+)*\(\s*(['"\x60])(${ID}(?:[ ,/]+${ID})*)\b`, 'g')
+// it / test, optionally .only/.concurrent/.each(...) – never .skip/.todo/.fixme, nor an expected failure
+// (Playwright test.fail('…'), Vitest it.fails('…')): a test that is meant to fail covers nothing.
+const TITLE = new RegExp(String.raw`\b(?:it|test)(?:\.(?!skip|todo|fixme|fail)\w+)*\(\s*(['"\x60])(${ID}(?:[ ,/]+${ID})*)\b`, 'g')
 
 /** The tracer's own unit test holds sample titles that are fixtures, not coverage. */
 export const SELF_TESTS = ['scripts/check-spec025-trace.test.mjs']

@@ -65,6 +65,9 @@ export interface PromptActionsPanelProps {
 }
 
 const ACTIONS: readonly SendAction[] = ['explain', 'ask', 'change', 'prompt']
+/** The close button's name while a send is in flight: the prompt is already in the terminal (round-3 UX review). */
+export const CLOSE_WHILE_SENDING = 'Already sending – the prompt is in the terminal'
+
 const ACTION_LABEL: Readonly<Record<SendAction, string>> = { explain: 'Explain', ask: 'Ask…', change: 'Change…', prompt: 'Prompt…' }
 const ACTION_DESC: Readonly<Record<SendAction, string>> = {
   explain: 'Sends now – asks the agent to explain this element',
@@ -256,8 +259,9 @@ export function PromptActionsPanel(props: PromptActionsPanelProps): JSX.Element 
           type="button"
           tabIndex={-1}
           className="erf-brw-actions__close"
-          aria-label="Close – nothing is sent"
-          title="Close – nothing is sent"
+          aria-label={busy === null ? 'Close – nothing is sent' : CLOSE_WHILE_SENDING}
+          title={busy === null ? 'Close – nothing is sent' : CLOSE_WHILE_SENDING}
+          aria-disabled={busy !== null ? true : undefined}
           onClick={onClose}
         >
           <X size={14} strokeWidth={2} aria-hidden="true" />
@@ -286,7 +290,7 @@ export function PromptActionsPanel(props: PromptActionsPanelProps): JSX.Element 
             data-tab-stop=""
             data-action={action}
             className="erf-brw-actions__action"
-            aria-label={ACTION_NAMES[action]}
+            aria-label={busy === action ? 'Sending…' : ACTION_NAMES[action]}
             aria-description={ACTION_DESC[action]}
             aria-disabled={busy !== null && busy !== action ? true : undefined}
             aria-busy={busy === action ? true : undefined}

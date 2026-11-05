@@ -311,6 +311,22 @@ describe('useBrowserPick', () => {
     expect(result.current.surface).toBe('panel')
   })
 
+  it('ignores the user\'s closes while a send waits for Enter, but a page change still closes (round-3 UX review)', async () => {
+    let finish: (value: { kind: 'failed'; reason: string }) => void = () => undefined
+    send.sendCapture.mockReturnValue(new Promise(resolve => (finish = resolve)))
+    const { result } = setup()
+    capture()
+    act(() => result.current.send('explain'))
+    expect(result.current.busy).toBe('explain')
+    for (const reason of ['esc', 'cancel', 'clickOutside', 'toolbar'] as const) act(() => result.current.close(reason))
+    expect(gateway.closePick).not.toHaveBeenCalled()
+    expect(pickTab().capture).not.toBeNull()
+    act(() => result.current.close('tabHidden'))
+    expect(gateway.closePick).toHaveBeenCalledWith({ tabId: TAB, captureId: CAPTURE, reason: 'tabHidden' })
+    finish({ kind: 'failed', reason: 'Disk full' })
+    await flush()
+  })
+
   it('sends a dialog action with its text, and keeps it after a failure', async () => {
     send.sendCapture.mockResolvedValue({ kind: 'failed', reason: 'Disk full' })
     const { result } = setup()

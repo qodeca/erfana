@@ -108,6 +108,26 @@ describe('sourceHints', () => {
       await symlink(path.join(outside, 'Secret.tsx'), path.join(root, 'src', 'Linked.tsx'))
       expect(await resolveSourcePath(root, 'src/Linked.tsx')).toBeNull()
     })
+
+    it('refuses a network path by its spelling, so no share is ever opened (round-3 security review)', async () => {
+      for (const reported of ['//attacker.example/share/a.tsx', '\\\\attacker.example\\share\\a.tsx', 'file://attacker.example/share/a.tsx']) {
+        expect(await resolveSourcePath(root, reported)).toBeNull()
+      }
+      // A local file:// URL with the localhost host is still a local file.
+      const file = path.join(root, 'src', 'components', 'Hero.tsx')
+      expect(await resolveSourcePath(root, pathToFileURL(file).href.replace('file://', 'file://localhost'))).toBe('src/components/Hero.tsx')
+    })
+
+    it('refuses a git-ignored file (S-13) and asks git with the project-relative path', async () => {
+      const ignored = vi.fn(async () => true)
+      expect(await resolveSourcePath(root, 'src/components/Hero.tsx', ignored)).toBeNull()
+      expect(ignored).toHaveBeenCalledWith(root, 'src/components/Hero.tsx')
+      expect(await resolveSourcePath(root, 'src/components/Hero.tsx', async () => false)).toBe('src/components/Hero.tsx')
+      // A path refused by its spelling never reaches git.
+      const asked = vi.fn(async () => false)
+      expect(await resolveSourcePath(root, path.join(outside, 'Secret.tsx'), asked)).toBeNull()
+      expect(asked).not.toHaveBeenCalled()
+    })
   })
 
   describe('collectSourceHints (025-FR-037)', () => {

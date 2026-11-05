@@ -55426,7 +55426,7 @@
       "quote": "**Parent element** and **Child element** (or <kbd>↑</kbd> and <kbd>↓</kbd>) move the pick",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/BrowserPanel/PromptActionsPanel.tsx:204",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/PromptActionsPanel.tsx:207",
       "match": "title=\"Parent element (↑)\""
     },
     {
@@ -55446,7 +55446,7 @@
       "quote": "**Explain** sends at once. **Ask…**, **Change…** and **Prompt…** open a box",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/BrowserPanel/PromptActionsPanel.tsx:68",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/PromptActionsPanel.tsx:71",
       "match": "const ACTION_LABEL: Readonly<Record<SendAction, string>> = { explain: 'Explain', ask: 'Ask…', change: 'Change…', prompt: 'Prompt…' }"
     },
     {
@@ -55456,7 +55456,7 @@
       "quote": "**Send** (or <kbd>⌘Enter</kbd> / <kbd>Ctrl+Enter</kbd>) sends it",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/BrowserPanel/InstructionDialog.tsx:210",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/InstructionDialog.tsx:217",
       "match": "{busy ? 'Sending…' : 'Send'}"
     },
     {
@@ -55476,7 +55476,7 @@
       "quote": "with **Choose terminal**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/BrowserPanel/PromptActionsPanel.tsx:315",
+      "source": "src/renderer/src/components/Panels/BrowserPanel/PromptActionsPanel.tsx:319",
       "match": "chooseTerminal: 'Choose terminal',"
     },
     {

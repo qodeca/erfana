@@ -36,6 +36,7 @@ import type { Bitmap } from '../capture/captureImage'
 import { renderCapture } from '../capture/captureRender'
 import { tabSessionFetch } from '../capture/pageResourceFetch'
 import { CaptureStore, CaptureWriteError } from '../capture/CaptureStore'
+import { createGitignoreEvaluator } from '../../preview/GitignoreEvaluator'
 import type { TabInputPick } from '../input/BrowserTabInput'
 import { BrowserTabPick, type PickRouting } from './BrowserTabPick'
 import { OutlineBand, type BandHostEvents, type BandPlacement, type BandState, type BandSurface } from './pickBand'
@@ -91,6 +92,7 @@ export class BrowserPicks {
   bandDrawn: ((tabId: string, box: Box, state: BandState) => void) | null = null
   readonly store: CaptureStore
   private readonly byTab = new Map<string, { tab: BrowserTab; pick: BrowserTabPick }>()
+  private readonly gitIgnore = createGitignoreEvaluator()
   /** Capture writes in flight, for {@link abortCaptureWrites}. */
   private readonly writes = new Set<{ readonly tab: BrowserTab; readonly done: Promise<unknown> }>()
 
@@ -117,6 +119,8 @@ export class BrowserPicks {
       projectRoot: () => tab.projectRoot,
       // The tab's own session: the React 19 source map read meets the page's request rules.
       fetchFromPage: tabSessionFetch(tab.contents),
+      // One hardened `git check-ignore` for every tab (S-13); it fails open on a project without git.
+      isGitIgnored: (root, rel) => this.gitIgnore.isIgnored(root, rel),
       band: this.bandFor(tab, host),
       clock: this.deps.clock,
       events,

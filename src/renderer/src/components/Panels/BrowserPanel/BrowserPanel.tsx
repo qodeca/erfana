@@ -57,6 +57,7 @@ import { useBrowserTarget } from './useBrowserTarget'
 import { useBrowserPick } from './useBrowserPick'
 import { useStillSurface } from './useStillSurface'
 import { pickPlace } from './pickRow.logic'
+import { ACTION_NAMES } from './browserSend'
 import { useBrowserStillStore } from '../../../stores/useBrowserStillStore'
 import { useProjectManagementContextSafe } from '../../../context/ProjectManagementContext'
 import { useTerminalPortalOptional } from '../../../context/TerminalPortalContext'
@@ -438,7 +439,7 @@ export function BrowserPanel(props: IDockviewPanelProps<BrowserPanelParams>): JS
         tooltip={<ToolbarTooltipBubble view={tooltip.view} />}
         tooltipOpen={tooltip.view !== null}
       />
-      <PickAnnouncer tabId={tabId} sent={pick.notice?.text ?? null} sentKey={pick.notice} sending={pick.busy !== null} />
+      <PickAnnouncer tabId={tabId} sent={pick.notice?.text ?? null} sentKey={pick.notice} sending={pick.busy !== null} sendingText={pick.busy === null ? null : `Sending ${ACTION_NAMES[pick.busy]} to ${target.terminalName ?? 'the terminal'}…`} />
       {findOpen && live && tabId !== null && <FindRow tabId={tabId} result={findResult} onClose={closeFind} />}
       <StripRows tabId={tabId} rows={rows} refused={refused} refusedId={refusedId} onEmpty={focusPageArea} />
       <PageArea

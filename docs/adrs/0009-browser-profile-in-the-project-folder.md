@@ -28,7 +28,7 @@ Facts: `session.fromPath` gives a persistent session per absolute path ([Electro
 13. **No tabs restored**: no tab list is stored anywhere (025-FR-006).
 14. **Project switch in a window** (`ProjectService` session change): end pick mode, abort a capture write and delete its partial files, then close the old project's browser views – in that order – before the new project opens.
 
-Implementation note (decision 6): the generation counters sit in their own file next to the marker's home copy, `~/.erfana/browser-profiles/<hash>.generations.json` (`profileGenerations.ts`), and `permissions.json` is signed the same way as `trust.json` and `credentials.json`.
+Implementation note (decision 6): the generation counters sit in their own file next to the marker's home copy, `~/.erfana/browser-profiles/<hash>.generations.json` (`profileGenerations.ts`), and `permissions.json` is signed the same way as `trust.json` and `credentials.json`. The signed body also carries the home record's **epoch** (`signedProfileFile.ts`, file version 3), so a signed file from a deleted and re-created home record is refused too.
 
 ## Amendment 2026-11-03: the Chromium profile moves under user data
 

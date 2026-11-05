@@ -28,7 +28,7 @@
  * "source not found" and never blocks the send.
  */
 import { realpath, stat } from 'node:fs/promises'
-import { isAbsolute, join, relative, sep } from 'node:path'
+import { isAbsolute, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Clock } from '../../../../shared/clock'
 import type { ReactHints } from '../../../../shared/browser/contextFile'
@@ -127,32 +127,47 @@ export function isResolvableSourcePath(rel: string): boolean {
   return UI_SOURCE_EXTENSIONS.some((ext) => name.endsWith(ext))
 }
 
+/** Asks git whether a project-relative path is ignored (`GitignoreEvaluator`); absent means no git check. */
+export type IsGitIgnored = (projectRoot: string, rel: string) => Promise<boolean>
+
 /**
  * The project-relative path of `reported` when it names a real file inside
  * `projectRoot` (a canonical path) that may be a resolved source; else null.
- * Absolute paths, `file://` URLs and project-relative paths are accepted;
+ * Absolute paths, local `file://` URLs and project-relative paths are accepted;
  * a link out of the project resolves outside it and is refused.
+ *
+ * The path is the page's text, so it is confined by its spelling before any
+ * file-system call (round-3 security review): a network path (`\\host\share`,
+ * `//host/share`, `file://host/…`) is refused before Windows can connect to the
+ * host and send the user's sign-in hash. A git-ignored file is refused too
+ * (S-13): a built or generated file is not the source to change.
  */
-export async function resolveSourcePath(projectRoot: string, reported: string): Promise<string | null> {
+export async function resolveSourcePath(projectRoot: string, reported: string, isGitIgnored?: IsGitIgnored): Promise<string | null> {
   let path = reported
-  if (/^file:\/\//i.test(path)) {
+  if (/^file:/i.test(path)) {
     try {
+      const url = new URL(path)
+      if (url.host !== '' && url.host.toLowerCase() !== 'localhost') return null
       // fileURLToPath, not the URL's pathname: on Windows `file:///C:/x` is `C:\\x`, never `/C:/x`.
-      path = fileURLToPath(path)
+      path = fileURLToPath(url)
     } catch {
       return null
     }
   }
   // eslint-disable-next-line no-control-regex -- control characters are refused here
   if (path === '' || /[\u0000-\u001f]/.test(path)) return null
-  const candidate = isAbsolute(path) ? path : join(projectRoot, path)
+  if (/^[\\/]{2}/.test(path)) return null
+  const candidate = resolve(projectRoot, path)
+  const spelled = relative(projectRoot, candidate)
+  if (spelled === '' || spelled.startsWith('..') || isAbsolute(spelled)) return null
   try {
     const real = await realpath(candidate)
     if (!(await stat(real)).isFile()) return null
     const rel = relative(projectRoot, real)
     if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) return null
     const posix = rel.split(sep).join('/')
-    return isResolvableSourcePath(posix) ? posix : null
+    if (!isResolvableSourcePath(posix)) return null
+    return isGitIgnored !== undefined && (await isGitIgnored(projectRoot, posix)) ? null : posix
   } catch {
     return null
   }
@@ -170,6 +185,8 @@ export interface HintSources {
    */
   readonly reactSourceLookup?: (signal: AbortSignal) => Promise<readonly ReportedLocation[]>
   readonly projectRoot: string | null
+  /** The git-ignored check of a resolved source (S-13); absent means none. */
+  readonly isGitIgnored?: IsGitIgnored
   readonly clock: Pick<Clock, 'setTimeout' | 'clearTimeout'>
 }
 
@@ -203,14 +220,14 @@ export function collectSourceHints(sources: HintSources): Promise<SourceHints> {
 async function findHints(sources: HintSources, signal: AbortSignal): Promise<SourceHints> {
   const attrs = sources.attributesNearestFirst.find((list) => list.length > 0)
   if (attrs !== undefined) {
-    const resolvedSource = await resolveLocation(sources.projectRoot, locationFromAttributes(attrs))
+    const resolvedSource = await resolveLocation(sources, locationFromAttributes(attrs))
     return { sourceAttributes: attrs, react: null, sourceNotFound: false, ...(resolvedSource ? { resolvedSource } : {}) }
   }
   if (sources.reactLookup === undefined) return { sourceAttributes: [], react: null, sourceNotFound: true }
   const parsed = parseReactAnswer(await sources.reactLookup())
   if (parsed === null) return { sourceAttributes: [], react: null, sourceNotFound: true }
   const answer = parsed.location === null ? await withMappedSource(sources, parsed, signal) : parsed
-  const resolvedSource = await resolveLocation(sources.projectRoot, answer.location)
+  const resolvedSource = await resolveLocation(sources, answer.location)
   return {
     sourceAttributes: [],
     react: answer.hints,
@@ -233,7 +250,7 @@ async function withMappedSource(sources: HintSources, answer: ReactAnswer, signa
   let chosen: ReportedLocation = candidates[0]
   if (sources.projectRoot !== null) {
     for (const candidate of candidates) {
-      const path = await resolveSourcePath(sources.projectRoot, candidate.path)
+      const path = await resolveSourcePath(sources.projectRoot, candidate.path, sources.isGitIgnored)
       if (path !== null) {
         chosen = { ...candidate, path }
         break
@@ -244,9 +261,9 @@ async function withMappedSource(sources: HintSources, answer: ReactAnswer, signa
   return { hints: { ...answer.hints, source }, location: chosen }
 }
 
-async function resolveLocation(projectRoot: string | null, location: ReportedLocation | null): Promise<SourceHints['resolvedSource']> {
-  if (projectRoot === null || location === null) return undefined
-  const path = await resolveSourcePath(projectRoot, location.path)
+async function resolveLocation(sources: HintSources, location: ReportedLocation | null): Promise<SourceHints['resolvedSource']> {
+  if (sources.projectRoot === null || location === null) return undefined
+  const path = await resolveSourcePath(sources.projectRoot, location.path, sources.isGitIgnored)
   if (path === null) return undefined
   return location.line === undefined ? { path } : { path, line: location.line }
 }

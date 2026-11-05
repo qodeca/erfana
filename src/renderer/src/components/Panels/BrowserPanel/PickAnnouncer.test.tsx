@@ -84,6 +84,15 @@ describe('PickAnnouncer (design § Announcements, M-45)', () => {
     expect(region()).toHaveTextContent('Load a page to pick an element.')
   })
 
+  it('says that a send started, once, while it waits for Enter (round-3 UX review)', () => {
+    const { rerender } = render(<PickAnnouncer tabId={TAB} sent={null} />)
+    rerender(<PickAnnouncer tabId={TAB} sent={null} sending sendingText="Sending Explain to Terminal…" />)
+    expect(region()).toHaveTextContent('Sending Explain to Terminal…')
+    const notice = { text: 'Sent Explain to Terminal' }
+    rerender(<PickAnnouncer tabId={TAB} sent={notice.text} sentKey={notice} sending={false} sendingText={null} />)
+    expect(region()).toHaveTextContent('Sent Explain to Terminal.')
+  })
+
   it('says the send, not "Picking stopped.", when pick mode goes off one render before the notice', () => {
     const { rerender } = render(<PickAnnouncer tabId={TAB} sent={null} />)
     apply({ tabId: TAB, kind: 'mode', on: true })

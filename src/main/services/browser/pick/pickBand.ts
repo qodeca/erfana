@@ -171,9 +171,11 @@ export class OutlineBand {
 
   /** Draw what is outlined again, where the page is now (placement change, window move). Never throws. */
   redraw(): void {
-    const surface = this.open()
+    // Nothing outlined: a placement change must not open the native window (round-3 architecture review).
     const wanted = this.wanted
-    if (surface === null || wanted === null) return
+    if (wanted === null) return
+    const surface = this.open()
+    if (surface === null) return
     const placement = this.deps.placement()
     const strips = placement === null ? [] : bandStrips(inSurface(wanted.box, placement), placement.clip)
     if (placement === null || strips.length === 0) return this.suspend()

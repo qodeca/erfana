@@ -5,6 +5,8 @@ import type { PageFetch } from './pageResourceFetch'
 import {
   decodeDataMap,
   findSourceMappingUrl,
+  SourceMapCache,
+  SOURCE_MAP_CACHE_MAX,
   locateInSourceMap,
   ownerStackFrame,
   parseFrame,
@@ -79,6 +81,15 @@ describe('sourceMapLocation (025-FR-037, React 19)', () => {
       expect(findSourceMappingUrl('const s = "sourceMappingURL=x.map"')).toBeNull()
       expect(findSourceMappingUrl('//# sourceMappingURL=a.map\nmore()')).toBeNull()
     })
+
+    it('stays linear on a long run of spaces, so a page cannot stall the main process (round-3 security review)', () => {
+      const spaces = ' '.repeat(200_000)
+      const started = performance.now()
+      expect(findSourceMappingUrl('//# sourceMappingURL=a' + spaces + 'b')).toBeNull()
+      expect(findSourceMappingUrl('//# sourceMappingURL=a.map' + spaces)).toBe('a.map')
+      expect(findSourceMappingUrl('/*# sourceMappingURL=a.map' + spaces + '*/' + spaces)).toBe('a.map')
+      expect(performance.now() - started).toBeLessThan(200)
+    })
   })
 
   describe('decodeDataMap', () => {
@@ -139,6 +150,29 @@ describe('sourceMapLocation (025-FR-037, React 19)', () => {
       expect(await locateInSourceMap(stackAt(SCRIPT_URL), lookup(fetch))).toEqual({ locations: [{ path: 'src/components/ItemRow.tsx', line: 16 }] })
       expect(fetch.urls).toEqual([SCRIPT_URL, `${SCRIPT_URL}.map`])
       for (const init of fetch.inits) expect(init).toMatchObject({ redirect: 'error', credentials: 'omit' })
+    })
+
+    it('reads and parses a script\'s map once while the cache holds it, and again after it is cleared (round-3 performance review)', async () => {
+      const fetch = pageFetch({ [SCRIPT_URL]: script('app.js.map'), [`${SCRIPT_URL}.map`]: JSON.stringify(MAP) })
+      const cache = new SourceMapCache()
+      const expected = { locations: [{ path: 'src/components/ItemRow.tsx', line: 16 }] }
+      expect(await locateInSourceMap(stackAt(SCRIPT_URL), { ...lookup(fetch), cache })).toEqual(expected)
+      expect(await locateInSourceMap(stackAt(SCRIPT_URL), { ...lookup(fetch), cache })).toEqual(expected)
+      expect(fetch.urls).toHaveLength(2)
+      cache.clear()
+      await locateInSourceMap(stackAt(SCRIPT_URL), { ...lookup(fetch), cache })
+      expect(fetch.urls).toHaveLength(4)
+    })
+
+    it('keeps the last few scripts only, the least recently used leaving first', () => {
+      const cache = new SourceMapCache()
+      const map = {} as never
+      for (let i = 0; i <= SOURCE_MAP_CACHE_MAX; i++) cache.set(`s${i}`, map)
+      expect(cache.get('s0')).toBeUndefined()
+      expect(cache.get('s1')).toBe(map)
+      cache.set('new', map)
+      expect(cache.get('s1')).toBe(map)
+      expect(cache.get('s2')).toBeUndefined()
     })
 
     it('maps through an inline data: map, whose sources resolve against the script', async () => {

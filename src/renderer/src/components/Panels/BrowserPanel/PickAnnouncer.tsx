@@ -33,10 +33,12 @@ export interface PickAnnouncerProps {
   readonly sentKey?: object | null
   /** A send is in flight (the panel's or dialog's busy action). */
   readonly sending?: boolean
+  /** The sentence for a send in flight ("Sending Explain to Terminal…"). */
+  readonly sendingText?: string | null
 }
 
 /** The facts of `tab` the region speaks about – never its hover label. */
-function storeFacts(tab: BrowserPickTab): Omit<PickAnnounceFacts, 'sent' | 'sentKey' | 'sending'> {
+function storeFacts(tab: BrowserPickTab): Omit<PickAnnounceFacts, 'sent' | 'sentKey' | 'sending' | 'sendingText'> {
   const capture = tab.capture
   return {
     on: tab.on,
@@ -60,9 +62,9 @@ function sameFacts(a: PickAnnounceFacts, b: PickAnnounceFacts): boolean {
  * @param props - {@link PickAnnouncerProps}
  * @returns The hidden live region
  */
-export function PickAnnouncer({ tabId, sent, sentKey = null, sending = false }: PickAnnouncerProps): JSX.Element {
+export function PickAnnouncer({ tabId, sent, sentKey = null, sending = false, sendingText = null }: PickAnnouncerProps): JSX.Element {
   const fromStore = useBrowserPickStore(useShallow(s => storeFacts(tabId === null ? IDLE_PICK : (s.byTab.get(tabId) ?? IDLE_PICK))))
-  const current: PickAnnounceFacts = { ...fromStore, sent, sentKey, sending }
+  const current: PickAnnounceFacts = { ...fromStore, sent, sentKey, sending, sendingText }
   const [seen, setSeen] = useState(current)
   // Pick mode going off while a send is in flight is held back until the send ends (see the header).
   const facts: PickAnnounceFacts = sending && seen.on && !current.on ? { ...current, on: true } : current

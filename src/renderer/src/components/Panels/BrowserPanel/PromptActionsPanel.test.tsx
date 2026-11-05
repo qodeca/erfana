@@ -148,7 +148,9 @@ describe('PromptActionsPanel (025-FR-027, 025-FR-030)', () => {
 
   it('marks busy actions, the note, the paused page and a changed page', () => {
     renderPanel({ busy: 'explain', note: 'Top of the page', frozen: true, capture: { ...CAPTURE, summary: { ...SUMMARY, changedAfterPick: true } } })
-    expect(screen.getByRole('button', { name: 'Explain' })).toHaveTextContent('Sending…')
+    // While busy the name matches the visible label (WCAG 2.5.3), and × says why it does nothing.
+    expect(screen.getByRole('button', { name: 'Sending…' })).toHaveAttribute('aria-busy', 'true')
+    expect(screen.getByRole('button', { name: 'Already sending – the prompt is in the terminal' })).toHaveAttribute('aria-disabled', 'true')
     const ask = screen.getByRole('button', { name: 'Ask' })
     expect(ask).toHaveAttribute('aria-disabled', 'true')
     // The dim is on the label span, never the button, so a focused one keeps a full ring (Permission band card).

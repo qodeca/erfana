@@ -24,7 +24,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { ArrowLeft, CircleX } from 'lucide-react'
 import { formatShortcut } from '../../../utils/shortcutLabel'
 import type { SendAction } from './browserSend'
-import { BannerSlot } from './PromptActionsPanel'
+import { BannerSlot, CLOSE_WHILE_SENDING } from './PromptActionsPanel'
 import type { TargetBanner } from './pickRow.logic'
 import { BROWSER_TEST_IDS } from './browserTestIds'
 
@@ -177,6 +177,7 @@ export function InstructionDialog({
         className="erf-brw-dialog__field"
         rows={4}
         value={text}
+        readOnly={busy}
         aria-invalid={invalid ? true : undefined}
         aria-describedby={invalid ? `${errorId} ${hintId}` : hintId}
         onChange={event => {
@@ -198,7 +199,13 @@ export function InstructionDialog({
         {target}
       </div>
       <div className="erf-brw-dialog__buttons">
-        <button type="button" className="erf-brw-actions__action" onClick={onCancel}>
+        <button
+          type="button"
+          className="erf-brw-actions__action"
+          aria-disabled={busy ? true : undefined}
+          title={busy ? CLOSE_WHILE_SENDING : undefined}
+          onClick={onCancel}
+        >
           Cancel
         </button>
         <button

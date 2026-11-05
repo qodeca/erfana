@@ -99,6 +99,9 @@ describe('preWarning (M-28)', () => {
     const shell = preWarning('Terminal', { kind: 'shell', process: 'zsh' })
     expect(shell).toMatchObject({ kind: 'preWarnShell', action: 'chooseTerminal' })
     expect(shell?.text).toMatch(/^Terminal is running zsh, not an agent\./)
+    // One terminal in v1 (025-FR-061): the text names no other terminal to choose (round-3 UX review).
+    expect(shell?.text).toMatch(/^Terminal is running zsh, not an agent\. Start your agent there, then pick again – /)
+    expect(shell?.text).not.toContain('another terminal')
     expect(preWarning('Terminal', { kind: 'shell', process: null })?.text).toContain('running a shell')
     expect(preWarning('Terminal', { kind: 'agent', process: 'claude' })).toBeNull()
     expect(preWarning('Terminal', null)).toBeNull()

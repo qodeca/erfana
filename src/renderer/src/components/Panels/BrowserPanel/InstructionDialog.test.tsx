@@ -69,6 +69,10 @@ describe('InstructionDialog (025-FR-031)', () => {
     expect(props.onSend).toHaveBeenCalledTimes(2)
     rerender(<InstructionDialog {...props} busy />)
     expect(screen.getByRole('button', { name: 'Sending…' })).toHaveAttribute('aria-busy', 'true')
+    // While the prompt waits for Enter the text cannot change, and Cancel says why it does nothing (round-3 UX review).
+    expect(screen.getByRole('textbox')).toHaveAttribute('readonly')
+    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveAttribute('title', 'Already sending – the prompt is in the terminal')
     fireEvent.click(screen.getByRole('button', { name: 'Sending…' }))
     expect(props.onSend).toHaveBeenCalledTimes(2)
   })

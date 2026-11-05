@@ -35,7 +35,7 @@ describe('check-spec025-trace', () => {
   it('counts IDs at the start of titles per lane and ignores skipped tests and later mentions', () => {
     const files = {
       'a.test.ts': `it('025-AC-002 rule 1', () => {})\ntest("025-AC-003, 025-AC-004 nav", () => {})\nit.skip('025-AC-005 no', () => {})\nit('see 025-AC-006', () => {})`,
-      'b.e2e.ts': `test('025-AC-002 loads', async () => {})\ntest.fixme('025-AC-007 no', async () => {})`
+      'b.e2e.ts': `test('025-AC-002 loads', async () => {})\ntest.fixme('025-AC-007 no', async () => {})\ntest.fail('025-AC-008 expected to fail', async () => {})`
     }
     const byLane = testedIds(Object.keys(files), f => files[f])
     expect([...byLane.unit].sort()).toEqual(['025-AC-002', '025-AC-003', '025-AC-004'])

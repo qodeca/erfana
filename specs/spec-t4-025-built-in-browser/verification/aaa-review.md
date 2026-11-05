@@ -69,3 +69,36 @@ Four lenses are under 8. Every finding goes to a fix round; each lens is then re
 | Test | 8 | 0 | 0 | 1 | 3 | [reviews/test-r2.md](reviews/test-r2.md) |
 
 Every lens scores 8 or higher, with no critical or high finding. The remaining medium findings are fixed after this round or recorded as technical debt; the fix record follows.
+
+### Round 3 – 2026-11-05, against `898c9c34` (fresh agents of the same types)
+
+Run again because rounds 1 and 2 predate the owner decisions of 2026-11-05 (the Erfana-drawn outline band, React 19 source maps, the queued terminal send, the in-use chip removal).
+
+| Lens | Score | Critical | High | Medium | Low | Report |
+|---|---|---|---|---|---|---|
+| Code | 8 | 0 | 0 | 1 | 3 | [reviews/code-r3.md](reviews/code-r3.md) |
+| Security | 8 | 0 | 0 | 2 | 2 | [reviews/security-r3.md](reviews/security-r3.md) |
+| Architecture | 8 | 0 | 0 | 1 | 12 | [reviews/architecture-r3.md](reviews/architecture-r3.md) |
+| UX | 7 | 0 | 0 | 3 | 5 | [reviews/ux-r3.md](reviews/ux-r3.md) |
+| UI | 8 | 0 | 0 | 2 | 5 | [reviews/ui-r3.md](reviews/ui-r3.md) |
+| Performance | 8 | 0 | 0 | 2 | 6 | [reviews/performance-r3.md](reviews/performance-r3.md) |
+| Test | 8 | 0 | 0 | 1 | 3 | [reviews/test-r3.md](reviews/test-r3.md) |
+
+UX is under 8, so its findings go to a fix round and a fresh UX agent reviews again. Security is re-run too, because its two fixes sit on the hostile-page boundary.
+
+**Round 3 fix record (medium findings)**
+
+| Lens | Finding | Fix | Test |
+|---|---|---|---|
+| Code | S-13 git-ignored rule not built | `resolveSourcePath` asks the hardened `GitignoreEvaluator` (one per `BrowserPicks`); fails open on a project without git | `sourceHints.test.ts` – "refuses a git-ignored file (S-13)…" |
+| Security | Windows network path opened before the root check (NTLM hash leak) | `file:` URLs with a host and `\\`/`//` paths refused; the path is confined by its spelling before `realpath` | `sourceHints.test.ts` – "refuses a network path by its spelling…" |
+| Security | Quadratic `sourceMappingURL` regex | Tail trimmed first; pattern parts share no character | `sourceMapLocation.test.ts` – "stays linear on a long run of spaces…" |
+| Architecture | Band opened its window on a placement change with nothing outlined | `redraw()` returns before `open()` when nothing is wanted | `pickBand.test.ts` – "does not open its window for a placement change…" |
+| UX | Close during the queued send said "nothing is sent" | User closes (Esc, ×, Cancel, click outside, Pick element) do nothing while busy; × and Cancel say why; the field is read-only | `useBrowserPick.test.tsx`, `PromptActionsPanel.test.tsx`, `InstructionDialog.test.tsx` |
+| UX | Silent send wait; busy name not the visible label | "Sending {action} to {terminal}…" said once; the busy button's name is "Sending…" | `PickAnnouncer.test.tsx`, `PromptActionsPanel.test.tsx` |
+| UX | Shell pre-warning said "Choose another terminal" with one terminal | "Start your agent there, then pick again"; design note and screen updated | `pickRow.logic.test.ts` |
+| UI | Still-image inner line lost in forced colours | Inner ink line is a nested `::after` box, `CanvasText` in forced colours | CSS; checked by `npm run lint:css` |
+| UI | Picked look not in the Differences table | Row added (outline only on the still image, owner decision Q2); in-use chip and React 19 rows updated | Design note |
+| Performance | Source map read and parsed on every pick | Per-tab `SourceMapCache` (4 scripts, LRU), cleared when pick mode starts over | `sourceMapLocation.test.ts` – cache tests |
+| Performance | AC-050 send bench predates the queued send | Owner queue item 52: rerun on the Mac with the band bench | – |
+| Test | Trace script counted `test.fail` titles | Lookahead now excludes `fail` | `check-spec025-trace.test.mjs` |

@@ -70,6 +70,39 @@ export interface SourceMapLookup {
   readonly frameOrigin: string | null
   readonly fetch: PageFetch
   readonly signal: AbortSignal
+  /** Parsed maps of this pick mode's scripts; without it every lookup reads and parses again. */
+  readonly cache?: SourceMapCache
+}
+
+/** Scripts whose parsed map is kept per tab (round-3 performance review). */
+export const SOURCE_MAP_CACHE_MAX = 4
+
+/**
+ * The parsed source maps of the last few scripts, by script URL, so a second
+ * pick on the same page neither reads nor parses again. The owner clears it
+ * when pick mode starts over, so a rebuilt bundle is read fresh.
+ */
+export class SourceMapCache {
+  private readonly maps = new Map<string, TraceMap>()
+
+  get(scriptUrl: string): TraceMap | undefined {
+    const map = this.maps.get(scriptUrl)
+    if (map !== undefined) {
+      this.maps.delete(scriptUrl)
+      this.maps.set(scriptUrl, map)
+    }
+    return map
+  }
+
+  set(scriptUrl: string, map: TraceMap): void {
+    this.maps.delete(scriptUrl)
+    this.maps.set(scriptUrl, map)
+    while (this.maps.size > SOURCE_MAP_CACHE_MAX) this.maps.delete(this.maps.keys().next().value as string)
+  }
+
+  clear(): void {
+    this.maps.clear()
+  }
 }
 
 /**
@@ -106,7 +139,9 @@ export function findSourceMappingUrl(script: string): string | null {
   const at = script.lastIndexOf(MAPPING_URL_KEY)
   if (at < 0) return null
   if (!/(?:\/\/|\/\*)[#@][ \t]*$/.test(script.slice(Math.max(0, at - 16), at))) return null
-  const m = /^([^\s'"*]+)[ \t]*(?:\*\/)?\s*$/.exec(script.slice(at + MAPPING_URL_KEY.length))
+  // Trimmed first, and no two parts of the pattern match the same character, so the match is linear on
+  // any page text (round-3 security review: `[ \t]*` then `\s*` backtracked quadratically).
+  const m = /^([^\s'"*]+)(?:[ \t]*\*\/)?$/.exec(script.slice(at + MAPPING_URL_KEY.length).trimEnd())
   return m === null ? null : m[1]
 }
 
@@ -181,6 +216,8 @@ export async function locateInSourceMap(stack: string, lookup: SourceMapLookup):
   if (frame === null) return { miss: 'no owner frame' }
   const script = webUrl(frame.url)
   if (script === null || lookup.frameOrigin === null || script.origin !== lookup.frameOrigin) return { miss: 'script not of the frame origin' }
+  const cached = lookup.cache?.get(script.href)
+  if (cached !== undefined) return mapPosition(cached, frame, script.origin)
   const scriptText = await fetchPageText(lookup.fetch, script.href, SCRIPT_MAX_BYTES, lookup.signal)
   if (scriptText === null) return { miss: 'script not read' }
   const ref = findSourceMappingUrl(scriptText)
@@ -189,6 +226,7 @@ export async function locateInSourceMap(stack: string, lookup: SourceMapLookup):
   if ('miss' in loaded) return loaded
   const map = parseSourceMap(loaded.text, loaded.mapUrl)
   if (map === null) return { miss: 'source map malformed' }
+  lookup.cache?.set(script.href, map)
   return mapPosition(map, frame, script.origin)
 }
 
