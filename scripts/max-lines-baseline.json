@@ -6,7 +6,7 @@
     "src/main/ipc/transcription-handlers.ts": 788,
     "src/main/services/ExternalFileService.ts": 909,
     "src/main/services/FileService.ts": 1148,
-    "src/main/services/FileWatcherService.ts": 581,
+    "src/main/services/FileWatcherService.ts": 579,
     "src/main/services/GitWatcherService.ts": 794,
     "src/main/services/LocalWhisperService.ts": 947,
     "src/main/services/LoggingService.ts": 623,

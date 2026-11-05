@@ -4080,7 +4080,7 @@
       "quote": "**Restart**: `RotateCw` icon in the header (`title=\"Restart terminal\"`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:824",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:841",
       "match": "title: 'Restart terminal',"
     },
     {
@@ -4150,7 +4150,7 @@
       "quote": "| Scroll to bottom | `ArrowDownToLine` | Scroll to bottom |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:816",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:849",
       "match": "title: 'Scroll to bottom',"
     },
     {
@@ -4160,7 +4160,7 @@
       "quote": "| Scroll lock | `LockKeyhole` / `LockKeyholeOpen` | Lock scroll to bottom / Disable scroll lock |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:832",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:831",
       "match": "title: scrollLocked ? 'Disable scroll lock' : 'Lock scroll to bottom',"
     },
     {
@@ -4170,7 +4170,7 @@
       "quote": "| Maximize terminal | `Maximize2` / `Minimize2` |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:842",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:816",
       "match": "icon: terminalExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />,"
     },
     {
@@ -5163,7 +5163,7 @@
       "quote": "A raw hex instead of a step of the grey scale (`design-tokens.css:441`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/styles/design-tokens.css:446",
+      "source": "src/renderer/src/styles/design-tokens.css:452",
       "match": "--scrollbar-thumb-hover: #4e4e4e;"
     },
     {
@@ -5333,21 +5333,20 @@
       "id": "docs-design-system-README/32",
       "audience": "developer",
       "doc": "docs/design-system/README.md",
-      "quote": "(`MarkdownToolbar.tsx:130`, `MermaidToolbar.tsx:110`, `ImageViewerToolbar.tsx:173`)",
+      "quote": "(`ToolbarOverflow/ToolbarOverflow.tsx:278`, shared by the Markdown and Mermaid toolbars, and `ImageViewerToolbar.tsx:173`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:110",
-      "match": "<div className=\"mermaid-toolbar\" role=\"toolbar\""
+      "source": "src/renderer/src/components/ToolbarOverflow/ToolbarOverflow.tsx:278",
+      "match": "role={toolbarLabel ? 'toolbar' : undefined}"
     },
     {
       "id": "docs-design-system-README/33",
       "audience": "developer",
       "doc": "docs/design-system/README.md",
       "quote": "so a screen reader cannot tell which mode is on (`MarkdownToolbar.tsx:291`)",
-      "status": "verified",
+      "status": "removed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:298",
-      "match": "className={`view-mode-btn ${viewMode === 'editor' ? 'active' : ''}`}"
+      "note": "Gap fixed in #461: the view-mode buttons now set aria-pressed (ToolbarOverflow); the row was dropped from the gap table"
     },
     {
       "id": "docs-design-system-README/34",
@@ -5356,7 +5355,7 @@
       "quote": "`MarkdownToolbar.css` types its separator width as a pixel literal",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.css:134",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.css:137",
       "match": "width: 1px;"
     },
     {
@@ -12920,11 +12919,11 @@
       "id": "docs-build-whisper-binaries/10",
       "audience": "developer",
       "doc": "docs/build/whisper-binaries.md",
-      "quote": "currently a **resolvability** probe only (`Get-Command signtool.exe`)",
+      "quote": "it looks for `signtool.exe` in the newest Windows 10 SDK `bin` folder",
       "status": "verified",
       "evidence": "source",
       "source": ".github/workflows/whisper-binaries-canary.yml:70",
-      "match": "Get-Command signtool.exe"
+      "match": "signtool is not on PATH on GitHub runners"
     },
     {
       "id": "docs-build-whisper-binaries/11",
@@ -12933,7 +12932,7 @@
       "quote": "creates (or comments on) a GitHub issue",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/whisper-binaries-canary.yml:111",
+      "source": ".github/workflows/whisper-binaries-canary.yml:114",
       "match": "--label canary"
     },
     {
@@ -14656,8 +14655,8 @@
       "quote": "| Change direction | Click `mermaid-direction-btn-{TB/BT/LR/RL}` |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:127",
-      "match": "data-testid={`${TEST_IDS.MERMAID_DIRECTION_BTN}-${direction}`}"
+      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:129",
+      "match": "testId: `${TEST_IDS.MERMAID_DIRECTION_BTN}-${direction}`"
     },
     {
       "id": "testing-e2e-third-party/11",
@@ -15167,7 +15166,7 @@
       "quote": "| `canary` | #fbca04 | Scheduled canary-run failures; applied by `whisper-binaries-canary.yml` notify-on-failure |",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/whisper-binaries-canary.yml:111",
+      "source": ".github/workflows/whisper-binaries-canary.yml:114",
       "match": "--label canary"
     },
     {
@@ -15733,7 +15732,7 @@
       "quote": "- `TerminalToolbar.tsx` - Screenshot, scroll, restart buttons; exported but not rendered",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:816",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:849",
       "match": "title: 'Scroll to bottom',",
       "note": "Implied the panel renders TerminalToolbar; the header buttons are inline in TerminalPanel.tsx and TerminalToolbar is only re-exported."
     },
@@ -16203,7 +16202,7 @@
       "quote": "**Icon**: ⬇️ (ArrowDownToLine from lucide-react)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:814",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:847",
       "match": "<ArrowDownToLine size={14} />"
     },
     {
@@ -16213,7 +16212,7 @@
       "quote": "  title=\"Scroll to bottom\"",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:816",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:849",
       "match": "title: 'Scroll to bottom',",
       "note": "Title was given as \"Scroll to Bottom\"; the button's title is sentence case."
     },
@@ -16309,7 +16308,7 @@
       "quote": "- **Built-in Helper**: Erfana v0.3.2+ includes a \"Scroll to bottom\" button",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:815",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:848",
       "match": "label: 'Scroll to bottom',",
       "note": "Label was quoted in title case."
     },
@@ -16351,7 +16350,7 @@
       "quote": "**Editor Only** (`editor`) - focus on writing; PDF/DOCX export is disabled in this mode",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:133",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:207",
       "match": "const exportDisabled = viewMode === 'editor'"
     },
     {
@@ -16361,8 +16360,8 @@
       "quote": "**Split Horizontal** (`split-horizontal`) - preview on top, editor below",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:309",
-      "match": "title=\"Split Horizontal (Preview Top)\""
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:138",
+      "match": "'Split Horizontal (Preview Top)'"
     },
     {
       "id": "docs-editor-README/03",
@@ -16371,8 +16370,8 @@
       "quote": "**Split Vertical** (`split`) - side by side, with synchronized scrolling",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:318",
-      "match": "title=\"Split Vertical (Side by Side)\""
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:145",
+      "match": "'Split Vertical (Side by Side)'"
     },
     {
       "id": "docs-editor-README/04",
@@ -16830,7 +16829,7 @@
       "quote": "Formatting buttons are visible in the editor and split-vertical modes only.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:126",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:204",
       "match": "const showFormattingButtons = viewMode === 'editor' || viewMode === 'split'"
     },
     {
@@ -16840,8 +16839,8 @@
       "quote": "| Insert link (Cmd/Ctrl+K) | `insertLink()` | `[text](url)` |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:182",
-      "match": "title={`Insert Link (${formatShortcut('K', { mod: true })})`}"
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:114",
+      "match": "title: 'Insert Link', shortcutKey: 'K'"
     },
     {
       "id": "docs-editor-README/50",
@@ -16860,8 +16859,8 @@
       "quote": "preview and split-horizontal modes where the formatting buttons are hidden.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:130",
-      "match": "const showSearchInLeftSection = viewMode === 'preview' || viewMode === 'split-horizontal'"
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:204",
+      "match": "const showFormattingButtons = viewMode === 'editor' || viewMode === 'split'"
     },
     {
       "id": "docs-editor-mermaid-viewer/01",
@@ -16870,8 +16869,8 @@
       "quote": "Click the **View fullscreen** button (a maximize icon) in the toolbar that appears when you hover",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:140",
-      "match": "title=\"View fullscreen\"",
+      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:139",
+      "match": "title: 'View fullscreen'",
       "note": "Described an expand arrow icon; the control is the View fullscreen button in the diagram's hover toolbar."
     },
     {
@@ -17198,7 +17197,7 @@
       "quote": "The diagram's toolbar (direction buttons and **View fullscreen**) appears on hover or keyboard focus",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.css:19",
+      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.css:26",
       "match": ".mermaid-toolbar:focus-within {",
       "note": "Described a standalone expand button; it lives in the diagram toolbar, which also shows on keyboard focus."
     },
@@ -19319,7 +19318,7 @@
       "quote": "| Dragging | 40% opacity, grabbing cursor |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/styles/design-tokens.css:434",
+      "source": "src/renderer/src/styles/design-tokens.css:440",
       "match": "--opacity-disabled: 0.4;"
     },
     {
@@ -20069,7 +20068,7 @@
       "quote": "void acquireFileWatch(slot, filePath).then(({ started, error, cause }) => {",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:401",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:382",
       "match": "void acquireFileWatch(slot, filePath).then(({ started, error, cause }) => {"
     },
     {
@@ -20101,7 +20100,7 @@
       "quote": "# - Toolbar shows \"Reloaded from disk\" (1 second)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:291",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:333",
       "match": "Reloaded from disk"
     },
     {
@@ -21477,11 +21476,11 @@
       "id": "docs-technical-debt/08",
       "audience": "developer",
       "doc": "docs/technical-debt.md",
-      "quote": "`MarkdownPreview.tsx` has since shrunk to 1,317",
+      "quote": "`MarkdownPreview.tsx` has since shrunk to 1,313",
       "status": "fixed",
       "evidence": "source",
       "source": "scripts/max-lines-baseline.json:27",
-      "match": "\"src/renderer/src/components/Editor/MarkdownPreview.tsx\": 1317",
+      "match": "\"src/renderer/src/components/Editor/MarkdownPreview.tsx\": 1313",
       "note": "\"Both are frozen at those sizes\" no longer held for MarkdownPreview.tsx: the ratchet lowered its cap to 1,317; the page now says so."
     },
     {
@@ -21683,11 +21682,11 @@
       "id": "docs-technical-debt/28",
       "audience": "developer",
       "doc": "docs/technical-debt.md",
-      "quote": "(`FileWatcherService.ts:126`)",
+      "quote": "(`FileWatcherService.ts:123`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:126",
-      "match": "!filePath.startsWith(this.projectPath)",
+      "source": "src/main/services/FileWatcherService.ts:123",
+      "match": "!isLexicallyInside(filePath, this.projectPath)",
       "note": "Line reference was :112"
     },
     {
@@ -21754,11 +21753,11 @@
       "id": "docs-technical-debt/35",
       "audience": "developer",
       "doc": "docs/technical-debt.md",
-      "quote": "It has since grown past it: 581 lines, frozen there in `scripts/max-lines-baseline.json`.",
+      "quote": "It has since grown past it: 579 lines, frozen there in `scripts/max-lines-baseline.json`.",
       "status": "fixed",
       "evidence": "source",
       "source": "scripts/max-lines-baseline.json:9",
-      "match": "\"src/main/services/FileWatcherService.ts\": 581",
+      "match": "\"src/main/services/FileWatcherService.ts\": 579",
       "note": "Said the file stayed under the cap; it is 581 lines and baselined"
     },
     {
@@ -24017,11 +24016,11 @@
       "id": "docs-windows-whisper-support-runbook/15",
       "audience": "developer",
       "doc": "docs/windows/whisper-support-runbook.md",
-      "quote": "update `APPLE_APP_PASSWORD` secret in `production-signing` environment",
+      "quote": "update `APPLE_APP_SPECIFIC_PASSWORD` secret in `production-signing` environment",
       "status": "verified",
       "evidence": "source",
       "source": ".github/workflows/whisper-binaries-canary.yml:39",
-      "match": "APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}"
+      "match": "APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}"
     },
     {
       "id": "docs-windows-whisper-support-runbook/16",
@@ -24030,8 +24029,8 @@
       "quote": "**`signtool.exe not found`** → Windows runner image regressed",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/whisper-binaries-canary.yml:72",
-      "match": "signtool.exe not found on PATH"
+      "source": ".github/workflows/whisper-binaries-canary.yml:75",
+      "match": "signtool.exe not found under"
     },
     {
       "id": "docs-windows-whisper-support-runbook/17",
@@ -24040,7 +24039,7 @@
       "quote": "titled `[canary] whisper-binaries credential health failure <date>`",
       "status": "verified",
       "evidence": "source",
-      "source": ".github/workflows/whisper-binaries-canary.yml:91",
+      "source": ".github/workflows/whisper-binaries-canary.yml:94",
       "match": "[canary] whisper-binaries credential health failure"
     },
     {
@@ -28601,8 +28600,8 @@
       "quote": "View modes: Editor Only, Split Horizontal, Split Vertical, Preview Only",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:318",
-      "match": "title=\"Split Vertical (Side by Side)\""
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:145",
+      "match": "'Split Vertical (Side by Side)'"
     },
     {
       "id": "user-guide-feature-inventory/52",
@@ -28621,8 +28620,8 @@
       "quote": "Insert Link, Insert Image, Heading 1, Bullet List, Numbered List, Find",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:191",
-      "match": "title=\"Insert Image\"",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:116",
+      "match": "title: 'Insert Image'",
       "note": "Named Link, Image and lists; the tooltips are Insert Link, Insert Image, Bullet List and Numbered List."
     },
     {
@@ -28756,8 +28755,8 @@
       "quote": "Mermaid diagrams with a toolbar: direction buttons, View fullscreen",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:140",
-      "match": "title=\"View fullscreen\""
+      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:139",
+      "match": "title: 'View fullscreen'"
     },
     {
       "id": "user-guide-feature-inventory/67",
@@ -29519,7 +29518,7 @@
       "quote": "Markdown to PDF and Word; disabled in Editor Only",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:133",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:207",
       "match": "const exportDisabled = viewMode === 'editor'"
     },
     {
@@ -29834,8 +29833,8 @@
       "quote": "| KEY-09 | <kbd>⌘F</kbd> / <kbd>Ctrl+F</kbd> | Find",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:233",
-      "match": "title={`Find (${formatShortcut('F', { mod: true })})`}"
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:227",
+      "match": "const findShortcut = formatShortcut('F', { mod: true })"
     },
     {
       "id": "user-guide-feature-inventory/172",
@@ -29896,7 +29895,7 @@
       "quote": "| Terminal copy and paste (<kbd>⌃C</kbd> / <kbd>Ctrl+C</kbd> without a selection interrupts)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/utils/terminalClipboard.logic.ts:57",
+      "source": "src/renderer/src/utils/terminalClipboard.logic.ts:75",
       "match": "if (keyLower === 'c') return hasSelection ? 'copy' : 'none'"
     },
     {
@@ -30300,8 +30299,8 @@
       "quote": "Formatting toolbar: Bold, Italic, Strikethrough, Inline Code",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:173",
-      "match": "title=\"Inline Code\""
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:112",
+      "match": "title: 'Inline Code'"
     },
     {
       "id": "user-guide-feature-inventory/217",
@@ -30498,8 +30497,8 @@
       "quote": "Select **Split Vertical** in the toolbar",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:318",
-      "match": "title=\"Split Vertical (Side by Side)\""
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:145",
+      "match": "'Split Vertical (Side by Side)'"
     },
     {
       "id": "user-guide-first-ten-minutes/05",
@@ -30711,7 +30710,7 @@
       "quote": "let you select **Restart terminal** or **Maximize terminal**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:824",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:841",
       "match": "title: 'Restart terminal',",
       "note": "'restart it' named without its UI label; now uses the exact button label."
     },
@@ -30722,7 +30721,7 @@
       "quote": "or **Maximize terminal**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:844",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:818",
       "match": "title: `Maximize terminal ("
     },
     {
@@ -30884,7 +30883,7 @@
       "quote": "while you have unsaved edits, choose",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:352",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:333",
       "match": "setExternalChangeDetected(true)"
     },
     {
@@ -30904,8 +30903,8 @@
       "quote": "1. Select **Editor Only**,",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:300",
-      "match": "title=\"Editor Only\""
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:133",
+      "match": "'Editor Only'"
     },
     {
       "id": "user-guide-how-to-edit-and-preview-markdown/07",
@@ -30914,8 +30913,8 @@
       "quote": "**Split Horizontal (Preview Top)**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:309",
-      "match": "title=\"Split Horizontal (Preview Top)\"",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:138",
+      "match": "'Split Horizontal (Preview Top)'",
       "note": "Label was truncated to 'Split Horizontal'; the tooltip reads 'Split Horizontal (Preview Top)'."
     },
     {
@@ -30925,8 +30924,8 @@
       "quote": "**Split Vertical (Side by Side)**, or **Preview Only**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:318",
-      "match": "title=\"Split Vertical (Side by Side)\"",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:145",
+      "match": "'Split Vertical (Side by Side)'",
       "note": "Label was truncated to 'Split Vertical'; the tooltip reads 'Split Vertical (Side by Side)'."
     },
     {
@@ -30936,8 +30935,8 @@
       "quote": "or **Preview Only** on the toolbar.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:327",
-      "match": "title=\"Preview Only\""
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:148",
+      "match": "'Preview Only'"
     },
     {
       "id": "user-guide-how-to-edit-and-preview-markdown/10",
@@ -30946,7 +30945,7 @@
       "quote": "2. In **Editor Only** or **Split Vertical (Side by Side)**, use the formatting buttons",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:126",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:204",
       "match": "const showFormattingButtons = viewMode === 'editor' || viewMode === 'split'",
       "note": "Page said formatting buttons work 'while the editor has focus'; they are only shown in Editor Only and Split Vertical modes."
     },
@@ -30968,8 +30967,8 @@
       "quote": "such as **Bold** (",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:143",
-      "match": "title={`Bold (${formatShortcut('B', { mod: true })})`}"
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:106",
+      "match": "title: 'Bold', shortcutKey: 'B'"
     },
     {
       "id": "user-guide-how-to-edit-and-preview-markdown/13",
@@ -30978,8 +30977,8 @@
       "quote": "3. Select **Find** (<kbd>⌘F</kbd> / <kbd>Ctrl+F</kbd>) to search the open document.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:233",
-      "match": "title={`Find (${formatShortcut('F', { mod: true })})`}",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:227",
+      "match": "const findShortcut = formatShortcut('F', { mod: true })",
       "note": "Added the Find shortcut shown in the tooltip."
     },
     {
@@ -31042,8 +31041,8 @@
       "quote": "3. Select **Find** (",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:234",
-      "match": "aria-label=\"Find\""
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:231",
+      "match": "label: 'Find'"
     },
     {
       "id": "user-guide-how-to-export-to-pdf-or-word/01",
@@ -31052,8 +31051,8 @@
       "quote": "then select **Export to PDF** or **Export to Word**.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:346",
-      "match": "aria-label=\"Export to PDF\""
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:260",
+      "match": "label: 'Export to PDF'"
     },
     {
       "id": "user-guide-how-to-export-to-pdf-or-word/02",
@@ -31062,8 +31061,8 @@
       "quote": "1. Select **Export to PDF** or **Export to Word** on the toolbar.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:360",
-      "match": "aria-label=\"Export to Word\""
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:272",
+      "match": "label: 'Export to Word'"
     },
     {
       "id": "user-guide-how-to-export-to-pdf-or-word/03",
@@ -31072,8 +31071,8 @@
       "quote": "switch the Markdown file to **Split Horizontal (Preview Top)**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:309",
-      "match": "title=\"Split Horizontal (Preview Top)\"",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:138",
+      "match": "'Split Horizontal (Preview Top)'",
       "note": "Page named a single **Split** control; the toolbar has two split buttons with these exact labels."
     },
     {
@@ -31083,8 +31082,8 @@
       "quote": "**Split Vertical (Side by Side)** or **Preview Only**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:318",
-      "match": "title=\"Split Vertical (Side by Side)\"",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:145",
+      "match": "'Split Vertical (Side by Side)'",
       "note": "Page said **Split** and **Preview**; the real labels are Split Vertical (Side by Side) and Preview Only."
     },
     {
@@ -31094,8 +31093,8 @@
       "quote": "**Split Vertical (Side by Side)** or **Preview Only**. Export",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:327",
-      "match": "title=\"Preview Only\"",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:148",
+      "match": "'Preview Only'",
       "note": "Page said **Preview**; the button label is Preview Only."
     },
     {
@@ -31105,7 +31104,7 @@
       "quote": "Export is unavailable in **Editor Only**.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:133",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:207",
       "match": "const exportDisabled = viewMode === 'editor'"
     },
     {
@@ -31115,8 +31114,8 @@
       "quote": "Export is unavailable in **Editor Only**.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:300",
-      "match": "title=\"Editor Only\""
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:207",
+      "match": "const exportDisabled = viewMode === 'editor'"
     },
     {
       "id": "user-guide-how-to-export-to-pdf-or-word/08",
@@ -31201,7 +31200,7 @@
       "quote": "Open a Markdown file in a split view or in preview only",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:133",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:207",
       "match": "const exportDisabled = viewMode === 'editor'"
     },
     {
@@ -31462,7 +31461,7 @@
       "quote": "Screenshot of an imported Markdown file open with its preview side by side.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:318",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:145",
       "match": "Split Vertical (Side by Side)",
       "note": "Alt text said 'Split view', which is not a UI label; the shown mode is Split Vertical (Side by Side)."
     },
@@ -32438,7 +32437,7 @@
       "quote": "Select **Maximize terminal** when you need more terminal space.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:844",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:818",
       "match": "title: `Maximize terminal ("
     },
     {
@@ -32448,7 +32447,7 @@
       "quote": "![Screenshot of the maximized terminal over the editor.]",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:845",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:819",
       "match": "ariaLabel: 'Maximize terminal over the editor',",
       "note": "Alt text said 'maximised'; aligned spelling with the UI's 'Maximize'."
     },
@@ -32459,7 +32458,7 @@
       "quote": "Use **Restart terminal** if a shell is stuck.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:824",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:841",
       "match": "title: 'Restart terminal',"
     },
     {
@@ -33677,8 +33676,8 @@
       "quote": "**Split Vertical**, **Split Horizontal** or **Preview Only** view",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:318",
-      "match": "title=\"Split Vertical (Side by Side)\"",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:145",
+      "match": "'Split Vertical (Side by Side)'",
       "note": "Page said 'Split or Preview view'; the view buttons are Split Vertical, Split Horizontal and Preview Only (lines 302, 311, 320)."
     },
     {
@@ -33709,7 +33708,7 @@
       "quote": "The buttons appear only for diagram types that support a direction.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:54",
+      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:57",
       "match": "const showDirectionButtons = supportsDirection(chartType)",
       "note": "Added: direction buttons are conditional on chart type."
     },
@@ -33720,7 +33719,7 @@
       "quote": "Erfana sends a prompt to the terminal, and the agent there rewrites the block.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:75",
+      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:78",
       "match": "executePromptTemplate('change-mermaid-direction'",
       "note": "Page implied the direction change is local; it sends a prompt to the terminal agent (panelUtils.ts:253 targetPanel 'terminal')."
     },
@@ -33731,8 +33730,8 @@
       "quote": "Select **View fullscreen** to open the diagram viewer.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:140",
-      "match": "title=\"View fullscreen\""
+      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:139",
+      "match": "title: 'View fullscreen'"
     },
     {
       "id": "user-guide-how-to-work-with-mermaid-diagrams/07",
@@ -34461,8 +34460,8 @@
       "quote": "**Editor Only**, **Split Horizontal**, **Split Vertical** and **Preview Only** change the panes",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:300",
-      "match": "title=\"Editor Only\"",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:133",
+      "match": "'Editor Only'",
       "note": "Split Horizontal (302), Split Vertical (311), Preview Only (320) titles on following buttons."
     },
     {
@@ -34484,8 +34483,8 @@
       "quote": "Apply **Bold**, **Italic**, **Strikethrough**, **Inline Code**, **Insert Link**, **Insert Image**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:173",
-      "match": "title=\"Inline Code\"",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:112",
+      "match": "title: 'Inline Code'",
       "test": "e2e/markdown-toolbar.e2e.ts"
     },
     {
@@ -34495,8 +34494,8 @@
       "quote": "**Heading 1**, **Bullet List**, or **Numbered List** to the selection",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:221",
-      "match": "title=\"Numbered List\""
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:122",
+      "match": "title: 'Numbered List'"
     },
     {
       "id": "user-guide-reference-editor/11",
@@ -34505,7 +34504,7 @@
       "quote": "Switch to **Editor Only** or **Split Vertical**, then select the toolbar control.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:126",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:204",
       "match": "const showFormattingButtons = viewMode === 'editor' || viewMode === 'split'",
       "note": "Was 'Editor or Split mode'; formatting buttons are hidden in Split Horizontal."
     },
@@ -34664,8 +34663,8 @@
       "quote": "**How to reach them:** the Markdown toolbar.",
       "status": "fixed",
       "evidence": "app",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:299",
-      "match": "onClick={() => onViewModeChange('editor')}",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:253",
+      "match": "onSelect: () => onViewModeChange(mode)",
       "note": "Removed the unprovable absence claim (no dedicated shortcut); kept the toolbar route, which markdown-toolbar.e2e.ts View modes tests exercise by clicking each mode button.",
       "test": "e2e/markdown-toolbar.e2e.ts"
     },
@@ -34699,7 +34698,7 @@
       "quote": "The formatting controls are hidden in the other modes.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:126",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:204",
       "match": "viewMode === 'editor' || viewMode === 'split'"
     },
     {
@@ -34720,8 +34719,8 @@
       "quote": "**Bold**, **Italic**, **Strikethrough**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:161",
-      "match": "title=\"Strikethrough\"",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:110",
+      "match": "title: 'Strikethrough'",
       "note": "Bold title line 137, Italic line 146."
     },
     {
@@ -34731,8 +34730,8 @@
       "quote": "Select **Export to PDF** or **Export to Word** in the toolbar",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:346",
-      "match": "aria-label=\"Export to PDF\""
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:260",
+      "match": "label: 'Export to PDF'"
     },
     {
       "id": "user-guide-reference-export/02",
@@ -34741,8 +34740,8 @@
       "quote": "Select **Export to PDF** or **Export to Word** in the toolbar",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:360",
-      "match": "aria-label=\"Export to Word\""
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:272",
+      "match": "label: 'Export to Word'"
     },
     {
       "id": "user-guide-reference-export/03",
@@ -34762,7 +34761,7 @@
       "quote": "both buttons are disabled in the **Editor only** view mode",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:133",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:207",
       "match": "const exportDisabled = viewMode === 'editor'",
       "note": "Was 'unavailable in Editor Only mode'; buttons are disabled, and the control's accessible label is 'Editor only' (MarkdownToolbar.tsx:294)."
     },
@@ -34773,8 +34772,8 @@
       "quote": "open a Markdown file in a preview or split view mode",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:343",
-      "match": "'Export to PDF (switch to preview or split mode)'",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:54",
+      "match": "const EXPORT_DISABLED_REASON = 'switch to preview or split mode'",
       "note": "Was 'Preview or Split mode'; there are three such modes (Split horizontal, Split vertical, Preview only), so lowercase generic wording."
     },
     {
@@ -34867,7 +34866,7 @@
       "quote": "Screenshot of the Markdown toolbar with the Export to PDF and Export to Word buttons.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:358",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:273",
       "match": ": 'Export to Word'",
       "note": "Alt text did not name the controls; now names both buttons."
     },
@@ -36997,7 +36996,7 @@
       "quote": "| Interrupt without selected text | <kbd>⌃C</kbd> | <kbd>Ctrl+C</kbd> |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/utils/terminalClipboard.logic.ts:63",
+      "source": "src/renderer/src/utils/terminalClipboard.logic.ts:75",
       "match": "if (keyLower === 'c') return hasSelection ? 'copy' : 'none'"
     },
     {
@@ -37496,8 +37495,8 @@
       "quote": "choose **Preview Only** or a Split mode from the toolbar",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:327",
-      "match": "title=\"Preview Only\""
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:148",
+      "match": "'Preview Only'"
     },
     {
       "id": "user-guide-reference-markdown-preview/05",
@@ -37506,8 +37505,8 @@
       "quote": "or a Split mode from the toolbar",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:318",
-      "match": "title=\"Split Vertical (Side by Side)\""
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:145",
+      "match": "'Split Vertical (Side by Side)'"
     },
     {
       "id": "user-guide-reference-markdown-preview/06",
@@ -37683,8 +37682,8 @@
       "quote": "Its toolbar changes direction and opens the full-screen viewer",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:141",
-      "match": "aria-label=\"Open diagram in fullscreen\""
+      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:140",
+      "match": "ariaLabel: 'Open diagram in fullscreen'"
     },
     {
       "id": "user-guide-reference-markdown-preview/23",
@@ -37694,7 +37693,7 @@
       "status": "verified",
       "evidence": "source",
       "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:125",
-      "match": "aria-label={`Change layout to ${getDirectionTooltip(direction)}`}"
+      "match": "ariaLabel: `Change layout to ${getDirectionTooltip(direction)}`"
     },
     {
       "id": "user-guide-reference-markdown-preview/24",
@@ -39069,7 +39068,7 @@
       "quote": "the layout direction buttons on the Mermaid diagram toolbar",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:75",
+      "source": "src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx:78",
       "match": "executePromptTemplate('change-mermaid-direction'"
     },
     {
@@ -40202,7 +40201,7 @@
       "quote": "**Scroll to bottom** jumps to the latest output",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:816",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:849",
       "match": "title: 'Scroll to bottom',"
     },
     {
@@ -40212,7 +40211,7 @@
       "quote": "**Restart terminal** starts a new terminal session",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:824",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:841",
       "match": "title: 'Restart terminal',"
     },
     {
@@ -40222,7 +40221,7 @@
       "quote": "**Lock scroll to bottom** keeps new output in view, while **Disable scroll lock**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:832",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:831",
       "match": "scrollLocked ? 'Disable scroll lock' : 'Lock scroll to bottom'"
     },
     {
@@ -40232,7 +40231,7 @@
       "quote": "**Maximize terminal** expands it over the editor",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:845",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:819",
       "match": "ariaLabel: 'Maximize terminal over the editor',"
     },
     {
@@ -40485,7 +40484,7 @@
       "quote": "<kbd>Ctrl+C</kbd> copies a selection but interrupts the running process if nothing is selected",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/utils/terminalClipboard.logic.ts:63",
+      "source": "src/renderer/src/utils/terminalClipboard.logic.ts:75",
       "match": "if (keyLower === 'c') return hasSelection ? 'copy' : 'none'"
     },
     {
@@ -41695,7 +41694,7 @@
       "quote": "A conflict notice appears if the file changed outside Erfana while the editor has local changes.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileWatcher.ts:350",
+      "source": "src/renderer/src/hooks/useFileWatcher.ts:331",
       "match": "if (hasLocalChangesRef.current) {"
     },
     {
@@ -42082,7 +42081,7 @@
       "quote": "- **Restart terminal** asks first",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:824",
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:841",
       "match": "title: 'Restart terminal',"
     },
     {
@@ -44279,7 +44278,7 @@
       "quote": "| `file-watch:error` |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:251",
+      "source": "src/main/services/FileWatcherService.ts:248",
       "match": "'file-watch:error'"
     },
     {
@@ -48650,7 +48649,7 @@
       "quote": "`--comments-window-width` 360px, `--comments-window-max-width` 480px, `--comments-drawer-width` 320px",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/styles/design-tokens.css:428",
+      "source": "src/renderer/src/styles/design-tokens.css:434",
       "match": "--comments-drawer-width: 320px;"
     },
     {
@@ -54705,7 +54704,7 @@
       "quote": "| export | Export to PDF |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:344",
+      "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:260",
       "match": "'Export to PDF'"
     },
     {

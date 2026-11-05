@@ -211,7 +211,7 @@ notarytool history probe succeeded.
 
 ### Failure signals
 
-- **Non-zero exit from `notarytool history`** → Apple app-specific password rotated out. Regenerate at https://appleid.apple.com, update `APPLE_APP_PASSWORD` secret in `production-signing` environment.
+- **Non-zero exit from `notarytool history`** → Apple app-specific password rotated out. Regenerate at https://appleid.apple.com, update `APPLE_APP_SPECIFIC_PASSWORD` secret in `production-signing` environment.
 - **`jq` assertion failed** → notarytool returned a non-JSON error (network or server-side). Retry; if persistent, check Apple Developer status page.
 - **`signtool.exe not found`** → Windows runner image regressed. File an issue to pin the runner image version.
 

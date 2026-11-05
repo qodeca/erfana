@@ -290,7 +290,7 @@ one calls the matching method on the `MonacoEditorHandle`:
 | Bullet list | `insertList(false)` | `- ` prefix |
 | Numbered list | `insertList(true)` | incremental numbers |
 
-A Find button (Cmd/Ctrl+F) sits beside them, and is rendered separately in the
+A Find button (Cmd/Ctrl+F) sits beside them, and stands alone at the start of the toolbar in the
 preview and split-horizontal modes where the formatting buttons are hidden.
 
 ### Narrow panels
