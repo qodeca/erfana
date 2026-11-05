@@ -322,6 +322,33 @@ describe('BrowserTabPick', () => {
       expect(captured).toMatchObject({ stillWidth: STILL_MAX_EDGE_PX })
     })
 
+    it('a key confirm while the next outline is still being drawn picks the shown element at its own point, not the newer pointer point (025-FR-053)', async () => {
+      await hovering(h)
+      // The outline of the element the pointer moved on to has not been drawn yet.
+      let draw: (() => void) | undefined
+      h.page.cdp.handle('Overlay.highlightQuad', () => new Promise<void>((resolve) => (draw = resolve)))
+      h.contents.mouse('mouseMove', 25, 22)
+      await settle()
+      expect(h.pick.highlight.record?.label).toMatch(/^span#label /)
+      h.routing.dispatch({ type: 'enter', now: h.clock.now() })
+      await settle()
+      draw?.()
+      await settle()
+      expect(h.pick.capture?.entry.name.id).toBe('label')
+      expect(h.pick.capture?.moment.pickPoint).toEqual({ x: 35, y: 30 })
+    })
+
+    it('a key confirm after the pointer moved within the outlined element picks it at the newer point (025-FR-053)', async () => {
+      await hovering(h)
+      h.contents.mouse('mouseMove', 36, 31)
+      await settle()
+      expect(h.pick.highlight.record?.label).toMatch(/^span#label /)
+      h.routing.dispatch({ type: 'enter', now: h.clock.now() })
+      await settle()
+      expect(h.pick.capture?.entry.name.id).toBe('label')
+      expect(h.pick.capture?.moment.pickPoint).toEqual({ x: 36, y: 31 })
+    })
+
     it('re-hit-tests at a click and captures the element under it', async () => {
       await hovering(h)
       // BrowserTabInput's listener runs first and dispatches the click; the pick controller then records the point.

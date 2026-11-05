@@ -441,6 +441,11 @@ test.describe('025-AC-034 the screenshot and the crop', () => {
 
     // A canvas pick by the second Ctrl/Cmd+E with the mouse still: the crosshair is at the mouse.
     const driver = await send.driver()
+    // The send flashes the canvas outline until main's clock moves 1 s (025-FR-060). Left up, its canvas label
+    // would satisfy the hover wait below before the hover at the mouse lands, and the key would race it.
+    await expect.poll(async () => (await driver.highlight())?.label ?? '', { timeout: SEND_WAIT_MS }).toMatch(/^canvas#canvas /)
+    await send.advanceMainClock(1000)
+    await expect.poll(() => driver.highlight(), { timeout: SEND_WAIT_MS }).toBeNull()
     await (await send.panel.page()).waitForInputReady()
     await driver.key('e', [process.platform === 'darwin' ? 'meta' : 'control'])
     await expect.poll(async () => (await driver.state()).active, { timeout: SEND_WAIT_MS }).toBe(true)

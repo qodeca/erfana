@@ -62,12 +62,17 @@ export class PickHover {
   private busy = false
   private queued: PointerReport | null = null
   private hovered: Hovered | null = null
-  /** Where the pointer last hit an element, in page view px. */
+  /**
+   * Where the pointer last hit the element the highlight shows, in page view
+   * px. Written only once that element's outline is the highlight record, so a
+   * confirm by key never pairs one element with the point of the next one,
+   * whose outline is still being drawn.
+   */
   private viewPoint: Point | null = null
 
   constructor(private readonly deps: PickHoverDeps) {}
 
-  /** Where the pointer last hit an element (page view px), for a confirm by key. */
+  /** Where the pointer last hit the highlighted element (page view px), for a confirm by key. */
   get lastViewPoint(): Point | null {
     return this.viewPoint
   }
@@ -149,13 +154,17 @@ export class PickHover {
     const hit = await this.hit(report)
     if (!this.deps.canHover()) return
     if (hit === null) return this.end()
-    this.viewPoint = hit.viewPoint
     // Skipped only while it shows: after a capture hid it, the same element is outlined again.
     const hovered = this.hovered
-    if (this.deps.highlight.record !== null && hovered !== null && hovered.index === null && sameNode(hovered.node, hit.node)) return
+    if (this.deps.highlight.record !== null && hovered !== null && hovered.index === null && sameNode(hovered.node, hit.node)) {
+      this.viewPoint = hit.viewPoint
+      return
+    }
     this.forget()
     const record = await this.deps.highlight.show(hit.node)
-    if (record === null || !this.deps.canHover()) return
+    if (record === null) return
+    this.viewPoint = hit.viewPoint
+    if (!this.deps.canHover()) return
     this.setHovered(this.restingOn(hit.node))
     this.deps.routing({ type: 'hover', element: true })
     this.deps.emit({ kind: 'highlight', label: record.label })
