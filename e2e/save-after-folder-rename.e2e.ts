@@ -8,10 +8,12 @@
  * looking normal - no "(deleted)" marker, no banner - and the next save failed
  * with ENOENT into the log only, with no toast and the edit landing nowhere.
  *
- * Now: the tab is marked deleted with the usual banner; an autosave in that
- * state fails visibly (error toast) without recreating the folder; and the
- * banner's "Save to restore it" (a manual save) recreates `docs/` and writes the
- * buffer back to the original path.
+ * Now: the tab is marked deleted with the usual banner; autosave holds in that
+ * state (#450 – the file may come back, and an autosave would overwrite it), so
+ * the edit stays in the editor, marked unsaved, and nothing recreates the
+ * folder; and the banner's "Save to restore it" (a manual save) recreates
+ * `docs/` and writes the buffer back to the original path. The autosave hold
+ * itself is timed with fake clocks in MarkdownEditorPanel.deletedRecover.test.tsx.
  *
  * Waits are condition-based only (Playwright auto-waiting and `expect.poll`).
  */
@@ -24,9 +26,8 @@ import { TabBarPage } from './pages/tab-bar.page'
 import { EditorPanelPage } from './pages/editor-panel.page'
 import { MonacoPage } from './pages/monaco.page'
 import { KeyboardHelper } from './pages/keyboard.helper'
-import { toastWithText } from './utils/toast'
 
-/** Watcher latency plus the 2 s autosave debounce, with CI headroom. */
+/** Watcher latency, with CI headroom. */
 const BUDGET_MS = 15_000
 
 test.use({
@@ -37,7 +38,7 @@ test.use({
 })
 
 test.describe('Save after the parent folder is renamed outside the app', () => {
-  test('marks the tab deleted, reports a failed autosave, and restores on manual save', async ({
+  test('marks the tab deleted, keeps the edit unsaved, and restores on manual save', async ({
     windowWithTestProject: page,
     testProject,
     keyboardHelper
@@ -63,11 +64,9 @@ test.describe('Save after the parent folder is renamed outside the app', () => {
     await expect(deletedMarker).toBeVisible({ timeout: BUDGET_MS })
     await expect(page.getByText('This file was deleted on disk. Save to restore it.')).toBeVisible()
 
-    // 2. An autosave in this state fails visibly and does not recreate the folder
+    // 2. An edit in this state stays unsaved: autosave holds and does not recreate the folder
     await monaco.appendContent('\nedit after rename\n')
-    await expect(toastWithText(page, 'its folder no longer exists on disk')).toBeVisible({
-      timeout: BUDGET_MS
-    })
+    await expect(tabs.dirtyDot('open.md')).toBeVisible()
     await expect(stat(join(testProject.path, 'docs'))).rejects.toMatchObject({ code: 'ENOENT' })
     await expect(deletedMarker).toBeVisible()
     await expect(tabs.dirtyDot('open.md')).toBeVisible()
