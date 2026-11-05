@@ -45,7 +45,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
   - [Technical Details](./file-watching/technical-details.md) - Performance, security, edge cases
 - [Prompt Templates](./prompts/README.md) - context-menu templates that send a selection to the CLI agent in the terminal (v0.3.4)
   - [AutoExecute Overview](./prompts/autoexecute-overview.md) - Feature overview and architecture
-  - [AutoExecute Technical](./prompts/autoexecute-technical.md) - Write pipeline and 200ms delay rationale
+  - [AutoExecute Technical](./prompts/autoexecute-technical.md) - Write pipeline, wait-for-quiet Enter and per-terminal send queue (#449)
   - [AutoExecute Testing](./prompts/autoexecute-testing.md) - Test coverage and mocking strategy
   - [AutoExecute Reference](./prompts/autoexecute-reference.md) - Implementation files and error handling
 - [Logging](./logging.md) - Logging layer, log levels, file rotation, settings

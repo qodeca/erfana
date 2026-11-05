@@ -33449,11 +33449,12 @@
       "id": "user-guide-how-to-view-and-export-images/12",
       "audience": "user",
       "doc": "docs/user-guide/how-to/view-and-export-images.md",
-      "quote": "Restore the file, then select **Reload**.",
+      "quote": "To check at once, select **Reload**.",
       "status": "verified",
       "evidence": "source",
       "source": "src/renderer/src/components/Panels/ImageViewerPanel/imageViewerStatus.logic.ts:161",
-      "match": "label: 'Reload'"
+      "match": "label: 'Reload'",
+      "note": "Since #450 the viewer takes a returned file back on its own; Reload stays as the manual path."
     },
     {
       "id": "user-guide-how-to-view-and-export-images/13",
@@ -55227,6 +55228,83 @@
       "evidence": "source",
       "source": "src/renderer/src/components/Comments/overlay/hostWindow.ts:41",
       "match": "export const DRAFT_REFRESH_MS = 4 * 60 * 1000"
+    },
+    {
+      "id": "user-guide-how-to-view-and-export-images/15",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/view-and-export-images.md",
+      "quote": "the viewer shows it again on its own within about 2 seconds",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/hooks/useFileChangeSubscription.ts:268",
+      "match": "useDeletedFileProbe(filePath, isFileDeleted, async () => {",
+      "note": "#450: a deleted image tab probes the disk (every 2 s, DELETED_FILE_PROBE_INTERVAL_MS) and refreshes when the file is back."
+    },
+    {
+      "id": "user-guide-how-to-edit-and-preview-markdown/20",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/edit-and-preview-markdown.md",
+      "quote": "If the file is deleted on disk, the tab says so and autosave waits.",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:253",
+      "match": "if (externalChangeDetected || isFileDeleted) return",
+      "note": "#450: autosave holds while the tab shows its file as deleted."
+    },
+    {
+      "id": "user-guide-how-to-edit-and-preview-markdown/21",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/edit-and-preview-markdown.md",
+      "quote": "a tab without edits shows it again on its own",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/hooks/takeBackReturnedFile.ts:75",
+      "match": "await deps.reload(diskContent)",
+      "note": "#450: the probe reloads a returned file into an unedited tab."
+    },
+    {
+      "id": "user-guide-how-to-edit-and-preview-markdown/22",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/edit-and-preview-markdown.md",
+      "quote": "If you typed meanwhile, choose **Reload from Disk** or **Keep My Version**.",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/hooks/takeBackReturnedFile.ts:82",
+      "match": "deps.showConflict()",
+      "note": "#450: an edited tab gets the file-changed-on-disk conflict bar."
+    },
+    {
+      "id": "user-guide-how-to-edit-and-preview-markdown/23",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/edit-and-preview-markdown.md",
+      "quote": "To write your version back while the file is gone, press <kbd>⌘S</kbd> / <kbd>Ctrl+S</kbd>.",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:314",
+      "match": "if (shouldRecreateParentDirs(trigger, isFileDeleted)) {",
+      "note": "#450: the tab's own save writes the file back (and recreates its folder) while it is deleted; autosave does not."
+    },
+    {
+      "id": "user-guide-reference-editor/32",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/editor.md",
+      "quote": "While a tab shows its file as deleted, autosave waits;",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:253",
+      "match": "if (externalChangeDetected || isFileDeleted) return",
+      "note": "#450: autosave is skipped while the tab is in the deleted state."
+    },
+    {
+      "id": "user-guide-reference-editor/33",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/editor.md",
+      "quote": "<kbd>⌘S</kbd> / <kbd>Ctrl+S</kbd> still writes the file back.",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx:314",
+      "match": "if (shouldRecreateParentDirs(trigger, isFileDeleted)) {",
+      "note": "#450: the tab's own save writes a deleted file back."
     }
   ],
   "reviewed": {

@@ -89,6 +89,7 @@ The autoExecute feature evolved through three major versions:
 **v0.3.2**: Simple fire-and-forget with 100ms delay - **unreliable**
 **v0.3.3**: Promise-based with callbacks and polling - **over-engineered, caused hangs**
 **v0.3.4**: Simplified fire-and-forget with 200ms delay - **reliable and maintainable**
+**#449**: The fixed delay replaced by waiting for the terminal output to go quiet, and sends to one terminal queued – see [AutoExecute Technical](./autoexecute-technical.md#since-449-enter-waits-for-the-paste-to-be-taken)
 
 ### Key Learnings
 
@@ -113,7 +114,7 @@ This pattern is applicable to any terminal automation requiring sequential opera
 - [Template Syntax](./template-syntax.md) - YAML frontmatter and variable syntax
 - [Template Examples](./examples.md) - Sample templates and use cases
 - [Prompt Templates README](./README.md) - User-facing overview
-- [AutoExecute Technical](./autoexecute-technical.md) - Write pipeline and 200ms delay details
+- [AutoExecute Technical](./autoexecute-technical.md) - Write pipeline and Enter timing
 - [AutoExecute Testing](./autoexecute-testing.md) - Test coverage and mocking strategy
 - [AutoExecute Reference](./autoexecute-reference.md) - Error handling and implementation files
 
