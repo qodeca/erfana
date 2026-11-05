@@ -73,7 +73,7 @@ npm run build:mac:test
 The `electron` project also runs on Linux under xvfb (a virtual X screen), inside Docker, so a run needs no visible window and does not take over the Mac. Docker Desktop must be running.
 
 ```bash
-# Whole functional suite (--project=electron is added when you pass no --project)
+# Whole functional suite, then the timing gates alone (--project=electron --project=timing is added when you pass no --project)
 npm run test:e2e:linux
 
 # Any Playwright arguments pass through
@@ -99,7 +99,7 @@ The full suite was tested at 8 CPUs, 32 GB and `ERFANA_E2E_LINUX_SHM=4g`. Use at
 
 #### A full run is noisy
 
- With 2 workers, `dockview-resize`, the `file-operations` copy test and 024-AC-024 in `markdown-comments.timing.e2e.ts` (save P95 about 1,010 ms under load, 770–840 ms alone) have each failed once in a full run and then passed alone 3 of 3. Rerun a failing test alone before you treat it as real.
+ With 2 workers, `dockview-resize` and the `file-operations` copy test have each failed once in a full run and then passed alone 3 of 3. The timing gates (`*.timing.e2e.ts`) no longer run beside them: they are the `timing` project, which runs after `electron` with one worker, because 024-AC-024's save P95 missed its budget under load (1,001 ms) while it is about 780 ms alone (owner decision 2026-11-04). Rerun a failing test alone before you treat it as real.
 
 `--no-sandbox` is not needed: Playwright's `electron.launch` adds it itself unless `chromiumSandbox: true` is passed, and nothing in the app code or the fixtures changes for the container. The one environment change the fixtures needed is `XAUTHORITY` in the env allowlist (`e2e/fixtures/isolation.ts`): `xvfb-run` protects its display with an auth file, and without the variable the app cannot open the display.
 

@@ -66,7 +66,20 @@ export default defineConfig({
     {
       name: 'electron',
       testMatch: '**/*.e2e.ts',
-      testIgnore: ['**/visual-regression*', '**/audio-transcription*'],
+      testIgnore: ['**/visual-regression*', '**/audio-transcription*', '**/*.timing.e2e.ts'],
+    },
+    {
+      // Timing gates (`*.timing.e2e.ts`, e.g. 024-NFR-001): they assert a P95
+      // budget, so they run alone, after the functional suite, with no second
+      // Electron app sharing the CPU (owner decision 2026-11-04: in the full
+      // run the save P95 missed 1000 ms by 1 ms, while it is ~780 ms alone).
+      // The budgets are unchanged. A dependency failure in `electron` skips
+      // them; run them alone with `--project=timing --no-deps`.
+      name: 'timing',
+      testMatch: '**/*.timing.e2e.ts',
+      dependencies: ['electron'],
+      fullyParallel: false,
+      workers: 1,
     },
     {
       // The built-in browser's hostile-page suite (spec 025, 025-NFR-001,

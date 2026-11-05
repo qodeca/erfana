@@ -4,7 +4,7 @@
 #
 # Run the Playwright Electron suite headless on Linux (xvfb) inside Docker.
 #   npm run test:e2e:linux [-- <playwright args>]
-# Without a --project argument it runs --project=electron.
+# Without a --project argument it runs --project=electron --project=timing (the timing gates run alone, after it).
 #
 # The repo is bind-mounted read-write, but node_modules and out/ live in named Docker
 # volumes so the host's macOS copies are never overwritten. The npm download cache has
@@ -45,7 +45,7 @@ has_project=0
 for arg in "${args[@]+"${args[@]}"}"; do
   case "$arg" in --project|--project=*) has_project=1 ;; esac
 done
-if [ "$has_project" -eq 0 ]; then args=("--project=electron" "${args[@]+"${args[@]}"}"); fi
+if [ "$has_project" -eq 0 ]; then args=("--project=electron" "--project=timing" "${args[@]+"${args[@]}"}"); fi
 
 docker build -t "$IMAGE" -f "$ROOT/e2e/docker/Dockerfile" "$ROOT/e2e/docker" || exit 1
 

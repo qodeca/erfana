@@ -10767,7 +10767,7 @@
       "status": "verified",
       "evidence": "source",
       "source": "package.json:56",
-      "match": "\"test:e2e\": \"npm run build:e2e && playwright test --project=electron\","
+      "match": "\"test:e2e\": \"npm run build:e2e && playwright test --project=electron --project=timing\","
     },
     {
       "id": "docs-README/07",
@@ -13687,7 +13687,7 @@
       "quote": "four projects in `playwright.config.ts`: `electron` functional, `transcription` env-gated, `bench` env-gated benchmarks, `visual` regression",
       "status": "verified",
       "evidence": "source",
-      "source": "playwright.config.ts:114",
+      "source": "playwright.config.ts:127",
       "match": "name: 'bench',"
     },
     {
@@ -13780,7 +13780,7 @@
       "quote": "Without it the project is `grepInvert`-ed to nothing",
       "status": "verified",
       "evidence": "source",
-      "source": "playwright.config.ts:106",
+      "source": "playwright.config.ts:119",
       "match": "grepInvert: process.env.ERFANA_E2E_TRANSCRIPTION === '1' ? undefined : /./,"
     },
     {
@@ -13881,7 +13881,7 @@
       "quote": "- `maxDiffPixelRatio: 0.01`, `retries: 0`",
       "status": "verified",
       "evidence": "source",
-      "source": "playwright.config.ts:141",
+      "source": "playwright.config.ts:154",
       "match": "maxDiffPixelRatio: 0.01,"
     },
     {
@@ -14366,7 +14366,7 @@
       "status": "verified",
       "evidence": "source",
       "source": "package.json:56",
-      "match": "\"test:e2e\": \"npm run build:e2e && playwright test --project=electron\","
+      "match": "\"test:e2e\": \"npm run build:e2e && playwright test --project=electron --project=timing\","
     },
     {
       "id": "testing-e2e-troubleshooting/02",
@@ -14793,7 +14793,7 @@
       "quote": "`playwright.config.ts` in the project root configures six Playwright projects:",
       "status": "fixed",
       "evidence": "source",
-      "source": "playwright.config.ts:134",
+      "source": "playwright.config.ts:147",
       "match": "name: 'visual',",
       "note": "Told the reader to create playwright.config.ts, which already exists."
     },
@@ -14825,7 +14825,7 @@
       "status": "verified",
       "evidence": "source",
       "source": "playwright.config.ts:69",
-      "match": "testIgnore: ['**/visual-regression*', '**/audio-transcription*'],"
+      "match": "testIgnore: ['**/visual-regression*', '**/audio-transcription*', '**/*.timing.e2e.ts'],"
     },
     {
       "id": "testing-e2e-testing/07",
@@ -14834,7 +14834,7 @@
       "quote": "`snapshotPathTemplate: '{snapshotDir}/{arg}-{platform}{ext}'`",
       "status": "verified",
       "evidence": "source",
-      "source": "playwright.config.ts:138",
+      "source": "playwright.config.ts:151",
       "match": "snapshotPathTemplate: '{snapshotDir}/{arg}-{platform}{ext}',"
     },
     {
@@ -14844,7 +14844,7 @@
       "quote": "`animations: 'disabled'`",
       "status": "verified",
       "evidence": "source",
-      "source": "playwright.config.ts:142",
+      "source": "playwright.config.ts:155",
       "match": "animations: 'disabled',"
     },
     {
@@ -14946,7 +14946,7 @@
       "quote": "| `ERFANA_E2E_BENCH=1` | Enables the `bench` Playwright project",
       "status": "fixed",
       "evidence": "source",
-      "source": "playwright.config.ts:118",
+      "source": "playwright.config.ts:131",
       "match": "grepInvert: process.env.ERFANA_E2E_BENCH === '1' ? undefined : /./,",
       "note": "Variable missing from the table."
     },
@@ -15048,7 +15048,7 @@
       "quote": "| `transcription` | `**/audio-transcription*.e2e.ts` |",
       "status": "verified",
       "evidence": "source",
-      "source": "playwright.config.ts:105",
+      "source": "playwright.config.ts:118",
       "match": "testMatch: '**/audio-transcription*.e2e.ts',"
     },
     {
@@ -25575,7 +25575,7 @@
       "status": "fixed",
       "evidence": "source",
       "source": "package.json:56",
-      "match": "\"test:e2e\": \"npm run build:e2e && playwright test --project=electron\"",
+      "match": "\"test:e2e\": \"npm run build:e2e && playwright test --project=electron --project=timing\"",
       "note": "Ledger source line number was wrong (package.json had shifted); repointed to the exact line."
     },
     {
@@ -50479,7 +50479,7 @@
       "status": "fixed",
       "evidence": "source",
       "source": "package.json:56",
-      "match": "\"test:e2e\": \"npm run build:e2e && playwright test --project=electron\"",
+      "match": "\"test:e2e\": \"npm run build:e2e && playwright test --project=electron --project=timing\"",
       "note": "Said test builds serve Playwright E2E in CI/CD; no workflow or e2e file uses ERFANA_TEST_BUILD or build:mac:test, and the suite launches the repository root unpackaged (e2e/fixtures/index.ts:124)."
     },
     {
@@ -54457,7 +54457,7 @@
       "quote": "All six baselines are generated and committed",
       "status": "verified",
       "evidence": "source",
-      "source": "playwright.config.ts:138",
+      "source": "playwright.config.ts:151",
       "match": "snapshotPathTemplate: '{snapshotDir}/{arg}-{platform}{ext}'"
     },
     {

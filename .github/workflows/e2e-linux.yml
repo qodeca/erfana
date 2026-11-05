@@ -37,7 +37,7 @@ jobs:
         # CI=1 turns on the Playwright retries (2) from playwright.config.ts.
         env:
           CI: '1'
-        run: bash scripts/e2e-linux.sh --project=electron
+        run: bash scripts/e2e-linux.sh --project=electron --project=timing
       - name: Upload report and test results
         if: always()
         # actions/upload-artifact v7.0.2
