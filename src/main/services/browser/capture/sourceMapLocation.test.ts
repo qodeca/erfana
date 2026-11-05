@@ -7,6 +7,7 @@ import {
   findSourceMappingUrl,
   SourceMapCache,
   SOURCE_MAP_CACHE_MAX,
+  SOURCE_MAP_CACHE_TEXT_MAX,
   locateInSourceMap,
   ownerStackFrame,
   parseFrame,
@@ -162,6 +163,14 @@ describe('sourceMapLocation (025-FR-037, React 19)', () => {
       cache.clear()
       await locateInSourceMap(stackAt(SCRIPT_URL), { ...lookup(fetch), cache })
       expect(fetch.urls).toHaveLength(4)
+    })
+
+    it('does not keep a map over the cache text limit (round-4 security review)', async () => {
+      const big = { ...MAP, x_pad: 'p'.repeat(SOURCE_MAP_CACHE_TEXT_MAX) }
+      const fetch = pageFetch({ [SCRIPT_URL]: script('app.js.map'), [`${SCRIPT_URL}.map`]: JSON.stringify(big) })
+      const cache = new SourceMapCache()
+      await locateInSourceMap(stackAt(SCRIPT_URL), { ...lookup(fetch), cache })
+      expect(cache.get(SCRIPT_URL)).toBeUndefined()
     })
 
     it('keeps the last few scripts only, the least recently used leaving first', () => {

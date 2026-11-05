@@ -288,6 +288,7 @@ export class BrowserTabPick {
     if (!this.active) return
     this.active = false
     this.hovering.reset()
+    this.reads.forgetSourceMaps()
     if (this.held !== null && !this.held.afterNavigation) this.release()
     await this.unfreeze()
     const sent = this.sentNode

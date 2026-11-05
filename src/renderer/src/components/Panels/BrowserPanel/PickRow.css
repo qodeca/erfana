@@ -611,16 +611,19 @@
   background: var(--color-bg-hover-solid);
 }
 
-.erf-brw-actions__step[aria-disabled='true'] > svg {
+.erf-brw-actions__step[aria-disabled='true'] > svg,
+.erf-brw-actions__close[aria-disabled='true'] > svg {
   opacity: var(--opacity-disabled);
 }
 
 /* Disabled: hover does nothing (Buttons card). */
-.erf-brw-actions__step[aria-disabled='true'] {
+.erf-brw-actions__step[aria-disabled='true'],
+.erf-brw-actions__close[aria-disabled='true'] {
   cursor: not-allowed;
 }
 
-.erf-brw-actions__step[aria-disabled='true']:hover {
+.erf-brw-actions__step[aria-disabled='true']:hover,
+.erf-brw-actions__close[aria-disabled='true']:hover {
   background: transparent;
 }
 

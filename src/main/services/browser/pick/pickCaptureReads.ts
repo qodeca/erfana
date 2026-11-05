@@ -76,6 +76,11 @@ export class PickCaptureReads {
     this.sourceMaps.clear()
   }
 
+  /** Let the parsed source maps go (pick mode ended; nothing needs them until it starts again). */
+  forgetSourceMaps(): void {
+    this.sourceMaps.clear()
+  }
+
   /** Record a `CSS.styleSheetAdded` header. */
   recordStyleSheet(params: unknown): void {
     const header = isRecord(params) && isRecord(params.header) ? params.header : null

@@ -102,3 +102,14 @@ UX is under 8, so its findings go to a fix round and a fresh UX agent reviews ag
 | Performance | Source map read and parsed on every pick | Per-tab `SourceMapCache` (4 scripts, LRU), cleared when pick mode starts over | `sourceMapLocation.test.ts` – cache tests |
 | Performance | AC-050 send bench predates the queued send | Owner queue item 52: rerun on the Mac with the band bench | – |
 | Test | Trace script counted `test.fail` titles | Lookahead now excludes `fail` | `check-spec025-trace.test.mjs` |
+
+### Round 4 – 2026-11-05, against `a06eb678` (fresh agents, the lenses re-run after round 3)
+
+| Lens | Score | Critical | High | Medium | Low | Report |
+|---|---|---|---|---|---|---|
+| UX | 8 | 0 | 0 | 0 | 7 | [reviews/ux-r4.md](reviews/ux-r4.md) |
+| Security | 9 | 0 | 0 | 0 | 3 | [reviews/security-r4.md](reviews/security-r4.md) |
+
+**Final scores:** Code 8 (round 3), Security 9 (round 4), Architecture 8 (round 3), UX 8 (round 4), UI 8 (round 3), Performance 8 (round 3), Test 8 (round 3). Every lens scores 8 or higher, with no critical or high finding.
+
+**Fixed after round 4 (low findings):** × and Cancel look disabled while a send waits (UX); a source map over 2 MiB of text is not cached, and the cache is cleared when pick mode stops (security). Still open as low: the React 19 stack text is cut only in main, and the Windows network-path test cannot fail on macOS or Linux runners (security); the remaining UX lows are listed in `ux-r4.md`.

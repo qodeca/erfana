@@ -76,6 +76,8 @@ export interface SourceMapLookup {
 
 /** Scripts whose parsed map is kept per tab (round-3 performance review). */
 export const SOURCE_MAP_CACHE_MAX = 4
+/** Largest map text kept in the cache; a bigger one is parsed for its pick only. */
+export const SOURCE_MAP_CACHE_TEXT_MAX = 2 * 1024 * 1024
 
 /**
  * The parsed source maps of the last few scripts, by script URL, so a second
@@ -226,7 +228,8 @@ export async function locateInSourceMap(stack: string, lookup: SourceMapLookup):
   if ('miss' in loaded) return loaded
   const map = parseSourceMap(loaded.text, loaded.mapUrl)
   if (map === null) return { miss: 'source map malformed' }
-  lookup.cache?.set(script.href, map)
+  // A large map is used once and let go: kept, its unpacked form could hold hundreds of MB (round-4 security review).
+  if (loaded.text.length <= SOURCE_MAP_CACHE_TEXT_MAX) lookup.cache?.set(script.href, map)
   return mapPosition(map, frame, script.origin)
 }
 

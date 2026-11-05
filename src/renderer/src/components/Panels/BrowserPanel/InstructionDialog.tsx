@@ -206,7 +206,7 @@ export function InstructionDialog({
           title={busy ? CLOSE_WHILE_SENDING : undefined}
           onClick={onCancel}
         >
-          Cancel
+          <span>Cancel</span>
         </button>
         <button
           type="button"
