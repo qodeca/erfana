@@ -19,7 +19,8 @@ vi.mock('electron', () => ({
   shell: { openExternal: vi.fn() },
   // S-17's page-clipboard marks read the clipboard's text (async in Electron 44).
   clipboard: { readText: vi.fn(async () => '') },
-  app: { on: vi.fn(), getPath: vi.fn(() => '/tmp/erfana-session-data') },
+  // The live pick outline's band reads the ozone platform switch (pickAppSetup.bandOpener).
+  app: { on: vi.fn(), getPath: vi.fn(() => '/tmp/erfana-session-data'), commandLine: { getSwitchValue: vi.fn(() => '') } },
   WebContentsView: vi.fn()
 }))
 vi.mock('../LoggingService', () => ({ logger: mockLogger }))

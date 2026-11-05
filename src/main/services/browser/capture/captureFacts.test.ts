@@ -70,6 +70,22 @@ describe('readElementFacts (025-FR-033, 025-FR-035)', () => {
     expect((await readElementFacts(ctx, top(5))).coveredBy).toBe('aside')
   })
 
+  it('025-AC-035 names an overlay that lets clicks through (pointer-events: none) as covering, by the topmost hit test (ADR 0007 decision 4, amended 2026-11-05)', async () => {
+    const { page, ctx } = setup()
+    page.add({ id: 9, tag: 'div', parent: 2, attrs: { id: 'overlay' }, box: [45, 30, 10, 10], pointerEventsNone: true })
+    expect((await readElementFacts(ctx, top(5))).coveredBy).toBe('div')
+    const asked = page.cdp.calls('DOM.getNodeForLocation').at(-1)?.params
+    expect(asked).toMatchObject({ x: 50, y: 35, ignorePointerEventsNone: true })
+  })
+
+  it('025-AC-035 does not name the element under a picked element that lets clicks through: on top, it covers nothing', async () => {
+    const { page, ctx } = setup()
+    // The fake stacks the smaller box on top: the <b> lies over the <aside>, and a click goes through it to the aside.
+    page.add({ id: 9, tag: 'aside', parent: 2, box: [45, 30, 10, 10] })
+    page.add({ id: 10, tag: 'b', parent: 2, box: [48, 33, 4, 4], pointerEventsNone: true })
+    expect((await readElementFacts(ctx, top(10))).coveredBy).toBeNull()
+  })
+
   it("reads matched rules in a cross-site frame's own document; none in a shadow root or when the selector finds no single node", async () => {
     const { page, ctx } = setup()
     page.matchedStyles = { matchedCSSRules: [rule('regular')] }

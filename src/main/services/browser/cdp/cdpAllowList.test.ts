@@ -197,11 +197,13 @@ describe('cdpAllowList – parameter pinning (S23)', () => {
     }
   })
 
-  it('pins the hit test to ignorePointerEventsNone false (ADR 0007 decision 4)', () => {
+  it('takes the click rule and the topmost rule of the hit test, and requires the caller to name one (ADR 0007 decision 4, amended 2026-11-05)', () => {
     expect(checkCdpCommand('tab', 'DOM.getNodeForLocation', { x: 1, y: 2, ignorePointerEventsNone: false })).toBeTruthy()
-    expect(() => checkCdpCommand('tab', 'DOM.getNodeForLocation', { x: 1, y: 2, ignorePointerEventsNone: true })).toThrow(CdpRefusedError)
+    expect(checkCdpCommand('tab', 'DOM.getNodeForLocation', { x: 1, y: 2, ignorePointerEventsNone: true })).toEqual({ x: 1, y: 2, ignorePointerEventsNone: true })
     expect(() => checkCdpCommand('tab', 'DOM.getNodeForLocation', { x: 1, y: 2 })).toThrow(CdpRefusedError)
+    expect(() => checkCdpCommand('tab', 'DOM.getNodeForLocation', { x: 1, y: 2, ignorePointerEventsNone: 'yes' })).toThrow(CdpRefusedError)
     expect(() => checkCdpCommand('tab', 'DOM.getNodeForLocation', { x: 1.5, y: 2, ignorePointerEventsNone: false })).toThrow(CdpRefusedError)
+    expect(() => checkCdpCommand('popup', 'DOM.getNodeForLocation', { x: 1, y: 2, ignorePointerEventsNone: true })).toThrow(CdpRefusedError)
   })
 
   it('pins the isolated world name and refuses universal access', () => {

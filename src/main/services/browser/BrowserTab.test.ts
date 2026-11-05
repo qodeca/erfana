@@ -39,7 +39,6 @@ function make(overrides: Partial<BrowserTabDeps> = {}): BrowserTab {
     caseSensitive: true,
     appAddresses: () => APP,
     resolveDomain: (h) => h,
-    mediaInUse: () => ({ camera: false, microphone: false, screen: false }),
     expectDevTools: vi.fn((_session: unknown) => withdraw),
     onStateChange,
     onDestroyed: vi.fn(),
@@ -86,12 +85,8 @@ describe('from creation, before any page loads', () => {
     expect(() => withoutCdp.close()).not.toThrow()
   })
 
-  it('025-FR-019 takes the in-use chips from its producer, read at every state', () => {
-    let inUse = { camera: true, microphone: false, screen: false }
-    const withMedia = make({ mediaInUse: () => inUse })
-    expect(withMedia.state().inUse).toEqual({ camera: true, microphone: false, screen: false })
-    inUse = { camera: false, microphone: true, screen: true }
-    expect(withMedia.state().inUse).toEqual({ camera: false, microphone: true, screen: true })
+  it('025-FR-019 reports no camera, microphone or screen in use: the state has no in-use field', () => {
+    expect(tab.state()).not.toHaveProperty('inUse')
   })
 
   it('025-FR-057 hands Open in system browser the whole committed address, without user info', () => {

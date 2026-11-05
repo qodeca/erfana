@@ -6,6 +6,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { Buffer } from 'node:buffer';
 import { createRequire } from 'node:module';
+import { once } from 'node:events';
 
 // Point the media cache at a temp dir BEFORE requiring fuses.js (which imports
 // ensure-media-binaries.js and reads CACHE_ROOT at module load).
@@ -1069,7 +1070,11 @@ describe('assertPackagedAppContents', () => {
     fs.mkdirSync(src);
     makePackedApp(src);
     const asar = loadAsarForTest();
-    await asar.createPackage(path.join(src, 'app'), path.join(tmpRoot, 'app.asar'));
+    // @electron/asar 3.x resolves createPackage with the archive's write stream as soon as it calls end() –
+    // before the bytes are flushed. Under load the read below then saw a half-written archive (twice in
+    // test:cov). Wait for the stream to close, as electron-builder's later read effectively does.
+    const out = await asar.createPackage(path.join(src, 'app'), path.join(tmpRoot, 'app.asar'));
+    if (out && typeof out.once === 'function' && !out.closed) await once(out, 'close');
     fs.rmSync(src, { recursive: true, force: true });
     fs.mkdirSync(path.join(tmpRoot, 'app.asar.unpacked', 'node_modules', 'node-pty'), { recursive: true });
     fs.writeFileSync(path.join(tmpRoot, 'app.asar.unpacked', 'node_modules', 'node-pty', 'pty.node'), 'bin');

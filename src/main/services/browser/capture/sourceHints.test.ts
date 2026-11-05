@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import * as path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createManualClock, realClock } from '../../../../shared/clock'
 import {
   collectSourceHints,
@@ -157,6 +157,80 @@ describe('sourceHints', () => {
       expect((await collectSourceHints({ ...base, reactLookup: async () => 42 })).sourceNotFound).toBe(true)
       expect((await collectSourceHints({ ...base, reactLookup: async () => Promise.reject(new Error('page')) })).sourceNotFound).toBe(true)
       expect(await collectSourceHints(base)).toEqual({ sourceAttributes: [], react: null, sourceNotFound: true })
+    })
+
+    describe('React 19 source lookup (owner decision 2026-11-05)', () => {
+      const react19 = async () => ({ component: 'ItemRow', owners: ['App'], source: null })
+      const base = { attributesNearestFirst: [[]], reactLookup: react19, clock: realClock }
+
+      it('names the first candidate that resolves in the project, as source and resolved source', async () => {
+        const hints = await collectSourceHints({
+          ...base,
+          projectRoot: root,
+          reactSourceLookup: async () => [
+            { path: 'Users/me/src/components/Hero.tsx', line: 9 },
+            { path: path.join(root, 'src', 'components', 'Hero.tsx'), line: 9 }
+          ]
+        })
+        expect(hints.react).toEqual({ component: 'ItemRow', ownerChain: ['App'], source: 'src/components/Hero.tsx:9' })
+        expect(hints.resolvedSource).toEqual({ path: 'src/components/Hero.tsx', line: 9 })
+        expect(hints.sourceNotFound).toBe(false)
+      })
+
+      it('reports a mapped source outside the project in the untrusted block only, never as resolved source', async () => {
+        const hints = await collectSourceHints({
+          ...base,
+          projectRoot: root,
+          reactSourceLookup: async () => [{ path: path.join(outside, 'Secret.tsx'), line: 3 }]
+        })
+        expect(hints.react?.source).toBe(`${path.join(outside, 'Secret.tsx')}:3`)
+        expect(hints.resolvedSource).toBeUndefined()
+        const noProject = await collectSourceHints({ ...base, projectRoot: null, reactSourceLookup: async () => [{ path: 'src/components/Hero.tsx' }] })
+        expect(noProject.react?.source).toBe('src/components/Hero.tsx')
+        expect(noProject.resolvedSource).toBeUndefined()
+      })
+
+      it('says source not found when the lookup finds nothing, rejects, or is absent', async () => {
+        for (const reactSourceLookup of [async () => [], async () => Promise.reject(new Error('page')), undefined]) {
+          const hints = await collectSourceHints({ ...base, projectRoot: root, reactSourceLookup })
+          expect(hints.sourceNotFound).toBe(true)
+          expect(hints.react?.source).toBeNull()
+        }
+      })
+
+      it('does not run when the React lookup already gave a source (React 18)', async () => {
+        let ran = false
+        const hints = await collectSourceHints({
+          ...base,
+          reactLookup: async () => ({ component: 'Hero', source: { file: 'src/components/Hero.tsx', line: 3 } }),
+          projectRoot: root,
+          reactSourceLookup: async () => {
+            ran = true
+            return []
+          }
+        })
+        expect(ran).toBe(false)
+        expect(hints.resolvedSource).toEqual({ path: 'src/components/Hero.tsx', line: 3 })
+      })
+
+      it('aborts its reads when the 750 ms budget ends, and gives source not found', async () => {
+        const clock = createManualClock()
+        let signal: AbortSignal | null = null
+        const pending = collectSourceHints({
+          ...base,
+          projectRoot: root,
+          clock,
+          reactSourceLookup: (s) => {
+            signal = s
+            return new Promise(() => undefined)
+          }
+        })
+        await vi.waitFor(() => expect(signal).not.toBeNull())
+        expect(signal!.aborted).toBe(false)
+        clock.advance(SOURCE_HINTS_BUDGET_MS)
+        await expect(pending).resolves.toEqual({ sourceAttributes: [], react: null, sourceNotFound: true })
+        expect(signal!.aborted).toBe(true)
+      })
     })
 
     it('gives source not found when the search runs past the 750 ms budget, and never rejects', async () => {

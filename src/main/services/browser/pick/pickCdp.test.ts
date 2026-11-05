@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { describe, expect, it } from 'vitest'
 import { ISOLATED_WORLD_NAME, PICK_OBJECT_GROUP } from '../cdp/cdpPinned'
-import { PICK_CHAIN } from '../cdp/cdpPickFunctions'
+import { PICK_CHAIN, REACT_DEBUG_STACK } from '../cdp/cdpPickFunctions'
 import { numberField, PickReader, PickReadError, stringField } from './pickCdp'
 import { FakePickCdp, frameTarget } from './__test-helpers__/fakePickCdp'
 
@@ -100,6 +100,23 @@ describe('PickReader', () => {
     expect(cdp.calls('Runtime.callFunctionOn')[0].params).toMatchObject({ returnByValue: false })
     answer = { result: { subtype: 'null' } }
     expect(await reader.callObject('', 'o', PICK_CHAIN)).toBeNull()
+  })
+
+  it("answers a returned error's description by handle, or null for anything else (the React 19 stack read)", async () => {
+    let answer: unknown = { result: { type: 'object', subtype: 'error', objectId: 'o6', description: 'Error: react-stack-top-frame\n    at x' } }
+    const cdp = new FakePickCdp().handle('Runtime.callFunctionOn', () => answer)
+    const reader = new PickReader(cdp)
+    expect(await reader.callErrorDescription('S1', 'o', REACT_DEBUG_STACK)).toBe('Error: react-stack-top-frame\n    at x')
+    expect(cdp.calls('Runtime.callFunctionOn')[0]).toMatchObject({
+      sessionKey: 'S1',
+      params: { functionDeclaration: REACT_DEBUG_STACK.source, returnByValue: false, throwOnSideEffect: true, objectGroup: PICK_OBJECT_GROUP }
+    })
+    answer = { result: { type: 'object', subtype: 'null', value: null } }
+    expect(await reader.callErrorDescription('', 'o', REACT_DEBUG_STACK)).toBeNull()
+    answer = { result: { type: 'object', className: 'Object', description: 'Object' } }
+    expect(await reader.callErrorDescription('', 'o', REACT_DEBUG_STACK)).toBeNull()
+    answer = { result: { type: 'object', subtype: 'error' } }
+    expect(await reader.callErrorDescription('', 'o', REACT_DEBUG_STACK)).toBeNull()
   })
 
   it('runs a function on a node in the isolated world', async () => {

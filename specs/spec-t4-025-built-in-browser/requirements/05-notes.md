@@ -192,6 +192,7 @@ Whether the context-file prompt templates share the existing apply-to-document f
 
 - Several elements in one prompt (owner: not in v1, 2026-11-01).
 - Pick the last element again after a reload (owner: not in v1, 2026-11-01).
+- Multiple terminals: choosing another target terminal in the toolbar, a target control in the dialog and menu at narrow widths, and the 8-character name cut (owner: v1 covers one terminal session, 2026-11-05; no issue number yet; 025-FR-061, 025-AC-077).
 
 ---
 

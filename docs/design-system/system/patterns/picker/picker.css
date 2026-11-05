@@ -14,6 +14,8 @@
  * The parts:
  *   .erf-picker-outline   the two-tone outline on the hovered element
  *   --selected            the picked element on the still image: adds a fill
+ *   --paper               the built-in browser's outline: the 2px line in paper,
+ *                         not the accent (owner decision, 2026-11-05)
  *   .erf-picker-label     tag#id.classes then size, on ink
  *   .erf-picker-flash     the static box shown after a send (no animation)
  *   .erf-picker-frame     the browser's pick-mode frame, drawn in the gutter
@@ -47,6 +49,14 @@
    fill, so "picked" differs from "hovered" by more than colour. */
 .erf-picker-outline--selected {
   background: color-mix(in srgb, var(--color-accent-primary) 12%, transparent);
+}
+
+/* The built-in browser's outline, live and on the still image (owner decision,
+   2026-11-05; ADR 0007 decision 6, amended): ink, paper, ink. Ink on paper is
+   the widest pair the tokens hold, so one of the two always stands out from the
+   page. Main draws the live one from the same two tokens (pickOutlineColours.ts). */
+.erf-picker-outline--paper {
+  border-color: var(--color-white);
 }
 
 /* ---------- label ---------- */

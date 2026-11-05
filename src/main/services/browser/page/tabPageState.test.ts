@@ -25,7 +25,6 @@ function baseState(over: Partial<TabStateEvent> = {}): TabStateEvent {
     zoomPercent: 100,
     widthPreset: 'full',
     security: 'notSecureHttp',
-    inUse: { camera: false, microphone: false, screen: false },
     erfanaPage: null,
     devToolsOpen: false,
     ...over

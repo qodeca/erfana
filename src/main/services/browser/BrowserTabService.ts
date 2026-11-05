@@ -53,7 +53,6 @@ import {
   type NavigateResponse,
   type NavigationSource,
   type StripAnswer,
-  type TabMediaInUse,
   type TabStateEvent
 } from '../../../shared/ipc/browser-tab-schema'
 import type { RegistrableDomainResolver } from '../../../shared/browser/originFormat'
@@ -122,12 +121,6 @@ export interface BrowserTabServiceDeps {
   readonly extras?: TabPageExtrasSetup
   /** The keyring notices of the project's first tab in this run (025-FR-018); without it none show. */
   readonly keyring?: KeyringStripSetup
-  /**
-   * The page's camera, microphone and screen capture now, for the address
-   * bar's in-use chips (025-FR-019). Required, so a tab never ships a
-   * placeholder: `browserAppSetup.ts` names what the app passes and why.
-   */
-  readonly mediaInUse: (tab: BrowserTab) => TabMediaInUse
 }
 
 /** The sources a local file opens from (`LOCAL_FILE_SOURCES`). */
@@ -367,7 +360,6 @@ export class BrowserTabService {
       onStateChange: (changed) => this.sendState(changed),
       onDestroyed: (gone) => this.forget(gone),
       onPageMoved: () => entry.input?.recordRowShift(),
-      mediaInUse: () => this.deps.mediaInUse(tab),
       local: this.deps.local,
       createClip: this.deps.createClip,
       armLeave: (repeat) => entry.extras?.arm(repeat)

@@ -24,7 +24,6 @@ function stateEvent(tabId: string, patch: Partial<TabStateEvent> = {}): TabState
     zoomPercent: 100,
     widthPreset: 'full',
     security: 'secure',
-    inUse: { camera: false, microphone: false, screen: false },
     erfanaPage: 'empty',
     devToolsOpen: false,
     ...patch

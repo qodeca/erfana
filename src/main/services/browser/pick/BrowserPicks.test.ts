@@ -144,6 +144,100 @@ describe('BrowserPicks', () => {
       expect(goneDeps.viewOrigin()).toBeNull()
     })
 
+    it('draws the live outline on a band over the tab’s window, at the page area on the screen, following its placement', async () => {
+      const page = samplePage({ crossSite: false })
+      const contents = new FakePickContents()
+      contents.zoom = 2
+      const watchers = new Set<() => void>()
+      let placed: { clip: object; view: object } | null = { clip: { x: 10, y: 40, width: 400, height: 300 }, view: { x: 10, y: 20, width: 400, height: 320 } }
+      const tab = {
+        id: 'tab-b',
+        contents,
+        projectRoot: root,
+        windowId: 7,
+        viewFrame: {
+          placement: () => placed,
+          widthPreset: 'full',
+          watchPlacement: (l: () => void) => (watchers.add(l), () => watchers.delete(l))
+        }
+      } as unknown as BrowserTab
+      const host = { id: 7, isDestroyed: () => false, getContentBounds: () => ({ x: 100, y: 200, width: 800, height: 600 }) } as unknown as TabHost
+      const draws: Array<{ bounds: unknown; first: unknown }> = []
+      const surface = {
+        draw: vi.fn((bounds: unknown, strips: ReadonlyArray<{ rect: unknown }>): void => {
+          draws.push({ bounds, first: strips[0]?.rect })
+        }),
+        hide: vi.fn(),
+        destroy: vi.fn()
+      }
+      const openBand = vi.fn(() => surface)
+      const picks = new BrowserPicks({ clock: createManualClock(), encodePng, sessionOf: () => page.cdp, openBand })
+      const routing = input()
+      const pick = picks.attach(tab, host, routing, () => undefined)!
+      routing.dispatch({ type: 'pickButton' })
+      await settle()
+      contents.mouse('mouseMove', 35 * 2, 30 * 2)
+      await settle()
+      expect(openBand).toHaveBeenCalledWith(7, expect.objectContaining({ moved: expect.any(Function) }))
+      expect(page.cdp.calls('Overlay.highlightQuad')).toEqual([])
+      // The surface covers the page area on the screen; the element (30, 25 at zoom 2) sits 20 px above the clip's top.
+      expect(draws[0]).toEqual({ bounds: { x: 110, y: 240, width: 400, height: 300 }, first: { x: 59, y: 29, width: 82, height: 4 } })
+      // The page is taken out of the window: the band hides; placed again, it draws again.
+      placed = null
+      for (const w of watchers) w()
+      expect(surface.hide).toHaveBeenCalledTimes(1)
+      placed = { clip: { x: 10, y: 40, width: 400, height: 300 }, view: { x: 10, y: 20, width: 400, height: 320 } }
+      for (const w of watchers) w()
+      expect(draws).toHaveLength(2)
+      // A closed page has no placement.
+      contents.destroyed = true
+      for (const w of watchers) w()
+      expect(surface.hide).toHaveBeenCalledTimes(2)
+      contents.destroyed = false
+      picks.forgetTab('tab-b')
+      expect(surface.destroy).toHaveBeenCalledTimes(1)
+      expect(watchers.size).toBe(0)
+      expect(pick.isActive).toBe(true)
+    })
+
+    it('opens no band over a closed window, and logs a band that fails to draw before the engine takes over', async () => {
+      const page = samplePage({ crossSite: false })
+      const contents = new FakePickContents()
+      const tab = { id: 'tab-c', contents, projectRoot: root, windowId: 7, viewFrame: { placement: () => ({ clip: { x: 0, y: 0, width: 800, height: 600 }, view: { x: 0, y: 0, width: 800, height: 600 } }), widthPreset: 'full', watchPlacement: () => () => undefined } } as unknown as BrowserTab
+      const gone = { id: 7, isDestroyed: () => true, getContentBounds: () => ({ x: 0, y: 0, width: 800, height: 600 }) } as unknown as TabHost
+      const openBand = vi.fn(() => ({ draw: () => undefined, hide: () => undefined, destroy: () => undefined }))
+      const closed = new BrowserPicks({ clock: createManualClock(), encodePng, sessionOf: () => page.cdp, openBand })
+      const routing = input()
+      closed.attach(tab, gone, routing, () => undefined)
+      routing.dispatch({ type: 'pickButton' })
+      await settle()
+      contents.mouse('mouseMove', 35, 30)
+      await settle()
+      expect(openBand).not.toHaveBeenCalled()
+      expect(page.cdp.calls('Overlay.highlightQuad')).toHaveLength(1)
+
+      const page2 = samplePage({ crossSite: false })
+      const contents2 = new FakePickContents()
+      const tab2 = { ...(tab as object), id: 'tab-d', contents: contents2 } as unknown as BrowserTab
+      const host = { id: 7, isDestroyed: () => false, getContentBounds: () => ({ x: 0, y: 0, width: 800, height: 600 }) } as unknown as TabHost
+      const failing = new BrowserPicks({
+        clock: createManualClock(),
+        encodePng,
+        sessionOf: () => page2.cdp,
+        openBand: () => ({ draw: () => { throw new Error('window gone') }, hide: () => undefined, destroy: () => undefined })
+      })
+      const routing2 = input()
+      failing.attach(tab2, host, routing2, () => undefined)
+      routing2.dispatch({ type: 'pickButton' })
+      await settle()
+      contents2.mouse('mouseMove', 35, 30)
+      await settle()
+      expect(logger.warn).toHaveBeenCalledWith('Browser pick: the live outline could not be drawn; the engine draws it', { error: 'Error: window gone' })
+      contents2.mouse('mouseMove', 75, 205)
+      await settle()
+      expect(page2.cdp.calls('Overlay.highlightQuad')).toHaveLength(1)
+    })
+
     it('forgets a tab whose page is destroyed, and a closed tab; detachTab disposes', () => {
       const s = setup()
       s.contents.emit('destroyed')

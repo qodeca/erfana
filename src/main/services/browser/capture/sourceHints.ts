@@ -10,7 +10,14 @@
  * 1. the source-location attributes on the element or its nearest ancestor
  *    that has any (exactly the names of `SOURCE_ATTRIBUTE_NAMES`);
  * 2. the React lookup in the page's main world (`REACT_LOOKUP`): the nearest
- *    component, up to 5 owners and the JSX source.
+ *    component, up to 5 owners and the JSX source. React 19 has no JSX
+ *    source on the fiber; when the lookup found a component but no source,
+ *    the React 19 source lookup (`reactSourceLookup`: the element's
+ *    `_debugStack` mapped through the page's source map,
+ *    `sourceMapLocation.ts`; owner decision 2026-11-05) gives candidate
+ *    locations, and the first that resolves in the project – else the first
+ *    – is reported. It shares the budget: when the budget ends, its reads
+ *    are aborted.
  *
  * The lookup's answer is the page's: only strings pass, each cut to 500
  * code units, the owner chain to 5 ({@link parseReactAnswer}). A path the
@@ -30,6 +37,9 @@ import { isRecord } from '../cdp/cdpTypes'
 
 /** The whole hint search ends after this; then "source not found" (025-FR-037). */
 export const SOURCE_HINTS_BUDGET_MS = 750
+
+/** Most candidate locations of the React 19 source lookup tried against the project. */
+const MAPPED_CANDIDATES_MAX = 4
 
 /** Source files a resolved source may name (S-13). */
 export const UI_SOURCE_EXTENSIONS: readonly string[] = Object.freeze([
@@ -153,14 +163,23 @@ export interface HintSources {
   readonly attributesNearestFirst: readonly (readonly (readonly [string, string])[])[]
   /** The React lookup; absent when it may not run (the page is frozen). */
   readonly reactLookup?: () => Promise<unknown>
+  /**
+   * The React 19 source lookup: candidate locations of the element's JSX,
+   * best first, or none; aborted through `signal` when the budget ends.
+   * Absent when it may not run.
+   */
+  readonly reactSourceLookup?: (signal: AbortSignal) => Promise<readonly ReportedLocation[]>
   readonly projectRoot: string | null
   readonly clock: Pick<Clock, 'setTimeout' | 'clearTimeout'>
 }
 
-/** Resolve within `ms` or give `fallback`. */
-function within<T>(clock: HintSources['clock'], ms: number, work: Promise<T>, fallback: T): Promise<T> {
+/** Resolve within `ms` or give `fallback`, calling `onTimeout` then. */
+function within<T>(clock: HintSources['clock'], ms: number, work: Promise<T>, fallback: T, onTimeout: () => void): Promise<T> {
   return new Promise((resolve) => {
-    const timer = clock.setTimeout(() => resolve(fallback), ms)
+    const timer = clock.setTimeout(() => {
+      onTimeout()
+      resolve(fallback)
+    }, ms)
     work.then(
       (value) => {
         clock.clearTimeout(timer)
@@ -177,18 +196,20 @@ function within<T>(clock: HintSources['clock'], ms: number, work: Promise<T>, fa
 /** The hints of 025-FR-037 within the 750 ms budget. Never rejects. */
 export function collectSourceHints(sources: HintSources): Promise<SourceHints> {
   const notFound: SourceHints = { sourceAttributes: [], react: null, sourceNotFound: true }
-  return within(sources.clock, SOURCE_HINTS_BUDGET_MS, findHints(sources), notFound)
+  const budget = new AbortController()
+  return within(sources.clock, SOURCE_HINTS_BUDGET_MS, findHints(sources, budget.signal), notFound, () => budget.abort())
 }
 
-async function findHints(sources: HintSources): Promise<SourceHints> {
+async function findHints(sources: HintSources, signal: AbortSignal): Promise<SourceHints> {
   const attrs = sources.attributesNearestFirst.find((list) => list.length > 0)
   if (attrs !== undefined) {
     const resolvedSource = await resolveLocation(sources.projectRoot, locationFromAttributes(attrs))
     return { sourceAttributes: attrs, react: null, sourceNotFound: false, ...(resolvedSource ? { resolvedSource } : {}) }
   }
   if (sources.reactLookup === undefined) return { sourceAttributes: [], react: null, sourceNotFound: true }
-  const answer = parseReactAnswer(await sources.reactLookup())
-  if (answer === null) return { sourceAttributes: [], react: null, sourceNotFound: true }
+  const parsed = parseReactAnswer(await sources.reactLookup())
+  if (parsed === null) return { sourceAttributes: [], react: null, sourceNotFound: true }
+  const answer = parsed.location === null ? await withMappedSource(sources, parsed, signal) : parsed
   const resolvedSource = await resolveLocation(sources.projectRoot, answer.location)
   return {
     sourceAttributes: [],
@@ -196,6 +217,31 @@ async function findHints(sources: HintSources): Promise<SourceHints> {
     sourceNotFound: answer.hints.source === null,
     ...(resolvedSource ? { resolvedSource } : {})
   }
+}
+
+type ReactAnswer = NonNullable<ReturnType<typeof parseReactAnswer>>
+
+/**
+ * `answer` with the React 19 source lookup's location: the first candidate
+ * that resolves in the project, else the first; `answer` itself when the
+ * lookup is absent, fails or finds none.
+ */
+async function withMappedSource(sources: HintSources, answer: ReactAnswer, signal: AbortSignal): Promise<ReactAnswer> {
+  if (sources.reactSourceLookup === undefined) return answer
+  const candidates = (await sources.reactSourceLookup(signal).catch(() => [])).slice(0, MAPPED_CANDIDATES_MAX)
+  if (candidates.length === 0) return answer
+  let chosen: ReportedLocation = candidates[0]
+  if (sources.projectRoot !== null) {
+    for (const candidate of candidates) {
+      const path = await resolveSourcePath(sources.projectRoot, candidate.path)
+      if (path !== null) {
+        chosen = { ...candidate, path }
+        break
+      }
+    }
+  }
+  const source = cut(chosen.line === undefined ? chosen.path : `${chosen.path}:${chosen.line}`)
+  return { hints: { ...answer.hints, source }, location: chosen }
 }
 
 async function resolveLocation(projectRoot: string | null, location: ReportedLocation | null): Promise<SourceHints['resolvedSource']> {

@@ -18,7 +18,9 @@
  *   view at once from the last push, without waiting for the renderer.
  *
  * The page's top edge in DIP is tracked for the click guard: a move while
- * shown is reported (025-FR-047).
+ * shown is reported (025-FR-047). Every change of the placement – placed,
+ * moved, resized, taken out – is reported to {@link TabViewFrame.watchPlacement}'s
+ * listeners (the live pick outline follows the page with it).
  */
 import type { WidthPresetId } from '../../../../shared/browser/widthPresets'
 import type { RectLike } from '../../preview/previewBoundsClamp'
@@ -59,6 +61,7 @@ export class TabViewFrame {
   private last: (PagePush & { readonly visible: boolean }) | null = null
   private preset: WidthPresetId = 'full'
   private placed: PagePlacement | null = null
+  private readonly placementListeners = new Set<() => void>()
 
   constructor(private readonly deps: TabViewFrameDeps) {
     deps.clip?.addChildView(deps.view as never)
@@ -93,6 +96,15 @@ export class TabViewFrame {
     return this.apply()
   }
 
+  /**
+   * Call `listener` after each change of {@link placement}; returns the
+   * unsubscribe. A listener must not throw.
+   */
+  watchPlacement(listener: () => void): () => void {
+    this.placementListeners.add(listener)
+    return () => this.placementListeners.delete(listener)
+  }
+
   /** Change the preset and re-place the view from the last push. */
   setPreset(preset: WidthPresetId): void {
     if (preset === this.preset) return
@@ -108,6 +120,7 @@ export class TabViewFrame {
     this.deps.onShown(false)
     const host = this.deps.host
     if (!host.isDestroyed()) host.contentView.removeChildView(this.topView() as never)
+    this.placementChanged()
   }
 
   private apply(): boolean | null {
@@ -135,7 +148,12 @@ export class TabViewFrame {
       this.attached = true
       this.deps.onShown(true)
     }
+    this.placementChanged()
     return true
+  }
+
+  private placementChanged(): void {
+    for (const listener of [...this.placementListeners]) listener()
   }
 
   /** What goes into the window: the clipping parent, or the page view without one. */

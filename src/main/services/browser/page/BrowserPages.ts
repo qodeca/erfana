@@ -89,6 +89,13 @@ const projectKey = (root: string, caseSensitive: boolean): string => (caseSensit
 export class BrowserPages {
   private readonly pages = new Set<BrowserTabPage>()
   private readonly stores = new Map<string, ProjectStores>()
+  /**
+   * Per page, a token renewed by each commit and each zoom step that reaches
+   * the page. A commit applies its site's stored level only once the zoom
+   * store has opened; a step taken meanwhile renews the token, so that late
+   * apply cannot undo it (it would put the page back to the stored level).
+   */
+  private readonly zoomTokens = new WeakMap<BrowserTabPage, object>()
   private readonly terminalAddresses = new TerminalLocalAddresses()
   /** Faults the e2e hooks plant in clearing steps; empty outside tests. */
   readonly clearFaults = new Map<ClearDataCategory, ClearFault>()
@@ -208,11 +215,13 @@ export class BrowserPages {
     const stores = this.storesOfPage(page)
     if (shown !== null) void stores.history.then((history) => history.record(shown))
     const site = zoomKeyOf(shown)
+    const token = this.renewZoomToken(page)
     if (site === null) {
       page.applyZoom(ZOOM_DEFAULT_PERCENT)
       return
     }
     void stores.zoom.then((zoom) => {
+      if (this.zoomTokens.get(page) !== token) return // a later commit or a zoom step since: theirs stands
       if (this.pages.has(page) && zoomKeyOf(page.shownUrl()) === site) page.applyZoom(zoom.level(site))
     })
   }
@@ -222,14 +231,24 @@ export class BrowserPages {
     const site = zoomKeyOf(page.shownUrl())
     const next = nextZoomPercent(page.facts().zoomPercent, step)
     if (site === null) {
+      this.renewZoomToken(page)
       page.applyZoom(next)
       return
     }
     const sameSite = [...this.pages].filter(
       (other) => this.sameProject(other, page) && zoomKeyOf(other.shownUrl()) === site
     )
-    for (const other of sameSite) other.applyZoom(next)
+    for (const other of sameSite) {
+      this.renewZoomToken(other)
+      other.applyZoom(next)
+    }
     void this.storesOfPage(page).zoom.then((zoom) => zoom.set(site, next))
+  }
+
+  private renewZoomToken(page: BrowserTabPage): object {
+    const token = {}
+    this.zoomTokens.set(page, token)
+    return token
   }
 
   private sameProject(a: BrowserTabPage, b: BrowserTabPage): boolean {

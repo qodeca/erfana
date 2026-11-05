@@ -153,7 +153,6 @@ export default defineConfig({
         // measured 95/100/100/96
         'src/main/services/browser/tabNavigationGuard.ts': { lines: 93, functions: 98, branches: 98, statements: 94 },
         // measured 100/100/100/100
-        'src/main/services/browser/site/mediaInUse.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // Built-in browser, main side (spec 025, commit 18): the keyring notices as strip
         // rows, the one place tab events are parsed and sent, and the tab's input wiring.
         // measured 100/100/100/100 each
@@ -268,8 +267,12 @@ export default defineConfig({
         'src/main/services/browser/capture/captureImage.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/88.63/100
         'src/main/services/browser/capture/captureRender.ts': { lines: 98, functions: 98, branches: 86, statements: 98 },
+        // measured 100/100/100/100 (2026-11-05)
+        'src/main/services/browser/capture/pageResourceFetch.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/98.78/100
         'src/main/services/browser/capture/sourceHints.ts': { lines: 98, functions: 98, branches: 96, statements: 98 },
+        // measured 98.9/100/98.93/99.15 (2026-11-05)
+        'src/main/services/browser/capture/sourceMapLocation.ts': { lines: 96, functions: 98, branches: 96, statements: 97 },
         // The terminal foreground the shell guard reads (025-FR-061; design
         // § 9.4, Q8) and the Windows process snapshot it shares with the
         // Claude-status detector. A gap here is a bare shell read as an agent,
@@ -314,6 +317,12 @@ export default defineConfig({
         'src/main/services/browser/pick/pickModeSwitch.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/main/services/browser/pick/pickSupport.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100 (the live outline's band, ADR 0007 decision 6 amended 2026-11-05)
+        'src/main/services/browser/pick/pickBand.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/pick/pickBandWindow.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/pick/pickOutlineColours.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/main/services/browser/cdp/cdpPickFunctions.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100

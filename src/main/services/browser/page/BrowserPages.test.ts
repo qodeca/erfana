@@ -100,6 +100,36 @@ describe('BrowserPages zoom', () => {
     // Two `until` waits of up to 5 s each (signed store writes are slow on Windows runners).
   }, 15_000)
 
+  it('025-AC-008 a zoom step made while the zoom store still opens is not undone when the store arrives', async () => {
+    // The store opens on its own schedule (a file read and a signature check, slow under load). The
+    // commit's "apply the site level" waits for it; a step the user made in the meantime must win.
+    const real = BrowserZoomStore.open
+    let release: () => void = () => undefined
+    const held = new Promise<void>((resolve) => (release = resolve))
+    const open = vi.spyOn(BrowserZoomStore, 'open').mockImplementation(async (...args) => {
+      await held
+      return real.apply(BrowserZoomStore, args)
+    })
+    try {
+      const { attach } = setup()
+      const a = attach(fakePageTab(projectA, 'http://app.test/'))
+      a.tab.contents.emit('did-navigate', {}, 'http://app.test/')
+      a.page.zoom('in')
+      expect(a.tab.contents.zoom).toBe(1.1)
+      a.page.zoom('in')
+      expect(a.tab.contents.zoom).toBe(1.25)
+      release()
+      await until(async () => expect((await BrowserZoomStore.open(projectA, home, testSigner('k'))).level('app.test')).toBe(125))
+      expect(a.tab.contents.zoom).toBe(1.25)
+      // A later commit of the site still takes the stored level.
+      a.tab.contents.zoom = 1
+      a.tab.contents.emit('did-navigate', {}, 'http://app.test/again')
+      await until(() => expect(a.tab.contents.zoom).toBe(1.25))
+    } finally {
+      open.mockRestore()
+    }
+  }, 15_000)
+
   it('025-AC-008 Plus at 500% and Minus at 25% do nothing', () => {
     const { attach } = setup()
     const a = attach(fakePageTab(projectA, 'http://app.test/'))

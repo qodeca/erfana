@@ -122,6 +122,18 @@ export class PickReader {
     return typeof result.objectId === 'string' && result.objectId !== '' ? result.objectId : null
   }
 
+  /**
+   * Run a pinned function on `objectId` that returns an `Error` by handle,
+   * and give that error's protocol description – V8 writes its stack there –
+   * or null when the result is not an error. The handle stays in the pick
+   * object group until {@link releaseAll}.
+   */
+  async callErrorDescription(sessionKey: string, objectId: string, fn: CdpPageFunction): Promise<string | null> {
+    const raw = await this.call('Runtime.callFunctionOn', this.callParams(objectId, fn, [], false), sessionKey)
+    const result = resultValue(fn.name, raw) as Record<string, unknown>
+    return result.subtype === 'error' && typeof result.description === 'string' ? result.description : null
+  }
+
   /** Run a pinned function on `node` in the isolated world. */
   async valueOn(node: PickNode, fn: CdpPageFunction, args: readonly unknown[] = []): Promise<unknown> {
     return this.callValue(node.sessionKey, await this.resolve(node, 'isolated'), fn, args)

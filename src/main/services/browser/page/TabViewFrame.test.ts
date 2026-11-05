@@ -86,4 +86,22 @@ describe('TabViewFrame', () => {
     frame.setPreset('tablet')
     expect(view.setBounds).toHaveBeenCalledTimes(calls)
   })
+
+  it('reports every placement change – placed, moved, taken out – to its watchers until they unsubscribe', () => {
+    const { frame } = setup(true)
+    const seen: Array<unknown> = []
+    const off = frame.watchPlacement(() => seen.push(frame.placement()?.view ?? null))
+    frame.push({ bounds: AREA, clip: AREA }, 1, true)
+    frame.push({ bounds: { ...AREA, y: 120, height: 580 }, clip: { ...AREA, y: 120, height: 580 } }, 2, true)
+    frame.detach()
+    frame.detach()
+    expect(seen).toEqual([AREA, { ...AREA, y: 120, height: 580 }, null])
+    // Hidden by the renderer: taken out, reported once.
+    frame.push({ bounds: AREA, clip: AREA }, 3, true)
+    frame.push({ bounds: AREA, clip: AREA }, 4, false)
+    expect(seen.slice(3)).toEqual([AREA, null])
+    off()
+    frame.push({ bounds: AREA, clip: AREA }, 5, true)
+    expect(seen).toHaveLength(5)
+  })
 })

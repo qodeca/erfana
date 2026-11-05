@@ -46,15 +46,6 @@
   outline-offset: calc(var(--space-1) * -1);
 }
 
-/* In use: static text, never a button (Security rule 15). */
-.erf-brw-chip--static {
-  cursor: default;
-}
-
-.erf-brw-chip--static:hover {
-  background: var(--color-bg-secondary);
-}
-
 .erf-brw-chip--warning {
   color: var(--color-warning);
 }

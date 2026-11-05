@@ -17,6 +17,7 @@ import {
   PICK_PAGE_FUNCTIONS,
   PICK_STRING_MAX,
   PICK_STYLES,
+  REACT_DEBUG_STACK,
   REACT_LOOKUP,
   SOURCE_ATTRIBUTE_NAMES
 } from './cdpPickFunctions'
@@ -50,7 +51,7 @@ describe('pinned pick functions', () => {
   })
 
   it('are all registered in the pinned registry, read-only', () => {
-    expect(PICK_PAGE_FUNCTIONS).toEqual([PICK_CHAIN, PICK_ANCESTOR, PICK_STYLES, REACT_LOOKUP])
+    expect(PICK_PAGE_FUNCTIONS).toEqual([PICK_CHAIN, PICK_ANCESTOR, PICK_STYLES, REACT_LOOKUP, REACT_DEBUG_STACK])
     for (const fn of PICK_PAGE_FUNCTIONS) {
       expect(CDP_PAGE_FUNCTIONS).toContain(fn)
       expect(fn.throwOnSideEffect).toBe(true)
@@ -176,6 +177,33 @@ describe('pinned pick functions', () => {
       expect(lookup(el)).toBeNull()
       el['__reactFiber$1'] = { type: 'b', return: { type: { displayName: 'N'.repeat(600) }, return: null }, _debugSource: { fileName: 5 } }
       expect(lookup(el)?.component).toHaveLength(PICK_STRING_MAX)
+    })
+  })
+
+  describe('reactDebugStack (React 19)', () => {
+    const debugStack = (el: unknown) => compile(REACT_DEBUG_STACK).call(el)
+
+    it("answers the host fiber's _debugStack, by reference", () => {
+      const stack = new Error('react-stack-top-frame')
+      const el = byId('save') as unknown as Record<string, unknown>
+      el['__reactFiber$abc'] = { type: 'button', _debugStack: stack, return: { type: function Row() {}, _debugStack: new Error('owner') } }
+      expect(debugStack(el)).toBe(stack)
+    })
+
+    it('walks up to the nearest fiber with one, finding the fiber on an ancestor element', () => {
+      const ownerStack = new Error('owner')
+      const parent = byId('save').parentElement as unknown as Record<string, unknown>
+      parent['__reactFiber$x'] = { type: 'li', return: { type: function Row() {}, _debugStack: ownerStack, return: null } }
+      expect(debugStack(byId('save'))).toBe(ownerStack)
+    })
+
+    it('answers null without a fiber, for a fiber that is not an object, or with no _debugStack (production, React 18)', () => {
+      expect(debugStack(byId('save'))).toBeNull()
+      const el = byId('save') as unknown as Record<string, unknown>
+      el['__reactFiber$1'] = 'junk'
+      expect(debugStack(el)).toBeNull()
+      el['__reactFiber$1'] = { type: 'b', _debugStack: 'text', return: { type: 'div', return: null } }
+      expect(debugStack(el)).toBeNull()
     })
   })
 })

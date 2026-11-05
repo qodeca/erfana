@@ -6,36 +6,25 @@ import { createRef } from 'react'
 
 vi.mock('../../../utils/platform', () => ({ isMacOS: () => true, isWindows: () => false }))
 
-import { AddressChips, inUseChips } from './AddressChips'
+import { AddressChips } from './AddressChips'
 import { browserState } from './__test__/browserState'
 
 afterEach(cleanup)
 
-describe('inUseChips', () => {
-  it('names each device in use with the host', () => {
-    expect(inUseChips(null)).toEqual([])
-    expect(inUseChips(browserState({ inUse: { camera: true, microphone: true, screen: true } })).map(c => c.name)).toEqual([
-      'www.example.test is using your camera',
-      'www.example.test is using your microphone',
-      'www.example.test is using your screen'
-    ])
-  })
-})
-
 describe('AddressChips', () => {
-  it('shows nothing at 100% with no pop-up and nothing in use', () => {
+  it('shows nothing at 100% with no pop-up', () => {
     const { container } = render(
       <AddressChips state={browserState()} popupBlocked={false} addressRef={createRef()} onResetZoom={vi.fn()} onShowPopupRow={vi.fn()} />
     )
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('draws the zoom, pop-up and in-use chips; the in-use chip is not a button', () => {
+  it('draws the zoom and pop-up chips, and no camera, microphone or screen chip (025-FR-019)', () => {
     const onResetZoom = vi.fn()
     const onShowPopupRow = vi.fn()
     render(
       <AddressChips
-        state={browserState({ zoomPercent: 150, inUse: { camera: true, microphone: false, screen: false } })}
+        state={browserState({ zoomPercent: 150 })}
         popupBlocked={true}
         addressRef={createRef()}
         onResetZoom={onResetZoom}
@@ -48,8 +37,8 @@ describe('AddressChips', () => {
     expect(onResetZoom).toHaveBeenCalledTimes(1)
     fireEvent.click(screen.getByRole('button', { name: 'Pop-up blocked, show options' }))
     expect(onShowPopupRow).toHaveBeenCalledTimes(1)
-    expect(screen.getByRole('img', { name: 'www.example.test is using your camera' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /camera/ })).toBeNull()
+    expect(screen.queryByRole('img')).toBeNull()
+    expect(screen.queryByText(/camera|microphone|screen|is using your/i)).toBeNull()
   })
 
   it('hides the zoom chip on an Erfana page', () => {

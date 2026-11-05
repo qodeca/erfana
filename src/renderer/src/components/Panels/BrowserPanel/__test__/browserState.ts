@@ -23,7 +23,6 @@ export function browserState(patch: Partial<BrowserTabState> = {}): BrowserTabSt
     zoomPercent: 100,
     widthPreset: 'full',
     security: 'secure',
-    inUse: { camera: false, microphone: false, screen: false },
     erfanaPage: null,
     devToolsOpen: false,
     ...patch

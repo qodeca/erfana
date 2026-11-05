@@ -224,7 +224,6 @@ describe('native-view guard – production wiring of browser views', () => {
       zoomPercent: 100,
       widthPreset: 'full',
       security: 'secure',
-      inUse: { camera: false, microphone: false, screen: false },
       erfanaPage,
       devToolsOpen: false
     }

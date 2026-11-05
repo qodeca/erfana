@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { EventEmitter } from 'node:events'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { fromId, createFromBitmap, logger } = vi.hoisted(() => ({
+const { fromId, createFromBitmap, logger, getSwitchValue, openBandWindow } = vi.hoisted(() => ({
   fromId: vi.fn(),
+  getSwitchValue: vi.fn(() => ''),
+  openBandWindow: vi.fn(() => ({ draw: vi.fn(), hide: vi.fn(), destroy: vi.fn() })),
   createFromBitmap: vi.fn(() => ({ toPNG: () => Buffer.from([137, 80]) })),
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 }))
-vi.mock('electron', () => ({ BrowserWindow: { fromId }, nativeImage: { createFromBitmap } }))
+vi.mock('electron', () => ({ app: { commandLine: { getSwitchValue } }, BrowserWindow: { fromId }, nativeImage: { createFromBitmap } }))
+vi.mock('./pickBandWindow', async (importOriginal) => ({ ...(await importOriginal<typeof import('./pickBandWindow')>()), openBandWindow }))
 vi.mock('../../LoggingService', () => ({ logger }))
 vi.mock('../../../ipc/browserTab/pick-handlers', () => ({ registerBrowserTabPickHandlers: vi.fn() }))
 
@@ -16,7 +19,7 @@ import { createManualClock } from '../../../../shared/clock'
 import { BROWSER_TAB_EVENTS } from '../../../../shared/ipc/browser-tab-channels'
 import type { BrowserTab } from '../BrowserTab'
 import { BrowserProjectTeardown } from '../browserProjectTeardown'
-import { encodePng, installBrowserPicks, registerPickSession } from './pickAppSetup'
+import { bandOpener, encodePng, installBrowserPicks, registerPickSession } from './pickAppSetup'
 import { FakePickCdp } from './__test-helpers__/fakePickCdp'
 
 function session() {
@@ -65,7 +68,7 @@ describe('pickAppSetup', () => {
     })
     const features = { attachTab: vi.fn(() => 'page'), detachTab: vi.fn() }
     const wrapped = setup.withPicks(features)
-    const tab = { id: 'browser-tab-1', windowId: 3, contents, projectRoot: '/p', viewFrame: { placement: () => null, widthPreset: 'full' } } as unknown as BrowserTab
+    const tab = { id: 'browser-tab-1', windowId: 3, contents, projectRoot: '/p', viewFrame: { placement: () => null, widthPreset: 'full', watchPlacement: () => () => undefined } } as unknown as BrowserTab
     expect(wrapped.attachTab(tab, 'events', 'hang')).toBe('page')
     expect(features.attachTab).toHaveBeenCalledWith(tab, 'events', 'hang')
     expect(input.attachPick).toHaveBeenCalledTimes(1)
@@ -108,5 +111,37 @@ describe('pickAppSetup', () => {
     })
     setup.withPicks({ attachTab: () => 'page', detachTab: () => undefined }).attachTab({ id: 'browser-tab-2', windowId: 4 } as unknown as BrowserTab, null, null)
     expect(input.attachPick).not.toHaveBeenCalled()
+  })
+
+  describe('bandOpener (the live outline’s window, ADR 0007 decision 6 amended 2026-11-05)', () => {
+    const platform = process.platform
+    const setPlatform = (value: string) => Object.defineProperty(process, 'platform', { value, configurable: true })
+    afterEach(() => setPlatform(platform))
+
+    it('opens the band window over the live browser window named by id, and none over a closed one', () => {
+      setPlatform('darwin')
+      const open = bandOpener()!
+      const events = { moved: vi.fn(), hidden: vi.fn(), closed: vi.fn() }
+      const window = { isDestroyed: () => false }
+      fromId.mockReturnValue(window)
+      const surface = open(7, events)
+      expect(surface).not.toBeNull()
+      expect(surface).toBe(openBandWindow.mock.results.at(-1)?.value)
+      expect(fromId).toHaveBeenCalledWith(7)
+      expect(openBandWindow).toHaveBeenCalledWith(window, events)
+      fromId.mockReturnValue(null)
+      expect(open(8, events)).toBeNull()
+      fromId.mockReturnValue({ isDestroyed: () => true })
+      expect(open(9, events)).toBeNull()
+    })
+
+    it('is absent under Wayland, where a child window cannot be placed, so the engine draws the outline', () => {
+      setPlatform('linux')
+      getSwitchValue.mockReturnValue('wayland')
+      expect(bandOpener()).toBeNull()
+      expect(getSwitchValue).toHaveBeenCalledWith('ozone-platform')
+      getSwitchValue.mockReturnValue('x11')
+      expect(bandOpener()).not.toBeNull()
+    })
   })
 })

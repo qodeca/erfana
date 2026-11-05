@@ -237,8 +237,6 @@ test.describe('025-AC-029 picks inside frames', () => {
   })
 })
 
-// Titled without the ID: the AC's covered case uses the fixture's click-through overlay, which the product does not
-// report (a test.fail below); the same note is proven with an overlay that catches clicks.
 test.describe('elements not wholly on screen (025-AC-035)', () => {
   test('an element taller than the viewport: the scroll position is unchanged, the outline runs to the image edge and the context file says partly off-screen with the full size', async ({
     appWithTestProject,
@@ -294,17 +292,14 @@ test.describe('elements not wholly on screen (025-AC-035)', () => {
     })
   }
 
-  test('an element under the fixture\'s overlay <div> (which lets clicks through) is sent with "covered by" and the tag div inside the untrusted block', async ({
+  test('025-AC-035 an element under the fixture\'s overlay <div> (which lets clicks through) is sent with "covered by" and the tag div inside the untrusted block', async ({
     appWithTestProject,
     windowWithTestProject,
     browserServers,
     testProject
   }) => {
-    // Known product gap: the "covered by" check (coveringTag, src/main/services/browser/capture/captureFacts.ts) runs
-    // the pick hit test, DOM.getNodeForLocation with ignorePointerEventsNone: false, so an overlay with
-    // `pointer-events: none` is never found as covering. That flag is pinned by ADR 0007 decision 4 and refused
-    // otherwise by the CDP allow list (cdpAllowList.ts), so changing it is an owner decision, not a test fix.
-    test.fail(true, 'Owner queue item 24 (025-AC-035): the covered-by check needs an ADR 0007 decision 4 amendment')
+    // The click goes through the overlay (`pointer-events: none`) to #covered; the covered-by check uses the hit
+    // test's topmost rule, which finds the overlay drawn on top (ADR 0007 decision 4, amended 2026-11-05).
     const flow = await PickFlow.open(appWithTestProject, windowWithTestProject)
     await new AgentTerminal(windowWithTestProject, flow).start()
     await flow.load(browserServers.sites.static.url('/offscreen.html'))

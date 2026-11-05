@@ -11,9 +11,11 @@
  *   a tab's CDP session holds (T14); the pick state and the held capture.
  * - **Faults**: an empty or failed screenshot, a slow or throwing hint
  *   lookup, a failed capture write (025-AC-034, 025-AC-037, 025-AC-060).
- * - **Test colour** (025-AC-034): the live pick outline in a unique colour,
- *   and the page as the engine paints it now – the positive control that the
- *   colour is really drawn, before a test shows it is absent from a capture.
+ * - **Test colours** (025-AC-034): the live pick outline's ink and paper in
+ *   unique colours; what Erfana's band draws now (surface bounds, strips and
+ *   their colours) – the positive control that the band is up in those
+ *   colours – and the page as `capturePage` gives it, so a test shows the
+ *   band is absent from the page's own image even while it is drawn.
  * - **Expiry**: run the 025-FR-039 sweep now, on the test clock.
  * - **Bench** (025-AC-049, 025-AC-050): the stage timings.
  *
@@ -23,7 +25,8 @@ import { mainClock } from '../utils/mainClock'
 import type { BrowserRuntime } from '../services/browser/browserAppSetup'
 import type { PickSummary } from '../services/browser/capture/BrowserCapture'
 import type { BrowserTabPick } from '../services/browser/pick/BrowserTabPick'
-import type { BenchStage } from '../services/browser/pick/pickSupport'
+import type { BandState } from '../services/browser/pick/pickBand'
+import type { BenchStage, FaultPair } from '../services/browser/pick/pickSupport'
 import type { Box } from '../services/browser/pick/pickGeometry'
 
 export interface HookHighlight {
@@ -63,12 +66,18 @@ export interface BrowserPickTestHook {
   /** The next `count` capture writes fail. */
   armWriteFailures(count: number): void
   resetFaults(): void
-  /** Draw the live pick outline in `colour` (0–255 channels, alpha 0–1), or the accent again with `null`; `resetFaults` clears it too. */
-  setHighlightColour(colour: { r: number; g: number; b: number; a: number } | null): void
   /**
-   * The tab's page as `capturePage` gives it now, as a base64 PNG. The live
-   * highlight shows in such an image (commit-8 probe), which is why a capture
-   * hides it first; a test reads it to see the outline's test colour painted.
+   * Draw the live pick outline's ink and paper in test colours (0–255
+   * channels, alpha 0–1), or in the product colours again with `null`;
+   * `resetFaults` clears them too.
+   */
+  setHighlightColours(pair: FaultPair | null): void
+  /** What Erfana's band draws for the tab now, or null (nothing shows, or the engine draws the outline). */
+  band(tabId: string): BandState | null
+  /**
+   * The tab's page as `capturePage` gives it now, as a base64 PNG. The
+   * engine's fallback outline shows in such an image (commit-8 probe); the
+   * band never does, which a test checks while the band is drawn.
    */
   pagePng(tabId: string): Promise<string>
   /** Run the expiry sweep of `projectRoot` now; resolves the names deleted. */
@@ -131,7 +140,11 @@ export function createBrowserPickTestHook(getRuntime: () => BrowserRuntime | nul
     },
     armWriteFailures: (count) => faults().armWriteFailures(count),
     resetFaults: () => faults().reset(),
-    setHighlightColour: (colour) => faults().setHighlightColour(colour),
+    setHighlightColours: (pair) => faults().setHighlightColours(pair),
+    band: (tabId) => {
+      const state = pickOf(tabId).highlight.band
+      return state === null ? null : { bounds: { ...state.bounds }, strips: state.strips.map((s) => ({ tone: s.tone, rect: { ...s.rect } })), colours: { ...state.colours } }
+    },
     pagePng: async (tabId) => {
       const runtime = requireRuntime(getRuntime)
       const tab = runtime.tabs.list().find((t) => t.id === tabId)

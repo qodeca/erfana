@@ -57,6 +57,11 @@ export class BrowserPickUi {
     return this.panel.root.getByTestId(BROWSER_TEST_IDS.INSTRUCTION_DIALOG)
   }
 
+  /** The panel's element chip, "{name} · {size}" – the current entry of the element path. */
+  get chip(): Locator {
+    return this.actions.getByRole('navigation', { name: 'Element path' }).locator('[aria-current="true"]')
+  }
+
   /** An action of the panel (Explain, Ask, Change, Prompt). */
   action(name: string): Locator {
     return this.actions.getByRole('button', { name, exact: true })
@@ -67,11 +72,15 @@ export class BrowserPickUi {
     return new PickDriver(this.app, this.panel.window, await this.panel.page())
   }
 
-  /** With pick mode on, hover `selector`, press Return in the page, and wait for the panel. */
+  /**
+   * With pick mode on, hover `selector` (its box read again on each try, so a
+   * layout shift cannot leave the pointer on a neighbour), press Return in the
+   * page, and wait for the panel.
+   */
   async confirm(selector: string, labelPrefix: string): Promise<void> {
     const driver = await this.driver()
     await expect.poll(async () => (await driver.state()).active, { timeout: PICK_WAIT_MS }).toBe(true)
-    await driver.hover(await driver.rect(selector), labelPrefix)
+    await driver.hoverSelector(selector, labelPrefix)
     await driver.key('Return')
     await expect(this.actions).toBeVisible({ timeout: PICK_WAIT_MS })
   }

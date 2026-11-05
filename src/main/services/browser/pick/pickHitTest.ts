@@ -1,11 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The pick hit test, in main (spec 025, 025-FR-025, 025-FR-029, 025-FR-053;
- * ADR 0007 decision 4 and its commit-8 probe results).
+ * The pick hit test, in main (spec 025, 025-FR-025, 025-FR-029, 025-FR-035,
+ * 025-FR-053; ADR 0007 decision 4, its commit-8 probe results and its
+ * 2026-11-05 amendment).
  *
  * `DOM.getNodeForLocation` on a session finds the element a click there would
- * hit, through same-process frames and shadow roots. When it lands on the
+ * hit, through same-process frames and shadow roots. That is the `click`
+ * rule, the only one picking uses. The `topmost` rule also finds elements
+ * with `pointer-events: none` – the element drawn on top – and serves only
+ * the read-only "covered by" check of 025-FR-035; it never chooses what is
+ * picked. When it lands on the
  * owner of an out-of-process frame, the point is mapped into that frame
  * through the owner's content quad and the test goes on in the frame's own
  * session – so transformed and nested cross-site frames work. A hit inside
@@ -43,6 +48,12 @@ export interface PickHit {
   readonly viewPoint: Point
 }
 
+/**
+ * Which element a hit test finds: `click` – the one a click would hit
+ * (`pointer-events: none` passes through); `topmost` – the one drawn on top.
+ */
+export type HitRule = 'click' | 'topmost'
+
 /** Out-of-process frames followed at most in one test. */
 const MAX_DESCENT = 16
 
@@ -53,7 +64,8 @@ export class PickHitTest {
 
   constructor(
     private readonly reader: PickReader,
-    private readonly frames: PickFrames
+    private readonly frames: PickFrames,
+    private readonly rule: HitRule = 'click'
   ) {
     this.embedHost = new PickEmbedHost(reader, frames)
   }
@@ -148,7 +160,12 @@ export class PickHitTest {
     try {
       located = await this.reader.call(
         'DOM.getNodeForLocation',
-        { x: Math.round(point.x + scroll.x), y: Math.round(point.y + scroll.y), ignorePointerEventsNone: false, includeUserAgentShadowDOM: false },
+        {
+          x: Math.round(point.x + scroll.x),
+          y: Math.round(point.y + scroll.y),
+          ignorePointerEventsNone: this.rule === 'topmost',
+          includeUserAgentShadowDOM: false
+        },
         sessionKey
       )
     } catch {

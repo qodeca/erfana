@@ -67,10 +67,10 @@ export interface Rgba {
 }
 
 /**
- * The live pick outline's colour (ADR 0007 decision 6, owner decision Q2):
- * `--color-accent-primary` (`--color-brand-violet`, #A0A8FF), opaque – the
- * Element picker card's accent ring, as close as the engine's one-colour
- * outline allows. The card's two-tone outline is drawn on the still image.
+ * The engine's one-colour fallback outline (ADR 0007 decision 6, owner
+ * decision Q2; amended 2026-11-05): `--color-accent-primary`
+ * (`--color-brand-violet`, #A0A8FF), opaque. Used only where Erfana's own
+ * ink-and-paper band cannot be placed (Wayland) or failed (`pickBand.ts`).
  */
 export const PICK_OUTLINE_COLOUR: Rgba = Object.freeze({ r: 160, g: 168, b: 255, a: 1 })
 

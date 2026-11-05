@@ -49,12 +49,20 @@ async function secureTab(browserTabs: BrowserTabPage, servers: BrowserFixtureSer
   return { page, major }
 }
 
-/** 025-FR-024: the Chromium version, in every place a site can read it, and no Electron or Erfana token. */
-function expectChromium(where: string, seen: Presented, major: string): void {
+/**
+ * 025-FR-024: the Chromium version, in every place a site can read it, and no
+ * Electron or Erfana token. `secChUa: 'required'` (a page, a popup) needs the
+ * `Sec-CH-UA` header with the Chromium version; `'asChromiumSends'` (a worker)
+ * accepts it absent – Chromium sends none on a worker's own request (owner
+ * decision, 2026-11-05) – but checks it the same way should it ever be sent.
+ */
+function expectChromium(where: string, seen: Presented, major: string, secChUa: 'required' | 'asChromiumSends' = 'required'): void {
   expect(seen.userAgent, `${where}: navigator.userAgent`).toMatch(new RegExp(`Chrome/${major}\\.0\\.0\\.0 Safari/537\\.36$`))
   expect(seen.headers['user-agent'], `${where}: User-Agent header`).toBe(seen.userAgent)
   expect(seen.brands, `${where}: navigator.userAgentData.brands`).toContainEqual({ brand: 'Chromium', version: major })
-  expect(seen.headers['sec-ch-ua'] ?? '', `${where}: Sec-CH-UA header`).toContain(`"Chromium";v="${major}"`)
+  if (secChUa === 'required' || seen.headers['sec-ch-ua'] !== undefined) {
+    expect(seen.headers['sec-ch-ua'] ?? '', `${where}: Sec-CH-UA header`).toContain(`"Chromium";v="${major}"`)
+  }
   expect(JSON.stringify(seen), `${where}: no Electron or Erfana token`).not.toMatch(/electron|erfana/i)
 }
 
@@ -223,15 +231,15 @@ test.describe('built-in browser tab', () => {
 })
 
 /*
- * 025-FR-024 user agent. NOT TITLED 025-AC-024: the criterion asks for a
- * `Sec-CH-UA` header on a worker's own request, and Chromium sends none there –
- * Google Chrome 156 neither (probe 2026-11-03: a dedicated worker's `fetch`
- * from a page that itself sends `Sec-CH-UA` carries no `sec-ch-ua`). The page
- * and the popup pass in full; the worker test is `test.fail()` with the full
- * assertions until the owner rewords the criterion, then title the AC.
+ * 025-AC-024 user agent. A page and a popup carry the Chromium version in
+ * `navigator.userAgent`, `navigator.userAgentData.brands` and the `Sec-CH-UA`
+ * header of their own request. A worker carries it in its navigator; it sends
+ * `Sec-CH-UA` only where Chromium sends it, which is none (Google Chrome 156
+ * neither – probe 2026-11-03; owner decision, 2026-11-05), so the worker test
+ * accepts the header absent and checks it only if present.
  */
-test.describe('025-FR-024 the user agent and client hints (part of 025-AC-024)', () => {
-  test('on a page: navigator.userAgent, userAgentData brands and Sec-CH-UA carry the Chromium version and no Electron or Erfana token', async ({
+test.describe('025-FR-024 the user agent and client hints', () => {
+  test('025-AC-024 on a page: navigator.userAgent, userAgentData brands and Sec-CH-UA carry the Chromium version and no Electron or Erfana token', async ({
     browserTabs,
     browserServers
   }) => {
@@ -243,8 +251,7 @@ test.describe('025-FR-024 the user agent and client hints (part of 025-AC-024)',
     expectChromium('page', await page.eval<Presented>(PRESENTED_EXPR), major)
   })
 
-  test('in a dedicated worker: the same, read inside the worker and from its own request', async ({ browserTabs, browserServers }) => {
-    test.fail(true, 'Spec gap (2026-11-03): Chromium, Google Chrome included, sends no Sec-CH-UA on a dedicated worker\'s requests; its navigator is correct')
+  test('025-AC-024 in a dedicated worker: navigator.userAgent and userAgentData brands carry the Chromium version; its own request carries Sec-CH-UA only as Chromium sends it (none)', async ({ browserTabs, browserServers }) => {
     const { page, major } = await secureTab(browserTabs, browserServers)
     const url = browserServers.sites.static.url('/plain.html', { secure: true })
     await browserTabs.navigate(page.tabId, url)
@@ -253,10 +260,10 @@ test.describe('025-FR-024 the user agent and client hints (part of 025-AC-024)',
       `new Promise((resolve) => { const w = new Worker('/ua-worker.js'); w.onmessage = (e) => resolve(e.data); w.onerror = (e) => resolve({ error: String(e.message) }) })`
     )
     expect(fromWorker.error).toBeUndefined()
-    expectChromium('worker', fromWorker, major)
+    expectChromium('worker', fromWorker, major, 'asChromiumSends')
   })
 
-  test('in a popup (window.open, opener kept): the same, on its navigation, its navigator and its own request', async ({ browserTabs, browserServers }) => {
+  test('025-AC-024 in a popup (window.open, opener kept): the same, on its navigation, its navigator and its own request', async ({ browserTabs, browserServers }) => {
     const app = browserTabs.app
     const { page, major } = await secureTab(browserTabs, browserServers)
     const url = browserServers.sites.static.url(`/popups.html?popup=${encodeURIComponent('/__headers')}`, { secure: true })

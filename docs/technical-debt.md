@@ -1178,6 +1178,17 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 
 **Revisit when**: a send is reported to stall the terminal, or before the browser leaves its first release.
 
+### 71. React 19 source lookup – what the source map read leaves open (spec 025, 025-FR-037, owner decision 2026-11-05)
+
+**What**: the React 19 source lookup (`src/main/services/browser/capture/sourceMapLocation.ts`; design § 4) leaves four things open:
+
+- **The stack crosses the protocol uncut.** `_debugStack` is returned by handle and V8 writes its whole stack into the handle's description, so a hostile page can make that one answer large; main reads at most 8 KiB of it. Every other pick read is cut in the page.
+- **Reading the description can run page code.** V8 formats the stack when the inspector builds the description, outside the side-effect check, so a page-defined `Error.prepareStackTrace` or `stack` getter runs then – in the page's own world, with nothing it could not do anyway.
+- **The page's server sees the read.** The script and map are fetched from main through the tab session (no credentials), so the server can tell that a pick happened. Nothing is cached, so each pick re-reads both (2.8 MB on the React 19 fixture).
+- **Local-file pages name no source.** A served local folder admits only its own page's requests, so the main-process read is refused and a React 19 page opened from disk says "source not found".
+
+**Revisit when**: a React 19 local-file page needs a source, or picks on large dev bundles miss the 750 ms budget.
+
 This doc covers project-wide non-Windows technical debt. For phase-structured deferred items with promotion criteria + risk-if-forgotten:
 
 - [`windows/deferred-work.md`](./windows/deferred-work.md) — D1-D8 (Phase 2 review aftermath, tracked in #168)

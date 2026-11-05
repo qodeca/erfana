@@ -79,7 +79,6 @@ import { installBrowserPicks, registerPickSession } from './pick/pickAppSetup'
 import type { BrowserPicks } from './pick/BrowserPicks'
 import type { TargetTerminals } from './capture/BrowserTargetStatus'
 import { PageClipboardMarks, watchPageClipboard } from './site/pageClipboardMarks'
-import { MEDIA_CAPTURE_UNOBSERVED } from './site/mediaInUse'
 
 /**
  * Chromium's per-disk-cache maximum: 512 MB (025-FR-015; ADR 0009 decision 9).
@@ -324,9 +323,7 @@ export function installBrowserAfterReady(deps: BrowserAfterReadyDeps): BrowserRu
       clock: mainClock,
       take: () => profiles.takeKeyringNotices(),
       dismissWeak: () => profiles.dismissWeakProtectionNotice()
-    },
-    // 025-FR-019's in-use chips have no producer yet: Electron 44 does not report a capture's end (site/mediaInUse.ts).
-    mediaInUse: () => MEDIA_CAPTURE_UNOBSERVED
+    }
   })
   ;(deps.registerTabHandlers ?? registerBrowserTabHandlers)({ service: tabs, openInSystemBrowser: (url) => openExternalSafe(url) })
   ;(deps.registerPageHandlers ?? registerBrowserTabPageHandlers)({

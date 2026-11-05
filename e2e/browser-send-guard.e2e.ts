@@ -2,34 +2,44 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Built-in browser send, the shell guard as the user meets it (spec 025,
- * 025-FR-061, S-23): no terminal, a bare shell, a wrapper (`ssh`, `sudo`,
- * `tmux`, `screen`) and an agent in front of the target terminal.
+ * 025-FR-061, S-23, 025-AC-077): no terminal, a bare shell, `nu.exe`, a
+ * wrapper (`ssh`, `sudo`, `tmux`, `screen`), an agent in front of the target
+ * terminal, and the target at a narrow width.
  *
- * No title carries 025-AC-077. Erfana has one terminal – the terminal panel's
- * single session, named "Terminal" as its panel header names it – so the parts
- * that need a second terminal cannot be built or proven on this build:
- * choosing another terminal in the toolbar's chooser and the next send going
- * there, the same from the dialog's and the menu's chooser at 400 px, and a
- * terminal name longer than 8 characters being cut (the design's "Terminal 1"
- * naming, CF-16, is an open owner question). An unreadable foreground is not
- * set up here. `nu.exe` is Windows only; it and the unknown foreground are
- * unit-tested in `src/main/services/browser/capture/BrowserTargetStatus.test.ts`,
- * the 10-second start-up window in `src/main/services/terminalForegroundRead.test.ts`. The app
- * opens a terminal at start, so "no terminal open" is reached through a
- * terminal whose shell exited. These tests prove the rest: the refusal with
- * no terminal and with a bare shell (nothing typed or written, no toast, focus
- * on the banner's button, the dialog kept with its text), **Open terminal**
- * starting a new terminal, **Choose terminal** opening the terminal menu where
- * a click sets the target, the wrappers' **Send anyway**, and one bracketed
- * paste and Enter to an agent.
+ * 025-AC-077 covers one terminal session (owner decision, 2026-11-05):
+ * Erfana has one terminal – the terminal panel's single session, named
+ * "Terminal" as its panel header names it. Choosing another terminal, the
+ * target control in the dialog and menu at narrow widths, and the 8-character
+ * name cut are a follow-up and are not tested here.
  *
- * The wrappers are stand-ins: links named `ssh`, `sudo`, … to node running the
- * stub agent, so the foreground reads by that name. Condition-based waits only.
+ * The app opens a terminal at start, so "no terminal open" is reached
+ * through a terminal whose shell exited. An unreadable foreground is not set
+ * up here: it is unit-tested in
+ * `src/main/services/browser/capture/BrowserTargetStatus.test.ts`, and the
+ * 10-second start-up window in `src/main/services/terminalForegroundRead.test.ts`.
+ *
+ * The stand-ins (`nu.exe`, `ssh`, `sudo`, …) are links of those names to node
+ * running the stub agent, so the foreground reads by that name; the stub agent
+ * itself runs as `node`, the documented limit (a `node` foreground is typed
+ * into). Condition-based waits only.
  */
 import { test, expect } from './fixtures/browserHarness'
+import type { Locator } from '@playwright/test'
 import { BrowserSendUi, SEND_WAIT_MS } from './pages/browser-send.page'
 
 const IS_POSIX = process.platform !== 'win32'
+
+/**
+ * `inner` is drawn whole: inside `box` – which itself cuts off nothing (no
+ * overflow) – and `box` inside `row`, horizontally.
+ */
+async function drawnWhole(inner: Locator, box: Locator, row: Locator): Promise<boolean> {
+  const [i, b, r] = [await inner.boundingBox(), await box.boundingBox(), await row.boundingBox()]
+  if (i === null || b === null || r === null || i.width === 0) return false
+  const within = (x: { x: number; width: number }, o: { x: number; width: number }): boolean => x.x >= o.x - 0.5 && x.x + x.width <= o.x + o.width + 0.5
+  const uncut = await box.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)
+  return uncut && within(i, b) && within(b, r)
+}
 
 // Pick, key routing and focus moving into the page all follow the page's
 // native focus, which ends when the window stops being the OS key window: run
@@ -39,7 +49,7 @@ test.use({ needsOsFocus: true })
 test.describe('built-in browser send, the shell guard', () => {
   test.skip(!IS_POSIX, 'The foreground is read by name on macOS and Linux; the stand-ins are POSIX links')
 
-  test('when the target terminal is gone, Change shows Open terminal with focus on it, keeps the dialog and its text and writes nothing', async ({
+  test('025-AC-077 when the target terminal is gone, Change shows Open terminal with focus on it, keeps the dialog and its text and writes nothing', async ({
     appWithTestProject,
     windowWithTestProject,
     browserServers,
@@ -85,7 +95,7 @@ test.describe('built-in browser send, the shell guard', () => {
     await send.terminal.waitForOutputLine('ERFANA_42')
   })
 
-  test('with a bare shell in front, Change and Explain type nothing and show Choose terminal with focus on it', async ({
+  test('025-AC-077 with a bare shell in front, Change and Explain type nothing and show Choose terminal with focus on it', async ({
     appWithTestProject,
     windowWithTestProject,
     browserServers,
@@ -130,7 +140,7 @@ test.describe('built-in browser send, the shell guard', () => {
     expect(screen).not.toContain('.erfana/browser/captures')
   })
 
-  test('with ssh, sudo, tmux or screen in front, a banner offers Send anyway, which types the prompt as one paste and Enter', async ({
+  test('025-AC-077 with ssh, sudo, tmux or screen in front, a banner offers Send anyway, which types the prompt as one paste and Enter', async ({
     appWithTestProject,
     windowWithTestProject,
     browserServers,
@@ -156,7 +166,7 @@ test.describe('built-in browser send, the shell guard', () => {
     }
   })
 
-  test('with an agent in front, the prompt arrives as one bracketed paste followed by Enter; the dialog carries the target as a menu button', async ({
+  test('025-AC-077 with an agent (a stub node process) in front, the prompt arrives as one bracketed paste followed by Enter; the dialog carries the target as a menu button', async ({
     appWithTestProject,
     windowWithTestProject,
     browserServers,
@@ -176,5 +186,49 @@ test.describe('built-in browser send, the shell guard', () => {
     expect(all.indexOf('\x1b[200~', 1)).toBe(-1)
     expect(all.endsWith('\x1b[201~\r')).toBe(true)
     expect(all).toContain('<change>\rlabel cut off\r</change>')
+  })
+
+  test('025-AC-077 with nu.exe in front, Explain types nothing and shows Choose terminal', async ({
+    appWithTestProject,
+    windowWithTestProject,
+    browserServers,
+    testProject
+  }) => {
+    const send = await BrowserSendUi.open(appWithTestProject, windowWithTestProject, testProject.path)
+    await send.startShell()
+    await send.load(browserServers.sites.static.url('/elements.html'))
+    await send.recordToasts()
+    // nu is a shell: with nu.exe in front the target names it as nu (the name compared drops `.exe`) and reads "no agent running".
+    const nu = await send.startStubAs('nu.exe', test.info().outputPath('shells'), test.info().outputPath('nu.bin'), /· nu, target terminal, no agent running$/)
+    await send.pickElement('#save-label', 'span#save-label ')
+    await send.pick.action('Explain').click()
+    await expect(send.pick.actions.getByRole('alert').locator('.erf-brw-banner__text')).toHaveText(
+      /^No agent is running in Terminal – start your agent there, then send again\.$/
+    )
+    await expect(send.pick.actions.getByRole('button', { name: 'Choose terminal', exact: true })).toBeFocused()
+    expect(await send.captureFiles()).toEqual([])
+    expect(await send.toastLog()).toEqual([])
+    expect(await nu.received()).toBe('')
+  })
+
+  test('025-AC-077 in a narrow browser tab the foreground process stays whole, and the target\'s accessible name and the target menu carry the full terminal name', async ({
+    appWithTestProject,
+    windowWithTestProject,
+    testProject
+  }) => {
+    const send = await BrowserSendUi.open(appWithTestProject, windowWithTestProject, testProject.path)
+    await send.startStubAgent(test.info().outputPath('agent-input.bin'))
+    await send.ui.setPanelWidth(send.panel, 360)
+
+    const target = send.pick.target
+    await expect(target).toHaveAccessibleName('Terminal · node, target terminal')
+    const proc = target.locator('.erf-brw-target__proc')
+    await expect(proc).toHaveText('· node')
+    await expect.poll(() => drawnWhole(proc, target, send.pick.row), { timeout: SEND_WAIT_MS, message: 'the foreground process is drawn whole' }).toBe(true)
+
+    await target.click()
+    const menu = send.panel.menu('Target terminal')
+    await expect(menu).toBeVisible()
+    await expect(menu.getByRole('menuitem', { name: /^Terminal · node\b/ })).toHaveCount(1)
   })
 })

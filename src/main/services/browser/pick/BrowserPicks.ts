@@ -34,9 +34,11 @@ import { outlineColour } from '../capture/accentColour'
 import { guardOf, targetStatus, targetStatusAtSend, targetStatusResponse, type TargetTerminals } from '../capture/BrowserTargetStatus'
 import type { Bitmap } from '../capture/captureImage'
 import { renderCapture } from '../capture/captureRender'
+import { tabSessionFetch } from '../capture/pageResourceFetch'
 import { CaptureStore, CaptureWriteError } from '../capture/CaptureStore'
 import type { TabInputPick } from '../input/BrowserTabInput'
 import { BrowserTabPick, type PickRouting } from './BrowserTabPick'
+import { OutlineBand, type BandHostEvents, type BandPlacement, type BandSurface } from './pickBand'
 import type { PickCdp } from './pickCdp'
 import { PickBench, PickFaults } from './pickSupport'
 
@@ -59,6 +61,12 @@ export interface BrowserPicksDeps {
   readonly store?: CaptureStore
   /** The tab-kind CDP session of a page `webContents` (`pickAppSetup.registerPickSession`). */
   readonly sessionOf?: (contents: object) => PickCdp | null
+  /**
+   * Opens the live outline's surface over window `hostId` (`pickBandWindow.ts`);
+   * absent, or answering null, where one cannot be placed – the engine then
+   * draws the outline.
+   */
+  readonly openBand?: ((hostId: number, events: BandHostEvents) => BandSurface | null) | null
 }
 
 /** The tab's routing as the pick pipeline attaches to it (`BrowserTabInput`). */
@@ -99,10 +107,25 @@ export class BrowserPicks {
       viewSize: () => tab.viewFrame.placement()?.view ?? null,
       widthPreset: () => ({ kind: 'preset', name: presetOf(tab.viewFrame.widthPreset).recordName }),
       projectRoot: () => tab.projectRoot,
+      // The tab's own session: the React 19 source map read meets the page's request rules.
+      fetchFromPage: tabSessionFetch(tab.contents),
+      band: this.bandFor(tab, host),
       clock: this.deps.clock,
       events,
       faults: this.faults,
       bench: this.bench
+    })
+  }
+
+  /** The tab's live outline band, or null without a surface to open. */
+  private bandFor(tab: BrowserTab, host: TabHost): OutlineBand | null {
+    const openBand = this.deps.openBand
+    if (openBand === undefined || openBand === null) return null
+    return new OutlineBand({
+      open: (events) => (host.isDestroyed() ? null : openBand(host.id, events)),
+      placement: () => bandPlacement(tab, host),
+      watchPlacement: (listener) => tab.viewFrame.watchPlacement(listener),
+      onError: (error) => logger.warn('Browser pick: the live outline could not be drawn; the engine draws it', { error: String(error) })
     })
   }
 
@@ -251,6 +274,15 @@ export class BrowserPicks {
       return { error: 'The capture could not be saved' }
     }
   }
+}
+
+/** Where `tab`'s page is on the screen now (DIP), for the live outline; null while hidden or closed. */
+function bandPlacement(tab: BrowserTab, host: TabHost): BandPlacement | null {
+  const placed = tab.viewFrame.placement()
+  if (placed === null || host.isDestroyed() || tab.contents.isDestroyed()) return null
+  const content = host.getContentBounds()
+  const onScreen = (r: { x: number; y: number; width: number; height: number }) => ({ x: content.x + r.x, y: content.y + r.y, width: r.width, height: r.height })
+  return { clip: onScreen(placed.clip), view: onScreen(placed.view), zoom: tab.contents.getZoomFactor() }
 }
 
 function withTimeout<T>(clock: Clock, work: Promise<T>, ms: number): Promise<T> {

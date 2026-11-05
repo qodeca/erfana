@@ -51,7 +51,6 @@ function make(overrides: Partial<BrowserTabServiceDeps> = {}): BrowserTabService
     expectDevTools: vi.fn(() => () => undefined),
     appAddresses: () => ({ rendererEntry: 'file:///r/index.html', resourcesDir: '/r', devServerOrigin: null }),
     resolveDomain: (h) => h,
-    mediaInUse: () => ({ camera: false, microphone: false, screen: false }),
     site: site as never,
     pages: pages as never,
     ...overrides

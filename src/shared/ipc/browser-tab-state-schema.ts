@@ -59,7 +59,6 @@ export const TabStateEventSchema = z
     zoomPercent: z.number().int().min(25).max(500),
     widthPreset: z.enum(['phone', 'tablet', 'full']),
     security: SecurityStateSchema,
-    inUse: z.object({ camera: z.boolean(), microphone: z.boolean(), screen: z.boolean() }).strict(),
     erfanaPage: ErfanaPageSchema.nullable(),
     certificate: CertificateWarningSchema.optional(), // the warning page's parts, with `erfanaPage: 'certificate'` (025-FR-021)
     loadError: LoadErrorPageSchema.optional(), // the load-error page's parts, with `erfanaPage: 'loadError'` (025-FR-059)
@@ -69,5 +68,3 @@ export const TabStateEventSchema = z
 
 export type OriginPartsPayload = z.infer<typeof OriginPartsSchema>
 export type TabStateEvent = z.infer<typeof TabStateEventSchema>
-/** The page's camera, microphone and screen capture, for the address bar's in-use chips (025-FR-019). */
-export type TabMediaInUse = TabStateEvent['inUse']

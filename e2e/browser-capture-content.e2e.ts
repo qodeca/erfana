@@ -12,12 +12,15 @@
  * Titles carry an AC id only where the whole criterion is proven here.
  * 025-AC-033: the golden file is an example of another page, so the match is
  * its structure (its headings, in its order) with every field checked by
- * value. 025-AC-034: the live pick outline gets a unique test colour from
- * main's pick hook (`setHighlightColour`, test builds only) and the pick label
- * one from a style on Erfana's window; each is first seen drawn (the positive
- * control), then searched for in the PNG. At a forced 2× scale the engine's
- * overlay does not show in `capturePage` at all, so that control runs at
- * scale 1. The 125 % and 150 % runs the criterion names are Windows scaling:
+ * value. 025-AC-034: the live pick outline's ink and paper get unique test
+ * colours from main's pick hook (`setHighlightColours`, test builds only) and
+ * the pick label one from a style on Erfana's window. The live outline is
+ * Erfana's band, a native surface over the page (ADR 0007 decision 6, amended
+ * 2026-11-05): the positive control is the band as main draws it – both test
+ * colours, around the highlighted box – and, while it is drawn, the page's
+ * own `capturePage` holds neither colour; then the PNG is searched for them.
+ * The label is first seen drawn, then searched for. The 125 % and 150 % runs
+ * the criterion names are Windows scaling:
  * they are covered by unit tests of the bitmap read at those scales
  * (`pickCaptureReads.test.ts`), not here. 025-AC-038 covers every case of the
  * criterion, plus no entry of Erfana's own making (the DevTools agent's
@@ -115,19 +118,30 @@ function countWhere(img: Image, matches: (p: Rgb) => boolean): number {
 }
 
 /**
- * The live pick outline's unique test colour (main's pick hook): magenta; and
- * the pick label's (a style on Erfana's window): cyan. A pixel counts as one
- * of them by the hue that dominates it, not by closeness: what the engine
- * paints reaches `capturePage` colour-managed (macOS converts to the display
- * profile) and, at a 2× scale, blended with the page along a thin line, so
- * its channels move by tens. Neither the fixture page nor the drawn accent
- * outline (#A0A8FF) has a pixel with either hue this strong.
+ * The live pick outline's unique test colours (main's pick hook): magenta ink
+ * and yellow paper; and the pick label's (a style on Erfana's window): cyan.
+ * A pixel counts as one of them by the hue that dominates it, not by
+ * closeness: what is painted reaches an image colour-managed (macOS converts
+ * to the display profile) and, at a 2× scale, blended with the page along a
+ * thin line, so its channels move by tens. Neither the fixture page nor the
+ * drawn accent outline (#A0A8FF) has a pixel with any of these hues this
+ * strong (its nearest, #ff7043, is 45 short of the paper's margin).
  */
-const LIVE_OUTLINE_TEST: Rgb = { r: 255, g: 0, b: 255 }
+const LIVE_INK_TEST: Rgb = { r: 255, g: 0, b: 255 }
+const LIVE_PAPER_TEST: Rgb = { r: 255, g: 255, b: 0 }
 const LABEL_TEST: Rgb = { r: 0, g: 255, b: 255 }
 const HUE_MARGIN = 100
-const isOutlineTest = (p: Rgb): boolean => Math.min(p.r, p.b) - p.g > HUE_MARGIN
+const isInkTest = (p: Rgb): boolean => Math.min(p.r, p.b) - p.g > HUE_MARGIN
+const isPaperTest = (p: Rgb): boolean => Math.min(p.r, p.g) - p.b > HUE_MARGIN
 const isLabelTest = (p: Rgb): boolean => Math.min(p.g, p.b) - p.r > HUE_MARGIN
+const hex = ({ r, g, b }: Rgb): string => `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`
+
+/** The band main draws for the live outline (the pick hook's `band`). */
+interface BandRecord {
+  bounds: { x: number; y: number; width: number; height: number }
+  strips: Array<{ tone: 'ink' | 'paper'; rect: { x: number; y: number; width: number; height: number } }>
+  colours: { ink: string; paper: string }
+}
 
 /** Decode a PNG (a buffer) into an {@link Image}. */
 async function decodePng(png: Buffer): Promise<Image> {
@@ -329,8 +343,8 @@ test.describe('025-AC-034 the screenshot and the crop', () => {
       }) => {
         const { send, agent } = await openSend(appWithTestProject, windowWithTestProject, testProject.path)
         await send.load(browserServers.sites.static.url('/elements.html'))
-        // The live outline and the label in colours of their own, so the image can be searched for them.
-        await send.fault('setHighlightColour', { ...LIVE_OUTLINE_TEST, a: 1 })
+        // The live outline's ink and paper and the label in colours of their own, so the image can be searched for them.
+        await send.fault('setHighlightColours', { ink: { ...LIVE_INK_TEST, a: 1 }, paper: { ...LIVE_PAPER_TEST, a: 1 } })
         await windowWithTestProject.addStyleTag({
           content: `.erf-brw-banner-line__more--1 { background-color: rgb(${LABEL_TEST.r}, ${LABEL_TEST.g}, ${LABEL_TEST.b}) !important; color: rgb(${LABEL_TEST.r}, ${LABEL_TEST.g}, ${LABEL_TEST.b}) !important; }`
         })
@@ -345,18 +359,24 @@ test.describe('025-AC-034 the screenshot and the crop', () => {
           const target = await driver.rect('[id="1abc"]')
           await driver.move(Math.round(target.x + target.width / 2), Math.round(target.y + target.height / 2))
           await expect.poll(async () => (await driver.highlight())?.label ?? '', { timeout: SEND_WAIT_MS }).toMatch(/^div/)
-          // Positive controls: the engine paints the live outline in its test colour on the page, and the label shows in its own.
-          // At a forced 2× scale the engine's overlay never shows in `capturePage` (seen on macOS, 2026-11-03), so
-          // there the control cannot run and the scale-1 run is the one that proves the outline is hidden first.
-          if (scale === 1) {
-            const tabId = await send.panel.tabId()
-            await expect
-              .poll(async () => countWhere(await decodePng(Buffer.from((await send.fault('pagePng', tabId)) as string, 'base64')), isOutlineTest), {
-                timeout: SEND_WAIT_MS,
-                message: 'live outline painted in its test colour'
-              })
-              .toBeGreaterThan(0)
-          }
+          // Positive control: Erfana's band is up around the highlighted element, in both test colours.
+          const tabId = await send.panel.tabId()
+          let band: BandRecord | null = null
+          await expect
+            .poll(async () => (band = (await send.fault('band', tabId)) as BandRecord | null) !== null, { timeout: SEND_WAIT_MS, message: 'live outline band drawn' })
+            .toBe(true)
+          const drawn = band as unknown as BandRecord
+          expect(drawn.colours).toEqual({ ink: hex(LIVE_INK_TEST), paper: hex(LIVE_PAPER_TEST) })
+          expect(new Set(drawn.strips.map((s) => s.tone))).toEqual(new Set(['ink', 'paper']))
+          // Its outer ink ring is the highlighted border box plus 1 DIP each side (zoom 100 %).
+          const box = (await driver.highlight())!.box!
+          const inkTop = drawn.strips.find((s) => s.tone === 'ink')!
+          expect(inkTop.rect.width).toBe(Math.round(box.x + box.width) - Math.round(box.x) + 2)
+          // The band is outside the page: while it is drawn, the page's own capture holds neither of its colours.
+          const live = await decodePng(Buffer.from((await send.fault('pagePng', tabId)) as string, 'base64'))
+          expect(countWhere(live, isInkTest), 'band ink in the page capture').toBe(0)
+          expect(countWhere(live, isPaperTest), 'band paper in the page capture').toBe(0)
+          expect(await send.fault('band', tabId), 'band still drawn after the page capture').not.toBeNull()
           const label = send.pick.status.locator('.erf-brw-banner-line__more--1')
           await expect(label).toHaveText(/^div/)
           expect(countWhere(await decodePng(await label.screenshot()), isLabelTest), 'label drawn in its test colour').toBeGreaterThan(0)
@@ -376,7 +396,8 @@ test.describe('025-AC-034 the screenshot and the crop', () => {
         expect(Math.abs(shot.width - vw * dpr)).toBeLessThanOrEqual(1)
         expect(Math.abs(shot.height - vh * dpr)).toBeLessThanOrEqual(1)
         // Neither Erfana's live outline nor its label is in the image: only the drawn outline is.
-        expect(countWhere(shot, isOutlineTest), 'live outline pixels').toBe(0)
+        expect(countWhere(shot, isInkTest), 'live outline ink pixels').toBe(0)
+        expect(countWhere(shot, isPaperTest), 'live outline paper pixels').toBe(0)
         expect(countWhere(shot, isLabelTest), 'label pixels').toBe(0)
 
         // The outline: the two device pixels just outside the box, in the accent colour; inside it is the element's own.

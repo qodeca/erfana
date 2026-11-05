@@ -37,7 +37,6 @@ function state(patch: Partial<BrowserTabState> = {}): BrowserTabState {
     zoomPercent: 100,
     widthPreset: 'full',
     security: 'secure',
-    inUse: { camera: false, microphone: false, screen: false },
     erfanaPage: null,
     devToolsOpen: false,
     ...patch

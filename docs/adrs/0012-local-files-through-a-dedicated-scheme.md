@@ -1,6 +1,6 @@
 # ADR 0012: Local files open through a per-folder loopback server
 
-- **Status**: accepted (owner decision, 2026-11-03) – revised 2026-11-02 after the expert panel; rewritten 2026-11-03 after the commit-8 spike failed: the owner chose the per-folder loopback server (owner question Q4) in place of the `erfana-local:` scheme. The file name keeps the original title; **amended 2026-11-04** (owner, option 1): the tab's pending top-level load also opens its folder to that tab until it commits – see [Amendment 2026-11-04](#amendment-2026-11-04-the-pending-top-level-load)
+- **Status**: accepted (owner decision, 2026-11-03) – revised 2026-11-02 after the expert panel; rewritten 2026-11-03 after the commit-8 spike failed: the owner chose the per-folder loopback server (owner question Q4) in place of the `erfana-local:` scheme. The file name keeps the original title; **amended 2026-11-04** (owner, option 1): the tab's pending top-level load also opens its folder to that tab until it commits – see [Amendment 2026-11-04](#amendment-2026-11-04-the-pending-top-level-load); first consequence reworded 2026-11-05 (owner decision)
 - **Date**: 2026-11-03
 - **Deciders**: Marcin Obel (owner), Claude Code
 - **Related**: [spec 025](../../specs/spec-t4-025-built-in-browser/requirements/02-requirements.md) 025-FR-002, 025-FR-005, 025-FR-010, 025-FR-011, 025-NFR-001 · 025-CA-009 · [ADR 0009](./0009-browser-profile-in-the-project-folder.md) · [solution design](../../specs/spec-t4-025-built-in-browser/architecture/001-solution-design.md) § 3.4, § 11 Q4
@@ -39,7 +39,7 @@ Option 2 depended on whether Chromium sends `Sec-Fetch-Dest` to a custom-scheme 
 
 ## Consequences
 
-- A local page cannot read local files, open a window that can, or be included by another site; a listening socket exists, reachable by other local processes only with the token and the exact `Host`.
+- A local page cannot fetch or XHR local files, open a window that can, or be included by another site. It is never served from the home folder or an OS user folder (Downloads, Desktop, Documents and the like) itself, nor from a folder that holds one. It can still load and read the images, style sheets, scripts and media of its own served folder (amended 2026-11-05, owner decision; `LocalFileServers.ts`). A listening socket exists, reachable by other local processes only with the token and the exact `Host`.
 - Fonts, module scripts and per-folder storage work for the page the user opened; pages reached by a link or in a frame have no storage and no module scripts.
 - A port per served folder while a tab holds it; at most 32.
 - Committed URLs differ from what the bar shows (spec change S-6); `127.0.0.1` must be excluded from the test host-resolver map (see 04-acceptance).

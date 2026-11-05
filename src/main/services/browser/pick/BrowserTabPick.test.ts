@@ -10,6 +10,8 @@ import { pickHarness, settle, type PickHarness } from './__test-helpers__/pickHa
 import { CHAIN_REST_MS } from './pickHover'
 import { PICK_CHAIN } from '../cdp/cdpPickFunctions'
 import { PAINT_WAIT_CAP_MS, PAINT_WAIT_SCRIPT, PAINT_WAIT_WORLD_ID } from './pickPainted'
+import { OutlineBand } from './pickBand'
+import { SCROLL_SETTLE_MS } from './pickHighlight'
 
 /** Pick mode on, the pointer over the label, its highlight shown. */
 async function hovering(h: PickHarness, x = 35, y = 30): Promise<void> {
@@ -560,5 +562,61 @@ describe('BrowserTabPick', () => {
 
   it('lists the targets its session holds (the test hook)', () => {
     expect(h.pick.attachedTargets().map((t) => t.sessionKey)).toEqual(['', 'S1'])
+  })
+
+  describe('Erfana’s band (ADR 0007 decision 6, amended 2026-11-05)', () => {
+    function withBand() {
+      const log: string[] = []
+      const surface = {
+        draw: vi.fn(() => log.push('draw')),
+        hide: vi.fn(() => log.push('hide')),
+        destroy: vi.fn(() => log.push('destroy'))
+      }
+      const band = new OutlineBand({ open: () => surface, placement: () => ({ clip: { x: 0, y: 0, width: 800, height: 600 }, view: { x: 0, y: 0, width: 800, height: 600 }, zoom: 1 }) })
+      return { h: pickHarness({ band }), surface, log }
+    }
+
+    it('outlines the hovered element on the band, with no engine overlay command', async () => {
+      const { h, surface } = withBand()
+      await hovering(h)
+      expect(surface.draw).toHaveBeenCalledTimes(1)
+      expect(h.page.cdp.calls('Overlay.highlightQuad')).toEqual([])
+      expect(h.pick.highlight.band?.strips.length).toBeGreaterThan(0)
+    })
+
+    it('025-AC-034 hides the band before the screenshot is taken', async () => {
+      const { h, log } = withBand()
+      await hovering(h)
+      h.contents.onScript = () => log.push('paint wait')
+      h.routing.dispatch({ type: 'enter', now: h.clock.now() })
+      await settle()
+      expect(h.contents.captures).toBe(1)
+      expect(log.indexOf('hide')).toBeGreaterThan(-1)
+      expect(log.indexOf('hide')).toBeLessThan(log.indexOf('paint wait'))
+    })
+
+    it('a wheel hides the band, which comes back at the element once the wheel is still', async () => {
+      const { h, surface } = withBand()
+      await hovering(h)
+      h.contents.mouse('mouseWheel', 35, 30)
+      expect(surface.hide).toHaveBeenCalledTimes(1)
+      h.clock.advance(SCROLL_SETTLE_MS)
+      await settle()
+      expect(surface.draw).toHaveBeenCalledTimes(2)
+    })
+
+    it('hides the band when the page navigates and at pick end, and closes it with the tab', async () => {
+      const { h, surface } = withBand()
+      await hovering(h)
+      h.contents.emit('did-navigate')
+      expect(surface.hide).toHaveBeenCalledTimes(1)
+      await hovering(h, 36, 30)
+      h.routing.dispatch({ type: 'pickButton' })
+      await settle()
+      expect(h.pick.isActive).toBe(false)
+      expect(surface.hide).toHaveBeenCalledTimes(2)
+      h.pick.dispose()
+      expect(surface.destroy).toHaveBeenCalledTimes(1)
+    })
   })
 })

@@ -21,7 +21,10 @@ function runtime() {
     moment: { pickPoint: { x: 1, y: 2 } }
   }
   const pick = {
-    highlight: { record: { label: 'span#a 1 × 1', box: { x: 0, y: 0, width: 1, height: 1 }, node: { sessionKey: '', backendNodeId: 5, frameId: 'top' } } as unknown },
+    highlight: {
+      record: { label: 'span#a 1 × 1', box: { x: 0, y: 0, width: 1, height: 1 }, node: { sessionKey: '', backendNodeId: 5, frameId: 'top' } } as unknown,
+      band: null as unknown
+    },
     attachedTargets: () => [{ sessionKey: '', targetId: 't', type: 'page', url: 'u' }],
     isActive: true,
     isFrozen: false,
@@ -66,16 +69,25 @@ describe('createBrowserPickTestHook', () => {
     expect(picks.faults.takeCaptureFailure()).toBe(false)
   })
 
-  it('025-AC-034 sets and clears the live outline test colour, and gives the page as painted now', async () => {
-    const { rt, picks } = runtime()
+  it('025-AC-034 sets and clears the live outline’s test colours, reads the band as drawn, and gives the page as painted now', async () => {
+    const { rt, picks, pick } = runtime()
     const hook = createBrowserPickTestHook(() => rt)
-    hook.setHighlightColour({ r: 255, g: 0, b: 255, a: 1 })
-    expect(picks.faults.highlightColour()).toEqual({ r: 255, g: 0, b: 255, a: 1 })
-    hook.setHighlightColour(null)
-    expect(picks.faults.highlightColour()).toBeNull()
-    hook.setHighlightColour({ r: 1, g: 2, b: 3, a: 1 })
+    const pair = { ink: { r: 255, g: 0, b: 255, a: 1 }, paper: { r: 255, g: 255, b: 0, a: 1 } }
+    hook.setHighlightColours(pair)
+    expect(picks.faults.highlightColours()).toEqual(pair)
+    hook.setHighlightColours(null)
+    expect(picks.faults.highlightColours()).toBeNull()
+    hook.setHighlightColours(pair)
     hook.resetFaults()
-    expect(picks.faults.highlightColour()).toBeNull()
+    expect(picks.faults.highlightColours()).toBeNull()
+    expect(hook.band('browser-tab-1')).toBeNull()
+    const state = { bounds: { x: 1, y: 2, width: 3, height: 4 }, strips: [{ tone: 'ink', rect: { x: 0, y: 0, width: 3, height: 1 } }], colours: { ink: '#ff00ff', paper: '#ffff00' } }
+    pick.highlight.band = state
+    const read = hook.band('browser-tab-1')
+    expect(read).toEqual(state)
+    // A copy: the test cannot reach into the band's own record.
+    expect(read).not.toBe(state)
+    expect(read?.strips[0].rect).not.toBe(state.strips[0].rect)
     expect(await hook.pagePng('browser-tab-1')).toBe(Buffer.from('png bytes').toString('base64'))
     await expect(hook.pagePng('browser-tab-9')).rejects.toThrow('No browser tab browser-tab-9')
   })

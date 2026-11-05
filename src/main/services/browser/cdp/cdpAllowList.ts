@@ -169,7 +169,9 @@ const TAB_ONLY_RULES: Readonly<Record<string, ParamsCheck>> = {
   'DOM.disable': noParams,
   'DOM.getDocument': shape({}, { depth: shallowDepth, pierce: is(false) }),
   'DOM.getNodeForLocation': shape(
-    { x: int, y: int, ignorePointerEventsNone: is(false) },
+    // Required: each caller names its rule – false for the pick (click), true for the read-only covered-by check
+    // (ADR 0007 decision 4, amended 2026-11-05).
+    { x: int, y: int, ignorePointerEventsNone: bool },
     { includeUserAgentShadowDOM: bool }
   ),
   'DOM.describeNode': shape({}, { ...nodeRef, depth: shallowDepth, pierce: is(false) }),

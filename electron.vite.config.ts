@@ -237,7 +237,7 @@ function testHooksDefine(mode: string): Record<string, string> {
 export default defineConfig(({ mode }) => ({
   main: {
     plugins: [assertModulePathsConfinedFirst()],
-    // The screenshot outline's accent, resolved from design-tokens.css here (025-FR-034).
+    // The screenshot outline's accent (025-FR-034) and the live pick outline's ink and paper, resolved from design-tokens.css here.
     define: { ...testHooksDefine(mode), ...mainDesignTokenDefines() },
     build: {
       rollupOptions: {

@@ -5,11 +5,11 @@
  * 025-AC-034, 025-AC-037, 025-AC-049, 025-AC-050, 025-AC-060).
  *
  * - {@link PickFaults}: failures a test hook can force – an empty or failed
- *   screenshot, a slow or throwing hint lookup, a failed file write – and a
- *   unique test colour for the live pick outline, so a screenshot test can
- *   tell a leaked live outline from the drawn one (both are the accent
- *   otherwise; 025-AC-034). Inert unless a hook arms them; production code
- *   only asks.
+ *   screenshot, a slow or throwing hint lookup, a failed file write – and
+ *   unique test colours for the live pick outline's ink and paper, so a
+ *   screenshot test can tell a leaked live outline from anything the page or
+ *   the still image draws (025-AC-034). Inert unless a hook arms them;
+ *   production code only asks.
  * - {@link PickBench}: stage timings (hover to highlight, confirm to menu,
  *   send), kept as the last {@link BENCH_SAMPLES} samples per stage for the
  *   bench lane's hooks. Measured on the injected clock.
@@ -47,8 +47,14 @@ export interface FaultRgba {
   readonly a: number
 }
 
+/** Test colours for the live outline's two tones. */
+export interface FaultPair {
+  readonly ink: FaultRgba
+  readonly paper: FaultRgba
+}
+
 export class PickFaults {
-  private highlightOutline: FaultRgba | null = null
+  private highlightOutline: FaultPair | null = null
   private emptyCaptures = 0
   private failedCaptures = 0
   private hintsDelay: Promise<void> | null = null
@@ -76,13 +82,17 @@ export class PickFaults {
     this.writeFailures = count
   }
 
-  /** The live pick outline is drawn in `colour` (a unique test colour), or the accent again with `null`. */
-  setHighlightColour(colour: FaultRgba | null): void {
-    this.highlightOutline = colour === null ? null : Object.freeze({ ...colour })
+  /**
+   * The live pick outline is drawn in `pair` (unique test colours for its ink
+   * and paper; the engine's one-colour fallback takes the ink), or in the
+   * product colours again with `null`.
+   */
+  setHighlightColours(pair: FaultPair | null): void {
+    this.highlightOutline = pair === null ? null : Object.freeze({ ink: Object.freeze({ ...pair.ink }), paper: Object.freeze({ ...pair.paper }) })
   }
 
-  /** The live outline's test colour, or `null` for the product colour. */
-  highlightColour(): FaultRgba | null {
+  /** The live outline's test colours, or `null` for the product colours. */
+  highlightColours(): FaultPair | null {
     return this.highlightOutline
   }
 

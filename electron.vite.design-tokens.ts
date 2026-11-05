@@ -45,7 +45,17 @@ export function resolveTokenHex(css: string, name: string): string {
   throw new Error(`${name}: var() chain deeper than ${MAX_VAR_DEPTH}`)
 }
 
-/** The `define` entries for the main process: `__ERFANA_ACCENT_PRIMARY__` = `--color-accent-primary` as `#rrggbb`. */
+/**
+ * The `define` entries for the main process, each a token as `#rrggbb`:
+ * `__ERFANA_ACCENT_PRIMARY__` = `--color-accent-primary` (the screenshot
+ * outline), and the live pick outline's pair (ADR 0007 decision 6, amended
+ * 2026-11-05) – `__ERFANA_OUTLINE_INK__` = `--color-brand-black` and
+ * `__ERFANA_OUTLINE_PAPER__` = `--color-white`.
+ */
 export function mainDesignTokenDefines(css: string = readFileSync(DESIGN_TOKENS_CSS, 'utf-8')): Record<string, string> {
-  return { __ERFANA_ACCENT_PRIMARY__: JSON.stringify(resolveTokenHex(css, '--color-accent-primary')) }
+  return {
+    __ERFANA_ACCENT_PRIMARY__: JSON.stringify(resolveTokenHex(css, '--color-accent-primary')),
+    __ERFANA_OUTLINE_INK__: JSON.stringify(resolveTokenHex(css, '--color-brand-black')),
+    __ERFANA_OUTLINE_PAPER__: JSON.stringify(resolveTokenHex(css, '--color-white'))
+  }
 }

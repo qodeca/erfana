@@ -9,7 +9,8 @@
  *
  * - **On and off**: the engine side is `pickModeSwitch.ts`.
  * - **Hover** and **Up and Down before a confirm** (`pickHover.ts`): each
- *   move is hit-tested, the latest wins, and the engine outlines the element;
+ *   move is hit-tested, the latest wins, and the element is outlined
+ *   (`pickHighlight.ts`: Erfana's band, or the engine where it cannot be placed);
  *   its chain is read only for an Up or Down or once the pointer rests on
  *   it; a frame that goes ends the highlight (`pickFrameGone.ts`).
  * - **Confirm** ({@link BrowserTabPick.startCapture}, `capture/` modules):
@@ -32,6 +33,8 @@ import type { ClosePickReason } from '../../../../shared/ipc/browser-tab-pick-sc
 import { logger } from '../../LoggingService'
 import { BrowserCapture, type RefineMove } from '../capture/BrowserCapture'
 import { downscaleBitmap } from '../capture/captureImage'
+import type { PageFetch } from '../capture/pageResourceFetch'
+import type { OutlineBand } from './pickBand'
 import { PickReader, type PickCdp, type PickNode } from './pickCdp'
 import { CaptureFailure, PickCaptureReads } from './pickCaptureReads'
 import { readChain } from './pickElement'
@@ -87,6 +90,10 @@ export interface BrowserTabPickDeps {
   readonly events: { pick(event: PickEvent): void }
   readonly faults?: PickFaults
   readonly bench?: PickBench
+  /** The tab session's `fetch`, for the React 19 source map (`PickCaptureReads`). */
+  readonly fetchFromPage?: PageFetch
+  /** Erfana's live outline (ADR 0007 decision 6, amended 2026-11-05); without it the engine draws one. */
+  readonly band?: OutlineBand | null
 }
 
 const captureId = (): string => randomBytes(16).toString('hex')
@@ -115,7 +122,11 @@ export class BrowserTabPick {
   constructor(private readonly deps: BrowserTabPickDeps) {
     this.reader = new PickReader(deps.cdp)
     this.frames = new PickFrames(deps.cdp, this.reader)
-    this.highlight = new PickHighlight(this.reader, this.frames, () => deps.faults?.highlightColour() ?? null)
+    this.highlight = new PickHighlight(this.reader, this.frames, {
+      testColours: () => deps.faults?.highlightColours() ?? null,
+      band: deps.band,
+      clock: deps.clock
+    })
     this.hovering = new PickHover({
       reader: this.reader,
       frames: this.frames,
@@ -142,7 +153,8 @@ export class BrowserTabPick {
       isFrozen: () => this.freeze.isFrozen,
       projectRoot: deps.projectRoot,
       clock: deps.clock,
-      faults: deps.faults
+      faults: deps.faults,
+      fetchFromPage: deps.fetchFromPage
     })
     this.offs.push(
       deps.cdp.on('protocolEvent', (event) => {
@@ -251,6 +263,7 @@ export class BrowserTabPick {
       if (!this.deps.contents.isDestroyed()) this.deps.contents.removeListener(event, listener)
     }
     this.held = null
+    this.highlight.dispose()
     void this.freeze.unfreeze()
     this.freeze.dispose()
     this.frames.dispose()
@@ -286,6 +299,7 @@ export class BrowserTabPick {
       if (this.active && this.held === null && this.deps.routing.state().surface === 'none') this.hovering.move(mouse)
       return
     }
+    if (mouse.type === 'mouseWheel') return this.highlight.scrolled()
     if (mouse.type === 'mouseDown' && (mouse.button ?? 'left') === 'left') {
       this.lastPointer = mouse
       this.clickPointer = mouse

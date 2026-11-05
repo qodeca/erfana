@@ -10,6 +10,7 @@ import { createManualClock, type TestClock } from '../../../../../shared/clock'
 import { INITIAL_ROUTING_STATE, reduceRouting, type RoutingEvent, type RoutingState } from '../../../../../shared/browser/routingState'
 import type { PickEvent } from '../../../../../shared/ipc/browser-tab-schema'
 import { BrowserTabPick, type PickContents, type PickRouting } from '../BrowserTabPick'
+import type { OutlineBand } from '../pickBand'
 import { PickBench, PickFaults } from '../pickSupport'
 import type { FakePage } from './fakePage'
 import { samplePage } from './samplePage'
@@ -90,7 +91,7 @@ export interface PickHarness {
 }
 
 export function pickHarness(
-  options: { projectRoot?: string | null; crossSite?: boolean; viewSize?: { width: number; height: number } | null } = {}
+  options: { projectRoot?: string | null; crossSite?: boolean; viewSize?: { width: number; height: number } | null; band?: OutlineBand } = {}
 ): PickHarness {
   const contents = new FakePickContents()
   const events: PickEvent[] = []
@@ -128,7 +129,8 @@ export function pickHarness(
         viewSize: options.viewSize === undefined ? undefined : () => options.viewSize ?? null,
         events: { pick: (e) => events.push(e) },
         faults,
-        bench
+        bench,
+        band: options.band
       })
     }
   })

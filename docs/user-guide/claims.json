@@ -12508,7 +12508,7 @@
       "quote": "`scripts/fuses.test.mjs` (9 cases:",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.test.mjs:113",
+      "source": "scripts/fuses.test.mjs:114",
       "match": "describe('chmodNodePtySpawnHelper', () => {"
     },
     {
@@ -24427,7 +24427,7 @@
       "quote": "Developer Mode so tests can create symlinks",
       "status": "fixed",
       "evidence": "source",
-      "source": "scripts/fuses.test.mjs:98",
+      "source": "scripts/fuses.test.mjs:99",
       "match": "Creating a symlink on Windows needs Developer Mode or elevation",
       "note": "Was: VS 2022 Build Tools, Developer Mode, Win32 long paths, 'breaks npm run build:win'. VS 2022 and long paths are not traceable in raw material; removed, pointing to docs/build/windows.md instead."
     },
@@ -50620,7 +50620,7 @@
       "quote": "A unit test parses a real signed exe (node-pty's `OpenConsole.exe`)",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/fuses.test.mjs:2259",
+      "source": "scripts/fuses.test.mjs:2264",
       "match": "'prebuilds', 'win32-x64', 'conpty', 'OpenConsole.exe'"
     },
     {

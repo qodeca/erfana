@@ -30,6 +30,8 @@ export interface FakeNode {
   /** For an `<iframe>`: the frame it holds. */
   readonly contentFrameId?: string
   readonly shadow?: 'open' | 'closed'
+  /** `pointer-events: none`: skipped by a hit test unless it asks for `ignorePointerEventsNone`. */
+  readonly pointerEventsNone?: boolean
 }
 
 export interface FakeFrame {
@@ -122,6 +124,7 @@ export class FakePage {
       let best: FakeNode | null = null
       for (const n of this.nodes.values()) {
         if (n.session !== session || n.box === undefined) continue
+        if (n.pointerEventsNone === true && p.ignorePointerEventsNone !== true) continue
         const [bx, by, bw, bh] = n.box
         if (x < bx || y < by || x >= bx + bw || y >= by + bh) continue
         if (best === null || bw * bh <= best.box![2] * best.box![3]) best = n

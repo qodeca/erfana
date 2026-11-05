@@ -124,7 +124,6 @@ describe('browser-tab event schemas', () => {
     zoomPercent: 100,
     widthPreset: 'full',
     security: 'secure',
-    inUse: { camera: false, microphone: false, screen: false },
     erfanaPage: null,
     devToolsOpen: false
   }
@@ -135,6 +134,11 @@ describe('browser-tab event schemas', () => {
     expect(TabStateEventSchema.safeParse({ ...state, icon: new Uint8Array(BROWSER_ICON_MAX_BYTES + 1) }).success).toBe(false)
     expect(TabStateEventSchema.safeParse({ ...state, icon: 'data:image/png;base64,AAAA' }).success).toBe(false)
     expect(TabStateEventSchema.safeParse({ ...state, title: 'x'.repeat(201) }).success).toBe(false)
+  })
+
+  it('refuses an in-use field: no camera, microphone or screen indicator is sent (025-FR-019)', () => {
+    expect(TabStateEventSchema.safeParse(state).success).toBe(true)
+    expect(TabStateEventSchema.safeParse({ ...state, inUse: { camera: true, microphone: false, screen: false } }).success).toBe(false)
   })
 
   it('splits the origin for display only in the formatter shapes', () => {

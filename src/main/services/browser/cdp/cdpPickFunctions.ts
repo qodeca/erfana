@@ -7,11 +7,11 @@
  *
  * Each is a `Runtime.callFunctionOn` declaration registered in
  * `cdpPinned.ts`'s `CDP_PAGE_FUNCTIONS`, compared by exact source; no caller
- * can build one at run time. All but the React lookup run in Erfana's
+ * can build one at run time. All but the two React reads run in Erfana's
  * isolated world, where the page cannot replace the DOM methods they call;
- * the React lookup must run in the page's main world, where React keeps its
- * fibers, so its result is untrusted and validated in main
- * (`capture/sourceHints.ts`).
+ * the React lookup and the React 19 stack read must run in the page's main
+ * world, where React keeps its fibers, so their results are untrusted and
+ * validated in main (`capture/sourceHints.ts`, `capture/sourceMapLocation.ts`).
  *
  * Every function is pinned to `throwOnSideEffect: true`: it only reads. The
  * DOM calls used here are marked side-effect free in Blink's IDL
@@ -21,7 +21,9 @@
  * with a pending pause hangs) – the capture reads everything it needs first.
  *
  * Results cross the protocol by value, each string cut in the page, so a
- * hostile page cannot send megabytes through a read.
+ * hostile page cannot send megabytes through a read. The one exception is
+ * the React 19 stack read, which returns a handle whose description V8
+ * writes uncut; main reads at most `OWNER_STACK_TEXT_MAX` of it.
  */
 import type { CdpPageFunction } from './cdpPinned'
 
@@ -281,10 +283,41 @@ export const REACT_LOOKUP: CdpPageFunction = Object.freeze({
   throwOnSideEffect: true
 })
 
+/**
+ * The React 19 development-build stack read (025-FR-037 rule 2; owner
+ * decision 2026-11-05), in the page's main world: the `_debugStack` of the
+ * element's fiber or its nearest ancestor that has one – the `Error` React 19
+ * creates where the element's JSX ran, which replaced React 18's
+ * `_debugSource`. Returned **by handle**: reading the stack text inside this
+ * function would call V8's stack getter, which the side-effect check refuses,
+ * so main takes the text from the handle's protocol description instead and
+ * maps its position through the page's source map
+ * (`capture/sourceMapLocation.ts`). Main accepts only an `error` subtype.
+ */
+export const REACT_DEBUG_STACK: CdpPageFunction = Object.freeze({
+  name: 'reactDebugStack',
+  source: `function () {
+  let fiber = null;
+  for (let n = this, depth = 0; n && !fiber && depth < 100; depth += 1) {
+    for (const key of Object.keys(n)) {
+      if (key.startsWith('__reactFiber$')) { fiber = n[key]; break; }
+    }
+    n = n.parentNode || (n.host || null);
+  }
+  for (let f = fiber, i = 0; f && typeof f === 'object' && i < 500; i += 1, f = f.return) {
+    const stack = f._debugStack;
+    if (stack && typeof stack === 'object') return stack;
+  }
+  return null;
+}`,
+  throwOnSideEffect: true
+})
+
 /** Every pick function, for the registry in `cdpPinned.ts`. */
 export const PICK_PAGE_FUNCTIONS: readonly CdpPageFunction[] = Object.freeze([
   PICK_CHAIN,
   PICK_ANCESTOR,
   PICK_STYLES,
-  REACT_LOOKUP
+  REACT_LOOKUP,
+  REACT_DEBUG_STACK
 ])

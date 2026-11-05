@@ -41,7 +41,6 @@ describe('browser-tab-site-schema', () => {
       zoomPercent: 100,
       widthPreset: 'full',
       security: 'warningUp',
-      inUse: { camera: false, microphone: false, screen: false },
       erfanaPage: 'certificate',
       certificate: WARNING,
       devToolsOpen: false

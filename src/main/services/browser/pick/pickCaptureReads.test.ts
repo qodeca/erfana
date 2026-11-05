@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import * as path from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('../../LoggingService', () => ({ logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 
 import { realClock } from '../../../../shared/clock'
-import { REACT_LOOKUP } from '../cdp/cdpPickFunctions'
+import type { PageFetch } from '../capture/pageResourceFetch'
+import { REACT_DEBUG_STACK, REACT_LOOKUP } from '../cdp/cdpPickFunctions'
 import { PickReader } from './pickCdp'
 import { bitmapWidth, CaptureFailure, fallbackFacts, PickCaptureReads, toBitmap, type CapturedImage } from './pickCaptureReads'
 import { readChain } from './pickElement'
@@ -19,7 +23,7 @@ function image(width: number, height: number, scale = 1, alpha = 255): CapturedI
   return { toBitmap: () => data, getSize: () => ({ width, height }) }
 }
 
-function setup(over: { capture?: () => Promise<CapturedImage>; frozen?: boolean; faults?: PickFaults } = {}) {
+function setup(over: { capture?: () => Promise<CapturedImage>; frozen?: boolean; faults?: PickFaults; fetchFromPage?: PageFetch; projectRoot?: string } = {}) {
   const page = samplePage({ crossSite: false })
   const reader = new PickReader(page.cdp)
   const frames = new PickFrames(page.cdp, reader)
@@ -28,9 +32,10 @@ function setup(over: { capture?: () => Promise<CapturedImage>; frozen?: boolean;
     frames,
     capturePage: over.capture ?? (async () => image(800, 600, 2)),
     isFrozen: () => over.frozen ?? false,
-    projectRoot: () => null,
+    projectRoot: () => over.projectRoot ?? null,
     clock: realClock,
-    faults: over.faults
+    faults: over.faults,
+    fetchFromPage: over.fetchFromPage
   })
   return { page, reader, frames, reads }
 }
@@ -168,6 +173,56 @@ describe('PickCaptureReads', () => {
     const frozen = setup({ frozen: true })
     frozen.page.react.set(3, { component: 'Outer' })
     expect(await frozen.reads.hints(chain, 2)).toEqual({ sourceAttributes: [], react: null, sourceNotFound: true })
+  })
+
+  describe('React 19 source through the source map (owner decision 2026-11-05)', () => {
+    const SCRIPT = 'https://app.test/bundle/app.js'
+    const MAP = JSON.stringify({ version: 3, sources: ['../src/Row.tsx'], names: [], mappings: ';AAeA' })
+    const files: Record<string, string> = { [SCRIPT]: 'x()\nRow()\n//# sourceMappingURL=app.js.map\n', [`${SCRIPT}.map`]: MAP }
+    const fetchFromPage: PageFetch = async (url) => new Response(files[url] ?? 'missing', { status: files[url] === undefined ? 404 : 200 })
+    const stack = `Error: react-stack-top-frame\n    at jsxDEV (https://app.test/bundle/react.js:1:1)\n    at Row (${SCRIPT}:2:5)`
+
+    /** Answer the React reads: no React 18 source, and `debugStack` for the React 19 stack read. */
+    function react19(page: ReturnType<typeof setup>['page'], debugStack: unknown): void {
+      page.cdp.handle('Runtime.callFunctionOn', (p) => {
+        if (p.functionDeclaration === REACT_LOOKUP.source) return { result: { value: { component: 'Row', owners: ['App'], source: null } } }
+        if (p.functionDeclaration === REACT_DEBUG_STACK.source) return { result: debugStack }
+        throw new Error('function not pinned')
+      })
+    }
+
+    it('reads the stack by handle in the main world and maps it to a project file', async () => {
+      const root = await realpath(await mkdtemp(path.join(tmpdir(), 'erfana-reads-')))
+      try {
+        await mkdir(path.join(root, 'src'))
+        await writeFile(path.join(root, 'src', 'Row.tsx'), 'export {}')
+        const { page, reader, frames, reads } = setup({ fetchFromPage, projectRoot: root })
+        const chain = await readChain(reader, frames, top(3))
+        react19(page, { type: 'object', subtype: 'error', objectId: 'e1', description: stack })
+        const hints = await reads.hints(chain, 2)
+        expect(hints.react).toEqual({ component: 'Row', ownerChain: ['App'], source: 'src/Row.tsx:16' })
+        expect(hints.resolvedSource).toEqual({ path: 'src/Row.tsx', line: 16 })
+        const read = page.cdp.calls('Runtime.callFunctionOn').find((c) => (c.params as { functionDeclaration: string }).functionDeclaration === REACT_DEBUG_STACK.source)
+        expect(read?.params).toMatchObject({ returnByValue: false, throwOnSideEffect: true })
+      } finally {
+        await rm(root, { recursive: true, force: true })
+      }
+    })
+
+    it('says source not found for a non-error answer, a map miss, or no page fetch', async () => {
+      for (const [debugStack, fetch] of [
+        [{ type: 'object', subtype: 'null', value: null }, fetchFromPage],
+        [{ type: 'object', subtype: 'error', description: stack.replace(SCRIPT, 'https://cdn.test/app.js') }, fetchFromPage],
+        [{ type: 'object', subtype: 'error', description: stack }, undefined]
+      ] as const) {
+        const { page, reader, frames, reads } = setup({ fetchFromPage: fetch })
+        const chain = await readChain(reader, frames, top(3))
+        react19(page, debugStack)
+        const hints = await reads.hints(chain, 2)
+        expect(hints.sourceNotFound).toBe(true)
+        expect(hints.react?.component).toBe('Row')
+      }
+    })
   })
 
   it('runs the hint fault before the lookup', async () => {

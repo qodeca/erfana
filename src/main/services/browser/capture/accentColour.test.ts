@@ -50,10 +50,18 @@ describe('electron.vite.design-tokens (the build-time resolution)', () => {
     expect(() => resolveTokenHex(css, '--loop')).toThrow(/deeper than/)
   })
 
-  it('defines __ERFANA_ACCENT_PRIMARY__ from the real stylesheet', () => {
-    expect(mainDesignTokenDefines()).toEqual({ __ERFANA_ACCENT_PRIMARY__: JSON.stringify(tokenHex(OUTLINE_TOKEN).toLowerCase()) })
-    expect(mainDesignTokenDefines(':root { --color-brand-x: #010203; --color-accent-primary: var(--color-brand-x); }')).toEqual({
-      __ERFANA_ACCENT_PRIMARY__: '"#010203"'
+  it('defines __ERFANA_ACCENT_PRIMARY__ and the live outline’s ink and paper from the real stylesheet', () => {
+    expect(mainDesignTokenDefines()).toEqual({
+      __ERFANA_ACCENT_PRIMARY__: JSON.stringify(tokenHex(OUTLINE_TOKEN).toLowerCase()),
+      __ERFANA_OUTLINE_INK__: JSON.stringify(tokenHex('--color-brand-black').toLowerCase()),
+      __ERFANA_OUTLINE_PAPER__: JSON.stringify(tokenHex('--color-white').toLowerCase())
     })
+    expect(
+      mainDesignTokenDefines(
+        ':root { --color-brand-x: #010203; --color-accent-primary: var(--color-brand-x); --color-brand-black: #0A0B0C; --color-white: #fefefe; }'
+      )
+    ).toEqual({ __ERFANA_ACCENT_PRIMARY__: '"#010203"', __ERFANA_OUTLINE_INK__: '"#0a0b0c"', __ERFANA_OUTLINE_PAPER__: '"#fefefe"' })
+    // Without either token the build fails rather than inline a colour it cannot draw.
+    expect(() => mainDesignTokenDefines(':root { --color-accent-primary: #010203; --color-white: #fefefe; }')).toThrow(/--color-brand-black is not declared/)
   })
 })

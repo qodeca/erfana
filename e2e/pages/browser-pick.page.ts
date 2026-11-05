@@ -19,6 +19,8 @@ import { browserHook, type BrowserPagePage } from './browser-page.page'
 import type { BrowserTabPage } from './browser-tab.page'
 
 export const PICK_WAIT_MS = 15_000
+/** How long one aim at an element waits for its label before the box is read and the pointer moved again. */
+const HOVER_SETTLE_MS = 2_000
 
 export interface Box {
   x: number
@@ -219,6 +221,25 @@ export class PickDriver {
   async hover(box: Box, prefix: string): Promise<HookHighlight> {
     await this.move(Math.round(box.x + box.width / 2), Math.round(box.y + box.height / 2))
     return this.waitForLabel(prefix)
+  }
+
+  /**
+   * Hover the centre of `selector` and wait until the highlight shows a label
+   * starting with `prefix`. The box is read again and the pointer moved again
+   * on every try: a layout shift between a read and the move (a late reflow,
+   * a strip row) would otherwise leave the pointer on a neighbour – seen as
+   * `div#:r1: 144 × 40` where `span#save-label` was meant. The label must
+   * still match; only the aim is retried.
+   */
+  async hoverSelector(selector: string, prefix: string, frame?: string): Promise<HookHighlight> {
+    const wanted = new RegExp(`^${escapeRe(prefix)}`)
+    let shown: HookHighlight | null = null
+    await expect(async () => {
+      const box = await this.rect(selector, frame)
+      await this.move(Math.round(box.x + box.width / 2), Math.round(box.y + box.height / 2))
+      await expect.poll(async () => (shown = await this.highlight())?.label ?? '', { timeout: HOVER_SETTLE_MS }).toMatch(wanted)
+    }, `the highlight on ${selector} reads ${prefix}`).toPass({ timeout: PICK_WAIT_MS })
+    return shown!
   }
 
   async waitForLabel(prefix: string): Promise<HookHighlight> {

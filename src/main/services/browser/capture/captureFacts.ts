@@ -15,10 +15,13 @@
  *   the context file then notes "matched rules not available". An answer
  *   with only user-agent rules is an empty list, not `null`. Stylesheet
  *   URLs come from the `CSS.styleSheetAdded` events the caller records.
- * - Covered by: what a click at the centre of the element's box would hit,
- *   when that is neither the element, one of its ancestors nor one of its
- *   descendants (025-FR-035). A CDP hit test, not `elementFromPoint`, which
- *   V8's side-effect check refuses in a page function (commit-14 probe).
+ * - Covered by: the element drawn on top at the centre of the element's
+ *   box, when that is neither the element, one of its ancestors nor one of
+ *   its descendants (025-FR-035). The hit test's `topmost` rule, so an
+ *   overlay with `pointer-events: none` counts (ADR 0007 decision 4, amended
+ *   2026-11-05); it reads only and never changes what was picked. A CDP hit
+ *   test, not `elementFromPoint`, which V8's side-effect check refuses in a
+ *   page function (commit-14 probe).
  *
  * Each part fails alone: a part that cannot be read is left empty, never
  * blocking the rest. Nothing here runs while the page is frozen.
@@ -140,7 +143,7 @@ async function isSessionRootFrame(ctx: FactsContext, node: PickNode): Promise<bo
 /** The tag of the element covering `node` at the centre of its box, or null (025-FR-035). */
 async function coveringTag(ctx: FactsContext, node: PickNode, chain: ElementChain, box: { x: number; y: number; width: number; height: number }): Promise<string | null> {
   if (!(box.width > 0 && box.height > 0)) return null
-  const hit = await new PickHitTest(ctx.reader, ctx.frames).atViewPoint({ x: box.x + box.width / 2, y: box.y + box.height / 2 })
+  const hit = await new PickHitTest(ctx.reader, ctx.frames, 'topmost').atViewPoint({ x: box.x + box.width / 2, y: box.y + box.height / 2 })
   if (hit === null || hit.node.sessionKey !== node.sessionKey || hit.node.backendNodeId === node.backendNodeId) return null
   const own = (n: { node: PickNode | null }): number | undefined => n.node?.backendNodeId
   if (chain.entries.some((e) => own(e) === hit.node.backendNodeId)) return null

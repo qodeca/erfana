@@ -5,9 +5,12 @@
  * 025-FR-053, 025-AC-034): the screenshot of a pick must not show Erfana's
  * live outline.
  *
- * `Overlay.hideHighlight` answers before the engine has drawn a frame
- * without the outline, and `capturePage` copies the last frame drawn – so
- * the outline could still be in the image (seen on Linux, 1 run in 4). Two
+ * Erfana's band (`pickBand.ts`) is never in the page's image – it is a
+ * separate native window – so this wait is for the engine's fallback outline
+ * (Wayland, or a band that failed) and for any other change just made to
+ * the page. `Overlay.hideHighlight` answers before the engine has drawn a
+ * frame without the outline, and `capturePage` copies the last frame drawn –
+ * so the outline could still be in the image (seen on Linux, 1 run in 4). Two
  * animation frames in the page mean the frame after the hide has been drawn
  * (the proxy the still-image drop uses too, ADR 0011 decision 3).
  *

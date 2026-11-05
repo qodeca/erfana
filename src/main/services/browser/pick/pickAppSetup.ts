@@ -15,7 +15,7 @@
  * - Pick mode ends and capture writes finish in the teardown's `endPick` and
  *   `abortCaptureWrites` stages, before the views close (ADR 0009 decision 14).
  */
-import { BrowserWindow, nativeImage, type WebContents } from 'electron'
+import { app, BrowserWindow, nativeImage, type WebContents } from 'electron'
 import type { Clock } from '../../../../shared/clock'
 import { BROWSER_TAB_EVENTS } from '../../../../shared/ipc/browser-tab-channels'
 import { PickEventSchema, type PickEvent } from '../../../../shared/ipc/browser-tab-schema'
@@ -30,6 +30,8 @@ import type { Bitmap } from '../capture/captureImage'
 import { CaptureExpiry } from '../capture/CaptureStore'
 import type { PickCdp } from './pickCdp'
 import { BrowserPicks } from './BrowserPicks'
+import type { BandHostEvents, BandSurface } from './pickBand'
+import { canPlaceBandWindow, openBandWindow } from './pickBandWindow'
 
 const sessions = new WeakMap<object, PickCdp>()
 
@@ -42,6 +44,19 @@ export function registerPickSession(contents: object, cdp: PickCdp): void {
 export function encodePng(bitmap: Bitmap): Uint8Array {
   const buffer = Buffer.from(bitmap.data.buffer, bitmap.data.byteOffset, bitmap.data.byteLength)
   return new Uint8Array(nativeImage.createFromBitmap(buffer, { width: bitmap.width, height: bitmap.height }).toPNG())
+}
+
+/**
+ * Opens the live outline's window over the browser window `hostId`; null
+ * when that window is gone. Absent where a child window cannot be placed
+ * (Wayland), so the engine draws the outline there.
+ */
+export function bandOpener(): ((hostId: number, events: BandHostEvents) => BandSurface | null) | null {
+  if (!canPlaceBandWindow(process.platform, process.env, app.commandLine.getSwitchValue('ozone-platform'))) return null
+  return (hostId, events) => {
+    const host = BrowserWindow.fromId(hostId)
+    return host === null || host.isDestroyed() ? null : openBandWindow(host, events)
+  }
 }
 
 /** What the page features' `attachTab` and `detachTab` look like, as far as the wrapper needs. */
@@ -86,7 +101,8 @@ export function installBrowserPicks(deps: BrowserPicksSetupDeps): BrowserPicksSe
     clock: deps.clock,
     encodePng,
     terminals: deps.terminals,
-    sessionOf: (contents) => sessions.get(contents) ?? null
+    sessionOf: (contents) => sessions.get(contents) ?? null,
+    openBand: bandOpener()
   })
   // The tab service is built after this (it takes `withPicks`), so it is reached lazily.
   const tabs: Pick<BrowserTabService, 'inputFor' | 'tabOf'> = {

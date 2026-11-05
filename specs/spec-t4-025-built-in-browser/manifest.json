@@ -2,9 +2,9 @@
   "spec_id": 25,
   "slug": "built-in-browser",
   "tier": "T4",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "created": "2026-10-31T22:42:00.358Z",
-  "updated": "2026-11-03T06:00:00.000Z",
+  "updated": "2026-11-05T06:00:00.000Z",
   "application": {
     "name": "Built-in browser with element prompts",
     "domain": null,
@@ -1372,6 +1372,13 @@
       "operation": "UPDATE",
       "target": "spec",
       "description": "Owner decisions of 2026-11-03 applied (v0.13.0): spec changes S-1 to S-35 written into the FR and AC text; AC-001 and FR-001 name the + button and File > New browser tab (no command palette); AC-019 uses geolocation (S-19); S-16 narrowed so the sign-in box shows for cross-origin frames, saved http sign-ins only for local or private hosts (FR-005, FR-022); local files through a per-folder loopback server shown as file:// (FR-002, FR-005, FR-010, FR-044); ADRs 0007-0012 accepted with probe amendments; Q1-Q11 decided (Q2 outline-only, Q9 required check after merge). Requirement line numbers and word counts refreshed.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-11-05T06:00:00.000Z",
+      "operation": "UPDATE",
+      "target": "spec",
+      "description": "Owner decisions of 2026-11-05 applied (v0.14.0): workers send no client hints (FR-024, AC-024); React 18 development builds may name the source (FR-037, AC-037); one terminal session in v1, multiple terminals a follow-up (FR-061, AC-077, notes); no in-use indicator for camera, microphone or screen (FR-019, FR-043, AC-019); key pick point is the last mouse position over the highlighted element (FR-033, AC-033); flood limit counts log events and the four read network events separately (FR-038, AC-038); executable-download warning text (FR-020, AC-020). ADR 0009, ADR 0012 and design rule R2-M9 amended in their own files.",
       "by": "claude-code"
     }
   ],

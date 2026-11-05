@@ -39,7 +39,7 @@
  * first load through {@link BrowserTabCdpHook}; the tab never touches the debugger.
  */
 import type { BrowserWindow, Session, WebContents, WebContentsView } from 'electron'
-import type { NavigationSource, TabMediaInUse, TabStateEvent } from '../../../shared/ipc/browser-tab-schema'
+import type { NavigationSource, TabStateEvent } from '../../../shared/ipc/browser-tab-schema'
 import { BROWSER_URL_MAX_CHARS } from '../../../shared/ipc/browser-tab-schema'
 import { originParts, withoutUserInfo, type RegistrableDomainResolver } from '../../../shared/browser/originFormat'
 import { sanitizePageText } from '../../../shared/browser/pageText'
@@ -116,8 +116,6 @@ export interface BrowserTabDeps {
   readonly createClip?: () => ClipView
   /** Told before each load the user starts, with a way to repeat it (`dialogs/leavePage.ts`). */
   readonly armLeave?: (repeat: () => void) => void
-  /** The page's camera, microphone and screen capture now (025-FR-019); required, so no state ships a placeholder. */
-  readonly mediaInUse: () => TabMediaInUse
 }
 
 /** A `navigate` answer: started, or refused by 025-FR-005. */
@@ -346,7 +344,6 @@ export class BrowserTab {
       zoomPercent: 100,
       widthPreset: this.viewFrame.widthPreset,
       security: this.certificate.warning !== null ? 'warningUp' : (this.certificate.sign ?? securityStateOf(shown)),
-      inUse: this.deps.mediaInUse(),
       erfanaPage: this.erfanaPage(),
       ...(this.certificate.warning === null ? {} : { certificate: this.certificate.warning }),
       devToolsOpen: this.contents.isDevToolsOpened()

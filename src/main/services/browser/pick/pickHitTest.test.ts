@@ -71,6 +71,25 @@ describe('PickHitTest', () => {
     expect((await hitTest.atViewPoint({ x: 10, y: 410 }))?.node.backendNodeId).toBe(7)
   })
 
+  it('the pick (click) rule passes through an element with pointer-events: none, as a click would (ADR 0007 decision 4)', async () => {
+    const { page, hitTest } = setup()
+    page.add({ id: 9, tag: 'div', parent: 2, box: [30, 25, 10, 10], pointerEventsNone: true })
+    expect((await hitTest.atViewPoint({ x: 35, y: 30 }))?.node.backendNodeId).toBe(5)
+    expect(page.cdp.calls('DOM.getNodeForLocation').at(-1)?.params).toMatchObject({ ignorePointerEventsNone: false })
+  })
+
+  it('the topmost rule finds an element with pointer-events: none, in every session it descends through (amended 2026-11-05)', async () => {
+    const { page } = setup()
+    const reader = new PickReader(page.cdp)
+    const topmost = new PickHitTest(reader, new PickFrames(page.cdp, reader), 'topmost')
+    page.add({ id: 9, tag: 'div', parent: 2, box: [30, 25, 10, 10], pointerEventsNone: true })
+    expect((await topmost.atViewPoint({ x: 35, y: 30 }))?.node.backendNodeId).toBe(9)
+    page.add({ id: 103, tag: 'i', session: 'S1', frameId: 'F1', parent: 102, box: [12, 12, 10, 10], pointerEventsNone: true })
+    expect((await topmost.atViewPoint({ x: 415, y: 115 }))?.node).toEqual({ sessionKey: 'S1', backendNodeId: 103, frameId: 'F1' })
+    const topmostAsk = expect.objectContaining({ ignorePointerEventsNone: true })
+    expect(page.cdp.calls('DOM.getNodeForLocation').map((c) => c.params)).toEqual([topmostAsk, topmostAsk, topmostAsk])
+  })
+
   it('answers null for a point that hits nothing', async () => {
     const { hitTest } = setup()
     expect(await hitTest.atViewPoint({ x: 900, y: 900 })).toBeNull()
