@@ -29,7 +29,7 @@ The tests cover core autoExecute functionality, error handling, bracketed paste,
 
 #### 3. Edge Cases (3 tests)
 - Handles long text content correctly (10,000 characters)
-- Handles multiple concurrent calls correctly (parallel execution)
+- Handles multiple concurrent calls correctly: sends to one terminal are queued, each Enter right after its own text
 - Handles an empty string with `autoExecute`
 
 #### 4. Bracketed Paste (4 tests)

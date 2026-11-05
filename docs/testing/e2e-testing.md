@@ -640,7 +640,7 @@ All 76 specs in `e2e/` (`ls e2e/*.e2e.ts | wc -l`, counted 2026-11-01). The thre
 - `project-switch-unsaved.e2e.ts` – unsaved tabs are saved before a project switch or close; only a tab that cannot be saved reaches the prompt, and "Switch Anyway" leaves it without a late autosave write
 - `quit-shutdown.e2e.ts` – #305: both ways of quitting run the shutdown to its last log line, with the terminal service disposed first
 - `reduced-motion.e2e.ts` – #96: under `prefers-reduced-motion: reduce` every keyframe animation in the shipped stylesheets runs once and ends at once, while without the preference it still loops
-- `save-after-folder-rename.e2e.ts` – a tab whose folder was renamed outside the app is marked deleted; autosave then fails visibly without recreating the folder, and "Save to restore it" writes the file back to its original path
+- `save-after-folder-rename.e2e.ts` – a tab whose folder was renamed outside the app is marked deleted; autosave holds (the edit stays unsaved, #450) and nothing recreates the folder, and "Save to restore it" writes the file back to its original path
 - `target-size.e2e.ts` – #96 (WCAG 2.2 SC 2.5.8): pointer targets measure at least 24 x 24 – some in the real UI, the rest as probes styled by the shipped stylesheet
 - `terminal-prompt-detection.e2e.ts` – #288: unit-style checks of when `TerminalPage.waitForPrompt()` counts a screen as a drawn prompt, on real xterm screen reads from macOS (zsh) and Windows (Git Bash). No app launch
 - `terminal-test-hook.e2e.ts` – the `window.__erfanaTest` hook that `TerminalPage.readScreen()` reads through is installed for the fixtures' launches

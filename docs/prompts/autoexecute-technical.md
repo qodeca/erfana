@@ -171,7 +171,9 @@ A fixed delay was not sufficient for long prompts. The program in the terminal r
 | Output that never pauses longer than 400 ms (a spinner) | after 8 s |
 | Long pauses that never end (a very slow paste) | after 60 s at most |
 
-The e2e test `e2e/prompt-submit.e2e.ts` runs a stand-in agent (`e2e/fixtures/pasteSubmitAgent.cjs`) in the real terminal and fails on Windows with the fixed delay.
+Sends to one terminal run one at a time (`sendQueueById` in `useTerminalStore`): a second prompt command fired while the first one's Enter is still waiting is pasted only after that Enter. Without the queue its paste landed in the prompt box first, so the first Enter submitted both prompts as one and the second Enter an empty one – rare with a fixed 200 ms, likely once Enter can wait seconds.
+
+The e2e test `e2e/prompt-submit.e2e.ts` runs a stand-in agent (`e2e/fixtures/pasteSubmitAgent.cjs`) in the real terminal. The agent reads its input in ~1 KiB pieces with short pauses, as ConPTY delivers it, so the test fails with the old fixed delay on every platform, not only on Windows.
 
 ### Alternative Approaches Considered
 

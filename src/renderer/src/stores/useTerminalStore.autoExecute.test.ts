@@ -6,7 +6,8 @@ import {
   ENTER_MAX_DELAY_MS,
   ENTER_MIN_DELAY_MS,
   ENTER_MIN_QUIET_MS,
-  ENTER_NO_OUTPUT_DELAY_MS
+  ENTER_NO_OUTPUT_DELAY_MS,
+  ENTER_POLL_MS
 } from './terminalInputSettle'
 import type { ITerminalOperations } from '../interfaces/ITerminalOperations'
 
@@ -180,17 +181,13 @@ describe('useTerminalStore.sendToTerminal with autoExecute', () => {
       useTerminalStore.getState().sendToTerminal('third', true)
     ]
 
-    // Advance timers for all delays
-    await vi.advanceTimersByTimeAsync(ENTER_NO_OUTPUT_DELAY_MS)
+    // Sends to one terminal run one after another, each waiting for its own Enter
+    await vi.advanceTimersByTimeAsync(3 * ENTER_NO_OUTPUT_DELAY_MS)
 
-    await Promise.all(promises)
+    await expect(Promise.all(promises)).resolves.toEqual([true, true, true])
 
-    // Verify - 6 writes total (3 text + 3 Enter)
-    expect(writeCalls.length).toBe(6)
-    expect(writeCalls).toContain('first')
-    expect(writeCalls).toContain('second')
-    expect(writeCalls).toContain('third')
-    expect(writeCalls.filter(c => c === '\r').length).toBe(3)
+    // Verify - each Enter right after its own text, in call order
+    expect(writeCalls).toEqual(['first', '\r', 'second', '\r', 'third', '\r'])
   })
 
   it('should handle unexpected errors gracefully', async () => {
@@ -356,7 +353,14 @@ describe('useTerminalStore.sendToTerminal with autoExecute', () => {
       await vi.advanceTimersByTimeAsync(ENTER_MIN_DELAY_MS - 2)
       expect(enterSent()).toBe(false)
 
-      await vi.advanceTimersByTimeAsync(ENTER_MAX_DELAY_MS)
+      // …and once the echo is quiet it does go, within one poll of the quiet
+      // time – not at a cap. (ENTER_MIN_QUIET_MS > ENTER_MIN_DELAY_MS, so the
+      // quiet time, not the 200 ms floor, is what sets the moment here.)
+      await vi.advanceTimersByTimeAsync(1 + ENTER_MIN_QUIET_MS - ENTER_MIN_DELAY_MS)
+      expect(enterSent()).toBe(false)
+      await vi.advanceTimersByTimeAsync(ENTER_POLL_MS)
+      expect(enterSent()).toBe(true)
+      expect(mockWrite).toHaveBeenCalledTimes(2)
       await expect(promise).resolves.toBe(true)
     })
 

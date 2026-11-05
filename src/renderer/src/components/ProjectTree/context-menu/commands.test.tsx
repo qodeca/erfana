@@ -15,6 +15,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render } from '@testing-library/react'
 import {
   CutCommand,
   CopyCommand,
@@ -27,6 +28,7 @@ import {
   NewFolderInDirectoryCommand,
   RevealInFileManagerCommand,
   OpenInBrowserCommand,
+  ImportCommand,
   separatorItem
 } from './commands'
 import { createMockMenuContext, createMockFileNode } from '../__test__/testUtils'
@@ -887,5 +889,20 @@ describe('OpenInBrowserCommand (#124)', () => {
     const cmd = new OpenInBrowserCommand(ctx, createMockFileNode('page.html', 'file'))
 
     expect(cmd.execute()).toBeUndefined()
+  })
+})
+
+describe('ImportCommand', () => {
+  // #452: Import draws file-input everywhere – toolbar, Welcome panel and this
+  // menu – never the upload-looking file-up the issue complained about
+  it('draws the file-input icon, not file-up', () => {
+    const node = createMockFileNode('docs', 'directory') as FileNodeDirectory
+    const cmd = new ImportCommand(createMockMenuContext(), node, vi.fn(async () => null))
+    const { container } = render(<>{cmd.toMenuItem().icon}</>)
+
+    expect(cmd.label).toBe('Import...')
+    expect([...(container.querySelector('svg')?.classList ?? [])].filter((c) => c !== 'lucide')).toEqual([
+      'lucide-file-input'
+    ])
   })
 })
