@@ -4,8 +4,7 @@ import { create } from 'zustand'
 import type {
   CommentIdentitySettings,
   GlobalSettings,
-  LoggingLevel,
-  TerminalScreenReaderMode
+  LoggingLevel
 } from '../../../shared/ipc/global-settings-schema'
 import type { TranscriptionBackend, WhisperModel } from '../../../shared/ipc/transcription-schema'
 import { globalSettingsGateway } from '../services/settingsGateway'
@@ -35,7 +34,6 @@ interface GlobalSettingsState {
   updateTranscriptionBackend: (backend: TranscriptionBackend) => Promise<void>
   updateWhisperModel: (model: WhisperModel) => Promise<void>
   updateHtmlPreviewEnabled: (enabled: boolean) => Promise<void>
-  updateTerminalScreenReaderMode: (mode: TerminalScreenReaderMode) => Promise<void>
   /** Project tree follows the active tab on/off (`projectTree.followActiveTab`, #453). */
   updateProjectTreeFollowActiveTab: (enabled: boolean) => Promise<void>
   /** HTML Preview comments on/off (`htmlPreview.comments.enabled`). */
@@ -114,11 +112,6 @@ export const useGlobalSettingsStore = create<GlobalSettingsState>((set, get) => 
   // live preview view via its `globalSettingsService.onSettingsChanged` subscription.
   updateHtmlPreviewEnabled: async (enabled: boolean) => {
     await get()._updateSection('htmlPreview', (current) => ({ ...current, enabled }))
-  },
-
-  // Read live by every terminal panel (useTerminalScreenReaderMode), no restart needed
-  updateTerminalScreenReaderMode: async (mode: TerminalScreenReaderMode) => {
-    await get()._updateSection('terminal', (current) => ({ ...current, screenReaderMode: mode }))
   },
 
   // Read live by the project tree (useRevealActiveFile), no restart needed

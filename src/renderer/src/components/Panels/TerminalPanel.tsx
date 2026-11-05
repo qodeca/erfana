@@ -47,7 +47,6 @@ import {
 import { useScreenshotCapture } from './TerminalPanel/hooks/useScreenshotCapture'
 import { useTerminalFileDrop } from './TerminalPanel/hooks/useTerminalFileDrop'
 import { useXtermSession } from './TerminalPanel/hooks/useXtermSession'
-import { useTerminalScreenReaderMode } from '../../hooks/useTerminalScreenReaderMode'
 import { getBasename } from '../../utils/fileUtils'
 import { openFileInPanel } from '../../utils/openFileInPanel'
 import { resolvePanelKind } from '../../utils/resolvePanelKind'
@@ -174,9 +173,6 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     [openTerminalContextMenu]
   )
 
-  // Screen reader access to the output: Settings override applied to the OS state ([23])
-  const screenReaderMode = useTerminalScreenReaderMode()
-
   const {
     terminalId,
     terminalIdRef,
@@ -199,8 +195,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     wheelEventHandler: handleWheelEvent,
     onContextMenu,
     attachFileDrop,
-    detachFileDrop,
-    screenReaderMode
+    detachFileDrop
   })
 
   // Screenshot capture state (issue #86 → cross-platform in #164)

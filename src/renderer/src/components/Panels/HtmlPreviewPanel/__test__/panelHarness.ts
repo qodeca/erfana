@@ -245,7 +245,9 @@ export function installHtmlPreviewPanelHarness(): HtmlPreviewPanelHarness {
       onOpenFileRequested: vi.fn(() => vi.fn()),
       // Issue #124, QG-8 U1: the keyboard route into the page. A press nobody
       // scripted is a refusal, so focus never lands anywhere by accident.
-      focusPage: vi.fn().mockResolvedValue({ ok: false })
+      focusPage: vi.fn().mockResolvedValue({ ok: false }),
+      // #463: the menu's Copy selection. Unscripted, it is a refusal.
+      copySelection: vi.fn().mockResolvedValue({ ok: false })
     } satisfies MockPreview & PreviewBridge)
 
     ;(window as unknown as { api: unknown }).api = { preview }

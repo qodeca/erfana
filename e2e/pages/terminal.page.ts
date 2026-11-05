@@ -7,7 +7,8 @@
  *
  * NOTE: xterm.js v6 with WebGL renderer does not expose terminal text content
  * to the DOM (.xterm-rows only exists with the DOM renderer, and
- * .xterm-accessibility-tree requires screenReaderMode: true). The page object
+ * .xterm-accessibility-tree needs xterm's screenReaderMode, which Erfana
+ * leaves off – #440). The page object
  * therefore reads xterm's own buffer – the text the terminal draws – through
  * the app's e2e test hook (`window.__erfanaTest`), falling back to the React
  * fiber of the terminal element when the hook is missing (`readScreen`).

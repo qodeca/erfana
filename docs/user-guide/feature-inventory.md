@@ -154,7 +154,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | TERM-10 | "Terminal not available": Recheck, Copy fix command | all | TerminalStatusContent.tsx | [reference/troubleshooting](./reference/troubleshooting.md#terminal-not-available) |
 | TERM-11 | Clean agent environment: Claude Code runs as a top-level session | all | M/services/TerminalService.ts | [Start your own agent](./how-erfana-works-with-agents.md#start-your-own-agent) |
 | TERM-12 | Restart terminal asks first while Claude Code runs, output follows input, or (macOS) a program runs | all | TerminalPanel/restartGuard.ts | [reference/terminal](./reference/terminal.md#header-controls) |
-| TERM-13 | Screen-reader mode: Auto / On / Off | all | R/hooks/useTerminalScreenReaderMode.ts | [reference/terminal](./reference/terminal.md#screen-readers) |
+| TERM-13 | Removed 2026-11-05 – screen-reader support dropped (#440); was screen-reader mode: Auto / On / Off | – | – | – |
 
 ## Claude Code status bar
 
@@ -214,7 +214,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | SET-11 | Per project `.erfana/settings.json`: `watcher.ignoreList`, `tree.hiddenPatterns` (extend/replace), `htmlPreview.allowlist.origins` | JSON file | [reference/settings](./reference/settings.md#per-project-settings) |
 | SET-12 | Settings overlay: gear icon, Esc closes, no shortcut | – | [reference/settings](./reference/settings.md#editor) |
 | SET-13 | Import tools: PDF, images, Office (LibreOffice found / not found / unsafe), install hint per OS, Check again | status list + button | [reference/settings](./reference/settings.md#import-tools) |
-| SET-14 | Terminal > Screen reader mode | Auto / On / Off, Auto | [reference/settings](./reference/settings.md#terminal) |
+| SET-14 | Removed 2026-11-05 – screen-reader support dropped (#440); was Terminal > Screen reader mode | – | – |
 | SET-15 | Transcription > Cancel a model download | button while downloading | [reference/settings](./reference/settings.md#transcription) |
 | SET-16 | Comments > Comments in HTML preview, Your name, Your email (optional) | checkbox, on; two text fields, empty | [reference/settings](./reference/settings.md#comments) |
 | SET-17 | Comments > Comments in Markdown preview | checkbox, on | [reference/settings](./reference/settings.md#comments) |

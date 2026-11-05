@@ -30,7 +30,7 @@
  * @module TerminalPanel/hooks/useXtermSession
  */
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MutableRefObject, type RefObject } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState, type MutableRefObject, type RefObject } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
@@ -134,12 +134,6 @@ export interface UseXtermSessionOptions {
   attachFileDrop: (xterm: Terminal, terminalIdRef: RefObject<string | null>) => void
   /** Detaches the external file-drop listeners */
   detachFileDrop: () => void
-  /**
-   * xterm's `screenReaderMode` (lens review [23]): an offscreen accessibility
-   * tree plus a live region, so a screen reader can read the canvas-drawn
-   * output. Applied at creation and updated live on the running instance.
-   */
-  screenReaderMode: boolean
 }
 
 /**
@@ -270,13 +264,6 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
   // No effect mirrors `terminalId` into the ref: start sets the ref as soon
   // as create resolves and teardown clears it. A mirror could write a killed
   // id back after a teardown({ resetState: false }), which keeps the state.
-
-  // Live toggle. Also re-run on a new session id: the mode may have changed
-  // between the constructor reading it and the session coming up
-  const { screenReaderMode } = options
-  useEffect(() => {
-    applyScreenReaderMode(xtermRef.current, screenReaderMode)
-  }, [screenReaderMode, terminalId, xtermRef])
 
   const nudgeClaudeStatus = useCallback((id: string) => {
     if (claudeNudgeTimerRef.current) clearTimeout(claudeNudgeTimerRef.current)
@@ -559,7 +546,7 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
     let inRefs = false
     try {
       // --- create ---
-      const xterm = new Terminal({ ...XTERM_OPTIONS, screenReaderMode: optionsRef.current.screenReaderMode })
+      const xterm = new Terminal(XTERM_OPTIONS)
       started = xterm
       const fitAddon = new FitAddon()
       // Links go through the checked IPC path, never the addon's default window.open
@@ -705,18 +692,6 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
     nudgeClaudeStatus,
     onDataListenerAttached,
     onDataListenerDetached
-  }
-}
-
-/**
- * Set xterm's screen-reader mode on a live instance. xterm builds or removes
- * its accessibility tree on the option change; writing an unchanged value is
- * skipped so a re-render does no work.
- */
-function applyScreenReaderMode(xterm: Terminal | null, enabled: boolean): void {
-  const xtermOptions = xterm?.options
-  if (xtermOptions && xtermOptions.screenReaderMode !== enabled) {
-    xtermOptions.screenReaderMode = enabled
   }
 }
 

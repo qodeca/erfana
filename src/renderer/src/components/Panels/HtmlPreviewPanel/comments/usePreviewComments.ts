@@ -27,6 +27,7 @@ import type { CommentSaveRequest } from '../../../../../../shared/ipc/preview-co
 import { commentGateway } from '../../../../services/preview/commentGateway'
 import { useSaveCommentIdentity } from '../../../Comments/useIdentityGate'
 import { previewGateway } from '../../../../services/previewGateway'
+import { copyPageSelection } from '../copyPageSelection'
 import { textClipboard } from '../../../../services/textClipboard'
 import { useGlobalSettingsStore } from '../../../../stores/useGlobalSettingsStore'
 import {
@@ -430,6 +431,7 @@ export function usePreviewComments({
         setMenu(null)
         if (!chosen) focusPageSoon(panelId)
       },
+      onCopySelection: () => void copyPageSelection(panelId),
       mode: state.mode,
       unavailable: state.unavailable,
       onAddComment: (draft: ElementDraft, scope = 'whole') => {

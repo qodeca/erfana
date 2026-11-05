@@ -16,7 +16,6 @@ import { TEST_IDS } from '../../constants/testids'
 import { HtmlPreviewSection } from './sections/HtmlPreviewSection'
 import { EditorSection } from './sections/EditorSection'
 import { ProjectTreeSection } from './sections/ProjectTreeSection'
-import { TerminalSection } from './sections/TerminalSection'
 import { ImportToolsSection } from './sections/ImportToolsSection'
 import './SettingsOverlay.css'
 import { loggingGateway } from '../../services/loggingGateway'
@@ -725,8 +724,6 @@ export function SettingsOverlay() {
             <ImportToolsSection />
 
             <HtmlPreviewSection />
-
-            <TerminalSection />
           </div>
         </div>
       </div>

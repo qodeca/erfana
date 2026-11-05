@@ -116,9 +116,6 @@ describe('GlobalSettingsSchema', () => {
         files: {
           exclude: ['tmp']
         },
-        terminal: {
-          screenReaderMode: 'on' as const
-        },
         projectTree: {
           followActiveTab: false
         },
@@ -154,9 +151,6 @@ describe('GlobalSettingsSchema', () => {
         },
         files: {
           exclude: ['tmp']
-        },
-        terminal: {
-          screenReaderMode: 'on' as const
         },
         projectTree: {
           followActiveTab: false
@@ -279,28 +273,30 @@ describe('GlobalSettingsSchema', () => {
     })
   })
 
-  describe('terminal.screenReaderMode (lens review [23])', () => {
-    it('defaults to auto when the section is missing', () => {
-      expect(GlobalSettingsSchema.parse({}).terminal).toEqual({ screenReaderMode: 'auto' })
+  describe('a settings file from before #440 (terminal.screenReaderMode removed)', () => {
+    it.each(['auto', 'on', 'off', 'loud'])('loads with terminal.screenReaderMode %s, drops it and keeps every other value', (mode) => {
+      const result = GlobalSettingsSchema.safeParse({
+        logging: { level: 'debug' },
+        files: { exclude: ['tmp'] },
+        terminal: { screenReaderMode: mode },
+        projectTree: { followActiveTab: false }
+      })
+
+      expect(result.success).toBe(true)
+      expect(result.data).not.toHaveProperty('terminal')
+      expect(result.data?.logging.level).toBe('debug')
+      expect(result.data?.files.exclude).toEqual(['tmp'])
+      expect(result.data?.projectTree.followActiveTab).toBe(false)
     })
 
-    it.each(['auto', 'on', 'off'] as const)('keeps %s', (mode) => {
-      expect(GlobalSettingsSchema.parse({ terminal: { screenReaderMode: mode } }).terminal.screenReaderMode).toBe(mode)
+    it('loads when the old terminal section is malformed', () => {
+      const result = GlobalSettingsSchema.safeParse({ terminal: 'on' })
+      expect(result.success).toBe(true)
+      expect(result.data).toEqual(getDefaultGlobalSettings())
     })
 
-    it('never fails on a bad value, so it cannot trip the corruption reset', () => {
-      const badMode = GlobalSettingsSchema.safeParse({ terminal: { screenReaderMode: 'loud' } })
-      expect(badMode.success).toBe(true)
-      expect(badMode.data?.terminal).toEqual({ screenReaderMode: 'auto' })
-
-      const badSection = GlobalSettingsSchema.safeParse({ terminal: 'on' })
-      expect(badSection.success).toBe(true)
-      expect(badSection.data?.terminal).toEqual({ screenReaderMode: 'auto' })
-    })
-
-    it('strips unknown keys', () => {
-      const parsed = GlobalSettingsSchema.parse({ terminal: { screenReaderMode: 'on', extra: 1 } })
-      expect(parsed.terminal).toEqual({ screenReaderMode: 'on' })
+    it('has no terminal section in the defaults', () => {
+      expect(getDefaultGlobalSettings()).not.toHaveProperty('terminal')
     })
   })
 
@@ -381,9 +377,6 @@ describe('GlobalSettingsSchema', () => {
         files: {
           exclude: []
         },
-        terminal: {
-          screenReaderMode: 'auto'
-        },
         projectTree: {
           followActiveTab: true
         },
@@ -406,7 +399,6 @@ describe('GlobalSettingsSchema', () => {
         transcription: { backend: 'openai', openaiApiKeyStored: false, whisperModel: 'base' },
         htmlPreview: { enabled: true },
         files: { exclude: [] },
-        terminal: { screenReaderMode: 'auto' },
         projectTree: { followActiveTab: true },
         comments: { identityNoticeSeen: false }
       }

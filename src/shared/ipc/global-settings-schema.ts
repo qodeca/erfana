@@ -116,33 +116,11 @@ export function isAnyPreviewCommentsEnabled(settings: Partial<Pick<GlobalSetting
 }
 
 /**
- * Terminal screen-reader mode (lens review [23]).
- *
- * - `auto` – on while the OS reports a screen reader (macOS, Windows), else off
- * - `on` – always on, for a screen reader Electron cannot detect (Linux)
- * - `off` – always off, for a tool Chromium mistakes for a screen reader
- */
-export const TerminalScreenReaderModeSchema = z.enum(['auto', 'on', 'off'])
-export type TerminalScreenReaderMode = z.infer<typeof TerminalScreenReaderModeSchema>
-
-/**
- * Terminal configuration. Lenient like `files`: a missing or malformed value
- * resolves to the default instead of tripping the corruption reset that would
- * replace every other setting.
- */
-export const TerminalSettingsSchema = z
-  .object({
-    screenReaderMode: TerminalScreenReaderModeSchema.catch('auto')
-  })
-  .catch(() => ({ screenReaderMode: 'auto' as const }))
-export type TerminalSettings = z.infer<typeof TerminalSettingsSchema>
-
-/**
  * Project tree configuration (#453). `followActiveTab` – "Follow the active
  * tab" in Settings, default on: when a file or preview tab becomes active, the
  * tree opens its folders, scrolls to it and underlines it. Global only, never
  * under `files`: a cloned project must not decide whether your tree moves.
- * Lenient, like `terminal`: a missing or malformed value resolves to on
+ * Lenient, like `files`: a missing or malformed value resolves to on
  * instead of tripping the corruption reset that would replace every other
  * setting. Read it through {@link isFollowActiveTabEnabled}.
  */
@@ -169,7 +147,7 @@ export function isFollowActiveTabEnabled(settings: Partial<Pick<GlobalSettings, 
  * repository cannot preset who you are (§9.1 S20). Main reads it at Save; the
  * renderer never sends an author (§7.5 step 2).
  *
- * Lenient like `terminal` when READ: a missing or malformed value resolves to
+ * Lenient like `files` when READ: a missing or malformed value resolves to
  * "not set" instead of tripping the corruption reset. A name or email over its
  * cap, one that is not a string, or one carrying a control or invisible
  * character (`REFUSED_IN_IDENTITY`, the writer's own rule) reads as unset.
@@ -214,6 +192,12 @@ export const GLOBAL_SETTINGS_WRITE_SCHEMAS: Readonly<Partial<Record<string, z.Zo
 
 /**
  * Root schema for ~/.erfana/settings.json
+ *
+ * Unknown top-level keys are stripped, never rejected – keep it that way
+ * (no `.strict()`): a file written by an older version still holds removed
+ * settings, and a rejected file trips the corruption reset that replaces
+ * every other setting. A stripped key is gone from disk at the next save.
+ * Removed so far: `terminal` (`terminal.screenReaderMode`, removed in #440).
  */
 export const GlobalSettingsSchema = z.object({
   /** JSON Schema reference (ignored, for IDE support) */
@@ -240,8 +224,6 @@ export const GlobalSettingsSchema = z.object({
    * reset that would replace every other setting.
    */
   files: FilesSettingsSchema,
-  /** Terminal configuration (lens review [23]) */
-  terminal: TerminalSettingsSchema,
   /** Project tree configuration (#453; lenient, absent means on) */
   projectTree: ProjectTreeSettingsSchema,
   /** HTML Preview comments: the reviewer's identity (lenient, see the schema) */

@@ -591,7 +591,7 @@ Form card errors (`aria-invalid`, `aria-describedby`, icon + text). Settings get
 ### 10.8 Accessibility
 
 - Keyboard-only path: shortcut or toggle → picker starts on the hovered element, else the element at the viewport centre → Tab and ⇧Tab / Shift+Tab next/previous at the same level, stopping at either end (differences table A-15), ⌥↑ ⌥↓ / Alt+↑ Alt+↓ level, each move scrolls into view → Enter opens the window, ⇧F10 / Shift+F10 the menu. Arrow keys keep scrolling.
-- Always-mounted polite live region in the shadow root ("button, Buy now, 2 comments."); mode and save results also go to `.erf-band__announce`; an assertive region for errors. Verify with NVDA, VoiceOver and Orca. *Rev 3 note (P7):* the page holds **no** live region – Find in page counts its text (E-022). The keyboard picker sends each move to main as a `step` pick (what it reached, as an element token – §19 "Picker words"), main passes it on as `commentModeChanged` with reason `picker`, and the comment chrome's polite region (`useLiveText`) says the §10.10 "Announce" sentence. Mode on and off are said there too.
+- Always-mounted polite live region in the shadow root ("button, Buy now, 2 comments."); mode and save results also go to `.erf-band__announce`; an assertive region for errors. ~~Verify with NVDA, VoiceOver and Orca.~~ Removed 2026-11-05 – screen-reader support dropped (#440). *Rev 3 note (P7):* the page holds **no** live region – Find in page counts its text (E-022). The keyboard picker sends each move to main as a `step` pick (what it reached, as an element token – §19 "Picker words"), main passes it on as `commentModeChanged` with reason `picker`, and the comment chrome's polite region (`useLiveText`) says the §10.10 "Announce" sentence. Mode on and off are said there too.
 - The drawer is the guaranteed keyboard route to every thread.
 - Reduced motion: no transitions; flash = static highlight for 1.5 s; instant scrolling; nothing loops.
 
@@ -710,7 +710,7 @@ About 330 tests in six layers; e2e ≈ 8%. The heaviest coverage goes to decisio
 | L3 injected | hover model, keys, capture-phase swallowing, pin model, visibility | jsdom per file under `src/preload/`; geometry, `elementFromPoint`, `checkVisibility`, Popover API and `adoptedStyleSheets` injected as test doubles | 30 |
 | L4 React | toolbar, menu, window, thread, drawer, identity, settings, store | vitest `renderer`, Testing Library + user-event | 45 |
 | L5 e2e | journeys on the real native view | Playwright `electron`; `e2e/html-preview-comments{,.frames,.safety,.perf}.e2e.ts` | 21 |
-| L6 manual | agent readability, macOS trackpad/VoiceOver, real git merge | §16 | 6 |
+| L6 manual | agent readability, macOS trackpad, real git merge (VoiceOver: removed 2026-11-05 – screen-reader support dropped, #440) | §16 | 6 |
 
 ### 12.2 Test cases
 
@@ -950,7 +950,7 @@ After P8: hand off to macOS (§16).
 | S9 | Main-thread cost of the shared parse + instrumentation at 0.5 / 1 / 4 MB and on a 10-frame page; worker needed? | P3 |
 | U2 | `readable-mismatch` as damaged vs tolerated – revisit after X-001. | P8 |
 | U3 | 10-minute draft TTL vs long write-ups – on expiry the window keeps the text and offers "Select again". | P6 |
-| U4 | Screen readers announcing a live region in the page document (NVDA, VoiceOver, Orca). | P7 / handoff |
+| U4 | Removed 2026-11-05 – screen-reader support dropped (#440). | – |
 | U5 | Cmd+Option+M vs macOS "Minimize All". | handoff |
 
 ## 16. Handoff to macOS
@@ -965,7 +965,7 @@ After P8: hand off to macOS (§16).
 **Manual on macOS**
 - Two-finger trackpad click and Ctrl+click both open the menu; Option+↑/↓ moves the outline without typing; Cmd+Enter saves; Cmd+Option+M toggles (and is not "Minimize All").
 - Retina: pin at the element's top-right, outline aligned.
-- VoiceOver reads the window, the drawer and "Comment saved".
+- ~~VoiceOver reads the window, the drawer and "Comment saved".~~ Removed 2026-11-05 – screen-reader support dropped (#440).
 - LF file from a git checkout, a file in a folder with an accented (NFD) name, a project reached through a symlinked folder.
 - Real `git merge` with a conflict inside a block → damaged; after resolving in source → normal.
 - With the window open, edit the file from the terminal, then Save.
@@ -976,7 +976,7 @@ After P8: hand off to macOS (§16).
 **Manual on Linux** (Docker/xvfb for automated; a real desktop when available)
 - Ctrl+Alt+M on GNOME and KDE (may be taken by the desktop – the toolbar toggle must still work).
 - Right-click and pointer position on X11 and Wayland (spike S4).
-- Orca reads the window, the drawer and "Comment saved".
+- ~~Orca reads the window, the drawer and "Comment saved".~~ Removed 2026-11-05 – screen-reader support dropped (#440).
 - `Index.html` vs `index.html` in one folder stay separate.
 
 **HPC-X-001 agent readability (decision 27, before the v1 lock)**

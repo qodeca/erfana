@@ -766,7 +766,7 @@ One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns 
 
 (all under `src/renderer/src/components/Panels/HtmlPreviewPanel/`)
 
-**Re-measured 2026-10-29**: five files have grown since the tables above – `PreviewViewService.pageScope.test.ts` is 504 lines, `PreviewSessionFactory.ts` 500, `PreviewViewService.ts` 472, `PreviewChromeBand.css` 509 and `HtmlPreviewPanel.tsx` 477. `usePreviewStillStore.ts` has not been split out.
+**Re-measured 2026-10-29**: five files have grown since the tables above – `PreviewViewService.pageScope.test.ts` is 504 lines, `PreviewSessionFactory.ts` 500, `PreviewViewService.ts` 472 (475 after #463), `PreviewChromeBand.css` 509 and `HtmlPreviewPanel.tsx` 477. `usePreviewStillStore.ts` has not been split out.
 
 **Recommended Solution**: split on the next behaviour change, as planned above; do not grow the band stylesheet further without moving a block (the nav controls already live in `PreviewNavControls.css`).
 

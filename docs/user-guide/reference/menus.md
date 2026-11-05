@@ -58,6 +58,8 @@ Related issues: [#431](https://github.com/qodeca/erfana/issues/431).
 
 **What they do:** With selected text, both menus offer **Explain**, **Modify**, **Ask**, **Visualize**, and **Prompt**; the editor also offers **Cut**, **Copy**, **Paste**, **Delete**, while Markdown Preview offers **Copy selection**. The clipboard items show their shortcuts. The prompt actions send text to the agent running in the terminal. **How to reach them:** right-click in the editor or preview. Without a selection both menus still open, with the items that need one greyed out. See [prompt templates](prompt-templates.md).
 
+In HTML Preview, the right-click menu lists the comment items, then **Copy selection** <kbd>⌘C</kbd> / <kbd>Ctrl+C</kbd>, which copies the words you right-clicked. It is greyed out when you did not right-click on selected words. The page is read-only, so there is no Cut, Paste or Delete. This menu appears only while comments are turned on in [Settings > Comments](settings.md#comments).
+
 ## Terminal and text-box context menus
 
 **What they do:** The terminal menu offers **Copy** and **Paste**; every text field – in dialogs, Settings, the search bar and comment boxes – offers **Cut**, **Copy**, **Paste**, and **Delete**, with their shortcuts. **Delete** removes the selected text without copying it. **How to reach them:** right-click in the relevant control, or press <kbd>⇧F10</kbd> / <kbd>Shift+F10</kbd> in a text field. Cut, Copy and Delete require a selection; a read-only field offers only **Copy**, and a password field never offers **Cut** or **Copy**.

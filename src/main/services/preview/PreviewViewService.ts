@@ -43,6 +43,7 @@ import { createPreviewOpenDiscard, type PreviewOpenDiscard } from './previewOpen
 import { createPreviewPanelState } from './previewPanelState'
 import { createPreviewViewEviction } from './previewViewEviction'
 import { createPreviewViewFocus } from './previewViewFocus'
+import { createPreviewViewCopy } from './previewViewCopy'
 import { createPreviewViewNavigation } from './previewViewNavigation'
 import { createResizeHoldRegistry, type PreviewResizeHoldRegistry } from './previewResizeHold'
 import type {
@@ -75,6 +76,8 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
   readonly navigate = this.navigation.navigate
   /** `preview:focusPage` (issue #124, QG-8 U1): the keyboard route into the page. */
   readonly focusPage = createPreviewViewFocus({ registry: this.registry })
+  /** `preview:copySelection` (#463): the HTML preview menu's Copy selection. */
+  readonly copySelection = createPreviewViewCopy({ registry: this.registry })
   /** Drop point M4: a push for a panel with no live view (issue #124, `previewBoundsDropLog.ts`). */
   private readonly noViewDrops = createNoViewDropLog(() => this.deps.now())
   /** Each window's resize hold (issue #124, `previewResizeHold.ts`), dropped with the window. */

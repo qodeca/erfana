@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { ContextMenu, ContextMenuItem } from './ContextMenu'
-import { clipboardIcon, clipboardShortcut } from './clipboardMenuItems'
+import { COPY_SELECTION_LABEL, clipboardIcon, clipboardShortcut } from './clipboardMenuItems'
 import { useDialog } from '../Dialog'
 import { executePromptTemplate } from '../../utils/panelUtils'
 import { PROMPT_REGISTRY, getPromptsForArea } from '../../prompts/registry'
@@ -249,8 +249,7 @@ export function PreviewContextMenu({
       : [
           { separator: true } as ContextMenuItem,
           {
-            // "Copy selection", not "Copy": it pairs with "Comment on selection" (spec 024, C-16)
-            label: 'Copy selection',
+            label: COPY_SELECTION_LABEL,
             shortcut: clipboardShortcut('copy'),
             icon: clipboardIcon('copy'),
             action: handleCopySelection,

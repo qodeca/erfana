@@ -40,6 +40,12 @@ export const CLIPBOARD_LABELS: Readonly<Record<ClipboardAction, string>> = {
   delete: 'Delete'
 }
 
+/**
+ * The preview menus' Copy – Markdown and HTML preview alike. "Copy selection",
+ * not "Copy": it pairs with "Comment on selection" (spec 024, C-16).
+ */
+export const COPY_SELECTION_LABEL = 'Copy selection'
+
 /** Shortcut letter of the commands that have one. */
 const LETTERS: Readonly<Record<Exclude<ClipboardAction, 'delete'>, string>> = { cut: 'X', copy: 'C', paste: 'V' }
 

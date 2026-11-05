@@ -8,6 +8,9 @@
  * - Paste is offered on a FILE row and lands in that file's folder.
  * - A Settings text field, which has no menu of its own, gets the app-level
  *   Cut / Copy / Paste / Delete menu, and its Delete removes the selection.
+ * - The HTML preview's right-click menu (#463, part 3) ends with Copy
+ *   selection: on selected words it copies them – main runs the page's own
+ *   Copy command – and without a selection it is shown, disabled.
  *
  * Condition-based waits only: POM waits, `expect.poll` and auto-waiting.
  */
@@ -20,6 +23,16 @@ import { DialogPage } from './pages/dialog.page'
 import { ProjectTreePage } from './pages/project-tree.page'
 import { byTestId } from './utils/locators'
 import { TEST_IDS } from '../src/renderer/src/constants/testids'
+import {
+  CommentChrome,
+  dragInPage,
+  mouseAt,
+  openCommentPage,
+  resetCommentSettings,
+  waitForBox,
+  waitForViewShown
+} from './pages/html-preview.comments-ui'
+import { HtmlPreviewPage, PREVIEW_BUDGET_MS } from './pages/html-preview.page'
 
 const SEED = {
   'README.md': '# Readme\n\nRoot document.\n',
@@ -166,5 +179,97 @@ test.describe('Settings text field – the app-level text menu (#463)', () => {
     await expect(tree.contextMenu()).toHaveCount(0)
     await expect(field).toBeFocused()
     await tree.closeSettings()
+  })
+})
+
+const HTML_PAGE = 'clipboard/copy.html'
+const HTML_TITLE = '-CLIP-COPY-'
+const HTML_TARGET = HtmlPreviewPage.target(HTML_PAGE)
+const HTML_LINE = 'We ship the beta to ten customers by Friday.'
+/** What the system clipboard holds before the copy, so a copy that did nothing is caught. */
+const CLIPBOARD_SENTINEL = 'clipboard-sentinel-Kp4Zr'
+
+/** One wide monospace line, so a drag across its first half stays on it. */
+const HTML_TEXT = [
+  '<!doctype html>',
+  '<html lang="en">',
+  '<head>',
+  '  <meta charset="utf-8">',
+  `  <title>${HTML_TITLE}</title>`,
+  '  <style>body { margin: 40px; } p { margin: 0 0 24px; font: 20px/1.6 monospace; white-space: nowrap; }</style>',
+  '</head>',
+  '<body>',
+  `  <p id="ship">${HTML_LINE}</p>`,
+  '  <p id="other">Nothing to see in this line at all.</p>',
+  '</body>',
+  '</html>',
+  ''
+].join('\n')
+
+async function readSystemClipboard(app: ElectronApplication): Promise<string> {
+  return app.evaluate(({ clipboard }) => clipboard.readText())
+}
+
+/** The hint the menu exposes to assistive tech on this host. */
+const COPY_KEYSHORTCUT = process.platform === 'darwin' ? 'Meta+C' : 'Control+C'
+
+test.describe('HTML preview – Copy selection in the right-click menu (#463)', () => {
+  test.use({ testProjectFiles: { [HTML_PAGE]: HTML_TEXT } })
+
+  test.afterEach(async ({ windowWithTestProject }) => {
+    await resetCommentSettings(windowWithTestProject)
+  })
+
+  test('on selected words Copy selection copies them; elsewhere it is shown, disabled', async ({
+    windowWithTestProject: page,
+    appWithTestProject: app
+  }) => {
+    const preview = new HtmlPreviewPage(page, app)
+    const chrome = new CommentChrome(page, preview, 'copy.html')
+    await writeSystemClipboard(app, CLIPBOARD_SENTINEL)
+
+    // Comment mode instruments a page with no comments yet, so a right-click opens Erfana's menu.
+    const panelId = await openCommentPage(preview, app, HTML_PAGE, HTML_TITLE)
+    await chrome.modeOn(app, panelId, HTML_TARGET)
+    await waitForViewShown(app, HTML_TARGET)
+
+    // No selection: the item is there, greyed out, with its hint.
+    const other = await waitForBox(app, 'other', HTML_TARGET)
+    const away = { x: Math.round(other.left + 40), y: Math.round(other.top + other.height / 2) }
+    expect(await mouseAt(app, away, 'right', HTML_TARGET), 'no preview to right-click').toBe(true)
+    await expect(chrome.menu()).toBeVisible({ timeout: PREVIEW_BUDGET_MS })
+    const idleCopy = chrome.menu().getByTestId(TEST_IDS.CONTEXT_MENU_ITEM_COPY)
+    await expect(idleCopy).toHaveAccessibleName('Copy selection')
+    await expect(idleCopy).toHaveAttribute('aria-disabled', 'true')
+    await expect(idleCopy).toHaveAttribute('aria-keyshortcuts', COPY_KEYSHORTCUT)
+    await page.keyboard.press('Escape')
+    await expect(chrome.menu()).toHaveCount(0)
+
+    // Select the first half of the line, then right-click on the words.
+    await waitForViewShown(app, HTML_TARGET)
+    const box = await waitForBox(app, 'ship', HTML_TARGET)
+    const y = Math.round(box.top + box.height / 2)
+    const from = { x: Math.round(box.left + 2), y }
+    const to = { x: Math.round(box.left + box.width * 0.45), y }
+    expect(await dragInPage(app, from, to, HTML_TARGET), 'no preview to drag in').toBe(true)
+    const on = { x: Math.round((from.x + to.x) / 2), y }
+    expect(await mouseAt(app, on, 'right', HTML_TARGET), 'no preview to right-click').toBe(true)
+    await expect(chrome.menu()).toHaveAttribute('aria-label', 'Selection', { timeout: PREVIEW_BUDGET_MS })
+
+    const copy = chrome.menu().getByTestId(TEST_IDS.CONTEXT_MENU_ITEM_COPY)
+    await expect(copy).not.toHaveAttribute('aria-disabled', 'true')
+    await expect(copy).toHaveAttribute('aria-keyshortcuts', COPY_KEYSHORTCUT)
+    await copy.click()
+    await expect(chrome.menu()).toHaveCount(0)
+
+    // The words went from the page to the system clipboard, and nothing else did.
+    await expect
+      .poll(() => readSystemClipboard(app), { timeout: PREVIEW_BUDGET_MS, message: 'the clipboard never changed' })
+      .not.toBe(CLIPBOARD_SENTINEL)
+    const copied = await readSystemClipboard(app)
+    expect(copied.length).toBeGreaterThan(0)
+    expect(HTML_LINE.startsWith(copied.trim()), `copied ${JSON.stringify(copied)}`).toBe(true)
+    // No comment window opened in its place.
+    await expect(chrome.window()).toHaveCount(0)
   })
 })

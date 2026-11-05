@@ -643,7 +643,6 @@ All 76 specs in `e2e/` (`ls e2e/*.e2e.ts | wc -l`, counted 2026-11-01). The thre
 - `save-after-folder-rename.e2e.ts` – a tab whose folder was renamed outside the app is marked deleted; autosave then fails visibly without recreating the folder, and "Save to restore it" writes the file back to its original path
 - `target-size.e2e.ts` – #96 (WCAG 2.2 SC 2.5.8): pointer targets measure at least 24 x 24 – some in the real UI, the rest as probes styled by the shipped stylesheet
 - `terminal-prompt-detection.e2e.ts` – #288: unit-style checks of when `TerminalPage.waitForPrompt()` counts a screen as a drawn prompt, on real xterm screen reads from macOS (zsh) and Windows (Git Bash). No app launch
-- `terminal-screen-reader.e2e.ts` – lens review [23]: the Settings screen-reader override adds or removes xterm's accessibility tree in a running terminal without a restart, and is put back to Auto at the end
 - `terminal-test-hook.e2e.ts` – the `window.__erfanaTest` hook that `TerminalPage.readScreen()` reads through is installed for the fixtures' launches
 - `tree-clipboard-scope.e2e.ts` – [27]: the tree's Cmd/Ctrl+C / X / V act on the tree only when it has focus, so copying text elsewhere after clicking a folder copies the text
 - `tree-keyboard.e2e.ts` – #87 / #88 / #89 and [33]: the tree is one Tab stop operated by arrows, Home / End, Enter, type-ahead and Shift+F10, shows the focus ring, mounts only a screenful of rows for a big folder, and still supports drag-and-drop with auto-scroll

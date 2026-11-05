@@ -17,7 +17,6 @@ Open **Settings** with the gear at the bottom of the left activity bar. <kbd>Esc
 - [Import tools](#import-tools)
 - [HTML preview](#html-preview)
 - [Comments](#comments)
-- [Terminal](#terminal)
 - [Per-project settings](#per-project-settings)
 - [Excluded folders](#excluded-folders)
 
@@ -108,16 +107,6 @@ Remote-host approvals belong to each project. An approved host is saved to `.erf
 | **Your email (optional)** | Empty | Also saved into the file. Leave it empty to keep it out. |
 
 Each field is saved when you leave it. Both are stored in Erfana's own settings (`~/.erfana/settings.json`), never in the project, and both are visible to anyone who can open the file – in its source and in git history once pushed.
-
-## Terminal
-
-**What it does:** **Screen reader mode** lets VoiceOver, NVDA and other screen readers read the terminal's output. **How to reach it:** **Settings > Terminal**.
-
-| Option | Default | Effect |
-| --- | --- | --- |
-| **Screen reader mode** | Auto | **Auto** turns it on while the system reports a screen reader (macOS and Windows) and off otherwise. **On** keeps it on – use it on Linux, where the system does not report screen readers to Erfana. **Off** keeps it off, for a tool the system mistakes for a screen reader. Changes apply to open terminals at once. |
-
-The line under the option says what Auto detects right now.
 
 ## Per-project settings
 

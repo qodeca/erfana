@@ -23,7 +23,6 @@ function settingsWith(enabled: boolean): GlobalSettings {
     transcription: { backend: 'openai', openaiApiKeyStored: false, whisperModel: 'base' },
     htmlPreview: { enabled },
     files: { exclude: [] },
-    terminal: { screenReaderMode: 'auto' },
     projectTree: { followActiveTab: true },
     comments: { identityNoticeSeen: false }
   }

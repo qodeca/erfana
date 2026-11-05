@@ -49,7 +49,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
   - [AutoExecute Testing](./prompts/autoexecute-testing.md) - Test coverage and mocking strategy
   - [AutoExecute Reference](./prompts/autoexecute-reference.md) - Implementation files and error handling
 - [Logging](./logging.md) - Logging layer, log levels, file rotation, settings
-- [Settings](./settings.md) - Settings overlay implementation notes: storage and parse rules, API-key and model storage, the `files.exclude` list, terminal screen-reader mode. The user-facing list of settings is the [settings reference](./user-guide/reference/settings.md)
+- [Settings](./settings.md) - Settings overlay implementation notes: storage and parse rules, API-key and model storage, the `files.exclude` list, removed settings. The user-facing list of settings is the [settings reference](./user-guide/reference/settings.md)
 
 ### UI/UX
 - **[Design system](design-system/index.html)** - the cards that decide the foundations, each component and each pattern (MANDATORY for UI changes; open it in a browser). How to use and change it: [`design-system/README.md`](design-system/README.md); every `deviates:` marker in the code: the [deviation register](design-system/deviations.html)

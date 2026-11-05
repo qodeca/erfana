@@ -14,7 +14,6 @@ The integrated terminal runs your shell and any CLI agent you start. Erfana host
 - [Capture controls](#capture-controls)
 - [File links and dropped files](#file-links-and-dropped-files)
 - [Copy and paste](#copy-and-paste)
-- [Screen readers](#screen-readers)
 
 ## Opening and session state
 
@@ -37,7 +36,3 @@ The integrated terminal runs your shell and any CLI agent you start. Erfana host
 ## Copy and paste
 
 **What it does:** Right-click for **Copy** and **Paste**. On Windows, <kbd>Ctrl+C</kbd> copies a selection but interrupts the running process if nothing is selected. **How to reach it:** terminal context menu – right-click, or press <kbd>⇧F10</kbd> / <kbd>Shift+F10</kbd> (Windows: also the <kbd>Menu</kbd> key) to open it at the terminal cursor – or the [shortcut reference](keyboard-shortcuts.md#terminal).
-
-## Screen readers
-
-**What it does:** The terminal draws its text as a picture, so a screen reader reads it only in screen-reader mode. Erfana turns that mode on while macOS or Windows reports a screen reader such as VoiceOver or NVDA. **How to reach it:** automatic; to force it on or off, use **Settings > Terminal > Screen reader mode** ([settings](settings.md#terminal)). A change applies to open terminals at once.

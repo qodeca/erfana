@@ -129,7 +129,6 @@ The three capture buttons appear only on platforms where screenshot capture is s
 - Cross-platform screenshot capture (screen / window / area) and webcam photo capture, inserted as a path into the terminal
 - Maximize over the editor (Cmd/Ctrl+Shift+M)
 - Per-terminal Claude Code context status bar (`ClaudeStatusBar`) – Claude Code only; other CLI agents run in the terminal without it
-- Screen-reader mode (xterm's `screenReaderMode`): **Settings > Terminal > Screen reader mode** – Auto (on while macOS or Windows reports a screen reader, through `terminal:getScreenReaderSupport`), On or Off; changes apply to open terminals at once (`useTerminalScreenReaderMode`)
 - Right-click menu from the keyboard: Shift+F10 or the Menu key
 - Preview and editor context menus send a selection to the terminal via prompt templates (there is no "Send selection to terminal" item)
 

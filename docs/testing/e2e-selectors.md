@@ -502,9 +502,6 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 | `settings-btn-whisper-cancel` | Cancel button shown while the Whisper binary or model downloads | static |
 | `settings-whisper-download-live` | Always-mounted, visually hidden status region announcing download progress | static |
 | `settings-whisper-download-alert` | Always-mounted, visually hidden alert region announcing a failed download | static |
-| `settings-section-terminal` | Terminal settings section (lens review [23]) | static |
-| `settings-select-screen-reader-mode` | Terminal screen-reader mode select: Auto / On / Off | static |
-| `settings-screen-reader-status` | What Auto currently detects (screen reader reported or not) | static |
 | `settings-section-import-tools` | Import tools section (#250) | static |
 | `settings-import-tool-status` | One format row's status; the row carries `data-format` and `data-state` | static |
 | `settings-btn-import-tools-recheck` | "Check again" button (#250) | static |

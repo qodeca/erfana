@@ -489,10 +489,6 @@ window.api.terminal = {
   list: () => Promise<{success, terminals?: Array<{id, title}>, error?}>
   getActivity: (terminalId) => Promise<{success, busy?, known?, error?}>  // restart guard
 
-  // Screen-reader support reported by the OS (macOS, Windows)
-  getScreenReaderSupport: () => Promise<ScreenReaderSupport>  // sender-gated, payload-free
-  onScreenReaderSupportChanged: (callback) => unsubscribe
-
   // Events
   onData: (callback) => unsubscribe
   onExit: (callback) => unsubscribe
@@ -553,7 +549,7 @@ See [Terminal Architecture Review](https://github.com/qodeca/erfana/blob/1d814e0
 
 **Teardown order** (`teardownTerminal`, fixed): clear the session's id refs; clear the Claude-nudge timer; stop a start that is waiting for visibility; remove the start-up clear listener, the test-hook registration and the file-drop listeners; clear the active terminal and Claude tracking; release the instance (`releaseInstance`: its fit and WebGL-recovery timers, context-menu and input listeners and parser hooks, then dispose xterm and null its refs); then kill the PTY. A start that fails after its instance reached the refs goes through the same `releaseInstance`. Every step runs even when an earlier one throws, and `releaseInstance` empties its refs before disposing and guards each dispose, so xterm is always disposed and the PTY always killed. A step that throws is logged (`Terminal teardown step failed`) and the teardown still resolves: its callers – effect cleanups, project switch, restart – do not catch, so a throw would reach the root error boundary or skip the next start. Restart and project switch await the kill before starting the next session.
 
-**Screen-reader mode** (lens review [23]): `useXtermSession` takes `screenReaderMode` from `useTerminalScreenReaderMode` (Settings > Terminal: Auto / On / Off, Auto following the OS through `terminal:getScreenReaderSupport` and `terminal:screenReaderSupportChanged`). It is passed to the `Terminal` constructor and set live on `xterm.options`, so xterm adds or removes its accessibility tree without a restart. Details: [settings.md § Terminal screen-reader mode](../settings.md#terminal-screen-reader-mode-terminalscreenreadermode).
+**Screen-reader mode**: removed 2026-11-05 – screen-reader support dropped (#440). xterm runs with its default (`screenReaderMode` off); there is no setting. See [settings.md § Removed settings](../settings.md#removed-settings).
 
 **Start-up guard** (lens review [18]): every teardown bumps a generation counter, and a start checks it after each await (font load, WebGL import, `terminal:create`). A start that finds it changed gives up – disposing its xterm if it was never stored, and killing a PTY main created for it in the meantime – so its id is never set and its output never reaches the terminal that replaced it. Only one start runs per generation: a second `start()` joins the one in flight, and a `start()` while a session is live does nothing.
 

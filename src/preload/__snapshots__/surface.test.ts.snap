@@ -122,7 +122,6 @@ exports[`preload surface > window.api.file and window.api.terminal expose the ex
   "create",
   "getActivity",
   "getInfo",
-  "getScreenReaderSupport",
   "isAvailable",
   "kill",
   "list",
@@ -131,7 +130,6 @@ exports[`preload surface > window.api.file and window.api.terminal expose the ex
   "onData",
   "onError",
   "onExit",
-  "onScreenReaderSupportChanged",
   "resize",
   "write",
 ]
@@ -247,6 +245,7 @@ exports[`preload surface > window.api.preview exposes the expected members 1`] =
   "approveHost",
   "checkEligibility",
   "close",
+  "copySelection",
   "exportPdf",
   "find",
   "focusPage",

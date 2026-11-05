@@ -56,7 +56,7 @@ Priority: **P0** must be in the enhanced designs; **P1** clear improvement, do n
 | [C-20](#c-20) | P1 | Quieter toolbar: icons toggle leaves the row, list becomes the icon and the count, honest toggle name | shared, html-shipped, markdown-proposed | yes |
 | [C-21](#c-21) | P1 | Window hierarchy: disabled primary looks disabled, quote is clamped, labels stop covering text | shared, html-shipped, markdown-proposed | yes |
 | [C-22](#c-22) | P1 | Clicking a commented element in comment mode opens its threads, not a blank new comment | html-shipped, markdown-proposed | yes |
-| [C-23](#c-23) | P1 | Screen-reader acceptance gate for comments | shared | no |
+| [C-23](#c-23) | – | Removed 2026-11-05 – screen-reader support dropped (#440) | – | no |
 | [C-24](#c-24) | P2 | Unread markers and last-activity rows | shared | yes |
 | [C-25](#c-25) | P2 | Guided review pass after an agent run, with batched resolves | shared | yes |
 | [C-26](#c-26) | P2 | Group drawer rows by file; compact banner actions | html-shipped, markdown-proposed | yes |
@@ -607,20 +607,7 @@ Cards: docs/designs/comments/html-comments/window.html (threads footer order).
 
 **Screen-reader acceptance gate for comments** – P1, surfaces: shared. Source findings: ACC-01, ACC-02.
 
-**Problem.** U4 (screen-reader verification) has been open since P0 (html design :927). The risky parts cross process boundaries – focus in a WebContentsView, a live region in another web contents, synthetic clicks into a closed shadow root – and e2e tests cannot see them.
-
-**Design.**
-
-Add docs/testing/comments-screen-reader.md with five scripted journeys:
-1. Keyboard pick and comment.
-2. Select-and-comment via Comment on specific words (C-07).
-3. Reply and resolve with the stepper (C-13).
-4. Damaged comment.
-5. Expired or moved draft (C-14).
-
-Each journey gives the exact expected speech for NVDA (browse and focus mode), VoiceOver on macOS and Orca. Link it from the §16 handoff and record pass or fail per release in the CHANGELOG.
-
-Automate what can be automated: an axe-core run over every card in html-comments, markdown-comments and selection-comments in the design CI step, and unit tests pinning `spokenTarget()` strings.
+Removed 2026-11-05 – screen-reader support dropped (#440). The scripted NVDA, VoiceOver and Orca journeys and their per-release record are no longer required. Keyboard-only use stays in scope (spec 024, 024-NFR-006).
 
 ### C-24
 

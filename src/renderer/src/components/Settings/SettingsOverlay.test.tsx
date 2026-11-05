@@ -45,10 +45,9 @@ vi.mock('../../utils/logger', () => ({ logger: mockLogger }))
 // The settings sections no test in this file varies. Every fixture spreads
 // them so it is a complete GlobalSettings; `enabled: true` is also what the
 // HTML preview section falls back to when the section is absent.
-const UNVARIED_SECTIONS: Pick<GlobalSettings, 'htmlPreview' | 'files' | 'terminal' | 'projectTree' | 'comments'> = {
+const UNVARIED_SECTIONS: Pick<GlobalSettings, 'htmlPreview' | 'files' | 'projectTree' | 'comments'> = {
   htmlPreview: { enabled: true },
   files: { exclude: [] },
-  terminal: { screenReaderMode: 'auto' },
   projectTree: { followActiveTab: true },
   comments: { identityNoticeSeen: false }
 }
@@ -165,6 +164,14 @@ describe('SettingsOverlay', () => {
       const portalRoot = document.getElementById('portal-root')
       const settingsContainer = portalRoot?.querySelector('.settings-container')
       expect(settingsContainer).toBeTruthy()
+    })
+
+    it('has no Terminal section and no screen reader control (#440)', () => {
+      render(<SettingsOverlay />)
+
+      expect(screen.queryByRole('heading', { name: 'Terminal' })).not.toBeInTheDocument()
+      expect(screen.queryByLabelText(/screen reader/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/screen reader mode/i)).not.toBeInTheDocument()
     })
   })
 
@@ -2493,7 +2500,6 @@ describe('SettingsOverlay', () => {
           transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
           htmlPreview: { enabled: true },
           files: UNVARIED_SECTIONS.files,
-          terminal: UNVARIED_SECTIONS.terminal,
           projectTree: UNVARIED_SECTIONS.projectTree,
           comments: UNVARIED_SECTIONS.comments
         }

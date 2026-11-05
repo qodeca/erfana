@@ -38,6 +38,7 @@ import type {
 import type {
   PdfExportResult,
   PreviewApproveResult,
+  PreviewCopySelectionResult,
   PreviewFindResult,
   PreviewFocusPageResult,
   PreviewNavigateResult,
@@ -88,6 +89,12 @@ export interface PreviewBridge {
    * `{ ok: false }` means the page is not there to enter and focus stays put.
    */
   focusPage(panelId: string): Promise<PreviewFocusPageResult>
+  /**
+   * Copy the text selected in the previewed page to the system clipboard
+   * (#463), for the right-click menu's Copy selection. Nothing comes back but
+   * the flag: `{ ok: false }` means no live page of this window was there.
+   */
+  copySelection(panelId: string): Promise<PreviewCopySelectionResult>
   /** Subscribe to failure-log changes; returns an unsubscribe. */
   onFailuresChanged(callback: (payload: PreviewFailureListPayload) => void): () => void
   /** Subscribe to host-block events; returns an unsubscribe. */
