@@ -810,20 +810,19 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
           testId: TEST_IDS.TERMINAL_BTN_CAMERA
         },
         {
-          id: 'scroll-to-bottom',
-          icon: <ArrowDownToLine size={14} />,
-          label: 'Scroll to bottom',
-          title: 'Scroll to bottom',
-          onSelect: handleScrollToBottom,
-          testId: TEST_IDS.TERMINAL_BTN_SCROLL
-        },
-        {
-          id: 'restart',
-          icon: <RotateCw size={14} />,
-          label: 'Restart terminal',
-          title: 'Restart terminal',
-          onSelect: () => void handleRestartRequest(),
-          testId: TEST_IDS.TERMINAL_BTN_RESTART
+          // Raised (Toolbar overflow card): moves last, as narrow is why it is wanted (#451).
+          // Scroll lock, Restart and Scroll to bottom follow it and hide first (owner, #462).
+          id: 'maximize',
+          icon: terminalExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />,
+          label: 'Maximize terminal',
+          title: `Maximize terminal (${expandShortcut})`,
+          ariaLabel: 'Maximize terminal over the editor',
+          shortcut: expandShortcut,
+          pressed: terminalExpanded,
+          className: `icon-btn${terminalExpanded ? ' icon-btn--active' : ''}`,
+          onSelect: toggleTerminalExpanded,
+          testId: TEST_IDS.TERMINAL_BTN_EXPAND,
+          moveLast: true
         },
         {
           id: 'scroll-lock',
@@ -836,19 +835,20 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
           testId: TEST_IDS.TERMINAL_BTN_LOCK
         },
         {
-          // Raised (Toolbar overflow card): the action a user reaches for
-          // because the terminal is narrow, so it moves last (#451).
-          id: 'maximize',
-          icon: terminalExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />,
-          label: 'Maximize terminal',
-          title: `Maximize terminal (${expandShortcut})`,
-          ariaLabel: 'Maximize terminal over the editor',
-          shortcut: expandShortcut,
-          pressed: terminalExpanded,
-          className: `icon-btn${terminalExpanded ? ' icon-btn--active' : ''}`,
-          onSelect: toggleTerminalExpanded,
-          testId: TEST_IDS.TERMINAL_BTN_EXPAND,
-          moveLast: true
+          id: 'restart',
+          icon: <RotateCw size={14} />,
+          label: 'Restart terminal',
+          title: 'Restart terminal',
+          onSelect: () => void handleRestartRequest(),
+          testId: TEST_IDS.TERMINAL_BTN_RESTART
+        },
+        {
+          id: 'scroll-to-bottom',
+          icon: <ArrowDownToLine size={14} />,
+          label: 'Scroll to bottom',
+          title: 'Scroll to bottom',
+          onSelect: handleScrollToBottom,
+          testId: TEST_IDS.TERMINAL_BTN_SCROLL
         }
       ]
 

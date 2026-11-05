@@ -271,3 +271,23 @@ describe('menuSeparatorsBefore (#461)', () => {
     expect(menuSeparatorsBefore(entries, ['b', 'i']).size).toBe(0)
   })
 })
+
+describe('terminal header at the default 300 px width (#462)', () => {
+  /** The owner's order: Maximize after the captures, then the three that hide first. */
+  const OWNER_ORDER = ['screen', 'window', 'area', 'photo', 'maximize', 'lock', 'restart', 'bottom']
+  const atDefault = (ids: string[]): OverflowInput => ({ ...terminal(300 - 2 * 12), items: items(ids, ['maximize']) })
+
+  it('moves only Scroll lock, Restart and Scroll to bottom; the captures and Maximize stay', () => {
+    expect(computeOverflow(atDefault(OWNER_ORDER)).moved).toEqual(['lock', 'restart', 'bottom'])
+  })
+
+  it('Linux, with no screen capture: all five buttons fit, so nothing moves', () => {
+    expect(computeOverflow(atDefault(['photo', 'maximize', 'lock', 'restart', 'bottom'])).moved).toEqual([])
+  })
+
+  it('narrower than the default, the captures move only after the three hide-first buttons', () => {
+    const order = moveOrder(items(OWNER_ORDER, ['maximize']))
+    expect(order.slice(0, 3)).toEqual(['bottom', 'restart', 'lock'])
+    expect(order.at(-1)).toBe('maximize')
+  })
+})
