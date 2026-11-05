@@ -801,7 +801,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     ariaLabel: capturingMode === mode ? `Capturing ${mode}, please wait` : idleName,
     busy: capturingMode === mode,
     busyLabel: `Capturing ${mode}…`,
-    disabled: capturingMode !== null,
+    disabled: capturingMode !== null && capturingMode !== mode, // busy keeps focus (Buttons card)
     className: `icon-btn${capturingMode === mode ? ' icon-btn--loading' : ''}`,
     onSelect,
     testId

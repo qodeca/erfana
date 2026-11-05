@@ -247,10 +247,10 @@ export function MarkdownEditorPanel(
   const { isAutoSaving, setIsAutoSaving, holdAutoSave, signalChange } = useAutoSave(
     currentFile?.modified ?? false,
     async () => {
-      // A file that changed on disk while the tab holds unsaved edits waits for
-      // the user's choice in the conflict bar; an autosave would overwrite the
-      // newer file and dismiss the bar.
-      if (externalChangeDetected) return
+      // A file changed on disk waits for the conflict bar's choice; an autosave would
+      // overwrite it. A deleted file may come back (branch switch) before the probe
+      // sees it, so it waits too (#450); Cmd+S ("Save to restore it") still writes.
+      if (externalChangeDetected || isFileDeleted) return
       // `false` (a failed write) makes autosave back off until the next edit
       return handleSaveRef.current('autosave')
     },
@@ -383,10 +383,10 @@ export function MarkdownEditorPanel(
   }, [handleSave])
 
   // When the conflict bar goes away with edits still unsaved ("Keep My
-  // Version", Dismiss), autosave resumes without waiting for another keystroke.
+  // Version", Dismiss) or the deleted state clears, autosave resumes at once.
   useEffect(() => {
-    if (!externalChangeDetected) signalChange()
-  }, [externalChangeDetected, signalChange])
+    if (!externalChangeDetected && !isFileDeleted) signalChange()
+  }, [externalChangeDetected, isFileDeleted, signalChange])
 
   // Read-only during an autosave hold, including an editor that remounts
   // (view-mode switch) while the hold is active – see handleEditorMount

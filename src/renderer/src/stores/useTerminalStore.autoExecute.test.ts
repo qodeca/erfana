@@ -181,19 +181,13 @@ describe('useTerminalStore.sendToTerminal with autoExecute', () => {
       useTerminalStore.getState().sendToTerminal('third', true)
     ]
 
-    // Advance timers for all delays
-    await vi.advanceTimersByTimeAsync(ENTER_NO_OUTPUT_DELAY_MS)
+    // Sends to one terminal run one after another, each waiting for its own Enter
+    await vi.advanceTimersByTimeAsync(3 * ENTER_NO_OUTPUT_DELAY_MS)
 
-    await Promise.all(promises)
+    await expect(Promise.all(promises)).resolves.toEqual([true, true, true])
 
-    // Verify - 6 writes total (3 text + 3 Enter). Counts only: the order
-    // (each Enter right after its own paste) is asserted, as a known bug, in
-    // useTerminalStore.autoExecute.paste.test.ts › two sends at once
-    expect(writeCalls.length).toBe(6)
-    expect(writeCalls).toContain('first')
-    expect(writeCalls).toContain('second')
-    expect(writeCalls).toContain('third')
-    expect(writeCalls.filter(c => c === '\r').length).toBe(3)
+    // Verify - each Enter right after its own text, in call order
+    expect(writeCalls).toEqual(['first', '\r', 'second', '\r', 'third', '\r'])
   })
 
   it('should handle unexpected errors gracefully', async () => {

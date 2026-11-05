@@ -220,25 +220,35 @@ describe('MarkdownEditorPanel – typing in a deleted tab, then the file comes b
     expect(conflictBar()).toBeInTheDocument()
   })
 
-  it('keeps the typed text when an autosave failed first (the folder was gone too)', async () => {
+  it('does not autosave while the file is deleted, even past the debounce and its 30 s ceiling', async () => {
     const editor = await renderPanel()
     await deleteOnDisk()
-    // A branch switch that removed the whole folder: a save has nowhere to land
-    writeFile.mockRejectedValue(new Error("ENOENT: no such file or directory, open '/project/docs/notes.md'"))
 
     fireEvent.change(editor, { target: { value: TYPED } })
-    await advance(2_000)
-    expect(writeFile).toHaveBeenCalledTimes(1)
-    expect(mockShowToast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Save failed' }))
-    expect(screen.getByText(DELETED_BANNER)).toBeInTheDocument()
+    await advance(35_000)
 
+    expect(writeFile).not.toHaveBeenCalled()
+    expect(disk).toBeNull()
+    expect(screen.getByText(DELETED_BANNER)).toBeInTheDocument()
+    expect(editor.value).toBe(TYPED)
+  })
+
+  it('never writes over a file that comes back just before autosave would fire (the branch-switch race)', async () => {
+    const editor = await renderPanel()
+    await deleteOnDisk()
+
+    // Typed at the moment of deletion, so autosave's 2 s end before or with the
+    // next probe; the file is back just before then
+    fireEvent.change(editor, { target: { value: TYPED } })
+    await advance(1_900)
     disk = FROM_OTHER_BRANCH
     await advance(DELETED_FILE_PROBE_INTERVAL_MS)
 
-    expect(screen.queryByText(DELETED_BANNER)).not.toBeInTheDocument()
-    expect(conflictBar()).toBeInTheDocument()
-    expect(editor.value).toBe(TYPED)
+    expect(writeFile).not.toHaveBeenCalled()
     expect(disk).toBe(FROM_OTHER_BRANCH)
+    expect(screen.queryByText(DELETED_BANNER)).not.toBeInTheDocument()
+    expect(conflictBar()).toHaveTextContent('notes.md changed on disk')
+    expect(editor.value).toBe(TYPED)
   })
 
   it('"Keep My Version" then saves the typed text: the keystrokes reach the disk', async () => {

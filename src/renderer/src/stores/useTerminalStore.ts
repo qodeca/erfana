@@ -54,6 +54,11 @@ export function createTerminalStore(
 ): UseBoundStore<StoreApi<TerminalStore>> {
   // Not store state: written on every output batch, read only while a send waits
   const lastOutputById = new Map<string, number>()
+  // The send in progress for each terminal. Sends to one terminal run one at a
+  // time: a second prompt pasted while the first one's Enter is still waiting
+  // would otherwise land in the prompt box first, so the first Enter submits
+  // both prompts as one and the second Enter an empty one (#449)
+  const sendQueueById = new Map<string, Promise<boolean>>()
 
   return create<TerminalStore>((set, get) => ({
   activeTerminalId: null,
@@ -129,7 +134,7 @@ export function createTerminalStore(
     lastOutputById.set(id, Date.now())
   },
 
-  sendToTerminal: async (text: string, autoExecute = false): Promise<boolean> => {
+  sendToTerminal: (text: string, autoExecute = false): Promise<boolean> => {
     const terminalId = get().activeTerminalId
 
     // Debug logging for issue #41
@@ -137,9 +142,38 @@ export function createTerminalStore(
 
     if (!terminalId) {
       logger.warn('sendToTerminal: No active terminal available')
-      return false
+      return Promise.resolve(false)
     }
 
+    // Wait for the previous send to this terminal – its Enter included – to finish
+    // (none pending: start at once, so a lone send writes in the same tick as before)
+    const previous = sendQueueById.get(terminalId)
+    const send = previous
+      ? previous.then(() => sendNow(get, terminalId, text, autoExecute))
+      : sendNow(get, terminalId, text, autoExecute)
+    sendQueueById.set(terminalId, send)
+    void send.finally(() => {
+      if (sendQueueById.get(terminalId) === send) sendQueueById.delete(terminalId)
+    })
+    return send
+  },
+
+  // Scroll lock state - ephemeral, resets on app restart
+  scrollLocked: false,
+
+  setScrollLocked: (locked: boolean) => {
+    logger.info(`Scroll lock: ${locked ? 'ON' : 'OFF'}`)
+    set({ scrollLocked: locked })
+  }
+  }))
+
+  /** Write one send to `terminalId` – the text, then Enter when `autoExecute` – never throwing. */
+  async function sendNow(
+    get: () => TerminalStore,
+    terminalId: string,
+    text: string,
+    autoExecute: boolean
+  ): Promise<boolean> {
     try {
       // For multi-line text, wrap in bracketed paste mode so the receiving
       // terminal program (e.g. Claude CLI) treats it as a single paste event
@@ -189,16 +223,7 @@ export function createTerminalStore(
       logger.error('sendToTerminal: Unexpected error', error instanceof Error ? error : undefined)
       return false
     }
-  },
-
-  // Scroll lock state - ephemeral, resets on app restart
-  scrollLocked: false,
-
-  setScrollLocked: (locked: boolean) => {
-    logger.info(`Scroll lock: ${locked ? 'ON' : 'OFF'}`)
-    set({ scrollLocked: locked })
   }
-  }))
 }
 
 // Default instance using window.api for backward compatibility

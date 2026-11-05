@@ -170,11 +170,9 @@ describe('useTerminalStore.sendToTerminal autoExecute – paste delivery (#449)'
   })
 
   describe('two sends at once', () => {
-    // KNOWN BUG (found while closing the #449 test gaps): sendToTerminal does
-    // not serialise sends per terminal, so today the writes are
-    // [paste 1, paste 2, Enter, Enter]. `it.fails` keeps the suite green and
-    // turns red once sends are queued – then drop `.fails`.
-    it.fails('never lets the second paste land between the first paste and its Enter', async () => {
+    // Sends to one terminal are queued (useTerminalStore sendQueueById): without
+    // the queue the writes were [paste 1, paste 2, Enter, Enter].
+    it('never lets the second paste land between the first paste and its Enter', async () => {
       // A second prompt command fired while the first one's Enter is waiting.
       // If its paste reaches the prompt box first, the first Enter submits
       // both prompts as one, and the second Enter submits an empty prompt.

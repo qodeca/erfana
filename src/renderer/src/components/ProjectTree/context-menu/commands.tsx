@@ -16,7 +16,7 @@
  * All commands are testable via dependency injection (MenuContext).
  */
 
-import { Copy, Scissors, Clipboard as ClipboardIcon, Edit, Trash, FilePlus, FolderPlus, FileUp, FolderOpen, FileCode, ExternalLink } from 'lucide-react'
+import { Copy, Scissors, Clipboard as ClipboardIcon, Edit, Trash, FilePlus, FolderPlus, FileInput, FolderOpen, FileCode, ExternalLink } from 'lucide-react'
 import type { IMenuItem, MenuContext, FileNode, FileNodeDirectory, FileNodeFile } from './types'
 import { isMacOS, isWindows } from '../../../utils/platform'
 import { getDirname } from '../../../utils/fileUtils'
@@ -420,7 +420,7 @@ export class NewFolderInDirectoryCommand extends CommandBase {
  */
 export class ImportCommand extends CommandBase {
   label = 'Import...'
-  icon = <FileUp size={14} strokeWidth={2} />
+  icon = <FileInput size={14} strokeWidth={2} />
 
   private importFile: () => Promise<string | null>
 

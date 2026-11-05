@@ -333,8 +333,10 @@ describe('TerminalPanel header actions through the overflow menu (#451)', () => 
       const area = await screen.findByRole('button', { name: 'Capturing area, please wait' })
       expect(area).toHaveAttribute('aria-busy', 'true')
       expect(area).toHaveAttribute('aria-disabled', 'true')
-      // Not asserted: the busy button also carries `disabled` (capturingMode !== null),
-      // as it did before #451 – at odds with the Buttons card's "busy keeps focus".
+      // Busy keeps focus (Buttons card): not natively disabled, so focus is not dropped
+      expect(area).not.toBeDisabled()
+      area.focus()
+      expect(area).toHaveFocus()
       expect(screen.getByTestId(TEST_IDS.TERMINAL_BTN_CAPTURE_SCREEN)).toBeDisabled()
       expect(screen.getByTestId(TEST_IDS.TERMINAL_BTN_CAPTURE_WINDOW)).toBeDisabled()
 

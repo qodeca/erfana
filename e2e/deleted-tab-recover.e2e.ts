@@ -16,13 +16,12 @@
  * look on the same clock, so by then the gone file has been looked for too.
  *
  * A tab the user typed in while it was deleted gets the "file changed on disk"
- * choice instead of the disk's text. Autosave fires 2 s after the last
- * keystroke and would write the buffer back before the file returns, so that
- * test removes the file's whole folder, as a branch switch does when the folder
- * exists on one branch only: the autosave then fails (its toast is the wait
- * condition) and backs off until the next edit, and the folder is put back only
- * after that – no race with the autosave clock. The panel-level version, with
- * both clocks on fake timers, is `MarkdownEditorPanel.deletedRecover.test.tsx`.
+ * choice instead of the disk's text. Autosave holds while the tab is deleted,
+ * so nothing writes the buffer back before the file returns; that test removes
+ * the file's whole folder, as a branch switch does when the folder exists on
+ * one branch only. The panel-level version, with autosave's and the probe's
+ * clocks on fake timers (the race of a file back just before autosave would
+ * fire included), is `MarkdownEditorPanel.deletedRecover.test.tsx`.
  *
  * A delete followed at once by the write back (`rm` then `writeFile`, back to
  * back) may reach the tab as a delete or as a change, depending on the
@@ -34,7 +33,6 @@
 import { mkdir, readFile, rm, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { test, expect } from './fixtures/index'
-import { toastWithText } from './utils/toast'
 import { ProjectTreePage } from './pages/project-tree.page'
 import { TabBarPage } from './pages/tab-bar.page'
 import { EditorPanelPage } from './pages/editor-panel.page'
@@ -134,11 +132,8 @@ test.describe('Editor tab typed in while its file is gone', () => {
     await rm(drafts, { recursive: true })
     await expect(deletedMarker).toBeVisible({ timeout: DELETE_BUDGET_MS })
 
-    // Typed while gone; the autosave has nowhere to land, says so and backs off
+    // Typed while gone; autosave holds while the tab is deleted
     await monaco.appendContent('\nTYPED-WHILE-GONE\n')
-    await expect(toastWithText(page, 'its folder no longer exists on disk')).toBeVisible({
-      timeout: DELETE_BUDGET_MS
-    })
     await expect(tabs.dirtyDot('typed.md')).toBeVisible()
 
     // The switch completes: folder and file are back, with the other text
