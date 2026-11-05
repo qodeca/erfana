@@ -24135,7 +24135,7 @@
       "quote": "| `e2e/html-preview-comments.e2e.ts:644` (E-004",
       "status": "fixed",
       "evidence": "source",
-      "source": "e2e/html-preview-comments.e2e.ts:687",
+      "source": "e2e/html-preview-comments.e2e.ts:689",
       "match": "test('E-004 the whole cycle on a CRLF + BOM file",
       "note": "said :631"
     },
