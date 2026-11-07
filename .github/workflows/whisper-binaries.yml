@@ -232,7 +232,7 @@ jobs:
         # apple-actions/import-codesign-certs v7.1.0 (PR #226). This action
         # consumes MAC_CERT_P12_BASE64 directly — SHA-pin is mandatory; a
         # tag-move would be a credential-handling supply-chain incident.
-        uses: apple-actions/import-codesign-certs@77ba2a2a8f5cfc8c405ebf3159f767c323e238f9
+        uses: apple-actions/import-codesign-certs@288b8ec97b82c66b6f2a6baaf7acc8dfbcbe331c
         with:
           p12-file-base64: ${{ secrets.MAC_CERT_P12_BASE64 }}
           p12-password: ${{ secrets.MAC_CERT_PASSWORD }}
