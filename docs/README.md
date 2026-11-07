@@ -152,7 +152,7 @@ Not to be confused with **[`docs/design-system/`](design-system/index.html)**, w
 
 ## Changelog
 
-- [CHANGELOG](./CHANGELOG.md) – Per-version release notes (v0.9.0 onward; v0.8.x and v0.3–v0.5 in the [Archive](#archive); v0.6.x–v0.7.x have no entries). Latest release: v0.24.0 (2026-10-28), which also ships the v0.23.0 changes – v0.23.0 was tagged but never published
+- [CHANGELOG](./CHANGELOG.md) – Per-version release notes (v0.9.0 onward; v0.8.x and v0.3–v0.5 in the [Archive](#archive); v0.6.x–v0.7.x have no entries). Latest release: v0.24.1 (2026-11-07)
 - [Changelog fragments](../changelog.d/README.md) – where a pull request records its change instead of editing the changelog; folded into the changelog at release
 - [Release notes](./release-notes/README.md) – Per-version release-notes files used as GitHub release bodies (v0.9.5 onward)
 - [Release incidents](./release-incidents/index.md) – Running log of `release.yml` failures with matched signatures and fixes

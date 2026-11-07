@@ -10,6 +10,104 @@ Each version uses the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) g
 
 Changes merged since the last release are not listed here. Each pull request adds a fragment to [`changelog.d/`](../changelog.d/README.md) instead, so no two pull requests edit the same lines of this file. At release time the fragments are folded into a new `## X.Y.Z` section directly below this one and deleted in the same commit; this section stays as it is. To see what is pending, read the fragments, or run `npx git-cliff --unreleased`, which lists the Conventional Commits since the last `v*` tag – the same command drafts the technical half of the release notes.
 
+## 0.24.1
+
+*Released 2026-11-07. Tag `v0.24.1`.*
+
+### Added
+
+- **The project tree follows the active tab.** When you switch to a file or preview tab, the tree opens its
+  folders, scrolls to the file and underlines it. Folders it opened close again at the next switch, unless you
+  worked in them. Turn it off in **Settings > Project tree > Follow the active tab**. (#453)
+
+### Changed
+
+- **One size for every toolbar button.** The 28px toolbar button height now comes from a single
+  design token, `--toolbar-tool-height`, in the Markdown, Mermaid and app toolbars and the preview
+  bar, instead of being typed by hand in each stylesheet. Nothing looks different; the sizes can no
+  longer drift apart. (#433)
+- **The project tree icons say what they do.** Import a file uses a file-input icon (also on the Welcome panel
+  and in the right-click menu), and a busy Import shows the busy ring. The project header opens the filter
+  with a **File filter** button, the filter is a **Show** choice of **All files** (a folder-tree icon) or
+  **Markdown only**, and the header says "Markdown only" while that filter is on. (#452)
+- **The terminal keeps its capture and Maximize buttons in view at its default width.** Scroll lock,
+  Restart terminal and Scroll to bottom now come last in the terminal header, so when the panel is
+  narrow they are the first to move into the "…" menu. (#462)
+- **Cut, Copy, Paste and Delete work the same way everywhere.** Every text field now has a
+  right-click menu, including Settings, the search bar and comment boxes. Text menus gain a Delete
+  item, and every menu shows the same labels and shortcut hints. In the project tree, the Delete
+  key deletes the selected item after confirmation, Paste is offered on file rows too, and Cut,
+  Copy and Paste keys act on the focused row. The Markdown preview menu opens with nothing
+  selected and greys out Copy instead of not appearing. The HTML preview menu gains **Copy selection**
+  too, with the same hint. (#463)
+
+### Removed
+
+- **The terminal's screen-reader mode setting.** Erfana no longer supports screen readers, so
+  **Settings > Terminal > Screen reader mode** is gone and the terminal always runs with xterm's
+  default, screen-reader mode off. A settings file that still holds the old setting loads as
+  before; the setting is dropped at the next save. Keyboard-only use is unchanged. (#440)
+
+### Fixed
+
+- **Esc in the Markdown preview is handled the same way every time.** When Esc closes a comment
+  window, the key release no longer reaches the preview either, as in comment mode. New tests cover
+  a window opened by clicking commented words outside comment mode, and the full Esc order: the
+  first Esc closes the window, the next turns comment mode off and moves focus to its button. (#445)
+- **A long prompt pasted into the terminal is no longer cut off before Enter.** Erfana used to press Enter a
+  fixed 200 ms after the paste, which on Windows could submit only part of a long prompt. It now waits until
+  the terminal output has gone quiet after the paste, and never less than 200 ms. Two prompts sent to the
+  terminal close together now go in one after the other instead of as one prompt. (#449)
+- **A tab whose file was deleted on disk recovers when the file comes back.** After a branch switch
+  or a merge the tab used to say "This file was deleted on disk" until you saved. It now looks for the
+  file every 2 seconds and shows its current content once it is back – editor, image and HTML preview
+  tabs alike. If you typed in the tab meanwhile, you get the usual "file changed on disk" choice
+  instead of losing your text. (#450)
+- **A narrow panel no longer cuts off its toolbar buttons.** When the terminal or the project tree is dragged
+  narrow, buttons that do not fit move into a "More actions" (…) menu at the end of the row, each with its
+  icon, label and shortcut; Maximize terminal and New file are the last to move. The menu works by keyboard,
+  and the project header's filter toggle is now a real button. The terminal's **Capture screen**, **Capture
+  window** and **Capture area** buttons keep keyboard focus while a screenshot is taken. (#451)
+- **Typing in a tab whose file was deleted no longer brings the file back.** After a branch switch
+  or a merge deleted an open file, a few keystrokes in its tab used to make autosave write the file
+  again 2 seconds later. Autosave now waits: the file comes back only when you press Cmd/Ctrl+S, and
+  if the file returns on its own you get the "file changed on disk" choice with your text kept. (#460)
+- **A narrow editor no longer cuts off its toolbar buttons.** The Markdown toolbar and each Mermaid diagram's
+  toolbar now move buttons that do not fit into a "More actions" (…) menu, rightmost first, as the terminal and
+  project tree already do. The menu shows each action's icon, label and shortcut, marks the current view mode or
+  diagram direction with a check, and says why an export is unavailable; it works by keyboard. The comment tools and
+  the auto-save status stay in the toolbar. (#461)
+- **Ctrl+V pastes in the terminal on Windows.** It used to send a control character to the shell and
+  paste nothing, so the only way to paste was the right-click menu. Ctrl+V, Ctrl+Shift+V and
+  Shift+Insert now each paste exactly once; Ctrl+C still copies selected text and interrupts the
+  program when nothing is selected. The terminal menu shows the paste key that works on your
+  system. (#463)
+- **Open previews keep refreshing when their file changes on disk.** On Windows a preview could stop
+  following its file with no sign – after a write that left the file missing or locked for a moment,
+  for a file opened from a path link in the terminal, or after another Erfana window closed. All three
+  are fixed for Markdown, HTML and image tabs. If a Markdown tab still cannot follow its file, it now
+  says "Auto-refresh stopped" and offers Reload, as the image viewer does. (#464)
+- **The terminal keeps its scroll history when you hide and show it.** Collapsing the terminal panel
+  from the activity bar used to shrink the terminal to 2 columns behind the scenes. Expanding it again
+  left a black area, the older output drawn one letter per line, and the oldest lines gone. The
+  terminal now keeps its size while the panel is hidden, so an agent's earlier output is still there
+  when you come back. (#465)
+- **The context meter knows the newer Claude models.** Opus 5.5, Sonnet 5.5, Haiku 5.5, Fable 5.1
+  and Mythos 5.1 now show their 1M window from the first reply instead of 200k; the model table was
+  re-checked against Anthropic's documentation on 2026-11-03. (#383)
+- **`/model` no longer shrinks a 1M-only model to 200k.** Picking a model such as Opus 5 with
+  `/model` and no `[1m]` keeps the meter at 1M, because that model has no 200k window. A model that
+  offers both, such as Opus 4.6, still shows 200k after that pick. (#383)
+- **A Claude model newer than Erfana's table no longer shows 200k.** It takes the window of the newest
+  model Erfana knows in its family, however far ahead it is, so the next release does not bring this
+  bug back. The tooltip marks any such guess **(inferred)**, a guessed 200k included. (#383)
+
+### Security
+
+- **Word export uses `follow-redirects` 1.16.2.** The earlier 1.16.1, which Word export reaches through
+  `axios`, could keep sensitive headers on a redirect ([GHSA-mrwp-f3q8-3g9p](https://github.com/advisories/GHSA-mrwp-f3q8-3g9p)).
+  (#468)
+
 ## 0.24.0
 
 *Released 2026-11-02. Tag `v0.24.0`.*
