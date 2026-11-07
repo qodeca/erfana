@@ -128,6 +128,13 @@ Notes:
   gh api graphql -f query="mutation{enqueuePullRequest(input:{pullRequestId:\"$id\"}){mergeQueueEntry{state position}}}"
   ```
 
+- **Watching a queued PR**: `gh pr view` has no queue field – `--json mergeQueueEntry` fails with `Unknown JSON field`, so a wait loop built on it gets an error on every pass instead of a queue state – it spins forever or exits at once, depending on how it is written. Read the entry through GraphQL; it is `null` (`gh` prints an empty line) once the PR has merged or left the queue – and also before it has joined, so start watching only after the enqueue mutation above returned `QUEUED`. Then run `gh pr view <n> --json state`: `MERGED` means it landed, `OPEN` means the queue dropped it (see the next bullet).
+
+  ```bash
+  gh api graphql -f query='query{repository(owner:"qodeca",name:"erfana"){pullRequest(number:<n>){mergeQueueEntry{state position}}}}' \
+    --jq '.data.repository.pullRequest.mergeQueueEntry'
+  ```
+
 - **When the queue drops a PR**, read the reason from the timeline:
 
   ```bash
