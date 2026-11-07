@@ -16,8 +16,27 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
   [feature inventory](../user-guide/feature-inventory.md) (moved there in #158) and
   [research notes](../designs/user-guide/research.md).
 
-This page is the build contract. The design explains *what* and *why*; this page says *in which
-order*, *which files*, and *how each step is proven*.
+This page is the build contract. The work for #138 is split across two documents, and each has
+one job. The design explains *what* gets built and *why*: the shape of the guide, the demo project
+it is captured from, the screenshot pipeline, and the trade-offs behind each choice. This page
+does not reopen those decisions. It turns them into work that can be carried out and checked
+without a return trip to the design.
+
+It answers three questions for every step:
+
+- *In which order* – the steps run in a fixed sequence, so each one builds on a finished, proven
+  predecessor rather than on work still in flight.
+- *Which files* – each step names the exact paths it creates or changes (for example
+  `scripts/capture/` or `scripts/check-links.mjs`), so the builder never has to guess where the
+  work lands and the reviewer knows exactly what to read.
+- *How each step is proven* – each step is tied to a check that shows it is done: a command, a
+  lint rule, a CI job, or a named reviewer action. "It looks done" is not proof; a green check or a
+  recorded run is.
+
+The accepted criteria in § 1 follow the same pattern: every criterion carries a "Proven by" column,
+and the later sections refer back to those IDs. A reviewer can therefore walk the table top to
+bottom and confirm each item against real evidence, and an agent picking up the work cold can
+follow the page without asking.
 
 ## 1. Accepted criteria
 

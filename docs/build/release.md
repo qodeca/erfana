@@ -383,7 +383,7 @@ First-time Windows installs will see a SmartScreen warning on a newly provisione
 | State | Remediation |
 |---|---|
 | Tag pushed; `prepare` failed on a repo-content assertion (e.g., release-notes file missing) | **Bump to the next patch version.** The tag ruleset carries a `deletion` rule with no bypass actors, so `git push --delete origin v${version}` is rejected (`push declined due to repository rule violations`) — the version cannot be reused. `gh run rerun` does not help either: it replays the same tagged commit, which still lacks the fix. No draft to clean. |
-| Tag pushed; `prepare` failed on `No green checks.yml run for <sha>` | **Not a red build — a race.** `checks.yml` had not yet reached `completed`/`success` for the tagged SHA when `prepare` queried it. Wait until `gh api "repos/qodeca/erfana/actions/workflows/checks.yml/runs?head_sha=$SHA&status=success"` reports `total_count ≥ 1`, then `gh run rerun <id>` — the same run id, no new tag. **The tag is not burned**: nothing was built, signed, or drafted. Prevention: poll the *workflow run* to completion before tagging, not just the seven required check contexts (the advisory `windows-checks` job keeps the run `in_progress` for ~3 min after they go green). See [`docs/release-incidents/v0.17.0-attempt-1.md`](../release-incidents/v0.17.0-attempt-1.md). |
+| Tag pushed; `prepare` failed on `No green checks.yml run for <sha>` | **Not a red build — a race.** `checks.yml` had not yet reached `completed`/`success` for the tagged SHA when `prepare` queried it. Wait until `gh api "repos/qodeca/erfana/actions/workflows/checks.yml/runs?head_sha=$SHA&status=success"` reports `total_count ≥ 1`, then `gh run rerun <id>` — the same run id, no new tag. **The tag is not burned**: nothing was built, signed, or drafted. If instead the run for that SHA finished `failure` only in an advisory job (`Windows checks`), no wait helps: run `gh run rerun <checks-run-id> --failed`, wait for it to go green, then `gh run rerun <release-run-id>` ([Lessons from v0.24.1](#lessons-from-v0241)). Prevention: poll the *workflow run* to completion before tagging, not just the seven required check contexts (the advisory `windows-checks` job keeps the run `in_progress` for ~3 min after they go green). See [`docs/release-incidents/v0.17.0-attempt-1.md`](../release-incidents/v0.17.0-attempt-1.md). |
 | Run sits in `waiting`, both build legs unstarted | The `production-signing` environment approval is pending. Approve via **Review deployments** in the Actions UI, or the CLI recipe in [Approval gate](#approval-gate-production-signing) (send the body as JSON via `--input -`; the `-F "environment_ids[]=…"` form returns HTTP 422 `not an integer`, and omitting `comment` returns 422 too). Not a failure; the tag is not burned. |
 | Tag pushed; `prepare` succeeded; any matrix leg failed | `cleanup` deletes the draft and exits red. Bump to the next patch — any signed artifact, even in a draft, burns the version. The tag itself cannot be deleted (ruleset `deletion` rule, no bypass actors); `git tag -d v${version}` clears only the local copy. |
 | Tag pushed; build all-green; `finalize` failed | Draft exists without a signed `SHA256SUMS`. `cleanup` does **not** fire – its condition watches only `prepare`, `build_mac` and `build_win` – so delete the draft by hand (`gh release delete v${version} --yes --cleanup-tag=false`). Bump to next patch. |
@@ -455,6 +455,21 @@ Some entries in `docs/user-guide/claims.json` prove a page's version text agains
 - Run `npm run check:claims` in the version-bump commit, before the develop-first push.
 - For a page that names the current version, update the page text and the claim's `quote` and `match` together.
 - For a page that names a past version, point the claim at code that still names it. `check-claims` refuses another doc as the source (Markdown outside `src/` and `.claude/skills/`) – see [maintaining-this-guide.md](../user-guide/maintaining-this-guide.md).
+
+## Lessons from v0.24.1
+
+v0.24.1 (2026-11-07) shipped the November 4–5 batch and the `follow-redirects` security bump. The dry-run and the tag run were green on the first try. Two earlier steps are worth knowing on every release: one at the version bump, one before the push to `main`.
+
+### 1. A pull request without a changelog fragment leaves no entry
+
+A dependency pull request, such as #468 (`follow-redirects` 1.16.1 → 1.16.2, GHSA-mrwp-f3q8-3g9p), often adds no `changelog.d/` fragment, so folding the fragments leaves it out. At the version bump, compare the folded section with `git log --oneline <last-app-tag>..HEAD` and add any missing user-relevant entry by hand – a security fix goes under `### Security`.
+
+### 2. An advisory job's failure still blocks the release
+
+`prepare` needs at least one `checks.yml` run of the tagged SHA with `status=success` (`release.yml`, step "Assert checks.yml has a green run for this commit"). `status=success` is the conclusion of the whole run, so a failed advisory job – `Windows checks` – makes the run red even with every required check green, and the develop-first run is the one you wait on before the push to `main`. On the v0.24.1 release commit, run `42364203255` failed only in `Windows checks`, on the `atomicWriteBytesStrict` M-006 timer flake ([known-flakes.md](../windows/known-flakes.md)).
+
+- Waiting on the run, not on the check contexts (see [Branch protection](#branch-protection-phase-i--done-2026-04-25)), catches this too: a run that finished red blocks just like one still running.
+- If only an advisory job failed on a known flake, re-run just that job – `gh run rerun <run-id> --failed` – and wait for the run to go green. The SHA does not change, so nothing has to be pushed again.
 
 ## Incident response
 

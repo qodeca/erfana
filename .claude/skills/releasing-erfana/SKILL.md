@@ -145,7 +145,7 @@ git status --porcelain
 
 ### 0.3 Version + CHANGELOG gate
 
-**Pre-skill checklist**, in the version-bump commit before the skill is invoked: fold the `changelog.d/` fragments below `## [Unreleased]`, bump the CLAUDE.md banner, run `npm run check:version-drift`, run `npm run check:claims` (a claim that pins the old version fails – [release.md § Lessons from v0.24.0](../../../docs/build/release.md#lessons-from-v0240)).
+**Pre-skill checklist**, in the version-bump commit before the skill is invoked: fold the `changelog.d/` fragments below `## [Unreleased]`, compare the folded section with `git log --oneline <last-app-tag>..HEAD` and add any user-relevant change that had no fragment, such as a dependency security fix under `### Security` ([release.md § Lessons from v0.24.1](../../../docs/build/release.md#lessons-from-v0241)), bump the CLAUDE.md banner, run `npm run check:version-drift`, run `npm run check:claims` (a claim that pins the old version fails – [release.md § Lessons from v0.24.0](../../../docs/build/release.md#lessons-from-v0240)).
 
 Ask the operator (AskUserQuestion) for the **bump type** (patch / minor / major). The skill computes the proposed version from `package.json`. Then:
 
@@ -396,7 +396,10 @@ TIP_SHA=$(git rev-parse HEAD)
 # Poll until BOTH runs for this SHA read completed/success (≈4 min; 20 s interval).
 # Wait on the runs, not on the seven check contexts: the advisory Windows job
 # keeps the run in_progress for ~3 min after the contexts go green, and `prepare`
-# asserts the *run*. On failure: abort, fix, re-enter Phase 0.
+# asserts the *run*. If only an advisory job (`Windows checks`) failed on a flake
+# listed in docs/windows/known-flakes.md, run `gh run rerun <run-id> --failed` and
+# keep polling – same SHA, nothing to push again (release.md § Lessons from
+# v0.24.1). Any other failure: abort, fix, re-enter Phase 0.
 gh run list --branch develop --limit 10 \
   --json name,status,conclusion,headSha \
   --jq "[.[] | select(.headSha==\"$TIP_SHA\")] | .[] | \"\(.name): \(.status) \(.conclusion)\""
