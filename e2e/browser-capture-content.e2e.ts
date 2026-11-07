@@ -499,7 +499,7 @@ test.describe('025-AC-034 the screenshot and the crop', () => {
       if ((await send.pick.pickButton.getAttribute('aria-pressed')) !== 'true') await send.pick.pickButton.click()
       const emptyDriver = await send.driver()
       await expect.poll(async () => (await emptyDriver.state()).active, { timeout: SEND_WAIT_MS }).toBe(true)
-      await emptyDriver.hover(await emptyDriver.rect('#save-label'), 'span#save-label ')
+      await emptyDriver.hoverSelector('#save-label', 'span#save-label ')
       await emptyDriver.key('Return')
       const toast = send.errorToasts().filter({ hasText: "Couldn't capture this element" })
       await expect(toast).toHaveCount(1, { timeout: SEND_WAIT_MS })

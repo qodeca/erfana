@@ -42,11 +42,11 @@ test.describe('built-in browser pick mode (main side)', () => {
     // SVG classes, an id with colons, a 10.6 px wide element, an emoji at character 40.
     const bar = await pick.rect('[data-testid="bar-a"]')
     expect((await pick.hover(bar, 'rect.bar.bar--a.bar--tall ')).label).toMatch(/^rect\.bar\.bar--a\.bar--tall \d+ × \d+$/)
-    expect((await pick.hover(await pick.rect('[id=":r1:"]'), 'div#:r1: ')).label).toMatch(/^div#:r1: \d+ × \d+$/)
-    expect((await pick.hover(await pick.rect('[data-testid="w10-6"]'), 'div.w10-6 ')).label).toBe('div.w10-6 11 × 24')
-    const emoji = await pick.hover(await pick.rect('[data-testid="emoji-class"]'), 'div.')
+    expect((await pick.hoverSelector('[id=":r1:"]', 'div#:r1: ')).label).toMatch(/^div#:r1: \d+ × \d+$/)
+    expect((await pick.hoverSelector('[data-testid="w10-6"]', 'div.w10-6 ')).label).toBe('div.w10-6 11 × 24')
+    const emoji = await pick.hoverSelector('[data-testid="emoji-class"]', 'div.')
     expect(emoji.label).not.toMatch(/[\ud800-\udbff](?![\udc00-\udfff])/)
-    const longList = await pick.hover(await pick.rect('[data-testid="long-classes"]'), 'div.alpha')
+    const longList = await pick.hoverSelector('[data-testid="long-classes"]', 'div.alpha')
     expect(longList.label).toMatch(/ \d+ × \d+$/)
     expect([...longList.label.replace(/ \d+ × \d+$/, '')].length).toBeLessThanOrEqual(40)
 
@@ -67,7 +67,7 @@ test.describe('built-in browser pick mode (main side)', () => {
   test('Up and Down walk the hovered chain, with the end notes (main side of 025-AC-027)', async ({ browserTabs, browserServers }) => {
     const pick = await openPicker(browserTabs, browserServers.sites.static.url('/elements.html'))
     await pick.mode(true)
-    await pick.hover(await pick.rect('#save-label'), 'span#save-label ')
+    await pick.hoverSelector('#save-label', 'span#save-label ')
     await pick.key('Down')
     await pick.waitForEvent((e) => e.kind === 'note' && e.note === 'backAtStart')
     await pick.key('Up')
@@ -91,7 +91,7 @@ test.describe('built-in browser pick mode (main side)', () => {
   }) => {
     const pick = await openPicker(browserTabs, browserServers.sites.static.url('/elements.html'))
     await pick.mode(true)
-    await pick.hover(await pick.rect('#save-label'), 'span#save-label ')
+    await pick.hoverSelector('#save-label', 'span#save-label ')
     await pick.key('Return')
     const captured = await pick.waitForEvent((e) => e.kind === 'captured')
     expect(captured.summary?.name).toBe('span#save-label')

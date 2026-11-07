@@ -117,7 +117,7 @@ test.describe('built-in browser hostile pages: the terminal and pick mode', () =
     // Forged Enter, Up, Esc and clicks while pick mode is on: nothing is confirmed, and pick mode stays on.
     await page.eval('window.__forge.run(); 0')
     // Sentinel: a real pointer move is still highlighted, so pick mode is live and unconfirmed.
-    await driver.hover(await driver.rect('#victim span'), 'span')
+    await driver.hoverSelector('#victim span', 'span')
     await expect(send.pick.actions).toHaveCount(0)
     await expect(send.pick.pickButton).toHaveAttribute('aria-pressed', 'true')
     expect(await send.pickState()).toMatchObject({ active: true, capture: null })

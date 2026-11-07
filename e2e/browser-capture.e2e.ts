@@ -91,7 +91,7 @@ async function killTerminal(pick: PickDriver, terminalId: string): Promise<void>
 async function confirmPick(pick: PickDriver, selector: string, labelPrefix: string): Promise<string> {
   await pick.mode(true)
   await expect.poll(async () => (await pick.state()).active, { timeout: WAIT_MS }).toBe(true)
-  await pick.hover(await pick.rect(selector), labelPrefix)
+  await pick.hoverSelector(selector, labelPrefix)
   const before = (await pick.events()).length
   await pick.key('Return')
   const captured = await pick.waitForEvent((e) => e.kind === 'captured', before)
@@ -287,9 +287,9 @@ test.describe('built-in browser capture and send (main side)', () => {
     const pick = await openPicker(browserTabs, browserServers.sites.static.url('/hover-menu.html'))
     await pick.mode(true)
     await expect.poll(async () => (await pick.state()).active, { timeout: WAIT_MS }).toBe(true)
-    await pick.hover(await pick.rect('#menu-trigger'), 'button#menu-trigger ')
+    await pick.hoverSelector('#menu-trigger', 'button#menu-trigger ')
     await pick.page.waitFor(`!document.getElementById('hover-menu').hidden`)
-    await pick.hover(await pick.rect('#item-reports'), 'a#item-reports ')
+    await pick.hoverSelector('#item-reports', 'a#item-reports ')
     const before = (await pick.events()).length
     await pick.key('e', [MOD])
     const captured = await pick.waitForEvent((e) => e.kind === 'captured', before)

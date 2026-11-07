@@ -216,7 +216,7 @@ test.describe('025-AC-060 a capture that cannot be saved sends nothing', () => {
     // Ctrl/Cmd+E starts picking; with the pointer on the element, Ctrl/Cmd+E again picks it and freezes the page.
     await driver.key('e', [MOD])
     await expect.poll(async () => (await driver.state()).active, { timeout: SEND_WAIT_MS }).toBe(true)
-    await driver.hover(await driver.rect('#save-label'), 'span#save-label ')
+    await driver.hoverSelector('#save-label', 'span#save-label ')
     await driver.key('e', [MOD])
     await expect(send.pick.actions).toBeVisible({ timeout: SEND_WAIT_MS })
     await expect.poll(async () => (await send.pickState()).frozen, { timeout: SEND_WAIT_MS }).toBe(true)
@@ -281,7 +281,7 @@ test.describe('025-AC-060 a capture that cannot be saved sends nothing', () => {
     try {
       // The first try and its retry both fail.
       await send.fault('armCaptureFailures', 2)
-      await driver.hover(await driver.rect('#save-label'), 'span#save-label ')
+      await driver.hoverSelector('#save-label', 'span#save-label ')
       await driver.key('Return')
       const toast = send.errorToasts().filter({ hasText: "Couldn't capture this element" })
       await expect(toast).toHaveCount(1, { timeout: SEND_WAIT_MS })
