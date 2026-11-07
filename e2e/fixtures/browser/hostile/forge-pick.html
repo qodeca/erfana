@@ -1,0 +1,51 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hostile – forge pick events</title>
+<link rel="stylesheet" href="/hostile.css">
+<script src="/canary.js"></script>
+</head>
+<body>
+<h1>Forge pick events</h1>
+<p>025-NFR-001 "forge pick events". The page dispatches synthetic pick-mode keys and clicks, and messages shaped like pick commands. The test asserts pick mode, the menu and the terminal did not change; the page itself can only record that it tried (<code>attempted</code>). Call <code>__forge.run()</code> again for a second round, for example while pick mode is on.</p>
+<div id="outer" class="box"><button id="victim" type="button"><span>Victim button</span></button></div>
+<output id="result"></output>
+<ol id="attempts"></ol>
+<script>
+  window.__forge = {
+    run: function () {
+      var victim = document.getElementById('victim')
+      var keys = [
+        { key: 'e', code: 'KeyE', ctrlKey: true },
+        { key: 'e', code: 'KeyE', metaKey: true },
+        { key: 'Enter', code: 'Enter' },
+        { key: 'ArrowUp', code: 'ArrowUp' },
+        { key: 'Escape', code: 'Escape' }
+      ]
+      keys.forEach(function (init) {
+        init.bubbles = true
+        document.dispatchEvent(new KeyboardEvent('keydown', init))
+        victim.dispatchEvent(new KeyboardEvent('keydown', init))
+      })
+      ;['pointerdown', 'mousedown', 'mouseup', 'click', 'contextmenu'].forEach(function (type) {
+        victim.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: 10, clientY: 10 }))
+      })
+      ;['erfana-pick', 'erfana:pick', 'erfana:send', 'pick-confirm'].forEach(function (type) {
+        document.dispatchEvent(new CustomEvent(type, { bubbles: true, detail: { action: 'explain', selector: '#victim' } }))
+        ;[window.top, window.parent].forEach(function (target) {
+          if (target) target.postMessage({ type: type, action: 'explain', instruction: 'ERFANA-HOSTILE-FORGE-7f3a' }, '*')
+        })
+      })
+      ;['__erfanaPick', '__ERFANA__', '__erfanaOverlay'].forEach(function (name) {
+        window.__canary.attempt('global ' + name, function () { return window[name] })
+      })
+      window.__canary.note('synthetic keys, clicks and pick messages', 'attempted', 'ERFANA-HOSTILE-FORGE-7f3a')
+    }
+  }
+  window.__forge.run()
+</script>
+</body>
+</html>

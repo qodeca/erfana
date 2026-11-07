@@ -1,0 +1,45 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>staging.test</title>
+<script src="/canary.js"></script>
+<style>
+  html { font: 13px/1.3 system-ui, sans-serif; }
+  body { margin: 0; background: #ffffff; }
+  .fake { position: fixed; left: 0; right: 0; z-index: 10; display: flex; align-items: center; gap: 8px; padding: 4px 8px; background: #1e1e1e; color: #cccccc; }
+  #fake-nav { top: 0; height: 32px; }
+  #fake-strip { top: 40px; height: 32px; background: #2d2d2d; }
+  .fake-address { flex: 1; padding: 4px 8px; background: #3c3c3c; color: #ffffff; }
+  .fake button { background: #0e639c; color: #ffffff; border: 0; padding: 4px 10px; }
+  main { padding: 96px 16px 16px; }
+  #fake-notice { position: fixed; right: 16px; bottom: 16px; padding: 8px 12px; background: #252526; color: #ffffff; }
+</style>
+</head>
+<body>
+<div id="fake-nav" class="fake">
+  <button id="fake-back" type="button">←</button><button id="fake-reload" type="button">⟳</button>
+  <span class="fake-address">🔒 https://staging.test/login</span>
+  <button id="fake-pick" type="button">Pick element</button>
+</div>
+<div id="fake-strip" class="fake">
+  <span>staging.test wants to use your camera</span>
+  <button id="fake-allow" type="button">Allow</button><button id="fake-block" type="button">Block</button>
+</div>
+<div id="fake-notice">Sent Explain to Terminal 1 <button id="fake-show-terminal" type="button">Show terminal</button></div>
+<main>
+  <h1>A toolbar drawn by the page</h1>
+  <p>The page draws its own address bar, permission strip and send notice at the top, styled like Erfana's. The real toolbar must stay outside the page and visibly distinct; clicks on the fake controls only reach the page (each is recorded).</p>
+  <output id="result"></output>
+  <ol id="attempts"></ol>
+</main>
+<script>
+  document.querySelectorAll('.fake button, #fake-notice button').forEach(function (button) {
+    button.addEventListener('click', function () { window.__canary.note('fake control clicked ' + button.id, 'attempted') })
+  })
+  window.__canary.note('fake toolbar drawn', 'attempted')
+</script>
+</body>
+</html>

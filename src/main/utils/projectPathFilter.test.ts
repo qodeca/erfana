@@ -303,3 +303,36 @@ describe('ProjectPathFilter – split plan inputs', () => {
     expect(filter.getWalkHints()).toEqual(['a/b'])
   })
 })
+
+describe('ProjectPathFilter – the browser folder (spec 025, 025-FR-015)', () => {
+  it.each(['.erfana/browser', '.erfana/browser/profile', '.erfana/browser/profile/Default/Cookies', '.erfana/browser/captures/x.png'])(
+    'always drops %s, with no list naming it',
+    (rel) => {
+      const filter = makeFilter('/p', { hiddenPatterns: [], ignorePatterns: [], exclude: [] })
+      expect(filter.isExcluded(rel)).toBe(true)
+      expect(filter.isEntryExcluded(rel)).toBe(true)
+      expect(filter.shouldDrop(rel)).toBe(true)
+    }
+  )
+
+  it.each(['.erfana', '.erfana/settings.json', '.erfana/browserx', 'src/.erfana/browserish', 'browser', 'x/.erfana/browser2'])(
+    'keeps %s',
+    (rel) => {
+      const filter = makeFilter('/p', { hiddenPatterns: [], ignorePatterns: [], exclude: [] })
+      expect(filter.isEntryExcluded(rel)).toBe(false)
+      expect(filter.shouldDrop(rel)).toBe(false)
+    }
+  )
+
+  it('folds the case on a case-insensitive volume only', () => {
+    const insensitive = makeFilter('/p', { caseSensitive: false })
+    const sensitive = makeFilter('/p', { caseSensitive: true })
+    expect(insensitive.shouldDrop('.Erfana/Browser/profile')).toBe(true)
+    expect(sensitive.shouldDrop('.Erfana/Browser/profile')).toBe(false)
+  })
+
+  it('drops the folder for a file under it reached from the absolute path', () => {
+    const filter = makeFilter('/p')
+    expect(filter.shouldDrop(toRootRelative('/p', '/p/.erfana/browser/profile/Cache/data_0'))).toBe(true)
+  })
+})

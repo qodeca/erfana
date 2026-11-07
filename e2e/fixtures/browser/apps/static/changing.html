@@ -1,0 +1,51 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Changing element fixture</title>
+<link rel="stylesheet" href="/style.css">
+<script src="/fixture.js"></script>
+<style>
+  #changing { width: 240px; height: 80px; padding: 8px; color: #ffffff; font-weight: bold; }
+  .state-1 { background: #c62828; }
+  .state-2 { background: #1565c0; }
+  .state-3 { background: #2e7d32; }
+  .state-4 { background: #f9a825; }
+  .state-5 { background: #6a1b9a; }
+</style>
+</head>
+<body>
+<h1>Test-driven changing element</h1>
+<p>025-AC-067, 025-AC-074. The element changes only through <code>__fixture.advance()</code>; each state has its own background colour (1 #c62828, 2 #1565c0, 3 #2e7d32, 4 #f9a825, 5 #6a1b9a) and logs <code>state N</code> to the console.</p>
+<section id="changing-parent" class="box">
+  <div id="changing" class="state-1" data-state="1">State 1</div>
+</section>
+<script>
+  var STATES = 5
+  var state = 1
+  function show(next) {
+    var el = document.getElementById('changing')
+    if (!el) return null
+    state = next
+    el.className = 'state-' + state
+    el.dataset.state = String(state)
+    el.textContent = 'State ' + state
+    console.log('state ' + state)
+    return state
+  }
+  window.__fixture.state = function () { return state }
+  window.__fixture.advance = function () { return show((state % STATES) + 1) }
+  window.__fixture.setState = function (n) { return show(n) }
+  window.__fixture.remove = function () {
+    var el = document.getElementById('changing')
+    if (el) el.remove()
+    return el !== null
+  }
+  window.__fixture.reload = function () { location.reload() }
+  window.__fixture.navigate = function (url) { location.href = url }
+  console.log('state 1')
+</script>
+</body>
+</html>

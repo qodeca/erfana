@@ -32,7 +32,7 @@ Templates split into two categories: **read-only** prompts (Explain, Ask, Prompt
 
 ```
 prompts/
-├── templates/       # Template markdown files (14 templates)
+├── templates/       # Template markdown files (18 templates)
 ├── parser.ts        # YAML frontmatter parser
 ├── renderer.ts      # CSP-safe renderer
 ├── schema.ts        # Zod validation (includes mutatesDocument flag)
@@ -170,7 +170,7 @@ Introduced in v0.10.0. Mutation templates set `mutatesDocument: true` in their f
 
 **Placement is per-template.** The footer enforces the *how*; each template's `<task>` states the *where* — replace selection (Modify), insert after selection with surrounding blank lines (Visualize), edit the existing diagram block in place (Diagram chat / Bug report), or replace the direction keyword (Change direction).
 
-**Mechanism.** In `applyFooter.ts`, `withApplyFooter(template, mutates)` is a pure function: when `mutates` is true it appends `MUTATE_DOCUMENT_FOOTER` to the template string and returns it; otherwise it returns the template unchanged. `panelUtils.executePromptTemplate` calls it once before `promptRenderer.render` so `{{fileRef}}` in the footer interpolates in the same pass as the body. The footer string is the spec-013 multi-CLI extension point — it is Claude-Code-specific today and will swap to a per-tool lookup when Codex / Gemini CLI support lands.
+**Mechanism.** In `applyFooter.ts`, `withApplyFooter(template, mutates)` is a pure function: when `mutates` is true it appends `MUTATE_DOCUMENT_FOOTER` to the template string and returns it; otherwise it returns the template unchanged. `panelUtils.executePromptTemplate` calls it once, through `withPromptFooter` (`browserCaptureFooter.ts`), before `promptRenderer.render` so `{{fileRef}}` in the footer interpolates in the same pass as the body. The footer string is the spec-013 multi-CLI extension point — it is Claude-Code-specific today and will swap to a per-tool lookup when Codex / Gemini CLI support lands.
 
 **Required variables.** `prompts/validation.ts` requires `filePath` for every mutation template (the four editor / preview ones already required it; the three diagram templates gained the requirement so the footer's `{{fileRef}}` can never render empty).
 

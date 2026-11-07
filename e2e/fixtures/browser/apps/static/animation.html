@@ -1,0 +1,35 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Animation fixture</title>
+<link rel="stylesheet" href="/style.css">
+<script src="/fixture.js"></script>
+<style>
+  @keyframes slide { from { transform: translateX(0); } to { transform: translateX(400px); } }
+  #mover { width: 80px; height: 80px; background: #c62828; animation: slide 2s linear infinite alternate; }
+</style>
+</head>
+<body>
+<h1>CSS animation and DOM listing</h1>
+<p>025-AC-073. <code>__fixture.bodyListing()</code> lists every element under <code>body</code>; <code>__fixture.mutations()</code> counts DOM mutations since load or the last <code>__fixture.resetCounters()</code>; every keydown is logged.</p>
+<div id="mover"></div>
+<button id="target-button" type="button"><span>Target button</span></button>
+<script>
+  var mutations = 0
+  new MutationObserver(function (records) { mutations += records.length }).observe(document, {
+    subtree: true, childList: true, attributes: true, characterData: true
+  })
+  window.__fixture.mutations = function () { return mutations }
+  window.__fixture.resetCounters = function () { mutations = 0 }
+  window.__fixture.bodyListing = function () {
+    return Array.prototype.map.call(document.body.querySelectorAll('*'), function (el) {
+      return el.tagName.toLowerCase() + (el.id ? '#' + el.id : '')
+    })
+  }
+  document.addEventListener('keydown', function (e) { window.__fixture.record('keydown', e.key) }, true)
+</script>
+</body>
+</html>

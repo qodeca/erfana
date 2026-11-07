@@ -1,0 +1,182 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * BrowserTab – the editor tab of a built-in browser tab (spec 025, commit 17).
+ *
+ * The same mechanism and look as HtmlPreviewTab.css (Tabs card, proposed;
+ * surfaces.html): token values only, no rounded corners, the 300px tab
+ * ceiling (U13), a 24 x 24 close target.
+ */
+
+.erf-brw-tab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex: 1 1 0;
+  box-sizing: border-box;
+  height: var(--tab-height);
+  min-width: 80px;
+  max-width: 300px;
+  padding: 0 var(--space-2) 0 var(--space-6);
+  overflow: hidden;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color var(--transition-fast);
+}
+
+.erf-brw-tab:hover {
+  background-color: var(--color-bg-hover);
+}
+.dv-active-tab .erf-brw-tab:hover {
+  background-color: var(--color-bg-hover-solid);
+}
+
+.erf-brw-tab:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--space-1) * -1);
+}
+
+.erf-brw-tab__kind,
+.erf-brw-tab__icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+}
+
+.dv-active-tab .erf-brw-tab__kind,
+.dv-active-tab .erf-brw-tab__icon {
+  color: var(--color-text-primary);
+}
+
+img.erf-brw-tab__icon {
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+}
+
+.erf-brw-tab__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dv-active-tab .erf-brw-tab__label {
+  color: var(--color-white);
+}
+
+/*
+ * A long host label (025-FR-004, fold step 8): the whole host stays in the
+ * layout, hidden, so the tab keeps the width it gives; the host fitted to that
+ * width – subdomain labels removed from the front – is drawn over it.
+ */
+.erf-brw-tab__label:has(.erf-brw-tab__fitted) {
+  position: relative;
+}
+
+.erf-brw-tab__sizer {
+  visibility: hidden;
+}
+
+.erf-brw-tab__fitted {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.erf-brw-tab__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.erf-brw-tab__close {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--btn-height-sm);
+  min-width: var(--btn-height-sm);
+  height: var(--btn-height-sm);
+  padding: 0;
+  border: none;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--transition-fast),
+    background-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.erf-brw-tab:hover .erf-brw-tab__close,
+.dv-active-tab .erf-brw-tab__close {
+  opacity: 1;
+}
+
+.erf-brw-tab__close:hover {
+  background-color: var(--color-border-default);
+  color: var(--color-text-primary);
+}
+
+.erf-brw-tab__close:active {
+  background-color: var(--color-gray-600);
+}
+
+.erf-brw-tab__close:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--space-1) * -1);
+  opacity: 1;
+}
+
+/* Dockview integration: the custom tab fills dockview's own tab box. */
+.dockview-theme-dark .dv-tab:has(.erf-brw-tab),
+.dockview-theme-dark .dv-default-tab:has(.erf-brw-tab) {
+  padding: 0 !important;
+  flex: 1 1 0 !important;
+  min-width: 80px !important;
+  max-width: 300px !important;
+}
+
+.dockview-theme-dark .dv-default-tab:has(.erf-brw-tab) .dv-default-tab-action,
+.dockview-theme-dark .dv-default-tab:has(.erf-brw-tab) .dv-default-tab-content {
+  display: none !important;
+}
+
+/* ---------- New browser tab (after the last tab in each editor strip) ---------- */
+
+.erf-brw-newtab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--btn-height-md);
+  height: var(--tab-height);
+  padding: 0;
+  border: none;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.erf-brw-newtab:hover {
+  background: var(--color-bg-hover-solid);
+}
+
+/* Inset: the tab strip clips its overflow (Focus card). */
+.erf-brw-newtab:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--space-1) * -1);
+}

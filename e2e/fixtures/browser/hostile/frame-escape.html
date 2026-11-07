@@ -1,0 +1,28 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hostile – escape through frames</title>
+<link rel="stylesheet" href="/hostile.css">
+<script src="/canary.js"></script>
+</head>
+<body>
+<h1>Escape through frames</h1>
+<p>025-NFR-001 "escape through frames". A cross-site frame and a sandboxed frame (<code>allow-scripts</code> only) run <code>escape-attacks.js</code> against this page and post the results here. Top-level navigations from a frame run when the test calls <code>frames[i].__escape.navigate(…)</code> through Playwright's frame API.</p>
+<iframe id="cross-site-frame" title="cross-site hostile frame"></iframe>
+<iframe id="sandboxed-frame" title="sandboxed hostile frame" sandbox="allow-scripts"></iframe>
+<output id="result"></output>
+<ol id="attempts"></ol>
+<script>
+  var otherOrigin = location.protocol === 'https:' ? '{{origin hostile https hostile-other.test}}' : '{{origin hostile http hostile-other.test}}'
+  document.getElementById('cross-site-frame').src = otherOrigin + '/frame-escape-child.html'
+  document.getElementById('sandboxed-frame').src = '/frame-escape-child.html?sandboxed=1'
+  window.addEventListener('message', function (event) {
+    if (!event.data || !event.data.attack) return
+    window.__canary.note('frame ' + event.origin + ': ' + event.data.attack, event.data.outcome, event.data.detail)
+  })
+</script>
+</body>
+</html>

@@ -17,7 +17,7 @@
  * @see src/renderer/src/components/Editor/MonacoMarkdownEditor.tsx
  */
 
-import { readFile, writeFile } from 'fs/promises'
+import { writeFile } from 'fs/promises'
 import { join } from 'path'
 import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures/index'
@@ -26,6 +26,7 @@ import { TabBarPage } from './pages/tab-bar.page'
 import { EditorPanelPage } from './pages/editor-panel.page'
 import { MonacoPage } from './pages/monaco.page'
 import { KeyboardHelper } from './pages/keyboard.helper'
+import { readFileIfPresent } from './utils/files'
 
 /** Past the watcher's debounce and the IPC round trip. */
 const WATCH_BUDGET_MS = 15_000
@@ -78,7 +79,7 @@ test.describe('Outside changes to an open buffer', () => {
     // A saved, clean buffer with the cursor after the first character
     await page.keyboard.type('X')
     await keyboard.save()
-    await expect.poll(async () => readFile(target, 'utf-8'), { timeout: WATCH_BUDGET_MS }).toBe(`X${NOTES}`)
+    await expect.poll(async () => readFileIfPresent(target), { timeout: WATCH_BUDGET_MS }).toBe(`X${NOTES}`)
     await expect(tabs.dirtyDot('notes.md')).toHaveCount(0, { timeout: WATCH_BUDGET_MS })
 
     // Another tool appends a line, far from the cursor
@@ -92,7 +93,7 @@ test.describe('Outside changes to an open buffer', () => {
     await page.keyboard.type('Y')
     await keyboard.save()
     await expect
-      .poll(async () => readFile(target, 'utf-8'), { timeout: WATCH_BUDGET_MS })
+      .poll(async () => readFileIfPresent(target), { timeout: WATCH_BUDGET_MS })
       .toBe(`XY${NOTES}EXTERNAL\n`)
 
     // Undo: first the Y, then the outside change as a step of its own
@@ -133,7 +134,7 @@ test.describe('Outside changes to an open buffer', () => {
     await expect(tabs.dirtyDot('notes.md')).toBeVisible({ timeout: WATCH_BUDGET_MS })
     // …and undoing the reload is a user edit like any other: it reaches disk
     await expect
-      .poll(async () => readFile(target, 'utf-8'), { timeout: WATCH_BUDGET_MS })
+      .poll(async () => readFileIfPresent(target), { timeout: WATCH_BUDGET_MS })
       .toContain('LOCAL')
   })
 })

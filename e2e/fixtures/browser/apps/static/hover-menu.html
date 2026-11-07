@@ -1,0 +1,79 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hover menu fixture</title>
+<link rel="stylesheet" href="/style.css">
+<script src="/fixture.js"></script>
+<style>
+  nav { display: flex; gap: 24px; }
+  .menu { list-style: none; margin: 0; padding: 4px; background: #263238; position: absolute; min-width: 180px; }
+  .menu a { display: block; padding: 6px 10px; color: #ffffff; }
+  .css-menu .menu { display: none; }
+  .css-menu:hover .menu { display: block; }
+</style>
+</head>
+<body>
+<h1>Hover-only menu</h1>
+<p>025-AC-028, 025-AC-057, 025-AC-083. The script menu opens on <code>mouseenter</code> and closes on <code>mouseleave</code>, window <code>blur</code> and <code>visibilitychange</code> (each logged); the CSS menu is <code>:hover</code> only. The clock moves only when the test calls <code>__fixture.tick()</code>.</p>
+<nav>
+  <div id="script-menu-root">
+    <button id="menu-trigger" type="button">Products</button>
+    <ul id="hover-menu" class="menu" hidden>
+      <li><a id="item-reports" href="#reports">Reports</a></li>
+      <li><a id="item-billing" href="#billing">Billing</a></li>
+      <li><a id="item-settings" href="#settings">Settings</a></li>
+    </ul>
+  </div>
+  <div id="css-menu-root" class="css-menu">
+    <button id="css-trigger" type="button">Resources</button>
+    <ul id="css-menu" class="menu">
+      <li><a id="css-item-docs" href="#docs">Docs</a></li>
+      <li><a id="css-item-blog" href="#blog">Blog</a></li>
+    </ul>
+  </div>
+</nav>
+<p style="margin-top: 160px">Clock: <output id="clock">0</output></p>
+<iframe id="clock-frame" title="cross-origin clock frame"></iframe>
+<script>
+  var root = document.getElementById('script-menu-root')
+  var menu = document.getElementById('hover-menu')
+  function setOpen(open, why) {
+    if (menu.hidden === !open) return
+    menu.hidden = !open
+    window.__fixture.record(open ? 'menu-open' : 'menu-close', why)
+  }
+  root.addEventListener('mouseenter', function () { setOpen(true, 'mouseenter') })
+  root.addEventListener('mouseleave', function () { setOpen(false, 'mouseleave') })
+  window.addEventListener('blur', function () {
+    window.__fixture.record('blur')
+    setOpen(false, 'blur')
+  })
+  document.addEventListener('visibilitychange', function () {
+    window.__fixture.record('visibilitychange', document.visibilityState)
+    if (document.visibilityState === 'hidden') setOpen(false, 'visibilitychange')
+  })
+  menu.addEventListener('click', function (event) {
+    event.preventDefault()
+    window.__fixture.record('item-click', event.target.id)
+  })
+
+  var ticks = 0
+  window.__fixture.tick = function () {
+    ticks += 1
+    document.getElementById('clock').textContent = String(ticks)
+    return ticks
+  }
+  window.__fixture.menuOpen = function () {
+    return !menu.hidden
+  }
+  window.__fixture.hasFocus = function () {
+    return document.hasFocus()
+  }
+  var otherOrigin = location.protocol === 'https:' ? '{{origin static https other.test}}' : '{{origin static http other.test}}'
+  document.getElementById('clock-frame').src = otherOrigin + '/frame-child.html?name=clock'
+</script>
+</body>
+</html>

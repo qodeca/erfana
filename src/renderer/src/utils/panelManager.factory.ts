@@ -34,6 +34,9 @@ export function createTerminalManager(): ITerminalManager {
     sendToTerminal: async (content, autoExecute = false) => {
       return useTerminalStore.getState().sendToTerminal(content, autoExecute)
     },
+    sendToTerminalId: async (terminalId, content) => {
+      return useTerminalStore.getState().sendToTerminalId(terminalId, content)
+    },
     /**
      * Event-based waiting for terminal readiness
      * Uses Zustand subscription for immediate notification when terminal becomes ready.

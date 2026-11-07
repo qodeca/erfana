@@ -1,0 +1,35 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Schemes fixture</title>
+<link rel="stylesheet" href="/style.css">
+<script src="/fixture.js"></script>
+</head>
+<body>
+<h1>Schemes a page may use</h1>
+<p>025-AC-005, allowed side: an <code>about:blank</code> iframe, a <code>data:</code> image, a <code>blob:</code> download of this origin. The blocked navigations live in <code>hostile/scheme-escape.html</code>.</p>
+<div class="row">
+  <iframe id="about-blank" title="about:blank frame" src="about:blank"></iframe>
+  <img id="data-image" alt="data URL image" width="48" height="48" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Crect width='48' height='48' fill='%232e7d32'/%3E%3C/svg%3E">
+  <button id="blob-download" type="button">blob: download</button>
+</div>
+<p>data image loaded: <output id="data-image-loaded"></output></p>
+<script>
+  var img = document.getElementById('data-image')
+  function reportImage() { document.getElementById('data-image-loaded').textContent = String(img.complete && img.naturalWidth > 0) }
+  if (img.complete) reportImage()
+  else img.addEventListener('load', reportImage)
+  document.getElementById('blob-download').addEventListener('click', function () {
+    var a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob(['blob download\n'], { type: 'text/plain' }))
+    a.download = 'from-blob.txt'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+  })
+</script>
+</body>
+</html>

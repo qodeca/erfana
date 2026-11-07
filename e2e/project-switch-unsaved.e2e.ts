@@ -30,6 +30,7 @@ import { KeyboardHelper } from './pages/keyboard.helper'
 import { MonacoPage } from './pages/monaco.page'
 import { ProjectTreePage } from './pages/project-tree.page'
 import { TabBarPage } from './pages/tab-bar.page'
+import { readFileIfPresent } from './utils/files'
 import { byTestId } from './utils/locators'
 import { anyToast, toastOfType, toastWithText } from './utils/toast'
 import { TEST_IDS } from '../src/renderer/src/constants/testids'
@@ -192,7 +193,7 @@ test.describe('Project switch with unsaved tabs', () => {
     // "Keep My Version" resolves it, and autosave (armed again) writes both edits
     await panel.conflictKeepButton().click()
     await expect
-      .poll(async () => readFile(aPath, 'utf-8'), { timeout: AUTOSAVE_BUDGET_MS })
+      .poll(async () => readFileIfPresent(aPath), { timeout: AUTOSAVE_BUDGET_MS })
       .toContain('more typing')
     expect(await readFile(aPath, 'utf-8')).toContain('unsaved edit')
   })

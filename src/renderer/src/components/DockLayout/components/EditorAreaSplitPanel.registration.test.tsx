@@ -29,15 +29,18 @@ import { useProjectStore } from '../../../stores/useProjectStore'
 const captured: {
   components?: Record<string, unknown>
   tabComponents?: Record<string, unknown>
+  leftHeaderActionsComponent?: unknown
 } = {}
 
 vi.mock('dockview', () => ({
   DockviewReact: (props: {
     components: Record<string, unknown>
     tabComponents: Record<string, unknown>
+    leftHeaderActionsComponent?: unknown
   }) => {
     captured.components = props.components
     captured.tabComponents = props.tabComponents
+    captured.leftHeaderActionsComponent = props.leftHeaderActionsComponent
     return null
   }
 }))
@@ -77,6 +80,17 @@ vi.mock('../../../services/preview/PreviewLinkRouter', () => ({
   }
 }))
 
+// The built-in browser's window events need the preload bridge; spied here.
+const browserEvents = vi.hoisted(() => ({ mounted: 0, disposed: 0 }))
+vi.mock('../../../services/browser/browserTabEvents', () => ({
+  mountBrowserTabEvents: () => {
+    browserEvents.mounted += 1
+    return () => {
+      browserEvents.disposed += 1
+    }
+  }
+}))
+
 import { EditorAreaSplitPanel } from './EditorAreaSplitPanel'
 
 const props = (): ISplitviewPanelProps =>
@@ -94,6 +108,8 @@ beforeEach(() => {
   captured.components = undefined
   captured.tabComponents = undefined
   routers.length = 0
+  browserEvents.mounted = 0
+  browserEvents.disposed = 0
 })
 
 afterEach(() => {
@@ -116,6 +132,17 @@ describe('EditorAreaSplitPanel registration', () => {
     expect(captured.components).toHaveProperty('imageViewer')
     expect(captured.tabComponents).toHaveProperty('editorTab')
     expect(captured.tabComponents).toHaveProperty('imageTab')
+  })
+
+  it('registers the browser panel, its tab and the New browser tab tool, and mounts the browser events once', () => {
+    const { unmount } = renderInApp()
+
+    expect(captured.components).toHaveProperty('browser')
+    expect(captured.tabComponents).toHaveProperty('browserTab')
+    expect(captured.leftHeaderActionsComponent).toBeDefined()
+    expect(browserEvents.mounted).toBe(1)
+    unmount()
+    expect(browserEvents.disposed).toBe(1)
   })
 })
 

@@ -14,14 +14,14 @@ Erfana follows **2025 Electron security best practices** with comprehensive hard
 | Electron Fuses | ✅ all 9 pinned (`strictlyRequireAllFuses`); 5 hardening fuses on | v0.6.0 (all pinned since v0.22.0) |
 | ASAR Packaging | ✅ Enabled (native addons and executables unpacked) | v0.22.0 |
 | ASAR Integrity | ✅ Checked at start-up (`EnableEmbeddedAsarIntegrityValidation` + `OnlyLoadAppFromAsar`); see the limits below | v0.22.0 |
-| Cookie Encryption | ❌ Disabled (no persistent cookies to protect – re-evaluated v0.22.0) | v0.6.0 |
+| Cookie Encryption | ✅ Enabled (the built-in browser keeps per-project sign-in cookies – ADR 0010) | spec 025 |
 | Content Security Policy | ✅ Strict | v0.1.0 |
 | Path confinement in main | ✅ Every `file:*` path argument resolved and checked against the open project | v0.22.0 |
 
 **Notes**:
 - The app's JavaScript ships inside `app.asar`, and the app refuses to start if a single byte of the archive changes while the embedded hash stays the same – see [ASAR Configuration](#asar-configuration) and its limits: on Windows (per-user install) the check raises the bar and makes tampering visible but does not stop a same-user process, which can change `Erfana.exe` too. Native addons and executables (`node-pty`, `ffmpeg`, `ffprobe`, LiteParse) stay real files in `app.asar.unpacked/`, which the check does **not** cover
-- Cookie encryption stays off: Erfana keeps no persistent cookies worth protecting (spike: [docs/spikes/2026-10-22-asar-integrity.md](spikes/2026-10-22-asar-integrity.md))
-- `scripts/fuses.js` pins all 9 fuses of Electron 44 (`strictlyRequireAllFuses`, read back after the flip). Five harden the build – RunAsNode, NodeOptions, NodeCliInspect (the last one only in production builds; see below), EnableEmbeddedAsarIntegrityValidation and OnlyLoadAppFromAsar. EnableCookieEncryption is deliberately `false`; LoadBrowserProcessSpecificV8Snapshot, GrantFileProtocolExtraPrivileges and WasmTrapHandlers stay at Electron's defaults
+- Cookie encryption is on: the built-in browser (spec 025) keeps a persistent per-project profile with sign-in cookies, so cookies on disk are encrypted with the OS key store ([ADR 0010](adrs/0010-turn-on-cookie-encryption.md)). It is one-way – see [Cookie encryption](#cookie-encryption)
+- `scripts/fuses.js` pins all 9 fuses of Electron 44 (`strictlyRequireAllFuses`, read back after the flip). Five harden the build – RunAsNode, NodeOptions, NodeCliInspect (the last one only in production builds; see below), EnableEmbeddedAsarIntegrityValidation and OnlyLoadAppFromAsar. EnableCookieEncryption is `true` (ADR 0010); LoadBrowserProcessSpecificV8Snapshot, GrantFileProtocolExtraPrivileges and WasmTrapHandlers stay at Electron's defaults
 - Test builds (`ERFANA_TEST_BUILD=true`) enable NodeCliInspect for Playwright E2E testing - see [Test Builds](#test-builds-erfana_test_build)
 - `ERFANA_E2E_FORCE_CRASH=1` injects a renderer crash for the error-boundary E2E scenario. Double-gated on `!app.isPackaged`, so a packaged build ignores it - see [Crash Injection](#crash-injection-erfana_e2e_force_crash)
 
@@ -83,7 +83,7 @@ Attackers exploit legitimate Electron features (like `ELECTRON_RUN_AS_NODE`) to 
 | Fuse | Value | Security Impact |
 |------|-------|-----------------|
 | `RunAsNode` | `false` | Disables `ELECTRON_RUN_AS_NODE` env var (prevents arbitrary code execution) |
-| `EnableCookieEncryption` | `false` | Off: no persistent cookies to protect (file:// main window, in-memory preview partitions); settings are not cookies and are unaffected either way |
+| `EnableCookieEncryption` | `true` | On: the built-in browser's per-project profile keeps sign-in cookies, encrypted on disk with the OS key store; one-way – never turn it off again |
 | `EnableNodeOptionsEnvironmentVariable` | `false` | Disables `NODE_OPTIONS` env var (prevents command injection) |
 | `EnableNodeCliInspectArguments` | `isTestBuild` – `false` on every production build | Disables `--inspect` CLI args (prevents remote debugging). `true` only under `ERFANA_TEST_BUILD=true` – see [Test Builds](#test-builds-erfana_test_build) |
 | `EnableEmbeddedAsarIntegrityValidation` | `true` | Refuses to start when `app.asar` no longer matches the header hash embedded at build time (see ASAR Configuration below) |
@@ -107,7 +107,7 @@ await flipFuses(electronBinaryPath, {
   version: FuseVersion.V1,
   resetAdHocDarwinSignature: context.electronPlatformName === 'darwin',
   [FuseV1Options.RunAsNode]: false,
-  [FuseV1Options.EnableCookieEncryption]: false,  // no persistent cookies to protect
+  [FuseV1Options.EnableCookieEncryption]: true,  // ADR 0010 – one-way, never turn off
   [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
   [FuseV1Options.EnableNodeCliInspectArguments]: isTestBuild,  // false in production
   [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
@@ -131,7 +131,7 @@ Build logs show fuses applied during `npm run build:mac`:
    Applying fuses to: release/{version}/mac-arm64/Erfana.app
 ✅ Electron fuses applied successfully
    - RunAsNode: disabled
-   - CookieEncryption: disabled
+   - CookieEncryption: enabled
    - NodeOptions: disabled
    - NodeCliInspect: disabled
    - AsarIntegrity: enabled (embedded <algorithm> <hash>)
@@ -300,7 +300,7 @@ From v0.6.0 until v0.22.0 ASAR was off (v0.21.0 was never released). The recorde
 
 ### Cookie encryption
 
-`EnableCookieEncryption` stays `false`. The main window loads `file://`, HTML previews run in in-memory partitions (`PreviewStorageSeal`), and API keys and the project-lock secret already use `safeStorage`, so the fuse would encrypt nothing of value. It would add a keychain read to every start, and turning it off again later makes encrypted cookies unreadable. Revisit it if Erfana ever keeps a signed-in web session.
+`EnableCookieEncryption` is `true` since spec 025 ([ADR 0010](adrs/0010-turn-on-cookie-encryption.md)). The built-in browser keeps a persistent per-project Chromium profile under Erfana's own data folder (`<sessionData>/browser-profiles/<name>/chromium/`, [ADR 0009](adrs/0009-browser-profile-in-the-project-folder.md) as amended 2026-11-03 – the macOS network-service sandbox writes nowhere else), with Erfana's own signed profile files in `<project>/.erfana/browser/`, and its sign-in cookies are worth protecting, so Chromium encrypts them with the OS key store (Keychain on macOS, DPAPI on Windows, the Secret Service keyring on Linux). HTML previews still run in in-memory partitions, and API keys and the project-lock secret still use `safeStorage` directly. The fuse is one-way: once it is off again, Electron cannot read the encrypted cookies, so it must never be turned back off. The start-up cost of the key-store read is measured by 025-NFR-010; on Linux without a keyring, the browser shows a notice (025-FR-018).
 
 ---
 
@@ -516,16 +516,17 @@ The handlers listed below add the stricter `isTrustedSender` on top of this gate
 
 ### `isTrustedSender` (shared predicate)
 
-`isTrustedSender(event)` in [`src/main/ipc/senderValidation.ts`](../src/main/ipc/senderValidation.ts) accepts a call only when both hold:
+`isTrustedSender(event)` in [`src/main/ipc/senderValidation.ts`](../src/main/ipc/senderValidation.ts) accepts a call only when all three hold:
 
-1. **Top-level frame.** `event.senderFrame` exists and `frame.parent === null` – any iframe or sub-frame is rejected.
-2. **Exact expected origin.** In development (`is.dev && ELECTRON_RENDERER_URL`) the sender's origin must equal the electron-vite dev-server origin. In production the sender URL must equal `RENDERER_FILE_URL` – `pathToFileURL(join(__dirname, '../renderer/index.html'))`, mirroring the exact `mainWindow.loadFile` call in `src/main/index.ts`. An arbitrary `file://` URL is **not** accepted, and the dev branch is unreachable in a production build because it is gated on the same condition that decides which URL the window actually loads.
+1. **One of Erfana's own windows.** `event.sender` is a `webContents` registered in [`src/main/ipc/appWebContents.ts`](../src/main/ipc/appWebContents.ts) where the window is created – the main window and the screenshot overlays – and its id is dropped when it is destroyed. A URL only says what a frame loaded, so a page that loads the renderer entry file in any other `webContents` is refused (spec 025, 025-NFR-001). Rules 2 and 3 still apply on top; neither replaces this one. `isTrustedAppSender` and the session permission handlers apply the same identity rule.
+2. **Top-level frame.** `event.senderFrame` exists and `frame.parent === null` – any iframe or sub-frame is rejected.
+3. **Exact expected origin.** In development (`is.dev && ELECTRON_RENDERER_URL`) the sender's origin must equal the electron-vite dev-server origin. In production the sender URL must equal `RENDERER_FILE_URL` – `pathToFileURL(join(__dirname, '../renderer/index.html'))`, mirroring the exact `mainWindow.loadFile` call in `src/main/index.ts`. An arbitrary `file://` URL is **not** accepted, and the dev branch is unreachable in a production build because it is gated on the same condition that decides which URL the window actually loads.
 
-Consumers: `clipboard-handlers.ts` (`clipboard:readText` / `clipboard:writeText`), `file-handlers.ts` (`file:revealInFileManager`), `claude-status-handlers.ts` (via a local copy of the same predicate), `system-handlers.ts`, `image-export-handlers.ts` (`image-export:run`, #73 – the gate runs **first**, before the payload is even parsed, so an untrusted sender never reaches the Zod parser, the filesystem or the save dialog), `browser-handlers.ts` (`browser:openFile`, #124, gate first in the same way), `markdown-image-handlers.ts` (`markdown-image:read`, gate first), `import-handlers.ts` (`import:toolStatus`) and `comments/file-comment-handlers.ts` (`file-comment:list`, `openDraft`, `save`, `release` – spec 024, gate first). The preview handlers run the byte-identical copy `isTrustedPreviewSender` (entry #44 in [technical-debt.md](./technical-debt.md)); of those, `preview:navigate` and `preview:focusPage` (#124) also run it before the payload is parsed.
+Consumers: `clipboard-handlers.ts` (`clipboard:readText` / `clipboard:writeText`), `file-handlers.ts` (`file:revealInFileManager`), `claude-status-handlers.ts`, `system-handlers.ts`, `image-export-handlers.ts` (`image-export:run`, #73 – the gate runs **first**, before the payload is even parsed, so an untrusted sender never reaches the Zod parser, the filesystem or the save dialog), `browser-handlers.ts` (`browser:openFile`, #124, gate first in the same way), `markdown-image-handlers.ts` (`markdown-image:read`, gate first), `import-handlers.ts` (`import:toolStatus`) and `comments/file-comment-handlers.ts` (`file-comment:list`, `openDraft`, `save`, `release` – spec 024, gate first). The preview handlers run `isTrustedPreviewSender`, which delegates to `isTrustedSender` (entry #44 in [technical-debt.md](./technical-debt.md)); of those, `preview:navigate` and `preview:focusPage` (#124) also run it before the payload is parsed.
 
 **Not** consumers: `pdf-handlers.ts` and `docx-handlers.ts`. The two document-export channels validate their payload and rely only on the process-wide gate above, not on the stricter `isTrustedSender`; adding it is recorded as entry #32 in [technical-debt.md](./technical-debt.md).
 
-One known limitation, recorded rather than fixed: in **development** rule 2 compares the dev-server *origin*, not the full URL, so any page served from that origin satisfies the predicate – including the image-export rasterize harness. It is not reachable in practice (the harness preload exposes three verbs – `ready`, `onRender`, `postResult` – and no `ipcRenderer` handle, so it has no bridge to a gated channel) and production pins the exact file URL. Entry #33 in [technical-debt.md](./technical-debt.md).
+One known limitation, recorded rather than fixed: in **development** rule 3 compares the dev-server *origin*, not the full URL, so any page served from that origin satisfies the predicate – including the image-export rasterize harness. It is not reachable in practice (the harness preload exposes three verbs – `ready`, `onRender`, `postResult` – and no `ipcRenderer` handle, so it has no bridge to a gated channel) and production pins the exact file URL. Entry #33 in [technical-debt.md](./technical-debt.md).
 
 ### Why `system:*` needs it most
 
@@ -541,7 +542,7 @@ No part of that URL comes from the renderer, so there is no arbitrary-URL or pro
 
 ### Screenshot: a stricter local variant
 
-`screenshot-handlers.ts` defines its own `validateMainRendererSender`, applying the same top-level-frame + exact-`file://`-URL rule to every public screenshot channel (`capture`, `getDisplays`, `getCapabilities`, `getScreenPermission`, `enumerateWindows`). It is deliberately separate from `isTrustedSender` because it must also exclude the app's **own** per-display area-select overlay windows, which are legitimate `BrowserWindow`s of the same app but must never be able to invoke the public capture API. Rejections fail closed (empty display list, `supported: false`, `'unknown'` permission, `SCREENSHOT_FAILED`) and are logged.
+`screenshot-handlers.ts` defines its own `validateMainRendererSender`, which delegates to `isTrustedSender` and guards every public screenshot channel (`capture`, `getDisplays`, `getCapabilities`, `getScreenPermission`, `enumerateWindows`). It must also exclude the app's **own** per-display area-select overlay windows: they are registered Erfana windows, but they load the renderer entry with a route hash, so the exact-URL rule keeps them out of the public capture API. Rejections fail closed (empty display list, `supported: false`, `'unknown'` permission, `SCREENSHOT_FAILED`) and are logged.
 
 The overlay windows have their own, tighter channel path: `screenshot:areaSelected` / `screenshot:areaCancelled` are attached per capture to each overlay's `webContents.mainFrame.ipc` (never global `ipcMain`) and every payload must carry that round's freshly minted UUID token – with one deliberate exception, the overlay's one-way `logging:log` forward (#60), which is untokenised because it carries a log record rather than a capture command and is re-validated main-side by the same `LogEntrySchema` as the editor window's entries.
 
@@ -553,7 +554,7 @@ The overlay windows have their own, tighter channel path: `screenshot:areaSelect
 
 ## External links
 
-`src/main/utils/openExternalSafe.ts` is the **only** module that calls `shell.openExternal`; ESLint syntax selectors refuse any other call site, including a destructured or aliased one. Clicks, middle-clicks, links in the terminal, the HTML preview's external links and pages that try to open a new window all go through it. Before anything opens, `parseExternalUrl` (`src/main/utils/externalUrl.ts`) requires:
+`src/main/utils/openExternalSafe.ts` is the **only** module that calls `shell.openExternal`; ESLint syntax selectors refuse any other call site, including a destructured or aliased one. Clicks, middle-clicks, links in the terminal opened with Cmd/Ctrl-click (a plain click opens an Erfana browser tab, spec 025), the HTML preview's external links and pages that try to open a new window all go through it. Before anything opens, `parseExternalUrl` (`src/main/utils/externalUrl.ts`) requires:
 
 - a string of at most 2,048 characters that parses with `new URL()`;
 - a protocol in `EXTERNAL_PROTOCOLS` (`src/shared/linkProtocolPolicy.ts`): `http:`, `https:`, `mailto:` and `tel:` only – so `file:` and `ftp:` links no longer open;

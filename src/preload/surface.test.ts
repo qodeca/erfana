@@ -72,6 +72,7 @@ describe('preload surface', () => {
     'docx',
     'imageExport',
     'browser',
+    'browserTab',
     'markdownImage',
     'preview',
     'previewComments',

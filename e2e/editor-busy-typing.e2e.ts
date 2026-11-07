@@ -31,6 +31,7 @@ import { TabBarPage } from './pages/tab-bar.page'
 import { EditorPanelPage } from './pages/editor-panel.page'
 import { MonacoPage } from './pages/monaco.page'
 import { KeyboardHelper } from './pages/keyboard.helper'
+import { readFileIfPresent } from './utils/files'
 
 /** Line count of the benchmark that first measured the loss. */
 const LINE_COUNT = 3_000
@@ -126,8 +127,9 @@ test.describe('Typing while the app is busy', () => {
     await keyboard.save()
 
     const target = join(testProject.path, 'large.md')
+    // A file caught missing mid-rename has not been saved yet, so it reads as the original
     await expect
-      .poll(async () => readFile(target, 'utf-8'), { timeout: SAVE_BUDGET_MS })
+      .poll(async () => (await readFileIfPresent(target)) ?? LARGE_FILE, { timeout: SAVE_BUDGET_MS })
       .not.toBe(LARGE_FILE)
     // Compare only the head: a 180 KB diff in a failure message helps no one,
     // and a dropped key or a jumped cursor both change the head.

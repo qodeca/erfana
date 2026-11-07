@@ -122,7 +122,7 @@
   <strong>What it does not decide.</strong> The icon button and its states are the
   <a href="../../components/button/index.html">Buttons</a> card's; the menu's look and keyboard are the
   <a href="../../components/menu/index.html">Menu</a> card's, reused here unchanged. The one thing this card adds to a
-  menu is the checked item (rule 7). The <a href="../../components/toolbar/index.html">Toolbar</a> card used to
+  menu is the checked item, checkbox or radio (rule 7). The <a href="../../components/toolbar/index.html">Toolbar</a> card used to
   sketch overflow by whole groups, with text-only menu items; this card replaces that sketch, and the Toolbar card's
   overflow section now points here.
 </div>
@@ -150,8 +150,9 @@
     the Menu card's shortcut column. Items keep the <strong>toolbar order</strong>, not the order they moved in.</li>
   <li><strong>State moves with the button.</strong> A toggle (<code>aria-pressed</code>) becomes a
     <code>menuitemcheckbox</code> whose <code>aria-checked</code> matches, drawn with a lime check in its own column at
-    the inline end – the same lime as the toolbar toggle's foot, so “on” reads alike in both places. A view-mode radio
-    becomes a <code>menuitemradio</code>. A disabled button becomes an <code>aria-disabled</code> item that is still
+    the inline end – the same lime as the toolbar toggle's foot, so “on” reads alike in both places. One choice of a set
+    – a view mode, a diagram direction – becomes a <code>menuitemradio</code>, the current one checked and drawn with
+    the same lime check (its icon slot keeps the button's own icon, rule 6). A disabled button becomes an <code>aria-disabled</code> item that is still
     reachable. A busy button becomes a disabled item with its busy label (“Importing file…”).</li>
   <li><strong>The menu floats.</strong> It opens under …, its inline-end edge on …'s. Where that would leave the
     window – a panel at the window's edge – it flips and opens toward the window's interior. It floats over the
@@ -499,8 +500,8 @@ exempt from contrast (SC 1.4.3) – the Menu card's rule.</p>
     <a href="../../components/toolbar/index.html">Toolbar</a> card lists them. The image viewer scrolls instead (#73,
     a locked requirement); it stays an exception there. The Markdown and Mermaid toolbars – <code>MarkdownToolbar.tsx</code>,
     <code>MermaidToolbar.tsx</code> – ship it since #461: a separator moves with the button after it, the spacer counts at
-    its minimum width, and the live status region, the modified dot and the comment tools stay in the row (two
-    recorded exceptions below). The HTML preview band's bar does not ship it yet.</li>
+    its minimum width, and the live status region, the modified dot and the comment tools stay in the row (a
+    recorded exception below). Their view modes and diagram directions are radio items in the menu (rule 7). The HTML preview band's bar does not ship it yet.</li>
 </ul>
 
 <section id="found">
@@ -516,7 +517,8 @@ exempt from contrast (SC 1.4.3) – the Menu card's rule.</p>
 
 <h2 id="decisions">For the owner</h2>
 <p class="ds-muted">Answered 2026-11-03: the owner approved every recommendation, and with it this card's promotion
-to decided and the change to the Toolbar card's overflow section.</p>
+to decided and the change to the Toolbar card's overflow section. On 2026-11-05 the owner closed the rule 7 exception:
+the view modes and the diagram directions are radio items in the menu.</p>
 <table>
   <thead><tr><th>Decision</th><th>Recommended</th><th>Alternatives</th><th>Owner's answer</th></tr></thead>
   <tbody>
@@ -525,6 +527,7 @@ to decided and the change to the Toolbar card's overflow section.</p>
     <tr><td>When … shows</td><td>Only once a button has moved</td><td>Always, even when everything fits – a fixed place, but a menu that is sometimes empty.</td><td>Recommended – approved 2026-11-03</td></tr>
     <tr><td>Title reserve</td><td>The title keeps a few letters until every button has moved</td><td>The title truncates to nothing first, so buttons stay longer.</td><td>Recommended – approved 2026-11-03</td></tr>
     <tr><td>Checked item</td><td>Lime check at the inline end (new on the Menu card)</td><td>The toolbar's pressed look – fill and lime foot – on the menu row.</td><td>Recommended – approved 2026-11-03</td></tr>
+    <tr><td>Choices in the menu (rule 7 exception, #461)</td><td>Make the view modes and the diagram directions <code>menuitemradio</code> items with the lime check, now that <code>ContextMenu</code> has radio items</td><td>Keep the recorded exception: a checked <code>menuitemcheckbox</code>, which tells a screen reader it is an independent toggle</td><td>Recommended – approved 2026-11-05; the exception is closed</td></tr>
     <tr><td>Terminal order at the default width (#462)</td><td>Scroll to bottom and Lock scroll first, a 6 px gap</td><td>One Capture button for the four captures; or the owner’s own order</td><td>Owner’s own answer, 2026-11-05: Scroll lock, Restart and Scroll to bottom last, hiding first</td></tr>
   </tbody>
 </table>
@@ -563,13 +566,6 @@ to decided and the change to the Toolbar card's overflow section.</p>
       <td>The comment tools stay in the row at every width. They are a component of their own – two stateful buttons
         with a count, a busy label and a drawer – not one action a menu item can stand for, so the buttons around them
         move instead. The live status region and the modified dot also stay, but they are not actions.</td>
-    </tr>
-    <tr>
-      <td><code>MarkdownToolbar.tsx</code>, <code>MermaidToolbar.tsx</code></td>
-      <td>Rule 7 – a view-mode radio becomes a <code>menuitemradio</code></td>
-      <td>The view modes and the diagram directions are mutually exclusive, but the shared menu has only checkbox
-        items, so the current one is a checked <code>menuitemcheckbox</code>; in the row each is a toggle with
-        <code>aria-pressed</code>. A <code>menuitemradio</code> item in <code>ContextMenu</code> would close this.</td>
     </tr>
   </tbody>
 </table>

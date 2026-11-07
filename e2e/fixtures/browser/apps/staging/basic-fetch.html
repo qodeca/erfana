@@ -1,0 +1,26 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Staging – page-made basic-auth request</title>
+<link rel="stylesheet" href="/staging.css">
+</head>
+<body>
+<h1>Basic auth from the page's own request</h1>
+<p>025-AC-022: the challenge comes from a <code>fetch</code> this page makes, so the sign-in box must not take focus.</p>
+<button id="fetch-basic" type="button">Fetch /basic</button>
+<output id="fetch-result"></output>
+<script>
+  function run() {
+    return fetch('/basic', { cache: 'no-store' }).then(function (r) {
+      document.getElementById('fetch-result').textContent = String(r.status)
+      return r.status
+    })
+  }
+  document.getElementById('fetch-basic').addEventListener('click', run)
+  window.fetchBasic = run
+</script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Frames fixture</title>
+<link rel="stylesheet" href="/style.css">
+<script src="/fixture.js"></script>
+</head>
+<body>
+<h1>Frames</h1>
+<p>Each frame holds a button (<code>#frame-button</code>) inside a <code>div.wrap</code>. 025-AC-029, 025-AC-027, 025-AC-072.</p>
+<div class="row">
+  <iframe id="same-origin" title="same-origin frame" src="/frame-child.html?name=same-origin"></iframe>
+  <iframe id="cross-site" title="cross-site frame"></iframe>
+  <iframe id="nested" title="three-level nested frame" src="/frame-nest-1.html"></iframe>
+  <iframe id="srcdoc" title="srcdoc frame" srcdoc="&lt;div class='wrap'&gt;&lt;button id='frame-button'&gt;&lt;span&gt;srcdoc button&lt;/span&gt;&lt;/button&gt;&lt;/div&gt;"></iframe>
+  <iframe id="blank-written" title="about:blank frame written by script"></iframe>
+  <iframe id="sandboxed" title="sandboxed frame" sandbox="" src="/frame-sandboxed.html"></iframe>
+</div>
+<script>
+  // The cross-site frame keeps the page's scheme, so an HTTPS page has no mixed content.
+  var otherOrigin = location.protocol === 'https:' ? '{{origin static https other.test}}' : '{{origin static http other.test}}'
+  document.getElementById('cross-site').src = otherOrigin + '/frame-child.html?name=cross-site'
+
+  var blank = document.getElementById('blank-written').contentDocument
+  blank.open()
+  blank.write('<!doctype html><div class="wrap"><button id="frame-button"><span>about:blank button</span></button></div>')
+  blank.close()
+
+  // Removes a frame while it may hold the highlight (025-AC-029).
+  window.__fixture.removeFrame = function (id) {
+    var frame = document.getElementById(id)
+    if (!frame) return false
+    frame.remove()
+    window.__fixture.record('frame-removed', id)
+    return true
+  }
+</script>
+</body>
+</html>

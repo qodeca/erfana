@@ -11,7 +11,8 @@ export default defineConfig({
   // Mirror the renderer build's `define` (electron.vite.config.ts) so components
   // that read the inlined app version resolve to a stable value under test.
   define: {
-    __APP_VERSION__: JSON.stringify('0.0.0-test')
+    __APP_VERSION__: JSON.stringify('0.0.0-test'),
+    __ERFANA_TEST_HOOKS__: 'false'
   },
   test: {
     name: 'renderer',
@@ -117,6 +118,105 @@ export default defineConfig({
         'src/renderer/src/hooks/useCommentDirtyGuard.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/renderer/src/hooks/useUnsavedSourcesFeed.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Built-in browser, renderer side (spec 025, commit 17): the tab lifetime, the
+        // page's placement and the keys that route into it. A regression here shows
+        // as a page left on screen over the wrong tab or a key acting on the wrong
+        // tab. Each floor ~2 points under the value measured when it landed.
+        // measured 100/100/97.91/100 (lines/functions/branches/statements)
+        'src/renderer/src/stores/useBrowserTabStore.ts': { lines: 98, functions: 98, branches: 95, statements: 98 },
+        // measured 100/100/88.88/100
+        'src/renderer/src/services/browser/browserTabLifecycle.ts': { lines: 98, functions: 98, branches: 86, statements: 98 },
+        // measured 100/100/100/100
+        'src/renderer/src/services/browser/browserTabEvents.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Download notices as toasts with Show in folder (025-FR-020). measured 100/100/91.66/100
+        'src/renderer/src/services/browser/browserDownloadNotices.ts': { lines: 98, functions: 98, branches: 89, statements: 98 },
+        // measured 100/100/100/100
+        'src/renderer/src/utils/openBrowserTab.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/95.58/100
+        'src/renderer/src/components/Panels/BrowserPanel/browserPanel.logic.ts': { lines: 98, functions: 98, branches: 93, statements: 98 },
+        // The origin fitted to its box (attacker pass F1, issue #448). measured 96.87/84.61/85/92.5
+        'src/renderer/src/components/Panels/BrowserPanel/useOriginFit.ts': { lines: 94, functions: 82, branches: 83, statements: 90 },
+        // measured 100/100/91.89/97.01
+        'src/renderer/src/components/Panels/BrowserPanel/useBrowserBounds.ts': { lines: 98, functions: 98, branches: 89, statements: 95 },
+        // measured 100/100/94.73/98.46
+        'src/renderer/src/components/Panels/BrowserPanel/useBrowserKeys.ts': { lines: 98, functions: 98, branches: 92, statements: 96 },
+        // measured 100/100/95/100
+        'src/renderer/src/components/Panels/BrowserPanel/useBrowserPageFocus.ts': { lines: 98, functions: 98, branches: 93, statements: 98 },
+        // Toolbar fold steps 3–7 (design § States › Tiers): a regression shows as a tool folding
+        // too early or too late, or the row flipping between steps. measured 100/100/100/100
+        'src/renderer/src/components/Panels/BrowserPanel/navFold.logic.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 98.39/95/84.62 (lines/functions/branches; statements not split out by lcov)
+        'src/renderer/src/components/Panels/BrowserPanel/useNavFold.ts': { lines: 96, functions: 93, branches: 82, statements: 94 },
+        // Built-in browser, renderer side (spec 025, commit 18): the strip rows and their
+        // input guard, the Erfana pages' words, the menus and the data actions. A
+        // regression here shows as an answer sent inside the guard, a wrong sentence on
+        // an error page, or a menu acting on the wrong item. Each floor ~2 points under
+        // the value measured when it landed.
+        // measured 100/100/96/100 (lines/functions/branches/statements)
+        'src/renderer/src/stores/useBrowserChromeStore.ts': { lines: 98, functions: 98, branches: 94, statements: 98 },
+        // measured 100/100/98.14/100
+        'src/renderer/src/components/Panels/BrowserPanel/stripRows.logic.ts': { lines: 98, functions: 98, branches: 96, statements: 98 },
+        // measured 98.07/95/89.55/93.84
+        'src/renderer/src/components/Panels/BrowserPanel/StripRow.tsx': { lines: 96, functions: 93, branches: 87, statements: 91 },
+        // measured 100/100/94.73/100
+        'src/renderer/src/components/Panels/BrowserPanel/StripRows.tsx': { lines: 98, functions: 98, branches: 92, statements: 98 },
+        // measured 100/100/100/100
+        'src/renderer/src/components/Panels/BrowserPanel/erfanaPageCopy.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/97.22/100
+        'src/renderer/src/components/Panels/BrowserPanel/browserMenus.logic.ts': { lines: 98, functions: 98, branches: 95, statements: 98 },
+        // measured 100/100/91.66/100
+        'src/renderer/src/components/Panels/BrowserPanel/browserDataActions.ts': { lines: 98, functions: 98, branches: 89, statements: 98 },
+        // measured 100/100/88/100
+        'src/renderer/src/browserPopup/PopupStrip.tsx': { lines: 98, functions: 98, branches: 86, statements: 98 },
+        // Built-in browser, renderer side (spec 025, commit 19): pick and send – the pick
+        // row's words, the panel's placement, the suggestions' rows, the send, the
+        // target and its re-ask, the still image and the pick state. A regression
+        // here shows as a send to the wrong terminal, a guard banner that never
+        // shows, or a page left hidden behind a still image. Each floor ~2 points
+        // under the value measured when it landed (2026-11-03), never above 98.
+        // measured 100/100/100/100 (lines/functions/branches/statements)
+        'src/renderer/src/components/Panels/BrowserPanel/pickRow.logic.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/renderer/src/components/Panels/BrowserPanel/pickPanel.logic.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/renderer/src/components/Panels/BrowserPanel/addressSuggestions.logic.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/75/100/95.65 (the uncovered functions are the no-op defaults)
+        'src/renderer/src/components/Panels/BrowserPanel/browserSend.ts': { lines: 98, functions: 73, branches: 98, statements: 93 },
+        // measured 100/96.55/89.81/95.45
+        'src/renderer/src/components/Panels/BrowserPanel/useBrowserPick.ts': { lines: 98, functions: 94, branches: 87, statements: 93 },
+        // measured 100/100/94.44/100
+        'src/renderer/src/components/Panels/BrowserPanel/useBrowserTarget.ts': { lines: 98, functions: 98, branches: 92, statements: 98 },
+        // measured 100/100/100/100
+        'src/renderer/src/components/Panels/BrowserPanel/useStillSurface.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/91.3/98.85
+        'src/renderer/src/services/browser/browserStill.ts': { lines: 98, functions: 98, branches: 89, statements: 96 },
+        // measured 100/100/100/100
+        'src/renderer/src/stores/useBrowserPickStore.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/renderer/src/stores/useBrowserStillStore.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Built-in browser commit 20 (spec 025, 025-FR-009, 025-FR-010, S-17,
+        // 025-FR-023): terminal links, the paste and drop guard, opening a
+        // tab at an address or file, the width preset menu and Forget's
+        // dialog. Pinned ~2 points under the value measured when they landed
+        // (2026-11-03), never above 98.
+        // measured 100/100/100/100
+        'src/renderer/src/utils/terminalPasteGuard.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/renderer/src/hooks/useTerminalPasteGuard.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/renderer/src/components/Panels/TerminalPanel/terminalPasteGuardAddon.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 81.81/66.66/100/83.33 – the uncovered part is the app's default wiring (APP_DEPS)
+        'src/renderer/src/components/Panels/TerminalPanel/terminalLinks.ts': { lines: 79, functions: 64, branches: 98, statements: 81 },
+        // measured 100/100/100/100
+        'src/renderer/src/utils/openBrowserTabAt.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/renderer/src/components/Panels/BrowserPanel/WidthPresetMenu.tsx': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/renderer/src/components/Panels/BrowserPanel/ForgetDataDialog.tsx': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 99.05/100/90.69/97.61 – the uncovered branch is the engine without :focus-visible
+        'src/renderer/src/components/Panels/BrowserPanel/ToolbarTooltip.tsx': { lines: 98, functions: 98, branches: 88, statements: 95 },
+        // measured 100/100/100/100
+        'src/renderer/src/components/Panels/BrowserPanel/PickAnnouncer.tsx': { lines: 98, functions: 98, branches: 98, statements: 98 },
       },
       exclude: [
         'node_modules/**',

@@ -17,6 +17,7 @@ import { pathToFileURL } from 'url'
 import type { IpcMainInvokeEvent } from 'electron'
 import { ErrorCode, ERROR_MESSAGES } from '../../shared/errors'
 import { IMAGE_EXPORT_CHANNELS } from '../../shared/ipc/image-export-channels'
+import { createFakeWebContents, registerInCurrentModule } from './__test-helpers__/appSender'
 
 const mockIpcMainHandle = vi.fn()
 const mockFromWebContents = vi.fn()
@@ -52,15 +53,20 @@ vi.mock('../services/imageExport/ImageExportService', () => ({
 /** Same derivation `senderValidation.ts` uses for the production trust pin. */
 const RENDERER_FILE_URL = pathToFileURL(join(__dirname, '../renderer/index.html')).href
 const TRUSTED_FRAME = { url: RENDERER_FILE_URL, parent: null }
-const SENDER = { id: 7 }
+/** The main window's `webContents`; `getHandler` registers it in each test's module copy. */
+const SENDER = createFakeWebContents(7)
 
-function makeEvent(frame: { url: string; parent: unknown } | null): IpcMainInvokeEvent {
-  return { senderFrame: frame, sender: SENDER } as unknown as IpcMainInvokeEvent
+function makeEvent(
+  frame: { url: string; parent: unknown } | null,
+  sender: unknown = SENDER
+): IpcMainInvokeEvent {
+  return { senderFrame: frame, sender } as unknown as IpcMainInvokeEvent
 }
 
 /** Register the handlers and return the captured `image-export:run` handler. */
 async function getHandler(): Promise<(...args: unknown[]) => Promise<unknown>> {
   const { registerImageExportHandlers } = await import('./image-export-handlers')
+  await registerInCurrentModule(SENDER)
   registerImageExportHandlers()
   const entry = mockIpcMainHandle.mock.calls.find(
     (call) => call[0] === IMAGE_EXPORT_CHANNELS.RUN
@@ -103,6 +109,15 @@ describe('image-export:run — trust gate', () => {
         filePath: '/p/a.png',
         target: 'png'
       })).toThrow(/Untrusted sender/)
+    expect(mockRun).not.toHaveBeenCalled()
+  })
+
+  it('rejects the exact renderer URL from an unregistered webContents', async () => {
+    // A browser tab that loaded the renderer entry file (025-NFR-001).
+    const handler = await getHandler()
+    expect(() =>
+      handler(makeEvent(TRUSTED_FRAME, createFakeWebContents()), { filePath: '/p/a.png', target: 'png' })
+    ).toThrow(/Untrusted sender/)
     expect(mockRun).not.toHaveBeenCalled()
   })
 

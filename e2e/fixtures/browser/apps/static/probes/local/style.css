@@ -1,0 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+@font-face { font-family: probe-font; src: url(font.woff2) format('woff2'); }
+.probe-font { font-family: probe-font, sans-serif; }

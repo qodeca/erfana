@@ -33,7 +33,7 @@ import { registerBrowserHandlers } from './ipc/browser-handlers'
 import { registerMarkdownImageHandlers } from './ipc/markdown-image-handlers'
 import { registerClaudeStatusHandlers } from './ipc/claude-status-handlers'
 import { registerPreviewHandlers } from './ipc/preview-handlers'
-import { registerPreviewScheme } from './services/preview/previewScheme'
+import { closeBrowserWindow, disposeBrowserForQuit, installBrowserAfterReady, installBrowserBeforeReady } from './services/browser/browserAppSetup'
 import { importToolStatusService, killActiveLibreOfficeProbes } from './services/import'
 import { FORCE_CRASH_ARG, LOGS_DIR_RELATIVE, TEST_HOOKS_ARG } from '../shared/constants'
 import { createApplicationMenu, setPreviewZoomHandler } from './menu'
@@ -47,6 +47,7 @@ import { globalSettingsService } from './services/GlobalSettingsService'
 import { loggingService, logger } from './services/LoggingService'
 import { logNodePtyBinding } from './utils/logNodePtyBinding'
 import { createQuitGuard } from './utils/quitGuard'
+import { disposeWithin } from './utils/disposeWithin'
 import { armLastResortExit, LAUNCHER_WAIT_MS, runQuitSequence, waitBounded } from './utils/quitSequence'
 import { QUIT_TRACE_FILE, startConptyHostReaper } from './services/conptyHostReaper'
 import { gitWatcherService } from './services/GitWatcherService'
@@ -55,11 +56,12 @@ import { projectLockService } from './services/ProjectLockService'
 import { gitStatusService } from './services/GitStatusService'
 import { installSafeConsole } from './utils/safeConsole'
 import { openExternalSafeDetached } from './utils/openExternalSafe'
-import { registerWebContentsBaseline } from './utils/webContentsBaseline'
 import { registerProcessCrashLogging } from './utils/processCrashLogging'
 import { writeCrashFallbackLine } from './utils/crashFallbackLog'
 import { isBenignShutdownTimerError } from './utils/isBenignShutdownTimerError'
 import { installDefaultSessionPermissions } from './services/session/defaultSessionPermissions'
+import { loadTestHooks } from './testHooks/loadTestHooks'
+import { registerAppWebContents } from './ipc/appWebContents'
 import {
   registerAppCrashLogging,
   registerWindowErrorSignals,
@@ -71,10 +73,9 @@ import {
 installSafeConsole()
 registerProcessCrashLogging()
 
-// Register the `erfana-preview://` privileged scheme (#74). MUST run before
-// `app.whenReady()`, so it lives here at module scope beside the other pre-ready
-// setup (`registerSchemesAsPrivileged` is a no-op once the app is ready).
-registerPreviewScheme()
+// Pre-ready, at module scope: the one privileged-scheme registration (erfana-preview,
+// erfana-local), the disk-cache cap and the deny-by-default webContents baseline (spec 025)
+installBrowserBeforeReady(app)
 
 // Packaged: leave the launching folder (possibly a cloned repo) as cwd, so no
 // bare-name spawn can resolve into it (#250). Dev keeps the repo as cwd.
@@ -223,6 +224,7 @@ function createWindow(): BrowserWindow {
     }
   })
 
+  registerAppWebContents(mainWindow.webContents, 'main') // IPC gates trust it by identity and kind (025-NFR-001)
   // Log renderer hangs for this window (log-only — see rendererCrashHandlers).
   registerWindowResponsiveness(mainWindow)
 
@@ -303,14 +305,13 @@ function createWindow(): BrowserWindow {
   // CRITICAL: Must also clear project state so new window can re-open the same project
   const webContentsId = mainWindow.webContents.id
 
-  // Previews belong to a WINDOW, so they are reaped when the window goes — the
-  // same rule watchers, terminals and git already follow below. Without this the
-  // only teardown was the app-level disposer at `before-quit`, which runs AFTER
-  // `mainWindowRef.destroy()`: every view was detached from a dead window and
-  // logged a teardown warning on each clean exit, and a second window's views
-  // would simply have leaked.
+  // Previews and browser tabs belong to a WINDOW, so they are reaped when the window
+  // goes — as watchers, terminals and git are below. Left to the `before-quit`
+  // disposer, which runs AFTER `mainWindowRef.destroy()`, every view was detached
+  // from a dead window, and a second window's views would have leaked.
   const previewWindowId = mainWindow.id
   mainWindow.on('closed', () => {
+    void closeBrowserWindow(previewWindowId) // spec 025: a tab belongs to its window
     void previewHandlers?.closeWindow(previewWindowId).catch((error) => {
       logger.warn('Preview teardown on window close failed', {
         windowId: previewWindowId,
@@ -382,10 +383,6 @@ function createWindow(): BrowserWindow {
   return mainWindow
 }
 
-// Deny-by-default window-open and navigation policy for every webContents
-// (windows set stricter handlers of their own where they need them).
-registerWebContentsBaseline(app)
-
 /**
  * Tell the user, once, that start-up had to fall back.
  *
@@ -422,6 +419,7 @@ function showStartupProblems(win: BrowserWindow, problems: string[], detailsSave
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(async () => {
+  await loadTestHooks() // e2e builds only, before any timer on mainClock (spec 025 § 12)
   // Set application name (shows in macOS menu bar)
   app.setName('ERFANA')
 
@@ -555,6 +553,8 @@ app.whenReady().then(async () => {
   // once. The menu holds a late-bound handler because it is installed before this
   // graph exists.
   setPreviewZoomHandler((step) => previewHandlers?.zoomFocused(step) ?? Promise.resolve(false))
+  // Built-in browser (spec 025): profiles, project-switch teardown, erfana-local refused here
+  installBrowserAfterReady({ defaultSession: session.defaultSession, projectSession: projectService.session, lockService: projectLockService, terminalOutput: terminalService })
 
   // RELIABILITY FIX (todo012): Clean up stale projects on startup
   // This runs asynchronously but doesn't block window creation
@@ -678,44 +678,6 @@ const LOCK_DISPOSE_TIMEOUT_MS = 1_000
 const quitGuard = createQuitGuard()
 
 /**
- * Runs one disposer and returns when it settles or when `timeoutMs` elapses,
- * whichever is first. Never rejects: shutdown must always reach `app.exit(0)`.
- *
- * @param label - Disposer name, used in the log line
- * @param dispose - The disposer to run
- * @param timeoutMs - Upper bound on how long to wait
- */
-async function disposeWithin(
-  label: string,
-  dispose: () => Promise<void>,
-  timeoutMs: number
-): Promise<void> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-
-  const settled = Promise.resolve()
-    .then(dispose)
-    .then(() => 'settled' as const)
-    .catch((err) => {
-      logger.warn(`App quit: ${label} threw`, {
-        error: err instanceof Error ? err.message : String(err)
-      })
-      return 'settled' as const
-    })
-
-  const outcome = await Promise.race([
-    settled,
-    new Promise<'timeout'>((resolve) => {
-      timer = setTimeout(() => resolve('timeout'), timeoutMs)
-    })
-  ])
-
-  if (timer !== undefined) clearTimeout(timer)
-  if (outcome === 'timeout') {
-    logger.warn(`App quit: ${label} timed out`, { timeoutMs })
-  }
-}
-
-/**
  * Shutdown-scoped uncaught-exception guard.
  *
  * During teardown a chokidar `awaitWriteFinish` throttle timer (FileWatcherService)
@@ -809,8 +771,8 @@ app.on('before-quit', (event): Promise<void> | undefined => {
               previewHandlers ? previewHandlers.dispose() : Promise.resolve(),
               gitWatcherService.dispose(),
               gitStatusService.dispose(),
-              // Abort an in-flight model download so its temp file is removed now.
-              whisperModelManager.dispose()
+              disposeBrowserForQuit(), // spec 025: cookies reach disk, local-file servers close
+              whisperModelManager.dispose() // aborts an in-flight download; its temp file goes now
             ])
           },
           SHUTDOWN_TIMEOUT_MS

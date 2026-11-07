@@ -10,6 +10,7 @@
 <title>Focus and keyboard – Erfana design system</title>
 <link rel="stylesheet" href="../../tokens.css">
 <link rel="stylesheet" href="../../ds.css">
+<link rel="stylesheet" href="../patterns/picker/picker.css">
 <style>
   .demo { display: flex; flex-wrap: wrap; gap: var(--space-12); align-items: center;
           padding: var(--space-12); background: var(--color-bg-secondary); margin-bottom: var(--space-8); }
@@ -70,6 +71,15 @@
                     display: flex; align-items: center; padding: 0 var(--space-8);
                     background: var(--color-gray-950); border-bottom: var(--border-width) solid var(--color-border-default);
                     font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--color-text-primary); }
+
+  /* ---------- the browser picker's outline (exceptions row), on three pages ---------- */
+  .pick-pages { display: flex; flex-wrap: wrap; gap: var(--space-8); margin-block-start: var(--space-6); }
+  .pick-case { display: flex; flex-direction: column; gap: var(--space-2); }
+  .pick-page { position: relative; inline-size: calc(var(--btn-height-lg) * 3); block-size: calc(var(--btn-height-lg) * 1.5); }
+  .pick-page--paper { background: var(--color-white); }
+  .pick-page--accent { background: var(--color-accent-primary); }
+  .pick-page--ink { background: var(--color-brand-black); }
+  .pick-page .erf-picker-outline { inset: var(--space-6); }
 
   pre { margin: 0 0 var(--space-12); padding: var(--space-8); background: var(--color-bg-secondary);
         max-width: var(--ds-measure-wide); overflow-x: auto; color: var(--color-text-primary); }
@@ -293,7 +303,7 @@ keyboard. The ratio under each frame is the ring against what it actually touche
 <div class="ds-note" id="two-tone">
   <strong>The two-tone ring is for a page Erfana does not own.</strong> The HTML Preview's comment overlay draws
   its ring inside a third-party page, from literal colours, with an ink line or halo beside the accent (the
-  overlay row below), and the built-in browser's element picker draws the same ring inside the pages it shows (the picker row below; owner decision OD-2, 2026-11-01). Those are the only places it is allowed. <strong>When the reader picks a block to comment on in
+  overlay row below), and the built-in browser's element picker draws a two-tone outline over the pages it shows, its 2px line in paper rather than the accent (the picker row below; owner decision OD-2, 2026-11-01, amended 2026-11-05). Those are the only places it is allowed. <strong>When the reader picks a block to comment on in
   the Markdown Preview</strong> (comment mode), the picked block shows the one standard ring of this card –
   <code>var(--color-border-focus)</code> at <code>--border-width-thick</code> – because Erfana renders that DOM
   itself and its tokens apply. No Exceptions row allows the two-tone ring there. Owner decision, 2026-10-28.
@@ -351,12 +361,43 @@ keyboard. The ratio under each frame is the ring against what it actually touche
         <a href="../../../designs/comments/html-comments/overlay.html">Comment overlay</a> card.</td>
     </tr>
     <tr>
-      <td>Built-in browser element picker (outline inside the page, spec 025 – planned)</td>
+      <td>Built-in browser element picker (outline on the page and on its still image, spec 025)</td>
       <td>The ring is <code>var(--color-border-focus)</code> at <code>--border-width-thick</code>.</td>
-      <td>The two-tone outline – a 2px accent ring with a 1px ink line on both sides – drawn by the engine over a page Erfana
-        does not own, for the same reason as the comment overlay: tokens do not reach that page, and one colour vanishes on a
-        page in the accent colour. Owner decision OD-2 (2026-11-01). See the <a href="../patterns/picker/index.html">Element
-        picker</a> card and <a href="../../../designs/browser/picking.html">Picking</a>. No <code>src/</code> site yet.</td>
+      <td>The two-tone outline – a 2px <code>--color-white</code> line with a 1px <code>--color-brand-black</code> line
+        on both sides – over a page Erfana does not own, for the same reason as the comment overlay: one colour vanishes
+        on a page of that colour, and ink beside paper is the widest pair the tokens hold, so one of the two always
+        stands out. Erfana draws it itself both live (on a click-through native surface over the page) and on the
+        page's still image (<code>.erf-brw-still__outline</code> in <code>PickRow.css</code>), the same look on both; the
+        engine's one-colour accent outline is used only under Wayland (ADR 0007, amendment 2026-11-05). Owner decision
+        OD-2 (2026-11-01); the paper line and Erfana drawing the live outline are the owner's decision of 2026-11-05.
+        See the <a href="../patterns/picker/index.html">Element picker</a> card and
+        <a href="../../../designs/browser/picking.html">Picking</a>.
+        <div class="pick-pages">
+          <div class="pick-case">
+            <div class="pick-page pick-page--paper" aria-hidden="true"><span class="erf-picker-outline erf-picker-outline--paper"></span></div>
+            <span>White page – the ink line carries the edge:
+              <span data-contrast="--color-brand-black on --color-white" data-min="3" data-result="pass">18.48:1 · pass</span></span>
+          </div>
+          <div class="pick-case">
+            <div class="pick-page pick-page--accent" aria-hidden="true"><span class="erf-picker-outline erf-picker-outline--paper"></span></div>
+            <span>Page in the accent – the paper line alone is only
+              <span data-contrast="--color-white on --color-accent-primary">2.20:1</span>, so the ink line carries the edge:
+              <span data-contrast="--color-brand-black on --color-accent-primary" data-min="3" data-result="pass">8.39:1 · pass</span></span>
+          </div>
+          <div class="pick-case">
+            <div class="pick-page pick-page--ink" aria-hidden="true"><span class="erf-picker-outline erf-picker-outline--paper"></span></div>
+            <span>Black page – the paper line carries it:
+              <span data-contrast="--color-white on --color-brand-black" data-min="3" data-result="pass">18.48:1 · pass</span></span>
+          </div>
+        </div></td>
+    </tr>
+    <tr>
+      <td>Built-in browser address chips (zoom, pop-up blocked)</td>
+      <td>Offset 2px outward, inset inside a scroller, or the inner-gap form over a transparent border.</td>
+      <td>Inset by 2px over the chip's visible 1px edge. The chips sit inside the address field, whose own ring is
+        drawn outward around the whole field, so an outward chip ring would meet or double that ring (M-32); the
+        inner-gap form needs a transparent border, and these chips draw a visible one.
+        See <code>BrowserChrome.css</code> (spec 025).</td>
     </tr>
     <tr>
       <td>Comment pins</td>

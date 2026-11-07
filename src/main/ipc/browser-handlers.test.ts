@@ -16,6 +16,11 @@ import type { IpcMainInvokeEvent } from 'electron'
 import { ErrorCode, ERROR_MESSAGES } from '../../shared/errors'
 import { BROWSER_CHANNELS } from '../../shared/ipc/browser-channels'
 import { BrowserOpenFileResponseSchema } from '../../shared/ipc/browser-schema'
+import {
+  createFakeWebContents,
+  registerInCurrentModule,
+  type FakeWebContents
+} from './__test-helpers__/appSender'
 
 type Listener = (...args: unknown[]) => Promise<unknown>
 
@@ -44,10 +49,26 @@ const mockLogger = {
 }
 vi.mock('../services/LoggingService', () => ({ logger: mockLogger }))
 
+/**
+ * `registerAppWebContents` of the identity set the OUTER gate reads. The mocked
+ * registry below is built once and survives `vi.resetModules()`, so it keeps
+ * the senderValidation / appWebContents copies it loaded first, while the
+ * handler module – re-imported per test – gets fresh ones. The app sender is
+ * registered in both (see `getHandlers`).
+ */
+const outerIdentity = vi.hoisted(() => ({
+  register: (_wc: unknown): void => {
+    throw new Error('registry not loaded yet')
+  }
+}))
+
 // The real registry, so the outer gate runs; the inner listener is recorded on
 // the way through so this channel's own gate can be driven directly.
 vi.mock('./registry', async importOriginal => {
   const actual = await importOriginal<typeof import('./registry')>()
+  const { registerAppWebContents } = await import('./appWebContents')
+  outerIdentity.register = (wc: unknown) =>
+    registerAppWebContents(wc as Parameters<typeof registerAppWebContents>[0], 'main')
   return {
     ...actual,
     registerHandle: (channel: string, listener: Listener) => {
@@ -86,13 +107,23 @@ const UNTRUSTED_SENDERS = [
   ['an event with no frame', null]
 ] as const
 
-function makeEvent(frame: { url: string; parent: unknown } | null): IpcMainInvokeEvent {
-  return { senderFrame: frame, sender: { id: 7 } } as unknown as IpcMainInvokeEvent
+/** The main window's `webContents`, registered as an Erfana window by `getHandlers`. */
+const APP_SENDER = createFakeWebContents(7)
+
+function makeEvent(
+  frame: { url: string; parent: unknown } | null,
+  sender: FakeWebContents = APP_SENDER
+): IpcMainInvokeEvent {
+  return { senderFrame: frame, sender } as unknown as IpcMainInvokeEvent
 }
 
 /** Register the handlers; return the gated handler and the channel's own listener. */
 async function getHandlers(): Promise<{ gated: Listener; inner: Listener }> {
   const { registerBrowserHandlers } = await import('./browser-handlers')
+  // Both gates trust the main window: the inner one through this test's fresh
+  // module copy, the outer one through the copy the cached registry holds.
+  await registerInCurrentModule(APP_SENDER)
+  outerIdentity.register(APP_SENDER)
   registerBrowserHandlers()
   const entry = mockIpcMainHandle.mock.calls.find(call => call[0] === BROWSER_CHANNELS.OPEN_FILE)
   return { gated: entry![1], inner: innerListeners.get(BROWSER_CHANNELS.OPEN_FILE)! }
@@ -126,6 +157,26 @@ describe('browser:openFile – the process-wide gate (registry.ts)', () => {
   it.each(UNTRUSTED_SENDERS)('refuses %s and NEVER calls the service', async (_label, frame) => {
     const { gated } = await getHandlers()
     expect(() => gated(makeEvent(frame), { filePath: PAGE })).toThrow(/Untrusted sender/)
+    expect(mockOpenFile).not.toHaveBeenCalled()
+  })
+})
+
+describe('browser:openFile – webContents identity (025-NFR-001)', () => {
+  it('the process-wide gate refuses the exact renderer URL from an unregistered webContents', async () => {
+    const { gated } = await getHandlers()
+    const browserTab = createFakeWebContents()
+    expect(() => gated(makeEvent(TRUSTED_FRAME, browserTab), { filePath: PAGE })).toThrow(
+      /Untrusted sender/
+    )
+    expect(mockOpenFile).not.toHaveBeenCalled()
+  })
+
+  it('the channel’s own gate refuses it too', async () => {
+    const { inner } = await getHandlers()
+    const browserTab = createFakeWebContents()
+    expect(await inner(makeEvent(TRUSTED_FRAME, browserTab), { filePath: PAGE })).toEqual(
+      invalidRequest()
+    )
     expect(mockOpenFile).not.toHaveBeenCalled()
   })
 })

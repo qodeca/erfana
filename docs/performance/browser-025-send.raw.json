@@ -1,0 +1,1201 @@
+{
+ "note": "025-AC-050 / 025-NFR-005. Generated from .local/bench/browser-025-send-{react,worst}-run1.json by e2e/browser-pick-send.bench.ts. Times in ms: menuFrameMs = confirm to the presented frame of Erfana window with the menu; viewRemovedMs = confirm to main removing the page view; menuMs = the later of the frame and the removal plus two refreshes; sendMs = Explain click to the last prompt byte at the stub agent.",
+ "runs": [
+  {
+   "fixture": "react",
+   "summary": {
+    "label": "run1",
+    "date": "2026-11-03T11:32:46.980Z",
+    "picks": 100,
+    "misses": 0,
+    "confirmFromTrace": 0,
+    "menuBoundByViewRemoval": 100,
+    "menuMs": {
+     "count": 100,
+     "p50": 71.1,
+     "p95": 73.3,
+     "max": 76,
+     "min": 66.2
+    },
+    "sendMs": {
+     "count": 100,
+     "p50": 220.9,
+     "p95": 231,
+     "max": 310.4,
+     "min": 218.4
+    },
+    "targets": {
+     "menuP95Ms": 500,
+     "sendP95Ms": 2000
+    },
+    "pass": true
+   },
+   "environment": {
+    "windowPid": 55239,
+    "electron": "44.9.3",
+    "chrome": "152.0.7977.167",
+    "display": {
+     "scaleFactor": 1,
+     "size": {
+      "width": 3440,
+      "height": 1440
+     },
+     "refreshHz": 59.972564697265625
+    },
+    "viewport": {
+     "width": 573,
+     "height": 745,
+     "dpr": 1
+    },
+    "machine": {
+     "platform": "darwin-arm64",
+     "osRelease": "27.2.0",
+     "cpu": "Apple M5 Pro",
+     "cores": 18,
+     "memoryGb": 64,
+     "loadAvg1m": 3.8
+    }
+   },
+   "samples": [
+    {
+     "pick": 0,
+     "confirmSource": "main",
+     "menuFrameMs": 48.7,
+     "viewRemovedMs": 42.7,
+     "menuMs": 76,
+     "sendMs": 222,
+     "miss": null
+    },
+    {
+     "pick": 1,
+     "confirmSource": "main",
+     "menuFrameMs": 45.9,
+     "viewRemovedMs": 40,
+     "menuMs": 73.3,
+     "sendMs": 220.7,
+     "miss": null
+    },
+    {
+     "pick": 2,
+     "confirmSource": "main",
+     "menuFrameMs": 44.9,
+     "viewRemovedMs": 38.9,
+     "menuMs": 72.2,
+     "sendMs": 219.8,
+     "miss": null
+    },
+    {
+     "pick": 3,
+     "confirmSource": "main",
+     "menuFrameMs": 46.2,
+     "viewRemovedMs": 40.4,
+     "menuMs": 73.7,
+     "sendMs": 220.6,
+     "miss": null
+    },
+    {
+     "pick": 4,
+     "confirmSource": "main",
+     "menuFrameMs": 44.5,
+     "viewRemovedMs": 38.6,
+     "menuMs": 71.9,
+     "sendMs": 219.8,
+     "miss": null
+    },
+    {
+     "pick": 5,
+     "confirmSource": "main",
+     "menuFrameMs": 45.1,
+     "viewRemovedMs": 39.1,
+     "menuMs": 72.4,
+     "sendMs": 220.6,
+     "miss": null
+    },
+    {
+     "pick": 6,
+     "confirmSource": "main",
+     "menuFrameMs": 44.8,
+     "viewRemovedMs": 38.8,
+     "menuMs": 72.2,
+     "sendMs": 221.4,
+     "miss": null
+    },
+    {
+     "pick": 7,
+     "confirmSource": "main",
+     "menuFrameMs": 42.9,
+     "viewRemovedMs": 36.8,
+     "menuMs": 70.2,
+     "sendMs": 220.4,
+     "miss": null
+    },
+    {
+     "pick": 8,
+     "confirmSource": "main",
+     "menuFrameMs": 45.1,
+     "viewRemovedMs": 39,
+     "menuMs": 72.4,
+     "sendMs": 221,
+     "miss": null
+    },
+    {
+     "pick": 9,
+     "confirmSource": "main",
+     "menuFrameMs": 45.1,
+     "viewRemovedMs": 39.1,
+     "menuMs": 72.4,
+     "sendMs": 220.2,
+     "miss": null
+    },
+    {
+     "pick": 10,
+     "confirmSource": "main",
+     "menuFrameMs": 42.2,
+     "viewRemovedMs": 34.5,
+     "menuMs": 67.9,
+     "sendMs": 221.2,
+     "miss": null
+    },
+    {
+     "pick": 11,
+     "confirmSource": "main",
+     "menuFrameMs": 46.2,
+     "viewRemovedMs": 40.2,
+     "menuMs": 73.6,
+     "sendMs": 218.5,
+     "miss": null
+    },
+    {
+     "pick": 12,
+     "confirmSource": "main",
+     "menuFrameMs": 41.2,
+     "viewRemovedMs": 35.4,
+     "menuMs": 68.7,
+     "sendMs": 220,
+     "miss": null
+    },
+    {
+     "pick": 13,
+     "confirmSource": "main",
+     "menuFrameMs": 45.8,
+     "viewRemovedMs": 37.9,
+     "menuMs": 71.2,
+     "sendMs": 219.8,
+     "miss": null
+    },
+    {
+     "pick": 14,
+     "confirmSource": "main",
+     "menuFrameMs": 45.6,
+     "viewRemovedMs": 37.9,
+     "menuMs": 71.3,
+     "sendMs": 220.4,
+     "miss": null
+    },
+    {
+     "pick": 15,
+     "confirmSource": "main",
+     "menuFrameMs": 43.2,
+     "viewRemovedMs": 37.4,
+     "menuMs": 70.8,
+     "sendMs": 221.1,
+     "miss": null
+    },
+    {
+     "pick": 16,
+     "confirmSource": "main",
+     "menuFrameMs": 43.9,
+     "viewRemovedMs": 37.9,
+     "menuMs": 71.3,
+     "sendMs": 220.7,
+     "miss": null
+    },
+    {
+     "pick": 17,
+     "confirmSource": "main",
+     "menuFrameMs": 44.8,
+     "viewRemovedMs": 38.8,
+     "menuMs": 72.1,
+     "sendMs": 220.9,
+     "miss": null
+    },
+    {
+     "pick": 18,
+     "confirmSource": "main",
+     "menuFrameMs": 46.4,
+     "viewRemovedMs": 38.8,
+     "menuMs": 72.1,
+     "sendMs": 221.6,
+     "miss": null
+    },
+    {
+     "pick": 19,
+     "confirmSource": "main",
+     "menuFrameMs": 44.7,
+     "viewRemovedMs": 38.7,
+     "menuMs": 72,
+     "sendMs": 220.9,
+     "miss": null
+    },
+    {
+     "pick": 20,
+     "confirmSource": "main",
+     "menuFrameMs": 45,
+     "viewRemovedMs": 38.9,
+     "menuMs": 72.3,
+     "sendMs": 219.7,
+     "miss": null
+    },
+    {
+     "pick": 21,
+     "confirmSource": "main",
+     "menuFrameMs": 44.9,
+     "viewRemovedMs": 38.9,
+     "menuMs": 72.2,
+     "sendMs": 219.4,
+     "miss": null
+    },
+    {
+     "pick": 22,
+     "confirmSource": "main",
+     "menuFrameMs": 46.1,
+     "viewRemovedMs": 40,
+     "menuMs": 73.4,
+     "sendMs": 220.2,
+     "miss": null
+    },
+    {
+     "pick": 23,
+     "confirmSource": "main",
+     "menuFrameMs": 44.7,
+     "viewRemovedMs": 36.8,
+     "menuMs": 70.2,
+     "sendMs": 221,
+     "miss": null
+    },
+    {
+     "pick": 24,
+     "confirmSource": "main",
+     "menuFrameMs": 43.8,
+     "viewRemovedMs": 37.8,
+     "menuMs": 71.2,
+     "sendMs": 221.7,
+     "miss": null
+    },
+    {
+     "pick": 25,
+     "confirmSource": "main",
+     "menuFrameMs": 40.7,
+     "viewRemovedMs": 33.1,
+     "menuMs": 66.4,
+     "sendMs": 219.2,
+     "miss": null
+    },
+    {
+     "pick": 26,
+     "confirmSource": "main",
+     "menuFrameMs": 45.9,
+     "viewRemovedMs": 39.4,
+     "menuMs": 72.7,
+     "sendMs": 220.9,
+     "miss": null
+    },
+    {
+     "pick": 27,
+     "confirmSource": "main",
+     "menuFrameMs": 47.1,
+     "viewRemovedMs": 39.2,
+     "menuMs": 72.6,
+     "sendMs": 221.4,
+     "miss": null
+    },
+    {
+     "pick": 28,
+     "confirmSource": "main",
+     "menuFrameMs": 44.6,
+     "viewRemovedMs": 36.7,
+     "menuMs": 70.1,
+     "sendMs": 219.5,
+     "miss": null
+    },
+    {
+     "pick": 29,
+     "confirmSource": "main",
+     "menuFrameMs": 44,
+     "viewRemovedMs": 36.2,
+     "menuMs": 69.5,
+     "sendMs": 220.3,
+     "miss": null
+    },
+    {
+     "pick": 30,
+     "confirmSource": "main",
+     "menuFrameMs": 42.4,
+     "viewRemovedMs": 35.3,
+     "menuMs": 68.7,
+     "sendMs": 219,
+     "miss": null
+    },
+    {
+     "pick": 31,
+     "confirmSource": "main",
+     "menuFrameMs": 44.5,
+     "viewRemovedMs": 38.2,
+     "menuMs": 71.5,
+     "sendMs": 220.2,
+     "miss": null
+    },
+    {
+     "pick": 32,
+     "confirmSource": "main",
+     "menuFrameMs": 44.3,
+     "viewRemovedMs": 38.3,
+     "menuMs": 71.6,
+     "sendMs": 223.2,
+     "miss": null
+    },
+    {
+     "pick": 33,
+     "confirmSource": "main",
+     "menuFrameMs": 45.6,
+     "viewRemovedMs": 38,
+     "menuMs": 71.3,
+     "sendMs": 222.7,
+     "miss": null
+    },
+    {
+     "pick": 34,
+     "confirmSource": "main",
+     "menuFrameMs": 45.9,
+     "viewRemovedMs": 38.6,
+     "menuMs": 71.9,
+     "sendMs": 226.4,
+     "miss": null
+    },
+    {
+     "pick": 35,
+     "confirmSource": "main",
+     "menuFrameMs": 43.2,
+     "viewRemovedMs": 35.6,
+     "menuMs": 68.9,
+     "sendMs": 227.7,
+     "miss": null
+    },
+    {
+     "pick": 36,
+     "confirmSource": "main",
+     "menuFrameMs": 44.7,
+     "viewRemovedMs": 37.1,
+     "menuMs": 70.4,
+     "sendMs": 225.1,
+     "miss": null
+    },
+    {
+     "pick": 37,
+     "confirmSource": "main",
+     "menuFrameMs": 43.8,
+     "viewRemovedMs": 36.5,
+     "menuMs": 69.9,
+     "sendMs": 225.4,
+     "miss": null
+    },
+    {
+     "pick": 38,
+     "confirmSource": "main",
+     "menuFrameMs": 42.7,
+     "viewRemovedMs": 35.1,
+     "menuMs": 68.5,
+     "sendMs": 220.3,
+     "miss": null
+    },
+    {
+     "pick": 39,
+     "confirmSource": "main",
+     "menuFrameMs": 43.6,
+     "viewRemovedMs": 35.8,
+     "menuMs": 69.2,
+     "sendMs": 228.1,
+     "miss": null
+    },
+    {
+     "pick": 40,
+     "confirmSource": "main",
+     "menuFrameMs": 44.3,
+     "viewRemovedMs": 36.9,
+     "menuMs": 70.3,
+     "sendMs": 229.3,
+     "miss": null
+    },
+    {
+     "pick": 41,
+     "confirmSource": "main",
+     "menuFrameMs": 45.6,
+     "viewRemovedMs": 38.5,
+     "menuMs": 71.9,
+     "sendMs": 224.5,
+     "miss": null
+    },
+    {
+     "pick": 42,
+     "confirmSource": "main",
+     "menuFrameMs": 44.8,
+     "viewRemovedMs": 37.2,
+     "menuMs": 70.5,
+     "sendMs": 225.8,
+     "miss": null
+    },
+    {
+     "pick": 43,
+     "confirmSource": "main",
+     "menuFrameMs": 45,
+     "viewRemovedMs": 37.8,
+     "menuMs": 71.1,
+     "sendMs": 234.5,
+     "miss": null
+    },
+    {
+     "pick": 44,
+     "confirmSource": "main",
+     "menuFrameMs": 44.8,
+     "viewRemovedMs": 36.9,
+     "menuMs": 70.2,
+     "sendMs": 226,
+     "miss": null
+    },
+    {
+     "pick": 45,
+     "confirmSource": "main",
+     "menuFrameMs": 44.1,
+     "viewRemovedMs": 36.9,
+     "menuMs": 70.2,
+     "sendMs": 237.3,
+     "miss": null
+    },
+    {
+     "pick": 46,
+     "confirmSource": "main",
+     "menuFrameMs": 44,
+     "viewRemovedMs": 36.1,
+     "menuMs": 69.5,
+     "sendMs": 231.2,
+     "miss": null
+    },
+    {
+     "pick": 47,
+     "confirmSource": "main",
+     "menuFrameMs": 43.8,
+     "viewRemovedMs": 37.6,
+     "menuMs": 70.9,
+     "sendMs": 225.7,
+     "miss": null
+    },
+    {
+     "pick": 48,
+     "confirmSource": "main",
+     "menuFrameMs": 45.4,
+     "viewRemovedMs": 37.8,
+     "menuMs": 71.1,
+     "sendMs": 228.9,
+     "miss": null
+    },
+    {
+     "pick": 49,
+     "confirmSource": "main",
+     "menuFrameMs": 44.4,
+     "viewRemovedMs": 36.9,
+     "menuMs": 70.3,
+     "sendMs": 231.8,
+     "miss": null
+    },
+    {
+     "pick": 50,
+     "confirmSource": "main",
+     "menuFrameMs": 40.5,
+     "viewRemovedMs": 32.9,
+     "menuMs": 66.2,
+     "sendMs": 231,
+     "miss": null
+    },
+    {
+     "pick": 51,
+     "confirmSource": "main",
+     "menuFrameMs": 44.1,
+     "viewRemovedMs": 38,
+     "menuMs": 71.4,
+     "sendMs": 221.7,
+     "miss": null
+    },
+    {
+     "pick": 52,
+     "confirmSource": "main",
+     "menuFrameMs": 42.4,
+     "viewRemovedMs": 36.2,
+     "menuMs": 69.5,
+     "sendMs": 219.8,
+     "miss": null
+    },
+    {
+     "pick": 53,
+     "confirmSource": "main",
+     "menuFrameMs": 45.2,
+     "viewRemovedMs": 37.3,
+     "menuMs": 70.6,
+     "sendMs": 220.3,
+     "miss": null
+    },
+    {
+     "pick": 54,
+     "confirmSource": "main",
+     "menuFrameMs": 47,
+     "viewRemovedMs": 39.8,
+     "menuMs": 73.2,
+     "sendMs": 220.4,
+     "miss": null
+    },
+    {
+     "pick": 55,
+     "confirmSource": "main",
+     "menuFrameMs": 45.4,
+     "viewRemovedMs": 39.4,
+     "menuMs": 72.7,
+     "sendMs": 219.7,
+     "miss": null
+    },
+    {
+     "pick": 56,
+     "confirmSource": "main",
+     "menuFrameMs": 44.3,
+     "viewRemovedMs": 38.4,
+     "menuMs": 71.8,
+     "sendMs": 222.2,
+     "miss": null
+    },
+    {
+     "pick": 57,
+     "confirmSource": "main",
+     "menuFrameMs": 44.3,
+     "viewRemovedMs": 36.7,
+     "menuMs": 70,
+     "sendMs": 220,
+     "miss": null
+    },
+    {
+     "pick": 58,
+     "confirmSource": "main",
+     "menuFrameMs": 44.5,
+     "viewRemovedMs": 38.5,
+     "menuMs": 71.9,
+     "sendMs": 220.8,
+     "miss": null
+    },
+    {
+     "pick": 59,
+     "confirmSource": "main",
+     "menuFrameMs": 43.8,
+     "viewRemovedMs": 36.1,
+     "menuMs": 69.4,
+     "sendMs": 222.2,
+     "miss": null
+    },
+    {
+     "pick": 60,
+     "confirmSource": "main",
+     "menuFrameMs": 44,
+     "viewRemovedMs": 37.2,
+     "menuMs": 70.6,
+     "sendMs": 223,
+     "miss": null
+    },
+    {
+     "pick": 61,
+     "confirmSource": "main",
+     "menuFrameMs": 42.9,
+     "viewRemovedMs": 35.1,
+     "menuMs": 68.4,
+     "sendMs": 223.9,
+     "miss": null
+    },
+    {
+     "pick": 62,
+     "confirmSource": "main",
+     "menuFrameMs": 43.5,
+     "viewRemovedMs": 37.7,
+     "menuMs": 71.1,
+     "sendMs": 222.7,
+     "miss": null
+    },
+    {
+     "pick": 63,
+     "confirmSource": "main",
+     "menuFrameMs": 43.9,
+     "viewRemovedMs": 38.1,
+     "menuMs": 71.4,
+     "sendMs": 222.9,
+     "miss": null
+    },
+    {
+     "pick": 64,
+     "confirmSource": "main",
+     "menuFrameMs": 45.2,
+     "viewRemovedMs": 39.3,
+     "menuMs": 72.7,
+     "sendMs": 221.7,
+     "miss": null
+    },
+    {
+     "pick": 65,
+     "confirmSource": "main",
+     "menuFrameMs": 42.4,
+     "viewRemovedMs": 34.8,
+     "menuMs": 68.2,
+     "sendMs": 223.4,
+     "miss": null
+    },
+    {
+     "pick": 66,
+     "confirmSource": "main",
+     "menuFrameMs": 44.4,
+     "viewRemovedMs": 36.5,
+     "menuMs": 69.9,
+     "sendMs": 221.5,
+     "miss": null
+    },
+    {
+     "pick": 67,
+     "confirmSource": "main",
+     "menuFrameMs": 44,
+     "viewRemovedMs": 37.9,
+     "menuMs": 71.3,
+     "sendMs": 219.9,
+     "miss": null
+    },
+    {
+     "pick": 68,
+     "confirmSource": "main",
+     "menuFrameMs": 42.5,
+     "viewRemovedMs": 36.7,
+     "menuMs": 70,
+     "sendMs": 226.4,
+     "miss": null
+    },
+    {
+     "pick": 69,
+     "confirmSource": "main",
+     "menuFrameMs": 41.2,
+     "viewRemovedMs": 34.3,
+     "menuMs": 67.7,
+     "sendMs": 221.1,
+     "miss": null
+    },
+    {
+     "pick": 70,
+     "confirmSource": "main",
+     "menuFrameMs": 43.9,
+     "viewRemovedMs": 38.1,
+     "menuMs": 71.5,
+     "sendMs": 222,
+     "miss": null
+    },
+    {
+     "pick": 71,
+     "confirmSource": "main",
+     "menuFrameMs": 46,
+     "viewRemovedMs": 39.9,
+     "menuMs": 73.3,
+     "sendMs": 220.2,
+     "miss": null
+    },
+    {
+     "pick": 72,
+     "confirmSource": "main",
+     "menuFrameMs": 42.7,
+     "viewRemovedMs": 36.9,
+     "menuMs": 70.3,
+     "sendMs": 220.6,
+     "miss": null
+    },
+    {
+     "pick": 73,
+     "confirmSource": "main",
+     "menuFrameMs": 44,
+     "viewRemovedMs": 37.9,
+     "menuMs": 71.2,
+     "sendMs": 221.1,
+     "miss": null
+    },
+    {
+     "pick": 74,
+     "confirmSource": "main",
+     "menuFrameMs": 44.5,
+     "viewRemovedMs": 38.7,
+     "menuMs": 72,
+     "sendMs": 220.1,
+     "miss": null
+    },
+    {
+     "pick": 75,
+     "confirmSource": "main",
+     "menuFrameMs": 41.3,
+     "viewRemovedMs": 35.6,
+     "menuMs": 69,
+     "sendMs": 221.9,
+     "miss": null
+    },
+    {
+     "pick": 76,
+     "confirmSource": "main",
+     "menuFrameMs": 47,
+     "viewRemovedMs": 40,
+     "menuMs": 73.3,
+     "sendMs": 222.5,
+     "miss": null
+    },
+    {
+     "pick": 77,
+     "confirmSource": "main",
+     "menuFrameMs": 41.7,
+     "viewRemovedMs": 33.7,
+     "menuMs": 67,
+     "sendMs": 220.3,
+     "miss": null
+    },
+    {
+     "pick": 78,
+     "confirmSource": "main",
+     "menuFrameMs": 43.7,
+     "viewRemovedMs": 37.9,
+     "menuMs": 71.2,
+     "sendMs": 219.7,
+     "miss": null
+    },
+    {
+     "pick": 79,
+     "confirmSource": "main",
+     "menuFrameMs": 42.4,
+     "viewRemovedMs": 34.6,
+     "menuMs": 68,
+     "sendMs": 219.5,
+     "miss": null
+    },
+    {
+     "pick": 80,
+     "confirmSource": "main",
+     "menuFrameMs": 44.3,
+     "viewRemovedMs": 37.4,
+     "menuMs": 70.8,
+     "sendMs": 221.8,
+     "miss": null
+    },
+    {
+     "pick": 81,
+     "confirmSource": "main",
+     "menuFrameMs": 44.4,
+     "viewRemovedMs": 38.6,
+     "menuMs": 71.9,
+     "sendMs": 220.4,
+     "miss": null
+    },
+    {
+     "pick": 82,
+     "confirmSource": "main",
+     "menuFrameMs": 44,
+     "viewRemovedMs": 38.2,
+     "menuMs": 71.6,
+     "sendMs": 221.2,
+     "miss": null
+    },
+    {
+     "pick": 83,
+     "confirmSource": "main",
+     "menuFrameMs": 44.3,
+     "viewRemovedMs": 37.4,
+     "menuMs": 70.8,
+     "sendMs": 220.3,
+     "miss": null
+    },
+    {
+     "pick": 84,
+     "confirmSource": "main",
+     "menuFrameMs": 44.7,
+     "viewRemovedMs": 38.9,
+     "menuMs": 72.2,
+     "sendMs": 219.2,
+     "miss": null
+    },
+    {
+     "pick": 85,
+     "confirmSource": "main",
+     "menuFrameMs": 43.5,
+     "viewRemovedMs": 36.7,
+     "menuMs": 70,
+     "sendMs": 219.5,
+     "miss": null
+    },
+    {
+     "pick": 86,
+     "confirmSource": "main",
+     "menuFrameMs": 44.3,
+     "viewRemovedMs": 38.5,
+     "menuMs": 71.9,
+     "sendMs": 310.4,
+     "miss": null
+    },
+    {
+     "pick": 87,
+     "confirmSource": "main",
+     "menuFrameMs": 42.2,
+     "viewRemovedMs": 36.4,
+     "menuMs": 69.7,
+     "sendMs": 220.9,
+     "miss": null
+    },
+    {
+     "pick": 88,
+     "confirmSource": "main",
+     "menuFrameMs": 43.5,
+     "viewRemovedMs": 37.6,
+     "menuMs": 71,
+     "sendMs": 219.4,
+     "miss": null
+    },
+    {
+     "pick": 89,
+     "confirmSource": "main",
+     "menuFrameMs": 43.8,
+     "viewRemovedMs": 37.4,
+     "menuMs": 70.8,
+     "sendMs": 219.4,
+     "miss": null
+    },
+    {
+     "pick": 90,
+     "confirmSource": "main",
+     "menuFrameMs": 43.8,
+     "viewRemovedMs": 38,
+     "menuMs": 71.3,
+     "sendMs": 220.7,
+     "miss": null
+    },
+    {
+     "pick": 91,
+     "confirmSource": "main",
+     "menuFrameMs": 43.6,
+     "viewRemovedMs": 37,
+     "menuMs": 70.4,
+     "sendMs": 219.1,
+     "miss": null
+    },
+    {
+     "pick": 92,
+     "confirmSource": "main",
+     "menuFrameMs": 42.9,
+     "viewRemovedMs": 37,
+     "menuMs": 70.4,
+     "sendMs": 219.5,
+     "miss": null
+    },
+    {
+     "pick": 93,
+     "confirmSource": "main",
+     "menuFrameMs": 43.8,
+     "viewRemovedMs": 36.7,
+     "menuMs": 70,
+     "sendMs": 220.8,
+     "miss": null
+    },
+    {
+     "pick": 94,
+     "confirmSource": "main",
+     "menuFrameMs": 44.2,
+     "viewRemovedMs": 38.4,
+     "menuMs": 71.7,
+     "sendMs": 219.7,
+     "miss": null
+    },
+    {
+     "pick": 95,
+     "confirmSource": "main",
+     "menuFrameMs": 43.8,
+     "viewRemovedMs": 37.8,
+     "menuMs": 71.1,
+     "sendMs": 220.5,
+     "miss": null
+    },
+    {
+     "pick": 96,
+     "confirmSource": "main",
+     "menuFrameMs": 44.2,
+     "viewRemovedMs": 36.4,
+     "menuMs": 69.7,
+     "sendMs": 218.4,
+     "miss": null
+    },
+    {
+     "pick": 97,
+     "confirmSource": "main",
+     "menuFrameMs": 44.5,
+     "viewRemovedMs": 37.3,
+     "menuMs": 70.6,
+     "sendMs": 219.8,
+     "miss": null
+    },
+    {
+     "pick": 98,
+     "confirmSource": "main",
+     "menuFrameMs": 46.7,
+     "viewRemovedMs": 40.9,
+     "menuMs": 74.2,
+     "sendMs": 221,
+     "miss": null
+    },
+    {
+     "pick": 99,
+     "confirmSource": "main",
+     "menuFrameMs": 42.7,
+     "viewRemovedMs": 36.9,
+     "menuMs": 70.3,
+     "sendMs": 219.3,
+     "miss": null
+    }
+   ]
+  },
+  {
+   "fixture": "worst",
+   "summary": {
+    "label": "run1",
+    "date": "2026-11-03T11:33:02.746Z",
+    "picks": 20,
+    "misses": 0,
+    "confirmFromTrace": 0,
+    "menuBoundByViewRemoval": 16,
+    "menuMs": {
+     "count": 20,
+     "p50": 141.7,
+     "p95": 148.8,
+     "max": 160.5,
+     "min": 132.8
+    },
+    "sendMs": {
+     "count": 20,
+     "p50": 260.2,
+     "p95": 265.8,
+     "max": 266.3,
+     "min": 257.6
+    },
+    "targets": {
+     "menuP95Ms": 500,
+     "sendP95Ms": 2000
+    },
+    "pass": true
+   },
+   "environment": {
+    "windowPid": 57008,
+    "electron": "44.9.3",
+    "chrome": "152.0.7977.167",
+    "display": {
+     "scaleFactor": 2,
+     "size": {
+      "width": 3440,
+      "height": 1440
+     },
+     "refreshHz": 59.972564697265625
+    },
+    "viewport": {
+     "width": 1920,
+     "height": 1080,
+     "dpr": 2
+    },
+    "machine": {
+     "platform": "darwin-arm64",
+     "osRelease": "27.2.0",
+     "cpu": "Apple M5 Pro",
+     "cores": 18,
+     "memoryGb": 64,
+     "loadAvg1m": 4
+    }
+   },
+   "samples": [
+    {
+     "pick": 0,
+     "confirmSource": "main",
+     "menuFrameMs": 159.1,
+     "viewRemovedMs": 127.1,
+     "menuMs": 160.5,
+     "sendMs": 266.3,
+     "miss": null
+    },
+    {
+     "pick": 1,
+     "confirmSource": "main",
+     "menuFrameMs": 147.1,
+     "viewRemovedMs": 111.7,
+     "menuMs": 147.1,
+     "sendMs": 259.5,
+     "miss": null
+    },
+    {
+     "pick": 2,
+     "confirmSource": "main",
+     "menuFrameMs": 145.8,
+     "viewRemovedMs": 112.3,
+     "menuMs": 145.8,
+     "sendMs": 258.8,
+     "miss": null
+    },
+    {
+     "pick": 3,
+     "confirmSource": "main",
+     "menuFrameMs": 143.4,
+     "viewRemovedMs": 110.3,
+     "menuMs": 143.6,
+     "sendMs": 261.3,
+     "miss": null
+    },
+    {
+     "pick": 4,
+     "confirmSource": "main",
+     "menuFrameMs": 143.9,
+     "viewRemovedMs": 115.4,
+     "menuMs": 148.8,
+     "sendMs": 261.9,
+     "miss": null
+    },
+    {
+     "pick": 5,
+     "confirmSource": "main",
+     "menuFrameMs": 128.8,
+     "viewRemovedMs": 108.1,
+     "menuMs": 141.4,
+     "sendMs": 262.9,
+     "miss": null
+    },
+    {
+     "pick": 6,
+     "confirmSource": "main",
+     "menuFrameMs": 145.9,
+     "viewRemovedMs": 110.1,
+     "menuMs": 145.9,
+     "sendMs": 265.3,
+     "miss": null
+    },
+    {
+     "pick": 7,
+     "confirmSource": "main",
+     "menuFrameMs": 126.1,
+     "viewRemovedMs": 104.4,
+     "menuMs": 137.8,
+     "sendMs": 260,
+     "miss": null
+    },
+    {
+     "pick": 8,
+     "confirmSource": "main",
+     "menuFrameMs": 144.2,
+     "viewRemovedMs": 108.7,
+     "menuMs": 144.2,
+     "sendMs": 263.8,
+     "miss": null
+    },
+    {
+     "pick": 9,
+     "confirmSource": "main",
+     "menuFrameMs": 127.8,
+     "viewRemovedMs": 107.8,
+     "menuMs": 141.2,
+     "sendMs": 259.6,
+     "miss": null
+    },
+    {
+     "pick": 10,
+     "confirmSource": "main",
+     "menuFrameMs": 142.7,
+     "viewRemovedMs": 111.2,
+     "menuMs": 144.6,
+     "sendMs": 263.3,
+     "miss": null
+    },
+    {
+     "pick": 11,
+     "confirmSource": "main",
+     "menuFrameMs": 127.6,
+     "viewRemovedMs": 103.4,
+     "menuMs": 136.8,
+     "sendMs": 259.7,
+     "miss": null
+    },
+    {
+     "pick": 12,
+     "confirmSource": "main",
+     "menuFrameMs": 129.7,
+     "viewRemovedMs": 106.8,
+     "menuMs": 140.1,
+     "sendMs": 265.8,
+     "miss": null
+    },
+    {
+     "pick": 13,
+     "confirmSource": "main",
+     "menuFrameMs": 146.4,
+     "viewRemovedMs": 114.1,
+     "menuMs": 147.4,
+     "sendMs": 262.7,
+     "miss": null
+    },
+    {
+     "pick": 14,
+     "confirmSource": "main",
+     "menuFrameMs": 130.6,
+     "viewRemovedMs": 108.9,
+     "menuMs": 142.3,
+     "sendMs": 258.7,
+     "miss": null
+    },
+    {
+     "pick": 15,
+     "confirmSource": "main",
+     "menuFrameMs": 130.1,
+     "viewRemovedMs": 108,
+     "menuMs": 141.3,
+     "sendMs": 257.6,
+     "miss": null
+    },
+    {
+     "pick": 16,
+     "confirmSource": "main",
+     "menuFrameMs": 130.4,
+     "viewRemovedMs": 107.9,
+     "menuMs": 141.3,
+     "sendMs": 260.2,
+     "miss": null
+    },
+    {
+     "pick": 17,
+     "confirmSource": "main",
+     "menuFrameMs": 130.8,
+     "viewRemovedMs": 99.5,
+     "menuMs": 132.8,
+     "sendMs": 261.2,
+     "miss": null
+    },
+    {
+     "pick": 18,
+     "confirmSource": "main",
+     "menuFrameMs": 130.8,
+     "viewRemovedMs": 108.4,
+     "menuMs": 141.7,
+     "sendMs": 259.3,
+     "miss": null
+    },
+    {
+     "pick": 19,
+     "confirmSource": "main",
+     "menuFrameMs": 127,
+     "viewRemovedMs": 104.2,
+     "menuMs": 137.6,
+     "sendMs": 258.8,
+     "miss": null
+    }
+   ]
+  }
+ ]
+}

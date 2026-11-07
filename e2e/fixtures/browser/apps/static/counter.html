@@ -1,0 +1,31 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Counter fixture</title>
+<link rel="stylesheet" href="/style.css">
+<script src="/fixture.js"></script>
+</head>
+<body>
+<h1>Running counter</h1>
+<p>025-AC-007. The counter advances on a 100 ms timer (the page's own running state, which a hidden tab must keep); <code>#load-count</code> counts loads of this page in this tab, so a reload shows.</p>
+<p>Counter: <output id="counter">0</output> · loads: <output id="load-count"></output></p>
+<label>Half-filled field <input id="field" type="text" autocomplete="off"></label>
+<div style="height: 300vh; background: linear-gradient(#ffffff, #b0bec5)"></div>
+<p id="bottom">Bottom of the page</p>
+<script>
+  var loads = Number(sessionStorage.getItem('counter-loads') || '0') + 1
+  sessionStorage.setItem('counter-loads', String(loads))
+  document.getElementById('load-count').textContent = String(loads)
+  var count = 0
+  setInterval(function () {
+    count += 1
+    document.getElementById('counter').textContent = String(count)
+  }, 100)
+  window.__fixture.counter = function () { return count }
+  window.__fixture.loads = function () { return loads }
+</script>
+</body>
+</html>

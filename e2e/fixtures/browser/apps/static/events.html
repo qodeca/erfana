@@ -1,0 +1,49 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Event log fixture</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/style.css">
+<script src="/fixture.js"></script>
+</head>
+<body>
+<h1>Key and pointer event log</h1>
+<p>025-AC-014, 025-AC-025, 025-AC-061 to 025-AC-066, 025-AC-074. Every keydown, focus change and pointer event is logged to <code>__fixture.log</code>; high-rate events (<code>mousemove</code>, <code>wheel</code>, <code>scroll</code>) only count, in <code>__fixture.counts</code>.</p>
+<div id="outer" class="toolbar box"><button id="target-button" type="button"><span id="target-label">Target button</span></button></div>
+<div class="row">
+  <label>Text <input id="text" type="text" autocomplete="off"></label>
+  <a id="link" href="/page-b.html">A link to page B</a>
+  <img id="image" src="/favicon.svg" alt="Fixture icon" width="64" height="64">
+  <div id="drag-source" draggable="true" class="box">Drag me</div>
+  <div id="drop-target" class="box">Drop here</div>
+</div>
+<ol id="log"></ol>
+<div style="height: 200vh"></div>
+<script>
+  var log = window.__fixture.record
+  var counts = { mousemove: 0, wheel: 0, scroll: 0 }
+  window.__fixture.counts = counts
+  function describeKey(e) {
+    return [e.ctrlKey && 'Ctrl', e.metaKey && 'Meta', e.altKey && 'Alt', e.shiftKey && 'Shift', e.key].filter(Boolean).join('+') + ' ' + e.code
+  }
+  document.addEventListener('keydown', function (e) { log('keydown', describeKey(e)) }, true)
+  document.addEventListener('compositionstart', function () { log('compositionstart') }, true)
+  window.addEventListener('focus', function () { log('window-focus') })
+  window.addEventListener('blur', function () { log('window-blur') })
+  document.addEventListener('focusin', function (e) { log('focusin', e.target.id || e.target.tagName) })
+  ;['pointerdown', 'mousedown', 'mouseup', 'click', 'dblclick', 'contextmenu', 'dragstart', 'drop', 'auxclick'].forEach(function (type) {
+    document.addEventListener(type, function (e) { log(type, e.target.id || e.target.tagName) }, true)
+  })
+  document.addEventListener('dragover', function (e) { e.preventDefault() })
+  document.addEventListener('mousemove', function () { counts.mousemove += 1 }, true)
+  document.addEventListener('wheel', function () { counts.wheel += 1 }, { capture: true, passive: true })
+  window.addEventListener('scroll', function () { counts.scroll += 1 }, { passive: true })
+  document.getElementById('drag-source').addEventListener('dragstart', function (e) {
+    e.dataTransfer.setData('text/plain', 'dragged from the page')
+  })
+</script>
+</body>
+</html>

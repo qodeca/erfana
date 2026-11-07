@@ -104,6 +104,19 @@
     <figcaption><strong>Partly visible</strong> – the outline is clipped where the page’s viewport ends; the label sticks to the visible top-left.</figcaption></figure>
 </div>
 
+<h2 id="browser-outline">The browser’s outline: ink and paper</h2>
+<p class="ds-muted">Proposed with the owner’s decision of 2026-11-05 (ADR 0007 decision 6, amended). The built-in browser draws <code>.erf-picker-outline--paper</code>: the same shape, with the 2px line in <code>--color-white</code> instead of the accent – 1px ink, 2px paper, 1px ink. One tone always clears 3:1 against the page, because ink and paper are far more than 9:1 apart (Contrast below). Erfana draws it both live – on a click-through native surface over the page, never inside it and never in the page’s screenshot – and on the still image, so the two look identical. The HTML preview’s comment overlay keeps the accent ring of its decided screen.</p>
+<div class="ds-frames">
+  <figure class="ds-frame"><div class="pk-area" aria-hidden="true"><div class="pk-page ds-foreign-page"><p class="ds-foreign-page__heading">Open day 2026</p><span class="pk-anchor"><span class="pk-btn">Show opening hours</span><span class="erf-picker-outline erf-picker-outline--paper"></span></span></div></div>
+    <figcaption><strong>Light page</strong> – the two ink lines carry the edge; the paper line between them disappears into white.</figcaption></figure>
+  <figure class="ds-frame"><div class="pk-area" aria-hidden="true"><div class="pk-page ds-foreign-page ds-foreign-page--dark"><p class="ds-foreign-page__heading">Release notes</p><span class="pk-anchor"><span class="pk-btn pk-btn--ink">Download</span><span class="erf-picker-outline erf-picker-outline--paper"></span></span></div></div>
+    <figcaption><strong>Dark page</strong> – the paper line carries it; the ink lines disappear into black.</figcaption></figure>
+  <figure class="ds-frame"><div class="pk-area" aria-hidden="true"><div class="pk-page ds-foreign-page ds-foreign-page--accent"><p class="ds-foreign-page__heading">Members</p><span class="pk-anchor"><span class="pk-btn pk-btn--ink">Join</span><span class="erf-picker-outline erf-picker-outline--paper"></span></span></div></div>
+    <figcaption><strong>A page in the accent colour</strong> – both tones stand out; the accent ring of the shared outline would vanish here.</figcaption></figure>
+  <figure class="ds-frame"><div class="pk-area" aria-hidden="true"><div class="pk-page ds-foreign-page erf-picker-frame"><p class="ds-foreign-page__heading">Open day 2026</p><span class="pk-anchor"><span class="pk-btn">Show opening hours</span><span class="erf-picker-outline erf-picker-outline--paper erf-picker-outline--selected"></span></span></div></div>
+    <figcaption><strong>Picked, on the still image</strong> – the same ink-and-paper outline with the light accent fill.</figcaption></figure>
+</div>
+
 <h2 id="states">Picked, sent, and the mode frame</h2>
 <div class="ds-frames">
   <figure class="ds-frame"><div class="pk-area" aria-hidden="true"><div class="pk-page ds-foreign-page erf-picker-frame"><p class="ds-foreign-page__heading">Open day 2026</p><span class="pk-anchor"><span class="pk-btn">Show opening hours</span><span class="erf-picker-outline erf-picker-outline--selected"></span><span class="erf-picker-label"><span class="erf-picker-label__tag">button</span>.cta<span class="erf-picker-label__size">176 × 32</span></span></span></div></div>
@@ -143,6 +156,8 @@
   <tbody>
     <tr><td>Accent ring on a white page</td><td><code>--color-accent-primary</code> on <code>--color-brand-white</code></td><td data-contrast="--color-accent-primary on --color-brand-white" data-min="3" data-result="fail">2.09:1 · fail</td></tr>
     <tr><td>Ink line on a white page</td><td><code>--color-brand-black</code> on <code>--color-brand-white</code></td><td data-contrast="--color-brand-black on --color-brand-white" data-min="3" data-result="pass">17.62:1 · pass</td></tr>
+    <tr><td>Browser outline: paper on ink – the pair, and paper on a black page</td><td><code>--color-white</code> on <code>--color-brand-black</code></td><td data-contrast="--color-white on --color-brand-black" data-min="9" data-result="pass">18.48:1 · pass</td></tr>
+    <tr><td>Browser outline: ink on an accent page</td><td><code>--color-brand-black</code> on <code>--color-accent-primary</code></td><td data-contrast="--color-brand-black on --color-accent-primary" data-min="3" data-result="pass">8.39:1 · pass</td></tr>
     <tr><td>Accent ring on a black page</td><td><code>--color-accent-primary</code> on <code>--color-brand-black</code></td><td data-contrast="--color-accent-primary on --color-brand-black" data-min="3" data-result="pass">8.39:1 · pass</td></tr>
     <tr><td>Label tag</td><td><code>--color-accent-primary</code> on <code>--color-brand-black</code></td><td data-contrast="--color-accent-primary on --color-brand-black" data-min="4.5" data-result="pass">8.39:1 · pass</td></tr>
     <tr><td>Label id and classes</td><td><code>--color-brand-white</code> on <code>--color-brand-black</code></td><td data-contrast="--color-brand-white on --color-brand-black" data-min="4.5" data-result="pass">17.62:1 · pass</td></tr>
@@ -181,7 +196,7 @@
 
 <section id="exceptions">
 <h2>Exceptions</h2>
-<p class="ds-muted">None recorded. The overlay inside a third-party page is drawn from resolved literals, never <code>var()</code>; the comment overlay records that on its own screen, and the browser’s engine overlay will record its own when built (browser note, ADR 0007).</p>
+<p class="ds-muted">None recorded. The overlay inside a third-party page is drawn from resolved literals, never <code>var()</code>; the comment overlay records that on its own screen. The browser’s live outline is not inside the page: main draws it on a native surface from <code>--color-brand-black</code> and <code>--color-white</code>, resolved from the tokens at build time (<code>pickOutlineColours.ts</code>, ADR 0007 amendment 2026-11-05). Where that surface cannot be placed (Wayland) the engine draws a one-colour accent outline instead, below 3:1 on a white page – recorded in the browser note’s Differences in the build.</p>
 </section>
 </main>
 </body>

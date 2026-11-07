@@ -6,7 +6,8 @@
  *
  * Mounted once, in `AppDockLayout`, because a sash anywhere in the window – the
  * project tree's, the terminal's, a split inside the editor area – can move a
- * live preview. The logic is the pure controller in
+ * native view: a live preview or a built-in browser tab's page (spec 025, ADR
+ * 0011 decision 2). Whichever kind the guard shows is the one a drag hides. The logic is the pure controller in
  * `services/preview/previewDragFreeze.ts`; this module only wires it to the real
  * document, window, stores, bridge and logger, and is the ONE place its
  * `window` listeners are attached.
@@ -30,17 +31,20 @@ import { useOverlayOccluderStore } from '../stores/useOverlayOccluderStore'
 import { usePreviewCollapsedStore } from '../stores/usePreviewCollapsedStore'
 import { usePreviewStore } from '../stores/usePreviewStore'
 import { logger } from '../utils/logger'
+import { browserViewBounds } from '../services/browser/browserViewBounds'
 import { previewGateway } from '../services/previewGateway'
 
 /**
- * Each mounted preview panel's forced bounds push, by panel id. The release
+ * Each mounted native-view panel's forced bounds push, by panel id – preview
+ * and browser panels alike. The release
  * pushes the frozen panel's settled rect before the page returns, and only the
  * panel's bounds hook can measure it.
  */
 const boundsPushers = new Map<string, () => void>()
 
 /**
- * Lets the splitter freeze push this panel's bounds when a drag ends.
+ * Lets the splitter freeze push this panel's bounds when a drag ends. A
+ * browser panel's bounds hook registers here too, under its own panel id.
  *
  * @param panelId - The preview panel
  * @param pushBounds - Its bounds hook's forced push
@@ -67,17 +71,54 @@ export function usePreviewDragFreezeTarget(panelId: string, pushBounds: () => bo
 /**
  * Whether main has a view for the panel that a drag could expose.
  *
- * @param panelId - The preview panel
- * @returns `false` for `failed` (a crashed page), `suspended`, `idle` and an
- *   unknown panel – each leaves nothing on screen to cover
+ * @param panelId - The preview or browser panel
+ * @returns For a preview, `false` for `failed` (a crashed page), `suspended`,
+ *   `idle` and an unknown panel – each leaves nothing on screen to cover; for
+ *   a browser panel, whether its tab's view is registered
  */
 function hasLiveView(panelId: string): boolean {
   const loadState = usePreviewStore.getState().getLoadState(panelId)
-  return loadState === 'loading' || loadState === 'ready'
+  if (loadState === 'loading' || loadState === 'ready') return true
+  return browserViewBounds.tabOf(panelId) !== null
 }
 
 /**
- * The panel whose live page is on screen, or `null`.
+ * Main's reports of what it did with a view, of either kind, by panel id.
+ *
+ * A browser view's report arrives under its tab id and is mapped to the
+ * hosting panel here, so the controller deals in panel ids only.
+ *
+ * @param listener - Called with the panel and what main applied
+ * @returns One unsubscribe for both feeds
+ */
+function subscribeNativeViewApplied(listener: (panelId: string, visible: boolean) => void): () => void {
+  const unsubscribers = [
+    previewGateway.onVisibilityApplied((payload) => listener(payload.panelId, payload.visible)),
+    browserViewBounds.onVisibilityApplied((tabId, visible) => {
+      const view = browserViewBounds.views().find((candidate) => candidate.tabId === tabId)
+      if (view !== undefined) listener(view.panelId, visible)
+    })
+  ]
+  return () => {
+    for (const unsubscribe of unsubscribers) unsubscribe()
+  }
+}
+
+/**
+ * Notified after anything {@link hasLiveView} reads may have changed.
+ *
+ * @param listener - Called (no args) on a preview-store or browser-view change
+ * @returns One unsubscribe for both
+ */
+function subscribeNativeViewLive(listener: () => void): () => void {
+  const unsubscribers = [usePreviewStore.subscribe(listener), browserViewBounds.subscribe(listener)]
+  return () => {
+    for (const unsubscribe of unsubscribers) unsubscribe()
+  }
+}
+
+/**
+ * The panel whose live page – preview or browser – is on screen, or `null`.
  *
  * Asked of the overlay guard, which already folds in the active tab, every
  * occluder and each panel's gate – so an inactive tab, an open host list or a
@@ -108,11 +149,11 @@ export function createSplitterDragFreezeDeps(): DragFreezeDeps {
     frames: browserFrames,
     visiblePreviewPanel: readVisiblePreviewPanel,
     isPanelLive: hasLiveView,
-    subscribeLive: (listener) => usePreviewStore.subscribe(listener),
-    subscribeVisibilityApplied: (listener) =>
-      previewGateway.onVisibilityApplied((payload) => listener(payload.panelId, payload.visible)),
+    subscribeLive: subscribeNativeViewLive,
+    subscribeVisibilityApplied: subscribeNativeViewApplied,
     beginHide: (panelId) => {
       // The latch first, so the render the occluder causes already carries it.
+      // A browser panel has no preview state, so this is a no-op for it.
       usePreviewStore.getState().latchDragHide(panelId)
       useOverlayOccluderStore.getState().register('drag')
     },

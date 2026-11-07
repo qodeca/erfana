@@ -21,6 +21,7 @@ import { cameraBridge } from './cameraBridge'
 import { docxBridge, pdfBridge } from './documentExportBridge'
 import { imageExportBridge } from './imageExportBridge'
 import { browserBridge } from './browserBridge'
+import { browserTabBridge } from './browserTabBridge'
 import { screenshotBridge } from './screenshotBridge'
 import { claudeStatusBridge } from './claudeStatusBridge'
 import { previewCommentsBridge } from './previewCommentsBridge'
@@ -125,6 +126,12 @@ const api = {
 
   // Open in default browser (#124, see browserBridge.ts)
   browser: browserBridge,
+
+  /**
+   * Built-in browser tabs (spec 025, see browserTabBridge.ts): main-minted tab
+   * ids only; the page views have no preload of their own.
+   */
+  browserTab: browserTabBridge,
 
   /**
    * Images referenced from Markdown (#71). Sends a path; gets back a `data:`

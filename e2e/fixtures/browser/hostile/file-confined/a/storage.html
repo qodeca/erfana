@@ -1,0 +1,19 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>file:// storage probe a</title></head>
+<body>
+<h1>file:// storage probe (a)</h1>
+<p>025-AC-005: two project HTML files in different folders cannot read each other's localStorage. Each writes <code>probe-a</code> and reports every key it sees in <code>#keys</code>.</p>
+<output id="keys"></output>
+<script>
+  try {
+    localStorage.setItem('probe-a', 'written by a')
+    document.getElementById('keys').textContent = Object.keys(localStorage).sort().join(',')
+  } catch (error) {
+    document.getElementById('keys').textContent = 'error:' + error.name
+  }
+</script>
+</body>
+</html>

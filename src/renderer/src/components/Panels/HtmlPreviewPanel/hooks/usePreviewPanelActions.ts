@@ -35,6 +35,7 @@ import { useSearchStore } from '../../../../stores/useSearchStore'
 import { openFileInPanel } from '../../../../utils/openFileInPanel'
 import { exportPreviewPdf } from '../previewPdfExport'
 import { openInDefaultBrowser } from '../previewOpenInBrowser'
+import { openBrowserTabAt } from '../../../../utils/openBrowserTabAt'
 import { usePreviewFindShortcuts } from './usePreviewFindShortcuts'
 import type { PreviewNavigation } from './usePreviewNavigation'
 import { previewGateway } from '../../../../services/previewGateway'
@@ -102,6 +103,8 @@ export interface PreviewPanelActions {
   openInBrowser: () => void
   /** An open-in-browser request is in flight, from the press until main answers. */
   openingInBrowser: boolean
+  /** Open the page the tab shows now in a built-in browser tab (spec 025, 025-FR-010); the preview stays. */
+  openInBrowserTab: () => void
   /** This file is previewed in another window: the text, and "Open as source". */
   limitReachedBanner: PreviewBannerProps
   /**
@@ -221,6 +224,11 @@ export function usePreviewPanelActions({
     })
   }, [filePath])
 
+  // **Open in browser tab** (025-FR-010): the page this tab shows NOW, as a file:// address.
+  const openInBrowserTab = useCallback(() => {
+    void openBrowserTabAt(containerApi, { kind: 'file', filePath })
+  }, [containerApi, filePath])
+
   // Cmd/Ctrl+W closes the panel via the dockview api, matching how the tab
   // close button and MarkdownEditorPanel close a panel (UX-006).
   const closePanel = useCallback(() => api.close(), [api])
@@ -272,6 +280,7 @@ export function usePreviewPanelActions({
     exportingPdf,
     openInBrowser,
     openingInBrowser,
+    openInBrowserTab,
     limitReachedBanner: {
       message: COPY.limitReached,
       actionLabel: COPY.openAsSource,

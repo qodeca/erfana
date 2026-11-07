@@ -11,7 +11,7 @@ cd /work
 status=0
 npm ci --no-audit --no-fund || status=$?
 # Same limit as the CI builds: V8's default in this container (about 2 GB) is too small.
-if [ "$status" -eq 0 ]; then NODE_OPTIONS=--max-old-space-size=4096 npx electron-vite build || status=$?; fi
+if [ "$status" -eq 0 ]; then NODE_OPTIONS=--max-old-space-size=4096 npx electron-vite build --mode e2e || status=$?; fi
 if [ "$status" -eq 0 ]; then
   PLAYWRIGHT_HTML_REPORT="/work/$REPORT_DIR/playwright-report" \
     xvfb-run -a --server-args="-screen 0 1920x1080x24" \

@@ -193,20 +193,20 @@ export function shouldApplyResize(
  * Build the click handler for the terminal's web-links addon.
  *
  * The addon's default handler calls `window.open`, which skips the checked
- * external-open path. This one hands the URL to the supplied opener (the
- * `shell:openExternal` IPC call), which validates it in the main process.
- * A refusal or failure is reported through `onError` and never thrown into the
- * addon's mouse handler.
+ * external-open path. This one hands the URL and the click to the supplied
+ * opener (`terminalLinks.ts`: a browser tab, or the `shell:openExternal` IPC
+ * call, which validates it in the main process). A refusal or failure is
+ * reported through `onError` and never thrown into the addon's mouse handler.
  *
- * @param open - Opens a URL through the checked IPC path
+ * @param open - Opens a URL; gets the click for its modifier keys
  * @param onError - Called with the error when the open is refused or fails
  */
 export function createTerminalLinkHandler(
-  open: (url: string) => Promise<void>,
+  open: (url: string, event: MouseEvent) => Promise<void>,
   onError: (error: unknown, url: string) => void
 ): (event: MouseEvent, uri: string) => void {
   return (event, uri) => {
     event.preventDefault()
-    open(uri).catch((error: unknown) => onError(error, uri))
+    open(uri, event).catch((error: unknown) => onError(error, uri))
   }
 }

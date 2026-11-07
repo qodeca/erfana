@@ -1,0 +1,23 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Long title</title>
+<link rel="stylesheet" href="/hostile.css">
+<script src="/canary.js"></script>
+</head>
+<body>
+<h1>Very long title</h1>
+<p>Tab and window titles must stay bounded and never push the origin out of view. The title is <code>?len=</code> characters (default 10,000) and starts with a fake origin.</p>
+<output id="result"></output>
+<ol id="attempts"></ol>
+<script>
+  var length = Number(window.__canary.param('len') || '10000')
+  var start = 'https://accounts.staging.test/signin – '
+  document.title = start + 'W'.repeat(Math.max(0, length - start.length))
+  window.__canary.note('title length', 'attempted', String(document.title.length))
+</script>
+</body>
+</html>

@@ -13,8 +13,6 @@
  * through for the first group, so only the preview predicate decides, and is
  * the real one for the last test.
  */
-import { join } from 'node:path'
-import { pathToFileURL } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ErrorCode } from '../../shared/errors'
 import { FileCommentChannels } from '../../shared/ipc/file-comment-channels'
@@ -24,6 +22,8 @@ import type { PreviewCommentRegistry } from '../services/preview/comments/commen
 import type { ProjectSessionSnapshot } from '../services/session/ProjectSession'
 import { registerPreviewHandlers, type PreviewHandlerBundle } from './preview-handlers'
 import type { PreviewGraph } from './preview/buildPreviewGraph'
+import { createAppSender, createFakeWebContents } from './__test-helpers__/appSender'
+import { RENDERER_FILE_URL } from './senderValidation'
 
 type Handler = (event: unknown, arg: unknown) => Promise<unknown>
 const handlers: Record<string, Handler> = {}
@@ -43,7 +43,7 @@ vi.mock('electron', () => ({
 vi.mock('@electron-toolkit/utils', () => ({ is: { dev: false } }))
 vi.mock('./senderValidation', async importOriginal => {
   const real = await importOriginal<typeof import('./senderValidation')>()
-  return { ...real, isTrustedAppSender: (event: Parameters<typeof real.isTrustedAppSender>[0]) => appGate.passThrough || real.isTrustedAppSender(event) }
+  return { ...real, isTrustedAppSender: (...args: Parameters<typeof real.isTrustedAppSender>) => appGate.passThrough || real.isTrustedAppSender(...args) }
 })
 vi.mock('./preview/buildPreviewGraph', () => ({ buildPreviewGraph: vi.fn() }))
 vi.mock('./preview/lifecycle-handlers', () => ({ registerPreviewLifecycleHandlers: vi.fn(() => () => {}) }))
@@ -55,8 +55,8 @@ vi.mock('../services/LoggingService', () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() }
 }))
 
-/** The bundled renderer entry, as `isTrustedPreviewSender` pins it (relative to its own folder). */
-const RENDERER_URL = pathToFileURL(join(__dirname, 'preview', '../renderer/index.html')).href
+/** The bundled renderer entry, as `isTrustedPreviewSender` pins it (through the shared senderValidation). */
+const RENDERER_URL = RENDERER_FILE_URL
 const PANEL = 'html-preview-/p/index.html'
 const KEY_INVALID = { ok: false, code: ErrorCode.COMMENT_KEY_INVALID }
 
@@ -86,9 +86,12 @@ function setup(session?: Parameters<typeof registerPreviewHandlers>[0]['session'
   return { registry, unsaved, list, graph }
 }
 
-/** An invoke from a frame at `url`; `child` makes it a sub-frame. */
+/** The main window: a registered Erfana `webContents`. */
+const APP_SENDER = createAppSender()
+
+/** An invoke from a frame at `url` in the main window; `child` makes it a sub-frame. */
 function from(url: string, child = false) {
-  return { sender: {}, senderFrame: { url, parent: child ? { url: RENDERER_URL } : null } }
+  return { sender: APP_SENDER, senderFrame: { url, parent: child ? { url: RENDERER_URL } : null } }
 }
 
 beforeEach(() => {
@@ -114,7 +117,9 @@ describe('SEC-07 the comment channels of registerPreviewHandlers', () => {
       from('erfana-preview://tok123/index.html'),
       from('erfana-preview://tok123/frame.html', true),
       from(RENDERER_URL, true),
-      { sender: {}, senderFrame: null }
+      { sender: APP_SENDER, senderFrame: null },
+      // The renderer entry in a webContents that is not an Erfana window (025-NFR-001).
+      { sender: createFakeWebContents(), senderFrame: { url: RENDERER_URL, parent: null } }
     ]
     for (const sender of senders) {
       expect(await handlers[PreviewCommentChannels.LIST](sender, { panelId: PANEL })).toEqual(KEY_INVALID)

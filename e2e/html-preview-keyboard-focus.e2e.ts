@@ -29,7 +29,7 @@
 
 import type { ElectronApplication, Page } from '@playwright/test'
 
-import { test, expect } from './fixtures/index'
+import { test, expect, OS_FOCUS_TAG } from './fixtures/index'
 import { HtmlPreviewPage, PREVIEW_BUDGET_MS } from './pages/html-preview.page'
 import { dismissAllToasts } from './pages/html-preview.browser'
 import {
@@ -58,7 +58,7 @@ const PAGE = `<!doctype html>
 test.use({ testProjectFiles: { [FILE]: PAGE } })
 
 test.describe('HTML preview — keyboard focus into the page and back', () => {
-  test('Enter focuses the page, and Escape in the page returns focus to the chip', async ({
+  test('Enter focuses the page, and Escape in the page returns focus to the chip', { tag: OS_FOCUS_TAG }, async ({
     windowWithTestProject: page,
     appWithTestProject: app
   }) => {

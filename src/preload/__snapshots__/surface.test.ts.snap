@@ -3,6 +3,7 @@
 exports[`preload surface > window.api has the expected top-level groups 1`] = `
 [
   "browser",
+  "browserTab",
   "camera",
   "claudeStatus",
   "clipboard",
@@ -38,6 +39,54 @@ exports[`preload surface > window.api has the expected top-level groups 1`] = `
 exports[`preload surface > window.api.browser exposes the expected members 1`] = `
 [
   "openFile",
+]
+`;
+
+exports[`preload surface > window.api.browserTab exposes the expected members 1`] = `
+[
+  "answerStrip",
+  "certificate",
+  "clearData",
+  "close",
+  "closePick",
+  "contextAction",
+  "create",
+  "devTools",
+  "discardCaptureFiles",
+  "find",
+  "focusOrigin",
+  "focusPage",
+  "forget",
+  "history",
+  "navigate",
+  "onBoundsApplied",
+  "onContextMenu",
+  "onFindResult",
+  "onFocus",
+  "onForwardedKey",
+  "onNewTabCommand",
+  "onNotice",
+  "onPick",
+  "onState",
+  "onStrip",
+  "onTabAdded",
+  "onTabClosed",
+  "openExternal",
+  "openLocalFile",
+  "pageClipboard",
+  "pickMode",
+  "pickSurface",
+  "refine",
+  "setBounds",
+  "showDownload",
+  "still",
+  "stopFind",
+  "suggest",
+  "targetStatus",
+  "toolbarFocus",
+  "widthPreset",
+  "writeCapture",
+  "zoom",
 ]
 `;
 

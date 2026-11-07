@@ -1,0 +1,38 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hostile – drag a file into the terminal</title>
+<link rel="stylesheet" href="/hostile.css">
+<script src="/canary.js"></script>
+<style>.drag { display: inline-block; margin: 8px; padding: 16px; background: #ffcc80; border: 2px dashed #e65100; }</style>
+</head>
+<body>
+<h1>Drag a file into the terminal</h1>
+<p>025-NFR-001 "drag a file into the terminal". Each box carries a different drag payload; the test drags it onto the terminal and asserts the terminal received none of <code>ERFANA-HOSTILE-DRAG-7f3a</code> nor a path. <code>dragstart</code> is recorded so the test knows the drag began.</p>
+<div id="drag-uri" class="drag" draggable="true">file:// URI list</div>
+<div id="drag-download" class="drag" draggable="true">DownloadURL (a file the page serves)</div>
+<div id="drag-text" class="drag" draggable="true">Shell text</div>
+<a id="drag-link" class="drag" href="file:///etc/passwd">file:// link</a>
+<output id="result"></output>
+<ol id="attempts"></ol>
+<script>
+  var PAYLOADS = {
+    'drag-uri': [['text/uri-list', 'file:///etc/passwd'], ['text/plain', '/etc/passwd']],
+    'drag-download': [['DownloadURL', 'application/octet-stream:evil.sh:' + location.origin + '/__download/evil.sh']],
+    'drag-text': [['text/plain', 'echo ERFANA-HOSTILE-DRAG-7f3a\n']]
+  }
+  Object.keys(PAYLOADS).forEach(function (id) {
+    document.getElementById(id).addEventListener('dragstart', function (event) {
+      PAYLOADS[id].forEach(function (pair) { event.dataTransfer.setData(pair[0], pair[1]) })
+      window.__canary.note('dragstart ' + id, 'attempted', 'ERFANA-HOSTILE-DRAG-7f3a')
+    })
+  })
+  document.getElementById('drag-link').addEventListener('dragstart', function () {
+    window.__canary.note('dragstart drag-link', 'attempted', 'file:///etc/passwd')
+  })
+</script>
+</body>
+</html>

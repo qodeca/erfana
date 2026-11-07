@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import type { Terminal } from '@xterm/xterm'
 import { getClipboardAction, shouldPassThrough, type KeyEventInfo } from '../utils/terminalClipboard.logic'
 import { textClipboard } from '../services/textClipboard'
+import { useTerminalPasteGuard } from './useTerminalPasteGuard'
 
 export interface UseTerminalClipboardOptions {
   /**
@@ -35,7 +36,8 @@ export interface UseTerminalClipboardReturn {
  * Provides:
  * - Selection state tracking via xterm's onSelectionChange
  * - Copy: getSelection() -> textClipboard.writeText() (selection kept)
- * - Paste: textClipboard.readText() -> terminal.paste()
+ * - Paste: textClipboard.readText() -> the paste guard (S-17: text a web page
+ *   wrote, with a line break or control character, is confirmed first) -> terminal.paste()
  * - Keyboard handler for Ctrl/Cmd+C/V shortcuts
  *
  * @param xtermRef Reference to xterm Terminal instance
@@ -50,6 +52,7 @@ export function useTerminalClipboard(
   // failure callback of its own.
   const { onCopy, onPaste } = options
   const [hasSelection, setHasSelection] = useState(false)
+  const mayPaste = useTerminalPasteGuard()
 
   // Track if component is mounted to avoid state updates after unmount
   const isMountedRef = useRef(true)
@@ -102,13 +105,13 @@ export function useTerminalClipboard(
 
     // Transport failures are logged + toasted centrally by the service.
     const text = await textClipboard.readText()
-    if (text) {
+    if (text && (await mayPaste(text, 'paste'))) {
       // Pass the unmodified text to xterm; xterm owns newline normalization
       // (\r?\n -> \r) and bracketed-paste wrapping. Do NOT pre-normalize here.
       xterm.paste(text)
       onPaste?.()
     }
-  }, [xtermRef, onPaste])
+  }, [xtermRef, onPaste, mayPaste])
 
   const handleKeyEvent = useCallback((event: KeyboardEvent): boolean => {
     const xterm = xtermRef.current

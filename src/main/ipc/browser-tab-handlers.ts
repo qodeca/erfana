@@ -1,0 +1,278 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+/**
+ * The built-in browser's tab channels (spec 025, solution design § 8,
+ * commit 7): `browser-tab:create`, `close`, `navigate`, `history` (Back,
+ * Forward, Reload, Stop), `bounds` (send; carries visibility), `focusPage` and
+ * `devTools`; `answerStrip` and `showDownload` (commit 12a–b, 025-FR-019,
+ * 025-FR-020), `certificate` (commit 12c, 025-FR-021); `focusOrigin` and `toolbarFocus` (send) for the key and mouse
+ * routers (commit 13, ADR 0011 decisions 13 and 16); `openLocalFile` (commit 11, 025-FR-010 – **Open in browser
+ * tab**) and the address bar's `file://` input through `navigate`, both loaded from the file's served folder
+ * (025-FR-005 rule 1); `openExternal` (commit 18, 025-FR-057 – **Open in system browser**, `http` and
+ * `https` only, through the checked external-open path). The tab state goes back as the `browser-tab:state` event, to
+ * the owning window only (`BrowserTabService`).
+ *
+ * Every handler is registered through `registry.ts` and runs the identity
+ * gate (`browserTab/tabRequestGate.ts`): the exact-URL sender check again,
+ * the strict zod schema, the window from the sender – never from the payload
+ * – and the tab owned by that window. It never throws: a refusal is an
+ * `{ error }` answer, or nothing for a request with no answer.
+ */
+import { fileURLToPath } from 'node:url'
+import { BrowserWindow, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
+import { createTabGate, guarded } from './browserTab/tabRequestGate'
+import { classifyAddressInput } from '../../shared/browser/addressInput'
+import { BROWSER_TAB_CHANNELS, BROWSER_TAB_EVENTS, type BrowserTabChannel } from '../../shared/ipc/browser-tab-channels'
+import {
+  AnswerStripRequestSchema,
+  BoundsAppliedEventSchema,
+  BoundsRequestSchema,
+  CertificateRequestSchema,
+  CloseRequestSchema,
+  CreateRequestSchema,
+  DevToolsRequestSchema,
+  FocusOriginRequestSchema,
+  FocusPageRequestSchema,
+  HistoryRequestSchema,
+  NavigateRequestSchema,
+  OpenExternalRequestSchema,
+  OpenLocalFileRequestSchema,
+  ShowDownloadRequestSchema,
+  ToolbarFocusRequestSchema,
+  type AnswerStripResponse,
+  type CreateResponse,
+  type NavigateResponse
+} from '../../shared/ipc/browser-tab-schema'
+import type { OpenExternalResponse } from '../../shared/ipc/browser-tab-chrome-schema'
+import type { BrowserTab, TabHost } from '../services/browser/BrowserTab'
+import type { BrowserTabService } from '../services/browser/BrowserTabService'
+import { logger } from '../services/LoggingService'
+import { redactedLogError } from '../utils/redactUserInput'
+import { registerHandle, registerOn, unregisterHandle, unregisterOn } from './registry'
+import { isTrustedSender as defaultIsTrustedSender } from './senderValidation'
+
+type TabServiceSurface = Pick<
+  BrowserTabService,
+  | 'create'
+  | 'close'
+  | 'tabOf'
+  | 'answerStrip'
+  | 'answerCertificate'
+  | 'showDownload'
+  | 'focusOrigin'
+  | 'toolbarFocus'
+  | 'openLocalFile'
+>
+
+export interface BrowserTabHandlerDeps {
+  readonly service: TabServiceSurface
+  readonly isTrustedSender?: (event: IpcMainInvokeEvent | IpcMainEvent) => boolean
+  /** The sender's window; defaults to `BrowserWindow.fromWebContents`. */
+  readonly resolveWindow?: (event: IpcMainInvokeEvent | IpcMainEvent) => TabHost | null
+  /** **Open in system browser** through the checked external-open path (`openExternalSafe`); without it the request is refused. */
+  readonly openInSystemBrowser?: (url: string) => Promise<void>
+}
+
+/** The schemes **Open in system browser** hands to the operating system (025-FR-057). */
+export const SYSTEM_BROWSER_SCHEMES: ReadonlySet<string> = new Set(['http:', 'https:'])
+
+/** `url` when it is an `http` or `https` address, else `null`. */
+export function systemBrowserUrl(url: string | null | undefined): string | null {
+  if (url === null || url === undefined) return null
+  try {
+    return SYSTEM_BROWSER_SCHEMES.has(new URL(url).protocol) ? url : null
+  } catch {
+    return null
+  }
+}
+
+const C = BROWSER_TAB_CHANNELS
+
+/**
+ * `browser-tab:openExternal`, spelled out: the lint rule that keeps every OS
+ * open behind `openExternalSafe` refuses a member named `openExternal`, and
+ * this handler does go through it. Pinned to the channel constant by test.
+ */
+export const SYSTEM_BROWSER_CHANNEL: BrowserTabChannel = 'browser-tab:openExternal'
+
+/** Every channel this module registers, for tests and the unregister function. */
+export const BROWSER_TAB_HANDLED_CHANNELS = [
+  C.create,
+  C.close,
+  C.navigate,
+  C.openLocalFile,
+  C.history,
+  C.bounds,
+  C.focusPage,
+  C.focusOrigin,
+  C.toolbarFocus,
+  C.devTools,
+  C.answerStrip,
+  C.showDownload,
+  C.certificate,
+  SYSTEM_BROWSER_CHANNEL
+] as const
+
+/** The path of a `file:` URL with no host, or `null` (a network path, or not a file URL). */
+function localFilePath(url: string): string | null {
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'file:' && parsed.host === '' ? fileURLToPath(parsed) : null
+  } catch {
+    return null
+  }
+}
+
+/** Register the tab channels; returns the function that removes them. */
+export function registerBrowserTabHandlers(deps: BrowserTabHandlerDeps): () => void {
+  const isTrusted = deps.isTrustedSender ?? defaultIsTrustedSender
+  const resolveWindow =
+    deps.resolveWindow ?? ((event) => BrowserWindow.fromWebContents(event.sender) as TabHost | null)
+  const { service } = deps
+  const { accept, acceptTab } = createTabGate<IpcMainInvokeEvent | IpcMainEvent, TabHost, BrowserTab>({
+    isTrusted,
+    resolveWindow: (event) => {
+      const host = resolveWindow(event)
+      return host === null || host.isDestroyed() ? null : host
+    },
+    tabOf: (host, tabId) => service.tabOf(host.id, tabId)
+  })
+
+  registerHandle(C.create, async (event, arg: unknown): Promise<CreateResponse> => {
+    const accepted = accept(C.create, event, CreateRequestSchema, arg)
+    if (accepted === null) return { error: 'Request refused' }
+    try {
+      return await service.create(accepted.window, accepted.data.panelId)
+    } catch (error) {
+      logger.error('Browser tab request failed', redactedLogError(error), { channel: C.create })
+      return { error: 'The browser tab could not open' }
+    }
+  })
+
+  // `true` when the window holds the tab: `tabClosed` follows once it is gone (or never, on Stay).
+  registerHandle(C.close, (event, arg: unknown): boolean => {
+    const accepted = accept(C.close, event, CloseRequestSchema, arg)
+    if (accepted === null) return false
+    const { tabId, byUser } = accepted.data
+    return guarded(C.close, false, () => service.close(accepted.window.id, tabId, byUser ?? true))
+  })
+
+  registerHandle(SYSTEM_BROWSER_CHANNEL, async (event, arg: unknown): Promise<OpenExternalResponse> => {
+    const target = acceptTab(SYSTEM_BROWSER_CHANNEL, event, OpenExternalRequestSchema, arg)
+    if (target === null || deps.openInSystemBrowser === undefined) return { error: 'Request refused' }
+    // The page's own address, not the bar's (capped at 8192 characters, 025-FR-057).
+    const url = systemBrowserUrl(target.data.url ?? target.tab.pageAddress())
+    if (url === null) return { error: 'Only http and https addresses open in your system browser' }
+    try {
+      await deps.openInSystemBrowser(url)
+      return { ok: true }
+    } catch (error) {
+      logger.error('Browser tab request failed', redactedLogError(error), { channel: SYSTEM_BROWSER_CHANNEL })
+      return { error: 'Your system browser did not open it' }
+    }
+  })
+
+  registerHandle(C.navigate, (event, arg: unknown): NavigateResponse | Promise<NavigateResponse> => {
+    const target = acceptTab(C.navigate, event, NavigateRequestSchema, arg)
+    if (target === null) return { error: 'Request refused' }
+    const { tab, data } = target
+    return guarded<NavigateResponse | Promise<NavigateResponse>>(C.navigate, { error: 'The address could not be opened' }, () => {
+      const decision = classifyAddressInput(data.input)
+      if (decision.kind === 'refused') return { refused: decision.reason }
+      const result = tab.navigate(decision.url, data.source)
+      if (!('refused' in result)) return { ok: true }
+      // The tab loads no file: URL itself; a local file opens through its served folder.
+      const filePath = result.refused === 'local-file' ? localFilePath(decision.url) : null
+      if (filePath === null) return { refused: result.refused }
+      return service.openLocalFile(tab.windowId, data.tabId, filePath, data.source)
+    })
+  })
+
+  // **Open in browser tab** from the HTML Preview (025-FR-010): the previewed file, from its served folder.
+  registerHandle(C.openLocalFile, async (event, arg: unknown): Promise<NavigateResponse> => {
+    const target = acceptTab(C.openLocalFile, event, OpenLocalFileRequestSchema, arg)
+    if (target === null) return { error: 'Request refused' }
+    return service.openLocalFile(target.tab.windowId, target.data.tabId, target.data.filePath, 'previewOpen')
+  })
+
+  registerHandle(C.history, (event, arg: unknown): void => {
+    const target = acceptTab(C.history, event, HistoryRequestSchema, arg)
+    if (target !== null) guarded(C.history, undefined, () => target.tab.history(target.data.step))
+  })
+
+  const onBounds = (event: IpcMainEvent, arg: unknown): void => {
+    const target = acceptTab(C.bounds, event, BoundsRequestSchema, arg)
+    if (target === null) return
+    const { tabId, bounds, seq, visible, ack, clip } = target.data
+    const shown = guarded(C.bounds, null, () => target.tab.applyBounds(bounds, seq, visible, clip))
+    // The answer goes to the sender, which acceptTab checked owns the tab
+    if (ack && shown !== null && !event.sender.isDestroyed()) {
+      event.sender.send(BROWSER_TAB_EVENTS.boundsApplied, BoundsAppliedEventSchema.parse({ tabId, seq, visible: shown }))
+    }
+  }
+  registerOn(C.bounds, onBounds)
+
+  registerHandle(C.focusPage, (event, arg: unknown): void => {
+    const target = acceptTab(C.focusPage, event, FocusPageRequestSchema, arg)
+    if (target !== null) guarded(C.focusPage, undefined, () => target.tab.focusPage())
+  })
+
+  registerHandle(C.focusOrigin, (event, arg: unknown): void => {
+    const accepted = accept(C.focusOrigin, event, FocusOriginRequestSchema, arg)
+    if (accepted === null) return
+    const { tabId, from } = accepted.data
+    guarded(C.focusOrigin, undefined, () => service.focusOrigin(accepted.window.id, tabId, from))
+  })
+
+  const onToolbarFocus = (event: IpcMainEvent, arg: unknown): void => {
+    const accepted = accept(C.toolbarFocus, event, ToolbarFocusRequestSchema, arg)
+    if (accepted === null) return
+    const { tabId, focused } = accepted.data
+    guarded(C.toolbarFocus, undefined, () => service.toolbarFocus(accepted.window.id, tabId, focused))
+  }
+  registerOn(C.toolbarFocus, onToolbarFocus)
+
+  registerHandle(C.devTools, (event, arg: unknown): void => {
+    const target = acceptTab(C.devTools, event, DevToolsRequestSchema, arg)
+    if (target !== null) guarded(C.devTools, undefined, () => target.tab.devTools(target.data.inspectAt))
+  })
+
+  // The owning window answers its own tab's row; main re-checks the input
+  // guard and that the answer is one the row offers (`TabStrip.answer`). The
+  // result goes back, so a row that was not answered (the sign-in box) recovers.
+  registerHandle(C.answerStrip, (event, arg: unknown): AnswerStripResponse => {
+    const accepted = accept(C.answerStrip, event, AnswerStripRequestSchema, arg)
+    if (accepted === null) return 'unknown'
+    // `fields` (a sign-in box's user name and password) go to the row's owner only, never to a log.
+    const { tabId, requestId, answer, fields } = accepted.data
+    return guarded<AnswerStripResponse>(C.answerStrip, 'unknown', () => service.answerStrip(accepted.window.id, tabId, requestId, answer, fields) ?? 'unknown')
+  })
+
+  // **Proceed anyway** or **Back to safety** on the owning window's tab;
+  // main re-checks the 500 ms input guard (`site/browserCertificates.ts`).
+  registerHandle(C.certificate, (event, arg: unknown): void => {
+    const accepted = accept(C.certificate, event, CertificateRequestSchema, arg)
+    if (accepted === null) return
+    const { tabId, decisionId, proceed } = accepted.data
+    guarded(C.certificate, undefined, () => {
+      service.answerCertificate(accepted.window.id, tabId, decisionId, proceed)
+    })
+  })
+
+  registerHandle(C.showDownload, (event, arg: unknown): void => {
+    const accepted = accept(C.showDownload, event, ShowDownloadRequestSchema, arg)
+    if (accepted !== null) {
+      guarded(C.showDownload, undefined, () => {
+        service.showDownload(accepted.window.id, accepted.data.downloadId)
+      })
+    }
+  })
+
+  return () => {
+    for (const channel of BROWSER_TAB_HANDLED_CHANNELS) {
+      if (channel === C.bounds) unregisterOn(channel, onBounds)
+      else if (channel === C.toolbarFocus) unregisterOn(channel, onToolbarFocus)
+      else unregisterHandle(channel)
+    }
+  }
+}

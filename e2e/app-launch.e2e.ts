@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { test, expect, _electron as electron } from '@playwright/test'
+import { expect, _electron as electron } from '@playwright/test'
+// The fixtures' `test`, for its auto OS-focus lock (e2e/fixtures/osFocusLock.ts).
+import { test } from './fixtures/index'
 import * as path from 'path'
 import { TEST_IDS, byTestId, createTempUserDataDir } from './utils/helpers'
 import { E2E_CHROMIUM_ARGS } from './fixtures/isolation'

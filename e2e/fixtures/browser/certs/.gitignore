@@ -1,0 +1,5 @@
+# Generated on demand by ../server/certs.ts (ensureCerts). Test-only keys are never
+# committed, because the required Secret scan reads every ref in the repository.
+generated/
+.gen-*/
+*.pem

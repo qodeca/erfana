@@ -25,7 +25,7 @@ inputPlaceholder: e.g...    # Optional: Input placeholder
 
 | Field | Type | Required | Values |
 |-------|------|----------|--------|
-| `area` | enum | ✅ | `markdown-preview`, `code-editor`, `global`, `diagram-viewer` |
+| `area` | enum | ✅ | `markdown-preview`, `code-editor`, `global`, `diagram-viewer`, `browser` |
 | `subArea` | enum | ❌ | `context-menu`, `toolbar`, `command-palette`, `mermaid-error`, `mermaid-direction`, `chat` |
 | `id` | string | ❌ | Unique identifier; generated from `name` when omitted |
 | `name` | string | ✅ | Display name |

@@ -140,6 +140,8 @@ export function PreviewChromeBand({
   exportingPdf = false,
   onOpenInBrowser,
   openingInBrowser = false,
+  onOpenInBrowserTab,
+  previewFileName,
   // A default applies to `undefined` only, so a caller can pass `null` to empty a slot.
   leadingTools = <PreviewFindTool onFind={onFind} />,
   trailingTools = (
@@ -148,6 +150,8 @@ export function PreviewChromeBand({
       exportingPdf={exportingPdf}
       onOpenInBrowser={onOpenInBrowser}
       openingInBrowser={openingInBrowser}
+      onOpenInBrowserTab={onOpenInBrowserTab}
+      previewFileName={previewFileName}
     />
   ),
   onApprove,

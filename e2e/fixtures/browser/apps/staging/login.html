@@ -1,0 +1,40 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Staging – sign in with Auth</title>
+<link rel="stylesheet" href="/staging.css">
+<script src="/session.js"></script>
+</head>
+<body>
+<header><strong>Staging</strong> · <span id="session">…</span></header>
+<h1>Sign in with the Auth popup</h1>
+<p>025-AC-011, 025-AC-056. The button opens <code>auth.test/authorize</code> in a 500 × 600 popup – a second origin – which posts a code back to this page with <code>window.opener.postMessage</code> and closes; this page exchanges the code for the session cookie.</p>
+<div class="panel">
+  <button id="popup-signin" type="button">Sign in with Auth</button>
+  <p>Popup said: <output id="popup-message"></output></p>
+</div>
+<script>
+  var authOrigin = location.protocol === 'https:' ? '{{origin staging https auth.test}}' : '{{origin staging http auth.test}}'
+  document.getElementById('popup-signin').addEventListener('click', function () {
+    var url = authOrigin + '/authorize?return_origin=' + encodeURIComponent(location.origin)
+    window.open(url, 'auth', 'width=500,height=600')
+  })
+  window.addEventListener('message', function (event) {
+    if (event.origin !== authOrigin || !event.data || event.data.type !== 'oauth-code') return
+    fetch('/oauth/exchange', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: event.data.code })
+    })
+      .then(function (r) { return r.ok ? 'ok' : 'exchange failed ' + r.status })
+      .then(function (result) {
+        document.getElementById('popup-message').textContent = result
+        return window.refreshSession()
+      })
+  })
+</script>
+</body>
+</html>

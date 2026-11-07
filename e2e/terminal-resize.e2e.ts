@@ -22,7 +22,9 @@
  * for parity with the sibling test that covers the same feature area.
  */
 
-import { test, expect, _electron as electron, Page } from '@playwright/test'
+import { expect, _electron as electron, Page } from '@playwright/test'
+// The fixtures' `test`, for its auto OS-focus lock (e2e/fixtures/osFocusLock.ts).
+import { test } from './fixtures/index'
 import * as path from 'path'
 import {
   TEST_IDS,

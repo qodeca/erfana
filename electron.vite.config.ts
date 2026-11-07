@@ -6,6 +6,7 @@ import { defineConfig } from 'electron-vite'
 import type { Plugin, Rollup } from 'vite'
 import react from '@vitejs/plugin-react'
 import { monacoOwnDompurify, monacoOwnDompurifyEsbuild } from './electron.vite.monaco-dompurify'
+import { mainDesignTokenDefines } from './electron.vite.design-tokens'
 
 // App version is read from package.json at build time and inlined into the
 // renderer as `__APP_VERSION__` (no runtime IPC). Used by the window title.
@@ -220,9 +221,24 @@ function assertSingleDompurify(): Plugin {
   }
 }
 
-export default defineConfig({
+/**
+ * The build mode that compiles the test hooks in: `electron-vite build --mode e2e`
+ * (`npm run build:e2e`). Every other mode inlines `__ERFANA_TEST_HOOKS__` as
+ * `false`, so `src/main/testHooks/loadTestHooks.ts` loses its dynamic import
+ * of the hooks and they never reach the output; `npm run check:no-test-hooks`
+ * proves it on a build (spec 025 solution design § 12, T3).
+ */
+export const TEST_HOOKS_BUILD_MODE = 'e2e'
+
+function testHooksDefine(mode: string): Record<string, string> {
+  return { __ERFANA_TEST_HOOKS__: JSON.stringify(mode === TEST_HOOKS_BUILD_MODE) }
+}
+
+export default defineConfig(({ mode }) => ({
   main: {
     plugins: [assertModulePathsConfinedFirst()],
+    // The screenshot outline's accent (025-FR-034) and the live pick outline's ink and paper, resolved from design-tokens.css here.
+    define: { ...testHooksDefine(mode), ...mainDesignTokenDefines() },
     build: {
       rollupOptions: {
         output: {
@@ -271,7 +287,10 @@ export default defineConfig({
           // The sealed HTML-preview page (#74 / sd-074b §5.1). Exposes nothing;
           // it only reports link clicks to main. Like the other secondary
           // entries it must stay self-contained — see the guard above.
-          previewPage: resolve('src/preload/previewPage.ts')
+          previewPage: resolve('src/preload/previewPage.ts'),
+          // A browser popup's host window (spec 025, ADR 0011 decision 9): the
+          // origin strip's three popup channels and nothing else.
+          browserPopup: resolve('src/preload/browserPopup.ts')
         },
         output: {
           format: 'cjs'
@@ -303,11 +322,12 @@ export default defineConfig({
       }
     },
     define: {
-      __APP_VERSION__: JSON.stringify(appVersion)
+      __APP_VERSION__: JSON.stringify(appVersion),
+      ...testHooksDefine(mode)
     },
     optimizeDeps: {
       esbuildOptions: { plugins: [monacoOwnDompurifyEsbuild()] }
     },
     plugins: [monacoOwnDompurify(), react(), assertSingleDompurify()]
   }
-})
+}))

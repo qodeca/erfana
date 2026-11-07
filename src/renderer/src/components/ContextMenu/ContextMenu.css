@@ -100,6 +100,17 @@
   margin: var(--space-2) 0;
 }
 
+/* A first line that is not an item (the browser's link menu header, spec 025 OD-12). */
+.context-menu-header {
+  padding: var(--space-2) var(--space-6);
+  overflow: hidden;
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* The check of a menuitemcheckbox (Toolbar overflow card, rule 7): its own
    column at the inline end, in the lime of the toolbar toggle's "on", so on
    reads alike in the row and in the menu. Never the only sign: the item

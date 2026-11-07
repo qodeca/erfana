@@ -60,7 +60,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 
 ### Development
 - [Development Tasks](./development-tasks.md) - Build, test, and deployment
-- [Continuous Integration](./ci.md) - GitHub Actions workflows (`checks.yml` on every push, carrying six of the seven required checks – the seventh, `Secret scan`, is `secret-scan.yml`; the macOS `e2e.yml` **disabled** since 2026-04-25, with the advisory `E2E (Linux, xvfb)` job in `e2e-linux.yml` as the only e2e run on pull requests; `release.yml` and `whisper-binaries*.yml` for release flow), retry patterns, visual-on-CI gap
+- [Continuous Integration](./ci.md) - GitHub Actions workflows (`checks.yml` on every push, carrying six of the seven required checks – the seventh, `Secret scan`, is `secret-scan.yml`; the macOS `e2e.yml` **disabled** since 2026-04-25, with the advisory `E2E (Linux, xvfb)` job in `e2e-linux.yml` as the only full e2e run on pull requests and `Browser isolation` (`browser-isolation.yml`, the built-in browser's hostile-page suite, advisory until the owner makes it required); `release.yml` and `whisper-binaries*.yml` for release flow), retry patterns, visual-on-CI gap
 - [Build](./build/README.md) - electron-builder, ASAR, fuses, troubleshooting
 - [Release signing keys](./release-pubkey.txt) - Published minisign public keys (primary + standby rotation) for verifying release artifacts
 - [Windows Enablement](./windows/README.md) - Phase roadmap, Windows-only behaviour and the test-flake register. **[`implementation-plan.md`](./windows/implementation-plan.md) § Status snapshot is the canonical status.** Issue, PR and release numbers from before the public-repo migration do not resolve on `qodeca/erfana`; the provenance banner at the top of each `docs/windows/` file explains how they are kept
@@ -82,6 +82,8 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
   - [Deferred Markdown preview: remembered link checks](./performance/deferred-markdown-preview.md) - finding [31], v0.22.0
   - [Opening a large project: the lazy tree walk](./performance/2026-10-22-lazy-tree-walk.md) - finding [32], v0.22.0
   - [Manual Windows run on a 222k-entry project](./performance/211-large-project-windows-run.md) - #211, W17 (no-exclusion arm)
+  - [Built-in browser: pick highlight latency](./performance/browser-025-highlight.md) - spec 025, 025-AC-049 (Linux; macOS history)
+  - [Built-in browser: send latency](./performance/browser-025-send.md) - spec 025, 025-AC-050 (macOS)
 - Spikes (`spikes/`) - time-boxed findings that a decision rests on
   - [ASAR packaging with integrity enforcement](./spikes/2026-10-22-asar-integrity.md) - the v0.22.0 `app.asar` integrity check
   - [How `fs.watch` behaves on Windows](./spikes/211-windows-fs-watch.md) - #211, W0

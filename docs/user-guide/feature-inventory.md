@@ -138,6 +138,18 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | HP-13 | Comments on page elements, saved in the `.html` file: comment mode, pins, the Comments drawer, threads | all | M/services/comments/, M/services/preview/comments/, R/components/Comments/, HtmlPreviewPanel/comments/ | [reference/html-preview](./reference/html-preview.md#comments) |
 | HP-14 | Comments on selected words, right-click comments outside comment mode, the drawer's filter and sort, stepping through comments, Rebuild from data | all | R/components/Comments/, M/services/preview/comments/ | [how-to/comment-on-a-preview](./how-to/comment-on-a-preview.md) |
 
+## Built-in browser
+
+| ID | Feature | Platforms | Source | Guide section |
+|---|---|---|---|---|
+| BRW-01 | New browser tab: strip button, File > New browser tab, Cmd/Ctrl+T; Open in browser tab from the HTML preview | all | R/components/Tabs/NewBrowserTabButton.tsx, M/menu.ts, PreviewToolbarTools.tsx | [reference/built-in-browser](./reference/built-in-browser.md#opening-a-browser-tab) |
+| BRW-02 | Address bar rules, DuckDuckGo search fallback, refused schemes, local files as `file://` | all | S/browser/addressInput.ts | [reference/built-in-browser](./reference/built-in-browser.md#address-bar) |
+| BRW-03 | Navigation row and More menu: zoom, find, system browser, DevTools, Clear, Forget | all | BrowserPanel/NavigationRow.tsx, BrowserPanel/MoreMenu.tsx | [reference/built-in-browser](./reference/built-in-browser.md#navigation-and-the-more-menu) |
+| BRW-04 | Pick and send: actions panel, element text and source, target guard, page width | all | BrowserPanel/PickRow.tsx, BrowserPanel/PromptActionsPanel.tsx, BrowserPanel/pickRow.logic.ts | [reference/built-in-browser](./reference/built-in-browser.md#pick-and-send) |
+| BRW-05 | Permissions, sign-in box, keyring notices, pop-up blocker, certificate page, not-responding row | all | BrowserPanel/stripRows.logic.ts, M/services/browser/site/keyringStrip.ts | [reference/built-in-browser](./reference/built-in-browser.md#permissions-and-sign-in) |
+| BRW-06 | Clear browsing data and Forget this project's browser data | all | BrowserPanel/ClearDataDialog.tsx, BrowserPanel/ForgetDataDialog.tsx | [reference/built-in-browser](./reference/built-in-browser.md#clear-and-forget-browsing-data) |
+| BRW-07 | What is stored, sent and logged | all | M/services/browser/ | [reference/browser-data-handling](./reference/browser-data-handling.md) |
+
 ## Terminal
 
 | ID | Feature | Platforms | Source | Guide section |
@@ -155,6 +167,8 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | TERM-11 | Clean agent environment: Claude Code runs as a top-level session | all | M/services/TerminalService.ts | [Start your own agent](./how-erfana-works-with-agents.md#start-your-own-agent) |
 | TERM-12 | Restart terminal asks first while Claude Code runs, output follows input, or (macOS) a program runs | all | TerminalPanel/restartGuard.ts | [reference/terminal](./reference/terminal.md#header-controls) |
 | TERM-13 | Removed 2026-11-05 – screen-reader support dropped (#440); was screen-reader mode: Auto / On / Off | – | – | – |
+| TERM-14 | Web links: plain click opens a browser tab, Cmd/Ctrl-click the system browser | all | TerminalPanel/terminalLinks.ts | [reference/terminal](./reference/terminal.md#web-links) |
+| TERM-15 | Paste or drop of page-written or outside text with a line break or control character asks first | all | R/utils/terminalPasteGuard.ts, TerminalPanel/terminalPasteGuardAddon.ts | [reference/terminal](./reference/terminal.md#copy-and-paste) |
 
 ## Claude Code status bar
 

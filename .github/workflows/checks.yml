@@ -226,6 +226,10 @@ jobs:
           run-postinstall: "true"
       - name: Build
         run: npx electron-vite build
+      # Spec 025 § 12: main-process test hooks exist only in `--mode e2e`
+      # builds. This fails if the hook sentinel reaches the production bundle.
+      - name: No test hooks in the production build
+        run: npm run check:no-test-hooks
 
   license:
     name: License compliance

@@ -1,0 +1,23 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Probe frame</title>
+<style>
+  html, body { margin: 0; height: 100%; }
+  #target { width: 100%; height: 100%; background: #ffe0b2; }
+</style>
+</head>
+<body>
+<!-- Engine probes (spec 025 commit 8): a frame that records the pointer it receives. -->
+<div id="target"></div>
+<script>
+  window.__probe = { moves: [] }
+  document.addEventListener('mousemove', function (e) {
+    window.__probe.moves.push({ x: e.clientX, y: e.clientY, screenX: e.screenX, screenY: e.screenY })
+  })
+</script>
+</body>
+</html>

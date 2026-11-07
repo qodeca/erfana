@@ -50,6 +50,7 @@ All shipped comment code is HTML-specific. Three facts constrain the split:
 |---|---|---|---|
 | `CommentWriter`, `commentWriteCore`, `commentFileAccess`, `commentFileLock`, `commentRefusals`, `commentUnsavedSources`, `commentSaveFlow`, `commentKeyStore`, `commentListCore`, `commentListBuilder`, `commentFileJobs`, `commentJobDocs`, `CommentParseWorkerAdapter`, `commentParseWorker`, `commentParseProtocol` (15) | `src/main/services/comments/` | S | – |
 | **New** `FileCommentService.ts`, `src/main/ipc/comments/file-comment-handlers.ts` | same folder | S | – |
+| **Added since** `fileCommentEchoes.ts` (1) | `src/main/services/comments/` | S | – |
 | `PreviewCommentService`, `ElementTokenTable`, `frameFileMap`, `commentFrames`, `commentFrameBroadcaster`, `commentPickHandler`, `commentPickerStep`, `commentMenuPoint`, `commentPins`, `commentPanelStatus`, `commentServiceEvents`, `commentServiceTypes`, `commentParseCore`, `commentInstrumentation` (14) | stay in `src/main/services/preview/comments/` | H | They serve one native preview view: tokens, frames, served bytes and page messages |
 | `commentStillCapture`, `commentReloadCoordinator`, `commentScripts`, `commentOverlayTheme` (4) | stay | H | Still images, reload and scroll restore exist only because the page runs in another process |
 | `commentDraftCore`, `commentDraftBuilder`, `commentDraftOpener` (3) | stay | H | They turn a page token into a target ("find target"). Markdown sends line, tag and ordinal instead (§3) |

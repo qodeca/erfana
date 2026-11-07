@@ -1,0 +1,46 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fullscreen spoof</title>
+<link rel="stylesheet" href="/hostile.css">
+<script src="/canary.js"></script>
+<style>
+  #fake-chrome { display: none; position: fixed; inset: 0 0 auto 0; height: 40px; background: #1e1e1e; color: #ffffff; padding: 8px; }
+  :fullscreen #fake-chrome, body.fullscreen #fake-chrome { display: block; }
+</style>
+</head>
+<body>
+<div id="fake-chrome">🔒 https://staging.test – Erfana (drawn by the page)</div>
+<h1>Fullscreen attempts</h1>
+<p>025-AC-019: page fullscreen fills the page area only, Erfana's rows stay visible, a notice names the origin and Esc exits before the page sees it. The page tries fullscreen without a gesture on load, then on <code>#go-fullscreen</code>, and tries <code>navigator.keyboard.lock()</code> to keep Esc. Every Esc keydown that reaches the page is recorded.</p>
+<button id="go-fullscreen" type="button">Go fullscreen</button>
+<output id="result"></output>
+<ol id="attempts"></ol>
+<script>
+  function goFullscreen(label) {
+    return window.__canary.attempt(label, function () {
+      return document.documentElement.requestFullscreen().then(function () {
+        document.body.classList.add('fullscreen')
+        // Fullscreen itself is allowed; covering Erfana's rows is not, and the test checks that side.
+        return null
+      })
+    })
+  }
+  goFullscreen('fullscreen without a gesture')
+  window.__canary.attempt('keyboard.lock', function () {
+    return navigator.keyboard && navigator.keyboard.lock(['Escape']).then(function () { return 'keyboard locked' })
+  })
+  document.getElementById('go-fullscreen').addEventListener('click', function () { goFullscreen('fullscreen on click') })
+  document.addEventListener('fullscreenchange', function () {
+    window.__canary.note('fullscreenchange', 'attempted', document.fullscreenElement ? 'entered ' + window.innerWidth + 'x' + window.innerHeight : 'exited')
+    if (!document.fullscreenElement) document.body.classList.remove('fullscreen')
+  })
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') window.__canary.note('Escape reached the page', 'attempted')
+  }, true)
+</script>
+</body>
+</html>

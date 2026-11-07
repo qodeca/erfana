@@ -91,6 +91,339 @@ export default defineConfig({
         // The module is small and fully unit-reachable; measured at 100% when
         // this entry landed. See: docs/designs/large-projects/design-issue-60.md §2.6, §5
         'src/main/utils/rendererCrashHandlers.ts': { lines: 90, functions: 90, branches: 90, statements: 90 },
+        // The identity half of every IPC trust gate (spec 025 commit 1,
+        // 025-NFR-001): the set of Erfana window webContents. A gap here is an
+        // unexercised path in deciding who may call the privileged IPC, so it is
+        // pinned 2 points under the value measured when this entry landed.
+        // measured 100/100/100/100
+        'src/main/ipc/appWebContents.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Built-in browser isolation and profile guards (spec 025 commits 4–5,
+        // 025-NFR-001, 025-FR-016, ADR 0009, ADR 0012): which webContents skip the
+        // baseline, which schemes are privileged, and every check that keeps the
+        // profile folder, its marker and its deletes inside the project. Each
+        // floor is pinned ~2 points under the value measured when it landed
+        // (2026-11-03); never raise one above what the Coverage job measures.
+        // measured 100/100/93.33/100
+        'src/main/services/browser/browserSessionRegistry.ts': { lines: 98, functions: 98, branches: 91, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/browserLocalScheme.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/appSchemes.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 93.4/95.23/83.33/92.52
+        'src/main/services/browser/browserProfileGuards.ts': { lines: 91, functions: 93, branches: 81, statements: 90 },
+        // measured 97.43/100/93.33/97.72
+        'src/main/services/browser/browserProfileMarker.ts': { lines: 95, functions: 98, branches: 91, statements: 95 },
+        // The generation record that refuses a replayed signed file (ADR 0009
+        // decision 6). measured 100/100/95/100
+        'src/main/services/browser/profileGenerations.ts': { lines: 98, functions: 98, branches: 93, statements: 98 },
+        // measured 96.05/100/85.71/96.77
+        'src/main/services/browser/browserProfileDeletes.ts': { lines: 94, functions: 98, branches: 83, statements: 94 },
+        // measured 100/100/100/100
+        'src/main/services/browser/BrowserProfileService.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // The per-project Chromium folder under sessionData (ADR 0009 decision 1 as
+        // amended 2026-11-03, S-36). measured 98.97/100/81.33/95.72 (2026-11-03);
+        // the open branches are errno fallbacks and a case-sensitive-volume path.
+        'src/main/services/browser/browserProfileFolders.ts': { lines: 96, functions: 98, branches: 79, statements: 93 },
+        // Built-in browser tabs and their gates (spec 025 commits 6–7, 025-NFR-001,
+        // 025-FR-005, 025-FR-019, S2, S7, A4, A16): the per-window-kind channel
+        // allow-list, the deny-by-default session policy, the pinned view settings,
+        // the navigation sources, the app-address request filter, the tab, the tab
+        // service and its IPC handlers. Pinned ~2 points under the value measured
+        // when they landed (2026-11-03), never above 98.
+        // measured 100/100/100/100
+        'src/main/ipc/channelAllowList.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/94.73/94.44/98.66 (lines/functions/branches/statements)
+        'src/main/ipc/browser-tab-handlers.ts': { lines: 98, functions: 92, branches: 92, statements: 96 },
+        // measured 100/100/100/100
+        'src/main/services/browser/browserSessionPolicy.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/browserWebPreferences.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/browserNavigationPolicy.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/browserAppRequestFilter.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 99.32/100/97.95/98.85
+        'src/main/services/browser/BrowserTab.ts': { lines: 97, functions: 98, branches: 95, statements: 96 },
+        // measured 96.87/100/92.5/96.05
+        'src/main/services/browser/BrowserTabService.ts': { lines: 94, functions: 98, branches: 90, statements: 94 },
+        // measured 100/100/100/100
+        'src/main/services/browser/tabFeatureRegistry.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/95.65/100
+        'src/main/services/browser/tabFeatureAttach.ts': { lines: 98, functions: 98, branches: 93, statements: 98 },
+        // measured 95/100/100/96
+        'src/main/services/browser/tabNavigationGuard.ts': { lines: 93, functions: 98, branches: 98, statements: 94 },
+        // measured 100/100/100/100
+        // Built-in browser, main side (spec 025, commit 18): the keyring notices as strip
+        // rows, the one place tab events are parsed and sent, and the tab's input wiring.
+        // measured 100/100/100/100 each
+        'src/main/services/browser/site/keyringStrip.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/main/services/browser/tabEventSend.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        'src/main/services/browser/input/tabInputFactory.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Built-in browser local files (spec 025 commit 11, 025-FR-005 rule 1,
+        // ADR 0012 option 4 – the per-folder loopback server): the request path,
+        // the real-path confinement, the fetch-metadata policy, the server and
+        // the registry. Pinned ~2 points under the value measured when they
+        // landed (2026-11-03), never above 98.
+        // measured 100/100/100/100
+        'src/main/services/browser/local/localRequestPath.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/94.73/100 (2026-11-04, with localConfinedFile.race.test.ts;
+        // the one branch left is the `O_NOFOLLOW ?? 0` fallback, Windows only)
+        'src/main/services/browser/local/localConfinedFile.ts': { lines: 98, functions: 98, branches: 92, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/local/localResponsePolicy.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 96.42/100/87.5/95.58
+        'src/main/services/browser/local/LocalFolderServer.ts': { lines: 94, functions: 98, branches: 85, statements: 93 },
+        // measured 100/100/93.97/100
+        'src/main/services/browser/local/LocalFileServers.ts': { lines: 98, functions: 98, branches: 91, statements: 98 },
+        // Built-in browser page features (spec 025 commit 12h, 025-FR-008,
+        // 025-FR-012, 025-FR-023, 025-FR-056, 025-FR-059, 025-FR-063): load
+        // errors, crash and hang notices, find, zoom per site, width presets
+        // and the clipping parent, Clear and Forget, history, terminal
+        // addresses, and their channels. Pinned ~2 points under the value
+        // measured when they landed (2026-11-03), never above 98.
+        // measured 97.93/95.45/89.13/97.45
+        'src/main/services/browser/page/BrowserPages.ts': { lines: 95, functions: 93, branches: 87, statements: 95 },
+        // measured 100/100/91.07/98.3
+        'src/main/services/browser/page/BrowserTabPage.ts': { lines: 98, functions: 98, branches: 89, statements: 96 },
+        // measured 100/100/96.87/100
+        'src/main/services/browser/page/TabViewFrame.ts': { lines: 98, functions: 98, branches: 94, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/page/browserClearData.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/page/historyStore.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/83.33/94.44/96.42
+        'src/main/services/browser/page/hungNotice.ts': { lines: 98, functions: 81, branches: 92, statements: 94 },
+        // measured 100/100/100/100 (2026-11-04, with plainProfileFile.test.ts and .guards.test.ts)
+        'src/main/services/browser/page/plainProfileFile.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/page/tabPageState.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/85.71/97.05
+        'src/main/services/browser/page/terminalLocalAddressScan.ts': { lines: 98, functions: 98, branches: 83, statements: 95 },
+        // measured 100/100/100/100
+        'src/main/services/browser/page/widthPresetLayout.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/87.5/97.67
+        'src/main/services/browser/page/zoomStore.ts': { lines: 98, functions: 98, branches: 85, statements: 95 },
+        // measured 96.29/93.75/76.92/96.92
+        'src/main/ipc/browserTab/page-handlers.ts': { lines: 94, functions: 91, branches: 74, statements: 94 },
+        // Built-in browser window open, popups, leave-page prompt and page
+        // right-click menu (spec 025 commits 12e–g, 025-FR-011, 025-FR-057,
+        // 025-FR-058): the popup blocker and its row, pop-up exceptions, the
+        // tab-or-window decision, the popup window's size, title and
+        // navigation rules, the leave-page prompt and its guard, and the menu
+        // that takes one offered action. A gap here is an untested way for a
+        // page to open a window or act through the menu. Pinned ~2 points
+        // under the value measured when they landed (2026-11-03, on their own
+        // suites), never above 98.
+        // measured 100/100/100/100
+        'src/main/services/browser/popups/TabWindowOpen.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 96.87/94.11/100/95.23
+        'src/main/services/browser/popups/popupActivation.ts': { lines: 94, functions: 92, branches: 98, statements: 93 },
+        // measured 100/100/100/100
+        'src/main/services/browser/popups/popupBlockedRow.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/popups/popupExceptionStore.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/93.93/100
+        'src/main/services/browser/popups/windowFeatures.ts': { lines: 98, functions: 98, branches: 91, statements: 98 },
+        // measured 98.66/100/95.83/97.8
+        'src/main/services/browser/popups/BrowserPopupWindow.ts': { lines: 96, functions: 98, branches: 93, statements: 95 },
+        // measured 100/100/83.33/100
+        'src/main/services/browser/popups/BrowserPopups.ts': { lines: 98, functions: 98, branches: 81, statements: 98 },
+        // measured 100/100/75/100
+        'src/main/services/browser/popups/popupWindowElectron.ts': { lines: 98, functions: 98, branches: 73, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/dialogs/guardedStripRow.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/93.75/100
+        'src/main/services/browser/dialogs/leavePage.ts': { lines: 98, functions: 98, branches: 91, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/dialogs/pageDialogs.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/94.11/100/96.96
+        'src/main/services/browser/dialogs/TabPageExtras.ts': { lines: 98, functions: 92, branches: 98, statements: 94 },
+        // measured 100/100/100/100
+        'src/main/services/browser/contextMenu/contextMenuItems.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/93.54/100
+        'src/main/services/browser/contextMenu/TabContextMenu.ts': { lines: 98, functions: 98, branches: 91, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/ipc/browserTab/popup-handlers.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Built-in browser pick and send, main side (spec 025 commits 14–15,
+        // 025-FR-025 to 025-FR-039, 025-FR-046, 025-FR-053, 025-FR-061): the hit
+        // test through frames, the highlight, the element chain and its facts,
+        // the freeze, the capture files and their store and expiry, the shell
+        // guard and the pinned page functions. A gap here is an untested way for
+        // a page to reach the capture file outside its fenced block, or for a
+        // capture to be written where it should not. Pinned ~2 points under the
+        // value measured when they landed (2026-11-03, on their own suites),
+        // never above 98.
+        // measured 100/100/96.42/100
+        'src/main/services/browser/capture/BrowserCapture.ts': { lines: 98, functions: 98, branches: 94, statements: 98 },
+        // measured 100/100/96.87/100
+        'src/main/services/browser/capture/BrowserTargetStatus.ts': { lines: 98, functions: 98, branches: 94, statements: 98 },
+        // measured 97.7/95.45/73.77/94.44
+        'src/main/services/browser/capture/CaptureStore.ts': { lines: 95, functions: 93, branches: 71, statements: 92 },
+        // measured 100/100/100/100
+        'src/main/services/browser/capture/accentColour.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/83.72/95.06
+        'src/main/services/browser/capture/captureFacts.ts': { lines: 98, functions: 98, branches: 81, statements: 93 },
+        // measured 100/100/100/100
+        'src/main/services/browser/capture/captureImage.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/88.63/100
+        'src/main/services/browser/capture/captureRender.ts': { lines: 98, functions: 98, branches: 86, statements: 98 },
+        // measured 100/100/100/100 (2026-11-05)
+        'src/main/services/browser/capture/pageResourceFetch.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/98.78/100
+        'src/main/services/browser/capture/sourceHints.ts': { lines: 98, functions: 98, branches: 96, statements: 98 },
+        // measured 98.9/100/98.93/99.15 (2026-11-05)
+        'src/main/services/browser/capture/sourceMapLocation.ts': { lines: 96, functions: 98, branches: 96, statements: 97 },
+        // The terminal foreground the shell guard reads (025-FR-061; design
+        // § 9.4, Q8) and the Windows process snapshot it shares with the
+        // Claude-status detector. A gap here is a bare shell read as an agent,
+        // which types a prompt into the shell. Measured 2026-11-03 on their own
+        // suites; processSnapshot's missing function is the real `execFile`
+        // default, which a unit test must not spawn.
+        // measured 100/100/94.44/100
+        'src/main/services/terminalForegroundRead.ts': { lines: 98, functions: 98, branches: 92, statements: 98 },
+        // measured 98.3/84.61/95.83/97.18
+        'src/main/services/process/processSnapshot.ts': { lines: 96, functions: 82, branches: 93, statements: 95 },
+        // measured 97.5/96.29/94.33/98.01
+        'src/main/services/browser/pick/BrowserPicks.ts': { lines: 95, functions: 94, branches: 92, statements: 96 },
+        // measured 96.88/87.93/80.57/92.02
+        'src/main/services/browser/pick/BrowserTabPick.ts': { lines: 94, functions: 85, branches: 78, statements: 90 },
+        // measured 100/85/81.57/92
+        'src/main/services/browser/pick/pickHover.ts': { lines: 98, functions: 83, branches: 79, statements: 90 },
+        // measured 100/100/88.88/100
+        'src/main/services/browser/pick/pickAppSetup.ts': { lines: 98, functions: 98, branches: 86, statements: 98 },
+        // measured 100/92.85/100/98
+        'src/main/services/browser/pick/pickCaptureReads.ts': { lines: 98, functions: 90, branches: 98, statements: 96 },
+        // measured 100/100/90.69/100
+        'src/main/services/browser/pick/pickCdp.ts': { lines: 98, functions: 98, branches: 88, statements: 98 },
+        // measured 98.48/100/83.58/96.25
+        'src/main/services/browser/pick/pickElement.ts': { lines: 96, functions: 98, branches: 81, statements: 94 },
+        // measured 98.03/100/85.71/95.52
+        'src/main/services/browser/pick/pickEmbedHost.ts': { lines: 96, functions: 98, branches: 83, statements: 93 },
+        // measured 100/100/100/100
+        'src/main/services/browser/pick/pickFrameGone.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/91.42/98.85
+        'src/main/services/browser/pick/pickFrames.ts': { lines: 98, functions: 98, branches: 89, statements: 96 },
+        // measured 100/93.33/100/98
+        'src/main/services/browser/pick/pickFreeze.ts': { lines: 98, functions: 91, branches: 98, statements: 96 },
+        // measured 100/100/100/100
+        'src/main/services/browser/pick/pickGeometry.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/88.88/91.66/94.11
+        'src/main/services/browser/pick/pickHighlight.ts': { lines: 98, functions: 86, branches: 89, statements: 92 },
+        // measured 98.03/100/87.87/98.43
+        'src/main/services/browser/pick/pickHitTest.ts': { lines: 96, functions: 98, branches: 85, statements: 96 },
+        // measured 100/100/100/100
+        'src/main/services/browser/pick/pickMenu.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/pick/pickModeSwitch.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/pick/pickSupport.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100 (the live outline's band, ADR 0007 decision 6 amended 2026-11-05)
+        'src/main/services/browser/pick/pickBand.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/pick/pickBandWindow.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/pick/pickOutlineColours.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/cdp/cdpPickFunctions.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/ipc/browserTab/pick-handlers.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/ipc/browserTab/tabRequestGate.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // The still image under Erfana's surfaces (spec 025 commit 19, ADR 0011).
+        // measured 100/100/100/100 (2026-11-03)
+        'src/main/services/browser/capture/surfaceStill.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/testHooks/browserPickHook.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Built-in browser CDP session (spec 025 commit 9, 025-NFR-001 bullet 2,
+        // 025-FR-038, 025-FR-056, S6, S23): the only sendCommand caller, the
+        // method allow-list and its pinned parameters, the flood budget, the log
+        // buffer and the hang probe. A coverage drop in the allow-list is a hole
+        // in the page isolation. Each floor is pinned ~2 points under the value
+        // measured when it landed (2026-11-03, on the cdp suites alone).
+        // measured 99.45/100/93.75/97.85
+        'src/main/services/browser/cdp/BrowserCdpSession.ts': { lines: 97, functions: 98, branches: 91, statements: 95 },
+        // measured 100/100/95.65/98.91
+        'src/main/services/browser/cdp/cdpAllowList.ts': { lines: 98, functions: 98, branches: 93, statements: 96 },
+        // measured 100/100/100/100
+        'src/main/services/browser/cdp/cdpPinned.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/cdp/cdpFloodBudget.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/94.44/97.5
+        'src/main/services/browser/cdp/cdpTargetLogs.ts': { lines: 98, functions: 98, branches: 92, statements: 95 },
+        // measured 100/100/100/100
+        'src/main/services/browser/cdp/browserLogBuffer.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/97.1/100
+        'src/main/services/browser/cdp/cdpLogCollector.ts': { lines: 98, functions: 98, branches: 95, statements: 98 },
+        // measured 100/100/95.12/98.88
+        'src/main/services/browser/cdp/browserHangProbe.ts': { lines: 98, functions: 98, branches: 93, statements: 96 },
+        // Built-in browser site permissions and downloads (spec 025 commits
+        // 12a–b, 025-FR-019, 025-FR-020, S-18, S-26): the strip's queue, input
+        // guard and gap, the per-pair saved decisions and their signed file,
+        // the per-tab broker, the session-to-tab routing, the download name
+        // and the save flow that deletes partial files. A gap here is an
+        // untested way for a page to get a permission or a file through.
+        // Pinned ~2 points under the value measured when they landed
+        // (2026-11-03), never above 98.
+        // measured 100/100/92.06/99.09
+        'src/main/services/browser/permissions/tabStrip.ts': { lines: 98, functions: 98, branches: 90, statements: 97 },
+        // measured 100/100/100/100
+        'src/main/services/browser/permissions/sitePermissions.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/permissions/tabPermissions.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 97.36/93.75/90/94.18
+        'src/main/services/browser/permissions/permissionStore.ts': { lines: 95, functions: 91, branches: 88, statements: 92 },
+        // measured 97.16/90.9/93.25/95.9
+        'src/main/services/browser/permissions/BrowserSite.ts': { lines: 95, functions: 88, branches: 91, statements: 93 },
+        // measured 100/100/78.57/94.73
+        'src/main/services/browser/downloads/downloadFileName.ts': { lines: 98, functions: 98, branches: 76, statements: 92 },
+        // measured 97.67/80/88.13/96
+        'src/main/services/browser/downloads/BrowserDownloads.ts': { lines: 95, functions: 78, branches: 86, statements: 94 },
+        // Built-in browser certificates, sign-in and private network (spec 025
+        // commits 12c–d, 025-FR-021, 025-FR-022, S-16, S-26): the warning page
+        // and its guard, the 7-day exceptions, saved sign-ins encrypted and
+        // signed, the auto-send rules, the address classifier and the
+        // public-to-local refusal. A gap here is an untested way to trust a
+        // forged certificate or send a password where it should not go.
+        // Pinned ~2 points under the value measured when they landed
+        // (2026-11-03), never above 98.
+        // measured 100/100/98.7/100
+        'src/main/services/browser/site/addressClass.ts': { lines: 98, functions: 98, branches: 96, statements: 98 },
+        // measured 100/100/97.67/97.67
+        'src/main/services/browser/site/browserAuth.ts': { lines: 98, functions: 98, branches: 95, statements: 95 },
+        // measured 98.7/100/97.95/97.72
+        'src/main/services/browser/site/browserCertificates.ts': { lines: 96, functions: 98, branches: 95, statements: 95 },
+        // measured 100/100/96.55/100
+        'src/main/services/browser/site/browserPrivateNetwork.ts': { lines: 98, functions: 98, branches: 94, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/site/certificateStore.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/site/credentialStore.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 94.44/87.5/87.5/90.24
+        'src/main/services/browser/site/signedProfileFile.ts': { lines: 92, functions: 85, branches: 85, statements: 88 },
+        // measured 90.9/79.16/92.85/92
+        'src/main/services/browser/site/siteSecurity.ts': { lines: 88, functions: 77, branches: 90, statements: 90 },
+        // measured 100/100/100/100
+        'src/main/services/browser/site/siteRequestHooks.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // The browser identity (025-FR-024): one Chromium user agent and client-hint set
+        // for every page, popup and worker; a gap here is an untested way to leak an
+        // Electron or Erfana token. measured 100/100/97.22/100 (2026-11-03)
+        'src/main/services/browser/site/browserUserAgent.ts': { lines: 98, functions: 98, branches: 95, statements: 98 },
+        // Built-in browser key and mouse routing (spec 025 commit 13,
+        // 025-FR-014, 025-FR-047 to 025-FR-052, ADR 0011 decisions 11–16):
+        // what reaches a page, what Erfana takes, the click guard and the
+        // first-click rule. A gap here is a key or click that leaks to the
+        // page or an app shortcut that fires from it. Pinned ~2 points under
+        // the value measured when they landed (2026-11-03), never above 98.
+        // measured 100/100/100/100
+        'src/main/services/browser/input/browserKeyRouter.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/input/browserMouseRouter.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/input/appWindowBrowserKeys.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/input/macAppRoles.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/input/BrowserTabInput.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // Multi-page HTML preview (#124). These modules decide what the preview
         // BrowserView is allowed to load and where it may navigate — frame/scheme
         // gating, request filtering, URL normalisation, page and tab scope — plus
@@ -123,6 +456,44 @@ export default defineConfig({
         'src/main/services/browserLaunch/BrowserLaunchService.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/shared/ipc/browser-schema.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // Built-in browser shared modules (spec 025 commit 3, 025-NFR-001,
+        // 025-FR-014, 025-FR-036, S9, S10, S-15): the IPC payload gate, the
+        // key routing that decides what reaches a page, the context file's
+        // untrusted fence, and every page string or origin Erfana draws. Each
+        // floor is pinned ~2 points under the value measured when it landed
+        // (2026-11-03, macOS, on the shared browser suites alone).
+        // measured 100/100/100/100
+        'src/shared/ipc/browser-tab-schema.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/shared/ipc/browser-tab-base-schema.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/shared/ipc/browser-tab-state-schema.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/shared/ipc/browser-tab-channels.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100 (certificate page and sign-in row parts, commits 12c–d)
+        'src/shared/ipc/browser-tab-site-schema.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/98.11/100
+        'src/shared/browser/contextFile.ts': { lines: 98, functions: 98, branches: 96, statements: 98 },
+        // measured 100/100/100/100 (download notice and executable-warning words, 025-FR-020)
+        'src/shared/browser/downloadNotice.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/shared/browser/pageText.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/90.9/100
+        'src/shared/browser/textCut.ts': { lines: 98, functions: 98, branches: 88, statements: 98 },
+        // measured 100/100/100/100
+        'src/shared/browser/elementLabel.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 98.3/100/96.61/98.57
+        'src/shared/browser/originFormat.ts': { lines: 96, functions: 98, branches: 94, statements: 96 },
+        // measured 100/100/91.11/96.87
+        'src/shared/browser/idnDisplay.ts': { lines: 98, functions: 98, branches: 89, statements: 94 },
+        // measured 100/100/86.88/94.87 (the uncovered branches are overflow guards)
+        'src/shared/browser/punycode.ts': { lines: 98, functions: 98, branches: 84, statements: 92 },
+        // measured 100/100/94.73/100
+        'src/shared/browser/publicSuffix.ts': { lines: 98, functions: 98, branches: 92, statements: 98 },
+        // measured 100/100/98.63/98.3
+        'src/shared/browser/browserKeys.ts': { lines: 98, functions: 98, branches: 96, statements: 96 },
+        // measured 100/100/94.44/99.45
+        'src/shared/browser/routingState.ts': { lines: 98, functions: 98, branches: 92, statements: 97 },
         // Offline link and wording check (#138). It reads contributor-controlled
         // Markdown in the local gate, and its path walk is what keeps a link from
         // probing or reading files outside the repository, so it carries the
@@ -344,6 +715,18 @@ export default defineConfig({
         'src/main/services/preview/PreviewRequestKindLedger.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 93.9/100/94.73/93.9
         'src/main/services/preview/previewPathResolve.ts': { lines: 91, functions: 98, branches: 92, statements: 91 },
+        // Built-in browser commit 20 (spec 025, S-17, 025-FR-042, 025-FR-053,
+        // 025-FR-060): page-clipboard marks, the load-failure log, the pick's
+        // text and source, and the post-send flash. Pinned ~2 points under the
+        // value measured when they landed (2026-11-03), never above 98.
+        // measured 100/96.15/100/100 – the queue's catch runs only if an operation rejects, which none does today
+        'src/main/services/browser/site/pageClipboardMarks.ts': { lines: 98, functions: 94, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/page/loadFailureLog.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/capture/pickDetails.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/browser/pick/pickFlash.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
       },
       exclude: [
         'node_modules/**',

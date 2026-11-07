@@ -11,3 +11,7 @@ declare module '*.md?raw' {
 
 // App version inlined at build time via electron.vite.config.ts `define`.
 declare const __APP_VERSION__: string
+
+// `true` only in an e2e build (`electron-vite build --mode e2e`); inlined by
+// electron.vite.config.ts `define`. Gates test-hook code (spec 025 § 12).
+declare const __ERFANA_TEST_HOOKS__: boolean

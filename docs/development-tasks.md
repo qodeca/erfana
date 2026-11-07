@@ -318,7 +318,7 @@ sendDirectly: false
 ### 2. Validate Schema
 
 Template automatically validates against Zod schema:
-- `area` (required): one of `markdown-preview`, `code-editor`, `global`, `diagram-viewer`
+- `area` (required): one of `markdown-preview`, `code-editor`, `global`, `diagram-viewer`, `browser`
 - `subArea` (optional): specific location – `context-menu`, `toolbar`, `command-palette`, `mermaid-error`, `mermaid-direction` or `chat`
 - `id` (optional): stable identifier; without it the id is slugified from `name` (see [Known issues – Template ID system](./known-issues.md#template-id-system))
 - `name` (required): Display name in UI
@@ -327,7 +327,7 @@ Template automatically validates against Zod schema:
 - `sendDirectly` (optional): Send immediately without review (default: false)
 - `autoExecute` (optional): press Enter after pasting into the terminal (default: false)
 - `requiresInput` (optional): ask the user for input before rendering (default: false); `inputLabel` and `inputPlaceholder` label the field
-- `mutatesDocument` (optional, v0.10.0): Set to `true` if the template edits the source file in place; otherwise omit. When `true`, the canonical apply-to-document footer is composed onto the rendered prompt at the render funnel (`panelUtils.executePromptTemplate` → `withApplyFooter` from `prompts/applyFooter.ts`) — the body must NOT also say "return only the code block" / "no commentary" / "no explanation" or the competing instruction will re-introduce the non-determinism the footer exists to prevent. Also add `'filePath'` to the template's entry in `PROMPT_REQUIREMENTS` (`prompts/validation.ts`) so the footer's `{{fileRef}}` can never render empty. See [docs/prompts/README.md § Mutation prompts and the apply-to-document footer](./prompts/README.md#mutation-prompts-and-the-apply-to-document-footer).
+- `mutatesDocument` (optional, v0.10.0): Set to `true` if the template edits the source file in place; otherwise omit. When `true`, the canonical apply-to-document footer is composed onto the rendered prompt at the render funnel (`panelUtils.executePromptTemplate` → `withPromptFooter` from `prompts/browserCaptureFooter.ts`, which uses `withApplyFooter` from `prompts/applyFooter.ts` for every non-browser template) — the body must NOT also say "return only the code block" / "no commentary" / "no explanation" or the competing instruction will re-introduce the non-determinism the footer exists to prevent. Also add `'filePath'` to the template's entry in `PROMPT_REQUIREMENTS` (`prompts/validation.ts`) so the footer's `{{fileRef}}` can never render empty. See [docs/prompts/README.md § Mutation prompts and the apply-to-document footer](./prompts/README.md#mutation-prompts-and-the-apply-to-document-footer).
 
 ### 3. Use Template Variables
 

@@ -2,9 +2,9 @@
   "spec_id": 25,
   "slug": "built-in-browser",
   "tier": "T4",
-  "version": "0.12.0",
+  "version": "0.14.0",
   "created": "2026-10-31T22:42:00.358Z",
-  "updated": "2026-11-01T18:24:20.000Z",
+  "updated": "2026-11-05T06:00:00.000Z",
   "application": {
     "name": "Built-in browser with element prompts",
     "domain": null,
@@ -32,8 +32,8 @@
       "file": "requirements/01-overview.md",
       "title": "Overview",
       "exists": true,
-      "word_count": 1172,
-      "last_updated": "2026-11-01T18:24:20.000Z",
+      "word_count": 1171,
+      "last_updated": "2026-11-03T06:00:00.000Z",
       "validation_score": null
     },
     {
@@ -41,8 +41,8 @@
       "file": "requirements/02-requirements.md",
       "title": "Requirements",
       "exists": true,
-      "word_count": 16841,
-      "last_updated": "2026-11-01T18:24:20.000Z",
+      "word_count": 18675,
+      "last_updated": "2026-11-03T06:00:00.000Z",
       "validation_score": null
     },
     {
@@ -59,8 +59,8 @@
       "file": "requirements/04-acceptance.md",
       "title": "Acceptance criteria",
       "exists": true,
-      "word_count": 14689,
-      "last_updated": "2026-11-01T18:24:20.000Z",
+      "word_count": 15836,
+      "last_updated": "2026-11-03T06:00:00.000Z",
       "validation_score": null
     },
     {
@@ -68,516 +68,516 @@
       "file": "requirements/05-notes.md",
       "title": "Notes",
       "exists": true,
-      "word_count": 2213,
-      "last_updated": "2026-11-01T18:24:20.000Z",
+      "word_count": 2256,
+      "last_updated": "2026-11-03T06:00:00.000Z",
       "validation_score": null
     }
   ],
   "requirements_index": {
     "025-FR-001": {
       "section": "02",
-      "line": 77,
+      "line": 79,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-002": {
       "section": "02",
-      "line": 83,
+      "line": 85,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-003": {
       "section": "02",
-      "line": 102,
+      "line": 104,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-004": {
       "section": "02",
-      "line": 108,
+      "line": 110,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-005": {
       "section": "02",
-      "line": 114,
+      "line": 116,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-006": {
       "section": "02",
-      "line": 127,
+      "line": 134,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-007": {
       "section": "02",
-      "line": 133,
+      "line": 140,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-008": {
       "section": "02",
-      "line": 139,
+      "line": 146,
       "status": "active",
       "priority": "Should",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-009": {
       "section": "02",
-      "line": 145,
+      "line": 152,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-010": {
       "section": "02",
-      "line": 151,
+      "line": 160,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-011": {
       "section": "02",
-      "line": 157,
+      "line": 166,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-012": {
       "section": "02",
-      "line": 167,
+      "line": 176,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-013": {
       "section": "02",
-      "line": 173,
+      "line": 182,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-014": {
       "section": "02",
-      "line": 211,
+      "line": 220,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-015": {
       "section": "02",
-      "line": 261,
+      "line": 270,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-016": {
       "section": "02",
-      "line": 278,
+      "line": 288,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-017": {
       "section": "02",
-      "line": 284,
+      "line": 294,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-018": {
       "section": "02",
-      "line": 292,
+      "line": 302,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-019": {
       "section": "02",
-      "line": 298,
+      "line": 308,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-020": {
       "section": "02",
-      "line": 312,
+      "line": 322,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-021": {
       "section": "02",
-      "line": 318,
+      "line": 328,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-022": {
       "section": "02",
-      "line": 324,
+      "line": 334,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-023": {
       "section": "02",
-      "line": 330,
+      "line": 340,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-024": {
       "section": "02",
-      "line": 336,
+      "line": 346,
       "status": "active",
       "priority": "Could",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-025": {
       "section": "02",
-      "line": 344,
+      "line": 354,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-026": {
       "section": "02",
-      "line": 350,
+      "line": 360,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-027": {
       "section": "02",
-      "line": 356,
+      "line": 366,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-028": {
       "section": "02",
-      "line": 364,
+      "line": 374,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-029": {
       "section": "02",
-      "line": 372,
+      "line": 382,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-030": {
       "section": "02",
-      "line": 378,
+      "line": 388,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-031": {
       "section": "02",
-      "line": 384,
+      "line": 394,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-032": {
       "section": "02",
-      "line": 390,
+      "line": 400,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-033": {
       "section": "02",
-      "line": 402,
+      "line": 412,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-034": {
       "section": "02",
-      "line": 420,
+      "line": 431,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-035": {
       "section": "02",
-      "line": 426,
+      "line": 437,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-036": {
       "section": "02",
-      "line": 432,
+      "line": 443,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-037": {
       "section": "02",
-      "line": 447,
+      "line": 458,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-038": {
       "section": "02",
-      "line": 458,
+      "line": 469,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-039": {
       "section": "02",
-      "line": 464,
+      "line": 475,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-040": {
       "section": "02",
-      "line": 533,
+      "line": 544,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-041": {
       "section": "02",
-      "line": 539,
+      "line": 550,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-042": {
       "section": "02",
-      "line": 545,
+      "line": 556,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-043": {
       "section": "02",
-      "line": 559,
+      "line": 570,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-044": {
       "section": "02",
-      "line": 565,
+      "line": 576,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-045": {
       "section": "02",
-      "line": 575,
+      "line": 587,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-FR-046": {
       "section": "02",
-      "line": 472,
+      "line": 483,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T22:48:48.067Z"
     },
     "025-FR-047": {
       "section": "02",
-      "line": 223,
+      "line": 232,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T23:40:08.648Z"
     },
     "025-FR-048": {
       "section": "02",
-      "line": 229,
+      "line": 238,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T23:40:08.648Z"
     },
     "025-FR-049": {
       "section": "02",
-      "line": 235,
+      "line": 244,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T23:40:08.648Z"
     },
     "025-FR-050": {
       "section": "02",
-      "line": 241,
+      "line": 250,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T23:40:08.648Z"
     },
     "025-FR-051": {
       "section": "02",
-      "line": 247,
+      "line": 256,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T23:40:08.648Z"
     },
     "025-FR-052": {
       "section": "02",
-      "line": 253,
+      "line": 262,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T23:40:08.648Z"
     },
     "025-FR-053": {
       "section": "02",
-      "line": 480,
+      "line": 491,
       "status": "active",
       "priority": "Must",
       "created": "2026-10-31T23:40:08.648Z"
     },
     "025-FR-054": {
       "section": "02",
-      "line": 495,
+      "line": 506,
       "status": "active",
       "priority": "Must",
       "created": "2026-11-01T07:38:39.581Z"
     },
     "025-FR-056": {
       "section": "02",
-      "line": 181,
+      "line": 190,
       "status": "active",
       "priority": "Must",
       "created": "2026-11-01T07:38:39.581Z"
     },
     "025-FR-057": {
       "section": "02",
-      "line": 187,
+      "line": 196,
       "status": "active",
       "priority": "Must",
       "created": "2026-11-01T07:38:39.581Z"
     },
     "025-FR-058": {
       "section": "02",
-      "line": 193,
+      "line": 202,
       "status": "active",
       "priority": "Must",
       "created": "2026-11-01T07:38:39.581Z"
     },
     "025-FR-059": {
       "section": "02",
-      "line": 199,
+      "line": 208,
       "status": "active",
       "priority": "Must",
       "created": "2026-11-01T07:38:39.581Z"
     },
     "025-FR-060": {
       "section": "02",
-      "line": 501,
+      "line": 512,
       "status": "active",
       "priority": "Must",
       "created": "2026-11-01T07:38:39.581Z"
     },
     "025-FR-061": {
       "section": "02",
-      "line": 507,
+      "line": 518,
       "status": "active",
       "priority": "Must",
       "created": "2026-11-01T07:38:39.581Z"
     },
     "025-FR-063": {
       "section": "02",
-      "line": 205,
+      "line": 214,
       "status": "active",
       "priority": "Should",
       "created": "2026-11-01T07:38:39.581Z"
     },
     "025-FR-064": {
       "section": "02",
-      "line": 553,
+      "line": 564,
       "status": "active",
       "priority": "Must",
       "created": "2026-11-01T07:38:39.581Z"
     },
     "025-FR-065": {
       "section": "02",
-      "line": 513,
+      "line": 524,
       "status": "active",
       "priority": "Must",
       "created": "2026-11-01T07:38:39.581Z"
     },
     "025-NFR-001": {
       "section": "02",
-      "line": 599,
+      "line": 611,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-NFR-002": {
       "section": "02",
-      "line": 617,
+      "line": 629,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-NFR-003": {
       "section": "02",
-      "line": 629,
+      "line": 641,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-NFR-004": {
       "section": "02",
-      "line": 641,
+      "line": 653,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-NFR-005": {
       "section": "02",
-      "line": 653,
+      "line": 665,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-NFR-006": {
       "section": "02",
-      "line": 665,
+      "line": 677,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-NFR-007": {
       "section": "02",
-      "line": 677,
+      "line": 689,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-NFR-008": {
       "section": "02",
-      "line": 689,
+      "line": 701,
       "status": "active",
       "created": "2026-10-31T22:42:00.358Z"
     },
     "025-NFR-009": {
       "section": "02",
-      "line": 701,
+      "line": 713,
       "status": "active",
       "created": "2026-11-01T07:38:39.581Z"
     },
     "025-NFR-010": {
       "section": "02",
-      "line": 713,
+      "line": 725,
       "status": "active",
       "created": "2026-11-01T07:38:39.581Z"
     },
     "025-NFR-011": {
       "section": "02",
-      "line": 725,
+      "line": 737,
       "status": "active",
       "created": "2026-11-01T19:30:00.000Z"
     },
@@ -1365,6 +1365,20 @@
       "operation": "UPDATE",
       "target": "spec",
       "description": "Mouse-first pick and prompt (v0.12.0), owner-approved plan .local/panel/spec-025-mouse-improved.md (findings .local/panel/mouse-025/merged.md; owner decisions P1–P4): new NFR-011 and AC-083 (pointer-complete pick and prompt); Send button (FR-031, FR-050); Parent element, Child element and the ancestor path, and the 'That element is gone – pick again' note (FR-027, FR-030); focus emulation while picking and the click route for hover-only picks (FR-025, FR-028, UC-004 A2); Pick this element picks at once from a pointer right-click (FR-057, FR-053); banners and empty-tab hint lead with the click (FR-065, FR-063); 'The page moved – click again' (FR-048); fresh pointer press (FR-030); dialog text kept across an editor-tab click (FR-052); More always shown (FR-023, FR-049); UC-001 A6; test rules (input method, one-line clauses). Touched AC-023, AC-027, 028, 030, 031, 044, 057, 062, 063, 064, 066, 070, 074, 077, 078, 081 and AC-054. New IDs: 025-NFR-011, 025-AC-083. Checker fixes: hung-page state is a strip notice (FR-056, FR-014, FR-025, FR-054); popup strip read-only top part and interactive prompt rows with F6 order (FR-011); FR-057 traces UC-001; overview origin wording.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-11-03T06:00:00.000Z",
+      "operation": "UPDATE",
+      "target": "spec",
+      "description": "Owner decisions of 2026-11-03 applied (v0.13.0): spec changes S-1 to S-35 written into the FR and AC text; AC-001 and FR-001 name the + button and File > New browser tab (no command palette); AC-019 uses geolocation (S-19); S-16 narrowed so the sign-in box shows for cross-origin frames, saved http sign-ins only for local or private hosts (FR-005, FR-022); local files through a per-folder loopback server shown as file:// (FR-002, FR-005, FR-010, FR-044); ADRs 0007-0012 accepted with probe amendments; Q1-Q11 decided (Q2 outline-only, Q9 required check after merge). Requirement line numbers and word counts refreshed.",
+      "by": "claude-code"
+    },
+    {
+      "date": "2026-11-05T06:00:00.000Z",
+      "operation": "UPDATE",
+      "target": "spec",
+      "description": "Owner decisions of 2026-11-05 applied (v0.14.0): workers send no client hints (FR-024, AC-024); React 18 development builds may name the source (FR-037, AC-037); one terminal session in v1, multiple terminals a follow-up (FR-061, AC-077, notes); no in-use indicator for camera, microphone or screen (FR-019, FR-043, AC-019); key pick point is the last mouse position over the highlighted element (FR-033, AC-033); flood limit counts log events and the four read network events separately (FR-038, AC-038); executable-download warning text (FR-020, AC-020). ADR 0009, ADR 0012 and design rule R2-M9 amended in their own files.",
       "by": "claude-code"
     }
   ],

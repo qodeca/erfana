@@ -10,6 +10,7 @@
  * `Api` that stops being `typeof api`, fails the typecheck here.
  */
 import type { BrowserBridge } from '../shared/ipc/browser-schema'
+import type { BrowserTabBridge } from '../shared/ipc/browser-tab-bridge-types'
 import type { CameraBridge } from '../shared/ipc/camera-schema'
 import type { ClaudeStatusBridge } from '../shared/ipc/claude-status-schema'
 import type { ClipboardBridge } from '../shared/ipc/clipboard-schema'
@@ -90,6 +91,7 @@ export type ApiContractChecks = [
   Assert<Equal<Api['docx'], DocxBridge>>,
   Assert<Equal<Api['imageExport'], ImageExportBridge>>,
   Assert<Equal<Api['browser'], BrowserBridge>>,
+  Assert<Equal<Api['browserTab'], BrowserTabBridge>>,
   Assert<Equal<Api['markdownImage'], MarkdownImageBridge>>,
   Assert<Equal<Api['preview'], PreviewBridge>>,
   Assert<Equal<Api['previewComments'], PreviewCommentsBridge>>,

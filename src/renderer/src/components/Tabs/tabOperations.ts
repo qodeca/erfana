@@ -15,6 +15,8 @@ import type { DockviewApi } from 'dockview'
 import { useProjectStore } from '../../stores/useProjectStore'
 import { getBasename } from '../../utils/fileUtils'
 import { WELCOME_PANEL_ID } from '../../constants/panels'
+import { isBrowserPanelId } from '../../utils/openBrowserTab'
+import { requestBrowserPanelClose } from '../../services/browser/browserTabLifecycle'
 
 /**
  * Get all editor panel IDs from dockview API
@@ -49,6 +51,11 @@ export function getDirtyPanels(panelIds: string[]): string[] {
 export function closePanel(api: DockviewApi, panelId: string): void {
   const panel = api.getPanel(panelId)
   if (panel) {
+    // A browser tab's page may ask to stay (spec 025, 025-FR-058): main decides when it goes.
+    if (isBrowserPanelId(panelId)) {
+      requestBrowserPanelClose(panelId, () => panel.api.close())
+      return
+    }
     // Clear dirty state before closing
     useProjectStore.getState().setEditorDirty(panelId, false)
     panel.api.close()

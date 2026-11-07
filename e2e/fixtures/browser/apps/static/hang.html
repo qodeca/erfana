@@ -1,0 +1,30 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hang fixture</title>
+<link rel="stylesheet" href="/style.css">
+<script src="/fixture.js"></script>
+</head>
+<body>
+<h1>Hanging page</h1>
+<p>025-AC-072. <code>#hang</code> (or <code>__fixture.hang(ms)</code>) blocks the main thread for <code>?ms=</code> milliseconds, 6,000 by default.</p>
+<button id="hang" type="button">Hang the page</button>
+<output id="done"></output>
+<script>
+  function hang(ms) {
+    var until = Date.now() + ms
+    while (Date.now() < until) {
+      // Busy on purpose: the renderer must stop answering.
+    }
+    document.getElementById('done').textContent = 'hang ended'
+  }
+  var duration = Number(window.__fixture.param('ms') || '6000')
+  document.getElementById('hang').addEventListener('click', function () { hang(duration) })
+  // Called through page.evaluate without awaiting, so the test's own call does not block.
+  window.__fixture.hang = function (ms) { setTimeout(function () { hang(ms || duration) }) }
+</script>
+</body>
+</html>

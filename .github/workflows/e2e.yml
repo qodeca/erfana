@@ -72,7 +72,8 @@ jobs:
           run-postinstall: "true"
 
       - name: Build app
-        run: npx electron-vite build
+        # e2e mode compiles the main-process test hooks in (spec 025 § 12).
+        run: npx electron-vite build --mode e2e
 
       - name: Run E2E tests
         # Scoped to --project=electron because visual regression tests (5/5)

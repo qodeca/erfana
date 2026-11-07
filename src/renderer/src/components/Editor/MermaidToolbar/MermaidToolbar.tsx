@@ -109,11 +109,9 @@ export function MermaidToolbar({
     return null
   }
 
-  // A direction is a toggle: the current one is pressed (and disabled, there is
-  // nothing to change to); in the menu it is the checked item.
-  /* deviates: docs/design-system/system/patterns/toolbar-overflow/index.html – the directions
-     are mutually exclusive, but the shared ContextMenu has only checkbox items, so the current
-     direction is a checked menuitemcheckbox rather than a menuitemradio (rule 7). */
+  // The directions are one choice of a set: the current one is pressed (and
+  // disabled, there is nothing to change to); in the menu each is a
+  // menuitemradio, the current one checked (Toolbar overflow card, rule 7).
   const directions: ToolbarAction[] = showDirectionButtons
     ? availableDirections.map((direction) => {
         const active = isDirectionActive(direction, currentDirection, chartType)
@@ -124,6 +122,7 @@ export function MermaidToolbar({
           title: getDirectionTooltip(direction),
           ariaLabel: `Change layout to ${getDirectionTooltip(direction)}`,
           pressed: active,
+          choice: true,
           disabled: isDirectionDisabled(direction, currentDirection, chartType),
           className: `mermaid-direction-btn ${active ? 'mermaid-direction-btn--active' : ''}`,
           testId: `${TEST_IDS.MERMAID_DIRECTION_BTN}-${direction}`,

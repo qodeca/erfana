@@ -1,0 +1,47 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Long HTML fixture</title>
+<link rel="stylesheet" href="/style.css">
+<script src="/fixture.js"></script>
+<style>.long { height: 60px; overflow: hidden; word-break: break-all; font-size: 10px; border: 1px solid #757575; margin: 8px 0; }</style>
+</head>
+<body>
+<h1>Long HTML</h1>
+<p>025-AC-033, 025-AC-036, 025-AC-050. Each element's <code>outerHTML</code> is built to an exact length in UTF-16 code units (JavaScript string length); <code>__fixture.lengths()</code> reports them.</p>
+<div id="slots"></div>
+<script>
+  // id -> [outerHTML length, UTF-16 index of an emoji or -1]
+  var SPECS = {
+    'exact-20000': [20000, -1],
+    'over-20000': [20001, -1],
+    'over-50000': [50000, -1],
+    // The emoji's two code units sit at 19999 and 20000: a cut at 20,000 must keep it whole.
+    'emoji-at-cut': [20010, 19999]
+  }
+  var slots = document.getElementById('slots')
+  Object.keys(SPECS).forEach(function (id) {
+    var total = SPECS[id][0]
+    var emojiAt = SPECS[id][1]
+    var el = document.createElement('div')
+    el.id = id
+    el.className = 'long'
+    var shell = el.outerHTML.length
+    var fill = total - shell
+    var text = emojiAt === -1
+      ? 'x'.repeat(fill)
+      : 'x'.repeat(emojiAt - (shell - '</div>'.length)) + '\u{1F3AF}' + 'x'.repeat(fill - (emojiAt - (shell - '</div>'.length)) - 2)
+    el.textContent = text
+    slots.appendChild(el)
+  })
+  window.__fixture.lengths = function () {
+    var out = {}
+    Object.keys(SPECS).forEach(function (id) { out[id] = document.getElementById(id).outerHTML.length })
+    return out
+  }
+</script>
+</body>
+</html>

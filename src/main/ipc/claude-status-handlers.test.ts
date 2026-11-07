@@ -17,6 +17,27 @@ import { join } from 'path'
 import { pathToFileURL } from 'url'
 import type { IpcMainInvokeEvent } from 'electron'
 import { ClaudeStatusChannels } from '../../shared/ipc/claude-status-channels'
+import { createFakeWebContents } from './__test-helpers__/appSender'
+
+// The handlers' own check is the shared `isTrustedSender`, which the global
+// setup stubs to `true`; this suite asserts its refusals, so it runs the real
+// one. The outer registry gate (`isTrustedAppSender`) stays stubbed, as it was
+// when this suite was written – registry.test.ts proves that gate.
+//
+// A factory result survives `vi.resetModules()`, so `real` keeps the
+// `appWebContents` copy it loaded first; the factory captures that copy's
+// register function, so senders are registered where the predicate looks.
+const identity = vi.hoisted(() => ({
+  register: (_wc: unknown): void => {
+    throw new Error('senderValidation not loaded yet')
+  }
+}))
+vi.mock('./senderValidation', async (importOriginal) => {
+  const real = await importOriginal<typeof import('./senderValidation')>()
+  const { registerAppWebContents } = await import('./appWebContents')
+  identity.register = (wc: unknown) => registerAppWebContents(wc as Parameters<typeof registerAppWebContents>[0], 'main')
+  return { ...real, isTrustedAppSender: () => true }
+})
 
 // electron-vite declares ELECTRON_RENDERER_URL read-only; this file sets and clears it.
 const writableEnv: Record<string, string | undefined> = process.env
@@ -73,12 +94,14 @@ vi.mock('../services/LoggingService', () => ({ logger: mockLogger }))
 const RENDERER_FILE_URL = pathToFileURL(join(__dirname, '../renderer/index.html')).href
 const TRUSTED_FRAME = { url: RENDERER_FILE_URL, parent: null }
 
-/** Build a mock invoke event with a given sender frame + sender id. */
+/** Build a mock invoke event with a given sender frame + sender id, from a registered Erfana window. */
 function makeEvent(
   frame: { url: string; parent: unknown } | null,
   senderId = 99
 ): IpcMainInvokeEvent {
-  return { senderFrame: frame, sender: { id: senderId } } as unknown as IpcMainInvokeEvent
+  const sender = createFakeWebContents(senderId)
+  identity.register(sender)
+  return { senderFrame: frame, sender } as unknown as IpcMainInvokeEvent
 }
 
 /** Fake ClaudeStatusService recording delegated calls. */
@@ -203,6 +226,28 @@ describe('claude-status-handlers', () => {
       )
 
       expect(service.registerPanel).not.toHaveBeenCalled()
+    })
+
+    it('rejects the exact renderer URL from an unregistered webContents (no registerPanel)', async () => {
+      const service = makeFakeService()
+      const terminalService = makeFakeTerminalService({
+        'term-1': { cwd: '/Users/x/proj', pid: 4321 }
+      })
+      await register(terminalService, service)
+
+      // A fresh id: the registered set outlives the per-test module reset here,
+      // so a reused id (99) could already be registered by an earlier test.
+      const browserTab = createFakeWebContents()
+      await handlers[ClaudeStatusChannels.REGISTER](
+        { senderFrame: TRUSTED_FRAME, sender: browserTab } as unknown as IpcMainInvokeEvent,
+        { terminalId: 'term-1' }
+      )
+
+      expect(service.registerPanel).not.toHaveBeenCalled()
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Rejected claude-status:register from untrusted sender',
+        expect.objectContaining({ url: RENDERER_FILE_URL })
+      )
     })
 
     it('does not register an unknown terminalId (no cwd)', async () => {

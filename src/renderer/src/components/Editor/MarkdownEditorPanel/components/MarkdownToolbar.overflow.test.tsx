@@ -219,7 +219,7 @@ describe('MarkdownToolbar overflow (#461)', () => {
     )
   })
 
-  it('shows the current view mode as the checked item; the row says it in aria-pressed', () => {
+  it('shows the view modes as radio items, the current one checked; the row says it in aria-pressed', () => {
     const onViewModeChange = vi.fn()
     render(<MarkdownToolbar {...props({ viewMode: 'split', onViewModeChange })} />)
     expect(within(toolbar()).getByTestId(TEST_IDS.VIEW_MODE_BTN_SPLIT)).toHaveAttribute('aria-pressed', 'true')
@@ -227,10 +227,16 @@ describe('MarkdownToolbar overflow (#461)', () => {
     resizeTo(6 * BTN)
     const menu = openMenu()
     const split = within(menu).getByTestId(`${TEST_IDS.VIEW_MODE_BTN_SPLIT}-overflow-item`)
-    expect(split).toHaveAttribute('role', 'menuitemcheckbox')
+    expect(split).toHaveAttribute('role', 'menuitemradio')
     expect(split).toHaveAttribute('aria-checked', 'true')
+    // The item keeps the view mode's own icon, so the current one also shows the lime end check.
+    expect(split.querySelector('.context-menu-icon svg')).not.toBeNull()
+    expect(split.querySelector('.context-menu-check svg')).not.toBeNull()
     const preview = within(menu).getByTestId(`${TEST_IDS.VIEW_MODE_BTN_PREVIEW}-overflow-item`)
+    expect(preview).toHaveAttribute('role', 'menuitemradio')
     expect(preview).toHaveAttribute('aria-checked', 'false')
+    expect(preview.querySelector('.context-menu-check svg')).toBeNull()
+    expect(within(menu).queryAllByRole('menuitemcheckbox')).toHaveLength(0)
     fireEvent.click(preview)
     expect(onViewModeChange).toHaveBeenCalledWith('preview')
     expect(screen.queryByRole('menu')).toBeNull()

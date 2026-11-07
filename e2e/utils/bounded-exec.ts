@@ -90,12 +90,18 @@ export interface ScriptTarget {
   executeJavaScript(code: string, userGesture?: boolean): Promise<unknown>
 }
 
-/** The main-side bounded call: `code` in `target`, rejected after `capMs` with `label` in the error. */
+/**
+ * The main-side bounded call: `code` in `target`, rejected after `capMs` with
+ * `label` in the error. `userGesture` runs it as a user activation (Electron's
+ * own flag), for a click a test cannot send as input – a press does not reach
+ * an out-of-process frame through `sendInputEvent`.
+ */
 export type BoundedExec = <T = unknown>(
   target: ScriptTarget,
   code: string,
   capMs: number,
-  label: string
+  label: string,
+  userGesture?: boolean
 ) => Promise<T>
 
 /** The main process's `globalThis` once {@link installBoundedExec} has run. */
@@ -126,7 +132,7 @@ export function installBoundedExec(app: ElectronApplication): Promise<void> {
       class Timeout extends Error {}
       Object.defineProperty(Timeout.prototype, 'name', { value: timeoutName })
       const text = (err: unknown): string => (err instanceof Error ? err.message : String(err))
-      const exec = (target: ScriptTarget, code: string, capMs: number, label: string): Promise<unknown> => {
+      const exec = (target: ScriptTarget, code: string, capMs: number, label: string, userGesture = false): Promise<unknown> => {
         let timer: ReturnType<typeof setTimeout> | undefined
         const cap = new Promise<never>((_resolve, reject) => {
           timer = setTimeout(
@@ -139,7 +145,7 @@ export function installBoundedExec(app: ElectronApplication): Promise<void> {
         // A frame rejects with a bare string: wrap it, and prefix every
         // rejection with the label so the failure names the call.
         const call = Promise.resolve()
-          .then(() => target.executeJavaScript(code))
+          .then(() => target.executeJavaScript(code, userGesture))
           .catch((err: unknown) => {
             const wrapped = new Error(`${label}: ${text(err)}`)
             if (err instanceof Error) wrapped.name = err.name

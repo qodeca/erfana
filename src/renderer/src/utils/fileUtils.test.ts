@@ -11,6 +11,7 @@ import {
   isPathInside,
   isStrictDescendant,
   pathsEqual,
+  joinPath,
   sanitizeFileName,
   MAX_FILENAME_LENGTH
 } from './fileUtils'
@@ -195,6 +196,45 @@ describe('fileUtils', () => {
 
     it('returns false for a Windows partial prefix match', () => {
       expect(isStrictDescendant('C:\\proj', 'C:\\projector\\x')).toBe(false)
+    })
+  })
+
+  describe('joinPath', () => {
+    it('joins with / on macOS and Linux, dropping the root\'s trailing and the tail\'s extra separators', () => {
+      expect(joinPath('/proj', '.erfana/browser/c.md', 'darwin')).toBe('/proj/.erfana/browser/c.md')
+      expect(joinPath('/proj//', '/a//b.md/', 'linux')).toBe('/proj/a/b.md')
+      expect(joinPath('/', 'a.md', 'darwin')).toBe('/a.md')
+    })
+
+    it('keeps a backslash on POSIX, where it is a filename character, not a separator', () => {
+      expect(joinPath('/proj/we\\ird', 'a\\b.md', 'darwin')).toBe('/proj/we\\ird/a\\b.md')
+    })
+
+    it('joins with \\ on Windows, splitting the tail on either separator', () => {
+      expect(joinPath('C:\\proj', '.erfana/browser/c.md', 'win32')).toBe('C:\\proj\\.erfana\\browser\\c.md')
+      expect(joinPath('C:\\proj\\', 'a\\b.md', 'win32')).toBe('C:\\proj\\a\\b.md')
+      expect(joinPath('C:\\', 'a.md', 'win32')).toBe('C:\\a.md')
+    })
+
+    it('uses \\ on Windows even for a UNC or mixed-separator root, keeping the root as written', () => {
+      expect(joinPath('\\\\srv\\share', 'a/b.md', 'win32')).toBe('\\\\srv\\share\\a\\b.md')
+      expect(joinPath('C:/Users/me\\proj/', 'c.md', 'win32')).toBe('C:/Users/me\\proj\\c.md')
+    })
+
+    it('returns the root unchanged for an empty tail', () => {
+      expect(joinPath('/proj', '', 'darwin')).toBe('/proj')
+      expect(joinPath('C:\\proj', '\\', 'win32')).toBe('C:\\proj')
+    })
+
+    it('uses the renderer platform when none is given', () => {
+      const host = window as unknown as { api?: unknown }
+      const saved = host.api
+      host.api = { utils: { getPlatform: () => 'win32' } }
+      try {
+        expect(joinPath('C:\\proj', 'a/b.md')).toBe('C:\\proj\\a\\b.md')
+      } finally {
+        host.api = saved
+      }
     })
   })
 

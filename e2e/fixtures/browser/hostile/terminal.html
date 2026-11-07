@@ -1,0 +1,41 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hostile – open the terminal</title>
+<link rel="stylesheet" href="/hostile.css">
+<script src="/canary.js"></script>
+</head>
+<body>
+<h1>Open or write to the terminal</h1>
+<p>025-NFR-001 "open the terminal". Every route aims the text <code>ERFANA-HOSTILE-TERMINAL-7f3a</code> at a terminal; the test asserts no terminal opened and none received it. The links and buttons are there for a test that clicks them (a user gesture); the script runs the rest on load.</p>
+<div>
+  <a id="scheme-link" href="erfana://terminal/new?cmd=echo%20ERFANA-HOSTILE-TERMINAL-7f3a">Open terminal (erfana://)</a>
+  <a id="preview-link" href="erfana-preview://terminal/echo%20ERFANA-HOSTILE-TERMINAL-7f3a">Open terminal (erfana-preview://)</a>
+  <button id="open-scheme" type="button">window.open erfana://</button>
+</div>
+<output id="result"></output>
+<ol id="attempts"></ol>
+<script>
+  var PAYLOAD = 'echo ERFANA-HOSTILE-TERMINAL-7f3a\r'
+  var a = window.__canary.attempt
+  a('bridge terminal.create', function () { return window.api && window.api.terminal && window.api.terminal.create({ cols: 80, rows: 24 }) })
+  a('bridge terminal.write', function () { return window.api && window.api.terminal && window.api.terminal.write('1', PAYLOAD) })
+  a('iframe erfana://', function () {
+    var frame = document.createElement('iframe')
+    frame.src = 'erfana://terminal/new'
+    document.body.appendChild(frame)
+    return null
+  })
+  ;[window.top, window.parent, window.opener].forEach(function (target) {
+    if (target && target !== window) target.postMessage({ channel: 'terminal:write', data: PAYLOAD }, '*')
+  })
+  document.getElementById('open-scheme').addEventListener('click', function () {
+    a('window.open erfana://', function () { return window.open('erfana://terminal/new?cmd=' + encodeURIComponent(PAYLOAD)) })
+  })
+  window.__canary.note('postMessage and scheme links', 'attempted', 'ERFANA-HOSTILE-TERMINAL-7f3a')
+</script>
+</body>
+</html>

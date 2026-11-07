@@ -45,6 +45,7 @@ vi.mock('../LoggingService', () => ({ logger: mockLogger }))
 
 const { registerBrowserHandlers } = await import('../../ipc/browser-handlers')
 const { RENDERER_FILE_URL } = await import('../../ipc/senderValidation')
+const { createAppSender, createFakeWebContents } = await import('../../ipc/__test-helpers__/appSender')
 const { fileService } = await import('../FileService')
 const { BrowserLaunchService } = await import('./BrowserLaunchService')
 const { createBrowserLauncher, E2E_BROWSER_SEAM_ENV } = await import('./browserLauncher')
@@ -59,7 +60,8 @@ interface SeamCall {
 const BROWSER_APP = '/Applications/Test Browser.app'
 /** Linux never looks the default browser up: it goes straight to the `.html` app. */
 const LOOKS_UP = process.platform === 'darwin'
-const TRUSTED = { senderFrame: { url: RENDERER_FILE_URL, parent: null }, sender: { id: 7 } } as unknown as IpcMainInvokeEvent
+/** The main window: the renderer URL from a registered Erfana `webContents`. */
+const TRUSTED = { senderFrame: { url: RENDERER_FILE_URL, parent: null }, sender: createAppSender() } as unknown as IpcMainInvokeEvent
 
 const seam = vi.fn<(launch: SeamCall) => Promise<void>>()
 const scope = globalThis as { __erfanaE2eBrowserLaunch?: unknown }
@@ -225,7 +227,17 @@ describe('open in default browser (P4-AC4)', () => {
       ['a previewed page', { url: `erfana-preview://${'0'.repeat(32)}/index.html`, parent: null }],
       ['a subframe of the app renderer', { url: RENDERER_FILE_URL, parent: {} }]
     ])('refuses %s before the payload is read', (_label, frame) => {
-      const event = { senderFrame: frame, sender: { id: 9 } } as unknown as IpcMainInvokeEvent
+      // A registered window, so the frame rule – not identity – is what refuses.
+      const event = { senderFrame: frame, sender: createAppSender() } as unknown as IpcMainInvokeEvent
+      expect(() => gated(event, { filePath: join(project, 'index.html') })).toThrow(/Untrusted sender/)
+      expect(seam).not.toHaveBeenCalled()
+    })
+
+    it('refuses the renderer URL from an unregistered webContents before the payload is read', () => {
+      const event = {
+        senderFrame: { url: RENDERER_FILE_URL, parent: null },
+        sender: createFakeWebContents()
+      } as unknown as IpcMainInvokeEvent
       expect(() => gated(event, { filePath: join(project, 'index.html') })).toThrow(/Untrusted sender/)
       expect(seam).not.toHaveBeenCalled()
     })

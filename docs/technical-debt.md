@@ -690,7 +690,9 @@ One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns 
 
 **Update (recorded 2026-10-25)**: since 2026-08-29 `senderValidation.ts` also exports `isTrustedAppSender`, the route-tolerant variant the process-wide gate in `registry.ts` uses, so there are four predicates to keep in step: `isTrustedSender` and `isTrustedAppSender` (`senderValidation.ts`), the local `isTrustedSender` in `claude-status-handlers.ts`, and `isTrustedPreviewSender`.
 
-**Status**: Pre-existing debt carried into #74; recorded from design §7.1.
+**Update (spec 025 commit 1, 2026-11)**: consolidated. `claude-status-handlers.ts`, `screenshot-handlers.ts` and `preview/isTrustedPreviewSender.ts` now call the shared `isTrustedSender`; their copies are gone. Every predicate in `senderValidation.ts` also requires the sender to be a registered Erfana window (`src/main/ipc/appWebContents.ts`, 025-NFR-001).
+
+**Status**: Resolved by spec 025 commit 1 (`feature/built-in-browser`). Pre-existing debt carried into #74; recorded from design §7.1.
 
 ---
 
@@ -1105,6 +1107,87 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 ---
 
 ## Deferred-work ledgers (Windows)
+
+### 67. Electronegativity scan findings (spec 025, 2026-11)
+
+**Severity**: Low (no open high finding)
+**Scan**: `npx @doyensec/electronegativity@1.10.3 -i src -e 44.9.3` (issue #448 definition of done § 3). It reads `new BrowserWindow({...})` literals only, so settings built elsewhere are invisible to it.
+
+**High – justified, false positive**:
+
+| Check | Site | Why it is not a defect |
+|---|---|---|
+| `CONTEXT_ISOLATION_JS_CHECK` | `src/main/services/imageExport/ImageRasterizeWindow.ts` (`new BrowserWindow`) | The window's `webPreferences` come from `buildHarnessWebPreferences` in `src/main/services/imageExport/rasterizeSession.ts`, which sets `contextIsolation: true`, `sandbox: true` and `nodeIntegration: false`; `rasterizeSession.test.ts` pins each value |
+
+**Medium and low – reviewed, no change**:
+
+- `SANDBOX_JS_CHECK`, `PRELOAD_JS_CHECK`, `AUXCLICK_JS_CHECK` on the main, PDF, screenshot-overlay and image-export windows: the same blind spot (settings built in a helper or set app-wide); browser tab views use `browserWebPreferences.ts`, pinned by its test, with no preload.
+- `OPEN_EXTERNAL_JS_CHECK` (8 sites): the main-side calls sit in `openExternalSafe` and the preview's link-consent flow; the renderer calls go through the preload's single `shell.openExternal` bridge to the `shell:openExternal` handler (`src/main/ipc/shell-handlers.ts`). The final security review re-checks each site.
+- `CERTIFICATE_VERIFY_PROC_JS_CHECK`, `CERTIFICATE_ERROR_EVENT_JS_CHECK`, `DANGEROUS_FUNCTIONS_JS_CHECK` (`insertCSS`): test hooks only (`src/main/testHooks/`), compiled out of production builds (`npm run check:no-test-hooks`).
+- `CSP_GLOBAL_CHECK` (low): `style-src 'unsafe-inline'` in the app and image-export entries is pre-existing; the local-file server's sandbox CSP is a constant the scanner cannot parse (`LOCAL_SANDBOX_POLICY` in `localResponsePolicy.ts`).
+
+**Re-run 2026-11-03** (after the browser UI, commit b95ca4fc): 1 high, 26 medium, 3 low. The high finding is the same `ImageRasterizeWindow.ts` false positive above. The new medium findings, all reviewed with no change:
+
+- `AUXCLICK_JS_CHECK` and `PRELOAD_JS_CHECK` on the popup host window (`src/main/services/browser/popups/popupWindowElectron.ts`): the host window loads only Erfana's own popup strip page, with `sandbox`, `contextIsolation` and `webSecurity` on, `nodeIntegration` off, and a bundled local preload (`browserPopup.js`, which exposes `browserPopupApi` only). The site's page runs in a separate `WebContentsView` with the browser tab's `browserWebPreferences.ts` and no preload; middle-click opens go through the window-open handler (`popups/TabWindowOpen.ts`).
+- `DANGEROUS_FUNCTIONS_JS_CHECK` in `src/main/services/browser/pick/pickModeSwitch.ts`: `insertCSS` with the constant `CROSSHAIR_CSS` at the user origin; no page or user text reaches it.
+- `OPEN_EXTERNAL_JS_CHECK` in the renderer (`services/browserTabGateway.ts`, `components/Panels/BrowserPanel/browserDataActions.ts`) and the preload test: these call the browser tab bridge's `openExternal`, whose main handler checks the sender and allows only `http` and `https` before `openExternalSafe` (`src/main/ipc/browser-tab-handlers.ts`). `components/Panels/TerminalPanel/terminalLinks.ts` (Ctrl/Cmd-click on a terminal link) uses the existing `shell.openExternal` bridge and its `shell:openExternal` handler.
+
+**Re-run 2026-11-04** (after the focus fix, commit ca75e26b): 1 high, 26 medium, 3 low – the same findings as the 2026-11-03 run, no new site.
+
+**Re-run**: at every release that touches windows, sessions or `webPreferences`.
+
+### 68. Browser URLs are logged in full, an exception to `redactUserInput` (spec 025, 025-FR-042, 2026-11)
+
+**Severity**: Low (accepted; reconfirmed by the owner 2026-11-01, `specs/spec-t4-025-built-in-browser/requirements/05-notes.md`)
+
+**What**: Erfana's log files may record the full URL of a browser page, path and query included, for navigation errors and load failures, so support can see what failed. This is a deliberate exception to the `redactUserInput` convention in `CLAUDE.md`. Query strings can hold tokens or personal data, and the user guide's Data handling page must say so (025-FR-044).
+
+**Limits that stay in force** (025-FR-064): no page titles, form data, console text, network bodies or typed search text; a failed search-fallback load is logged without a URL; local file paths go through `redactPath`.
+
+**Where the exception applies**: the sites that log a browser URL, each of which carries a comment pointing here. Today there is one: the load-failure log, `page/loadFailureLog.ts` (`logLoadFailure`), called from `page/BrowserTabPage.ts` (`loadFailed`). It writes the error code and the URL with userinfo and the fragment dropped (`failedRequestUrl`), and writes a failed search-fallback load as "search load failed" with no URL. A served local file's load is not under the exception: it is logged as "A browser tab local file failed to load" with its file path through `redactPath` (folders hidden, file name kept), never its loopback address (`http://127.0.0.1:<port>/<token>/…`), as ADR 0012 decision 9 requires. `browserSessionPolicy.ts` (`logDenied`) logs by name with no URL, and `cdp/browserLogBuffer.ts` keeps path and query for the context file, not the log file. Add each new site to this entry when it is written.
+
+**Status**: Accepted. The load-failure site logs the URL and carries the comment (025-AC-042); `loadFailureLog.test.ts` pins the fields.
+
+### 69. The macOS network sandbox cannot write a `session.fromPath()` profile (spec 025, ADR 0009 amendment, 2026-11)
+
+**Severity**: Low (worked around; the owner chose not to file upstream yet, 2026-11-03)
+
+**What**: On macOS Chromium always sandboxes the network service, and Electron 44.9.3 grants that sandbox write access only below `app.getPath('sessionData')`. A profile created with `session.fromPath()` anywhere else gets no cookie database, HTTP cache or network state on disk: it silently works in memory and loses every sign-in at quit. Erfana therefore keeps each project's Chromium profile in `<sessionData>/browser-profiles/<name>/chromium` instead of the project folder the owner first chose ([ADR 0009](./adrs/0009-browser-profile-in-the-project-folder.md) § Amendment 2026-11-03).
+
+**Upstream issue, ready to file** (title: *macOS: `session.fromPath()` outside `sessionData` never persists cookies – the network-service sandbox cannot write there*):
+
+> **Electron version**: 44.9.3 · **OS**: macOS (any; network-service sandbox on, the default)
+>
+> **What happens.** `session.fromPath(p)` with `p` outside `app.getPath('sessionData')` returns a working session, but its network context cannot open its files: the `Cookies` database, the HTTP cache, Shared Dictionary, Trust Tokens and network state are never written. Cookies live in memory only and are gone after a restart. No error reaches the app; `cookies.flushStore()` resolves.
+>
+> **Why.** On macOS `IsNetworkSandboxEnabled()` is always true, and the sandbox profile grants write access to the folders the browser client names in `GetNetworkContextsParentDirectory()`. Electron's `ElectronBrowserClient::GetNetworkContextsParentDirectory()` returns only `DIR_SESSION_DATA`, so a `fromPath()` folder elsewhere is outside the sandbox's writable paths (Chromium `sandbox_parameters_mac.mm`).
+>
+> **Expected.** A session created with `session.fromPath(p)` persists like one under `sessionData`: Electron adds each `fromPath()` folder (or its parent) to the folders it returns from `GetNetworkContextsParentDirectory()` – for example by recording the paths given to `fromPath()` before the network context is created – or documents that `fromPath()` must be under `sessionData` on macOS and fails loudly otherwise.
+>
+> **Reproduce.** `const s = session.fromPath('/tmp/x')`; load a page that sets a persistent cookie; `await s.cookies.flushStore()`; quit. `/tmp/x/Cookies` does not exist, and after a restart the cookie is gone. The same code with a path under `app.getPath('sessionData')` writes `Cookies` and keeps the cookie.
+
+**Revisit when**: Electron grants `fromPath()` folders to the macOS network sandbox – then the owner can decide whether the Chromium profile goes back to the project folder. Evidence: `specs/spec-t4-025-built-in-browser/verification/evidence/025-AC-052-macos.md`.
+
+### 70. A send's screenshot is PNG-encoded on main's thread (spec 025, 2026-11)
+
+**Severity**: Medium (performance; found by the AAA performance review, round 2)
+
+**What**: each send encodes the capture's full-resolution screenshot and crop with `nativeImage.toPNG()` on the main process's thread (`src/main/services/browser/pick/pickAppSetup.ts`, `encodePng`, called from `capture/captureRender.ts`). While it runs, main handles no IPC: terminal output, window events and every tab's key and mouse routing wait. The measured Explain → terminal p95 is 265.8 ms on the 3840 × 2160 worst case (`docs/performance/browser-025-send.md`), which bounds the block at that size; a 5K or 6K window costs more.
+
+**Fix**: encode in a `worker_thread` (as git status and the preview link scan already do), transferring the bitmap's buffer. It needs its own bundle entry in the build config, so it is a design change rather than an edit.
+
+**Revisit when**: a send is reported to stall the terminal, or before the browser leaves its first release.
+
+### 71. React 19 source lookup – what the source map read leaves open (spec 025, 025-FR-037, owner decision 2026-11-05)
+
+**What**: the React 19 source lookup (`src/main/services/browser/capture/sourceMapLocation.ts`; design § 4) leaves four things open:
+
+- **The stack crosses the protocol uncut.** `_debugStack` is returned by handle and V8 writes its whole stack into the handle's description, so a hostile page can make that one answer large; main reads at most 8 KiB of it. Every other pick read is cut in the page.
+- **Reading the description can run page code.** V8 formats the stack when the inspector builds the description, outside the side-effect check, so a page-defined `Error.prepareStackTrace` or `stack` getter runs then – in the page's own world, with nothing it could not do anyway.
+- **The page's server sees the read.** The script and map are fetched from main through the tab session (no credentials), so the server can tell that a pick happened. Nothing is cached, so each pick re-reads both (2.8 MB on the React 19 fixture).
+- **Local-file pages name no source.** A served local folder admits only its own page's requests, so the main-process read is refused and a React 19 page opened from disk says "source not found".
+
+**Revisit when**: a React 19 local-file page needs a source, or picks on large dev bundles miss the 750 ms budget.
 
 This doc covers project-wide non-Windows technical debt. For phase-structured deferred items with promotion criteria + risk-if-forgotten:
 

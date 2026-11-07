@@ -26,6 +26,7 @@ import { TabBarPage } from './pages/tab-bar.page'
 import { EditorPanelPage } from './pages/editor-panel.page'
 import { MonacoPage } from './pages/monaco.page'
 import { KeyboardHelper } from './pages/keyboard.helper'
+import { readFileIfPresent } from './utils/files'
 
 /** Watcher latency, with CI headroom. */
 const BUDGET_MS = 15_000
@@ -74,7 +75,7 @@ test.describe('Save after the parent folder is renamed outside the app', () => {
     // 3. "Save to restore it": a manual save recreates docs/ and writes the buffer
     await page.keyboard.press(`${await keyboardHelper.getModifier()}+s`)
     await expect
-      .poll(async () => readFile(join(testProject.path, 'docs', 'open.md'), 'utf-8').catch(() => ''), {
+      .poll(async () => readFileIfPresent(join(testProject.path, 'docs', 'open.md')), {
         timeout: BUDGET_MS
       })
       .toContain('edit after rename')

@@ -1,0 +1,38 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Probe failed requests</title>
+</head>
+<body>
+<!--
+  Engine probe (spec 025 commit 8, ADR 0007 decision 2): one request of each
+  failure kind of 025-FR-038 – a 500, an unresolvable host, a 404, a
+  CORS-blocked request, a 404 from a dedicated worker and a cancelled request –
+  with no frames, so it loads with a CDP session attached. `window.__probe.run()`
+  starts them; `window.__probe.settled` lists each outcome by label.
+-->
+<script>
+  var probe = { settled: {} }
+  window.__probe = probe
+  var otherOrigin = '{{origin static http other.test}}'
+  function settle(label, promise) {
+    return promise.then(function (r) { probe.settled[label] = 'response ' + r.status }, function (e) { probe.settled[label] = 'failed ' + e.name })
+  }
+  probe.run = function () {
+    settle('500', fetch('/__status/500?probe=500'))
+    settle('invalid-host', fetch('http://errors.invalid/missing?probe=invalid'))
+    settle('404', fetch('/__status/404?probe=404'))
+    settle('cors-blocked', fetch(otherOrigin + '/__status/200?probe=cors'))
+    var worker = new Worker('/console-worker.js')
+    worker.onmessage = function (event) { probe.settled.worker = String(event.data) }
+    var controller = new AbortController()
+    settle('cancelled', fetch('/__hold/probe-cancel-' + Date.now(), { signal: controller.signal }))
+    controller.abort()
+    return 0
+  }
+</script>
+</body>
+</html>

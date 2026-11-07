@@ -7,6 +7,7 @@
  * - EditorTab: Custom tab with dirty indicator, close button, and context menu
  * - ImageTab: Simple tab for image viewer panels (read-only, no dirty state)
  * - HtmlPreviewTab: Tab for the running HTML preview panel (read-only, #74)
+ * - BrowserTab: Tab for a built-in browser tab (spec 025), and NewBrowserTabButton
  * - useTabContextMenu: Hook for context menu items
  * - useTabTitle: Live panel title -> label + deleted marker (issue #70)
  * - tabOperations: Utility functions for tab management
@@ -15,6 +16,8 @@
 export { EditorTab } from './EditorTab'
 export { ImageTab } from './ImageTab'
 export { HtmlPreviewTab } from './HtmlPreviewTab'
+export { BrowserTab } from './BrowserTab'
+export { NewBrowserTabButton } from './NewBrowserTabButton'
 export { useTabContextMenu } from './useTabContextMenu'
 export { useTabTitle } from './useTabTitle'
 export type { TabTitleSource, TabTitleState } from './useTabTitle'

@@ -1,0 +1,67 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * A browser popup's origin strip (spec 025, commit 18; design README § A popup
+ * window, proposed). Its height is --space-20 (40px), which must equal
+ * POPUP_STRIP_HEIGHT_PX in src/main/services/browser/popups/
+ * popupWindowElectron.ts: main places the page view right under it.
+ */
+
+html,
+body,
+#root {
+  margin: 0;
+  overflow: hidden;
+  background: var(--color-bg-primary);
+}
+
+.erf-popup-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  box-sizing: border-box;
+  height: var(--space-20);
+  padding: 0 var(--space-6);
+  border-bottom: var(--border-width) solid var(--color-border-default);
+  background: var(--color-bg-primary);
+  font-family: var(--font-sans);
+}
+
+.erf-popup-strip__badge {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.erf-popup-strip__badge--warning {
+  color: var(--color-warning);
+}
+
+.erf-popup-strip__badge--error {
+  color: var(--color-error);
+}
+
+.erf-popup-strip__badge--neutral {
+  color: var(--color-text-secondary);
+}
+
+.erf-popup-strip__address {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: var(--input-height-sm);
+  padding: 0 var(--space-4);
+  border: var(--border-width) solid var(--color-border-input);
+  border-radius: var(--border-radius);
+  background: var(--color-bg-input);
+  color: var(--color-text-emphasis);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.erf-popup-strip__address:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}

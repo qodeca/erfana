@@ -55,6 +55,35 @@ describe('ContextMenu', () => {
     expect(menuItems).toHaveLength(3)
   })
 
+  it('renders a choice item as menuitemradio with aria-checked, and leaves plain items as menuitem', () => {
+    const items: ContextMenuItem[] = [
+      { label: 'Full width', action: vi.fn(), checked: true, checkKind: 'radio' },
+      { label: 'Phone width', action: vi.fn(), checked: false, checkKind: 'radio' },
+      { label: 'Zoom in', action: vi.fn() }
+    ]
+    renderMenu({ items })
+    expect(screen.getByRole('menuitemradio', { name: 'Full width' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('menuitemradio', { name: 'Phone width' })).toHaveAttribute('aria-checked', 'false')
+    const plain = screen.getByRole('menuitem', { name: 'Zoom in' })
+    expect(plain).not.toHaveAttribute('aria-checked')
+  })
+
+  it('draws no end check on a radio item by default, and the lime end check with radioMark "check"', () => {
+    const items: ContextMenuItem[] = [
+      { label: 'Full width', action: vi.fn(), checked: true, checkKind: 'radio' },
+      { label: 'Split', action: vi.fn(), checked: true, checkKind: 'radio', radioMark: 'check' },
+      { label: 'Preview', action: vi.fn(), checked: false, checkKind: 'radio', radioMark: 'check' }
+    ]
+    renderMenu({ items })
+    expect(screen.getByRole('menuitemradio', { name: 'Full width' }).querySelector('.context-menu-check')).toBeNull()
+    const split = screen.getByRole('menuitemradio', { name: 'Split' })
+    expect(split.querySelector('.context-menu-check svg')).not.toBeNull()
+    // The column is kept on an unchecked choice so the labels stay aligned, but it is empty.
+    const preview = screen.getByRole('menuitemradio', { name: 'Preview' })
+    expect(preview.querySelector('.context-menu-check')).not.toBeNull()
+    expect(preview.querySelector('.context-menu-check svg')).toBeNull()
+  })
+
   it('separators have role="separator"', () => {
     const items: ContextMenuItem[] = [
       { label: 'Copy', action: vi.fn() },
@@ -238,4 +267,18 @@ describe('ContextMenu', () => {
     expect(action).not.toHaveBeenCalled()
     expect(onClose).not.toHaveBeenCalled()
   })
+
+  it('draws an optional header line that describes the menu and takes no focus', () => {
+    renderMenu({ ariaLabel: 'Page actions', header: 'www.a.test' })
+    const menu = screen.getByRole('menu', { name: 'Page actions' })
+    expect(menu).toHaveAccessibleDescription('www.a.test')
+    expect(screen.getAllByRole('menuitem')).toHaveLength(defaultItems.length)
+    expect(screen.getByText('www.a.test')).not.toHaveAttribute('tabindex')
+  })
+
+  it('has no description without a header', () => {
+    renderMenu({ ariaLabel: 'Actions' })
+    expect(screen.getByRole('menu', { name: 'Actions' })).not.toHaveAttribute('aria-describedby')
+  })
+
 })

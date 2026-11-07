@@ -50,7 +50,10 @@ const variables = mockPromptVariables({
   userInstruction: 'Add a node C',
   targetDirection: 'LR',
   directionLabel: 'Left to Right',
-  importedFilePath: '/Users/test/project/imported.md'
+  importedFilePath: '/Users/test/project/imported.md',
+  // The browser prompts (spec 025) reference a page capture
+  contextRef: '@.erfana/browser/captures/20261103-101500Z-0a1b2c3d.md',
+  screenshotRef: '@.erfana/browser/captures/20261103-101500Z-0a1b2c3d.png'
 })
 
 const allPrompts = getAllPrompts()

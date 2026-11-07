@@ -1,0 +1,11 @@
+{
+  "name": "erfana-browser-fixture-react18",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Spec 025 browser fixture: a small React 18 app served from a prebuilt bundle. Not part of Erfana; see ../../README.md.",
+  "license": "GPL-3.0-only",
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  }
+}

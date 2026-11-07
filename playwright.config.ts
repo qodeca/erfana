@@ -66,7 +66,43 @@ export default defineConfig({
     {
       name: 'electron',
       testMatch: '**/*.e2e.ts',
-      testIgnore: ['**/visual-regression*', '**/audio-transcription*'],
+      testIgnore: ['**/visual-regression*', '**/audio-transcription*', '**/*.timing.e2e.ts'],
+    },
+    {
+      // Timing gates (`*.timing.e2e.ts`, e.g. 024-NFR-001): they assert a P95
+      // budget, so they run alone, after the functional suite, with no second
+      // Electron app sharing the CPU (owner decision 2026-11-04: in the full
+      // run the save P95 missed 1000 ms by 1 ms, while it is ~780 ms alone).
+      // The budgets are unchanged. A dependency failure in `electron` skips
+      // them; run them alone with `--project=timing --no-deps`.
+      name: 'timing',
+      testMatch: '**/*.timing.e2e.ts',
+      dependencies: ['electron'],
+      fullyParallel: false,
+      workers: 1,
+    },
+    {
+      // The built-in browser's hostile-page suite (spec 025, 025-NFR-001,
+      // 025-AC-046, 025-AC-068): what the `Browser isolation` CI job runs
+      // (browser-isolation.yml). A subset of the `electron` project, so a bare
+      // `playwright test` runs these twice – every script names its project.
+      // Files and titles together pick the suite: every test of
+      // browser-tab-isolation.e2e.ts carries 025-AC-046 or 025-AC-068, every
+      // test of browser-hostile-pages.e2e.ts and browser-hostile-terminal.e2e.ts
+      // carries 025-AC-046 or "hostile", and browser-local-files.e2e.ts adds
+      // its hostile local folder test.
+      // Retries 0, also on CI: a hostile page that gets through once and not
+      // on the retry is an attack that worked, not a flake.
+      // Run: npm run test:e2e:browser-isolation
+      name: 'browser-isolation',
+      testMatch: [
+        '**/browser-tab-isolation.e2e.ts',
+        '**/browser-hostile-pages.e2e.ts',
+        '**/browser-hostile-terminal.e2e.ts',
+        '**/browser-local-files.e2e.ts'
+      ],
+      grep: /025-AC-046|025-AC-068|hostile/,
+      retries: 0,
     },
     {
       // Env-gated project for capabilities that make real (paid) external
@@ -105,8 +141,11 @@ export default defineConfig({
       retries: 0,
     },
     {
+      // Every visual spec: visual-regression.e2e.ts (the app's core states) and
+      // visual-regression.browser.e2e.ts (the built-in browser's surfaces). The
+      // electron project ignores the same files (`**/visual-regression*`).
       name: 'visual',
-      testMatch: '**/visual-regression.e2e.ts',
+      testMatch: '**/visual-regression*.e2e.ts',
       retries: 0, // Visual diffs must be investigated, not retried (spec 019-FR-003)
       snapshotDir: './e2e/screenshots',
       snapshotPathTemplate: '{snapshotDir}/{arg}-{platform}{ext}',

@@ -15,7 +15,9 @@
  * `excludeMatcher`), hidden (a segment equal to a `tree.hiddenPatterns` name –
  * the tree's exact rule) or ignored (a `watcher.ignoreList` entry, by the
  * existing substring rule on `/` + the relative path). The project root itself
- * is never dropped.
+ * is never dropped. `.erfana/browser` – the built-in browser's profile and
+ * captures (spec 025, 025-FR-015) – is always excluded, whatever the lists say:
+ * Chromium writes there constantly, and none of it is the user's work.
  *
  * The filter also carries the inputs of the Windows watcher's split plan: the
  * path entries of the exclude list and the walk hints the last completed root
@@ -26,6 +28,7 @@ import path from 'path'
 import { logger } from '../services/LoggingService'
 import { isLexicallyInside } from './projectConfinement'
 import { compileExcludeMatcher, type ExcludeMatcher } from './excludeMatcher'
+import { isBrowserDataRelPath } from '../services/browser/browserProfilePaths'
 
 /** Path-entry split paths handed to the Windows watcher's plan (design D1). */
 export const MAX_SPLIT_PATHS = 64
@@ -89,11 +92,17 @@ export class ProjectPathFilter {
       .map(pattern => `/${pattern}`)
   }
 
-  /** The path, or an ancestor, is in the exclude list. */
-  readonly isExcluded = (rel: string): boolean => this.excludeMatcher.isExcluded(rel)
+  /** The path, or an ancestor, is in the exclude list or is the browser folder. */
+  readonly isExcluded = (rel: string): boolean =>
+    isBrowserDataRelPath(rel, this.caseSensitive) || this.excludeMatcher.isExcluded(rel)
 
-  /** The path itself is in the exclude list – for the tree walk. */
-  readonly isEntryExcluded = (rel: string): boolean => this.excludeMatcher.isEntryExcluded(rel)
+  /**
+   * The path itself is in the exclude list, or is the browser folder – for the
+   * tree walk, which never enters an excluded folder (and records it as a walk
+   * hint, so the Windows watcher's plan splits around it too).
+   */
+  readonly isEntryExcluded = (rel: string): boolean =>
+    isBrowserDataRelPath(rel, this.caseSensitive) || this.excludeMatcher.isEntryExcluded(rel)
 
   /** Some segment of the path equals a hidden name (the tree's exact rule). */
   readonly isHidden = (rel: string): boolean => {

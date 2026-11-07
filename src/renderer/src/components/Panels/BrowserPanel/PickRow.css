@@ -1,0 +1,963 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * Pick and send (spec 025, commit 19): the pick row and its status slot, the
+ * target chooser, the pick frame, the page's still image, the prompt-actions
+ * panel, the instruction dialog, the send notice and the address
+ * suggestions.
+ *
+ * Built to docs/designs/browser/picking.html, prompt-actions.html and
+ * tab-and-toolbar.html (proposed) on the decided Focus card (one 2px ring,
+ * offset outward) and the proposed Element picker card (outline, frame, the
+ * lime top edge of a surface that answers the pick). The still image's
+ * outline is the picker card's two-tone ring, outline only – no fill (owner
+ * decision Q2). The banner's later clauses fold by the row's own width
+ * (container queries): the shortcut clause first, then "Esc to stop"; the
+ * first clause never drops (025-FR-065).
+ */
+
+/* ---------- pick row ---------- */
+
+.erf-brw-pick {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2) var(--space-6);
+  border-bottom: var(--border-width) solid var(--color-border-default);
+  background: var(--color-bg-primary);
+  container-type: inline-size;
+  user-select: none;
+}
+
+.erf-brw-pickbtn {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-3);
+  height: var(--btn-height-sm);
+  padding: 0 var(--space-4) 0 var(--space-3);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.erf-brw-pickbtn:hover {
+  background: var(--color-bg-hover-solid);
+  color: var(--color-white);
+}
+
+.erf-brw-pickbtn[aria-pressed='true'] {
+  border-color: var(--color-accent-secondary);
+  background: var(--color-bg-selected);
+  color: var(--color-white);
+}
+
+.erf-brw-pickbtn[aria-disabled='true'] > svg {
+  opacity: var(--opacity-disabled);
+}
+
+/* Disabled: hover does nothing (Buttons card), as on `.erf-brw-tool:disabled`. */
+.erf-brw-pickbtn[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+.erf-brw-pickbtn[aria-disabled='true']:hover {
+  background: transparent;
+  color: var(--color-text-primary);
+}
+
+/*
+ * Forced colours override the border and the fill, so pressed takes the
+ * system's full Highlight (design § Cross-cutting cases). Opting out with
+ * `forced-color-adjust: none` keeps the authored lime edge and violet ring,
+ * so both are repainted in system colours too (Forced colours card rule 4):
+ * the edge in Highlight, the ring in CanvasText, offset onto Canvas.
+ */
+@media (forced-colors: active) {
+  .erf-brw-pickbtn[aria-pressed='true'] {
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+
+  .erf-brw-pickbtn[aria-pressed='true']:focus-visible {
+    outline-color: CanvasText;
+  }
+}
+
+.erf-brw-pickbtn:focus-visible,
+.erf-brw-target:focus-visible,
+.erf-brw-notice__action:focus-visible,
+.erf-brw-actions button:focus-visible,
+.erf-brw-dialog__field:focus-visible,
+.erf-brw-banner__button:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+.erf-brw-status {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  min-width: 0;
+  margin-inline-start: var(--space-4);
+  overflow: hidden;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-base);
+  white-space: nowrap;
+}
+
+.erf-brw-banner-line {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.erf-brw-banner-line__first {
+  flex: 0 0 auto;
+  color: var(--color-text-primary);
+}
+
+.erf-brw-banner-line__more {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.erf-brw-banner-line__more::before {
+  content: '·';
+  margin-inline-end: var(--space-2);
+  color: var(--color-text-tertiary);
+}
+
+/* The fold order of 025-FR-065: the shortcut clause, then "Esc to stop". */
+@container (max-width: 520px) {
+  .erf-brw-banner-line__more--2 {
+    display: none;
+  }
+}
+
+/* The row's own content box: a 400px tab is 376px here and keeps "Esc to stop"; a 360px tab (336px) folds it. */
+@container (max-width: 360px) {
+  .erf-brw-banner-line__more--1 {
+    display: none;
+  }
+}
+
+/* Icon only below 380px: the label leaves sight but stays the button's accessible name (it has no other). */
+@container (max-width: 380px) {
+  .erf-brw-pickbtn__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .erf-brw-status {
+    margin-inline-start: var(--space-2);
+  }
+}
+
+/*
+ * The static neutral tag ("Page paused", "Still image", "The page changed
+ * after the pick"): text, never a control – no hover, no pointer. The
+ * interactive address chip is `.erf-brw-chip` in BrowserChrome.css.
+ */
+.erf-brw-tag {
+  flex: 0 0 auto;
+  padding: 0 var(--space-3);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  white-space: nowrap;
+  cursor: default;
+}
+
+.erf-brw-spacer {
+  flex: 1 1 0;
+  min-width: var(--space-2);
+}
+
+/* ---------- toolbar tooltip (ToolbarTooltip.tsx; design R2-H5, proposed Tooltip card) ---------- */
+
+/*
+ * Drawn inside this band for both toolbar rows: the panel clips above the
+ * navigation row and the native page paints over everything below this
+ * row. Left and width come from the script (after the banner's first
+ * clause, before the focused control); one line, cut with an ellipsis – the
+ * full text stays in the control's description. Opaque, so the status text
+ * under it is hidden while it shows.
+ */
+.erf-brw-tip {
+  position: absolute;
+  inset-block: var(--space-1);
+  z-index: var(--z-tooltip);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: 0 var(--space-4);
+  overflow: hidden;
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  background: var(--color-gray-800);
+  box-shadow: var(--shadow-md);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  white-space: nowrap;
+}
+
+.erf-brw-tip__line {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.erf-brw-tip__line:first-child {
+  flex: 0 0 auto;
+  max-width: 100%;
+}
+
+/* A second line follows on the same line behind a CSS-drawn separator (VS-21). */
+.erf-brw-tip__line + .erf-brw-tip__line::before {
+  content: '·';
+  margin-inline-end: var(--space-2);
+  color: var(--color-text-tertiary);
+}
+
+@media (forced-colors: active) {
+  .erf-brw-tip {
+    border-color: CanvasText;
+  }
+}
+
+/* ---------- target chooser ---------- */
+
+/* The target never yields room to the status slot – the slot's clauses fold first (025-FR-061, 025-FR-065) – until 380px (below). */
+/* ---------- width preset (deck *Width presets*; § Tiers "Width preset") ---------- */
+
+.erf-brw-width {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--btn-height-sm);
+  padding: 0 var(--space-3);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--text-base);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.erf-brw-width:hover {
+  background: var(--color-bg-hover-solid);
+}
+
+.erf-brw-width:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+/* Icon only while picking or while the send notice shows; the name keeps the preset. */
+.erf-brw-pick[data-picking='true'] .erf-brw-width__label,
+.erf-brw-pick[data-notice='true'] .erf-brw-width__label {
+  display: none;
+}
+
+@container (max-width: 700px) {
+  .erf-brw-width__label {
+    display: none;
+  }
+}
+
+/* Out of room it is the first pick-row control to fold; More keeps *Page width*. */
+@container (max-width: 520px) {
+  .erf-brw-pick[data-picking='true'] .erf-brw-width {
+    display: none;
+  }
+}
+
+@container (max-width: 800px) {
+  .erf-brw-pick[data-notice='true'] .erf-brw-width {
+    display: none;
+  }
+}
+
+.erf-brw-target {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 40ch;
+  height: var(--btn-height-sm);
+  padding: 0 var(--space-3);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.erf-brw-target:hover {
+  background: var(--color-bg-hover-solid);
+}
+
+.erf-brw-target--panel {
+  border-color: var(--color-border-subtle);
+}
+
+.erf-brw-target__arrow {
+  color: var(--color-text-tertiary);
+}
+
+/* The name is cut from its end, never below 8 characters; the process never is (025-FR-061). */
+.erf-brw-target__name {
+  min-width: 8ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.erf-brw-target__proc {
+  flex: 0 0 auto;
+  color: var(--color-text-bright);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.erf-brw-target__warn {
+  flex: 0 0 auto;
+  color: var(--color-warning);
+}
+
+/*
+ * Below 380px the banner's first clause keeps its room (025-FR-065: it never
+ * truncates) and the target yields instead: its name may shrink below 8
+ * characters, down to "…", the full name kept in its accessible name and the
+ * target menu; the process is never cut (design § Pick row at the narrowest
+ * widths, Target chooser).
+ */
+@container (max-width: 380px) {
+  .erf-brw-target {
+    flex-shrink: 1;
+  }
+
+  .erf-brw-target__name {
+    min-width: 1ch;
+  }
+
+  .erf-brw-pick[data-picking='true'] .erf-brw-status {
+    flex-shrink: 0;
+  }
+}
+
+/*
+ * While the panel or the dialog is open (`data-surface`), and after the panel
+ * closed when the reviewer left (`data-panel-closed`, the longest clause),
+ * the banner's first clause and its "Still image" / "Page paused" chip keep
+ * their room (025-FR-065, M-03): the width preset leaves the row (More keeps
+ * Page width), the target yields to its arrow and process under 800px, and
+ * under 660px it leaves too – the panel footer and the dialog's target line
+ * carry the same menu button, and after a panel closed the next pick opens a
+ * panel that carries it again (design § Pick row, TR-20). 660px is the
+ * panel's clause, its chip, Pick element and the folded target side by side.
+ */
+.erf-brw-pick:is([data-surface], [data-panel-closed]) .erf-brw-width {
+  display: none;
+}
+
+@container (max-width: 800px) {
+  .erf-brw-pick:is([data-surface], [data-panel-closed]) .erf-brw-target__name:has(+ .erf-brw-target__proc) {
+    display: none;
+  }
+}
+
+@container (max-width: 660px) {
+  .erf-brw-pick:is([data-surface], [data-panel-closed]) .erf-brw-target {
+    display: none;
+  }
+}
+
+/*
+ * Under 560px those long clauses (about 300–330px) plus Pick element's label
+ * and the tag no longer fit (ui review round 2), so the clause keeps its room:
+ * Pick element shows its icon only and the tag leaves. The label stays in the
+ * accessibility tree, hidden visually, so the button keeps its name. The
+ * clause alone then fits a 400px tab (376px here) with room to spare.
+ */
+@container (max-width: 560px) {
+  .erf-brw-pick:is([data-surface], [data-panel-closed]) .erf-brw-pickbtn__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .erf-brw-pick:is([data-surface], [data-panel-closed]) .erf-brw-banner-line .erf-brw-tag {
+    display: none;
+  }
+}
+
+/* ---------- send notice (status slot) ---------- */
+
+.erf-brw-notice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--color-text-primary);
+}
+
+.erf-brw-notice__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The actions sit --space-6 after the sentence (VS-18): the row's --space-2 gap plus --space-4. */
+.erf-brw-notice__text + .erf-brw-notice__action {
+  margin-inline-start: var(--space-4);
+}
+
+.erf-brw-notice__action {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--btn-height-sm);
+  padding: 0 var(--space-3);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  background: var(--color-btn-secondary-bg);
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.erf-brw-notice__action:hover {
+  background: var(--color-btn-secondary-hover);
+}
+
+/* Under 800px the actions keep their names but show icons only. */
+@container (max-width: 800px) {
+  .erf-brw-notice__label {
+    display: none;
+  }
+}
+
+/* ---------- pick frame (Element picker card) ---------- */
+
+.erf-brw-frame--pick {
+  border-color: var(--color-accent-secondary);
+  cursor: crosshair;
+}
+
+.erf-brw-frame--pick-away {
+  border-color: var(--color-accent-secondary);
+  border-style: dashed;
+}
+
+@media (forced-colors: active) {
+  .erf-brw-frame--pick {
+    border-color: Highlight;
+    border-style: dashed;
+  }
+
+  .erf-brw-frame--pick-away {
+    border-color: Highlight;
+    border-style: dotted;
+  }
+}
+
+/* ---------- still image ---------- */
+
+.erf-brw-frame__still {
+  position: absolute;
+  inset: var(--space-1);
+  overflow: hidden;
+  background: var(--color-bg-primary);
+}
+
+.erf-brw-still {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.erf-brw-still__page {
+  position: relative;
+  align-self: flex-start;
+}
+
+.erf-brw-still__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The pick outline's two tones (ADR 0007 decision 6, amended 2026-11-05): a 2px paper line with a 1px ink
+   line on both sides; no fill (Q2). The live outline main draws over the page is the same band in the same
+   tokens (pickBand.ts, pickOutlineColours.ts), so both look identical. */
+.erf-brw-still__outline {
+  position: absolute;
+  box-sizing: border-box;
+  pointer-events: none;
+  border: var(--border-width-thick) solid var(--color-white);
+  outline: var(--border-width) solid var(--color-brand-black);
+}
+
+/* The inner ink line is a nested box, not a shadow: forced colours drop box-shadow (Forced colours card),
+   and the design asks for an inner CanvasText line there (design note § Still image). */
+.erf-brw-still__outline::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: var(--border-width) solid var(--color-brand-black);
+}
+
+@media (forced-colors: active) {
+  .erf-brw-still__outline {
+    border-color: Highlight;
+    outline-color: Canvas;
+  }
+
+  .erf-brw-still__outline::after {
+    border-color: CanvasText;
+  }
+}
+
+/* ---------- prompt-actions panel and instruction dialog ---------- */
+
+.erf-brw-actions {
+  position: absolute;
+  z-index: var(--z-popover);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: min(var(--comments-window-max-width), 100%);
+  padding: var(--space-4) var(--space-6) var(--space-6);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-lg);
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+}
+
+/* The Element picker card's lime top edge: this surface answers the pick. */
+.erf-brw-actions.erf-picker-owned {
+  border-top: var(--border-width-thick) solid var(--color-accent-secondary);
+}
+
+/* Under 400px of room: a sheet at the foot of the page area, over the still image (M-36). */
+.erf-brw-actions--sheet {
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: auto;
+}
+
+.erf-brw-actions__header,
+.erf-brw-dialog__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.erf-brw-actions__step,
+.erf-brw-actions__close {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: var(--btn-height-sm);
+  height: var(--btn-height-sm);
+  padding: 0;
+  border: none;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.erf-brw-actions__step:hover,
+.erf-brw-actions__close:hover,
+.erf-brw-actions__crumb:hover {
+  background: var(--color-bg-hover-solid);
+}
+
+.erf-brw-actions__step[aria-disabled='true'] > svg,
+.erf-brw-actions__close[aria-disabled='true'] > svg {
+  opacity: var(--opacity-disabled);
+}
+
+/* Disabled: hover does nothing (Buttons card). */
+.erf-brw-actions__step[aria-disabled='true'],
+.erf-brw-actions__close[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+.erf-brw-actions__step[aria-disabled='true']:hover,
+.erf-brw-actions__close[aria-disabled='true']:hover {
+  background: transparent;
+}
+
+.erf-brw-actions__close {
+  margin-inline-start: auto;
+}
+
+.erf-brw-actions__path {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.erf-brw-actions__path > ol {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.erf-brw-actions__path li {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  white-space: nowrap;
+}
+
+/* The picked element's chip stays whole; the crumbs before it shrink to an ellipsis (025-FR-027). */
+.erf-brw-actions__path li:last-child {
+  flex: 0 0 auto;
+  max-width: 100%;
+}
+
+.erf-brw-actions__crumb {
+  height: var(--btn-height-sm);
+  padding: 0 var(--space-2);
+  border: none;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.erf-brw-actions__sep {
+  color: var(--color-text-tertiary);
+}
+
+.erf-brw-actions__chip {
+  overflow: hidden;
+  padding: 0 var(--space-2);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  color: var(--color-text-bright);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.erf-brw-actions__chip--changed {
+  border-color: var(--color-accent-secondary);
+}
+
+/* The element's text and confirmed source (page text: mono, isolated, one line each). */
+.erf-brw-actions__details {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.erf-brw-actions__detail {
+  display: flex;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.erf-brw-actions__detail dt {
+  flex: none;
+  color: var(--color-text-tertiary);
+}
+
+.erf-brw-actions__detail dd {
+  min-width: 0;
+  margin: 0;
+}
+
+.erf-brw-actions__page-text {
+  display: block;
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  unicode-bidi: isolate;
+}
+
+.erf-brw-actions__note,
+.erf-brw-actions__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--color-text-tertiary);
+}
+
+.erf-brw-actions__buttons,
+.erf-brw-dialog__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.erf-brw-dialog__buttons {
+  justify-content: flex-end;
+}
+
+.erf-brw-actions__action {
+  height: var(--btn-height-md);
+  padding: 0 var(--space-6);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  background: var(--color-btn-secondary-bg);
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.erf-brw-actions__action:hover {
+  background: var(--color-btn-secondary-hover);
+}
+
+.erf-brw-actions__action--primary {
+  border-color: var(--color-accent-primary);
+  background: var(--color-btn-primary-bg);
+  color: var(--color-btn-primary-text);
+}
+
+.erf-brw-actions__action--primary:hover {
+  background: var(--color-btn-primary-hover);
+}
+
+.erf-brw-actions__action[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+/* The dim lives on the label, never on the button, so a focused one keeps a full-strength ring (Permission band card). */
+.erf-brw-actions__action[aria-disabled='true'] > span {
+  opacity: var(--opacity-disabled);
+}
+
+.erf-brw-actions__footer,
+.erf-brw-dialog__target {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.erf-brw-actions__hint,
+.erf-brw-dialog__hint {
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-base);
+}
+
+/* ---------- banner slot (guard, pre-warning, target chosen) ---------- */
+
+.erf-brw-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-inline-start: var(--border-width-thick) solid var(--color-border-subtle);
+  background: var(--color-bg-secondary);
+}
+
+.erf-brw-banner--warning {
+  border-inline-start-color: var(--color-warning);
+}
+
+.erf-brw-banner--error {
+  border-inline-start-color: var(--color-error);
+}
+
+.erf-brw-banner__text {
+  flex: 1 1 20ch;
+  margin: 0;
+}
+
+.erf-brw-banner__button {
+  height: var(--btn-height-sm);
+  padding: 0 var(--space-6);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  background: var(--color-btn-secondary-bg);
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.erf-brw-banner__button:hover {
+  background: var(--color-btn-secondary-hover);
+}
+
+/* ---------- instruction dialog ---------- */
+
+.erf-brw-dialog__back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--btn-height-sm);
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.erf-brw-dialog__back:hover {
+  background: var(--color-bg-hover-solid);
+}
+
+.erf-brw-dialog__title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
+}
+
+.erf-brw-dialog__label {
+  font-weight: var(--font-medium);
+}
+
+.erf-brw-dialog__field {
+  min-height: calc(var(--btn-height-md) * 3);
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-width) solid var(--color-border-input);
+  border-radius: var(--border-radius);
+  background: var(--color-bg-input);
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--text-base);
+  resize: vertical;
+}
+
+/* The Form card (decided): the boundary is --color-border-input, gray-500 on hover. */
+.erf-brw-dialog__field:hover {
+  border-color: var(--color-gray-500);
+}
+
+.erf-brw-dialog__field[aria-invalid='true'] {
+  border-color: var(--color-error);
+}
+
+/* The Form card's error contract: red edge, icon, message. */
+.erf-brw-dialog__error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: 0;
+  color: var(--color-error);
+}
+
+.erf-brw-dialog__error > svg {
+  flex: 0 0 auto;
+  width: var(--icon-size-xs);
+  height: var(--icon-size-xs);
+  margin-block-start: var(--space-1);
+}
+
+/* ---------- address suggestions ---------- */
+
+.erf-brw-address {
+  position: relative;
+}
+
+.erf-brw-suggest {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  left: 0;
+  z-index: var(--z-dropdown);
+  margin: 0;
+  padding: var(--space-2) 0;
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-lg);
+  list-style: none;
+}
+
+.erf-brw-suggest__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-2) var(--space-4);
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.erf-brw-suggest__row:hover,
+.erf-brw-suggest__row--active {
+  background: var(--color-bg-hover-solid);
+}
+
+.erf-brw-suggest__row--active {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--border-width-thick) * -1);
+}
+
+.erf-brw-suggest__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

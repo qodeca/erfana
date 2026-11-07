@@ -3,6 +3,7 @@
   "include": [
     "electron.vite.config.*",
     "electron.vite.monaco-dompurify.ts",
+    "electron.vite.design-tokens.ts",
     "src/main/**/*",
     "src/preload/**/*",
     "src/shared/**/*"

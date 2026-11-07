@@ -164,7 +164,7 @@ This leverages the frontmatter erfana's importers already write (`source` and `d
 
 A new prompt template for erfana's prompt system (`src/renderer/src/prompts/templates/`):
 
-> Note: the current schema (`src/renderer/src/prompts/schema.ts`) accepts only the `area` values `markdown-preview`, `code-editor`, `global` and `diagram-viewer` and a fixed `subArea` list, so `area: document` / `subArea: audit` below would need a schema change first.
+> Note: the current schema (`src/renderer/src/prompts/schema.ts`) accepts only the `area` values `markdown-preview`, `code-editor`, `global`, `diagram-viewer` and `browser` and a fixed `subArea` list, so `area: document` / `subArea: audit` below would need a schema change first.
 
 ```yaml
 ---

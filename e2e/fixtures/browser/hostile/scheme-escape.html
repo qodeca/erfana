@@ -1,0 +1,45 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hostile – navigate to refused schemes</title>
+<link rel="stylesheet" href="/hostile.css">
+<script src="/canary.js"></script>
+</head>
+<body>
+<h1>Navigate to refused schemes</h1>
+<p>025-AC-005, 025-NFR-001. Each button (or <code>__canary.navigate(i)</code>) navigates this page to a scheme a page must not reach. A blocked navigation leaves this page in place: the test asserts the committed URL is still this page's.</p>
+<div id="buttons"></div>
+<output id="result"></output>
+<ol id="attempts"></ol>
+<script>
+  var TARGETS = [
+    'chrome://gpu',
+    'chrome://settings',
+    'devtools://devtools/bundled/inspector.html',
+    'data:text/html,<title>ERFANA-HOSTILE-DATA-7f3a</title>top-level data URL',
+    'file:///etc/hosts',
+    'view-source:' + location.href,
+    'javascript:document.title="ERFANA-HOSTILE-JS-7f3a"'
+  ]
+  var holder = document.getElementById('buttons')
+  window.__canary.navigate = function (i) {
+    window.__canary.note('navigate ' + TARGETS[i].slice(0, 40), 'attempted')
+    location.href = TARGETS[i]
+  }
+  TARGETS.forEach(function (url, i) {
+    var button = document.createElement('button')
+    button.type = 'button'
+    button.id = 'navigate-' + i
+    button.textContent = url.slice(0, 40)
+    button.addEventListener('click', function () { window.__canary.navigate(i) })
+    holder.appendChild(button)
+  })
+  window.__canary.openJavascript = function () {
+    return window.__canary.attempt('window.open javascript:', function () { return window.open(TARGETS[6]) && null })
+  }
+</script>
+</body>
+</html>

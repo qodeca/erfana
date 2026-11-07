@@ -319,6 +319,7 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
     exportingPdf,
     openInBrowser,
     openingInBrowser,
+    openInBrowserTab,
     limitReachedBanner,
     failedBanner,
     leavePage
@@ -410,6 +411,8 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
             exportingPdf={exportingPdf}
             onOpenInBrowser={openInBrowser}
             openingInBrowser={openingInBrowser}
+            onOpenInBrowserTab={openInBrowserTab}
+            previewFileName={getBasename(filePath)}
             onApprove={approveHost}
             onExpandedChange={setBandExpanded}
             collapseRef={bandCollapseRef}

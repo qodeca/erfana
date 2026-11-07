@@ -211,7 +211,7 @@ count as you type. Its warning and error states are drawn below.</p>
 
 <div class="ds-note">
   <strong>The contract exists in one place and is missing in the rest.</strong> <code>aria-invalid</code>
-  appears in <span data-claim="aria-invalid-uses" title="places the renderer marks a field invalid to assistive tech">2</span> places in the renderer – the comment form fields in
+  appears in <span data-claim="aria-invalid-uses" title="places the renderer marks a field invalid to assistive tech">5</span> places in the renderer – the comment form fields in
   <code>CommentParts.tsx</code>, which also name their message with <code>aria-describedby</code>. That is the
   contract below, and it is the model to copy. The rename and new-file field in <code>FileSystemDialog.tsx</code>
   does none of it: its <code>&lt;label&gt;</code> is linked to nothing, it never sets <code>aria-invalid</code>,
@@ -298,7 +298,7 @@ not disabled: a disabled field leaves the Tab order and dims, and its text can n
 </table>
 
 <h2 id="sizes">Sizes</h2>
-<p class="ds-muted"><span data-claim="input-height-users" title="renderer stylesheets that size a field with an --input-height-* token">4</span> renderer stylesheets size a field with these
+<p class="ds-muted"><span data-claim="input-height-users" title="renderer stylesheets that size a field with an --input-height-* token">8</span> renderer stylesheets size a field with these
 tokens today; every other field sets its height by hand or lets padding decide it, so the same control is a
 different size depending on which dialog you opened.</p>
 <table class="ds-tokens">

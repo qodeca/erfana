@@ -1,9 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Overlay guard service (Issue #74, work item 69; design §1.8, §5(d)).
+ * Overlay guard service (Issue #74, work item 69; design §1.8, §5(d)) – the
+ * native-view guard (spec 025, ADR 0011 decision 2, commit 16).
  *
- * The SINGLE owner of preview show/hide. It watches the occluder store (any
+ * The SINGLE owner of show/hide for every native view: HTML preview views
+ * and, through {@link OverlayGuardDeps.otherKinds}, built-in browser tab views
+ * (`nativeViewKinds.ts`; one visibility API per kind, one rule for all). For
+ * browser views the send is `browserViewBounds.setVisibility`, which owns the
+ * `browser-tab:bounds` push. The single-owner rule and the drag freeze below
+ * apply to them too; the window-edge resize hold is main's, and main does not
+ * hold browser views yet.
+ *
+ * Preview show/hide in detail. The guard watches the occluder store (any
  * dialog/settings/toast/menu/full-screen overlay on screen), the preview store
  * (which panels are live – several can be at once, each with its own
  * `WebContentsView`), the per-panel gate stores, and the active dockview tab
@@ -54,52 +63,27 @@
 
 import { useOverlayOccluderStore } from '../../stores/useOverlayOccluderStore'
 import { usePreviewStore } from '../../stores/usePreviewStore'
-import {
-  usePreviewChromeGateStore,
-  type PreviewChromeGateReason
-} from '../../stores/usePreviewChromeGateStore'
+import { usePreviewChromeGateStore } from '../../stores/usePreviewChromeGateStore'
 import { usePreviewCollapsedStore } from '../../stores/usePreviewCollapsedStore'
 import { usePreviewCoveredStore } from '../../stores/usePreviewCoveredStore'
 import { logger } from '../../utils/logger'
+import { browserViewBounds } from '../browser/browserViewBounds'
+import { useBrowserTabStore } from '../../stores/useBrowserTabStore'
 import { previewGateway } from '../previewGateway'
+import {
+  createBrowserViewKind,
+  visibilityReason,
+  type NativeViewGate,
+  type NativeViewKind
+} from './nativeViewKinds'
 
 /**
- * Reason strings sent alongside `preview:setVisibility` (design §5(d)).
- *
- * The IPC `reason` is a bounded free string for main-side logging, NOT a closed
- * enum (see `OccluderKind`'s doc comment) — so a coarse cause here is fine. The
- * occluder store only exposes a boolean, so the guard cannot name the exact
- * overlay kind; it distinguishes the three cases it can tell apart.
- */
-const VISIBILITY_REASON = {
-  /** Live preview is the active tab and nothing occludes it. */
-  activeTab: 'active-tab',
-  /** Hidden because an overlay (dialog/toast/menu/…) is on screen. */
-  occluded: 'occluded',
-  /** Hidden because another tab is active. */
-  inactiveTab: 'inactive-tab',
-  /** Hidden because the page did not prove it moved out of Erfana's chrome. */
-  chromeUnconfirmed: 'chrome-unconfirmed',
-  /** Hidden because the panel is too short to share with an open host list. */
-  chromeTooShort: 'chrome-too-short',
-  /**
-   * Hidden because the panel's page area is clipped away by a collapsed
-   * ancestor (issue #124 C2), so the page would paint over something else.
-   */
-  collapsed: 'collapsed',
-  /** Hidden because the panel's own comments drawer covers its page area. */
-  covered: 'covered'
-} as const
-
-/**
- * Why one panel's page must stay hidden: a chrome-gate reason from the
- * permission band, `'collapsed'` from the bounds hook (issue #124 C2), or
- * `'covered'` from the comments drawer as a full-width sheet.
+ * Why one preview panel's page must stay hidden (see {@link NativeViewGate}).
  *
  * One term, three stores: each has a single writer, so none can overwrite or
  * lift another's hide (see `usePreviewCollapsedStore`).
  */
-export type PreviewPanelGate = PreviewChromeGateReason | 'collapsed' | 'covered'
+export type PreviewPanelGate = NativeViewGate
 
 /**
  * Everything the guard needs from the outside world.
@@ -174,6 +158,16 @@ export interface OverlayGuardDeps {
   subscribeVisibilityApplied?: (
     listener: (panelId: string, visible: boolean) => void
   ) => () => void
+  /**
+   * Native views of other kinds – the built-in browser's tab views – each
+   * with its own list, gate and visibility send ({@link NativeViewKind}).
+   * The occlusion and the active tab above apply to them unchanged.
+   *
+   * Optional, and still fail-closed: a kind's views are shown only by this
+   * guard (`browserViewBounds` starts every view hidden), so a kind left out
+   * is never shown, rather than shown over an overlay.
+   */
+  otherKinds?: readonly NativeViewKind[]
 }
 
 /**
@@ -228,44 +222,54 @@ class OverlayGuardService implements IOverlayGuard {
   private activeTabId: string | null = null
 
   /**
-   * Last visibility sent per live panel. A panel absent from the map has never
-   * been sent one, so its first computed value is always sent; entries are
-   * pruned when a panel stops being live, so a re-opened panel is treated as
-   * new rather than inheriting a stale value.
+   * Per kind (the preview first), the last visibility sent per live view, with
+   * the view's panel. A view absent from its map has never been sent one, so
+   * its first computed value is always sent; entries are pruned when a view
+   * stops being live, so a re-opened view is treated as new rather than
+   * inheriting a stale value.
    */
-  private readonly lastVisible = new Map<string, boolean>()
+  private readonly kinds: ReadonlyArray<{
+    readonly kind: NativeViewKind
+    readonly lastVisible: Map<string, { visible: boolean; panelId: string }>
+  }>
 
   private readonly unsubscribers: Array<() => void> = []
 
   constructor(private readonly deps: OverlayGuardDeps) {
-    // Recompute whenever either signal changes. `sync` covers the third trigger
-    // (tab activation), which neither store observes.
+    this.kinds = [previewKind(deps), ...(deps.otherKinds ?? [])].map((kind) => ({
+      kind,
+      lastVisible: new Map()
+    }))
+    // Recompute whenever a signal changes. `sync` covers the remaining trigger
+    // (tab activation), which no store observes.
     this.unsubscribers.push(deps.subscribeOccluded(() => this.recompute()))
-    this.unsubscribers.push(deps.subscribePreview(() => this.recompute()))
-    this.unsubscribers.push(deps.subscribeGate(() => this.recompute()))
+    for (const { kind, lastVisible } of this.kinds) {
+      this.unsubscribers.push(kind.subscribe(() => this.recompute()))
+      this.unsubscribers.push(kind.subscribeGate(() => this.recompute()))
 
-    /*
-     * RECONCILE, because "I sent it" is not "it happened".
-     *
-     * `lastVisible` is written at send time and gates every later send, so one
-     * lost message wedges a panel for the life of the session. Main reports what
-     * it applied; if that disagrees with what this guard believes, the belief is
-     * wrong and must be dropped — the next recompute then sends again.
-     *
-     * Deliberately NOT a retry loop. It corrects the CACHE and asks for a fresh
-     * decision; if the world genuinely wants the other state, the recompute says
-     * so and one more message goes out. If main keeps disagreeing, that is a
-     * main-side fault and hammering it would only hide it.
-     */
-    const subscribeApplied = deps.subscribeVisibilityApplied
-    if (subscribeApplied !== undefined) {
-      this.unsubscribers.push(
-        subscribeApplied((panelId, applied) => {
-          if (this.lastVisible.get(panelId) === applied) return
-          this.lastVisible.delete(panelId)
-          this.recompute()
-        })
-      )
+      /*
+       * RECONCILE, because "I sent it" is not "it happened".
+       *
+       * `lastVisible` is written at send time and gates every later send, so one
+       * lost message wedges a view for the life of the session. Main reports what
+       * it applied; if that disagrees with what this guard believes, the belief is
+       * wrong and must be dropped — the next recompute then sends again.
+       *
+       * Deliberately NOT a retry loop. It corrects the CACHE and asks for a fresh
+       * decision; if the world genuinely wants the other state, the recompute says
+       * so and one more message goes out. If main keeps disagreeing, that is a
+       * main-side fault and hammering it would only hide it.
+       */
+      const subscribeApplied = kind.subscribeVisibilityApplied
+      if (subscribeApplied !== undefined) {
+        this.unsubscribers.push(
+          subscribeApplied((viewId, applied) => {
+            if (lastVisible.get(viewId)?.visible === applied) return
+            lastVisible.delete(viewId)
+            this.recompute()
+          })
+        )
+      }
     }
   }
 
@@ -276,8 +280,10 @@ class OverlayGuardService implements IOverlayGuard {
 
   visiblePanelId(): string | null {
     // At most one entry is `true` (the one-visible-tab assumption below).
-    for (const [panelId, visible] of this.lastVisible) {
-      if (visible) return panelId
+    for (const { lastVisible } of this.kinds) {
+      for (const { visible, panelId } of lastVisible.values()) {
+        if (visible) return panelId
+      }
     }
     return null
   }
@@ -290,56 +296,44 @@ class OverlayGuardService implements IOverlayGuard {
 
   /**
    * Computes `visible = isActiveTab && !isOccluded() && gate === null` for EVERY
-   * live preview (`gate` from {@link OverlayGuardDeps.getPanelGate}) and
-   * sends `setVisibility` only where it differs from the last sent value.
+   * live view of every kind and sends that kind's visibility only where it
+   * differs from the last sent value.
    *
-   * Panels that are no longer live are pruned from the cache; main destroyed
-   * their views, so there is nothing left to hide.
+   * Views that are no longer live are pruned from the cache; main destroyed
+   * them, so there is nothing left to hide.
    */
   private recompute(): void {
-    const livePanelIds = this.deps.getLivePreviewPanelIds()
-
-    // Prune panels that stopped being live, so a re-open starts from unknown.
-    const live = new Set(livePanelIds)
-    for (const panelId of [...this.lastVisible.keys()]) {
-      if (!live.has(panelId)) {
-        this.lastVisible.delete(panelId)
-      }
-    }
-
-    if (livePanelIds.length === 0) return
-
-    const occluded = this.deps.isOccluded()
+    let occluded: boolean | null = null
     let visibleCount = 0
+    const visiblePanels: string[] = []
 
-    for (const panelId of livePanelIds) {
-      // The gate is per PANEL: a band waiting on one preview must not blank a
-      // second preview in a split view, which is exactly what routing this
-      // through the global occluder store would have done.
-      const gate = this.deps.getPanelGate(panelId)
-      const visible = this.activeTabId === panelId && !occluded && gate === null
-      if (visible) visibleCount += 1
+    for (const { kind, lastVisible } of this.kinds) {
+      const views = kind.liveViews()
 
-      if (this.lastVisible.get(panelId) === visible) continue
+      // Prune views that stopped being live, so a re-open starts from unknown.
+      const live = new Set(views.map((view) => view.viewId))
+      for (const viewId of [...lastVisible.keys()]) {
+        if (!live.has(viewId)) lastVisible.delete(viewId)
+      }
+      if (views.length === 0) continue
 
-      this.lastVisible.set(panelId, visible)
-      // Precedence when several apply: an inactive tab first, because it is the
-      // most basic fact; then the gate, because it is the only one with a
-      // user-visible explanation attached to it; then occlusion.
-      const reason = visible
-        ? VISIBILITY_REASON.activeTab
-        : this.activeTabId !== panelId
-          ? VISIBILITY_REASON.inactiveTab
-          : gate === 'unconfirmed'
-            ? VISIBILITY_REASON.chromeUnconfirmed
-            : gate === 'too-short'
-              ? VISIBILITY_REASON.chromeTooShort
-              : gate === 'collapsed'
-                ? VISIBILITY_REASON.collapsed
-                : gate === 'covered'
-                  ? VISIBILITY_REASON.covered
-                  : VISIBILITY_REASON.occluded
-      this.deps.setVisibility(panelId, visible, reason)
+      occluded ??= this.deps.isOccluded()
+      for (const { viewId, panelId } of views) {
+        // The gate is per PANEL: a band waiting on one preview must not blank a
+        // second view in a split, which routing it through the global occluder
+        // store would have done.
+        const gate = kind.getGate(panelId)
+        const active = this.activeTabId === panelId
+        const visible = active && !occluded && gate === null
+        if (visible) {
+          visibleCount += 1
+          visiblePanels.push(panelId)
+        }
+
+        if (lastVisible.get(viewId)?.visible === visible) continue
+        lastVisible.set(viewId, { visible, panelId })
+        kind.setVisibility(viewId, visible, visibilityReason(visible, active, gate))
+      }
     }
 
     // The one-visible-tab assumption is a consequence of `disableDnd`, not
@@ -347,11 +341,29 @@ class OverlayGuardService implements IOverlayGuard {
     // paint at once and the symptom (a view over the wrong group) is baffling —
     // so say so loudly here instead.
     if (visibleCount > 1 && import.meta.env.DEV) {
-      logger.warn('Overlay guard computed more than one visible preview', {
+      logger.warn('Overlay guard computed more than one visible native view', {
         visibleCount,
-        livePanelIds: [...livePanelIds]
+        visiblePanels
       })
     }
+  }
+}
+
+/**
+ * The preview kind, read from the guard's own preview deps (a preview's view
+ * id is its panel id).
+ *
+ * @param deps - The guard's deps
+ * @returns The preview kind
+ */
+function previewKind(deps: OverlayGuardDeps): NativeViewKind {
+  return {
+    liveViews: () => deps.getLivePreviewPanelIds().map((panelId) => ({ viewId: panelId, panelId })),
+    subscribe: deps.subscribePreview,
+    getGate: deps.getPanelGate,
+    subscribeGate: deps.subscribeGate,
+    setVisibility: deps.setVisibility,
+    subscribeVisibilityApplied: deps.subscribeVisibilityApplied
   }
 }
 
@@ -438,7 +450,8 @@ let singleton: IOverlayGuard | null = null
 
 /**
  * The production overlay-guard singleton, wired to the real occluder + preview
- * stores and the `previewGateway.setVisibility` bridge.
+ * stores, the `previewGateway.setVisibility` bridge and the browser view
+ * bounds owner.
  *
  * The `setVisibility` closure here is the ONLY `previewGateway.setVisibility`
  * call site in `src/renderer/**` (design §1.8; item 84 ESLint guard).
@@ -459,7 +472,20 @@ export function getOverlayGuard(): IOverlayGuard {
     subscribeVisibilityApplied: (listener) =>
       previewGateway.onVisibilityApplied((payload) =>
         listener(payload.panelId, payload.visible)
-      )
+      ),
+    otherKinds: [
+      // A browser panel's collapsed flag is written by its own bounds hook,
+      // keyed by its own panel id, so it never meets a preview's flag; its
+      // page is covered while Erfana's DOM fills the page area.
+      createBrowserViewKind(browserViewBounds, {
+        isCollapsed: (panelId) => usePreviewCollapsedStore.getState().isCollapsed(panelId),
+        isCovered: (panelId) => useBrowserTabStore.getState().coversPage(panelId),
+        subscribe: (listener) => {
+          const off = [usePreviewCollapsedStore.subscribe(listener), useBrowserTabStore.subscribe(listener)]
+          return () => off.forEach((unsubscribe) => unsubscribe())
+        }
+      })
+    ]
   })
   return singleton
 }

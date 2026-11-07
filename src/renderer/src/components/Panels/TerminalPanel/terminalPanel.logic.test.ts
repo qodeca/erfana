@@ -111,7 +111,7 @@ describe('ensureTerminalFontLoaded', () => {
 })
 
 describe('createTerminalLinkHandler', () => {
-  it('opens the clicked link through the supplied opener and not window.open', async () => {
+  it('hands the clicked link and its click to the supplied opener, not window.open', async () => {
     const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
     const open = vi.fn().mockResolvedValue(undefined)
     const onError = vi.fn()
@@ -120,7 +120,7 @@ describe('createTerminalLinkHandler', () => {
     createTerminalLinkHandler(open, onError)(event, 'https://example.com/')
     await Promise.resolve()
 
-    expect(open).toHaveBeenCalledWith('https://example.com/')
+    expect(open).toHaveBeenCalledWith('https://example.com/', event)
     expect(event.preventDefault).toHaveBeenCalled()
     expect(openSpy).not.toHaveBeenCalled()
     expect(onError).not.toHaveBeenCalled()

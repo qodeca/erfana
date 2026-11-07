@@ -38,6 +38,18 @@ export interface ITerminalManager {
   sendToTerminal(content: string, autoExecute?: boolean): Promise<boolean>
 
   /**
+   * Send text to a named terminal, whether or not it is the active one: the
+   * text is stripped of control characters except line breaks, sent as one
+   * bracketed paste, then submitted with Enter.
+   * Optional so managers that predate it still type-check; a send that names a
+   * terminal fails when it is missing.
+   * @param terminalId - The terminal to type into
+   * @param content - Text to send
+   * @returns Promise resolving to success status
+   */
+  sendToTerminalId?(terminalId: string, content: string): Promise<boolean>
+
+  /**
    * Wait for terminal to become ready using events (not polling)
    * Uses Zustand subscription for immediate notification when terminal is ready.
    * @param timeoutMs - Maximum time to wait (default 5000ms)

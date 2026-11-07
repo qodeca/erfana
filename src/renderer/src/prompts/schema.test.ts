@@ -24,7 +24,8 @@ describe('Prompt Frontmatter Schema', () => {
         requiresInput: true,
         inputLabel: 'Enter input',
         inputPlaceholder: 'Type here...',
-        mutatesDocument: false
+        mutatesDocument: false,
+        browserCapture: false
       }
 
       const result = validateFrontmatter(data)

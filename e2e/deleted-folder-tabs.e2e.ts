@@ -20,7 +20,7 @@
  * `toPass`).
  */
 
-import { readFile, rename, rm, writeFile } from 'fs/promises'
+import { rename, rm, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { test, expect } from './fixtures/index'
 import { ProjectTreePage } from './pages/project-tree.page'
@@ -28,6 +28,7 @@ import { TabBarPage } from './pages/tab-bar.page'
 import { EditorPanelPage } from './pages/editor-panel.page'
 import { MonacoPage } from './pages/monaco.page'
 import { KeyboardHelper } from './pages/keyboard.helper'
+import { readFileIfPresent } from './utils/files'
 
 /** The 2 s re-check, the atomic-save window and the existence re-check, with CI headroom. */
 const BUDGET_MS = 15_000
@@ -97,7 +98,7 @@ test.describe('Open tab restored by a save', () => {
     // "Save to restore it"
     await page.keyboard.press(`${await keyboardHelper.getModifier()}+s`)
     await expect
-      .poll(async () => readFile(filePath, 'utf-8').catch(() => ''), { timeout: BUDGET_MS })
+      .poll(async () => readFileIfPresent(filePath), { timeout: BUDGET_MS })
       .toContain('Original body.')
     await expect(deletedMarker).toHaveCount(0)
     await expect(tabs.dirtyDot('open.md')).toHaveCount(0)

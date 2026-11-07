@@ -38,9 +38,28 @@ function isOverlayRoute(): boolean {
   return typeof window.overlayApi !== 'undefined'
 }
 
-const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement)
+/**
+ * A browser popup's host window (spec 025, commit 18): mounted only when
+ * `window.browserPopupApi` exists, which only `src/preload/browserPopup.ts`
+ * exposes – the `#browser-popup` route is content, not a trust signal.
+ */
+function popupApi(): NonNullable<Window['browserPopupApi']> | null {
+  return window.browserPopupApi ?? null
+}
 
-if (isOverlayRoute()) {
+const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement)
+const browserPopupApi = popupApi()
+
+if (browserPopupApi !== null) {
+  // A separate chunk, as the overlay: its global `html, body` rules stay out of the app's CSS.
+  void import('./browserPopup/PopupStrip').then(({ PopupStrip }) => {
+    root.render(
+      <React.StrictMode>
+        <PopupStrip api={browserPopupApi} />
+      </React.StrictMode>
+    )
+  })
+} else if (isOverlayRoute()) {
   // Load the overlay (and its `ScreenshotOverlay.css`) via a dynamic import so the
   // bundler emits it as a separate chunk. A static top-level import would fold the
   // overlay's global `html, body, #root { cursor: crosshair; … }` rule into the MAIN

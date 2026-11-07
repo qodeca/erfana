@@ -50,7 +50,7 @@ e4e3c73cec9dbdd525082d68069754e54ca7b283:src/shared/ipc/preview-comment-schema.t
 # Spec 024 unified comments: a fake draft token (0123456789abcdef repeated) in two test harnesses – not a secret.
 a6b954465cd3fa5211f1cc8accd98f8cd67b6075:src/renderer/src/components/Comments/__conformance__/txt/txtPreview.conformance.test.tsx:generic-api-key:31
 d79d88055e00ed4d790b95da7b38ff1864729414:src/renderer/src/components/Editor/markdownComments/__test-utils__/harness.tsx:generic-api-key:26
-# Spec 025 built-in browser (PR #458): a fake API key in a packaged-build test script and a fake draft token (0123456789abcdef repeated) in two capture fixtures – not secrets.
+# Spec 025 built-in browser: test values, not secrets – a fake transcription key ("sk-erfana-ac079-probe-key") in the packaged-probe evidence, and the golden capture token (0123456789abcdef repeated) in two capture fixtures.
 7009d6bf8bdb8b963a69fe7bce50f7350f025545:specs/spec-t4-025-built-in-browser/verification/evidence/macos-packaged-harness.md:generic-api-key:505
 6e716296459fa2162f01aeedeb4612952cc7ebee:src/main/services/browser/capture/captureRender.test.ts:generic-api-key:9
 873b69a30f62284263954a328eae934fad3a4b3f:src/shared/browser/__fixtures__/goldenCapture.ts:generic-api-key:10

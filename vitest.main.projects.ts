@@ -22,6 +22,7 @@
 import path from 'node:path'
 import type { TestProjectInlineConfiguration } from 'vitest/config'
 import { maxWorkers } from './vitest.workers'
+import { mainDesignTokenDefines } from './electron.vite.design-tokens'
 
 type ProjectTestOptions = NonNullable<TestProjectInlineConfiguration['test']>
 
@@ -35,10 +36,15 @@ export const PERF_TEST_PATTERN = '**/*.perf.test.*'
 /** The timing-budget suites among the main-process tests: {@link MAIN_INCLUDE}, `*.perf.test.*` only. */
 const PERF_INCLUDE = MAIN_INCLUDE.map((glob) => glob.replace('*.test.', '*.perf.test.'))
 
-/** What both projects share: Node, the main setup file, the `@main` / `@shared` aliases. */
+/** What both projects share: Node, the main setup file, the `@main` / `@shared` aliases, the build flags. */
 function mainProcessProject(test: ProjectTestOptions): TestProjectInlineConfiguration {
   return {
     extends: false,
+    // Mirror the main build's `define` (electron.vite.config.ts) for a non-e2e
+    // build: the test hooks are compiled out. A test of the e2e path stubs the
+    // global with `vi.stubGlobal('__ERFANA_TEST_HOOKS__', true)`.
+    // …and its design-token values, resolved from design-tokens.css the same way.
+    define: { __ERFANA_TEST_HOOKS__: 'false', ...mainDesignTokenDefines() },
     resolve: {
       alias: {
         '@main': path.resolve(__dirname, 'src/main'),

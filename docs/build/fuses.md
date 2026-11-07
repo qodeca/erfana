@@ -22,7 +22,7 @@ await flipFuses(electronBinaryPath, {
   version: FuseVersion.V1,
   resetAdHocDarwinSignature: context.electronPlatformName === 'darwin',
   [FuseV1Options.RunAsNode]: false,
-  [FuseV1Options.EnableCookieEncryption]: false,
+  [FuseV1Options.EnableCookieEncryption]: true,
   [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
   [FuseV1Options.EnableNodeCliInspectArguments]: isTestBuild,
   [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
@@ -198,7 +198,7 @@ Three guardrails keep such a build from being mistaken for a release:
 | Fuse | Value | Reason |
 |------|-------|--------|
 | `RunAsNode` | `false` | **Critical**: Prevents `ELECTRON_RUN_AS_NODE` exploitation (CVE-2024-46992) |
-| `EnableCookieEncryption` | `false` | **Nothing to protect**: no persistent cookies (re-evaluated v0.22.0, see [Cookie encryption decision](#cookie-encryption-decision)) |
+| `EnableCookieEncryption` | `true` | **Browser sign-ins**: the built-in browser keeps persistent per-project cookies (spec 025, [ADR 0010](../adrs/0010-turn-on-cookie-encryption.md); see [Cookie encryption decision](#cookie-encryption-decision)) |
 | `EnableNodeOptionsEnvironmentVariable` | `false` | **Critical**: Prevents command injection via `NODE_OPTIONS` |
 | `EnableNodeCliInspectArguments` | `isTestBuild` – `false` on every production build | **Critical**: Prevents remote debugging access via `--inspect`. Set to `true` only when `ERFANA_TEST_BUILD=true`, for Playwright E2E over CDP – see [test builds and the Node CLI inspector](#test-builds-and-the-node-cli-inspector) |
 | `EnableEmbeddedAsarIntegrityValidation` | `true` | **Tamper check**: refuses to start when `app.asar` differs from the hash embedded at build time (since v0.22.0) |
@@ -233,15 +233,15 @@ Three guardrails keep such a build from being mistaken for a release:
 
 ## Cookie encryption decision
 
-### Why it stays off (re-evaluated for v0.22.0)
+### Why it is on (spec 025, ADR 0010)
 
-The fuse encrypts Chromium's on-disk cookie store with the OS key (Keychain on macOS, DPAPI on Windows). Erfana has nothing in that store worth encrypting:
+The built-in browser (spec 025) keeps one persistent Chromium profile per project in `<sessionData>/browser-profiles/<name>/chromium/` (ADR 0009, amended 2026-11-03), with the sign-in cookies of the sites the user visits. The fuse encrypts that cookie store with the OS key (Keychain on macOS, DPAPI on Windows, the Secret Service keyring on Linux), so a cookie value is not readable as plain text from disk (025-NFR-007). [ADR 0010](../adrs/0010-turn-on-cookie-encryption.md) supersedes the v0.22.0 decision to keep it off.
 
-- The main window loads `file://` and sets no cookies.
-- HTML previews run in in-memory partitions (no `persist:` prefix – `previewSessionPolicy.ts`), so their cookies never reach disk.
-- Secrets that do need the OS key already use `safeStorage` directly: the transcription API key (`ApiKeyService`) and the project-lock HMAC secret (`lockHmac.ts`). Settings are a JSON file, not cookies, and the fuse does not touch them.
-
-The original v0.6.0 reason – a keychain prompt with no context – is weaker than it was, because `safeStorage` already reads the same "Erfana Safe Storage" key when a project lock is taken. Turning the fuse on would still add that read to every start, before any window opens, and Electron cannot read encrypted cookies again if the fuse is ever turned back off. With no benefit today, it stays off. Revisit it if Erfana ever keeps a signed-in web session.
+- **One-way.** Electron cannot read encrypted cookies once the fuse is off again, so it must never be turned back off.
+- **Existing cookies.** Plain-text cookies from earlier versions are encrypted the next time they are written, with no data loss (025-AC-079).
+- **Only cookies.** Local storage, IndexedDB, the cache and service-worker storage stay plain text, and on Windows any process of the same user can decrypt the cookie key; the user guide states both limits (025-FR-017).
+- **Start-up cost.** Every start reads the "Erfana Safe Storage" key, which `safeStorage` already reads when a project lock is taken. The cost is measured against the previous release (025-NFR-010, 025-AC-082).
+- **Linux without a keyring.** Chromium falls back to its built-in key (`basic_text`), which is weak; the browser shows a one-time notice (025-FR-018).
 
 ---
 

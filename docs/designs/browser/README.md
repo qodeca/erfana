@@ -386,9 +386,9 @@ Separators between clauses are drawn by CSS with equal margins, never typed (VS-
 
 ### Pick overlay and label
 
-Engine-drawn over the live page; Erfana-drawn on the still image; same look (Element picker card).
+Erfana-drawn on both: over the live page on a click-through native surface outside the page, and on the still image; same look (Element picker card). Under Wayland the engine draws the live outline in one colour (ADR 0007, amendment 2026-11-05).
 
-- **Outline**: 2px `--color-accent-primary` with a 1px `--color-brand-black` line on both sides, drawn instantly; selected adds a light accent fill and, so it is a shape too, a doubled edge. **Forced colours** (M-33): outer 1px Canvas, 2px Highlight, inner 1px CanvasText (a nested pseudo-element, not a shadow); selected shown by the doubled edge.
+- **Outline**: 2px `--color-white` with a 1px `--color-brand-black` line on both sides, drawn instantly, by Erfana both live (click-through native surface) and on the still image; the engine's one-colour accent outline only under Wayland (ADR 0007, amendment 2026-11-05; Focus card picker row). Selected adds a light accent fill and, so it is a shape too, a doubled edge. **Forced colours** (M-33): outer 1px Canvas, 2px Highlight, inner 1px CanvasText (a nested pseudo-element, not a shadow); selected shown by the doubled edge.
 - **Label**: *Label*; tag in accent, `#id` or classes in paper, size in `--color-text-primary`, on ink. Placement (VS-20): above the element's top-left, else below, else at the end side; **never inside an element shorter than about two label heights**; inside the top-left corner only for a tall element whose top edge has no room. The panel keeps at least `--space-4` clear of the label.
 - **Zoom** (M-34): ADR 0007 must make the engine label scale with Erfana's zoom factor; if it cannot, the status slot echoes *Label* in place of the banner's later clauses while hovering, and the deviation is recorded at the site.
 - Tiny, huge, partly visible, in a frame: as round 0 (ring pushed out 2px under 8px; clipped to the visible part; label at the visible top-left; the panel names a cross-origin frame).
@@ -490,7 +490,7 @@ Focus never falls to the document.
 ## Security UI rules
 
 1. **One source for the origin.** The address bar and every origin line are filled from the engine's **committed** URL, never from page content. The bar shows a **pending** URL only for a navigation the reviewer started (typed address, Reload, Back or Forward, a history or empty-tab row, a terminal link, Open in browser tab); for one the page started (script, link click, form, redirect, meta refresh) it keeps the committed URL until the new document commits, and drops a pending URL the moment the page modifies the document (H-03). **The editor-tab label and its description follow the same rule** (R2-M12): for a page-started load they keep the committed page's title, or its host, until commit. **An Erfana certificate or load-error page commits the failed URL** (R2-M10): the bar then shows that URL through the formatter with its badge (*Badge – not secure (warning up)* on the certificate page), so the bar names the host that Proceed anyway or Reload would load.
-2. **One formatter for every origin Erfana writes** (H-01): the address bar, the editor-tab label when it is an address, the tab tooltip, suggestion and history rows, strip rows, notices, toasts, the certificate and load-error pages, the popup strip and the popup's OS title. It drops `https://`; keeps the scheme when it is not `https` and the port when it is not default, **at every tier**; dims subdomain labels to `--color-text-tertiary` and draws the registrable domain in `--color-text-emphasis`; removes whole subdomain labels from the front as `….`; never wraps inside the registrable domain (`nowrap`) and never cuts it, except by the last-resort start cut of fold step 8 (§ States › Tiers, R4-H1), which keeps the domain's end, the TLD and the port and never clips the end of the field – the formatter slices the string and writes the leading "…" itself, never CSS `direction`, because bidi reordering scrambles digit-led domains (R5-M3); gives the path a 2ch floor below which it is dropped whole. **It strips userinfo** (`user:password@`) on every display surface – the bar at rest, the link destination, the link header, history rows, notices; only the focused, editable bar shows it, never emphasised (R2-M9). **A non-web target** (any scheme other than `http`, `https`, `file`) is shown as the scheme word plus a plain description (*Link – non-web*), never as a host in bright text. No surface does its own truncation. Where Erfana finds the registrable domain is OD-1.
+2. **One formatter for every origin Erfana writes** (H-01): the address bar, the editor-tab label when it is an address, the tab tooltip, suggestion and history rows, strip rows, notices, toasts, the certificate and load-error pages, the popup strip and the popup's OS title. It drops `https://`; keeps the scheme when it is not `https` and the port when it is not default, **at every tier**; dims subdomain labels to `--color-text-tertiary` and draws the registrable domain in `--color-text-emphasis`; removes whole subdomain labels from the front as `….`; never wraps inside the registrable domain (`nowrap`) and never cuts it, except by the last-resort start cut of fold step 8 (§ States › Tiers, R4-H1), which keeps the domain's end, the TLD and the port and never clips the end of the field – the formatter slices the string and writes the leading "…" itself, never CSS `direction`, because bidi reordering scrambles digit-led domains (R5-M3); gives the path a 2ch floor below which it is dropped whole. **It strips userinfo** (`user:password@`) on every display surface – the bar at rest, the link destination, the link header, history rows, notices, and the editable bar while it is being edited, as Chrome does; no surface shows it (R2-M9, amended 2026-11-05, owner decision: the spoofing fix in `specs/spec-t4-025-built-in-browser/verification/attacker-pass.md`). **A non-web target** (any scheme other than `http`, `https`, `file`) is shown as the scheme word plus a plain description (*Link – non-web*), never as a host in bright text. No surface does its own truncation. Where Erfana finds the registrable domain is OD-1.
 3. **Lookalikes are shown for what they are.** Mixed-script labels in punycode. Whole-script confusables remain for the code-level spoofing review (05-notes).
 4. **Titles never sit where origins are.** (a) The page title appears only as the editor-tab label and as line 2 of the tab's tooltip, labelled "Title:"; the tab tooltip is drawn inside the tab strip band and never covers the address bar or the focused row (H-02); a popup's OS title shows "{host} – Erfana". (b) **One provenance grammar, asker first** (H-04): "{frame host}, inside {top host}, {asks / wants to / says} …" on every prompt, and "{frame host}, inside {top host}" as the panel's frame line. A credential prompt always leads with the origin that will receive the password.
 5. **Erfana never draws inside the page (025-FR-054).** Only the rows above, the still image and Erfana pages.
@@ -547,7 +547,7 @@ How to read: `{braces}` are variables; "Name" is the accessible name when it dif
 | sign in / sign-in | Basic and Digest authentication, and logins generally | log in, login, credentials (new strings) | "Sign in to {host}" |
 | pop-up | A window or tab a page tries to open | popup (spec prose only) | "Pop-up blocked" |
 | full screen | A page filling the page area | fullscreen | "{host} is now full screen." |
-| clear / forget | Clear removes kinds of data; Forget deletes `.erfana/browser/` | reset, wipe | "Clear browsing data…" |
+| clear / forget | Clear removes kinds of data; Forget deletes `.erfana/browser/` and the project's Chromium profile under Erfana's data folder | reset, wipe | "Clear browsing data…" |
 | prompt above the page | How announcements name a strip row (CT-16) | the bar above the page | "Press F6 to answer in the prompt above the page." |
 
 ### Variables
@@ -775,14 +775,14 @@ Shown in the first strip row as a field error, linked to the field; typed text s
 | Send notice | Sent {action} to {terminal name} | – | spec-fixed (025-FR-060) |
 | Show terminal | Show terminal (icon below 800px) | "Show terminal" | spec-fixed |
 | Open capture | Open capture (icon below 800px) | "Open capture"; Desc. "Opens the context file in an editor tab" | spec-fixed |
-| Announce – sent | Sent {action} to {terminal name}. Show terminal and Open capture are also in the target menu. | – | Polite (H-12) |
+| Announce – sent | Sent {action} to {terminal name}. Show terminal and Open last capture are also in the target menu. | – | Polite (H-12) |
 | Note – page changed | The page changed – pick the element again. | – | spec-fixed (025-FR-053); takes its full stop even in the status slot (OD-9), over voice rule 10's one-line-clause exception |
 
 ### Guard, pre-warn and failure messages
 
 | Row | String | Action | Notes |
 | --- | --- | --- | --- |
-| Pre-warn – shell | {terminal name} is running {process}, not an agent. Choose another terminal, or start your agent there and pick again – leaving this panel closes the pick. Ask…, Change… and Prompt… keep your pick while you're away. | Choose terminal | Warning, on open (M-28, R2-M13); never the error's "send again" (R2-M4) |
+| Pre-warn – shell | {terminal name} is running {process}, not an agent. Start your agent there, then pick again – leaving this panel closes the pick. Ask…, Change… and Prompt… keep your pick while you're away. | Choose terminal | Warning, on open (M-28, R2-M13); never the error's "send again" (R2-M4) |
 | Pre-warn – no terminal | No terminal open. Open one, start your agent there and pick again – leaving this panel closes the pick. Ask…, Change… and Prompt… keep your pick while you're away. | Open terminal | Warning (R2-M13) |
 | Guard – shell | No agent is running in {terminal name} – start your agent there, then send again. | Choose terminal | spec-fixed (025-FR-061); error, assertive |
 | Guard – no terminal | No agent is running in a terminal – no terminal is open. Open one, start your agent there, then send again. | Open terminal | Keeps the AC prefix (CT-10, CF-1); button is addition A-5 |
@@ -932,7 +932,7 @@ Shown in the first strip row as a field error, linked to the field; typed text s
 | Blocked reason | Tick at least one kind of data. | – |
 | Buttons, busy, done | Cancel · Clear · Clearing… · toast "Browsing data cleared for this project." | – |
 | Step failed | Some data wasn't cleared · Couldn't clear {kind} – {reason}. Data you didn't tick wasn't touched. | – |
-| Forget | Title "Forget this project's browser data?" · body "This closes the project's browser tabs and deletes the .erfana/browser folder – cookies, saved sign-ins, permissions, history and captures. You'll be signed out of every site in this project." · Cancel · Forget browser data · Forgetting… | – |
+| Forget | Title "Forget this project's browser data?" · body "This closes the project's browser tabs and deletes its browser data – cookies, saved sign-ins, permissions, history and captures – from the .erfana/browser folder and from Erfana's own data folder. You'll be signed out of every site in this project." · Cancel · Forget browser data · Forgetting… | – |
 | Forget done | This project's browser data is deleted. | – |
 | Forget done, Windows | This project's browser data is deleted. A few files still in use go the next time Erfana starts. | CT-21 |
 | Forget failed | Browser data not fully deleted · Couldn't delete {path} – {reason}. | – |
@@ -963,10 +963,13 @@ Fed into one always-mounted, visually hidden polite region per browser tab (M-45
 | Panel opens | The panel's name, then its first action (native focus) |
 | Refinement | *Announce – refined*; at an end, *Note – top of the page* / *Note – back at the start* with a full stop |
 | Page paused | Page paused. (once) |
+| Send starts (the wait for Enter can take seconds while the agent works, #449) | Sending {action} to {terminal}… (once) |
 | Sent | *Announce – sent* |
 | Guard hit | The guard text – assertive |
 | Capture or write failed | The toast title and message – assertive |
 | Page changed | The page changed – pick the element again. |
+| Element gone (↑ ↓ in the panel) | That element is gone – pick again. |
+| Load a page (Pick element or Ctrl/Cmd+E on an empty tab or Erfana page) | Load a page to pick an element. |
 | Site prompt arrives | *Announce – prompt arrives* |
 | Sign-in arrives without focus | *Announce – prompt arrives*, with "{host} asks you to sign in" as the request |
 | Page dialog waits | *Announce – page dialog waiting* |
@@ -1326,7 +1329,7 @@ Round 4 – 2026-11-01, confirm round, five reviewers (IX had nothing open): R3-
 | Pre-warn text without "send again" | R2-M4 |
 | Certificate caution text per code, "proceed" not "continue" | R2-M6, CT-R2-9 |
 | Page dialog answers "Decline · Confirm" (025-FR-058 does not fix them) | R2-M8 |
-| Formatter strips userinfo; non-web schemes as scheme word plus description | R2-M9 |
+| Formatter strips userinfo; non-web schemes as scheme word plus description (userinfo also stripped while editing, 2026-11-05) | R2-M9 |
 | Interstitials commit the failed URL; tab label follows rule 1 | R2-M10, R2-M12 |
 | Proceed anyway takes the input guard and fresh-press rule (A-27) | R2-M11 |
 | Honest pre-warn: the pick closes when you leave, Prompt… keeps it; return banner | R2-M13 |
@@ -1382,3 +1385,32 @@ Round 4 – 2026-11-01, confirm round, five reviewers (IX had nothing open): R3-
 | Owner decisions recorded: § Open decisions became § Decisions (owner answer, date) and § Spec follow-ups; OD-5 and SPEC-4 answered against the recommendation, so Proceed anyway shows at once on every host and the HSTS frame is gone; OD-7 width labels to "390px"; OD-14 shares one banner pattern with comments; A-24 withdrawn | Owner, 2026-11-01 |
 | Declined – no send-time notice about the AI provider (owner decision D5) | M-49 (SEC-10) |
 | Screen- and card-only items, not note text | M-38, M-39 (central stand-ins noted), M-41, TR-16, TR-17, TR-18, TR-22, VS-17, VS-22, VS-24 |
+
+## Differences in the build
+
+Where the shipped build differs from this note. Each row is a difference to settle – by changing the build or this note – not a decision.
+
+| Build step | Surface | This note says | The build does | Why |
+|---|---|---|---|---|
+| Commit 19 | Page right-click menu, More, target menu, address suggestions | The surface draws over a still image of the page | Built as the note says: the page's picture is taken first and the surface opens over it. When no picture can be taken (no live page, capture refused), the surface opens over Erfana's background, as the native-view guard hides the page for any app overlay | – |
+| Commit 18 | Pop-up blocked chip | The chip brings the row back while the row is kept | The chip shows only while the row is in the strip; once dismissed, main forgets the blocked open, so there is nothing for the chip to bring back | Main keeps no dismissed row to return to |
+| Commit 18 | Keyring notices | – | The weak-protection and keyring-reset notices are `keyring` strip rows with **Dismiss** only; "remembered for this session" wording on a permission row is the build's own | The note has no row copy for them |
+| Commit 18 | Page dialogs | `pageDialog` rows | Rendered generically (Confirm / Close / Decline); main emits none yet | Main-side emitter pending |
+| Commit 18 | Sign-in rejection line | – | No live region: both fields carry `aria-invalid` and point at the line, and the strip's polite announcer says it when the row arrives (Form card, decided) | `role="alert"` on a line that appears with its text is unreliable (Feedback card) |
+| Commit 19 | Send notice, target menu | **Open capture** opens the context file in preview | Opens the context file in an editor tab in its default mode | The editor panel is at its line-count baseline; a preview-mode option was not added |
+| Commit 19 | Target chooser (025-FR-061) | A list of the project's terminals, the current one marked (`menuitemradio`) | One entry – Erfana's one terminal panel, named "Terminal" – as a plain menu item | Erfana has one terminal panel (owner item 26); the shared menu's radio items (`checked`) wait for a second entry |
+| Commit 19 | Agent deny-rule offer (S-21) | Offered once per project | Offered once per project per app session (kept in memory) | No persisted flag yet |
+| Commit 19, amended 2026-11-05 | Pick outline, live and on the still image | Two-tone outline, 3:1 against the page: 2px `--color-accent-primary` with a 1px `--color-brand-black` line on both sides | Both outlines are 2px `--color-white` (paper) with a 1px `--color-brand-black` line on both sides. The live one is drawn by Erfana on a click-through child window over the page (never inside it, never in the page's capture); under Wayland, where that window cannot be placed, the live outline is the engine's one-colour accent outline (about 2.1:1 on a white page) | Owner decision 2026-11-05 ([ADR 0007 amendment](../../adrs/0007-pick-overlay-engine-drawn-through-cdp.md#amendment-2026-11-05-owner-decision-the-live-outline-is-drawn-by-erfana)): the engine strokes one colour; ink on paper is 18.5:1, so one of the two clears 3:1 on any page. The note's outline bullet and the decided Focus card's picker row say paper too (owner, 2026-11-05) |
+| Commit 20, amended 2026-11-05 | Picked look on the still image | *Selected* adds a light accent fill and a doubled edge | The still image shows the same ink-and-paper outline as hovering, with no fill and no doubled edge; the panel or dialog next to it is what says the element is picked | Owner decision Q2 (outline only, no fill), applied to the still image too so the picture stays an exact copy of the page under the outline |
+| Owner decision 2026-11-05 | In-use chip, capture chip, in-use tab states (025-FR-019) | A chip and a tab state while the page uses the camera, microphone or screen | Not built: the permission prompt and the site settings are the only signs | Owner decision Q-34: Electron gives no reliable in-use signal for a tab |
+| Commit 20 | Prompt-actions panel (025-FR-027) | The card shows the element's source file:line | The source line shows only when a source hint resolves to a real, not git-ignored file in the project – a source-location attribute on the element, React's JSX source where React still gives one, or, for React 19 dev builds, the bundle stack mapped back through the page's own source map | Owner decision 2026-11-05 (Q-18) added the source-map library; a page without a same-origin source map, or an eval-built bundle, still shows no source line |
+| Commit 20 | Prompt-actions panel (025-FR-027) | The card shows the element's selector | The card shows the element's name, text and ancestor path; the selector stays in the context file | The panel's width is spent on the text |
+| Commit 20 | Pick row width preset | Page width moves to More only while it is off the row | More keeps **Page width** at every width, as well as the row button | One menu definition for both places; the row button hides first when the row runs out of room |
+| Commit 20 | HTML preview, Open in browser tab | The tool's name gives the file's project-relative path | The tool's name gives the file name ("Open index.html in a browser tab") | The band has only the file path, not the project root |
+| Commit 20 | Terminal drop confirmation (S-17) | Ask before dropping text a web page wrote | Every text drop from outside Erfana with a line break or control character asks, whatever app it came from | A drop carries no sign of the page that started it |
+| Commit 20 | Strip rows | Rows fold by tier when the strip runs out of room | Still not built – every row shows in the fixed kind order | Neither this note nor the deck defines the tiers' order and break widths |
+| Fold steps | Badge, icon-only (step 6) | *Badge tooltip* on hover, and on the field's keyboard focus while icon-only | The tooltip is the native `title` on the whole badge segment, on hover only; the description stays the field's accessible description | Erfana's own tooltip for the badge is not built |
+| Fold steps | Rows below 700px | The rows' inline padding steps down (non-folding tier change, R5-M1) | Not built – the rows keep `--space-6` | The note gives no step-down value |
+| AAA review fixes | Toolbar tooltips (025-AC-065, H-02, R2-H5) | Navigation-row tooltips open above their trigger; pick-row tooltips sit in the pick row's band, up to two lines; the trigger's `aria-describedby` points at the tooltip | One bubble for both rows, always inside the pick row's band – after the send notice or the banner's first clause, before a focused pick-row control – on one line, cut with an ellipsis; a second line follows behind a CSS-drawn "·". The full text is the control's `aria-description`. It does not show with less than 80px of room. A navigation-row bubble is not next to its trigger, so the pointer cannot travel onto it (Tooltip card, hoverable) | The panel clips everything above the navigation row and the native page paints over everything below the pick row; the band is one line high. A shared bubble cannot be every trigger's `aria-describedby` target |
+| AAA review fixes | More, *Page width* group | Three `menuitemradio` items in a `role="group"` labelled by a "Page width" heading | `menuitemradio` items with `aria-checked`, the current one also ticked; no group or heading | The shared menu has no groups |
+| AAA review fixes | Pick row while the panel or dialog is open | The width preset and the target leave the row at narrow | The width preset leaves at every width; the target folds to its arrow and process below 800px and leaves below 660px, so the panel's or dialog's first clause and its *Still image* / *Page paused* chip never clip | The note gives no break widths; 660px fits the panel clause, its chip, Pick element and the folded target |

@@ -20,7 +20,9 @@
  * @see docs/file-watching/README.md — architectural notes
  */
 
-import { test, expect, _electron as electron } from '@playwright/test'
+import { expect, _electron as electron } from '@playwright/test'
+// The fixtures' `test`, for its auto OS-focus lock (e2e/fixtures/osFocusLock.ts).
+import { test } from './fixtures/index'
 import * as path from 'path'
 import { promisify } from 'util'
 import { execFile } from 'child_process'

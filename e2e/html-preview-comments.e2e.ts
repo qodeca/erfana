@@ -61,7 +61,7 @@ import * as fs from 'fs'
 import * as fsp from 'fs/promises'
 import * as path from 'path'
 import type { ElectronApplication, Locator, Page } from '@playwright/test'
-import { test, expect } from './fixtures/index'
+import { test, expect, OS_FOCUS_TAG } from './fixtures/index'
 import { TEST_IDS } from '../src/renderer/src/constants/testids'
 import { byTestId } from './utils/locators'
 import { runGit } from './utils/git-helpers'
@@ -891,7 +891,7 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     expect(insertedText(before, await diskBytes(file)).text).toContain(TYPED)
   })
 
-  test('E-016b the shortcut works with focus on the dockview group, where a tab switch leaves it – not in the page', async ({
+  test('E-016b the shortcut works with focus on the dockview group, where a tab switch leaves it – not in the page', { tag: OS_FOCUS_TAG }, async ({
     windowWithTestProject,
     appWithTestProject
   }) => {
@@ -934,7 +934,7 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
       .toBe(true)
   })
 
-  test('K-6, K-8 no mouse: the shortcut from the toolbar takes the keyboard into the page and starts the picker; Esc comes back to the toggle', async ({
+  test('K-6, K-8 no mouse: the shortcut from the toolbar takes the keyboard into the page and starts the picker; Esc comes back to the toggle', { tag: OS_FOCUS_TAG }, async ({
     windowWithTestProject,
     appWithTestProject
   }) => {
@@ -961,7 +961,7 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     await expect(chrome.modeButton()).toBeFocused()
   })
 
-  test('K-1, I-18 no mouse: outside comment mode Shift+F10 opens the menu with the pointer far away, and the page cannot fake it', async ({
+  test('K-1, I-18 no mouse: outside comment mode Shift+F10 opens the menu with the pointer far away, and the page cannot fake it', { tag: OS_FOCUS_TAG }, async ({
     windowWithTestProject,
     appWithTestProject
   }) => {
@@ -1018,7 +1018,7 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     await expect(chrome.window()).toContainText(`${STATIC}, line `)
   })
 
-  test('E-016c a pick made with the page holding the keyboard opens the window with the keyboard in its field; Ctrl/Cmd+Enter saves', async ({
+  test('E-016c a pick made with the page holding the keyboard opens the window with the keyboard in its field; Ctrl/Cmd+Enter saves', { tag: OS_FOCUS_TAG }, async ({
     windowWithTestProject,
     appWithTestProject,
     testProject
@@ -1412,9 +1412,14 @@ test.describe('HTML Preview comments – the pin at the page edge (§19 Rev 4 ow
     // The pin's row: the overlay host takes the hit along a whole 24 px box,
     // and the box ends 4 px inside the visible width. Before the fix the box
     // was clamped to innerWidth, so it ran under the scrollbar and only a
-    // sliver of it was left of the scrollbar's edge. Polled: the view settles
-    // its new width after the drawer opens.
+    // sliver of it was left of the scrollbar's edge. And #doc spans the page:
+    // its top-right corner is on the visible edge, where the pin's tail would
+    // have put it under the scrollbar. Polled, both from one read: the view
+    // settles its new width after the drawer opens, and a box read at another
+    // moment than the hits can come from the old layout (seen: right 535 with
+    // a visible width of 855).
     let hits: EdgeHits | null = null
+    let docBox: Awaited<ReturnType<typeof elementBox>> = null
     await expect
       .poll(
         async () => {
@@ -1424,12 +1429,15 @@ test.describe('HTML Preview comments – the pin at the page edge (§19 Rev 4 ow
           if (raw === null) return 'the page is mid-load'
           const now = JSON.parse(raw) as EdgeHits
           hits = now
+          docBox = box
           if (now.first === null || now.last === null) return `no pin along its row (visible ${now.visible} of ${now.inner} px)`
+          if (box.visibleWidth !== now.visible) return `the layout moved between reads (visible ${box.visibleWidth}, then ${now.visible} px)`
           const whole = now.last - now.first + 1 >= PIN_BOX_PX - 1
           const inside = now.last < now.visible - PIN_EDGE_INSET_PX
-          return whole && inside ? 'inside' : `pin hit at x ${now.first}–${now.last}, visible width ${now.visible} of ${now.inner} px`
+          if (!(whole && inside)) return `pin hit at x ${now.first}–${now.last}, visible width ${now.visible} of ${now.inner} px`
+          return box.right >= box.visibleWidth - 1 ? 'inside' : `#doc ends at ${box.right}, short of the visible width ${box.visibleWidth} px`
         },
-        { timeout: PREVIEW_BUDGET_MS, message: 'the full-width element’s pin is not wholly inside the page’s visible width' }
+        { timeout: PREVIEW_BUDGET_MS, message: 'the full-width element’s pin is not wholly inside the page’s visible width, or #doc does not reach it' }
       )
       .toBe('inside')
     const seen = hits as EdgeHits | null
@@ -1437,10 +1445,7 @@ test.describe('HTML Preview comments – the pin at the page edge (§19 Rev 4 ow
       type: 'scrollbar',
       description: seen === null ? 'unread' : `${seen.inner - seen.visible} px (0 under overlay scrollbars)`
     })
-
-    // #doc spans the page: its top-right corner is on the visible edge, where
-    // the pin's tail would have put it under the scrollbar.
-    const box = await elementBox(app, 'doc', target)
+    const box = docBox as Awaited<ReturnType<typeof elementBox>>
     expect(box, '#doc vanished').not.toBeNull()
     if (box === null) return
     expect(box.right).toBeGreaterThanOrEqual(box.visibleWidth - 1)

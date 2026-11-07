@@ -135,6 +135,7 @@ const RENDERER_GATEWAY_FILES = [
   'src/renderer/src/services/documentExportGateway.ts',
   'src/renderer/src/services/imageExportGateway.ts',
   'src/renderer/src/services/browserGateway.ts',
+  'src/renderer/src/services/browserTabGateway.ts',
   'src/renderer/src/services/markdownImageGateway.ts',
   'src/renderer/src/services/previewGateway.ts',
   'src/renderer/src/services/claudeStatusGateway.ts',
@@ -303,7 +304,15 @@ export default [
       // Static browser test-input fixtures for the HTML-preview feature (#74):
       // these run inside the sealed preview WebContentsView, not the app/Node
       // context, so linting them as project source flags browser globals.
-      'e2e/fixtures/html-preview-corpus/**'
+      'e2e/fixtures/html-preview-corpus/**',
+      // Spec 025 browser fixtures (e2e/fixtures/browser/README.md): pages and
+      // scripts that run inside a browser tab, not the app or Node, and the
+      // generated React bundles. serve.ts, server/, the build script and the
+      // React apps' src/ stay linted.
+      'e2e/fixtures/browser/apps/static/**',
+      'e2e/fixtures/browser/apps/staging/**',
+      'e2e/fixtures/browser/apps/*/bundle/**',
+      'e2e/fixtures/browser/hostile/**'
     ]
   },
   { files: ['**/*.{js,mjs,cjs,ts,jsx,tsx}'] },

@@ -1,0 +1,63 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hostile – read local files through frames</title>
+<link rel="stylesheet" href="/hostile.css">
+<script src="/canary.js"></script>
+<script src="/file-targets.js"></script>
+</head>
+<body>
+<h1>Read local files through frames</h1>
+<p>025-NFR-001 "read local files (from a frame)": an <code>iframe</code>, an <code>object</code> and an <code>img</code> pointed at <code>file://</code> URLs, then their content read back. A blocked frame may fire no event; the test then calls <code>__canary.finish()</code>.</p>
+<output id="result"></output>
+<ol id="attempts"></ol>
+<div id="frames"></div>
+<script>
+  var holder = document.getElementById('frames')
+  window.__fileTargets.forEach(function (url) {
+    window.__canary.attempt('iframe ' + url, function () {
+      return new Promise(function (resolve, reject) {
+        var frame = document.createElement('iframe')
+        frame.onload = function () {
+          try {
+            var doc = frame.contentDocument
+            resolve(doc && doc.body ? doc.body.textContent : null)
+          } catch (error) {
+            reject(error)
+          }
+        }
+        frame.src = url
+        holder.appendChild(frame)
+      })
+    })
+    window.__canary.attempt('img ' + url, function () {
+      return new Promise(function (resolve, reject) {
+        var img = new Image()
+        img.onload = function () { resolve('image loaded ' + img.naturalWidth + 'x' + img.naturalHeight) }
+        img.onerror = function () { reject(new Error('img error')) }
+        img.src = url
+      })
+    })
+  })
+  window.__canary.attempt('object ' + window.__fileTargets[0], function () {
+    return new Promise(function (resolve, reject) {
+      var object = document.createElement('object')
+      object.onload = function () {
+        try {
+          var doc = object.contentDocument
+          resolve(doc && doc.body ? doc.body.textContent : null)
+        } catch (error) {
+          reject(error)
+        }
+      }
+      object.onerror = function () { reject(new Error('object error')) }
+      object.data = window.__fileTargets[0]
+      holder.appendChild(object)
+    })
+  })
+</script>
+</body>
+</html>

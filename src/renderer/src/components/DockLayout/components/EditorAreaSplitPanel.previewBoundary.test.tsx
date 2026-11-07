@@ -48,6 +48,9 @@ vi.mock('dockview', () => ({
   }
 }))
 
+// The built-in browser's window events need the preload bridge; stubbed here.
+vi.mock('../../../services/browser/browserTabEvents', () => ({ mountBrowserTabEvents: () => () => undefined }))
+
 // MarkdownEditorPanel pulls in monaco-editor (unresolvable in the test env).
 vi.mock('../../Panels/MarkdownEditorPanel', () => ({ MarkdownEditorPanel: () => null }))
 

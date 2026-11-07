@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import {
   DockviewReact,
   DockviewReadyEvent,
@@ -10,10 +10,11 @@ import {
 import { MarkdownEditorPanel } from '../../Panels/MarkdownEditorPanel'
 import { ImageViewerPanel, type ImageViewerPanelParams } from '../../Panels/ImageViewerPanel'
 import { HtmlPreviewPanel, type HtmlPreviewPanelParams } from '../../Panels/HtmlPreviewPanel'
+import { BrowserPanel } from '../../Panels/BrowserPanel'
 import { PanelErrorBoundary } from '../../Panels/PanelErrorBoundary'
 import { WelcomePanel } from '../../Panels/WelcomePanel'
 import { WelcomeTab } from '../../Panels/WelcomeTab'
-import { EditorTab, ImageTab, HtmlPreviewTab } from '../../Tabs'
+import { EditorTab, ImageTab, HtmlPreviewTab, BrowserTab, NewBrowserTabButton } from '../../Tabs'
 import { closePanel } from '../../Tabs/tabOperations'
 import { useOptionalDialog } from '../../Dialog/DialogContext'
 import { getOverlayGuard } from '../../../services/preview/OverlayGuardService'
@@ -23,6 +24,17 @@ import { useActivityBarStore } from '../../../stores/useActivityBarStore'
 import { useProjectStore } from '../../../stores/useProjectStore'
 import { usePreviewTabStore } from '../../../stores/usePreviewTabStore'
 import { logger } from '../../../utils/logger'
+import { useProjectManagementContext } from '../../../context/ProjectManagementContext'
+import { mountBrowserTabEvents } from '../../../services/browser/browserTabEvents'
+import { closeBrowserTab } from '../../../services/browser/browserTabLifecycle'
+import {
+  BROWSER_PANEL_COMPONENT,
+  BROWSER_TAB_COMPONENT,
+  focusInEditorArea,
+  isBrowserPanelId,
+  openBrowserTab,
+  type BrowserPanelParams
+} from '../../../utils/openBrowserTab'
 import { TEST_IDS } from '../../../constants/testids'
 import { WELCOME_PANEL_ID } from '../../../constants/panels'
 
@@ -82,6 +94,23 @@ const HtmlPreviewPanelWithBoundary = (
 )
 
 /**
+ * Built-in browser registration wrapper (spec 025, commit 17).
+ *
+ * The boundary is keyed by the project and the panel: a browser tab belongs to
+ * one project's profile, so a panel that failed under one project never stays
+ * "unavailable" under the next (src/renderer/CLAUDE.md, error containment).
+ * The tab itself outlives a boundary remount (`browserTabLifecycle`).
+ */
+const BrowserPanelWithBoundary = (props: IDockviewPanelProps<BrowserPanelParams>): JSX.Element => {
+  const { projectPath } = useProjectManagementContext()
+  return (
+    <PanelErrorBoundary key={`${projectPath ?? 'none'}:${props.api.id}`} componentName="Browser tab">
+      <BrowserPanel {...props} />
+    </PanelErrorBoundary>
+  )
+}
+
+/**
  * Closes a tab by id for the preview move coordinator: the one-file-one-tab
  * rule closes the other tabs showing a page once main accepted the move.
  * `closePanel` clears the dirty flag first, which is how a "Don't save"
@@ -121,6 +150,27 @@ export const EditorAreaSplitPanel = (props: ISplitviewPanelProps): JSX.Element =
   // file this window holds unsaved editor changes for. Once per window.
   useUnsavedSourcesFeed()
 
+  // The built-in browser's window-wide events, once per window: tab state and
+  // focus into the store, local addresses for the empty tab, and an editor tab
+  // for each tab a page opened.
+  const areaRef = useRef<HTMLDivElement>(null)
+  useEffect(
+    () =>
+      mountBrowserTabEvents({
+        openPageTab: (event) =>
+          openBrowserTab(useProjectStore.getState().dockviewApi, { tabId: event.tabId, background: event.background }),
+        // Main closed the tab (its close went through, Forget, the page): the editor tab goes.
+        removePanel: (panelId) => useProjectStore.getState().dockviewApi?.getPanel(panelId)?.api.close(),
+        // App menu → New browser tab. From Ctrl/Cmd+T only while focus is in the editor
+        // area (or nowhere), so a terminal or another panel keeps the key (025-FR-014).
+        newTabCommand: (byKey) => {
+          if (byKey && !focusInEditorArea(areaRef.current)) return
+          openBrowserTab(useProjectStore.getState().dockviewApi)
+        }
+      }),
+    []
+  )
+
   const onEditorReady = (event: DockviewReadyEvent) => {
     logger.info('📝 Editor DockView ready')
 
@@ -143,6 +193,8 @@ export const EditorAreaSplitPanel = (props: ISplitviewPanelProps): JSX.Element =
     // So it is dropped here, when dockview removes the panel, and nowhere else.
     event.api.onDidRemovePanel((panel) => {
       usePreviewTabStore.getState().removePanel(panel.id)
+      // A browser tab lives as long as its editor tab: main closes it now.
+      if (isBrowserPanelId(panel.id)) closeBrowserTab(panel.id)
     })
 
     // Listen for active panel changes and focus the panel content
@@ -186,19 +238,22 @@ export const EditorAreaSplitPanel = (props: ISplitviewPanelProps): JSX.Element =
     editor: MarkdownEditorPanel,
     imageViewer: ImageViewerPanelWithBoundary,
     htmlPreview: HtmlPreviewPanelWithBoundary,
+    [BROWSER_PANEL_COMPONENT]: BrowserPanelWithBoundary,
     welcome: WelcomePanel
   }
 
   return (
-    <div style={{ width: '100%', height: '100%' }} data-testid={TEST_IDS.EDITOR_AREA}>
+    <div ref={areaRef} style={{ width: '100%', height: '100%' }} data-testid={TEST_IDS.EDITOR_AREA}>
       <DockviewReact
         components={editorComponents}
         tabComponents={{
           welcomeTab: WelcomeTab,
           editorTab: EditorTab,
           imageTab: ImageTab,
-          htmlPreviewTab: HtmlPreviewTab
+          htmlPreviewTab: HtmlPreviewTab,
+          [BROWSER_TAB_COMPONENT]: BrowserTab
         }}
+        leftHeaderActionsComponent={NewBrowserTabButton}
         onReady={onEditorReady}
         className="dockview-theme-dark"
         // Dockview is used for editor tabs only — never docking/splitting (see

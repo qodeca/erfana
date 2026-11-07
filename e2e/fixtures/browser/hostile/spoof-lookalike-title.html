@@ -1,0 +1,37 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lookalike title</title>
+<link rel="stylesheet" href="/hostile.css">
+<script src="/canary.js"></script>
+</head>
+<body>
+<h1>Lookalike characters in the title</h1>
+<p>Titles that imitate another host or Erfana's own window title with confusable characters. <code>__spoof.next()</code> moves to the next one.</p>
+<output id="result"></output>
+<ol id="attempts"></ol>
+<script>
+  var TITLES = [
+    'staging.test – Erfana',
+    'stаging.tеst',
+    'аpple.com',
+    'gіthub.com – Sign in',
+    'Erfana – Terminal 1',
+    'localhost:5173'
+  ]
+  var index = 0
+  function show(i) {
+    document.title = TITLES[i]
+    window.__canary.note('title ' + i, 'attempted', TITLES[i])
+  }
+  window.__spoof = {
+    titles: TITLES,
+    next: function () { index = (index + 1) % TITLES.length; show(index); return index }
+  }
+  show(0)
+</script>
+</body>
+</html>

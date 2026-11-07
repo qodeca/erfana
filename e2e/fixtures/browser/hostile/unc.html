@@ -1,0 +1,38 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hostile – UNC paths</title>
+<link rel="stylesheet" href="/hostile.css">
+<script src="/canary.js"></script>
+</head>
+<body>
+<h1>UNC paths</h1>
+<p>025-NFR-001 "read local files (a UNC path)", 025-AC-005. Images, a frame and a fetch aimed at an SMB share on <code>?host=</code> (default 127.0.0.1, where a test SMB listener counts connections). The page sees only load or error; the listener is the real check. The link is for a test that clicks it.</p>
+<a id="unc-link" href="file://127.0.0.1/share/link.html">UNC link</a>
+<output id="result"></output>
+<ol id="attempts"></ol>
+<script>
+  var host = window.__canary.param('host') || '127.0.0.1'
+  document.getElementById('unc-link').href = 'file://' + host + '/share/link.html'
+  var urls = ['file://' + host + '/share/image.png', 'file:////' + host + '/share/image.png', '\\\\' + host + '\\share\\image.png']
+  urls.forEach(function (url) {
+    window.__canary.attempt('img ' + url, function () {
+      return new Promise(function (resolve, reject) {
+        var img = new Image()
+        img.onload = function () { resolve('image loaded') }
+        img.onerror = function () { reject(new Error('img error')) }
+        img.src = url
+      })
+    })
+    window.__canary.attempt('fetch ' + url, function () { return fetch(url).then(function (r) { return r.text() }) })
+  })
+  var frame = document.createElement('iframe')
+  frame.src = 'file://' + host + '/share/frame.html'
+  document.body.appendChild(frame)
+  window.__canary.note('iframe file://' + host + '/share', 'attempted', 'checked by the SMB listener')
+</script>
+</body>
+</html>

@@ -5,8 +5,10 @@
  * architecture note 001 § 4, § 5, § 8 C17, C18), driven over a temporary
  * project with the test-only paragraph kind, in-process jobs and fake watches.
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { rm } from 'node:fs/promises'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ErrorCode } from '../../../shared/errors'
+import { FileCommentEchoes } from './fileCommentEchoes'
 import { PARAGRAPH_AGENT_NOTE } from './__test-helpers__/paragraphKind'
 import { fileCommentHarness, PANEL, pickOn, VIEW, type FileCommentHarness } from './__test-helpers__/fileCommentHarness'
 
@@ -253,5 +255,74 @@ describe('024-AC-028 item 6: file-comment:changed goes only to the owning window
     await h.service.clear()
     expect(h.service.watchCount).toBe(0)
     expect(await h.service.openDraft(h.caller(), { panelId: PANEL, filePath: h.project.path('notes.txt') })).toEqual(NOT_OPEN)
+  })
+})
+
+describe('§7.5 the own-write echo filter: a panel is not told about its own comment write', () => {
+  // The echo check reads the file asynchronously; awaiting the check that the
+  // change started lets its send (or skip) run before the test looks.
+  const holds = (): ReturnType<typeof vi.spyOn> =>
+    vi.spyOn(FileCommentEchoes.prototype as unknown as { holds: (realPath: string, hash: string) => Promise<boolean> }, 'holds')
+  const fireAndSettle = async (spy: ReturnType<typeof holds>): Promise<void> => {
+    const before = spy.mock.results.length
+    h.watches.fire(h.project.path('notes.txt'))
+    expect(spy.mock.results.length).toBe(before + 1)
+    await spy.mock.results[before].value
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('the watch event of the panel\'s own write sends nothing', async () => {
+    const spy = holds()
+    await h.listOk('notes.txt')
+    expect(await h.add('notes.txt', 3, 'Mine.')).toMatchObject({ ok: true })
+    await fireAndSettle(spy)
+    expect(h.sent).not.toHaveBeenCalled()
+  })
+
+  it('bytes other than the write left send once', async () => {
+    const spy = holds()
+    await h.listOk('notes.txt')
+    expect(await h.add('notes.txt', 3, 'Mine.')).toMatchObject({ ok: true })
+    await h.project.write('notes.txt', `${DOC}Edited outside.\n`)
+    await fireAndSettle(spy)
+    expect(h.sent).toHaveBeenCalledTimes(1)
+  })
+
+  it('the remembered write is used once: the next event after the echo sends', async () => {
+    const spy = holds()
+    await h.listOk('notes.txt')
+    expect(await h.add('notes.txt', 3, 'Mine.')).toMatchObject({ ok: true })
+    await fireAndSettle(spy)
+    h.watches.fire(h.project.path('notes.txt'))
+    expect(h.sent).toHaveBeenCalledTimes(1)
+  })
+
+  it('a file that cannot be read sends', async () => {
+    const spy = holds()
+    await h.listOk('notes.txt')
+    expect(await h.add('notes.txt', 3, 'Mine.')).toMatchObject({ ok: true })
+    await rm(h.project.path('notes.txt'))
+    await fireAndSettle(spy)
+    expect(h.sent).toHaveBeenCalledTimes(1)
+  })
+
+  it('another panel showing the file is still told about the write', async () => {
+    const spy = holds()
+    await h.listOk('notes.txt', { windowId: 1, panelId: 'a' })
+    await h.listOk('notes.txt', { windowId: 2, panelId: 'b' })
+    expect(await h.add('notes.txt', 3, 'Mine.', { windowId: 1, panelId: 'a' })).toMatchObject({ ok: true })
+    await fireAndSettle(spy)
+    expect(h.sent.mock.calls.map(([windowId, payload]) => [windowId, payload.panelId])).toEqual([[2, 'b']])
+  })
+
+  it('a failed write remembers nothing: its file\'s next event sends at once', async () => {
+    await h.listOk('notes.txt')
+    h.dirty.add(h.project.path('notes.txt'))
+    expect(await h.add('notes.txt', 3, 'Mine.')).toMatchObject({ ok: false, reason: 'unsaved-source' })
+    h.watches.fire(h.project.path('notes.txt'))
+    expect(h.sent).toHaveBeenCalledTimes(1)
   })
 })

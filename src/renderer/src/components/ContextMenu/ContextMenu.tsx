@@ -17,6 +17,7 @@ import { useLatestRef } from '../../hooks/useLatestRef'
 import { useOccluder } from '../../hooks/useOccluder'
 import { useOverlayStackEntry } from '../../hooks/useOverlayStackEntry'
 import { toAriaKeyShortcuts } from './ariaKeyShortcuts'
+import { firstItem, lastItem, stepFrom } from './menuItemSteps'
 import { placeUnderAnchor } from './placeUnderAnchor'
 import './ContextMenu.css'
 
@@ -53,9 +54,27 @@ export interface ContextMenuItem {
   /**
    * Makes the item a `menuitemcheckbox` with this `aria-checked`, drawn with a
    * lime check when on (Toolbar overflow card, rule 7: a toolbar toggle that
-   * moved into the "…" menu). Leave unset for a plain `menuitem`.
+   * moved into the "…" menu). Leave unset for a plain `menuitem`. With
+   * `checkKind: 'radio'` it is one choice of a set instead – see there.
    */
   checked?: boolean
+  /**
+   * With `checked`, `'radio'` makes the item one choice of a set
+   * (`menuitemradio`, e.g. the browser's width presets). Its visible check
+   * stays the caller's `icon`, so no lime check is drawn; `aria-checked`
+   * carries the state to assistive tech, which ignores the icon. Default
+   * `'checkbox'`.
+   */
+  checkKind?: 'checkbox' | 'radio'
+  /**
+   * How a radio item (`checkKind: 'radio'`) shows it is the current choice:
+   * `'icon'` (default) leaves it to the caller's icon, as the browser's width
+   * presets do; `'check'` draws the lime check at the inline end, as a
+   * checkbox item does – for a toolbar's view modes in the "…" menu, whose
+   * icon slot keeps the button's own icon (Toolbar overflow card, rules 6
+   * and 7). Ignored on other items.
+   */
+  radioMark?: 'icon' | 'check'
 }
 
 /** Give either `x` and `y` (a right-click) or `anchorElement` (a menu button). */
@@ -77,6 +96,12 @@ interface ContextMenuProps {
   containerTestId?: string
   /** The menu's accessible name (Menu card: "Element" for a page element's menu) */
   ariaLabel?: string
+  /**
+   * A first line that is not an item (the browser's link menu names the
+   * link's host, spec 025 OD-12): never focusable, never an arrow stop or a
+   * typeahead match; it describes the menu.
+   */
+  header?: string
   /** Which item takes focus on open: the first (default) or the last (↑ on a menu button) */
   initialFocus?: 'first' | 'last'
   /** Extra class on the menu element */
@@ -85,33 +110,6 @@ interface ContextMenuProps {
 
 /** Typed characters within this many ms extend one typeahead search. */
 export const TYPEAHEAD_RESET_MS = 800
-
-/**
- * The next non-separator item after `from`, stepping by `by` with wrap-around.
- *
- * @returns Its index, or -1 when the menu has no items at all
- */
-function stepFrom(items: ContextMenuItem[], from: number, by: 1 | -1): number {
-  const count = items.length
-  for (let i = 1; i <= count; i += 1) {
-    const at = (((from + by * i) % count) + count) % count
-    if (!items[at].separator) return at
-  }
-  return -1
-}
-
-/** The first non-separator item, or -1 for an empty menu. */
-function firstItem(items: ContextMenuItem[]): number {
-  return items.findIndex((item) => !item.separator)
-}
-
-/** The last non-separator item, or -1 for an empty menu. */
-function lastItem(items: ContextMenuItem[]): number {
-  for (let i = items.length - 1; i >= 0; i -= 1) {
-    if (!items[i].separator) return i
-  }
-  return -1
-}
 
 /**
  * The shared right-click menu, with the keyboard contract `role="menu"`
@@ -157,6 +155,7 @@ export function ContextMenu({
   onClose,
   containerTestId,
   ariaLabel,
+  header,
   initialFocus = 'first',
   className
 }: ContextMenuProps) {
@@ -407,6 +406,7 @@ export function ContextMenu({
       className={className ? `context-menu ${className}` : 'context-menu'}
       role="menu"
       aria-label={ariaLabel}
+      aria-describedby={header === undefined ? undefined : `${idBase}-header`}
       // Focusable only so an EMPTY menu can still hold focus; with items the
       // roving stop is always an item.
       tabIndex={-1}
@@ -421,6 +421,11 @@ export function ContextMenu({
         opacity: 0
       }}
     >
+      {header !== undefined && (
+        <div id={`${idBase}-header`} className="context-menu-header" role="presentation">
+          {header}
+        </div>
+      )}
       {items.map((item, index) =>
         item.separator ? (
           <div
@@ -436,7 +441,7 @@ export function ContextMenu({
               itemRefs.current[index] = node
             }}
             className={`context-menu-item ${item.danger ? 'danger' : ''} ${item.disabled ? 'disabled' : ''}${item.reason ? ' context-menu-item--described' : ''}`}
-            role={item.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
+            role={item.checked === undefined ? 'menuitem' : item.checkKind === 'radio' ? 'menuitemradio' : 'menuitemcheckbox'}
             aria-checked={item.checked}
             tabIndex={index === current ? 0 : -1}
             aria-disabled={item.disabled || undefined}
@@ -467,7 +472,7 @@ export function ContextMenu({
                 {item.shortcut}
               </span>
             )}
-            {item.checked !== undefined && (
+            {item.checked !== undefined && (item.checkKind !== 'radio' || item.radioMark === 'check') && (
               <span className="context-menu-check" aria-hidden="true">
                 {item.checked && <Check size={16} strokeWidth={2} />}
               </span>

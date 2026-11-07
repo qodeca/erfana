@@ -51,6 +51,13 @@ import {
   E2E_CHROMIUM_ARGS,
   removeDirWithRetry
 } from './isolation'
+import {
+  acquireOsFocusLock,
+  focusAppWindow,
+  movePointerOffWindow,
+  OS_FOCUS_LOCK_FIXTURE_TIMEOUT_MS,
+  OS_FOCUS_TAG
+} from './osFocusLock'
 
 const PROJECT_ROOT = path.join(__dirname, '..', '..')
 const DEFAULT_TEST_PROJECT = process.env.ERFANA_TEST_PROJECT || PROJECT_ROOT
@@ -139,7 +146,7 @@ async function launchApp(
  */
 async function getReadyWindow(
   app: ElectronApplication,
-  options: { waitForProjectTree?: boolean } = {}
+  options: { waitForProjectTree?: boolean; needsOsFocus?: boolean } = {}
 ): Promise<Page> {
   const window = await app.firstWindow()
   await window.waitForLoadState('domcontentloaded')
@@ -147,6 +154,11 @@ async function getReadyWindow(
   if (options.waitForProjectTree) {
     await byTestId(window, TEST_IDS.PROJECT_TREE).waitFor({ state: 'visible', timeout: 15000 })
   }
+  // Keep the real mouse pointer off the window (see movePointerOffWindow);
+  // a test holding the exclusive OS-focus lease (osFocusLock.ts) also gets its
+  // window made key now, so it starts from a known focus state.
+  await movePointerOffWindow(app, options.needsOsFocus === true)
+  if (options.needsOsFocus) await focusAppWindow(app)
   return window
 }
 
@@ -179,6 +191,24 @@ type TestFixtures = {
    * `test.use({ resetRendererStorage: true })`.
    */
   resetRendererStorage: boolean
+  /**
+   * The test needs its window to be the OS key window: native focus, window
+   * blur, focus moving into a page's `WebContentsView`. Default `false`.
+   *
+   * `true` takes the OS-focus lock EXCLUSIVE, so no other e2e app runs while
+   * the test does, and the `window*` fixtures make the window key before the
+   * test starts. Set per file or describe:
+   * `test.use({ needsOsFocus: true })`; for one test, tag it
+   * `{ tag: OS_FOCUS_TAG }` instead. See e2e/fixtures/osFocusLock.ts.
+   */
+  needsOsFocus: boolean
+  /**
+   * Auto fixture: holds the OS-focus lock for the whole test – shared, or
+   * exclusive with `needsOsFocus` or the `@os-focus` tag (`exclusive` says
+   * which). Every launch fixture depends on it, so the lock is taken before
+   * the app starts and released after it has closed.
+   */
+  osFocusLock: { exclusive: boolean }
   app: ElectronApplication
   window: Page
   appWithProject: ElectronApplication
@@ -251,8 +281,27 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   // Option: pre-launch wipe of persisted renderer storage (override with test.use())
   resetRendererStorage: [false, { option: true }],
 
+  // Option: the test needs OS keyboard focus (override with test.use())
+  needsOsFocus: [false, { option: true }],
+
+  // Auto, test-scoped: the OS-focus lock (osFocusLock.ts). Auto so a spec that
+  // launches its own app (`electron.launch` in the test) is covered too; its
+  // own timeout so waiting for the other worker's test does not eat this one's.
+  osFocusLock: [
+    async ({ needsOsFocus }, use, testInfo) => {
+      const exclusive = needsOsFocus || testInfo.tags.includes(OS_FOCUS_TAG)
+      const lease = await acquireOsFocusLock(exclusive ? 'exclusive' : 'shared')
+      try {
+        await use({ exclusive })
+      } finally {
+        lease.release()
+      }
+    },
+    { auto: true, timeout: OS_FOCUS_LOCK_FIXTURE_TIMEOUT_MS }
+  ],
+
   // Test-scoped: app launch
-  app: async ({ userDataDir, homeDir, extraLaunchArgs, resetRendererStorage }, use) => {
+  app: async ({ userDataDir, homeDir, extraLaunchArgs, resetRendererStorage, osFocusLock: _lock }, use) => {
     await launchApp(
       [PROJECT_ROOT, ...extraLaunchArgs],
       userDataDir,
@@ -263,12 +312,15 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   },
 
   // Test-scoped: main window
-  window: async ({ app }, use) => {
-    await use(await getReadyWindow(app))
+  window: async ({ app, osFocusLock }, use) => {
+    await use(await getReadyWindow(app, { needsOsFocus: osFocusLock.exclusive }))
   },
 
   // Test-scoped: app with project loaded
-  appWithProject: async ({ userDataDir, homeDir, extraLaunchArgs, resetRendererStorage }, use) => {
+  appWithProject: async (
+    { userDataDir, homeDir, extraLaunchArgs, resetRendererStorage, osFocusLock: _lock },
+    use
+  ) => {
     await launchApp(
       [PROJECT_ROOT, DEFAULT_TEST_PROJECT, ...extraLaunchArgs],
       userDataDir,
@@ -279,8 +331,10 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   },
 
   // Test-scoped: window with project loaded
-  windowWithProject: async ({ appWithProject }, use) => {
-    await use(await getReadyWindow(appWithProject, { waitForProjectTree: true }))
+  windowWithProject: async ({ appWithProject, osFocusLock }, use) => {
+    await use(
+      await getReadyWindow(appWithProject, { waitForProjectTree: true, needsOsFocus: osFocusLock.exclusive })
+    )
   },
 
   // --- Test project fixtures ---
@@ -359,7 +413,14 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   // its project folder is removed. Without it the folder went first and, on
   // Windows, stayed locked by the still-running app (EBUSY, #134).
   appWithTestProject: async (
-    { userDataDir, homeDir, extraLaunchArgs, resetRendererStorage, testProject: _testProject },
+    {
+      userDataDir,
+      homeDir,
+      extraLaunchArgs,
+      resetRendererStorage,
+      testProject: _testProject,
+      osFocusLock: _lock
+    },
     use
   ) => {
     await launchApp(
@@ -372,8 +433,8 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   },
 
   // Test-scoped: window from appWithTestProject with the project opened.
-  windowWithTestProject: async ({ appWithTestProject, testProject }, use) => {
-    const window = await getReadyWindow(appWithTestProject)
+  windowWithTestProject: async ({ appWithTestProject, testProject, osFocusLock }, use) => {
+    const window = await getReadyWindow(appWithTestProject, { needsOsFocus: osFocusLock.exclusive })
     await window.evaluate(async (projectPath) => {
       // window.api is the preload-bridge contextBridge surface; cast for
       // ergonomics — same shape as fixtures.ts:414-418 uses.
@@ -384,6 +445,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       state: 'visible',
       timeout: 15000
     })
+    if (osFocusLock.exclusive) await focusAppWindow(appWithTestProject)
     await use(window)
   },
 
@@ -446,6 +508,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 })
 
 export { expect }
+export { OS_FOCUS_TAG } from './osFocusLock'
 
 export function getTestProjectPath(): string {
   return DEFAULT_TEST_PROJECT
@@ -507,6 +570,21 @@ type VisualTestFixtures = {
   visualAppWithProject: ElectronApplication
   /** Window from visual app with project, ready for screenshot capture. */
   visualWindowWithProject: Page
+  /**
+   * Extra Chromium switches for both visual apps, appended after the defaults.
+   * Empty by default, so the existing baselines launch exactly as before; the
+   * built-in browser visuals pass the sealed-network switches
+   * (`BROWSER_CHROMIUM_ARGS`) through it.
+   */
+  visualExtraLaunchArgs: string[]
+  /**
+   * Wipe the renderer's persisted web storage before the visual app with a
+   * project launches (see `resetRendererStorageDirs`). Off by default, so the
+   * existing baselines launch exactly as before. `userDataDir` is worker-scoped,
+   * so without it a panel size or divider one test persisted shapes the next
+   * test's layout, and an element shot's size depends on test order.
+   */
+  visualResetRendererStorage: boolean
 }
 
 const VISUAL_TEST_SEED_FILES: Record<string, string> = {
@@ -543,8 +621,12 @@ export const visualTest = base.extend<VisualTestFixtures, WorkerFixtures>({
     { scope: 'worker' }
   ],
 
-  visualApp: async ({ userDataDir, homeDir }, use) => {
+  visualExtraLaunchArgs: [[], { option: true }],
+  visualResetRendererStorage: [false, { option: true }],
+
+  visualApp: async ({ userDataDir, homeDir, visualExtraLaunchArgs }, use) => {
     const opts = buildVisualLaunchOptions(userDataDir, undefined, homeDir)
+    opts.args.push(...visualExtraLaunchArgs)
     const app = await electron.launch(opts)
     await resizeBrowserWindow(app, VISUAL_CONTENT_SIZE.width, VISUAL_CONTENT_SIZE.height)
     await use(app)
@@ -582,8 +664,13 @@ export const visualTest = base.extend<VisualTestFixtures, WorkerFixtures>({
 
   // `visualTestProject` is a dependency only for teardown order: the app closes
   // before its project folder is removed (see appWithTestProject).
-  visualAppWithProject: async ({ userDataDir, homeDir, visualTestProject: _visualTestProject }, use) => {
+  visualAppWithProject: async (
+    { userDataDir, homeDir, visualExtraLaunchArgs, visualResetRendererStorage, visualTestProject: _visualTestProject },
+    use
+  ) => {
+    if (visualResetRendererStorage) await resetRendererStorageDirs(userDataDir)
     const opts = buildVisualLaunchOptions(userDataDir, undefined, homeDir)
+    opts.args.push(...visualExtraLaunchArgs)
     const app = await electron.launch(opts)
     await resizeBrowserWindow(app, VISUAL_CONTENT_SIZE.width, VISUAL_CONTENT_SIZE.height)
     await use(app)
