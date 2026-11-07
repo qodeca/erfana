@@ -70,6 +70,13 @@ function setup(over: Partial<BrowserPagesDeps> = {}) {
 /** Wait until `check` passes: the stores open and write on their own schedule. */
 const until = (check: () => Promise<void> | void): Promise<void> => vi.waitFor(check, { timeout: 5000, interval: 10 })
 
+/**
+ * Wait until the zoom file on disk holds what `check` wants. Each try opens the file again, so try
+ * rarely: a read every 10 ms races the signed write on a slow Windows runner, and 5 s was too short
+ * there (the step was seen as 100 where 125 was written).
+ */
+const untilOnDisk = (check: () => Promise<void>): Promise<void> => vi.waitFor(check, { timeout: 10_000, interval: 100 })
+
 describe('BrowserPages zoom', () => {
   it('025-AC-008 two tabs on the same site share the level; another site and another project do not', async () => {
     const { attach } = setup()
@@ -93,7 +100,7 @@ describe('BrowserPages zoom', () => {
     const a = attach(fakePageTab(projectA, 'http://app.test/'))
     a.page.zoom('in')
     a.page.zoom('in')
-    await until(async () => expect((await BrowserZoomStore.open(projectA, home, testSigner('k'))).level('app.test')).toBe(125))
+    await untilOnDisk(async () => expect((await BrowserZoomStore.open(projectA, home, testSigner('k'))).level('app.test')).toBe(125))
     const later = attach(fakePageTab(projectA, 'http://app.test/later'))
     later.tab.contents.emit('did-navigate', {}, 'http://app.test/later')
     await until(() => expect(later.tab.contents.zoom).toBe(1.25))
@@ -119,7 +126,7 @@ describe('BrowserPages zoom', () => {
       a.page.zoom('in')
       expect(a.tab.contents.zoom).toBe(1.25)
       release()
-      await until(async () => expect((await BrowserZoomStore.open(projectA, home, testSigner('k'))).level('app.test')).toBe(125))
+      await untilOnDisk(async () => expect((await BrowserZoomStore.open(projectA, home, testSigner('k'))).level('app.test')).toBe(125))
       expect(a.tab.contents.zoom).toBe(1.25)
       // A later commit of the site still takes the stored level.
       a.tab.contents.zoom = 1
