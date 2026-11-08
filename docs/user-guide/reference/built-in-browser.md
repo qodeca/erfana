@@ -26,7 +26,7 @@ A browser tab shows a web page, your dev server or a project HTML file inside Er
 
 **What it does:** Opens an empty browser tab with the address bar focused. **How to reach it:** the **New browser tab** button after the last tab of an editor strip, **File > New browser tab**, or <kbd>⌘T</kbd> / <kbd>Ctrl+T</kbd>. Two more ways open a page directly:
 
-- A plain click on a web link in the [terminal](terminal.md#web-links) opens it in a new browser tab; <kbd>⌘</kbd>-click / <kbd>Ctrl</kbd>-click opens your system browser instead.
+- Selecting a web link in the [terminal](terminal.md#web-links) opens it in a new browser tab; <kbd>⌘</kbd>-click / <kbd>Ctrl</kbd>-click opens your system browser instead.
 - In an [HTML preview](html-preview.md), **Open in browser tab** (the window icon in the toolbar) opens the previewed file in a browser tab. Selecting an HTML file in the project tree still opens the preview.
 
 Browser tabs are not restored when you reopen a project or restart Erfana. A tab hidden behind another keeps its page loaded.
@@ -50,12 +50,12 @@ Zoom steps from 25% to 500% and is kept per site in the project, as in Chrome. *
 **What it does:** Sends one element of the page to the agent in a terminal, with a screenshot and a context file. **How to reach it:** **Pick element** in the **Pick and send** row under the address bar, or <kbd>⌘E</kbd> / <kbd>Ctrl+E</kbd>.
 
 1. Select **Pick element**. The row reads **Picking – click an element**.
-2. Click the element. Erfana holds a still image of the page and opens the actions panel next to the element. **Parent element** and **Child element** (or <kbd>↑</kbd> and <kbd>↓</kbd>) move the pick. The panel shows the element's text and, when the page names it, its source file and line.
+2. Select the element. Erfana holds a still image of the page and opens the actions panel next to the element. **Parent element** and **Child element** (or <kbd>↑</kbd> and <kbd>↓</kbd>) move the pick. The panel shows the element's text and, when the page names it, its source file and line.
 3. Choose an action. **Explain** sends at once. **Ask…**, **Change…** and **Prompt…** open a box for your instruction first; **Send** (or <kbd>⌘Enter</kbd> / <kbd>Ctrl+Enter</kbd>) sends it.
 
 After a send, the element you sent flashes briefly with an outline on the live page.
 
-Starting pick mode keeps hover content open, whether you start it with **Pick element** or with <kbd>⌘E</kbd> / <kbd>Ctrl+E</kbd>: a menu or tooltip the pointer is over stays shown, so you can hover it open and click the item to pick it.
+Starting pick mode keeps hover content open, whether you start it with **Pick element** or with <kbd>⌘E</kbd> / <kbd>Ctrl+E</kbd>: a menu or tooltip the pointer is over stays shown, so you can hover it open and select the item to pick it.
 
 The target button at the end of the row names the terminal that receives the send. When no agent seems to run there, Erfana stops before sending: **No agent is running in** that terminal shows with **Choose terminal**, and with no terminal open, **Open terminal**. When Erfana sees another program or cannot tell, it asks whether to **Send anyway**. The check looks only at which program runs in front in the terminal: any program that is not a shell counts as an agent, even a dev server, and Erfana does not notice an agent that is busy or waiting on a permission question – keep the target on the terminal where your agent waits for input. The **Page width** button in the same row sets the page to **Phone width (390px)**, **Tablet width (768px)** or **Full width**, so you can pick in that layout. The presets set the width only: they do not turn on touch input or a mobile user agent – use device mode in **DevTools** for that.
 
@@ -78,7 +78,7 @@ If the keyring changes and stored cookies can no longer be read, the tab says on
 
 ## Pop-ups
 
-**What it does:** A page may open a tab or window only right after you click or press a key on it, and at most 5 per tab in a minute. A link to a new tab opens a browser tab; a page that keeps a handle to its window opens a separate pop-up window, 800 × 600 unless the page asks for a size. Other attempts are blocked and the tab shows **Pop-up blocked** with **Allow once** and **Always allow for this site**. **How to reach it:** answer the row.
+**What it does:** A page may open a tab or window only right after you select something or press a key on it, and at most 5 per tab in a minute. A link to a new tab opens a browser tab; a page that keeps a handle to its window opens a separate pop-up window, 800 × 600 unless the page asks for a size. Other attempts are blocked and the tab shows **Pop-up blocked** with **Allow once** and **Always allow for this site**. **How to reach it:** answer the row.
 
 ## Certificates
 

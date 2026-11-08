@@ -167,7 +167,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | TERM-11 | Clean agent environment: Claude Code runs as a top-level session | all | M/services/TerminalService.ts | [Start your own agent](./how-erfana-works-with-agents.md#start-your-own-agent) |
 | TERM-12 | Restart terminal asks first while Claude Code runs, output follows input, or (macOS) a program runs | all | TerminalPanel/restartGuard.ts | [reference/terminal](./reference/terminal.md#header-controls) |
 | TERM-13 | Removed 2026-11-05 – screen-reader support dropped (#440); was screen-reader mode: Auto / On / Off | – | – | – |
-| TERM-14 | Web links: plain click opens a browser tab, Cmd/Ctrl-click the system browser | all | TerminalPanel/terminalLinks.ts | [reference/terminal](./reference/terminal.md#web-links) |
+| TERM-14 | Web links: selecting one opens a browser tab, Cmd/Ctrl-click the system browser | all | TerminalPanel/terminalLinks.ts | [reference/terminal](./reference/terminal.md#web-links) |
 | TERM-15 | Paste or drop of page-written or outside text with a line break or control character asks first | all | R/utils/terminalPasteGuard.ts, TerminalPanel/terminalPasteGuardAddon.ts | [reference/terminal](./reference/terminal.md#copy-and-paste) |
 
 ## Claude Code status bar
