@@ -256,17 +256,22 @@ test.describe('built-in browser tab chrome', () => {
     await page.key('=', [MOD])
     await expect(zoomChip).toHaveText('110%', { timeout: WAIT_MS })
     await page.key('=', [MOD])
-    // Main's tab state first: it tells a lost key (state stays 110) from a chip the
-    // row hid (state 125, chip folded away) – a full run once found no chip here (2026-11-08).
+    // Main's tab state first, then where the row shows it. When the address needs the
+    // room, fold step 3 moves the zoom chip into More (navFold.logic.ts) – a full run
+    // hit that at 125% (2026-11-08: state 125, data-fold="3"), so More carries the level.
     await panel.waitForState({ zoomPercent: 125 })
-    try {
+    const fold = (await panel.root.locator('.erf-brw-nav').first().getAttribute('data-fold')) ?? ''
+    if (fold.split(/\s+/).includes('3')) {
+      await panel.tool('More').click()
+      await expect(panel.menu('More').getByRole('menuitem', { name: /^Zoom: 125% – reset/ })).toBeVisible({ timeout: WAIT_MS })
+      await windowWithTestProject.keyboard.press('Escape')
+      await expect(panel.menu('More')).toHaveCount(0, { timeout: WAIT_MS })
+    } else {
       await expect(zoomChip).toHaveText('125%', { timeout: WAIT_MS })
-    } catch (error) {
-      const fold = await panel.root.locator('.erf-brw-nav').first().getAttribute('data-fold')
-      throw new Error(`zoom state is 125 but the chip is missing (nav data-fold="${fold ?? ''}")`, { cause: error })
+      await shot(windowWithTestProject, 'chip-zoom')
     }
-    await shot(windowWithTestProject, 'chip-zoom')
     await page.key('0', [MOD])
+    await panel.waitForState({ zoomPercent: 100 })
     await expect(zoomChip).toHaveCount(0, { timeout: WAIT_MS })
   })
 
