@@ -100,6 +100,11 @@ export function netErrorCodeText(code: number): string {
  */
 export const NET_ERROR_ABORTED = -3
 
+/** True for Chromium's certificate errors: the -200 to -299 block of `net_error_list.h`. */
+export function isCertificateError(code: number): boolean {
+  return Number.isInteger(code) && code <= -200 && code >= -299
+}
+
 /** True when a failed load should show the load-error page (every code but `ERR_ABORTED`). */
 export function showsLoadErrorPage(code: number): boolean {
   return code !== NET_ERROR_ABORTED

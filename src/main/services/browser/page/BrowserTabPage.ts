@@ -36,6 +36,7 @@
  * pages and the hung notice.
  */
 import type { Clock } from '../../../../shared/clock'
+import { isCertificateError } from '../../../../shared/browser/netErrorMessages'
 import { zoomFactorOf, zoomPercentOf, type ZoomStep } from '../../../../shared/browser/zoomSteps'
 import type { WidthPresetId } from '../../../../shared/browser/widthPresets'
 import type { LoadErrorPage } from '../../../../shared/ipc/browser-tab-page-schema'
@@ -279,8 +280,11 @@ export class BrowserTabPage {
   }
 
   private loadFailed(code: number, url: string): void {
-    // A certificate failure the certificate page took (025-FR-021) is that page's, not a load error.
-    if (this.deps.tab.state().erfanaPage === 'certificate') return
+    // A main-frame certificate failure is always the certificate page's (025-FR-021), not a load
+    // error: `browserCertificates` refused it and showed that page. Chromium can report the failure
+    // after the page is already answered – on Windows about 100 ms after it shows, so after a
+    // Proceed anyway or Back to safety – which the tab's state alone cannot tell.
+    if (this.deps.tab.state().erfanaPage === 'certificate' || isCertificateError(code)) return
     const page = loadErrorFor(code, this.userStarted)
     if (page === null || url === '') return
     // Logs the full URL – a recorded exception, docs/technical-debt.md entry 68 (025-FR-042).

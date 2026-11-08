@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_NET_ERROR_MESSAGE,
+  isCertificateError,
   netErrorCodeText,
   netErrorCodes,
   netErrorEntry,
@@ -39,5 +40,10 @@ describe('load-error messages (025-FR-059)', () => {
   it('shows no error page for an aborted load', () => {
     expect(showsLoadErrorPage(-3)).toBe(false)
     expect(showsLoadErrorPage(-102)).toBe(true)
+  })
+
+  it('names the certificate block, -200 to -299, and nothing else', () => {
+    for (const code of [-200, -201, -202, -207, -299]) expect(isCertificateError(code)).toBe(true)
+    for (const code of [-199, -300, -102, -3, 0, -200.5]) expect(isCertificateError(code)).toBe(false)
   })
 })
