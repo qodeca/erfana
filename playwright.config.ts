@@ -66,7 +66,7 @@ export default defineConfig({
     {
       name: 'electron',
       testMatch: '**/*.e2e.ts',
-      testIgnore: ['**/visual-regression*', '**/audio-transcription*', '**/*.timing.e2e.ts'],
+      testIgnore: ['**/visual-regression*', '**/audio-transcription*', '**/*.timing.e2e.ts', '**/*.perf.e2e.ts'],
     },
     {
       // Timing gates (`*.timing.e2e.ts`, e.g. 024-NFR-001): they assert a P95
@@ -78,6 +78,21 @@ export default defineConfig({
       name: 'timing',
       testMatch: '**/*.timing.e2e.ts',
       dependencies: ['electron'],
+      fullyParallel: false,
+      workers: 1,
+    },
+    {
+      // Heavy performance tests (`*.perf.e2e.ts`, e.g. F-002's 25 MB page,
+      // up to 30 min): last, alone, one worker. Beside the functional suite
+      // they held a shared OS-focus lease for 6.5 min, longer than an
+      // exclusive waiter's 170 s (e2e/fixtures/osFocusLock.ts), so an
+      // @os-focus test in the other worker timed out (2026-11-08), and they
+      // load the CPU the other worker's tests share. After `timing`, so the
+      // timing gates also never share the machine with them. A failure
+      // upstream skips them; run them alone with `--project=perf --no-deps`.
+      name: 'perf',
+      testMatch: '**/*.perf.e2e.ts',
+      dependencies: ['timing'],
       fullyParallel: false,
       workers: 1,
     },

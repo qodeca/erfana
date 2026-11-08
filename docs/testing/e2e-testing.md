@@ -73,7 +73,7 @@ npm run build:mac:test
 The `electron` project also runs on Linux under xvfb (a virtual X screen), inside Docker, so a run needs no visible window and does not take over the Mac. Any Docker engine works – Docker Desktop, OrbStack or Colima – but the checkout must be shared into the Docker VM. Docker Desktop and OrbStack share `/Users` by default. Colima shares only what `mounts:` lists in `~/.colima/<profile>/colima.yaml`: add the checkout's folder (`writable: true`) and run `colima restart`. The script checks this before the run and stops with the fix when the folder is not shared (before 2026-11-08 the run failed later with `run-suite.sh: No such file or directory`). On Windows, run it from WSL; Git Bash also works, because the script sets `MSYS_NO_PATHCONV=1` so Git Bash does not rewrite the container paths. `npm run doctor` shows whether Docker sees the checkout.
 
 ```bash
-# Whole functional suite, then the timing gates alone (--project=electron --project=timing is added when you pass no --project)
+# Whole functional suite, then the timing gates, then the perf tests, each alone (--project=electron --project=timing --project=perf is added when you pass no --project)
 npm run test:e2e:linux
 
 # Any Playwright arguments pass through
@@ -99,7 +99,7 @@ The full suite was tested at 8 CPUs, 32 GB and `ERFANA_E2E_LINUX_SHM=4g`. Use at
 
 #### A full run is noisy
 
- With 2 workers, `dockview-resize` and the `file-operations` copy test have each failed once in a full run and then passed alone 3 of 3. The timing gates (`*.timing.e2e.ts`) no longer run beside them: they are the `timing` project, which runs after `electron` with one worker, because 024-AC-024's save P95 missed its budget under load (1,001 ms) while it is about 780 ms alone (owner decision 2026-11-04). Rerun a failing test alone before you treat it as real.
+ With 2 workers, `dockview-resize` and the `file-operations` copy test have each failed once in a full run and then passed alone 3 of 3. The timing gates (`*.timing.e2e.ts`) no longer run beside them: they are the `timing` project, which runs after `electron` with one worker, because 024-AC-024's save P95 missed its budget under load (1,001 ms) while it is about 780 ms alone (owner decision 2026-11-04). The heavy perf tests (`*.perf.e2e.ts`) are the `perf` project, which runs after `timing` with one worker: on 2026-11-08 F-002 held a shared [focus-lock](#os-keyboard-focus-the-focus-lock) lease for 6.5 minutes beside the functional suite, longer than an exclusive waiter's 170 s, so `html-preview-keyboard-focus.e2e.ts` timed out. The same run also failed `browser-tab-isolation.e2e.ts` 025-AC-046 (the popup button moved under the click while the canary list grew – the test now waits for the canary first) and `browser-tab-chrome.e2e.ts` 025-AC-008 (the zoom chip was missing; the test now names the tab's zoom state and the toolbar fold when it fails). All three passed alone. Rerun a failing test alone before you treat it as real.
 
 `--no-sandbox` is not needed: Playwright's `electron.launch` adds it itself unless `chromiumSandbox: true` is passed, and nothing in the app code or the fixtures changes for the container. The one environment change the fixtures needed is `XAUTHORITY` in the env allowlist (`e2e/fixtures/isolation.ts`): `xvfb-run` protects its display with an auth file, and without the variable the app cannot open the display.
 

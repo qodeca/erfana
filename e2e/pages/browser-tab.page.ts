@@ -25,6 +25,7 @@ export interface TabState {
   loading: boolean
   erfanaPage: string | null
   devToolsOpen: boolean
+  zoomPercent: number
 }
 
 /** Where tests place a shown tab's page, in the window's CSS px. */

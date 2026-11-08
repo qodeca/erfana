@@ -256,7 +256,15 @@ test.describe('built-in browser tab chrome', () => {
     await page.key('=', [MOD])
     await expect(zoomChip).toHaveText('110%', { timeout: WAIT_MS })
     await page.key('=', [MOD])
-    await expect(zoomChip).toHaveText('125%', { timeout: WAIT_MS })
+    // Main's tab state first: it tells a lost key (state stays 110) from a chip the
+    // row hid (state 125, chip folded away) – a full run once found no chip here (2026-11-08).
+    await panel.waitForState({ zoomPercent: 125 })
+    try {
+      await expect(zoomChip).toHaveText('125%', { timeout: WAIT_MS })
+    } catch (error) {
+      const fold = await panel.root.locator('.erf-brw-nav').first().getAttribute('data-fold')
+      throw new Error(`zoom state is 125 but the chip is missing (nav data-fold="${fold ?? ''}")`, { cause: error })
+    }
     await shot(windowWithTestProject, 'chip-zoom')
     await page.key('0', [MOD])
     await expect(zoomChip).toHaveCount(0, { timeout: WAIT_MS })
