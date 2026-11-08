@@ -15,6 +15,11 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
   - `npm run test:preload` — preload tests
 - Run `npm run test` for current test count
 
+#### Spec 024 measurement reports (opt-in, never in the default suite)
+- `npm run test:corpus` – the real-file corpus round trip (024-NFR-003, 024-AC-026). It first runs `npm run corpus:fetch` (`scripts/fetch-corpus.mjs`), which downloads the pinned extra sources once – today the Python 3.14.9 HTML docs (PSF-2.0, 579 HTML files), SHA-256-checked – into the git-ignored `temp/corpus/sources/`. With them every machine reaches the 500-HTML-file floor; without them the repository and `node_modules` give about 150, and the collect step stops with that count and the fix. `CORPUS_EXTRA_ROOTS` (a JSON array of `{ label, dir, licence }`) replaces the fetched sources; `CORPUS_LIMIT=<n>` is a short trial that writes to `temp/corpus/` only.
+- `npm run test:timing` – the large-file timing floor (024-NFR-001, 024-AC-024), alone, with the production package conditions the app ships (`vitest.corpus.config.ts` sets `NODE_ENV=production` for it).
+- Both **write the committed reports** in `specs/spec-t3-024-unified-comments/verification/` (`corpus-round-trip.md` and `corpus-manifest.tsv`, `large-file-timing.md`), which the ordinary `main` run then re-checks in CI. Commit a new report on purpose, from a full run; otherwise `git restore` that folder.
+
 #### Renderer tips
 - When testing TerminalPanel in jsdom, mock xterm and addons to avoid canvas errors:
   - `vi.mock('@xterm/xterm', () => ({ Terminal: class { open(){} loadAddon(){} dispose(){} write(){} cols=80; rows=24 } }))`
