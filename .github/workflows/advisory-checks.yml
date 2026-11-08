@@ -1,0 +1,69 @@
+name: Advisory Checks
+
+# Checks that report but are not required by branch protection (docs/ci.md):
+#
+# - Docs lint: `npm run lint:docs` – Vale prose rules, markdownlint and lychee
+#   links over the user guide. Vale and lychee come from scripts/tools.mjs
+#   (pinned versions, SHA-256 checked), the same binaries a local run uses.
+# - Spec 025 trace: `npm run check:trace:025` is a release gate (spec 025
+#   04-acceptance.md), so open acceptance IDs are expected until release. The
+#   job writes the open count to the run summary and never fails on it.
+on:
+  push:
+    branches-ignore:
+      - 'gh-readonly-queue/**'
+  pull_request:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: advisory-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs-lint:
+    name: Docs lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    steps:
+      # actions/checkout v7.0.1 — pinned to match the other workflows.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-with-retry
+      - name: Docs lint (Vale, markdownlint, lychee)
+        env:
+          # lychee reads it to lift the GitHub rate limit on github.com links.
+          GITHUB_TOKEN: ${{ github.token }}
+        run: npm run lint:docs
+
+  spec-025-trace:
+    name: Spec 025 trace
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    steps:
+      # actions/checkout v7.0.1 — pinned to match the other workflows.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Report open acceptance IDs
+        run: |
+          set -uo pipefail
+          node scripts/check-spec025-trace.mjs > trace.txt 2>&1
+          status=$?
+          cat trace.txt
+          {
+            echo '### Spec 025 trace'
+            echo
+            echo '```'
+            tail -n 40 trace.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$status" -ne 0 ]; then echo "::notice::Spec 025 trace: $(tail -n 1 trace.txt)"; fi

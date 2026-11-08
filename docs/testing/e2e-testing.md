@@ -70,7 +70,7 @@ npm run build:mac:test
 
 ### Headless on Linux in Docker
 
-The `electron` project also runs on Linux under xvfb (a virtual X screen), inside Docker, so a run needs no visible window and does not take over the Mac. Docker Desktop must be running.
+The `electron` project also runs on Linux under xvfb (a virtual X screen), inside Docker, so a run needs no visible window and does not take over the Mac. Any Docker engine works – Docker Desktop, OrbStack or Colima – but the checkout must be shared into the Docker VM. Docker Desktop and OrbStack share `/Users` by default. Colima shares only what `mounts:` lists in `~/.colima/<profile>/colima.yaml`: add the checkout's folder (`writable: true`) and run `colima restart`. The script checks this before the run and stops with the fix when the folder is not shared (before 2026-11-08 the run failed later with `run-suite.sh: No such file or directory`). On Windows, run it from WSL; Git Bash also works, because the script sets `MSYS_NO_PATHCONV=1` so Git Bash does not rewrite the container paths. `npm run doctor` shows whether Docker sees the checkout.
 
 ```bash
 # Whole functional suite, then the timing gates alone (--project=electron --project=timing is added when you pass no --project)

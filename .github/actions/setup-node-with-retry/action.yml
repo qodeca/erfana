@@ -1,6 +1,6 @@
 name: Setup Node with retry
 description: |
-  Installs Node.js 24, caches ~/.npm (never node_modules), and runs
+  Installs Node.js (the major in .nvmrc unless node-version is given), caches ~/.npm (never node_modules), and runs
   `npm ci --ignore-scripts` with retry on transient ECONNRESET. Optional
   postinstall step runs only allowlisted native-module builds.
 
@@ -15,9 +15,9 @@ description: |
 
 inputs:
   node-version:
-    description: Node.js version. Matches project target.
+    description: Node.js version. Empty means the version in .nvmrc, the same file local setups read.
     required: false
-    default: "24"
+    default: ""
   run-postinstall:
     description: Run allowlisted postinstall for electron, node-pty, node-addon-api.
     required: false
@@ -31,6 +31,7 @@ runs:
       uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
       with:
         node-version: ${{ inputs.node-version }}
+        node-version-file: ${{ inputs.node-version == '' && '.nvmrc' || '' }}
 
     - name: Cache ~/.npm (download cache only)
       # actions/cache v5.0.5

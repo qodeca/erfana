@@ -34,8 +34,11 @@ TEMP_VOLUME="erfana-e2e-temp-$KEY"
 NPM_VOLUME="erfana-e2e-npm-cache-$KEY"
 CONTAINER_HOME=/tmp/home
 
+# Git Bash rewrites "/work"-style container paths into Windows paths; keep them as written.
+export MSYS_NO_PATHCONV=1
+
 if ! docker info >/dev/null 2>&1; then
-  echo "Docker daemon is not running. Start Docker Desktop and retry." >&2
+  echo "Docker daemon is not reachable. Start Docker Desktop, Colima or OrbStack and retry." >&2
   exit 2
 fi
 
@@ -48,6 +51,17 @@ done
 if [ "$has_project" -eq 0 ]; then args=("--project=electron" "--project=timing" "${args[@]+"${args[@]}"}"); fi
 
 docker build -t "$IMAGE" -f "$ROOT/e2e/docker/Dockerfile" "$ROOT/e2e/docker" || exit 1
+
+# The image builds without the checkout (the build context travels through the API), but the
+# run bind-mounts it. A Docker VM that does not share this folder mounts an empty directory,
+# and the run would fail later with "run-suite.sh: No such file or directory".
+if ! docker run --rm -v "$ROOT":/work "$IMAGE" test -f /work/e2e/docker/run-suite.sh; then
+  echo "Docker cannot see $ROOT: the Docker VM does not share this folder." >&2
+  echo "  Colima: add it under 'mounts:' in ~/.colima/<profile>/colima.yaml (writable: true), then run 'colima restart'." >&2
+  echo "  Docker Desktop: Settings > Resources > File sharing." >&2
+  echo "  OrbStack: shares /Users by default; check that the checkout is under it." >&2
+  exit 2
+fi
 
 # Fresh report folder every run; volumes are created root-owned, so hand them to the host user.
 mkdir -p "$ROOT/$REPORT_DIR"

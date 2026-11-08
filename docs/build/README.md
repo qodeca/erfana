@@ -36,7 +36,7 @@ npm run build:mac
 
 **Development Tools**:
 - Node.js 24+ — `.nvmrc` pins the major, so `nvm use` in the repo root selects it. CI installs the same major
-  (`node-version: "24"` in `.github/actions/setup-node-with-retry`), so a local run and a CI run agree
+  (`node-version-file: .nvmrc` in `.github/actions/setup-node-with-retry`), so a local run and a CI run agree
 - npm 11 (ships with Node 24). See the lockfile note in [CONTRIBUTING](../../CONTRIBUTING.md#local-setup) before
   committing anything `npm install` writes to `package-lock.json`
 - Xcode Command Line Tools (macOS only):
