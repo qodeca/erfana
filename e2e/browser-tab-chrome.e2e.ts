@@ -259,15 +259,29 @@ test.describe('built-in browser tab chrome', () => {
     // Main's tab state first, then where the row shows it. When the address needs the
     // room, fold step 3 moves the zoom chip into More (navFold.logic.ts) – a full run
     // hit that at 125% (2026-11-08: state 125, data-fold="3"), so More carries the level.
+    // The fold is measured after the chip grows, so wait for one of the two places to
+    // settle (a Linux run read data-fold too early and then missed the folded chip).
     await panel.waitForState({ zoomPercent: 125 })
-    const fold = (await panel.root.locator('.erf-brw-nav').first().getAttribute('data-fold')) ?? ''
-    if (fold.split(/\s+/).includes('3')) {
+    const nav = panel.root.locator('.erf-brw-nav').first()
+    let where = ''
+    await expect
+      .poll(
+        async () => {
+          const fold = ((await nav.getAttribute('data-fold')) ?? '').split(/\s+/)
+          if (fold.includes('3')) where = 'more'
+          else if ((await zoomChip.count()) > 0 && (await zoomChip.textContent()) === '125%') where = 'chip'
+          else where = ''
+          return where
+        },
+        { timeout: WAIT_MS }
+      )
+      .not.toBe('')
+    if (where === 'more') {
       await panel.tool('More').click()
       await expect(panel.menu('More').getByRole('menuitem', { name: /^Zoom: 125% – reset/ })).toBeVisible({ timeout: WAIT_MS })
       await windowWithTestProject.keyboard.press('Escape')
       await expect(panel.menu('More')).toHaveCount(0, { timeout: WAIT_MS })
     } else {
-      await expect(zoomChip).toHaveText('125%', { timeout: WAIT_MS })
       await shot(windowWithTestProject, 'chip-zoom')
     }
     await page.key('0', [MOD])
