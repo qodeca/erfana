@@ -19,6 +19,7 @@ import { promises as fs } from 'node:fs'
 import * as path from 'node:path'
 import { test, expect } from './fixtures/browserHarness'
 import { openPicker, PICK_WAIT_MS as WAIT_MS, type PickDriver, type WriteCaptureAnswer } from './pages/browser-pick.page'
+import { ECHO_AGENT } from './fixtures/browser/echoAgent'
 
 const IS_MAC = process.platform === 'darwin'
 const MOD = IS_MAC ? 'meta' : 'control'
@@ -77,9 +78,12 @@ async function createTerminal(pick: PickDriver): Promise<string> {
   return terminalId
 }
 
-/** Put `cat` in front of the shell: a non-shell foreground, as an agent is. */
+/** Put the echo stand-in agent (`cat`; `node` on Windows) in front of the shell: a non-shell foreground, as an agent is. */
 async function runCat(pick: PickDriver, terminalId: string): Promise<void> {
-  await pick.window.evaluate((id) => (window as unknown as TerminalApi).api.terminal.write(id, 'cat\r'), terminalId)
+  await pick.window.evaluate(
+    ([id, command]) => (window as unknown as TerminalApi).api.terminal.write(id, `${command}\r`),
+    [terminalId, ECHO_AGENT.command] as const
+  )
   await expect.poll(async () => (await pick.targetStatus(terminalId)).kind, { timeout: WAIT_MS }).toBe('agent')
 }
 

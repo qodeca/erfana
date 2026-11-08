@@ -36,6 +36,7 @@ import type { Page } from '@playwright/test'
 import { visualTest, expect } from './fixtures/index'
 import { BROWSER_CHROMIUM_ARGS, startBrowserFixtureServers, type BrowserFixtureServers } from './fixtures/browser/serve'
 import { AgentTerminal, PickFlow, PICK_WAIT_MS } from './pages/browser-pick-flow.page'
+import { ECHO_AGENT } from './fixtures/browser/echoAgent'
 import { assertBaselineExists } from './utils/visual-baseline'
 
 /**
@@ -147,7 +148,7 @@ async function openTabWithAgent(app: Parameters<typeof PickFlow.open>[0], window
   const setup = await PickFlow.open(app, window)
   await new AgentTerminal(window, setup).start()
   const flow = await PickFlow.open(app, window)
-  await expect(flow.target).toHaveAccessibleName('Terminal · cat, target terminal', { timeout: PICK_WAIT_MS })
+  await expect(flow.target).toHaveAccessibleName(`Terminal · ${ECHO_AGENT.name}, target terminal`, { timeout: PICK_WAIT_MS })
   return flow
 }
 

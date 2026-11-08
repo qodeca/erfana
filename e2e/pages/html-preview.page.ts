@@ -70,8 +70,11 @@ export class HtmlPreviewPage {
    *
    * The test-project fixtures mount with the tree panel already open — do NOT
    * click the Files activity-bar button, which would toggle it shut.
+   *
+   * `options.timeout` replaces {@link PREVIEW_BUDGET_MS} for the wait on the
+   * live view, for a page a slow host takes longer to serve.
    */
-  async open(relPath: string): Promise<void> {
+  async open(relPath: string, options: { timeout?: number } = {}): Promise<void> {
     const tree = new ProjectTreePage(this.page)
     const segments = relPath.split('/')
     if (segments.length > 1) {
@@ -104,7 +107,7 @@ export class HtmlPreviewPage {
     await this.withReadError(
       expect
         .poll(async () => (await this.livePreviews()).some((p) => p.url.endsWith(`/${urlPath}`)), {
-          timeout: PREVIEW_BUDGET_MS,
+          timeout: options.timeout ?? PREVIEW_BUDGET_MS,
           message: `no live preview appeared for ${relPath}`
         })
         .toBe(true)

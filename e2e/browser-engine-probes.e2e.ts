@@ -602,14 +602,15 @@ test.describe('spec 025 engine probes: the view on screen', () => {
     browserServers
   }) => {
     const view = await ProbeView.open(appWithTestProject)
-    const linux = process.platform === 'linux'
-    // On Linux the 10 ms timer page: its ticks measure time passing in the page without a sleep in the test.
-    await view.load(browserServers.sites.static.url(linux ? '/probes/page.html?timer=1' : '/probes/page.html'))
+    // Off macOS a detached view draws no animation frame, so it is probed with the timer page.
+    const noFramesDetached = process.platform !== 'darwin'
+    // The 10 ms timer page: its ticks measure time passing in the page without a sleep in the test.
+    await view.load(browserServers.sites.static.url(noFramesDetached ? '/probes/page.html?timer=1' : '/probes/page.html'))
     expect(await framesPainted(view, 2)).toBe('visible')
-    if (linux) {
-      // Linux (2026-11-04, Electron 44, xvfb): the detached view also stays visible with no visibilitychange,
-      // but it draws no animation frame until it is attached again – decision 3's "hidden tabs cost no
-      // compositing" holds here, unlike on macOS (ADR 0011 probe results).
+    if (noFramesDetached) {
+      // Linux (2026-11-04, Electron 44, xvfb) and Windows (2026-11-08, Electron 44, Windows 11): the detached
+      // view also stays visible with no visibilitychange, but it draws no animation frame until it is attached
+      // again – decision 3's "hidden tabs cost no compositing" holds here, unlike on macOS (ADR 0011 probe results).
       await view.eval('window.__probe.logFrames()')
       await view.setPhase('detached')
       await view.hook('probeDetachView')

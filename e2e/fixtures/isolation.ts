@@ -181,6 +181,10 @@ export async function createWorkerHome(prefix: string): Promise<string> {
   ]) {
     await fs.promises.mkdir(dir, { recursive: true })
   }
+  // On Windows, Electron resolves app.getPath('downloads') through the OS
+  // known-folder lookup under USERPROFILE, which throws "Failed to get
+  // 'downloads' path" when the folder does not exist. macOS ignores HOME here.
+  await fs.promises.mkdir(path.join(home, 'Downloads'), { recursive: true })
   // Seeded shell startup files: zsh offers its interactive `zsh-newuser-install`
   // menu when none exists in $HOME, and that menu swallows typed input.
   for (const name of SHELL_STARTUP_FILES) {

@@ -16,6 +16,11 @@
 #                                        host, for the "host presents a new certificate" case
 set -euo pipefail
 
+# Git Bash on Windows rewrites an argument that starts with "/" into a Windows
+# path, which turns `-subj "/CN=..."` into `C:/Program Files/Git/CN=...`.
+# Leave the subject names alone; other platforms ignore this variable.
+export MSYS2_ARG_CONV_EXCL='/CN='
+
 usage() {
   cat <<'EOF'
 Usage: bash e2e/fixtures/browser/certs/generate.sh [--help] [OUT_DIR]
@@ -54,6 +59,10 @@ readonly VALID_HOSTS=(
 WORK_DIR="$(mktemp -d)"
 readonly WORK_DIR
 trap 'rm -rf -- "${WORK_DIR}"' EXIT
+# ca.cnf is read by openssl itself, so on Git Bash it needs the Windows form of
+# the path (C:/...); cygpath exists only there.
+CNF_DIR="$(cygpath -m "${WORK_DIR}" 2>/dev/null || printf '%s' "${WORK_DIR}")"
+readonly CNF_DIR
 
 new_key() {
   openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "$1" 2>/dev/null
@@ -74,10 +83,10 @@ cat >"${WORK_DIR}/ca.cnf" <<EOF
 [ ca ]
 default_ca = test_ca
 [ test_ca ]
-dir = ${WORK_DIR}
-database = ${WORK_DIR}/index.txt
-new_certs_dir = ${WORK_DIR}
-serial = ${WORK_DIR}/serial
+dir = ${CNF_DIR}
+database = ${CNF_DIR}/index.txt
+new_certs_dir = ${CNF_DIR}
+serial = ${CNF_DIR}/serial
 default_md = sha256
 policy = policy_any
 copy_extensions = none

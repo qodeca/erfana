@@ -36,6 +36,7 @@ import { BrowserPickUi } from './browser-pick-ui.page'
 import { mainHook, PICK_WAIT_MS, type Box, type HookPickState, type PickDriver } from './browser-pick.page'
 import { browserHook, testHook } from './browser-page.page'
 import { TerminalPage } from './terminal.page'
+import { ECHO_AGENT } from '../fixtures/browser/echoAgent'
 import { EXEC_ACTION_CAP_MS, EXEC_READ_CAP_MS, installBoundedExec, type BoundedExecGlobal } from '../utils/bounded-exec'
 
 export { PICK_WAIT_MS }
@@ -742,10 +743,10 @@ export class AgentTerminal {
     if (options.focus === false) {
       await this.window.evaluate(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the preload bridge, untyped in e2e
-        (id) => (window as any).api.terminal.write(id, 'cat\r'),
-        this.id
+        ([id, command]) => (window as any).api.terminal.write(id, `${command}\r`),
+        [this.id, ECHO_AGENT.command] as const
       )
-    } else await this.terminal.sendCommand('cat')
+    } else await this.terminal.sendCommand(ECHO_AGENT.command)
     const driver = await this.flow.driver()
     await expect.poll(async () => (await driver.targetStatus(this.id)).kind, { timeout: PICK_WAIT_MS }).toBe('agent')
   }
@@ -840,9 +841,15 @@ export async function captureFiles(projectRoot: string): Promise<string[]> {
 export async function newCapture(projectRoot: string, after: readonly string[]): Promise<{ name: string; text: string; screenshot: string }> {
   await expect.poll(async () => (await contextFiles(projectRoot)).filter((f) => !after.includes(f)).length, { timeout: PICK_WAIT_MS }).toBe(1)
   const name = (await contextFiles(projectRoot)).find((f) => !after.includes(f))!
-  const text = await fs.readFile(path.join(capturesDir(projectRoot), name), 'utf8')
-  const shot = /^- Screenshot: (.+)$/m.exec(text)?.[1]
-  if (shot === undefined) throw new Error(`${name} names no screenshot`)
+  // The store creates the file, then writes it: a read right after the name shows up can find it empty.
+  let text = ''
+  await expect
+    .poll(async () => (text = await fs.readFile(path.join(capturesDir(projectRoot), name), 'utf8')), {
+      timeout: PICK_WAIT_MS,
+      message: `${name} names its screenshot`
+    })
+    .toMatch(/^- Screenshot: .+$/m)
+  const shot = /^- Screenshot: (.+)$/m.exec(text)![1]!
   return { name, text, screenshot: path.join(projectRoot, shot) }
 }
 
