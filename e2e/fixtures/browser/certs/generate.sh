@@ -55,8 +55,11 @@ WORK_DIR="$(mktemp -d)"
 readonly WORK_DIR
 trap 'rm -rf -- "${WORK_DIR}"' EXIT
 
+# ec_param_enc:named_curve: OpenSSL 3 writes the curve by name anyway, but LibreSSL
+# (macOS's /usr/bin/openssl) writes its explicit parameters, and Chromium and Node then
+# refuse the certificate ("Certificate public key has explicit ECC parameters").
 new_key() {
-  openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "$1" 2>/dev/null
+  openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -pkeyopt ec_param_enc:named_curve -out "$1" 2>/dev/null
 }
 
 # san_list host... -> "DNS:a,DNS:b,IP:127.0.0.1"
@@ -87,8 +90,11 @@ commonName = supplied
 [ req ]
 distinguished_name = dn
 prompt = no
+# The CA's own name. LibreSSL (macOS's /usr/bin/openssl) takes it from here and ignores
+# -subj when prompt = no, so it must match the -subj of the CA below.
 [ dn ]
-CN = placeholder
+CN = Erfana e2e test CA (test only)
+O = Qodeca test fixtures
 [ v3_ca ]
 basicConstraints = critical, CA:true, pathlen:0
 keyUsage = critical, keyCertSign, cRLSign
