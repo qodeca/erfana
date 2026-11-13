@@ -150,6 +150,8 @@ export class BrowserTab {
   private closed = false
   /** The certificate warning page and the address bar's warning sign (025-FR-021, `site/browserCertificates.ts`). */
   private certificate: TabCertificateState = { warning: null, sign: null }
+  /** The address the last warning page was for: its load's own failure may arrive after the user answered. */
+  private certificateRefusedUrl: string | null = null
 
   constructor(deps: BrowserTabDeps) {
     this.deps = deps
@@ -304,7 +306,13 @@ export class BrowserTab {
   /** Show the certificate warning page or the warning sign, or neither (`site/browserCertificates.ts`). */
   setCertificateState(state: TabCertificateState): void {
     this.certificate = state
+    if (state.failedUrl !== undefined) this.certificateRefusedUrl = state.failedUrl
     this.changed()
+  }
+
+  /** Whether the warning page took the certificate failure of `url` – shown now, or answered already (025-FR-021). */
+  certificatePageTook(url: string): boolean {
+    return url === this.certificateRefusedUrl
   }
 
   /** Whether a navigation the user started is pending: a sign-in box for it takes focus (025-FR-022). */

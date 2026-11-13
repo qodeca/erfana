@@ -157,6 +157,31 @@ describe('TabCertificates', () => {
     expect(tab.goBack).toHaveBeenCalledTimes(1)
   })
 
+  it('025-AC-021 Back to safety answered before the refused load settled steps back once its entry comes', async () => {
+    await certError(URL_A, CERT_1, true)
+    tab.contents.url = 'https://previous.test/'
+    tab.canGoBack = true
+    expect(certs.answer('decision1', false)).toBe('accepted')
+    expect(tab.goBack).not.toHaveBeenCalled()
+    // Another address failing changes nothing; the refused load's own failure brings its entry.
+    certs.loadFailed('https://other.test/')
+    expect(tab.goBack).not.toHaveBeenCalled()
+    tab.contents.url = URL_A
+    certs.loadFailed(URL_A)
+    expect(tab.goBack).toHaveBeenCalledTimes(1)
+    certs.loadFailed(URL_A)
+    expect(tab.goBack).toHaveBeenCalledTimes(1)
+
+    // A navigation the user starts first cancels the step back.
+    await certError(URL_A, CERT_1, true)
+    tab.contents.url = 'https://previous.test/'
+    certs.answer('decision2', false)
+    certs.navigationStarted()
+    tab.contents.url = URL_A
+    certs.loadFailed(URL_A)
+    expect(tab.goBack).toHaveBeenCalledTimes(1)
+  })
+
   it('Back to safety works inside the guard; a stale or unknown decision is ignored', async () => {
     await certError(URL_A, CERT_1, true)
     expect(certs.answer('decision1', false)).toBe('accepted')

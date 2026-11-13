@@ -54,6 +54,29 @@ describe('BrowserTabPage load errors', () => {
     expect(page.facts().loadError).toBeNull()
   })
 
+  it('025-AC-021 leaves a late certificate failure to the certificate page after the user answered it', () => {
+    const { tab, page, outlet, startMain, failMain } = setup()
+    // The warning page showed for this address, then Back to safety (or Proceed anyway) took it
+    // away before the refused load's own did-fail-load arrived.
+    tab.certificateRefusedUrl = 'https://expired.test/'
+    tab.erfanaPage = 'empty'
+    failMain(-201, 'https://expired.test/')
+    // Proceed anyway: the reload started, then the old failure arrives.
+    startMain()
+    failMain(-202, 'https://expired.test/')
+    expect(page.facts().loadError).toBeNull()
+    expect(outlet.stateChanged).not.toHaveBeenCalled()
+  })
+
+  it('025-AC-076 still shows the load-error page for another address, or a non-certificate code', () => {
+    const { tab, page, failMain } = setup()
+    tab.certificateRefusedUrl = 'https://expired.test/'
+    failMain(-202, 'https://other.test/')
+    expect(page.facts()).toMatchObject({ failedUrl: 'https://other.test/', loadError: { code: -202 } })
+    failMain(-102, 'https://expired.test/')
+    expect(page.facts()).toMatchObject({ failedUrl: 'https://expired.test/', loadError: { code: -102 } })
+  })
+
   it('ignores a cancelled load, a frame failure and an empty address', () => {
     const { tab, page, failMain } = setup()
     failMain(-3)

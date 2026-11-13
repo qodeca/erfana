@@ -80,6 +80,8 @@ export interface PageTab {
   hasPendingUserNavigation(): boolean
   history(step: 'reload'): void
   state(): Pick<TabStateEvent, 'committedUrl' | 'erfanaPage'>
+  /** Whether the certificate warning page took `url`'s certificate failure (`BrowserTab.certificatePageTook`). */
+  certificatePageTook(url: string): boolean
 }
 
 /** The tab CDP session's hang events (`cdp/BrowserCdpSession.ts`, through the tab's CDP link). */
@@ -280,7 +282,10 @@ export class BrowserTabPage {
 
   private loadFailed(code: number, url: string): void {
     // A certificate failure the certificate page took (025-FR-021) is that page's, not a load error.
+    // The refused load's own failure can arrive after Proceed anyway or Back to safety took the page
+    // away (seen under load in a macOS VM, 2026-11-13): it is still that page's.
     if (this.deps.tab.state().erfanaPage === 'certificate') return
+    if (isCertificateError(code) && this.deps.tab.certificatePageTook(url)) return
     const page = loadErrorFor(code, this.userStarted)
     if (page === null || url === '') return
     // Logs the full URL – a recorded exception, docs/technical-debt.md entry 68 (025-FR-042).
@@ -323,4 +328,9 @@ export class BrowserTabPage {
     this.killingForReload = true
     contents.forcefullyCrashRenderer()
   }
+}
+
+/** Chromium's certificate errors are -200 to -299 (net_error_list.h). */
+function isCertificateError(code: number): boolean {
+  return code <= -200 && code > -300
 }

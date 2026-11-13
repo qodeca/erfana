@@ -45,6 +45,8 @@ interface RawState {
   erfanaPage: string | null
   security: string
   certificate?: CertificateWarning
+  /** The load-error page's parts, with `erfanaPage: 'loadError'` – printed when a wait fails. */
+  loadError?: unknown
 }
 
 interface SignInRow {
@@ -101,7 +103,14 @@ function rawState(window: Page, tabId: string): Promise<RawState | null> {
 }
 
 async function waitForState(window: Page, tabId: string, expected: Partial<RawState>): Promise<RawState> {
-  await expect.poll(() => rawState(window, tabId), { timeout: WAIT_MS }).toMatchObject(expected)
+  try {
+    await expect.poll(() => rawState(window, tabId), { timeout: WAIT_MS }).toMatchObject(expected)
+  } catch (error) {
+    // The diff shows only the expected keys; a full macOS VM run twice ended on a load-error
+    // page here (2026-11-10), and the page's parts say why.
+    const last = await rawState(window, tabId).catch(() => null)
+    throw new Error(`${(error as Error).message}\nLast tab state: ${JSON.stringify(last)}`, { cause: error })
+  }
   return (await rawState(window, tabId))!
 }
 

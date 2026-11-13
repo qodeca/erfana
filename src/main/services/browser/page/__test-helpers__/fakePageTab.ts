@@ -30,6 +30,8 @@ export interface FakePageTab extends PageTab {
   committedUrl: string | null
   erfanaPage: 'empty' | 'certificate' | 'loadError' | 'crashed' | null
   pending: boolean
+  /** The address whose certificate failure the warning page took (`certificatePageTook`). */
+  certificateRefusedUrl: string | null
   readonly history: Mock<(step: 'reload') => void>
   readonly viewFrame: { widthPreset: WidthPresetId; setPreset: Mock<(preset: WidthPresetId) => void> }
 }
@@ -46,6 +48,7 @@ export function fakePageTab(projectRoot = '/p', committedUrl: string | null = 'h
     committedUrl,
     erfanaPage: null,
     pending: false,
+    certificateRefusedUrl: null,
     history: vi.fn<(step: 'reload') => void>(),
     viewFrame: {
       widthPreset: 'full',
@@ -54,7 +57,8 @@ export function fakePageTab(projectRoot = '/p', committedUrl: string | null = 'h
       })
     },
     hasPendingUserNavigation: () => tab.pending,
-    state: () => ({ committedUrl: tab.committedUrl, erfanaPage: tab.erfanaPage })
+    state: () => ({ committedUrl: tab.committedUrl, erfanaPage: tab.erfanaPage }),
+    certificatePageTook: (url) => url === tab.certificateRefusedUrl
   }
   return tab
 }

@@ -117,12 +117,16 @@ export class SiteSecurity {
       if (details.isMainFrame) auth.mainNavigation(details.url)
     }
     const onCommit = (_event: unknown, url: string): void => certificates.committed(url)
+    const onFail = (_event: unknown, _code: number, _description: string, url: string, isMainFrame: boolean): void => {
+      if (isMainFrame) certificates.loadFailed(url)
+    }
     const events: Array<[string, (...args: never[]) => void]> = [
       ['certificate-error', onCertificate],
       ['login', onLogin],
       ['did-start-navigation', onStart],
       ['did-redirect-navigation', onRedirect],
-      ['did-navigate', onCommit]
+      ['did-navigate', onCommit],
+      ['did-fail-load', onFail]
     ]
     const emitter = contents as unknown as {
       on(name: string, listener: (...args: never[]) => void): void
