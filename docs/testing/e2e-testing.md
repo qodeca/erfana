@@ -136,6 +136,34 @@ One test helper was changed for the container, safely for macOS and Windows too:
 
 - `/bin/sh` is linked to bash in the image. `ERFANA_E2E_FAST_SHELL` tests exec `/bin/sh -i`, which is bash on macOS; Ubuntu's dash made the blank-terminal race above more likely.
 - Without a window manager Monaco-heavy specs lose focus and window maximize does nothing, so `e2e/docker/run-under-xvfb.sh` starts openbox before Playwright.
+- The container runs with `--ulimit core=0`. Before that, a crashed renderer left a core dump of over 200 MB in the checkout root (seen 2026-11-08), because the checkout is the container's `/work`.
+
+### macOS in a virtual machine (Tart)
+
+A local `npm run test:e2e` needs someone at the Mac: the [focus tests](#os-keyboard-focus-the-focus-lock) need Erfana to be the OS key window, and macOS gives that to no window while the screen is locked. A run with the screen locked failed all 167 of them with "the OS would not make Erfana the key window" (2026-11-08). `npm run test:e2e:macos-vm` runs the same suite in a macOS virtual machine on the same Mac. The VM has its own display, logs in automatically and has no screen lock, so the run does not depend on the host screen.
+
+```bash
+npm run test:e2e:macos-vm                        # electron, timing and perf, as test:e2e
+npm run test:e2e:macos-vm -- e2e/foo.e2e.ts:42   # any Playwright arguments pass through
+```
+
+**One-time setup** (Apple Silicon only):
+
+1. Install [Tart](https://github.com/openai/tart) 2.41 or later. The Homebrew tap `cirruslabs/cli` fails on current Homebrew (2026-11-10), so download `tart.tar.gz` from the [releases page](https://github.com/openai/tart/releases), check it against `tart_<version>_checksums.txt`, unpack `tart.app` into `~/Applications` and link `tart.app/Contents/MacOS/tart` into your `PATH`.
+2. Nothing else. The first run creates the VM `erfana-e2e` from `ghcr.io/cirruslabs/macos-tahoe-base:latest` (about 33 GB, once), with 6 CPUs, 16 GB memory, a 90 GB disk and a 1920×1200 display (some tests widen the window to 1800 px). That image already has the Command Line Tools, automatic login and the screen lock off. Its Homebrew Node is not used: the script installs the nodejs.org build of the `.nvmrc` major into `/Users/admin/.erfana-node` (checked against `SHASUMS256.txt`), because the 025-AC-077 shell-guard tests run a copy of the node binary under another name (`ssh`, `nu.exe`), and Homebrew's node cannot load its separate `libnode.dylib` from there. `npm run doctor` warns about such a Node on any machine.
+
+**How it works** (`scripts/e2e-macos-vm.sh`):
+
+- It starts the VM headless (no window) when it is not running, and stops it at the end only if it started it.
+- Nothing on the host is shared into the VM. The script streams in only the files git tracks or would add (`git ls-files --cached --others --exclude-standard`), so ignored files such as `signing-secrets.local` and `.env` never reach it, and it streams the reports back into `.local/e2e-macos-vm/` (git-ignored).
+- `node_modules` and `out/` stay in the VM between runs. `npm ci` runs again only when `package-lock.json` changes.
+- Commands run through `tart exec` (the Tart guest agent), which runs them in the logged-in desktop session, so the app's windows can take focus.
+- It sets `ERFANA_E2E_MACOS_VM=1`. The `timing` project then records 024-AC-024's numbers without gating them, as on Windows: a VM is not the reference hardware (save P50 1,256 ms in the VM against about 780 ms on the host, 2026-11-10). Gate the timing budget with `npm run test:e2e` on the Mac itself.
+- Full-run flakes seen in the VM, each passing alone 3 of 3: `browser-certificates-auth.e2e.ts` 025-AC-021 (expired and host-mismatch), `browser-send.e2e.ts` 025-AC-070 (the send notice) and `markdown-preview-comments.e2e.ts` I-14.
+
+**What the first VM run found** (2026-11-10): 25 tests failed because the VM has only macOS's own `openssl` (LibreSSL 3.3), and `e2e/fixtures/browser/certs/generate.sh` then wrote EC keys with explicit curve parameters (Chromium and Node refuse them: "Certificate public key has explicit ECC parameters") and a CA named `placeholder` (LibreSSL ignores `-subj` when the config sets `prompt = no`). The script now asks for named curves and keeps the CA name in its config, so both OpenSSL and LibreSSL write the same certificates. Any Mac without Homebrew's OpenSSL had the same failures.
+
+Variables: `ERFANA_E2E_VM` (VM name, default `erfana-e2e`) and `ERFANA_E2E_VM_IMAGE` (base image). Tart's licence is FSL-1.1-ALv2: any use except a product that competes with Tart.
 
 ---
 

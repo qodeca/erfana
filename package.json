@@ -64,6 +64,7 @@
     "test:e2e": "npm run build:e2e && playwright test --project=electron --project=timing --project=perf",
     "test:e2e:no-build": "playwright test --project=electron --project=timing --project=perf",
     "test:e2e:linux": "bash scripts/e2e-linux.sh",
+    "test:e2e:macos-vm": "bash scripts/e2e-macos-vm.sh",
     "test:e2e:browser-isolation": "npm run build:e2e && playwright test --project=browser-isolation",
     "test:e2e:headed": "npm run build:e2e && playwright test --project=electron --headed",
     "test:e2e:visual": "electron-vite build --mode e2e && playwright test --project=visual",

@@ -78,6 +78,7 @@ machine and CI run the same build. `npm run tools` downloads all of them at once
 | `test:e2e`, `test:e2e:browser-isolation` | a desktop session (the app opens windows) | macOS, Windows |
 | `test:e2e:visual` | a desktop session; baselines are macOS-only | macOS |
 | `test:e2e:linux` | bash and Docker (Docker Desktop, Colima or OrbStack) sharing the checkout into its VM | macOS, Linux; Windows from WSL or Git Bash |
+| `test:e2e:macos-vm` | Tart and a macOS VM (created on first run, about 33 GB); no desktop session, so it runs while the screen is locked | macOS on Apple Silicon |
 | `test:corpus` | network once, for `npm run corpus:fetch` (pinned HTML doc sets) | everywhere |
 | `build:mac*` | macOS, Xcode; signing variables for a signed build | macOS |
 | `build:win` | Windows, VS Build Tools; Azure Trusted Signing for a signed build | Windows |
@@ -137,6 +138,7 @@ For changes touching Electron-specific paths, also run the end-to-end suite loca
 ```bash
 npm run test:e2e        # the Playwright Electron suite on your machine
 npm run test:e2e:linux  # the same suite headless in Docker under xvfb, as CI runs it
+npm run test:e2e:macos-vm  # the macOS suite in a Tart VM: no one needs to keep the screen unlocked
 ```
 
 The macOS e2e workflow is disabled. The only e2e run on CI is the advisory `E2E (Linux, xvfb)` job

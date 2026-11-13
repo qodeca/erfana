@@ -7,7 +7,7 @@
 // Every non-ok row prints the install line for this OS. Exit code: 1 when any row fails.
 
 import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { TOOLS, binaryPath } from './tools.mjs'
@@ -40,6 +40,17 @@ else
     'Node',
     `v${process.versions.node}, .nvmrc wants ${wantNode}`,
     `nvm install ${wantNode} (or fnm/volta/mise)`
+  )
+
+// A Node built against a shared libnode (Homebrew's node@24) cannot run from a copy under
+// another name, which the e2e shell-guard tests (025-AC-077) do.
+const nodeLib = join(dirname(process.execPath), '..', 'lib')
+if (existsSync(nodeLib) && readdirSync(nodeLib).some(f => /^libnode\./.test(f)))
+  add(
+    'warn',
+    'Node build',
+    `${process.execPath} links a shared libnode – the 025-AC-077 e2e tests fail with it`,
+    'use the nodejs.org build: nvm, fnm, volta, mise or the nodejs.org installer'
   )
 
 // npm – the packageManager field.
