@@ -75,8 +75,11 @@ docker run --rm --user 0 \
 lock_before="$(hash_text < "$ROOT/package-lock.json")"
 
 # --init reaps the zombie processes Electron leaves; /dev/shm is enlarged for Chromium.
+# --ulimit core=0: a crashed renderer would otherwise drop a core dump (over 200 MB)
+# into the checkout root, which /work is.
 docker run --rm \
   --init \
+  --ulimit core=0 \
   --shm-size="${ERFANA_E2E_LINUX_SHM:-1g}" \
   --user "$(id -u):$(id -g)" \
   -e HOME="$CONTAINER_HOME" \
