@@ -45821,7 +45821,7 @@
       "quote": "| `ProjectTreePage` |",
       "status": "verified",
       "evidence": "source",
-      "source": "e2e/pages/project-tree.page.ts:19",
+      "source": "e2e/pages/project-tree.page.ts:20",
       "match": "export class ProjectTreePage"
     },
     {
@@ -45831,7 +45831,7 @@
       "quote": "entProject(name)` / `switchToRecent(name)` |",
       "status": "verified",
       "evidence": "source",
-      "source": "e2e/pages/project-tree.page.ts:135",
+      "source": "e2e/pages/project-tree.page.ts:138",
       "match": "async switchToRecent(name: string): Promise<void> {"
     },
     {

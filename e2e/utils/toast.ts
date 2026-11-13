@@ -48,3 +48,31 @@ export function toastOfType(page: Page, type: ToastType): Locator {
 export function toastWithText(page: Page, text: string): Locator {
   return anyToast(page).filter({ hasText: text })
 }
+
+type Box = { x: number; y: number; width: number; height: number }
+
+function overlaps(a: Box, b: Box): boolean {
+  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+}
+
+/**
+ * Dismiss every toast that covers `target`, so a click on `target` lands.
+ *
+ * Toasts sit at the bottom left, over the activity bar's Settings button, and a
+ * toast pauses while the pointer rests on it – so a click that Playwright aims
+ * at a covered button parks the pointer on the toast and waits for ever. Seen
+ * in a full macOS VM run (2026-11-10): "Project Opened" covered Settings.
+ * Toasts elsewhere stay, for the specs that read them.
+ */
+export async function dismissToastsOver(page: Page, target: Locator): Promise<void> {
+  const targetBox = await target.boundingBox()
+  if (!targetBox) return
+  const toasts = anyToast(page)
+  for (let i = (await toasts.count()) - 1; i >= 0; i--) {
+    const toast = toasts.nth(i)
+    const box = await toast.boundingBox().catch(() => null)
+    if (!box || !overlaps(box, targetBox)) continue
+    await toast.getByTestId(TEST_IDS.TOAST_BTN_DISMISS).click()
+    await toast.waitFor({ state: 'detached' })
+  }
+}
