@@ -97,6 +97,22 @@ The full suite was tested at 8 CPUs, 32 GB and `ERFANA_E2E_LINUX_SHM=4g`. Use at
 - A small machine can fail a heavy test for lack of resources. In a Docker machine with 6 CPUs and 12 GB, the 25 MB page in `e2e/html-preview-comments.perf.e2e.ts` (F-002) did not finish its reload in 600 s. With 8 CPUs, 32 GB and 4 GB of shared memory it finished: median 38.5 s with comments on, 19.0 s with them off ([known limits](../../specs/spec-t3-024-unified-comments/verification/known-limits.md)).
 - On Colima, `colima start` for a new profile makes that profile the current Docker context. Restore your previous context afterwards (`docker context use <name>`), and pass the profile to a run through `DOCKER_CONTEXT` (`DOCKER_CONTEXT=colima-<profile> npm run test:e2e:linux`), which the script's `docker` calls honour.
 
+#### From a Windows host
+
+Run the script from Git Bash with Docker Desktop's `docker.exe` on `PATH`. Git Bash rewrites arguments that start with `/` (and `name:/path` volume
+pairs) into Windows paths, which breaks the script's `docker run` mounts and `HOME=/tmp/home`; `MSYS2_ARG_CONV_EXCL` turns that off for the listed
+prefixes. Verified 2026-11-08 (Windows 11, Docker Desktop, no WSL integration):
+
+```bash
+export PATH="$PATH:/c/Program Files/Docker/Docker/resources/bin"
+export MSYS2_ARG_CONV_EXCL="erfana-e2e;/work;HOME=;/tmp;$PWD:"   # run from the repo root
+bash scripts/e2e-linux.sh
+```
+
+Do not run the Windows e2e suite at the same time: both share the CPU, the Linux run takes several times longer, and `@os-focus` tests fail
+with `os-focus lock: no exclusive lease within 170000 ms`. One test has failed only in this setup (Docker on a Windows host): see the `browser-capture-content.e2e.ts:338` row in the
+[Windows flake register](../windows/known-flakes.md#register).
+
 #### A full run is noisy
 
  With 2 workers, `dockview-resize` and the `file-operations` copy test have each failed once in a full run and then passed alone 3 of 3. The timing gates (`*.timing.e2e.ts`) no longer run beside them: they are the `timing` project, which runs after `electron` with one worker, because 024-AC-024's save P95 missed its budget under load (1,001 ms) while it is about 780 ms alone (owner decision 2026-11-04). Rerun a failing test alone before you treat it as real.
@@ -107,7 +123,7 @@ The script sets `ERFANA_E2E_LINUX_CONTAINER=1`. Tests read it only through `IS_L
 
 **Not run in the container**
 
-- The `visual` project: its baselines are `-darwin` PNGs (see `snapshotPathTemplate`), and there are no Linux baselines.
+- The `visual` project: its baselines are `-darwin` and `-win32` PNGs (see `snapshotPathTemplate`), and there are no Linux baselines.
 - The `transcription` project: needs `ERFANA_E2E_TRANSCRIPTION=1` and an API key, as everywhere.
 
 **Skipped or adapted in the container**
@@ -173,7 +189,7 @@ prompt-actions panel, the instruction dialog, and the certificate, load-error an
 native view and never appears in a window screenshot; the still image is a canvas in Erfana's DOM, so it does. Three things keep them
 deterministic, and each is needed:
 
-- **The target terminal runs the stub agent (`cat`).** With the bare shell the row, panel and dialog name the host's login shell and the panel adds a
+- **The target terminal runs the stub agent (`ECHO_AGENT`).** It is `cat`, or `node` on Windows, so the drawn name differs per platform. With the bare shell the row, panel and dialog name the host's login shell and the panel adds a
   shell-guard banner that wraps by that name. The agent is started from a first tab and the tab under test opened after it, because a tab reads its
   target as it opens.
 - **Ports are pinned in the drawn text.** The fixture servers listen on OS-assigned ports; `pinPortText()` replaces the port number in the panel's
@@ -184,10 +200,14 @@ deterministic, and each is needed:
 
 The two visual option fixtures on `visualTest` (`e2e/fixtures/index.ts`) default to the old behaviour, so the six core baselines launch exactly as before:
 `visualExtraLaunchArgs` (extra Chromium switches for both visual apps; the browser cases pass `BROWSER_CHROMIUM_ARGS`) and `visualResetRendererStorage`.
-Both visual specs share `assertBaselineExists` from `e2e/utils/visual-baseline.ts`. **Only the darwin set of the browser baselines exists** (generated
-2026-11-03): until a Windows host runs `npm run test:e2e:update-screenshots -- missing e2e/visual-regression.browser.e2e.ts` and commits the seven
-`*-win32.png` files, the visual suite on Windows fails those seven cases with "Missing visual baseline". The `missing` mode writes only absent baselines, so
-the run cannot rewrite an existing one.
+Both visual specs share `assertBaselineExists` from `e2e/utils/visual-baseline.ts`. The browser baselines exist in both sets: darwin (generated
+2026-11-03) and win32 (2026-11-08). To choose what gets written, build in e2e mode (`npm run build:e2e`), then pass Playwright's mode yourself:
+`npx playwright test --project=visual --update-snapshots=missing` writes only absent baselines and never rewrites an existing one;
+`=changed` also rewrites every existing baseline that fails. Look at every written PNG before committing it.
+
+The `settings-overlay` baseline draws the **Logs folder** row with the worker's temporary home path (`.e2e-temp/home-visual-<n>-<random>`), so a few
+pixels change per run and per machine – within the 1 % `maxDiffPixelRatio`. A settings screen that gains a section needs that baseline regenerated on
+every platform (on 2026-11-08 the darwin one still lacked the **Project tree** section).
 
 See `playwright.config.ts` for the full configuration.
 
@@ -229,7 +249,7 @@ Located in `e2e/pages/`:
 | `BrowserTabUiPage`, `BrowserPanelUi` (`browser-tab-ui.page.ts`) | The browser's renderer UI driven through Erfana's DOM by role and name (commits 17–18). `BrowserTabUiPage`: `newTabButton`, `panels`, `editorTabs`, `visiblePanel()`, `openWithButton()`, `openFromAppMenu()`, `closeAll()`. `BrowserPanelUi` (one panel): `tabId()`, `addressBar`, `navigation`, `button()` / `tool()`, `placeholder`, `refused`, `strip` / `stripRow()` / `answerRow()` (waits out the input guard), `chips`, `findRow` / `findField` / `findCount`, `pageHeading` (the load-error, certificate and crashed pages), `menu()`, `chooseMore()`, `load()`, `waitForState()`, `page()`, `hookTab()`, `waitForAttached()` |
 | `PickDriver` (`browser-pick.page.ts`) | Pick and send below the UI (commits 14–15): calls the bridge (`mode()`, `refine()`, `close()`, `write()`, `discard()`, `targetStatus()`) and reads main through the `pick` hook (`highlight()`, `state()`, `events()` / `waitForEvent()`); pointer and keys through main-side input (`rect()`, `move()`, `key()`, `hover()`, `waitForLabel()`). Also `mainHook()`, `openPicker()`, `expectBoxNear()`, `PICK_WAIT_MS` |
 | `BrowserPickUi` (`browser-pick-ui.page.ts`) | The pick row, the prompt-actions panel and the instruction dialog over the still image (commit 19), by role and name – `row`, `pickButton`, `status`, `target`, `still`, `actions`, `dialog`, `action(name)`, `driver()`, `confirm()` (hover, Return, wait for the panel) |
-| `PickFlow`, `AgentTerminal`, `NoKeyTrap` (`browser-pick-flow.page.ts`) | The whole pick-and-send flow of one tab as a user drives it, on top of `BrowserPickUi` and `PickDriver`. `PickFlow`: `open()`, `load()`, the panel's header and dialog controls (`parentButton`, `childButton`, `path` / `crumb()` / `chip`, `closeButton`, `panelNote`, `panelTarget`, `dialogField` / `dialogSend` / `dialogCancel` / `dialogBack`, `showTerminal`, `openCapture`, `frame`, `statusChip`), the status slot as read (`statusText()`, `expectStatus()`, `recordStatus()` / `statusLog()` / `shownFor()`), main's state (`state()`, `highlightLabel()`, `waitForActive()`, `waitForFrozen()`, `routing()`, `waitForPageFocus()`, `focusErfana()`, `passClickWindows()` on the test clock), raw page input (`input()`, `move()`, `click()`, `key()`, `keyWithRepeats()`, `pickKey()`), `hover()`, `pickByClick()`, `pickByShortcut()`, `setTabWidth()`, `trustTestCa()`, paint reads (`livePaint()`, `windowPaint()`), the live outline's band read natively (`outlineBand()`: the band window's visibility, bounds and strip views over the page view's screen place, with main's tones and colours – the band never shows in `livePaint()`) and CDP watches. `AgentTerminal`: the app's terminal with `cat` in front, a stub agent (`open()`, `start()`, `text()`, `count()`). `NoKeyTrap`: the no-key trap of 025-AC-083 (`arm()`, `expectNoKeys()`). Plus capture-file readers (`capturesDir()`, `contextFiles()`, `newCapture()`, `captureBox()`, `readPng()`) |
+| `PickFlow`, `AgentTerminal`, `NoKeyTrap` (`browser-pick-flow.page.ts`) | The whole pick-and-send flow of one tab as a user drives it, on top of `BrowserPickUi` and `PickDriver`. `PickFlow`: `open()`, `load()`, the panel's header and dialog controls (`parentButton`, `childButton`, `path` / `crumb()` / `chip`, `closeButton`, `panelNote`, `panelTarget`, `dialogField` / `dialogSend` / `dialogCancel` / `dialogBack`, `showTerminal`, `openCapture`, `frame`, `statusChip`), the status slot as read (`statusText()`, `expectStatus()`, `recordStatus()` / `statusLog()` / `shownFor()`), main's state (`state()`, `highlightLabel()`, `waitForActive()`, `waitForFrozen()`, `routing()`, `waitForPageFocus()`, `focusErfana()`, `passClickWindows()` on the test clock), raw page input (`input()`, `move()`, `click()`, `key()`, `keyWithRepeats()`, `pickKey()`), `hover()`, `pickByClick()`, `pickByShortcut()`, `setTabWidth()`, `trustTestCa()`, paint reads (`livePaint()`, `windowPaint()`), the live outline's band read natively (`outlineBand()`: the band window's visibility, bounds and strip views over the page view's screen place, with main's tones and colours – the band never shows in `livePaint()`) and CDP watches. `AgentTerminal`: the app's terminal with an echo program in front, a stub agent (`open()`, `start()`, `text()`, `count()`) – `cat` on macOS and Linux, `node -e "process.stdin.pipe(process.stdout)"` on Windows (`ECHO_AGENT` in `e2e/fixtures/browser/echoAgent.ts`; Git Bash's `cat` is an MSYS program whose Windows parent pid is dead, so the foreground walk never sees it and the target stays a bare shell). `NoKeyTrap`: the no-key trap of 025-AC-083 (`arm()`, `expectNoKeys()`). Plus capture-file readers (`capturesDir()`, `contextFiles()`, `newCapture()`, `captureBox()`, `readPng()`) |
 | `BrowserSendUi`, `StubAgent` (`browser-send.page.ts`) | Pick and send end to end with a terminal running a program the test chose. `BrowserSendUi`: `open()`, `startStubAgent()` (the recording `fixtures/browser/stub-agent.cjs`) / `startStubAs()` / `stopStub()` / `startShell()` / `run()`, `waitForTarget()`, `load()`, `pickElement()` / `pickAt()`, `explainAndRead()`, `openDialog()`, the send notice and banner, toast recording (`recordToasts()`, `errorToasts()`, `infoToasts()`), `routingFocus()`, `windowKey()`, `advanceMainClock()`, `pickState()`, `fault()` / `failNextTerminalPaste()`, `captureFiles()` / `waitForCaptureCount()`. `StubAgent`: `received()`, `waitForSubmitted()`, `reset()`. Also `maskCaptureRefs()` |
 | `HostileSuite` (`browser-hostile.page.ts`) | The hostile-page suite (025-AC-046): `open()` a fixture of `e2e/fixtures/browser/hostile/`, `report()` / `finish()` (the canary's attempts with their detail; `finish()` settles refused frames that never answer once a ready condition holds), `sentinel()` (a real click the page counts, before any "nothing happened" read), `mark()` / `expectStayed()` (the tab idle on the same address and the same document after a navigation attempt), `recordShellOpens()` / `shellOpens()` (`shell.openExternal`, `openPath`, `showItemInFolder` recorded), `windowCount()`, `popups()` / `popupExec()`, `frameExec()` (a frame's script with a user gesture), `trustTestCa()`, `expectOnlyTabsInBrowserSession()`. Also `leaks()` |
 | `DownloadsDriver` (`browser-downloads.page.ts`) | Downloads from a browser tab (025-AC-020): the save dialog stubbed and its options recorded (`answerSaveDialog()`, `dialogCalls()`, `dialogPaths()`, `waitForDialogCount()`), the notices (`recordNotices()`, `notices()`, `waitForNotice()`, `doneToast()`, `failedToast()`), **Show in folder** replaced by a recorder (`recordShowInFolder()`, `shownInFolder()`, `showInFolderButton()`), and what is left on disk (`downloadsDir()`, `leftovers()`, `waitForNoLeftovers()`) |
