@@ -79,9 +79,12 @@ test.describe('fixture teardown: an app that hangs on quit', () => {
     } as unknown as ElectronApplication
 
     try {
-      const started = Date.now()
+      // A monotonic clock, as the deadline's timer is: Date.now() follows the wall clock, which a
+      // Docker VM steps when it syncs its time – a Linux run read 14,901 ms here (2026-11-14).
+      // libuv rounds a timer to whole milliseconds, so allow 1 ms.
+      const started = performance.now()
       await closeAppAndWait(fakeApp)
-      const elapsed = Date.now() - started
+      const elapsed = performance.now() - started + 1
 
       // It gave up at the deadline instead of waiting on close() forever
       expect(elapsed).toBeGreaterThanOrEqual(APP_EXIT_TIMEOUT_MS)
