@@ -186,6 +186,29 @@ describe('BrowserDownloads', () => {
     await vi.waitFor(() => expect(readdirSync(stagingRoot)).toEqual([]))
   })
 
+  it('025-AC-020 the dialog still opens, with the bare name, when the OS cannot name the Downloads folder', async () => {
+    downloads = new BrowserDownloads({
+      downloadsDir: () => {
+        throw new Error("Failed to get 'downloads' path")
+      },
+      stagingRoot: () => stagingRoot,
+      showSaveDialog,
+      showItemInFolder,
+      newId: () => 'dl1'
+    })
+    const chosen = join(base, 'report.pdf')
+    dialogAnswer = async () => chosen
+    const item = new FakeItem('report.pdf')
+    start(item)
+    await vi.waitFor(() => expect(showSaveDialog).toHaveBeenCalled())
+    expect(showSaveDialog).toHaveBeenCalledWith(WINDOW, { defaultPath: 'report.pdf' })
+    item.receive()
+    item.end('completed')
+    await vi.waitFor(() => expect(readdirSync(stagingRoot)).toEqual([]))
+    expect(readFileSync(chosen, 'utf8')).toBe('file body')
+    expect(notices.map((n) => n.kind)).toEqual(['downloadDone'])
+  })
+
   it('025-AC-020 Show in folder works only from the window the download was announced to', async () => {
     const item = new FakeItem('a.pdf')
     start(item)

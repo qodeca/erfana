@@ -20,6 +20,7 @@ import type { Locator, Page } from '@playwright/test'
 import { test, expect } from './fixtures/browserHarness'
 import { AgentTerminal, captureFiles, contextFiles, newCapture, NoKeyTrap, PickFlow, PICK_WAIT_MS as WAIT_MS } from './pages/browser-pick-flow.page'
 import { TabBarPage } from './pages/tab-bar.page'
+import { ECHO_AGENT } from './fixtures/browser/echoAgent'
 
 /** The first item row's Save label: span.save-label › button.save-button › div.item-actions › li.item-row. */
 const REACT_ITEM = '.save-label'
@@ -85,7 +86,7 @@ test.describe('025-AC-083 pick and prompt with the pointer alone', () => {
     await flow.waitForActive(true)
     await flow.pickByClick(REACT_ITEM, REACT_ITEM_LABEL)
     await expect(flow.chip).toHaveText(/^span\.save-label · /)
-    await expect(flow.panelTarget).toHaveAttribute('aria-label', 'Terminal · cat, target terminal')
+    await expect(flow.panelTarget).toHaveAttribute('aria-label', `Terminal · ${ECHO_AGENT.name}, target terminal`)
     await flow.parentButton.click()
     await expect(flow.chip).toHaveText(/^button\.save-button · /)
     await flow.childButton.click()

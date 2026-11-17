@@ -20,6 +20,7 @@ import { test, expect } from './fixtures/browserHarness'
 import { LogTail } from './fixtures/logTail'
 import { appLogsDir } from './fixtures/isolation'
 import { TerminalPage } from './pages/terminal.page'
+import { ECHO_AGENT } from './fixtures/browser/echoAgent'
 import { BrowserTabUiPage } from './pages/browser-tab-ui.page'
 import { BrowserPickUi } from './pages/browser-pick-ui.page'
 
@@ -46,11 +47,11 @@ test.describe('built-in browser logging', () => {
     const logs = LOG_FILES.map(name => new LogTail(path.join(appLogsDir(homeDir), name)))
     for (const log of logs) await log.mark()
 
-    // The send's target: `cat` echoes the typed prompt back.
+    // The send's target: the echo stand-in agent (`cat`; `node` on Windows) echoes the typed prompt back.
     const terminalPage = new TerminalPage(windowWithTestProject)
     await terminalPage.open()
-    await terminalPage.sendCommand('cat')
-    await terminalPage.waitForOutput('cat')
+    await terminalPage.sendCommand(ECHO_AGENT.command)
+    await terminalPage.waitForOutput(ECHO_AGENT.command)
 
     const ui = new BrowserTabUiPage(appWithTestProject, windowWithTestProject)
     const panel = await ui.openWithButton()

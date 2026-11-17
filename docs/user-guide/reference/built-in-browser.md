@@ -26,7 +26,7 @@ A browser tab shows a web page, your dev server or a project HTML file inside Er
 
 **What it does:** Opens an empty browser tab with the address bar focused. **How to reach it:** the **New browser tab** button after the last tab of an editor strip, **File > New browser tab**, or <kbd>⌘T</kbd> / <kbd>Ctrl+T</kbd>. Two more ways open a page directly:
 
-- Selecting a web link in the [terminal](terminal.md#web-links) opens it in a new browser tab; hold <kbd>⌘</kbd> / <kbd>Ctrl</kbd> while you select it to open your system browser instead.
+- Selecting a web link in the [terminal](terminal.md#web-links) opens it in a new browser tab; <kbd>⌘</kbd>-click / <kbd>Ctrl</kbd>-click opens your system browser instead.
 - In an [HTML preview](html-preview.md), **Open in browser tab** (the window icon in the toolbar) opens the previewed file in a browser tab. Selecting an HTML file in the project tree still opens the preview.
 
 Browser tabs are not restored when you reopen a project or restart Erfana. A tab hidden behind another keeps its page loaded.

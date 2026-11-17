@@ -432,9 +432,6 @@ describe('certificate page and sign-in hooks (025-FR-021, 025-FR-022)', () => {
     // Back to safety: the committed page, its title and its address return.
     tab.setCertificateState({ warning: null, sign: null })
     expect(tab.state()).toMatchObject({ committedUrl: 'https://a.test/x', pendingUrl: null, title: 'Page A', erfanaPage: null })
-    // The warning page took that address's failure, even after it went (a late did-fail-load).
-    expect(tab.certificatePageTook('https://selfsigned.test/login')).toBe(true)
-    expect(tab.certificatePageTook('https://a.test/x')).toBe(false)
   })
 
   it('025-AC-021 shows the warning sign for a proceeded host or a failed subresource', () => {

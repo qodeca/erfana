@@ -14900,7 +14900,7 @@
       "quote": "folders are removed with `removeDirWithRetry`",
       "status": "verified",
       "evidence": "source",
-      "source": "e2e/fixtures/isolation.ts:212",
+      "source": "e2e/fixtures/isolation.ts:216",
       "match": "export async function removeDirWithRetry(dir: string): Promise<void> {"
     },
     {
@@ -45991,7 +45991,7 @@
       "quote": "/ `cancelButton()`, `allowedSection()`). Not a",
       "status": "verified",
       "evidence": "source",
-      "source": "e2e/pages/html-preview.page.ts:260",
+      "source": "e2e/pages/html-preview.page.ts:263",
       "match": "allowedSection(): Locator {"
     },
     {
@@ -55834,7 +55834,7 @@
       "id": "user-guide-reference-terminal/b02",
       "audience": "user",
       "doc": "docs/user-guide/reference/terminal.md",
-      "quote": "Hold <kbd>⌘</kbd> / <kbd>Ctrl</kbd> while you select it to open it in your operating system's default browser instead",
+      "quote": "<kbd>⌘</kbd>-click / <kbd>Ctrl</kbd>-click opens it in your operating system's default browser instead",
       "status": "verified",
       "evidence": "source",
       "source": "src/renderer/src/components/Panels/TerminalPanel/terminalLinks.ts:46",

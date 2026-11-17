@@ -231,13 +231,31 @@ export class BrowserDownloads {
   private async askTarget(tab: DownloadTab, name: string): Promise<string | 'refused' | null> {
     let chosen: string | null
     try {
-      chosen = await this.deps.showSaveDialog(tab.parentWindow(), saveDialogRequest(join(this.deps.downloadsDir(), name), name))
+      chosen = await this.deps.showSaveDialog(tab.parentWindow(), saveDialogRequest(this.defaultSavePath(name), name))
     } catch (error) {
       logger.warn('The download save dialog failed', { error: String((error as Error).message) })
       return null
     }
     if (chosen === null || chosen === '') return null
     return isInsideErfanaFolder(chosen) ? 'refused' : chosen
+  }
+
+  /**
+   * Where the save dialog opens: the OS Downloads folder, or the bare name
+   * when the OS cannot name that folder (Windows throws "Failed to get
+   * 'downloads' path" when it was removed or redirected). The dialog still
+   * opens then, in the OS default folder, so the user can choose – the
+   * download is never dropped silently.
+   */
+  private defaultSavePath(name: string): string {
+    try {
+      return join(this.deps.downloadsDir(), name)
+    } catch (error) {
+      logger.warn('The Downloads folder could not be found; the save dialog opens without it', {
+        error: String((error as Error).message)
+      })
+      return name
+    }
   }
 
   private async moveInto(staged: string, target: string, tab: DownloadTab): Promise<void> {

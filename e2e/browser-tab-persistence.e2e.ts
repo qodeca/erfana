@@ -137,7 +137,8 @@ test.describe('built-in browser profile per project', () => {
     await signIn(await openStaging(launched, browserServers))
     const chromium = await chromiumProfileDir(userDataDir, testProject.path)
     expect(chromium, 'the project has a Chromium folder under user data').not.toBeNull()
-    const cookieDb = path.join(chromium!, 'Cookies')
+    // Windows Chromium keeps the cookie database under `Network/` (its sandboxed network service); macOS and Linux beside the profile.
+    const cookieDbs = [path.join(chromium!, 'Cookies'), path.join(chromium!, 'Network', 'Cookies')]
     const origin = new URL(browserServers.sites.staging.url('/')).origin
     // Flush the tab's own session: the cookie store writes on a timer otherwise.
     const flushed = await launched.app.evaluate(async ({ webContents }, o) => {
@@ -147,9 +148,11 @@ test.describe('built-in browser profile per project', () => {
       return true
     }, origin)
     expect(flushed).toBe(true)
-    await expect.poll(() => fs.existsSync(cookieDb), { message: `${cookieDb} written` }).toBe(true)
+    await expect.poll(() => cookieDbs.some((db) => fs.existsSync(db)), { message: `${cookieDbs.join(' or ')} written` }).toBe(true)
     // Nothing of Chromium's is written into the project
-    expect(fs.existsSync(path.join(testProject.path, '.erfana', 'browser', 'profile', 'Cookies'))).toBe(false)
+    const projectProfile = path.join(testProject.path, '.erfana', 'browser', 'profile')
+    expect(fs.existsSync(path.join(projectProfile, 'Cookies'))).toBe(false)
+    expect(fs.existsSync(path.join(projectProfile, 'Network', 'Cookies'))).toBe(false)
 
     await launched.close()
     launched = await launchBrowserApp({ userDataDir, homeDir, projectPath: testProject.path })

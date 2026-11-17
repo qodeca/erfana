@@ -221,7 +221,8 @@ async function openSized(
     await openCommentPage(preview, app, rel, title)
     return
   }
-  await preview.open(rel)
+  // The view itself can take as long as the title on a slow host (a 4 MB page on Windows).
+  await preview.open(rel, { timeout: openMs })
   await preview.withReadError(
     expect
       .poll(async () => (await preview.snapshot(HtmlPreviewPage.target(rel)))?.docTitle, {
