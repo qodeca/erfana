@@ -56,8 +56,9 @@ jobs:
       - name: Report open acceptance IDs
         run: |
           set -uo pipefail
-          node scripts/check-spec025-trace.mjs > trace.txt 2>&1
-          status=$?
+          # The runner's shell is `bash -e`: catch the status, or the step stops here and fails.
+          status=0
+          node scripts/check-spec025-trace.mjs > trace.txt 2>&1 || status=$?
           cat trace.txt
           {
             echo '### Spec 025 trace'
