@@ -30,14 +30,22 @@
  *    same-size rewrite inside the timestamp granularity; `stat({ bigint: true })`
  *    exposes `mtimeNs`, which on APFS and NTFS resolves to 1 ns / 100 ns. The
  *    inode goes into the token too, so a replace-by-rename that preserves size
- *    and mtime is still seen as a change.
+ *    and mtime is still seen as a change, and so does the change time
+ *    (`ctimeNs`), which every write moves and no copy tool can put back: a
+ *    same-size in-place copy that keeps the old mtime is a change too (#478 L4).
+ *
+ * And two checks make the bytes trustworthy (#478, plan decision 30-31):
+ * anything but a regular file is refused before a byte is read, and a second
+ * `stat` after the read must match the first, or the read throws
+ * {@link FileBusyError} instead of handing out a half-written file (P3).
  *
  * @see src/shared/ipc/file-image-schema.ts for the wire contract
  */
 import { readFile, stat } from 'fs/promises'
 import { extname } from 'path'
 import type { BigIntStats } from 'fs'
-import type { ImageReadOk, ImageReadResponse } from '../../../shared/ipc/file-image-schema'
+import { IMAGE_READ_MAX_BYTES, type ImageReadOk, type ImageReadResponse } from '../../../shared/ipc/file-image-schema'
+import { sameStats, stampFromStats } from '../freshness/stampStats'
 import {
   IMAGE_EXTENSIONS,
   getImageMimeType
@@ -53,8 +61,9 @@ export { IMAGE_EXTENSIONS }
 /**
  * Security: cap the file size to prevent memory exhaustion (DoS).
  * Base64 encoding grows the payload by ~33%, so a 50 MB file becomes ~67 MB.
+ * The value lives in the shared schema so the renderer's notice states it too.
  */
-export const MAX_IMAGE_SIZE = 50 * 1024 * 1024 // 50 MB
+export const MAX_IMAGE_SIZE = IMAGE_READ_MAX_BYTES
 
 /**
  * Thrown when a file is over {@link MAX_IMAGE_SIZE}. A subclass, so a caller
@@ -68,15 +77,37 @@ export class ImageTooLargeError extends Error {
   }
 }
 
+/** The opened path is not a regular file (a folder, FIFO, socket or device). */
+export class NotARegularFileError extends Error {
+  constructor() {
+    super('Not a regular file')
+    this.name = 'NotARegularFileError'
+  }
+}
+
+/**
+ * The file changed while it was read (#478 P3): the bytes may be torn, so none
+ * are handed out. The next change event (or a retry after the write settles)
+ * reads it again.
+ */
+export class FileBusyError extends Error {
+  constructor() {
+    super('File changed while it was read')
+    this.name = 'FileBusyError'
+  }
+}
+
 /**
  * Mint the opaque version token for a stat result.
  *
- * `size:mtimeNs:ino` - content length, last-write time at the finest resolution
- * the platform records, and the inode so a swapped-in file with identical size
- * and preserved mtime is still a different version. Callers treat it as opaque.
+ * `size:mtimeNs:ctimeNs:ino` - content length, last-write time at the finest
+ * resolution the platform records, the change time (moved by every write, even
+ * one that puts the old mtime back - #478 L4), and the inode so a swapped-in
+ * file with identical size and preserved mtime is still a different version.
+ * Callers treat it as opaque.
  */
 export function formatVersion(stats: BigIntStats): string {
-  return `${stats.size}:${stats.mtimeNs}:${stats.ino}`
+  return `${stats.size}:${stats.mtimeNs}:${stats.ctimeNs}:${stats.ino}`
 }
 
 /**
@@ -84,10 +115,12 @@ export function formatVersion(stats: BigIntStats): string {
  *
  * @param filePath - Absolute path to the image file (confinement is the caller's job)
  * @param knownVersion - Version the caller already holds bytes for; omit to force a read
- * @returns `{ status: 'ok', dataUrl, version }`, or `{ status: 'unchanged', version }`
+ * @returns `{ status: 'ok', dataUrl, version, stamp }`, or `{ status: 'unchanged', version, stamp }`
  *          when `knownVersion` still matches the file on disk
  * @throws Error if the extension is unsupported, the file exceeds
- *         {@link MAX_IMAGE_SIZE}, or the file cannot be stat'd/read
+ *         {@link MAX_IMAGE_SIZE}, or the file cannot be stat'd/read;
+ *         {@link NotARegularFileError} for anything but a regular file;
+ *         {@link FileBusyError} when the file changed during the read
  *
  * @example
  * ```ts
@@ -113,23 +146,28 @@ export async function readImage(
   // Stat first: it gates the size cap AND mints the version, and doing it
   // before the read keeps the version from ever outrunning the bytes.
   const stats = await stat(filePath, { bigint: true })
+  if (!stats.isFile()) throw new NotARegularFileError()
   const size = Number(stats.size)
 
   // The cap is checked before the version comparison so an oversized file
   // reports the same error whether or not a version was supplied.
   if (size > MAX_IMAGE_SIZE) {
-    const sizeMB = (size / (1024 * 1024)).toFixed(1)
+    // Rounded up: a file just over the cap must not read "50.0 MB" against a 50 MB limit (U6)
+    const sizeMB = (Math.ceil((size * 10) / (1024 * 1024)) / 10).toFixed(1)
     throw new ImageTooLargeError(`Image file too large (${sizeMB} MB). Maximum size is 50 MB.`)
   }
 
   const version = formatVersion(stats)
+  const stamp = stampFromStats(stats)
 
   if (knownVersion !== undefined && knownVersion === version) {
-    return { status: 'unchanged', version }
+    return { status: 'unchanged', version, stamp }
   }
 
   const mimeType = getImageMimeType(ext) ?? 'application/octet-stream'
   const buffer = await readFile(filePath)
+  // Read-verify: the file must be the version stat'd before the read
+  if (!sameStats(stats, await stat(filePath, { bigint: true }))) throw new FileBusyError()
 
-  return { status: 'ok', dataUrl: `data:${mimeType};base64,${buffer.toString('base64')}`, version }
+  return { status: 'ok', dataUrl: `data:${mimeType};base64,${buffer.toString('base64')}`, version, stamp }
 }

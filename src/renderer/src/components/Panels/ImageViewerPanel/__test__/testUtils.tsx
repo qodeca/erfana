@@ -3,19 +3,24 @@
 /**
  * Shared test harness for the {@link ImageViewerPanel} suites.
  *
- * The panel's tests were split by concern across four files (characterization,
- * refresh, status, deleted-banner). They all need the same ~150 lines of
- * environment scaffolding – a fake `window.api`, a fake file watcher whose
- * listeners the test drives by hand, and jsdom patches for the image decode
- * pipeline. This module owns that scaffolding so the split files stay small and
- * cannot drift apart.
+ * The panel's tests were split by concern across several files
+ * (characterization, refresh, status, deleted-banner, recover). They all need
+ * the same environment scaffolding – a fake `window.api`, a fake watch layer
+ * the test drives by hand (installed as the window's freshness environment,
+ * #478 S15), and jsdom patches for the image decode pipeline. This module owns
+ * that scaffolding so the split files stay small and cannot drift apart.
+ *
+ * The fake watch layer keeps one stamp per file: `emitChanged` moves it on (as
+ * a write would) and tells every subscription on the file. The file's presence
+ * is `getStats`: a rejecting `getStats` is a file that is gone, which is what
+ * the tracker's probe asks before it shows a delete.
  *
  * @module ImageViewerPanel/__test__/testUtils
  * @see ImageViewerPanel.test.tsx for the characterization baseline
  */
 
-import { vi, beforeEach, afterEach, type Mock } from 'vitest'
-import { render, screen, cleanup, type RenderResult } from '@testing-library/react'
+import { vi, beforeEach, afterEach, expect, type Mock } from 'vitest'
+import { act, render, screen, cleanup, waitFor, type RenderResult } from '@testing-library/react'
 import type { IDockviewPanelProps } from 'dockview'
 
 import type { ImageReadRequest, ImageReadResponse } from '../../../../../../shared/ipc/file-image-schema'
@@ -23,14 +28,22 @@ import type {
   ImageExportRequest,
   ImageExportResponse
 } from '../../../../../../shared/ipc/image-export-schema'
+import type {
+  FileStamp,
+  FreshnessSource,
+  ProbeReply,
+  SubscribeReply,
+  SubscribeRequest,
+  WatchEvent,
+  WatchEventListener
+} from '../../../../../../shared/freshness/freshnessTypes'
+import { realClock } from '../../../../../../shared/clock'
+import { setFreshnessEnvironmentForTests } from '../../../../services/freshness/windowFreshness'
 import { ImageViewerPanel } from '../ImageViewerPanel'
 import { TEST_IDS } from '../../../../constants/testids'
 
 /** Panel params shape the viewer consumes. */
 export type ImageViewerProps = IDockviewPanelProps<{ filePath: string }>
-
-type WatchCallback = (data: { filePath: string }) => void
-type WatchErrorCallback = (data: { filePath: string; error: string }) => void
 
 /** Intrinsic size the fake decoder reports before a test overrides it. */
 const DEFAULT_NATURAL_SIZE = { width: 800, height: 600 }
@@ -41,15 +54,11 @@ const CONTAINER_BOX = { width: 1000, height: 800, top: 0, left: 0, right: 1000, 
 /** Default file path used by {@link ImageViewerHarness.renderAndSettle}. */
 export const DEFAULT_IMAGE_PATH = '/proj/icon.png'
 
-/** The fake `window.api.fileWatch` bridge. */
+/** The fake watch layer's subscribe and unsubscribe, as spies a test can assert on or script. */
 export interface MockFileWatch {
-  start: Mock
-  stop: Mock
-  pause: Mock
-  resume: Mock
-  onFileChanged: Mock
-  onFileDeleted: Mock
-  onFileError: Mock
+  /** Answers `started` with the file's stamp unless a test scripts another reply. */
+  subscribe: Mock<(request: SubscribeRequest) => Promise<SubscribeReply>>
+  unsubscribe: Mock<(watchId: string) => Promise<void>>
 }
 
 /** Handles returned by {@link installImageViewerHarness}. */
@@ -66,10 +75,10 @@ export interface ImageViewerHarness {
   /**
    * Fake `window.api.file.readImage` – the real bridge under test.
    *
-   * Its default implementation answers `ok` with {@link ImageViewerHarness.readBytes}
-   * and a FRESH version every call, i.e. "the file genuinely changed", which is
-   * what every watcher event in these suites represents. Override it (see
-   * {@link ImageViewerHarness.serveUnchanged}) to exercise the skip path.
+   * Its default implementation answers `ok` with {@link ImageViewerHarness.readBytes},
+   * the file's current stamp and a FRESH version every call, i.e. "the file
+   * genuinely changed". Override it (see {@link ImageViewerHarness.serveUnchanged})
+   * to exercise the skip path.
    */
   readImage: Mock<(request: ImageReadRequest) => Promise<ImageReadResponse>>
   /**
@@ -78,13 +87,9 @@ export interface ImageViewerHarness {
    * read. Returns to normal on the next `beforeEach`.
    */
   serveUnchanged: () => void
-  /**
-   * Undoes {@link ImageViewerHarness.serveUnchanged} – the file moved again, so
-   * the next read is a full one carrying a fresh version. This is the default,
-   * so it is only needed after a deliberate `serveUnchanged`.
-   */
+  /** Undoes {@link ImageViewerHarness.serveUnchanged}. */
   serveChanged: () => void
-  /** Fake `window.api.file.getStats`. */
+  /** Fake `window.api.file.getStats`; also the fake watch layer's "is the file there". */
   getStats: Mock<(request: { filePath: string }) => Promise<{ size: number }>>
   /**
    * Fake `window.api.imageExport.run` (issue #73).
@@ -95,7 +100,7 @@ export interface ImageViewerHarness {
    * cancellation, a failure or a qualifier-bearing selection.
    */
   imageExportRun: Mock<(request: ImageExportRequest) => Promise<ImageExportResponse>>
-  /** Fake `window.api.fileWatch` bridge. */
+  /** The fake watch layer. */
   fileWatch: MockFileWatch
   /**
    * Overrides the intrinsic size reported by both the DOM `<img>` and the
@@ -103,11 +108,16 @@ export interface ImageViewerHarness {
    * size" scenario is set up in one call.
    */
   setNaturalSize: (width: number, height: number) => void
-  /** Emits a watcher `changed` event to every subscribed listener. */
-  emitChanged: (filePath: string) => void
-  /** Emits a watcher `deleted` event to every subscribed listener. */
+  /** The file was rewritten (to `size` bytes, if given): its stamp moves on and every subscription on it hears `changed`. */
+  emitChanged: (filePath: string, options?: { size?: number }) => void
+  /** The file was replaced without an event yet (a slow atomic save): its stamp moves on silently. */
+  replaceFile: (filePath: string) => void
+  /** Every subscription on the file hears `deleted`; the probe (`getStats`) decides whether it is gone. */
   emitDeleted: (filePath: string) => void
-  /** Emits a watcher `error` event to every subscribed listener. */
+  /**
+   * The file's watch died (`ended`, watcher error) and cannot be restarted:
+   * the automatic restart is refused, so the tab stops following.
+   */
   emitWatchError: (filePath: string, error: string) => void
   /**
    * Builds the minimal `IDockviewPanelProps` surface the panel consumes.
@@ -116,7 +126,7 @@ export interface ImageViewerHarness {
    * a tab component and the tab will re-render when the panel calls `setTitle`.
    */
   makeProps: (filePath: string) => ImageViewerProps
-  /** Renders the panel, waits for the initial load to settle, returns the view. */
+  /** Renders the panel, waits for its first image and for its watch's subscribe reply to land, returns the view. */
   renderAndSettle: (filePath?: string) => Promise<RenderResult>
 }
 
@@ -124,11 +134,9 @@ export interface ImageViewerHarness {
  * Installs the shared image-viewer test environment.
  *
  * Call once at module scope in a test file; it registers its own `beforeEach`
- * and `afterEach`, so every test gets a clean watcher, clean mocks and a fresh
- * `portal-root`. The returned handles are stable across tests – capture them
- * once and use them inside `it` blocks.
- *
- * @returns Mock bridges, watcher emitters and render helpers
+ * and `afterEach`, so every test gets a clean watch layer, clean mocks and a
+ * fresh `portal-root`. The returned handles are stable across tests – capture
+ * them once and use them inside `it` blocks.
  *
  * @example
  * ```tsx
@@ -144,9 +152,36 @@ export interface ImageViewerHarness {
 export function installImageViewerHarness(): ImageViewerHarness {
   let naturalSize = { ...DEFAULT_NATURAL_SIZE }
 
-  let changedListeners: WatchCallback[] = []
-  let deletedListeners: WatchCallback[] = []
-  let errorListeners: WatchErrorCallback[] = []
+  /** Live subscriptions (watch id → path), per-file stamps, event listeners. */
+  const subscriptions = new Map<string, string>()
+  const stamps = new Map<string, FileStamp>()
+  const eventListeners = new Set<WatchEventListener>()
+  let stampSeq = 0
+
+  const stampOf = (filePath: string): FileStamp => {
+    let stamp = stamps.get(filePath)
+    if (!stamp) {
+      stamp = { size: 2048, mtimeMs: 1, ctimeMs: 1, ino: '1', hash: 'h0' }
+      stamps.set(filePath, stamp)
+    }
+    return stamp
+  }
+  const emitTo = (filePath: string, make: (watchId: string) => WatchEvent): void => {
+    const events = [...subscriptions].filter(([, path]) => path === filePath).map(([watchId]) => make(watchId))
+    for (const event of events) for (const listener of [...eventListeners]) listener(event)
+  }
+
+  /** A write: the file's stamp moves on (no event). */
+  const moveStamp = (filePath: string, size?: number): void => {
+    stampSeq += 1
+    stamps.set(filePath, {
+      ...stampOf(filePath),
+      ...(size !== undefined ? { size } : {}),
+      mtimeMs: 1 + stampSeq,
+      ctimeMs: 1 + stampSeq,
+      hash: `h${stampSeq}`
+    })
+  }
 
   const readBytes = vi.fn<(path: string) => Promise<string>>()
   const readImage = vi.fn<(request: ImageReadRequest) => Promise<ImageReadResponse>>()
@@ -169,53 +204,57 @@ export function installImageViewerHarness(): ImageViewerHarness {
   /** Version the fake disk last handed out, for the `unchanged` answer. */
   let servedVersion = 'v0'
 
-  /**
-   * Default bridge behaviour: every read is a real read of fresh bytes.
-   *
-   * A watcher event in these suites always stands for a genuine rewrite, so the
-   * version differs every time and the hook never takes the skip path unless a
-   * test asks for it.
-   */
+  /** Default bridge behaviour: every read is a real read of fresh bytes. */
   const alwaysChanged = async ({ filePath }: ImageReadRequest): Promise<ImageReadResponse> => {
     const dataUrl = await readBytes(filePath)
     versionSeq += 1
     servedVersion = `v${versionSeq}`
-    return { status: 'ok', dataUrl, version: servedVersion }
+    return { status: 'ok', dataUrl, version: servedVersion, stamp: stampOf(filePath) }
+  }
+
+  const startedFor = async ({ watchId, filePath }: SubscribeRequest): Promise<SubscribeReply> => {
+    subscriptions.set(watchId, filePath)
+    return { status: 'started', stamp: stampOf(filePath), liveRefresh: 'full' }
   }
 
   const fileWatch: MockFileWatch = {
-    start: vi.fn().mockResolvedValue({ success: true }),
-    stop: vi.fn().mockResolvedValue({ success: true }),
-    pause: vi.fn().mockResolvedValue({ success: true }),
-    resume: vi.fn().mockResolvedValue({ success: true }),
-    onFileChanged: vi.fn((cb: WatchCallback) => {
-      changedListeners.push(cb)
-      return () => {
-        changedListeners = changedListeners.filter((l) => l !== cb)
-      }
-    }),
-    onFileDeleted: vi.fn((cb: WatchCallback) => {
-      deletedListeners.push(cb)
-      return () => {
-        deletedListeners = deletedListeners.filter((l) => l !== cb)
-      }
-    }),
-    onFileError: vi.fn((cb: WatchErrorCallback) => {
-      errorListeners.push(cb)
-      return () => {
-        errorListeners = errorListeners.filter((l) => l !== cb)
-      }
+    subscribe: vi.fn(startedFor),
+    unsubscribe: vi.fn(async (watchId: string) => {
+      subscriptions.delete(watchId)
     })
   }
+
+  const source: FreshnessSource = {
+    subscribe: (request) => fileWatch.subscribe(request),
+    unsubscribe: (watchId) => fileWatch.unsubscribe(watchId),
+    probe: async (filePath, knownHash): Promise<ProbeReply> => {
+      try {
+        await getStats({ filePath })
+      } catch {
+        return { status: 'missing' }
+      }
+      const stamp = stampOf(filePath)
+      return { status: knownHash !== undefined && knownHash === stamp.hash ? 'same' : 'changed', stamp }
+    },
+    readText: async () => ({ status: 'missing' }),
+    onEvent: (listener) => {
+      eventListeners.add(listener)
+      return () => eventListeners.delete(listener)
+    }
+  }
+
+  let restoreEnvironment: (() => void) | null = null
+  let idSeq = 0
 
   const originalGetBoundingClientRect = Element.prototype.getBoundingClientRect
   const originalImage = globalThis.Image
 
   beforeEach(() => {
     naturalSize = { ...DEFAULT_NATURAL_SIZE }
-    changedListeners = []
-    deletedListeners = []
-    errorListeners = []
+    subscriptions.clear()
+    stamps.clear()
+    eventListeners.clear()
+    stampSeq = 0
 
     versionSeq = 0
     servedVersion = 'v0'
@@ -223,16 +262,20 @@ export function installImageViewerHarness(): ImageViewerHarness {
     readImage.mockReset().mockImplementation(alwaysChanged)
     getStats.mockReset().mockResolvedValue({ size: 2048 })
     imageExportRun.mockReset().mockImplementation(exportSucceeds)
-    fileWatch.start.mockClear().mockResolvedValue({ success: true })
-    fileWatch.stop.mockClear().mockResolvedValue({ success: true })
-    fileWatch.pause.mockClear()
-    fileWatch.resume.mockClear()
+    fileWatch.subscribe.mockReset().mockImplementation(startedFor)
+    fileWatch.unsubscribe.mockClear()
+    restoreEnvironment = setFreshnessEnvironmentForTests({
+      source,
+      // No save port: the viewer never saves, and its environment cannot reach one (A7)
+      clock: realClock,
+      newId: () => `00000000-0000-4000-8000-${String(++idSeq).padStart(12, '0')}`,
+      onCheck: () => () => {}
+    })
 
     // NOTE: extend `window`, never `vi.stubGlobal('window', …)` – replacing the
     // window object destroys React's DOM internals.
     ;(window as unknown as { api: unknown }).api = {
       file: { readImage, getStats },
-      fileWatch,
       imageExport: { run: imageExportRun }
     }
 
@@ -268,6 +311,8 @@ export function installImageViewerHarness(): ImageViewerHarness {
 
   afterEach(() => {
     cleanup()
+    restoreEnvironment?.()
+    restoreEnvironment = null
     Element.prototype.getBoundingClientRect = originalGetBoundingClientRect
     globalThis.Image = originalImage
 
@@ -285,6 +330,23 @@ export function installImageViewerHarness(): ImageViewerHarness {
     document.getElementById('portal-root')?.remove()
     vi.useRealTimers()
   })
+
+  /**
+   * Settled means the tab follows its file, not only that its first image is
+   * on screen: the watch starts after that image (`ready`), so without this
+   * wait an event a test emits next could reach no subscription at all, or
+   * reach one whose `started` reply the tracker has not taken yet – which the
+   * real IPC never does, because main's reply always lands before any event
+   * for the id. One macrotask after the reply lets the tracker take it.
+   */
+  const waitForWatchReply = async (): Promise<void> => {
+    await waitFor(() => expect(fileWatch.subscribe).toHaveBeenCalled())
+    await act(async () => {
+      await Promise.allSettled(fileWatch.subscribe.mock.results.map((result) => result.value))
+      if (vi.isFakeTimers()) await vi.advanceTimersByTimeAsync(0)
+      else await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+  }
 
   // A LIVE title: `setTitle` updates `api.title` and notifies
   // `onDidTitleChange` subscribers, exactly as dockview does. A `vi.fn()` stub
@@ -322,7 +384,7 @@ export function installImageViewerHarness(): ImageViewerHarness {
     serveUnchanged: () => {
       readImage.mockImplementation(async (request) =>
         request.knownVersion === servedVersion
-          ? { status: 'unchanged', version: servedVersion }
+          ? { status: 'unchanged', version: servedVersion, stamp: stampOf(request.filePath) }
           : alwaysChanged(request)
       )
     },
@@ -333,19 +395,26 @@ export function installImageViewerHarness(): ImageViewerHarness {
     setNaturalSize: (width, height) => {
       naturalSize = { width, height }
     },
-    emitChanged: (filePath) => {
-      for (const listener of [...changedListeners]) listener({ filePath })
+    emitChanged: (filePath, options = {}) => {
+      moveStamp(filePath, options.size)
+      emitTo(filePath, (watchId) => ({ watchId, kind: 'changed' }))
     },
+    replaceFile: (filePath) => moveStamp(filePath),
     emitDeleted: (filePath) => {
-      for (const listener of [...deletedListeners]) listener({ filePath })
+      emitTo(filePath, (watchId) => ({ watchId, kind: 'deleted' }))
     },
-    emitWatchError: (filePath, error) => {
-      for (const listener of [...errorListeners]) listener({ filePath, error })
+    emitWatchError: (filePath) => {
+      fileWatch.subscribe.mockImplementationOnce(async () => ({ status: 'refused', code: 'WATCH_FAILED' }))
+      emitTo(filePath, (watchId) => {
+        subscriptions.delete(watchId)
+        return { watchId, kind: 'ended', reason: 'watcher-error' }
+      })
     },
     makeProps,
     renderAndSettle: async (filePath = DEFAULT_IMAGE_PATH) => {
       const view = render(<ImageViewerPanel {...makeProps(filePath)} />)
       await screen.findByTestId(TEST_IDS.IMAGE_VIEWER_IMAGE)
+      await waitForWatchReply()
       return view
     }
   }

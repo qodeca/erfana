@@ -6,7 +6,8 @@
  */
 import type { MenuContext, FileNode, FileNodeFile } from './types'
 import { getDirname } from '../../../utils/fileUtils'
-import { DeleteDirectoryCommand, DeleteFileCommand, PasteIntoDirectoryCommand } from './commands'
+import { PasteIntoDirectoryCommand } from './commands'
+import { DeleteDirectoryCommand, DeleteFileCommand } from './deleteCommands'
 
 /**
  * Paste on a FILE row: the item lands in the file's folder, as it would on

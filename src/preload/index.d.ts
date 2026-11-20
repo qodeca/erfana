@@ -71,6 +71,11 @@ declare global {
        * null when no live editor is there
        */
       editorValue: (container: Element) => string | null
+      /**
+       * Where the Monaco editor inside `container` is scrolled and the line
+       * its cursor is on, or null when no live editor (or no cursor) is there
+       */
+      editorView: (container: Element) => { scrollTop: number; cursorLine: number } | null
     }
   }
 }

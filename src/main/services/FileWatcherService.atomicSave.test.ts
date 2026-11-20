@@ -8,26 +8,31 @@
  * split policy.
  *
  * What this file can and cannot prove: it verifies "given an unlink and a file
- * that is back on disk, the watch is re-armed and the change is debounced". It
+ * that is back on disk, the watch is re-armed and the change is reported". It
  * CANNOT verify that chokidar actually emits `unlink` for `mv tmp target` -
  * that premise is pinned by the real-chokidar test in
  * `watcher/singleFileWatch.rename.integration.test.ts` (finding M-7).
  */
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { FileWatcherService } from './FileWatcherService'
-import { WATCH_DEAD_OUTSIDE_PROJECT, WATCH_DEAD_SESSION_ENDED } from './watcher/atomicRearm'
 import { UNREADABLE_RECHECK_MS } from './watcher/pathPresence'
+import { testSession, type TestSession } from './watcher/__test__/testSession'
+import { WindowWatches } from './watcher/__test__/windowWatches'
+import { pathKey } from '../utils/pathCompare'
 
 const DETECTOR_WINDOW_MS = 100
-const DEBOUNCE_MS = 300
+/** Time for a change already decided to reach the renderer (main no longer debounces, #478). */
+const DELIVER_MS = 300
 /** The single-file watch's stability threshold plus one poll. */
 const WRITE_SETTLE_MS = 400
+const STAMP = { size: 42, mtimeMs: 1, ctimeMs: 1, ino: '1' }
 
 interface FakeWatcher {
   path: string
   handlers: Record<string, (arg?: unknown) => void>
   close: Mock
   on: (event: string, handler: (arg?: unknown) => void) => FakeWatcher
+  once: (event: string, handler: () => void) => FakeWatcher
 }
 
 /**
@@ -115,6 +120,11 @@ vi.mock('chokidar', () => ({
         watcher.handlers[event] = handler
         return watcher
       }
+      // chokidar says `ready` on a later tick
+      watcher.once = (event, handler) => {
+        if (event === 'ready') queueMicrotask(handler)
+        return watcher
+      }
       createdWatchers.push(watcher)
       watchHooks.onCreate?.(watcher)
       return watcher
@@ -164,13 +174,18 @@ vi.mock('fs/promises', async importOriginal => {
 })
 
 let service: FileWatcherService
+let session: TestSession
+let w: WindowWatches
 
-let internals: any
+/** The entry the service holds for `FILE`, if any. */
+const held = () => service.entries.get(pathKey(FILE, true))
+/** Windows subscribed to `FILE`. */
+const windowsOn = (): number => service.getStats().fileDetails[0]?.watchers ?? 0
 
 /** Start a watch for `filePath` on behalf of one webContents. */
 async function startWatch(filePath = FILE, webContentsId = 1): Promise<FakeWatcher> {
   filesOnDisk.add(filePath)
-  await service.watchFile(filePath, { id: webContentsId } as never)
+  await w.watch(filePath, webContentsId)
   return createdWatchers[createdWatchers.length - 1]
 }
 
@@ -179,20 +194,18 @@ async function closeDetectorWindow(): Promise<void> {
   await vi.advanceTimersByTimeAsync(DETECTOR_WINDOW_MS + 20)
 }
 
-/** Let a debounced change reach the renderer. */
+/** Let a change already decided reach the renderer. */
 async function flushDebounce(): Promise<void> {
-  await vi.advanceTimersByTimeAsync(DEBOUNCE_MS + 20)
+  await vi.advanceTimersByTimeAsync(DELIVER_MS + 20)
 }
 
-/**
- * Let a raw chokidar change reach the renderer: the write-finish gate's settle
- * (300 ms stable size, polled every 100 ms, #464), then the debounce.
- */
+/** Let a raw chokidar change reach the renderer: the write-finish gate's settle (#464). */
 async function flushChange(): Promise<void> {
-  await vi.advanceTimersByTimeAsync(WRITE_SETTLE_MS + DEBOUNCE_MS + 20)
+  await vi.advanceTimersByTimeAsync(WRITE_SETTLE_MS + 20)
 }
 
-const channels = (): string[] => sends.map(s => s.channel)
+/** The event kinds sent so far, in order. */
+const kinds = (): string[] => w.kinds()
 
 const HOST_PLATFORM = process.platform
 
@@ -209,9 +222,9 @@ beforeEach(() => {
   failingPaths.clear()
   canonicalPaths.clear()
   watchHooks.onCreate = null
-  service = new FileWatcherService()
-  internals = service
-  service.setProjectPath(PROJECT)
+  session = testSession(PROJECT)
+  service = new FileWatcherService({ session, stampFile: async () => STAMP })
+  w = new WindowWatches(service, sends)
 })
 
 afterEach(async () => {
@@ -232,22 +245,17 @@ describe('FileWatcherService atomic save re-arm', () => {
     // stale watcher must be replaced, not reused.
     expect(createdWatchers).toHaveLength(2)
     expect(first.close).toHaveBeenCalled()
-    expect(internals.watchedFiles.has(FILE)).toBe(true)
+    expect(held()).toBeDefined()
   })
 
-  it('emits the change through the debounced path, not immediately', async () => {
+  it('reports the re-armed file once, as a change', async () => {
     const first = await startWatch()
 
     first.handlers.unlink()
     await closeDetectorWindow()
-
-    // H-1: a direct notify here would tell the editor to reload a file that may
-    // still be half written.
-    expect(sends).toHaveLength(0)
-
     await flushDebounce()
 
-    expect(sends).toEqual([{ id: 1, channel: 'file-watch:changed', payload: { filePath: FILE } }])
+    expect(w.events()).toEqual([expect.objectContaining({ window: 1, filePath: FILE, kind: 'changed' })])
   })
 
   it('never reports a delete for an atomic save', async () => {
@@ -257,13 +265,13 @@ describe('FileWatcherService atomic save re-arm', () => {
     await closeDetectorWindow()
     await flushDebounce()
 
-    expect(channels()).not.toContain('file-watch:deleted')
+    expect(kinds()).not.toContain('deleted')
   })
 
   it('keeps subscribers and map size across the re-arm', async () => {
     filesOnDisk.add(FILE)
-    await service.watchFile(FILE, { id: 1 } as never)
-    await service.watchFile(FILE, { id: 2 } as never)
+    await w.watch(FILE, 1)
+    await w.watch(FILE, 2)
     const first = createdWatchers[0]
 
     first.handlers.unlink()
@@ -276,15 +284,14 @@ describe('FileWatcherService atomic save re-arm', () => {
     await flushChange()
 
     expect(sends.map(s => s.id).sort()).toEqual([1, 2])
-    // The re-arm mutates in place, so it can never grow the map towards
-    // MAX_WATCHED_FILES
-    expect(internals.watchedFiles.size).toBe(1)
-    expect(internals.watchedFiles.get(FILE).subscribers.size).toBe(2)
+    // The re-arm mutates in place, so it can never grow the bucket towards its cap
+    expect(service.entries.size).toBe(1)
+    expect(windowsOn()).toBe(2)
   })
 
   it('stays silent after a re-arm while the watch is paused', async () => {
     const first = await startWatch()
-    service.pauseWatch(FILE)
+    w.pause(FILE, 1)
 
     first.handlers.unlink()
     await closeDetectorWindow()
@@ -292,7 +299,7 @@ describe('FileWatcherService atomic save re-arm', () => {
 
     // Erfana's own save pauses the watch; a re-arm must not punch through it
     expect(sends).toHaveLength(0)
-    expect(internals.watchedFiles.has(FILE)).toBe(true)
+    expect(held()).toBeDefined()
   })
 
   it('re-arms when a slow rename lands after the detector gave up', async () => {
@@ -308,7 +315,7 @@ describe('FileWatcherService atomic save re-arm', () => {
     await restore
     await flushDebounce()
 
-    expect(channels()).toEqual(['file-watch:changed'])
+    expect(kinds()).toEqual(['changed'])
     expect(createdWatchers).toHaveLength(2)
   })
 })
@@ -321,9 +328,9 @@ describe('FileWatcherService genuine delete', () => {
     first.handlers.unlink()
     await closeDetectorWindow()
 
-    expect(sends).toEqual([{ id: 1, channel: 'file-watch:deleted', payload: { filePath: FILE } }])
+    expect(w.events()).toEqual([expect.objectContaining({ window: 1, filePath: FILE, kind: 'deleted' })])
     expect(first.close).toHaveBeenCalled()
-    expect(internals.watchedFiles.has(FILE)).toBe(false)
+    expect(held()).toBeUndefined()
     // No replacement watcher for a file that is really gone
     expect(createdWatchers).toHaveLength(1)
   })
@@ -335,31 +342,31 @@ describe('FileWatcherService genuine delete', () => {
     first.handlers.unlink()
     await closeDetectorWindow()
 
-    expect(internals.atomicSaveDetector.getPendingCount()).toBe(0)
+    expect(service.atomicSaveDetector.getPendingCount()).toBe(0)
   })
 })
 
 describe('FileWatcherService re-arm bail-outs', () => {
-  it('tells the renderer the watch is dead when the session moved on', async () => {
-    const first = await startWatch()
+  it('tells a subscriber its watch ended when the project switches inside the window', async () => {
+    filesOnDisk.add(FILE)
+    const watchId = '0b6f3c1e-2b47-4f0e-a3f8-6d8f1a2b3c4d'
+    await service.subscribe({ owner: { kind: 'window', webContentsId: 1 }, watchId, filePath: FILE, profile: 'editor' })
+    filesOnDisk.delete(FILE)
+    createdWatchers[0].handlers.unlink()
 
-    first.handlers.unlink()
     // Project switch inside the 100 ms window
-    service.setProjectPath(OTHER_PROJECT)
+    await service.suspendAll()
+    await service.endSuspended(session.switchTo(OTHER_PROJECT))
     await closeDetectorWindow()
     await flushDebounce()
 
     // H-4b: silently dropping the entry would leave the panel showing stale
-    // content with no indicator - the symptom #70 fixes.
+    // content with no indicator - the symptom #70 fixes. The pending check was
+    // cancelled with the suspend, so no stale "deleted" follows.
     expect(sends).toEqual([
-      {
-        id: 1,
-        channel: 'file-watch:error',
-        // `ended`: the renderer slot forgets its hold, as on a delete (#252)
-        payload: { filePath: FILE, error: WATCH_DEAD_SESSION_ENDED, ended: true }
-      }
+      { id: 1, channel: 'file-watch:event', payload: { watchId, kind: 'ended', reason: 'project-switch' } }
     ])
-    expect(internals.watchedFiles.has(FILE)).toBe(false)
+    expect(held()).toBeUndefined()
   })
 
   it('sends nothing once the service is disposing', async () => {
@@ -385,8 +392,8 @@ describe('FileWatcherService re-arm bail-outs', () => {
     await closeDetectorWindow()
     await flushDebounce()
 
-    expect(channels()).toEqual(['file-watch:deleted'])
-    expect(internals.watchedFiles.has(FILE)).toBe(false)
+    expect(kinds()).toEqual(['deleted'])
+    expect(held()).toBeUndefined()
     expect(createdWatchers[1].close).toHaveBeenCalled()
   })
 })
@@ -395,7 +402,7 @@ describe('FileWatcherService re-arm confinement', () => {
   it('kills the watch when the replacement resolves outside the project', async () => {
     // The unlink/re-arm window is the moment an outside writer can swap the
     // file for a symlink pointing out of the project; the re-arm re-checks with
-    // realpath rather than trusting `watchFile`'s lexical entry check.
+    // realpath rather than trusting the subscribe's lexical entry check.
     const first = await startWatch()
     canonicalPaths.set(FILE, OUTSIDE_TARGET)
 
@@ -403,14 +410,10 @@ describe('FileWatcherService re-arm confinement', () => {
     await closeDetectorWindow()
     await flushDebounce()
 
-    expect(sends).toEqual([
-      {
-        id: 1,
-        channel: 'file-watch:error',
-        payload: { filePath: FILE, error: WATCH_DEAD_OUTSIDE_PROJECT, ended: true }
-      }
+    expect(w.events()).toEqual([
+      expect.objectContaining({ window: 1, filePath: FILE, kind: 'ended', reason: 'outside-project' })
     ])
-    expect(internals.watchedFiles.has(FILE)).toBe(false)
+    expect(held()).toBeUndefined()
     // No watcher is ever bound to the escaped path
     expect(createdWatchers).toHaveLength(1)
   })
@@ -423,23 +426,24 @@ describe('FileWatcherService pending-delete fast path', () => {
     const first = await startWatch()
 
     first.handlers.unlink()
-    expect(internals.atomicSaveDetector.getPendingCount()).toBe(1)
+    expect(service.atomicSaveDetector.getPendingCount()).toBe(1)
 
-    await service.watchFile(FILE, { id: 2 } as never)
+    await w.watch(FILE, 2)
 
-    expect(internals.atomicSaveDetector.getPendingCount()).toBe(0)
+    expect(service.atomicSaveDetector.getPendingCount()).toBe(0)
     expect(createdWatchers).toHaveLength(2)
     expect(first.close).toHaveBeenCalled()
-    expect(internals.watchedFiles.get(FILE).subscribers.size).toBe(2)
+    expect(windowsOn()).toBe(2)
 
     await flushDebounce()
-    expect(sends.map(s => s.channel)).toEqual(['file-watch:changed', 'file-watch:changed'])
+    expect(kinds()).toEqual(['changed', 'changed'])
   })
 
-  it('fails the join when the re-arm dropped the watch instead of reviving it', async () => {
-    // LOW-3: the subscriber is added before the re-arm is awaited. Returning
-    // success after the entry was dropped would leave the renderer believing it
-    // watches a path that has no watcher at all.
+  it('never leaves a join believing it watches when the re-arm dropped the watch', async () => {
+    // LOW-3: a join that succeeds silently after the entry was dropped would
+    // leave the renderer believing it watches a path that has no watcher at all.
+    // The detector looks at once (#478), so the re-arm may finish before or
+    // after the join answers: the join is then refused, or it hears the delete.
     const first = await startWatch()
 
     first.handlers.unlink()
@@ -448,12 +452,17 @@ describe('FileWatcherService pending-delete fast path', () => {
       filesOnDisk.delete(FILE)
     }
 
-    await expect(service.watchFile(FILE, { id: 2 } as never)).rejects.toThrow(
-      'File watch ended while joining'
-    )
+    const join = await w.watch(FILE, 2)
+    await closeDetectorWindow()
+    await flushDebounce()
 
-    expect(internals.watchedFiles.has(FILE)).toBe(false)
-    expect(channels()).toContain('file-watch:deleted')
+    const toldDeleted = w.to(FILE, 'deleted').includes(2)
+    expect(
+      join.status === 'refused' || toldDeleted,
+      `join answered ${JSON.stringify(join)} and was ${toldDeleted ? '' : 'not '}told the file is gone`
+    ).toBe(true)
+    expect(held()).toBeUndefined()
+    expect(kinds()).toContain('deleted')
   })
 })
 
@@ -462,9 +471,9 @@ describe('FileWatcherService detector disposal', () => {
     const first = await startWatch()
 
     first.handlers.unlink()
-    await service.unwatchFile(FILE, { id: 1 } as never)
+    await w.unwatch(FILE, 1)
 
-    expect(internals.atomicSaveDetector.getPendingCount()).toBe(0)
+    expect(service.atomicSaveDetector.getPendingCount()).toBe(0)
     await closeDetectorWindow()
     expect(sends).toHaveLength(0)
   })
@@ -475,7 +484,7 @@ describe('FileWatcherService detector disposal', () => {
     first.handlers.unlink()
     await service.cleanupForWebContentsId(1)
 
-    expect(internals.atomicSaveDetector.getPendingCount()).toBe(0)
+    expect(service.atomicSaveDetector.getPendingCount()).toBe(0)
     await closeDetectorWindow()
     expect(sends).toHaveLength(0)
   })
@@ -486,9 +495,11 @@ describe('FileWatcherService detector disposal', () => {
     first.handlers.unlink()
     await service.stopAll()
 
-    expect(internals.atomicSaveDetector.getPendingCount()).toBe(0)
+    expect(service.atomicSaveDetector.getPendingCount()).toBe(0)
     await closeDetectorWindow()
-    expect(sends).toHaveLength(0)
+    // The window hears its watch ended with the project – and no stale verdict after it
+    expect(kinds()).toEqual(['ended'])
+    expect(w.events()[0]).toMatchObject({ reason: 'project-closed' })
   })
 
   it('disposes the detector with the service', async () => {
@@ -497,10 +508,10 @@ describe('FileWatcherService detector disposal', () => {
     first.handlers.unlink()
     await service.dispose()
 
-    expect(internals.atomicSaveDetector.getPendingCount()).toBe(0)
+    expect(service.atomicSaveDetector.getPendingCount()).toBe(0)
     // The detector is disposed for good, so late unlinks register nothing
-    internals.atomicSaveDetector.registerDelete(FILE, () => {})
-    expect(internals.atomicSaveDetector.getPendingCount()).toBe(0)
+    service.atomicSaveDetector.registerDelete(FILE, () => {})
+    expect(service.atomicSaveDetector.getPendingCount()).toBe(0)
   })
 })
 
@@ -524,7 +535,7 @@ describe('FileWatcherService – a newer watch on the path while a second look w
 
     // The tab is closed and reopened while the stat waits, then the file is gone
     failingPaths.delete(FILE)
-    await service.unwatchFile(FILE, { id: 1 } as never)
+    await w.unwatch(FILE, 1)
     const newer = await startWatch()
     filesOnDisk.delete(FILE)
     sends.length = 0
@@ -534,7 +545,7 @@ describe('FileWatcherService – a newer watch on the path while a second look w
 
     // The reopened tab hears no stale "deleted", and its watch is neither dropped nor closed
     expect(sends).toHaveLength(0)
-    expect(internals.watchedFiles.get(FILE)?.watcher).toBe(newer)
+    expect(held()?.watcher).toBe(newer)
     expect(newer.close).not.toHaveBeenCalled()
   })
 
@@ -544,12 +555,12 @@ describe('FileWatcherService – a newer watch on the path while a second look w
     failingPaths.set(FILE, 'EPERM')
     first.handlers.unlink()
     await closeDetectorWindow()
-    expect(internals.atomicSaveDetector.hasPending(FILE)).toBe(true)
+    expect(service.atomicSaveDetector.hasPending(FILE)).toBe(true)
 
     // The same project is reopened, and the file is back
     failingPaths.delete(FILE)
-    await service.stopAll()
-    service.setProjectPath(PROJECT)
+    await service.suspendAll()
+    await service.endSuspended(session.switchTo(PROJECT))
     const newer = await startWatch()
     sends.length = 0
 
@@ -560,7 +571,7 @@ describe('FileWatcherService – a newer watch on the path while a second look w
     expect(sends).toHaveLength(0)
     expect(createdWatchers).toHaveLength(2)
     expect(newer.close).not.toHaveBeenCalled()
-    expect(internals.watchedFiles.get(FILE)?.watcher).toBe(newer)
+    expect(held()?.watcher).toBe(newer)
   })
 
   it('lets a consumer joining during the second look re-arm at once, and only once', async () => {
@@ -571,7 +582,7 @@ describe('FileWatcherService – a newer watch on the path while a second look w
 
     // The replacement has landed by the time a second tab opens the file
     failingPaths.delete(FILE)
-    await service.watchFile(FILE, { id: 2 } as never)
+    await w.watch(FILE, 2)
     expect(createdWatchers).toHaveLength(2)
 
     await vi.advanceTimersByTimeAsync(UNREADABLE_RECHECK_MS)
@@ -579,7 +590,7 @@ describe('FileWatcherService – a newer watch on the path while a second look w
 
     // The cancelled check adds no second re-arm
     expect(createdWatchers).toHaveLength(2)
-    expect(internals.watchedFiles.get(FILE).subscribers.size).toBe(2)
-    expect(channels()).toEqual(['file-watch:changed', 'file-watch:changed'])
+    expect(windowsOn()).toBe(2)
+    expect(kinds()).toEqual(['changed', 'changed'])
   })
 })

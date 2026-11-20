@@ -134,8 +134,27 @@ export function computeMinimalEdit(current: string, next: string): MinimalEdit |
 /** The slice of a Monaco text model the sync needs. */
 export type ValueSyncModel = Pick<
   monaco.editor.ITextModel,
-  'getValue' | 'setValue' | 'getPositionAt' | 'pushStackElement' | 'pushEditOperations'
+  'getValue' | 'setValue' | 'getPositionAt' | 'pushStackElement' | 'pushEditOperations' | 'getEOL' | 'pushEOL'
 >
+
+/** A line ending a model can use. */
+export type LineEnding = '\n' | '\r\n'
+
+/** Monaco's `EndOfLineSequence` values (this module imports no `monaco-editor` value). */
+const EOL_SEQUENCE: Readonly<Record<LineEnding, monaco.editor.EndOfLineSequence>> = {
+  '\n': 0 as monaco.editor.EndOfLineSequence.LF,
+  '\r\n': 1 as monaco.editor.EndOfLineSequence.CRLF
+}
+
+/**
+ * The line ending of `text`, from its first line break – the rule the disk
+ * reader uses for `Eol` – or `null` when it has none.
+ */
+export function lineEndingOf(text: string): LineEnding | null {
+  const at = text.indexOf('\n')
+  if (at === -1) return null
+  return at > 0 && text[at - 1] === '\r' ? '\r\n' : '\n'
+}
 
 /** The slice of a Monaco editor the sync needs. */
 export interface ValueSyncEditor {
@@ -276,10 +295,26 @@ export function createEditorValueSync(): EditorValueSync {
       const model = editor.getModel()
       if (!model) return 'no-model'
 
+      // Monaco turns every inserted line break into the model's own: an outside
+      // LF→CRLF change applied as text would come back LF, and the next autosave
+      // would write the old endings back. Take the incoming ending first (#478 F15).
+      const ending = lineEndingOf(value)
+      const endingChanged = ending !== null && model.getEOL() !== ending
+      if (endingChanged) {
+        write(() => {
+          model.pushStackElement()
+          model.pushEOL(EOL_SEQUENCE[ending])
+        })
+      }
+
       const current = model.getValue()
       const edit = computeMinimalEdit(current, value)
       clear()
-      if (!edit) return 'in-sync'
+      if (!edit) {
+        if (!endingChanged) return 'in-sync'
+        model.pushStackElement()
+        return 'applied'
+      }
 
       const start = model.getPositionAt(edit.start)
       const end = model.getPositionAt(edit.end)

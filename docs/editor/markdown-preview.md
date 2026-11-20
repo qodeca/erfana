@@ -145,9 +145,12 @@ e2e test `e2e/preview-images.e2e.ts` now pins the fixed behaviour).
 - **SVG** is always an `<img src="data:image/svg+xml;base64,…">`, never inlined into the DOM, so
   its scripts do not run and it fetches nothing.
 - **CSP:** unchanged. The page already allows `img-src data:`; no custom protocol was added.
-- **Refresh:** no new watch. `markdownImageStore.ts` listens to the same signals as the link
+- **Refresh:** while the preview is visible, the first 8 image files of the document are followed
+  live, each by a freshness tracker on the `dependent` watch profile (`markdownImageFreshness.ts`,
+  #478): a change is read once and handed to the store. The fallback for the rest is
+  `markdownImageStore.ts` listening to the same signals as the link
   checks – every `directory-watch:changed` batch (content edits included) and this window's own
-  file operations – settles a burst (300 ms, at most 2 s), then asks again for every image on
+  file operations – which settles a burst (75 ms, at most 2 s), then asks again for every image on
   screen *with the version of the last bytes it received* (also when they did not decode). The
   main process answers `unchanged` after an `fstat`, so only changed images are re-read and
   re-sent. New bytes are decoded off the DOM first; a

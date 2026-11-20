@@ -118,8 +118,12 @@ function errnoCode(error: unknown): string | undefined {
   return (error as NodeJS.ErrnoException | null)?.code
 }
 
-/** Steps 1 and 2: the shape of the string, before the file system is asked anything. */
-function checkForm(input: unknown, deps: ConfinementDeps): string {
+/**
+ * Steps 1 and 2: the shape of the string, before the file system is asked anything.
+ *
+ * @throws ConfinementError `INVALID_PATH` for anything that is not a plain absolute path
+ */
+export function checkForm(input: unknown, deps: ConfinementDeps): string {
   if (
     typeof input !== 'string' ||
     input.length === 0 ||

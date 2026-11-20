@@ -17,7 +17,7 @@
 import { act, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { DELETED_FILE_PROBE_INTERVAL_MS } from '../../../../../shared/deletedFileProbe'
+import { DELETED_PROBE_BACKOFF, TIMING_PROFILES } from '../../../../../shared/freshness/timingProfiles'
 import { TEST_IDS } from '../../../constants/testids'
 import { installImageViewerHarness, DEFAULT_IMAGE_PATH } from './__test__/testUtils'
 
@@ -39,7 +39,8 @@ async function renderDeleted(): Promise<void> {
   vi.useFakeTimers()
   h.getStats.mockRejectedValue(new Error('ENOENT'))
   act(() => h.emitDeleted(DEFAULT_IMAGE_PATH))
-  await advance(0)
+  // The tracker confirms a delete after the profile's re-check window
+  await advance(TIMING_PROFILES.image.deleteConfirmMs + 100)
   expect(deletedBanner()).toBeInTheDocument()
   expect(image()).toHaveAttribute('src', 'data:image/png;base64,AAAA')
   h.readImage.mockClear()
@@ -51,7 +52,8 @@ describe('ImageViewerPanel – a deleted image that comes back (#450)', () => {
 
     h.getStats.mockResolvedValue({ size: 4096 })
     h.readBytes.mockResolvedValue('data:image/png;base64,BBBB')
-    await advance(DELETED_FILE_PROBE_INTERVAL_MS)
+    h.replaceFile(DEFAULT_IMAGE_PATH)
+    await advance(DELETED_PROBE_BACKOFF.maxMs)
     await advance(0)
 
     expect(h.readImage).toHaveBeenCalledWith(expect.objectContaining({ filePath: DEFAULT_IMAGE_PATH }))
@@ -62,7 +64,7 @@ describe('ImageViewerPanel – a deleted image that comes back (#450)', () => {
   it('keeps the banner and the last image, and reads nothing, while the file stays gone', async () => {
     await renderDeleted()
 
-    await advance(DELETED_FILE_PROBE_INTERVAL_MS * 3)
+    await advance(DELETED_PROBE_BACKOFF.maxMs * 3)
 
     expect(h.readImage).not.toHaveBeenCalled()
     expect(deletedBanner()).toBeInTheDocument()

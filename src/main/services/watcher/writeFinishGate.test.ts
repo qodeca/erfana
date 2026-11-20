@@ -35,6 +35,8 @@ describe('writeFinishGate (#464)', () => {
     expect(emit).not.toHaveBeenCalled()
     await vi.advanceTimersByTimeAsync(200)
     expect(emit).toHaveBeenCalledTimes(1)
+    // Settled: an ordinary change, the reader may read at once
+    expect(emit).toHaveBeenCalledWith(false)
     expect(gate.isPending()).toBe(false)
   })
 
@@ -95,10 +97,11 @@ describe('writeFinishGate (#464)', () => {
     gate.trigger()
     await vi.advanceTimersByTimeAsync(OPTS.maxWaitMs + 200)
     expect(emit).toHaveBeenCalledTimes(1)
+    expect(emit).toHaveBeenCalledWith(true)
     expect(gate.isPending()).toBe(false)
   })
 
-  it('emits by maxWait even when the size never settles', async () => {
+  it('emits by maxWait even when the size never settles – as a forced change, never a settled one (F8)', async () => {
     let size = 0
     const stat: NonNullable<WriteFinishDeps['stat']> = (_p, cb) => queueMicrotask(() => cb(null, { size: ++size }))
     const emit = vi.fn()
@@ -107,6 +110,24 @@ describe('writeFinishGate (#464)', () => {
     gate.trigger()
     await vi.advanceTimersByTimeAsync(OPTS.maxWaitMs + 200)
     expect(emit).toHaveBeenCalledTimes(1)
+    // The file may still be being written: the reader must settle before it reads
+    expect(emit).toHaveBeenCalledWith(true)
+  })
+
+  it('P3: a settled change carries the stamp of the poll that saw it settle, so the reader can check its read', async () => {
+    const stampAt = (size: number) => ({ size, mtimeMs: 1_000 + size, ctimeMs: 1_000 + size, ino: '7' })
+    let size = 10
+    const stat: NonNullable<WriteFinishDeps['stat']> = (_p, cb) =>
+      queueMicrotask(() => cb(null, { size, stamp: stampAt(size) }))
+    const emit = vi.fn()
+    const gate = createWriteFinishGate('/p/a.md', OPTS, emit, { stat, now: Date.now })
+
+    gate.trigger()
+    await vi.advanceTimersByTimeAsync(100)
+    size = 20
+    await vi.advanceTimersByTimeAsync(600)
+    expect(emit).toHaveBeenCalledTimes(1)
+    expect(emit).toHaveBeenCalledWith(false, stampAt(20))
   })
 
   it('cancel drops the wait without emitting; a closed watch stops polling', async () => {

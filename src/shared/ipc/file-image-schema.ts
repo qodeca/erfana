@@ -30,6 +30,8 @@
  */
 import { z } from 'zod'
 
+import { FileStampSchema } from './file-stamp-schema'
+
 /**
  * Upper bound accepted for an echoed-back version token.
  *
@@ -38,6 +40,13 @@ import { z } from 'zod'
  * unbounded string to compare.
  */
 export const MAX_IMAGE_VERSION_LENGTH = 128
+
+/**
+ * Largest image `file:readImage` reads (bytes; 50 MB). Base64 grows the payload
+ * by ~33%, so this caps the IPC message near 67 MB. Here, not in the main-only
+ * `imageRead.ts`, so the renderer's "too large" notice states the same limit.
+ */
+export const IMAGE_READ_MAX_BYTES = 50 * 1024 * 1024
 
 /** Request payload for `file:readImage`. */
 export const ImageReadRequestSchema = z.strictObject({
@@ -59,7 +68,9 @@ export const ImageReadOkSchema = z.object({
   /** `data:<mime>;base64,...` URL for use in `<img src="...">`. */
   dataUrl: z.string(),
   /** Opaque version of the bytes in `dataUrl`. Echo it back on the next read. */
-  version: z.string()
+  version: z.string(),
+  /** The stamp of the bytes read (#478): what a freshness check compares against. Additive. */
+  stamp: FileStampSchema.optional()
 })
 
 export type ImageReadOk = z.infer<typeof ImageReadOkSchema>
@@ -72,7 +83,9 @@ export type ImageReadOk = z.infer<typeof ImageReadOkSchema>
  */
 export const ImageReadUnchangedSchema = z.object({
   status: z.literal('unchanged'),
-  version: z.string()
+  version: z.string(),
+  /** The stamp of the file as it is on disk now (#478). Additive. */
+  stamp: FileStampSchema.optional()
 })
 
 export type ImageReadUnchanged = z.infer<typeof ImageReadUnchangedSchema>

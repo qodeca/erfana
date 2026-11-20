@@ -1,481 +1,211 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * File Watcher Hook for Markdown Editor
+ * The Markdown editor's adapter on "follow the file on disk" (#478, plan S14,
+ * decisions 41–45).
  *
- * Monitors a file for external changes and deletion.
- * Handles conflict detection when local changes exist.
+ * It supplies only the editor's update rule; the shared tracker
+ * (`useFreshness`) does the following, catching up, retrying, deleted and
+ * restart work, and the save add-on decides own-save identity in main:
+ *
+ * - **Rule**: an unedited tab takes the disk's text (`onContentUpdate`, with
+ *   the line ending it was read with – the panel keeps the cursor and scroll,
+ *   F15); an edited tab whose text differs holds it as the conflict; an edited
+ *   tab whose text equals the disk's adopts it silently. A keystroke during
+ *   the read counts as an edit.
+ * - **Save** (`save`): pause this tab's subscription → `writeText` → adopt the
+ *   written stamp (its echo stays silent – N1) or, for an autosave that found
+ *   the file changed, the "Not saved" conflict (F16) → resume → check. Only an
+ *   autosave sends `expectedStamp`, and never in the deleted state (F7).
+ * - **Blocked content** (too large, binary, another encoding, unreadable):
+ *   `isReadOnlyBlocked` – the panel makes the editor read-only and autosave
+ *   stops (F1).
  *
  * @module useFileWatcher
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+
 import { INDICATOR_DURATION_MS } from '../constants/fileWatch'
-import {
-  acquireFileWatch,
-  createFileWatchSlot,
-  forgetFileWatch,
-  releaseFileWatch,
-  type FileWatchSlot
-} from './fileWatchSlot'
-import { logger } from '../utils/logger'
-import { useLatestRef } from './useLatestRef'
-import { useTakeBackReturnedFile } from './takeBackReturnedFile'
+import { isContentBlocked } from '../../../shared/freshness/FreshnessTracker'
+import type {
+  Eol,
+  FileStamp,
+  FreshnessState,
+  ReadOutcome,
+  UpdateRule,
+  WriteTextReply
+} from '../../../shared/freshness/freshnessTypes'
+import { createSaveAddOn, type SaveRequest } from '../../../shared/freshness/saveAddOn'
+import { textReadOutcome, type TextVersion } from '../../../shared/freshness/textOutcome'
+import { freshnessEnvironment, pausableFreshnessSource } from '../services/freshness/windowFreshness'
 import { normalizeLF } from '../utils/lineEndings'
-import { fileGateway } from '../services/fileGateway'
-import { fileWatchGateway } from '../services/fileWatchGateway'
+import { logger } from '../utils/logger'
+import { useFreshness } from './useFreshness'
+import { useLatestRef } from './useLatestRef'
 
-/**
- * Determines whether a file-watch change event is an echo of our own save.
- *
- * Compares the on-disk content against a set of recently saved contents.
- * Uses a Set to handle rapid successive saves where multiple echoes may
- * be in flight simultaneously (e.g., autosave at t=0 and t=2s, echo for
- * t=0 arrives at t=2.5s after the ref was already updated for t=2s).
- *
- * @param onDiskContent - Content read from disk after watcher fired
- * @param pendingSavedContents - Set of content strings from recent saves
- * @returns true if the change is a self-save echo that should be ignored
- */
-export function isEchoEvent(
-  onDiskContent: string,
-  pendingSavedContents: Set<string>
-): boolean {
-  if (pendingSavedContents.size === 0) return false
-  const normalized = normalizeLF(onDiskContent)
-  for (const saved of pendingSavedContents) {
-    if (normalized === normalizeLF(saved)) return true
-  }
-  return false
-}
+export type { SaveRequest }
 
-/**
- * File watcher state
- */
-export interface FileWatcherState {
-  /** Whether an external change was detected while file has local modifications */
+/** Return type of {@link useFileWatcher}. */
+export interface UseFileWatcherReturn {
+  /** The one state object every notice reads (decision 35). */
+  state: FreshnessState
+  /** The file changed on disk while the tab holds edits: the conflict bar is up. */
   externalChangeDetected: boolean
-  /** Whether the file was deleted externally; clears itself when the file is back (#450) */
+  /** The file is gone (confirmed); it clears itself when the file is back. */
   isFileDeleted: boolean
-  /** Whether the file is currently being reloaded from disk */
+  /** The disk's text was just taken (the toolbar's brief indicator). */
   isReloading: boolean
-  /** Auto-refresh stopped: the watch never started or the watcher failed (#464) */
-  isWatchUnavailable: boolean
-}
-
-/** File watcher actions */
-export interface FileWatcherActions {
-  /** Reload file content from disk */
+  /** The content cannot be shown: the editor is read-only and autosave is off (F1). */
+  isReadOnlyBlocked: boolean
+  /** The size of the file when the last read refused it as too large. */
+  tooLargeSize: number | undefined
+  /** Reload from disk: a new watch and a forced read that discards the buffer (also the notices' Reload). */
   reloadFromDisk: () => Promise<void>
-  /** Our own write landed (a comment save): take the file only while the tab is unedited before AND after the read */
-  reloadIfUnedited: () => Promise<void>
-  /** Keep local version and dismiss conflict notification */
+  /** Keep my version: adopt the disk's version, so autosave may write the buffer (N6). */
   keepLocal: () => void
-  /** Dismiss external change notification without action */
+  /** Dismiss the conflict bar: exactly Keep my version (owner decision N6). */
   dismissConflict: () => void
-  /**
-   * Clear the file deleted state (e.g., after saving). When the tab was marked
-   * deleted, the save restored the file, so it is watched again (#252).
-   */
-  clearDeletedState: () => void
-  /** Mark that a save operation is starting (prevents race conditions) */
-  markSaving: () => void
-  /** Mark that a save operation has ended */
-  unmarkSaving: () => void
-  /** Notify that a save completed with the given content (for self-save echo detection) */
-  notifySaveComplete: (savedContent: string) => void
-  /** Start the watch again and re-read the file – the stopped notice's Reload (#464) */
-  restartWatch: () => void
+  /** Our own write landed elsewhere (a comment save): look at the disk now. */
+  reloadIfUnedited: () => void
+  /** Save the buffer through the save add-on (see the module header). Rejects on an I/O error. */
+  save: (request: SaveRequest) => Promise<WriteTextReply>
 }
 
-/** Return type for useFileWatcher hook */
-export type UseFileWatcherReturn = FileWatcherState & FileWatcherActions
-
-/**
- * Configuration for useFileWatcher hook
- * @remarks Renamed from UseFileWatcherConfig for codebase consistency
- */
+/** Options of {@link useFileWatcher}. */
 export interface UseFileWatcherOptions {
-  /** Path of the file to watch */
+  /** Path of the file to follow. */
   filePath: string | null
-  /** Whether the file has unsaved local modifications */
+  /** The tab holds unsaved local edits. */
   hasLocalChanges: boolean
-  /** Callback when file content should be updated */
-  onContentUpdate: (content: string) => void
-  /** Callback when file is reloaded (for state updates) */
-  onReload?: () => void
-  /** The editor's text now (`undefined`: no editor mounted); `reloadIfUnedited` compares it across its read */
+  /** The tab has its initial text; the tracker starts from `baseline`. */
+  ready?: boolean
+  /** The stamp of the initial read (G3: anything newer is caught up). */
+  baseline?: FileStamp
+  /** The tab is shown (a shown tab checks the disk – S1). */
+  visible?: boolean
+  /** Put the disk's text in the editor; the tab is clean afterwards. */
+  onContentUpdate: (content: string, eol: Eol) => void
+  /** The editor's text now (`undefined`: no editor mounted). */
   bufferNow?: () => string | undefined
 }
 
 /**
- * @deprecated Use UseFileWatcherOptions instead
- */
-export type UseFileWatcherConfig = UseFileWatcherOptions
-
-/**
- * Hook for watching file changes and handling conflicts.
- *
- * Monitors a file for external changes (modifications and deletions).
- * When local changes exist and external change is detected, shows
- * a conflict notification. Otherwise, auto-reloads the file.
- *
- * @param options - Configuration options
- * @returns File watcher state and actions
+ * Follow the editor tab's file on disk.
  *
  * @example
  * ```tsx
- * const { externalChangeDetected, isFileDeleted, isWatchUnavailable, restartWatch, markSaving, unmarkSaving } =
- *   useFileWatcher({ filePath, hasLocalChanges: isModified, onContentUpdate: setContent })
- * // Bracket every write with markSaving() / unmarkSaving(); show the conflict
- * // bar, the deleted warning and the stopped notice from the three flags
- *  * ```
- */
-export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherReturn {
-  const { filePath, hasLocalChanges, onContentUpdate, onReload } = options
-
-  const [externalChangeDetected, setExternalChangeDetected] = useState(false)
-  const [isFileDeleted, setIsFileDeleted] = useState(false)
-  const [isReloading, setIsReloading] = useState(false)
-  // The path whose watch failed; keyed by path so a file switch clears it (#464)
-  const [unavailableFor, setUnavailableFor] = useState<string | null>(null)
-  const isWatchUnavailable = filePath !== null && unavailableFor === filePath
-
-  // Mirrors isFileDeleted for clearDeletedState, which must know synchronously
-  // whether the main-process watch is gone (it ends the watch on a delete).
-  const isFileDeletedRef = useRef(false)
-
-  // Track save operations to prevent race conditions
-  // Exposed via markSaving/unmarkSaving so parent component can coordinate saves
-  const isSavingRef = useRef(false)
-
-  // Mirror hasLocalChanges as a ref to avoid stale closure issues in handleExternalChange.
-  // React state updates are batched – the ref always reflects the current value.
-  const hasLocalChangesRef = useRef(hasLocalChanges)
-  useEffect(() => {
-    hasLocalChangesRef.current = hasLocalChanges
-  }, [hasLocalChanges])
-
-  // Content strings from recent saves – used to detect self-save echo events.
-  // A Set handles rapid successive saves where multiple echoes may be in flight.
-  // Cleared on: reload, keepLocal, file switch (useEffect cleanup), and after echo match.
-  const pendingSavedContentsRef = useRef<Set<string>>(new Set())
-
-  // This consumer's single hold on the main-process watch. `fileWatch.start` is
-  // a counting acquire, so start/stop must be balanced and ordered – the slot
-  // owns both properties (issue #70).
-  const [slot] = useState<FileWatchSlot>(createFileWatchSlot)
-
-  /**
-   * Mark that a save operation is starting.
-   * Call this before saving to prevent race conditions with file watcher.
-   */
-  const markSaving = useCallback(() => {
-    isSavingRef.current = true
-  }, [])
-
-  /**
-   * Mark that a save operation has ended.
-   * Call this after saving completes (in finally block).
-   */
-  const unmarkSaving = useCallback(() => {
-    isSavingRef.current = false
-  }, [])
-
-  /**
-   * Clear the file deleted state.
-   *
-   * The main process ended the watch when it reported the delete, and the slot
-   * forgot its hold then, so a file that is back – restored by a save, or
-   * reloaded – is watched again with a plain acquire; without it the tab would
-   * stay deaf to outside edits until it was reopened (#252). No release first:
-   * a `stop` here could take the count of another consumer of the same file.
-   */
-  const clearDeletedState = useCallback(() => {
-    const wasDeleted = isFileDeletedRef.current
-    isFileDeletedRef.current = false
-    setIsFileDeleted(false)
-    if (!wasDeleted || !filePath) return
-    void acquireFileWatch(slot, filePath).then(({ started, error, cause }) => {
-      if (!started) {
-        logger.error('Failed to watch the restored file again', cause, { error })
-      }
-    })
-  }, [filePath, slot])
-
-  /**
-   * Reload file content from disk.
-   *
-   * @param prefetchedContent - If provided, uses this content instead of reading from disk.
-   *   Used internally by handleExternalChange to avoid a double read.
-   */
-  const reloadFromDisk = useCallback(async (prefetchedContent?: string) => {
-    if (!filePath) return
-
-    setIsReloading(true)
-    try {
-      // Only a string counts as prefetched content. This function is also used
-      // directly as a click handler, and React passes the synthetic event as
-      // the first argument — which used to be adopted as the file's content
-      // and crashed the panel. A zero-arg signature is assignable to a one-arg
-      // DOM handler, so the type system never saw it.
-      const prefetched = typeof prefetchedContent === 'string' ? prefetchedContent : undefined
-      const content = prefetched ?? await fileGateway.readFile({ filePath })
-      onContentUpdate(content)
-      pendingSavedContentsRef.current.clear() // Disk content is now authoritative
-      setExternalChangeDetected(false)
-      // The file was read, so it is there: watch it again if it had been deleted
-      clearDeletedState()
-      onReload?.()
-      logger.info('File reloaded successfully', { filePath })
-
-      // Show reload indicator briefly
-      setTimeout(() => setIsReloading(false), INDICATOR_DURATION_MS)
-    } catch (error) {
-      logger.error('Error reloading file', error instanceof Error ? error : undefined)
-      setIsReloading(false)
-    }
-  }, [filePath, onContentUpdate, onReload, clearDeletedState])
-
-  // Release any hold (the main watch may be half-dead), start again, then catch
-  // up with the disk – unless the tab holds edits a re-read would throw away
-  const restartWatch = useCallback(() => {
-    if (!filePath) return
-    void releaseFileWatch(slot, filePath)
-      .then(() => acquireFileWatch(slot, filePath))
-      .then(({ started, error, cause }) => {
-        if (!started) return logger.error('Failed to restart watching file', cause, { error })
-        setUnavailableFor((current) => (current === filePath ? null : current))
-        if (!hasLocalChangesRef.current) void reloadFromDisk()
-      })
-  }, [filePath, slot, reloadFromDisk])
-
-  const bufferNowRef = useLatestRef(options.bufferNow)
-  const reloadIfUnedited = useCallback(async () => {
-    if (!filePath || hasLocalChangesRef.current) return
-    const before = bufferNowRef.current?.()
-    const content = await fileGateway.readFile({ filePath }).catch((error: unknown) => {
-      logger.error('Error reading the file after our own write', error instanceof Error ? error : undefined)
-      return null
-    })
-    // Typed during the read: the edits win – autosave or the watcher's conflict path settles the file.
-    if (content === null || hasLocalChangesRef.current || bufferNowRef.current?.() !== before) return
-    await reloadFromDisk(content)
-  }, [filePath, reloadFromDisk, bufferNowRef])
-
-  /**
-   * Keep local version and dismiss conflict notification
-   */
-  const keepLocal = useCallback(() => {
-    logger.info('User chose to keep local version')
-    pendingSavedContentsRef.current.clear() // User accepted divergence
-    setExternalChangeDetected(false)
-  }, [])
-
-  /**
-   * Dismiss conflict notification without action
-   */
-  const dismissConflict = useCallback(() => {
-    setExternalChangeDetected(false)
-  }, [])
-
-  /**
-   * Notify the hook that a save completed with the given content.
-   * Stores the content for self-save echo detection.
-   */
-  const notifySaveComplete = useCallback((savedContent: string) => {
-    pendingSavedContentsRef.current.add(savedContent)
-  }, [])
-
-  /**
-   * Handle external file change event.
-   *
-   * Uses three layers of defense against the autosave race condition (#124):
-   * 1. isSavingRef – drops events while save is in progress
-   * 2. Content comparison – detects self-save echoes via isEchoEvent
-   * 3. hasLocalChangesRef – always-current value (no stale closure)
-   *
-   * Reads the file once and passes prefetched content to reloadFromDisk
-   * to avoid a double-read timing gap.
-   */
-  const handleExternalChange = useCallback(async () => {
-    logger.info('External change detected for file', { filePath })
-
-    // Guard 1: Ignore if we're currently saving
-    if (isSavingRef.current) {
-      logger.debug('Ignoring external change (save in progress)')
-      return
-    }
-
-    if (!filePath) return
-
-    // Guard 2: Read file and compare with last saved content
-    try {
-      const diskContent = await fileGateway.readFile({ filePath })
-
-      // Self-save echo detection: disk matches a recently saved content → drop
-      if (isEchoEvent(diskContent, pendingSavedContentsRef.current)) {
-        logger.debug('Ignoring self-save echo (content matches a recent save)')
-        // Remove the matched entry; keep others for pending echoes from rapid saves
-        const normalized = normalizeLF(diskContent)
-        for (const saved of pendingSavedContentsRef.current) {
-          if (normalizeLF(saved) === normalized) {
-            pendingSavedContentsRef.current.delete(saved)
-            break
-          }
-        }
-        return
-      }
-
-      // Genuine external change – decide based on local changes (via ref, not closure)
-      if (hasLocalChangesRef.current) {
-        logger.warn('Local changes detected, showing conflict notification')
-        setExternalChangeDetected(true)
-      } else {
-        // Safe to auto-reload with prefetched content (single read)
-        logger.info('No local changes, auto-reloading')
-        await reloadFromDisk(diskContent)
-      }
-    } catch (error) {
-      logger.error(
-        'Error reading file for change detection',
-        error instanceof Error ? error : undefined
-      )
-      // Fallback: decide without content comparison
-      if (hasLocalChangesRef.current) {
-        setExternalChangeDetected(true)
-      } else {
-        await reloadFromDisk()
-      }
-    }
-  }, [filePath, reloadFromDisk])
-
-  /**
-   * Handle file deletion event
-   */
-  const handleFileDeleted = useCallback(() => {
-    logger.warn('File deleted externally', { filePath })
-    // The main process dropped the watch, every count with it, before sending
-    // this: the slot holds nothing now, and must not send a `stop` (#252)
-    forgetFileWatch(slot)
-    isFileDeletedRef.current = true
-    setIsFileDeleted(true)
-    setExternalChangeDetected(false) // Clear conflict notification if shown
-  }, [filePath, slot])
-
-  // A deleted tab looks for its file and takes it back when it returns (#450)
-  useTakeBackReturnedFile(filePath, isFileDeleted, { isSavingRef, isFileDeletedRef, hasLocalChangesRef, bufferNowRef },
-    { reload: reloadFromDisk, clearDeletedState, setConflict: setExternalChangeDetected })
-
-  // Set up file watching
-  useEffect(() => {
-    if (!filePath) return
-    // The ref always holds the same Set; capture it for the cleanup.
-    const pendingSavedContents = pendingSavedContentsRef.current
-
-    logger.info('Starting watch for file', { filePath })
-
-    // Start watching. Acquire/release are serialised through the slot, so a
-    // refused start is never followed by a stop this consumer did not earn, and
-    // a mount->unmount faster than the IPC round trip cannot deliver the stop
-    // before the start and leak the watch slot for good (issue #70).
-    void acquireFileWatch(slot, filePath).then(({ started, error, cause }) => {
-      if (!started) {
-        logger.error('Failed to start watching file', cause, { error })
-        setUnavailableFor(filePath)
-      }
-    })
-
-    // Set up event listeners
-    const unsubscribeChanged = fileWatchGateway.onFileChanged((data) => {
-      if (data.filePath === filePath) {
-        handleExternalChange()
-      }
-    })
-
-    const unsubscribeDeleted = fileWatchGateway.onFileDeleted((data) => {
-      if (data.filePath === filePath) {
-        handleFileDeleted()
-      }
-    })
-
-    const unsubscribeError = fileWatchGateway.onFileError((data) => {
-      if (data.filePath === filePath) {
-        // The main process ended the watch: forget the hold, as on a delete
-        // (#252). Outside edits no longer reach the tab, so it says so.
-        if (data.ended) forgetFileWatch(slot)
-        logger.error('File watch error', undefined, { error: data.error, ended: data.ended === true })
-        setUnavailableFor(filePath) // say so, with Reload (#464)
-      }
-    })
-
-    // Cleanup on unmount or file change
-    return () => {
-      logger.info('Stopping watch for file', { filePath })
-      void releaseFileWatch(slot, filePath)
-      unsubscribeChanged()
-      unsubscribeDeleted()
-      unsubscribeError()
-      pendingSavedContents.clear() // Clear on file switch
-    }
-  }, [filePath, handleExternalChange, handleFileDeleted, slot])
-
-  return {
-    // State
-    externalChangeDetected,
-    isFileDeleted,
-    isReloading,
-    isWatchUnavailable,
-    // Actions
-    reloadFromDisk,
-    restartWatch,
-    reloadIfUnedited,
-    keepLocal,
-    dismissConflict,
-    clearDeletedState,
-    markSaving,
-    unmarkSaving,
-    notifySaveComplete
-  }
-}
-
-/**
- * Pause/resume helpers for use during save operations
- */
-export interface FileSaveGuard {
-  /** Pause file watching before save */
-  pauseWatch: () => Promise<void>
-  /** Resume file watching after save */
-  resumeWatch: () => Promise<void>
-}
-
-/**
- * Creates a save guard for pausing file watching during save operations
- *
- * @param filePath - Path of the file being saved
- * @returns Save guard functions
- *
- * @example
- * ```ts
- * const guard = createFileSaveGuard(filePath)
- *
- * async function handleSave() {
- *   await guard.pauseWatch()
- *   try {
- *     await saveFile(content)
- *   } finally {
- *     await guard.resumeWatch()
- *   }
- * }
+ * const watch = useFileWatcher({ filePath, hasLocalChanges, ready, baseline, visible, onContentUpdate })
+ * await watch.save({ content, trigger: 'autosave', generation })
+ * <FreshnessNotice notice={selectNotice({ state: watch.state, fileName, tab: 'editor' })} … />
  * ```
  */
-export function createFileSaveGuard(filePath: string): FileSaveGuard {
-  return {
-    pauseWatch: async () => {
-      await fileWatchGateway.pause(filePath)
-    },
-    resumeWatch: async () => {
-      await fileWatchGateway.resume(filePath)
+export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherReturn {
+  const { filePath, hasLocalChanges, ready = true, baseline, visible = true } = options
+
+  const [isReloading, setIsReloading] = useState(false)
+  const [tooLargeSize, setTooLargeSize] = useState<number | undefined>(undefined)
+
+  const hasLocalChangesRef = useLatestRef(hasLocalChanges)
+  const onContentUpdateRef = useLatestRef(options.onContentUpdate)
+  const bufferNowRef = useLatestRef(options.bufferNow)
+  /** The buffer when the current read began: a keystroke during the read is an edit. */
+  const bufferAtReadRef = useRef<string | undefined>(undefined)
+  const indicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isMountedRef = useRef(true)
+
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+      if (indicatorTimerRef.current) clearTimeout(indicatorTimerRef.current)
     }
+  }, [])
+
+  const flashReloaded = useCallback(() => {
+    if (!isMountedRef.current) return
+    setIsReloading(true)
+    if (indicatorTimerRef.current) clearTimeout(indicatorTimerRef.current)
+    indicatorTimerRef.current = setTimeout(() => {
+      indicatorTimerRef.current = null
+      if (isMountedRef.current) setIsReloading(false)
+    }, INDICATOR_DURATION_MS)
+  }, [])
+
+  const rule = useMemo<UpdateRule<TextVersion>>(
+    () => ({
+      read: async (): Promise<ReadOutcome<TextVersion>> => {
+        if (!filePath) return { status: 'missing' }
+        bufferAtReadRef.current = bufferNowRef.current?.()
+        const reply = await freshnessEnvironment().source.readText(filePath)
+        if (reply.status === 'too-large' && isMountedRef.current) setTooLargeSize(reply.size)
+        return textReadOutcome(reply)
+      },
+      // The editor reads hidden or shown: an unedited background tab stays current
+      readNow: () => true,
+      apply: (version, _stamp, force) => {
+        const buffer = bufferNowRef.current?.()
+        const typedDuringRead = bufferAtReadRef.current !== undefined && buffer !== bufferAtReadRef.current
+        const edited = hasLocalChangesRef.current || typedDuringRead
+        if (force || !edited) {
+          onContentUpdateRef.current(version.text, version.eol)
+          flashReloaded()
+          logger.info('File reloaded from disk', { filePath })
+          return 'applied'
+        }
+        // Edited, but the disk already holds exactly this text: nothing to choose
+        if (buffer !== undefined && normalizeLF(buffer) === normalizeLF(version.text)) return 'applied'
+        logger.warn('Local changes held against a change on disk', { filePath })
+        return 'held'
+      }
+    }),
+    [filePath, bufferNowRef, hasLocalChangesRef, onContentUpdateRef, flashReloaded]
+  )
+
+  const { state, tracker } = useFreshness<TextVersion>({ filePath, profile: 'editor', rule, ready, baseline, visible })
+
+  const reloadFromDisk = useCallback(async () => {
+    await tracker?.reload()
+  }, [tracker])
+
+  const keepLocal = useCallback(() => {
+    logger.info('User chose to keep the local version')
+    void tracker?.keepLocal()
+  }, [tracker])
+
+  const reloadIfUnedited = useCallback(() => {
+    tracker?.check('manual')
+  }, [tracker])
+
+  const save = useCallback(
+    async (request: SaveRequest): Promise<WriteTextReply> => {
+      const port = pausableFreshnessSource()
+      if (!filePath) throw new Error('No file to save')
+      if (!tracker) {
+        // Not following yet (the initial read is still out): a plain, unconditional write
+        return port.writeText({
+          filePath,
+          content: request.content,
+          ...(request.generation !== undefined ? { generation: request.generation } : {}),
+          ...(request.createParentDirs ? { createParentDirs: true as const } : {})
+        })
+      }
+      return createSaveAddOn({ filePath, source: port, tracker }).save(request)
+    },
+    [filePath, tracker]
+  )
+
+  return {
+    state,
+    externalChangeDetected: state.content.kind === 'changed' && state.content.mode === 'held',
+    isFileDeleted: state.content.kind === 'deleted',
+    isReloading,
+    isReadOnlyBlocked: isContentBlocked(state),
+    tooLargeSize,
+    reloadFromDisk,
+    keepLocal,
+    dismissConflict: keepLocal,
+    reloadIfUnedited,
+    save
   }
 }

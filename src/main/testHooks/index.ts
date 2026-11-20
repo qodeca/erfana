@@ -25,6 +25,18 @@ import { createBrowserPageTestHook, type BrowserPageTestHook } from './browserPa
 import { createBrowserPopupTestHook, type BrowserPopupTestHook } from './browserPopupHook'
 import { createBrowserPickTestHook, type BrowserPickTestHook } from './browserPickHook'
 import { getBrowserRuntime } from '../services/browser/browserAppSetup'
+import {
+  createFreshnessTestHook,
+  freshnessPowerMonitor,
+  type FreshnessTestHook,
+  type WatcherInternals,
+  type WritableFiles
+} from './freshnessHook'
+import { fileWatcherService } from '../services/FileWatcherService'
+import { directoryWatcherService } from '../services/DirectoryWatcherService'
+import { replaceTrash } from '../services/file/trashEntry'
+import { textWriter } from '../services/freshness/textWrite'
+import { createTrashTestHook, type TrashTestHook } from './trashHook'
 
 /** The string `scripts/check-no-test-hooks.mjs` looks for in a production build. */
 export const TEST_HOOK_SENTINEL = 'ERFANA_BROWSER_TEST_HOOK_SENTINEL'
@@ -47,6 +59,10 @@ export interface TestHooks {
   readonly popup: BrowserPopupTestHook
   /** Built-in browser pick and send: highlight, targets, capture faults, expiry, bench (spec 025 commits 14–15). */
   readonly pick: BrowserPickTestHook
+  /** File freshness: watch counts, refused, muted, dead and held watches, wake (#478). */
+  readonly freshness: FreshnessTestHook
+  /** The project tree's Delete: a stub trash, its record, and forced refusals (#486). */
+  readonly trash: TrashTestHook
 }
 
 /** What `globalThis.__erfanaTestHooks` holds. */
@@ -63,12 +79,30 @@ export interface TestHookDependencies {
   readonly createPage?: () => BrowserPageTestHook
   readonly createPopup?: () => BrowserPopupTestHook
   readonly createPick?: () => BrowserPickTestHook
+  readonly createFreshness?: () => FreshnessTestHook
+  readonly createTrash?: () => TrashTestHook
 }
 
 const defaultDependencies: TestHookDependencies = {
   installClock: () => installClockTestHook(),
   createBrowser: () => createBrowserTestHook(getBrowserRuntime),
   createBrowserInput: () => createBrowserInputTestHook(getBrowserRuntime)
+}
+
+/** The freshness hook over the app's singletons (see `freshnessHook.ts` for why it reads private fields). */
+function createAppFreshnessHook(): FreshnessTestHook {
+  return createFreshnessTestHook({
+    watcher: fileWatcherService as unknown as WatcherInternals,
+    files: textWriter as unknown as WritableFiles,
+    powerMonitor: freshnessPowerMonitor
+  })
+}
+
+/** The trash hook, counting the app's own watch handles under each trashed entry (#486). */
+function createAppTrashHook(): TrashTestHook {
+  return createTrashTestHook(replaceTrash, undefined, (entryPath) =>
+    fileWatcherService.openHandlesUnder(entryPath) + directoryWatcherService.openHandlesUnder(entryPath)
+  )
 }
 
 /** Builds every hook. */
@@ -83,7 +117,9 @@ export function createTestHooks(
     site: (deps.createSite ?? (() => createBrowserSiteTestHook(getBrowserRuntime)))(),
     page: (deps.createPage ?? (() => createBrowserPageTestHook(getBrowserRuntime)))(),
     popup: (deps.createPopup ?? (() => createBrowserPopupTestHook(getBrowserRuntime)))(),
-    pick: (deps.createPick ?? (() => createBrowserPickTestHook(getBrowserRuntime)))()
+    pick: (deps.createPick ?? (() => createBrowserPickTestHook(getBrowserRuntime)))(),
+    freshness: (deps.createFreshness ?? createAppFreshnessHook)(),
+    trash: (deps.createTrash ?? createAppTrashHook)()
   })
 }
 

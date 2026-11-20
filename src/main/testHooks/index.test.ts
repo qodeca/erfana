@@ -13,6 +13,7 @@ vi.mock('./browserHook', () => ({ createBrowserTestHook: vi.fn() }))
 vi.mock('../services/browser/browserAppSetup', () => ({ getBrowserRuntime: vi.fn() }))
 import type { ClockTestHook } from './clockHook'
 import type { BrowserTestHook } from './browserHook'
+import type { TrashTestHook } from './trashHook'
 import {
   TEST_HOOKS_GLOBAL_KEY,
   TEST_HOOK_SENTINEL,
@@ -28,9 +29,15 @@ const clockHook: ClockTestHook = {
 }
 
 const browserHook = {} as BrowserTestHook
+// The default puts a stub behind the real trash, which only an e2e build allows
+const trashHook = {} as TrashTestHook
 
 function deps(): TestHookDependencies {
-  return { installClock: vi.fn(() => clockHook), createBrowser: vi.fn(() => browserHook) }
+  return {
+    installClock: vi.fn(() => clockHook),
+    createBrowser: vi.fn(() => browserHook),
+    createTrash: vi.fn(() => trashHook)
+  }
 }
 
 describe('test hooks', () => {

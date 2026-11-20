@@ -4,7 +4,7 @@
  * A 1200-file folder delete with three tabs open inside it (#346 review, W2).
  *
  * Every message the main process sends drives renderer work, so a removal
- * burst must cost the renderer one `file-watch:deleted` per open tab and a
+ * burst must cost the renderer one `deleted` event per open tab and a
  * bounded number of tree broadcasts - not one message per removed path, and
  * no re-armed watch on a file that is going away. The project watcher (fake
  * native backend) and the single-file watches (fake chokidar) are wired the
@@ -52,6 +52,11 @@ vi.mock('chokidar', () => {
     const watcher = {
       on: vi.fn((event: string, listener: (...args: unknown[]) => void) => {
         handlers.set(event, listener)
+        return watcher
+      }),
+      // Says `ready` at once: a subscribe answers after it (#478 G3)
+      once: vi.fn((event: string, listener: () => void) => {
+        if (event === 'ready') queueMicrotask(listener)
         return watcher
       }),
       close: vi.fn(async () => {})
@@ -110,6 +115,8 @@ vi.mock('./LoggingService', () => ({ logger: harness.logger }))
 import chokidar from 'chokidar'
 import { DirectoryWatcherService } from './DirectoryWatcherService'
 import { FileWatcherService } from './FileWatcherService'
+import { testSession } from './watcher/__test__/testSession'
+import { WindowWatches } from './watcher/__test__/windowWatches'
 
 const ROOT = path.resolve(path.sep, 'work', 'proj')
 const BIG = path.join(ROOT, 'big')
@@ -146,6 +153,7 @@ const count = (channel: string): number => harness.sends.filter(s => s.channel =
 
 let dws: DirectoryWatcherService
 let fws: FileWatcherService
+let w: WindowWatches
 
 beforeEach(async () => {
   vi.useFakeTimers()
@@ -158,9 +166,9 @@ beforeEach(async () => {
   vi.mocked(chokidar.watch).mockClear()
 
   dws = new DirectoryWatcherService({ backend: 'native-recursive' })
-  fws = new FileWatcherService()
+  fws = new FileWatcherService({ session: testSession(ROOT), stampFile: async () => ({ size: 1, mtimeMs: 1, ctimeMs: 1, ino: '1' }) })
+  w = new WindowWatches(fws, harness.sends)
   dws.setProjectPath(ROOT)
-  fws.setProjectPath(ROOT)
   // Wired as src/main/index.ts wires them
   dws.onPathsRemoved(removed => fws.handleAncestorRemovals(removed))
   dws.onRemovalsLost((root, isOwnRemoval) => {
@@ -168,7 +176,7 @@ beforeEach(async () => {
   })
   fws.watchUnseenFiles(dws)
   await dws.watchDirectory(ROOT, webContents)
-  for (const open of OPEN) await fws.watchFile(open, webContents)
+  for (const open of OPEN) await w.started(open, OWNER)
   harness.sends.length = 0
 })
 
@@ -180,12 +188,9 @@ afterEach(async () => {
 
 /** The whole burst costs the renderer one deleted per tab, nothing else per tab, a few tree broadcasts. */
 function expectBoundedBurst(): void {
-  expect(count('file-watch:deleted')).toBe(OPEN.length)
-  expect(new Set(harness.sends.filter(s => s.channel === 'file-watch:deleted').map(s => s.payload.filePath))).toEqual(
-    new Set(OPEN)
-  )
-  expect(count('file-watch:changed')).toBe(0)
-  expect(count('file-watch:error')).toBe(0)
+  expect(w.filesWith('deleted')).toHaveLength(OPEN.length)
+  expect(new Set(w.filesWith('deleted'))).toEqual(new Set(OPEN))
+  expect(w.kinds().filter(kind => kind !== 'deleted')).toEqual([])
   // No watch was re-armed on a file that is going away
   expect(chokidar.watch).toHaveBeenCalledTimes(OPEN.length)
   // Everything else is the coalesced tree broadcast, a handful for 1213 removals
@@ -242,7 +247,7 @@ describe('a 1200-file folder delete with three tabs open inside it', () => {
     dws.pauseWatch(ROOT, OWNER)
     emitBigRemoval()
     await vi.advanceTimersByTimeAsync(SETTLE_MS)
-    expect(count('file-watch:deleted')).toBe(0)
+    expect(w.filesWith('deleted')).toHaveLength(0)
 
     dws.resumeWatch(ROOT)
     await vi.advanceTimersByTimeAsync(SETTLE_MS)

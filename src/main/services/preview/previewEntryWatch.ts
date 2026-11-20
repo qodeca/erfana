@@ -10,29 +10,52 @@
  * after its `close()` was asked for – is ignored, so saving the page the tab
  * left cannot reload, or mark deleted, the page it shows now.
  *
- * A save of the page reloads it (`onChange`, through the reload policy); an
- * unlink – a rename unlinks the old path too – marks it deleted (`onDeleted`).
- * A genuine delete ends the watcher, so nothing would report the page coming
- * back – a branch switch or a merge puts it back seconds later. After a delete
- * the page is therefore asked for once per `DELETED_FILE_PROBE_INTERVAL_MS`;
- * when it is there again it is watched anew and reported as a change, which
- * reloads it and clears the failed state (#450). A move or `dispose` ends the ask.
+ * In production the watcher is a freshness tracker on the shared watch layer
+ * (#478 plan S17, `freshness/mainTrackedWatch.ts`, `preview` profile): a save
+ * of the page reloads it (`onChange`, through the reload policy, whose
+ * coalesce is the preview's only burst control – F21); a confirmed delete – a
+ * rename unlinks the old path too – marks it deleted (`onDeleted`). The page
+ * coming back (a branch switch, a merge) is reported by the tracker itself as
+ * a change, which reloads it and clears the failed state (#450): there is no
+ * probe loop here any more. A watch that stopped for good, waits for a slot,
+ * or a page that cannot be read is reported to `onProblem` for the failure
+ * badge (§ 3.6). The page is checked on window focus, on a power resume and
+ * when the view is shown again (`setVisible`).
+ *
  * A watcher error is not a page failure: it is logged by the error's name and
  * code, with the file name redacted and the panel by digest (QG-7 S3, S4), and
  * the next load surfaces a genuinely missing file.
  */
-import { DELETED_FILE_PROBE_INTERVAL_MS } from '../../../shared/deletedFileProbe'
+import { basename } from 'node:path'
+import { ErrorCode } from '../../../shared/errors'
+import type { CheckReason } from '../../../shared/freshness/freshnessTypes'
+import type { PreviewFailureInput, PreviewFailureType } from '../../../shared/ipc/preview-types'
 import { stablePathDigest } from '../../../shared/stablePathDigest'
 import { logger } from '../LoggingService'
 import { redactPath } from '../../utils/redactUserInput'
-import { probePath } from '../watcher/pathPresence'
+import type { TrackedWatchProblem } from '../freshness/mainTrackedWatch'
 import type { PreviewFileWatcherHandle } from './previewViewLifecycle'
+
+/** What the page's watcher reports. */
+export interface PreviewEntryWatchHandlers {
+  onChange(): void
+  onUnlink(): void
+  onError(error: unknown): void
+  /** The watch stopped, waits for a slot, or the page cannot be read (§ 3.6). */
+  onProblem?(problem: TrackedWatchProblem): void
+}
+
+/** A page watcher; the tracked one also checks on demand and when shown. */
+export type PreviewEntryWatcherHandle = PreviewFileWatcherHandle & {
+  check?(reason: CheckReason): void
+  setVisible?(visible: boolean): void
+}
 
 /** Opens a single-file watcher; the service's `createEntryWatcher`. */
 export type PreviewEntryWatcherFactory = (
   filePath: string,
-  handlers: { onChange(): void; onUnlink(): void; onError(error: unknown): void }
-) => PreviewFileWatcherHandle
+  handlers: PreviewEntryWatchHandlers
+) => PreviewEntryWatcherHandle
 
 /** What the entry watch needs from its view. */
 export interface PreviewEntryWatchDeps {
@@ -40,26 +63,22 @@ export interface PreviewEntryWatchDeps {
   /** The page the view opens on. Watched at once: a throw is the construction's to unwind. */
   readonly initialPath: string
   readonly createEntryWatcher: PreviewEntryWatcherFactory
-  /** The page on screen was saved. */
+  /** The page on screen was saved, or came back after a delete. */
   readonly onChange: () => void
   /** The page on screen was deleted, or renamed away. */
   readonly onDeleted: () => void
-  /**
-   * Is a deleted page on disk again? Defaults to one `stat` that must succeed:
-   * a page that cannot be read yet is not back, since reloading it would fail.
-   */
-  readonly isPresent?: (path: string) => Promise<boolean>
-}
-
-/** The default {@link PreviewEntryWatchDeps.isPresent}: only a successful `stat` counts. */
-async function statSucceeds(path: string): Promise<boolean> {
-  return (await probePath(path)) === 'present'
+  /** Something to tell the reader about the page's watch (the failure badge). */
+  readonly onProblem?: (problem: TrackedWatchProblem) => void
 }
 
 /** The watch on one live view's page. */
 export interface PreviewEntryWatch {
   /** Watch `path` instead of the page watched now; the same path changes nothing. */
   retarget(path: string): void
+  /** The view was shown or hidden: a shown page is checked (S1). */
+  setVisible(visible: boolean): void
+  /** Check the page against the version last seen. */
+  check(reason: CheckReason): void
   /** Close the watcher. Nothing is reported afterwards; a failed close rejects. */
   dispose(): Promise<void>
 }
@@ -77,55 +96,33 @@ function codeOf(error: unknown): string | undefined {
   return typeof error.code === 'string' ? error.code : undefined
 }
 
+/** The badge entry each watch problem shows (§ 3.6 of #478's plan). */
+const PROBLEM_FAILURE: Readonly<Record<TrackedWatchProblem, PreviewFailureType>> = {
+  stopped: 'auto-refresh-stopped',
+  queued: 'watch-limit',
+  unreadable: 'file-unreadable',
+  limited: 'live-refresh-limited'
+}
+
+/** The failure-badge entry for a problem with the page at `pagePath`; it names the file, never its folder. */
+export function entryProblemFailure(problem: TrackedWatchProblem, pagePath: string): PreviewFailureInput {
+  return {
+    type: PROBLEM_FAILURE[problem],
+    resourceUrlOrHost: basename(pagePath),
+    reasonCode: problem === 'unreadable' ? ErrorCode.PATH_NOT_ACCESSIBLE : ErrorCode.UNKNOWN_ERROR
+  }
+}
+
 /** Start watching a live view's first page. */
 export function createPreviewEntryWatch(deps: PreviewEntryWatchDeps): PreviewEntryWatch {
   // The panel id is the page's readable path: log lines carry its digest.
   const loggedPanelId = stablePathDigest(deps.panelId)
-  const isPresent = deps.isPresent ?? statSucceeds
   // Each watcher reports only while it is the latest one opened.
   let serial = 0
   let disposed = false
   let watchedPath = deps.initialPath
-  // The pending ask for a deleted page, if any (#450).
-  let probeTimer: ReturnType<typeof setTimeout> | null = null
 
-  function stopProbe(): void {
-    if (probeTimer !== null) {
-      clearTimeout(probeTimer)
-      probeTimer = null
-    }
-  }
-
-  /**
-   * Ask for the deleted page until it is back, then watch it again and report
-   * a change. Asks one at a time; stops when a newer watcher was opened (a
-   * move) or the watch was disposed, since `isCurrent` then answers false.
-   */
-  function probeForReturn(path: string, isCurrent: () => boolean): void {
-    stopProbe()
-    const tick = async (): Promise<void> => {
-      probeTimer = null
-      const isBack = await isPresent(path)
-      if (!isCurrent()) {
-        return
-      }
-      if (!isBack) {
-        probeTimer = setTimeout(() => void tick(), DELETED_FILE_PROBE_INTERVAL_MS)
-        return
-      }
-      if (replaceWatcher(path, 'Preview entry watcher could not watch the returned page')) {
-        deps.onChange()
-        return
-      }
-      // No watcher could be opened: the page stays failed and is asked for
-      // again, until a move or `dispose` opens a newer watcher or ends it all.
-      const mine = serial
-      probeForReturn(path, () => !disposed && mine === serial)
-    }
-    probeTimer = setTimeout(() => void tick(), DELETED_FILE_PROBE_INTERVAL_MS)
-  }
-
-  function open(path: string): PreviewFileWatcherHandle {
+  function open(path: string): PreviewEntryWatcherHandle {
     serial += 1
     const mine = serial
     const current = (): boolean => !disposed && mine === serial
@@ -134,11 +131,7 @@ export function createPreviewEntryWatch(deps: PreviewEntryWatchDeps): PreviewEnt
         if (current()) deps.onChange()
       },
       onUnlink: () => {
-        if (!current()) {
-          return
-        }
-        deps.onDeleted()
-        probeForReturn(path, current)
+        if (current()) deps.onDeleted()
       },
       onError: (error) => {
         logger.warn('Preview entry watcher error', {
@@ -147,20 +140,22 @@ export function createPreviewEntryWatch(deps: PreviewEntryWatchDeps): PreviewEnt
           error: nameOf(error),
           code: codeOf(error)
         })
+      },
+      onProblem: (problem) => {
+        if (current()) deps.onProblem?.(problem)
       }
     })
   }
 
-  let handle: PreviewFileWatcherHandle | null = open(watchedPath)
+  let handle: PreviewEntryWatcherHandle | null = open(watchedPath)
 
   /**
    * Close the watcher in use and open one on `path`. The old watcher is
    * silenced first, so nothing it still reports can reach the page on screen.
-   * `false` when the new watcher could not be opened; the page still shows,
-   * only its live reload is lost.
+   * When the new watcher cannot be opened the page still shows; only its live
+   * reload is lost until the next move.
    */
-  function replaceWatcher(path: string, failureMessage: string): boolean {
-    stopProbe()
+  function replaceWatcher(path: string): void {
     const previous = handle
     const previousPath = watchedPath
     watchedPath = path
@@ -175,14 +170,12 @@ export function createPreviewEntryWatch(deps: PreviewEntryWatchDeps): PreviewEnt
     })
     try {
       handle = open(path)
-      return true
     } catch (error) {
-      logger.warn(failureMessage, {
+      logger.warn('Preview entry watcher could not follow the page', {
         panelId: loggedPanelId,
         path: redactPath(path),
         error: nameOf(error)
       })
-      return false
     }
   }
 
@@ -191,8 +184,15 @@ export function createPreviewEntryWatch(deps: PreviewEntryWatchDeps): PreviewEnt
       if (disposed || path === watchedPath) {
         return
       }
-      // The page still shows; only its live reload is lost until the next move.
-      replaceWatcher(path, 'Preview entry watcher could not follow the page')
+      replaceWatcher(path)
+    },
+
+    setVisible(visible: boolean): void {
+      if (!disposed) handle?.setVisible?.(visible)
+    },
+
+    check(reason: CheckReason): void {
+      if (!disposed) handle?.check?.(reason)
     },
 
     async dispose(): Promise<void> {
@@ -200,7 +200,6 @@ export function createPreviewEntryWatch(deps: PreviewEntryWatchDeps): PreviewEnt
         return
       }
       disposed = true
-      stopProbe()
       const previous = handle
       handle = null
       await previous?.close()

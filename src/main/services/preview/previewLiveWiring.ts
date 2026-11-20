@@ -50,7 +50,7 @@ import {
   nativeHistoryOf,
   type PreviewPageNavigator
 } from './previewPageNavigator'
-import { createPreviewEntryWatch, type PreviewEntryWatch } from './previewEntryWatch'
+import { createPreviewEntryWatch, entryProblemFailure, type PreviewEntryWatch } from './previewEntryWatch'
 import { buildPreviewUrl, toProjectPath } from './previewUrl'
 import { createPreviewLiveBounds, type PreviewLiveBounds } from './previewLiveBounds'
 import { createPreviewLiveVisibility, type PreviewLiveVisibility } from './previewLiveVisibility'
@@ -316,7 +316,10 @@ export function wirePreviewLiveView(owner: PreviewLiveWiringOwner): PreviewLiveP
       initialPath: page.currentPage(),
       createEntryWatcher: deps.createEntryWatcher,
       onChange: () => recordChange(page.currentPage()),
-      onDeleted: () => owner.onEntryDeleted()
+      onDeleted: () => owner.onEntryDeleted(),
+      // A watch that stopped, waits for a slot, or cannot read the page is a badge entry (#478 § 3.6)
+      onProblem: (problem) =>
+        pageScopes.committed().recordFailure(entryProblemFailure(problem, page.currentPage()))
     })
 
     lifecycle = wirePreviewLifecycle(

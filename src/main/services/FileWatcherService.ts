@@ -1,578 +1,429 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { FSWatcher } from 'chokidar'
-import { WebContents } from 'electron'
-import { stat } from 'fs/promises'
+/**
+ * FileWatcherService - the one watch layer for every consumer of "follow the
+ * file on disk" (#478, plan decisions 3, 8): editor and image tabs (windows),
+ * and in-process owners such as the HTML preview.
+ *
+ * Subscriptions (`watcher/watchSubscriptions`) are keyed by owner + `watchId`;
+ * each attaches to one native watch entry keyed by `pathKey(realPath)`, shared
+ * by every subscription on that file. The entries, the native-watcher events
+ * and the helpers are `watcher/FileWatchCore`; every watcher is (re-)created by
+ * `watcher/armWatch`, which re-checks confinement. Caps and the waitlist are
+ * `watcher/watchBuckets`; a project switch is `watcher/watchSuspension`; the
+ * health round rides `UnseenWatchProbe`'s queue. The service reads the open
+ * project from the injected read-only `ProjectSession` (decision 13).
+ *
+ * Every subscriber names its subscription by a `watchId`; the path-counted
+ * API this replaced is gone (plan step S16).
+ */
+import { resolve } from 'path'
 import { logger } from './LoggingService'
-import { classifyConfinement, isLexicallyInside } from '../utils/projectConfinement'
-import { createAtomicSaveDetector } from './watcher/AtomicSaveDetector'
-import { SubscriberCounter } from './watcher/SubscriberCounter'
-import { createSingleFileWatcher } from './watcher/singleFileWatch'
-import { sendToSubscribers } from './watcher/watchNotifier'
-import { AtomicRearmDeps, RearmableWatch, resolveDeletedWatch } from './watcher/atomicRearm'
-import { watchedUnderRemovedFolders } from './watcher/ancestorRemoval'
-import { UnseenWatchProbe, type RemovalCoverage } from './watcher/unseenWatchProbe'
+import { redactedLogError } from '../utils/redactUserInput'
+import { isInsideRoot } from '../utils/pathCompare'
+import type { ProjectSessionSnapshot } from './session/ProjectSession'
+import { FRESHNESS_LIMITS, type WatchBucketName } from '../../shared/freshness/timingProfiles'
+import type { FileStamp, SubscribeRefusalCode, SubscribeReply, WatchEndReason } from '../../shared/freshness/freshnessTypes'
+import { resolveDeletedWatch } from './watcher/atomicRearm'
+import { checkTarget, closeQuietly, inspectTarget, type RecheckAnswer } from './watcher/armWatch'
+import { closeAndForget, forgetEntry } from './watcher/watchEntryOps'
+import { WatchSubscriptions, subscriptionKey } from './watcher/watchSubscriptions'
+import type { WatchBuckets } from './watcher/watchBuckets'
+import type { SuspensionHost } from './watcher/watchSuspension'
+import { readStartStamp } from './watcher/startStamp'
+import { FileWatchCore } from './watcher/FileWatchCore'
+import {
+  ownerKeyOf,
+  type ArmOutcome,
+  type SubscribeInput,
+  type WatchEntry,
+  type WatchOwner,
+  type WatchSubscription
+} from './watcher/watchTypes'
 
-interface WatchedFile {
-  filePath: string
-  watcher: FSWatcher
-  /**
-   * Subscription count per webContents. A count (not a `Set` of ids) so two
-   * consumers inside one window cannot cancel each other's watch (issue #70).
-   */
-  subscribers: SubscriberCounter
-  isPaused: boolean
-  debounceTimer: NodeJS.Timeout | null
-  version: number
+export type { FileWatcherServiceDeps } from './watcher/FileWatchCore'
+
+const refused = (code: SubscribeRefusalCode): SubscribeReply => ({ status: 'refused', code })
+
+/** How a refused arm ends a watch. */
+const ARM_REFUSAL: Record<Exclude<ArmOutcome, 'armed'>, SubscribeRefusalCode> = {
+  missing: 'NOT_FOUND',
+  'outside-project': 'OUTSIDE_PROJECT',
+  unsupported: 'UNSUPPORTED',
+  failed: 'WATCH_FAILED',
+  stale: 'WATCH_FAILED'
 }
 
-export class FileWatcherService {
-  private watchedFiles: Map<string, WatchedFile> = new Map()
-  private readonly DEBOUNCE_DELAY = 300 // ms
-  private readonly MAX_WATCHED_FILES = 100
-  private projectPath: string | null = null
-  private isDisposing: boolean = false // Flag to prevent operations during cleanup
-  // Session token to guard against late/stale events
-  private switchVersion = 0
-  /**
-   * One detector for the whole service, not one per watched file.
-   *
-   * `AtomicSaveDetector` already keys its pending deletes by path, and this
-   * service is 1 watcher : 1 path, so a per-file detector would be a Map with a
-   * single entry duplicated across every watch - with disposal duties in four
-   * methods. One instance keeps disposal in one place (issue #70, M2).
-   */
-  private readonly atomicSaveDetector = createAtomicSaveDetector()
+export class FileWatcherService extends FileWatchCore {
+  private readonly readyTimeoutMs = FRESHNESS_LIMITS.readyTimeoutMs
 
-  /** Re-checks the files the project watcher cannot see (#252); see {@link watchUnseenFiles}. */
-  private readonly unseenProbe = new UnseenWatchProbe({
-    probeablePaths: () => this.probeablePaths(),
-    onMissing: filePath => this.handleFileDeleted(filePath)
-  })
+  // ---- subscribe ------------------------------------------------------------------
 
   /**
-   * The seam the atomic re-arm branch talks to this service through.
-   *
-   * Built once as a field of bound closures so `watcher/atomicRearm.ts` never
-   * needs access to the private map, the session token or the disposal flag.
+   * Start following a file for one owner. Answers after the native watcher is
+   * ready, with a stamp read after that (`limited` when ready did not come
+   * within 2 s, decision 14); `queued` when the bucket is full (decision 20).
+   * The session and page generations are recorded at entry and checked again
+   * before the answer: a subscribe that raced a project switch or a page
+   * reload is refused and leaves no watch (decision 15, N1).
    */
-  private readonly rearmDeps: AtomicRearmDeps = {
-    isDisposing: () => this.isDisposing,
-    currentVersion: () => this.switchVersion,
-    getWatch: filePath => this.watchedFiles.get(filePath),
-    isPathConfined: filePath => this.isPathConfined(filePath),
-    createWatcher: filePath => this.createWatcher(filePath),
-    replaceWatcher: (filePath, watcher) => this.replaceWatcher(filePath, watcher),
-    discardWatch: (filePath, watched) => this.discardWatch(filePath, watched),
-    notifyDeleted: filePath => this.notifyWebContents(filePath, 'file-watch:deleted', { filePath }),
-    notifyWatchDead: (filePath, reason) => this.notifyWatchDead(filePath, reason),
-    emitChange: filePath => this.handleFileChange(filePath),
-    log: message => this.safeLog(message)
-  }
+  async subscribe(input: SubscribeInput): Promise<SubscribeReply> {
+    if (this.isDisposing) return refused('WATCH_FAILED')
+    const generation = this.generation()
+    const pageGeneration = this.pageGenerationOf(input.owner)
+    // A delete under the file has let go of its watches (#486): resolve and stamp after it
+    await this.releases.waitFor(this.realSpellingOf(input.filePath))
+    const target = await this.resolveTarget(input.filePath)
+    if (typeof target !== 'string') return refused(target.code)
+    const sub = WatchSubscriptions.create({
+      owner: input.owner,
+      watchId: input.watchId,
+      profile: input.profile,
+      requestedPath: input.filePath,
+      realPath: target,
+      generation,
+      pageGeneration
+    })
+    if (this.subscriptions.get(sub.key)) return refused('DUPLICATE_ID')
+    const stale = this.staleCode(sub)
+    if (stale) return refused(stale)
+    this.subscriptions.add(sub)
 
-  setProjectPath(path: string): void {
-    this.projectPath = path
-    // Bump session on project changes to drop stale events
-    this.switchVersion++
-  }
-  /**
-   * Stop all file watchers (for project switching)
-   */
-  async stopAll(): Promise<void> {
-    this.safeLog('👁️  Stopping all file watchers...')
-    // First, before the closes below can be overtaken: a check still waiting on
-    // the old project's disk stops at its next file and reports nothing (#252)
-    this.unseenProbe.reset()
-    for (const [filePath, watched] of this.watchedFiles.entries()) {
-      this.atomicSaveDetector.cancelPending(filePath)
-      if (watched.debounceTimer) {
-        clearTimeout(watched.debounceTimer)
+    const entryKey = this.keyOf(sub.realPath)
+    if (!this.buckets.hasSlot(sub, this.entries.has(entryKey) ? entryKey : null, this.subscriptions.all())) {
+      if (this.buckets.enqueue(sub)) {
+        sub.state = 'waiting'
+        return { status: 'queued' }
       }
-      try {
-        await watched.watcher.close()
-      } catch {
-        // ignore
-      }
+      this.subscriptions.remove(sub)
+      return refused('WATCH_FAILED')
     }
-    this.watchedFiles.clear()
-    // Increment session to ignore late events from the previous watchers
-    this.switchVersion++
+    const attached = await this.attach(sub, entryKey)
+    if (attached) {
+      await this.drop(sub)
+      return refused(attached)
+    }
+    return this.answer(sub)
   }
 
   /**
-   * Safe logging that handles EPIPE errors during app shutdown
+   * Check `realPath` again as an arm does – its real path inside the open
+   * project, a regular file – before a main-side probe or read opens it (SEC2).
+   * A path `realpath` cannot resolve answers `unresolved`, not `outside-project`:
+   * the caller must not end a watch over a delete-pending file (R2-1).
    */
-  private safeLog(message: string): void {
-    if (this.isDisposing) return // Don't log during disposal
-    try {
-      logger.info(message)
-    } catch (error) {
-      // Suppress EPIPE errors during shutdown
-      if (error instanceof Error && !error.message.includes('EPIPE')) {
-        // Only re-throw non-EPIPE errors
-        throw error
-      }
-    }
+  recheckTarget(realPath: string): Promise<RecheckAnswer> {
+    return inspectTarget(realPath, this.snapshot(), this.deps.fs)
+  }
+
+  /** The real path of a file a subscribe may follow, or why not. */
+  private async resolveTarget(filePath: string): Promise<string | { code: SubscribeRefusalCode }> {
+    const session = this.snapshot()
+    // Lexically first, before any file-system call: an outside path is refused
+    // without saying whether it exists
+    if (session && !isLexicallyInSession(filePath, session)) return { code: 'OUTSIDE_PROJECT' }
+    // Then inside after the real path is resolved, by the session's case rule:
+    // two spellings of one file are one file (G6, decision 10)
+    const checked = await checkTarget(filePath, session, this.deps.fs)
+    return typeof checked === 'string' ? { code: ARM_REFUSAL[checked] } : checked.real
   }
 
   /**
-   * Start watching a file for changes
+   * Attach `sub` to the entry under `entryKey`, creating and arming it when
+   * there is none. While the project switch is suspending, a new entry is
+   * inserted suspended (decision 18), and so while a delete under it holds its
+   * watches (#486). Resolves a refusal code, or null.
    */
-  async watchFile(filePath: string, webContents: WebContents): Promise<void> {
-    // Security: inside the project, lexically on resolved paths (a terminal link sends C:/proj/a.md, #464); the re-arm re-checks with realpath
-    if (this.projectPath && !isLexicallyInside(filePath, this.projectPath)) {
-      throw new Error('Cannot watch files outside the project directory')
-    }
-
-    // Verify file exists
-    try {
-      await stat(filePath)
-    } catch {
-      throw new Error(`File does not exist: ${filePath}`)
-    }
-
-    const webContentsId = webContents.id
-
-    // If already watching, just add this webContents.
-    //
-    // Joining an existing watch is decided BEFORE the MAX_WATCHED_FILES cap and
-    // can never fail on it. Refusing a second consumer once the map is full
-    // would leave it unwatched while its later `unwatchFile` still decremented
-    // the count - closing the watcher for the first consumer, which is exactly
-    // the D3 defect subscriber counting exists to remove (issue #70).
-    const existing = this.watchedFiles.get(filePath)
+  private async attach(sub: WatchSubscription, entryKey: string): Promise<SubscribeRefusalCode | null> {
+    const existing = this.entries.get(entryKey)
     if (existing) {
-      existing.subscribers.add(webContentsId)
-      this.safeLog(`👁️  Added webContents ${webContentsId} to watch: ${filePath}`)
-      // The file was unlinked moments ago and the replacement has already
-      // landed (we just stat-ed it). The existing watcher is still bound to the
-      // dead inode, so joining it would deafen this subscriber: resolve the
-      // pending check now and re-arm instead (issue #70, L-2).
-      if (this.atomicSaveDetector.hasPending(filePath)) {
-        this.atomicSaveDetector.cancelPending(filePath)
-        // The stat above already proved the replacement is on disk, which is
-        // exactly the detector's atomic-save verdict.
-        await resolveDeletedWatch(filePath, true, this.rearmDeps)
-        // The re-arm can also decide the watch is dead (file gone again, path
-        // no longer inside the project, session moved on) and drop the entry
-        // while this call awaits it. Reporting success then would leave the
-        // renderer believing it watches a path that has no watcher (#70, LOW-3).
-        if (!this.watchedFiles.has(filePath)) {
-          throw new Error(`File watch ended while joining: ${filePath}`)
-        }
-      }
-      return
+      existing.subs.add(sub.key)
+      sub.entryKey = entryKey
+      return this.joined(existing)
     }
-
-    // The cap governs NEW entries only - see the join branch above.
-    if (this.watchedFiles.size >= this.MAX_WATCHED_FILES) {
-      throw new Error(`Maximum watched files limit reached (${this.MAX_WATCHED_FILES})`)
+    const entry: WatchEntry = {
+      key: entryKey,
+      filePath: sub.realPath,
+      profile: sub.profile,
+      watcher: null,
+      suspended: this.suspension.isSuspending,
+      identity: null,
+      arming: null,
+      ready: null,
+      subs: new Set([sub.key])
     }
-
-    this.safeLog(`👁️  Starting watch for: ${filePath}`)
-
-    const watcher = this.createWatcher(filePath)
-
-    const watched: WatchedFile = {
-      filePath,
-      watcher,
-      subscribers: SubscriberCounter.from([webContentsId]),
-      isPaused: false,
-      debounceTimer: null,
-      version: this.switchVersion
-    }
-
-    this.watchedFiles.set(filePath, watched)
-    this.unseenProbe.pathChanged(filePath)
+    this.entries.set(entryKey, entry)
+    sub.entryKey = entryKey
+    if (this.releases.adopt(entry)) entry.suspended = true
+    this.unseenProbe.pathChanged(entry.filePath)
+    if (entry.suspended) return null
+    const outcome = await this.arm(entry)
+    if (outcome === 'armed' || (outcome === 'stale' && entry.suspended && this.isHeld(entry))) return null
+    forgetEntry(this, entry)
+    return ARM_REFUSAL[outcome]
   }
 
-  /**
-   * Create a chokidar watcher for one path with this service's handlers.
-   *
-   * Shared by the initial watch and by the atomic re-arm so the production
-   * option object and the three handler registrations exist exactly once
-   * (issue #70, M3).
-   */
-  private createWatcher(filePath: string): FSWatcher {
-    return createSingleFileWatcher(filePath, {
-      onChange: () => this.handleFileChange(filePath),
-      onUnlink: () => this.handleFileDeleted(filePath),
-      onError: (error: unknown) => this.handleWatcherError(filePath, error)
+  /** A join: wait for an arm in flight, and resolve an unlink still pending (issue #70, L-2). */
+  private async joined(entry: WatchEntry): Promise<SubscribeRefusalCode | null> {
+    if (entry.arming) {
+      const outcome = await entry.arming
+      if (outcome !== 'armed' && !entry.suspended) return ARM_REFUSAL[outcome]
+    }
+    if (this.atomicSaveDetector.hasPending(entry.filePath)) {
+      // The file was unlinked moments ago and the subscribe just found it on
+      // disk, which is the detector's atomic-save verdict: re-arm now rather
+      // than join a watcher bound to the dead inode
+      this.atomicSaveDetector.cancelPending(entry.filePath)
+      await resolveDeletedWatch(entry.key, true, this.rearmDeps)
+    }
+    return this.isHeld(entry) ? null : 'WATCH_FAILED'
+  }
+
+  /** Wait for ready and the stamp, check staleness again, and answer. */
+  private async answer(sub: WatchSubscription): Promise<SubscribeReply> {
+    let ready = true
+    const entry = sub.entryKey ? this.entries.get(sub.entryKey) : undefined
+    if (entry && !entry.suspended) ready = await this.waitReady(entry)
+    const stamp: FileStamp | null = await (this.deps.stampFile ?? readStartStamp)(sub.realPath)
+    const stale = this.staleCode(sub)
+    if (!this.subscriptions.holds(sub)) return refused(stale ?? 'NOT_FOUND')
+    if (stale || stamp === null) {
+      await this.drop(sub)
+      return refused(stale ?? 'NOT_FOUND')
+    }
+    sub.state = 'active'
+    return { status: 'started', stamp, liveRefresh: ready ? 'full' : 'limited' }
+  }
+
+  private waitReady(entry: WatchEntry): Promise<boolean> {
+    const ready = entry.ready
+    if (!ready) return Promise.resolve(false)
+    return new Promise(resolve => {
+      const timer = setTimeout(() => resolve(false), this.readyTimeoutMs)
+      void ready.then(isReady => {
+        clearTimeout(timer)
+        resolve(isReady)
+      })
     })
   }
 
-  /**
-   * Point a watched path's record at a replacement watcher. The only supported
-   * way for the re-arm branch to swap one in, so every mutation of
-   * `watchedFiles` stays inside this service (issue #70, arch M3).
-   *
-   * @returns false when the entry has since been dropped, so the caller knows
-   *          its new watcher is orphaned and must be closed
-   */
-  private replaceWatcher(filePath: string, watcher: FSWatcher): boolean {
-    const watched = this.watchedFiles.get(filePath)
-    if (!watched) return false
-    watched.watcher = watcher
-    return true
+  /** `PAGE_CHANGED` / `PROJECT_CHANGED` when the subscribe is from a page or project gone by. */
+  private staleCode(sub: WatchSubscription): SubscribeRefusalCode | null {
+    if (sub.pageGeneration !== null && this.pageGenerationOf(sub.owner) !== sub.pageGeneration) return 'PAGE_CHANGED'
+    if (sub.generation !== this.generation()) return 'PROJECT_CHANGED'
+    return null
+  }
+
+  // ---- unsubscribe, pause, owners -----------------------------------------------------
+
+  /** Stop one subscription; a foreign or unknown id is a no-op (decision 5). */
+  async unsubscribe(owner: WatchOwner, watchId: string): Promise<void> {
+    const sub = this.subscriptions.get(subscriptionKey(ownerKeyOf(owner), watchId))
+    if (sub) await this.drop(sub)
+  }
+
+  /** Pause one subscription for an own save (decision 16); others on the file keep hearing. */
+  pauseSubscription(owner: WatchOwner, watchId: string): void {
+    const sub = this.subscriptions.get(subscriptionKey(ownerKeyOf(owner), watchId))
+    if (sub) this.subscriptions.pause(sub)
+  }
+
+  /** End the pause; `missed` asks the saver to check. An unknown id says `missed` too, to be safe. */
+  resumeSubscription(owner: WatchOwner, watchId: string): { success: boolean; missed: boolean } {
+    const sub = this.subscriptions.get(subscriptionKey(ownerKeyOf(owner), watchId))
+    if (!sub) return { success: false, missed: true }
+    return { success: true, missed: this.subscriptions.resume(sub) }
+  }
+
+  /** Drop every subscription and waitlist entry of one owner (`w:<id>` or `p:<id>`). */
+  async dropOwner(ownerKey: string): Promise<void> {
+    await Promise.all(this.subscriptions.forOwner(ownerKey).map(sub => this.drop(sub)))
   }
 
   /**
-   * Is this path still inside the open project, symlinks resolved?
-   *
-   * `watchFile`'s entry check is lexical, which a symlink defeats. The re-arm
-   * runs long after that check, on a path an outside writer just replaced, so
-   * it re-validates with `fs.realpath` before binding a new watcher (#70). A
-   * missing path stays "confined" - the re-arm's own existence check reports
-   * the delete, which is the accurate outcome - and with no project path there
-   * is no boundary to enforce, matching the entry check.
+   * A window's page navigated or reloaded (decision 17): later answers to its
+   * old page's subscribes are refused, and everything it held is dropped.
    */
-  private async isPathConfined(filePath: string): Promise<boolean> {
-    if (!this.projectPath) return true
-    const verdict = await classifyConfinement(filePath, this.projectPath)
-    return verdict === 'inside' || verdict === 'missing'
+  async pageNavigated(webContentsId: number): Promise<void> {
+    this.pageGenerations.set(webContentsId, (this.pageGenerations.get(webContentsId) ?? 0) + 1)
+    await this.dropOwner(ownerKeyOf({ kind: 'window', webContentsId }))
   }
 
-  /**
-   * Report a chokidar-level watcher error to the subscribing renderers
-   */
-  private handleWatcherError(filePath: string, error: unknown): void {
-    if (this.isDisposing) return // Ignore errors during disposal
-    const errorMessage = error instanceof Error ? error.message : String(error)
-
-    try {
-      logger.error(`File watcher error for ${filePath}`, error instanceof Error ? error : undefined)
-    } catch {
-      // Suppress EPIPE errors
-    }
-
-    this.notifyWebContents(filePath, 'file-watch:error', {
-      filePath,
-      error: errorMessage
-    })
-  }
-
-  /**
-   * Stop watching a file for a specific webContents
-   */
-  async unwatchFile(filePath: string, webContents: WebContents): Promise<void> {
-    const watched = this.watchedFiles.get(filePath)
-    if (!watched) {
-      return
-    }
-
-    const webContentsId = webContents.id
-    const remaining = watched.subscribers.release(webContentsId)
-
-    this.safeLog(`👁️  Removed webContents ${webContentsId} from watch: ${filePath}`)
-
-    // If no more subscribers watching this file, stop watching entirely
-    if (remaining === 0) {
-      this.safeLog(`👁️  Stopping watch for: ${filePath}`)
-      await this.closeAndForget(filePath, watched)
-    }
-  }
-
-  /**
-   * Stop watching all files for a specific webContents (cleanup on window close)
-   */
-  async unwatchAll(webContents: WebContents): Promise<void> {
-    await this.dropSubscriber(webContents.id)
-    this.safeLog(`👁️  Cleaned up watches for webContents ${webContents.id}`)
-  }
-
-  /**
-   * Cleanup file watchers owned by a specific webContents.
-   * Called when webContents is destroyed (window close or dev refresh).
-   *
-   * @param webContentsId - The ID of the destroyed webContents
-   * @remarks
-   * - Increments session version to invalidate pending events (race guard)
-   * - Fire-and-forget safe - errors are logged but don't propagate
-   * @see Issue #59 - App enters broken state after window close
-   */
+  /** A window was destroyed: as a navigation, so nothing it started can land (issue #59). */
   async cleanupForWebContentsId(webContentsId: number): Promise<void> {
-    // Bump session version FIRST to invalidate pending events (issue #59); a watch another window still holds moves to the new session, or all its later changes were dropped (#464)
-    const before = this.switchVersion++
-    for (const w of this.watchedFiles.values()) if (w.version === before) w.version = this.switchVersion
-    await this.dropSubscriber(webContentsId)
+    await this.pageNavigated(webContentsId)
     this.safeLog(`👁️  Cleaned up file watches for webContentsId ${webContentsId}`)
   }
 
-  /**
-   * Drop every subscription one webContents holds and close the watches that
-   * are left with no subscriber at all.
-   *
-   * The window is going away, so its subscriptions die together: the count is
-   * removed outright rather than decremented, which would leave a phantom
-   * subscriber holding the watch open forever.
-   */
-  private async dropSubscriber(webContentsId: number): Promise<void> {
-    const emptied: string[] = []
+  /** Remove a subscription from wherever it is; close its entry when it was the last. */
+  private async drop(sub: WatchSubscription): Promise<void> {
+    this.subscriptions.remove(sub)
+    this.buckets.remove(sub)
+    const entry = sub.entryKey ? this.entries.get(sub.entryKey) : undefined
+    sub.entryKey = null
+    if (entry?.subs.delete(sub.key) && entry.subs.size === 0) await closeAndForget(this, entry)
+    this.promote()
+  }
 
-    for (const [filePath, watched] of this.watchedFiles.entries()) {
-      if (!watched.subscribers.has(webContentsId)) continue
-      watched.subscribers.removeAll(webContentsId)
-      if (watched.subscribers.size === 0) {
-        emptied.push(filePath)
+  /** End one subscription with `reason` (it is told), then drop it. */
+  private endSubscription(sub: WatchSubscription, reason: WatchEndReason): void {
+    this.deliver([sub], { kind: 'ended', reason })
+    void this.drop(sub)
+  }
+
+  /** Arm queued subscriptions while their buckets have slots, first in line first (G9). */
+  protected promote(): void {
+    if (this.isDisposing) return
+    for (const bucket of this.buckets.bucketsWithQueue()) {
+      for (const key of this.buckets.queued(bucket)) {
+        const sub = this.subscriptions.get(key)
+        if (!sub) continue
+        const entryKey = this.keyOf(sub.realPath)
+        const joins = this.entries.has(entryKey) ? entryKey : null
+        // A per-owner cap can block the first in line and not the next: keep looking
+        if (!this.buckets.hasSlot(sub, joins, this.subscriptions.all())) continue
+        this.buckets.remove(sub)
+        sub.state = 'pending'
+        void this.activate(sub, entryKey)
       }
     }
+  }
 
-    for (const filePath of emptied) {
-      const watched = this.watchedFiles.get(filePath)
-      if (watched) {
-        await this.closeAndForget(filePath, watched)
+  /** A queued subscription got its slot: arm it and say `started` (or why not). */
+  private async activate(sub: WatchSubscription, entryKey: string): Promise<void> {
+    await this.releases.waitFor(sub.realPath)
+    if (!this.subscriptions.holds(sub)) return
+    const attached = await this.attach(sub, entryKey)
+    const reply = attached ? refused(attached) : await this.answer(sub)
+    if (reply.status === 'started') {
+      this.deliver([sub], { kind: 'started', stamp: reply.stamp, liveRefresh: reply.liveRefresh })
+      return
+    }
+    if (reply.status !== 'refused' || reply.code === 'PAGE_CHANGED' || reply.code === 'PROJECT_CHANGED') return
+    this.deliver([sub], reply.code === 'NOT_FOUND' ? { kind: 'deleted' } : { kind: 'ended', reason: endReasonFor(reply.code) })
+    await this.drop(sub)
+  }
+
+  // ---- project switch, wake (decisions 18, 22) ----------------------------------------
+
+  /** Just before a project commit: flag up, every native watcher closed, records kept. */
+  async suspendAll(): Promise<void> {
+    this.unseenProbe.reset()
+    await this.suspension.suspendAll(this.suspensionHost, this.generation())
+  }
+
+  /** A step after the suspend failed: re-arm everything suspended (G1). */
+  async resumeSuspended(): Promise<void> {
+    await this.suspension.resumeSuspended(this.suspensionHost)
+  }
+
+  /** The commit happened: end everything recorded before `newGeneration` (N1). */
+  async endSuspended(newGeneration: number, reason: WatchEndReason = 'project-switch'): Promise<void> {
+    await this.suspension.endSuspended(this.suspensionHost, newGeneration, reason)
+  }
+
+  /** End every subscription and close every watch at once (no project left to follow). */
+  async stopAll(): Promise<void> {
+    this.unseenProbe.reset()
+    for (const sub of this.subscriptions.all()) this.endSubscription(sub, 'project-closed')
+    await Promise.all([...this.entries.values()].map(entry => closeAndForget(this, entry)))
+  }
+
+  private readonly suspensionHost: SuspensionHost = {
+    entries: () => [...this.entries.values()],
+    subscriptions: () => this.subscriptions.all(),
+    suspendEntry: entry => this.closeHeld(entry),
+    resumeEntry: async entry => {
+      // A delete still holds it: its release re-arms it when it ends (#486)
+      if (this.releases.isHolding(entry)) return
+      entry.suspended = false
+      await this.rearmAndTell(entry, 'restarted', 'restart-failed')
+    },
+    endSubscription: (sub, reason) => this.endSubscription(sub, reason)
+  }
+
+  /** After a wake: re-arm every watch; a watch that died silently in sleep follows again (G8, F26). */
+  async rearmAll(): Promise<void> {
+    const live = [...this.entries.values()].filter(entry => !entry.suspended)
+    await Promise.all(live.map(entry => this.rearmAndTell(entry, 'restarted', 'restart-failed')))
+  }
+
+  /** One health round now, in the probe's queue. */
+  runHealthRound(): Promise<void> {
+    return this.unseenProbe.runExtraNow()
+  }
+
+  /** Ask every in-process owner to check its files (after a wake). */
+  checkInProcessOwners(): void {
+    const owners = new Map<string, () => void>()
+    for (const { owner, ownerKey } of this.subscriptions.all()) {
+      if (owner.kind === 'process' && owner.onCheck) owners.set(ownerKey, owner.onCheck)
+    }
+    for (const check of owners.values()) {
+      try {
+        check()
+      } catch (error) {
+        logger.error('File watch owner check failed', redactedLogError(error))
       }
     }
   }
 
-  /**
-   * Cancel every pending operation for a watch, close it and drop the entry
-   */
-  private async closeAndForget(filePath: string, watched: WatchedFile): Promise<void> {
-    this.cancelPendingWork(filePath, watched)
-    await watched.watcher.close()
-    this.watchedFiles.delete(filePath)
-    this.unseenProbe.pathChanged(filePath)
+  /** Change a bucket's cap (the e2e watch-limit hook); returns the previous one. */
+  setBucketCap(bucket: WatchBucketName, totalCap: number): number {
+    const previous = this.buckets.setTotalCap(bucket, totalCap)
+    this.promote()
+    return previous
   }
 
-  /**
-   * Drop the atomic-save check and the debounce timer for a watch
-   */
-  private cancelPendingWork(filePath: string, watched: RearmableWatch): void {
-    this.atomicSaveDetector.cancelPending(filePath)
-    clearDebounce(watched)
-  }
-
-  /**
-   * Pause watching a file (during save operations to prevent race conditions)
-   */
-  pauseWatch(filePath: string): void {
-    const watched = this.watchedFiles.get(filePath)
-    if (watched) {
-      watched.isPaused = true
-      this.safeLog(`⏸️  Paused watch for: ${filePath}`)
-    }
-  }
-
-  /**
-   * Resume watching a file after save completes
-   */
-  resumeWatch(filePath: string): void {
-    const watched = this.watchedFiles.get(filePath)
-    if (watched) {
-      watched.isPaused = false
-      this.safeLog(`▶️  Resumed watch for: ${filePath}`)
-    }
-  }
-
-  /**
-   * Handle file change events with debouncing
-   */
-  private handleFileChange(filePath: string): void {
-    if (this.isDisposing) return // Ignore events during disposal
-    const watched = this.watchedFiles.get(filePath)
-    if (!watched) return
-    // Drop events generated for a previous session
-    if (watched.version !== this.switchVersion) {
-      return
-    }
-
-    // Ignore if paused (during our own save)
-    if (watched.isPaused) {
-      this.safeLog(`⏸️  Ignoring change (paused): ${filePath}`)
-      return
-    }
-
-    // Clear existing debounce timer
-    if (watched.debounceTimer) {
-      clearTimeout(watched.debounceTimer)
-    }
-
-    // Debounce: wait for file changes to settle
-    watched.debounceTimer = setTimeout(() => {
-      if (this.isDisposing) return // Check again after timeout
-      this.safeLog(`📝 File changed externally: ${filePath}`)
-      this.notifyWebContents(filePath, 'file-watch:changed', { filePath })
-      watched.debounceTimer = null
-    }, this.DEBOUNCE_DELAY)
-  }
-
-  /**
-   * Handle file deletion.
-   *
-   * An unlink is ambiguous: it is either a genuine delete or the first half of
-   * an atomic save (write temp, rename over the target), which is how most
-   * agents and design tools write. The entry is deliberately kept alive for the
-   * detector's 100 ms window so the second half can turn it into a change
-   * instead of destroying the watch (issue #70, defect D2).
-   */
-  private handleFileDeleted(filePath: string): void {
-    if (this.isDisposing) return // Ignore events during disposal
-    const watched = this.watchedFiles.get(filePath)
-    if (!watched) return
-    // Ignore late delete notices from previous sessions
-    if (watched.version !== this.switchVersion) {
-      return
-    }
-
-    this.atomicSaveDetector.registerDelete(filePath, (path, wasAtomicSave) => {
-      void resolveDeletedWatch(path, wasAtomicSave, this.rearmDeps)
-    })
-  }
-
-  /**
-   * The project watcher removed these paths: a watched file under a removed
-   * folder vanished unheard (see `watcher/ancestorRemoval`), so it takes the
-   * normal unlink branch, whose existence re-check guards a false banner.
-   */
-  handleAncestorRemovals(removedPaths: readonly string[]): void {
-    if (this.isDisposing) return
-    const affected = watchedUnderRemovedFolders(this.watchedFiles.keys(), removedPaths)
-    for (const filePath of affected) this.handleFileDeleted(filePath)
-  }
-
-  /**
-   * Re-check, on a slow timer, the watched files whose folders the project
-   * watcher cannot report on: excluded, hidden or ignored ones
-   * (`watcher/unseenWatchProbe`, #252). `coverage` says which those are.
-   */
-  watchUnseenFiles(coverage: RemovalCoverage): void {
-    this.unseenProbe.setCoverage(coverage)
-  }
-
-  /**
-   * A paused project watch lost removals under `root` without their paths:
-   * check the watched files there on disk, in the probe's one-`stat`-at-a-time
-   * queue, and take each missing one down the unlink branch – except the ones
-   * the pausing operation removed itself (#252).
-   */
-  async checkWatchedFilesUnder(
-    root: string,
-    isOwnRemoval: (filePath: string) => boolean = () => false
-  ): Promise<void> {
-    if (this.isDisposing) return
-    const under = this.probeablePaths().filter(filePath => isLexicallyInside(filePath, root))
-    await this.unseenProbe.checkNow(under, isOwnRemoval)
-  }
-
-  /**
-   * The watched paths the probe may `stat`: this session's, lexically inside
-   * the project. Nothing without a project, so no probe reaches outside it.
-   */
-  private probeablePaths(): string[] {
-    const root = this.projectPath
-    if (!root) return []
-    const paths: string[] = []
-    for (const watched of this.watchedFiles.values()) {
-      if (watched.version === this.switchVersion && isLexicallyInside(watched.filePath, root)) {
-        paths.push(watched.filePath)
-      }
-    }
-    return paths
-  }
-
-  /**
-   * Fire-and-forget teardown, used from the async unlink branch where there is
-   * nobody left to await the close
-   */
-  private discardWatch(filePath: string, watched: RearmableWatch): void {
-    void watched.watcher.close().catch(() => {})
-    // A newer watch may own the path by now (it was reopened while this one's
-    // check awaited the disk): its entry and its pending check stay, and only
-    // this entry's own timer goes (#252 review)
-    if (this.watchedFiles.get(filePath) !== watched) {
-      clearDebounce(watched)
-      return
-    }
-    this.cancelPendingWork(filePath, watched)
-    this.watchedFiles.delete(filePath)
-    this.unseenProbe.pathChanged(filePath)
-  }
-
-  /**
-   * Notify all webContents watching this file
-   */
-  private notifyWebContents(
-    filePath: string,
-    channel: string,
-    data: Record<string, unknown>
-  ): void {
-    if (this.isDisposing) return // Don't notify during disposal
-    const watched = this.watchedFiles.get(filePath)
-    if (!watched) return
-    // Ensure only current-session watchers can publish notifications
-    if (watched.version !== this.switchVersion) {
-      return
-    }
-
-    this.send(watched, channel, data)
-  }
-
-  /**
-   * Tell subscribers their watch is dead, bypassing the session-version guard.
-   *
-   * {@link notifyWebContents} drops anything whose version no longer matches -
-   * which is precisely the case this message has to survive, since "your watch
-   * ended with the session" is only ever sent on a version mismatch. The
-   * disposal and destroyed-window guards still apply (issue #70, H-4b).
-   */
-  private notifyWatchDead(filePath: string, reason: string): void {
-    if (this.isDisposing) return
-    const watched = this.watchedFiles.get(filePath)
-    if (!watched) return
-
-    // `ended`: the entry and every count go with it, so a renderer slot must
-    // forget its hold rather than send a `stop` for it later (#252)
-    this.send(watched, 'file-watch:error', { filePath, error: reason, ended: true })
-  }
-
-  /** Hand one event to the subscribing windows (see `watcher/watchNotifier`) */
-  private send(watched: WatchedFile, channel: string, data: Record<string, unknown>): void {
-    sendToSubscribers(watched.subscribers, channel, data, message => this.safeLog(message))
-  }
-
-  /**
-   * Get statistics about watched files (for debugging)
-   */
-  getStats(): { totalWatched: number; fileDetails: Array<{ path: string; watchers: number }> } {
+  /** Statistics about watched files (diagnostics, `file-watch:stats`). */
+  getStats(): {
+    totalWatched: number
+    fileDetails: Array<{ path: string; watchers: number }>
+    subscriptions: number
+    paused: number
+    waiting: number
+    buckets: ReturnType<WatchBuckets['stats']>
+  } {
+    const subs = this.subscriptions.all()
     return {
-      totalWatched: this.watchedFiles.size,
-      fileDetails: Array.from(this.watchedFiles.entries()).map(([path, watched]) => ({
-        path,
-        watchers: watched.subscribers.size
-      }))
+      totalWatched: this.entries.size,
+      fileDetails: [...this.entries.values()].map(entry => ({
+        path: entry.filePath,
+        watchers: new Set(this.subsOf(entry).map(sub => sub.ownerKey)).size
+      })),
+      subscriptions: subs.filter(sub => sub.entryKey !== null).length,
+      paused: subs.filter(sub => sub.paused).length,
+      waiting: this.buckets.waitingCount,
+      buckets: this.buckets.stats(subs)
     }
   }
 
-  /**
-   * Cleanup all watchers (on app shutdown)
-   */
+  /** Cleanup all watchers (on app shutdown). */
   async dispose(): Promise<void> {
-    this.isDisposing = true // Set flag FIRST to stop all event processing
     this.safeLog('👁️  Disposing all file watchers...')
+    this.isDisposing = true
     this.atomicSaveDetector.dispose()
     this.unseenProbe.dispose()
-
-    for (const [, watched] of this.watchedFiles.entries()) {
-      if (watched.debounceTimer) {
-        clearTimeout(watched.debounceTimer)
-      }
-      try {
-        await watched.watcher.close()
-      } catch {
-        // Suppress errors during cleanup
-      }
-    }
-    this.watchedFiles.clear()
+    for (const sub of this.subscriptions.all()) this.subscriptions.remove(sub)
+    const entries = [...this.entries.values()]
+    this.entries.clear()
+    await Promise.all(entries.map(entry => (entry.watcher ? closeQuietly(entry.watcher) : undefined)))
   }
 }
 
-/** Stop a watch's pending change notification, if it has one */
-function clearDebounce(watched: RearmableWatch): void {
-  if (watched.debounceTimer) {
-    clearTimeout(watched.debounceTimer)
-    watched.debounceTimer = null
-  }
+/** Below the session's root, as shown or as resolved, by the session's case rule. */
+function isLexicallyInSession(filePath: string, session: ProjectSessionSnapshot): boolean {
+  const resolved = resolve(filePath)
+  return (
+    isInsideRoot(resolved, session.root, session.caseSensitive) ||
+    isInsideRoot(resolved, session.realRoot, session.caseSensitive)
+  )
+}
+
+function endReasonFor(code: SubscribeRefusalCode): WatchEndReason {
+  if (code === 'OUTSIDE_PROJECT') return 'outside-project'
+  if (code === 'UNSUPPORTED') return 'unsupported'
+  return 'restart-failed'
 }
 
 // Singleton instance

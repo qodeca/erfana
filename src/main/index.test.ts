@@ -167,6 +167,8 @@ describe('Main Process - Window Creation', () => {
       app: mockApp,
       shell: { openExternal: vi.fn() },
       BrowserWindow: mockBrowserWindow,
+      // #478: a wake re-arms the file watches
+      powerMonitor: { on: vi.fn() },
       dialog: { showMessageBox: mockShowMessageBox },
       Menu: {
         buildFromTemplate: vi.fn(() => ({})),
@@ -228,7 +230,6 @@ describe('Main Process - Window Creation', () => {
     vi.doMock('./services/FileWatcherService', () => ({
       fileWatcherService: {
         dispose: vi.fn(),
-        setProjectPath: vi.fn(), // issue #59: clear project state on destroy
         cleanupForWebContentsId: vi.fn(() => Promise.resolve()), // issue #59
         handleAncestorRemovals: vi.fn(), // save after a folder rename
         checkWatchedFilesUnder: vi.fn(() => Promise.resolve()), // #252
@@ -695,6 +696,8 @@ describe('Main Process - Window Creation', () => {
           app: mockApp,
           shell: { openExternal: vi.fn() },
           BrowserWindow: mockBrowserWindow,
+          // #478: a wake re-arms the file watches
+          powerMonitor: { on: vi.fn() },
           Menu: {
             buildFromTemplate: vi.fn(() => ({})),
             setApplicationMenu: vi.fn()
@@ -878,13 +881,17 @@ describe('Main Process - Window Creation', () => {
       // Issue #59: without it the same-project check answers 'noop' for a new
       // window. The session close also releases the project lock.
       await loadAndGetCloseHandler()
-      const destroyed = createdWindow.webContents.on.mock.calls.find(
-        ([event]: [string]) => event === 'destroyed'
-      )?.[1]
-      expect(destroyed).toBeInstanceOf(Function)
+      // Every 'destroyed' listener runs, as Electron would (the file watches wire their own, #478)
+      const destroyed = createdWindow.webContents.on.mock.calls
+        .filter(([event]: [string]) => event === 'destroyed')
+        .map(([, listener]: [string, () => void]) => listener)
+      expect(destroyed.length).toBeGreaterThan(0)
       const { projectService } = await import('./ipc/file-handlers')
+      const { fileWatcherService } = await import('./services/FileWatcherService')
 
-      destroyed()
+      for (const listener of destroyed) listener()
+
+      expect(fileWatcherService.cleanupForWebContentsId).toHaveBeenCalledWith(createdWindow.webContents.id)
 
       expect(projectService.close).toHaveBeenCalledWith({
         senderId: createdWindow.webContents.id,

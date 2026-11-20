@@ -50,12 +50,12 @@ vi.mock('fs/promises', async () => {
 })
 
 // Mock services used by file-handlers
-const stopAllFiles = vi.fn(async () => {})
+const suspendFiles = vi.fn(async () => {})
 const stopAllDirs = vi.fn(async () => {})
 const setFileSvcPath = vi.fn()
-const setFileWatchPath = vi.fn()
+const endFileWatches = vi.fn(async () => {})
 const setDirWatchPath = vi.fn()
-vi.mock('../services/FileWatcherService', () => ({ fileWatcherService: { stopAll: stopAllFiles, setProjectPath: setFileWatchPath } }))
+vi.mock('../services/FileWatcherService', () => ({ fileWatcherService: { bindSession: vi.fn(), suspendAll: suspendFiles, resumeSuspended: vi.fn(async () => {}), endSuspended: endFileWatches } }))
 vi.mock('../services/DirectoryWatcherService', () => ({ directoryWatcherService: { stopAll: stopAllDirs, setProjectPath: setDirWatchPath } }))
 vi.mock('../services/FileService', () => ({ fileService: { getProjectPath: () => '/old/path', setProjectPath: setFileSvcPath } }))
 vi.mock('../services/SettingsService', () => ({ settingsService: { setLastProjectPath: vi.fn(async () => {}) } }))
@@ -87,7 +87,7 @@ describe('file:openProject error hardening', () => {
     expect(sends.find((s) => s.ch === 'project:changed')).toBeUndefined()
     // The session was never changed, so no service path was touched
     expect(setFileSvcPath).not.toHaveBeenCalled()
-    expect(setFileWatchPath).not.toHaveBeenCalled()
+    expect(endFileWatches).not.toHaveBeenCalled()
     expect(setDirWatchPath).not.toHaveBeenCalled()
   })
 })

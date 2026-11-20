@@ -5,7 +5,8 @@
  *
  * Renderer code calls `fileWatchGateway.<method>`, which forwards to the
  * preload bridge with the same contract ({@link FileWatchBridge}). Keeping the
- * access in one module gives the renderer a single seam to change or fake.
+ * access in one module gives the renderer a single seam to change or fake; the
+ * freshness trackers reach it through `services/freshness/ipcFreshnessSource`.
  */
 import type { FileWatchBridge } from '../../../shared/ipc/file-watch-schema'
 
@@ -15,13 +16,14 @@ const bridge = (): FileWatchBridge =>
   (window as unknown as { api: { fileWatch: FileWatchBridge } }).api.fileWatch
 
 export const fileWatchGateway: FileWatchBridge = {
-  start: (...args) => bridge().start(...args),
-  stop: (...args) => bridge().stop(...args),
-  stopAll: (...args) => bridge().stopAll(...args),
-  pause: (...args) => bridge().pause(...args),
-  resume: (...args) => bridge().resume(...args),
+  subscribe: (...args) => bridge().subscribe(...args),
+  unsubscribe: (...args) => bridge().unsubscribe(...args),
+  pauseWatch: (...args) => bridge().pauseWatch(...args),
+  resumeWatch: (...args) => bridge().resumeWatch(...args),
+  probe: (...args) => bridge().probe(...args),
+  readText: (...args) => bridge().readText(...args),
+  writeText: (...args) => bridge().writeText(...args),
   getStats: (...args) => bridge().getStats(...args),
-  onFileChanged: (...args) => bridge().onFileChanged(...args),
-  onFileDeleted: (...args) => bridge().onFileDeleted(...args),
-  onFileError: (...args) => bridge().onFileError(...args)
+  onEvent: (...args) => bridge().onEvent(...args),
+  onCheck: (...args) => bridge().onCheck(...args)
 }

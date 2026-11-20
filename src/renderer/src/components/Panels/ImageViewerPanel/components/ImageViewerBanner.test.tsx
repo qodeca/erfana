@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Tests for {@link ImageViewerBanner}.
+ * Tests for {@link ImageViewerBanner}: the tab's freshness notice in the
+ * viewer's slot (#478 § 3.6), or the viewer's own stale-bytes state.
  *
  * @module ImageViewerBanner.test
  */
@@ -11,82 +12,91 @@ import { render, screen, fireEvent } from '@testing-library/react'
 
 import { ImageViewerBanner } from './ImageViewerBanner'
 import { TEST_IDS } from '../../../../constants/testids'
-import { VIEWER_BANNER_COPY } from '../imageViewerStatus.logic'
+import { VIEWER_BANNER_COPY, VIEWER_RELOAD_BUTTON_COPY } from '../imageViewerStatus.logic'
+import {
+  FRESHNESS_NOTICE_TEST_IDS,
+  NOTICE_BUTTON_COPY,
+  selectNotice
+} from '../../../FileConflictNotification/freshnessNoticeCopy'
+import type { FreshnessState } from '../../../../../../shared/freshness/freshnessTypes'
+
+const ACTIVE = { kind: 'active', live: 'full' } as const
+
+function notice(state: FreshnessState) {
+  return selectNotice({ state, fileName: 'icon.png', tab: 'image' })
+}
+
+const banner = (): HTMLElement => screen.getByTestId(TEST_IDS.IMAGE_VIEWER_DELETED_BANNER)
 
 describe('ImageViewerBanner', () => {
-  it('announces the deleted state with the agreed copy', () => {
-    render(<ImageViewerBanner variant="deleted" onReload={vi.fn()} />)
+  it('shows the deleted notice with Close tab only (no Restore – a viewer has nothing to save)', () => {
+    const onClose = vi.fn()
+    const model = notice({ watch: ACTIVE, content: { kind: 'deleted' } })
+    render(<ImageViewerBanner variant="notice" notice={model} onReload={vi.fn()} onClose={onClose} />)
 
-    const banner = screen.getByTestId(TEST_IDS.IMAGE_VIEWER_DELETED_BANNER)
-    expect(banner).toHaveAttribute('role', 'alert')
-    expect(banner).toHaveAttribute('data-variant', 'deleted')
-    expect(banner).toHaveTextContent(VIEWER_BANNER_COPY.deleted)
+    expect(banner()).toHaveAttribute('data-variant', 'deleted')
+    expect(banner()).toHaveTextContent(model?.message ?? '')
+    expect(screen.queryByTestId(TEST_IDS.IMAGE_VIEWER_BTN_RELOAD)).toBeNull()
+    expect(screen.queryByTestId(FRESHNESS_NOTICE_TEST_IDS.restore)).toBeNull()
+
+    fireEvent.click(screen.getByTestId(FRESHNESS_NOTICE_TEST_IDS.close))
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('states the cause and the remedy in VISIBLE text for the watcher cap', () => {
-    render(
-      <ImageViewerBanner variant="unavailable" unavailableReason="limit" onReload={vi.fn()} />
-    )
-
-    // QG-11a H3: this used to be an aria-label on the toolbar's status span, so
-    // a sighted user pressed Reload against a cap that was still full and could
-    // never learn that closing tabs is the fix.
-    const banner = screen.getByTestId(TEST_IDS.IMAGE_VIEWER_DELETED_BANNER)
-    expect(banner).toHaveAttribute('data-variant', 'unavailable')
-    expect(banner).toHaveTextContent(VIEWER_BANNER_COPY.unavailableLimit)
-    expect(banner).toHaveTextContent('100')
-    expect(banner).toHaveTextContent('Close some tabs')
-  })
-
-  it('uses the watcher-fault wording when the cap is not to blame', () => {
+  it('carries no live-region role: the panel status region announces (F13)', () => {
     render(
       <ImageViewerBanner
-        variant="unavailable"
-        unavailableReason="watcher-error"
+        variant="notice"
+        notice={notice({ watch: ACTIVE, content: { kind: 'deleted' } })}
         onReload={vi.fn()}
       />
     )
-
-    const banner = screen.getByTestId(TEST_IDS.IMAGE_VIEWER_DELETED_BANNER)
-    expect(banner).toHaveTextContent(VIEWER_BANNER_COPY.unavailableWatcherError)
-    expect(banner).not.toHaveTextContent('Close some tabs')
+    expect(banner()).not.toHaveAttribute('role')
   })
 
-  it('reports a failed re-read with its own copy', () => {
-    render(<ImageViewerBanner variant="stale" onReload={vi.fn()} />)
-
-    const banner = screen.getByTestId(TEST_IDS.IMAGE_VIEWER_DELETED_BANNER)
-    expect(banner).toHaveAttribute('data-variant', 'stale')
-    expect(banner).toHaveTextContent(VIEWER_BANNER_COPY.stale)
-  })
-
-  it('offers one Reload action for both variants', () => {
+  it('states a stopped watch with a Reload that calls back', () => {
     const onReload = vi.fn()
-    render(<ImageViewerBanner variant="deleted" onReload={onReload} />)
+    const model = notice({ watch: { kind: 'stopped', reason: 'restart-failed' }, content: { kind: 'fresh' } })
+    render(<ImageViewerBanner variant="notice" notice={model} onReload={onReload} />)
 
-    const button = screen.getByTestId(TEST_IDS.IMAGE_VIEWER_BTN_RELOAD)
-    expect(button).toHaveTextContent('Reload')
-    expect(button).toHaveAccessibleName('Reload image from disk')
-
-    fireEvent.click(button)
+    expect(banner()).toHaveAttribute('data-variant', 'unavailable')
+    expect(banner()).toHaveTextContent(model?.message ?? '')
+    const reload = screen.getByTestId(TEST_IDS.IMAGE_VIEWER_BTN_RELOAD)
+    expect(reload).toHaveAccessibleName(VIEWER_RELOAD_BUTTON_COPY.ariaLabel)
+    fireEvent.click(reload)
     expect(onReload).toHaveBeenCalledTimes(1)
   })
 
-  it('does not steal focus', () => {
-    render(<ImageViewerBanner variant="deleted" onReload={vi.fn()} />)
+  it('shows the watch-limit notice for a queued tab, without Reload (G9)', () => {
+    const model = notice({ watch: { kind: 'queued' }, content: { kind: 'fresh' } })
+    render(<ImageViewerBanner variant="notice" notice={model} onReload={vi.fn()} />)
 
-    // A passive notification must not interrupt keyboard panning.
-    expect(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_BTN_RELOAD)).not.toHaveFocus()
+    expect(banner()).toHaveTextContent('Too many files are open to follow this one live.')
+    expect(screen.queryByTestId(TEST_IDS.IMAGE_VIEWER_BTN_RELOAD)).toBeNull()
   })
 
-  it('disables Reload while an attempt is in flight', () => {
-    const onReload = vi.fn()
-    render(<ImageViewerBanner variant="deleted" onReload={onReload} isReloadPending />)
+  it('gives the limited notice the neutral treatment and a Dismiss', () => {
+    const onDismissLimited = vi.fn()
+    const model = notice({ watch: { kind: 'active', live: 'limited' }, content: { kind: 'fresh' } })
+    render(
+      <ImageViewerBanner variant="notice" notice={model} onReload={vi.fn()} onDismissLimited={onDismissLimited} />
+    )
 
-    const button = screen.getByTestId(TEST_IDS.IMAGE_VIEWER_BTN_RELOAD)
-    expect(button).toBeDisabled()
+    expect(banner()).toHaveAttribute('data-variant', 'info')
+    fireEvent.click(screen.getByRole('button', { name: NOTICE_BUTTON_COPY.dismiss }))
+    expect(onDismissLimited).toHaveBeenCalledTimes(1)
+  })
 
-    fireEvent.click(button)
-    expect(onReload).not.toHaveBeenCalled()
+  it('shows the stale state with its own copy and a Reload', () => {
+    render(<ImageViewerBanner variant="stale" onReload={vi.fn()} />)
+
+    expect(banner()).toHaveAttribute('data-variant', 'stale')
+    expect(banner()).toHaveTextContent(VIEWER_BANNER_COPY.stale)
+    expect(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_BTN_RELOAD)).toBeInTheDocument()
+  })
+
+  it('disables Reload while a reload is pending', () => {
+    render(<ImageViewerBanner variant="stale" onReload={vi.fn()} isReloadPending />)
+    expect(screen.getByTestId(TEST_IDS.IMAGE_VIEWER_BTN_RELOAD)).toBeDisabled()
   })
 })

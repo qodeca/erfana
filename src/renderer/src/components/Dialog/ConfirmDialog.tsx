@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { HelpCircle, AlertTriangle } from 'lucide-react'
 import { BaseDialog } from './BaseDialog'
 import { TEST_IDS } from '../../constants/testids'
@@ -24,6 +24,10 @@ interface ConfirmDialogProps {
  *   Confirm otherwise
  * - Enter follows the focused button; with focus off the buttons it confirms
  *   a non-danger prompt and does nothing on a danger one. Esc cancels
+ * - Opt-in click guard (`confirmArmDelayMs`): Confirm ignores every press and
+ *   shows the Buttons card's blocked look (`aria-disabled`, still focusable)
+ *   until the delay has passed, so a double-click on the button that opened
+ *   a follow-up question cannot answer it
  * - Promise-based API via useDialog()
  *
  * @example
@@ -44,14 +48,24 @@ export function ConfirmDialog({ config, zIndex, onConfirm, onCancel }: ConfirmDi
     message,
     confirmLabel = 'Confirm',
     cancelLabel = 'Cancel',
-    danger = false
+    danger = false,
+    confirmArmDelayMs = 0
   } = config
+
+  // Fixed for the dialog's life: the guard runs once, from when it opens
+  const [armed, setArmed] = useState(() => confirmArmDelayMs <= 0)
+  useEffect(() => {
+    if (armed) return
+    const timer = setTimeout(() => setArmed(true), confirmArmDelayMs)
+    return () => clearTimeout(timer)
+  }, [armed, confirmArmDelayMs])
 
   // Generate unique IDs for ARIA attributes
   const titleId = `dialog-title-${id}`
   const messageId = `dialog-message-${id}`
 
   const handleConfirm = () => {
+    if (!armed) return
     onConfirm()
   }
 
@@ -126,6 +140,7 @@ export function ConfirmDialog({ config, zIndex, onConfirm, onCancel }: ConfirmDi
             ref={confirmRef}
             className={`dialog-btn ${danger ? 'dialog-btn-danger' : 'dialog-btn-primary'}`}
             onClick={handleConfirm}
+            aria-disabled={armed ? undefined : 'true'}
             data-testid={TEST_IDS.DIALOG_BTN_CONFIRM}
           >
             {confirmLabel}

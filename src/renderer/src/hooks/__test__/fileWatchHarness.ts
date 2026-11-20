@@ -1,197 +1,110 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Shared test harness for the {@link useFileChangeSubscription} suites.
+ * Shared harness for the {@link useFileChangeSubscription} (image adapter)
+ * suites (#478, plan S15).
  *
- * The hook's tests are split by concern across four files (lifecycle, degraded
- * states, deletion and recovery, watch-slot balance). All four need the same
- * environment: a fake `window.api.fileWatch` whose listeners the test drives by
- * hand, a fake `file.getStats`, and the verbatim error strings the main process
- * produces. This module owns that scaffolding so the split files stay small and
- * cannot drift apart.
+ * The watch layer and the disk are the core's fakes, installed as the
+ * window's freshness environment (`installFakeFreshness`); the image read is
+ * a fake `window.api.file.readImage` that answers from the same fake disk the
+ * way main does: `unchanged` when the caller's version is current, a
+ * "too large (… MB)" rejection for a blocked file, ENOENT for a missing one.
+ * A version token is the fake disk's content hash.
  *
  * @module hooks/__test__/fileWatchHarness
- * @see useFileChangeSubscription.test.ts for the lifecycle baseline
  */
 
-import { vi, beforeEach, afterEach, type Mock } from 'vitest'
-import { act, renderHook, type RenderHookResult } from '@testing-library/react'
+import { renderHook, type RenderHookResult } from '@testing-library/react'
+import { beforeEach, vi, type Mock } from 'vitest'
 
+import type { ImageReadRequest, ImageReadResponse } from '../../../../shared/ipc/file-image-schema'
+import { installFakeFreshness, type FakeFreshness } from '../../services/freshness/__test__/fakeFreshnessEnvironment'
 import {
   useFileChangeSubscription,
+  type ImageBytes,
+  type UseFileChangeSubscriptionOptions,
   type UseFileChangeSubscriptionResult
 } from '../useFileChangeSubscription'
 
 /** The path every suite watches unless it says otherwise. */
 export const WATCHED_PATH = '/proj/icon.png'
 
-/** A second path, used to prove events for other files are ignored. */
-export const OTHER_PATH = '/proj/other.png'
+/** The size the fake main reports for a too-large image (MB). */
+export const TOO_LARGE_MB = 60
 
-/** Verbatim cap error from `FileWatcherService.watchFile` (the only 'limit' evidence). */
-export const CAP_ERROR = 'Maximum watched files limit reached (100)'
-
-/** A non-cap `start` failure: the atomic-save re-arm ended the watch mid-join. */
-export const JOIN_ERROR = `File watch ended while joining: ${WATCHED_PATH}`
-
-type WatchCallback = (data: { filePath: string }) => void
-type WatchErrorCallback = (data: { filePath: string; error: string; ended?: boolean }) => void
-
-/** The fake `window.api.fileWatch` bridge. */
-export interface MockFileWatch {
-  start: Mock
-  stop: Mock
-  pause: Mock
-  resume: Mock
-  onFileChanged: Mock
-  onFileDeleted: Mock
-  onFileError: Mock
+export interface ImageWatchHarness extends FakeFreshness {
+  /** The fake `file:readImage`. */
+  readImage: Mock<(request: ImageReadRequest) => Promise<ImageReadResponse>>
 }
 
-/** How many listeners are currently registered on each watcher event. */
-export interface ListenerCounts {
-  changed: number
-  deleted: number
-  error: number
-}
-
-/** Handles returned by {@link installFileWatchHarness}. */
-export interface FileWatchHarness {
-  /** Fake `window.api.fileWatch` bridge. */
-  fileWatch: MockFileWatch
-  /** Fake `window.api.file.getStats`, the disk re-check behind a delete event. */
-  getStats: Mock<(path: string) => Promise<{ size: number }>>
-  /** Emits a watcher `changed` event to every subscribed listener. */
-  emitChanged: (filePath: string) => void
-  /** Emits a watcher `deleted` event to every subscribed listener. */
-  emitDeleted: (filePath: string) => void
-  /**
-   * Emits a watcher `error` event to every subscribed listener. `ended`: the
-   * main process dropped the watch with it (`notifyWatchDead`, #252).
-   */
-  emitError: (filePath: string, error: string, ended?: boolean) => void
-  /** Live listener counts, so teardown can be asserted rather than assumed. */
-  listenerCounts: () => ListenerCounts
-}
-
-/**
- * Installs the shared file-watch test environment.
- *
- * Call once at module scope in a test file; it registers its own `beforeEach`
- * and `afterEach`, so every test gets a clean watcher and clean mocks. The
- * returned handles are stable across tests – capture them once and use them
- * inside `it` blocks.
- *
- * @returns The mock bridge, the watcher emitters and the listener counters
- *
- * @example
- * ```ts
- * const h = installFileWatchHarness()
- *
- * it('reports a change', async () => {
- *   const onExternalChange = vi.fn()
- *   renderSubscription(WATCHED_PATH, onExternalChange)
- *   await waitFor(() => expect(h.fileWatch.start).toHaveBeenCalled())
- *
- *   h.emitChanged(WATCHED_PATH)
- *
- *   expect(onExternalChange).toHaveBeenCalledTimes(1)
- * })
- * ```
- */
-export function installFileWatchHarness(): FileWatchHarness {
-  let changedListeners: WatchCallback[] = []
-  let deletedListeners: WatchCallback[] = []
-  let errorListeners: WatchErrorCallback[] = []
-
-  const getStats = vi.fn<(path: string) => Promise<{ size: number }>>()
-
-  const fileWatch: MockFileWatch = {
-    start: vi.fn(),
-    stop: vi.fn(),
-    pause: vi.fn(),
-    resume: vi.fn(),
-    onFileChanged: vi.fn((cb: WatchCallback) => {
-      changedListeners.push(cb)
-      return () => {
-        changedListeners = changedListeners.filter((l) => l !== cb)
-      }
-    }),
-    onFileDeleted: vi.fn((cb: WatchCallback) => {
-      deletedListeners.push(cb)
-      return () => {
-        deletedListeners = deletedListeners.filter((l) => l !== cb)
-      }
-    }),
-    onFileError: vi.fn((cb: WatchErrorCallback) => {
-      errorListeners.push(cb)
-      return () => {
-        errorListeners = errorListeners.filter((l) => l !== cb)
-      }
-    })
-  }
+/** Installs the fake environment plus the fake image read; call once at module scope. */
+export function installImageWatchHarness(): ImageWatchHarness {
+  const env = installFakeFreshness()
+  const readImage = vi.fn<(request: ImageReadRequest) => Promise<ImageReadResponse>>()
+  const harness = env as ImageWatchHarness
+  harness.readImage = readImage
 
   beforeEach(() => {
-    changedListeners = []
-    deletedListeners = []
-    errorListeners = []
-
-    fileWatch.start.mockReset().mockResolvedValue({ success: true })
-    fileWatch.stop.mockReset().mockResolvedValue({ success: true })
-    fileWatch.pause.mockReset()
-    fileWatch.resume.mockReset()
-    fileWatch.onFileChanged.mockClear()
-    fileWatch.onFileDeleted.mockClear()
-    fileWatch.onFileError.mockClear()
-    getStats.mockReset().mockResolvedValue({ size: 1024 })
-
+    readImage.mockReset().mockImplementation(async ({ filePath, knownVersion }) => {
+      const reply = await env.disk.readText(filePath)
+      if (reply.status === 'missing') throw new Error(`ENOENT: no such file or directory, open '${filePath}'`)
+      if (reply.status === 'too-large') throw new Error(`Image is too large (${TOO_LARGE_MB}.0 MB)`)
+      if (reply.status !== 'ok') throw new Error('EBUSY: resource busy or locked')
+      const stamp = env.disk.stamp(filePath)
+      if (!stamp?.hash) throw new Error('setup: fake disk gave no hash')
+      if (knownVersion === stamp.hash) return { status: 'unchanged', version: stamp.hash, stamp }
+      return { status: 'ok', dataUrl: `data:image/png;base64,${btoa(reply.text)}`, version: stamp.hash, stamp }
+    })
     // NOTE: extend `window`, never `vi.stubGlobal('window', …)` – replacing the
     // window object destroys React's DOM internals.
-    ;(window as unknown as { api: unknown }).api = {
-      file: { getStats },
-      fileWatch
-    }
+    ;(window as unknown as { api: unknown }).api = { file: { readImage } }
   })
 
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  /** Fans an event out to a snapshot of the listeners, inside `act`. */
-  const emit = <T>(listeners: ((data: T) => void)[], data: T): void => {
-    act(() => {
-      for (const listener of [...listeners]) listener(data)
-    })
-  }
-
-  return {
-    fileWatch,
-    getStats,
-    emitChanged: (filePath) => emit(changedListeners, { filePath }),
-    emitDeleted: (filePath) => emit(deletedListeners, { filePath }),
-    emitError: (filePath, error, ended) =>
-      emit(errorListeners, ended === undefined ? { filePath, error } : { filePath, error, ended }),
-    listenerCounts: () => ({
-      changed: changedListeners.length,
-      deleted: deletedListeners.length,
-      error: errorListeners.length
-    })
-  }
+  return harness
 }
 
-/**
- * Renders {@link useFileChangeSubscription} with the usual arguments.
- *
- * Most tests care about the watch, not about the change callback, so it
- * defaults to a throwaway spy.
- *
- * @param filePath - Path to subscribe to
- * @param onExternalChange - Change callback; defaults to a fresh spy
- * @returns The `renderHook` result for the subscription
- */
-export function renderSubscription(
-  filePath: string = WATCHED_PATH,
-  onExternalChange: () => void = vi.fn()
-): RenderHookResult<UseFileChangeSubscriptionResult, unknown> {
-  return renderHook(() => useFileChangeSubscription(filePath, { onExternalChange }))
+export interface ImageTab {
+  hook: RenderHookResult<UseFileChangeSubscriptionResult, UseFileChangeSubscriptionOptions>
+  /** Bytes the viewer was handed, in order. */
+  onBytes: Mock<(bytes: ImageBytes) => void>
+  /** The version token on screen. */
+  shown(): string | undefined
+  /** Show or hide the tab. */
+  setVisible(visible: boolean): void
+}
+
+/** Open the image tab the way the viewer does: first image on screen, then follow from its stamp. */
+export async function openImageTab(
+  env: FakeFreshness,
+  filePath = WATCHED_PATH,
+  overrides: Partial<UseFileChangeSubscriptionOptions> = {}
+): Promise<ImageTab> {
+  const baseline = env.disk.stamp(filePath)
+  let version = baseline?.hash
+  let visible = overrides.visible ?? true
+  const onBytes = vi.fn((bytes: ImageBytes) => {
+    version = bytes.version
+    hook.rerender(props())
+  })
+  const props = (): UseFileChangeSubscriptionOptions => ({
+    ready: true,
+    baseline,
+    currentVersion: version,
+    onBytes,
+    ...overrides,
+    visible
+  })
+  const hook = renderHook((p: UseFileChangeSubscriptionOptions) => useFileChangeSubscription(filePath, p), {
+    initialProps: props()
+  })
+  await env.flush()
+  return {
+    hook,
+    onBytes,
+    shown: () => version,
+    setVisible: (next) => {
+      visible = next
+      hook.rerender(props())
+    }
+  }
 }

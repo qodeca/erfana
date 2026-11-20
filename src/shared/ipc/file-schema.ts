@@ -120,9 +120,43 @@ export interface FindByNameResponse {
   truncated: boolean
 }
 
-/** `file:readFile`, `file:getStats`, `file:exists`, `file:deleteFile`, `file:deleteFolder`, `file:revealInFileManager` */
+/** `file:readFile`, `file:getStats`, `file:exists`, `file:revealInFileManager` */
 export const PathRequestSchema = z.strictObject({ filePath: pathField('Invalid file path') })
 export type PathRequest = z.infer<typeof PathRequestSchema>
+
+/**
+ * `file:deleteFile`, `file:deleteFolder` (#486). The item goes to the Recycle
+ * Bin / Trash. Only a literal `permanent: true` – sent after the person accepted
+ * a second prompt that says so – removes it for good.
+ */
+export const DeleteEntryRequestSchema = z.strictObject({
+  filePath: pathField('Invalid file path'),
+  permanent: z.literal(true, { error: 'Invalid permanent flag' }).optional()
+})
+export type DeleteEntryRequest = z.infer<typeof DeleteEntryRequestSchema>
+
+/** What a delete answers when the item is free but the trash refused it. Nothing was removed. */
+export const TRASH_UNAVAILABLE = 'TRASH_UNAVAILABLE'
+
+/**
+ * What a delete answers when the item is in use, locked or protected (another
+ * program, a terminal's working folder, a missing permission). Nothing was
+ * removed, and a permanent delete is never offered for it.
+ */
+export const IN_USE = 'IN_USE'
+
+/**
+ * What `file:deleteFile` / `file:deleteFolder` answer. `trashed` says where the
+ * item went. `TRASH_UNAVAILABLE` means it is still on disk and the renderer may
+ * ask to delete it permanently; `IN_USE` means it is still on disk and the
+ * person must close what holds it first. Any other failure rejects – an item
+ * that is no longer there rejects with `ENOENT`.
+ */
+export const DeleteEntryResultSchema = z.discriminatedUnion('ok', [
+  z.strictObject({ ok: z.literal(true), trashed: z.boolean() }),
+  z.strictObject({ ok: z.literal(false), code: z.enum([TRASH_UNAVAILABLE, IN_USE]) })
+])
+export type DeleteEntryResult = z.infer<typeof DeleteEntryResultSchema>
 
 /**
  * `file:writeFile`. `createParentDirs` is the explicit "Save to restore it" of a
@@ -247,8 +281,9 @@ export interface FileBridge {
   getProjectPath(): Promise<string | null>
   createFile(request: CreateEntryRequest): Promise<string>
   createFolder(request: CreateEntryRequest): Promise<string>
-  deleteFile(request: PathRequest): Promise<boolean>
-  deleteFolder(request: PathRequest): Promise<boolean>
+  /** To the Recycle Bin / Trash unless `permanent` (#486); see {@link DeleteEntryResult}. */
+  deleteFile(request: DeleteEntryRequest): Promise<DeleteEntryResult>
+  deleteFolder(request: DeleteEntryRequest): Promise<DeleteEntryResult>
   rename(request: RenameRequest): Promise<string>
   revealInFileManager(request: PathRequest): Promise<string>
   moveItem(request: MoveItemRequest): Promise<FileTransferResult>

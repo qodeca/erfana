@@ -25,7 +25,7 @@ Use the project tree to create, move, rename, import, or delete files.
 
 ## What happens next / If something goes wrong
 
-Deletion cannot be undone. If a dropped file's name already exists, the **File already exists** box offers **Skip**, **Keep both**, or **Replace**. A name cannot contain `/ \ : * ? " < > |`. Keyboard users can open the same row menu with <kbd>⇧F10</kbd> / <kbd>Shift+F10</kbd>, or the Menu key – see [keyboard navigation](../reference/project-tree.md#keyboard-navigation).
+**Delete** moves the item to the Recycle Bin (macOS: Trash; Linux: the trash), so you can restore it from there. If it cannot go there – on a network drive or a WSL path, for example – Erfana asks again, and **Delete permanently** removes it for good. If the item is in use – a file open in another program, or a folder a terminal is working in – Erfana shows an error asking you to close it, and does not offer to delete it permanently. If a dropped file's name already exists, the **File already exists** box offers **Skip**, **Keep both**, or **Replace**. A name cannot contain `/ \ : * ? " < > |`. Keyboard users can open the same row menu with <kbd>⇧F10</kbd> / <kbd>Shift+F10</kbd>, or the Menu key – see [keyboard navigation](../reference/project-tree.md#keyboard-navigation).
 
 ## Related
 

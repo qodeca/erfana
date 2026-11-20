@@ -21,8 +21,8 @@ import * as monaco from 'monaco-editor'
 import { MonacoEditorHandle } from '../Editor/MonacoMarkdownEditor'
 import { MarkdownPreviewHandle } from '../Editor/MarkdownPreview'
 import { EditorContextMenu } from '../ContextMenu/EditorContextMenu'
-import { FileConflictNotification } from '../FileConflictNotification/FileConflictNotification'
-import { WatchStoppedNotice } from '../FileConflictNotification/WatchStoppedNotice'
+import { FreshnessNotice } from '../FileConflictNotification/FreshnessNotice'
+import { selectNotice } from '../FileConflictNotification/freshnessNoticeCopy'
 import { useDialog } from '../Dialog'
 import { useToast } from '../Toast/ToastContext'
 import { useProjectStore } from '../../stores/useProjectStore'
@@ -31,7 +31,7 @@ import { getBasename } from '../../utils/fileUtils'
 import { openFileInPanel } from '../../utils/openFileInPanel'
 import { logger } from '../../utils/logger'
 import { useAutoSave } from '../../hooks/useAutoSave'
-import { useFileWatcher, createFileSaveGuard } from '../../hooks/useFileWatcher'
+import { useFileWatcher } from '../../hooks/useFileWatcher'
 import { useSearchKeyboard } from '../../hooks/useSearchKeyboard'
 import { MonacoSearchProvider, PreviewSearchProvider } from '../../providers/search'
 
@@ -64,8 +64,9 @@ import { formatTabTitle } from '../../utils/tabTitle'
 import { INDICATOR_DURATION_MS } from '../../constants/fileWatch'
 
 import './MarkdownEditorPanel.css'
-import { fileGateway } from '../../services/fileGateway'
 import { getLastSeenProjectGeneration } from '../../services/projectGeneration'
+import type { FileStamp } from '../../../../shared/freshness/freshnessTypes'
+import { readEditorText, saveTriggerFor } from './editorFreshness.logic'
 
 /**
  * Props passed to the MarkdownEditorPanel via Dockview.
@@ -116,6 +117,10 @@ export function MarkdownEditorPanel(
   const [currentFile, setCurrentFile] = useState<EditorFile | null>(null)
   // The project session generation the file was loaded under (undefined until a project event was seen)
   const openedGenerationRef = useRef<number | undefined>(undefined)
+  // The stamp of the initial read: the tracker catches up with anything newer (#478 G3)
+  const [baseline, setBaseline] = useState<FileStamp | undefined>(undefined)
+  // The "limited live refresh" notice was dismissed for this tab (#478 F35)
+  const [limitedDismissed, setLimitedDismissed] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('preview')
   const [selectedText, setSelectedText] = useState<string>('')
   const [activePaneId, setActivePaneId] = useState<'editor' | 'preview'>('editor')
@@ -146,7 +151,6 @@ export function MarkdownEditorPanel(
   const editorRef = useRef<MonacoEditorHandle>(null)
   const previewRef = useRef<HTMLDivElement>(null)
   const previewHandleRef = useRef<MarkdownPreviewHandle>(null)
-  const saveGuardRef = useRef<ReturnType<typeof createFileSaveGuard> | null>(null)
   /**
    * The last save-failure toast for the CURRENT file, so a failing autosave
    * does not repeat it every few seconds. Reset when the file changes (below).
@@ -191,47 +195,41 @@ export function MarkdownEditorPanel(
   // File Watcher Hook
   // =========================================================================
 
-  // Stable callback for watcher content updates – uses functional updater to avoid
-  // closing over currentFile, which would cause watcher re-subscription on every keystroke.
+  // Stable callback for content taken from disk – uses a functional updater to
+  // avoid closing over currentFile, which would rebuild the rule on every keystroke.
+  // The minimal edit keeps the cursor and selection; the scroll is put back
+  // after the commit, so an outside write never moves the view (#478 F15).
   const handleContentUpdateFromWatcher = useCallback((content: string) => {
+    const editor = editorRef.current?.getEditor()
+    const scroll = editor && typeof editor.getScrollTop === 'function'
+      ? { top: editor.getScrollTop(), left: editor.getScrollLeft() }
+      : null
     setCurrentFile((prev) => prev ? { ...prev, content, modified: false } : prev)
-    // The buffer now matches the disk ("Reload from Disk" or a clean file
-    // taking an external change), so the tab's dirty dot goes too. It reads
+    if (editor && scroll) requestAnimationFrame(() => {
+      editor.setScrollTop(scroll.top)
+      editor.setScrollLeft(scroll.left)
+    })
+    // The buffer now matches the disk, so the tab's dirty dot goes too. It reads
     // the store, not `modified`, and used to stay on after a Reload.
     if (panelId) {
       useProjectStore.getState().setEditorDirty(panelId, false)
     }
   }, [panelId])
-  const {
-    externalChangeDetected,
-    isFileDeleted,
-    isReloading, isWatchUnavailable, restartWatch,
-    reloadFromDisk: handleReloadFromDisk, reloadIfUnedited,
-    keepLocal: handleKeepLocal,
-    dismissConflict,
-    clearDeletedState,
-    markSaving, unmarkSaving,
-    notifySaveComplete
-  } = useFileWatcher({
+  const watch = useFileWatcher({
     filePath: currentFile?.path ?? null,
     hasLocalChanges: currentFile?.modified ?? false,
+    ready: baseline !== undefined,
+    baseline,
+    visible: isPanelVisible,
     onContentUpdate: handleContentUpdateFromWatcher,
-    bufferNow: () => editorRef.current?.getEditor()?.getValue() // a comment save's re-read never overwrites a keystroke
+    bufferNow: () => editorRef.current?.getEditor()?.getValue() // a read never overwrites a keystroke
   })
+  const { externalChangeDetected, isFileDeleted, isReloading, isReadOnlyBlocked } = watch
 
   // A save-failure reason shown for one file must not mute the same reason for
   // the next file this panel shows
   useEffect(() => {
     lastSaveErrorRef.current = null
-  }, [currentFile?.path])
-
-  // Create file save guard for pausing/resuming file watching during save
-  useEffect(() => {
-    if (currentFile?.path) {
-      saveGuardRef.current = createFileSaveGuard(currentFile.path)
-    } else {
-      saveGuardRef.current = null
-    }
   }, [currentFile?.path])
 
   // =========================================================================
@@ -246,11 +244,12 @@ export function MarkdownEditorPanel(
   // save callback: the hook is called first and reaches handleSave through
   // this ref, which a layout effect below points at the latest handleSave.
   const handleSaveRef = useRef<(trigger?: SaveTrigger) => Promise<boolean>>(async () => false)
+  const autosaveGate = { conflict: externalChangeDetected, deleted: isFileDeleted, contentBlocked: isReadOnlyBlocked }
   const { isAutoSaving, setIsAutoSaving, holdAutoSave, signalChange } = useAutoSave(
     currentFile?.modified ?? false,
     async () => {
-      // Never over a changed-on-disk conflict or a deleted file (#460)
-      if (!shouldAutosave(externalChangeDetected, isFileDeleted)) return
+      // Never over a changed-on-disk conflict, a deleted file (#460) or content it cannot show (#478 F1)
+      if (!shouldAutosave(autosaveGate)) return
       // `false` (a failed write) makes autosave back off until the next edit
       return handleSaveRef.current('autosave')
     },
@@ -261,30 +260,27 @@ export function MarkdownEditorPanel(
   const saveInFlightRef = useRef<Promise<void> | null>(null)
 
   /**
-   * Saves the current file to disk.
+   * Saves the current file to disk, through the editor's freshness save
+   * (#478 S14, `useFileWatcher.save`): it pauses this tab's own watch, writes
+   * in main – an autosave only while the file is still the version the tab
+   * read (F7) – adopts the written stamp so the echo stays silent, and resumes.
    *
    * Step ordering contract (do not reorder):
-   * 1. markSaving – guard against watcher events during save
-   * 2. pauseWatch – pause chokidar (first defense layer)
-   * 3. Read content from Monaco model (authoritative source, not React state)
-   * 4. writeFile – write to disk
-   * 5. notifySaveComplete – store content for self-save echo detection
-   * 6. setCurrentFile modified: false – mark clean
-   * 7. Post-save dirty check – if editor diverged during async write, re-mark dirty
-   * 8. finally: resumeWatch + unmarkSaving
+   * 1. Read content from Monaco model (authoritative source, not React state)
+   * 2. watch.save – the checked write
+   * 3. changed-on-disk: the conflict bar says "Not saved" (F16), no failure toast
+   * 4. setCurrentFile modified: false – mark clean, from the buffer as it is now
+   *    (if the editor diverged during the async write, it stays dirty)
    *
    * @param trigger - Who asked: the tab's own Cmd+S (`user`), `autosave`, or a
    *   save by id (`registry`); it decides folder restore and the failure toast
    * @returns `true` when the write succeeded (issue #124: a save by id reads it)
    */
   const handleSave = useCallback(async (trigger: SaveTrigger = 'user'): Promise<boolean> => {
-    if (!currentFile) return false
+    if (!currentFile || isReadOnlyBlocked) return false // never over content it cannot show (#478 F1)
     const isAutoSave = trigger === 'autosave'
 
     const finishInFlight = trackSaveInFlight(saveInFlightRef)
-
-    // Step 1: Mark saving via hook to prevent race conditions with file watcher
-    markSaving()
 
     try {
       if (isAutoSave) {
@@ -296,41 +292,33 @@ export function MarkdownEditorPanel(
         setIsAutoSaving(true)
       }
 
-      // Step 2: Pause file watching during save to prevent race condition
-      await saveGuardRef.current?.pauseWatch()
-
-      // Step 3: Read content from Monaco model – always reflects latest keystrokes,
+      // Step 1: Read content from Monaco model – always reflects latest keystrokes,
       // unlike currentFile.content which may be stale from the useCallback closure
       const contentToSave =
         editorRef.current?.getEditor()?.getValue() ?? currentFile.content
 
-      // Step 4: Write to disk. Only the tab's own Cmd+S in the deleted state is
-      // the banner's "Save to restore it", so only it may recreate the folder
-      // the file lived in. An autosave or a save by id never does: it would
-      // silently resurrect a folder someone just renamed.
+      // Step 2: Write. Only the tab's own Cmd+S (or Restore file) in the deleted
+      // state may recreate the folder the file lived in. An autosave or a save
+      // by id never does: it would silently resurrect a folder someone just renamed.
       // The write names the project the file was opened under: after a project
       // switch the main process refuses it, so a stale tab never lands in the next project.
       const generation = openedGenerationRef.current
-      if (shouldRecreateParentDirs(trigger, isFileDeleted)) {
-        await fileGateway.writeFile({
-          filePath: currentFile.path,
-          content: contentToSave,
-          createParentDirs: true,
-          generation
-        })
-      } else {
-        await fileGateway.writeFile({
-          filePath: currentFile.path,
-          content: contentToSave,
-          generation
-        })
-      }
+      const reply = await watch.save({
+        content: contentToSave,
+        trigger: saveTriggerFor(trigger, isFileDeleted),
+        generation,
+        ...(shouldRecreateParentDirs(trigger, isFileDeleted) ? { createParentDirs: true as const } : {})
+      })
       lastSaveErrorRef.current = null
 
-      // Step 5: Record saved content for self-save echo detection (#124)
-      notifySaveComplete(contentToSave)
+      // Step 3: the autosave found the file changed since it was read: nothing
+      // was written; the conflict bar (already up) says "Not saved"
+      if (reply.status === 'changed-on-disk') {
+        setIsAutoSaving(false)
+        return false
+      }
 
-      // Steps 6+7: settle the file state in one update. If the user typed
+      // Step 4: settle the file state in one update. If the user typed
       // during the async write, the buffer is ahead of what was written: keep
       // the buffer's text and stay modified. One update, so React never
       // renders the written (older) text as current (functional updater to
@@ -343,10 +331,6 @@ export function MarkdownEditorPanel(
           bufferNow !== undefined && bufferNow !== contentToSave
         )
       }
-
-      // Clear any external change detection since we just saved
-      dismissConflict()
-      clearDeletedState()
 
       if (isAutoSave) {
         // Show auto-save indicator briefly (the reset is cleared on unmount)
@@ -372,27 +356,26 @@ export function MarkdownEditorPanel(
       }
       return false
     } finally {
-      // Step 8: Resume file watching after save completes
-      await saveGuardRef.current?.resumeWatch()
-      unmarkSaving()
       finishInFlight()
     }
-  }, [currentFile, isFileDeleted, dismissConflict, clearDeletedState, markSaving, unmarkSaving, notifySaveComplete, showToast, setIsAutoSaving, panelId])
+  }, [currentFile, isFileDeleted, watch, showToast, setIsAutoSaving, panelId, isReadOnlyBlocked])
   useLayoutEffect(() => {
     handleSaveRef.current = handleSave
   }, [handleSave])
 
-  // When the conflict bar or the deleted banner goes away with edits unsaved
-  // (Keep My Version, Dismiss, the file back), autosave resumes on its own.
+  // When the conflict bar, the deleted notice or a content block goes away with
+  // edits unsaved (Keep My Version, Dismiss, the file back), autosave resumes on its own.
   useEffect(() => {
-    if (shouldAutosave(externalChangeDetected, isFileDeleted)) signalChange()
-  }, [externalChangeDetected, isFileDeleted, signalChange])
+    if (shouldAutosave({ conflict: externalChangeDetected, deleted: isFileDeleted, contentBlocked: isReadOnlyBlocked })) signalChange()
+  }, [externalChangeDetected, isFileDeleted, isReadOnlyBlocked, signalChange])
 
   // Read-only during an autosave hold, including an editor that remounts
   // (view-mode switch) while the hold is active – see handleEditorMount
   const readOnlyHold = useEditorReadOnlyHold(() => editorRef.current?.getEditor())
+  // ...and while the file cannot be shown: the buffer is the last good read (#478 F1)
+  useEffect(() => (isReadOnlyBlocked ? readOnlyHold.hold() : undefined), [isReadOnlyBlocked, readOnlyHold])
 
-  useEditorSaveRegistration(panelId, () => handleSave('registry'), externalChangeDetected, () => {
+  useEditorSaveRegistration(panelId, () => handleSave('registry'), externalChangeDetected || isReadOnlyBlocked, () => {
     // A hold stops autosave for real (no re-arming by typing or the modified
     // effect) and makes the editor read-only, so nothing new can be typed
     // between a flush and the end of the hold.
@@ -492,7 +475,7 @@ export function MarkdownEditorPanel(
   })
 
   // Markdown Preview comments (spec 024): toolbar tools, paused band, pane overlay – preview-only view.
-  const comments = useMarkdownComments({ panelId, filePath: currentFile?.path, content: currentFile?.content ?? '', viewMode, setViewMode, editorRef, isActivePanel, isVisible: isPanelVisible, panelApi: props.api, onFileWritten: reloadIfUnedited })
+  const comments = useMarkdownComments({ panelId, filePath: currentFile?.path, content: currentFile?.content ?? '', viewMode, setViewMode, editorRef, isActivePanel, isVisible: isPanelVisible, panelApi: props.api, onFileWritten: watch.reloadIfUnedited })
   // =========================================================================
   // Document Statistics
   // =========================================================================
@@ -518,12 +501,13 @@ export function MarkdownEditorPanel(
     read: async (filePath) => {
       // The project this file is opened under; saves name it
       const generation = getLastSeenProjectGeneration()
-      const content = await fileGateway.readFile({ filePath })
-      return { content, generation }
+      const { content, stamp } = await readEditorText(filePath)
+      return { content, generation, stamp }
     },
     onStart: () => setIsEditorReady(false), // Reset editor ready state when loading new file
-    onLoaded: (filePath, { content, generation }) => {
+    onLoaded: (filePath, { content, generation, stamp }) => {
       openedGenerationRef.current = generation
+      setBaseline(stamp)
       comments.prefetch(filePath, getDefaultViewMode(filePath)) // 024-NFR-001: main reads comments while the preview renders
       setCurrentFile({ path: filePath, content, modified: false })
       setViewMode(getDefaultViewMode(filePath)) // by file type
@@ -667,21 +651,17 @@ export function MarkdownEditorPanel(
           </EditorErrorBoundary>
           {comments.band}
 
-          {/* File conflict notification */}
-          {externalChangeDetected && (
-            <FileConflictNotification
-              fileName={getBasename(currentFile.path) || 'File'}
-              onReload={handleReloadFromDisk}
-              onKeepLocal={handleKeepLocal}
-              onDismiss={dismissConflict}
-            />
-          )}
-          {isWatchUnavailable && <WatchStoppedNotice fileName={getBasename(currentFile.path) || 'File'} onReload={restartWatch} />}
-          {isFileDeleted && (
-            <div className="file-deleted-warning">
-              <span>This file was deleted on disk. Save to restore it.</span>
-            </div>
-          )}
+          <FreshnessNotice
+            notice={selectNotice({ state: watch.state, fileName: getBasename(currentFile.path) || 'File', tab: 'editor', tooLargeSize: watch.tooLargeSize, limitedDismissed })}
+            fileName={getBasename(currentFile.path) || 'File'}
+            isActive={isActivePanel}
+            handlers={{
+              restore: () => void handleSave('user'), close: () => props.api.close(),
+              'reload-from-disk': () => void watch.reloadFromDisk(), 'keep-local': watch.keepLocal,
+              'dismiss-conflict': watch.dismissConflict, reload: () => void watch.reloadFromDisk(),
+              'dismiss-limited': () => setLimitedDismissed(true)
+            }}
+          />
         </>
       )}
 

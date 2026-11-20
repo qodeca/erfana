@@ -47,42 +47,34 @@ const createFile = async () => {
 
 Standard pattern for listening to file system events in React components.
 
-The editor does not call `window.api.fileWatch.start/stop` directly. `useFileWatcher` (`src/renderer/src/hooks/useFileWatcher.ts`, used by the Markdown editor) and `useFileChangeSubscription` (the read-only image-viewer hook) both hold their watch through a **slot** from `src/renderer/src/hooks/fileWatchSlot.ts`, because `fileWatch.start` is a counting acquire main-side and start/stop must stay balanced and ordered.
+No component calls `window.api.fileWatch` directly. A tab follows its file through the shared freshness tracker (#478): `useFreshness` (`src/renderer/src/hooks/useFreshness.ts`) builds one `FreshnessTracker` per tab, and the adapters – `useFileWatcher` (the Markdown editor) and `useFileChangeSubscription` (the image viewer) – supply only the update rule.
 
 ```typescript
-// hooks/useFileWatcher.ts (simplified) - file content watching through the slot
-import { createFileWatchSlot, acquireFileWatch, releaseFileWatch } from './fileWatchSlot'
+// hooks/useFileWatcher.ts (simplified) - the editor's rule on the shared tracker
+const rule = useMemo<UpdateRule<TextVersion>>(() => ({
+  read: async () => textReadOutcome(await freshnessEnvironment().source.readText(filePath)),
+  readNow: () => true,
+  apply: (version, _stamp, force) => (force || !edited ? take(version) : 'held')
+}), [filePath])
 
-useEffect(() => {
-  if (!filePath) return
+const { state, tracker } = useFreshness<TextVersion>({ filePath, profile: 'editor', rule, ready, baseline, visible })
+```
 
-  // Acquire this consumer's single hold on the main-process watch
-  void acquireFileWatch(slot, filePath).then(({ started, error, cause }) => {
-    // started === false → surface `cause` (deleted / outside project / ...)
-  })
-
-  // Listen for changes and deletion
-  const unsubscribeChanged = fileWatchGateway.onFileChanged((data) => {
-    if (data.filePath === filePath) handleExternalChange()
-  })
-  const unsubscribeDeleted = fileWatchGateway.onFileDeleted((data) => {
-    if (data.filePath === filePath) setIsFileDeleted(true)
-  })
-
-  // Cleanup: release the slot (balanced stop), then drop the listeners
-  return () => {
-    void releaseFileWatch(slot, filePath)
-    unsubscribeChanged()
-    unsubscribeDeleted()
-  }
-}, [filePath])
+```typescript
+// hooks/useFreshness.ts (simplified) - one subscription per tab, released with it
+const tracker = new FreshnessTracker({ filePath, profile, rule, source, clock, newId })
+const unregister = registerTracker(tracker)
+void tracker.begin(baselineRef.current)
+return () => {
+  unregister()
+  tracker.dispose() // unsubscribes its own watchId only
+}
 ```
 
 **Key Points**:
-- Watch starts when file is opened (via `acquireFileWatch`, never a raw `fileWatch.start`)
-- Multiple event listeners can be attached
-- Each listener returns an unsubscribe function
-- All listeners and watchers are cleaned up on unmount
+- The watch starts once the tab's first read is in, from that read's stamp, so a write before the watch was live is caught up (G3)
+- Each tab's subscription has its own `watchId`; events, pauses and releases never reach another tab
+- The tracker is disposed on unmount, which releases its subscription
 
 ### Session Token Guards (Switch Tokens)
 
@@ -98,13 +90,12 @@ Effect:
 
 ### Watcher boundaries follow the open project
 
-Erfana does not reopen the last project at launch (#60 – a crash caused by a project must not repeat on relaunch). Whenever the open-project session changes, `ProjectService.updateServices(root)` points all three services at the new root:
+Erfana does not reopen the last project at launch (#60 – a crash caused by a project must not repeat on relaunch). Whenever the open-project session changes, `ProjectService.updateServices(root)` points the two services that still take a pushed root at the new root:
 
 - `fileService.setProjectPath(root)`
-- `fileWatcherService.setProjectPath(root)`
 - `directoryWatcherService.setProjectPath(root)`
 
-This keeps the watcher boundary checks ("inside project root") in step with the project that is open; `''` means no project.
+`FileWatcherService` takes no pushed root (#478): `ProjectService` binds it to the read-only session (`bindSession`), and it reads the root, the real root, the case rule and the generation from there on every subscribe and every arm. `''` means no project.
 
 ### Expanded State Preservation Pattern
 
@@ -148,9 +139,9 @@ echo "# Conflict" >> /path/to/project/test.md
 rm /path/to/project/test.md
 
 # Expected:
-# - Red warning banner: "This file was deleted on disk. Save to restore it."
+# - The deleted notice: "test.md was deleted, renamed or moved on disk." with Restore file and Close tab
 # - Editor content remains (not cleared)
-# - Can still save to recreate file
+# - Restore file (or Cmd/Ctrl+S) recreates the file
 ```
 
 **Test 4: Rapid changes (debouncing)**
@@ -160,7 +151,8 @@ rm /path/to/project/test.md
 for i in {1..10}; do echo "Change $i" >> test.md; done
 
 # Expected:
-# - Single reload after changes settle (300ms)
+# - The tab updates at once for the first change, then at most every 250 ms,
+#   and ends on the last line (leading + trailing throttle)
 # - Not 10 separate reloads
 ```
 
@@ -265,6 +257,22 @@ Catch-up after a pause ([#210](https://github.com/qodeca/erfana/issues/210)):
 - `DirectoryWatcherService.pipeline.test.ts` › `#210 catch-up after a pause` – the service end to end: exactly one `catchUp: true` send, which reads cover (subfolder, other window, trailing separator), own change filtered, safety timeout, nested pauses (9 tests)
 - `file-handlers.test.ts` › `#210 watcher catch-up hooks` – `beginTreeRead` before the walk and a commit only on success; each mutation channel records its change on success only (20 tests). Renderer: one catch-up case each in `useDirectoryWatcher.test.ts`, `useDirectoryWatcher.logic.test.ts` and `withWatcherPause.test.ts`
 
+### File freshness (#478)
+
+How the shared capability is tested (design: [README § Following a file](./README.md#following-a-file-the-freshness-capability-478), [ADR 0013](../adrs/0013-one-freshness-capability.md)).
+
+**Core against a fake disk, clock and source.** `src/shared/freshness/__test__/` holds `fakeClock.ts`, `fakeDisk.ts` and `fakeSource.ts` (a `ready` that can be held, scripted events including ones before `started`, injectable failures). The tracker suites (`FreshnessTracker.*.test.ts`: catch-up, ids, restart, limit, deleted, dropped, safety net, content, burst, limited) and `saveAddOn.test.ts` run on them with no real timers. `freshnessPurity.test.ts` fails when a file under `src/shared/freshness/` imports anything outside `src/shared/`. These suites run in the Node `main` Vitest project, not jsdom.
+
+**One contract suite for every adapter.** `__test__/freshnessContract.ts` exports `describeFreshnessContract(name, harness)`. The harness supplies the adapter, what the tab shows, whether it is edited, visibility, and a map of scenarios the adapter skips, each with a reason. It runs for the editor (`editorFreshness.contract.test.ts`), the image viewer (`imageFreshness.contract.test.ts`), Markdown preview images (`markdownImageFreshness.contract.test.ts`), the HTML preview (`previewFreshness.contract.test.ts`) and the comments (`commentFreshness.contract.test.ts`). A new tab type adds one adapter and one short test file like these.
+
+**Symptom-pinned gap tests.** Each gap of the issue has a test that states the correct behaviour (`FileWatcherService.gaps.test.ts`, `useFileWatcher.gaps.test.ts`, `imageRead.gaps.test.ts`, `e2e/file-freshness-gaps.e2e.ts`). They were written first, against the old code, inside `expectGap(…, /symptom/)` so they passed only on the named failure; each was converted to the plain assertion when its fix landed, and none remains.
+
+**End to end (Playwright, condition waits only).** `e2e/file-freshness-gaps.e2e.ts` (G1, G2, G4–G6, G8, G9), `-writers` (in place, temp and rename, stream, a copy that keeps the modified time, `git checkout`, by tab type, visible and hidden), `-content` (empty, too large, binary, encoding, unreadable, rename and move), `-save` (own save, conflict, Restore file), `-safety-net` (focus, shown, wake, limited), `-comments`. Main-process test hooks in `src/main/testHooks/freshnessHook.ts` (`watchStats`, `setWatchLimit`, `failNextSubscribe`, `muteWatchEvents`, `killWatchesSilently`, `simulateResume`, `holdNextWrite` / `releaseWrite`) reach states a real run cannot order. Writers live in `e2e/utils/freshness-writers.ts`.
+
+**Latency gates.** `e2e/file-freshness-latency.timing.e2e.ts` runs in the `timing` Playwright project (one worker, `*.timing.e2e.ts`): 30 runs per case, each with a unique marker; the time is measured from the write call returning to the marker in the page. The editor, image and Markdown preview image gates are p50 ≤ 250 ms and p95 ≤ 400 ms; the HTML preview must stay within its recorded reference plus a margin. A second file, `file-freshness-burst.timing.e2e.ts`, covers a burst of writes and the partial-file case. Run on Windows locally; the gate is meant to pass 20 times in a row (`npx playwright test --project=timing --no-deps --repeat-each=20 e2e/file-freshness-latency.timing.e2e.ts`).
+
+**Cost of a check.** `src/main/services/freshness/fileStamp.perf.test.ts` asserts a fresh stamp with hash of a 16 MiB file stays under 200 ms, the budget of one safety-net check.
+
 ### Large projects on Windows (#211)
 
 **Test setup forces chokidar.** `tests/setup/setupTests.main.ts` mocks `src/main/services/watcher/directoryWatchBackend.ts` wholesale so `selectDirectoryWatchBackend()` returns `chokidar` on every host – the same precedent as its `senderValidation` default. Without it the `DirectoryWatcherService` suites, written against a mocked `chokidar`, would exercise chokidar on Linux CI and a real native watcher on a Windows host. The stub is a plain function, not `vi.fn`, so a suite's `vi.resetAllMocks()` cannot turn the answer into `undefined`; the module exports nothing else at runtime, so the wholesale factory is complete. The selector's own suite declares `vi.unmock`; the native wiring suite constructs the service with `{ backend: 'native-recursive' }` instead.
@@ -315,9 +323,9 @@ await window.api.file.getProjectPath()
 Session reset (drops stale events):
 
 ```ts
-// Stop all directory/file watchers for this window (safe; re-created on demand)
+// Stop the directory watchers for this window (safe; re-created on demand).
+// File watches are per-tab subscriptions: closing or reloading the window drops them.
 await window.api.directoryWatch.stopAll()
-await window.api.fileWatch.stopAll()
 ```
 
 Pause/resume around internal CRUD (if scripting flows):

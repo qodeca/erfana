@@ -4,6 +4,7 @@ import type { FileNode } from '../../shared/ipc/file-schema'
 import type { ImageReadResponse } from '../../shared/ipc/file-image-schema'
 import type { ProjectPathFilter } from '../utils/projectPathFilter'
 import type { ProjectSession } from '../services/session/ProjectSession'
+import type { EntryRemover } from '../services/file/entryRemoval'
 
 /**
  * Interface for file system operations
@@ -86,14 +87,15 @@ export interface IFileService {
   createFolder(dirPath: string, folderName: string): Promise<string>
 
   /**
-   * Delete a file
+   * Delete a file. `remove` does the removal once the checks pass: permanent by
+   * default; the project tree's Delete passes the trash remover (#486).
    */
-  deleteFile(filePath: string): Promise<void>
+  deleteFile(filePath: string, remove?: EntryRemover): Promise<void>
 
   /**
-   * Delete a folder
+   * Delete a folder and its contents (never the project root). `remove` as for `deleteFile`.
    */
-  deleteFolder(folderPath: string): Promise<void>
+  deleteFolder(folderPath: string, remove?: EntryRemover): Promise<void>
 
   /**
    * Rename a file or folder

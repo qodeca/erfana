@@ -48,6 +48,7 @@ ADRs are **not** retrofitted for every historical choice — only for decisions 
 | [0010](./0010-turn-on-cookie-encryption.md) | Turn on the `EnableCookieEncryption` fuse | accepted | 2026-11-03 |
 | [0011](./0011-erfana-surfaces-over-the-page-and-main-process-key-routing.md) | Erfana surfaces around and over the page view, and key routing in the main process | accepted | 2026-11-03 |
 | [0012](./0012-local-files-through-a-dedicated-scheme.md) | Local files open through a per-folder loopback server (file name keeps the first plan's `erfana-local:` title) | accepted | 2026-11-03 |
+| [0013](./0013-one-freshness-capability.md) | One freshness capability follows every open file (#478) | accepted | 2026-11-18 |
 
 ## When to write an ADR
 

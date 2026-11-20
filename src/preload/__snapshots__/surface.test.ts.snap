@@ -201,14 +201,15 @@ exports[`preload surface > window.api.fileComments exposes the expected members 
 exports[`preload surface > window.api.fileWatch exposes the expected members 1`] = `
 [
   "getStats",
-  "onFileChanged",
-  "onFileDeleted",
-  "onFileError",
-  "pause",
-  "resume",
-  "start",
-  "stop",
-  "stopAll",
+  "onCheck",
+  "onEvent",
+  "pauseWatch",
+  "probe",
+  "readText",
+  "resumeWatch",
+  "subscribe",
+  "unsubscribe",
+  "writeText",
 ]
 `;
 

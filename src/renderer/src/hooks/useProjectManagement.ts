@@ -102,6 +102,8 @@ export function useProjectManagement(
   const refreshRunnerRef = useRef<CoalescingRunner<void> | null>(null)
   // Scope of the listener load still in flight, or null when there is none.
   const pendingLoadGenerationRef = useRef<number | null>(null)
+  // Written only by the project-changed listener, so a close toasts without racing the close reply (#485)
+  const announcedProjectRef = useRef<string | null>(null)
 
   /** Open a new refresh scope: later results from older scopes are dropped. */
   const beginRefreshScope = (path: string | null): CoalescingRunner<void> => {
@@ -199,11 +201,11 @@ export function useProjectManagement(
 
       if (shouldOpenExternalProject(data.newPath)) {
         const newPath = data.newPath!
+        announcedProjectRef.current = newPath
         // New scope first, before any state update or await: every older
         // read (listener or refresh) is from now on dropped when it lands.
         beginRefreshScope(newPath)
         const generation = refreshGenerationRef.current
-        // New project opened externally
         // Clear old project files immediately before loading new ones
         setProjectPath(newPath)
         // Same synchronous block as setProjectPath, before the await: the
@@ -260,24 +262,21 @@ export function useProjectManagement(
           }
         }
       } else {
-        // Project closed externally
+        const hadProject = announcedProjectRef.current !== null // null on a reloaded page (#485)
+        announcedProjectRef.current = null
         beginRefreshScope(null)
         setProjectPath(null)
         setFiles([])
         // Clears a spinner left by an open-load this close superseded.
         setLoading(false)
         setFirstReadPending(false)
-        showGlobalToast({
-          type: 'info',
-          title: 'Project Closed',
-          message: createProjectClosedMessage()
-        })
+        if (hadProject) {
+          showGlobalToast({ type: 'info', title: 'Project Closed', message: createProjectClosedMessage() })
+        }
       }
     })
 
-    return () => {
-      unsubscribe()
-    }
+    return unsubscribe
   }, [api.file, options])
 
   /**

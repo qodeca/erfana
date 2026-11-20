@@ -56,6 +56,7 @@ export interface Dialogs {
     confirmLabel?: string
     cancelLabel?: string
     danger?: boolean
+    confirmArmDelayMs?: number
   }) => Promise<boolean>
   showRename: (opts: {
     title: string

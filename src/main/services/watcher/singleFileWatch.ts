@@ -17,6 +17,7 @@
  * instead (see `directoryWatchBackend`).
  */
 import chokidar, { FSWatcher, ChokidarOptions } from 'chokidar'
+import type { FileStamp } from '../../../shared/freshness/freshnessTypes'
 import { createWriteFinishGate, type WriteFinishOptions } from './writeFinishGate'
 
 /**
@@ -49,7 +50,11 @@ export const SINGLE_FILE_WATCH_OPTIONS: ChokidarOptions = {
 }
 
 export interface SingleFileWatchHandlers {
-  onChange: () => void
+  /**
+   * The file changed; `forced` when the write gate gave up waiting for it to
+   * settle (its cap), else `stamp` is the stat-only stamp the writes settled at.
+   */
+  onChange: (forced: boolean, stamp?: FileStamp) => void
   onUnlink: () => void
   onError: (error: unknown) => void
   /**
@@ -86,7 +91,7 @@ export function createSingleFileWatcher(
   // A change is held until its writes settle, by our gate rather than
   // chokidar's (see SINGLE_FILE_WATCH_OPTIONS); `awaitWriteFinish: false` in
   // the options passes every change straight through
-  let onChange = handlers.onChange
+  let onChange = (): void => handlers.onChange(false)
   let cancelWait = (): void => {}
   if (writeFinish) {
     const timings: WriteFinishOptions =

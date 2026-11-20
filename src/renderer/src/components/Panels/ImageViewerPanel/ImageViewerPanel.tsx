@@ -29,7 +29,7 @@
  * @see Issue #73 - PNG / PDF / clipboard export controls
  */
 
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { IDockviewPanelProps } from 'dockview'
 import { Loader2, AlertCircle, ImageIcon } from 'lucide-react'
@@ -39,7 +39,9 @@ import { getBasename, sanitizeFileName } from '../../../utils/fileUtils'
 import { formatTabTitle } from '../../../utils/tabTitle'
 import { TEST_IDS } from '../../../constants/testids'
 import { useFileChangeSubscription } from '../../../hooks/useFileChangeSubscription'
-import { DOCKVIEW_PANEL_VISIBLE, useDockviewValue } from '../../../hooks/useDockviewValue'
+import { DOCKVIEW_PANEL_ACTIVE, DOCKVIEW_PANEL_VISIBLE, useDockviewValue } from '../../../hooks/useDockviewValue'
+import { selectNotice } from '../../FileConflictNotification/freshnessNoticeCopy'
+import { FreshnessStatusRegion } from '../../FileConflictNotification/FreshnessStatusRegion'
 import { ImageViewerBanner, ImageViewerToolbar } from './components'
 import {
   useFullScreenOverlay,
@@ -105,14 +107,10 @@ export function ImageViewerPanel(props: IDockviewPanelProps<ImageViewerPanelPara
   const fileName = useMemo(() => sanitizeFileName(filePath), [filePath])
   const format = useMemo(() => getImageFormat(filePath), [filePath])
 
-  // ========================================
-  // Visibility
-  // ========================================
-
   // The watch is always live; only the multi-MB base64 re-read waits for the
-  // tab to be looked at. Written against a plain boolean so swapping dockview's
-  // `isVisible` for `isActive` is a one-line change here (DOCKVIEW_PANEL_ACTIVE).
+  // tab to be looked at; only the tab in front speaks its notice (#478 F13)
   const isVisible = useDockviewValue(api, DOCKVIEW_PANEL_VISIBLE)
+  const isActive = useDockviewValue(api, DOCKVIEW_PANEL_ACTIVE)
 
   // ========================================
   // Source + watch
@@ -121,17 +119,10 @@ export function ImageViewerPanel(props: IDockviewPanelProps<ImageViewerPanelPara
   const fullScreen = useFullScreenOverlay()
   const { isFullScreen, overlayRef, portalRoot } = fullScreen
 
-  // Forward declaration: the subscription needs `refresh`, and `useImageSource`
-  // needs `markReloaded`. A ref breaks the cycle without an extra render.
-  const refreshRef = useRef<() => void>(() => {})
-
-  const watch = useFileChangeSubscription(filePath, {
-    onExternalChange: () => refreshRef.current()
-  })
-
-  // Second forward declaration, same reason as `refreshRef`: the source hook
-  // must reconcile the transform in the batch that swaps `src`, but the
-  // transform hook needs the decoded dimensions the source hook produces.
+  // Forward declarations: the source hook reports a landed refresh to the watch
+  // (built after it), and reconciles the transform in the batch that swaps
+  // `src` while the transform needs the dimensions it produces. Refs break both cycles.
+  const markReloadedRef = useRef<() => void>(() => {})
   const applySourceChangeRef = useRef<UseImageViewerTransformResult['applySourceChange']>(() => {})
 
   // Stable identity, so `useImageSource` never re-reads a moving callback.
@@ -142,21 +133,29 @@ export function ImageViewerPanel(props: IDockviewPanelProps<ImageViewerPanelPara
     []
   )
 
-  const { source, isLoading, error, isStale, refresh, handleImageError } = useImageSource({
+  const { source, isLoading, error, isStale, refresh, pushSource, handleImageError } = useImageSource({
     filePath,
     isVisible,
-    onRefreshed: watch.markReloaded,
+    onRefreshed: () => markReloadedRef.current(),
     onSourceCommit: handleSourceCommit
   })
 
-  // Written in an effect, never in the render body: under concurrent rendering
-  // React may render this component without committing, and a render-phase
-  // write would leave the ref pointing at a `refresh` bound to a state that was
-  // thrown away – surfacing much later as "the tab just stopped refreshing".
-  // An effect is late enough because the ref is only read from watcher events.
+  // The freshness tracker starts once the first image is on screen, from its
+  // stamp (#478 G3), and hands every new version it reads straight to the
+  // source hook – no second read (F30)
+  // Follow once the first load settled: a failed first load is retried by the tracker's catch-up read
+  const watch = useFileChangeSubscription(filePath, {
+    ready: source !== null || error !== null,
+    baseline: source?.stamp,
+    visible: isVisible,
+    currentVersion: source?.version,
+    onBytes: pushSource
+  })
+
+  // In an effect, never in render: a render React throws away must not write it
   useEffect(() => {
-    refreshRef.current = refresh
-  }, [refresh])
+    markReloadedRef.current = watch.markReloaded
+  }, [watch.markReloaded])
 
   const imageSize = useMemo(
     () => (source ? { width: source.naturalWidth, height: source.naturalHeight } : null),
@@ -218,25 +217,34 @@ export function ImageViewerPanel(props: IDockviewPanelProps<ImageViewerPanelPara
   // Degraded states
   // ========================================
 
-  const { isReloadPending, hasReloadFailed, reload } = useReloadAction({
-    recover: watch.recover,
-    refresh
+  // With an image on screen, Reload is the tracker's (a new watch and a forced
+  // read); on the error screen there is no tracker yet: if the file is there, read it afresh
+  const hasSource = source !== null
+  const recover = useCallback(async (): Promise<boolean> => {
+    const followed = await watch.reload()
+    if (followed && !hasSource) refresh()
+    return followed
+  }, [hasSource, watch, refresh])
+  const { isReloadPending, hasReloadFailed, reload } = useReloadAction({ recover, refresh: () => {} })
+  const [limitedDismissed, setLimitedDismissed] = useState(false)
+  const notice = selectNotice({
+    state: watch.state,
+    fileName: getBasename(filePath) || 'Image',
+    tab: 'image',
+    tooLargeSize: watch.tooLargeSize,
+    limitedDismissed
   })
 
   // Read at render time, never captured when the click was made: `recover`
   // updates `isFileDeleted` as part of failing, so the current value is what
   // says whether the file is still missing or the watch would not restart.
   const reloadFailure: ReloadFailure | null = hasReloadFailed
-    ? watch.isFileDeleted
+    ? watch.isFileDeleted || watch.reloadFoundMissing
       ? 'missing'
       : 'watch'
     : null
 
-  const bannerVariant = getBannerVariant({
-    isFileDeleted: watch.isFileDeleted,
-    isWatchUnavailable: watch.isWatchUnavailable,
-    isStale
-  })
+  const bannerVariant = getBannerVariant({ hasNotice: notice !== null, isStale })
 
   const status = getViewerStatus({
     isWatchUnavailable: watch.isWatchUnavailable,
@@ -244,7 +252,7 @@ export function ImageViewerPanel(props: IDockviewPanelProps<ImageViewerPanelPara
     isReloading: watch.isReloading,
     reloadFailure,
     // The banner is the fuller statement of the same fact; passing it in stops
-    // a role="alert" and a role="status" announcing one sentence twice.
+    // two live regions announcing one sentence twice.
     bannerVariant
   })
 
@@ -301,8 +309,10 @@ export function ImageViewerPanel(props: IDockviewPanelProps<ImageViewerPanelPara
     bannerVariant && (
       <ImageViewerBanner
         variant={bannerVariant}
-        unavailableReason={watch.unavailableReason}
+        notice={notice}
         onReload={reload}
+        onClose={() => api.close()}
+        onDismissLimited={() => setLimitedDismissed(true)}
         isReloadPending={isReloadPending}
       />
     )
@@ -368,6 +378,8 @@ export function ImageViewerPanel(props: IDockviewPanelProps<ImageViewerPanelPara
         <img
           src={source.url}
           alt={`Preview of ${fileName}`}
+          // The version on screen: the e2e freshness recorder times it (#478 P1)
+          data-version={source.version}
           className={styles.image}
           style={{
             transform: `translate(${transform.transform.translateX}px, ${transform.transform.translateY}px) scale(${transform.transform.scale})`,
@@ -457,6 +469,8 @@ export function ImageViewerPanel(props: IDockviewPanelProps<ImageViewerPanelPara
       {!isFullScreen && renderBanner()}
 
       {!isFullScreen && renderExportStatus()}
+
+      <FreshnessStatusRegion text={isActive && bannerVariant === 'notice' ? (notice?.message ?? '') : ''} />
 
       {renderImageContent(containerRef)}
 

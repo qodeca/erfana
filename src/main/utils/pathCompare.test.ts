@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import path from 'node:path'
-import { isInsideRoot, pathBelowRoot, type PathFlavour } from './pathCompare'
+import { isInsideRoot, pathBelowRoot, pathKey, type PathFlavour } from './pathCompare'
 
 const darwin: PathFlavour = { path: path.posix, platform: 'darwin' }
 const linux: PathFlavour = { path: path.posix, platform: 'linux' }
@@ -87,5 +87,34 @@ describe('pathBelowRoot', () => {
         isInsideRoot(candidate, root, caseSensitive, flavour)
       )
     }
+  })
+})
+
+describe('pathKey', () => {
+  it('folds letter case under a case-insensitive rule (Windows lower-case drive link – G6)', () => {
+    expect(pathKey('c:\\Users\\A\\Proj\\a.md', false, win32)).toBe(pathKey('C:\\users\\a\\proj\\A.MD', false, win32))
+  })
+
+  it('keeps letter case under a case-sensitive rule', () => {
+    expect(pathKey('/home/a/Proj/a.md', true, linux)).not.toBe(pathKey('/home/a/proj/a.md', true, linux))
+  })
+
+  it('composes Unicode on darwin, so an NFD name and an NFC name share one key', () => {
+    const nfc = '/Users/a/Proj/caf\u00e9.md'
+    const nfd = '/Users/a/Proj/cafe\u0301.md'
+    expect(pathKey(nfd, false, darwin)).toBe(pathKey(nfc, false, darwin))
+    // Linux names are bytes: two forms are two files
+    expect(pathKey(nfd, true, linux)).not.toBe(pathKey(nfc, true, linux))
+  })
+
+  it('drops the extended-length prefix and trailing separators of realpath output', () => {
+    expect(pathKey('\\\\?\\C:\\Proj\\a.md', false, win32)).toBe(pathKey('C:\\Proj\\a.md', false, win32))
+    expect(pathKey('\\\\?\\UNC\\srv\\share\\a.md', false, win32)).toBe(pathKey('\\\\srv\\share\\a.md', false, win32))
+    expect(pathKey('/home/a/proj/', true, linux)).toBe('/home/a/proj')
+  })
+
+  it('keeps a filesystem root intact', () => {
+    expect(pathKey('/', true, linux)).toBe('/')
+    expect(pathKey('C:\\', false, win32)).toBe('c:\\')
   })
 })

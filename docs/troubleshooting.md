@@ -132,18 +132,18 @@ npm rebuild node-pty --build-from-source
 1. Check if file watcher is active:
 
    ```typescript
-   // In the main-process log, should see (FileWatcherService.ts):
-   👁️  Starting watch for: /path/to/file.md
+   // In DevTools, the watch counters should list the file:
+   await window.api.fileWatch.getStats() // fileDetails: [{ path: '…/file.md', … }]
    ```
 
-2. Check for debounce timing (300ms for files):
+2. Check the write-finish wait (75 ms for an editor tab):
 
    ```bash
    # Edit file externally
    echo "test" >> file.md
 
-   # Wait 400ms
-   # Should see: 📝 File changed externally: /path/to/file.md
+   # Wait half a second
+   # Should see: 📝 File changed externally: [redacted]/file.md
    ```
 
 **Common Causes:**
@@ -152,7 +152,9 @@ npm rebuild node-pty --build-from-source
 - File path contains special characters
 - Network file system (NFS/SMB) - may require polling
 
-**Solution for Network FS:**
+**What Erfana already does for network drives and WSL (#478):** a file on a network share or a `\\wsl$` path is followed in limited mode. The tab shows "Live refresh is limited for files on network drives and WSL. Erfana checks for changes when you switch to this tab or window." and checks the file on tab switch and window focus, and every 2 seconds while the tab is visible. If a tab shows "Auto-refresh stopped", **Reload** starts the watch again. macOS reports every volume as local, so a share there gets no limited notice.
+
+**Solution for Network FS (only if the checks above are too slow):** the options below are the defaults of the single-file watch. The editor and image tabs replace the 300 ms with their profile's 75 ms (`src/shared/freshness/timingProfiles.ts`).
 
 ```typescript
 // In src/main/services/watcher/singleFileWatch.ts (SINGLE_FILE_WATCH_OPTIONS)

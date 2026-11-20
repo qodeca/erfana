@@ -8,7 +8,7 @@
  *   the tree still lists it, lazily): renaming the folder outside the app used
  *   to leave the tab looking normal. It is now marked deleted, by the
  *   single-file watch's own check.
- * - A file restored with "Save to restore it" used to stay unwatched until the
+ * - A file restored by a save (Cmd+S or Restore file) used to stay unwatched until the
  *   tab was reopened, so a later outside edit never reached the editor. It is
  *   watched again and reloads.
  *
@@ -34,7 +34,8 @@ import { readFileIfPresent } from './utils/files'
 const BUDGET_MS = 15_000
 /** One outside write reaching the editor: chokidar's write settle, the debounce and the reload. */
 const ONE_RELOAD_MS = 4_000
-const DELETED_BANNER = 'This file was deleted on disk. Save to restore it.'
+/** The editor's deleted notice (#478 § 3.6: "… was deleted, renamed or moved on disk.", with Restore file and Close tab). */
+const DELETED_NOTICE = 'freshness-notice-deleted'
 
 test.describe('Open tab whose file vanished where the project watcher cannot see', () => {
   test.use({
@@ -60,7 +61,10 @@ test.describe('Open tab whose file vanished where the project watcher cannot see
     await rename(join(testProject.path, 'dist'), join(testProject.path, 'dist-old'))
 
     await expect(tabs.tab('notes.md').locator('.editor-tab-deleted')).toBeVisible({ timeout: BUDGET_MS })
-    await expect(page.getByText(DELETED_BANNER)).toBeVisible()
+    await expect(page.getByTestId(DELETED_NOTICE)).toBeVisible()
+    // F14: the notice offers Restore file and Close tab
+    await expect(page.getByTestId(DELETED_NOTICE).getByRole('button', { name: 'Restore file' })).toBeVisible()
+    await expect(page.getByTestId(DELETED_NOTICE).getByRole('button', { name: 'Close tab' })).toBeVisible()
   })
 })
 
@@ -95,7 +99,7 @@ test.describe('Open tab restored by a save', () => {
     await rm(filePath)
     await expect(deletedMarker).toBeVisible({ timeout: BUDGET_MS })
 
-    // "Save to restore it"
+    // Save to restore it (the notice's Restore file is the same save)
     await page.keyboard.press(`${await keyboardHelper.getModifier()}+s`)
     await expect
       .poll(async () => readFileIfPresent(filePath), { timeout: BUDGET_MS })

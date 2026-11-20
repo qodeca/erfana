@@ -9,7 +9,7 @@
  * delegates to the real implementation.
  */
 import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest'
-import { mkdtempSync, rmSync, statSync, truncateSync, utimesSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, statSync, truncateSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -22,7 +22,7 @@ vi.mock('fs/promises', async (importOriginal) => {
   }
 })
 
-import { MAX_IMAGE_SIZE, readImage } from './imageRead'
+import { FileBusyError, MAX_IMAGE_SIZE, NotARegularFileError, readImage } from './imageRead'
 
 /** Bytes are never decoded here, so any payload of a known length will do. */
 const PNG_BYTES = Buffer.from('first-revision')
@@ -54,7 +54,8 @@ describe('readImage', () => {
       expect(result).toEqual({
         status: 'ok',
         dataUrl: `data:image/png;base64,${PNG_BASE64}`,
-        version: expect.any(String)
+        version: expect.any(String),
+        stamp: expect.objectContaining({ size: PNG_BYTES.length })
       })
       expect(result.version).not.toBe('')
       expect(readFileMock).toHaveBeenCalledTimes(1)
@@ -98,7 +99,7 @@ describe('readImage', () => {
 
       const second = await readImage(imagePath, first.version)
 
-      expect(second).toEqual({ status: 'unchanged', version: first.version })
+      expect(second).toEqual({ status: 'unchanged', version: first.version, stamp: first.stamp })
       expect(readFileMock).not.toHaveBeenCalled()
     })
 
@@ -129,7 +130,8 @@ describe('readImage', () => {
       expect(refreshed).toEqual({
         status: 'ok',
         dataUrl: `data:image/png;base64,${nextBytes.toString('base64')}`,
-        version: expect.any(String)
+        version: expect.any(String),
+        stamp: expect.objectContaining({ size: nextBytes.length })
       })
       expect(refreshed.version).not.toBe(first.version)
       expect(readFileMock).toHaveBeenCalledTimes(1)
@@ -202,9 +204,53 @@ describe('readImage', () => {
       expect(readFileMock).not.toHaveBeenCalled()
     })
 
+    it('rounds the size of a file just over the cap up, so it never reads as the limit (U6)', async () => {
+      const huge = join(dir, 'just-over.png')
+      writeFileSync(huge, '')
+      truncateSync(huge, MAX_IMAGE_SIZE + 1)
+
+      await expect(readImage(huge)).rejects.toThrow('Image file too large (50.1 MB)')
+    })
+
     it('propagates the stat failure for a missing file', async () => {
       await expect(readImage(join(dir, 'gone.png'))).rejects.toThrow(/ENOENT/)
       expect(readFileMock).not.toHaveBeenCalled()
+    })
+
+    it('refuses anything that is not a regular file, before reading (#478)', async () => {
+      const folder = join(dir, 'folder.png')
+      mkdirSync(folder)
+
+      await expect(readImage(folder)).rejects.toBeInstanceOf(NotARegularFileError)
+      expect(readFileMock).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('read-verify and stamp (#478)', () => {
+    it('throws FileBusyError when the file changes while it is read (P3)', async () => {
+      const fsPromises = await import('fs/promises')
+      const actual = await vi.importActual<typeof import('fs/promises')>('fs/promises')
+      readFileMock.mockImplementationOnce(async (path: string) => {
+        const bytes = await actual.readFile(path)
+        // A writer lands right after our read
+        writeFileSync(imagePath, Buffer.from('a longer, newer revision'))
+        return bytes
+      })
+      expect(fsPromises.readFile).toBe(readFileMock)
+
+      await expect(readImage(imagePath)).rejects.toBeInstanceOf(FileBusyError)
+    })
+
+    it('stamps the version it read: size, times and file id from the stat', async () => {
+      const result = await readImage(imagePath)
+      const stats = statSync(imagePath, { bigint: true })
+
+      expect(result.stamp).toEqual({
+        size: PNG_BYTES.length,
+        mtimeMs: Number(stats.mtimeNs / 1000n) / 1000,
+        ctimeMs: Number(stats.ctimeNs / 1000n) / 1000,
+        ino: stats.ino.toString()
+      })
     })
   })
 })

@@ -355,17 +355,19 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 **Severity**: Medium — it is a main-process security boundary, though a notification-only one.
 
-**Impact**: `watchFile` gates on `isLexicallyInside(filePath, this.projectPath)` (`FileWatcherService.ts:123`). Since #464 that resolves both paths and compares on a separator boundary, so `/proj-evil/x.png` no longer passes when the project is `/proj` – but the check is still lexical only, with no `fs.realpath`, so a symlink inside the project that points outside it still passes. The read handlers next to it (`file:readFile`, `file:readImage`) went through `assertInsideProject` in #70 and now do the two-stage lexical + canonical check.
+**Impact**: before #478, `watchFile` gated on `isLexicallyInside(filePath, this.projectPath)` only. Since #478 every subscribe and every re-arm goes through `checkTarget` in `watcher/armWatch.ts`, which resolves the real path and checks it inside the session's real root, so a link inside the project that points outside it is refused. Before that, since #464 that resolves both paths and compares on a separator boundary, so `/proj-evil/x.png` no longer passes when the project is `/proj` – but the check is still lexical only, with no `fs.realpath`, so a symlink inside the project that points outside it still passes. The read handlers next to it (`file:readFile`, `file:readImage`) went through `assertInsideProject` in #70 and now do the two-stage lexical + canonical check.
 
 **Why it was left alone in #70**: it is a shared boundary used by every watcher consumer and deserves its own tests and review pass rather than a drive-by edit inside a bugfix. The exposure is bounded — watching is a notification side channel, the *content* read behind it goes through the stricter guard, and the atomic re-arm path already re-validates the path with `classifyConfinement` before rebuilding a watcher (`watcher/atomicRearm.ts` → `AtomicRearmDeps.isPathConfined`).
 
 **Recommended Solution**: route `watchFile` through `assertInsideProject` from `src/main/utils/projectConfinement.ts`, keeping the existing "file does not exist" throw (the guard lets a `missing` verdict through on purpose).
 
+**Status**: Resolved by #478 (plan decision 12) – the realpath check now runs in `watcher/armWatch.ts` on every arm.
+
 **The confined-path wrapper (#252 review, 2026-10).** The fuller fix is to register `file-watch:start` through `registerConfinedHandle`, as every `file:*` channel is. It is not a small change: the channel takes a positional string rather than a request object ([IPC patterns](./ipc-patterns.md)), so it needs a strict request schema, a preload and renderer API change, a project session passed into `registerFileWatcherHandlers`, and a refusal mapped to `{ success: false, error }`, whose wording the renderer's `classifyWatchStartFailure` reads. The handler must also watch the `requested` spelling, since every event is matched against it. `stop`, `pause` and `resume` only look up the map, so they touch no file. Meanwhile, #252's unseen-file probe `stat`s only this session's paths lexically inside the project (`FileWatcherService.probeablePaths`), so it never reaches outside it.
 
 **Files**: `src/main/services/FileWatcherService.ts` (`watchFile`), `src/main/utils/projectConfinement.ts`; for the wrapper also `src/main/ipc/file-watcher-handlers.ts` and `src/preload/index.ts`.
 
-**Status**: Open — recorded by the #70 design (§9.1) and its review rounds; the wrapper note added by the #252 review. **A follow-up issue should be filed.**
+**Status**: Resolved by #478 (plan step S12) – the legacy `file-watch:start` is gone; `file-watch:subscribe` registers through `registerConfinedHandle` with a strict request object, a sender gate and the open project's session, and the subscription follows the canonical (`real`) path.
 
 ---
 
@@ -437,7 +439,7 @@ The policy before the ratchet, as practised: *a file a change adds behaviour to 
 | `src/main/services/workers/git-status.worker.ts` | 520 | Pre-existing |
 | `src/renderer/src/hooks/useExternalFileDrop.ts` | 518 | Pre-existing |
 
-`FileWatcherService.ts` deliberately stayed under the cap (498 lines at the #70 measurement) by moving the watch factory, the unlink branch, the send loop and the subscriber counting into `src/main/services/watcher/`. It has since grown past it: 579 lines, frozen there in `scripts/max-lines-baseline.json`.
+`FileWatcherService.ts` deliberately stayed under the cap (498 lines at the #70 measurement) by moving the watch factory, the unlink branch, the send loop and the subscriber counting into `src/main/services/watcher/`. It later grew past it (579 lines, baselined); #478 moved its native-watcher half into `src/main/services/watcher/FileWatchCore.ts`, which brought it back under the cap and off the baseline.
 
 **Recommended Solution**: (#124 made the split below for both preview files; the rest stands.) `PreviewLiveView.ts` and `PreviewViewService.ts` were the entries gaining code fastest and the ones to split first – the lifecycle wiring, teardown and still-frame paths in the former and the suspend/resume policy in the latter are separable. `file-handlers.ts` remains a candidate: the project/file/stat/CRUD handler groups are independent. The `imageViewer.logic.ts` file is a candidate for the next pass that genuinely changes it.
 
@@ -1188,6 +1190,45 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 - **Local-file pages name no source.** A served local folder admits only its own page's requests, so the main-process read is refused and a React 19 page opened from disk says "source not found".
 
 **Revisit when**: a React 19 local-file page needs a source, or picks on large dev bundles miss the 750 ms budget.
+
+### 72. Known limits and accepted trade-offs from #478 (2026-11)
+
+The review rulings (QG-4b, QG-8 rounds 1 and 2) accepted these as tech debt; the design is in [ADR 0013](./adrs/0013-one-freshness-capability.md) and [File watching](./file-watching/README.md#following-a-file-the-freshness-capability-478). Ids are the review finding ids.
+
+| Id | What is left | Why it was accepted | Revisit when |
+|---|---|---|---|
+| P3 re-arm | After an atomic save the re-arm reads the new file without the settle wait (the change is plain, not forced). A writer that deletes the file and then streams the new one slowly can show a partial file for a moment; its next change, held by the write gate, corrects it | Settling would add about 75 ms to every atomic save – the main agent write path – on a latency margin of about 20 ms; the temp-and-rename and slow in-place cases of P3 pass | A report of a partial file after a delete-then-stream writer. Idea: settle only when a second stat about 25 ms later shows the size moved |
+| Write gap | No file lock: an outside write in the gap of one `lstat` plus one `rename` after the autosave's last check is overwritten (`textWrite.ts`) | A lock is not portable; the check repeats before every rename retry and in-place write | – |
+| F36 | When a notice closes, focus is not returned to the editor or image viewer; keyboard users click back into the content | The old notices behaved the same; no criterion requires it | The next notice or accessibility pass |
+| A2 / U2 rest | The HTML preview badge merges `outside-project` and `unsupported` into "Auto-refresh stopped", and its copy is a second copy of the notice copy (`htmlPreview.logic.ts`, not shared) | The `limited` badge, the real gap, was fixed | A copy change that must touch both |
+| A3 rest | The image adapter maps `file:readImage` failures by matching the error text (`useFileChangeSubscription.ts`); there is no typed status union | The torn-read case was fixed with a one-line mapping to `busy` | A new `file:readImage` failure kind |
+| A4 | The tracker lifecycle is repeated in three adapters (editor, image, Markdown images) and the "stamp of a probe" check in six places | A cross-runtime refactor with no behaviour gain at this stage | Another adapter is added |
+| A6 | `tooLargeSize` lives outside the one freshness state object (a small deviation from the one-state rule); only the too-large notice reads it | Changing the `ContentState` type now is out of proportion | The too-large notice changes |
+| A12 | The HTML preview's same-tab move takes its baseline probe after the navigation commit, so a write in that window is not caught up | The window is narrow; closing it means passing a baseline from each consumer's read | A missed update after a same-tab move |
+| C6 | One automatic restart per tab life (reset only by **Reload** or the file coming back): a second unrelated end later in a long-lived tab shows "Auto-refresh stopped" with a working **Reload** | Matches the plain rule "one auto-restart"; the stop is visible, not silent; resetting needs a loop guard | A report of repeated stops in one tab |
+| S5 | A comment watch that stops for good is only logged; the drawer shows no notice and no Reload | The drawer has no file notices; a stop signal plus Reload there is new UI that needs a design | A comments design pass |
+| S8 | A slow `ready` on a local disk shows the "network drives and WSL" limited copy | The guidance ("checks when you switch") is still right; changing the decided copy touches docs and claims | The copy is reworked |
+| U1 | The notice still pushes the editor down when it appears (the planned reserved height was not built) | The conflict bar always did this; a reserved strip is a visible layout change that needs a design-card decision | A Feedback-card decision |
+| U3 | The image status region sits outside the full-screen overlay, so changes are not announced there | A rare state; moving the region conditionally is not trivial | An accessibility pass on the overlay |
+| U5 | Notice text has no hidden "Warning:" / "Note:" prefix for screen readers | The Feedback card is `proposed` and already lists the prefix as an app-wide follow-up | The Feedback card is decided |
+| P1 HTML | The HTML preview updates about 14 ms slower than before #478 (median p50 about 152 ms over 20 Windows runs, against 138 ms at S0); the timing gate now holds it to the measured level (`HTML_PREVIEW_REFERENCE` in `e2e/file-freshness-latency.timing.e2e.ts`) | The cost is the settle wait that keeps a half-written page from showing; the owner accepted it on 2026-11-19 after two fix attempts did not close the gap, and the editor and image tabs got about 3 times faster | The write gate or the settle wait is redesigned, or a user reports the preview feels slower |
+
+**Known volume limit**: macOS reports every volume as local (`volumeKind.ts`), so a network share there gets no limited notice; on Windows a mapped drive is caught only when `realpath` resolves it to its UNC form. Network drives and `\\wsl$` are checked by hand.
+
+### 73. Known limits and accepted trade-offs from #485 and #486 (2026-11)
+
+The QG-8 review of the #485 / #486 / #487 follow-ups (rounds 1 and 2) accepted these as tech debt; ids are its finding ids (`F` round 1, `R` round 2). The trash flow is described in [IPC patterns](./ipc-patterns.md) (`file:deleteFile`).
+
+| Id | What is left | Why it was accepted | Revisit when |
+|---|---|---|---|
+| F6 | The real `shell.trashItem` is never run by an automated test: unit tests mock it, and e2e swaps it for a stub (`src/main/testHooks/trashHook.ts`) | No CI runner can use a real Recycle Bin / Trash. **The Windows manual check is a merge gate**: delete a file, a folder with a watched subfolder, a folder with a `.git` or `node_modules` subfolder (alone, and with a file below it open in a tab), a file open in a tab, a folder that is a terminal's working folder (expect the in-use error) and a link; each lands in the Recycle Bin and restores. macOS through the erfana-macos session; Linux unverified | Electron or CI offers a scriptable trash |
+| F8 | The delete questions' titles "Delete File" / "Delete Folder" are title case and not questions, unlike "Delete permanently?" and the Dialog and Writing cards | Older than #486; both cards are `proposed`, and renaming touches about ten sites (e2e waits, the capture script, `claims.json`, unit tests) | One sweep of every dialog title |
+| F19 | A parent folder swapped for a link between the confinement check and the removal can redirect the delete (a time-of-check to time-of-use gap) | Older than #486, and present for every confined write; closing it is a confinement redesign | The confinement layer is reworked |
+| F28 | `.dialog-message` has no `overflow-wrap: anywhere`, so a very long name without spaces overflows the delete questions | Older than #486 (the old messages embedded the name too); `Dialog.css` is shared | A small Dialog fix: one line |
+| #485 rest | A page reload closes the window's project (`page-reloaded`), but its terminals (PTYs) and its git watcher are cleaned up only when the window is destroyed, not on a reload | Out of #485's scope (the reopen); found while fixing it | Reload cleanup is next touched |
+| R5 | The rule for when a released file watch may arm again (held, no project switch suspending it, no delete holding it) is spelled out separately in `attach`, `resumeEntry`, `rearmReleased` and `rearmAll` (`FileWatchCore.ts`, `FileWatcherService.ts`); one `mayArm(entry)` predicate would state it once | The release × project switch × wake tests in `FileWatcherService.release.test.ts` pin the behaviour; refactoring arming in a review round puts the core #478 path at risk for readability only | Arming is next changed |
+| R7 | When a delete's release ends, a directory-watch handle reopens its folder without checking that the path is still a plain folder (`releasableWatchHandles.ts`, `ReleasableHandle.unhold`): a subfolder swapped for a junction during the delete would be watched at the junction's target | A local actor must swap the folder within the few seconds of a delete; the lost-events signal makes the native watcher re-list, and its re-list treats links as leaves (inferred, not verified). No data loss, no stale tab. Fix: `lstatSync` before `open()` – not a plain folder or a link: stay closed and signal; gone: stay quiet | The release or the native watcher is next changed |
+| R14 | The "gone" (`ENOENT`, `ENOTDIR`) and "in use" error-code sets and the `errorCode` helper are copied again by #486 (`entryProbe.ts`, `releasableWatchHandles.ts`) – the fifth `GONE_CODES` and third `errorCode` copy | Each copy is a two-to-four-code set; consolidating means touching modules outside the change | A shared `src/main/utils/errno.ts` is created for another reason |
 
 This doc covers project-wide non-Windows technical debt. For phase-structured deferred items with promotion criteria + risk-if-forgotten:
 

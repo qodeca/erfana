@@ -1,139 +1,82 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2026 Qodeca sp. z o.o.
 /**
- * `useFileWatcher` – a Markdown tab that can no longer follow its file says
- * so and offers Reload (#464).
- *
- * The watch could fail to start (a terminal-link path the main process
- * refused) or the watcher could fail later, and the tab only logged it: the
- * preview went stale with no sign. The hook now reports `isWatchUnavailable`,
- * and `restartWatch` starts the watch again and re-reads the file.
+ * The editor adapter's watch states (#478, plan S14; G5, G7, G9): a refused
+ * subscribe stops following and says so, a queued tab waits for a slot and
+ * follows from `started`, a limited watch is reported as such, and Reload
+ * starts a new watch. The notice for each state is `selectNotice`'s job; this
+ * suite pins only the state the adapter hands it.
  */
-import { act, renderHook, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
 
-import { useFileWatcher, type UseFileWatcherOptions } from './useFileWatcher'
+import { installFakeFreshness } from '../services/freshness/__test__/fakeFreshnessEnvironment'
+import { PATH, openEditorTab } from './__test__/editorWatchHarness'
 
-const PATH = '/project/notes.md'
+const SETTLED_MS = 3_000
 
-type ErrorCallback = (data: { filePath: string; error: string; ended?: boolean }) => void
+const env = installFakeFreshness()
 
-let errorListeners: ErrorCallback[] = []
+describe('useFileWatcher – watch states', () => {
+  it('a refused subscribe stops following, never silently (G5)', async () => {
+    env.disk.write(PATH, '# v1\n', { silent: true })
+    // The first subscribe and its one automatic restart are both refused
+    env.source.scriptSubscribe({ kind: 'refused', code: 'WATCH_FAILED' }, { kind: 'refused', code: 'WATCH_FAILED' })
+    const tab = await openEditorTab(env)
+    await env.run(SETTLED_MS)
 
-const mockReadFile = vi.fn<(request: { filePath: string }) => Promise<string>>()
-const mockFileWatch = {
-  start: vi.fn(),
-  stop: vi.fn(),
-  pause: vi.fn(),
-  resume: vi.fn(),
-  onFileChanged: vi.fn(() => () => {}),
-  onFileDeleted: vi.fn(() => () => {}),
-  onFileError: vi.fn((cb: ErrorCallback) => {
-    errorListeners.push(cb)
-    return () => {
-      errorListeners = errorListeners.filter((l) => l !== cb)
-    }
-  })
-}
-
-Object.defineProperty(window, 'api', {
-  value: { file: { readFile: mockReadFile, getStats: vi.fn() }, fileWatch: mockFileWatch },
-  writable: true,
-  configurable: true
-})
-
-function watcher(initial: Partial<UseFileWatcherOptions> = {}) {
-  const onContentUpdate = vi.fn()
-  const props: UseFileWatcherOptions = { filePath: PATH, hasLocalChanges: false, onContentUpdate, ...initial }
-  const hook = renderHook((p: UseFileWatcherOptions) => useFileWatcher(p), { initialProps: props })
-  return { hook, onContentUpdate, props }
-}
-
-describe('useFileWatcher – auto-refresh stopped (#464)', () => {
-  beforeEach(() => {
-    errorListeners = []
-    mockReadFile.mockReset().mockResolvedValue('# On disk\n')
-    mockFileWatch.start.mockReset().mockResolvedValue({ success: true })
-    mockFileWatch.stop.mockReset().mockResolvedValue({ success: true })
+    expect(tab.current().state.watch).toEqual({ kind: 'stopped', reason: 'restart-failed' })
   })
 
-  it('is not flagged while the watch runs', async () => {
-    const { hook } = watcher()
-    await waitFor(() => expect(mockFileWatch.start).toHaveBeenCalledTimes(1))
-    expect(hook.result.current.isWatchUnavailable).toBe(false)
+  it('Reload after a refused subscribe follows the file again', async () => {
+    env.disk.write(PATH, '# v1\n', { silent: true })
+    // The first subscribe and its one automatic restart are both refused
+    env.source.scriptSubscribe({ kind: 'refused', code: 'WATCH_FAILED' }, { kind: 'refused', code: 'WATCH_FAILED' })
+    const tab = await openEditorTab(env)
+    await env.run(SETTLED_MS)
+    expect(tab.current().state.watch.kind).toBe('stopped')
+
+    await act(async () => {
+      const reloading = tab.current().reloadFromDisk()
+      await env.clock.run(SETTLED_MS)
+      await reloading
+    })
+
+    expect(tab.current().state.watch).toEqual({ kind: 'active', live: 'full' })
   })
 
-  it('flags a watch that never started', async () => {
-    mockFileWatch.start.mockResolvedValue({ success: false, error: 'Cannot watch files outside the project directory' })
-    const { hook } = watcher()
-    await waitFor(() => expect(hook.result.current.isWatchUnavailable).toBe(true))
+  it('a tab past the watch cap is queued, then follows from `started` (G9)', async () => {
+    env.disk.write(PATH, '# v1\n', { silent: true })
+    env.source.scriptSubscribe({ kind: 'queued' })
+    const tab = await openEditorTab(env)
+    expect(tab.current().state.watch).toEqual({ kind: 'queued' })
+
+    // Written while it waited: the `started` stamp shows it changed
+    env.disk.write(PATH, '# while queued\n', { silent: true })
+    act(() => env.source.promote(env.source.subscribeCalls[0].watchId))
+    await env.run(SETTLED_MS)
+
+    expect(tab.current().state.watch).toEqual({ kind: 'active', live: 'full' })
+    expect(tab.buffer()).toBe('# while queued\n')
   })
 
-  it('flags a watcher error for this file, and ignores one for another file', async () => {
-    const { hook } = watcher()
-    await waitFor(() => expect(errorListeners).toHaveLength(1))
+  it('a limited watch (network or WSL volume) is reported as limited (G7)', async () => {
+    env.disk.write(PATH, '# v1\n', { silent: true })
+    env.source.scriptSubscribe({ kind: 'started', liveRefresh: 'limited' })
+    const tab = await openEditorTab(env)
 
-    act(() => errorListeners[0]({ filePath: '/project/other.md', error: 'EPERM' }))
-    expect(hook.result.current.isWatchUnavailable).toBe(false)
-
-    act(() => errorListeners[0]({ filePath: PATH, error: 'EPERM', ended: true }))
-    expect(hook.result.current.isWatchUnavailable).toBe(true)
+    expect(tab.current().state.watch).toEqual({ kind: 'active', live: 'limited' })
   })
 
-  it('restartWatch starts the watch again, clears the flag and re-reads an unedited file', async () => {
-    mockFileWatch.start.mockResolvedValueOnce({ success: false, error: 'boom' })
-    const { hook, onContentUpdate } = watcher()
-    await waitFor(() => expect(hook.result.current.isWatchUnavailable).toBe(true))
+  it('a watch main ends with the project stops quietly (project-closed)', async () => {
+    env.disk.write(PATH, '# v1\n', { silent: true })
+    const tab = await openEditorTab(env)
 
-    act(() => hook.result.current.restartWatch())
+    act(() =>
+      env.source.emit({ watchId: env.source.subscribeCalls[0].watchId, kind: 'ended', reason: 'project-closed' })
+    )
+    await env.run(SETTLED_MS)
 
-    await waitFor(() => expect(hook.result.current.isWatchUnavailable).toBe(false))
-    expect(mockFileWatch.start).toHaveBeenCalledTimes(2)
-    await waitFor(() => expect(onContentUpdate).toHaveBeenCalledWith('# On disk\n'))
-  })
-
-  it('restartWatch releases a half-dead hold first, so the main watch is rebuilt', async () => {
-    const { hook } = watcher()
-    await waitFor(() => expect(errorListeners).toHaveLength(1))
-    act(() => errorListeners[0]({ filePath: PATH, error: 'watcher died' })) // not ended: the hold remains
-
-    act(() => hook.result.current.restartWatch())
-
-    await waitFor(() => expect(mockFileWatch.start).toHaveBeenCalledTimes(2))
-    expect(mockFileWatch.stop).toHaveBeenCalledTimes(1)
-    expect(mockFileWatch.stop.mock.invocationCallOrder[0]).toBeLessThan(mockFileWatch.start.mock.invocationCallOrder[1])
-  })
-
-  it('restartWatch keeps unsaved edits: it does not re-read over them', async () => {
-    mockFileWatch.start.mockResolvedValueOnce({ success: false, error: 'boom' })
-    const { hook, onContentUpdate } = watcher({ hasLocalChanges: true })
-    await waitFor(() => expect(hook.result.current.isWatchUnavailable).toBe(true))
-
-    act(() => hook.result.current.restartWatch())
-
-    await waitFor(() => expect(hook.result.current.isWatchUnavailable).toBe(false))
-    expect(mockReadFile).not.toHaveBeenCalled()
-    expect(onContentUpdate).not.toHaveBeenCalled()
-  })
-
-  it('stays flagged when the restart fails too', async () => {
-    mockFileWatch.start.mockResolvedValue({ success: false, error: 'still refused' })
-    const { hook } = watcher()
-    await waitFor(() => expect(hook.result.current.isWatchUnavailable).toBe(true))
-
-    act(() => hook.result.current.restartWatch())
-
-    await waitFor(() => expect(mockFileWatch.start).toHaveBeenCalledTimes(2))
-    expect(hook.result.current.isWatchUnavailable).toBe(true)
-  })
-
-  it('a file switch clears the flag of the previous file', async () => {
-    mockFileWatch.start.mockResolvedValueOnce({ success: false, error: 'boom' })
-    const { hook, props } = watcher()
-    await waitFor(() => expect(hook.result.current.isWatchUnavailable).toBe(true))
-
-    hook.rerender({ ...props, filePath: '/project/next.md' })
-
-    expect(hook.result.current.isWatchUnavailable).toBe(false)
+    expect(tab.current().state.watch).toEqual({ kind: 'stopped', reason: 'project-closed' })
   })
 })

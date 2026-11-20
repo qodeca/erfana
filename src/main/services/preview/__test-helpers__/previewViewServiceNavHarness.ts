@@ -278,6 +278,7 @@ export function makeHarness(
     emit,
     createWatchCoordinator: () => ({
       setWatchSet: vi.fn(() => Promise.resolve({ watched: [], dropped: [] })),
+      recheck: vi.fn(),
       dispose: vi.fn(() => Promise.resolve())
     }),
     createReloadPolicy: (onDecision) => {

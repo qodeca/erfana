@@ -26,6 +26,10 @@
  *
  * A reported file takes the watch's normal unlink path, whose atomic-save
  * window and final existence check guard against a false banner.
+ *
+ * The same queue and timer also run the watch health round (#478, plan
+ * decision 21, `watchHealthRound`) for every watched file, seen or not, so all
+ * of the watch layer's background `stat`s still go one at a time.
  */
 import { logger } from '../LoggingService'
 import { redactedLogError } from '../../utils/redactUserInput'
@@ -59,6 +63,14 @@ export interface UnseenWatchProbeDeps {
   onMissing(filePath: string): void
   /** Existence test; {@link pathIsPresent} by default. */
   exists?(filePath: string): Promise<boolean>
+  /** A second check each round runs after this one, in the same queue (the watch health round). */
+  extraRound?: ExtraRound
+}
+
+/** A check that rides the probe's rounds; `run` stops early once `isCancelled` says so. */
+export interface ExtraRound {
+  hasWork(): boolean
+  run(isCancelled: () => boolean): Promise<void>
 }
 
 export class UnseenWatchProbe {
@@ -97,10 +109,10 @@ export class UnseenWatchProbe {
     this.schedule()
   }
 
-  /** Arm the next round, unless one is armed or pending, or no watched file is unseen. */
+  /** Arm the next round, unless one is armed or pending, or there is nothing to check. */
   schedule(): void {
     if (this.disposed || this.timer !== null || this.roundPending) return
-    if (this.unseenPaths().length === 0) return
+    if (this.unseenPaths().length === 0 && !this.deps.extraRound?.hasWork()) return
     this.timer = setTimeout(() => {
       this.timer = null
       this.runRound()
@@ -124,6 +136,14 @@ export class UnseenWatchProbe {
         if (!present && !isOwnRemoval(filePath)) this.deps.onMissing(filePath)
       }
     })
+  }
+
+  /** Run the extra round now, in the queue (a power resume, #478 G8). */
+  runExtraNow(): Promise<void> {
+    const extra = this.deps.extraRound
+    if (!extra) return Promise.resolve()
+    const generation = this.generation
+    return this.enqueue(() => extra.run(() => this.isCancelled(generation)))
   }
 
   /**
@@ -161,6 +181,7 @@ export class UnseenWatchProbe {
       const startedAt = Date.now()
       try {
         await this.checkRound(generation)
+        await this.deps.extraRound?.run(() => this.isCancelled(generation))
       } catch (error) {
         logger.error('Unseen file watch probe failed', redactedLogError(error))
       } finally {

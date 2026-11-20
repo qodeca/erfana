@@ -213,6 +213,7 @@ function makeHarness(root = '/proj', extra: Partial<PreviewViewDeps> = {}) {
     },
     createWatchCoordinator: () => ({
       setWatchSet: vi.fn(() => Promise.resolve({ watched: [], dropped: [] })),
+      recheck: vi.fn(),
       dispose: vi.fn(() => Promise.resolve())
     }),
     createReloadPolicy: () => ({

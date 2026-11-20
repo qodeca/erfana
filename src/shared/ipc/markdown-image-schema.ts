@@ -28,6 +28,7 @@
  */
 import { z } from 'zod'
 import { MAX_IMAGE_VERSION_LENGTH } from './file-image-schema'
+import { FileStampSchema } from './file-stamp-schema'
 
 /**
  * Image extensions the Markdown preview loads: the formats a browser shows in
@@ -105,9 +106,11 @@ export const MarkdownImageReadResponseSchema = z.discriminatedUnion('status', [
     /** `data:<image mime>;base64,...` – for an `<img src>`, never for inlining */
     dataUrl: z.string(),
     /** Opaque version of these bytes; echo it back as `knownVersion` */
-    version: z.string()
+    version: z.string(),
+    /** The stamp of these bytes (#478): what the preview's image tracker compares a check against. Additive. */
+    stamp: FileStampSchema.optional()
   }),
-  z.object({ status: z.literal('unchanged'), version: z.string() }),
+  z.object({ status: z.literal('unchanged'), version: z.string(), stamp: FileStampSchema.optional() }),
   z.object({ status: z.literal('refused'), reason: z.enum(MARKDOWN_IMAGE_REFUSALS) })
 ])
 

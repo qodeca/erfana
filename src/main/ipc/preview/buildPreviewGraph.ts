@@ -20,8 +20,6 @@ import { BrowserWindow, dialog, screen, type Session } from 'electron'
 import { openExternalSafe } from '../../utils/openExternalSafe'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import type { ChokidarOptions } from 'chokidar'
-import { PREVIEW } from '../../../shared/constants'
 import {
   isHtmlPreviewCommentsEnabled,
   type GlobalSettings
@@ -42,9 +40,8 @@ import {
 } from '../../services/preview/PreviewFindController'
 import { createPreviewFailureLog } from '../../services/preview/PreviewFailureLog'
 import { purge as purgePreviewSession } from '../../services/preview/PreviewStorageSeal'
-import { createRearmingSingleFileWatcher } from '../../services/watcher/rearmingSingleFileWatch'
-import { classifyConfinement } from '../../utils/projectConfinement'
-import { confinePath } from '../../services/preview/previewPathResolve'
+import { createTrackedFileWatch } from '../../services/freshness/mainTrackedWatch'
+import { readStatStampOutcome } from '../../services/freshness/statStamp'
 import {
   PreviewViewService,
   type IPreviewViewService,
@@ -98,14 +95,6 @@ export interface PreviewGraph {
    * Optional so a test graph without comments stays valid.
    */
   readonly comments?: PreviewCommentShared
-}
-
-/** Preview-tuned entry-file watch timings (mirrors the pool's overrides, §1.4). */
-const PREVIEW_ENTRY_WATCH_OVERRIDES: Partial<ChokidarOptions> = {
-  awaitWriteFinish: {
-    stabilityThreshold: PREVIEW.WATCH_STABILITY_MS,
-    pollInterval: PREVIEW.WATCH_POLL_INTERVAL_MS
-  }
 }
 
 /**
@@ -238,12 +227,9 @@ export function buildPreviewGraph(deps: BuildPreviewGraphDeps): PreviewGraph {
     createWatchCoordinator: (realRoot, onChanged) =>
       createPreviewWatchCoordinator({
         realRoot,
-        // The pool re-arms each subresource watch across an atomic save; give it
-        // the same realpath gate the coordinator uses so a re-arm re-confines the
-        // path an external writer just replaced (TOCTOU).
-        pool: createPreviewWatchPool({
-          isPathConfined: async (candidate) => (await confinePath(realRoot, candidate)).ok
-        }),
+        // The pool is this view's in-process owner on the shared watch layer
+        // (#478): its re-arms re-check realpath confinement there (`armWatch`).
+        pool: createPreviewWatchPool(),
         onChanged
       }),
     createReloadPolicy: (onDecision) => createPreviewReloadPolicy({ onDecision }),
@@ -253,25 +239,16 @@ export function buildPreviewGraph(deps: BuildPreviewGraphDeps): PreviewGraph {
     createFindController: (wc, onCount) =>
       createPreviewFindController(wc as unknown as PreviewFindContents, onCount),
     createFailureLog: (onEmit) => createPreviewFailureLog({ onEmit }),
+    // The page's own file: a freshness tracker on the shared watch layer
+    // (#478, `preview` profile). An atomic save re-arms there; a genuine delete
+    // is the entry-file "missing" case, and the page coming back reloads it.
+    // Its version is a stat-only stamp: the reload reads the page itself, so a
+    // read and hash first would only delay it (P1).
     createEntryWatcher: (filePath, handlers) =>
-      createRearmingSingleFileWatcher(
+      createTrackedFileWatch(
         filePath,
-        {
-          onChange: handlers.onChange,
-          // A genuine delete is the entry-file "missing" case; an atomic-save
-          // rename re-arms instead, so live-reload survives editor saves.
-          onDeleted: handlers.onUnlink,
-          onError: handlers.onError
-        },
-        {
-          overrides: PREVIEW_ENTRY_WATCH_OVERRIDES,
-          isPathConfined: async (candidate) => {
-            const root = getProjectPath()
-            if (root === null) return true
-            const verdict = await classifyConfinement(candidate, root)
-            return verdict === 'inside' || verdict === 'missing'
-          }
-        }
+        { onChange: handlers.onChange, onDeleted: handlers.onUnlink, onProblem: handlers.onProblem },
+        { profile: 'preview', read: readStatStampOutcome }
       ),
     getProjectPath,
     getZoomFactor,
