@@ -103,6 +103,7 @@ let notices: NoticeEvent[]
 let dialogAnswer: (defaultPath: string) => Promise<string | null>
 let showSaveDialog: Mock<(parent: unknown, request: SaveDialogRequest) => Promise<string | null>>
 let showItemInFolder: Mock<(path: string) => void>
+let markQuarantined: Mock<(path: string) => Promise<void>>
 let downloads: BrowserDownloads
 let tab: DownloadTab
 let tabOpen: boolean
@@ -123,13 +124,15 @@ beforeEach(() => {
   dialogAnswer = async (defaultPath) => defaultPath
   showSaveDialog = vi.fn((_parent: unknown, request: SaveDialogRequest) => dialogAnswer(request.defaultPath))
   showItemInFolder = vi.fn<(path: string) => void>()
+  markQuarantined = vi.fn<(path: string) => Promise<void>>(async () => undefined)
   let n = 0
   downloads = new BrowserDownloads({
     downloadsDir: () => downloadsDir,
     stagingRoot: () => stagingRoot,
     showSaveDialog,
     showItemInFolder,
-    newId: () => `dl${++n}`
+    newId: () => `dl${++n}`,
+    markQuarantined
   })
   tabOpen = true
   tab = {
@@ -268,6 +271,40 @@ describe('BrowserDownloads', () => {
     expect(notices[0]).toMatchObject({ kind: 'downloadFailed', download: { fileName: 'a.pdf', reason: 'folderNotWritable' } })
     expect(notices[0].text).toContain('Erfana can\u2019t write to that folder.')
     expect(readdirSync(stagingRoot)).toEqual([])
+  })
+
+  it('S-18 marks the saved file as downloaded (macOS quarantine) before the done notice, on both move paths', async () => {
+    const item = new FakeItem('a.dmg')
+    start(item)
+    item.end('completed')
+    await vi.waitFor(() => expect(notices).toHaveLength(1))
+    expect(markQuarantined).toHaveBeenCalledWith(join(downloadsDir, 'a.dmg'))
+    fsHooks.renameError = Object.assign(new Error('cross-device'), { code: 'EXDEV' })
+    const second = new FakeItem('b.dmg', true)
+    start(second)
+    second.end('completed')
+    await vi.waitFor(() => expect(notices).toHaveLength(2))
+    expect(markQuarantined).toHaveBeenLastCalledWith(join(downloadsDir, 'b.dmg'))
+  })
+
+  it('S-18 a quarantine mark that fails (a disk with no extended attributes) still keeps the file and says done', async () => {
+    markQuarantined.mockRejectedValueOnce(Object.assign(new Error('not supported'), { code: 1 }))
+    const item = new FakeItem('a.dmg')
+    start(item)
+    item.end('completed')
+    await vi.waitFor(() => expect(notices).toHaveLength(1))
+    expect(notices[0].kind).toBe('downloadDone')
+    expect(readFileSync(join(downloadsDir, 'a.dmg'), 'utf8')).toBe('file body')
+  })
+
+  it('a failed move is never marked', async () => {
+    fsHooks.renameError = Object.assign(new Error('denied'), { code: 'EACCES' })
+    const item = new FakeItem('a.dmg')
+    start(item)
+    item.end('completed')
+    await vi.waitFor(() => expect(notices).toHaveLength(1))
+    expect(notices[0].kind).toBe('downloadFailed')
+    expect(markQuarantined).not.toHaveBeenCalled()
   })
 
   it('copies across volumes, and deletes a half-copied target when the disk fills', async () => {
