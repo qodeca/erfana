@@ -35,9 +35,16 @@ import { join } from 'path'
 import { test, expect } from './fixtures/index'
 import { ProjectTreePage } from './pages/project-tree.page'
 import { DialogPage } from './pages/dialog.page'
+import { TabBarPage } from './pages/tab-bar.page'
+import { EditorPanelPage } from './pages/editor-panel.page'
 import { byTestId } from './utils/locators'
 import { toastWithText } from './utils/toast'
+import { trashHook, trashedNames } from './utils/trash-hook'
 import { TEST_IDS } from '../src/renderer/src/constants/testids'
+import {
+  FRESHNESS_NOTICE_COPY,
+  FRESHNESS_NOTICE_TEST_IDS
+} from '../src/renderer/src/components/FileConflictNotification/freshnessNoticeCopy'
 
 /**
  * Seed shaped for these journeys: a root file to rename and delete, a nested
@@ -243,8 +250,12 @@ test.describe('Project tree – renaming', () => {
   })
 })
 
+// The item goes to the Recycle Bin / Trash (#486). In an e2e build that is the
+// stub trash of the test hooks: it removes the item from disk and records it,
+// so these tests never fill the real Recycle Bin.
 test.describe('Project tree – deleting', () => {
   test('should delete a file only after the confirmation is accepted', async ({
+    appWithTestProject,
     windowWithTestProject,
     testProject
   }) => {
@@ -254,10 +265,13 @@ test.describe('Project tree – deleting', () => {
     await tree.runContextMenuAction(tree.fileRow('precious.md'), 'Delete')
     await dialog.waitForConfirm('Delete File')
     await expect(dialog.confirmMessage()).toContainText('precious.md')
+    await expect(dialog.confirmMessage()).toContainText(/will be moved to the (Recycle Bin|Trash|trash)/)
+    await expect(dialog.confirmButton()).toHaveText(/^Move to (Recycle Bin|Trash|trash)$/)
     await dialog.accept()
 
     await tree.waitForFileGone('precious.md')
     expect(await exists(join(testProject.path, 'precious.md'))).toBe(false)
+    expect(await trashedNames(appWithTestProject)).toEqual(['precious.md'])
   })
 
   test('should keep the file when the delete confirmation is declined', async ({
@@ -276,6 +290,7 @@ test.describe('Project tree – deleting', () => {
   })
 
   test('should delete a folder and everything inside it', async ({
+    appWithTestProject,
     windowWithTestProject,
     testProject
   }) => {
@@ -288,6 +303,110 @@ test.describe('Project tree – deleting', () => {
 
     await expect(tree.folderRow('docs')).toHaveCount(0, { timeout: 10_000 })
     expect(await exists(join(testProject.path, 'docs'))).toBe(false)
+    expect(await trashedNames(appWithTestProject)).toEqual(['docs'])
+  })
+
+  // On Windows a watch handle below a folder blocks its move to the Recycle
+  // Bin, and an open tab holds one. The stub trash removes with rm, which such
+  // a handle does not block, so it records how many of Erfana's own handles
+  // were open under the folder when it was asked: 0 means they were released.
+  test('should delete a folder holding a file open in a tab, and show the tab the deleted notice', async ({
+    appWithTestProject,
+    windowWithTestProject: page,
+    testProject
+  }) => {
+    const tree = new ProjectTreePage(page)
+    const dialog = new DialogPage(page)
+    const tabs = new TabBarPage(page)
+    const panel = new EditorPanelPage(page)
+
+    await tree.expandTo(['docs'])
+    await tree.fileRow('docs/guide.md').click()
+    await tabs.waitForTab('guide.md')
+    await panel.waitForReady()
+
+    await tree.runContextMenuAction(tree.folderRow('docs'), 'Delete')
+    await dialog.waitForConfirm('Delete Folder')
+    await dialog.accept()
+
+    await expect(tree.folderRow('docs')).toHaveCount(0, { timeout: 10_000 })
+    expect(await exists(join(testProject.path, 'docs'))).toBe(false)
+    expect(await trashedNames(appWithTestProject)).toEqual(['docs'])
+    expect(await trashHook<number[]>(appWithTestProject, 'handlesAtTrash')).toEqual([0])
+
+    const notice = page.getByTestId(FRESHNESS_NOTICE_TEST_IDS.deleted)
+    await expect(notice).toBeVisible({ timeout: 10_000 })
+    await expect(notice).toContainText(FRESHNESS_NOTICE_COPY.deleted('guide.md'))
+    await expect(notice.getByTestId(FRESHNESS_NOTICE_TEST_IDS.close)).toBeVisible()
+  })
+
+  test('should ask again, and keep the file on Cancel, when it cannot go to the trash', async ({
+    appWithTestProject,
+    windowWithTestProject,
+    testProject
+  }) => {
+    const tree = new ProjectTreePage(windowWithTestProject)
+    const dialog = new DialogPage(windowWithTestProject)
+    await trashHook(appWithTestProject, 'failNext', 1)
+
+    await tree.runContextMenuAction(tree.fileRow('precious.md'), 'Delete')
+    await dialog.waitForConfirm('Delete File')
+    await dialog.confirmButton().click()
+
+    await dialog.waitForConfirm('Delete permanently?')
+    await expect(dialog.confirmMessage()).toContainText('precious.md')
+    await expect(dialog.confirmMessage()).toContainText('You cannot undo this.')
+    await expect(dialog.confirmButton()).toHaveText('Delete permanently')
+    await expect(dialog.cancelButton()).toBeFocused()
+    await dialog.decline()
+
+    await expect(tree.fileRow('precious.md')).toBeVisible()
+    expect(await readFile(join(testProject.path, 'precious.md'), 'utf-8')).toBe(PRECIOUS_CONTENT)
+    expect(await trashedNames(appWithTestProject)).toEqual([])
+  })
+
+  test('should delete permanently only after the second confirmation', async ({
+    appWithTestProject,
+    windowWithTestProject,
+    testProject
+  }) => {
+    const tree = new ProjectTreePage(windowWithTestProject)
+    const dialog = new DialogPage(windowWithTestProject)
+    await trashHook(appWithTestProject, 'failNext', 1)
+
+    await tree.runContextMenuAction(tree.folderRow('docs'), 'Delete')
+    await dialog.waitForConfirm('Delete Folder')
+    await dialog.confirmButton().click()
+    await dialog.waitForConfirm('Delete permanently?')
+    expect(await exists(join(testProject.path, 'docs'))).toBe(true)
+    // The click guard: Confirm ignores clicks for a moment after the dialog opens
+    await expect(dialog.confirmButton()).toHaveAttribute('aria-disabled', 'true')
+    await expect(dialog.confirmButton()).not.toHaveAttribute('aria-disabled')
+    await dialog.accept()
+
+    await expect(tree.folderRow('docs')).toHaveCount(0, { timeout: 10_000 })
+    expect(await exists(join(testProject.path, 'docs'))).toBe(false)
+    expect(await trashedNames(appWithTestProject)).toEqual([])
+  })
+
+  test('should show an in-use error, and never offer a permanent delete, when the item is in use', async ({
+    appWithTestProject,
+    windowWithTestProject,
+    testProject
+  }) => {
+    const tree = new ProjectTreePage(windowWithTestProject)
+    const dialog = new DialogPage(windowWithTestProject)
+    await trashHook(appWithTestProject, 'inUseNext', 1)
+
+    await tree.runContextMenuAction(tree.folderRow('docs'), 'Delete')
+    await dialog.waitForConfirm('Delete Folder')
+    await dialog.accept()
+
+    await expect(toastWithText(windowWithTestProject, '“docs” is in use')).toBeVisible({ timeout: 10_000 })
+    await expect(dialog.container()).toHaveCount(0)
+    await expect(tree.folderRow('docs')).toBeVisible()
+    expect(await exists(join(testProject.path, 'docs', 'guide.md'))).toBe(true)
+    expect(await trashedNames(appWithTestProject)).toEqual([])
   })
 })
 

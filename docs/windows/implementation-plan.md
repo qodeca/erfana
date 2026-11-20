@@ -107,7 +107,7 @@ Three of the four rows that used to sit here have shipped and moved to the ✅ t
 | **Duplicate-instance focus attention** | macOS bounces dock via `app.dock?.bounce`; Windows steals focus via `setAlwaysOnTop` without taskbar flash | Phase 6 polish (untracked GH issue) — `focusWindow.ts:43-63` should call `BrowserWindow.flashFrame(true)` |
 | **Recent projects in jumplist / dock menu** | Not wired; `app.addRecentDocument` never called on project open. Both OSes silently miss recent projects | Phase 6 polish (untracked GH issue) — `main/index.ts:612-643` (dock menu and jump list carry only "New Window") |
 | **Windows menubar About / Help entry** | macOS app menu has About via `role: 'about'`; Windows menubar has File/Edit/View/Window only; users cannot see app version in-product | Phase 6 polish (untracked GH issue) — `createApplicationMenu` in `menu.ts:76-158` |
-| **File deletion** | Both platforms permanently delete via `fs.rm`; no Trash / Recycle Bin via `shell.trashItem` | Phase 6 polish (untracked GH issue) — `deleteFile` / `deleteFolder` in `FileService.ts:910-934` |
+| ~~**File deletion**~~ | ✅ #486: the project tree's Delete goes to the Recycle Bin / Trash via `shell.trashItem`; a permanent `fs.rm` only after a second prompt when the trash refuses the item | #486 — `src/main/ipc/file-delete-handlers.ts`, `src/main/services/file/trashEntry.ts` |
 
 ---
 
@@ -352,7 +352,7 @@ Changes:
 
 **Item 8 / deferred items (D-series):** D5 (log-redaction for filename PII) and D7 (40-char truncation review) **resolved 2026-06-05** — see [`deferred-work.md`](deferred-work.md). New `src/main/utils/redactUserInput.ts` strips filename PII from log messages for `ErrorCode.INVALID_FILENAME` at the create/rename handlers (applied at call-site as an interim; centralize-in-`LoggingService` is the documented follow-up trigger before any telemetry ships). The 40-char toast truncation is intentional UX and stays. **D4 (structured-error IPC serialization to retire `INVALID_FILENAME_MARKER`) is deferred to its own ticket** — a design review found it larger / riskier than the umbrella implied; recommended transport is the documented Option B (the 3 filename handlers return a `{ ok, data, error: { code } }` object instead of throwing, renderer reads `result.error.code` — not a message-string prefix), and the marker's consumer list spans ~8 code files plus docs.
 
-**Forward-looking parity items deferred to their own follow-up tickets:** `flashFrame` focus (Windows), `addRecentDocument` jumplist wiring, Windows About / Help menu entry, `shell.trashItem` for file deletion (see §"Degraded" for file:line references).
+**Forward-looking parity items deferred to their own follow-up tickets:** `flashFrame` focus (Windows), `addRecentDocument` jumplist wiring, Windows About / Help menu entry (`shell.trashItem` for file deletion landed with #486; see §"Degraded" for file:line references).
 
 ---
 

@@ -319,7 +319,7 @@
       "quote": "everything past 50,000 entries as `lazy` rows",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:180",
+      "source": "src/main/services/FileService.ts:181",
       "match": "MAX_WALK_ENTRIES = 50_000"
     },
     {
@@ -389,7 +389,7 @@
       "quote": "has no \"load last project on mount\" effect",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useProjectManagement.ts:181",
+      "source": "src/renderer/src/hooks/useProjectManagement.ts:183",
       "match": "No \"load last project on mount\"",
       "note": "Cited a \"Load last project on mount - DISABLED\" effect that no longer exists; the hook has only a comment"
     },
@@ -958,7 +958,7 @@
       "quote": "`quit:requested` | Event: main asks the renderer to confirm a quit (`{ reason: 'close' }`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:250",
+      "source": "src/main/index.ts:251",
       "match": "send('quit:requested', { reason: 'close' })"
     },
     {
@@ -968,7 +968,7 @@
       "quote": "File watcher: src/main/services/FileWatcherService.ts (each subscription records the session generation; a stale one is refused before its answer, and a project switch ends older ones – #478)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:209",
+      "source": "src/main/services/FileWatcherService.ts:213",
       "match": "if (sub.generation !== this.generation()) return 'PROJECT_CHANGED'",
       "note": "Reworded by #478: the old anchor was removed (S8-S11 watch layer)"
     },
@@ -1183,7 +1183,7 @@
       "quote": "- Empty name (`'Name cannot be empty'`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:941",
+      "source": "src/main/services/FileService.ts:940",
       "match": "throw new Error('Name cannot be empty')"
     },
     {
@@ -1193,7 +1193,7 @@
       "quote": "`'Item no longer exists on disk'`, `'Cannot reveal items outside the project'`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/file-handlers.ts:694",
+      "source": "src/main/ipc/file-handlers.ts:657",
       "match": "return 'Item no longer exists on disk'"
     },
     {
@@ -1213,7 +1213,7 @@
       "quote": "Each I/O step of a transition has a 15 s limit (`TRANSITION_STEP_TIMEOUT_MS`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:79",
+      "source": "src/main/services/ProjectService.ts:80",
       "match": "TRANSITION_STEP_TIMEOUT_MS = 15_000"
     },
     {
@@ -1223,7 +1223,7 @@
       "quote": "Every open, switch and close runs on one queue (`serialise`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:208",
+      "source": "src/main/services/ProjectService.ts:209",
       "match": "private serialise<T>("
     },
     {
@@ -2161,7 +2161,7 @@
       "quote": "LiteParse (pinned at 2.15.1; this was read from 2.14.7)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:67",
+      "source": "package.json:68",
       "match": "\"@llamaindex/liteparse\": \"2.15.1\","
     },
     {
@@ -2352,7 +2352,7 @@
       "quote": "Uses the `@turbodocx/html-to-docx` npm package",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:70",
+      "source": "package.json:71",
       "match": "\"@turbodocx/html-to-docx\": \"^1.23.1\","
     },
     {
@@ -2903,7 +2903,7 @@
       "quote": "**Installation**: Called early in `src/main/index.ts`, before the services start",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:74",
+      "source": "src/main/index.ts:75",
       "match": "installSafeConsole()"
     },
     {
@@ -3435,7 +3435,7 @@
       "quote": "Once per walk, `READ_DIRECTORY_SLOW_WARN_MS` (60 s) after it started",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:47",
+      "source": "src/main/services/FileService.ts:48",
       "match": "export const READ_DIRECTORY_SLOW_WARN_MS = 60_000"
     },
     {
@@ -3445,7 +3445,7 @@
       "quote": "the walk hit `MAX_WALK_ENTRIES`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:180",
+      "source": "src/main/services/FileService.ts:181",
       "match": "export const MAX_WALK_ENTRIES = 50_000"
     },
     {
@@ -3455,7 +3455,7 @@
       "quote": "| `file:findByName completed` | info |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/file-handlers.ts:245",
+      "source": "src/main/ipc/file-handlers.ts:246",
       "match": "logger.info('file:findByName completed', {"
     },
     {
@@ -3475,7 +3475,7 @@
       "quote": "| `FileService: readDirectory joined follow-up read` | info |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:359",
+      "source": "src/main/services/FileService.ts:360",
       "match": "logger.info('FileService: readDirectory joined follow-up read', {"
     },
     {
@@ -3495,7 +3495,7 @@
       "quote": "`rejectedCount`, `rejected` – the first 64 `{ index, reason }`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:128",
+      "source": "src/main/services/ProjectService.ts:129",
       "match": "const MAX_LOGGED_EXCLUDE_REJECTIONS = 64"
     },
     {
@@ -3525,7 +3525,7 @@
       "quote": "| `Directory watcher backend selected` | info |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/watcher/DirectoryWatcherCore.ts:150",
+      "source": "src/main/services/watcher/DirectoryWatcherCore.ts:176",
       "match": "logger.info('Directory watcher backend selected', { backend: this.watchBackend })"
     },
     {
@@ -3545,7 +3545,7 @@
       "quote": "| `Native directory watcher ready` | info |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/watcher/directoryWatchBuilders.ts:115",
+      "source": "src/main/services/watcher/directoryWatchBuilders.ts:118",
       "match": "logger.info('Native directory watcher ready', {"
     },
     {
@@ -3585,7 +3585,7 @@
       "quote": "the token discipline that `npm run lint:css` now enforces",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:15",
+      "source": "package.json:16",
       "match": "\"lint:css\": \"stylelint"
     },
     {
@@ -4039,7 +4039,7 @@
       "quote": "Rename, Import..., Delete, Reveal in Finder / Reveal in Explorer / Reveal in File Manager",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:472",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:407",
       "match": "? 'Reveal in Explorer'",
       "note": "Said \"Import…\" and \"Show in Explorer\"; the labels are \"Import...\" and \"Reveal in Explorer\" (and \"Reveal in File Manager\" on Linux)."
     },
@@ -4050,7 +4050,7 @@
       "quote": "built per node type by `context-menu/strategies.tsx`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/strategies.tsx:78",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/strategies.tsx:77",
       "match": "items.push(new RevealInFileManagerCommand(ctx, dirNode).toMenuItem())"
     },
     {
@@ -4218,7 +4218,7 @@
       "quote": "**Tech**: xterm.js v6.0.0, node-pty v1.0.0, WebglAddon, FitAddon, WebLinksAddon",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:115",
+      "source": "package.json:116",
       "match": "\"@xterm/xterm\": \"^6.0.0\","
     },
     {
@@ -5033,7 +5033,7 @@
       "quote": "npm run design && open docs/design-system/index.html",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:44",
+      "source": "package.json:45",
       "match": "\"design\": \"node scripts/design-sync.mjs\","
     },
     {
@@ -5405,7 +5405,7 @@
       "quote": "`pointer-events: none` on the shipping tooltips (`Dialog/Dialog.css:411`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Dialog/Dialog.css:411",
+      "source": "src/renderer/src/components/Dialog/Dialog.css:422",
       "match": "pointer-events: none;"
     },
     {
@@ -6105,7 +6105,7 @@
       "quote": "calls `shell.showItemInFolder`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/file-handlers.ts:700",
+      "source": "src/main/ipc/file-handlers.ts:663",
       "match": "shell.showItemInFolder(filePath.real)"
     },
     {
@@ -6478,7 +6478,7 @@
       "quote": "the demo project and `npm run docs:screenshots` (implemented)",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:42",
+      "source": "package.json:43",
       "match": "\"docs:screenshots\": \"node scripts/capture/run.mjs\"",
       "note": "Listed as proposed; the guide, capture script and npm script ship."
     },
@@ -6489,7 +6489,7 @@
       "quote": "- **Implementation:** shipped",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:42",
+      "source": "package.json:43",
       "match": "\"docs:screenshots\": \"node scripts/capture/run.mjs\"",
       "note": "Page read as an unshipped plan; added a line that the tooling and guide now exist."
     },
@@ -6500,7 +6500,7 @@
       "quote": "`\"docs:screenshots\": \"node scripts/capture/run.mjs\"`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:42",
+      "source": "package.json:43",
       "match": "\"docs:screenshots\": \"node scripts/capture/run.mjs\""
     },
     {
@@ -6510,7 +6510,7 @@
       "quote": "`\"check:links\": \"node scripts/check-links.mjs\"`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:33",
+      "source": "package.json:34",
       "match": "\"check:links\": \"node scripts/check-links.mjs\""
     },
     {
@@ -7060,7 +7060,7 @@
       "quote": "npm run test:renderer -- useTerminalStore.autoExecute",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:28",
+      "source": "package.json:29",
       "match": "\"test:renderer\": \"vitest --run --config vitest.renderer.config.ts --project renderer\""
     },
     {
@@ -7070,7 +7070,7 @@
       "quote": "npm run test:cov",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:29",
+      "source": "package.json:30",
       "match": "\"test:cov\": \"node scripts/test-cov.mjs\""
     },
     {
@@ -7195,7 +7195,7 @@
       "quote": "generated by `npm run design` from the folders and the screens' `@card` markers",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:44",
+      "source": "package.json:45",
       "match": "\"design\": \"node scripts/design-sync.mjs\""
     },
     {
@@ -7963,7 +7963,7 @@
       "quote": "`npm run docs:brand` screenshots its artwork into `docs/assets/readme/`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:43",
+      "source": "package.json:44",
       "match": "\"docs:brand\": \"node scripts/capture/brand.mjs\""
     },
     {
@@ -8116,7 +8116,7 @@
       "quote": "Status: **implemented** – the guide is in `docs/user-guide/` and the capture script ships as",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:42",
+      "source": "package.json:43",
       "match": "\"docs:screenshots\": \"node scripts/capture/run.mjs\"",
       "note": "Status said \"proposed\"; the guide and the capture script shipped (#138)."
     },
@@ -8127,7 +8127,7 @@
       "quote": "**Entry point:** `npm run docs:screenshots` → `node scripts/capture/run.mjs`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:42",
+      "source": "package.json:43",
       "match": "\"docs:screenshots\": \"node scripts/capture/run.mjs\""
     },
     {
@@ -8260,7 +8260,7 @@
       "quote": "(`npm run check:headers` checks",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:32",
+      "source": "package.json:33",
       "match": "\"check:headers\": \"node scripts/check-spdx-headers.mjs\""
     },
     {
@@ -8270,7 +8270,7 @@
       "quote": "`scripts/check-links.mjs` runs in the local checks (`npm run check:links`)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:33",
+      "source": "package.json:34",
       "match": "\"check:links\": \"node scripts/check-links.mjs\""
     },
     {
@@ -8280,7 +8280,7 @@
       "quote": "It was not in `package.json` then; it is a direct",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:151",
+      "source": "package.json:152",
       "match": "\"tesseract.js\": \"^7.0.0\"",
       "note": "Said tesseract.js is not in package.json; it is now a devDependency."
     },
@@ -8373,7 +8373,7 @@
       "quote": "An npm script (`docs:brand`)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:43",
+      "source": "package.json:44",
       "match": "\"docs:brand\": \"node scripts/capture/brand.mjs\""
     },
     {
@@ -8383,7 +8383,7 @@
       "quote": "| F-64 | 96 | `npm run dev` |",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:47",
+      "source": "package.json:48",
       "match": "\"dev\": \"electron-vite dev\""
     },
     {
@@ -8393,7 +8393,7 @@
       "quote": "`npm run build`, `npm run build:mac`, `npm run build:win`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:54",
+      "source": "package.json:55",
       "match": "\"build:mac\": \"npm run build && electron-builder --mac\""
     },
     {
@@ -8403,7 +8403,7 @@
       "quote": "and merged to `develop` in PR #219",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/watcher/directoryWatchBuilders.ts:115",
+      "source": "src/main/services/watcher/directoryWatchBuilders.ts:118",
       "match": "logger.info('Native directory watcher ready'",
       "note": "Status said \"implemented on fix/211…\" only; the work is merged and the native watcher is in the code."
     },
@@ -8425,7 +8425,7 @@
       "quote": "uses chokidar, which is now 5.0.0",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:72",
+      "source": "package.json:73",
       "match": "\"chokidar\": \"5.0.0\"",
       "note": "Body pins chokidar 3.6.0; package.json has 5.0.0. Recorded in the \"Changed since\" line."
     },
@@ -8436,7 +8436,7 @@
       "quote": "the native watcher's `ready` log line is `Native directory watcher ready`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/watcher/directoryWatchBuilders.ts:115",
+      "source": "src/main/services/watcher/directoryWatchBuilders.ts:118",
       "match": "logger.info('Native directory watcher ready'"
     },
     {
@@ -8536,7 +8536,7 @@
       "quote": "`ERFANA_E2E_FORCE_CRASH=1` in the launching environment",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:188",
+      "source": "src/main/index.ts:189",
       "match": "process.env.ERFANA_E2E_FORCE_CRASH === '1'"
     },
     {
@@ -8759,7 +8759,7 @@
       "quote": "the `!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1'` check in `src/main/index.ts`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/index.ts:188",
+      "source": "src/main/index.ts:189",
       "match": "!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1'",
       "note": "Cited src/main/index.ts:161; the check is at :187. Named the check instead."
     },
@@ -8835,7 +8835,7 @@
       "quote": "The app ships one window (`createWindow` in `src/main/index.ts`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/index.ts:198",
+      "source": "src/main/index.ts:199",
       "match": "function createWindow(): BrowserWindow",
       "note": "Cited src/main/index.ts:172, which is now a command-line switch. Named createWindow instead."
     },
@@ -8916,7 +8916,7 @@
       "quote": "- Zustand stores for settings/state",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:86",
+      "source": "package.json:87",
       "match": "\"zustand\": \"^5.0.15\""
     },
     {
@@ -8948,7 +8948,7 @@
       "quote": "4. **better-sqlite3 Packaging**: Requires careful electron-vite configuration",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:121",
+      "source": "package.json:122",
       "match": "\"electron-vite\": \"^5.0.0\"",
       "note": "electron-vite is the build tool; better-sqlite3 is not yet a dependency (proposal)"
     },
@@ -8970,7 +8970,7 @@
       "quote": "npm run dev",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:47",
+      "source": "package.json:48",
       "match": "\"dev\": \"electron-vite dev\""
     },
     {
@@ -9173,7 +9173,7 @@
       "quote": "**Method:** `npm run build:mac:test`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:55",
+      "source": "package.json:56",
       "match": "\"build:mac:test\": \"npm run build && ERFANA_TEST_BUILD=true"
     },
     {
@@ -9205,7 +9205,7 @@
       "quote": "the app moved to Electron 44 and chokidar 5.0.0 (`package.json`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:118",
+      "source": "package.json:119",
       "match": "\"electron\": \"^44.9.0\"",
       "note": "Page said the libuv abort \"is not live in the shipped app\" for Electron 39 and called chokidar 3.6.0 \"today's\"; both are now stale – status line added"
     },
@@ -9216,7 +9216,7 @@
       "quote": "the Electron 39 and chokidar 3.6.0 figures below describe the build tested on that date",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:72",
+      "source": "package.json:73",
       "match": "\"chokidar\": \"5.0.0\"",
       "note": "chokidar is 5.0.0 now, not 3.6.0"
     },
@@ -9513,7 +9513,7 @@
       "quote": "npm run build:mac",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:54",
+      "source": "package.json:55",
       "match": "\"build:mac\": \"npm run build && electron-builder --mac\""
     },
     {
@@ -9523,7 +9523,7 @@
       "quote": "npm run build:win",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:53",
+      "source": "package.json:54",
       "match": "\"build:win\": \"npm run build && electron-builder --win\""
     },
     {
@@ -9597,7 +9597,7 @@
       "quote": "npm run build:mac",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:54",
+      "source": "package.json:55",
       "match": "\"build:mac\": \"npm run build && electron-builder --mac\""
     },
     {
@@ -9755,7 +9755,7 @@
       "quote": "| Source/derived detection | `src/main/services/FileService.ts` |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:272",
+      "source": "src/main/services/FileService.ts:273",
       "match": "export class FileService implements"
     },
     {
@@ -9787,7 +9787,7 @@
       "quote": "LiteParse (shipped in erfana's import system)",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:67",
+      "source": "package.json:68",
       "match": "\"@llamaindex/liteparse\": \"2.15.1\"",
       "note": "Said LiteParse was planned; it ships as LiteParseConverter"
     },
@@ -9798,7 +9798,7 @@
       "quote": "Last Updated**: October 2026 (Electron 44)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:118",
+      "source": "package.json:119",
       "match": "\"electron\": \"^44.9.0\""
     },
     {
@@ -9958,7 +9958,7 @@
       "quote": "npm run build:mac:test",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:55",
+      "source": "package.json:56",
       "match": "\"build:mac:test\": \"npm run build && ERFANA_TEST_BUILD=true electron-builder --mac"
     },
     {
@@ -9968,7 +9968,7 @@
       "quote": "**App Name**: Includes \"(TEST BUILD)\" suffix",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:55",
+      "source": "package.json:56",
       "match": "-c.productName=\\\"Erfana (TEST BUILD)\\\""
     },
     {
@@ -9978,7 +9978,7 @@
       "quote": "Placed in `release/test/{version}/` instead of `release/{version}/`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:55",
+      "source": "package.json:56",
       "match": "-c.directories.output=release/test/${npm_package_version}"
     },
     {
@@ -9998,7 +9998,7 @@
       "quote": "`!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1'`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:188",
+      "source": "src/main/index.ts:189",
       "match": "if (!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1') {"
     },
     {
@@ -10008,7 +10008,7 @@
       "quote": "preload: join(__dirname, '../preload/index.js'),",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:217",
+      "source": "src/main/index.ts:218",
       "match": "preload: join(__dirname, '../preload/index.js'),"
     },
     {
@@ -10018,7 +10018,7 @@
       "quote": "contextIsolation: true,    // NEVER disable",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:220",
+      "source": "src/main/index.ts:221",
       "match": "contextIsolation: true,"
     },
     {
@@ -10028,7 +10028,7 @@
       "quote": "nodeIntegration: false,    // NEVER enable",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:221",
+      "source": "src/main/index.ts:222",
       "match": "nodeIntegration: false,"
     },
     {
@@ -10078,7 +10078,7 @@
       "quote": "The `dompurify` override in `package.json` (`^3.4.17`)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:164",
+      "source": "package.json:165",
       "match": "\"dompurify\": \"^3.4.17\""
     },
     {
@@ -10228,7 +10228,7 @@
       "quote": "**Current**: 26.18.0 (`package.json` devDependency, exact pin)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:119",
+      "source": "package.json:120",
       "match": "\"electron-builder\": \"26.18.0\""
     },
     {
@@ -10238,7 +10238,7 @@
       "quote": "Full support for Electron 44.x (`^44.9.0` in `package.json`, 44.9.3 in the lockfile)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:118",
+      "source": "package.json:119",
       "match": "\"electron\": \"^44.9.0\""
     },
     {
@@ -10458,7 +10458,7 @@
       "quote": "| `lodash`, `lodash-es` | **exact** `4.18.1` |",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:163",
+      "source": "package.json:164",
       "match": "\"lodash-es\": \"4.18.1\""
     },
     {
@@ -10468,7 +10468,7 @@
       "quote": "| `chokidar` | **exact** `5.0.0` |",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:161",
+      "source": "package.json:162",
       "match": "\"chokidar\": \"5.0.0\""
     },
     {
@@ -10759,7 +10759,7 @@
       "quote": "Run `npm run test` for unit tests, `npm run test:e2e` for E2E tests",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:56",
+      "source": "package.json:57",
       "match": "\"test:e2e\": \"npm run build:e2e && playwright test --project=electron --project=timing\","
     },
     {
@@ -11139,7 +11139,7 @@
       "quote": "`npm run build` runs `npm run typecheck` before `electron-vite build`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:48",
+      "source": "package.json:49",
       "match": "\"build\": \"npm run typecheck && electron-vite build\","
     },
     {
@@ -11149,7 +11149,7 @@
       "quote": "`npm run dev` (`electron-vite dev`) does not type-check",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:47",
+      "source": "package.json:48",
       "match": "\"dev\": \"electron-vite dev\","
     },
     {
@@ -11483,7 +11483,7 @@
       "quote": "`check:claims` (`scripts/check-claims.mjs`) checks the documentation claim ledger",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:34",
+      "source": "package.json:35",
       "match": "\"check:claims\": \"node scripts/check-claims.mjs\"",
       "note": "new Lint step was undocumented"
     },
@@ -11491,11 +11491,11 @@
       "id": "docs-ci/18",
       "audience": "developer",
       "doc": "docs/ci.md",
-      "quote": "`npm run lint` itself runs `lint:shebang` after ESLint (`scripts/check-shebangs.mjs`)",
+      "quote": "Next, `lint:tracked-dirs` (`scripts/check-tracked-dirs.mjs`) fails when a tracked file under `.vale/` or `.codex/` is missing from the working tree",
       "status": "verified",
       "evidence": "source",
       "source": "package.json:11",
-      "match": "&& npm run lint:shebang && npm run lint:max-lines\","
+      "match": "&& npm run lint:shebang && npm run lint:tracked-dirs && npm run lint:max-lines\","
     },
     {
       "id": "docs-ci/19",
@@ -11514,7 +11514,7 @@
       "quote": "`tsconfig.node.test.json` (main, preload, shared tests), `tsconfig.web.test.json`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:18",
+      "source": "package.json:19",
       "match": "\"typecheck:test:node\": \"tsc --noEmit -p tsconfig.node.test.json\""
     },
     {
@@ -11835,7 +11835,7 @@
       "quote": "the `typecheck` script is split into `typecheck:node`, `typecheck:web`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:22",
+      "source": "package.json:23",
       "match": "\"typecheck\": \"npm run typecheck:node && npm run typecheck:web && npm run typecheck:test\""
     },
     {
@@ -11886,7 +11886,7 @@
       "quote": "runs automatically via the `prebuild` npm script (`node scripts/prebuild.mjs`)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:51",
+      "source": "package.json:52",
       "match": "\"prebuild\": \"node scripts/prebuild.mjs\""
     },
     {
@@ -11906,7 +11906,7 @@
       "quote": "The `postinstall` script is `patch-package && install-electron && electron-builder install-app-deps`",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:50",
+      "source": "package.json:51",
       "match": "\"postinstall\": \"patch-package && install-electron && electron-builder install-app-deps\"",
       "note": "install-electron step was missing"
     },
@@ -12152,7 +12152,7 @@
       "quote": "`jsdom: ^25.0.1` in `devDependencies`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:128",
+      "source": "package.json:129",
       "match": "\"jsdom\": \"^25.0.1\","
     },
     {
@@ -12172,7 +12172,7 @@
       "quote": "\"postinstall\": \"patch-package && install-electron && electron-builder install-app-deps\"",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:50",
+      "source": "package.json:51",
       "match": "\"postinstall\": \"patch-package && install-electron && electron-builder install-app-deps\"",
       "note": "install-electron step was missing"
     },
@@ -12193,7 +12193,7 @@
       "quote": "`@llamaindex/liteparse` is pinned exactly (`2.15.1`)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:67",
+      "source": "package.json:68",
       "match": "\"@llamaindex/liteparse\": \"2.15.1\","
     },
     {
@@ -12203,7 +12203,7 @@
       "quote": "\"overrides\":    { \"chokidar\": \"5.0.0\" }",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:161",
+      "source": "package.json:162",
       "match": "\"chokidar\": \"5.0.0\""
     },
     {
@@ -12213,7 +12213,7 @@
       "quote": "\"overrides\": { \"lodash\": \"4.18.1\", \"lodash-es\": \"4.18.1\" }",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:163",
+      "source": "package.json:164",
       "match": "\"lodash-es\": \"4.18.1\""
     },
     {
@@ -12223,7 +12223,7 @@
       "quote": "`dompurify` is floored at `^3.4.17`, forced through the tree.",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:164",
+      "source": "package.json:165",
       "match": "\"dompurify\": \"^3.4.17\""
     },
     {
@@ -12253,7 +12253,7 @@
       "quote": "\"electron-builder\": \"26.18.0\"",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:119",
+      "source": "package.json:120",
       "match": "\"electron-builder\": \"26.18.0\","
     },
     {
@@ -12263,7 +12263,7 @@
       "quote": "(`electron: ^44.9.0` in `package.json`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:118",
+      "source": "package.json:119",
       "match": "\"electron\": \"^44.9.0\","
     },
     {
@@ -12417,7 +12417,7 @@
       "quote": "whose product name makes electron-builder name the bundle `Erfana (TEST BUILD).app`",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:55",
+      "source": "package.json:56",
       "match": "-c.productName=\\\"Erfana (TEST BUILD)\\\"",
       "note": "said the bundle is renamed"
     },
@@ -12806,7 +12806,7 @@
       "quote": "`package.json` declares `typescript: ^6.0.3`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:152",
+      "source": "package.json:153",
       "match": "\"typescript\": \"^6.0.3\","
     },
     {
@@ -12826,7 +12826,7 @@
       "quote": "npm run test:preload",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:27",
+      "source": "package.json:28",
       "match": "\"test:preload\": \"vitest --run --config vitest.preload.config.ts --project preload\","
     },
     {
@@ -13027,7 +13027,7 @@
       "quote": "which is `patch-package && install-electron && electron-builder install-app-deps`",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:50",
+      "source": "package.json:51",
       "match": "\"postinstall\": \"patch-package && install-electron && electron-builder install-app-deps\"",
       "note": "install-electron step was missing"
     },
@@ -13307,7 +13307,7 @@
       "quote": "`ProjectService` calls `settingsService.setLastProjectPath(newPath)` when a project opens",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:270",
+      "source": "src/main/services/ProjectService.ts:271",
       "match": "await this.settingsService.setLastProjectPath(newPath)"
     },
     {
@@ -13559,7 +13559,7 @@
       "quote": "`npm run test:main` — main process tests",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:26",
+      "source": "package.json:27",
       "match": "\"test:main\": \"vitest --run --config vitest.main.config.ts --project main --project main-perf\","
     },
     {
@@ -13569,7 +13569,7 @@
       "quote": "`npm run test:preload` — preload tests",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:27",
+      "source": "package.json:28",
       "match": "\"test:preload\": \"vitest --run --config vitest.preload.config.ts --project preload\","
     },
     {
@@ -13733,7 +13733,7 @@
       "quote": "Makes the main process append `--erfana-force-crash` to `webPreferences.additionalArguments`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:188",
+      "source": "src/main/index.ts:189",
       "match": "if (!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1') {"
     },
     {
@@ -13915,7 +13915,7 @@
       "quote": "`npm run test:e2e:headed` for a visible window",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:60",
+      "source": "package.json:61",
       "match": "\"test:e2e:headed\": \"npm run build:e2e && playwright test --project=electron --headed\","
     },
     {
@@ -14268,7 +14268,7 @@
       "quote": "window.close() → main process 'close' event → 'quit:requested' IPC",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:250",
+      "source": "src/main/index.ts:251",
       "match": "mainWindow.webContents.send('quit:requested', { reason: 'close' })"
     },
     {
@@ -14359,7 +14359,7 @@
       "quote": "`npm run test:e2e` is `npm run build:e2e && playwright test --project=electron`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:56",
+      "source": "package.json:57",
       "match": "\"test:e2e\": \"npm run build:e2e && playwright test --project=electron --project=timing\","
     },
     {
@@ -14380,7 +14380,7 @@
       "quote": "npm run build:mac:test",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:55",
+      "source": "package.json:56",
       "match": "\"build:mac:test\": \"npm run build && ERFANA_TEST_BUILD=true",
       "note": "Used `ERFANA_TEST_BUILD=true npm run build:mac`; the project script is build:mac:test, which also renames the app."
     },
@@ -14776,7 +14776,7 @@
       "quote": "# Test build (inspector enabled - for Playwright debugging); sets ERFANA_TEST_BUILD=true",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:55",
+      "source": "package.json:56",
       "match": "\"build:mac:test\": \"npm run build && ERFANA_TEST_BUILD=true",
       "note": "Used `ERFANA_TEST_BUILD=true npm run build:mac`; the project script is build:mac:test."
     },
@@ -14919,7 +14919,7 @@
       "quote": "installed only for an unpackaged app launched with `ERFANA_E2E_TEST_HOOKS=1`,",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:192",
+      "source": "src/main/index.ts:193",
       "match": "if (!app.isPackaged && process.env.ERFANA_E2E_TEST_HOOKS === '1') {"
     },
     {
@@ -15002,7 +15002,7 @@
       "quote": "`tsconfig.e2e.json` covers `e2e/**/*.ts` and `playwright.config.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:20",
+      "source": "package.json:21",
       "match": "\"typecheck:test:e2e\": \"tsc --noEmit -p tsconfig.e2e.json\","
     },
     {
@@ -15183,7 +15183,7 @@
       "quote": "- **xterm.js v6.0.0** - Modern terminal emulator for web",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:115",
+      "source": "package.json:116",
       "match": "\"@xterm/xterm\": \"^6.0.0\""
     },
     {
@@ -15193,7 +15193,7 @@
       "quote": "(`^1.0.0` in `package.json`, 1.1.0 in the lock file)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:81",
+      "source": "package.json:82",
       "match": "\"node-pty\": \"^1.0.0\""
     },
     {
@@ -16045,7 +16045,7 @@
       "quote": "app.commandLine.appendSwitch('enable-webgl2-compute-context')",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:172",
+      "source": "src/main/index.ts:173",
       "match": "app.commandLine.appendSwitch('enable-webgl2-compute-context')"
     },
     {
@@ -16055,7 +16055,7 @@
       "quote": "app.commandLine.appendSwitch('ignore-gpu-blocklist')",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:173",
+      "source": "src/main/index.ts:174",
       "match": "app.commandLine.appendSwitch('ignore-gpu-blocklist')"
     },
     {
@@ -16065,7 +16065,7 @@
       "quote": "// TODO: Test if still needed with Electron 39+ (Chromium 142)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:170",
+      "source": "src/main/index.ts:171",
       "match": "// TODO: Test if still needed with Electron 39+ (Chromium 142)"
     },
     {
@@ -16075,7 +16075,7 @@
       "quote": "(`src/main/index.ts` notes it is \"not needed for current functionality\")",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:224",
+      "source": "src/main/index.ts:225",
       "match": "// experimentalFeatures removed - not needed for current functionality"
     },
     {
@@ -16085,7 +16085,7 @@
       "quote": "The app now runs Electron 44 (Chromium 152)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:118",
+      "source": "package.json:119",
       "match": "\"electron\": \"^44.9.0\""
     },
     {
@@ -16610,7 +16610,7 @@
       "quote": "`DocxService.ts` - DOCX generation via `@turbodocx/html-to-docx`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:70",
+      "source": "package.json:71",
       "match": "\"@turbodocx/html-to-docx\": \"^1.23.1\""
     },
     {
@@ -17162,7 +17162,7 @@
       "quote": "and filters nothing, so any type the bundled Mermaid version (`mermaid` `^12.2.0` in",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:131",
+      "source": "package.json:132",
       "match": "\"mermaid\": \"^12.2.0\",",
       "note": "Version now traced to package.json instead of an untraceable keyword list."
     },
@@ -17519,7 +17519,7 @@
       "quote": "remark-gfm for GitHub features",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:144",
+      "source": "package.json:145",
       "match": "\"remark-gfm\": \"^4.0.1\","
     },
     {
@@ -17529,7 +17529,7 @@
       "quote": "rehype-raw for HTML parsing",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:141",
+      "source": "package.json:142",
       "match": "\"rehype-raw\": \"^7.0.0\","
     },
     {
@@ -17539,7 +17539,7 @@
       "quote": "rehype-sanitize for security",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:142",
+      "source": "package.json:143",
       "match": "\"rehype-sanitize\": \"^6.0.0\","
     },
     {
@@ -17549,7 +17549,7 @@
       "quote": "react-markdown for AST generation",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:140",
+      "source": "package.json:141",
       "match": "\"react-markdown\": \"^10.1.0\","
     },
     {
@@ -18359,7 +18359,7 @@
       "quote": "Activates the focused button of the \"Replace Item\" dialog, which opens with Cancel focused",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Dialog/ConfirmDialog.tsx:98",
+      "source": "src/renderer/src/components/Dialog/ConfirmDialog.tsx:112",
       "match": "initialFocusRef={danger ? cancelRef : confirmRef}",
       "note": "Said Enter confirms the move; the Replace dialog is a danger prompt focused on Cancel, and Enter follows the focused button."
     },
@@ -18370,7 +18370,7 @@
       "quote": "Closes the \"Replace Item\" dialog without replacing",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Dialog/ConfirmDialog.tsx:95",
+      "source": "src/renderer/src/components/Dialog/ConfirmDialog.tsx:109",
       "match": "closeOnEscape={true}",
       "note": "Claimed Escape also cancels a drag; no tree code handles that, so the claim now covers the dialog only."
     },
@@ -18402,7 +18402,7 @@
       "quote": "(shown on folders and on files – on a file it pastes into that file's folder – and only when the clipboard holds an item)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/strategies.tsx:119",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/strategies.tsx:118",
       "match": "items.push(new PasteIntoParentFolderCommand(ctx, fileNode).toMenuItem())",
       "note": "Said Paste is enabled/disabled by folder selection; it is added only to the directory menu when the clipboard has content."
     },
@@ -18424,7 +18424,7 @@
       "quote": "Cross-filesystem move support (fallback to copy+delete)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:1063",
+      "source": "src/main/services/FileService.ts:1062",
       "match": "if (code === 'EXDEV') {"
     },
     {
@@ -18658,7 +18658,7 @@
       "quote": "same-path guard, project-root guard (`isProjectRoot`), circular-move guard,",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:1021",
+      "source": "src/main/services/FileService.ts:1020",
       "match": "if (this.isProjectRoot(sourcePath)) {",
       "note": "Listed in-project guards in moveItem; those moved to the IPC confinement layer."
     },
@@ -18669,7 +18669,7 @@
       "quote": "const targetPath = childPath(targetParentPath, finalName)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:1013",
+      "source": "src/main/services/FileService.ts:1012",
       "match": "const targetPath = childPath(targetParentPath, finalName)",
       "note": "Code showed join(); the service uses childPath()."
     },
@@ -18680,7 +18680,7 @@
       "quote": "// paths inside the project first (`registerConfinedHandle`).",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/ipc/file-handlers.ts:507",
+      "source": "src/main/ipc/file-handlers.ts:470",
       "match": "FILE_CHANNELS.moveItem,",
       "note": "Added: confinement lives in the handler, not FileService."
     },
@@ -18691,7 +18691,7 @@
       "quote": "await cp(sourcePath, targetPath, { recursive: true, preserveTimestamps: true })",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:1066",
+      "source": "src/main/services/FileService.ts:1065",
       "match": "await cp(sourcePath, targetPath, { recursive: true, preserveTimestamps: true })"
     },
     {
@@ -18701,7 +18701,7 @@
       "quote": "await this.rollbackHandler.rollbackCopyOnDeleteFailure(sourcePath, targetPath, deleteError)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:1076",
+      "source": "src/main/services/FileService.ts:1075",
       "match": "await this.rollbackHandler.rollbackCopyOnDeleteFailure("
     },
     {
@@ -18785,7 +18785,7 @@
       "quote": "resolve it with `mustExist: true, kind: 'directory'`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/ipc/file-handlers.ts:516",
+      "source": "src/main/ipc/file-handlers.ts:479",
       "match": "mustExist: true,",
       "note": "Said only \"target path must exist\"; now names where it is enforced."
     },
@@ -19001,7 +19001,7 @@
       "quote": "schema: payloadArgs(MoveItemRequestSchema),",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/ipc/file-handlers.ts:509",
+      "source": "src/main/ipc/file-handlers.ts:472",
       "match": "schema: payloadArgs(MoveItemRequestSchema),",
       "note": "Handler was shown as registerHandle with positional args and separator stripping."
     },
@@ -19012,7 +19012,7 @@
       "quote": "a name containing `/`, `\\` or a NUL byte, or equal to `.` / `..`, is refused with \"Invalid new name\"",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/shared/ipc/file-schema.ts:159",
+      "source": "src/shared/ipc/file-schema.ts:193",
       "match": "newName: entryNameField('Invalid new name').optional(),",
       "note": "Said separators are stripped from the name; the schema refuses the name instead."
     },
@@ -19043,7 +19043,7 @@
       "quote": "Paste offered on directory and file nodes when the clipboard has content",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/strategies.tsx:119",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/strategies.tsx:118",
       "match": "items.push(new PasteIntoParentFolderCommand(ctx, fileNode).toMenuItem())"
     },
     {
@@ -19084,7 +19084,7 @@
       "quote": "- \"Cannot move the project root directory\"",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:1022",
+      "source": "src/main/services/FileService.ts:1021",
       "match": "throw new Error('Cannot move the project root directory')"
     },
     {
@@ -19094,7 +19094,7 @@
       "quote": "- \"Target must be a directory\"",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:1009",
+      "source": "src/main/services/FileService.ts:1008",
       "match": "throw new Error('Target must be a directory')",
       "note": "Added a FileService error the list omitted."
     },
@@ -19178,7 +19178,7 @@
       "quote": "return entries.some(entry => entry.toLowerCase() === lowerName)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:978",
+      "source": "src/main/services/FileService.ts:977",
       "match": "return entries.some(entry => entry.toLowerCase() === lowerName)"
     },
     {
@@ -19199,7 +19199,7 @@
       "quote": "if (this.isProjectRoot(sourcePath)) {",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:1021",
+      "source": "src/main/services/FileService.ts:1020",
       "match": "if (this.isProjectRoot(sourcePath)) {",
       "note": "Code compared sourcePath === this.projectPath."
     },
@@ -19231,7 +19231,7 @@
       "quote": "| Copy overflow | `copyNumber > MAX_COPY_ATTEMPTS` (1000) |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:40",
+      "source": "src/main/services/FileService.ts:41",
       "match": "export const MAX_COPY_ATTEMPTS = 1000"
     },
     {
@@ -19241,7 +19241,7 @@
       "quote": "a link to a file is copied as the file's content (the `file:copyItem` handler in `file-handlers.ts`)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/ipc/file-handlers.ts:581",
+      "source": "src/main/ipc/file-handlers.ts:544",
       "match": "linkToFolder ? sourceEntry.real : sourcePath.real,",
       "note": "Said symlinks are always copied as symlinks."
     },
@@ -19294,7 +19294,7 @@
       "quote": "Refused before `FileService` runs: the handler requires `kind: 'directory'`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/ipc/file-handlers.ts:517",
+      "source": "src/main/ipc/file-handlers.ts:480",
       "match": "kind: 'directory',",
       "note": "Error-code table listed EISDIR/ENOTDIR as \"validation prevents this\" without a source."
     },
@@ -19484,7 +19484,7 @@
       "quote": "Chokidar is pinned to exact `5.0.0`.",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:72",
+      "source": "package.json:73",
       "match": "\"chokidar\": \"5.0.0\","
     },
     {
@@ -19719,7 +19719,7 @@
       "quote": "and is logged as `readDirectory still running` after 60 s",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:47",
+      "source": "src/main/services/FileService.ts:48",
       "match": "export const READ_DIRECTORY_SLOW_WARN_MS = 60_000"
     },
     {
@@ -20036,7 +20036,7 @@
       "quote": "const filePath = await api.file.createFile({ dirPath: targetPath!, name: fileName })",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileOperations.ts:92",
+      "source": "src/renderer/src/hooks/useFileOperations.ts:87",
       "match": "const filePath = await api.file.createFile({ dirPath: targetPath!, name: fileName })",
       "note": "Excerpt called window.api.file.createFile positionally and refreshFileTree()."
     },
@@ -20102,7 +20102,7 @@
       "quote": "`ProjectService.updateServices(root)` points the two services that still take a pushed root at the new root",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:231",
+      "source": "src/main/services/ProjectService.ts:232",
       "match": "this.directoryWatcherService.setProjectPath(root)",
       "note": "Calls were tied to auto-restore; they run on every session change. Reworded by #478 S21: FileWatcherService reads the bound session instead of a pushed root."
     },
@@ -20298,7 +20298,7 @@
       "quote": "- **Which backend**: `Directory watcher backend selected`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/watcher/DirectoryWatcherCore.ts:150",
+      "source": "src/main/services/watcher/DirectoryWatcherCore.ts:176",
       "match": "logger.info('Directory watcher backend selected', { backend: this.watchBackend })"
     },
     {
@@ -20652,7 +20652,7 @@
       "quote": "- **Command**: Testable command objects (13 classes)",
       "status": "verified",
       "evidence": "app",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:468",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:403",
       "match": "export class RevealInFileManagerCommand",
       "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
@@ -20663,7 +20663,7 @@
       "quote": "**Folders**: Cut, Copy, Paste, ---, New File, New Folder, Rename, ---, Import..., ---, Delete,",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/strategies.tsx:62",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/strategies.tsx:61",
       "match": "items.push(new NewFolderInDirectoryCommand(ctx, dirNode).toMenuItem())"
     },
     {
@@ -20673,7 +20673,7 @@
       "quote": "The Reveal label switches on `isMacOS()`.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:470",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:405",
       "match": "? 'Reveal in Finder'"
     },
     {
@@ -20744,7 +20744,7 @@
       "quote": "and past 50,000 entries leaves the rest unread too",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:180",
+      "source": "src/main/services/FileService.ts:181",
       "match": "export const MAX_WALK_ENTRIES = 50_000"
     },
     {
@@ -20775,7 +20775,7 @@
       "quote": "`@tanstack/react-virtual` draws only the rows on screen",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:98",
+      "source": "package.json:99",
       "match": "\"@tanstack/react-virtual\": \"3.14.21\","
     },
     {
@@ -20877,7 +20877,7 @@
       "quote": "Both `npm run build:win` and `npm run build:unpack` stop with",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:52",
+      "source": "package.json:53",
       "match": "\"build:unpack\": \"npm run build && electron-builder --dir\""
     },
     {
@@ -21200,7 +21200,7 @@
       "quote": "npm run test:e2e:visual                   # Visual regression suite",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:61",
+      "source": "package.json:62",
       "match": "\"test:e2e:visual\": \"electron-vite build --mode e2e && playwright test --project=visual\""
     },
     {
@@ -21210,7 +21210,7 @@
       "quote": "npm run test:e2e:update-screenshots       # Update visual baselines",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:62",
+      "source": "package.json:63",
       "match": "\"test:e2e:update-screenshots\": \"electron-vite build --mode e2e && playwright test --project=visual --update-snapshots\""
     },
     {
@@ -21311,7 +21311,7 @@
       "quote": "past 50,000 entries (`MAX_WALK_ENTRIES` in `FileService.ts`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:180",
+      "source": "src/main/services/FileService.ts:181",
       "match": "export const MAX_WALK_ENTRIES = 50_000"
     },
     {
@@ -21391,7 +21391,7 @@
       "quote": "committed `patches/node-pty+1.1.0.patch`, applied via `patch-package` in the `postinstall` hook",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:50",
+      "source": "package.json:51",
       "match": "\"postinstall\": \"patch-package && install-electron && electron-builder install-app-deps\""
     },
     {
@@ -21442,7 +21442,7 @@
       "quote": "an advisory `E2E (Linux, xvfb)` job (`.github/workflows/e2e-linux.yml`)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:58",
+      "source": "package.json:59",
       "match": "\"test:e2e:linux\": \"bash scripts/e2e-linux.sh\""
     },
     {
@@ -21536,7 +21536,7 @@
       "quote": "`Dialog/Dialog.css:573`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Dialog/Dialog.css:573",
+      "source": "src/renderer/src/components/Dialog/Dialog.css:584",
       "match": "background-size: 12px;"
     },
     {
@@ -21567,7 +21567,7 @@
       "quote": "currently at `^4.3.1`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:79",
+      "source": "package.json:80",
       "match": "\"js-yaml\": \"^4.3.1\""
     },
     {
@@ -21669,7 +21669,7 @@
       "quote": "`npm run typecheck` runs it as `typecheck:test:e2e`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:20",
+      "source": "package.json:21",
       "match": "\"typecheck:test:e2e\": \"tsc --noEmit -p tsconfig.e2e.json\""
     },
     {
@@ -21710,7 +21710,7 @@
       "quote": "with the path policy `{ mode: 'external', check: 'escape' }`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/file-handlers.ts:320",
+      "source": "src/main/ipc/file-handlers.ts:321",
       "match": "mode: 'external', check: 'escape'"
     },
     {
@@ -21731,7 +21731,7 @@
       "status": "verified",
       "evidence": "source",
       "source": "package.json:11",
-      "match": "&& npm run lint:shebang && npm run lint:max-lines"
+      "match": "&& npm run lint:tracked-dirs && npm run lint:max-lines"
     },
     {
       "id": "docs-technical-debt/32",
@@ -21935,7 +21935,7 @@
       "quote": "`package.json` now pins `vitest` and `@vitest/coverage-v8` at `^5.0.5`",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:156",
+      "source": "package.json:157",
       "match": "\"vitest\": \"^5.0.5\"",
       "note": "The major vitest upgrade the advisory needed has landed"
     },
@@ -21957,7 +21957,7 @@
       "quote": "`package.json` now pins 26.18.0",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:119",
+      "source": "package.json:120",
       "match": "\"electron-builder\": \"26.18.0\"",
       "note": "Said package.json pins 26.16.1"
     },
@@ -22058,7 +22058,7 @@
       "quote": "Where: `DirectoryWatcherCore.shouldDropAbs` (`watcher/DirectoryWatcherCore.ts`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/watcher/DirectoryWatcherCore.ts:97",
+      "source": "src/main/services/watcher/DirectoryWatcherCore.ts:119",
       "match": "protected shouldDropAbs(absPath: string, watchRoot: string): boolean {"
     },
     {
@@ -22138,7 +22138,7 @@
       "quote": "both on the shared `src/shared/coalescingRunner.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useProjectManagement.ts:110",
+      "source": "src/renderer/src/hooks/useProjectManagement.ts:112",
       "match": "const runner = createCoalescingRunner<void>()"
     },
     {
@@ -22358,7 +22358,7 @@
       "quote": "at most `WALK_READ_CONCURRENCY` (24) file-system calls in flight per walk",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:171",
+      "source": "src/main/services/FileService.ts:172",
       "match": "export const WALK_READ_CONCURRENCY = 24"
     },
     {
@@ -22368,7 +22368,7 @@
       "quote": "After `MAX_WALK_ENTRIES` (50,000) rows, a folder whose turn comes is left lazy",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:180",
+      "source": "src/main/services/FileService.ts:181",
       "match": "export const MAX_WALK_ENTRIES = 50_000"
     },
     {
@@ -22408,7 +22408,7 @@
       "quote": "Adds `folderReadCount`, `lazyFolderCount`, `entryCapReached`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:124",
+      "source": "src/main/services/FileService.ts:125",
       "match": "folderReadCount: number"
     },
     {
@@ -22428,7 +22428,7 @@
       "quote": "Since v0.22.0 the walk keeps up to `WALK_READ_CONCURRENCY` (24) file-system calls in flight",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:171",
+      "source": "src/main/services/FileService.ts:172",
       "match": "export const WALK_READ_CONCURRENCY = 24",
       "note": "Added a status note: 'The walk is sequential' read as current; the walk is parallel since v0.22.0"
     },
@@ -22439,7 +22439,7 @@
       "quote": "Directory watch starts – backend `native-recursive`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/watcher/DirectoryWatcherCore.ts:150",
+      "source": "src/main/services/watcher/DirectoryWatcherCore.ts:176",
       "match": "logger.info('Directory watcher backend selected', { backend: this.watchBackend })"
     },
     {
@@ -22469,7 +22469,7 @@
       "quote": "npm run test:main        # baseline drifts per release",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:26",
+      "source": "package.json:27",
       "match": "\"test:main\": \"vitest --run"
     },
     {
@@ -22479,7 +22479,7 @@
       "quote": "npm run dev              # smoke-test Electron + terminal",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:47",
+      "source": "package.json:48",
       "match": "\"dev\": \"electron-vite dev\""
     },
     {
@@ -22489,7 +22489,7 @@
       "quote": "npm run build:mac        # produces .dmg",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:54",
+      "source": "package.json:55",
       "match": "\"build:mac\": \"npm run build && electron-builder --mac\""
     },
     {
@@ -22519,7 +22519,7 @@
       "quote": "the script now reads `node scripts/test-cov.mjs` at `:29`",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:29",
+      "source": "package.json:30",
       "match": "\"test:cov\": \"node scripts/test-cov.mjs\"",
       "note": "said :21; the script is on line 29"
     },
@@ -22530,7 +22530,7 @@
       "quote": "the script now reads `node scripts/prebuild.mjs` at `:46`",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:51",
+      "source": "package.json:52",
       "match": "\"prebuild\": \"node scripts/prebuild.mjs\"",
       "note": "said :27; the script is on line 46"
     },
@@ -22729,7 +22729,7 @@
       "quote": "`ProjectService.ts:86-88` (`foldCase`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:87",
+      "source": "src/main/services/ProjectService.ts:88",
       "match": "function foldCase(p: string): string {"
     },
     {
@@ -22799,7 +22799,7 @@
       "quote": "The committed `patches/node-pty+1.1.0.patch` (applied via `patch-package` in `postinstall`)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:50",
+      "source": "package.json:51",
       "match": "\"postinstall\": \"patch-package && install-electron"
     },
     {
@@ -22839,7 +22839,7 @@
       "quote": "npm run test:cov         # every unit test once",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:29",
+      "source": "package.json:30",
       "match": "\"test:cov\": \"node scripts/test-cov.mjs\""
     },
     {
@@ -23029,7 +23029,7 @@
       "quote": "to test the `MAX_COPY_ATTEMPTS` safety guard without creating 1001 real files",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:40",
+      "source": "src/main/services/FileService.ts:41",
       "match": "export const MAX_COPY_ATTEMPTS = 1000"
     },
     {
@@ -23291,11 +23291,11 @@
       "id": "docs-windows-implementation-plan/23",
       "audience": "developer",
       "doc": "docs/windows/implementation-plan.md",
-      "quote": "`deleteFile` / `deleteFolder` in `FileService.ts:910-934`",
+      "quote": "#486 — `src/main/ipc/file-delete-handlers.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:910",
-      "match": "async deleteFile(filePath: string): Promise<void> {"
+      "source": "src/main/ipc/file-delete-handlers.ts:118",
+      "match": "export function registerDeleteHandlers(session: ProjectSession): void {"
     },
     {
       "id": "docs-windows-implementation-plan/24",
@@ -23364,7 +23364,7 @@
       "quote": "`foldCase` in `ProjectService.ts:86-88`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:87",
+      "source": "src/main/services/ProjectService.ts:88",
       "match": "function foldCase(p: string): string {"
     },
     {
@@ -24416,7 +24416,7 @@
       "quote": "`npm ci` runs `electron-builder install-app-deps`, which rebuilds `node-pty` for Electron",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:50",
+      "source": "package.json:51",
       "match": "electron-builder install-app-deps",
       "note": "Was: Python 3.12 or 3.14.x, node-pty fails on 3.13 (untraceable versions; replaced with the traceable reason Python is needed). Checker: source line was package.json:40 (the design script); postinstall is line 45."
     },
@@ -24448,7 +24448,7 @@
       "quote": "npm run dev          # Start the app in development mode",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:47",
+      "source": "package.json:48",
       "match": "\"dev\": \"electron-vite dev\"",
       "note": "Was 'Start development server'; electron-vite dev launches the Electron app with the dev server. Checker: source line was 38, dev script is line 43."
     },
@@ -24459,7 +24459,7 @@
       "quote": "npm run test         # Run all unit tests (should pass)",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:23",
+      "source": "package.json:24",
       "match": "\"test\": \"vitest --run\"",
       "note": "Was 'Run all tests'; it runs Vitest unit tests only, E2E is the separate test:e2e script."
     },
@@ -24470,7 +24470,7 @@
       "quote": "npm run typecheck    # Type checking (should pass)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:22",
+      "source": "package.json:23",
       "match": "\"typecheck\": \"npm run typecheck:node"
     },
     {
@@ -24491,7 +24491,7 @@
       "quote": "│   ├── services/       # Business logic (FileService, TerminalService, etc.)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:272",
+      "source": "src/main/services/FileService.ts:273",
       "match": "export class FileService"
     },
     {
@@ -24541,7 +24541,7 @@
       "quote": "npm run lint:css && npm run design -- --check && npm run test",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:44",
+      "source": "package.json:45",
       "match": "\"design\": \"node scripts/design-sync.mjs\"",
       "note": "Page text right; ledger cited package.json:35, the design script is line 40."
     },
@@ -25431,7 +25431,7 @@
       "quote": "npm run dev              # Start dev server",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:47",
+      "source": "package.json:48",
       "match": "\"dev\": \"electron-vite dev\"",
       "note": "Ledger source line number was wrong (package.json had shifted); repointed to the exact line."
     },
@@ -25442,7 +25442,7 @@
       "quote": "npm run build            # Production build",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:48",
+      "source": "package.json:49",
       "match": "\"build\": \"npm run typecheck && electron-vite build\"",
       "note": "Ledger source line number was wrong (package.json had shifted); repointed to the exact line."
     },
@@ -25474,7 +25474,7 @@
       "quote": "# Type checking (node + web, and their tests + e2e)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:22",
+      "source": "package.json:23",
       "match": "\"typecheck\": \"npm run typecheck:node && npm run typecheck:web && npm run typecheck:test\""
     },
     {
@@ -25494,7 +25494,7 @@
       "quote": "stylelint: src/ CSS + the docs/design-system/ cards and docs/designs/ screens",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:15",
+      "source": "package.json:16",
       "match": "\"lint:css\": \"stylelint \\\"src/**/*.css\\\" \\\"docs/design-system/**/*.css\\\""
     },
     {
@@ -25554,7 +25554,7 @@
       "quote": "vitest.preload.config.ts config: preload tests",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:27",
+      "source": "package.json:28",
       "match": "\"test:preload\": \"vitest --run --config vitest.preload.config.ts --project preload\""
     },
     {
@@ -25574,7 +25574,7 @@
       "quote": "# E2E tests (Playwright + Electron)",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:56",
+      "source": "package.json:57",
       "match": "\"test:e2e\": \"npm run build:e2e && playwright test --project=electron --project=timing\"",
       "note": "Ledger source line number was wrong (package.json had shifted); repointed to the exact line."
     },
@@ -25585,7 +25585,7 @@
       "quote": "npm run test:e2e:visual            # Visual regression baselines",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:61",
+      "source": "package.json:62",
       "match": "\"test:e2e:visual\": \"electron-vite build --mode e2e && playwright test --project=visual\"",
       "note": "Ledger source line number was wrong (package.json had shifted); repointed to the exact line."
     },
@@ -25596,7 +25596,7 @@
       "quote": "npm run test:e2e:update-screenshots # Refresh visual baselines",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:62",
+      "source": "package.json:63",
       "match": "playwright test --project=visual --update-snapshots",
       "note": "Ledger source line number was wrong (package.json had shifted); repointed to the exact line."
     },
@@ -25774,7 +25774,7 @@
       "quote": "├── stores/            # Zustand state",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:86",
+      "source": "package.json:87",
       "match": "\"zustand\": \"^5.0.15\"",
       "note": "Ledger source line number was wrong (package.json had shifted); repointed to the exact line."
     },
@@ -25936,7 +25936,7 @@
       "quote": "npm run design           # Bake values into the cards",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:44",
+      "source": "package.json:45",
       "match": "\"design\": \"node scripts/design-sync.mjs\""
     },
     {
@@ -25946,7 +25946,7 @@
       "quote": "npm run check:links          # Relative links",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:33",
+      "source": "package.json:34",
       "match": "\"check:links\": \"node scripts/check-links.mjs\""
     },
     {
@@ -25956,7 +25956,7 @@
       "quote": "npm run check:version-drift  # Docs that state",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:41",
+      "source": "package.json:42",
       "match": "\"check:version-drift\": \"node scripts/check-version-drift.mjs\""
     },
     {
@@ -25967,7 +25967,7 @@
       "status": "verified",
       "evidence": "source",
       "source": "package.json:11",
-      "match": "npm run lint:shebang && npm run lint:max-lines"
+      "match": "npm run lint:tracked-dirs && npm run lint:max-lines"
     },
     {
       "id": "quick-reference/54",
@@ -25976,7 +25976,7 @@
       "quote": "npm run test             # All tests",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:23",
+      "source": "package.json:24",
       "match": "\"test\": \"vitest --run\""
     },
     {
@@ -25996,7 +25996,7 @@
       "quote": "├── main/services/         # Backend services",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:30",
+      "source": "src/main/index.ts:31",
       "match": "from './services/WhisperModelManager'"
     },
     {
@@ -26385,7 +26385,7 @@
       "quote": "Erfana enables context isolation, disables node integration in the sandboxed renderer",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:221",
+      "source": "src/main/index.ts:222",
       "match": "nodeIntegration: false,",
       "note": "contextIsolation: true at src/main/index.ts:219; sandbox is Electron's default (comment line 217)."
     },
@@ -26524,7 +26524,7 @@
       "quote": "disables node integration in the sandboxed renderer",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:218",
+      "source": "src/main/index.ts:219",
       "match": "sandbox: true is the default since Electron 20"
     },
     {
@@ -26925,7 +26925,7 @@
       "quote": "is read by `ProjectSettingsService` on every project open",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:486",
+      "source": "src/main/services/ProjectService.ts:487",
       "match": "this.projectSettingsService.loadSettings(newProjectPath),"
     },
     {
@@ -26935,7 +26935,7 @@
       "quote": "any failure there blocks the project from opening",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:490",
+      "source": "src/main/services/ProjectService.ts:491",
       "match": "// Settings validation failed - block project open"
     },
     {
@@ -27043,7 +27043,7 @@
       "quote": "`globalSettingsService.getSetting('files').exclude`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/file-handlers.ts:66",
+      "source": "src/main/ipc/file-handlers.ts:67",
       "match": "globalSettingsService.getSetting('files').exclude"
     },
     {
@@ -27073,7 +27073,7 @@
       "quote": "logs the rejections and builds one `ProjectPathFilter`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:247",
+      "source": "src/main/services/ProjectService.ts:248",
       "match": "logExcludeRejections(settings.excludeRejections)"
     },
     {
@@ -27620,7 +27620,7 @@
       "quote": "Should see: 📝 File changed externally: [redacted]/file.md",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/watcher/FileWatchCore.ts:190",
+      "source": "src/main/services/watcher/FileWatchCore.ts:242",
       "match": "File changed externally: ${redactPath(entry.filePath)}",
       "note": "Reworded by #478: the old anchor was removed (S8-S11 watch layer)"
     },
@@ -27631,7 +27631,7 @@
       "quote": "File is paused (during save operation)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/watcher/FileWatchCore.ts:186",
+      "source": "src/main/services/watcher/FileWatchCore.ts:238",
       "match": "if (sub.paused) sub.missed = true",
       "note": "Re-anchored by #478 (S8-S11 watch layer)"
     },
@@ -27752,7 +27752,7 @@
       "quote": "`shouldDropAbs` / `shouldDropWatchRel` in `src/main/services/watcher/DirectoryWatcherCore.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/watcher/DirectoryWatcherCore.ts:97",
+      "source": "src/main/services/watcher/DirectoryWatcherCore.ts:119",
       "match": "protected shouldDropAbs(absPath: string, watchRoot: string): boolean"
     },
     {
@@ -27772,7 +27772,7 @@
       "quote": "from the native watcher's `shouldDrop` option (macOS and Windows)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/watcher/DirectoryWatcherCore.ts:164",
+      "source": "src/main/services/watcher/DirectoryWatcherCore.ts:190",
       "match": "shouldDrop: (rel: string) => this.shouldDropWatchRel(watchPrefix, rel, depth)"
     },
     {
@@ -27812,7 +27812,7 @@
       "quote": "hands it to the watcher with `setPathFilter`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:262",
+      "source": "src/main/services/ProjectService.ts:263",
       "match": "this.directoryWatcherService.setPathFilter(pathFilter)"
     },
     {
@@ -27843,7 +27843,7 @@
       "quote": "const path = await window.api.file.createFile({ dirPath: targetPath, name: fileName })",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileOperations.ts:92",
+      "source": "src/renderer/src/hooks/useFileOperations.ts:87",
       "match": "api.file.createFile({ dirPath: targetPath!, name: fileName })",
       "note": "Snippet passed (targetPath, fileName) as two arguments; createFile takes one request object"
     },
@@ -27854,7 +27854,7 @@
       "quote": "await refreshProjectTree()",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileOperations.ts:93",
+      "source": "src/renderer/src/hooks/useFileOperations.ts:88",
       "match": "await refreshProjectTree()",
       "note": "Snippet called refreshFileTree(), which the caller does not have"
     },
@@ -27968,7 +27968,7 @@
       "quote": "build fails during `npm install`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:50",
+      "source": "package.json:51",
       "match": "electron-builder install-app-deps",
       "note": "postinstall rebuilds native deps (node-pty) during npm install"
     },
@@ -27979,7 +27979,7 @@
       "quote": "electron-store v11+ is ES Module only",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:74",
+      "source": "package.json:75",
       "match": "\"electron-store\": \"^11.0.2\""
     },
     {
@@ -28020,7 +28020,7 @@
       "quote": "`ProjectService` builds the filter when the project opens",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:510",
+      "source": "src/main/services/ProjectService.ts:511",
       "match": "pathFilter = this.buildPathFilter(newProjectPath"
     },
     {
@@ -28040,7 +28040,7 @@
       "quote": "callers in `src/renderer/src/hooks/useFileOperations.ts`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileOperations.ts:87",
+      "source": "src/renderer/src/hooks/useFileOperations.ts:82",
       "match": "const createdFilePath = await withWatcherPause("
     },
     {
@@ -28506,7 +28506,7 @@
       "quote": "**Rename**, **Import...**, **Delete**, **Reveal in Finder** or its platform equivalent)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:438",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:373",
       "match": "label = 'Import...'",
       "note": "The label is Import... with three dots, not an ellipsis character; labels now bold so they stay exact. Reveal item is 'Reveal in Finder' / 'Reveal in Explorer' / 'Reveal in File Manager' (commands.tsx:454-457)."
     },
@@ -28527,18 +28527,18 @@
       "quote": "Reveal in Finder / Reveal in Explorer",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:470",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:405",
       "match": "? 'Reveal in Finder'"
     },
     {
       "id": "user-guide-feature-inventory/43",
       "audience": "user",
       "doc": "docs/user-guide/feature-inventory.md",
-      "quote": "Delete confirmation (\"cannot be undone\")",
+      "quote": "Delete moves the item to the Recycle Bin / Trash; a second prompt before a permanent delete when it cannot go there",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:330",
-      "match": "This action cannot be undone.`"
+      "source": "src/renderer/src/components/ProjectTree/context-menu/treeDelete.ts:114",
+      "match": "title: 'Delete permanently?',"
     },
     {
       "id": "user-guide-feature-inventory/44",
@@ -28588,7 +28588,7 @@
       "quote": "folders beyond the first 50,000 rows read on expand",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:180",
+      "source": "src/main/services/FileService.ts:181",
       "match": "export const MAX_WALK_ENTRIES = 50_000",
       "note": "Said folders past 50,000 entries; the cap counts rows the first walk lists, after which folders load on expand."
     },
@@ -30310,7 +30310,7 @@
       "quote": "ignored build folders and folders beyond",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:230",
+      "source": "src/main/services/FileService.ts:231",
       "match": "An ignored folder (`watcher.ignoreList`, on whole segments): shown, but not"
     },
     {
@@ -30603,7 +30603,7 @@
       "quote": "choose a folder containing Markdown files",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/file-handlers.ts:132",
+      "source": "src/main/ipc/file-handlers.ts:133",
       "match": "properties: ['openDirectory', 'createDirectory'],",
       "note": "Open project shows a folder picker."
     },
@@ -31255,7 +31255,7 @@
       "quote": "right-click a folder and select **Import...**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:438",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:373",
       "match": "label = 'Import...'",
       "note": "Context menu item label is 'Import...', not 'Import'."
     },
@@ -31266,7 +31266,7 @@
       "quote": "right-click a folder and select",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/strategies.tsx:68",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/strategies.tsx:67",
       "match": "items.push(new ImportCommand(ctx, dirNode, ctx.importFile).toMenuItem())"
     },
     {
@@ -31529,7 +31529,7 @@
       "quote": "not in the folder you right-clicked",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:449",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:384",
       "match": "const result = await this.importFile()",
       "note": "The folder Import... command passes no target folder, so the right-clicked folder does not receive the file. Reworded from 'whichever folder you right-clicked', which could be misread as saving into that folder.",
       "test": "e2e/guide-tasks/import.guide.ts"
@@ -31604,7 +31604,7 @@
       "quote": "Erfana opens folders, not individual files.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/file-handlers.ts:132",
+      "source": "src/main/ipc/file-handlers.ts:133",
       "match": "properties: ['openDirectory', 'createDirectory']"
     },
     {
@@ -31614,7 +31614,7 @@
       "quote": "2. Choose the folder in the system dialog.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/file-handlers.ts:131",
+      "source": "src/main/ipc/file-handlers.ts:132",
       "match": "dialog.showOpenDialog("
     },
     {
@@ -31685,7 +31685,7 @@
       "quote": "**Cancel** keeps the current project open.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Dialog/ConfirmDialog.tsx:46",
+      "source": "src/renderer/src/components/Dialog/ConfirmDialog.tsx:50",
       "match": "cancelLabel = 'Cancel',"
     },
     {
@@ -31726,7 +31726,7 @@
       "quote": "On Windows, the folder picker is different, but the Home and project-header controls are the same.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/file-handlers.ts:131",
+      "source": "src/main/ipc/file-handlers.ts:132",
       "match": "dialog.showOpenDialog(withLastDirectory<OpenDialogOptions>({",
       "note": "Native OS dialog; renderer controls are not platform-gated"
     },
@@ -31852,7 +31852,7 @@
       "quote": "**Rename**, **Delete**, and **Reveal in Finder**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:327",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/deleteCommands.ts:16",
       "match": "label = 'Delete'"
     },
     {
@@ -31862,7 +31862,7 @@
       "quote": "**Reveal in Finder** (Windows: **Reveal in Explorer**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:470",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:405",
       "match": "? 'Reveal in Finder'"
     },
     {
@@ -31872,7 +31872,7 @@
       "quote": "(Windows: **Reveal in Explorer**;",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:472",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:407",
       "match": "? 'Reveal in Explorer'"
     },
     {
@@ -31882,7 +31882,7 @@
       "quote": "Linux: **Reveal in File Manager**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:473",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:408",
       "match": ": 'Reveal in File Manager'",
       "note": "Linux label was missing; added. Also moved Reveal after Delete to match menu order."
     },
@@ -31893,7 +31893,7 @@
       "quote": "**Paste** appears on folders and files when the clipboard has items",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/strategies.tsx:119",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/strategies.tsx:118",
       "match": "items.push(new PasteIntoParentFolderCommand(ctx, fileNode).toMenuItem())"
     },
     {
@@ -31986,7 +31986,7 @@
       "quote": "Screenshot of the Create New File dialog.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileOperations.ts:78",
+      "source": "src/renderer/src/hooks/useFileOperations.ts:73",
       "match": "title: 'Create New File',"
     },
     {
@@ -31996,7 +31996,7 @@
       "quote": "Screenshot of the Delete File confirmation dialog.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:328",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/deleteCommands.ts:49",
       "match": "confirmTitle = 'Delete File'"
     },
     {
@@ -32013,11 +32013,21 @@
       "id": "user-guide-how-to-organise-project-files/25",
       "audience": "user",
       "doc": "docs/user-guide/how-to/organise-project-files.md",
-      "quote": "Deletion cannot be undone.",
+      "quote": "**Delete** moves the item to the Recycle Bin (macOS: Trash; Linux: the trash), so you can restore it from there.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:330",
-      "match": "This action cannot be undone."
+      "source": "src/renderer/src/components/ProjectTree/context-menu/treeDelete.ts:36",
+      "match": "moveLabel: 'Move to Recycle Bin'"
+    },
+    {
+      "id": "user-guide-how-to-organise-project-files/g01",
+      "audience": "user",
+      "doc": "docs/user-guide/how-to/organise-project-files.md",
+      "quote": "Erfana shows an error asking you to close it, and does not offer to delete it permanently.",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/treeDelete.ts:69",
+      "match": "is in use – close the programs or terminals using it"
     },
     {
       "id": "user-guide-how-to-organise-project-files/26",
@@ -32091,7 +32101,7 @@
       "quote": "Screenshot of the folder context menu.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/strategies.tsx:54",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/strategies.tsx:53",
       "match": "if (ctx.clipboard.hasClipboard())",
       "note": "Folder menu built by DirectoryContextMenuStrategy."
     },
@@ -32102,7 +32112,7 @@
       "quote": "Right-click a file or folder for",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/strategies.tsx:134",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/strategies.tsx:133",
       "match": "new RevealInFileManagerCommand(ctx, fileNode)",
       "note": "Both file and folder menus carry Cut, Copy, Rename, Delete and Reveal."
     },
@@ -32927,7 +32937,7 @@
       "quote": "right-click a folder and choose **Import...**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:438",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:373",
       "match": "label = 'Import...'",
       "note": "Context menu label is \"Import...\" and appears on folders."
     },
@@ -32938,7 +32948,7 @@
       "quote": "right-click a folder",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/strategies.tsx:68",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/strategies.tsx:67",
       "match": "new ImportCommand(ctx, dirNode"
     },
     {
@@ -33462,7 +33472,7 @@
       "id": "user-guide-how-to-view-and-export-images/11",
       "audience": "user",
       "doc": "docs/user-guide/how-to/view-and-export-images.md",
-      "quote": "a banner says \"<file> was deleted, renamed or moved on disk.\"",
+      "quote": "a banner says \"*file name* was deleted, renamed or moved on disk.\"",
       "status": "fixed",
       "evidence": "source",
       "source": "src/renderer/src/components/FileConflictNotification/freshnessNoticeCopy.ts:103",
@@ -33529,7 +33539,7 @@
       "quote": "Opening a project that is already open in another window focuses that window instead.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:436",
+      "source": "src/main/services/ProjectService.ts:437",
       "match": "this.projectLockService.requestFocus(newProjectPath)",
       "note": "Reworded: the old text said a project 'focuses its existing window', unclear about the trigger (opening the project)."
     },
@@ -33581,7 +33591,7 @@
       "quote": "3. Close the window.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/index.ts:250",
+      "source": "src/main/index.ts:251",
       "match": "mainWindow.webContents.send('quit:requested', { reason: 'close' })",
       "note": "Step said 'Close the window, or quit from the app menu' then promised a confirmation; only the window close handler sends quit:requested, so the step now names closing the window only."
     },
@@ -33944,7 +33954,7 @@
       "quote": "A full `npm run docs:screenshots` regenerates",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:42",
+      "source": "package.json:43",
       "match": "\"docs:screenshots\": \"node scripts/capture/run.mjs\"",
       "note": "Ledger cited package.json:33 for the script; it is on line 38. Page text was already right."
     },
@@ -34007,7 +34017,7 @@
       "quote": "npm run check:links",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:33",
+      "source": "package.json:34",
       "match": "\"check:links\": \"node scripts/check-links.mjs\""
     },
     {
@@ -34017,7 +34027,7 @@
       "quote": "npm run check:headers",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:32",
+      "source": "package.json:33",
       "match": "\"check:headers\": \"node scripts/check-spdx-headers.mjs\""
     },
     {
@@ -34435,7 +34445,7 @@
       "quote": "Monaco's built-in editing commands work, such as multiple cursors, undo and redo, and line operations",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:132",
+      "source": "package.json:133",
       "match": "\"monaco-editor\": \"^0.55.1\"",
       "note": "Specific Monaco default shortcuts (F1 palette, Alt+Up/Down, Cmd+D, Alt+click) are Monaco built-ins not defined in Erfana source; removed and kept a general statement."
     },
@@ -35932,7 +35942,7 @@
       "quote": "an image opened past that waits, but it still updates when you switch to it, and starts refreshing live when another tab closes",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:293",
+      "source": "src/main/services/FileWatcherService.ts:299",
       "match": "kind: 'started', stamp: reply.stamp",
       "note": "Reworded by #478: past the cap a tab now waits in line (G9) instead of failing"
     },
@@ -36072,7 +36082,7 @@
       "quote": "a folder's **Import...** menu item opens a file picker for one file",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:438",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:373",
       "match": "label = 'Import...'",
       "note": "Menu label uses three dots \"Import...\", not an ellipsis character."
     },
@@ -36972,7 +36982,7 @@
       "quote": "| Undo; redo; toggle comment |",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:132",
+      "source": "package.json:133",
       "match": "\"monaco-editor\": \"^0.55.1\"",
       "test": "e2e/editor-outside-change.e2e.ts",
       "note": "Monaco built-in keys; source moved from an updateOptions call that does not bind them to the monaco-editor dependency."
@@ -36984,7 +36994,7 @@
       "quote": "| Move line; select next match; add cursor |",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:132",
+      "source": "package.json:133",
       "match": "\"monaco-editor\": \"^0.55.1\"",
       "note": "Monaco built-in keys; source moved from an updateOptions call that does not bind them to the monaco-editor dependency."
     },
@@ -36995,7 +37005,7 @@
       "quote": "| Command palette | <kbd>F1</kbd> | <kbd>F1</kbd> |",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:132",
+      "source": "package.json:133",
       "match": "\"monaco-editor\": \"^0.55.1\"",
       "note": "Monaco built-in key; source moved from an e2e page object (not src) to the monaco-editor dependency."
     },
@@ -37229,7 +37239,7 @@
       "quote": "| Close or cancel | <kbd>Esc</kbd> | <kbd>Esc</kbd> |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Dialog/ConfirmDialog.tsx:95",
+      "source": "src/renderer/src/components/Dialog/ConfirmDialog.tsx:109",
       "match": "closeOnEscape={true}"
     },
     {
@@ -37259,7 +37269,7 @@
       "quote": "Prompts that delete, discard or quit open with focus on **Cancel**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Dialog/ConfirmDialog.tsx:98",
+      "source": "src/renderer/src/components/Dialog/ConfirmDialog.tsx:112",
       "match": "initialFocusRef={danger ? cancelRef : confirmRef}"
     },
     {
@@ -37504,7 +37514,7 @@
       "quote": "In ordinary dialogs, <kbd>Enter</kbd> activates the focused button, even when it is **Cancel**.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Dialog/ConfirmDialog.tsx:83",
+      "source": "src/renderer/src/components/Dialog/ConfirmDialog.tsx:97",
       "match": "if (e.target instanceof HTMLButtonElement || danger) return"
     },
     {
@@ -37949,7 +37959,7 @@
       "quote": "Opening a project that is already open in another window focuses that window instead.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:436",
+      "source": "src/main/services/ProjectService.ts:437",
       "match": "this.projectLockService.requestFocus(newProjectPath)",
       "note": "Was worded as if New Window itself focused a window; the focus happens when opening a project already locked by another window."
     },
@@ -38069,7 +38079,7 @@
       "quote": "**Paste** (when the clipboard has items)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/strategies.tsx:54",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/strategies.tsx:53",
       "match": "if (ctx.clipboard.hasClipboard()) {"
     },
     {
@@ -38079,7 +38089,7 @@
       "quote": "**New File**, **New Folder**, **Rename**, **Import...**, **Delete**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:438",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:373",
       "match": "label = 'Import...'",
       "note": "Label is three ASCII dots, not the ellipsis character."
     },
@@ -38090,7 +38100,7 @@
       "quote": "**Reveal in Finder** or **Reveal in Explorer**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:472",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:407",
       "match": "? 'Reveal in Explorer'"
     },
     {
@@ -38100,7 +38110,7 @@
       "quote": "File menus offer **Cut**, **Copy**, **Paste** (when the clipboard has items – it pastes into the file's folder), **Rename**, **Delete**, and the same platform-specific **Reveal** action",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/strategies.tsx:134",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/strategies.tsx:133",
       "match": "items.push(new RevealInFileManagerCommand(ctx, fileNode).toMenuItem())"
     },
     {
@@ -38117,11 +38127,11 @@
       "id": "user-guide-reference-menus/26",
       "audience": "user",
       "doc": "docs/user-guide/reference/menus.md",
-      "quote": "**Delete** asks for confirmation because it cannot be undone.",
+      "quote": "**Delete** asks for confirmation, then moves the item to the Recycle Bin on Windows, the Trash on macOS or the trash on Linux, where you can restore it.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:330",
-      "match": "This action cannot be undone."
+      "source": "src/renderer/src/components/ProjectTree/context-menu/treeDelete.ts:64",
+      "match": "You can restore it from there."
     },
     {
       "id": "user-guide-reference-menus/27",
@@ -38282,7 +38292,7 @@
       "quote": "Folder menus offer **Cut**, **Copy**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/strategies.tsx:50",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/strategies.tsx:49",
       "match": "items.push(new CutCommand(ctx, dirNode).toMenuItem())"
     },
     {
@@ -38591,8 +38601,8 @@
       "quote": "deletion requires confirmation",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileOperations.ts:172",
-      "match": "confirmLabel: 'Delete'"
+      "source": "src/renderer/src/components/ProjectTree/context-menu/treeDelete.ts:105",
+      "match": "confirmLabel: copy.moveLabel,"
     },
     {
       "id": "user-guide-reference-project-tree/29",
@@ -38611,7 +38621,7 @@
       "quote": "**Reveal in Finder** is labeled **Reveal in Explorer** on Windows",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:472",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:407",
       "match": "'Reveal in Explorer'"
     },
     {
@@ -38695,7 +38705,7 @@
       "quote": "it is where paste, **Create new markdown file** and import go",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/hooks/useFileOperations.ts:73",
+      "source": "src/renderer/src/hooks/useFileOperations.ts:68",
       "match": "getTargetPath(selectedFolder, projectPath)",
       "note": "Label was 'New markdown file'; the toolbar button is 'Create new markdown file'."
     },
@@ -38756,7 +38766,7 @@
       "quote": "their contents are read only when you expand them",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:699",
+      "source": "src/main/services/FileService.ts:700",
       "match": "if (isLazyFolder(rel, scope)) return 'ignored'"
     },
     {
@@ -38766,7 +38776,7 @@
       "quote": "A project with more than 50,000 entries opens too",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:180",
+      "source": "src/main/services/FileService.ts:181",
       "match": "export const MAX_WALK_ENTRIES = 50_000"
     },
     {
@@ -38837,7 +38847,7 @@
       "quote": "**Reveal in Finder** is labeled",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:470",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:405",
       "match": "'Reveal in Finder'"
     },
     {
@@ -38917,7 +38927,7 @@
       "quote": "the remaining folders are read when you expand them",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:524",
+      "source": "src/main/services/FileService.ts:525",
       "match": "scope.entryCount >= MAX_WALK_ENTRIES"
     },
     {
@@ -39837,7 +39847,7 @@
       "quote": "Tree hidden patterns match entry names exactly",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:211",
+      "source": "src/main/services/FileService.ts:212",
       "match": "if (scope.hiddenPatterns.includes(name)) return true"
     },
     {
@@ -39867,7 +39877,7 @@
       "quote": "An excluded folder is not shown in the project tree, not read when the tree loads",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:214",
+      "source": "src/main/services/FileService.ts:215",
       "match": "!scope.filter.isEntryExcluded(rel)) return false"
     },
     {
@@ -39957,7 +39967,7 @@
       "quote": "the log gets a warning naming the file (`global` or `project`) and the entry's position in the list",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:142",
+      "source": "src/main/services/ProjectService.ts:143",
       "match": "logger.warn('Project switch: files.exclude entries rejected', {"
     },
     {
@@ -40008,7 +40018,7 @@
       "quote": "choosing the project that is already open does not re-read its settings",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:422",
+      "source": "src/main/services/ProjectService.ts:423",
       "match": "const isSame = await step(this.isSameProject(openSnapshot, newProjectPath), 'Same-project check')"
     },
     {
@@ -40039,7 +40049,7 @@
       "quote": "A file inside an excluded folder that is already open in a tab keeps refreshing when it changes on disk.",
       "status": "verified",
       "evidence": "app",
-      "source": "src/main/services/watcher/FileWatchCore.ts:148",
+      "source": "src/main/services/watcher/FileWatchCore.ts:200",
       "match": "createSingleFileWatcher(",
       "test": "e2e/guide-tasks/claims-user-3.guide.ts",
       "note": "Real-app test: scratch/ excluded, scratch/note.md opened from a Markdown preview link, rewritten on disk, the tab shows the new text.; Re-anchored by #478 (S8-S11 watch layer)"
@@ -40051,7 +40061,7 @@
       "quote": "Path entries such as `.local/test-tmp` are not affected.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/watcher/directoryWatchBuilders.ts:75",
+      "source": "src/main/services/watcher/directoryWatchBuilders.ts:77",
       "match": "const pathEntries = filter.splitPaths().map(intoWatch).filter(isPresent)",
       "note": "Every path entry goes into the native watcher split plan when the watch starts, whether or not the folder exists yet, so the late-matching limit applies only to pattern entries."
     },
@@ -40363,7 +40373,7 @@
       "quote": "(**Restart terminal?**, with focus on **Cancel**)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Dialog/ConfirmDialog.tsx:98",
+      "source": "src/renderer/src/components/Dialog/ConfirmDialog.tsx:112",
       "match": "initialFocusRef={danger ? cancelRef : confirmRef}"
     },
     {
@@ -40812,7 +40822,7 @@
       "quote": "Closing a project returns to the welcome view; it does not delete the folder.",
       "status": "verified",
       "evidence": "app",
-      "source": "src/main/ipc/file-handlers.ts:380",
+      "source": "src/main/ipc/file-handlers.ts:381",
       "match": "await projectService.close({",
       "test": "e2e/project-switch-unsaved.e2e.ts",
       "note": "Entry repaired: previous source was the Open project button label, which proves nothing about closing; now the close handler plus the e2e test that closes and checks the welcome screen."
@@ -41626,7 +41636,7 @@
       "quote": "It appears when you open a folder from the dialog or the recent list.",
       "status": "fixed",
       "evidence": "app",
-      "source": "src/main/services/ProjectService.ts:401",
+      "source": "src/main/services/ProjectService.ts:402",
       "match": "assertAcceptableProjectRoot(realRoot)",
       "note": "No drop-a-folder-to-open-project route exists (folder drops on the tree are ignored), so \"or by dropping it\" was removed. Real-app test: dialog with the drive root shows \"System directories cannot be opened as projects\"; a recent project replaced by a link to the drive root shows \"This directory link points to a protected location\".",
       "test": "e2e/guide-tasks/claims-user-3.guide.ts"
@@ -41900,7 +41910,7 @@
       "quote": "**Reveal in Explorer** opens the selected item in File Explorer",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:472",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:407",
       "match": "? 'Reveal in Explorer'"
     },
     {
@@ -43311,7 +43321,7 @@
       "quote": "are built into the Monaco editor component, not defined by Erfana",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:132",
+      "source": "package.json:133",
       "match": "\"monaco-editor\": \"^0.55.1\"",
       "note": "Added: these keys are Monaco defaults, with no binding in Erfana src (cross-page note); proven by the monaco-editor dependency."
     },
@@ -43319,31 +43329,51 @@
       "id": "user-guide-reference-menus/g01",
       "audience": "user",
       "doc": "docs/user-guide/reference/menus.md",
-      "quote": "it does not go to the Trash on macOS or the Recycle Bin on Windows",
+      "quote": "When the item cannot go there – a network drive, a WSL path, or no trash – a second prompt asks before **Delete permanently** removes it for good",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:917",
-      "match": "await rm(filePath)"
+      "source": "src/renderer/src/components/ProjectTree/context-menu/treeDelete.ts:44",
+      "match": "DELETE_PERMANENTLY_LABEL = 'Delete permanently'"
     },
     {
       "id": "user-guide-reference-menus/g02",
       "audience": "user",
       "doc": "docs/user-guide/reference/menus.md",
-      "quote": "Erfana removes the item from disk straight away",
+      "quote": "**Cancel** keeps it.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:933",
-      "match": "await rm(folderPath, { recursive: true, force: true })"
+      "source": "src/renderer/src/components/ProjectTree/context-menu/treeDelete.ts:120",
+      "match": "if (!permanently) return false"
     },
     {
       "id": "user-guide-reference-menus/g03",
       "audience": "user",
       "doc": "docs/user-guide/reference/menus.md",
-      "quote": "Deleting a folder also removes everything inside it.",
+      "quote": "Deleting a folder also moves everything inside it.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:344",
-      "match": "and all its contents? This action cannot be undone."
+      "source": "src/renderer/src/components/ProjectTree/context-menu/treeDelete.ts:59",
+      "match": "and everything in it`"
+    },
+    {
+      "id": "user-guide-reference-menus/g04",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/menus.md",
+      "quote": "shows an error asking you to close it, and is not offered for permanent delete.",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/treeDelete.ts:69",
+      "match": "is in use – close the programs or terminals using it"
+    },
+    {
+      "id": "user-guide-reference-menus/g05",
+      "audience": "user",
+      "doc": "docs/user-guide/reference/menus.md",
+      "quote": "Reload also closes the project open in that window; open it again from Recent Projects.",
+      "status": "verified",
+      "evidence": "source",
+      "source": "src/main/services/project/projectOwnerLifecycle.ts:48",
+      "match": "reason: 'page-reloaded'"
     },
     {
       "id": "user-guide-reference-project-tree/g01",
@@ -43407,7 +43437,7 @@
       "quote": "and **Reveal in File Manager** on Linux",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:473",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:408",
       "match": "'Reveal in File Manager'",
       "note": "Linux label was missing (cross-page note)."
     },
@@ -43418,7 +43448,7 @@
       "quote": "An excluded folder is never read when the tree loads",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:206",
+      "source": "src/main/services/FileService.ts:207",
       "match": "so an excluded folder is never read",
       "note": "Added for #60/#208/#211: what excluding a big folder buys."
     },
@@ -44766,7 +44796,7 @@
       "quote": "- Iterate `BrowserWindow.getAllWindows()`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:156",
+      "source": "src/main/services/ProjectService.ts:157",
       "match": "const windows = BrowserWindow.getAllWindows()"
     },
     {
@@ -44776,7 +44806,7 @@
       "quote": "- File watcher: src/main/services/FileWatcherService.ts (each subscription records the session generation; a stale one is refused before its answer, and a project switch ends older ones – #478)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:209",
+      "source": "src/main/services/FileWatcherService.ts:213",
       "match": "if (sub.generation !== this.generation()) return 'PROJECT_CHANGED'",
       "note": "Reworded by #478: the old anchor was removed (S8-S11 watch layer)"
     },
@@ -44967,7 +44997,7 @@
       "quote": "`ProjectService` owns a `ProjectSessionStore` and exposes it read-only as `projectService.session`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:176",
+      "source": "src/main/services/ProjectService.ts:177",
       "match": "readonly session: ProjectSession = this.sessionStore"
     },
     {
@@ -44997,7 +45027,7 @@
       "quote": "`ctx.reason` is `'user'`, `'project-deleted'`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:68",
+      "source": "src/main/services/ProjectService.ts:69",
       "match": "reason: 'user' | 'project-deleted' | 'window-destroyed'"
     },
     {
@@ -45007,7 +45037,7 @@
       "quote": "Every open, switch and close runs on one queue (`serialise`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:628",
+      "source": "src/main/services/ProjectService.ts:629",
       "match": "return this.serialise(() => this.performClose(ctx))"
     },
     {
@@ -45017,7 +45047,7 @@
       "quote": "Each I/O step of a transition has a 15 s limit (`TRANSITION_STEP_TIMEOUT_MS`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/ProjectService.ts:79",
+      "source": "src/main/services/ProjectService.ts:80",
       "match": "const TRANSITION_STEP_TIMEOUT_MS = 15_000"
     },
     {
@@ -45248,7 +45278,7 @@
       "quote": "Document import converter for 50+ formats via `@llamaindex/liteparse` with local OCR.",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:67",
+      "source": "package.json:68",
       "match": "\"@llamaindex/liteparse\": \"2.15.1\""
     },
     {
@@ -45829,7 +45859,7 @@
       "quote": "Erfana has no full-text index, vector store or MCP server today",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:64",
+      "source": "package.json:65",
       "match": "\"dependencies\": {",
       "note": "Added a status note: the gap table's 'What's specified' rows read as current state. package.json dependencies carry no SQLite, sqlite-vec, ONNX or MCP SDK package, and search_notes appears in no spec (spec 004 names erfana_graph_search)"
     },
@@ -46205,7 +46235,7 @@
       "quote": "Each consumer subscribes with a `watchId` of its own",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:85",
+      "source": "src/main/services/FileWatcherService.ts:87",
       "match": "if (this.subscriptions.get(sub.key)) return refused('DUPLICATE_ID')",
       "note": "Reworded by #478: the old anchor was removed (S12-S16 legacy watch API)"
     },
@@ -46216,7 +46246,7 @@
       "quote": "a window that closes or reloads drops all of its subscriptions together",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:249",
+      "source": "src/main/services/FileWatcherService.ts:253",
       "match": "async cleanupForWebContentsId(webContentsId: number): Promise<void> {",
       "note": "Reworded by #478: the old anchor was removed (S12-S16 legacy watch API)"
     },
@@ -46238,7 +46268,7 @@
       "quote": "That is why the bucket check is",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/services/FileWatcherService.ts:91",
+      "source": "src/main/services/FileWatcherService.ts:93",
       "match": "this.entries.has(entryKey) ? entryKey : null",
       "note": "Reworded by #478: the old anchor was removed (S8-S11 watch layer)"
     },
@@ -46502,7 +46532,7 @@
       "quote": "\"postinstall\": \"patch-package && install-electron && electron-builder install-app-deps\"",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:50",
+      "source": "package.json:51",
       "match": "\"postinstall\": \"patch-package && install-electron && electron-builder install-app-deps\""
     },
     {
@@ -46512,7 +46542,7 @@
       "quote": "`patch-package` applies the committed `patches/node-pty+1.1.0.patch`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:50",
+      "source": "package.json:51",
       "match": "patch-package"
     },
     {
@@ -46532,7 +46562,7 @@
       "quote": "`@llamaindex/liteparse` is pinned exactly (`2.15.1`).",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:67",
+      "source": "package.json:68",
       "match": "\"@llamaindex/liteparse\": \"2.15.1\""
     },
     {
@@ -46552,7 +46582,7 @@
       "quote": "`sharp` and `tesseract.js`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:151",
+      "source": "package.json:152",
       "match": "\"tesseract.js\": \"^7.0.0\","
     },
     {
@@ -46572,7 +46602,7 @@
       "quote": "\"dependencies\": { \"chokidar\": \"5.0.0\" },",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:72",
+      "source": "package.json:73",
       "match": "\"chokidar\": \"5.0.0\","
     },
     {
@@ -46582,7 +46612,7 @@
       "quote": "\"overrides\":    { \"chokidar\": \"5.0.0\" }",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:161",
+      "source": "package.json:162",
       "match": "\"chokidar\": \"5.0.0\","
     },
     {
@@ -46612,7 +46642,7 @@
       "quote": "\"overrides\": { \"lodash\": \"4.18.1\", \"lodash-es\": \"4.18.1\" }",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:163",
+      "source": "package.json:164",
       "match": "\"lodash-es\": \"4.18.1\","
     },
     {
@@ -46622,7 +46652,7 @@
       "quote": "`dompurify` is floored at `^3.4.17`, forced through the tree.",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:164",
+      "source": "package.json:165",
       "match": "\"dompurify\": \"^3.4.17\""
     },
     {
@@ -46672,7 +46702,7 @@
       "quote": "*Automated: `e2e/file-operations.e2e.ts`*",
       "status": "verified",
       "evidence": "source",
-      "source": "e2e/file-operations.e2e.ts:67",
+      "source": "e2e/file-operations.e2e.ts:74",
       "match": "test.describe('Project tree – creating files and folders', () => {"
     },
     {
@@ -46982,7 +47012,7 @@
       "quote": "incl. **Import...** (folders)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:438",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:373",
       "match": "label = 'Import...'"
     },
     {
@@ -46992,7 +47022,7 @@
       "quote": "**Reveal in Finder/Explorer**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:470",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:405",
       "match": "? 'Reveal in Finder'"
     },
     {
@@ -47012,7 +47042,7 @@
       "quote": "last item below Delete",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/strategies.tsx:76",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/strategies.tsx:75",
       "match": "(last, below Delete)"
     },
     {
@@ -47876,7 +47906,7 @@
       "quote": "which is sender-validated + project-confined",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/file-handlers.ts:692",
+      "source": "src/main/ipc/file-handlers.ts:655",
       "match": "Cannot reveal items outside the project"
     },
     {
@@ -50424,7 +50454,7 @@
       "quote": "// sandbox: true is the default since Electron 20 (2022)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:218",
+      "source": "src/main/index.ts:219",
       "match": "// sandbox: true is the default since Electron 20 (2022)"
     },
     {
@@ -50434,7 +50464,7 @@
       "quote": "  webgl: true",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:222",
+      "source": "src/main/index.ts:223",
       "match": "webgl: true"
     },
     {
@@ -50444,7 +50474,7 @@
       "quote": "every file action goes through IPC to main, which checks the path",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/file-handlers.pathChecks.test.ts:207",
+      "source": "src/main/ipc/file-handlers.pathChecks.test.ts:210",
       "match": "every registered file:* channel is confined or on the explicit allow-list"
     },
     {
@@ -50555,7 +50585,7 @@
       "quote": "Playwright runs against a packaged app (the `e2e/` suite and its CI job launch the unpackaged app",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:56",
+      "source": "package.json:57",
       "match": "\"test:e2e\": \"npm run build:e2e && playwright test --project=electron --project=timing\"",
       "note": "Said test builds serve Playwright E2E in CI/CD; no workflow or e2e file uses ERFANA_TEST_BUILD or build:mac:test, and the suite launches the repository root unpackaged (e2e/fixtures/index.ts:124)."
     },
@@ -50566,7 +50596,7 @@
       "quote": "without the e2e test-hooks flag (`ERFANA_E2E_TEST_HOOKS=1`), which has the same `!app.isPackaged` gate",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/index.ts:192",
+      "source": "src/main/index.ts:193",
       "match": "process.env.ERFANA_E2E_TEST_HOOKS === '1'",
       "note": "Said buildAdditionalArguments otherwise returns []; it also appends TEST_HOOKS_ARG under ERFANA_E2E_TEST_HOOKS=1 behind the same unpackaged gate."
     },
@@ -51011,7 +51041,7 @@
       "quote": "wired into `FileService.createFile`/`createFolder`/`rename` (throws `AppError(INVALID_FILENAME)`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:837",
+      "source": "src/main/services/FileService.ts:838",
       "match": "assertValidUserFilename(fileName)"
     },
     {
@@ -51072,7 +51102,7 @@
       "quote": "The older separator strip in `FileService.createFile`/`createFolder`/`rename` stays behind it",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:817",
+      "source": "src/main/services/FileService.ts:818",
       "match": "fileName = fileName.replace(/[/\\\\]/g, '')"
     },
     {
@@ -51244,7 +51274,7 @@
       "quote": "**Status**: ✅ DOUBLE-GATED – inert in any packaged build",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:188",
+      "source": "src/main/index.ts:189",
       "match": "!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1'"
     },
     {
@@ -51254,7 +51284,7 @@
       "quote": "`npm run build` runs the `prebuild` script (`node scripts/prebuild.mjs`) first",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:51",
+      "source": "package.json:52",
       "match": "\"prebuild\": \"node scripts/prebuild.mjs\"",
       "note": "Told the reader to create the aproba stub by hand before build:mac; the npm prebuild hook (scripts/prebuild.mjs) now writes it automatically on every build"
     },
@@ -51265,7 +51295,7 @@
       "quote": "`canvas` is no longer in the lockfile, so this chain no longer resolves today",
       "status": "fixed",
       "evidence": "source",
-      "source": "package.json:128",
+      "source": "package.json:129",
       "match": "\"jsdom\": \"^25.0.1\"",
       "note": "Presented the jsdom → canvas → aproba chain as current; canvas is absent from package-lock.json, so it is now marked as the 26.0.0 record"
     },
@@ -51595,7 +51625,7 @@
       "quote": "now extracts with `yauzl` 3.4.0 directly",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:84",
+      "source": "package.json:85",
       "match": "\"yauzl\""
     },
     {
@@ -51605,7 +51635,7 @@
       "quote": "`sharp` stays a `devDependency` for the documentation-capture scripts only",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:148",
+      "source": "package.json:149",
       "match": "\"sharp\": \"^0.35.4\""
     },
     {
@@ -51615,7 +51645,7 @@
       "quote": "| `dompurify` | `^3.4.17` |",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:164",
+      "source": "package.json:165",
       "match": "\"dompurify\": \"^3.4.17\""
     },
     {
@@ -51635,7 +51665,7 @@
       "quote": "run `npm run test:cov`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:29",
+      "source": "package.json:30",
       "match": "\"test:cov\": \"node scripts/test-cov.mjs\""
     },
     {
@@ -53242,7 +53272,7 @@
       "quote": "- `Escape` - Close the \"Replace Item\" dialog",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Dialog/ConfirmDialog.tsx:95",
+      "source": "src/renderer/src/components/Dialog/ConfirmDialog.tsx:109",
       "match": "closeOnEscape={true}"
     },
     {
@@ -53292,7 +53322,7 @@
       "quote": "- **New Methods**: `moveItem()`, `copyItem()`, `checkNameConflict()`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:974",
+      "source": "src/main/services/FileService.ts:973",
       "match": "async checkNameConflict(targetParentPath: string, itemName: string)"
     },
     {
@@ -53302,7 +53332,7 @@
       "quote": "- **Dependencies**: RollbackHandler, SymlinkDetector",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:276",
+      "source": "src/main/services/FileService.ts:277",
       "match": "private rollbackHandler = new RollbackHandler()"
     },
     {
@@ -53352,7 +53382,7 @@
       "quote": "- \"Cannot move a folder into its own subfolder\"",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:1027",
+      "source": "src/main/services/FileService.ts:1026",
       "match": "throw new Error('Cannot move a folder into its own subfolder')"
     },
     {
@@ -53362,7 +53392,7 @@
       "quote": "- \"Source and target paths are the same\"",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:1017",
+      "source": "src/main/services/FileService.ts:1016",
       "match": "throw new Error('Source and target paths are the same')"
     },
     {
@@ -53777,7 +53807,7 @@
       "quote": "`npm run build:unpack` (`electron-builder --dir`)",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:52",
+      "source": "package.json:53",
       "match": "\"build:unpack\": \"npm run build && electron-builder --dir\","
     },
     {
@@ -53798,7 +53828,7 @@
       "quote": "The build runs `prebuild` (the aproba shim) and `electron-builder --win` automatically.",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:51",
+      "source": "package.json:52",
       "match": "\"prebuild\": \"node scripts/prebuild.mjs\","
     },
     {
@@ -53828,7 +53858,7 @@
       "quote": "`patches/node-pty+1.1.0.patch` should exist",
       "status": "verified",
       "evidence": "source",
-      "source": "package-lock.json:12996",
+      "source": "package-lock.json:13013",
       "match": "\"resolved\": \"https://registry.npmjs.org/node-pty/-/node-pty-1.1.0.tgz\","
     },
     {
@@ -53947,7 +53977,7 @@
       "quote": "returns early when `isRendererGone(mainWindow)` is true",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/main/index.ts:247",
+      "source": "src/main/index.ts:248",
       "match": "if (isRendererGone(mainWindow)) return",
       "note": "Fix line described a webContents.isDestroyed() guard; the close handler now uses isRendererGone (destroyed or crashed, #60)."
     },
@@ -53958,7 +53988,7 @@
       "quote": "before it calls `webContents.send('quit:requested', …)`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/index.ts:250",
+      "source": "src/main/index.ts:251",
       "match": "mainWindow.webContents.send('quit:requested', { reason: 'close' })"
     },
     {
@@ -54040,7 +54070,7 @@
       "quote": "1. Build: `npm run build`",
       "status": "verified",
       "evidence": "source",
-      "source": "package.json:48",
+      "source": "package.json:49",
       "match": "\"build\": \"npm run typecheck && electron-vite build\""
     },
     {
@@ -54432,7 +54462,7 @@
       "quote": "Applied **at the call-site as an interim measure**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/ipc/file-handlers.ts:407",
+      "source": "src/main/ipc/file-handlers.ts:408",
       "match": "logger.error('Error creating file', redactedLogError(error))"
     },
     {
@@ -54624,11 +54654,11 @@
       "id": "docs-windows-implementation-plan/s11",
       "audience": "developer",
       "doc": "docs/windows/implementation-plan.md",
-      "quote": "Both platforms permanently delete via `fs.rm`; no Trash / Recycle Bin via `shell.trashItem`",
+      "quote": "the project tree's Delete goes to the Recycle Bin / Trash via `shell.trashItem`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/main/services/FileService.ts:917",
-      "match": "await rm(filePath)",
+      "source": "src/main/services/file/trashEntry.ts:44",
+      "match": "shell.trashItem(path.resolve(entryPath))",
       "note": "Still open: no shell.trashItem call in src/"
     },
     {

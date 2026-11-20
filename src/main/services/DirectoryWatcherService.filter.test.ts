@@ -57,6 +57,7 @@ import { DirectoryWatcherService } from './DirectoryWatcherService'
 import { PauseEpisode } from './watcher'
 import { ProjectPathFilter } from '../utils/projectPathFilter'
 import { ATOMIC_TEMP_PREFIX } from '../utils/atomicWrite'
+import { PROBE_NAME_PREFIX } from './file/entryProbe'
 
 const ROOT = '/work/build/proj'
 const OWNER = 1
@@ -161,6 +162,17 @@ describe('DirectoryWatcherService path filter (#211)', () => {
       expect(ignored(`${ROOT}/docs/deep/${ATOMIC_TEMP_PREFIX}1234`)).toBe(true)
       expect(ignored(`${ROOT}/docs/erfana-tmp-notes.md`)).toBe(false)
       expect(ignored(`${ROOT}/docs/x${ATOMIC_TEMP_PREFIX}notes.md`)).toBe(false)
+    })
+
+    // #486: a folder under the probe's name is the person's folder mid-check –
+    // never a new row, and no watch below it to block the rename back
+    it('drops the in-use probe’s temporary name and everything below it, but not a lookalike document', async () => {
+      const { ignored } = await startWatch(svc, ROOT)
+      const probe = `${PROBE_NAME_PREFIX}1b4e28ba-2fa1-11d2-883f-0016d3cca427`
+
+      expect(ignored(`${ROOT}/docs/${probe}`)).toBe(true)
+      expect(ignored(`${ROOT}/docs/${probe}/sub/a.md`)).toBe(true)
+      expect(ignored(`${ROOT}/docs/erfana-check.md`)).toBe(false)
     })
 
     it('drops a path outside the project, including a sibling sharing its prefix (fail closed)', async () => {

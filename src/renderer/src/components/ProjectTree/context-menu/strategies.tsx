@@ -21,8 +21,6 @@ import {
   PasteIntoDirectoryCommand,
   RenameFileCommand,
   RenameDirectoryCommand,
-  DeleteFileCommand,
-  DeleteDirectoryCommand,
   NewFileInDirectoryCommand,
   NewFolderInDirectoryCommand,
   ImportCommand,
@@ -32,6 +30,7 @@ import {
   separatorItem
 } from './commands'
 import { PasteIntoParentFolderCommand } from './fileRowCommands'
+import { DeleteDirectoryCommand, DeleteFileCommand } from './deleteCommands'
 
 /**
  * Directory context menu strategy

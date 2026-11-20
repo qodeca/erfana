@@ -71,6 +71,8 @@ export class FileWatcherService extends FileWatchCore {
     if (this.isDisposing) return refused('WATCH_FAILED')
     const generation = this.generation()
     const pageGeneration = this.pageGenerationOf(input.owner)
+    // A delete under the file has let go of its watches (#486): resolve and stamp after it
+    await this.releases.waitFor(this.realSpellingOf(input.filePath))
     const target = await this.resolveTarget(input.filePath)
     if (typeof target !== 'string') return refused(target.code)
     const sub = WatchSubscriptions.create({
@@ -129,7 +131,8 @@ export class FileWatcherService extends FileWatchCore {
   /**
    * Attach `sub` to the entry under `entryKey`, creating and arming it when
    * there is none. While the project switch is suspending, a new entry is
-   * inserted suspended (decision 18). Resolves a refusal code, or null.
+   * inserted suspended (decision 18), and so while a delete under it holds its
+   * watches (#486). Resolves a refusal code, or null.
    */
   private async attach(sub: WatchSubscription, entryKey: string): Promise<SubscribeRefusalCode | null> {
     const existing = this.entries.get(entryKey)
@@ -151,6 +154,7 @@ export class FileWatcherService extends FileWatchCore {
     }
     this.entries.set(entryKey, entry)
     sub.entryKey = entryKey
+    if (this.releases.adopt(entry)) entry.suspended = true
     this.unseenProbe.pathChanged(entry.filePath)
     if (entry.suspended) return null
     const outcome = await this.arm(entry)
@@ -287,6 +291,8 @@ export class FileWatcherService extends FileWatchCore {
 
   /** A queued subscription got its slot: arm it and say `started` (or why not). */
   private async activate(sub: WatchSubscription, entryKey: string): Promise<void> {
+    await this.releases.waitFor(sub.realPath)
+    if (!this.subscriptions.holds(sub)) return
     const attached = await this.attach(sub, entryKey)
     const reply = attached ? refused(attached) : await this.answer(sub)
     if (reply.status === 'started') {
@@ -326,14 +332,10 @@ export class FileWatcherService extends FileWatchCore {
   private readonly suspensionHost: SuspensionHost = {
     entries: () => [...this.entries.values()],
     subscriptions: () => this.subscriptions.all(),
-    suspendEntry: async entry => {
-      this.atomicSaveDetector.cancelPending(entry.filePath)
-      entry.suspended = true
-      const watcher = entry.watcher
-      entry.watcher = null
-      if (watcher) await closeQuietly(watcher)
-    },
+    suspendEntry: entry => this.closeHeld(entry),
     resumeEntry: async entry => {
+      // A delete still holds it: its release re-arms it when it ends (#486)
+      if (this.releases.isHolding(entry)) return
       entry.suspended = false
       await this.rearmAndTell(entry, 'restarted', 'restart-failed')
     },

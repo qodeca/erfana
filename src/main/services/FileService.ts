@@ -25,6 +25,7 @@ import { redactPath } from '../utils/redactUserInput'
 import { logger } from './LoggingService'
 import { atomicWriteText, isAtomicTempName } from '../utils/atomicWrite'
 import { IMAGE_EXTENSIONS, readImage } from './file/imageRead'
+import { removeFilePermanently, removeTreePermanently, type EntryRemover } from './file/entryRemoval'
 import { childPath } from '../utils/childPath'
 import { createConcurrencyLimit, type ConcurrencyLimit } from '../utils/concurrencyLimit'
 import { createFindByNameGate, startFindByName, type FindByNameResult } from './file/findByName'
@@ -907,17 +908,16 @@ export class FileService implements IFileService {
     return isSamePath(target, resolvePath(this.projectPath), getPlatformConfig().caseSensitive)
   }
 
-  async deleteFile(filePath: string): Promise<void> {
-    // Verify it's a file, not a directory
+  async deleteFile(filePath: string, remove: EntryRemover = removeFilePermanently): Promise<void> {
     const stats = await stat(filePath)
     if (stats.isDirectory()) {
       throw new Error('Cannot delete a directory using deleteFile. Use deleteFolder instead.')
     }
 
-    await rm(filePath)
+    await remove(filePath)
   }
 
-  async deleteFolder(folderPath: string): Promise<void> {
+  async deleteFolder(folderPath: string, remove: EntryRemover = removeTreePermanently): Promise<void> {
     // Verify it's a directory
     const stats = await stat(folderPath)
     if (!stats.isDirectory()) {
@@ -929,8 +929,7 @@ export class FileService implements IFileService {
       throw new Error('Cannot delete the project root directory')
     }
 
-    // Delete folder recursively
-    await rm(folderPath, { recursive: true, force: true })
+    await remove(folderPath)
   }
 
   async rename(oldPath: string, newName: string): Promise<string> {

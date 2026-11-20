@@ -46,6 +46,7 @@ import { isTrustedSender } from './senderValidation'
 import { registerHandle } from './registry'
 import { rememberDialogResult, withLastDirectory } from '../utils/lastDialogDirectory'
 import { FILE_CHANNELS } from '../../shared/ipc/file-channels'
+import { registerDeleteHandlers } from './file-delete-handlers'
 
 // REFACTORING (todo017): Create ProjectService singleton for orchestration
 // Thin adapter pattern: IPC handler depends on service, not orchestration logic
@@ -435,46 +436,8 @@ export function registerFileHandlers(): void {
     session
   )
 
-  // Delete file. The entry itself is checked, not what it points at: a link
-  // inside the project is removed as a link and nothing outside is touched.
-  registerConfinedHandle(
-    FILE_CHANNELS.deleteFile,
-    {
-      schema: payloadArgs(PathRequestSchema),
-      paths: { filePath: { arg: 0, key: 'filePath', mode: 'project-entry', access: 'change' } },
-      handler: async (_ctx, _args, { filePath }) => {
-        try {
-          await fileService.deleteFile(filePath.real)
-          directoryWatcherService.noteInternalChange({ path: filePath.requested, kind: 'removed', subtree: true })
-          return true
-        } catch (error) {
-          logger.error('Error deleting file', redactedLogError(error))
-          throw error
-        }
-      }
-    },
-    session
-  )
-
-  // Delete folder
-  registerConfinedHandle(
-    FILE_CHANNELS.deleteFolder,
-    {
-      schema: payloadArgs(PathRequestSchema),
-      paths: { folderPath: { arg: 0, key: 'filePath', mode: 'project-entry', access: 'change' } },
-      handler: async (_ctx, _args, { folderPath }) => {
-        try {
-          await fileService.deleteFolder(folderPath.real)
-          directoryWatcherService.noteInternalChange({ path: folderPath.requested, kind: 'removed', subtree: true })
-          return true
-        } catch (error) {
-          logger.error('Error deleting folder', redactedLogError(error))
-          throw error
-        }
-      }
-    },
-    session
-  )
+  // Delete file / folder: to the Recycle Bin / Trash unless `permanent` (#486)
+  registerDeleteHandlers(session)
 
   // Rename file or folder
   registerConfinedHandle(

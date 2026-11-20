@@ -65,7 +65,8 @@ export interface OpenContext {
 
 export interface CloseContext {
   senderId: number | null
-  reason: 'user' | 'project-deleted' | 'window-destroyed'
+  /** `window-destroyed` and `page-reloaded` (#485) are a page ending, not the user closing */
+  reason: 'user' | 'project-deleted' | 'window-destroyed' | 'page-reloaded'
   /** Close only if the session is still at this generation; a mismatch is a no-op */
   expectedGeneration?: number
 }
@@ -621,8 +622,8 @@ export class ProjectService {
    * Close the open project: release its lock, stop the watchers, commit `null`,
    * forget the last path, tell the renderers. Runs after any open or switch
    * already queued. With `expectedGeneration`, a project opened in the meantime
-   * is left alone; a `window-destroyed` close from a window that does not own
-   * the open project is ignored.
+   * is left alone; a page-end close (`window-destroyed`, `page-reloaded`) from a
+   * window that does not own the open project is ignored.
    */
   close(ctx: CloseContext): Promise<void> {
     return this.serialise(() => this.performClose(ctx))
@@ -639,11 +640,9 @@ export class ProjectService {
       })
       return
     }
-    if (
-      ctx.reason === 'window-destroyed' &&
-      open.ownerWebContentsId !== null &&
-      open.ownerWebContentsId !== ctx.senderId
-    ) {
+    const pageEnded = ctx.reason === 'window-destroyed' || ctx.reason === 'page-reloaded'
+    const owner = open.ownerWebContentsId
+    if (pageEnded && owner !== null && owner !== ctx.senderId) {
       logger.debug('Project close: skipped, the project belongs to another window', {
         generation: open.generation
       })
@@ -663,8 +662,8 @@ export class ProjectService {
     const generation = this.sessionStore.commit(null)
     await this.watchers.end(generation, 'project-closed')
 
-    // A closing window is not the user forgetting the project: keep the last path
-    if (ctx.reason !== 'window-destroyed') {
+    // A page ending (window closed or reloaded) is not the user forgetting the project
+    if (!pageEnded) {
       try {
         await step(this.settingsService.clearLastProjectPath(), 'Clearing the last project path')
       } catch (e) {

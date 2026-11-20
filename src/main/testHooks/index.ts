@@ -33,7 +33,10 @@ import {
   type WritableFiles
 } from './freshnessHook'
 import { fileWatcherService } from '../services/FileWatcherService'
+import { directoryWatcherService } from '../services/DirectoryWatcherService'
+import { replaceTrash } from '../services/file/trashEntry'
 import { textWriter } from '../services/freshness/textWrite'
+import { createTrashTestHook, type TrashTestHook } from './trashHook'
 
 /** The string `scripts/check-no-test-hooks.mjs` looks for in a production build. */
 export const TEST_HOOK_SENTINEL = 'ERFANA_BROWSER_TEST_HOOK_SENTINEL'
@@ -58,6 +61,8 @@ export interface TestHooks {
   readonly pick: BrowserPickTestHook
   /** File freshness: watch counts, refused, muted, dead and held watches, wake (#478). */
   readonly freshness: FreshnessTestHook
+  /** The project tree's Delete: a stub trash, its record, and forced refusals (#486). */
+  readonly trash: TrashTestHook
 }
 
 /** What `globalThis.__erfanaTestHooks` holds. */
@@ -75,6 +80,7 @@ export interface TestHookDependencies {
   readonly createPopup?: () => BrowserPopupTestHook
   readonly createPick?: () => BrowserPickTestHook
   readonly createFreshness?: () => FreshnessTestHook
+  readonly createTrash?: () => TrashTestHook
 }
 
 const defaultDependencies: TestHookDependencies = {
@@ -92,6 +98,13 @@ function createAppFreshnessHook(): FreshnessTestHook {
   })
 }
 
+/** The trash hook, counting the app's own watch handles under each trashed entry (#486). */
+function createAppTrashHook(): TrashTestHook {
+  return createTrashTestHook(replaceTrash, undefined, (entryPath) =>
+    fileWatcherService.openHandlesUnder(entryPath) + directoryWatcherService.openHandlesUnder(entryPath)
+  )
+}
+
 /** Builds every hook. */
 export function createTestHooks(
   deps: TestHookDependencies = defaultDependencies
@@ -105,7 +118,8 @@ export function createTestHooks(
     page: (deps.createPage ?? (() => createBrowserPageTestHook(getBrowserRuntime)))(),
     popup: (deps.createPopup ?? (() => createBrowserPopupTestHook(getBrowserRuntime)))(),
     pick: (deps.createPick ?? (() => createBrowserPickTestHook(getBrowserRuntime)))(),
-    freshness: (deps.createFreshness ?? createAppFreshnessHook)()
+    freshness: (deps.createFreshness ?? createAppFreshnessHook)(),
+    trash: (deps.createTrash ?? createAppTrashHook)()
   })
 }
 

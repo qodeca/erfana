@@ -143,9 +143,10 @@ async function closeOrphan(watched: WatchEntry): Promise<void> {
 /**
  * End a watch whose re-arm was refused. A file that went away meanwhile (or,
  * on Windows, is being deleted) cannot be resolved either: that is a delete,
- * not an escape from the project (#252).
+ * not an escape from the project (#252). Also how a watch let go for a delete
+ * ends when its file is gone (#486, `FileWatchCore.rearmReleased`).
  */
-async function endUnarmed(
+export async function endUnarmed(
   watched: WatchEntry,
   outcome: Exclude<ArmOutcome, 'armed' | 'stale'>,
   deps: AtomicRearmDeps

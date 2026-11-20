@@ -126,19 +126,27 @@ function doc(title: string, marker: string): string {
 }
 
 /**
- * After a page reload, subscribes `filePaths` from the new page exactly as its
- * tabs' trackers do (`fileWatch.subscribe` with a fresh watch id and the tab's
- * profile – `editor` unless `profiles` names `image`) and records
- * the change events the page receives, by path. A reloaded page starts with no
- * project, and reopening the same project answers "no-op" without filling the
- * tree, so the reloaded page cannot get its tabs back through the UI today; the
- * bridge call is what those tabs would send.
+ * After a page reload, reopens `projectPath` – a reload closes the page's
+ * project (#485), so the new page starts with none, as a user would find it –
+ * then subscribes `filePaths` from the new page exactly as its tabs' trackers
+ * do (`fileWatch.subscribe` with a fresh watch id and the tab's profile –
+ * `editor` unless `profiles` names `image`) and records the change events the
+ * page receives, by path. The bridge call is what those tabs would send.
  */
 async function resubscribeFromPage(
   page: Page,
+  projectPath: string,
   filePaths: readonly string[],
   profiles: Readonly<Record<string, 'editor' | 'image'>> = {}
 ): Promise<void> {
+  await page.evaluate(async (root) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the preload bridge, as the fixtures call it
+    await (window as any).api.file.openProjectByPath({ projectPath: root })
+  }, projectPath)
+  await expect(
+    page.locator(`[data-testid^="${TEST_IDS.PROJECT_TREE_NODE_FILE}-"]`).first(),
+    'setup: the reloaded page has the project open again'
+  ).toBeVisible({ timeout: 15_000 })
   const started = await page.evaluate(async ({ paths, kinds }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the preload bridge, as the fixtures call it
     const api = (window as any).api
@@ -313,7 +321,7 @@ test.describe('#478 gaps: an open tab stops following its file', () => {
     await page.reload()
     await fresh.releaseWrite()
     await expect.poll(() => fresh.writeHeld(), { message: 'setup: the held write finished' }).toBe(false)
-    await resubscribeFromPage(page, [file])
+    await resubscribeFromPage(page, testProject.path, [file])
 
     await writeInPlace(file, doc('A', 'g2-after'))
     await expect
@@ -340,7 +348,7 @@ test.describe('#478 gaps: an open tab stops following its file', () => {
     const profiles = { [paths[2]]: 'image' } as const
     for (let i = 0; i < RELOADS; i++) {
       await page.reload()
-      await resubscribeFromPage(page, paths, profiles)
+      await resubscribeFromPage(page, testProject.path, paths, profiles)
     }
 
     const stats = await fresh.watchStats()

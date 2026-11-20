@@ -21,15 +21,16 @@ import type { FileStamp, WatchEndReason } from '../../../shared/freshness/freshn
 import { createAtomicSaveDetector } from './AtomicSaveDetector'
 import { createSingleFileWatcher } from './singleFileWatch'
 import { deliverEvent } from './watchNotifier'
-import { AtomicRearmDeps, resolveDeletedWatch } from './atomicRearm'
+import { AtomicRearmDeps, endUnarmed, resolveDeletedWatch } from './atomicRearm'
 import { watchedUnderRemovedFolders } from './ancestorRemoval'
 import { UnseenWatchProbe, type RemovalCoverage } from './unseenWatchProbe'
-import { armWatch, type ArmFs, type ArmWatchDeps } from './armWatch'
+import { armWatch, closeQuietly, type ArmFs, type ArmWatchDeps } from './armWatch'
 import { discardEntry } from './watchEntryOps'
 import { WatchSubscriptions } from './watchSubscriptions'
 import { WatchBuckets } from './watchBuckets'
 import { WatchSuspension } from './watchSuspension'
 import { WatchHealthRound } from './watchHealthRound'
+import { WatchReleases, type ReArm } from './watchReleases'
 import type { ArmOutcome, EntryEvent, WatchEntry, WatchOwner, WatchSubscription } from './watchTypes'
 
 /** What the service can be given; the defaults are the real disk and no session. */
@@ -74,6 +75,14 @@ export abstract class FileWatchCore {
   }
 
   protected readonly armDeps: ArmWatchDeps
+
+  /** Watches let go while the project tree deletes a path (#486, `watchReleases`). */
+  protected readonly releases = new WatchReleases({
+    entries: () => this.entries.values(),
+    caseSensitive: () => this.caseSensitive(),
+    hold: entry => this.closeHeld(entry),
+    rearm: entry => this.rearmReleased(entry)
+  })
 
   constructor(protected readonly deps: FileWatcherServiceDeps = {}) {
     this.session = deps.session ?? null
@@ -141,6 +150,49 @@ export abstract class FileWatchCore {
       this.deliver(this.subsOf(entry), { kind: 'ended', reason })
     }
     this.discardWatch(entry)
+  }
+
+  // ---- release around a delete (#486) ------------------------------------------------
+
+  /**
+   * Close every native watch at or below `realPath` – the path itself too –
+   * until the returned re-arm runs; the subscriptions stay and hear nothing
+   * meanwhile. A delete calls this so Windows lets it move the item.
+   */
+  releaseUnder(realPath: string): Promise<ReArm> {
+    return this.releases.releaseUnder(realPath)
+  }
+
+  /** Native watches open at or below `realPath` now (the e2e trash hook checks it is 0). */
+  openHandlesUnder(realPath: string): number {
+    return this.releases.countOpen(realPath)
+  }
+
+  /** Close the entry's watcher; the record stays, suspended (a project switch or a release). */
+  protected async closeHeld(entry: WatchEntry): Promise<void> {
+    this.atomicSaveDetector.cancelPending(entry.filePath)
+    entry.suspended = true
+    const watcher = entry.watcher
+    entry.watcher = null
+    if (watcher) await closeQuietly(watcher)
+  }
+
+  /**
+   * The last release over the entry ended: arm it again. A file still there is
+   * `restarted` (the tracker checks it, and shows a change only if there is
+   * one); a file gone takes the genuine-delete branch (`deleted`, the watch
+   * dropped). While a project switch is suspending, the switch decides.
+   */
+  private async rearmReleased(entry: WatchEntry): Promise<void> {
+    if (!this.isHeld(entry) || this.suspension.isSuspending) return
+    entry.suspended = false
+    const outcome = await this.arm(entry).catch((): ArmOutcome => 'failed')
+    if (!this.isHeld(entry) || outcome === 'stale') return
+    if (outcome === 'armed') {
+      this.deliver(this.subsOf(entry), { kind: 'restarted' })
+      return
+    }
+    await endUnarmed(entry, outcome, this.rearmDeps)
   }
 
   protected createWatcher(entry: WatchEntry, onReady: () => void): FSWatcher {
@@ -261,10 +313,14 @@ export abstract class FileWatchCore {
 
   /** The entry for a path spelled below the session's root (the tree's spelling) or a real path. */
   protected entryAtDisplayPath(filePath: string): WatchEntry | undefined {
+    return this.entries.get(this.keyOf(this.realSpellingOf(filePath)))
+  }
+
+  /** A path spelled below the session's root, spelled below its real root instead; any other as is. */
+  protected realSpellingOf(filePath: string): string {
     const session = this.snapshot()
     const below = session ? pathBelowRoot(filePath, session.root, session.caseSensitive) : undefined
-    const real = session && below !== undefined ? join(session.realRoot, below) : filePath
-    return this.entries.get(this.keyOf(real))
+    return session && below !== undefined ? join(session.realRoot, below) : filePath
   }
 
   // ---- helpers -------------------------------------------------------------------------
@@ -282,7 +338,11 @@ export abstract class FileWatchCore {
   }
 
   protected keyOf(realPath: string): string {
-    return pathKey(realPath, this.snapshot()?.caseSensitive ?? HOST_CASE_SENSITIVE)
+    return pathKey(realPath, this.caseSensitive())
+  }
+
+  protected caseSensitive(): boolean {
+    return this.snapshot()?.caseSensitive ?? HOST_CASE_SENSITIVE
   }
 
   protected isHeld(entry: WatchEntry): boolean {

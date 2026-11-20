@@ -22,6 +22,7 @@ import { test, expect } from './fixtures/index'
 import { DialogPage } from './pages/dialog.page'
 import { ProjectTreePage } from './pages/project-tree.page'
 import { byTestId } from './utils/locators'
+import { trashedNames } from './utils/trash-hook'
 import { TEST_IDS } from '../src/renderer/src/constants/testids'
 import {
   CommentChrome,
@@ -55,7 +56,11 @@ async function exists(path: string): Promise<boolean> {
 const DELETE_KEY = 'Delete'
 
 test.describe('Project tree – Delete key (#463)', () => {
-  test('Delete on a focused file asks first, then deletes it', async ({ windowWithTestProject: page, testProject }) => {
+  test('Delete on a focused file asks first, then deletes it', async ({
+    appWithTestProject: app,
+    windowWithTestProject: page,
+    testProject
+  }) => {
     const tree = new ProjectTreePage(page)
     const dialog = new DialogPage(page)
     const target = join(testProject.path, 'notes.md')
@@ -72,6 +77,8 @@ test.describe('Project tree – Delete key (#463)', () => {
     await dialog.accept()
     await tree.waitForFileGone('notes.md')
     await expect.poll(() => exists(target)).toBe(false)
+    // To the stub trash of the test hooks, never the real Recycle Bin (#486)
+    expect(await trashedNames(app)).toEqual(['notes.md'])
   })
 
   test('Cancel in the confirmation deletes nothing', async ({ windowWithTestProject: page, testProject }) => {

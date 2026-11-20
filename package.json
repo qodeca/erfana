@@ -8,9 +8,10 @@
   "private": true,
   "scripts": {
     "format": "prettier --write .",
-    "lint": "eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix && npm run lint:shebang && npm run lint:max-lines",
-    "lint:check": "eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts && npm run lint:shebang && npm run lint:max-lines",
+    "lint": "eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix && npm run lint:shebang && npm run lint:tracked-dirs && npm run lint:max-lines",
+    "lint:check": "eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts && npm run lint:shebang && npm run lint:tracked-dirs && npm run lint:max-lines",
     "lint:shebang": "node scripts/check-shebangs.mjs",
+    "lint:tracked-dirs": "node scripts/check-tracked-dirs.mjs",
     "lint:max-lines": "node scripts/check-max-lines.mjs",
     "lint:css": "stylelint \"src/**/*.css\" \"docs/design-system/**/*.css\" \"docs/design-system/**/*.html\" \"docs/designs/**/*.css\" \"docs/designs/**/*.html\"",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",

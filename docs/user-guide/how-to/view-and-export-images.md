@@ -20,7 +20,7 @@ Open an image from the project tree, then zoom, fit, export, or copy it from the
 
 ## What happens next / If something goes wrong
 
-The viewer refreshes files that change on disk and shows **Reloaded from disk**. If a file is deleted, a banner says "<file> was deleted, renamed or moved on disk." When the file comes back – for example after a branch switch – the viewer shows it again on its own within about 2 seconds. To close the tab instead, select **Close tab**.
+The viewer refreshes files that change on disk and shows **Reloaded from disk**. If a file is deleted, a banner says "*file name* was deleted, renamed or moved on disk." When the file comes back – for example after a branch switch – the viewer shows it again on its own within about 2 seconds. To close the tab instead, select **Close tab**.
 
 ## Related
 

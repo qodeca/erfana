@@ -80,26 +80,6 @@ export function getSiblingNames(
 }
 
 /**
- * Creates confirmation message for file deletion
- *
- * @param fileName - Name of file to delete
- * @returns Confirmation message
- */
-export function createDeleteFileMessage(fileName: string): string {
-  return `Are you sure you want to delete "${fileName}"? This action cannot be undone.`
-}
-
-/**
- * Creates confirmation message for folder deletion
- *
- * @param folderName - Name of folder to delete
- * @returns Confirmation message
- */
-export function createDeleteFolderMessage(folderName: string): string {
-  return `Are you sure you want to delete "${folderName}" and all its contents? This action cannot be undone.`
-}
-
-/**
  * Creates success message for rename operation
  *
  * @returns Success message
@@ -193,20 +173,6 @@ export function formatCreateFolderError(error: unknown): string {
 }
 
 /**
- * Formats error message for delete operation
- *
- * @param error - Error object
- * @param itemType - Type of item being deleted
- * @returns User-friendly error message
- */
-export function formatDeleteError(error: unknown, itemType: 'file' | 'folder'): string {
-  if (error instanceof Error) {
-    return error.message
-  }
-  return `Failed to delete ${itemType}`
-}
-
-/**
  * Determines if error indicates permission issue
  *
  * @param error - Error object to check
@@ -264,24 +230,6 @@ export function createFileCreationErrorLog(): string {
  */
 export function createFolderCreationErrorLog(): string {
   return 'Error creating folder:'
-}
-
-/**
- * Creates log message for file deletion error
- *
- * @returns Log message prefix
- */
-export function createFileDeletionErrorLog(): string {
-  return 'Error deleting file:'
-}
-
-/**
- * Creates log message for folder deletion error
- *
- * @returns Log message prefix
- */
-export function createFolderDeletionErrorLog(): string {
-  return 'Error deleting folder:'
 }
 
 /**

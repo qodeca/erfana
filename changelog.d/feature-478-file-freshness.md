@@ -13,8 +13,19 @@
 - **Dismiss on the "changed on disk" bar is Keep My Version.** It always was: autosave writes your text over the
   disk change about 2 seconds later. The guide now says so, and the button's accessible name reads
   "Dismiss – keeps your version". (#478)
+- **Delete in the project tree moves the item to the Recycle Bin / Trash.** Files and folders deleted from the
+  tree (menu or Delete key) can be restored from there. When the trash cannot take a free item – a network drive,
+  a WSL path, no trash – a second question offers **Delete permanently**, and its button ignores clicks for half a
+  second so a double-click cannot answer it. An item in use – open in another program, or a folder a terminal is
+  working in – shows an error asking to close it and is never offered for permanent delete; a permanent delete
+  checks for this first, so a lock cannot leave a folder half-deleted. Erfana's own file watches do not count
+  as "in use": a folder with a file open in a tab, or with a hidden subfolder, goes to the Recycle Bin, and the
+  open tab shows that its file was deleted, with Restore file and Close tab. (#486)
 
 ### Fixed
+
+- **After View › Reload, opening the same project shows its tree again.** A reload now closes the window's open
+  project, without a "Project Closed" toast; reopen it from Recent Projects. (#485)
 
 - **A tab no longer stops following its file without a word.** Every case where the watch ended silently now
   restarts it or shows a notice. Known limits are listed in ADR 0013 and technical debt #72: no file lock
@@ -28,3 +39,6 @@
   round and a wake re-arm; a contract suite runs against every adapter, and latency gates run in the
   `timing` Playwright project. The old watch slot, subscriber counter, deleted-file probe and legacy watch
   channels are gone. See [ADR 0013](../docs/adrs/0013-one-freshness-capability.md). (#478)
+- **`npm run lint` names tracked files missing under `.vale/` or `.codex/`** and prints the `git restore`
+  command that brings them back. (#486)
+- **markdownlint-cli2 0.24.2**, clearing the dev-only `npm audit` highs. (#487)

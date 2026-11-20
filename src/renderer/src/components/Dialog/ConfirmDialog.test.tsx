@@ -7,6 +7,9 @@
  * dialog used to confirm on every Enter, so a user who tabbed to Cancel on a
  * delete / discard / quit prompt and pressed Enter still ran the destructive
  * action, and a held Enter could auto-repeat into it.
+ *
+ * Also the opt-in click guard (`confirmArmDelayMs`, #486): a question that
+ * follows another in the same place ignores Confirm until the delay has passed.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen } from '@testing-library/react'
@@ -17,7 +20,7 @@ import { ConfirmDialog } from './ConfirmDialog'
 /** BaseDialog's FOCUS_DELAY_MS (10 ms), with headroom. */
 const PAST_FOCUS_DELAY_MS = 20
 
-function renderDialog(danger: boolean) {
+function renderDialog(danger: boolean, confirmArmDelayMs?: number) {
   const onConfirm = vi.fn()
   const onCancel = vi.fn()
   render(
@@ -27,7 +30,8 @@ function renderDialog(danger: boolean) {
         title: 'Delete File',
         message: 'Delete notes.md?',
         confirmLabel: 'Delete',
-        danger
+        danger,
+        confirmArmDelayMs
       }}
       zIndex={10001}
       onConfirm={onConfirm}
@@ -210,5 +214,86 @@ describe('ConfirmDialog', () => {
 
     expect(upperCancel).toHaveBeenCalledTimes(1)
     expect(lowerCancel).not.toHaveBeenCalled()
+  })
+
+  describe('confirm click guard (confirmArmDelayMs)', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    const advance = (ms: number): void => {
+      act(() => {
+        vi.advanceTimersByTime(ms)
+      })
+    }
+
+    it('ignores clicks on Confirm until the delay has passed, then confirms', () => {
+      const { onConfirm, onCancel } = renderDialog(true, 500)
+
+      fireEvent.click(confirmButton())
+      advance(499)
+      fireEvent.click(confirmButton())
+      expect(onConfirm).not.toHaveBeenCalled()
+
+      advance(1)
+      fireEvent.click(confirmButton())
+      expect(onConfirm).toHaveBeenCalledTimes(1)
+      expect(onCancel).not.toHaveBeenCalled()
+    })
+
+    it('shows Confirm as aria-disabled – still focusable – while it waits, and enabled after', () => {
+      renderDialog(true, 500)
+
+      expect(confirmButton()).toHaveAttribute('aria-disabled', 'true')
+      expect(confirmButton()).not.toBeDisabled()
+
+      advance(500)
+      expect(confirmButton()).not.toHaveAttribute('aria-disabled')
+    })
+
+    it('keeps Cancel answering at once, and Cancel keeps first focus', () => {
+      const { onCancel } = renderDialog(true, 500)
+      advance(PAST_FOCUS_DELAY_MS)
+
+      expect(cancelButton()).toHaveFocus()
+      fireEvent.click(cancelButton())
+      expect(onCancel).toHaveBeenCalledTimes(1)
+    })
+
+    it('a non-danger prompt also ignores Enter off the buttons while it waits', () => {
+      const { onConfirm } = renderDialog(false, 500)
+
+      fireEvent.keyDown(message(), { key: 'Enter' })
+      expect(onConfirm).not.toHaveBeenCalled()
+
+      advance(500)
+      fireEvent.keyDown(message(), { key: 'Enter' })
+      expect(onConfirm).toHaveBeenCalledTimes(1)
+    })
+
+    it('is off by default: Confirm answers at once and is never aria-disabled', () => {
+      const { onConfirm } = renderDialog(true)
+
+      expect(confirmButton()).not.toHaveAttribute('aria-disabled')
+      fireEvent.click(confirmButton())
+      expect(onConfirm).toHaveBeenCalledTimes(1)
+    })
+
+    it('clears its timer when the dialog closes before the delay', () => {
+      const { unmount } = render(
+        <ConfirmDialog
+          config={{ id: 'c2', title: 'T', message: 'M', confirmArmDelayMs: 500 }}
+          zIndex={10001}
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      )
+      unmount()
+      expect(vi.getTimerCount()).toBe(0)
+    })
   })
 })

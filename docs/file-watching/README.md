@@ -249,6 +249,17 @@ A join must never fail on the cap: an entry it joins is already counted. That is
 told whether a subscribe joins a file that is already watched: a join takes no
 slot, so the cap never refuses it. A subscribe past the cap is `queued` (a waitlist of up to 200) and gets `started` when a slot frees; past the waitlist it is refused with `WATCH_FAILED`.
 
+### Released around a project-tree delete (#486)
+
+On Windows a handle anywhere **below** a folder blocks renaming it, and the Recycle Bin moves a folder by renaming it (so does the in-use probe, `services/file/entryProbe.ts`). Erfana holds such handles itself: a single-file watch (libuv watches a file through its folder) and the native directory watcher's handles on a split folder's children (a folder that holds a hidden, ignored or excluded subfolder). A watcher pause closes none of them. So `file:deleteFile` / `file:deleteFolder` run the trash, the probe and the permanent removal inside `releasingWatches` (`services/file/releaseWatchesAround.ts`), after the confinement and `FileService` checks pass:
+
+- **Release.** `FileWatcherService.releaseUnder(realPath)` (`watcher/watchReleases.ts`) closes the watcher of every entry at or below the path – the path itself too, so a file's own watch – matched as entries are keyed: real paths under the session's case rule (`C:\Proj\A` covers `c:\proj\a\x.md` on Windows). The entries and subscriptions stay, suspended as for a project switch, so nothing reaches a tab meanwhile. `DirectoryWatcherService.releaseUnder(realPath)` closes the native handles strictly below the folder (`watcher/releasableWatchHandles.ts`, the native watcher's `fsWatch`); the folder's own handle stays, so its removal is still heard.
+- **Re-arm**, after the removal succeeded or failed. Each held entry goes through `armWatch` again: a file still there gets `restarted` (the tracker's catch-up check – it shows a change only if the disk differs); a file gone takes the genuine-delete branch (`atomicRearm.endUnarmed`: `deleted`, the watch dropped), so the tab shows the deleted notice with Restore file and Close tab, and follows the file again if it comes back. A directory handle whose folder is gone stays closed quietly – its removal reaches the watcher through the folder above, never as an error; one still there is opened again and reported as lost events (a `null` file name), so the watcher re-lists or resyncs what it may have missed.
+- **Concurrency.** Releases nest: an entry is held while any delete covers it and re-armed when the last one ends. A subscribe for a file under a release waits for it (at most 30 s) before it resolves and stamps the file, and an entry created under a release is held from the start, so no handle opens mid-delete. A window closed meanwhile drops its subscriptions as usual and nothing is re-armed for it; a project switch that is suspending takes over the held entries. A failed project switch's resume skips entries a delete still holds; the release re-arms them when it ends.
+- **Time box.** Each release and each re-arm has 2 s (`WATCH_RELEASE_TIMEOUT_MS`): a release that does not answer does not hold the delete up (its re-arm runs once it answers), and a slow re-arm goes on in the background; closing each watcher is itself bounded (`HOLD_TIMEOUT_MS`, 1 s), so a close that never settles cannot keep a release active. Log lines carry `redactPath` / `redactedLogError` only.
+
+Only handles **other programs** hold – a terminal whose working folder is inside, an editor with a file open – still answer `IN_USE`. Not covered: the chokidar backend (Linux, where such handles do not block a rename, and the `ERFANA_DIRECTORY_WATCHER=chokidar` support override on Windows). The e2e trash stub removes with `rm`, which these handles do not block, so it records how many were open under each entry when it was asked (`handlesAtTrash`); `releaseWatchesAround.win32.test.ts` proves the move with real handles.
+
 ### Renderer side: one tracker per tab
 
 - **`hooks/useFreshness.ts`** – builds the tab's `FreshnessTracker` once the
@@ -506,7 +517,7 @@ Monitors git repository state files for real-time status updates in the Project 
 
 ### Window Cleanup (#106)
 
-`cleanupForWebContentsId(id)` is called from `webContents.on('destroyed')` in `index.ts` to prevent stale git watchers from accumulating after window close or dev refresh.
+`cleanupForWebContentsId(id)` is called from `webContents.on('destroyed')` in `index.ts` to prevent stale git watchers from accumulating after a window closes. A reload keeps the same `webContents`, so this cleanup does not run then; the `did-navigate` hooks in `index.ts` end the page's file watches (#478) and close its open project (#485, `projectOwnerLifecycle.ts`) instead. Neither hook stops the git watcher: it runs on until the next `git-watcher:start` (the next project open) replaces it.
 
 ### IPC Channels
 

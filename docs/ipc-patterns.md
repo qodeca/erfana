@@ -217,8 +217,8 @@ Note that several domains register through channel **constants**
 | `file:createFile` | Create new empty file. Request `{ dirPath, name }` |
 | `file:createFolder` | Create new folder. Request `{ dirPath, name }` |
 | `file:rename` | Rename file or folder. Request `{ oldPath, newName }` |
-| `file:deleteFile` | Delete file. Request `{ filePath }` |
-| `file:deleteFolder` | Delete folder recursively. Request `{ filePath }` |
+| `file:deleteFile` | Move a file to the Recycle Bin / Trash (`shell.trashItem`). Request `{ filePath, permanent? }` – only a literal `permanent: true` deletes it for good. Answers `DeleteEntryResult`: `{ ok: true, trashed }`; `{ ok: false, code: 'TRASH_UNAVAILABLE' }` when the item is free but the trash refused it (the renderer may then ask for `permanent: true`); `{ ok: false, code: 'IN_USE' }` when another program, a terminal's working folder or a missing permission holds it – never followed by a permanent-delete offer. An item that is already gone rejects with `ENOENT`. Nothing is removed in any of these. Electron's refusal carries no error code, so main tells them apart by probing the entry (`lstat`, then a same-folder rename and back – `services/file/entryProbe.ts`); `permanent: true` runs the same probe first and answers `IN_USE` rather than leave a folder half-deleted (#486). The trash, the probe and the permanent removal run with Erfana's own watch handles under the item released and re-armed after, so `IN_USE` means another program's hold ([File watching § Released around a project-tree delete](./file-watching/README.md#released-around-a-project-tree-delete-486)) |
+| `file:deleteFolder` | The same for a folder and its contents. Request `{ filePath, permanent? }` |
 | `file:moveItem` | Move file/folder – `fs.rename` with copy+delete fallback on EXDEV (drag-drop, cut/paste). Request `{ sourcePath, targetParentPath, newName?, replaceExisting? }` |
 | `file:copyItem` | Copy file/folder with automatic `(1)`, `(2)` name numbering. Request `{ sourcePath, targetParentPath, newName? }` |
 | `file:checkConflict` | Case-insensitive name-conflict probe before a move/copy. Request `{ targetParentPath, itemName }` |

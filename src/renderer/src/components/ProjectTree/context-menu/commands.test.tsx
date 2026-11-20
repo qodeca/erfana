@@ -10,7 +10,7 @@
  * - CutCommand, CopyCommand
  * - PasteIntoDirectoryCommand
  * - RenameFileCommand, RenameDirectoryCommand
- * - DeleteFileCommand, DeleteDirectoryCommand
+ * - DeleteFileCommand, DeleteDirectoryCommand: deleteCommands.test.ts
  * - NewFileInDirectoryCommand, NewFolderInDirectoryCommand
  */
 
@@ -22,8 +22,6 @@ import {
   PasteIntoDirectoryCommand,
   RenameFileCommand,
   RenameDirectoryCommand,
-  DeleteFileCommand,
-  DeleteDirectoryCommand,
   NewFileInDirectoryCommand,
   NewFolderInDirectoryCommand,
   RevealInFileManagerCommand,
@@ -462,151 +460,6 @@ describe('Context Menu Commands', () => {
           itemType: 'directory'
         })
       )
-    })
-  })
-
-  describe('DeleteFileCommand', () => {
-    it('should construct with correct label, icon, danger flag', () => {
-      const node = createMockFileNode('test.md', 'file')
-      const cmd = new DeleteFileCommand(ctx, node as FileNodeFile)
-
-      expect(cmd.label).toBe('Delete')
-      expect(cmd.icon).toBeDefined()
-      expect(cmd.danger).toBe(true)
-    })
-
-    it('should show confirmation with file-specific message', async () => {
-      const node = createMockFileNode('test.md', 'file')
-      vi.mocked(ctx.dialogs.showConfirm).mockResolvedValue(true)
-
-      const cmd = new DeleteFileCommand(ctx, node as FileNodeFile)
-      await cmd.execute()
-
-      expect(ctx.dialogs.showConfirm).toHaveBeenCalledWith({
-        title: 'Delete File',
-        message: 'Are you sure you want to delete "test.md"? This action cannot be undone.',
-        confirmLabel: 'Delete',
-        danger: true
-      })
-    })
-
-    it('should include "cannot be undone" warning', async () => {
-      const node = createMockFileNode('test.md', 'file')
-      vi.mocked(ctx.dialogs.showConfirm).mockResolvedValue(true)
-
-      const cmd = new DeleteFileCommand(ctx, node as FileNodeFile)
-      await cmd.execute()
-
-      expect(ctx.dialogs.showConfirm).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: expect.stringContaining('cannot be undone')
-        })
-      )
-    })
-
-    it('should cancel when user declines', async () => {
-      const node = createMockFileNode('test.md', 'file')
-      vi.mocked(ctx.dialogs.showConfirm).mockResolvedValue(false)
-
-      const cmd = new DeleteFileCommand(ctx, node as FileNodeFile)
-      await cmd.execute()
-
-      expect(ctx.api.deleteFile).not.toHaveBeenCalled()
-    })
-
-    it('should call api.deleteFile when confirmed', async () => {
-      const node = createMockFileNode('test.md', 'file')
-      vi.mocked(ctx.dialogs.showConfirm).mockResolvedValue(true)
-
-      const cmd = new DeleteFileCommand(ctx, node as FileNodeFile)
-      await cmd.execute()
-
-      expect(ctx.api.deleteFile).toHaveBeenCalledWith({ filePath: '/test/project/test.md' })
-    })
-
-    it('should refresh tree after deletion', async () => {
-      const node = createMockFileNode('test.md', 'file')
-      vi.mocked(ctx.dialogs.showConfirm).mockResolvedValue(true)
-
-      const cmd = new DeleteFileCommand(ctx, node as FileNodeFile)
-      await cmd.execute()
-
-      expect(ctx.refreshProjectTree).toHaveBeenCalled()
-    })
-
-    it('should show error toast on failure', async () => {
-      const node = createMockFileNode('test.md', 'file')
-      vi.mocked(ctx.dialogs.showConfirm).mockResolvedValue(true)
-      vi.mocked(ctx.api.deleteFile).mockRejectedValue(new Error('Delete failed'))
-      vi.mocked(ctx.formatFileOperationError).mockReturnValue('Delete failed')
-
-      const cmd = new DeleteFileCommand(ctx, node as FileNodeFile)
-      await cmd.execute()
-
-      expect(ctx.toast).toHaveBeenCalledWith({
-        type: 'error',
-        title: 'Error',
-        message: 'Delete failed'
-      })
-    })
-
-    it('should wrap operation with withWatcherPause', async () => {
-      const node = createMockFileNode('test.md', 'file')
-      vi.mocked(ctx.dialogs.showConfirm).mockResolvedValue(true)
-
-      const cmd = new DeleteFileCommand(ctx, node as FileNodeFile)
-      await cmd.execute()
-
-      expect(ctx.withWatcherPause).toHaveBeenCalled()
-    })
-  })
-
-  describe('DeleteDirectoryCommand', () => {
-    it('should construct with correct label, icon, danger flag', () => {
-      const node = createMockFileNode('folder', 'directory')
-      const cmd = new DeleteDirectoryCommand(ctx, node as FileNodeDirectory)
-
-      expect(cmd.label).toBe('Delete')
-      expect(cmd.danger).toBe(true)
-    })
-
-    it('should show confirmation with folder-specific message', async () => {
-      const node = createMockFileNode('folder', 'directory')
-      vi.mocked(ctx.dialogs.showConfirm).mockResolvedValue(true)
-
-      const cmd = new DeleteDirectoryCommand(ctx, node as FileNodeDirectory)
-      await cmd.execute()
-
-      expect(ctx.dialogs.showConfirm).toHaveBeenCalledWith({
-        title: 'Delete Folder',
-        message: 'Are you sure you want to delete "folder" and all its contents? This action cannot be undone.',
-        confirmLabel: 'Delete',
-        danger: true
-      })
-    })
-
-    it('should warn about deleting "all its contents"', async () => {
-      const node = createMockFileNode('folder', 'directory')
-      vi.mocked(ctx.dialogs.showConfirm).mockResolvedValue(true)
-
-      const cmd = new DeleteDirectoryCommand(ctx, node as FileNodeDirectory)
-      await cmd.execute()
-
-      expect(ctx.dialogs.showConfirm).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: expect.stringContaining('all its contents')
-        })
-      )
-    })
-
-    it('should call api.deleteFolder when confirmed', async () => {
-      const node = createMockFileNode('folder', 'directory')
-      vi.mocked(ctx.dialogs.showConfirm).mockResolvedValue(true)
-
-      const cmd = new DeleteDirectoryCommand(ctx, node as FileNodeDirectory)
-      await cmd.execute()
-
-      expect(ctx.api.deleteFolder).toHaveBeenCalledWith({ filePath: '/test/project/folder' })
     })
   })
 

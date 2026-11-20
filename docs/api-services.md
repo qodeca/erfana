@@ -320,11 +320,12 @@ Create new empty file.
 
 ---
 
-#### `deleteFile(filePath: string): Promise<void>`
-Delete file.
+#### `deleteFile(filePath: string, remove?: EntryRemover): Promise<void>`
+Delete file. `deleteFolder(folderPath, remove?)` is the same for a folder and refuses the project root.
 
 **Parameters:**
 - `filePath` - Absolute path to file
+- `remove` - Does the removal once the checks pass. Permanent by default (`services/file/entryRemoval.ts`); the project tree's Delete passes `trashEntry` (`services/file/trashEntry.ts`), which sorts a refusal of the Recycle Bin / Trash into `EntryGoneError` (the item is no longer there, `ENOENT`), `EntryInUseError` (another program, a terminal's working folder or a missing permission holds it) or `TrashUnavailableError` (the item is free, the trash is not) – by the refusal's error code when it has one, otherwise with the in-use probe (`services/file/entryProbe.ts`: `lstat`, then a rename to a hidden sibling and straight back; a failed rename-back throws `ProbeRestoreError` naming the temporary name). Its confirmed permanent delete passes `removeUnlessInUse(...)`, which runs the same probe before the recursive removal (#486)
 
 **Throws:** Error if deletion fails.
 
