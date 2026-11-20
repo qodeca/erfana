@@ -126,12 +126,21 @@ describe.runIf(process.platform === 'win32')('Windows: a delete with Erfana’s 
       child.once('error', reject)
     })
 
+    // Whether a child's working folder blocks a rename of a folder above it differs between
+    // Windows builds: it does on a desktop host, not on the GitHub Windows runner. What must
+    // hold everywhere is that the probe agrees with the rename the Recycle Bin would do
     let access: string | undefined
+    let renameBlocked: boolean | undefined
     await releasingWatches(async (entry) => {
       access = await probeEntryAccess(entry)
+      const moved = path.join(base, 'moved-check')
+      renameBlocked = await rename(entry, moved).then(
+        () => rename(moved, entry).then(() => false),
+        () => true
+      )
     }, owners)(docs)
 
-    expect(access).toBe('in-use')
+    expect(access).toBe(renameBlocked ? 'in-use' : 'free')
     expect(events.map((event) => event.kind)).toEqual(['restarted'])
     expect(files.openHandlesUnder(docs)).toBe(1)
     expect(handles.openBelow(docs, false)).toBeGreaterThan(0)

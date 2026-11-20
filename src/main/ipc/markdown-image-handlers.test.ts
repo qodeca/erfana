@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync, truncateSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync, truncateSync, writeFileSync } from 'node:fs'
 import path, { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { openTestProject } from './__test-helpers__/openTestProject'
@@ -69,8 +69,11 @@ describe('markdown-image:read', () => {
     for (const key of Object.keys(handlers)) delete handlers[key]
     trusted.value = true
     vi.resetModules()
-    tmp = mkdtempSync(join(tmpdir(), 'erfana-mdimage-'))
-    outside = mkdtempSync(join(tmpdir(), 'erfana-mdimage-outside-'))
+    // Long-form paths: a Windows runner's temp folder is spelled with an 8.3 short name
+    // (`C:\Users\RUNNER~1\…`), and a short-name segment on the project's drive is the one
+    // case the precheck expands with a file-system call (#478 G6)
+    tmp = realpathSync.native(mkdtempSync(join(tmpdir(), 'erfana-mdimage-')))
+    outside = realpathSync.native(mkdtempSync(join(tmpdir(), 'erfana-mdimage-outside-')))
     mkdirSync(join(tmp, 'assets'))
     writeFileSync(join(tmp, 'assets', 'icon.svg'), SVG)
     writeFileSync(join(tmp, 'assets', 'pixel.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]))
