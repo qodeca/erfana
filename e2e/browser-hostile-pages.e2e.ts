@@ -22,6 +22,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { test, expect } from './fixtures/browserHarness'
+import { BROWSER_CHROMIUM_ARGS } from './fixtures/browser/serve'
 import { HostileSuite, leaks } from './pages/browser-hostile.page'
 import { DownloadsDriver } from './pages/browser-downloads.page'
 import { BrowserTabUiPage } from './pages/browser-tab-ui.page'
@@ -339,8 +340,11 @@ interface ProbeSeen {
   notification: string
 }
 
-/** The page's location permission as the engine reports it (`granted`, `prompt`, `denied` or an error name). */
-const GEOLOCATION = `navigator.permissions.query({ name: 'geolocation' }).then((s) => s.state, (e) => e.name)`
+/**
+ * The page's camera permission as the engine reports it (`granted`, `prompt`, `denied` or an error name). The camera,
+ * not location: macOS denies location without a prompt. A fake device keeps the real camera (and its macOS prompt) out.
+ */
+const CAMERA = `navigator.permissions.query({ name: 'camera' }).then((s) => s.state, (e) => e.name)`
 
 /** The HTML Preview's half of the session probe: it writes its own cookie and storage entry. */
 const PREVIEW_PROBE = `<!doctype html>
@@ -355,7 +359,7 @@ const PREVIEW_PROBE = `<!doctype html>
 `
 
 test.describe('built-in browser hostile pages: sessions', () => {
-  test.use({ testProjectFiles: { 'preview-probe.html': PREVIEW_PROBE } })
+  test.use({ testProjectFiles: { 'preview-probe.html': PREVIEW_PROBE }, extraLaunchArgs: [...BROWSER_CHROMIUM_ARGS, '--use-fake-device-for-media-stream'] })
 
   test('025-AC-046 hostile page: a cookie, a storage entry and a permission set in a browser tab are absent from Erfana\'s session and the HTML Preview\'s, and the reverse', async ({
     appWithTestProject: app,
@@ -373,21 +377,21 @@ test.describe('built-in browser hostile pages: sessions', () => {
     await page.waitForLoaded(url)
 
     // The browser tab writes a cookie, localStorage and IndexedDB (`__probe.write()`), and is granted
-    // location in the strip. (Notifications are not used: the page reads them as denied without a prompt.)
+    // the camera in the strip. (Notifications and, on macOS, location are not used: the page reads them as denied without a prompt.)
     await page.eval('window.__probe.write().then((p) => { window.__written = p }); 0')
     await page.waitFor(`window.__written !== undefined`, 'probe written')
-    await testHook(app, 'browserInput', 'execWithGesture', page.tabId, 'navigator.geolocation.getCurrentPosition(() => {}, () => {}); 0')
+    await testHook(app, 'browserInput', 'execWithGesture', page.tabId, 'navigator.mediaDevices.getUserMedia({ video: true }).then((s) => { window.__camera = s }, () => {}); 0')
     await panel.answerRow('permission', 'Allow')
-    await page.waitFor(`navigator.permissions.query({ name: 'geolocation' }).then((s) => s.state === 'granted')`, 'location granted')
+    await page.waitFor(`navigator.permissions.query({ name: 'camera' }).then((s) => s.state === 'granted')`, 'camera granted')
     const inTab = await page.eval<ProbeSeen>('window.__probe.read()')
     // Positive control: the tab itself sees all three.
     expect(inTab.cookie).toContain('erfana_isolation_probe=7f3a')
     expect(inTab.localStorage).toContain('erfana_isolation_probe=7f3a')
-    expect(await page.eval(GEOLOCATION)).toBe('granted')
+    expect(await page.eval(CAMERA)).toBe('granted')
 
     // Erfana's own session: the same origin in a hidden window there sees none of it; it then writes its own.
     await installBoundedExec(app)
-    const inDefault = await app.evaluate(async ({ BrowserWindow, session }, [probeUrl, geolocation, capMs]) => {
+    const inDefault = await app.evaluate(async ({ BrowserWindow, session }, [probeUrl, camera, capMs]) => {
       const { __erfanaE2eExec: exec } = globalThis as unknown as BoundedExecGlobal
       const run = <T>(code: string): Promise<T> => exec<T>(probe.webContents, code, capMs as number, 'default-session probe')
       const probe = new BrowserWindow({ show: false, webPreferences: { session: session.defaultSession, sandbox: true, contextIsolation: true } })
@@ -399,18 +403,18 @@ test.describe('built-in browser hostile pages: sessions', () => {
       try {
         await probe.loadURL(probeUrl as string)
         const seen = await run<{ cookie: string; localStorage: string[] }>('window.__probe.read()')
-        const location = await run<string>(geolocation as string)
+        const cameraState = await run<string>(camera as string)
         await run(`document.cookie = 'erfana_default_probe=1; Max-Age=600; path=/'; localStorage.setItem('erfana_default_probe', '1'); 0`)
         const own = await run<{ cookie: string; localStorage: string[] }>('window.__probe.read()')
         const cookies = (await session.defaultSession.cookies.get({})).map((c) => c.name)
-        return { seen, location, own, cookies }
+        return { seen, cameraState, own, cookies }
       } finally {
         probe.destroy()
       }
-    }, [url, GEOLOCATION, EXEC_ACTION_CAP_MS] as const)
+    }, [url, CAMERA, EXEC_ACTION_CAP_MS] as const)
     expect(inDefault.seen.cookie).not.toContain('erfana_isolation_probe')
     expect(inDefault.seen.localStorage.join()).not.toContain('erfana_isolation_probe')
-    expect(inDefault.location).not.toBe('granted')
+    expect(inDefault.cameraState).not.toBe('granted')
     expect(inDefault.cookies).not.toContain('erfana_isolation_probe')
     // Positive control for the reverse: Erfana's session holds its own entries.
     expect(inDefault.own.cookie).toContain('erfana_default_probe=1')
@@ -423,14 +427,14 @@ test.describe('built-in browser hostile pages: sessions', () => {
     await preview.open('preview-probe.html')
     await expect.poll(() => preview.eval('document.title'), { timeout: 20_000 }).toBe('PREVIEW-PROBE-READY')
     const previewSeen = JSON.parse(
-      (await preview.eval(`(async () => JSON.stringify({ probe: window.__previewProbe, location: await ${GEOLOCATION},
+      (await preview.eval(`(async () => JSON.stringify({ probe: window.__previewProbe, cameraState: await ${CAMERA},
         storage: (() => { try { return Object.keys(localStorage) } catch (e) { return [e.name] } })() }))()`))!
-    ) as { probe: { storage: string }; location: string; storage: string[] }
+    ) as { probe: { storage: string }; cameraState: string; storage: string[] }
     expect(previewSeen.storage).not.toContain('erfana_isolation_probe')
     // The preview page is an opaque origin with no storage at all; its session's cookie jar is
     // reached from main instead (a cookie for the hostile origin is set there below).
     expect(previewSeen.probe).toEqual({ storage: 'SecurityError', cookie: 'SecurityError' })
-    expect(previewSeen.location).not.toBe('granted')
+    expect(previewSeen.cameraState).not.toBe('granted')
     const sessions = await app.evaluate(async ({ webContents, session }, [tabId, probeUrl]) => {
       const tab = webContents.fromId(tabId as number)!
       const previewContents = webContents.getAllWebContents().find((c) => c.getURL().startsWith('erfana-preview://'))!

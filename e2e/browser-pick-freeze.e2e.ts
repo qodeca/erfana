@@ -307,7 +307,7 @@ test.describe('the capture is taken at the pick', () => {
     const button = await flow.hover('#request-notifications', 'button#request-notifications ')
     const point = { x: button.x + button.width / 2, y: button.y + button.height / 2 }
     // A site request puts a row in the strip above the page; the page moves down under the pointer.
-    await flow.eval(`window.__fixture.clear(); navigator.geolocation.getCurrentPosition(() => {}, () => {}); 0`)
+    await flow.eval(`window.__fixture.clear(); navigator.mediaDevices.getUserMedia({ video: true }).catch(() => {}); 0`)
     await expect(flow.panel.stripRow('permission')).toBeVisible({ timeout: WAIT_MS })
     // Main armed the click guard for the shift (025-FR-047) before the test moves its clock past it.
     await expect.poll(async () => (await flow.routing()).clickGuardUntil, { timeout: WAIT_MS }).toBeGreaterThan(0)

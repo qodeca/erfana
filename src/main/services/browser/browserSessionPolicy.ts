@@ -116,16 +116,30 @@ export const BROWSER_PERMISSION_CLASSES: Readonly<Record<ElectronPermission, Per
   unknown: 'deny'
 })
 
-/** The class of `permission`; a name the table does not know is `deny` (fail closed). */
-export function permissionClass(permission: string): PermissionClass {
-  return Object.hasOwn(BROWSER_PERMISSION_CLASSES, permission)
-    ? BROWSER_PERMISSION_CLASSES[permission as ElectronPermission]
-    : 'deny'
+/**
+ * Per-platform exceptions to the table. macOS: location is denied without a
+ * prompt. The signed, hardened build has no `NSLocationUsageDescription` and
+ * no location entitlement, and Electron has no API to ask Core Location, so
+ * after **Allow** the page's request would hang or fail (v0.24.2 macOS review).
+ * Denied, the page gets a position error at once (025-FR-019).
+ */
+const PLATFORM_CLASSES: Readonly<Partial<Record<NodeJS.Platform, Readonly<Partial<Record<ElectronPermission, PermissionClass>>>>>> =
+  Object.freeze({
+    darwin: Object.freeze({ geolocation: 'deny', 'geolocation-approximate': 'deny' })
+  })
+
+/** The class of `permission` on `platform`; a name the table does not know is `deny` (fail closed). */
+export function permissionClass(permission: string, platform: NodeJS.Platform = process.platform): PermissionClass {
+  if (!Object.hasOwn(BROWSER_PERMISSION_CLASSES, permission)) return 'deny'
+  const name = permission as ElectronPermission
+  const exceptions = PLATFORM_CLASSES[platform]
+  const exception = exceptions !== undefined && Object.hasOwn(exceptions, name) ? exceptions[name] : undefined
+  return exception ?? BROWSER_PERMISSION_CLASSES[name]
 }
 
 /** Whether `permission` is granted with no prompt, no notice and no tab: `allow` only. */
-export function isPermissionGranted(permission: string): boolean {
-  return permissionClass(permission) === 'allow'
+export function isPermissionGranted(permission: string, platform: NodeJS.Platform = process.platform): boolean {
+  return permissionClass(permission, platform) === 'allow'
 }
 
 /** The part of an Electron `Session` the hardening touches. */
