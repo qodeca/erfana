@@ -97,6 +97,8 @@ export interface BrowserSiteDeps {
   readonly credentialCrypto?: CredentialCrypto
   /** `safeStorage`'s backend name (`basic_text`: no keyring, sign-ins in memory only). */
   readonly storageBackend?: () => string
+  /** The platform the permission table is read for (macOS denies location); the host's by default. */
+  readonly platform?: NodeJS.Platform
 }
 
 interface AttachedTab {
@@ -190,7 +192,7 @@ export class BrowserSite implements SessionSiteHooks {
     callback: (granted: boolean) => void,
     details: PermissionRequestDetails
   ): void {
-    const cls = permissionClass(permission)
+    const cls = permissionClass(permission, this.deps.platform)
     if (cls === 'allow' || cls === 'deny') {
       if (cls === 'deny') logger.debug('Browser permission denied', { permission, path: 'request' })
       callback(cls === 'allow')
@@ -225,7 +227,7 @@ export class BrowserSite implements SessionSiteHooks {
     requesting: string,
     details: { embeddingOrigin?: string; mediaType?: 'video' | 'audio' | 'unknown' }
   ): boolean {
-    const cls = permissionClass(permission)
+    const cls = permissionClass(permission, this.deps.platform)
     if (cls === 'allow' || cls === 'deny') return cls === 'allow'
     const tab = contents === null ? undefined : this.tabs.get(contents.id)
     if (contents === null || tab === undefined || !tab.open) return false

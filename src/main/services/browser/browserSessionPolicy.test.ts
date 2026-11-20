@@ -66,7 +66,7 @@ describe('permission table', () => {
   })
 
   it('grants only clipboard writes and persistent storage today', () => {
-    const granted = Object.keys(BROWSER_PERMISSION_CLASSES).filter(isPermissionGranted).sort()
+    const granted = Object.keys(BROWSER_PERMISSION_CLASSES).filter((name) => isPermissionGranted(name)).sort()
     expect(granted).toEqual(['clipboard-sanitized-write', 'persistent-storage'])
   })
 
@@ -79,6 +79,23 @@ describe('permission table', () => {
     for (const name of ['media', 'fullscreen', 'pointerLock', 'geolocation', 'clipboard-read', 'display-capture']) {
       expect(isPermissionGranted(name)).toBe(false)
     }
+  })
+})
+
+describe('permission table per platform', () => {
+  it('macOS denies location without a prompt: the signed build has no location permission', () => {
+    expect(permissionClass('geolocation', 'darwin')).toBe('deny')
+    expect(permissionClass('geolocation-approximate', 'darwin')).toBe('deny')
+    expect(permissionClass('media', 'darwin')).toBe('ask')
+  })
+
+  it.each(['win32', 'linux'] as const)('%s asks for location', (platform) => {
+    expect(permissionClass('geolocation', platform)).toBe('ask')
+    expect(permissionClass('geolocation-approximate', platform)).toBe('ask')
+  })
+
+  it('an unknown name stays denied on every platform', () => {
+    for (const platform of ['darwin', 'win32', 'linux'] as const) expect(permissionClass('hasOwnProperty', platform)).toBe('deny')
   })
 })
 

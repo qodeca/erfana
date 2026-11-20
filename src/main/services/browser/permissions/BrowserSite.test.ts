@@ -48,6 +48,8 @@ function make(overrides: Partial<BrowserSiteDeps> = {}): void {
     },
     fromFrame: () => contents as never,
     newRowId: () => `row${++rows}`,
+    // The prompts these tests drive are the Windows and Linux ones; macOS denies location (its own test).
+    platform: 'linux',
     ...overrides
   }
   site = new BrowserSite(deps)
@@ -110,6 +112,19 @@ describe('BrowserSite permission requests', () => {
     expect(site.permissionCheck(contents as never, 'media', ORIGIN, { mediaType: 'video' })).toBe(true)
     expect(site.permissionCheck(contents as never, 'media', ORIGIN, { mediaType: 'audio' })).toBe(false)
     expect(site.permissionCheck(contents as never, 'media', ORIGIN, { mediaType: 'unknown' })).toBe(false)
+  })
+
+  it('macOS: location is denied at once with no prompt, and checks as denied (no location permission in the signed build)', async () => {
+    make({ platform: 'darwin' })
+    expect(request('geolocation')).toEqual([false])
+    expect(request('geolocation-approximate')).toEqual([false])
+    await flush()
+    expect(strip).toEqual([])
+    expect(site.permissionCheck(contents as never, 'geolocation', ORIGIN, {})).toBe(false)
+    // The camera still asks there.
+    request('media', { mediaTypes: ['video'], securityOrigin: ORIGIN, requestingUrl: PAGE })
+    await flush()
+    expect(strip[0]).toMatchObject({ op: 'add', row: { text: 'garden.test wants to use your camera' } })
   })
 
   it('refuses an ask-class request from a page no tab owns, or with an opaque origin', async () => {

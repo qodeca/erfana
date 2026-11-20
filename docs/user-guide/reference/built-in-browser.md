@@ -63,7 +63,7 @@ The text of a page goes to the agent as data, inside a fenced block, never as pa
 
 ## Permissions and sign-in
 
-**What it does:** When a site asks for the camera, the microphone, screen sharing, your location or clipboard read, a row at the top of the tab names the site and offers **Allow** and **Block**; camera and microphone also offer **Allow once**. Erfana remembers your answer for this site in this project. Screen sharing always asks. **How to reach it:** answer the row; to undo answers, use **Clear browsing data…**.
+**What it does:** When a site asks for the camera, the microphone, screen sharing, your location or clipboard read, a row at the top of the tab names the site and offers **Allow** and **Block**; camera and microphone also offer **Allow once**. Erfana remembers your answer for this site in this project. Screen sharing always asks. On macOS, Erfana blocks location requests without asking, and the site gets an error. **How to reach it:** answer the row; to undo answers, use **Clear browsing data…**.
 
 A site that asks you to sign in with a browser box shows **Username**, **Password** and **Remember for this project**. A saved sign-in is stored encrypted with your system's keyring in the project's browser data.
 

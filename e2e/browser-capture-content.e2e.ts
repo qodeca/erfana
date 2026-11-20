@@ -333,7 +333,7 @@ test.describe('025-AC-034 the screenshot and the crop', () => {
 
   for (const scale of [1, 2]) {
     test.describe(`at device scale ${scale}`, () => {
-      test.use({ extraLaunchArgs: [...BROWSER_CHROMIUM_ARGS, ...(scale === 2 ? ['--force-device-scale-factor=2'] : [])] })
+      test.use({ extraLaunchArgs: [...BROWSER_CHROMIUM_ARGS, `--force-device-scale-factor=${scale}`] })
 
       test('one PNG of the viewport × the pixel ratio, a 2-device-pixel accent outline just outside the element, and a crop of its box plus 24 px', async ({
         appWithTestProject,
