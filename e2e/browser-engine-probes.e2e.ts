@@ -365,6 +365,8 @@ test.describe('spec 025 engine probes: input and frames', () => {
 })
 
 test.describe('spec 025 engine probes: the CDP session', () => {
+  // Scale 1 on every host: the probes' pixel regions are CSS pixels, and a Retina Mac would capture at 2.
+  test.use({ extraLaunchArgs: [...BROWSER_CHROMIUM_ARGS, '--force-device-scale-factor=1'] })
   test('ADR 0007 decision 11: opening and closing DevTools does not detach the CDP session, and its commands keep working', async ({
     appWithTestProject,
     windowWithTestProject: _window,
